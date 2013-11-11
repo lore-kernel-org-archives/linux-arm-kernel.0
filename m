@@ -1,31 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Nov 2013 10:31:49 +0000
-Subject: [GIT PULL] prefetch support for 3.13
-In-Reply-To: <20131111090810.GI14892@pengutronix.de>
-References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
- <20131111090810.GI14892@pengutronix.de>
-Message-ID: <20131111103149.GY16735@n2100.arm.linux.org.uk>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 11 Nov 2013 18:41:56 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+ <87zjpf4w0j.fsf@rustcorp.com.au>
+ <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+ <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+ <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
+Message-ID: <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 10:08:10AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Will,
-> 
-> it seems the last patch breaks on efm32:
-> 
-> arch/arm/lib/changebit.S: Assembler messages:
-> arch/arm/lib/changebit.S:15: Error: architectural extension `mp' is not allowed for the current base architecture
+Hi,
 
-EFM32 support is not available on either Will's nor my tree, therefore
-this is new breakage which we're going to have to fix during the -rc
-series.
+On Mon, Nov 11, 2013 at 5:57 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+> Hi,
+>
+> On Mon, Nov 11, 2013 at 4:37 PM, Axel Lin <axel.lin@ingics.com> wrote:
+>> 2013/11/11 Ming Lei <tom.leiming@gmail.com>:
+>>
+>> Hi Ming,
+>>
+>> commit f6537f2f "scripts/kallsyms: filter symbols not in kernel address space",
+>> uses CONFIG_PAGE_OFFSET as kernel_start_addr.
+>> However, for !CONFIG_MMU case we have :
+>>     PAGE_OFFSET != CONFIG_PAGE_OFFSET.
+>
+> Yes, it is the cause, and strictly speaking, commit f6537f2f is wrong,
+> but triggered with bogus CONFIG_PAGE_OFFSET if !CONFIG_MMU.
+>
+> We can fix it either by Rusty's patch or removing the bogus
+> CONFIG_PAGE_OFFSET for !CONFIG_MMU.
 
-My view is that we've tried to do too much this merge window: we've
-had rather a large number of conflicts of all kinds not only between
-patch series (such as the BE series and others) as well as a large
-number of build problems caused by changes via my tree interfering
-with changes from the arm-soc tree.
+Rusty, maybe we need revert commit f6537f2f "scripts/kallsyms: filter
+symbols not in kernel address space", since CONFIG_PAGE_OFFSET
+may be bogus on !MMU or not defined on ARCHs(most of 64bit arch,
+no regression report because scripts/kallsyms may get zero
+kernel_start_addr)
 
-In other words, I think that both arm-soc and myself need to push back
-and slow things down a bit, and merge less during each cycle, especially
-if it is submitted later than about -rc3.
+As I thought of, another way for fixing original problem is to define a RO
+global variable in kernel and set its value as PAGE_OFFSET, then let
+scripts/kallsyms use it as kernel start address, or do you other
+suggestions?
+
+
+Thanks,
+-- 
+Ming Lei
