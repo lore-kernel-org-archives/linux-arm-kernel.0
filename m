@@ -1,42 +1,58 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 11 Nov 2013 21:36:15 +0530
-Subject: [PATCH V2 1/2] ARM: dts: doc: Document missing binding for omap5-mpu
-Message-ID: <1384185976-17822-1-git-send-email-r.sricharan@ti.com>
+Date: Mon, 11 Nov 2013 21:36:16 +0530
+Subject: [PATCH V2 2/2] ARM: dts: doc: Document missing binding for ti-sdma
+ controller
+In-Reply-To: <1384185976-17822-1-git-send-email-r.sricharan@ti.com>
+References: <1384185976-17822-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1384185976-17822-2-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding and support for omap5-mpu which has a cortex-a15
-smp core, gic and integrated L2 cache has been existing for sometime.
-So Documenting the missing binding here.
+The binding and support for system DMA module present in OMAP2+ Socs
+and DRA7 with dma-engine is already present. So adding the missing
+documentation for the same.
 
-Cc: Benoit Cousson <bcousson@baylibre.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- Documentation/devicetree/bindings/arm/omap/mpu.txt |    8 ++++++++
- 1 file changed, 8 insertions(+)
+[V2] Fixed comments from Rob Herring <robherring2@gmail.com>
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/mpu.txt b/Documentation/devicetree/bindings/arm/omap/mpu.txt
-index 1a5a42c..83f405b 100644
---- a/Documentation/devicetree/bindings/arm/omap/mpu.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/mpu.txt
-@@ -7,10 +7,18 @@ The MPU contain CPUs, GIC, L2 cache and a local PRCM.
- Required properties:
- - compatible : Should be "ti,omap3-mpu" for OMAP3
-                Should be "ti,omap4-mpu" for OMAP4
-+	       Should be "ti,omap5-mpu" for OMAP5
- - ti,hwmods: "mpu"
- 
- Examples:
- 
-+- For an OMAP5 SMP system:
+ Documentation/devicetree/bindings/dma/ti-sdma.txt |   28 +++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/ti-sdma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/ti-sdma.txt b/Documentation/devicetree/bindings/dma/ti-sdma.txt
+new file mode 100644
+index 0000000..2e0a6d8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/ti-sdma.txt
+@@ -0,0 +1,28 @@
++TI SDMA
 +
-+mpu {
-+    compatible = "ti,omap5-mpu";
-+    ti,hwmods = "mpu"
++Required Properties:
++- compatible :	Should be "ti,omap2420-sdma", "ti,omap2430-sdma" for OMAP2
++		Should be "ti,omap3430-sdma", "ti,omap3630-sdma" for OMAP3
++		Should be "ti,omap4430-sdma" for OMAP4, OMAP5 and DRA7
++- reg: Memory map for accessing module
++- interrupts: Interrupt request number from the DMA controller to
++	      interrupt controller
++- #dma-cells: Should be set to <1>
++- #dma-channels: Total number of logical DMA channels supported by the
++		controller
++- #dma-requests: Total number of DMA request signals supported by the
++		controller
++
++Example:
++
++sdma: dma-controller at 48056000 {
++	compatible = "ti,omap4430-sdma";
++	reg = <0x48056000 0x1000>;
++	interrupts = <12>,
++		     <13>,
++		     <14>,
++		     <15>;
++	#dma-cells = <1>;
++	#dma-channels = <32>;
++	#dma-requests = <64>;
 +};
-+
- - For an OMAP4 SMP system:
- 
- mpu {
 -- 
 1.7.9.5
