@@ -1,108 +1,78 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 11 Nov 2013 16:13:43 +0200
-Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
-In-Reply-To: <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
- <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
-Message-ID: <5280E617.3000004@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 11 Nov 2013 15:14:31 +0100
+Subject: [PATCH 1/1] ARM: EXYNOS: Add default latency values for Device
+ and Power Domain
+In-Reply-To: <CAPmaG0t++EtdGmVg_JOZt-MU1Su=BDAe7L-tv-un3qkQRkebfg@mail.gmail.com>
+References: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
+ <CAK9yfHz-iUfOXEHwJ_QaF=YXudqiUMY0MMpNY4mh-f+ABAx-Xg@mail.gmail.com>
+ <CAPmaG0t++EtdGmVg_JOZt-MU1Su=BDAe7L-tv-un3qkQRkebfg@mail.gmail.com>
+Message-ID: <1904642.oaMlk6atuQ@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-11 15:57, Dr. H. Nikolaus Schaller wrote:
-> Hi Tomi,
-> 
-> Am 11.11.2013 um 14:29 schrieb Tomi Valkeinen:
-> 
->> Hi,
->>
->> On 2013-11-05 09:24, Belisko Marek wrote:
->>> Hi,
->>>
->>> ping.
->>>
->>> On Mon, Oct 14, 2013 at 11:02 PM, Marek Belisko <marek@goldelico.com> wrote:
->>>> This patches is adding bypass and acbias functionality to omapdss venc driver.
->>>> In first patch we export updatin bypass and acbias in devconf1 register. Next patch
->>>> add handling for updating in venc driver and last patch add driver for opa362 which
->>>> is used on gta04 board and set bypass + acbias.
->>> Is there a chance to get this series to 3.13? Thanks.
->>
->> Sorry, I haven't had time to do much reviewing.
->>
->> The code in omap3-tvout.c should be included in the display.c file,
->> which already contains some things like muxing.
-> 
-> Ok, that might be better - but we were not sure where to place code to
-> modify the DEVCONF1 registers. It is not directly DSS related but a special
-> control of the OMAP3 SoC. Therefore we think it is better located in omap3-tvout.c
+Hi Prasanna,
 
-The display.c file is not strictly DSS stuff, but DSS related "glue" for
-the SoC. For example, the muxing of the DSI pads is also done on the
-CONTROL module, and it's also in display.c.
+On Monday 11 of November 2013 10:19:40 Prasanna Kumar wrote:
+> On Mon, Nov 11, 2013 at 8:52 AM, Sachin Kamat <sachin.kamat@linaro.org>
+> wrote:
+> >
+> > Hi Tomasz,
+> >
+> > Thanks for reviewing.
+> >
+> > On 10 November 2013 22:25, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > > Hi Sachin, Prasanna,
+> > >
+> > > [CCing Rafael and respective mailing lists]
+> > >
+> > > Please see my comments inline. Also please always remember to add all
+> > > appropriate recipients on CC list. More reviewers means higher chance of
+> > > spotting (and so eliminating) potential issues.
+> >
+> > Indeed. Thanks for adding. get_maintainers somehow did not list PM
+> > related folks.
+> > So missed this.
+> >
+> > >
+> > > On Friday 08 of November 2013 11:57:05 Sachin Kamat wrote:
+> > >> From: Prasanna Kumar <prasanna.ps@samsung.com>
+> > >>
+> > >> Power domain and device timing data are intialized with default
+> > >> values to avoid dump of warnings from various power domains
+> > >> during power gating.
+> > >>
+> > >> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> > >> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
+> > >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> > >> ---
+> > >>  arch/arm/mach-exynos/pm_domains.c |   15 ++++++++++++++-
+> > >>  1 file changed, 14 insertions(+), 1 deletion(-)
+> > >>
+> > >> diff --git a/arch/arm/mach-exynos/pm_domains.c
+> > >> b/arch/arm/mach-exynos/pm_domains.c
+> > >> index 84e0483a0500..9bbb4ac23980 100644
+> > >> --- a/arch/arm/mach-exynos/pm_domains.c
+> > >> +++ b/arch/arm/mach-exynos/pm_domains.c
+> > >> @@ -25,6 +25,10 @@
+> > >>  #include <mach/regs-pmu.h>
+> > >>  #include <plat/devs.h>
+> > >>
+> > >> +#define DEFAULT_DEV_LATENCY_NS                       1000000UL
+> > >> +#define DEFAULT_PD_PWRON_LATENCY_NS          10000000UL
+> > >> +#define DEFAULT_PD_PWROFF_LATENCY_NS         10000000UL
+> > >
+> > > Is there any rationale behind choosing these particular values?
+> >
+> > IMO, these values were obtained more from experimentation. Prasanna,
+> > please comment.
+> As Sachin mentioned, the values are obtained from experimentation to avoid
+> latency warning messages. These values can be changed when the
+> information becomes available from the specs.
+> As of now , this seems to be good set of values.
 
-The file is getting a bit large, so I'm not against splitting it. But I
-don't think there's point to add omap3-tvout.c file, which most likely
-will ever contain only that one function.
+Do you have any measurements that confirm that there is no regression
+in power consumption (e.g. caused by unnecessarily delayed runtime PM
+operations) after applying this patch?
 
->> Also, func(bool, bool)
->> style functions are rather confusing to read. Maybe an enum would be
->> better, so you'd instead have something like:
->>
->> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN)
-> 
-> We have no special preference on that.
-
-It's just about readability. Which one tells you better what the code does:
-
-func(true, true);
-
-or
-
-func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN);
-
->> But the main issue is: while this series probably works well, I really
->> don't like it that the OPA driver needs to pass bypass and acbias. It
->> shouldn't know anything about such things. I'm just not certain how to
->> implement that with the current omapdss driver.
-> 
-> Well, it must know bypass and acbias because it requires the OMAP
-> CPU to be configured accordingly. I.e. it is the one who pushes the
-> button. Or we get a problem that people might misconfigure it.
-
-While the omapdss display drivers are currently OMAP specific, I want to
-(or at least try to) keep them platform independent. Afaik, acbias and
-bypass are OMAP VENC specific things, not something that every SoC with
-an analog TV-out have. Thus, the OPA driver should not know about them,
-and it should be something that only the DSS glue code in mach-omap2/
-and the venc driver know about.
-
-> I would see it similar as a driver must be able to control power. Here
-> it must be able to control bypass and acbias in a special way that it works.
-
-The difference is that on all possible SoCs where you could add OPA
-chip, you'll need to manage the power for OPA, and it's done in a common
-way. Whereas the bypass and acbias are OMAP specific things.
-
->> I'll try to find time to think about this more, but I don't think I can
->> merge this for 3.13.
-> 
-> Please take your time.
-> 
-> And please also consider the approach to merge it into 3.13 as it is
-> and we can then fix it in the weeks while release candidates are pushed.
-
-If it was purely omapdss code, I could possibly take it. But it contains
-arch/arm code also, and I don't want to cause needless changes on code
-that I do not maintain.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/d173d7a8/attachment.sig>
+Best regards,
+Tomasz
