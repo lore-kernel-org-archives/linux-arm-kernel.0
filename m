@@ -1,66 +1,17 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Nov 2013 21:59:10 +0100
-Subject: [PATCH] clk: add flags to distinguish xtal clocks
-In-Reply-To: <1384199456.12583.27.camel@porter.coelho.fi>
-References: <1382528150.21526.25.camel@porter.coelho.fi>
- <1383933648-28595-1-git-send-email-balbi@ti.com>
- <20131110113716.GN26440@lukather>
- <20131111194247.GB19212@saruman.home>
- <1384199456.12583.27.camel@porter.coelho.fi>
-Message-ID: <20131111205910.GA26440@lukather>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Nov 2013 14:24:11 -0700
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <52814AFB.3070600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luca,
+On 11/11/2013 01:29 PM, Jason Cooper wrote:
+> Consumers of the Linux kernel's build products are beginning to hardcode
+> the filenames of the dtbs generated.  Since the dtb filenames are
+> currently the dts filename s/dts/dtb/, this prevents the kernel
+> community from renaming dts files as needed.
 
-On Mon, Nov 11, 2013 at 09:50:56PM +0200, Luca Coelho wrote:
-> On Mon, 2013-11-11 at 13:42 -0600, Felipe Balbi wrote:
-> > > > +	if (of_property_read_bool(node, "clock-xtal"))
-> > > > +		flags |= CLK_IS_TYPE_XTAL;
-> > > > +
-> > > 
-> > > Introducing a new compatible instead of a property would make more
-> > > sense here I think.
-> > > 
-> > > Do you have a reason not to do so?
-> > 
-> > As you can see, this is original work from Luca but I disagree that
-> > adding a new compatible makes more sense. This still related to a fixed
-> > rate clock, we're just giving it one extra metadata which willAnd t
-> > differentiate between crystal and oscilator fixed rate clocks.
-> 
-> I agree with Felipe.  This was discussed before [1].  While still at TI,
-> I tried to figure out the exact need for the firmware to know whether it
-> was an oscillator or not.  It was mostly because the stabilization time
-> and such things differ with oscillators, but I wasn't able to find out
-> how exactly this affected things.
-> 
-> In any case, as I concluded earlier (but it's not really my call), being
-> a crystal or an oscillator *is* a characteristic of the hardware,
-> regardless of whether that information is useful or not.  In the WiLink
-> case it is, at least it can differentiate the clocks that are used in
-> the HW modules it uses.
-> 
-> So IMHO it doesn't really hurt and it's not really against the DT
-> principles.
-
-Just to be clear, I'm not against your patch. If you need this to make
-your driver work, then it's fine for me. Mike will probably know
-better if we actually need some extra metadata.
-
-What I'm not really convinced about is *how* you carry that metadata
-in the DT, that's all, nothing more.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/7774823a/attachment.sig>
+My take is that the DTB filenames are part of the ABI, and therefore the
+DTS filenames are also part of the ABI. Why would we want to rename them?
