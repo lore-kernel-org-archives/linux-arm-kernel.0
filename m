@@ -1,64 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Nov 2013 19:55:45 +0100
-Subject: [PATCH v3 1/4] reset: Add Allwinner SoCs Reset Controller Driver
-In-Reply-To: <1384165135.5191.5.camel@pizza.hi.pengutronix.de>
-References: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
- <1382707365-4776-2-git-send-email-maxime.ripard@free-electrons.com>
- <1384165135.5191.5.camel@pizza.hi.pengutronix.de>
-Message-ID: <20131111185545.GW26440@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Nov 2013 20:06:44 +0100
+Subject: [PATCH v2 5/5] Documentation: Add documentation for APM X-Gene
+ SATA DTS binding
+In-Reply-To: <CAPw-ZT=pBmDERDkaX66qStqVB2bD95248GKQpVQZWjmryA4uxA@mail.gmail.com>
+References: <1383980431-6572-1-git-send-email-lho@apm.com>
+ <201311102139.10082.arnd@arndb.de>
+ <CAPw-ZT=pBmDERDkaX66qStqVB2bD95248GKQpVQZWjmryA4uxA@mail.gmail.com>
+Message-ID: <201311112006.44921.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On Mon, Nov 11, 2013 at 11:18:55AM +0100, Philipp Zabel wrote:
-> > +static int sunxi_reset_assert(struct reset_controller_dev *rcdev,
-> > +			      unsigned long id)
-> > +{
-> > +	struct sunxi_reset_data *data = container_of(rcdev,
-> > +						     struct sunxi_reset_data,
-> > +						     rcdev);
-> > +	int bank = id / BITS_PER_LONG;
-> > +	int offset = id % BITS_PER_LONG;
-> > +	u32 reg = readl(data->membase + (bank * 4));
-> > +
-> > +	writel(reg & ~BIT(offset), data->membase + (bank * 4));
+On Monday 11 November 2013, Loc Ho wrote:
+> Hi Arnd,
 > 
-> the reset core just passes through calls to reset_controller_assert
-> directly, ...
+> >> ---
+> >>  .../devicetree/bindings/ata/apm-xgene.txt          |   84 ++++++++++++++++++++
+> >
+> > Please Cc the devicetree-discuss mailing list for the binding submission.
+> [Loc Ho]
+> I did cc on the first version. But this email
+> 'devicetree-discuss at lists.ozlabs.org' bounced on me.
+
+It has recently moved to devicetree at vger.kernel.org
+
+> >> +- clocks             : Reference to the clock entry
+> >> +- clock-names                : Shall be "eth01clk", "eth23clk", or "eth45clk".
+> >
+> > This makes no sense. The clock-names property needs to have a fixed
+> > string according to the name of the clock input signal of the hardware,
+> > not a name of the clock provider.
+> [Loc Ho]
+> The clock "eth01clk", "eth23clk", and "eth45clk" are the internal
+> divider clock. They are not the physical input clock. It sounds like
+> we don't need the "clock-names" are all.
+
+Ok.
+
 > 
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int sunxi_reset_deassert(struct reset_controller_dev *rcdev,
-> > +				unsigned long id)
-> > +{
-> > +	struct sunxi_reset_data *data = container_of(rcdev,
-> > +						     struct sunxi_reset_data,
-> > +						     rcdev);
-> > +	int bank = id / BITS_PER_LONG;
-> > +	int offset = id % BITS_PER_LONG;
-> > +	u32 reg = readl(data->membase + (bank * 4));
-> > +
-> > +	writel(reg | BIT(offset), data->membase + (bank * 4));
-> 
-> ... so those read-modify-write cycles in sunxi_reset_assert and here
-> should be protected with a lock.
+> >
+> >> +- serdes-diff-clk    : Shall be 0 for external, 1 internal differential,
+> >> +                       or 2 internal single ended clock. Default is 0.
+> >> +- gen-sel            : Shall be 1 (force Gen1), 2 (Force Gen2, or 3 Gen3).
+> >> +                       Default is 3.
+> >> +- EQA1                       : Serdes EQ parameter for A1 chip. Default is 9.
+> >> +- EQ                 : Serdes EQ parameter for non-A1 chip. Default is 2.
+> >> +- GENAVG             : Enable averaging Serdes calculation. Default is 0 for
+> >> +                       A1 chip and 1 for non-A1 chip.
+> >> +- LBA1                       : Serdes loopback buffer for A1 chip. Default is 1;
+> >> +- LB                 : Serdes loopback buffer for non-A1 chip. Default is 0;
+> >> +- LCA1                       : Serdes loopback enable control for A1 chip. Default
+> >> +                       is 1;
+> >> +- LC                 : Serdes loopback enable control for non-A1 chip.
+> >> +                       Default is 0;
+> >> +- CDRA1                      : Serdes SPD select CDR for A1 chip. Default is 5.
+> >> +- CDR                        : Serdes SPD select CDR for non-A1 chip. Default is 5.
+> >> +- PQA1                       : Serdes PQ for A1 chip. Default is 8.
+> >> +- PQ                 : Serdes PQ for non-A1 chip. Default is 0xA.
+> >> +- coherent           : Enable coherent (1 = enable, 0 = disable).
+> >> +                       Default is 1.
+> >
+> > This looks like a really bad binding. I would suggest that instead of having
+> > individual register values in here, you hardwire the settings in the driver
+> > based on the compatible string. It's pretty crazy to put register-level configuration
+> > in the DT like this.
+> [Loc Ho]
+> If I hardwire them in the driver, it will NOT scale across multiple
+> board. I guess if I moved it out to the PHY driver, then we can
+> discuss in that driver.
 
-Right, I'll fix this in the v3.
+Yes, makes sense. If you need the values to change per board, it's probably best to
+come up with a somewhat higher-level representation of the same contents. Ideally
+we should be able to use the same properties for any SerDes PHY, regarless of
+how the register level interface is implemented.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/971e9f19/attachment.sig>
+	Arnd
