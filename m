@@ -1,41 +1,31 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 11 Nov 2013 15:34:02 +0200
-Subject: [PATCH 11/12] fbdev: shmobile-hdmi: Convert to
- clk_prepare/unprepare
-In-Reply-To: <1388008.xjh7MrPrF3@avalon>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131031104809.GB18477@ns203013.ovh.net> <1388008.xjh7MrPrF3@avalon>
-Message-ID: <5280DCCA.7060106@ti.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Mon, 11 Nov 2013 13:40:30 +0000
+Subject: [PATCH v4] ARM: vexpress/TC2: Implement MCPM power_down_finish()
+In-Reply-To: <1384160080.4495.2.camel@hornet>
+References: <20131108185613.GF2602@localhost.localdomain>
+ <1384160080.4495.2.camel@hornet>
+Message-ID: <20131111134030.GA2391@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-09 16:13, Laurent Pinchart wrote:
-> Hi Jean-Christophe,
+On Mon, Nov 11, 2013 at 08:54:40AM +0000, Pawel Moll wrote:
+> On Fri, 2013-11-08 at 18:56 +0000, Dave Martin wrote:
+> > Hi Pawel, did you manage to take a look at this?
+> > 
+> > I want to have something in place here, otherwise there's a nice WARN_ON
+> > to look forward to in 3.13 :)
+> > 
+> > I don't think I've seen a response from you so far?
 > 
-> On Thursday 31 October 2013 11:48:09 Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 23:49 Mon 28 Oct     , Laurent Pinchart wrote:
->>> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
->>> clk_disable_unprepare() to get ready for the migration to the common
->>> clock framework.
->>>
->>> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->>> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
->>
->> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> On Fri, 2013-11-01 at 12:21 +0000, Pawel Moll wrote:
+> > PS. I actually had a look at the patches after you reminded me last week
+> > (two weeks ago? ;-)
 > 
-> Thank you. Could you please pick patches 11/12 and 12/12 up for v3.13 or v3.14 
-> ?
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Thanks, picked both for 3.13.
+Thanks
 
- Tomi
+What's the best way to send this upstream?
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/4b2bc4fc/attachment.sig>
+Cheers
+---Dave
