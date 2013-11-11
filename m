@@ -1,83 +1,71 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 11 Nov 2013 14:48:40 +0100
-Subject: [PATCH 0/6] PCI: imx6: Random fixes
-In-Reply-To: <201311111432.59318.jbe@pengutronix.de>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
- <201311111432.59318.jbe@pengutronix.de>
-Message-ID: <201311111448.40922.marex@denx.de>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Mon, 11 Nov 2013 14:57:30 +0100
+Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
+In-Reply-To: <5280DBA6.50303@ti.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
+ <5280DBA6.50303@ti.com>
+Message-ID: <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear J?rgen Beisert,
+Hi Tomi,
+
+Am 11.11.2013 um 14:29 schrieb Tomi Valkeinen:
 
 > Hi,
 > 
-> I'm also trying to get the PCIe to work on an i.MX6. But the attached
-> device cannot be enabled. The external device is an FPGA directly
-> connected to the i.MX6. I'm using the changes from linux-next to get the
-> machine working up to this point. But it seems I still miss something.
+> On 2013-11-05 09:24, Belisko Marek wrote:
+>> Hi,
+>> 
+>> ping.
+>> 
+>> On Mon, Oct 14, 2013 at 11:02 PM, Marek Belisko <marek@goldelico.com> wrote:
+>>> This patches is adding bypass and acbias functionality to omapdss venc driver.
+>>> In first patch we export updatin bypass and acbias in devconf1 register. Next patch
+>>> add handling for updating in venc driver and last patch add driver for opa362 which
+>>> is used on gta04 board and set bypass + acbias.
+>> Is there a chance to get this series to 3.13? Thanks.
 > 
-> What I see is:
+> Sorry, I haven't had time to do much reviewing.
 > 
-> [...]
-> PCI host bridge to bus 0000:00
-> pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
-> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
-> pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
-> pci_bus 0000:00: scanning bus
-> pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
-> pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
-> pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
-> pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x5c
-> pci 0000:00:00.0: supports D1
-> pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
-> pci 0000:00:00.0: PME# disabled
-> pci_bus 0000:00: fixups for bus
-> PCI: bus0: Fast back to back transfers disabled
-> pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
-> pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
-> pci_bus 0000:01: scanning bus
-> pci 0000:01:00.0: [1172:0004] type 00 class 0x000000
-> pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x0000ffff]
-> pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x5c
-> pci_bus 0000:01: fixups for bus
-> PCI: bus1: Fast back to back transfers disabled
-> pci_bus 0000:01: bus scan returning with max=01
-> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-> pci_bus 0000:00: bus scan returning with max=01
-> pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
-> pci 0000:00:00.0: fixup irq: got 155
-> pci 0000:00:00.0: assigning IRQ 155
-> pci 0000:01:00.0: fixup irq: got 155
-> pci 0000:01:00.0: assigning IRQ 155
-> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
-> pci 0000:00:00.0: BAR 0: set to [mem 0x01000000-0x010fffff] (PCI address
-> [0x1000000-0x10fffff]) pci 0000:00:00.0: BAR 8: assigned [mem
-> 0x01100000-0x011fffff]
-> pci 0000:00:00.0: BAR 6: assigned [mem 0x01200000-0x0120ffff pref]
-> pci 0000:00:00.0: PCI bridge to [bus 01]
-> pci 0000:00:00.0:   bridge window [mem 0x01100000-0x011fffff]
-> pci_bus 0000:00: max bus depth: 1 pci_try_num: 2
-> pci 0000:00:00.0: PCI bridge to [bus 01]
-> pci 0000:00:00.0:   bridge window [mem 0x01100000-0x011fffff]
-> pci_bus 0000:00: resource 4 [io  0x1000-0x10000]
-> pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
-> pci_bus 0000:01: resource 1 [mem 0x01100000-0x011fffff]
-> [...]
-> pcieport 0000:00:00.0: Resource 0: from 1000000 to 10FFFFF <- my message
-> from pcibios_enable_device()/arch/arm/kernel/bios32.c [...]
-> FPGA 0000:01:00.0: Dummy FPGA driver starts probing
-> FPGA 0000:01:00.0: Resource 0: from 0 to FFFF <- my message from
-> pcibios_enable_device()/arch/arm/kernel/bios32.c PCI: Device 0000:01:00.0
-> not available because of resource collisions FPGA 000:01:00.0: Cannot
-> enable PCIe device, aborting
-> FPGA: probe of 0000:01:00.0 failed with error -5
-> 
-> pcibios_enable_device() fails due to the start address of this device is
-> still 0.
+> The code in omap3-tvout.c should be included in the display.c file,
+> which already contains some things like muxing.
 
-Looks like your device isn't assigned it's memory windows for some reason. There 
-is a discussion going on about DWC PCIe and how the iATU configuration is wrong 
-and how to fix it in the PCI ML. I'd check that.
+Ok, that might be better - but we were not sure where to place code to
+modify the DEVCONF1 registers. It is not directly DSS related but a special
+control of the OMAP3 SoC. Therefore we think it is better located in omap3-tvout.c
 
-btw. do you need to switch the bus to Gen1 to get it to probe your device?
+> Also, func(bool, bool)
+> style functions are rather confusing to read. Maybe an enum would be
+> better, so you'd instead have something like:
+> 
+> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN)
+
+We have no special preference on that.
+
+> 
+> But the main issue is: while this series probably works well, I really
+> don't like it that the OPA driver needs to pass bypass and acbias. It
+> shouldn't know anything about such things. I'm just not certain how to
+> implement that with the current omapdss driver.
+
+Well, it must know bypass and acbias because it requires the OMAP
+CPU to be configured accordingly. I.e. it is the one who pushes the
+button. Or we get a problem that people might misconfigure it.
+
+I would see it similar as a driver must be able to control power. Here
+it must be able to control bypass and acbias in a special way that it works.
+
+> I'll try to find time to think about this more, but I don't think I can
+> merge this for 3.13.
+
+Please take your time.
+
+And please also consider the approach to merge it into 3.13 as it is
+and we can then fix it in the weeks while release candidates are pushed.
+
+But that is your decision.
+
+BR and thanks,
+Nikolaus
