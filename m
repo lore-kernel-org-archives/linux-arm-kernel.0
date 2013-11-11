@@ -1,61 +1,108 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Mon, 11 Nov 2013 23:11:41 +0900
-Subject: [PATCH 1/1] ARM: EXYNOS: Add default latency values for Device
- and Power Domain
-In-Reply-To: <9546263.JaCWNRjo5C@flatron>
-References: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
- <9546263.JaCWNRjo5C@flatron>
-Message-ID: <CAKew6eUrtw7bTqo8tWD4JCwvCM0jRowSj=v4=dnqc5krPLpRWg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 11 Nov 2013 16:13:43 +0200
+Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
+In-Reply-To: <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
+ <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
+Message-ID: <5280E617.3000004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +};
->> +
->>  static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->>  {
->>       struct exynos_pm_domain *pd;
->> @@ -83,7 +94,7 @@ static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
->>       dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+On 2013-11-11 15:57, Dr. H. Nikolaus Schaller wrote:
+> Hi Tomi,
+> 
+> Am 11.11.2013 um 14:29 schrieb Tomi Valkeinen:
+> 
+>> Hi,
 >>
->>       while (1) {
->> -             ret = pm_genpd_add_device(&pd->pd, dev);
->> +             ret = __pm_genpd_add_device(&pd->pd, dev, &dev_latencies);
->
-> The double underscore prefix scares me a bit. Is this function really
-> supposed to be used like this?
->
+>> On 2013-11-05 09:24, Belisko Marek wrote:
+>>> Hi,
+>>>
+>>> ping.
+>>>
+>>> On Mon, Oct 14, 2013 at 11:02 PM, Marek Belisko <marek@goldelico.com> wrote:
+>>>> This patches is adding bypass and acbias functionality to omapdss venc driver.
+>>>> In first patch we export updatin bypass and acbias in devconf1 register. Next patch
+>>>> add handling for updating in venc driver and last patch add driver for opa362 which
+>>>> is used on gta04 board and set bypass + acbias.
+>>> Is there a chance to get this series to 3.13? Thanks.
+>>
+>> Sorry, I haven't had time to do much reviewing.
+>>
+>> The code in omap3-tvout.c should be included in the display.c file,
+>> which already contains some things like muxing.
+> 
+> Ok, that might be better - but we were not sure where to place code to
+> modify the DEVCONF1 registers. It is not directly DSS related but a special
+> control of the OMAP3 SoC. Therefore we think it is better located in omap3-tvout.c
 
-Moreover, it also seems little bit odd in the first place, to pass
-dev_latencies(QoS timing parameters) when we are not using/providing
-any governor for the genpd. QoS timing parameters have to be provided
-to be used by governor. In our case since we are not using/providing
-any governor yet, so it seems odd to provide QoS timing parameters. It
-seems, here core pd code is giving unnecessary warning in our case,
-since we are not providing governor(not interested in QoS). So IMO
-warning should be fixed instead of just suppressing it by giving some
-big values of timing parameters.
+The display.c file is not strictly DSS stuff, but DSS related "glue" for
+the SoC. For example, the muxing of the DSI pads is also done on the
+CONTROL module, and it's also in display.c.
+
+The file is getting a bit large, so I'm not against splitting it. But I
+don't think there's point to add omap3-tvout.c file, which most likely
+will ever contain only that one function.
+
+>> Also, func(bool, bool)
+>> style functions are rather confusing to read. Maybe an enum would be
+>> better, so you'd instead have something like:
+>>
+>> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN)
+> 
+> We have no special preference on that.
+
+It's just about readability. Which one tells you better what the code does:
+
+func(true, true);
+
+or
+
+func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN);
+
+>> But the main issue is: while this series probably works well, I really
+>> don't like it that the OPA driver needs to pass bypass and acbias. It
+>> shouldn't know anything about such things. I'm just not certain how to
+>> implement that with the current omapdss driver.
+> 
+> Well, it must know bypass and acbias because it requires the OMAP
+> CPU to be configured accordingly. I.e. it is the one who pushes the
+> button. Or we get a problem that people might misconfigure it.
+
+While the omapdss display drivers are currently OMAP specific, I want to
+(or at least try to) keep them platform independent. Afaik, acbias and
+bypass are OMAP VENC specific things, not something that every SoC with
+an analog TV-out have. Thus, the OPA driver should not know about them,
+and it should be something that only the DSS glue code in mach-omap2/
+and the venc driver know about.
+
+> I would see it similar as a driver must be able to control power. Here
+> it must be able to control bypass and acbias in a special way that it works.
+
+The difference is that on all possible SoCs where you could add OPA
+chip, you'll need to manage the power for OPA, and it's done in a common
+way. Whereas the bypass and acbias are OMAP specific things.
+
+>> I'll try to find time to think about this more, but I don't think I can
+>> merge this for 3.13.
+> 
+> Please take your time.
+> 
+> And please also consider the approach to merge it into 3.13 as it is
+> and we can then fix it in the weeks while release candidates are pushed.
+
+If it was purely omapdss code, I could possibly take it. But it contains
+arch/arm code also, and I don't want to cause needless changes on code
+that I do not maintain.
+
+ Tomi
 
 
-Regards,
-Yadwinder
-
->>               if (ret != -EAGAIN)
->>                       break;
->>               cond_resched();
->> @@ -173,6 +184,8 @@ static __init int exynos4_pm_init_power_domain(void)
->>               pd->base = of_iomap(np, 0);
->>               pd->pd.power_off = exynos_pd_power_off;
->>               pd->pd.power_on = exynos_pd_power_on;
->> +             pd->pd.power_off_latency_ns = DEFAULT_PD_PWROFF_LATENCY_NS;
->> +             pd->pd.power_on_latency_ns = DEFAULT_PD_PWRON_LATENCY_NS;
->
-> It might be worth to set up the latencies indeed, but wrong values can do
-> more harm than good.
->
-> Best regards,
-> Tomasz
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/d173d7a8/attachment.sig>
