@@ -1,91 +1,42 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 11 Nov 2013 17:03:36 +0100
-Subject: [RFC] ASoC: fsl-ssi: Missing DMA-Request workaround
-Message-ID: <1384185816-7730-1-git-send-email-mpa@pengutronix.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 11 Nov 2013 21:36:15 +0530
+Subject: [PATCH V2 1/2] ARM: dts: doc: Document missing binding for omap5-mpu
+Message-ID: <1384185976-17822-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a hardware issue when using capture and playback at the same
-time. In the tested scenario, the capture stream was started slightly
-before the playback stream. The first time the application starts after
-a powerup, there is a high probability that the SSI unit does not send a
-request to the SDMA unit. The playback does not work. I tested this on
-i.MX53 with SSI unit 2 kernel 3.10.10.
+The binding and support for omap5-mpu which has a cortex-a15
+smp core, gic and integrated L2 cache has been existing for sometime.
+So Documenting the missing binding here.
 
-Here is a register dump of the situation:
-SDMA
-0x63fb0000
-00000000: c0040000 00000000 0000001e 00000000
-00000010: 00000001 ffffffff 00000000 e03efa41
-00000020: 00000000 00000000 00000000 00000000
-00000030: 00000064 00000000 00000003 00000000
-00000040: 00000000 00000000 00000000 00006000
-00000050: 00000000 00000000 00000001 00004050
-00000060: 01208000 00000000 00000000 00000000 /* 0x60: EVT_MIRROR showing all received DMA requests */
-           ^ This should be a 3 instead. Bits 24 and 25 are the DMA requests for
-             RX and TX. Bit 25 is not set, DMA request 25 is missing.
-
-SSI
-0x50014000
-00000000: 00000000 00000000 0000005f 00000000
-00000010: 00000457 000050c1 01f80f00 0000028d /* 0x14: ISR Interrupt status register */
-                          ^
-	     At 0x14 we can clearly see the last bit is set (0x1) which
-	     is TFE0, Transmit FIFO 0 empty. So it should automatically
-	     request data from the DMA engine, but it doesn't.
-
-00000020: 0000028d 0004e000 00040000 000010dd
-00000030: 00001f1f 00000000 00000000 00000000
-00000040: 00000000 00000000 00000000 00000000
-00000050: 00000000 00000000 ........
-STATS (/sys/bus/platform/devices/50014000.ssi/statistics)
-rfrc=0
-tfrc=0
-roe1=0
-roe0=0
-tue1=0
-tue0=1094475
-
-I could solve this issue by filling the transmit FIFO with data. After
-that, the SDMA unit receives DMA request 25 again and audio playback
-works.
-
-This patch adds TUE0 interrupt handler which fills FIFO0 with arbitrary data.
-
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Cc: Benoit Cousson <bcousson@baylibre.com>
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
+ Documentation/devicetree/bindings/arm/omap/mpu.txt |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Hi,
-
-does anyone have an idea why the SSI unit does not request DMA by its own at
-the beginning? Or is it a hardware errata that is not listed yet?
-
-Regards,
-
-Markus Pargmann
-
-
- sound/soc/fsl/fsl_ssi.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 6b81d0c..8faf2b5 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -269,9 +269,14 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 	}
+diff --git a/Documentation/devicetree/bindings/arm/omap/mpu.txt b/Documentation/devicetree/bindings/arm/omap/mpu.txt
+index 1a5a42c..83f405b 100644
+--- a/Documentation/devicetree/bindings/arm/omap/mpu.txt
++++ b/Documentation/devicetree/bindings/arm/omap/mpu.txt
+@@ -7,10 +7,18 @@ The MPU contain CPUs, GIC, L2 cache and a local PRCM.
+ Required properties:
+ - compatible : Should be "ti,omap3-mpu" for OMAP3
+                Should be "ti,omap4-mpu" for OMAP4
++	       Should be "ti,omap5-mpu" for OMAP5
+ - ti,hwmods: "mpu"
  
- 	if (sisr & CCSR_SSI_SISR_TUE0) {
-+		int i;
-+
- 		ssi_private->stats.tue0++;
- 		sisr2 |= CCSR_SSI_SISR_TUE0;
- 		ret = IRQ_HANDLED;
-+
-+		for (i = 0; i != ssi_private->fifo_depth; ++i)
-+			write_ssi(0x0, &ssi->stx0);
- 	}
+ Examples:
  
- 	if (sisr & CCSR_SSI_SISR_TFS) {
++- For an OMAP5 SMP system:
++
++mpu {
++    compatible = "ti,omap5-mpu";
++    ti,hwmods = "mpu"
++};
++
+ - For an OMAP4 SMP system:
+ 
+ mpu {
 -- 
-1.8.4.2
+1.7.9.5
