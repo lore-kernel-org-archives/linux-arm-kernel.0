@@ -1,12 +1,16 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Nov 2013 15:42:40 +0800
+Date: Mon, 11 Nov 2013 15:47:11 +0800
 Subject: [PATCH 1/2] ARM: i.MX28: define ref_xtal frequency in DT
 In-Reply-To: <1383918521-4668-2-git-send-email-mkl@pengutronix.de>
 References: <1383918521-4668-1-git-send-email-mkl@pengutronix.de>
  <1383918521-4668-2-git-send-email-mkl@pengutronix.de>
-Message-ID: <20131111074238.GD10085@S2101-09.ap.freescale.net>
+Message-ID: <20131111074709.GE10085@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Device tree list is now devicetree at vger.kernel.org
+
+Shawn
 
 On Fri, Nov 08, 2013 at 02:48:40PM +0100, Marc Kleine-Budde wrote:
 > From: Juergen Beisert <jbe@pengutronix.de>
@@ -34,17 +38,7 @@ On Fri, Nov 08, 2013 at 02:48:40PM +0100, Marc Kleine-Budde wrote:
 > +		#size-cells = <0>;
 > +
 > +		xtal-24m {
-
-To follow the common pattern, we may want to name the node in a generic
-way, i.e. 'clock at 0'.
-
 > +			compatible = "fsl,mxs-xtal-24m", "fixed-clock";
-
-DT maintainers start checking undocumented compatible strings.  We may
-need to find a place to document it, even though it's quite trivial.
-
-Shawn
-
 > +			clock-frequency = <24000000>;
 > +		};
 > +	};
