@@ -1,26 +1,40 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 11 Nov 2013 08:54:40 +0000
-Subject: [PATCH v4] ARM: vexpress/TC2: Implement MCPM power_down_finish()
-In-Reply-To: <20131108185613.GF2602@localhost.localdomain>
-References: <20131108185613.GF2602@localhost.localdomain>
-Message-ID: <1384160080.4495.2.camel@hornet>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Mon, 11 Nov 2013 14:25:54 +0530
+Subject: [PATCH RFC 4/6] arm64: Add kernel return probes
+ support(kretprobes)
+In-Reply-To: <52808CFC.6060701@linaro.org>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131108170448.GF15074@mudshark.cambridge.arm.com>
+ <CA+b37P2aeXs4Cy_HxF24HQAYAnYzZ19PgV6rqrQLY9SMpZHDJg@mail.gmail.com>
+ <52808CFC.6060701@linaro.org>
+Message-ID: <CA+b37P27CiozHnARndFGsESrxPDNvXwNKRX2wWzLVPCGtVfH0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-11-08 at 18:56 +0000, Dave Martin wrote:
-> Hi Pawel, did you manage to take a look at this?
-> 
-> I want to have something in place here, otherwise there's a nice WARN_ON
-> to look forward to in 3.13 :)
-> 
-> I don't think I've seen a response from you so far?
-
-On Fri, 2013-11-01 at 12:21 +0000, Pawel Moll wrote:
-> PS. I actually had a look at the patches after you reminded me last week
-> (two weeks ago? ;-)
-
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-
-Cheers!
-
-Pawel
+On 11 November 2013 13:23, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> On 11/11/2013 01:29 PM, Sandeepa Prabhu wrote:
+>>
+>> On 8 November 2013 22:34, Will Deacon <will.deacon@arm.com> wrote:
+>>>>
+>>>> +static inline long regs_return_value(struct pt_regs *regs)
+>>>> +{
+>>>> +     return regs->regs[0];
+>>>> +}
+>>>
+>>>
+>>> This is also being implemented by another patch series (I think the audit
+>>> stuff?).
+>>
+>> Not sure, I did not see this being implemented in audit(audit adds for
+>> 'syscallno',  not for return value in x0)
+>> I can rebase my code if this change is implemented and queued in other
+>> patchset.
+>
+>
+> Yes, my audit patch has it.
+> The definition is referred to in include/linux/audit.h (and ptrace.h),
+> too.
+Thanks, I will rebase kprobes code to use your API.
+>
+> -Takahiro AKASHI
