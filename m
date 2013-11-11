@@ -1,43 +1,92 @@
 From: ivan.khoronzhuk@ti.com (Khoronzhuk, Ivan)
-Date: Mon, 11 Nov 2013 17:12:24 +0000
-Subject: [PATCH 11/12] mtd: nand: davinci: don't request AEMIF address range
-In-Reply-To: <1384187188-5776-12-git-send-email-ivan.khoronzhuk@ti.com>
+Date: Mon, 11 Nov 2013 17:13:01 +0000
+Subject: [PATCH 12/12] arm: dts: keystone: add AEMIF/NAND device entry
+In-Reply-To: <1384187188-5776-13-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-12-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <4F5844B3A985794BA902E12C070812375F8D64@DNCE04.ent.ti.com>
+ <1384187188-5776-13-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <4F5844B3A985794BA902E12C070812375F8D71@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AEMIF driver registers are used to setup timings for each chip
-select. The same registers range is used to setup NAND settings.
-The AEMIF and NAND drivers not use the same registers in this range.
-
-In case with AEMIF driver, the memory address range is requested
-already by AEMIF, so we cannot request it twice, just ioremap.
+Add AEMIF/NAND device entry.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 ---
- drivers/mtd/nand/davinci_nand.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/keystone.dts |   63 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index 879e915..bb6b7e5 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -639,9 +639,11 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-        if (IS_ERR(vaddr))
-                return PTR_ERR(vaddr);
-
--       base = devm_ioremap_resource(&pdev->dev, res2);
--       if (IS_ERR(base))
--               return PTR_ERR(base);
-+       base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
-+       if (!base) {
-+               dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
-+               return -EADDRNOTAVAIL;
-+       }
-
-        info->dev               = &pdev->dev;
-        info->base              = base;
+diff --git a/arch/arm/boot/dts/keystone.dts b/arch/arm/boot/dts/keystone.dts
+index 100bdf5..998da98 100644
+--- a/arch/arm/boot/dts/keystone.dts
++++ b/arch/arm/boot/dts/keystone.dts
+@@ -179,5 +179,68 @@
+                        interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
+                        clocks = <&clkspi>;
+                };
++
++               aemif at 021000A00 {
++                       compatible = "ti,keystone-aemif";
++                       #address-cells = <2>;
++                       #size-cells = <1>;
++                       clocks = <&clkaemif>;
++                       clock-names = "aemif";
++                       clock-ranges;
++
++                       reg = <0x2100A00 0x00000100>;
++                       ranges = <0 0 0x30000000 0x10000000
++                                 1 0 0x21000A00 0x00000100>;
++
++                       nand:cs0 {
++                               compatible = "ti,davinci-cs";
++                               #address-cells = <2>;
++                               #size-cells = <1>;
++                               clock-ranges;
++                               ranges;
++
++                               /* all timings in nanoseconds */
++                               ti,davinci-cs-ta = <12>;
++                               ti,davinci-cs-rhold = <6>;
++                               ti,davinci-cs-rstrobe = <23>;
++                               ti,davinci-cs-rsetup = <9>;
++                               ti,davinci-cs-whold = <8>;
++                               ti,davinci-cs-wstrobe = <23>;
++                               ti,davinci-cs-wsetup = <8>;
++
++                               nand at 0,0 {
++                                       compatible = "ti,keystone-nand";
++                                       #address-cells = <1>;
++                                       #size-cells = <1>;
++                                       reg = <0 0 0x4000000
++                                              1 0 0x0000100>;
++
++                                       ti,davinci-chipselect = <0>;
++                                       ti,davinci-mask-ale = <0x2000>;
++                                       ti,davinci-mask-cle = <0x4000>;
++                                       ti,davinci-mask-chipsel = <0>;
++                                       nand-ecc-mode = "hw";
++                                       ti,davinci-ecc-bits = <4>;
++                                       nand-on-flash-bbt;
++
++                                       partition at 0 {
++                                               label = "u-boot";
++                                               reg = <0x0 0x100000>;
++                                               read-only;
++                                       };
++
++                                       partition at 100000 {
++                                               label = "params";
++                                               reg = <0x100000 0x80000>;
++                                               read-only;
++                                       };
++
++                                       partition at 180000 {
++                                               label = "ubifs";
++                                               reg = <0x180000 0x7E80000>;
++                                       };
++                               };
++                       };
++               };
+        };
+ };
 --
 1.7.9.5
