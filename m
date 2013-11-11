@@ -1,174 +1,58 @@
-From: t.dakhran@samsung.com (Tarek Dakhran)
-Date: Mon, 11 Nov 2013 12:03:07 +0400
-Subject: [PATCH v3 4/4] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <19495187.Nrl1zS8Kog@flatron>
-References: <1383811969-32712-1-git-send-email-v.tyrtov@samsung.com>
- <1383811969-32712-5-git-send-email-v.tyrtov@samsung.com>
- <19495187.Nrl1zS8Kog@flatron>
-Message-ID: <52808F3B.2000804@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 Nov 2013 16:11:50 +0800
+Subject: [PATCH 1/5] ARM: dts: i.MX51: Move usbphy0 node from AIPS1
+In-Reply-To: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
+References: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131111081148.GA11083@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 07, 2013 at 12:45:04PM +0400, Alexander Shiyan wrote:
+> usbphy0 is not a part of AIPS1, so move this node under usbotg.
+> Additionally this patch removes useless "status" property.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-On 10.11.2013 22:02, Tomasz Figa wrote:
-> Hi,
->
-> Please see my comments inline.
->
-> On Thursday 07 of November 2013 12:12:49 Vyacheslav Tyrtov wrote:
->> From: Tarek Dakhran <t.dakhran@samsung.com>
->>
->> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
->>
->> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
->> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
->> ---
->>   arch/arm/boot/dts/Makefile                |   1 +
->>   arch/arm/boot/dts/exynos5410-smdk5410.dts |  65 ++++++++++
->>   arch/arm/boot/dts/exynos5410.dtsi         | 209 ++++++++++++++++++++++++++++++
->>   3 files changed, 275 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
->>   create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
-> [snip]
->> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
->> new file mode 100644
->> index 0000000..06ae479
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
->> @@ -0,0 +1,65 @@
->> +/*
->> + * SAMSUNG SMDK5410 board device tree source
->> + *
->> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +/dts-v1/;
->> +#include "exynos5410.dtsi"
->> +/ {
->> +	model = "Samsung SMDK5410 board based on EXYNOS5410";
->> +	compatible = "samsung,smdk5410", "samsung,exynos5410";
->> +
->> +	memory {
->> +		reg = <0x40000000 0x80000000>;
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "console=ttySAC2,115200";
->> +	};
->> +
->> +	oscclk: oscclk {
-> coding style: According to ePAPR recommendation, node name should
-> represent hardware type, not particular instance of hardware.
->
-> So instead, the preferred way would be to specify the clock using
-> following layout:
->
-> 	clocks {
-> 		compatible = "simple-bus";
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
->
-> 		oscclk: clock at 0 {
-> 			compatible = "fixed-clock";
-> 			reg = <0>;
-> 			#clock-cells = <0>;
-> 			clock-frequency = <24000000>;
-> 			clock-output-names = "fin_pll";
-> 		};
-> 	};
->
->> +		compatible = "fixed-clock";
->> +		#clock-cells = <0>;
->> +		clock-frequency = <24000000>;
->> +		clock-output-names = "fin_pll";
->> +	};
-> [snip]
->> +
->> +};
->> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
->> new file mode 100644
->> index 0000000..9921b66
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5410.dtsi
->> @@ -0,0 +1,209 @@
->> +/*
->> + * SAMSUNG EXYNOS5410 SoC device tree source
->> + *
->> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
->> + * EXYNOS5410 based board files can include this file and provide
->> + * values for board specfic bindings.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <dt-bindings/clock/exynos5410.h>
->> +#include "exynos5.dtsi"
->> +/ {
-> [snip]
->> +	clock: clock-controller at 10010000 {
->> +		compatible = "samsung,exynos5410-clock";
->> +		reg = <0x10010000 0x30000>;
->> +		#clock-cells = <1>;
->> +	};
->> +
->> +	mct at 101C0000 {
-> A generic name would be: timer at 101C0000
->
->> +		compatible = "samsung,exynos4210-mct";
->> +		reg = <0x101C0000 0xB00>;
->> +		interrupt-controller;
->> +		#interrups-cells = <1>;
-> MCT is not an interrupt controller, so both interrupt-controller and
-> #interrupt-cells properties are incorrect. I guess that's due to the
-> broken example in the documentation, that I already posted patches to fix.
->
->> +		interrupt-parent = <&mct_map>;
->> +		interrupts = <0>, <1>, <2>, <3>,
->> +			<4>, <5>, <6>, <7>,
->> +			<8>, <9>, <10>, <11>;
->> +		clocks = <&oscclk>, <&clock CLK_MCT>;
->> +		clock-names = "fin_pll", "mct";
->> +
->> +		mct_map: mct-map {
-> Again, interrupt-map would be a better name for this node.
->
->> +			#interrupt-cells = <1>;
->> +			#address-cells = <0>;
->> +			#size-cells = <0>;
->> +			interrupt-map = <0 &combiner 23 3>,
->> +					<1 &combiner 23 4>,
->> +					<2 &combiner 25 2>,
->> +					<3 &combiner 25 3>,
->> +					<4 &gic 0 120 0>,
->> +					<5 &gic 0 121 0>,
->> +					<6 &gic 0 122 0>,
->> +					<7 &gic 0 123 0>,
->> +					<8 &gic 0 128 0>,
->> +					<9 &gic 0 129 0>,
->> +					<10 &gic 0 130 0>,
->> +					<11 &gic 0 131 0>;
->> +		};
->> +	};
-> Otherwise, the patch looks good.
->
-> Best regards,
-> Tomasz
->
->
-Thanks a lot, Tomasz.
-All will be corrected in v4.
+Applied all except #4.  I would add those pingroups only when there are
+in-tree users of it.
 
-Best regards,
-     Tarek Dakhran
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx51.dtsi | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index 463dfe8..1075a7d 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -189,13 +189,6 @@
+>  				};
+>  			};
+>  
+> -			usbphy0: usbphy at 0 {
+> -				compatible = "usb-nop-xceiv";
+> -				clocks = <&clks 75>;
+> -				clock-names = "main_clk";
+> -				status = "okay";
+> -			};
+> -
+>  			usbotg: usb at 73f80000 {
+>  				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
+>  				reg = <0x73f80000 0x0200>;
+> @@ -204,6 +197,12 @@
+>  				fsl,usbmisc = <&usbmisc 0>;
+>  				fsl,usbphy = <&usbphy0>;
+>  				status = "disabled";
+> +
+> +				usbphy0: usbphy at 0 {
+> +					compatible = "usb-nop-xceiv";
+> +					clocks = <&clks 75>;
+> +					clock-names = "main_clk";
+> +				};
+>  			};
+>  
+>  			usbh1: usb at 73f80200 {
+> -- 
+> 1.8.1.5
+> 
