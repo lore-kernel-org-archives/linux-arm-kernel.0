@@ -1,157 +1,110 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 11 Nov 2013 20:06:12 +0530
-Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY's
-In-Reply-To: <20131017163828.GH11611@gimli>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-2-git-send-email-kishon@ti.com>
- <20131017163828.GH11611@gimli>
-Message-ID: <5280EB5C.1040001@ti.com>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Mon, 11 Nov 2013 15:39:57 +0100
+Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
+In-Reply-To: <5280E617.3000004@ti.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
+ <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
+ <5280E617.3000004@ti.com>
+Message-ID: <37D5EFEB-D329-4652-A88D-8423276359B4@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
 
-On Thursday 17 October 2013 10:08 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Wed, Oct 16, 2013 at 01:24:11AM +0530, Kishon Vijay Abraham I wrote:
->> There can be systems which does not have a external usb_phy, so get
->> usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
->> if platform_data indicates the presence of PHY. Also remove checking if
->> return value is -ENXIO since it's now changed to always enable usb_phy layer.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> I'm fine with this patch, but one comment below:
-> 
->> @@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
->>  	if (node) {
->>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
->>  
->> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
->> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
->> +		count = of_count_phandle_with_args(node, "usb-phy", NULL);
->> +		switch (count) {
->> +		case 2:
->> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
->> +				"usb-phy", 1);
->> +			if (IS_ERR(dwc->usb3_phy)) {
->> +				dev_err(dev, "usb3 phy not found\n");
->> +				return PTR_ERR(dwc->usb3_phy);
->> +			}
->> +		case 1:
->> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
->> +				"usb-phy", 0);
->> +			if (IS_ERR(dwc->usb2_phy)) {
->> +				dev_err(dev, "usb2 phy not found\n");
->> +				return PTR_ERR(dwc->usb2_phy);
->> +			}
->> +			break;
->> +		default:
->> +			dev_err(dev, "usb phy nodes not configured\n");
->> +		}
->>  
->>  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
->>  		dwc->dr_mode = of_usb_get_dr_mode(node);
->>  	} else if (pdata) {
->>  		dwc->maximum_speed = pdata->maximum_speed;
->>  
->> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
->> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
->> +		if (pdata->usb2_phy) {
->> +			dwc->usb2_phy = devm_usb_get_phy(dev,
->> +				USB_PHY_TYPE_USB2);
->> +			if (IS_ERR(dwc->usb2_phy)) {
->> +				dev_err(dev, "usb2 phy not found\n");
->> +				return PTR_ERR(dwc->usb2_phy);
->> +			}
->> +		}
->> +
->> +		if (pdata->usb3_phy) {
->> +			dwc->usb3_phy = devm_usb_get_phy(dev,
->> +				USB_PHY_TYPE_USB3);
->> +			if (IS_ERR(dwc->usb3_phy)) {
->> +				dev_err(dev, "usb3 phy not found\n");
->> +				return PTR_ERR(dwc->usb3_phy);
->> +			}
->> +		}
->>  
->>  		dwc->needs_fifo_resize = pdata->tx_fifo_resize;
->>  		dwc->dr_mode = pdata->dr_mode;
->> @@ -409,36 +443,6 @@ static int dwc3_probe(struct platform_device *pdev)
->>  	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
->>  		dwc->maximum_speed = USB_SPEED_SUPER;
->>  
->> -	if (IS_ERR(dwc->usb2_phy)) {
->> -		ret = PTR_ERR(dwc->usb2_phy);
->> -
->> -		/*
->> -		 * if -ENXIO is returned, it means PHY layer wasn't
->> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
->> -		 * in that case, since no PHY driver will ever probe.
->> -		 */
->> -		if (ret == -ENXIO)
->> -			return ret;
->> -
->> -		dev_err(dev, "no usb2 phy configured\n");
->> -		return -EPROBE_DEFER;
->> -	}
->> -
->> -	if (IS_ERR(dwc->usb3_phy)) {
->> -		ret = PTR_ERR(dwc->usb3_phy);
->> -
->> -		/*
->> -		 * if -ENXIO is returned, it means PHY layer wasn't
->> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
->> -		 * in that case, since no PHY driver will ever probe.
->> -		 */
->> -		if (ret == -ENXIO)
->> -			return ret;
->> -
->> -		dev_err(dev, "no usb3 phy configured\n");
->> -		return -EPROBE_DEFER;
->> -	}
-> 
-> the idea for doing the error checking here was actually to avoid
-> duplicating it in all previous cases, as you did. Please keep the error
-> checking here and you're good to go.
-> 
->> -
->>  	dwc->xhci_resources[0].start = res->start;
->>  	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
->>  					DWC3_XHCI_REGS_END;
->> diff --git a/drivers/usb/dwc3/platform_data.h b/drivers/usb/dwc3/platform_data.h
->> index 7db34f0..49ffa6d 100644
->> --- a/drivers/usb/dwc3/platform_data.h
->> +++ b/drivers/usb/dwc3/platform_data.h
->> @@ -24,4 +24,6 @@ struct dwc3_platform_data {
->>  	enum usb_device_speed maximum_speed;
->>  	enum usb_dr_mode dr_mode;
->>  	bool tx_fifo_resize;
->> +	bool usb2_phy;
->> +	bool usb3_phy;
-> 
-> This would look better as a quirks flag, then we could:
-> 
-> unsigned long quirks;
-> #define DWC3_QUIRK_NO_USB3_PHY	BIT(0)
-> #define DWC3_QUIRK_NO_USB2_PHY	BIT(1)
+Am 11.11.2013 um 15:13 schrieb Tomi Valkeinen:
 
-Should this quirk be used for dt also? Currently we find if it has usb3 phy or
-usb2 phy from the dt data only. But if we add a quirk, we'll have to add a
-property to populate the quirk no?
+> On 2013-11-11 15:57, Dr. H. Nikolaus Schaller wrote:
+>> Hi Tomi,
+>> 
+>> Am 11.11.2013 um 14:29 schrieb Tomi Valkeinen:
+>> 
+>>> Hi,
+>>> 
+>>> On 2013-11-05 09:24, Belisko Marek wrote:
+>>>> Hi,
+>>>> 
+>>>> ping.
+>>>> 
+>>>> On Mon, Oct 14, 2013 at 11:02 PM, Marek Belisko <marek@goldelico.com> wrote:
+>>>>> This patches is adding bypass and acbias functionality to omapdss venc driver.
+>>>>> In first patch we export updatin bypass and acbias in devconf1 register. Next patch
+>>>>> add handling for updating in venc driver and last patch add driver for opa362 which
+>>>>> is used on gta04 board and set bypass + acbias.
+>>>> Is there a chance to get this series to 3.13? Thanks.
+>>> 
+>>> Sorry, I haven't had time to do much reviewing.
+>>> 
+>>> The code in omap3-tvout.c should be included in the display.c file,
+>>> which already contains some things like muxing.
+>> 
+>> Ok, that might be better - but we were not sure where to place code to
+>> modify the DEVCONF1 registers. It is not directly DSS related but a special
+>> control of the OMAP3 SoC. Therefore we think it is better located in omap3-tvout.c
+> 
+> The display.c file is not strictly DSS stuff, but DSS related "glue" for
+> the SoC. For example, the muxing of the DSI pads is also done on the
+> CONTROL module, and it's also in display.c.
+> 
+> The file is getting a bit large, so I'm not against splitting it. But I
+> don't think there's point to add omap3-tvout.c file, which most likely
+> will ever contain only that one function.
+> 
+>>> Also, func(bool, bool)
+>>> style functions are rather confusing to read. Maybe an enum would be
+>>> better, so you'd instead have something like:
+>>> 
+>>> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN)
+>> 
+>> We have no special preference on that.
+> 
+> It's just about readability. Which one tells you better what the code does:
+> 
+> func(true, true);
+> 
+> or
+> 
+> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN);
+> 
+>>> But the main issue is: while this series probably works well, I really
+>>> don't like it that the OPA driver needs to pass bypass and acbias. It
+>>> shouldn't know anything about such things. I'm just not certain how to
+>>> implement that with the current omapdss driver.
+>> 
+>> Well, it must know bypass and acbias because it requires the OMAP
+>> CPU to be configured accordingly. I.e. it is the one who pushes the
+>> button. Or we get a problem that people might misconfigure it.
+> 
+> While the omapdss display drivers are currently OMAP specific, I want to
+> (or at least try to) keep them platform independent. Afaik, acbias and
+> bypass are OMAP VENC specific things, not something that every SoC with
+> an analog TV-out have. Thus, the OPA driver should not know about them,
+> and it should be something that only the DSS glue code in mach-omap2/
+> and the venc driver know about.
 
-Thanks
-Kishon
+What about calling it prepare_venc_for_external_amplifier (or similar). Then,
+venc.c can hide that really has to be done and call whatever SoC API is
+needed to program DEFCONF1?
 
 > 
-> ...
+>> I would see it similar as a driver must be able to control power. Here
+>> it must be able to control bypass and acbias in a special way that it works.
 > 
-> if (!test_bit(DWC3_QUIRK_NO_USB3_PHY), &dwc->quirks &&
-> 	dwc->has_usb3_phy) {
-> 	grab_usb3_phy();
-> }
+> The difference is that on all possible SoCs where you could add OPA
+> chip, you'll need to manage the power for OPA, and it's done in a common
+> way. Whereas the bypass and acbias are OMAP specific things.
 > 
-> cheers
+>>> I'll try to find time to think about this more, but I don't think I can
+>>> merge this for 3.13.
+>> 
+>> Please take your time.
+>> 
+>> And please also consider the approach to merge it into 3.13 as it is
+>> and we can then fix it in the weeks while release candidates are pushed.
+> 
+> If it was purely omapdss code, I could possibly take it. But it contains
+> arch/arm code also, and I don't want to cause needless changes on code
+> that I do not maintain.
+> 
+> Tomi
+> 
 > 
