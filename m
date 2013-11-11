@@ -1,32 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Nov 2013 14:06:14 +0000
-Subject: imx-drm: possible circular locking dependency detected
-In-Reply-To: <CAH9NwWdXxzQc3zJrH+p2bV8js2Pz5tA8HZRDjWrWkvFBeSd2Eg@mail.gmail.com>
-References: <CAH9NwWdswcfwVOoCz3AmS8O7Adaun5tf3QJh5YE2iK96d3ajOg@mail.gmail.com>
- <CAOMZO5A1i2jf1Mw-js=+ZF=rRL5JZFHD_d-KMhsqOuaZQx-9zw@mail.gmail.com>
- <CAH9NwWdXxzQc3zJrH+p2bV8js2Pz5tA8HZRDjWrWkvFBeSd2Eg@mail.gmail.com>
-Message-ID: <20131111140614.GZ16735@n2100.arm.linux.org.uk>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Mon, 11 Nov 2013 23:11:41 +0900
+Subject: [PATCH 1/1] ARM: EXYNOS: Add default latency values for Device
+ and Power Domain
+In-Reply-To: <9546263.JaCWNRjo5C@flatron>
+References: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
+ <9546263.JaCWNRjo5C@flatron>
+Message-ID: <CAKew6eUrtw7bTqo8tWD4JCwvCM0jRowSj=v4=dnqc5krPLpRWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 01:08:24PM +0100, Christian Gmeiner wrote:
-> Hi Fabio
-> 
-> 2013/11/11 Fabio Estevam <festevam@gmail.com>:
-> > Hi Christian,
-> >
-> > On Mon, Nov 11, 2013 at 7:25 AM, Christian Gmeiner
-> > <christian.gmeiner@gmail.com> wrote:
-> >> I am not sure if this problem is known but here is dmesg output. If a
-> >> kernel config is needed I can
-> >> send it
-> >
-> > Please apply this patch:
-> > https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/staging/imx-drm/imx-drm-core.c?id=c35d6a37bdcb1dde42dd65b00676696e2dd78f2f
-> >
-> 
-> thanks
+>> +};
+>> +
+>>  static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+>>  {
+>>       struct exynos_pm_domain *pd;
+>> @@ -83,7 +94,7 @@ static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+>>       dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+>>
+>>       while (1) {
+>> -             ret = pm_genpd_add_device(&pd->pd, dev);
+>> +             ret = __pm_genpd_add_device(&pd->pd, dev, &dev_latencies);
+>
+> The double underscore prefix scares me a bit. Is this function really
+> supposed to be used like this?
+>
 
-If you're looking at using imx-drm, please note that I have a substantial
-pile of patches against this now - some 58 patches.  I'll be posting them
-only once v3.13-rc1 has been released.
+Moreover, it also seems little bit odd in the first place, to pass
+dev_latencies(QoS timing parameters) when we are not using/providing
+any governor for the genpd. QoS timing parameters have to be provided
+to be used by governor. In our case since we are not using/providing
+any governor yet, so it seems odd to provide QoS timing parameters. It
+seems, here core pd code is giving unnecessary warning in our case,
+since we are not providing governor(not interested in QoS). So IMO
+warning should be fixed instead of just suppressing it by giving some
+big values of timing parameters.
+
+
+Regards,
+Yadwinder
+
+>>               if (ret != -EAGAIN)
+>>                       break;
+>>               cond_resched();
+>> @@ -173,6 +184,8 @@ static __init int exynos4_pm_init_power_domain(void)
+>>               pd->base = of_iomap(np, 0);
+>>               pd->pd.power_off = exynos_pd_power_off;
+>>               pd->pd.power_on = exynos_pd_power_on;
+>> +             pd->pd.power_off_latency_ns = DEFAULT_PD_PWROFF_LATENCY_NS;
+>> +             pd->pd.power_on_latency_ns = DEFAULT_PD_PWRON_LATENCY_NS;
+>
+> It might be worth to set up the latencies indeed, but wrong values can do
+> more harm than good.
+>
+> Best regards,
+> Tomasz
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
