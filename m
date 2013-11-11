@@ -1,64 +1,67 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 11 Nov 2013 15:53:51 +0800
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
-References: <1383789208.5970.1.camel@phoenix>
- <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
- <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
- <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
- <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
- <87zjpf4w0j.fsf@rustcorp.com.au>
- <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
- <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
-Message-ID: <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 11 Nov 2013 16:54:59 +0900
+Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping support
+In-Reply-To: <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131108165639.GD15074@mudshark.cambridge.arm.com>
+ <527DFC1C.1020107@hitachi.com>
+ <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
+Message-ID: <52808D53.7080904@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+(2013/11/11 14:39), Sandeepa Prabhu wrote:
+> On 9 November 2013 14:40, Masami Hiramatsu
+> <masami.hiramatsu.pt@hitachi.com> wrote:
+>> (2013/11/09 1:56), Will Deacon wrote:
+>>> Hi Sandeepa,
+>>>
+>>> On Thu, Oct 17, 2013 at 12:17:47PM +0100, Sandeepa Prabhu wrote:
+>>>> Add support for basic kernel probes(kprobes), jump probes (jprobes)
+>>>> for ARM64.
+>>>
+>>> I think this series will conflict quite heavily with the jump_label series,
+>>> since they both introduce some common instruction manipulation code. On the
+>>> debug side, there will also be conflicts with the kgdb series, so it might
+>>> make sense for us to merge those two first, then you can rebase on a stable
+>>> branch from us.
+>>
+>> [...]
+>>
+>>> In fact, how do you avoid a race with hardware breakpoints? E.g., somebody
+>>> places a hardware breakpoint on an instruction in the kernel for which
+>>> kprobes has patched in a brk. We take the hardware breakpoint, disable the
+>>> breakpoint and set up a single step before returning to the brk. The brk
+>>> then traps, but we must take care not to disable single-step and/or unmask
+>>> debug exceptions, because that will cause the hardware breakpoint code to
+>>> re-arm its breakpoint before we've stepped off the brk instruction.
+>>
+>> Hmm, frankly to say, this kind of race issue is not seriously discussed
+>> on x86 too, since kgdb is still a special tool (not used on the production
+>> system).
+>> I think under such situation kgdb operator must have full control of the
+>> system, and he can (and has to) avoid such kind of race.
+> Masami,
+> 
+> Hmm I think in same lines, but not sure if we expect kprobes to be
+> able to work fool-proof along with kgdb or hw breakpoints ?
 
-On Mon, Nov 11, 2013 at 2:43 PM, Axel Lin <axel.lin@ingics.com> wrote:
-> 2013/11/11 Rusty Russell <rusty@rustcorp.com.au>:
->
-> Hi Rusty,
->
-> I don't have other noMMU platform to test.
-> But I think this issue impacts various !CONFIG_MMU platforms:
-> We have CONFIG_PAGE_OFFSET=0xC0000000 in various default configs.
-> For !CONFIG_MMU case, it just don't use the CONFIG_PAGE_OFFSET setting.
-> So use CONFIG_PAGE_OFFSET to filter symbols looks wrong to me for all
-> !CONFIG_MMU cases.
->
-> Below is PAGE_OFFSET setting for !CONFIG_MMU case:
-> (arch/arm/include/asm/memory.h)
->
-> #ifndef PHYS_OFFSET
-> #define PHYS_OFFSET             UL(CONFIG_DRAM_BASE)
-> #endif
->
-> #ifndef END_MEM
-> #define END_MEM                 (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
-> #endif
->
-> #ifndef PAGE_OFFSET
-> #define PAGE_OFFSET             (PHYS_OFFSET)
-> #endif
->
-> My patchs for gpl327xx SoC is still in very early stage.
-> I think you should send your fix upstream because I think it impacts other
-> noMMU platforms (for above reason).
+For hw breakpoint, yes, we finally get check each other to safely
+use it even if one rejects the other one at some points(address).
+Since the hw breakpoint is already open for normal user via perf,
+we should do it. But the policy still needs to be discussed.
 
-I suggest to do it when we are clear behind the break.
+On the other hand, kgdb is a special case and it should be,
+because, IMHO, kgdb is a debugger, which means that the kgdb
+has to be able to monitor whole the kernel from outside. So
+kprobes should not change its behavior even if used with kgdb.
 
-As I mentioned, no matter what PAGE_OFFSET is, if you link vmlinux
-from the address of PAGE_OFFSET(that is what arm's link script in tree
-does), the filter won't break anything.
+Thank you,
 
 
-Thanks,
 -- 
-Ming Lei
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
