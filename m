@@ -1,44 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Nov 2013 08:49:17 -0800
-Subject: [PATCH 1/3] arm: omap2: Export devconf1 bypass and acbias.
-In-Reply-To: <1381784555-18344-2-git-send-email-marek@goldelico.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <1381784555-18344-2-git-send-email-marek@goldelico.com>
-Message-ID: <20131111164917.GN15154@atomide.com>
+From: ivan.khoronzhuk@ti.com (Khoronzhuk, Ivan)
+Date: Mon, 11 Nov 2013 16:52:05 +0000
+Subject: [PATCH 01/12] mtd: nand: davinci: fix driver registration
+In-Reply-To: <1384187188-5776-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <4F5844B3A985794BA902E12C070812375F8CE2@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marek Belisko <marek@goldelico.com> [131014 14:11]:
-> devconf1 reg access is localized only in mach-omap2 and we need to export
-> updating of devconf1 from omapdss venc driver (bypass and acbias bits).
-> Add simple api call which update only necessary bits.
-...
 
-> +void update_bypass_acbias(bool bypass, bool acbias)
-> +{
-> +#ifdef CONFIG_ARCH_OMAP3
-> +	int val = omap_ctrl_readl(OMAP343X_CONTROL_DEVCONF1);
-> +
-> +	if (bypass)
-> +		val |= OMAP2_TVOUTBYPASS;
-> +	else
-> +		val &= ~OMAP2_TVOUTBYPASS;
-> +
-> +	if (acbias)
-> +		val |= OMAP2_TVACEN;
-> +	else
-> +		val &= ~OMAP2_TVACEN;
-> +
-> +	omap_ctrl_writel(val, OMAP343X_CONTROL_DEVCONF1);
-> +#endif
+When kernel is booted using DT, there is no guarantee that Davinci
+NAND device has been created already at the time when driver init
+function is executed. Therefore, platform_driver_probe() can't be used
+because this may result the Davinci NAND driver will never be probed.
+The driver probing has to be made with core mechanism.
 
-If this is truly a pinmux, you could already access this
-using pinctrl-single,bits device tree driver.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/mtd/nand/davinci_nand.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-But I guess that won't work yet, so it's best to set this
-up as a separate driver like we've done for the USB PHY
-registers.
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index b77a01e..d87213f 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
+ }
 
-Regards,
+ static struct platform_driver nand_davinci_driver = {
++       .probe          = nand_davinci_probe,
+        .remove         = __exit_p(nand_davinci_remove),
+        .driver         = {
+                .name   = "davinci_nand",
+@@ -886,7 +887,7 @@ static struct platform_driver nand_davinci_driver = {
+ };
+ MODULE_ALIAS("platform:davinci_nand");
 
-Tony
+-module_platform_driver_probe(nand_davinci_driver, nand_davinci_probe);
++module_platform_driver(nand_davinci_driver);
+
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Texas Instruments");
+--
+1.7.9.5
