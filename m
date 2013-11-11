@@ -1,110 +1,39 @@
-From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
-Date: Mon, 11 Nov 2013 15:39:57 +0100
-Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
-In-Reply-To: <5280E617.3000004@ti.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
- <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
- <5280E617.3000004@ti.com>
-Message-ID: <37D5EFEB-D329-4652-A88D-8423276359B4@goldelico.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 11 Nov 2013 14:41:51 +0000
+Subject: [PATCH v4] ARM: vexpress/TC2: Implement MCPM power_down_finish()
+In-Reply-To: <20131111134030.GA2391@e103592.cambridge.arm.com>
+References: <20131108185613.GF2602@localhost.localdomain>
+ <1384160080.4495.2.camel@hornet>
+ <20131111134030.GA2391@e103592.cambridge.arm.com>
+Message-ID: <1384180911.4495.77.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2013-11-11 at 13:40 +0000, Dave P Martin wrote:
+> On Mon, Nov 11, 2013 at 08:54:40AM +0000, Pawel Moll wrote:
+> > On Fri, 2013-11-08 at 18:56 +0000, Dave Martin wrote:
+> > > Hi Pawel, did you manage to take a look at this?
+> > > 
+> > > I want to have something in place here, otherwise there's a nice WARN_ON
+> > > to look forward to in 3.13 :)
+> > > 
+> > > I don't think I've seen a response from you so far?
+> > 
+> > On Fri, 2013-11-01 at 12:21 +0000, Pawel Moll wrote:
+> > > PS. I actually had a look at the patches after you reminded me last week
+> > > (two weeks ago? ;-)
+> > 
+> > Acked-by: Pawel Moll <pawel.moll@arm.com>
+> 
+> Thanks
+> 
+> What's the best way to send this upstream?
 
-Am 11.11.2013 um 15:13 schrieb Tomi Valkeinen:
+Through arm-soc, I believe. Generally Nico was pulling this stuff into
+his PM branch (except for the one case of me helping out with the SPC).
 
-> On 2013-11-11 15:57, Dr. H. Nikolaus Schaller wrote:
->> Hi Tomi,
->> 
->> Am 11.11.2013 um 14:29 schrieb Tomi Valkeinen:
->> 
->>> Hi,
->>> 
->>> On 2013-11-05 09:24, Belisko Marek wrote:
->>>> Hi,
->>>> 
->>>> ping.
->>>> 
->>>> On Mon, Oct 14, 2013 at 11:02 PM, Marek Belisko <marek@goldelico.com> wrote:
->>>>> This patches is adding bypass and acbias functionality to omapdss venc driver.
->>>>> In first patch we export updatin bypass and acbias in devconf1 register. Next patch
->>>>> add handling for updating in venc driver and last patch add driver for opa362 which
->>>>> is used on gta04 board and set bypass + acbias.
->>>> Is there a chance to get this series to 3.13? Thanks.
->>> 
->>> Sorry, I haven't had time to do much reviewing.
->>> 
->>> The code in omap3-tvout.c should be included in the display.c file,
->>> which already contains some things like muxing.
->> 
->> Ok, that might be better - but we were not sure where to place code to
->> modify the DEVCONF1 registers. It is not directly DSS related but a special
->> control of the OMAP3 SoC. Therefore we think it is better located in omap3-tvout.c
-> 
-> The display.c file is not strictly DSS stuff, but DSS related "glue" for
-> the SoC. For example, the muxing of the DSI pads is also done on the
-> CONTROL module, and it's also in display.c.
-> 
-> The file is getting a bit large, so I'm not against splitting it. But I
-> don't think there's point to add omap3-tvout.c file, which most likely
-> will ever contain only that one function.
-> 
->>> Also, func(bool, bool)
->>> style functions are rather confusing to read. Maybe an enum would be
->>> better, so you'd instead have something like:
->>> 
->>> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN)
->> 
->> We have no special preference on that.
-> 
-> It's just about readability. Which one tells you better what the code does:
-> 
-> func(true, true);
-> 
-> or
-> 
-> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN);
-> 
->>> But the main issue is: while this series probably works well, I really
->>> don't like it that the OPA driver needs to pass bypass and acbias. It
->>> shouldn't know anything about such things. I'm just not certain how to
->>> implement that with the current omapdss driver.
->> 
->> Well, it must know bypass and acbias because it requires the OMAP
->> CPU to be configured accordingly. I.e. it is the one who pushes the
->> button. Or we get a problem that people might misconfigure it.
-> 
-> While the omapdss display drivers are currently OMAP specific, I want to
-> (or at least try to) keep them platform independent. Afaik, acbias and
-> bypass are OMAP VENC specific things, not something that every SoC with
-> an analog TV-out have. Thus, the OPA driver should not know about them,
-> and it should be something that only the DSS glue code in mach-omap2/
-> and the venc driver know about.
+Nevertheless I'm happy to queue it if you want me to.
 
-What about calling it prepare_venc_for_external_amplifier (or similar). Then,
-venc.c can hide that really has to be done and call whatever SoC API is
-needed to program DEFCONF1?
+Cheers!
 
-> 
->> I would see it similar as a driver must be able to control power. Here
->> it must be able to control bypass and acbias in a special way that it works.
-> 
-> The difference is that on all possible SoCs where you could add OPA
-> chip, you'll need to manage the power for OPA, and it's done in a common
-> way. Whereas the bypass and acbias are OMAP specific things.
-> 
->>> I'll try to find time to think about this more, but I don't think I can
->>> merge this for 3.13.
->> 
->> Please take your time.
->> 
->> And please also consider the approach to merge it into 3.13 as it is
->> and we can then fix it in the weeks while release candidates are pushed.
-> 
-> If it was purely omapdss code, I could possibly take it. But it contains
-> arch/arm code also, and I don't want to cause needless changes on code
-> that I do not maintain.
-> 
-> Tomi
-> 
-> 
+Pawe?
