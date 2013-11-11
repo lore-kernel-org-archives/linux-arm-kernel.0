@@ -1,47 +1,64 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 11 Nov 2013 18:57:44 +0000
-Subject: [PATCH 2/7] arm: dt: zynq: Add 'cpus' node
-In-Reply-To: <1383945677-29674-3-git-send-email-soren.brinkmann@xilinx.com>
-References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383945677-29674-3-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <528128A8.9060400@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Nov 2013 19:55:45 +0100
+Subject: [PATCH v3 1/4] reset: Add Allwinner SoCs Reset Controller Driver
+In-Reply-To: <1384165135.5191.5.camel@pizza.hi.pengutronix.de>
+References: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1382707365-4776-2-git-send-email-maxime.ripard@free-electrons.com>
+ <1384165135.5191.5.camel@pizza.hi.pengutronix.de>
+Message-ID: <20131111185545.GW26440@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/13 21:21, Soren Brinkmann wrote:
-> Add a 'cpus' node to describe the CPU cores of Zynq.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 27ebc1ba9671..37fc04525142 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -15,6 +15,33 @@
->  / {
->  	compatible = "xlnx,zynq-7000";
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +			clocks = <&clkc 3>;
-> +			i-cache-size = <0x8000>;
-> +			i-cache-line-size = <0x20>;
-> +			d-cache-size = <0x8000>;
-> +			d-cache-line-size = <0x20>;
+Hi Philipp,
 
-These cache properties can be identified through CCSIDR(Cache Size ID Registers)
-on ARMv7 Cortex implementations. It's better not to have these in DT if they can
-be identified runtime.
+On Mon, Nov 11, 2013 at 11:18:55AM +0100, Philipp Zabel wrote:
+> > +static int sunxi_reset_assert(struct reset_controller_dev *rcdev,
+> > +			      unsigned long id)
+> > +{
+> > +	struct sunxi_reset_data *data = container_of(rcdev,
+> > +						     struct sunxi_reset_data,
+> > +						     rcdev);
+> > +	int bank = id / BITS_PER_LONG;
+> > +	int offset = id % BITS_PER_LONG;
+> > +	u32 reg = readl(data->membase + (bank * 4));
+> > +
+> > +	writel(reg & ~BIT(offset), data->membase + (bank * 4));
+> 
+> the reset core just passes through calls to reset_controller_assert
+> directly, ...
+> 
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int sunxi_reset_deassert(struct reset_controller_dev *rcdev,
+> > +				unsigned long id)
+> > +{
+> > +	struct sunxi_reset_data *data = container_of(rcdev,
+> > +						     struct sunxi_reset_data,
+> > +						     rcdev);
+> > +	int bank = id / BITS_PER_LONG;
+> > +	int offset = id % BITS_PER_LONG;
+> > +	u32 reg = readl(data->membase + (bank * 4));
+> > +
+> > +	writel(reg | BIT(offset), data->membase + (bank * 4));
+> 
+> ... so those read-modify-write cycles in sunxi_reset_assert and here
+> should be protected with a lock.
 
-Regards,
-Sudeep
+Right, I'll fix this in the v3.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/971e9f19/attachment.sig>
