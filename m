@@ -1,91 +1,180 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Mon, 11 Nov 2013 16:39:46 +0530
-Subject: [PATCH v4 3/4] AArch64: KGDB: Add step debugging support
-In-Reply-To: <20131108141841.GI17461@mudshark.cambridge.arm.com>
-References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
- <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
- <20131108141841.GI17461@mudshark.cambridge.arm.com>
-Message-ID: <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Mon, 11 Nov 2013 16:50:20 +0530
+Subject: [PATCH V2] i2c: s3c2410 : Add polling mode support
+Message-ID: <1384168820-2986-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 8, 2013 at 7:48 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Nov 05, 2013 at 08:45:45AM +0000, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>
->> Add KGDB software step debugging support for EL1 debug
->> in AArch64 mode.
->>
->> KGDB registers step debug handler with debug monitor.
->> On receiving 'step' command from GDB tool, target enables
->> software step debugging and step address is updated.
->> If no step address is received from GDB tool, target assumes
->> next step address is current PC.
->>
->> Software Step debugging is disabled when 'continue' command
->> is received
->>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->> ---
->>  arch/arm64/kernel/kgdb.c |   67 +++++++++++++++++++++++++++++++++++++++-------
->>  1 file changed, 58 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
->> index ec624bc..f10f2ba 100644
->> --- a/arch/arm64/kernel/kgdb.c
->> +++ b/arch/arm64/kernel/kgdb.c
->> @@ -137,13 +137,26 @@ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
->>
->>  static int compiled_break;
->>
->> +static void kgdb_arch_update_addr(struct pt_regs *regs,
->> +                             char *remcom_in_buffer)
->> +{
->> +     unsigned long addr;
->> +     char *ptr;
->> +
->> +     ptr = &remcom_in_buffer[1];
->> +     if (kgdb_hex2long(&ptr, &addr))
->> +             kgdb_arch_set_pc(regs, addr);
->> +     else if (compiled_break == 1)
->> +             kgdb_arch_set_pc(regs, regs->pc + 4);
->> +
->> +     compiled_break = 0;
->> +}
->> +
->>  int kgdb_arch_handle_exception(int exception_vector, int signo,
->>                              int err_code, char *remcom_in_buffer,
->>                              char *remcom_out_buffer,
->>                              struct pt_regs *linux_regs)
->>  {
->> -     unsigned long addr;
->> -     char *ptr;
->>       int err;
->>
->>       switch (remcom_in_buffer[0]) {
->> @@ -153,6 +166,8 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
->>                * Packet D (Detach), k (kill). No special handling
->>                * is required here
->>                */
->> +             atomic_set(&kgdb_cpu_doing_single_step, -1);
->> +             kgdb_single_step =  0;
->
-> This looks really weird: you have two variables, which you attempt to keep
-> in sync, only one of them is an atomic access and you don't have any
-> locking or memory barriers between them, so it must be ok if they're not
-> in-sync. In which case, why do we have two variables?
->
-IMHO, two variables are being used by kgdb framework
-The variables 'kgdb_cpu_doing_single_step'  holds the cpu on which
-step debugging
-is happening. With this, when during step debugging, it ensures that on next
-step debug exception only this CPU aquires master lock and step
-debugging is performed.
+From: Vasanth Ananthan <vasanthananthan@gmail.com>
 
-The variable 'kgdb_single_step' is used to know if step debugging is
-ongoing or not.
-If so, the non-primary cpu's are not released untill the continue
-command is received
-So, with this the cpu's are not released and acquired for every step command
+This patch adds polling mode support for i2c-s3c2410 driver.The
+SATA PHY controller's CMU and TRSV block's are of I2C register
+map in exynos5250.These blocks can be configured using i2c.
 
-> Will
+But i2c controller instance on which these block's sits lacks an
+interrupt line.Also the current i2c-s3c2410 driver is only interrupt
+driven, thus a polling mode support is required in the driver for
+supporting this controller. This patch adds this support to the driver.
+
+Changes from V1:
+	1.Changed the is_ack() to have even period b/w polls and
+	  used usleep_range() instead of udelay().
+
+Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+---
+ .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    2 +
+ drivers/i2c/busses/i2c-s3c2410.c                   |   66 +++++++++++++++++---
+ 2 files changed, 58 insertions(+), 10 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+index 296eb45..278de8e 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+@@ -10,6 +10,8 @@ Required properties:
+           inside HDMIPHY block found on several samsung SoCs
+       (d) "samsung, exynos5440-i2c", for s3c2440-like i2c used
+ 	   on EXYNOS5440 which does not need GPIO configuration.
++      (e) "samsung, exynos5-sata-phy-i2c", for s3c2440-like i2c used as
++	   a host to SATA PHY controller on an internal bus.
+   - reg: physical base address of the controller and length of memory mapped
+     region.
+   - interrupts: interrupt number to the cpu.
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 3747b9b..08ed126 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -85,6 +85,7 @@
+ #define QUIRK_S3C2440		(1 << 0)
+ #define QUIRK_HDMIPHY		(1 << 1)
+ #define QUIRK_NO_GPIO		(1 << 2)
++#define QUIRK_POLL		(1 << 3)
+ 
+ /* Max time to wait for bus to become idle after a xfer (in us) */
+ #define S3C2410_IDLE_TIMEOUT	5000
+@@ -141,6 +142,8 @@ static struct platform_device_id s3c24xx_driver_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(platform, s3c24xx_driver_ids);
+ 
++static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat);
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id s3c24xx_i2c_match[] = {
+ 	{ .compatible = "samsung,s3c2410-i2c", .data = (void *)0 },
+@@ -149,6 +152,8 @@ static const struct of_device_id s3c24xx_i2c_match[] = {
+ 	  .data = (void *)(QUIRK_S3C2440 | QUIRK_HDMIPHY | QUIRK_NO_GPIO) },
+ 	{ .compatible = "samsung,exynos5440-i2c",
+ 	  .data = (void *)(QUIRK_S3C2440 | QUIRK_NO_GPIO) },
++	{ .compatible = "samsung,exynos5-sata-phy-i2c",
++	  .data = (void *)(QUIRK_S3C2440 | QUIRK_POLL | QUIRK_NO_GPIO) },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, s3c24xx_i2c_match);
+@@ -187,7 +192,8 @@ static inline void s3c24xx_i2c_master_complete(struct s3c24xx_i2c *i2c, int ret)
+ 	if (ret)
+ 		i2c->msg_idx = ret;
+ 
+-	wake_up(&i2c->wait);
++	if (!(i2c->quirks & QUIRK_POLL))
++		wake_up(&i2c->wait);
+ }
+ 
+ static inline void s3c24xx_i2c_disable_ack(struct s3c24xx_i2c *i2c)
+@@ -224,6 +230,22 @@ static inline void s3c24xx_i2c_enable_irq(struct s3c24xx_i2c *i2c)
+ 	writel(tmp | S3C2410_IICCON_IRQEN, i2c->regs + S3C2410_IICCON);
+ }
+ 
++static bool is_ack(struct s3c24xx_i2c *i2c)
++{
++	int tries;
++
++	for (tries = 50; tries; --tries) {
++		if (readl(i2c->regs + S3C2410_IICCON)
++			& S3C2410_IICCON_IRQPEND) {
++			if (!(readl(i2c->regs + S3C2410_IICSTAT)
++				& S3C2410_IICSTAT_LASTBIT))
++				return true;
++		}
++		usleep_range(1000, 2000);
++	}
++	dev_err(i2c->dev, "ack was not recieved\n");
++	return false;
++}
+ 
+ /* s3c24xx_i2c_message_start
+  *
+@@ -268,6 +290,16 @@ static void s3c24xx_i2c_message_start(struct s3c24xx_i2c *i2c,
+ 
+ 	stat |= S3C2410_IICSTAT_START;
+ 	writel(stat, i2c->regs + S3C2410_IICSTAT);
++
++	if (i2c->quirks & QUIRK_POLL) {
++		while ((i2c->msg_num != 0) && is_ack(i2c)) {
++			i2c_s3c_irq_nextbyte(i2c, stat);
++			stat = readl(i2c->regs + S3C2410_IICSTAT);
++
++			if (stat & S3C2410_IICSTAT_ARBITR)
++				dev_err(i2c->dev, "deal with arbitration loss\n");
++		}
++	}
+ }
+ 
+ static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
+@@ -675,6 +707,15 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 	s3c24xx_i2c_enable_irq(i2c);
+ 	s3c24xx_i2c_message_start(i2c, msgs);
+ 
++	if (i2c->quirks & QUIRK_POLL) {
++		ret = i2c->msg_idx;
++
++		if (ret != num)
++			dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
++
++		goto out;
++	}
++
+ 	timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
+ 
+ 	ret = i2c->msg_idx;
+@@ -820,6 +861,9 @@ static int s3c24xx_i2c_clockrate(struct s3c24xx_i2c *i2c, unsigned int *got)
+ 	if (div1 == 512)
+ 		iiccon |= S3C2410_IICCON_TXDIV_512;
+ 
++	if (i2c->quirks & QUIRK_POLL)
++		iiccon |= S3C2410_IICCON_SCALE(2);
++
+ 	writel(iiccon, i2c->regs + S3C2410_IICCON);
+ 
+ 	if (i2c->quirks & QUIRK_S3C2440) {
+@@ -1117,18 +1161,20 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+ 	 * ensure no current IRQs pending
+ 	 */
+ 
+-	i2c->irq = ret = platform_get_irq(pdev, 0);
+-	if (ret <= 0) {
+-		dev_err(&pdev->dev, "cannot find IRQ\n");
+-		return ret;
+-	}
++	if (!(i2c->quirks & QUIRK_POLL)) {
++		i2c->irq = ret = platform_get_irq(pdev, 0);
++		if (ret <= 0) {
++			dev_err(&pdev->dev, "cannot find IRQ\n");
++			return ret;
++		}
+ 
+ 	ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq, 0,
+-			       dev_name(&pdev->dev), i2c);
++				dev_name(&pdev->dev), i2c);
+ 
+-	if (ret != 0) {
+-		dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
+-		return ret;
++		if (ret != 0) {
++			dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
++			return ret;
++		}
+ 	}
+ 
+ 	ret = s3c24xx_i2c_register_cpufreq(i2c);
+-- 
+1.7.9.5
