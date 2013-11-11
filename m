@@ -1,97 +1,277 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 11 Nov 2013 19:19:47 +0100
-Subject: [PATCH] pinctrl: imx1-core populate subdevices
-In-Reply-To: <CACRpkda2dO6DvurEhaTVGJv8nDyEGOEeLCap-_+1e1mHtD0XyQ@mail.gmail.com>
-References: <CACRpkda2dO6DvurEhaTVGJv8nDyEGOEeLCap-_+1e1mHtD0XyQ@mail.gmail.com>
-Message-ID: <1384193987-20740-1-git-send-email-mpa@pengutronix.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 11 Nov 2013 19:20:10 +0100
+Subject: [alsa-devel] [PATCHv2] dmaengine: Add support for BCM2835.
+In-Reply-To: <528106E5.5000307@koalo.de>
+References: <528106E5.5000307@koalo.de>
+Message-ID: <52811FDA.7080905@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support gpio devicetree subnodes to allow a more detailed DT hardware
-description.
-
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
-
-Hi,
-
-This is an incremental patch for the imx1-core and imx27-pinctrl patches to
-support the gpio nodes as iomux subdevices.
-
-Linus, I can resend this integrated into the other two patches if you want.
-
-Regards,
-
-Markus Pargmann
+On 11/11/2013 05:33 PM, Florian Meier wrote:
+[...]
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/list.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/io.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/irq.h>
 
 
- .../bindings/pinctrl/fsl,imx27-pinctrl.txt         | 22 ++++++++++++++++++++++
- drivers/pinctrl/pinctrl-imx1-core.c                |  7 +++++++
- 2 files changed, 29 insertions(+)
+No driver (other than irqchip drivers) should ever need to include irq.h
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-index 353eca0..d1706ea 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-@@ -52,12 +52,25 @@ Required properties for pin configuration node:
-   CONFIG can be 0 or 1, meaning Pullup disable/enable.
- 
- 
-+The iomux controller has gpio child nodes which are embedded in the iomux
-+control registers. They have to be defined as child nodes of the iomux device
-+node. If gpio subnodes are defined "#address-cells", "#size-cells" and "ranges"
-+properties for the iomux device node are required.
- 
- Example:
- 
- iomuxc: iomuxc at 10015000 {
- 	compatible = "fsl,imx27-iomuxc";
- 	reg = <0x10015000 0x600>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	gpio1: gpio at 10015000 {
-+		...
-+	};
-+
-+	...
- 
- 	uart {
- 		pinctrl_uart1: uart-1 {
-@@ -83,6 +96,15 @@ The above example using macros:
- iomuxc: iomuxc at 10015000 {
- 	compatible = "fsl,imx27-iomuxc";
- 	reg = <0x10015000 0x600>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	gpio1: gpio at 10015000 {
-+		...
-+	};
-+
-+	...
- 
- 	uart {
- 		pinctrl_uart1: uart-1 {
-diff --git a/drivers/pinctrl/pinctrl-imx1-core.c b/drivers/pinctrl/pinctrl-imx1-core.c
-index 4d5a9e7..2eadba7 100644
---- a/drivers/pinctrl/pinctrl-imx1-core.c
-+++ b/drivers/pinctrl/pinctrl-imx1-core.c
-@@ -638,6 +638,13 @@ int imx1_pinctrl_core_probe(struct platform_device *pdev,
- 		return -EINVAL;
- 	}
- 
-+	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-+	if (ret) {
-+		pinctrl_unregister(ipctl->pctl);
-+		dev_err(&pdev->dev, "Failed to populate subdevices\n");
-+		return ret;
-+	}
-+
- 	dev_info(&pdev->dev, "initialized IMX pinctrl driver\n");
- 
- 	return 0;
--- 
-1.8.4.2
+> +#include <linux/of.h>
+> +#include <linux/of_dma.h>
+> +
+> +#include "virt-dma.h"
+> +
+[...]
+> +struct bcm2835_chan {
+> +	struct virt_dma_chan vc;
+> +	struct list_head node;
+> +
+> +	struct dma_slave_config	cfg;
+> +	unsigned dma_sig;
+> +	bool cyclic;
+> +	unsigned dreq;
+> +
+> +	int dma_ch;
+> +	struct bcm2835_desc *desc;
+> +	unsigned sgidx;
+> +
+> +	void __iomem *dma_chan_base;
+> +	int dma_irq_number;
+> +	struct irqaction dma_irq_handler;
+
+dma_irq_handler is not used.
+
+> +};
+[...]
+> +
+[...]
+> +/*
+> + * This callback schedules all pending channels.  We could be more
+> + * clever here by postponing allocation of the real DMA channels to
+> + * this point, and freeing them when our virtual channel becomes idle.
+> + *
+> + * We would then need to deal with 'all channels in-use'
+> + */
+
+I'm wondering why does this need to be done in a tasklet?
+
+> +static void bcm2835_dma_sched(unsigned long data)
+> +{
+> +	struct bcm2835_dmadev *d = (struct bcm2835_dmadev *)data;
+> +	LIST_HEAD(head);
+> +
+> +	spin_lock_irq(&d->lock);
+> +	list_splice_tail_init(&d->pending, &head);
+> +	spin_unlock_irq(&d->lock);
+> +
+> +	while (!list_empty(&head)) {
+> +		struct bcm2835_chan *c = list_first_entry(&head,
+> +			struct bcm2835_chan, node);
+> +
+> +		spin_lock_irq(&c->vc.lock);
+> +		list_del_init(&c->node);
+> +		bcm2835_dma_start_desc(c);
+> +		spin_unlock_irq(&c->vc.lock);
+> +	}
+> +}
+> +
+> +static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
+> +{
+> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+> +	int ret;
+> +	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(chan->device);
+> +	uint32_t chans = d->chans_available;
+> +	int chanID = 0;
+> +
+> +	dev_dbg(c->vc.chan.device->dev,
+> +			"allocating channel for %u\n", c->dma_sig);
+> +
+> +	/* do not use the FIQ and BULK channels */
+> +	chans &= ~0xD;
+> +
+> +	if (chans) {
+> +		/* return the ordinal of the first channel in the bitmap */
+> +		while (chans != 0 && (chans & 1) == 0) {
+> +			chans >>= 1;
+> +			chanID++;
+> +		}
+
+It might make sense to leave the channel id allocation to the core. Each
+channel already has an unique id (chan->chan_id) so you could just reuse
+that. Otherwise __ffs() is your friend
+
+> +
+> +		/* claim the channel */
+> +		d->chans_available &= ~(1 << chanID);
+> +
+> +		c->dma_chan_base = BCM2835_DMA_CHANIO(d->dma_base, chanID);
+> +		c->dma_irq_number = d->dma_irq_numbers[chanID];
+> +		c->dma_ch = chanID;
+> +	} else {
+> +		return -ENOMEM;
+> +	}
+> +
+> +	c->dma_irq_handler.name = "DMA engine IRQ handler";
+> +	c->dma_irq_handler.flags = 0;
+> +	c->dma_irq_handler.handler = bcm2835_dma_callback;
+> +
+> +	ret = request_irq(c->dma_irq_number,
+> +			bcm2835_dma_callback, 0, "DMA IRQ", c);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+[...]
+> +
+> +static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
+> +	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+> +	size_t period_len, enum dma_transfer_direction direction,
+> +	unsigned long flags, void *context)
+> +{
+[...]
+> +
+> +	c->cyclic = true; /* nothing else is implemented */
+
+The channel should only be switched to cyclic once the descriptor is issued,
+not when it is prepared.
+
+> +
+> +	return vchan_tx_prep(&c->vc, &d->vd, flags);
+> +}
+> +
+> +static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
+> +		struct dma_slave_config *cfg)
+> +{
+> +	if ((cfg->direction == DMA_DEV_TO_MEM
+> +			&& cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
+> +	    (cfg->direction == DMA_MEM_TO_DEV
+> +			&& cfg->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES)) {
+> +		return -EINVAL;
+> +	}
+
+MEM_TO_MEM and DEV_TO_DEV don't seem to be supported by the driver, so
+trying to set that should probably also generate an error.
+
+> +
+> +	memcpy(&c->cfg, cfg, sizeof(c->cfg));
+
+	c->cfg = *cfg;
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
+> +{
+> +	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(c->vc.chan.device);
+> +	unsigned long flags;
+> +	LIST_HEAD(head);
+> +
+> +	spin_lock_irqsave(&c->vc.lock, flags);
+> +
+> +	/* Prevent this channel being scheduled */
+> +	spin_lock(&d->lock);
+> +	list_del_init(&c->node);
+> +	spin_unlock(&d->lock);
+> +
+> +	/*
+> +	 * Stop DMA activity: we assume the callback will not be called
+> +	 * after bcm_dma_abort() returns (even if it does, it will see
+> +	 * c->desc is NULL and exit.)
+> +	 */
+> +	if (c->desc) {
+> +		c->desc = NULL;
+> +		bcm2835_dma_abort(c->dma_chan_base);
+> +
+> +		/* Wait for stopping */
+> +		while (readl(c->dma_chan_base + BCM2835_DMA_CS)
+> +			& BCM2835_DMA_ACTIVE)
+> +			;
+
+In case the hardware acts up this should have a timeout.
+
+> +	}
+> +
+> +	vchan_get_all_descriptors(&c->vc, &head);
+> +	spin_unlock_irqrestore(&c->vc.lock, flags);
+> +	vchan_dma_desc_free_list(&c->vc, &head);
+> +
+> +	return 0;
+> +}
+> +
+> +static int bcm2835_dma_pause(struct bcm2835_chan *c)
+> +{
+> +	/* FIXME: not supported by platform private API */
+> +	return -EINVAL;
+> +}
+> +
+> +static int bcm2835_dma_resume(struct bcm2835_chan *c)
+> +{
+> +	/* FIXME: not supported by platform private API */
+> +	return -EINVAL;
+> +}
+
+I think you don't need the two functions above if you are not going to
+implement them.
+
+[...]
+> +
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id bcm2835_dma_of_match[] = {
+> +	{
+> +		.compatible = "brcm,bcm2835-dma",
+> +	}
+> +};
+> +MODULE_DEVICE_TABLE(of, bcm2835_dma_of_match);
+
+The devicetree binding documentation in Documentation/devicetree/ is missing
+for this driver.
+
+> +#endif
+
+[...]
+
+> +static int bcm2835_dma_probe(struct platform_device *pdev)
+> +{
+> +	struct bcm2835_dmadev *od;
+> +	struct resource *dma_res = NULL;
+> +	void __iomem *dma_base = NULL;
+> +	int rc = 0;
+> +	int i;
+> +	struct resource *irq;
+> +	int irq_resources;
+
+You should set the maximum segment size, this allows the ASoC PCM driver to
+query this and use it for the maximum period size. This means that you can
+remove the snd_pcm_hardware struct with the hardcoded values from your ASoC
+driver.
+[...]
+This can be done using the following code snippet:
+
+pdev->dev->dma_parms = &od->dma_parms;
+dma_set_max_seg_size(&pdev->dev, 0x123456);
+
+Where od->dma_parms is of type struct device_dma_parameters and embedded in
+your device struct.
+\
+
+
+> +static const struct platform_device_info bcm2835_dma_dev_info = {
+> +	.name = "bcm2835-dma",
+> +	.id = -1,
+> +	.dma_mask = DMA_BIT_MASK(32),
+> +};
+
+This seems to be unused.
+
+[...]
