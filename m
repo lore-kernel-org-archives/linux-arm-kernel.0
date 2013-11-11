@@ -1,80 +1,48 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Mon, 11 Nov 2013 14:43:28 +0800
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <87y54vzszo.fsf@rustcorp.com.au>
-References: <1383789208.5970.1.camel@phoenix>
- <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
- <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
- <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
- <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
- <87zjpf4w0j.fsf@rustcorp.com.au>
- <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
-Message-ID: <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 11 Nov 2013 15:38:20 +0900
+Subject: [PATCH 0/4] arm64: Add audit support
+In-Reply-To: <20131108143456.GJ17461@mudshark.cambridge.arm.com>
+References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
+ <20131108143456.GJ17461@mudshark.cambridge.arm.com>
+Message-ID: <52807B5C.20300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/11 Rusty Russell <rusty@rustcorp.com.au>:
-> Ming Lei <tom.leiming@gmail.com> writes:
->> Hi Axel,
->>
->> On Fri, Nov 8, 2013 at 12:20 PM, Axel Lin <axel.lin@ingics.com> wrote:
->>>
->>>
->>> Hi Ming,
->>>
->>> I have patches on top of 3.12 to support gpl32700 SoC.
->>> So you cannot find this platform on mainline kernel.
->>
->> OK, I see.
->>
->>> I havn't tried perf, below is my config for your reference:
->>> (to make the config smaller, I grep out disabled config entries.)
->>
->> I doubt CONFIG_VMSPLIT_3G/CONFIG_PAGE_OFFSET isn't
->> used at all in your unmerged patchset, also your link script should
->> be different with in-tree arch/arm/kernel/vmlinux.lds.S, otherwise
->> you may put all your kernel symbols after 0xC00000000.
->>
->> Maybe you need to not define PAGE_OFFSET and let it be
->> PHYS_OFFSET at default, also VMSPLIT_3G shouldn't have
->> been there on non-MMU linux.
+On 11/08/2013 11:34 PM, Will Deacon wrote:
+> On Wed, Nov 06, 2013 at 10:25:42AM +0000, AKASHI Takahiro wrote:
+>> This patchset adds audit support on arm64.
+>> The implementation is just like in other architectures,
+>> and so I think little explanation is needed.
 >
-> OK, unless there are other platforms which have this issue, I'll
-> leave it with you to hold this patch for merge with your SoC.
+> That doesn't mean you can just omit the commit messages!
 
+I will include some commit messages in the next version.
 
-Hi Rusty,
+>> I'd like to discuss about the following issues:
+>> (issues)
+>> * AUDIT_ARCH_*
+>>    Why do we need to distiguish big-endian and little-endian? [2/4]
+>
+> We don't. This is only the case if the syscall ABIs differ between them (for
+> AArch32, people mistakenly thought __ARMEB__ was related to AEABI.
 
-I don't have other noMMU platform to test.
-But I think this issue impacts various !CONFIG_MMU platforms:
-We have CONFIG_PAGE_OFFSET=0xC0000000 in various default configs.
-For !CONFIG_MMU case, it just don't use the CONFIG_PAGE_OFFSET setting.
-So use CONFIG_PAGE_OFFSET to filter symbols looks wrong to me for all
-!CONFIG_MMU cases.
+I guessed so, but ...
 
-Below is PAGE_OFFSET setting for !CONFIG_MMU case:
-(arch/arm/include/asm/memory.h)
+>> * Userspace audit package
+>>    There are some missing syscall definitions in lib/aarch64_table.h.
+>>    There is no support for AUDIT_ARCH_ARM (I mean LE. armeb is BE).
+>
+> I did post something over a year ago... did it not get picked up?
+>
+>    http://permalink.gmane.org/gmane.linux.ports.arm.kernel/165266
 
-#ifndef PHYS_OFFSET
-#define PHYS_OFFSET             UL(CONFIG_DRAM_BASE)
-#endif
+Sounds great, but the reality is that AUDIT_ARCH_ARMEB is still used
+in the latest v2.3.2, and due to this, ausearch cannot pretty-print
+the architecture name in the audit log for LE.
 
-#ifndef END_MEM
-#define END_MEM                 (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
-#endif
+I will ask this in linux-audit ML.
 
-#ifndef PAGE_OFFSET
-#define PAGE_OFFSET             (PHYS_OFFSET)
-#endif
+-Takahiro AKASHI
 
-My patchs for gpl327xx SoC is still in very early stage.
-I think you should send your fix upstream because I think it impacts other
-noMMU platforms (for above reason).
-
-Thanks,
-Axel
+> Will
+>
