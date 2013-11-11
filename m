@@ -1,165 +1,37 @@
-From: ivan.khoronzhuk@ti.com (Khoronzhuk, Ivan)
-Date: Mon, 11 Nov 2013 16:54:23 +0000
-Subject: [PATCH 03/12] mtd: nand: davinci: simplify error handling
-In-Reply-To: <1384187188-5776-4-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-4-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <4F5844B3A985794BA902E12C070812375F8CFB@DNCE04.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Nov 2013 17:55:02 +0100
+Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
+In-Reply-To: <20131111093311.GK14892@pengutronix.de>
+References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
+ <20131111093311.GK14892@pengutronix.de>
+Message-ID: <20131111165502.GL14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is not needed to use a lot of names for err handling.
-It complicates code support and reading.
+Hello Victor,
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- drivers/mtd/nand/davinci_nand.c |   46 +++++++++++++++------------------------
- 1 file changed, 17 insertions(+), 29 deletions(-)
+On Mon, Nov 11, 2013 at 10:33:11AM +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Nov 11, 2013 at 12:10:26AM -0800, Victor Kamensky wrote:
+> > Here is proposal for armv7-m build failure in sigreturn_codes.S. The 
+> > armv7-m build issue was discussed in [1].
+> > 
+> > Proposed solution is based on conditional compilation. If 
+> > CONFIG_CPU_THUMBONLY is set instead of arm opcodes nops in thumb mode
+> > are used. I've tried to wrap conditional compilation as nice as I 
+> > found possible. Other suggestions/approaches are welcome.
+> > 
+> > Fix was tested:
+> >    linux-next with efm32_defconfig build (along with few other fixes)
+> >    rmk-next BE/LE arndale build/boot and LTP rt_sigaction0? tests run
+> Next currently fails for other reasons, too and I'm out of time. I'd say
+> if it compiles for you it's fine and I will handle eventual fall-outs
+> later.
+next-20131111 + your patch + reverts of d779c07dd7209 and 50e05119f9800
+compiles and boots fine.
 
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index 8e1c88e..9bcbaa9 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -617,8 +617,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-        info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
-        if (!info) {
-                dev_err(&pdev->dev, "unable to allocate memory\n");
--               ret = -ENOMEM;
--               goto err_nomem;
-+               return -ENOMEM;
-        }
+Best regards
+Uwe
 
-        platform_set_drvdata(pdev, info);
-@@ -627,20 +626,16 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-        res2 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-        if (!res1 || !res2) {
-                dev_err(&pdev->dev, "resource missing\n");
--               ret = -EINVAL;
--               goto err_nomem;
-+               return -EINVAL;
-        }
-
-        vaddr = devm_ioremap_resource(&pdev->dev, res1);
--       if (IS_ERR(vaddr)) {
--               ret = PTR_ERR(vaddr);
--               goto err_ioremap;
--       }
-+       if (IS_ERR(vaddr))
-+               return PTR_ERR(vaddr);
-+
-        base = devm_ioremap_resource(&pdev->dev, res2);
--       if (IS_ERR(base)) {
--               ret = PTR_ERR(base);
--               goto err_ioremap;
--       }
-+       if (IS_ERR(base))
-+               return PTR_ERR(base);
-
-        info->dev               = &pdev->dev;
-        info->base              = base;
-@@ -707,7 +702,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-                        spin_unlock_irq(&davinci_nand_lock);
-
-                        if (ret == -EBUSY)
--                               goto err_ecc;
-+                               return ret;
-
-                        info->chip.ecc.calculate = nand_davinci_calculate_4bit;
-                        info->chip.ecc.correct = nand_davinci_correct_4bit;
-@@ -723,8 +718,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-                info->chip.ecc.strength = pdata->ecc_bits;
-                break;
-        default:
--               ret = -EINVAL;
--               goto err_ecc;
-+               return -EINVAL;
-        }
-        info->chip.ecc.mode = ecc_mode;
-
-@@ -732,7 +726,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-        if (IS_ERR(info->clk)) {
-                ret = PTR_ERR(info->clk);
-                dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
--               goto err_clk;
-+               return ret;
-        }
-
-        ret = clk_prepare_enable(info->clk);
-@@ -761,7 +755,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-                                                        info->core_chipsel);
-        if (ret < 0) {
-                dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
--               goto err_timing;
-+               goto err;
-        }
-
-        spin_lock_irq(&davinci_nand_lock);
-@@ -777,7 +771,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-        ret = nand_scan_ident(&info->mtd, pdata->mask_chipsel ? 2 : 1, NULL);
-        if (ret < 0) {
-                dev_dbg(&pdev->dev, "no NAND chip(s) found\n");
--               goto err_scan;
-+               goto err;
-        }
-
-        /* Update ECC layout if needed ... for 1-bit HW ECC, the default
-@@ -791,7 +785,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-                if (!chunks || info->mtd.oobsize < 16) {
-                        dev_dbg(&pdev->dev, "too small\n");
-                        ret = -EINVAL;
--                       goto err_scan;
-+                       goto err;
-                }
-
-                /* For small page chips, preserve the manufacturer's
-@@ -822,7 +816,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
-                dev_warn(&pdev->dev, "no 4-bit ECC support yet "
-                                "for 4KiB-page NAND\n");
-                ret = -EIO;
--               goto err_scan;
-+               goto err;
-
- syndrome_done:
-                info->chip.ecc.layout = &info->ecclayout;
-@@ -830,7 +824,7 @@ syndrome_done:
-
-        ret = nand_scan_tail(&info->mtd);
-        if (ret < 0)
--               goto err_scan;
-+               goto err;
-
-        if (pdata->parts)
-                ret = mtd_device_parse_register(&info->mtd, NULL, NULL,
-@@ -843,7 +837,7 @@ syndrome_done:
-                                                NULL, 0);
-        }
-        if (ret < 0)
--               goto err_scan;
-+               goto err;
-
-        val = davinci_nand_readl(info, NRCSR_OFFSET);
-        dev_info(&pdev->dev, "controller rev. %d.%d\n",
-@@ -851,8 +845,7 @@ syndrome_done:
-
-        return 0;
-
--err_scan:
--err_timing:
-+err:
-        clk_disable_unprepare(info->clk);
-
- err_clk_enable:
-@@ -860,11 +853,6 @@ err_clk_enable:
-        if (ecc_mode == NAND_ECC_HW_SYNDROME)
-                ecc4_busy = false;
-        spin_unlock_irq(&davinci_nand_lock);
--
--err_ecc:
--err_clk:
--err_ioremap:
--err_nomem:
-        return ret;
- }
-
---
-1.7.9.5
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
