@@ -1,143 +1,80 @@
-From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
-Date: Mon, 11 Nov 2013 14:10:10 +0800
-Subject: [PATCH 1/2] usb: chipidea: usbmisc: Add support for i.MX27/i.MX31
- CPUs
-In-Reply-To: <1384148852.19743495@f117.i.mail.ru>
-References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
- <1384145140.400290349@f353.i.mail.ru> <52806C24.8040100@gtsys.com.hk>
- <1384148852.19743495@f117.i.mail.ru>
-Message-ID: <528074C2.9070707@gtsys.com.hk>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Mon, 11 Nov 2013 14:43:28 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <87y54vzszo.fsf@rustcorp.com.au>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+ <87zjpf4w0j.fsf@rustcorp.com.au>
+ <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+Message-ID: <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 11, 2013 01:47 PM, Alexander Shiyan wrote:
->> On Monday, November 11, 2013 12:45 PM, Alexander Shiyan wrote:
->>>> Hi Alexander,
->>>>
->>>> On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
->>>>> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
->>>>>
->>>>> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
->>>>> ---
->>>>>     drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
->>>>>     1 file changed, 42 insertions(+)
->>>>>
->>>>> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
->>> ...
->>>>> +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
->>>>> +{
->>>>> +	unsigned long flags;
->>>>> +	u32 val;
->>>>> +
->>>>> +	switch (data->index) {
->>>>> +	case 0:
->>>>> +		val = MX27_OTG_PM_BIT;
->>>>> +		break;
->>>>> +	case 1:
->>>>> +		val = MX27_H1_PM_BIT;
->>>>> +		break;
->>>>> +	case 2:
->>>>> +		val = MX27_H2_PM_BIT;
->>>>> +		break;
->>>>> +	default:
->>>>> +		return -EINVAL;
->>>>> +	};
->>>>> +
->>>>
->>>>      From my understanding this can not work, the usbmisc->base not point into the
->>>> usb control register (USB_CTRL). Reference manual 30.5.1.1 says
->>>> BASE + 0x600
->>>> you must add the offset to the readl instruction.
+2013/11/11 Rusty Russell <rusty@rustcorp.com.au>:
+> Ming Lei <tom.leiming@gmail.com> writes:
+>> Hi Axel,
+>>
+>> On Fri, Nov 8, 2013 at 12:20 PM, Axel Lin <axel.lin@ingics.com> wrote:
 >>>
->>> Why not work?
->>> usbotg: usb at 10024000
->>> usbh1: usb at 10024200
->>> usbh2: usb at 10024400
->>> usbmisc: usbmisc at 10024600
->>> So, offset to USB_CTRL should already be defined by DTS.
+>>>
+>>> Hi Ming,
+>>>
+>>> I have patches on top of 3.12 to support gpl32700 SoC.
+>>> So you cannot find this platform on mainline kernel.
 >>
->> in the usbmisc_imx_probe() the base pointer is loaded from
+>> OK, I see.
 >>
->> res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> data->base = devm_ioremap_resource(&pdev->dev, res);
+>>> I havn't tried perf, below is my config for your reference:
+>>> (to make the config smaller, I grep out disabled config entries.)
 >>
->> (and I did not see any of_ operations)
->
-> Yes, and this is an address of usbmisc node, not otg.
-
-Sorry, you are right. I misunderstood because I didn't see any of sample DTS 
-files define usbmisc yet.
-
-At this point might be good to patch the imx27.dtsi with the usb defines.
-
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -30,6 +30,9 @@
-                 spi0 = &cspi1;
-                 spi1 = &cspi2;
-                 spi2 = &cspi3;
-+               usb0 = &usbotg;
-+               usb1 = &usbh1;
-+               usb2 = &usbh2;
-         };
-
-@@ -404,6 +419,44 @@
-                                 iram = <&iram>;
-                         };
-
-+                       usbotg: usb at 10024000 {
-+                               compatible = "fsl,imx27-usb";
-+                               reg = <0x10024000 0x200>;
-+                               interrupts = <56>;
-+                               clocks = <&clks 75>, <&clks 62>;
-+                               clock-names = "ipg", "ahb";
-+                               dr_mode = "host";
-+                               phy_type = "ulpi";
-+                               status = "disabled";
-+                       };
-+
-+                       usbh1: usb at 10024200 {
-+                               compatible = "fsl,imx27-usb";
-+                               reg = <0x10024200 0x200>;
-+                               interrupts = <54>;
-+                               clocks = <&clks 75>, <&clks 62>;
-+                               clock-names = "ipg", "ahb";
-+                               dr_mode = "host";
-+                               phy_type = "serial";
-+                               status = "disabled";
-+                       };
-+
-+                       usbh2: usb at 10024400 {
-+                               compatible = "fsl,imx27-usb";
-+                               reg = <0x10024400 0x200>;
-+                               interrupts = <55>;
-+                               clocks = <&clks 75>, <&clks 62>;
-+                               clock-names = "ipg", "ahb";
-+                               dr_mode = "host";
-+                               phy_type = "ulpi";
-+                               status = "disabled";
-+                       };
-+
-+                       usbmisc: usbmisc at 10024600 {
-+                               compatible = "fsl,imx27-usb";
-+                               reg = <0x10024600 0x4>;
-+                       };
-+
-
-Regards
-Chris
->
->> usbmisc = data;
+>> I doubt CONFIG_VMSPLIT_3G/CONFIG_PAGE_OFFSET isn't
+>> used at all in your unmerged patchset, also your link script should
+>> be different with in-tree arch/arm/kernel/vmlinux.lds.S, otherwise
+>> you may put all your kernel symbols after 0xC00000000.
 >>
->>    base is set to 0x10024000
->>
->> when I look around all other functions init functions did a offset calculation.
+>> Maybe you need to not define PAGE_OFFSET and let it be
+>> PHYS_OFFSET at default, also VMSPLIT_3G shouldn't have
+>> been there on non-MMU linux.
 >
-> Can you point me on this?
-> For example, for i.MX5 CPUs we calculate only offset to PHY_CTRL_X register
-> relative to basic offset 0x800, which is already defined in DTS.
->
-> ...
->
+> OK, unless there are other platforms which have this issue, I'll
+> leave it with you to hold this patch for merge with your SoC.
 
-r
+
+Hi Rusty,
+
+I don't have other noMMU platform to test.
+But I think this issue impacts various !CONFIG_MMU platforms:
+We have CONFIG_PAGE_OFFSET=0xC0000000 in various default configs.
+For !CONFIG_MMU case, it just don't use the CONFIG_PAGE_OFFSET setting.
+So use CONFIG_PAGE_OFFSET to filter symbols looks wrong to me for all
+!CONFIG_MMU cases.
+
+Below is PAGE_OFFSET setting for !CONFIG_MMU case:
+(arch/arm/include/asm/memory.h)
+
+#ifndef PHYS_OFFSET
+#define PHYS_OFFSET             UL(CONFIG_DRAM_BASE)
+#endif
+
+#ifndef END_MEM
+#define END_MEM                 (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
+#endif
+
+#ifndef PAGE_OFFSET
+#define PAGE_OFFSET             (PHYS_OFFSET)
+#endif
+
+My patchs for gpl327xx SoC is still in very early stage.
+I think you should send your fix upstream because I think it impacts other
+noMMU platforms (for above reason).
+
+Thanks,
+Axel
