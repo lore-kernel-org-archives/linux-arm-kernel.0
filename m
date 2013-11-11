@@ -1,49 +1,109 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 11 Nov 2013 10:53:23 +1030
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
-References: <1383789208.5970.1.camel@phoenix>
- <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
- <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
- <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
- <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
- <87zjpf4w0j.fsf@rustcorp.com.au>
- <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
-Message-ID: <87y54vzszo.fsf@rustcorp.com.au>
+From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
+Date: Mon, 11 Nov 2013 10:30:36 +0800
+Subject: [PATCH 1/2] usb: chipidea: usbmisc: Add support for i.MX27/i.MX31
+ CPUs
+In-Reply-To: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+Message-ID: <5280414C.3060806@gtsys.com.hk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
-> Hi Axel,
->
-> On Fri, Nov 8, 2013 at 12:20 PM, Axel Lin <axel.lin@ingics.com> wrote:
->>
->>
->> Hi Ming,
->>
->> I have patches on top of 3.12 to support gpl32700 SoC.
->> So you cannot find this platform on mainline kernel.
->
-> OK, I see.
->
->> I havn't tried perf, below is my config for your reference:
->> (to make the config smaller, I grep out disabled config entries.)
->
-> I doubt CONFIG_VMSPLIT_3G/CONFIG_PAGE_OFFSET isn't
-> used at all in your unmerged patchset, also your link script should
-> be different with in-tree arch/arm/kernel/vmlinux.lds.S, otherwise
-> you may put all your kernel symbols after 0xC00000000.
->
-> Maybe you need to not define PAGE_OFFSET and let it be
-> PHYS_OFFSET at default, also VMSPLIT_3G shouldn't have
-> been there on non-MMU linux.
+Hi Alexander,
 
-OK, unless there are other platforms which have this issue, I'll
-leave it with you to hold this patch for merge with your SoC.
+On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
+> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
+>
+> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
+> ---
+>   drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 42 insertions(+)
+>
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index 8a1094b..4381c5a6 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -21,6 +21,10 @@
+>   #define MX25_USB_PHY_CTRL_OFFSET	0x08
+>   #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
+>
+> +#define MX27_H1_PM_BIT			BIT(8)
+> +#define MX27_H2_PM_BIT			BIT(16)
+> +#define MX27_OTG_PM_BIT			BIT(24)
+> +
+>   #define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08
+>   #define MX53_USB_UH2_CTRL_OFFSET	0x14
+>   #define MX53_USB_UH3_CTRL_OFFSET	0x18
+> @@ -68,6 +72,36 @@ static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
+>   	return 0;
+>   }
+>
+> +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
+> +{
+> +	unsigned long flags;
+> +	u32 val;
+> +
+> +	switch (data->index) {
+> +	case 0:
+> +		val = MX27_OTG_PM_BIT;
+> +		break;
+> +	case 1:
+> +		val = MX27_H1_PM_BIT;
+> +		break;
+> +	case 2:
+> +		val = MX27_H2_PM_BIT;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	};
+> +
 
-Cheers,
-Rusty.
+ From my understanding this can not work, the usbmisc->base not point into the
+usb control register (USB_CTRL). Reference manual 30.5.1.1 says
+BASE + 0x600
+you must add the offset to the readl instruction.
+
+> +	spin_lock_irqsave(&usbmisc->lock, flags);
+> +	if (data->disable_oc)
+> +		val = readl(usbmisc->base) | val;
+
+else part not needed, the registers bits are set to 0 (reset)
+the function is called on start-up once only, right?!
+
+> +	else
+> +		val = readl(usbmisc->base)&  ~val;
+> +	writel(val, usbmisc->base);
+> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+>   static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
+>   {
+>   	void __iomem *reg = NULL;
+> @@ -128,6 +162,10 @@ static const struct usbmisc_ops imx25_usbmisc_ops = {
+>   	.post = usbmisc_imx25_post,
+>   };
+>
+> +static const struct usbmisc_ops imx27_usbmisc_ops = {
+> +	.init = usbmisc_imx27_init,
+> +};
+> +
+>   static const struct usbmisc_ops imx53_usbmisc_ops = {
+>   	.init = usbmisc_imx53_init,
+>   };
+> @@ -162,6 +200,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
+>   		.data =&imx25_usbmisc_ops,
+>   	},
+>   	{
+> +		.compatible = "fsl,imx27-usbmisc",
+> +		.data =&imx27_usbmisc_ops,
+> +	},
+> +	{
+>   		.compatible = "fsl,imx53-usbmisc",
+>   		.data =&imx53_usbmisc_ops,
+>   	},
+
+
+
+Regards
+Chris
