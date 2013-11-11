@@ -1,47 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Nov 2013 10:51:41 +0000
-Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
-In-Reply-To: <1384157427-31613-2-git-send-email-victor.kamensky@linaro.org>
-References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
- <1384157427-31613-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20131111105141.GB28302@mudshark.cambridge.arm.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 11 Nov 2013 19:51:52 +0900
+Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping support
+In-Reply-To: <52808D53.7080904@hitachi.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131108165639.GD15074@mudshark.cambridge.arm.com>
+ <527DFC1C.1020107@hitachi.com>
+ <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
+ <52808D53.7080904@hitachi.com>
+Message-ID: <5280B6C8.7050807@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 08:10:27AM +0000, Victor Kamensky wrote:
-> In case of armv7-m architecture arm instructions are not allowed.
-> For this architecture CONFIG_CPU_THUMBONLY is set. Use this macro
-> to emit conditionally arm instructions or nops in thumb mode.
+(2013/11/11 16:54), Masami Hiramatsu wrote:
+>>>> In fact, how do you avoid a race with hardware breakpoints? E.g., somebody
+>>>> places a hardware breakpoint on an instruction in the kernel for which
+>>>> kprobes has patched in a brk. We take the hardware breakpoint, disable the
+>>>> breakpoint and set up a single step before returning to the brk. The brk
+>>>> then traps, but we must take care not to disable single-step and/or unmask
+>>>> debug exceptions, because that will cause the hardware breakpoint code to
+>>>> re-arm its breakpoint before we've stepped off the brk instruction.
+>>>
+>>> Hmm, frankly to say, this kind of race issue is not seriously discussed
+>>> on x86 too, since kgdb is still a special tool (not used on the production
+>>> system).
+>>> I think under such situation kgdb operator must have full control of the
+>>> system, and he can (and has to) avoid such kind of race.
+>> Masami,
+>>
+>> Hmm I think in same lines, but not sure if we expect kprobes to be
+>> able to work fool-proof along with kgdb or hw breakpoints ?
 > 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
->  arch/arm/kernel/sigreturn_codes.S | 25 ++++++++++++++++++-------
->  1 file changed, 18 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
-> index 3c5d0f2..899fb86 100644
-> --- a/arch/arm/kernel/sigreturn_codes.S
-> +++ b/arch/arm/kernel/sigreturn_codes.S
-> @@ -41,17 +41,29 @@
->  	.arch armv4t
->  #endif
->  
-> +/*
-> + * In CPU_THUMBONLY kernel case arm opcodes are not allowed
-> + */
-> +#ifndef CONFIG_CPU_THUMBONLY
+> For hw breakpoint, yes, we finally get check each other to safely
+> use it even if one rejects the other one at some points(address).
+> Since the hw breakpoint is already open for normal user via perf,
+> we should do it. But the policy still needs to be discussed.
 
-Is this THUMBONLY stuff actually destined for mainline?
+OK, I've ensured that the hw_breakpoint (from perf) can work
+with kprobes (from ftrace) at the same address on x86.
+So if arm64 already support hw_breakpoint on perf, kprobes should
+work with it.
 
-> +#define ARM_INSTR(code...) .arm ; \
-> +			   code
-> +#else
-> +#define ARM_INSTR(code...) .thumb ; \
-> +			   nop ;    \
-> +			   nop ;
-> +#endif
+Thank you,
 
-Why can't you solve this with the ARM(...) and THUMB(...) macros, like we do
-in places like head.S?
-
-Will
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
