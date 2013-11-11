@@ -1,86 +1,178 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 11 Nov 2013 10:31:52 +0200
-Subject: [PATCHv4 1/7] ARM: tegra: Create a DT header defining SWGROUP ID
+Date: Mon, 11 Nov 2013 10:31:54 +0200
+Subject: [PATCHv4 3/7] iommu/tegra: smmu: Register IOMMU'able devices
+ dynamically
 In-Reply-To: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
 References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1384158718-4756-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1384158718-4756-4-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-binding. "swgroup" is a group of H/W clients which a Tegra SoC
-supports. This unique ID can be used to calculate MC_SMMU_<swgroup
-name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
-register bit. This will allow the same header to be used by both
-device tree files, and drivers implementing this binding, which
-guarantees that the two stay in sync. This also makes device trees
-more readable by using names instead of magic numbers. For HOTRESET
-bit shifting we need another conversion table, which will come later.
+platform_devices are registered as IOMMU'able dynamically via
+add_device() and remove_device().
+
+Tegra SMMU can have multiple address spaces(AS). IOMMU'able devices
+can belong to one of them. Multiple IOVA maps are created at boot-up,
+which can be attached to devices later. We reserve 2 of them for
+static assignment, AS[0] for system default, AS[1] for AHB clusters as
+protected domain from others, where there are many traditional
+pheripheral devices like USB, SD/MMC. They should be isolated from
+some smart devices like host1x for system robustness. Even if smart
+devices behaves wrongly, the traditional devices(SD/MMC, USB) wouldn't
+be affected, and the system could continue most likely. DMA API(ARM)
+needs ARM_DMA_USE_IOMMU to be enabled.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
 Update:
-This is almost same as the previous v3. Just TEGRA_SWGROUP_MAX is
-added.
-  [PATCHv3 15/19] ARM: tegra: Create a DT header defining SWGROUP ID
+Combined the following from v3. This makes more sense what they do.
+  [PATCHv3 06/19] iommu/tegra: smmu: Select ARM_DMA_USE_IOMMU in Kconfig
+  [PATCHv3 07/19] iommu/tegra: smmu: Create default IOVA maps
+  [PATCHv3 08/19] iommu/tegra: smmu: Register platform_device to IOMMU dynamically
+  [PATCHv3 19/19] iommu/tegra: smmu: Support Multiple ASID
 ---
- include/dt-bindings/memory/tegra-swgroup.h | 48 ++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 include/dt-bindings/memory/tegra-swgroup.h
+ drivers/iommu/Kconfig      |  1 +
+ drivers/iommu/tegra-smmu.c | 68 +++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 68 insertions(+), 1 deletion(-)
 
-diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
-new file mode 100644
-index 0000000..ef41166
---- /dev/null
-+++ b/include/dt-bindings/memory/tegra-swgroup.h
-@@ -0,0 +1,48 @@
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index c880eba..d1bc65d 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -170,6 +170,7 @@ config TEGRA_IOMMU_SMMU
+ 	bool "Tegra SMMU IOMMU Support"
+ 	depends on ARCH_TEGRA && TEGRA_AHB
+ 	select IOMMU_API
++	select ARM_DMA_USE_IOMMU
+ 	help
+ 	  Enables support for remapping discontiguous physical memory
+ 	  shared with the operating system into contiguous I/O virtual
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index 37dd862..6968c11 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -39,6 +39,7 @@
+ 
+ #include <asm/page.h>
+ #include <asm/cacheflush.h>
++#include <asm/dma-iommu.h>
+ 
+ enum smmu_hwgrp {
+ 	HWGRP_AFI,
+@@ -319,6 +320,8 @@ struct smmu_device {
+ 
+ 	struct device_node *ahb;
+ 
++	struct dma_iommu_mapping **map;
++
+ 	int		num_as;
+ 	struct smmu_as	as[0];		/* Run-time allocated array */
+ };
+@@ -947,6 +950,47 @@ static void smmu_iommu_domain_destroy(struct iommu_domain *domain)
+ 	dev_dbg(smmu->dev, "smmu_as@%p\n", as);
+ }
+ 
 +/*
-+ * This header provides constants for binding nvidia,swgroup ID
++ * ASID[0] for the system default
++ * ASID[1] for PPCS("AHB bus children"), which has SDMMC
++ * ASID[2][3].. open for drivers, first come, first served.
 + */
++enum {
++	SYSTEM_DEFAULT,
++	SYSTEM_PROTECTED,
++};
 +
-+#ifndef _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
-+#define _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
++static int smmu_iommu_add_device(struct device *dev)
++{
++	int err = -EPROBE_DEFER;
++	u64 swgroups;
++	struct dma_iommu_mapping *map = NULL;
 +
-+#define TEGRA_SWGROUP_AFI	0	/* 0x238 */
-+#define TEGRA_SWGROUP_AVPC	1	/* 0x23c */
-+#define TEGRA_SWGROUP_DC	2	/* 0x240 */
-+#define TEGRA_SWGROUP_DCB	3	/* 0x244 */
-+#define TEGRA_SWGROUP_EPP	4	/* 0x248 */
-+#define TEGRA_SWGROUP_G2	5	/* 0x24c */
-+#define TEGRA_SWGROUP_HC	6	/* 0x250 */
-+#define TEGRA_SWGROUP_HDA	7	/* 0x254 */
-+#define TEGRA_SWGROUP_ISP	8	/* 0x258 */
-+#define TEGRA_SWGROUP_ISP2	SWGROUP_ISP
-+#define TEGRA_SWGROUP_DC14	9	/* 0x490 *//* Exceptional non-linear */
-+#define TEGRA_SWGROUP_DC12	10	/* 0xa88 *//* Exceptional non-linear */
-+#define TEGRA_SWGROUP_MPE	11	/* 0x264 */
-+#define TEGRA_SWGROUP_MSENC	SWGROUP_MPE
-+#define TEGRA_SWGROUP_NV	12	/* 0x268 */
-+#define TEGRA_SWGROUP_NV2	13	/* 0x26c */
-+#define TEGRA_SWGROUP_PPCS	14	/* 0x270 */
-+#define TEGRA_SWGROUP_SATA2	15	/* 0x274 */
-+#define TEGRA_SWGROUP_SATA	16	/* 0x278 */
-+#define TEGRA_SWGROUP_VDE	17	/* 0x27c */
-+#define TEGRA_SWGROUP_VI	18	/* 0x280 */
-+#define TEGRA_SWGROUP_VIC	19	/* 0x284 */
-+#define TEGRA_SWGROUP_XUSB_HOST	20	/* 0x288 */
-+#define TEGRA_SWGROUP_XUSB_DEV	21	/* 0x28c */
-+#define TEGRA_SWGROUP_A9AVP	22	/* 0x290 */
-+#define TEGRA_SWGROUP_TSEC	23	/* 0x294 */
-+#define TEGRA_SWGROUP_PPCS1	24	/* 0x298 */
-+#define TEGRA_SWGROUP_SDMMC1A	25	/* 0xa94 *//* Linear shift again */
-+#define TEGRA_SWGROUP_SDMMC2A	26	/* 0xa98 */
-+#define TEGRA_SWGROUP_SDMMC3A	27	/* 0xa9c */
-+#define TEGRA_SWGROUP_SDMMC4A	28	/* 0xaa0 */
-+#define TEGRA_SWGROUP_ISP2B	29	/* 0xaa4 */
-+#define TEGRA_SWGROUP_GPU	30	/* 0xaa8 */
-+#define TEGRA_SWGROUP_GPUB	31	/* 0xaac */
-+#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
++	swgroups = smmu_of_get_memory_client(dev);
++	switch (swgroups) {
++	case TEGRA_SWGROUP_BIT(PPCS):
++		map = smmu_handle->map[SYSTEM_PROTECTED];
++		break;
++	default:
++		map = smmu_handle->map[SYSTEM_DEFAULT];
++		break;
++	}
 +
-+#define TEGRA_SWGROUP_MAX	64
++	if (map)
++		err = arm_iommu_attach_device(dev, map);
 +
-+#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
++	pr_debug("swgroups=%016llx map=%p err=%d %s\n",
++		 swgroups, map, err, dev_name(dev));
 +
-+#endif /* _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H */
++	return err;
++}
++
++static void smmu_iommu_remove_device(struct device *dev)
++{
++	dev_dbg(dev, "Detaching from map %p\n", to_dma_iommu_mapping(dev));
++	arm_iommu_detach_device(dev);
++}
++
+ static struct iommu_ops smmu_iommu_ops = {
+ 	.domain_init	= smmu_iommu_domain_init,
+ 	.domain_destroy	= smmu_iommu_domain_destroy,
+@@ -956,6 +1000,8 @@ static struct iommu_ops smmu_iommu_ops = {
+ 	.unmap		= smmu_iommu_unmap,
+ 	.iova_to_phys	= smmu_iommu_iova_to_phys,
+ 	.domain_has_cap	= smmu_iommu_domain_has_cap,
++	.add_device	= smmu_iommu_add_device,
++	.remove_device	= smmu_iommu_remove_device,
+ 	.pgsize_bitmap	= SMMU_IOMMU_PGSIZES,
+ };
+ 
+@@ -1144,6 +1190,23 @@ static int tegra_smmu_resume(struct device *dev)
+ 	return err;
+ }
+ 
++static void tegra_smmu_create_default_map(struct smmu_device *smmu)
++{
++	int i;
++
++	for (i = 0; i < smmu->num_as; i++) {
++		dma_addr_t base = smmu->iovmm_base;
++		size_t size = smmu->page_count << PAGE_SHIFT;
++
++		smmu->map[i] = arm_iommu_create_mapping(&platform_bus_type,
++							base, size, 0);
++		if (IS_ERR(smmu->map[i]))
++			dev_err(smmu->dev,
++				"Couldn't create: asid=%d map=%p %pa-%pa\n",
++				i, smmu->map[i], &base, &base + size - 1);
++	}
++}
++
+ static int tegra_smmu_probe(struct platform_device *pdev)
+ {
+ 	struct smmu_device *smmu;
+@@ -1160,13 +1223,15 @@ static int tegra_smmu_probe(struct platform_device *pdev)
+ 	if (of_property_read_u32(dev->of_node, "nvidia,#asids", &asids))
+ 		return -ENODEV;
+ 
+-	bytes = sizeof(*smmu) + asids * sizeof(*smmu->as);
++	bytes = sizeof(*smmu) + asids * (sizeof(*smmu->as) +
++					 sizeof(struct dma_iommu_mapping *));
+ 	smmu = devm_kzalloc(dev, bytes, GFP_KERNEL);
+ 	if (!smmu) {
+ 		dev_err(dev, "failed to allocate smmu_device\n");
+ 		return -ENOMEM;
+ 	}
+ 
++	smmu->map = (struct dma_iommu_mapping **)(smmu->as + asids);
+ 	smmu->nregs = pdev->num_resources;
+ 	smmu->regs = devm_kzalloc(dev, 2 * smmu->nregs * sizeof(*smmu->regs),
+ 				  GFP_KERNEL);
+@@ -1236,6 +1301,7 @@ static int tegra_smmu_probe(struct platform_device *pdev)
+ 	smmu_debugfs_create(smmu);
+ 	smmu_handle = smmu;
+ 	bus_set_iommu(&platform_bus_type, &smmu_iommu_ops);
++	tegra_smmu_create_default_map(smmu);
+ 	return 0;
+ }
+ 
 -- 
 1.8.1.5
