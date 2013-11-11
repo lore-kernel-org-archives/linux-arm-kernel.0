@@ -1,48 +1,42 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 11 Nov 2013 10:14:53 +0100
+Date: Mon, 11 Nov 2013 10:20:59 +0100
 Subject: [PATCH] arm,arm64: Conditionalize bio_vec usage
-In-Reply-To: <CAOesGMjCeTeoF3M4UNY4zzAMyBFLddcwaXU91ur28hGca2uBHA@mail.gmail.com>
+In-Reply-To: <alpine.DEB.2.02.1311061619540.26077@kaball.uk.xensource.com>
 References: <1383743117-4138-1-git-send-email-treding@nvidia.com>
- <CAOesGMjCeTeoF3M4UNY4zzAMyBFLddcwaXU91ur28hGca2uBHA@mail.gmail.com>
-Message-ID: <20131111091452.GE3884@ulmo.nvidia.com>
+ <20131106152909.GE979@arm.com>
+ <alpine.DEB.2.02.1311061619540.26077@kaball.uk.xensource.com>
+Message-ID: <20131111092047.GF3884@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 07:40:43AM -0800, Olof Johansson wrote:
-> On Wed, Nov 6, 2013 at 5:05 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > Commit 3d1975b57097 (arm,arm64: do not always merge bio_vec if we are
-> > running on Xen) unconditionally added code using the bio_vec typedefs
-> > which causes build errors on configurations where CONFIG_BLOCK is
-> > disabled.
-> >
-> > Add #ifdef CONFIG_BLOCK protection to fix this.
-> >
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+On Wed, Nov 06, 2013 at 04:21:09PM +0000, Stefano Stabellini wrote:
+> On Wed, 6 Nov 2013, Catalin Marinas wrote:
+> > On Wed, Nov 06, 2013 at 01:05:17PM +0000, Thierry Reding wrote:
+> > > Commit 3d1975b57097 (arm,arm64: do not always merge bio_vec if we are
+> > > running on Xen) unconditionally added code using the bio_vec typedefs
+> > > which causes build errors on configurations where CONFIG_BLOCK is
+> > > disabled.
+> > 
+> > I guess this commit is only in -next. Would it have the same hash when
+> > hitting mainline? Otherwise I'm fine with the patch, maybe Stephano can
+> > pick it together with the patch that breaks it.
 > 
-> I commented on the offending patch (which is a good way to make people
-> aware of it instead of posting standalone patches like you did),
-
-The standalone patch got Stefano's attention, so I don't see why you
-think it was a bad idea.
-
-I don't expect such patches to always be applied as is. If they aren't
-proper fixes and someone comes up with a much better way (which they did
-in this case), then I'm just as happy. Also it actually takes about the
-same amount of time to write up a patch, compile-test it and send it out
-than it takes to complain about the breakage by mail. I also find it
-slightly more helpful than just telling somebody that their patch broke
-something.
-
-Perhaps this is a bad example because it's really a trivial issue, but
-if it were anything slightly more complex, then sending a patch for it
-may save some maintainer the additional work. I don't immediately see
-what's wrong with that. Perhaps you'd care to elaborate.
-
-> and Stefano posted patch that declares struct bio_vec; instead.
+> I sent this patch earlier today to fix the problem:
 > 
-> Either way is ok with me, I'd generally prefer to avoid the ifdefs though.
+> http://marc.info/?l=linux-kernel&m=138374169030300&w=2
+> 
+> I prefer it to adding more ifdefs. I was going to add it to linux-next
+> as soon as possible and then send it upstream together with the rest of
+> the series.
 
-I agree, that's much nicer than the #ifdef.
+I generally prefer to avoid #ifdefs too. Although there are cases where
+an #ifdef can be an advantage as well. For instance if you call the
+xen_biovec_phys_mergeable() function and don't have CONFIG_BLOCK enabled
+the kernel will happily compile but fail to link. That might be somewhat
+more difficult to figure out than a compile error. Perhaps it won't.
+
+I have no objections to your proposed patch, and it fixes the build
+issues, so I'm good.
 
 Thierry
 -------------- next part --------------
@@ -51,4 +45,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/1700a2d2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/e29912cc/attachment.sig>
