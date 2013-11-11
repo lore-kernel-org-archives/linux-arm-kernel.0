@@ -1,31 +1,64 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 11 Nov 2013 16:53:32 +0900
-Subject: [PATCH RFC 4/6] arm64: Add kernel return probes
- support(kretprobes)
-In-Reply-To: <CA+b37P2aeXs4Cy_HxF24HQAYAnYzZ19PgV6rqrQLY9SMpZHDJg@mail.gmail.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108170448.GF15074@mudshark.cambridge.arm.com>
- <CA+b37P2aeXs4Cy_HxF24HQAYAnYzZ19PgV6rqrQLY9SMpZHDJg@mail.gmail.com>
-Message-ID: <52808CFC.6060701@linaro.org>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 11 Nov 2013 15:53:51 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+ <87zjpf4w0j.fsf@rustcorp.com.au>
+ <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+Message-ID: <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 01:29 PM, Sandeepa Prabhu wrote:
-> On 8 November 2013 22:34, Will Deacon <will.deacon@arm.com> wrote:
->>> +static inline long regs_return_value(struct pt_regs *regs)
->>> +{
->>> +     return regs->regs[0];
->>> +}
->>
->> This is also being implemented by another patch series (I think the audit
->> stuff?).
-> Not sure, I did not see this being implemented in audit(audit adds for
-> 'syscallno',  not for return value in x0)
-> I can rebase my code if this change is implemented and queued in other patchset.
+Hi,
 
-Yes, my audit patch has it.
-The definition is referred to in include/linux/audit.h (and ptrace.h),
-too.
+On Mon, Nov 11, 2013 at 2:43 PM, Axel Lin <axel.lin@ingics.com> wrote:
+> 2013/11/11 Rusty Russell <rusty@rustcorp.com.au>:
+>
+> Hi Rusty,
+>
+> I don't have other noMMU platform to test.
+> But I think this issue impacts various !CONFIG_MMU platforms:
+> We have CONFIG_PAGE_OFFSET=0xC0000000 in various default configs.
+> For !CONFIG_MMU case, it just don't use the CONFIG_PAGE_OFFSET setting.
+> So use CONFIG_PAGE_OFFSET to filter symbols looks wrong to me for all
+> !CONFIG_MMU cases.
+>
+> Below is PAGE_OFFSET setting for !CONFIG_MMU case:
+> (arch/arm/include/asm/memory.h)
+>
+> #ifndef PHYS_OFFSET
+> #define PHYS_OFFSET             UL(CONFIG_DRAM_BASE)
+> #endif
+>
+> #ifndef END_MEM
+> #define END_MEM                 (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
+> #endif
+>
+> #ifndef PAGE_OFFSET
+> #define PAGE_OFFSET             (PHYS_OFFSET)
+> #endif
+>
+> My patchs for gpl327xx SoC is still in very early stage.
+> I think you should send your fix upstream because I think it impacts other
+> noMMU platforms (for above reason).
 
--Takahiro AKASHI
+I suggest to do it when we are clear behind the break.
+
+As I mentioned, no matter what PAGE_OFFSET is, if you link vmlinux
+from the address of PAGE_OFFSET(that is what arm's link script in tree
+does), the filter won't break anything.
+
+
+Thanks,
+-- 
+Ming Lei
