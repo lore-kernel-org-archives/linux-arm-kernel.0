@@ -1,73 +1,50 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Mon, 11 Nov 2013 16:37:15 +0800
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
-References: <1383789208.5970.1.camel@phoenix>
- <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
- <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
- <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
- <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
- <87zjpf4w0j.fsf@rustcorp.com.au>
- <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
- <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
- <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
-Message-ID: <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 11 Nov 2013 14:17:52 +0530
+Subject: [RFC v1 PATCH] ARM64: KGDB: Add FP/SIMD debug support
+In-Reply-To: <20131108150602.GN17461@mudshark.cambridge.arm.com>
+References: <1383827921-18526-1-git-send-email-vijay.kilari@gmail.com>
+ <1383827921-18526-2-git-send-email-vijay.kilari@gmail.com>
+ <20131108150602.GN17461@mudshark.cambridge.arm.com>
+Message-ID: <CALicx6s_F=s7XmoU=f1kdyq0c12VcJZC5KJtH-5=0OGv1Sn9vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/11 Ming Lei <tom.leiming@gmail.com>:
-> Hi,
+On Fri, Nov 8, 2013 at 8:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Nov 07, 2013 at 12:38:41PM +0000, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>>
+>> Add KGDB debug support for FP/SIMD processor.This support
+>> only debugging of FP/SIMD in kernel mode.
+>> With this patch one can view or set FP/SIMD registers in
+>> kernel context
+>>
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>> ---
+>>  arch/arm64/kernel/kgdb.c |   98 ++++++++++++++++++++++++++++------------------
+>>  1 file changed, 60 insertions(+), 38 deletions(-)
 >
-> On Mon, Nov 11, 2013 at 2:43 PM, Axel Lin <axel.lin@ingics.com> wrote:
->> 2013/11/11 Rusty Russell <rusty@rustcorp.com.au>:
->>
->> Hi Rusty,
->>
->> I don't have other noMMU platform to test.
->> But I think this issue impacts various !CONFIG_MMU platforms:
->> We have CONFIG_PAGE_OFFSET=0xC0000000 in various default configs.
->> For !CONFIG_MMU case, it just don't use the CONFIG_PAGE_OFFSET setting.
->> So use CONFIG_PAGE_OFFSET to filter symbols looks wrong to me for all
->> !CONFIG_MMU cases.
->>
->> Below is PAGE_OFFSET setting for !CONFIG_MMU case:
->> (arch/arm/include/asm/memory.h)
->>
->> #ifndef PHYS_OFFSET
->> #define PHYS_OFFSET             UL(CONFIG_DRAM_BASE)
->> #endif
->>
->> #ifndef END_MEM
->> #define END_MEM                 (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
->> #endif
->>
->> #ifndef PAGE_OFFSET
->> #define PAGE_OFFSET             (PHYS_OFFSET)
->> #endif
->>
->> My patchs for gpl327xx SoC is still in very early stage.
->> I think you should send your fix upstream because I think it impacts other
->> noMMU platforms (for above reason).
+> [...]
 >
-> I suggest to do it when we are clear behind the break.
+>> @@ -100,11 +108,18 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
+>>       if (regno >= DBG_MAX_REG_NUM || regno < 0)
+>>               return NULL;
+>>
+>> -     if (dbg_reg_def[regno].offset != -1)
+>> +     if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
+>>               memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
+>>                      dbg_reg_def[regno].size);
+>> -     else
+>> +     else {
+>> +#ifdef CONFIG_KERNEL_MODE_NEON
+>> +             fpsimd_save_state(&kgdb_fpsimd_regs);
+>> +             memcpy(mem, (void *)&kgdb_fpsimd_regs +
+>> +                     dbg_reg_def[regno].offset, dbg_reg_def[regno].size);
 >
-> As I mentioned, no matter what PAGE_OFFSET is, if you link vmlinux
-> from the address of PAGE_OFFSET(that is what arm's link script in tree
-> does), the filter won't break anything.
+> Don't you only want to do this if you're inside a kernel_neon_{begin,end}
+> section? Otherwise, you'll be copying out user registers. It really depends
+> on what semantics you want.
+>
+Yes, we can do that. I couldn't find any api to know the state of the neon.
+I think of using a status variable and update in kernel_neon_begin/end?
 
-Hi Ming,
-
-commit f6537f2f "scripts/kallsyms: filter symbols not in kernel address space",
-uses CONFIG_PAGE_OFFSET as kernel_start_addr.
-However, for !CONFIG_MMU case we have :
-    PAGE_OFFSET != CONFIG_PAGE_OFFSET.
-
-That is why I think the filter breaks !MMU platforms.
-
-Regards,
-Axel
+> Will
