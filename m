@@ -1,23 +1,28 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 11 Nov 2013 13:03:52 +0100
-Subject: [PATCHv4 5/7] iommu/tegra: smmu: Support "mmu-masters" binding
-In-Reply-To: <20131111113510.GG28302@mudshark.cambridge.arm.com>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com><1384158718-4756-6-git-send-email-hdoyu@nvidia.com><20131111113510.GG28302@mudshark.cambridge.arm.com>
-Message-ID: <20131111.140352.730622703500692694.hdoyu@nvidia.com>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Mon, 11 Nov 2013 13:08:24 +0100
+Subject: imx-drm: possible circular locking dependency detected
+In-Reply-To: <CAOMZO5A1i2jf1Mw-js=+ZF=rRL5JZFHD_d-KMhsqOuaZQx-9zw@mail.gmail.com>
+References: <CAH9NwWdswcfwVOoCz3AmS8O7Adaun5tf3QJh5YE2iK96d3ajOg@mail.gmail.com>
+ <CAOMZO5A1i2jf1Mw-js=+ZF=rRL5JZFHD_d-KMhsqOuaZQx-9zw@mail.gmail.com>
+Message-ID: <CAH9NwWdXxzQc3zJrH+p2bV8js2Pz5tA8HZRDjWrWkvFBeSd2Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> wrote @ Mon, 11 Nov 2013 12:35:10 +0100:
+Hi Fabio
 
-> This code looks familiar ;)
+2013/11/11 Fabio Estevam <festevam@gmail.com>:
+> Hi Christian,
+>
+> On Mon, Nov 11, 2013 at 7:25 AM, Christian Gmeiner
+> <christian.gmeiner@gmail.com> wrote:
+>> I am not sure if this problem is known but here is dmesg output. If a
+>> kernel config is needed I can
+>> send it
+>
+> Please apply this patch:
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/staging/imx-drm/imx-drm-core.c?id=c35d6a37bdcb1dde42dd65b00676696e2dd78f2f
+>
 
-;)
- 
-> If this approach makes it past the DT guys, I wonder if there's any scope
-> for factoring out some of the arm-smmu code so that basic client
-> parsing/searching/registration can be made into a library?
-
-That's what I thought too. I just didn't proceed further till I get
-some feedback on this design first. As you suggested, some of arm,smmu
-part can be enough generic so that some other of IOMMU drivers can
-make use of that as a library.
+thanks
+--
+Christian Gmeiner, MSc
