@@ -1,56 +1,70 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 11 Nov 2013 15:26:52 -0800
-Subject: [RFC PATCH 4/4] mm/vmalloc.c: Treat the entire kernel virtual space
- as vmalloc
-In-Reply-To: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1384212412-21236-5-git-send-email-lauraa@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Nov 2013 15:31:52 -0800
+Subject: [PATCH 1/3] arm: omap2: Export devconf1 bypass and acbias.
+In-Reply-To: <CAAfyv37LRb_Q=UZVgtKdOAz_r6_qThewAU90W7nrqHdB5fDA_g@mail.gmail.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <1381784555-18344-2-git-send-email-marek@goldelico.com>
+ <20131111164917.GN15154@atomide.com>
+ <CAAfyv37LRb_Q=UZVgtKdOAz_r6_qThewAU90W7nrqHdB5fDA_g@mail.gmail.com>
+Message-ID: <20131111233152.GR15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_ENABLE_VMALLOC_SAVINGS, all lowmem is tracked in
-vmalloc. This means that all the kernel virtual address space
-can be treated as part of the vmalloc region. Allow vm areas
-to be allocated from the full kernel address range.
+* Belisko Marek <marek.belisko@gmail.com> [131111 14:01]:
+> Hi Tony,
+> 
+> On Mon, Nov 11, 2013 at 5:49 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Marek Belisko <marek@goldelico.com> [131014 14:11]:
+> >> devconf1 reg access is localized only in mach-omap2 and we need to export
+> >> updating of devconf1 from omapdss venc driver (bypass and acbias bits).
+> >> Add simple api call which update only necessary bits.
+> > ...
+> >
+> >> +void update_bypass_acbias(bool bypass, bool acbias)
+> >> +{
+> >> +#ifdef CONFIG_ARCH_OMAP3
+> >> +     int val = omap_ctrl_readl(OMAP343X_CONTROL_DEVCONF1);
+> >> +
+> >> +     if (bypass)
+> >> +             val |= OMAP2_TVOUTBYPASS;
+> >> +     else
+> >> +             val &= ~OMAP2_TVOUTBYPASS;
+> >> +
+> >> +     if (acbias)
+> >> +             val |= OMAP2_TVACEN;
+> >> +     else
+> >> +             val &= ~OMAP2_TVACEN;
+> >> +
+> >> +     omap_ctrl_writel(val, OMAP343X_CONTROL_DEVCONF1);
+> >> +#endif
+> >
+> > If this is truly a pinmux, you could already access this
+> > using pinctrl-single,bits device tree driver.
+> >
+> > But I guess that won't work yet, so it's best to set this
+> > up as a separate driver like we've done for the USB PHY
+> > registers.
+>
+> Can you please point me to that driver directly? I cannot see benefit
+> of new driver as as it will be only dummy driver
+> with export_symbol_gpl of upper function. Can it sit then in dss
+> directory or somewhere else? Thanks.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-Signed-off-by: Neeti Desai <neetid@codeaurora.org>
----
- mm/vmalloc.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+You can take a look at drivers/usb/phy/phy-omap-control.c.
 
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index c7b138b..181247d 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -1385,16 +1385,27 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
-  */
- struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
- {
-+#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-+	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
-+				  NUMA_NO_NODE, GFP_KERNEL,
-+				  __builtin_return_address(0));
-+#else
- 	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
- 				  NUMA_NO_NODE, GFP_KERNEL,
- 				  __builtin_return_address(0));
-+#endif
- }
- 
- struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
- 				const void *caller)
- {
-+#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-+	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
-+				  NUMA_NO_NODE, GFP_KERNEL, caller);
-+#else
- 	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
- 				  NUMA_NO_NODE, GFP_KERNEL, caller);
-+#endif
- }
- 
- /**
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Then there's a device tree using example for control_devconf0 in
+Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt.
+
+Looks like CONTROL_DEVCONF1 contains a bunch of misc registers,
+and arch/arm/mach-omap2/hsmmc.c seems to be tinkering with it too.
+
+It would be best to set it up as omap-ctrl.c driver under drivers
+somewhere with few functions exported for DSS and MMC drivers.
+
+The reason why it should be a separate driver is that the system
+control module can live a separate runtime PM life from the
+drivers using the CONTROL_DEVCONF register bits.
+
+Regards,
+
+Tony
