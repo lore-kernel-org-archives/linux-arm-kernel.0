@@ -1,36 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Nov 2013 18:35:56 -0800
-Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <20131111074633.GG14892@pengutronix.de>
-References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
- <20131111074633.GG14892@pengutronix.de>
-Message-ID: <5281940C.3040705@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 11 Nov 2013 15:30:02 +0000
+Subject: [PATCH] phy: Add MOXA RTL8201CP PHY support
+In-Reply-To: <CAGVrzcZW=CLWPZgRqkqR1wNh+S7dfwRZAzn1Uq7Ji6K0=iGYtg@mail.gmail.com>
+References: <1383317673-14704-1-git-send-email-jonas.jensen@gmail.com>
+ <CAGVrzcYfdChFNgkh=VAFZQfCRHyNTe_pZxx1Z6Sz1S8_1vzgtA@mail.gmail.com>
+ <CACmBeS3aUq_yPVg_GaKmQRQMhAmO8RZVzUGY=T6Ghn7v0sP8Dw@mail.gmail.com>
+ <CAGVrzcZW=CLWPZgRqkqR1wNh+S7dfwRZAzn1Uq7Ji6K0=iGYtg@mail.gmail.com>
+Message-ID: <20131111153002.722CCC4191F@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/13 23:46, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> On Fri, Nov 08, 2013 at 03:00:32PM -0800, Stephen Boyd wrote:
->> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
->> index bd454b0..38621729 100644
->> --- a/arch/arm/lib/Makefile
->> +++ b/arch/arm/lib/Makefile
->> @@ -15,6 +15,12 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
->>  		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
->>  		   call_with_stack.o
->>  
->> +lib-$(CONFIG_CPU_V7) += div-v7.o
-> CPU_V7M could make use of that, too.
-> (If you follow Nico's advice to use runtime patching I cannot test it
-> for you on v7-M though as my machine has to use an XIP kernel.)
->
+On Mon, 4 Nov 2013 09:51:24 -0800, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 2013/11/4 Jonas Jensen <jonas.jensen@gmail.com>:
+> > This is why I ended up setting PHY_IGNORE_INTERRUPT and the comment
+> > about its effectiveness. Polling works but the extra reads on the bus
+> > seem unnecessary.
+> > Ideas how they can be eliminated are appreciated.
+> 
+> As of today, the only way to work around it is not to use
+> of_mdiobus_register() and use mdiobus_register() directly which will
+> allow you to properly describe such a configuration.
 
-It already is runtime patching so I suspect you won't be able to test it
-anyway. I suppose we need another config like MIGHT_HAVE_IDIV or
-something that both v7 and v7M select?
+of_mdiobus_register() can be changed. One option: If the caller knows
+what it wants to happen in the case of no interrupt, then it can be
+added as an argument to of_mdiobus_register(). No need to work around
+this in an ugly way.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Is setting the irq to PHY_POLL something that should be done for the
+entire bus, or only for a handful of PHYs?
+
+g.
