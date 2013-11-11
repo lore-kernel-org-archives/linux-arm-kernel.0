@@ -1,99 +1,49 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 11 Nov 2013 02:09:08 +0100
-Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 2120 board
-In-Reply-To: <87fvr393ro.fsf@natisbad.org>
-References: <87bo1tmibv.fsf@natisbad.org> <527ECBDD.7050607@gmail.com>
- <87hablulxu.fsf@natisbad.org> <527ED9E5.80800@gmail.com>
- <87fvr393ro.fsf@natisbad.org>
-Message-ID: <52802E34.5020209@gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 11 Nov 2013 10:53:23 +1030
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+ <87zjpf4w0j.fsf@rustcorp.com.au>
+ <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+Message-ID: <87y54vzszo.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 01:32 AM, Arnaud Ebalard wrote:
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
->>>>> +				status = "okay";
->>>>> +			};
->>>>> +
->>>>> +			mdio {
->>>>> +				phy0: ethernet-phy at 0 {
->>>>> +					reg = <0>;
->>>>
->>>> Can you evaluate PHYs compatible from u-boot or post vendor:prodid
->>>> from MDIO registers?
->>>
->>> Looking at the PCB, 88E1318-NNB2. I will dig into Documentation/ the
->>> associated compatible. Out of curiosity, how do you get the PHY model
->>> from u-boot or userland?
+Ming Lei <tom.leiming@gmail.com> writes:
+> Hi Axel,
+>
+> On Fri, Nov 8, 2013 at 12:20 PM, Axel Lin <axel.lin@ingics.com> wrote:
 >>
->> If it is 88e1318 the compatible is "marvell,88e1318" then. I usually
->> look at u-boot messages which sometimes reveal the PHY used. If that
->> is not sufficient, you can read PHY ID 1/2 (SMI address 2 and 3)
->> registers and go looking for model numbers.
+>>
+>> Hi Ming,
+>>
+>> I have patches on top of 3.12 to support gpl32700 SoC.
+>> So you cannot find this platform on mainline kernel.
 >
-> For the records, another solution is to look under /sys/:
+> OK, I see.
 >
-> root at thin:/sys/bus/mdio_bus/drivers# find -name '*mdio*'
-> ./Marvell 88E1318S/d0072004.mdio-mi:00
-> ./Marvell 88E1318S/d0072004.mdio-mi:01
-
-Well, the compatible is "marvell,88e1318s" then.
-
-> I guess the driver just looks at the PHY ID to detect the flavour.
+>> I havn't tried perf, below is my config for your reference:
+>> (to make the config smaller, I grep out disabled config entries.)
 >
-> Now regarding the compatible string you propose,  did some grep calls
-> and was unable to find a reference to marvell,88e1318 or even 88e138 and
-> was unable to find any. How does the kernel do something with it to
-> somehow inflect the selection of the right driver/flavour?
-
-You are right, it uses PHYID registers. The compatible is not used by
-the driver. Anyway, it is nice to have it in there.
-
->>>> Both properties above are not required, so please remove them.
->>>>
->>>>> +	       g762_clk: fixedclk {
->>>>
->>>> s/fixedclk/oscillator/ ?
+> I doubt CONFIG_VMSPLIT_3G/CONFIG_PAGE_OFFSET isn't
+> used at all in your unmerged patchset, also your link script should
+> be different with in-tree arch/arm/kernel/vmlinux.lds.S, otherwise
+> you may put all your kernel symbols after 0xC00000000.
 >
-> In fact, if I change 'fixedclk' for 'oscillator', then I am unable to
-> boot: my SATA disk get unrecognized in a storm of insane
-> messages. Obviously, because I had modified the whole .dts to handle all
-> the points in your revieuw, I spent some time finding the root
-> cause. But that was interesting on many aspects and the continuation of
-> a debugging week end ;-)
+> Maybe you need to not define PAGE_OFFSET and let it be
+> PHYS_OFFSET at default, also VMSPLIT_3G shouldn't have
+> been there on non-MMU linux.
 
-Ah, sorry for that. You can try to make the node name unique by either
-choosing a different meaningful name or try to add @1 after the node
-name. G762 datasheet might have a good name for it, like clock-crystal
-or something.
+OK, unless there are other platforms which have this issue, I'll
+leave it with you to hold this patch for merge with your SoC.
 
-> Can you confirm the following: g762_clk is a *label for the node*, which
-> is referenced via specific properties of g762 at xx nodes, so that they get
-> a clock frequency (a property of g762_clk). And fixedclk is *the name of
-> the node*. In that specific case, fixedclk is ok because it does not
-> collide w/ any existing node. But 'oscillator' is already defined in
-> armada-xp.dtsi (included via armada-370-xp.dtsi):
->
-> 	clocks {
-> 		/* 25 MHz reference crystal */
-> 		refclk: oscillator {
-> 			compatible = "fixed-clock";
-> 			#clock-cells = <0>;
-> 			clock-frequency = <25000000>;
-> 		};
-> 	};
-
-Confirmed.
-
-> So I guess the renaming I did from 'fixedclk' to 'oscillator' just
-> somehow overloaded the armada-xp.dtsi 25Mhz clock for a 32KHz one, hence
-> the inability to boot. If I am correct, I guess it would be nice to have
-> some checks from dtc when compiling the .dts to verify the uniqueness of
-> nodes in order to avoid such things.
-
-Hmm, that's difficult because dtc cannot know if you intentionally want
-to overwrite that node or I gave you the wrong name for it. The
-different node label could be a hint for the latter though.
-
-Sorry for the extra work that comment caused.
-
-Sebastian
+Cheers,
+Rusty.
