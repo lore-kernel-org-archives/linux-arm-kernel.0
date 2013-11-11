@@ -1,81 +1,135 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Nov 2013 11:19:33 +0100
-Subject: [PATCH 2/4] cpu: advertise CPU features over udev in a generic way
-In-Reply-To: <1384165175-16134-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1384165175-16134-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1384165175-16134-3-git-send-email-ard.biesheuvel@linaro.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 11 Nov 2013 11:27:48 +0100
+Subject: [REGRESSION,BISECTED] 3.11.7,3.12: GbE iface rate drops to few KB/s
+Message-ID: <871u2n44ij.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements a generic modalias 'cpu:type:...:feature:...'
-which enables CPU feature flag based module loading in a generic way.
-All the arch needs to do is enable CONFIG_ARCH_HAS_CPU_AUTOPROBE and
-implement arch_print_cpu_modalias(). The modules need to declare the
-CPU feature they depend on with MODULE_DEVICE_TABLE(cpu, ...)
+Hi,    [resending (previous msg did not hit netdev); also fixed subject]
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- include/linux/mod_devicetable.h   | 11 +++++++++++
- scripts/mod/devicetable-offsets.c |  3 +++
- scripts/mod/file2alias.c          | 10 ++++++++++
- 3 files changed, 24 insertions(+)
+I decided to upgrade the kernel on one of my ReadyNAS 102 from 3.11.1 to 
+3.11.7. The device is based on Marvell Armada 370 SoC and uses mvneta
+driver. Mine runs Debian armel unstable but I can confirm the issue also
+happens on a debian harmhf unstable.
 
-diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
-index 45e9214..da20e57 100644
---- a/include/linux/mod_devicetable.h
-+++ b/include/linux/mod_devicetable.h
-@@ -564,6 +564,17 @@ struct x86_cpu_id {
- #define X86_MODEL_ANY  0
- #define X86_FEATURE_ANY 0	/* Same as FPU, you can't test for that */
- 
-+/*
-+ * Generic table type for tracking CPU features.
-+ * @feature:	the bit number of the feature (0000 - ffff)
-+ *
-+ * How the bit numbers map to actual CPU features is entirely up to the arch
-+ */
-+
-+struct generic_cpu_id {
-+	__u16	feature;
-+};
-+
- #define IPACK_ANY_FORMAT 0xff
- #define IPACK_ANY_ID (~0)
- struct ipack_device_id {
-diff --git a/scripts/mod/devicetable-offsets.c b/scripts/mod/devicetable-offsets.c
-index bb5d115..1aa2126 100644
---- a/scripts/mod/devicetable-offsets.c
-+++ b/scripts/mod/devicetable-offsets.c
-@@ -174,6 +174,9 @@ int main(void)
- 	DEVID_FIELD(x86_cpu_id, model);
- 	DEVID_FIELD(x86_cpu_id, vendor);
- 
-+	DEVID(generic_cpu_id);
-+	DEVID_FIELD(generic_cpu_id, feature);
-+
- 	DEVID(mei_cl_device_id);
- 	DEVID_FIELD(mei_cl_device_id, name);
- 
-diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
-index 2370863..efc7abe 100644
---- a/scripts/mod/file2alias.c
-+++ b/scripts/mod/file2alias.c
-@@ -1135,6 +1135,16 @@ static int do_x86cpu_entry(const char *filename, void *symval,
- }
- ADD_TO_DEVTABLE("x86cpu", x86_cpu_id, do_x86cpu_entry);
- 
-+/* LOOKS like cpu:type:*:feature:*FEAT* */
-+static int do_cpu_entry(const char *filename, void *symval, char *alias)
-+{
-+	DEF_FIELD(symval, generic_cpu_id, feature);
-+
-+	sprintf(alias, "cpu:type:*:feature:*%04X*", feature);
-+	return 1;
-+}
-+ADD_TO_DEVTABLE("cpu", generic_cpu_id, do_cpu_entry);
-+
- /* Looks like: mei:S */
- static int do_mei_entry(const char *filename, void *symval,
- 			char *alias)
--- 
-1.8.3.2
+Doing some scp transfers of files located on the NAS (1000baseT-FD on
+both side), I noticed the transfers rate is ridiculously slow (280KB/s).
+I did the same test with a 3.12 kernel and got the same results,
+i.e. AFAICT the bug also exist upstream.
+
+So, I decided to go to hell and start digging a bit: I run a 'git bisect'
+session on stable tree from 3.11.1 (known good) to 3.11.7 (known
+bad). The results are given below.
+
+I decided to reboot on my old 3.11.1 kernel and do 20 files transfers
+of a 1GB file located on the NAS to my laptop via scp. I took the 20+
+minutes and let them all finish: each transfer took between 1min5s and
+1min7s (around 16MB/s, the limitation in that case being the crypto part).
+
+I rebooted again and did the exact same thing on the 3.11.7 and after
+the completion of the first file transfer in 1m6s (16MB/s), the second
+one gave me that:
+
+arno at small:~scp RN102:/tmp/random /dev/null
+random                               0% 1664KB 278.9KB/s 1:05:37 ETA^C
+
+And it continued that way for the remaining transfers (i did ^c after
+some seconds to restart the transfer when the rate was low):
+
+$ for k in $(seq 1 20) ; do scp RN102:random /dev/null ; done 
+random                             100% 1024MB  15.6MB/s   01:06 ETA^C 
+random                               0% 9856KB 282.2KB/s 1:01:20 ETA^C
+random                              16%  168MB 563.9KB/s   25:54 ETA^C
+random                               0% 2816KB 273.5KB/s 1:03:43 ETA^C
+random                             100% 1024MB  15.5MB/s   01:06    
+random                               1%   17MB 282.3KB/s 1:00:54 ETA^C
+random                               0%  544KB 259.2KB/s 1:07:23 ETA^C
+random                               0% 4224KB 277.3KB/s 1:02:45 ETA^C
+random                               0%  832KB 262.1KB/s 1:06:37 ETA^C
+random                               0% 3360KB 273.4KB/s 1:03:43 ETA^C
+random                               0% 3072KB 271.8KB/s 1:04:07 ETA^C
+random                               0%  832KB 262.1KB/s 1:06:37 ETA^C
+random                               0% 1408KB 267.0KB/s 1:05:21 ETA^C
+random                               0% 1120KB 264.7KB/s 1:05:57 ETA
+...
+
+To be sure, I did 2 additional reboots, one on each kernel and the
+result is consistent. Perfect on 3.11.1 and slow rate most of the time
+on 3.11.7 (Both kernel are compiled from a fresh make clean, using the
+same config file).
+
+Then, knowing that, I started a git bisect session on stable tree to end
+up with the following suspects. I failed to go any further to a single
+commit, due to crashes, but I could recompile a kernel w/ debug info and
+report what I get if neeeded.
+
+commit dc0791aee672 tcp: do not forget FIN in tcp_shifted_skb()     [bad]
+commit 18ddf5127c9f tcp: must unclone packets before mangling them
+commit 80bd5d8968d8 tcp: TSQ can use a dynamic limit
+commit dbeb18b22197 tcp: TSO packets automatic sizing
+commit 50704410d014 Linux 3.11.6                                    [good]
+
+Eric, David, if it has already been reported and fixed, just tell
+me. Otherwise, if you have any ideas, I'll be happy to test this
+evening.
+
+Cheers,
+
+a+
+
+
+Just in case it may be useful, here is what ethtool reports on RN102:
+
+# ethtool -i eth0
+driver: mvneta
+version: 1.0
+firmware-version: 
+bus-info: eth0
+supports-statistics: no
+supports-test: no
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: no
+
+# ethtool -k eth0
+Features for eth0:
+rx-checksumming: off [fixed]
+tx-checksumming: on
+        tx-checksum-ipv4: on
+        tx-checksum-ip-generic: off [fixed]
+        tx-checksum-ipv6: off [fixed]
+        tx-checksum-fcoe-crc: off [fixed]
+        tx-checksum-sctp: off [fixed]
+scatter-gather: on
+        tx-scatter-gather: on
+        tx-scatter-gather-fraglist: off [fixed]
+tcp-segmentation-offload: off
+        tx-tcp-segmentation: off [fixed]
+        tx-tcp-ecn-segmentation: off [fixed]
+        tx-tcp6-segmentation: off [fixed]
+udp-fragmentation-offload: off [fixed]
+generic-segmentation-offload: on
+generic-receive-offload: on
+large-receive-offload: off [fixed]
+rx-vlan-offload: off [fixed]
+tx-vlan-offload: off [fixed]
+ntuple-filters: off [fixed]
+receive-hashing: off [fixed]
+highdma: off [fixed]
+rx-vlan-filter: off [fixed]
+vlan-challenged: off [fixed]
+tx-lockless: off [fixed]
+netns-local: off [fixed]
+tx-gso-robust: off [fixed]
+tx-fcoe-segmentation: off [fixed]
+tx-gre-segmentation: off [fixed]
+tx-udp_tnl-segmentation: off [fixed]
+tx-mpls-segmentation: off [fixed]
+fcoe-mtu: off [fixed]
+tx-nocache-copy: on
+loopback: off [fixed]
+rx-fcs: off [fixed]
+rx-all: off [fixed]
+tx-vlan-stag-hw-insert: off [fixed]
+rx-vlan-stag-hw-parse: off [fixed]
+rx-vlan-stag-filter: off [fixed]
