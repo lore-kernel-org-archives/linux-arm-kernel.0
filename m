@@ -1,181 +1,73 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
-Date: Mon, 11 Nov 2013 14:02:58 +0530
-Subject: [PATCH V2 2/2] ARM: dts: Enable ahci sata and sata phy
-In-Reply-To: <1384158778-27555-1-git-send-email-yuvaraj.cd@samsung.com>
-References: <1384158778-27555-1-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <1384158778-27555-3-git-send-email-yuvaraj.cd@samsung.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Mon, 11 Nov 2013 16:37:15 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+ <87zjpf4w0j.fsf@rustcorp.com.au>
+ <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+Message-ID: <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dt entry for ahci sata controller and its
-corresponding phy controller.phy node has been added w.r.t
-new generic phy framework.
+2013/11/11 Ming Lei <tom.leiming@gmail.com>:
+> Hi,
+>
+> On Mon, Nov 11, 2013 at 2:43 PM, Axel Lin <axel.lin@ingics.com> wrote:
+>> 2013/11/11 Rusty Russell <rusty@rustcorp.com.au>:
+>>
+>> Hi Rusty,
+>>
+>> I don't have other noMMU platform to test.
+>> But I think this issue impacts various !CONFIG_MMU platforms:
+>> We have CONFIG_PAGE_OFFSET=0xC0000000 in various default configs.
+>> For !CONFIG_MMU case, it just don't use the CONFIG_PAGE_OFFSET setting.
+>> So use CONFIG_PAGE_OFFSET to filter symbols looks wrong to me for all
+>> !CONFIG_MMU cases.
+>>
+>> Below is PAGE_OFFSET setting for !CONFIG_MMU case:
+>> (arch/arm/include/asm/memory.h)
+>>
+>> #ifndef PHYS_OFFSET
+>> #define PHYS_OFFSET             UL(CONFIG_DRAM_BASE)
+>> #endif
+>>
+>> #ifndef END_MEM
+>> #define END_MEM                 (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
+>> #endif
+>>
+>> #ifndef PAGE_OFFSET
+>> #define PAGE_OFFSET             (PHYS_OFFSET)
+>> #endif
+>>
+>> My patchs for gpl327xx SoC is still in very early stage.
+>> I think you should send your fix upstream because I think it impacts other
+>> noMMU platforms (for above reason).
+>
+> I suggest to do it when we are clear behind the break.
+>
+> As I mentioned, no matter what PAGE_OFFSET is, if you link vmlinux
+> from the address of PAGE_OFFSET(that is what arm's link script in tree
+> does), the filter won't break anything.
 
-Changes since V1:
-	1.Minor changes to node name convention
-	2.Updated binding document.
+Hi Ming,
 
-Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
----
- .../devicetree/bindings/ata/exynos-sata-phy.txt    |   19 +++++++++++++-----
- .../devicetree/bindings/ata/exynos-sata.txt        |   17 +++++++++++-----
- arch/arm/boot/dts/exynos5250-arndale.dts           |    9 ++++++++-
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |    8 ++------
- arch/arm/boot/dts/exynos5250.dtsi                  |   21 ++++++++++++++++----
- 5 files changed, 53 insertions(+), 21 deletions(-)
+commit f6537f2f "scripts/kallsyms: filter symbols not in kernel address space",
+uses CONFIG_PAGE_OFFSET as kernel_start_addr.
+However, for !CONFIG_MMU case we have :
+    PAGE_OFFSET != CONFIG_PAGE_OFFSET.
 
-diff --git a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-index 37824fa..a679e17 100644
---- a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-+++ b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-@@ -4,11 +4,20 @@ SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
- Each SATA PHY controller should have its own node.
- 
- Required properties:
--- compatible        : compatible list, contains "samsung,exynos5-sata-phy"
-+- compatible        : compatible list, contains "samsung,exynos5250-sata-phy"
- - reg               : <registers mapping>
- 
- Example:
--        sata at ffe07000 {
--                compatible = "samsung,exynos5-sata-phy";
--                reg = <0xffe07000 0x1000>;
--        };
-+	sata_phy: sata-phy at 12170000 {
-+		compatible = "samsung,exynos5250-sata-phy";
-+		reg = <0x12170000 0x1ff>;
-+		clocks = <&clock 287>;
-+		clock-names = "sata_phyctrl";
-+		#phy-cells = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		sataphy-pmu {
-+			reg = <0x10040724 0x4>;
-+			};
-+	};
-diff --git a/Documentation/devicetree/bindings/ata/exynos-sata.txt b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-index 0849f10..8ec7327 100644
---- a/Documentation/devicetree/bindings/ata/exynos-sata.txt
-+++ b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-@@ -8,10 +8,17 @@ Required properties:
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
- - samsung,sata-freq : <frequency in MHz>
-+- phys              : as mentioned in phy-bindings.txt
-+- phy-names         : as mentioned in phy-bindings.txt
- 
- Example:
--        sata at ffe08000 {
--                compatible = "samsung,exynos5-sata";
--                reg = <0xffe08000 0x1000>;
--                interrupts = <115>;
--        };
-+	sata at 122F0000 {
-+		compatible = "snps,dwc-ahci";
-+		samsung,sata-freq = <66>;
-+		reg = <0x122F0000 0x1ff>;
-+		interrupts = <0 115 0>;
-+		clocks = <&clock 277>, <&clock 143>;
-+		clock-names = "sata", "sclk_sata";
-+		phys = <&sata_phy>;
-+		phy-names = "sata-phy";
-+	};
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index b77a37e..434e4f3 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -381,7 +381,14 @@
- 	};
- 
- 	i2c at 121D0000 {
--		status = "disabled";
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <40000>;
-+		samsung,i2c-slave-addr = <0x38>;
-+
-+		sata-phy {
-+			compatible = "sata-phy-i2c";
-+			reg = <0x38>;
-+		};
- 	};
- 
- 	mmc_0: mmc at 12200000 {
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 13746df..eeeeef9 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -90,16 +90,12 @@
- 		samsung,i2c-max-bus-freq = <40000>;
- 		samsung,i2c-slave-addr = <0x38>;
- 
--		sata-phy {
--			compatible = "samsung,sata-phy";
-+		sata-phy at 38 {
-+			compatible = "sata-phy-i2c";
- 			reg = <0x38>;
- 		};
- 	};
- 
--	sata at 122F0000 {
--		samsung,sata-freq = <66>;
--	};
--
- 	i2c at 12C80000 {
- 		samsung,i2c-sda-delay = <100>;
- 		samsung,i2c-max-bus-freq = <66000>;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 80b5df5..d24db31 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -46,6 +46,7 @@
- 		i2c6 = &i2c_6;
- 		i2c7 = &i2c_7;
- 		i2c8 = &i2c_8;
-+		i2c9 = &i2c_9;
- 		pinctrl0 = &pinctrl_0;
- 		pinctrl1 = &pinctrl_1;
- 		pinctrl2 = &pinctrl_2;
-@@ -216,16 +217,28 @@
- 	};
- 
- 	sata at 122F0000 {
--		compatible = "samsung,exynos5-sata-ahci";
-+		compatible = "snps,dwc-ahci";
-+		samsung,sata-freq = <66>;
- 		reg = <0x122F0000 0x1ff>;
- 		interrupts = <0 115 0>;
- 		clocks = <&clock 277>, <&clock 143>;
- 		clock-names = "sata", "sclk_sata";
-+		phys = <&sata_phy>;
-+		phy-names = "sata-phy";
- 	};
- 
--	sata-phy at 12170000 {
--		compatible = "samsung,exynos5-sata-phy";
-+	sata_phy: sata-phy at 12170000 {
-+		compatible = "samsung,exynos5250-sata-phy";
- 		reg = <0x12170000 0x1ff>;
-+		clocks = <&clock 287>;
-+		clock-names = "sata_phyctrl";
-+		#phy-cells = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		sataphy-pmu {
-+			reg = <0x10040724 0x4>;
-+			};
- 	};
- 
- 	i2c_0: i2c at 12C60000 {
-@@ -334,7 +347,7 @@
- 		clock-names = "i2c";
- 	};
- 
--	i2c at 121D0000 {
-+	i2c_9: i2c at 121D0000 {
-                 compatible = "samsung,exynos5-sata-phy-i2c";
-                 reg = <0x121D0000 0x100>;
-                 #address-cells = <1>;
--- 
-1.7.9.5
+That is why I think the filter breaks !MMU platforms.
+
+Regards,
+Axel
