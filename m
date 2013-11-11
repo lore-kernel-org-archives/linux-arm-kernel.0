@@ -1,15 +1,63 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Nov 2013 15:07:53 +0800
-Subject: [PATCH] ARM: i.MX5x: Add SAHARA clock for i.MX5x CPUs
-In-Reply-To: <1383901222-12013-1-git-send-email-shc_work@mail.ru>
-References: <1383901222-12013-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131111070751.GA10085@S2101-09.ap.freescale.net>
+Date: Mon, 11 Nov 2013 15:10:05 +0800
+Subject: [PATCHv7 1/3] ARM: imx: Add DMAMUX clock for Vybrid vf610 SoC
+In-Reply-To: <1383904915-27634-2-git-send-email-b35083@freescale.com>
+References: <1383904915-27634-1-git-send-email-b35083@freescale.com>
+ <1383904915-27634-2-git-send-email-b35083@freescale.com>
+Message-ID: <20131111071003.GB10085@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 01:00:22PM +0400, Alexander Shiyan wrote:
-> Patch adds missing Security Accelerator (SAHARA) clock for i.MX5x CPUs.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+On Fri, Nov 08, 2013 at 06:01:53PM +0800, Jingchang Lu wrote:
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
 
-Applied, thanks.
+Applied this one.
+
+Shawn
+
+> ---
+>  changes in v7:
+>  fix dmamux2 and dmamux3 register number.
+> 
+>  no changes in v2 ~ v6.
+> 
+>  arch/arm/mach-imx/clk-vf610.c           | 5 +++++
+>  include/dt-bindings/clock/vf610-clock.h | 6 +++++-
+>  2 files changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+> index b169a39..ecd66d8 100644
+> --- a/arch/arm/mach-imx/clk-vf610.c
+> +++ b/arch/arm/mach-imx/clk-vf610.c
+> @@ -298,6 +298,11 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+>  	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
+>  	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
+>  
+> +	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
+> +	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
+> +	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(1));
+> +	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
+> +
+>  	clk_set_parent(clk[VF610_CLK_QSPI0_SEL], clk[VF610_CLK_PLL1_PFD4]);
+>  	clk_set_rate(clk[VF610_CLK_QSPI0_X4_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_SEL]) / 2);
+>  	clk_set_rate(clk[VF610_CLK_QSPI0_X2_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_X4_DIV]) / 2);
+> diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+> index 4aa2b48..a916029 100644
+> --- a/include/dt-bindings/clock/vf610-clock.h
+> +++ b/include/dt-bindings/clock/vf610-clock.h
+> @@ -160,6 +160,10 @@
+>  #define VF610_CLK_GPU2D			147
+>  #define VF610_CLK_ENET0			148
+>  #define VF610_CLK_ENET1			149
+> -#define VF610_CLK_END			150
+> +#define VF610_CLK_DMAMUX0		150
+> +#define VF610_CLK_DMAMUX1		151
+> +#define VF610_CLK_DMAMUX2		152
+> +#define VF610_CLK_DMAMUX3		153
+> +#define VF610_CLK_END			154
+>  
+>  #endif /* __DT_BINDINGS_CLOCK_VF610_H */
+> -- 
+> 1.8.0
+> 
+> 
