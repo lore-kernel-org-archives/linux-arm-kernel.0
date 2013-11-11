@@ -1,57 +1,15 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 11 Nov 2013 15:48:02 +0900
-Subject: [PATCH 2/4] arm64: Add audit support
-In-Reply-To: <20131108144307.GK17461@mudshark.cambridge.arm.com>
-References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
- <1383733546-2846-3-git-send-email-takahiro.akashi@linaro.org>
- <20131108144307.GK17461@mudshark.cambridge.arm.com>
-Message-ID: <52807DA2.4030704@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 Nov 2013 15:07:53 +0800
+Subject: [PATCH] ARM: i.MX5x: Add SAHARA clock for i.MX5x CPUs
+In-Reply-To: <1383901222-12013-1-git-send-email-shc_work@mail.ru>
+References: <1383901222-12013-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131111070751.GA10085@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 11:43 PM, Will Deacon wrote:
-> On Wed, Nov 06, 2013 at 10:25:44AM +0000, AKASHI Takahiro wrote:
->> diff --git a/arch/arm64/kernel/audit.c b/arch/arm64/kernel/audit.c
->> new file mode 100644
->> index 0000000..9aab2b3
->> --- /dev/null
->> +++ b/arch/arm64/kernel/audit.c
->> @@ -0,0 +1,59 @@
->> +#include <linux/audit.h>
->> +#include <linux/init.h>
->> +#include <asm/unistd.h>
->> +
->> +static unsigned dir_class[] = {
->> +#include <asm-generic/audit_dir_write.h>
->> +~0U
->> +};
->> +
->> +static unsigned read_class[] = {
->> +#include <asm-generic/audit_read.h>
->> +~0U
->> +};
->> +
->> +static unsigned write_class[] = {
->> +#include <asm-generic/audit_write.h>
->> +~0U
->> +};
->> +
->> +static unsigned chattr_class[] = {
->> +#include <asm-generic/audit_change_attr.h>
->> +~0U
->> +};
->> +
->> +static unsigned signal_class[] = {
->> +#include <asm-generic/audit_signal.h>
->> +~0U
->> +};
->
-> This looks like a copy of lib/audit.c to me. Why can't we use that instead?
+On Fri, Nov 08, 2013 at 01:00:22PM +0400, Alexander Shiyan wrote:
+> Patch adds missing Security Accelerator (SAHARA) clock for i.MX5x CPUs.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-As you might notice, we need to have copies both for aarch64 and arch32
-(compat system calls).
-
--Takahiro AKASHI
-
-> Will
->
+Applied, thanks.
