@@ -1,41 +1,174 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Nov 2013 09:01:04 +0100
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
-References: <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
- <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
- <87zjpf4w0j.fsf@rustcorp.com.au>
- <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
- <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
-Message-ID: <20131111080104.GH14892@pengutronix.de>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Mon, 11 Nov 2013 12:03:07 +0400
+Subject: [PATCH v3 4/4] ARM: dts: Add initial device tree support for
+ EXYNOS5410
+In-Reply-To: <19495187.Nrl1zS8Kog@flatron>
+References: <1383811969-32712-1-git-send-email-v.tyrtov@samsung.com>
+ <1383811969-32712-5-git-send-email-v.tyrtov@samsung.com>
+ <19495187.Nrl1zS8Kog@flatron>
+Message-ID: <52808F3B.2000804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Mon, Nov 11, 2013 at 02:43:28PM +0800, Axel Lin wrote:
-> 2013/11/11 Rusty Russell <rusty@rustcorp.com.au>:
-> > Ming Lei <tom.leiming@gmail.com> writes:
-> I don't have other noMMU platform to test.
-> But I think this issue impacts various !CONFIG_MMU platforms:
-> We have CONFIG_PAGE_OFFSET=0xC0000000 in various default configs.
-> For !CONFIG_MMU case, it just don't use the CONFIG_PAGE_OFFSET setting.
-> So use CONFIG_PAGE_OFFSET to filter symbols looks wrong to me for all
-> !CONFIG_MMU cases.
-I don't know what the original problem is, but for my Cortex-M3 machine
-(ie. !MMU) I also have CONFIG_PAGE_OFFSET=0xC0000000. Didn't see this
-resulting in any problems although the value looks bogus. (The range
-0x90000000-0xdfffffff is reserved on my SoC. Trying to read from there
-with the debugger fails with a message "Could not read memory.")
+On 10.11.2013 22:02, Tomasz Figa wrote:
+> Hi,
+>
+> Please see my comments inline.
+>
+> On Thursday 07 of November 2013 12:12:49 Vyacheslav Tyrtov wrote:
+>> From: Tarek Dakhran <t.dakhran@samsung.com>
+>>
+>> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
+>>
+>> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+>> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile                |   1 +
+>>   arch/arm/boot/dts/exynos5410-smdk5410.dts |  65 ++++++++++
+>>   arch/arm/boot/dts/exynos5410.dtsi         | 209 ++++++++++++++++++++++++++++++
+>>   3 files changed, 275 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+>>   create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+> [snip]
+>> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+>> new file mode 100644
+>> index 0000000..06ae479
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+>> @@ -0,0 +1,65 @@
+>> +/*
+>> + * SAMSUNG SMDK5410 board device tree source
+>> + *
+>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> + *		http://www.samsung.com
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +/dts-v1/;
+>> +#include "exynos5410.dtsi"
+>> +/ {
+>> +	model = "Samsung SMDK5410 board based on EXYNOS5410";
+>> +	compatible = "samsung,smdk5410", "samsung,exynos5410";
+>> +
+>> +	memory {
+>> +		reg = <0x40000000 0x80000000>;
+>> +	};
+>> +
+>> +	chosen {
+>> +		bootargs = "console=ttySAC2,115200";
+>> +	};
+>> +
+>> +	oscclk: oscclk {
+> coding style: According to ePAPR recommendation, node name should
+> represent hardware type, not particular instance of hardware.
+>
+> So instead, the preferred way would be to specify the clock using
+> following layout:
+>
+> 	clocks {
+> 		compatible = "simple-bus";
+> 		#address-cells = <1>;
+> 		#size-cells = <0>;
+>
+> 		oscclk: clock at 0 {
+> 			compatible = "fixed-clock";
+> 			reg = <0>;
+> 			#clock-cells = <0>;
+> 			clock-frequency = <24000000>;
+> 			clock-output-names = "fin_pll";
+> 		};
+> 	};
+>
+>> +		compatible = "fixed-clock";
+>> +		#clock-cells = <0>;
+>> +		clock-frequency = <24000000>;
+>> +		clock-output-names = "fin_pll";
+>> +	};
+> [snip]
+>> +
+>> +};
+>> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+>> new file mode 100644
+>> index 0000000..9921b66
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+>> @@ -0,0 +1,209 @@
+>> +/*
+>> + * SAMSUNG EXYNOS5410 SoC device tree source
+>> + *
+>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> + *		http://www.samsung.com
+>> + *
+>> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
+>> + * EXYNOS5410 based board files can include this file and provide
+>> + * values for board specfic bindings.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <dt-bindings/clock/exynos5410.h>
+>> +#include "exynos5.dtsi"
+>> +/ {
+> [snip]
+>> +	clock: clock-controller at 10010000 {
+>> +		compatible = "samsung,exynos5410-clock";
+>> +		reg = <0x10010000 0x30000>;
+>> +		#clock-cells = <1>;
+>> +	};
+>> +
+>> +	mct at 101C0000 {
+> A generic name would be: timer at 101C0000
+>
+>> +		compatible = "samsung,exynos4210-mct";
+>> +		reg = <0x101C0000 0xB00>;
+>> +		interrupt-controller;
+>> +		#interrups-cells = <1>;
+> MCT is not an interrupt controller, so both interrupt-controller and
+> #interrupt-cells properties are incorrect. I guess that's due to the
+> broken example in the documentation, that I already posted patches to fix.
+>
+>> +		interrupt-parent = <&mct_map>;
+>> +		interrupts = <0>, <1>, <2>, <3>,
+>> +			<4>, <5>, <6>, <7>,
+>> +			<8>, <9>, <10>, <11>;
+>> +		clocks = <&oscclk>, <&clock CLK_MCT>;
+>> +		clock-names = "fin_pll", "mct";
+>> +
+>> +		mct_map: mct-map {
+> Again, interrupt-map would be a better name for this node.
+>
+>> +			#interrupt-cells = <1>;
+>> +			#address-cells = <0>;
+>> +			#size-cells = <0>;
+>> +			interrupt-map = <0 &combiner 23 3>,
+>> +					<1 &combiner 23 4>,
+>> +					<2 &combiner 25 2>,
+>> +					<3 &combiner 25 3>,
+>> +					<4 &gic 0 120 0>,
+>> +					<5 &gic 0 121 0>,
+>> +					<6 &gic 0 122 0>,
+>> +					<7 &gic 0 123 0>,
+>> +					<8 &gic 0 128 0>,
+>> +					<9 &gic 0 129 0>,
+>> +					<10 &gic 0 130 0>,
+>> +					<11 &gic 0 131 0>;
+>> +		};
+>> +	};
+> Otherwise, the patch looks good.
+>
+> Best regards,
+> Tomasz
+>
+>
+Thanks a lot, Tomasz.
+All will be corrected in v4.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+     Tarek Dakhran
