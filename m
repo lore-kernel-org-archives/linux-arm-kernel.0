@@ -1,32 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Nov 2013 08:56:39 -0800
-Subject: [PATCH] ARM: dts: Add missing reg, interrupt and dma entries
- for omap3
-In-Reply-To: <20131110234717.GA29968@earth.universe>
-References: <20131017221522.GE15154@atomide.com>
- <20131110234717.GA29968@earth.universe>
-Message-ID: <20131111165638.GP15154@atomide.com>
+From: ivan.khoronzhuk@ti.com (Khoronzhuk, Ivan)
+Date: Mon, 11 Nov 2013 16:53:17 +0000
+Subject: [PATCH 02/12] mtd: nand: davinci: check required
+ ti,davinci-chipselect property
+In-Reply-To: <1384187188-5776-3-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-3-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <4F5844B3A985794BA902E12C070812375F8CEF@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [131110 15:48]:
-> Hi Tony,
-> 
-> On Thu, Oct 17, 2013 at 03:15:22PM -0700, Tony Lindgren wrote:
-> > Looks like omap3 is still relying on hwmod data for some basic
-> > device tree information. Let's add the information to omap3.dtsi
-> > so we can remove the related hwmod data once omap3 is DT only.
-> 
-> This patch fixes a regression in omap3 DT boot introduced by
-> commit 2a0b965cfb6efc667228831fc3a30308b4f94a87. This commit
-> assumes, that interrupts are specified via DT data if booted
-> via DT.
+The property "ti,davinci-chipselect" is required. So we have to check
+if it is set.
 
-Yes sorry about that, this should have been merged as a fix
-earlier to avoid breaking things during the merge window.
-Looks like I only tested 2a0b965cfb6efc667228831fc3a30308b4f94a87
-separately on omap4 or something and forgot about the dependency.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/mtd/nand/davinci_nand.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Regards,
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index d87213f..8e1c88e 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -541,10 +541,14 @@ static struct davinci_nand_pdata
+                                GFP_KERNEL);
+                pdev->dev.platform_data = pdata;
+                if (!pdata)
+-                       return NULL;
++                       return ERR_PTR(-ENOMEM);
++
+                if (!of_property_read_u32(pdev->dev.of_node,
+                        "ti,davinci-chipselect", &prop))
+                        pdev->id = prop;
++               else
++                       return ERR_PTR(-EINVAL);
++
+                if (!of_property_read_u32(pdev->dev.of_node,
+                        "ti,davinci-mask-ale", &prop))
+                        pdata->mask_ale = prop;
+@@ -598,6 +602,10 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
+        nand_ecc_modes_t                ecc_mode;
 
-Tony
+        pdata = nand_davinci_get_pdata(pdev);
++       if (IS_ERR(pdata)) {
++               return PTR_ERR(pdata);
++       }
++
+        /* insist on board-specific configuration */
+        if (!pdata)
+                return -ENODEV;
+--
+1.7.9.5
