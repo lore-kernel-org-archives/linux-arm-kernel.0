@@ -1,109 +1,71 @@
 From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Mon, 11 Nov 2013 23:17:05 +0900
-Subject: [PATCH 1/4] clk: clk-s2mps11: Refactor for including support for
- other MFD clocks
-In-Reply-To: <1383202124-1775-2-git-send-email-tushar.behera@linaro.org>
-References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
- <1383202124-1775-2-git-send-email-tushar.behera@linaro.org>
-Message-ID: <CAKew6eV76nrsM3Q1-uWriUg03=0n4CiAALVu8O7UYUHT0iKH6Q@mail.gmail.com>
+Date: Mon, 11 Nov 2013 23:27:08 +0900
+Subject: [RFC 0/4] Add basic support for ASV
+In-Reply-To: <1378898048-25205-1-git-send-email-yadi.brar@samsung.com>
+References: <1378898048-25205-1-git-send-email-yadi.brar@samsung.com>
+Message-ID: <CAKew6eUK9ZtoVgVu_b13Bn20iMNWzHnWjSHMjxD1Y+zDtvoCWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 3:48 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
-> The clocks in S2MPS11 and S5M8767 are managed in the same way, baring
-> a difference in the register offset. It would be better to update
-> existing S2MPS11 driver to support the clocks in S5M8767, rather than
-> creating an almost duplicate driver altogether.
->
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> CC: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> CC: Mike Turquette <mturquette@linaro.org>
-> ---
+gentle ping for suggestions/reviews ..
 
-Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
 
-Regards,
-Yadwinder
-
->  drivers/clk/clk-s2mps11.c |   20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
+On Wed, Sep 11, 2013 at 8:14 PM, Yadwinder Singh Brar
+<yadi.brar@samsung.com> wrote:
+> This series is to add basic common infrastructure for ASV.
+>  Basically ASV is a technique used on samsung SoCs, which provides the
+> recommended supply voltage for dvfs of arm, mif etc. For a given operating
+> frequency, the voltage is recommended based on SoC's ASV group.
+> ASV group gets fussed on SoCs during process of mass production.
 >
-> diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-> index 7be41e6..2262cb4 100644
-> --- a/drivers/clk/clk-s2mps11.c
-> +++ b/drivers/clk/clk-s2mps11.c
-> @@ -48,6 +48,7 @@ struct s2mps11_clk {
->         struct clk_lookup *lookup;
->         u32 mask;
->         bool enabled;
-> +       unsigned int reg;
->  };
+> This series includes:
+>  - basic common infrastructue for ASV. It provides common APIs for user drivers
+> like cpufreq & devfreq and and an interface for SoC specific drivers to
+> register ASV members(instances)
+>  - a common platform driver to register ASV members for exynos SoCs
+>  - an example providing minimal support (only for ARM ASV) for exynos5250 chips
 >
->  static struct s2mps11_clk *to_s2mps11_clk(struct clk_hw *hw)
-> @@ -61,7 +62,7 @@ static int s2mps11_clk_prepare(struct clk_hw *hw)
->         int ret;
+> Its just basic skelton which I wanted to get it reviewed or discussed in
+> early stage, before going ahead on further development based on it.
+>  Presently example is based on static ASV table provided in SoC specific file,
+> which I expects to go into DT. But exactly how and where needs to be discussed,
+> may be in next revisions once we get through the basic skelton.
+>  Also the location of driver in kernel may also seem odd to someone and
+> many more things :).
 >
->         ret = regmap_update_bits(s2mps11->iodev->regmap,
-> -                               S2MPS11_REG_RTC_CTRL,
-> +                                s2mps11->reg,
->                                  s2mps11->mask, s2mps11->mask);
->         if (!ret)
->                 s2mps11->enabled = true;
-> @@ -74,7 +75,7 @@ static void s2mps11_clk_unprepare(struct clk_hw *hw)
->         struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
->         int ret;
+> Looking for your valuable reviews and suggestions.
 >
-> -       ret = regmap_update_bits(s2mps11->iodev->regmap, S2MPS11_REG_RTC_CTRL,
-> +       ret = regmap_update_bits(s2mps11->iodev->regmap, s2mps11->reg,
->                            s2mps11->mask, ~s2mps11->mask);
+> Thanks
 >
->         if (!ret)
-> @@ -155,6 +156,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->         struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
->         struct s2mps11_clk *s2mps11_clks, *s2mps11_clk;
->         struct device_node *clk_np = NULL;
-> +       unsigned int s2mps11_reg;
->         int i, ret = 0;
->         u32 val;
+> Yadwinder Singh Brar (4):
+>   power: asv: Add common ASV support for samsung SoCs
+>   power: asv: Add a common asv driver for exynos SoCs.
+>   power: asv: Add support for exynos5250
+>   arm: exynos5: Register static platform device for ASV.
 >
-> @@ -169,13 +171,23 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->         if (IS_ERR(clk_np))
->                 return PTR_ERR(clk_np);
+>  arch/arm/mach-exynos/mach-exynos5-dt.c   |    3 +
+>  drivers/power/Kconfig                    |    1 +
+>  drivers/power/Makefile                   |    1 +
+>  drivers/power/asv/Kconfig                |   24 ++++
+>  drivers/power/asv/Makefile               |    2 +
+>  drivers/power/asv/exynos-asv.c           |   81 ++++++++++++++
+>  drivers/power/asv/exynos-asv.h           |   22 ++++
+>  drivers/power/asv/exynos5250-asv.c       |  141 ++++++++++++++++++++++++
+>  drivers/power/asv/samsung-asv.c          |  175 ++++++++++++++++++++++++++++++
+>  include/linux/power/samsung-asv-driver.h |   61 +++++++++++
+>  include/linux/power/samsung-asv.h        |   37 +++++++
+>  11 files changed, 548 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/power/asv/Kconfig
+>  create mode 100644 drivers/power/asv/Makefile
+>  create mode 100644 drivers/power/asv/exynos-asv.c
+>  create mode 100644 drivers/power/asv/exynos-asv.h
+>  create mode 100644 drivers/power/asv/exynos5250-asv.c
+>  create mode 100644 drivers/power/asv/samsung-asv.c
+>  create mode 100644 include/linux/power/samsung-asv-driver.h
+>  create mode 100644 include/linux/power/samsung-asv.h
 >
-> +       switch(platform_get_device_id(pdev)->driver_data) {
-> +       case S2MPS11X:
-> +               s2mps11_reg = S2MPS11_REG_RTC_CTRL;
-> +               break;
-> +       default:
-> +               dev_err(&pdev->dev, "Invalid device type\n");
-> +               return -EINVAL;
-> +       };
-> +
->         for (i = 0; i < S2MPS11_CLKS_NUM; i++, s2mps11_clk++) {
->                 s2mps11_clk->iodev = iodev;
->                 s2mps11_clk->hw.init = &s2mps11_clks_init[i];
->                 s2mps11_clk->mask = 1 << i;
-> +               s2mps11_clk->reg = s2mps11_reg;
 >
->                 ret = regmap_read(s2mps11_clk->iodev->regmap,
-> -                                 S2MPS11_REG_RTC_CTRL, &val);
-> +                                 s2mps11_clk->reg, &val);
->                 if (ret < 0)
->                         goto err_reg;
->
-> @@ -241,7 +253,7 @@ static int s2mps11_clk_remove(struct platform_device *pdev)
->  }
->
->  static const struct platform_device_id s2mps11_clk_id[] = {
-> -       { "s2mps11-clk", 0},
-> +       { "s2mps11-clk", S2MPS11X},
->         { },
->  };
->  MODULE_DEVICE_TABLE(platform, s2mps11_clk_id);
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
