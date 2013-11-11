@@ -1,28 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Nov 2013 19:32:36 +0000
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <528110B1.4060402@arm.com>
-References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
- <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
- <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
- <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
- <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
- <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
- <528110B1.4060402@arm.com>
-Message-ID: <20131111193236.GB16735@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 11 Nov 2013 11:35:45 -0800
+Subject: [PATCH v4 3/4] ARM: v7-M: drop using mach/entry-macro.S
+In-Reply-To: <1383562853-17202-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20131104105836.GI14892@pengutronix.de>
+ <1383562853-17202-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131111193545.GB12278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 05:15:29PM +0000, Jonathan Austin wrote:
-> I've tested the patch below and it solves the ARM side of things - so
-> gives you an option other than a complete revert. Happy to put this in to
-> RMK's patch system if you'd prefer not to have to revert and he's happy
-> with the patch.
+On Mon, Nov 04, 2013 at 12:00:52PM +0100, Uwe Kleine-K?nig wrote:
+> The only v7-M platform only has some unused stubs in its
+> mach/entry-macro.S file. So don't include it which allows efm32 to drop
+> the file.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-I think this is the right solution because it then means that this symbol
-has the same meaning whether on MMU or !MMU - and getting rid of these
-kinds of gratuitous variances are the only way that !MMU is going to
-become less fragile.
+Acked-by: Olof Johansson <olof@lixom.net>
+
+
+-Olof
