@@ -1,68 +1,91 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 11 Nov 2013 21:28:03 +0530
-Subject: [PATCH 2/2] ARM: dts: doc: Document missing binding for ti-sdma
- controller
-In-Reply-To: <CAL_JsqKfHPcycgH7oZeGYpnuEV-PBH1q_11O8=gC_50X_vWJsA@mail.gmail.com>
-References: <1383907129-7325-1-git-send-email-r.sricharan@ti.com>
- <1383907129-7325-2-git-send-email-r.sricharan@ti.com>
- <CAL_JsqLT0zOMDEQD5gkvTN2KYD2D--=pM6xgwQqPQOmkgcQBVg@mail.gmail.com>
- <527E224E.5020405@ti.com>
- <CAL_JsqKfHPcycgH7oZeGYpnuEV-PBH1q_11O8=gC_50X_vWJsA@mail.gmail.com>
-Message-ID: <5280FE8B.7060804@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 11 Nov 2013 17:03:36 +0100
+Subject: [RFC] ASoC: fsl-ssi: Missing DMA-Request workaround
+Message-ID: <1384185816-7730-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 November 2013 09:26 PM, Rob Herring wrote:
-> On Sat, Nov 9, 2013 at 5:53 AM, Sricharan R <r.sricharan@ti.com> wrote:
->> Hi Rob,
->>
->> On Saturday 09 November 2013 03:24 AM, Rob Herring wrote:
->>> On Fri, Nov 8, 2013 at 4:38 AM, Sricharan R <r.sricharan@ti.com> wrote:
->>>> The binding and support for system DMA module present in OMAP2+ Socs
->>>> and DRA7 with dma-engine is already present. So adding the missing
->>>> documentation for the same.
->>>>
->>>> Cc: Benoit Cousson <bcousson@baylibre.com>
->>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/dma/ti-sdma.txt |   28 +++++++++++++++++++++
->>>>  1 file changed, 28 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/dma/ti-sdma.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/dma/ti-sdma.txt b/Documentation/devicetree/bindings/dma/ti-sdma.txt
->>>> new file mode 100644
->>>> index 0000000..7fb2342
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/dma/ti-sdma.txt
->>>> @@ -0,0 +1,28 @@
->>>> +TI SDMA
->>>> +
->>>> +Required Properties:
->>>> +- compatible : Should be "ti,omap2420-sdma", "ti,omap2430-sdma" for OMAP2
->>>> +               Should be "ti,omap3430-sdma", "ti,omap3630-sdma" for OMAP3
->>>> +               Should be "ti,omap4430-sdma" for OMAP4, OMAP5 and DRA7
->>>> +- reg: Memory map for accessing module
->>>> +- interrupts: Interrupt request number from the dma controller to
->>> s/dma/DMA/
->>>
->>>> +             interrupt controller
->>>> +- dma-cells: Should be set to <1>
->>>> +- dma-channels: Total number of logical DMA channels supported by the
->>>> +               controller
->>>> +- dma-requests: Total number of dma request signals supported by the
->>> s/dma/DMA/
->>  Ok, will correct case.
->>>> +               controller
->>> These should have the # included.
->>  Sorry, i do not follow this ?
-> You are missing the # in the property names as the example has:
->
-> +       #dma-cells = <1>;
-> +       #dma-channels = <32>;
-> +       #dma-requests = <64>;
->
-> Rob
-Oh, ok, Will add this.
+There is a hardware issue when using capture and playback at the same
+time. In the tested scenario, the capture stream was started slightly
+before the playback stream. The first time the application starts after
+a powerup, there is a high probability that the SSI unit does not send a
+request to the SDMA unit. The playback does not work. I tested this on
+i.MX53 with SSI unit 2 kernel 3.10.10.
+
+Here is a register dump of the situation:
+SDMA
+0x63fb0000
+00000000: c0040000 00000000 0000001e 00000000
+00000010: 00000001 ffffffff 00000000 e03efa41
+00000020: 00000000 00000000 00000000 00000000
+00000030: 00000064 00000000 00000003 00000000
+00000040: 00000000 00000000 00000000 00006000
+00000050: 00000000 00000000 00000001 00004050
+00000060: 01208000 00000000 00000000 00000000 /* 0x60: EVT_MIRROR showing all received DMA requests */
+           ^ This should be a 3 instead. Bits 24 and 25 are the DMA requests for
+             RX and TX. Bit 25 is not set, DMA request 25 is missing.
+
+SSI
+0x50014000
+00000000: 00000000 00000000 0000005f 00000000
+00000010: 00000457 000050c1 01f80f00 0000028d /* 0x14: ISR Interrupt status register */
+                          ^
+	     At 0x14 we can clearly see the last bit is set (0x1) which
+	     is TFE0, Transmit FIFO 0 empty. So it should automatically
+	     request data from the DMA engine, but it doesn't.
+
+00000020: 0000028d 0004e000 00040000 000010dd
+00000030: 00001f1f 00000000 00000000 00000000
+00000040: 00000000 00000000 00000000 00000000
+00000050: 00000000 00000000 ........
+STATS (/sys/bus/platform/devices/50014000.ssi/statistics)
+rfrc=0
+tfrc=0
+roe1=0
+roe0=0
+tue1=0
+tue0=1094475
+
+I could solve this issue by filling the transmit FIFO with data. After
+that, the SDMA unit receives DMA request 25 again and audio playback
+works.
+
+This patch adds TUE0 interrupt handler which fills FIFO0 with arbitrary data.
+
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+
+Hi,
+
+does anyone have an idea why the SSI unit does not request DMA by its own at
+the beginning? Or is it a hardware errata that is not listed yet?
 
 Regards,
- Sricharan
+
+Markus Pargmann
+
+
+ sound/soc/fsl/fsl_ssi.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 6b81d0c..8faf2b5 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -269,9 +269,14 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	}
+ 
+ 	if (sisr & CCSR_SSI_SISR_TUE0) {
++		int i;
++
+ 		ssi_private->stats.tue0++;
+ 		sisr2 |= CCSR_SSI_SISR_TUE0;
+ 		ret = IRQ_HANDLED;
++
++		for (i = 0; i != ssi_private->fifo_depth; ++i)
++			write_ssi(0x0, &ssi->stx0);
+ 	}
+ 
+ 	if (sisr & CCSR_SSI_SISR_TFS) {
+-- 
+1.8.4.2
