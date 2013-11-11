@@ -1,61 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Nov 2013 11:25:54 +0000
-Subject: [GIT PULL] prefetch support for 3.13
-In-Reply-To: <20131111090810.GI14892@pengutronix.de>
-References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
- <20131111090810.GI14892@pengutronix.de>
-Message-ID: <20131111112554.GE28302@mudshark.cambridge.arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 11 Nov 2013 12:31:47 +0100
+Subject: [GIT PULL] Third and final KVM/ARM updates for 3.13
+In-Reply-To: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
+References: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5280C023.4080203@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 09:08:10AM +0000, Uwe Kleine-K?nig wrote:
-> Hello Will,
+Il 08/11/2013 02:31, Christoffer Dall ha scritto:
+> The following changes since commit e4b3c9c21bd5674e96988f7507fd924e00087cd0:
 > 
-> On Wed, Oct 09, 2013 at 06:13:13PM +0100, Will Deacon wrote:
-> > The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
-> > 
-> >   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/prefetch
-> > 
-> > for you to fetch changes up to d779c07dd72098a7416d907494f958213b7726f3:
-> > 
-> >   ARM: bitops: prefetch the destination word for write prior to strex (2013-09-30 16:42:56 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Will Deacon (6):
-> >       ARM: prefetch: remove redundant "cc" clobber
-> >       ARM: smp_on_up: move inline asm ALT_SMP patching macro out of spinlock.h
-> >       ARM: prefetch: add support for prefetchw using pldw on SMP ARMv7+ CPUs
-> >       ARM: locks: prefetch the destination word for write prior to strex
-> >       ARM: atomics: prefetch the destination word for write prior to strex
-> >       ARM: bitops: prefetch the destination word for write prior to strex
-> Hello Will,
+>   Merge branch 'kvm-arm-next-3.13-2' into kvm-arm-next (2013-10-17 20:41:44 -0700)
 > 
-> it seems the last patch breaks on efm32:
+> are available in the git repository at:
 > 
-> arch/arm/lib/changebit.S: Assembler messages:
-> arch/arm/lib/changebit.S:15: Error: architectural extension `mp' is not allowed for the current base architecture
+> 
+>   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-for-3.13-3
+> 
+> for you to fetch changes up to 79c648806f9034abf54332b78043bb242189d953:
+> 
+>   arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU (2013-10-22 08:00:06 -0700)
+> 
+> Sorry about sending this out so late.  It has been in linux-next for a
+> while and is well-tested.
+> 
+> ----------------------------------------------------------------
+> Updates for KVM/ARM, take 3 supporting more than 4 CPUs.
+> 
+> ----------------------------------------------------------------
+> Marc Zyngier (4):
+>       ARM: KVM: Fix MPIDR computing to support virtual clusters
+>       ARM: KVM: fix L2CTLR to be per-cluster
+>       ARM: KVM: drop limitation to 4 CPU VMs
+>       arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU
+> 
+>  arch/arm/include/asm/kvm_emulate.h   |    5 +++++
+>  arch/arm/kvm/coproc.c                |   14 ++++++++++----
+>  arch/arm/kvm/psci.c                  |   17 +++++++++++++----
+>  arch/arm/kvm/reset.c                 |    4 ----
+>  arch/arm64/include/asm/kvm_emulate.h |    5 +++++
+>  5 files changed, 33 insertions(+), 12 deletions(-)
+> 
 
-I see gas is being as helpful as ever. Something like the (untested) patch
-below should fix the issue.
+Pulled, thanks.
 
-Will
-
---->8
-
-diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-index e0c68d5bb7dc..52886b89706c 100644
---- a/arch/arm/lib/bitops.h
-+++ b/arch/arm/lib/bitops.h
-@@ -10,7 +10,7 @@ UNWIND(       .fnstart        )
-        and     r3, r0, #31             @ Get bit offset
-        mov     r0, r0, lsr #5
-        add     r1, r1, r0, lsl #2      @ Get word offset
--#if __LINUX_ARM_ARCH__ >= 7
-+#if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
-        .arch_extension mp
-        ALT_SMP(W(pldw) [r1])
-        ALT_UP(W(nop))
+Paolo
