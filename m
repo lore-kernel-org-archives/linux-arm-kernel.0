@@ -1,85 +1,41 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 11 Nov 2013 17:47:58 +0800
-Subject: [PATCH] spi: sirf: move to use generic dma dt-binding
-Message-ID: <1384163278-28108-1-git-send-email-Baohua.Song@csr.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Nov 2013 10:50:18 +0100
+Subject: [PATCH v7] pinctrl: imx27: imx27 pincontrol driver
+In-Reply-To: <20131107103859.GI15098@pengutronix.de>
+References: <1382950843-26066-3-git-send-email-mpa@pengutronix.de>
+ <1383057139-25304-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdYKgA5E4-APSTHsM=zVbb3X2R4v+V4EeK3+W1tKPR1FeA@mail.gmail.com>
+ <CAHCPf3v3dsTyk9Cd93GBLBKQLSQ+Mb0mpq134X7Ko4U8m-b-qg@mail.gmail.com>
+ <20131107091212.GH15098@pengutronix.de>
+ <1383816481.4115.2.camel@weser.hi.pengutronix.de>
+ <20131107103859.GI15098@pengutronix.de>
+Message-ID: <CACRpkdbJLSHOoE9gNDnne+xwCxu4FzGreeRJfNpL7nC8ddD04w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sirf-dma driver enabled generic dt binding for dma channels.
-see here we remove self-defined dma channel prop and move to
-use generic dma_request_slave_channel.
-related changes in dts is something like:
-    dmas = <&dmac1 9>,
-    <&dmac1 4>;
-    dma-names = "rx", "tx";
+On Thu, Nov 7, 2013 at 11:38 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> On Thu, Nov 07, 2013 at 10:28:01AM +0100, Lucas Stach wrote:
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/spi/spi-sirf.c | 26 ++------------------------
- 1 file changed, 2 insertions(+), 24 deletions(-)
+>> > The first version of this series [1] was designed to have a iomux node
+>> > with 6 gpio subnodes.
+>>
+>> Why was this changed? Having two different DT nodes requesting the same
+>> IO region is certainly the wrong thing to do.
+>
+> It was suggested to map the same memory range from both drivers, so I
+> changed the layout completely. Perhaps it would have been better to keep
+> the DT node structure while not passing the memory to the gpio
+> subdevices.
 
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index a1f21b7..7c6a797 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -22,7 +22,6 @@
- #include <linux/dmaengine.h>
- #include <linux/dma-direction.h>
- #include <linux/dma-mapping.h>
--#include <linux/sirfsoc_dma.h>
- 
- #define DRIVER_NAME "sirfsoc_spi"
- 
-@@ -555,8 +554,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 	struct spi_master *master;
- 	struct resource *mem_res;
- 	int num_cs, cs_gpio, irq;
--	u32 rx_dma_ch, tx_dma_ch;
--	dma_cap_mask_t dma_cap_mask;
- 	int i;
- 	int ret;
- 
-@@ -567,20 +564,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 		goto err_cs;
- 	}
- 
--	ret = of_property_read_u32(pdev->dev.of_node,
--			"sirf,spi-dma-rx-channel", &rx_dma_ch);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "Unable to get rx dma channel\n");
--		goto err_cs;
--	}
--
--	ret = of_property_read_u32(pdev->dev.of_node,
--			"sirf,spi-dma-tx-channel", &tx_dma_ch);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "Unable to get tx dma channel\n");
--		goto err_cs;
--	}
--
- 	master = spi_alloc_master(&pdev->dev, sizeof(*sspi) + sizeof(int) * num_cs);
- 	if (!master) {
- 		dev_err(&pdev->dev, "Unable to allocate SPI master\n");
-@@ -644,18 +627,13 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 	sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
- 
- 	/* request DMA channels */
--	dma_cap_zero(dma_cap_mask);
--	dma_cap_set(DMA_INTERLEAVE, dma_cap_mask);
--
--	sspi->rx_chan = dma_request_channel(dma_cap_mask, (dma_filter_fn)sirfsoc_dma_filter_id,
--		(void *)rx_dma_ch);
-+	sspi->rx_chan = dma_request_slave_channel(&pdev->dev, "rx");
- 	if (!sspi->rx_chan) {
- 		dev_err(&pdev->dev, "can not allocate rx dma channel\n");
- 		ret = -ENODEV;
- 		goto free_master;
- 	}
--	sspi->tx_chan = dma_request_channel(dma_cap_mask, (dma_filter_fn)sirfsoc_dma_filter_id,
--		(void *)tx_dma_ch);
-+	sspi->tx_chan = dma_request_slave_channel(&pdev->dev, "tx");
- 	if (!sspi->tx_chan) {
- 		dev_err(&pdev->dev, "can not allocate tx dma channel\n");
- 		ret = -ENODEV;
--- 
-1.8.2.3
+>From a pinctrl/GPIO point of view anything goes, it's a little bit like
+big-endian vs little-endian.
+
+I did merge the i.MX27 driver as it was ACKed by the subarch
+maintainers.
+
+So what do we do now, shall I revert this patch or can you refactor
+it in accordance with the comments so it should be kept as a
+base for the rewrite?
+
+Yours,
+Linus Walleij
