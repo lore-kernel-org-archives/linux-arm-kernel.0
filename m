@@ -1,23 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Nov 2013 07:54:45 -0200
-Subject: imx-drm: possible circular locking dependency detected
-In-Reply-To: <CAH9NwWdswcfwVOoCz3AmS8O7Adaun5tf3QJh5YE2iK96d3ajOg@mail.gmail.com>
-References: <CAH9NwWdswcfwVOoCz3AmS8O7Adaun5tf3QJh5YE2iK96d3ajOg@mail.gmail.com>
-Message-ID: <CAOMZO5A1i2jf1Mw-js=+ZF=rRL5JZFHD_d-KMhsqOuaZQx-9zw@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 11 Nov 2013 17:57:29 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+ <87zjpf4w0j.fsf@rustcorp.com.au>
+ <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+ <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+Message-ID: <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+Hi,
 
-On Mon, Nov 11, 2013 at 7:25 AM, Christian Gmeiner
-<christian.gmeiner@gmail.com> wrote:
-> I am not sure if this problem is known but here is dmesg output. If a
-> kernel config is needed I can
-> send it
+On Mon, Nov 11, 2013 at 4:37 PM, Axel Lin <axel.lin@ingics.com> wrote:
+> 2013/11/11 Ming Lei <tom.leiming@gmail.com>:
+>
+> Hi Ming,
+>
+> commit f6537f2f "scripts/kallsyms: filter symbols not in kernel address space",
+> uses CONFIG_PAGE_OFFSET as kernel_start_addr.
+> However, for !CONFIG_MMU case we have :
+>     PAGE_OFFSET != CONFIG_PAGE_OFFSET.
 
-Please apply this patch:
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/staging/imx-drm/imx-drm-core.c?id=c35d6a37bdcb1dde42dd65b00676696e2dd78f2f
+Yes, it is the cause, and strictly speaking, commit f6537f2f is wrong,
+but triggered with bogus CONFIG_PAGE_OFFSET if !CONFIG_MMU.
 
-Regards,
+We can fix it either by Rusty's patch or removing the bogus
+CONFIG_PAGE_OFFSET for !CONFIG_MMU.
 
-Fabio Estevam
+
+Thanks,
+-- 
+Ming Lei
