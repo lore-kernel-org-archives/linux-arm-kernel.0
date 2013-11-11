@@ -1,120 +1,63 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 11 Nov 2013 08:52:07 +0530
-Subject: [PATCH 1/1] ARM: EXYNOS: Add default latency values for Device
- and Power Domain
-In-Reply-To: <9546263.JaCWNRjo5C@flatron>
-References: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
- <9546263.JaCWNRjo5C@flatron>
-Message-ID: <CAK9yfHz-iUfOXEHwJ_QaF=YXudqiUMY0MMpNY4mh-f+ABAx-Xg@mail.gmail.com>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Mon, 11 Nov 2013 12:00:24 +0800
+Subject: [PATCH v6 2/4] dma: imx-sdma: Add new dma type for ssi dual fifo
+ script
+In-Reply-To: <cover.1384136268.git.b42378@freescale.com>
+References: <cover.1384136268.git.b42378@freescale.com>
+Message-ID: <9876297f9cdc00b2969115980cd253ffd71cc08a.1384136268.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+This patch adds a new DMA_TYPE for SSI dual FIFO script, included
+in SDMA firmware version 2. This script would allow SSI use dual
+fifo mode to transimit/receive data without occasional hardware
+underrun/overrun.
 
-Thanks for reviewing.
+Signed-off-by: Nicolin Chen <b42378@freescale.com>
+---
+ Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt | 1 +
+ drivers/dma/imx-sdma.c                                 | 4 ++++
+ include/linux/platform_data/dma-imx.h                  | 1 +
+ 3 files changed, 6 insertions(+)
 
-On 10 November 2013 22:25, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Sachin, Prasanna,
->
-> [CCing Rafael and respective mailing lists]
->
-> Please see my comments inline. Also please always remember to add all
-> appropriate recipients on CC list. More reviewers means higher chance of
-> spotting (and so eliminating) potential issues.
-
-Indeed. Thanks for adding. get_maintainers somehow did not list PM
-related folks.
-So missed this.
-
->
-> On Friday 08 of November 2013 11:57:05 Sachin Kamat wrote:
->> From: Prasanna Kumar <prasanna.ps@samsung.com>
->>
->> Power domain and device timing data are intialized with default
->> values to avoid dump of warnings from various power domains
->> during power gating.
->>
->> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
->> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> ---
->>  arch/arm/mach-exynos/pm_domains.c |   15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
->> index 84e0483a0500..9bbb4ac23980 100644
->> --- a/arch/arm/mach-exynos/pm_domains.c
->> +++ b/arch/arm/mach-exynos/pm_domains.c
->> @@ -25,6 +25,10 @@
->>  #include <mach/regs-pmu.h>
->>  #include <plat/devs.h>
->>
->> +#define DEFAULT_DEV_LATENCY_NS                       1000000UL
->> +#define DEFAULT_PD_PWRON_LATENCY_NS          10000000UL
->> +#define DEFAULT_PD_PWROFF_LATENCY_NS         10000000UL
->
-> Is there any rationale behind choosing these particular values?
-
-IMO, these values were obtained more from experimentation. Prasanna,
-please comment.
-
->
->> +
->>  /*
->>   * Exynos specific wrapper around the generic power domain
->>   */
->> @@ -36,6 +40,13 @@ struct exynos_pm_domain {
->>       u32 enable;
->>  };
->>
->> +static struct gpd_timing_data dev_latencies = {
->> +     .stop_latency_ns = DEFAULT_DEV_LATENCY_NS,
->> +     .start_latency_ns = DEFAULT_DEV_LATENCY_NS,
->> +     .save_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
->> +     .restore_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
->
-> I don't think that stop, start, save and restore latencies should be all
-> the same.
-
-They could be different. But again as I said it was based on
-experimentation rather than reference.
-
->
->> +};
->> +
->>  static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->>  {
->>       struct exynos_pm_domain *pd;
->> @@ -83,7 +94,7 @@ static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
->>       dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
->>
->>       while (1) {
->> -             ret = pm_genpd_add_device(&pd->pd, dev);
->> +             ret = __pm_genpd_add_device(&pd->pd, dev, &dev_latencies);
->
-> The double underscore prefix scares me a bit. Is this function really
-> supposed to be used like this?
-
-We did not find a wrapper/helper function to set this. Hence had to
-use this. In fact I did not
-find any other users of this function (pm_genpd_add_device) too.
-
->
->>               if (ret != -EAGAIN)
->>                       break;
->>               cond_resched();
->> @@ -173,6 +184,8 @@ static __init int exynos4_pm_init_power_domain(void)
->>               pd->base = of_iomap(np, 0);
->>               pd->pd.power_off = exynos_pd_power_off;
->>               pd->pd.power_on = exynos_pd_power_on;
->> +             pd->pd.power_off_latency_ns = DEFAULT_PD_PWROFF_LATENCY_NS;
->> +             pd->pd.power_on_latency_ns = DEFAULT_PD_PWRON_LATENCY_NS;
->
-> It might be worth to set up the latencies indeed, but wrong values can do
-> more harm than good.
-
-Right. As of this now, this is a well tested set of values.
-
+diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+index 4fa814d..68b83ec 100644
+--- a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
++++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+@@ -42,6 +42,7 @@ The full ID of peripheral types can be found below.
+ 	19	IPU Memory
+ 	20	ASRC
+ 	21	ESAI
++	22	SSI Dual FIFO	(needs firmware ver >= 2)
+ 
+ The third cell specifies the transfer priority as below.
+ 
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 43a8441..efe9d6a 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -725,6 +725,10 @@ static void sdma_get_pc(struct sdma_channel *sdmac,
+ 		per_2_emi = sdma->script_addrs->app_2_mcu_addr;
+ 		emi_2_per = sdma->script_addrs->mcu_2_app_addr;
+ 		break;
++	case IMX_DMATYPE_SSI_DUAL:
++		per_2_emi = sdma->script_addrs->ssish_2_mcu_addr;
++		emi_2_per = sdma->script_addrs->mcu_2_ssish_addr;
++		break;
+ 	case IMX_DMATYPE_SSI_SP:
+ 	case IMX_DMATYPE_MMC:
+ 	case IMX_DMATYPE_SDHC:
+diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
+index beac6b8..bcbc6c3 100644
+--- a/include/linux/platform_data/dma-imx.h
++++ b/include/linux/platform_data/dma-imx.h
+@@ -39,6 +39,7 @@ enum sdma_peripheral_type {
+ 	IMX_DMATYPE_IPU_MEMORY,	/* IPU Memory */
+ 	IMX_DMATYPE_ASRC,	/* ASRC */
+ 	IMX_DMATYPE_ESAI,	/* ESAI */
++	IMX_DMATYPE_SSI_DUAL,	/* SSI Dual FIFO */
+ };
+ 
+ enum imx_dma_prio {
 -- 
-With warm regards,
-Sachin
+1.8.4
