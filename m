@@ -1,46 +1,188 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Nov 2013 15:00:13 +0000
-Subject: [PATCH v4 3/4] AArch64: KGDB: Add step debugging support
-In-Reply-To: <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
-References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
- <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
- <20131108141841.GI17461@mudshark.cambridge.arm.com>
- <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
-Message-ID: <20131111150013.GJ28302@mudshark.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 11 Nov 2013 17:18:29 +0200
+Subject: [PATCH v5 5/7] gpio: davinci: add OF support
+In-Reply-To: <1383905510-31760-6-git-send-email-prabhakar.csengg@gmail.com>
+References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1383905510-31760-6-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <5280F545.3040406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 11:09:46AM +0000, Vijay Kilari wrote:
-> On Fri, Nov 8, 2013 at 7:48 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Nov 05, 2013 at 08:45:45AM +0000, vijay.kilari at gmail.com wrote:
-> >> @@ -153,6 +166,8 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
-> >>                * Packet D (Detach), k (kill). No special handling
-> >>                * is required here
-> >>                */
-> >> +             atomic_set(&kgdb_cpu_doing_single_step, -1);
-> >> +             kgdb_single_step =  0;
-> >
-> > This looks really weird: you have two variables, which you attempt to keep
-> > in sync, only one of them is an atomic access and you don't have any
-> > locking or memory barriers between them, so it must be ok if they're not
-> > in-sync. In which case, why do we have two variables?
-> >
-> IMHO, two variables are being used by kgdb framework
-> The variables 'kgdb_cpu_doing_single_step'  holds the cpu on which
-> step debugging
-> is happening. With this, when during step debugging, it ensures that on next
-> step debug exception only this CPU aquires master lock and step
-> debugging is performed.
+On 11/08/2013 12:11 PM, Prabhakar Lad wrote:
+> From: KV Sujith <sujithkv@ti.com>
 > 
-> The variable 'kgdb_single_step' is used to know if step debugging is
-> ongoing or not.
-> If so, the non-primary cpu's are not released untill the continue
-> command is received
-> So, with this the cpu's are not released and acquired for every step command
+> This patch adds OF parser support for davinci gpio
+> driver and also appropriate documentation in gpio-davinci.txt
+> located at Documentation/devicetree/bindings/gpio/.
+> 
+> Signed-off-by: KV Sujith <sujithkv@ti.com>
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> [prabhakar.csengg at gmail.com: simplified the OF code, removed
+> 		unnecessary DT property and also simplified
+> 		the commit message]
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> ---
+>   .../devicetree/bindings/gpio/gpio-davinci.txt      |   39 ++++++++++++++
+>   drivers/gpio/gpio-davinci.c                        |   54 ++++++++++++++++++--
+>   2 files changed, 90 insertions(+), 3 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> new file mode 100644
+> index 0000000..d677bbe
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> @@ -0,0 +1,39 @@
+> +Davinci GPIO controller bindings
+> +
+> +Required Properties:
+> +- compatible: should be "ti,dm6441-gpio"
+> +
+> +- reg: Physical base address of the controller and the size of memory mapped
+> +       registers.
+> +
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +
+> +- interrupt-parent: phandle of the parent interrupt controller.
+> +
+> +- interrupts: Array of GPIO interrupt number. Only banked or unbanked IRQs are
+> +	      supported at a time.
+> +
+> +- ti,ngpio: The number of GPIO pins supported.
+> +
+> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt
+> +		             line to processor.
+> +
+> +The GPIO controller also acts as an interrupt controller. It uses the default
+> +two cells specifier as described in Documentation/devicetree/bindings/
+> +interrupt-controller/interrupts.txt.
+> +
+> +Example:
+> +
+> +gpio: gpio at 1e26000 {
+> +	compatible = "ti,dm6441-gpio";
+> +	gpio-controller;
+> +	reg = <0x226000 0x1000>;
+> +	interrupt-parent = <&intc>;
+> +	interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
+> +		44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
+> +		46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
+> +		48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
+> +		50 IRQ_TYPE_EDGE_BOTH>;
+> +	ti,ngpio = <144>;
+> +	ti,davinci-gpio-unbanked = <0>;
+> +};
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index b149239..ed04835 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -17,6 +17,9 @@
+>   #include <linux/io.h>
+>   #include <linux/irq.h>
+>   #include <linux/irqdomain.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/platform_data/gpio-davinci.h>
+>   
+> @@ -134,6 +137,40 @@ davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>   	writel((1 << offset), value ? &g->set_data : &g->clr_data);
+>   }
+>   
+> +static struct davinci_gpio_platform_data *
+> +davinci_gpio_get_pdata(struct platform_device *pdev)
 
-Ok, but in what situation would you have both kgdb_cpu_doing_single_step == -1
-and kgdb_single_step == 1 (ignoring races between setting the two variables)?
+Minor: usually such functions have "_of" in their names:
+ davinci_gpio_of_get_pdata()
 
-In other words, can we reduce this to a single variable?
+> +{
+> +	struct device_node *dn = pdev->dev.of_node;
+> +	struct davinci_gpio_platform_data *pdata;
+> +	int ret;
+> +	u32 val;
+> +
+> +	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
+> +		return pdev->dev.platform_data;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return NULL;
+> +
+> +	ret = of_property_read_u32(dn, "ti,ngpio", &val);
+> +	if (ret)
+> +		goto of_err;
+> +
+> +	pdata->ngpio = val;
+> +
+> +	ret = of_property_read_u32(dn, "ti,davinci-gpio-unbanked", &val);
+> +	if (ret)
+> +		goto of_err;
+> +
+> +	pdata->gpio_unbanked = val;
+> +
+> +	return pdata;
+> +
+> +of_err:
+> +	dev_err(&pdev->dev, "Populating pdata from DT failed: err %d\n", ret);
+> +	return NULL;
+> +}
+> +
+>   static int davinci_gpio_probe(struct platform_device *pdev)
+>   {
+>   	int i, base;
+> @@ -144,12 +181,14 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+>   	struct device *dev = &pdev->dev;
+>   	struct resource *res;
+>   
+> -	pdata = dev->platform_data;
+> +	pdata = davinci_gpio_get_pdata(pdev);
+>   	if (!pdata) {
+>   		dev_err(dev, "No platform data found\n");
+>   		return -EINVAL;
+>   	}
+>   
+> +	dev->platform_data = pdata;
+> +
 
-Will
+Pls, add following code to GPIO chip initialization:
+
+@@ -233,6 +245,9 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+                chips[i].chip.ngpio = ngpio - base;
+                if (chips[i].chip.ngpio > 32)
+                        chips[i].chip.ngpio = 32;
++#ifdef CONFIG_OF_GPIO
++               chips[i].chip.of_node = dev->of_node;
++#endif
+
+
+
+>   	/*
+>   	 * The gpio banks conceptually expose a segmented bitmap,
+>   	 * and "ngpio" is one more than the largest zero-based
+> @@ -496,11 +535,20 @@ done:
+>   	return 0;
+>   }
+>   
+> +#if IS_ENABLED(CONFIG_OF)
+> +static const struct of_device_id davinci_gpio_ids[] = {
+> +	{ .compatible = "ti,dm6441-gpio", },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
+> +#endif
+> +
+>   static struct platform_driver davinci_gpio_driver = {
+>   	.probe		= davinci_gpio_probe,
+>   	.driver		= {
+> -		.name	= "davinci_gpio",
+> -		.owner	= THIS_MODULE,
+> +		.name		= "davinci_gpio",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(davinci_gpio_ids),
+>   	},
+>   };
+>   
+> 
+Regards,
+- grygorii
