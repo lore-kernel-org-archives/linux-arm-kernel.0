@@ -1,79 +1,119 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 11 Nov 2013 09:47:32 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIHVzYjogY2hpcGlkZWE6IHVzYm1pc2M6IEFkZCBz?=
- =?UTF-8?B?dXBwb3J0IGZvciBpLk1YMjcvaS5NWDMxIENQVXM=?=
-In-Reply-To: <52806C24.8040100@gtsys.com.hk>
-References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
- <1384145140.400290349@f353.i.mail.ru>
- <52806C24.8040100@gtsys.com.hk>
-Message-ID: <1384148852.19743495@f117.i.mail.ru>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Mon, 11 Nov 2013 11:28:52 +0530
+Subject: [PATCH RFC 3/6] arm64: Kprobes instruction simulation support
+In-Reply-To: <20131108170333.GE15074@mudshark.cambridge.arm.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-4-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131108170333.GE15074@mudshark.cambridge.arm.com>
+Message-ID: <CA+b37P1uEYX=kTtLfDn=OYoB0nrX1igeGT+-1LfEhNpEjS9MFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Monday, November 11, 2013 12:45 PM, Alexander Shiyan wrote:
-> >> Hi Alexander,
-> >>
-> >> On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
-> >>> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
-> >>>
-> >>> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
-> >>> ---
-> >>>    drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
-> >>>    1 file changed, 42 insertions(+)
-> >>>
-> >>> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> > ...
-> >>> +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
-> >>> +{
-> >>> +	unsigned long flags;
-> >>> +	u32 val;
-> >>> +
-> >>> +	switch (data->index) {
-> >>> +	case 0:
-> >>> +		val = MX27_OTG_PM_BIT;
-> >>> +		break;
-> >>> +	case 1:
-> >>> +		val = MX27_H1_PM_BIT;
-> >>> +		break;
-> >>> +	case 2:
-> >>> +		val = MX27_H2_PM_BIT;
-> >>> +		break;
-> >>> +	default:
-> >>> +		return -EINVAL;
-> >>> +	};
-> >>> +
-> >>
-> >>    From my understanding this can not work, the usbmisc->base not point into the
-> >> usb control register (USB_CTRL). Reference manual 30.5.1.1 says
-> >> BASE + 0x600
-> >> you must add the offset to the readl instruction.
-> >
-> > Why not work?
-> > usbotg: usb at 10024000
-> > usbh1: usb at 10024200
-> > usbh2: usb at 10024400
-> > usbmisc: usbmisc at 10024600
-> > So, offset to USB_CTRL should already be defined by DTS.
-> 
-> in the usbmisc_imx_probe() the base pointer is loaded from
-> 
-> res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> data->base = devm_ioremap_resource(&pdev->dev, res);
-> 
-> (and I did not see any of_ operations)
+On 8 November 2013 22:33, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Oct 17, 2013 at 12:17:48PM +0100, Sandeepa Prabhu wrote:
+>> Add support for AArch64 instruction simulation in kprobes.
+>>
+>> Kprobes need simulation of instructions that cannot be stepped
+>> right-away from different memory location. i.e. those instructions
+>> that uses PC-relative addressing. In simulation, the behaviour
+>> of the instruction is implemented using copy of pt_regs.
+>>
+>> Following instruction catagories are simulated:
+>>  - All branching instructions(conditional, register, and immediate)
+>>  - Literal access instructions(load-literal, adr/adrp)
+>>
+>> conditional execution are limited to branching instructions in
+>> ARM v8. If conditions at PSTATE does not match the condition fields
+>> of opcode, the instruction is effectively NOP. Kprobes consider
+>> this case as 'miss'.
+>
+> [...]
+>
+>> diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
+>> index 30d1c14..c690be3 100644
+>> --- a/arch/arm64/kernel/kprobes-arm64.c
+>> +++ b/arch/arm64/kernel/kprobes-arm64.c
+>> @@ -20,6 +20,101 @@
+>>
+>>  #include "probes-decode.h"
+>>  #include "kprobes-arm64.h"
+>> +#include "simulate-insn.h"
+>> +
+>> +/*
+>> + * condition check functions for kprobes simulation
+>> + */
+>> +static unsigned long __kprobes
+>> +__check_pstate(struct kprobe *p, struct pt_regs *regs)
+>> +{
+>> +       struct arch_specific_insn *asi = &p->ainsn;
+>> +       unsigned long pstate = regs->pstate & 0xffffffff;
+>> +
+>> +       return asi->pstate_cc(pstate);
+>> +}
+>> +
+>> +static unsigned long __kprobes
+>> +__check_cbz(struct kprobe *p, struct pt_regs *regs)
+>> +{
+>> +       return check_cbz((u32)p->opcode, regs);
+>
+> Isn't p->opcode already a u32? (by your definition of kprobe_opcode_t).
+Yup, can avoid typecasting.
+>
+>> diff --git a/arch/arm64/kernel/simulate-insn.c b/arch/arm64/kernel/simulate-insn.c
+>> new file mode 100644
+>> index 0000000..10173cf
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/simulate-insn.c
+>> @@ -0,0 +1,184 @@
+>> +/*
+>> + * arch/arm64/kernel/simulate-insn.c
+>> + *
+>> + * Copyright (C) 2013 Linaro Limited.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>> + * General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/kprobes.h>
+>> +#include <linux/module.h>
+>> +
+>> +#include "simulate-insn.h"
+>> +
+>> +#define sign_extend(x, signbit)                \
+>> +       ((x) | (0 - ((x) & (1 << (signbit)))))
+>> +
+>> +#define bbl_displacement(insn)         \
+>> +       sign_extend(((insn) & 0x3ffffff) << 2, 27)
+>> +
+>> +#define bcond_displacement(insn)       \
+>> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
+>> +
+>> +#define cbz_displacement(insn) \
+>> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
+>> +
+>> +#define tbz_displacement(insn) \
+>> +       sign_extend(((insn >> 5) & 0x3fff) << 2, 15)
+>> +
+>> +#define ldr_displacement(insn) \
+>> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
+>
+> The mask, shift and signbit position are all related here, so you could
+> rework the definition of sign_extend to avoid having three magic numbers.
+Hmm, mask and signbit are related, shift is based on instruction type
+(conditional instructions need >> 5 for extracting immediate offset).
+I will refine these macros in next version.
 
-Yes, and this is an address of usbmisc node, not otg.
-
-> usbmisc = data;
-> 
->   base is set to 0x10024000
-> 
-> when I look around all other functions init functions did a offset calculation.
-
-Can you point me on this?
-For example, for i.MX5 CPUs we calculate only offset to PHY_CTRL_X register
-relative to basic offset 0x800, which is already defined in DTS.
-
-...
-
----
+>
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
