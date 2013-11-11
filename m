@@ -1,54 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Nov 2013 10:58:12 +0000
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping support
-In-Reply-To: <5280B6C8.7050807@hitachi.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
-Message-ID: <20131111105812.GC28302@mudshark.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 11 Nov 2013 16:41:33 +0530
+Subject: [PATCH RFC 1/4] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <000301ceda84$1d648bf0$582da3d0$%han@samsung.com>
+References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
+ <1383205544-32244-2-git-send-email-gautam.vivek@samsung.com>
+ <527744B2.4090303@ti.com>
+ <030d01ced946$d6e23490$84a69db0$%debski@samsung.com>
+ <52779D28.9000905@ti.com>
+ <CAFp+6iH7vQ-OtMFL4pyr4tFDRchH4oh1Z0753WNgrHiUzj+kzw@mail.gmail.com>
+ <00fe01ceda0a$941957a0$bc4c06e0$%debski@samsung.com>
+ <000001ceda17$f41c2030$dc546090$%han@samsung.com>
+ <000101ceda1f$04ca6f20$0e5f4d60$%han@samsung.com>
+ <CAFp+6iFAZab35F-MOOZHcHpzSEOL=51gWBK2KZbOJS+0731GJQ@mail.gmail.com>
+ <000301ceda84$1d648bf0$582da3d0$%han@samsung.com>
+Message-ID: <5280BB65.5040305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 10:51:52AM +0000, Masami Hiramatsu wrote:
-> (2013/11/11 16:54), Masami Hiramatsu wrote:
-> >>>> In fact, how do you avoid a race with hardware breakpoints? E.g., somebody
-> >>>> places a hardware breakpoint on an instruction in the kernel for which
-> >>>> kprobes has patched in a brk. We take the hardware breakpoint, disable the
-> >>>> breakpoint and set up a single step before returning to the brk. The brk
-> >>>> then traps, but we must take care not to disable single-step and/or unmask
-> >>>> debug exceptions, because that will cause the hardware breakpoint code to
-> >>>> re-arm its breakpoint before we've stepped off the brk instruction.
-> >>>
-> >>> Hmm, frankly to say, this kind of race issue is not seriously discussed
-> >>> on x86 too, since kgdb is still a special tool (not used on the production
-> >>> system).
-> >>> I think under such situation kgdb operator must have full control of the
-> >>> system, and he can (and has to) avoid such kind of race.
-> >> Masami,
-> >>
-> >> Hmm I think in same lines, but not sure if we expect kprobes to be
-> >> able to work fool-proof along with kgdb or hw breakpoints ?
-> > 
-> > For hw breakpoint, yes, we finally get check each other to safely
-> > use it even if one rejects the other one at some points(address).
-> > Since the hw breakpoint is already open for normal user via perf,
-> > we should do it. But the policy still needs to be discussed.
+Hi,
+
+On Wednesday 06 November 2013 05:37 AM, Jingoo Han wrote:
+> On Wednesday, November 06, 2013 2:58 AM, Vivek Gautam wrote:
+>> On Tue, Nov 5, 2013 at 5:33 PM, Jingoo Han <jg1.han@samsung.com> wrote:
 > 
-> OK, I've ensured that the hw_breakpoint (from perf) can work
-> with kprobes (from ftrace) at the same address on x86.
-> So if arm64 already support hw_breakpoint on perf, kprobes should
-> work with it.
+> [.....]
+> 
+>>> USB3.0 PHY consists of two blocks such as 3.0 block and 2.0 block.
+>>> This USB3.0 PHY can support UTMI+ and PIPE3 interface for 3.0 block
+>>> and 2.0 block, respectively.
+>>>
+>>> Conclusion:
+>>>
+>>>    1) USB2.0 PHY: USB2.0 HOST, USB2.0 Device
+>>>                        Base address: 0x1213 0000
+>>>
+>>>    2) USB3.0 PHY: USB3.0 DRD (3.0 HOST & 3.0 Device)
+>>>                        Base address: 0x1210 0000
+>>>                        2.0 block(UTMI+) & 3.0 block(PIPE3)
+>>
+>> And this is of course the PHY used by DWC3 controller, which works at
+>> both High speed as well as Super Speed.
+>> Right ?
+> 
+> Right.
+> 
+> While 3.0 block(PIPE3) can be used for Super Speed, 2.0 block(UTMI+)
+> can be used for High speed.
 
-Single-stepping on x86 is different to the step behaviour on arm64 afaik. On
-ARM, we have to manually remove the breakpoint, perform a single-step, then
-add the breakpoint again. If we re-enable debug exceptions in the kprobe
-handler, the step will complete early and we'll never step off the
-breakpoint.
+It should then come under *single IP muliple PHY* category similar to what
+Sylwester has done.
 
-Sandeepa: I think you need to retry Masami's test on the arm64 model, since
-I'm fairly sure it won't work as expected without some additional code.
-
-Will
+Thanks
+Kishon
