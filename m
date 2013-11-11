@@ -1,47 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Nov 2013 10:44:32 +0000
-Subject: [PATCH 0/2] genirq: arm64: perf: support for percpu pmu interrupt
-In-Reply-To: <527D8A17.9020208@codeaurora.org>
-References: <1383739658-10036-1-git-send-email-vkale@apm.com>
- <527D8A17.9020208@codeaurora.org>
-Message-ID: <20131111104432.GA28302@mudshark.cambridge.arm.com>
+Date: Mon, 11 Nov 2013 10:51:41 +0000
+Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
+In-Reply-To: <1384157427-31613-2-git-send-email-victor.kamensky@linaro.org>
+References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
+ <1384157427-31613-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131111105141.GB28302@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 09, 2013 at 01:04:23AM +0000, Stephen Boyd wrote:
-> On 11/06/13 04:07, Vinayak Kale wrote:
-> > This patch series adds support to handle interrupt registration/deregistration
-> > in arm64 pmu driver when pmu interrupt type is percpu.
-> >
-> > Patches in this patch series were previously sent out as separate patches [1].
-> > This patch series incorporates comments/fixes suggested for original patches.
-> >
-> > [1] 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205888.html
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204414.html 
-> >
-> > Vinayak Kale (2):
-> >   genirq: error reporting in request_percpu_irq() and
-> >     request_threaded_irq()
-> >   arm64: perf: add support for percpu pmu interrupt
-> >
-> >  arch/arm64/kernel/perf_event.c |  109 +++++++++++++++++++++++++++++-----------
-> >  kernel/irq/manage.c            |   12 +++--
-> >  2 files changed, 89 insertions(+), 32 deletions(-)
-> >
+On Mon, Nov 11, 2013 at 08:10:27AM +0000, Victor Kamensky wrote:
+> In case of armv7-m architecture arm instructions are not allowed.
+> For this architecture CONFIG_CPU_THUMBONLY is set. Use this macro
+> to emit conditionally arm instructions or nops in thumb mode.
 > 
-> What ever happened to the approach here[1]? It doesn't look very nice to
-> have to request the irq first as a per-cpu interrupt and then try as a
-> non-percpu interrupt when genirq already knows if its per-cpu or not.
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm/kernel/sigreturn_codes.S | 25 ++++++++++++++++++-------
+>  1 file changed, 18 insertions(+), 7 deletions(-)
 > 
-> [1] http://lkml.indiana.edu/hypermail/linux/kernel/1207.3/02955.html
+> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
+> index 3c5d0f2..899fb86 100644
+> --- a/arch/arm/kernel/sigreturn_codes.S
+> +++ b/arch/arm/kernel/sigreturn_codes.S
+> @@ -41,17 +41,29 @@
+>  	.arch armv4t
+>  #endif
+>  
+> +/*
+> + * In CPU_THUMBONLY kernel case arm opcodes are not allowed
+> + */
+> +#ifndef CONFIG_CPU_THUMBONLY
 
-Hmm, I'd completely forgotten about that approach. Whilst it certainly looks
-cleaner from a user perspective, I always get scared when I see
-'desc->status_use_accessors' since it tends to incur the wrath of tglx :)
+Is this THUMBONLY stuff actually destined for mainline?
 
-That said, I guess that should be fine in irqdesc.h (basically adding a new
-accessor). Chris went missing after sending those initial patches, so
-perhaps Vinayak could look at resurrecting those?
+> +#define ARM_INSTR(code...) .arm ; \
+> +			   code
+> +#else
+> +#define ARM_INSTR(code...) .thumb ; \
+> +			   nop ;    \
+> +			   nop ;
+> +#endif
+
+Why can't you solve this with the ARM(...) and THUMB(...) macros, like we do
+in places like head.S?
 
 Will
