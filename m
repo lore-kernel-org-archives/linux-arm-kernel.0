@@ -1,40 +1,33 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Mon, 11 Nov 2013 14:25:54 +0530
-Subject: [PATCH RFC 4/6] arm64: Add kernel return probes
- support(kretprobes)
-In-Reply-To: <52808CFC.6060701@linaro.org>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108170448.GF15074@mudshark.cambridge.arm.com>
- <CA+b37P2aeXs4Cy_HxF24HQAYAnYzZ19PgV6rqrQLY9SMpZHDJg@mail.gmail.com>
- <52808CFC.6060701@linaro.org>
-Message-ID: <CA+b37P27CiozHnARndFGsESrxPDNvXwNKRX2wWzLVPCGtVfH0w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Nov 2013 10:04:17 +0100
+Subject: [PATCH] MAINTAINERS: drop discontinued mailing list
+Message-ID: <1384160657-2953-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2013 13:23, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> On 11/11/2013 01:29 PM, Sandeepa Prabhu wrote:
->>
->> On 8 November 2013 22:34, Will Deacon <will.deacon@arm.com> wrote:
->>>>
->>>> +static inline long regs_return_value(struct pt_regs *regs)
->>>> +{
->>>> +     return regs->regs[0];
->>>> +}
->>>
->>>
->>> This is also being implemented by another patch series (I think the audit
->>> stuff?).
->>
->> Not sure, I did not see this being implemented in audit(audit adds for
->> 'syscallno',  not for return value in x0)
->> I can rebase my code if this change is implemented and queued in other
->> patchset.
->
->
-> Yes, my audit patch has it.
-> The definition is referred to in include/linux/audit.h (and ptrace.h),
-> too.
-Thanks, I will rebase kprobes code to use your API.
->
-> -Takahiro AKASHI
+The ST-internal Nomadik mailing list is going down. Remove
+it from the MAINTAINERS file.
+
+Cc: Olivier CLERGEAUD <olivier.clergeaud@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this directly for fixes unless
+there are some problems with it.
+---
+ MAINTAINERS | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4d66a03e4f57..7d280b7c1400 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1056,7 +1056,6 @@ S:	Maintained
+ ARM/NOMADIK ARCHITECTURE
+ M:	Alessandro Rubini <rubini@unipv.it>
+ M:	Linus Walleij <linus.walleij@linaro.org>
+-M:	STEricsson <STEricsson_nomadik_linux@list.st.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-nomadik/
+-- 
+1.8.3.1
