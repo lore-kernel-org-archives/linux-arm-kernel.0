@@ -1,40 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Nov 2013 10:16:48 -0800
-Subject: [PATCH] ARM: dts: Add missing reg, interrupt and dma entries
- for omap3
-In-Reply-To: <20131111174839.GA15331@earth.universe>
-References: <20131017221522.GE15154@atomide.com>
- <20131110234717.GA29968@earth.universe>
- <20131111165638.GP15154@atomide.com>
- <20131111174839.GA15331@earth.universe>
-Message-ID: <20131111181647.GQ15154@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 11 Nov 2013 18:16:46 +0000
+Subject: [PATCH 8/9] ARM: add test for as supporting '.inst'
+In-Reply-To: <1383935832-20865-9-git-send-email-ben.dooks@codethink.co.uk>
+References: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1383935832-20865-9-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20131111181646.GD3166@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [131111 09:49]:
-> On Mon, Nov 11, 2013 at 08:56:39AM -0800, Tony Lindgren wrote:
-> > * Sebastian Reichel <sre@ring0.de> [131110 15:48]:
-> > > Hi Tony,
-> > > 
-> > > On Thu, Oct 17, 2013 at 03:15:22PM -0700, Tony Lindgren wrote:
-> > > > Looks like omap3 is still relying on hwmod data for some basic
-> > > > device tree information. Let's add the information to omap3.dtsi
-> > > > so we can remove the related hwmod data once omap3 is DT only.
-> > > 
-> > > This patch fixes a regression in omap3 DT boot introduced by
-> > > commit 2a0b965cfb6efc667228831fc3a30308b4f94a87. This commit
-> > > assumes, that interrupts are specified via DT data if booted
-> > > via DT.
-> > 
-> > Yes sorry about that, this should have been merged as a fix
-> > earlier to avoid breaking things during the merge window.
-> > Looks like I only tested 2a0b965cfb6efc667228831fc3a30308b4f94a87
-> > separately on omap4 or something and forgot about the dependency.
+On Fri, Nov 08, 2013 at 06:37:11PM +0000, Ben Dooks wrote:
+> Add a test for the assembler supporting .inst and then defining
+> ARM_HAVE_INST for any position where this is needed.
 > 
-> No problem, but I think its currently not queued for 3.13.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/Makefile | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 0069697..d556a52 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -36,6 +36,8 @@ MMUEXT		:= -nommu
+>  KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
+>  endif
+>  
+> +KBUILD_CFLAGS	+= $(call as-instr,.inst 0x0,-DARM_HAVE_INST)
+> +
 
-Should be merged now it seems.
+It looks like all the .inst directive variants were added to gas at the
+same time, so we know if .inst is there, .inst.n and .inst.w are there
+too.
 
-Regards,
+The above does seem to DTRT with gas-2.19 as well as modern versions
+(though making GCC invoke a non-default assembler is painful...)
 
-Tony
+Acked-by: Dave Martin <Dave.Martin@arm.com>
+
+Cheers
+---Dave
