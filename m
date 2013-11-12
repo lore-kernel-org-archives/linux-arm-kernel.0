@@ -1,133 +1,115 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Nov 2013 16:42:41 +0000
-Subject: arm/arm64 UEFI boot protocol
-In-Reply-To: <20131111174321.GQ1557@rocoto.smurfnet.nu>
-References: <20131111174321.GQ1557@rocoto.smurfnet.nu>
-Message-ID: <20131112164241.GD25953@mudshark.cambridge.arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Tue, 12 Nov 2013 17:49:18 +0100
+Subject: [PATCHv3 1/8] drm: Add the lacking DRM_MODE_FLAG_* for matching the
+ DISPLAY_FLAGS_*
+Message-ID: <1384274965-30549-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leif,
+Without that fix, drivers using the drm_display_mode_from_videomode
+  function will not be able to get certain information because
+  some DISPLAY_FLAGS_* have no corresponding DRM_MODE_FLAG_*.
 
-On Mon, Nov 11, 2013 at 05:43:21PM +0000, Leif Lindholm wrote:
-> We currently have a few sets of patches floating around, for UEFI
-> runtime services, UEFI stub and GRUB support for Linux/UEFI on
-> arm/arm64.
-> 
-> The last version of Documentation/arm/uefi.txt I sent out raised a few
-> questions with regards to the boot protocol between UEFI and Linux, and
-> there is also upcoming support for ACPI which could use a few
-> clarifications in this area.
-> 
-> So, rather than sending out complete sets of patches for all these until
-> consensus is reached, below is my proposed suggestion for a
-> Documentation/arm/uefi.txt, to be shared for arm and arm64. If noone has
-> strong objections to this, we can quickly send updated (and hopefully
-> final-ish) versions of these sets.
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: driverdev-devel at linuxdriverproject.org
+Cc: Matt Sealey <neko@bakuhatsu.net>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Ville Syrjala <syrjala@sci.fi>
+Cc: dri-devel at lists.freedesktop.org
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v2->v3:
+- Added some interested people in the Cc list.
+- Removed a duplicated Cc.
+- Changed the flags names to match the one in DISPLAY_FLAGS.
+- Moved the flags out of the userspace headers.
+- Updated the rest of the code accordingly.
+---
+ drivers/gpu/drm/drm_modes.c |    9 +++++++++
+ include/drm/drm_mode.h      |   34 ++++++++++++++++++++++++++++++++++
+ include/uapi/drm/drm_mode.h |    4 ++--
+ 3 files changed, 45 insertions(+), 2 deletions(-)
+ create mode 100644 include/drm/drm_mode.h
 
-In the absence of code, I'll play English teacher then :)
-
-> UEFI, the Unified Extensible Firmware Interface is a specification
-
-Interface, is
-
-> governing the behaviours of compatible firmware interfaces.
-> It is maintained by the UEFI Forum - http://www.uefi.org/.
-> Support for the AArch32 (arm) architecture was added in version 2.3 of
-> the specification, and support for AAaarch64 (arm64) was added in
-> version 2.4.
-
-AArch64
-
-> UEFI is an evolution of its predecessor 'EFI', so the terms EFI and
-> EFI are used somewhat interchangeably in this document and associated
-
-UEFI
-
-> source code. As a rule, anything new uses 'UEFI', whereas 'EFI' refers
-> to legacy code or specifications.  
-> 
-> UEFI support in Linux                                                           
-> =====================                                                           
-> Booting on a platform with firmware compliant with the UEFI
-> specification makes it possible for the kernel to support additional
-> features:
-> - UEFI Runtime Services
-> - Retrieving various configuration information through the standardised
->   interface of UEFI configuration tables. (ACPI, SMBIOS, ...)
-> 
-> For actually enabling [U]EFI support, enable:
-> - CONFIG_EFI=y
-> - CONFIG_EFI_VARS=y or m
-> 
-> UEFI stub
-> =========
-> The "stub" is a feature that turns the Image/zImage/bzImage into a valid
-
-We don't support bzImage for arm or arm64.
-
-> UEFI PE/COFF executable, including a loader application that makes it
-> possible to load the kernel directly from the UEFI shell, boot menu, or
-> one of the lightweight bootloaders like Gummiboot or rEFInd. 
-> The kernel image built with stub support remains a valid kernel image
-> for booting in the legacy fashion.
-
-By legacy, you mean non-UEFI rather than EFI? I consider UEFI as a choice
-rather than the future ;p
-
-> UEFI kernel support on ARM
-> ==========================
-
-Wait, isn't this all under Documentation/arm/? You could probably combine
-some of these sections together, since the scope is really tied to ARM here.
-
-> The implementation depends on receiving information about the UEFI
-> environment in a Flattened Device Tree (FDT) - so is only available with
-> CONFIG_OF.
-
-You could mention this in your earlier list of dependencies.
-
-> UEFI support also depends on early_memremap().
-
-Why is that worthy of note? Can a user even turn that off?
-
-> UEFI kernel support on the ARM architectures (arm and arm64) is only
-> available when boot is performed through the stub.
-> 
-> When booting in UEFI mode, the kernel ignores any memory nodes in the
-> DT, and instead reads the UEFI memory map. To prevent confusion, the
-> stub deletes any memory nodes from a provided DT.
-> 
-> The stub populates the FDT /chosen node with, and the kernel scans for
-> the following parameters:
-
-Sentence doesn't read very well. Maybe stick some brackets around (and the
-kernel scans for)?
-
-> ______________________________________________________________________________
-> Name                      | Size   | Description
-> ================================================================================
-> linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
-> --------------------------------------------------------------------------------
-> linux,uefi-mmap           | 64-bit | Physical address of the UEFI memory map,
->                           |        | populated by the UEFI GetMemoryMap() call.
-> --------------------------------------------------------------------------------
-> linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
->                           |        | pointed to in previous entry.
-> --------------------------------------------------------------------------------
-> linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
->                           |        | memory map.
-
-Do we actually need to define these sizes here, or can they be dealt with
-using the usual #address-cells property? Also, I think you should describe
-the binding in a separate document somewhere under Documentation/devicetree,
-then cross-reference it from here.
-
-> --------------------------------------------------------------------------------
-> linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
-> --------------------------------------------------------------------------------
-
-Are you sure you want to refer to kernel symbols here? If somebody renames
-that variable, they're not going to fix this file.
-
-Will
+diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+index fc2adb6..586c12f 100644
+--- a/drivers/gpu/drm/drm_modes.c
++++ b/drivers/gpu/drm/drm_modes.c
+@@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
+ 		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
+ 	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
+ 		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
++	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
++		dmode->flags |= DRM_MODE_FLAG_DE_LOW;
++	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
++		dmode->flags |= DRM_MODE_FLAG_DE_HIGH;
++	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
++		dmode->flags |= DRM_MODE_FLAG_PIXDATA_POSEDGE;
++	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
++		dmode->flags |= DRM_MODE_FLAG_PIXDATA_NEGEDGE;
++
+ 	drm_mode_set_name(dmode);
+ 
+ 	return 0;
+diff --git a/include/drm/drm_mode.h b/include/drm/drm_mode.h
+new file mode 100644
+index 0000000..07e5259
+--- /dev/null
++++ b/include/drm/drm_mode.h
+@@ -0,0 +1,34 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#ifndef _DRM_MODE_H
++#define _DRM_MODE_H
++
++#include <uapi/drm/drm_mode.h>
++
++/* DISPLAY_FLAGS DRM counterpart */
++#define DRM_MODE_FLAG_DE_HIGH			(1<<22)
++#define DRM_MODE_FLAG_DE_LOW			(1<<23)
++#define DRM_MODE_FLAG_PIXDATA_POSEDGE		(1<<24)
++#define DRM_MODE_FLAG_PIXDATA_NEGEDGE		(1<<25)
++
++#endif
+diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+index 28acbaf..5681897 100644
+--- a/include/uapi/drm/drm_mode.h
++++ b/include/uapi/drm/drm_mode.h
+@@ -24,8 +24,8 @@
+  * IN THE SOFTWARE.
+  */
+ 
+-#ifndef _DRM_MODE_H
+-#define _DRM_MODE_H
++#ifndef _UAPI_DRM_MODE_H
++#define _UAPI_DRM_MODE_H
+ 
+ #include <linux/types.h>
+ 
+-- 
+1.7.9.5
