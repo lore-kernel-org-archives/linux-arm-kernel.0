@@ -1,42 +1,17 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 12 Nov 2013 13:40:23 -0200
-Subject: [PATCH] ARM: dts: imx6q-udoo: Add Ethernet support
-Message-ID: <1384270823-13229-1-git-send-email-fabio.estevam@freescale.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 12 Nov 2013 10:40:49 -0500
+Subject: Fwd: [PATCH 7/8] watchdog: davinci: add "clocks" property
+In-Reply-To: <527A28E8.4010204@ti.com>
+References: <1383680783-12114-8-git-send-email-ivan.khoronzhuk@ti.com>
+ <527A28E8.4010204@ti.com>
+Message-ID: <52824C01.7030302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ethernet support for imx6q udoo board.
-
-Tested by booting a kernel via NFS.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-udoo.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
-index 1b5104d..1c7f7a1 100644
---- a/arch/arm/boot/dts/imx6q-udoo.dts
-+++ b/arch/arm/boot/dts/imx6q-udoo.dts
-@@ -21,8 +21,19 @@
- 	};
- };
- 
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	imx6q-udoo {
-+		pinctrl_enet: enetgrp {
-+			fsl,pins = <MX6QDL_ENET_PINGRP1>;
-+		};
-+
- 		pinctrl_uart2: uart2grp {
- 			fsl,pins = <MX6QDL_UART2_PINGRP1>;
- 		};
--- 
-1.8.1.2
+On Wednesday 06 November 2013 06:32 AM, ivan.khoronzhuk wrote:
+> The Keystone arch is using clocks in DT and source clock for watchdog
+> has to be specified, so add this to binding.
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
