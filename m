@@ -1,63 +1,61 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 12 Nov 2013 08:56:25 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> (Cong Wang's
- message of "Tue, 12 Nov 2013 06:48:59 +0000 (UTC)")
-References: <8761s0cqhh.fsf@natisbad.org>
- <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
-Message-ID: <87y54u59zq.fsf@natisbad.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 12 Nov 2013 08:59:29 +0100
+Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
+ Interface driver.
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F8287E87B@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+ <526021B0.6050206@metafoo.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F8286A385@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20131112050226.GK8834@intel.com>
+ <1DD289F6464F0949A2FCA5AA6DC23F8287E87B@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <5281DFE1.3040904@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Thanks for the pointer. See below.
-
-Cong Wang <xiyou.wangcong@gmail.com> writes:
-
-> On Sun, 10 Nov 2013 at 13:53 GMT, Arnaud Ebalard <arno@natisbad.org> wrote:
->> Hi,
->>
->> I decided to upgrade the kernel on one of my ReadyNAS 102 from 3.11.1 to 
->> 3.11.7. The device is based on Marvell Armada 370 SoC and uses mvneta
->> driver. Mine runs Debian armel unstable but I can confirm the issue also
->> happens on a debian harmhf unstable.
->>
-> [...]
->>
->> Then, knowing that, I started a git bisect session on stable tree to end
->> up with the following suspects. I failed to go any further to a single
->> commit, due to crashes, but I could recompile a kernel w/ debug info and
->> report what I get if neeeded.
->>
->> commit dc0791aee672 tcp: do not forget FIN in tcp_shifted_skb()     [bad]
->> commit 18ddf5127c9f tcp: must unclone packets before mangling them
->> commit 80bd5d8968d8 tcp: TSQ can use a dynamic limit
->> commit dbeb18b22197 tcp: TSO packets automatic sizing
->> commit 50704410d014 Linux 3.11.6                                    [good]
+On 11/12/2013 08:35 AM, Li Xiubo wrote:
+>>>>> +static int fsl_sai_probe(struct platform_device *pdev) {
+>>>> [...]
+>>>>> +
+>>>>> +	sai->dma_params_rx.addr = res->start + SAI_RDR;
+>>>>> +	sai->dma_params_rx.maxburst = 6;
+>>>>> +	index = of_property_match_string(np, "dma-names", "rx");
+>>>>> +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
+>> index,
+>>>>> +				&dma_args);
+>>>>> +	if (ret)
+>>>>> +		return ret;
+>>>>> +	sai->dma_params_rx.slave_id = dma_args.args[1];
+>>>>> +
+>>>>> +	sai->dma_params_tx.addr = res->start + SAI_TDR;
+>>>>> +	sai->dma_params_tx.maxburst = 6;
+>>>>> +	index = of_property_match_string(np, "dma-names", "tx");
+>>>>> +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
+>> index,
+>>>>> +				&dma_args);
+>>>>> +	if (ret)
+>>>>> +		return ret;
+>>>>> +	sai->dma_params_tx.slave_id = dma_args.args[1];
+>>>>
+>>>> The driver should not have to manually parse the dma devicetree
+>>>> properties, this is something that should be handled by the dma
+>>>> engine driver.
+>>>>
+>>>
+>>> What do you think about the DMA slave_id ?
+>>> I have been noticed by one colleague that this should be parsed here,
+>>> which is from your opinions ?
+>> Sure slave_id can be parsed here, but IMO it should be programmed via the
+>> dma_slave_confog into the respective channel
 >>
 >
-> This regression is probably introduced the last TSQ commit, Eric has a patch
-> for mvneta in the other thread:
+> Actually, these are parsed for cpu_dai->playback_dma_data and cpu_dai->capture_dma_data dynamically, whose type is struct dma_slave_config.
 >
-> http://article.gmane.org/gmane.linux.network/290359
+> And now I must parse them here, because the platform eDMA driver's newest version will check and use the slave_ids to select and configure the eDMA channels via dma_device->device_control().
 
-I had some offline (*) discussions w/ Eric and did some test w/ the patches
-he sent. It does not fix the regression I see. It would be nice if someone
-w/ the hardware and more knowledge of mvneta driver could reproduce the
-issue and spend some time on it.
+Parsing them here is a layering violation. The format of the DMA specifier 
+depends on the DMA controller. A DMA slave should not make any assumptions 
+about how the specifier looks like, it should not even look at them. You should 
+fix the DMA controller driver to work without slave_id in the devicetree case.
 
-That been said, even if the driver is most probably not the only one to
-blame here (considering the result of bisect and current thread on
-netdev), I never managed to get the performance I have on my ReadyNAS
-Duo v2 (i.e. 108MB/s for a file served by an Apache) with a mvneta-based
-platform (RN102, RN104 or RN2120). Understanding why is on an already a
-long todo list. 
-
-Cheers,
-
-a+
-
-(*): for some reasons, my messages to netdev and stable are not published
-even though I can interact w/ {majordomo,autoanswer}@vger.kernel.org. I
-poked postmaster@ bug got no reply yet.
+- Lars
