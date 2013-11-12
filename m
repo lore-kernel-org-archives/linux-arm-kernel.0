@@ -1,134 +1,49 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 12 Nov 2013 19:00:51 +0100
-Subject: arm/arm64 UEFI boot protocol
-In-Reply-To: <20131112164241.GD25953@mudshark.cambridge.arm.com>
-References: <20131111174321.GQ1557@rocoto.smurfnet.nu>
- <20131112164241.GD25953@mudshark.cambridge.arm.com>
-Message-ID: <20131112180050.GR1557@rocoto.smurfnet.nu>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Nov 2013 19:35:53 +0100
+Subject: [GIT PULL] clockevents/clocksource: 3.12 fixes
+In-Reply-To: <528234B9.7080402@linaro.org>
+References: <528234B9.7080402@linaro.org>
+Message-ID: <20131112183553.GQ14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 04:42:41PM +0000, Will Deacon wrote:
-> > So, rather than sending out complete sets of patches for all these until
-> > consensus is reached, below is my proposed suggestion for a
-> > Documentation/arm/uefi.txt, to be shared for arm and arm64. If noone has
-> > strong objections to this, we can quickly send updated (and hopefully
-> > final-ish) versions of these sets.
+Hello,
+
+On Tue, Nov 12, 2013 at 03:01:29PM +0100, Daniel Lezcano wrote:
 > 
-> In the absence of code, I'll play English teacher then :)
-
-Yey - a reply!
-
-> > UEFI, the Unified Extensible Firmware Interface is a specification
+> Hi Ingo and Thomas,
 > 
-> Interface, is
-
-ok
- 
-> > governing the behaviours of compatible firmware interfaces.
-> > It is maintained by the UEFI Forum - http://www.uefi.org/.
-> > Support for the AArch32 (arm) architecture was added in version 2.3 of
-> > the specification, and support for AAaarch64 (arm64) was added in
-> > version 2.4.
+> this pull request has the following contain:
 > 
-> AArch64
- 
-ok
-
-> > UEFI is an evolution of its predecessor 'EFI', so the terms EFI and
-> > EFI are used somewhat interchangeably in this document and associated
+>  * Laurent Pinchard fixed a missing a clk_put in case the
+> registering of the sh_mtu[2] drivers fails.
 > 
-> UEFI
- 
-ok
-
-> > UEFI stub
-> > =========
-> > The "stub" is a feature that turns the Image/zImage/bzImage into a valid
+>  * Uwe Kleine-K?nig reuse clockevents_config_and_register for the
+> at91rm9200_time timer as it was depending on the patch (commit
+> a4578ea (clockevents: Sanitize ticks to nsec conversion).
 > 
-> We don't support bzImage for arm or arm64.
- 
-Well, it works the same on x86, and the feature is called the same.
-Once we get the basic support in, I'm planning to write a
-Documentation/uefi.txt and move all of the non architecture-specific to.
+> I don't know why Thomas's patch "clockevents: Sanitize ticks to nsec
+> conversion" appears in the request log because it is not part of the
+> patches interval I specified for git request pull. The diffstat does
+> not show the files which should have been changed by the patch. In
+> any case I kept the changelog untouched since it is what gives me
+> git and maybe someone can tell me why it appears.
+Look at:
 
-> > UEFI PE/COFF executable, including a loader application that makes it
-> > possible to load the kernel directly from the UEFI shell, boot menu, or
-> > one of the lightweight bootloaders like Gummiboot or rEFInd. 
-> > The kernel image built with stub support remains a valid kernel image
-> > for booting in the legacy fashion.
-> 
-> By legacy, you mean non-UEFI rather than EFI? I consider UEFI as a choice
-> rather than the future ;p
+	git log --oneline --graph --boundary 97b9410..42ab380
 
-So, "historical"? "Traditional"? Or just "non-UEFI"?
- 
-> > UEFI kernel support on ARM
-> > ==========================
-> 
-> Wait, isn't this all under Documentation/arm/? You could probably combine
-> some of these sections together, since the scope is really tied to ARM here.
- 
-Same reason as above, but I could squash for now.
+Then you see that there is Thomas' patch twice. Once the version he
+committed and sent to Linus (97b9410) and once the version that you get
+as part of my pull request (a4578ea). To fix this (assuming you don't
+care much about a stable tree), simply do:
 
-> > The implementation depends on receiving information about the UEFI
-> > environment in a Flattened Device Tree (FDT) - so is only available with
-> > CONFIG_OF.
-> 
-> You could mention this in your earlier list of dependencies.
- 
-Ditto.
+	git rebase 97b9410 42ab380
 
-> > UEFI support also depends on early_memremap().
-> 
-> Why is that worthy of note? Can a user even turn that off?
- 
-Not really.
+and let the result pull.
 
-> > The stub populates the FDT /chosen node with, and the kernel scans for
-> > the following parameters:
-> 
-> Sentence doesn't read very well. Maybe stick some brackets around (and the
-> kernel scans for)?
- 
-ok
+Best regards
+Uwe
 
-> > ______________________________________________________________________________
-> > Name                      | Size   | Description
-> > ================================================================================
-> > linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
-> > --------------------------------------------------------------------------------
-> > linux,uefi-mmap           | 64-bit | Physical address of the UEFI memory map,
-> >                           |        | populated by the UEFI GetMemoryMap() call.
-> > --------------------------------------------------------------------------------
-> > linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
-> >                           |        | pointed to in previous entry.
-> > --------------------------------------------------------------------------------
-> > linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
-> >                           |        | memory map.
-> 
-> Do we actually need to define these sizes here, or can they be dealt with
-> using the usual #address-cells property? Also, I think you should describe
-> the binding in a separate document somewhere under Documentation/devicetree,
-> then cross-reference it from here.
- 
-This is not a generic ABI, so I don't think it belongs in there (it will
-never be in a .dtb, and the only way it can be generated by something
-that isn't the stub is by lying).
-But I don't really care either way - as long as some general agreement
-can be had.
-
-> > --------------------------------------------------------------------------------
-> > linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
-> > --------------------------------------------------------------------------------
-> 
-> Are you sure you want to refer to kernel symbols here? If somebody renames
-> that variable, they're not going to fix this file.
-
-There is a comment above the definition of linux_banner that says:
-/* FIXED STRINGS! Don't touch! */
-
-Sounded reliable enough to me :)
-
-/
-    Leif
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
