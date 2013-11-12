@@ -1,70 +1,55 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Tue, 12 Nov 2013 16:27:04 +0900
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
- support
-In-Reply-To: <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <528114C4.5000506@hitachi.com>
- <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
-Message-ID: <5281D848.7000502@hitachi.com>
+From: Li.Xiubo@freescale.com (Li Xiubo)
+Date: Tue, 12 Nov 2013 07:35:55 +0000
+Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
+ Interface driver.
+In-Reply-To: <20131112050226.GK8834@intel.com>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+ <526021B0.6050206@metafoo.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F8286A385@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20131112050226.GK8834@intel.com>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F8287E87B@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/11/12 15:23), Sandeepa Prabhu wrote:
->>>> OK, I've ensured that the hw_breakpoint (from perf) can work
->>>> with kprobes (from ftrace) at the same address on x86.
->>>> So if arm64 already support hw_breakpoint on perf, kprobes should
->>>> work with it.
->>>
->>> Single-stepping on x86 is different to the step behaviour on arm64 afaik. On
->>> ARM, we have to manually remove the breakpoint, perform a single-step, then
->>> add the breakpoint again. If we re-enable debug exceptions in the kprobe
->>> handler, the step will complete early and we'll never step off the
->>> breakpoint.
->>
->> I'm unsure about arm64's debug feature behavior, what does happen when
->> it performs a single-step on sw-breakpoint?
->>
->>> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
->>> I'm fairly sure it won't work as expected without some additional code.
->>
->> OK, anyway, for testing same one, we need to port ftrace first. So the next
+> > > > +static int fsl_sai_probe(struct platform_device *pdev) {
+> > > [...]
+> > > > +
+> > > > +	sai->dma_params_rx.addr = res->start + SAI_RDR;
+> > > > +	sai->dma_params_rx.maxburst = 6;
+> > > > +	index = of_property_match_string(np, "dma-names", "rx");
+> > > > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
+> index,
+> > > > +				&dma_args);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +	sai->dma_params_rx.slave_id = dma_args.args[1];
+> > > > +
+> > > > +	sai->dma_params_tx.addr = res->start + SAI_TDR;
+> > > > +	sai->dma_params_tx.maxburst = 6;
+> > > > +	index = of_property_match_string(np, "dma-names", "tx");
+> > > > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
+> index,
+> > > > +				&dma_args);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +	sai->dma_params_tx.slave_id = dma_args.args[1];
+> > >
+> > > The driver should not have to manually parse the dma devicetree
+> > > properties, this is something that should be handled by the dma
+> > > engine driver.
+> > >
+> >
+> > What do you think about the DMA slave_id ?
+> > I have been noticed by one colleague that this should be parsed here,
+> > which is from your opinions ?
+> Sure slave_id can be parsed here, but IMO it should be programmed via the
+> dma_slave_confog into the respective channel
+> 
 
-Sorry for confusion, s/next/fallback is what I meant. Making a kprobe module
-can be done without ftrace port.
+Actually, these are parsed for cpu_dai->playback_dma_data and cpu_dai->capture_dma_data dynamically, whose type is struct dma_slave_config.
 
->> plan is to make a kprobe module to put a probe (which just printk something)
->> on a specific function (e.g. vfs_symlink), and run perf record with
->> hw-breakpoint as below
->>
->> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
->>
->> Note that 0xXXXXXX is the address of vfs_symlink.
->>
->> After that, you can see the message in dmesg and also check the perf result
->> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
->> it works)
-> Thanks for steps, ARM64 ftrace patches are under review on arm mailing
-> list, I can contact the (linaro) developer implementing ftrace on
-> what's supported and then figure-out a way to test this concurrency of
-> kprobes breakpoint and hardware breakpoint.
+And now I must parse them here, because the platform eDMA driver's newest version will check and use the slave_ids to select and configure the eDMA channels via dma_device->device_control(). 
 
-Would you mean this? :)
-http://www.spinics.net/lists/arm-kernel/msg278477.html
-
-Wow, it seems that this also has some works around instruction
-manipulation (and confusable filenames...)
-
-Thank you,
-
--- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+--
+Xiubo
