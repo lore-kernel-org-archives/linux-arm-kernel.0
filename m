@@ -1,122 +1,56 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Tue, 12 Nov 2013 10:30:34 +0800
-Subject: [RFC] ASoC: fsl-ssi: Missing DMA-Request workaround
-In-Reply-To: <20131112014913.GE11083@S2101-09.ap.freescale.net>
-References: <1384185816-7730-1-git-send-email-mpa@pengutronix.de>
- <20131112014913.GE11083@S2101-09.ap.freescale.net>
-Message-ID: <20131112023033.GA23243@MrMyself>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 12 Nov 2013 11:22:44 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <20131111193236.GB16735@n2100.arm.linux.org.uk>
+References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+ <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+ <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
+ <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
+ <528110B1.4060402@arm.com>
+ <20131111193236.GB16735@n2100.arm.linux.org.uk>
+Message-ID: <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+On Tue, Nov 12, 2013 at 3:32 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 11, 2013 at 05:15:29PM +0000, Jonathan Austin wrote:
+>> I've tested the patch below and it solves the ARM side of things - so
+>> gives you an option other than a complete revert. Happy to put this in to
+>> RMK's patch system if you'd prefer not to have to revert and he's happy
+>> with the patch.
+>
+> I think this is the right solution because it then means that this symbol
+> has the same meaning whether on MMU or !MMU - and getting rid of these
+> kinds of gratuitous variances are the only way that !MMU is going to
+> become less fragile.
 
-On Tue, Nov 12, 2013 at 09:49:16AM +0800, Shawn Guo wrote:
-> Copy Nicolin.
-> 
-> Shawn
-> 
-> On Mon, Nov 11, 2013 at 05:03:36PM +0100, Markus Pargmann wrote:
-> > There is a hardware issue when using capture and playback at the same
-> > time. In the tested scenario, the capture stream was started slightly
-> > before the playback stream. The first time the application starts after
-> > a powerup, there is a high probability that the SSI unit does not send a
-> > request to the SDMA unit. The playback does not work. I tested this on
-> > i.MX53 with SSI unit 2 kernel 3.10.10.
+The patch only fixes problem on arm, and other !MMU&&!ARM archs
+should be affected too.
 
-I've been tested SSI with WM8962 on i.MX6 series for a while, and never met
-this issue, well, not with 3.10.10 original code and i.MX53 though.
+Also there is no CONFIG_PAGE_OFFSET defined for some ARCHs,
+such as 64bit ARCHs.
 
-Could you please provide me a reproducible flow? 
+Currently, I suggest to filter only on ARM as attachment patch if we plan
+to merge Jonathan's patch, otherwise a more complicated approach has
+to be figured out  to do the filter(such as, define a readonly symbol in
+kernel to store PAGE_OFFSET, and let scripts/kallsyms use it for
+filtering).
 
-If playback first and capture later, would this also reproduce the issue?
 
-Is there any command must be executed before the arecord | aplay, or just
-run it after system boot-up?
 
-By trying to reproduce it on i.MX6, we can confirm if it's a common issue
-to the IP or its driver, or just a hardware defect within i.MX53.
-
-Thank you,
-Nicolin Chen
-
----
-
-> > 
-> > Here is a register dump of the situation:
-> > SDMA
-> > 0x63fb0000
-> > 00000000: c0040000 00000000 0000001e 00000000
-> > 00000010: 00000001 ffffffff 00000000 e03efa41
-> > 00000020: 00000000 00000000 00000000 00000000
-> > 00000030: 00000064 00000000 00000003 00000000
-> > 00000040: 00000000 00000000 00000000 00006000
-> > 00000050: 00000000 00000000 00000001 00004050
-> > 00000060: 01208000 00000000 00000000 00000000 /* 0x60: EVT_MIRROR showing all received DMA requests */
-> >            ^ This should be a 3 instead. Bits 24 and 25 are the DMA requests for
-> >              RX and TX. Bit 25 is not set, DMA request 25 is missing.
-> > 
-> > SSI
-> > 0x50014000
-> > 00000000: 00000000 00000000 0000005f 00000000
-> > 00000010: 00000457 000050c1 01f80f00 0000028d /* 0x14: ISR Interrupt status register */
-> >                           ^
-> > 	     At 0x14 we can clearly see the last bit is set (0x1) which
-> > 	     is TFE0, Transmit FIFO 0 empty. So it should automatically
-> > 	     request data from the DMA engine, but it doesn't.
-> > 
-> > 00000020: 0000028d 0004e000 00040000 000010dd
-> > 00000030: 00001f1f 00000000 00000000 00000000
-> > 00000040: 00000000 00000000 00000000 00000000
-> > 00000050: 00000000 00000000 ........
-> > STATS (/sys/bus/platform/devices/50014000.ssi/statistics)
-> > rfrc=0
-> > tfrc=0
-> > roe1=0
-> > roe0=0
-> > tue1=0
-> > tue0=1094475
-> > 
-> > I could solve this issue by filling the transmit FIFO with data. After
-> > that, the SDMA unit receives DMA request 25 again and audio playback
-> > works.
-> > 
-> > This patch adds TUE0 interrupt handler which fills FIFO0 with arbitrary data.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> > 
-> > Hi,
-> > 
-> > does anyone have an idea why the SSI unit does not request DMA by its own at
-> > the beginning? Or is it a hardware errata that is not listed yet?
-> > 
-> > Regards,
-> > 
-> > Markus Pargmann
-> > 
-> > 
-> >  sound/soc/fsl/fsl_ssi.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> > index 6b81d0c..8faf2b5 100644
-> > --- a/sound/soc/fsl/fsl_ssi.c
-> > +++ b/sound/soc/fsl/fsl_ssi.c
-> > @@ -269,9 +269,14 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
-> >  	}
-> >  
-> >  	if (sisr & CCSR_SSI_SISR_TUE0) {
-> > +		int i;
-> > +
-> >  		ssi_private->stats.tue0++;
-> >  		sisr2 |= CCSR_SSI_SISR_TUE0;
-> >  		ret = IRQ_HANDLED;
-> > +
-> > +		for (i = 0; i != ssi_private->fifo_depth; ++i)
-> > +			write_ssi(0x0, &ssi->stx0);
-> >  	}
-> >  
-> >  	if (sisr & CCSR_SSI_SISR_TFS) {
-> > -- 
-> > 1.8.4.2
-> > 
+Thanks,
+-- 
+Ming Lei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: filter-only-on-arm.patch
+Type: text/x-patch
+Size: 531 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131112/66bf6a2d/attachment.bin>
