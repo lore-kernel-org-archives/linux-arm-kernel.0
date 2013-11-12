@@ -1,48 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Nov 2013 17:23:12 -0800
-Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <CAHCPf3tCTUEX6oDLUndZwt=Hk+YxsKjPO96N=Zhx82+_LM66sQ@mail.gmail.com>
-References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
- <CAHCPf3tCTUEX6oDLUndZwt=Hk+YxsKjPO96N=Zhx82+_LM66sQ@mail.gmail.com>
-Message-ID: <52818300.70003@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 11 Nov 2013 17:24:12 -0800
+Subject: [RFC 0/4] Intermix Lowmem and vmalloc
+In-Reply-To: <20131112001315.GD16735@n2100.arm.linux.org.uk>
+References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
+ <20131112001315.GD16735@n2100.arm.linux.org.uk>
+Message-ID: <5281833C.4010006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/13 22:46, Matt Sealey wrote:
-> On Fri, Nov 8, 2013 at 5:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> If we're running on a v7 ARM CPU, detect if the CPU supports the
->> sdiv/udiv instructions and replace the signed and unsigned
->> division library functions with an sdiv/udiv instruction.
+On 11/11/2013 4:13 PM, Russell King - ARM Linux wrote:
+> On Mon, Nov 11, 2013 at 03:26:48PM -0800, Laura Abbott wrote:
+>> Hi,
 >>
->> Running the perf messaging benchmark in pipe mode
+>> This is an RFC for a feature to allow lowmem and vmalloc virtual address space
+>> to be intermixed. This has currently only been tested on a narrow set of ARM
+>> chips.
 >>
->>  $ perf bench sched messaging -p
+>> Currently on 32-bit systems we have
 >>
->> shows a modest improvement on my v7 CPU.
 >>
->> before:
->> (5.060 + 5.960 + 5.971 + 5.643 + 6.029 + 5.665 + 6.050 + 5.870 + 6.117 + 5.683) / 10 = 5.805
+>>                    Virtual                             Physical
 >>
->> after:
->> (4.884 + 5.549 + 5.749 + 6.001 + 5.460 + 5.103 + 5.956 + 6.112 + 5.468 + 5.093) / 10 = 5.538
+>>     PAGE_OFFSET   +--------------+     PHYS_OFFSET   +------------+
+>>                   |              |                   |            |
+>>                   |              |                   |            |
+>>                   |              |                   |            |
+>>                   | lowmem       |                   |  direct    |
+>>                   |              |                   |   mapped   |
+>>                   |              |                   |            |
+>>                   |              |                   |            |
+>>                   |              |                   |            |
+>>                   +--------------+------------------>x------------>
+>>                   |              |                   |            |
+>>                   |              |                   |            |
+>>                   |              |                   |  not-direct|
+>>                   |              |                   | mapped     |
+>>                   | vmalloc      |                   |            |
+>>                   |              |                   |            |
+>>                   |              |                   |            |
+>>                   |              |                   |            |
+>>                   +--------------+                   +------------+
 >>
->> (5.805 - 5.538) / 5.805 = 4.6%
-> Even with the change to the output constraint suggested by Mans, you
-> get absolutely identical benchmark results? There's a lot of variance
-> in any case..
-
-Yeah sorry I didn't run the testcase again to see if numbers changed
-because I assumed one less instruction would be in the noise. I agree
-there is a lot of variance so if you have any better
-benchmarks/testcases please let me know.
-
+>> Where part of the virtual spaced above PHYS_OFFSET is reserved for direct
+>> mapped lowmem and part of the virtual address space is reserved for vmalloc.
 >
-> BTW has there been any evaluation of the penalty for the extra
-> branching, or the performance hit for the ARMv7-without-division
-> cases?
+> Minor nit...
+>
+> ITYM PAGE_OFFSET here.  vmalloc space doesn't exist in physical memory.
+>
 
-I haven't done any. I'll factor that in for the next round.
+Yes, that is a typo.
+
+Thanks,
+Laura
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
