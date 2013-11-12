@@ -1,24 +1,38 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 12 Nov 2013 09:50:42 -0500
-Subject: [PATCH 03/11] arm: use generic fixmap.h
-In-Reply-To: <1384262545-20875-4-git-send-email-msalter@redhat.com>
-References: <1384262545-20875-1-git-send-email-msalter@redhat.com>
- <1384262545-20875-4-git-send-email-msalter@redhat.com>
-Message-ID: <1384267842.24631.3.camel@deneb.redhat.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 12 Nov 2013 09:51:08 -0500
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <52814AFB.3070600@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <52814AFB.3070600@wwwdotorg.org>
+Message-ID: <20131112145108.GQ10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-11-12 at 08:22 -0500, Mark Salter wrote:
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/include/asm/fixmap.h | 25 ++++++-------------------
->  1 file changed, 6 insertions(+), 19 deletions(-)
+On Mon, Nov 11, 2013 at 02:24:11PM -0700, Stephen Warren wrote:
+> On 11/11/2013 01:29 PM, Jason Cooper wrote:
+> > Consumers of the Linux kernel's build products are beginning to hardcode
+> > the filenames of the dtbs generated.  Since the dtb filenames are
+> > currently the dts filename s/dts/dtb/, this prevents the kernel
+> > community from renaming dts files as needed.
+> 
+> My take is that the DTB filenames are part of the ABI, and therefore the
+> DTS filenames are also part of the ABI. Why would we want to rename them?
 
-Okay, this one is wrong. I just noticed that arm is different
-from other architectures in that increasing fixed indices
-convert to increasing virt addresses. Does this need to be
-the case or is it okay to change it to match other architectures?
+This idea originated from a conversation with Olof about starting to
+pre-pend the manufacturer name to the dts files:
 
---Mark
+  https://lkml.org/lkml/2013/11/8/378
+
+imho, at some point there is going to be an ABI breakage wrt dtb names
+when the devicetree moves to a separate repository.  All users will have
+to rework their scripts at that point.
+
+If that assumption is correct, why not put in place a _good_ ABI that
+allows us to be flexible as needed and specific for end users?  If you're
+still with me on this idea, shouldn't we put this in place now (as
+symlinks, thus retaining old names) so that we can switch over more
+easily later?
+
+thx,
+
+Jason.
