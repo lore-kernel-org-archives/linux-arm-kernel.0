@@ -1,61 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 12 Nov 2013 10:31:58 -0500
-Subject: Fwd: [PATCH 1/8] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <527A287C.2090401@ti.com>
-References: <1383680783-12114-2-git-send-email-ivan.khoronzhuk@ti.com>
- <527A287C.2090401@ti.com>
-Message-ID: <528249EE.6080109@ti.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 12 Nov 2013 15:32:37 +0000
+Subject: [Xen-devel] Physical memory start contraints in the Linux
+ kernel (Was: Re:	Xen osstest on Calxeda midway progress (Was: Re:
+ [xen-unstable test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <52824817.7010404@linaro.org>
+References: <osstest-21486-mainreport@xen.org>
+ <1384250005.1883.35.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
+ <201311121437.55826.arnd@arndb.de> <52823C9E.2010007@linaro.org>
+ <20131112144128.GL16735@n2100.arm.linux.org.uk>
+ <52824090.8040203@linaro.org>
+ <1384268259.10204.29.camel@kazak.uk.xensource.com>
+ <52824817.7010404@linaro.org>
+Message-ID: <1384270357.10204.52.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 November 2013 06:31 AM, ivan.khoronzhuk wrote:
-> To reduce code duplicate and increase code readability use WDT core
-> code to handle WDT interface.
+On Tue, 2013-11-12 at 15:24 +0000, Julien Grall wrote:
 > 
-> Remove io_lock as the WDT core uses mutex to lock each wdt device.
-> Remove wdt_state as the WDT core track state with its own variable.
+> On 11/12/2013 02:57 PM, Ian Campbell wrote:
+> > On Tue, 2013-11-12 at 14:52 +0000, Julien Grall wrote:
+> >>
+> >> On 11/12/2013 02:41 PM, Russell King - ARM Linux wrote:
+> >>> On Tue, Nov 12, 2013 at 02:35:10PM +0000, Julien Grall wrote:
+> >>>> During some debugging on the Arndale and Midway, I found another
+> >>>> constraint with CONFIG_ARM_PATCH_PHYS_VIRT.
+> >>>> I have noticed that all the kernel physical addresses must be lower than
+> >>>> the corresponding virtual addresses. So the delta offset compute in
+> >>>> __fixup_pv_table (arch/arm/kernel/head.S) must always be negative.
+> >>>> If this assertion is not validated, when the kernel will browse the
+> >>>> memory bank (sanity_check_info in arch/arm/mm/mmu.c), __phys(...) will
+> >>>> compute a wrong address and will result to consider all memory bank as
+> >>>> highmem.
+> >>>>
+> >>>> After digging in the code, it seems it's due to some optimization during
+> >>>> opcode fixup in __fixup_a_pvtable. Is it a wanted constraint?
+> >>>
+> >>> Are you talking about the code in v3.12 or the code in -next ?
+> >>
+> >> I was talking about 3.12. I have just checked -next and my issue seems
+> >> to be fixed by the commit f52bb722547f43caeaecbcc62db9f3c3b80ead9b.
+> >> I should have checked earlier, thanks.
+> >
+> > Should we revert your Xen side fix^Wworkaround then:
 > 
-> The watchdog_init_timeout() can read timeout value from timeout-sec
-> property if the passed value is out of bounds. So set initial
-> heartbeat value more than max value in order to initialize heartbeat
-> in next way. If heartbeat is not set thought module parameter, try
-> to read it's value from WDT node timeout-sec property. If node has
-> no one, use default value.
-> 
-> The heartbeat is hold in wdd->timeout by WDT core, so use it in
-> order to set timeout period.
-> 
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->  drivers/watchdog/Kconfig       |    1 +
->  drivers/watchdog/davinci_wdt.c |  150 ++++++++++------------------------------
->  2 files changed, 38 insertions(+), 113 deletions(-)
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index d1d53f3..2c954b5 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -271,6 +271,7 @@ config IOP_WATCHDOG
->  config DAVINCI_WATCHDOG
->  	tristate "DaVinci watchdog"
->  	depends on ARCH_DAVINCI
-> +	select WATCHDOG_CORE
->  	help
->  	  Say Y here if to include support for the watchdog timer
->  	  in the DaVinci DM644x/DM646x processors.
-> diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-> index bead774..a6eef71 100644
-> --- a/drivers/watchdog/davinci_wdt.c
-> +++ b/drivers/watchdog/davinci_wdt.c
-> @@ -3,7 +3,7 @@
->   *
->   * Watchdog driver for DaVinci DM644x/DM646x processors
->   *
-> - * Copyright (C) 2006 Texas Instruments.
-> + * Copyright (C) 2013 Texas Instruments.
-s/2013/2006-2013
+> For now it's only in -next. I would wait until this commit is at least 
+> in Linux master, otherwise we will likely break vanilla/distro kernel 
+> for Xen 4.4.
 
-Apart from the minor nit, this is really nice clean-up and
-more aligned with wdt coer leayer.
+OK. Can you keep an eye on it and let me know if/when the time comes to
+revert?
 
-FWIW, Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Is the fix a candidate for stable? Seems like a bit of a big exciting
+fix for what was an quite recently an obscure corner case...
+
+Ian.
