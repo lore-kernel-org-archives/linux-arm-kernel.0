@@ -1,93 +1,122 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 11 Nov 2013 15:50:50 +0000
-Subject: address translation for PCIe-to-localbus bridge
-In-Reply-To: <20131106182457.GA25879@obsidianresearch.com>
-References: <527A1983.6020603@keymile.com>
- <20131106173649.GA25515@obsidianresearch.com> <20131106190308.01f7a4a9@skate>
- <20131106182457.GA25879@obsidianresearch.com>
-Message-ID: <20131111155050.96290C41ABB@trevor.secretlab.ca>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Tue, 12 Nov 2013 10:30:34 +0800
+Subject: [RFC] ASoC: fsl-ssi: Missing DMA-Request workaround
+In-Reply-To: <20131112014913.GE11083@S2101-09.ap.freescale.net>
+References: <1384185816-7730-1-git-send-email-mpa@pengutronix.de>
+ <20131112014913.GE11083@S2101-09.ap.freescale.net>
+Message-ID: <20131112023033.GA23243@MrMyself>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Nov 2013 11:24:57 -0700, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
-> On Wed, Nov 06, 2013 at 07:03:08PM +0100, Thomas Petazzoni wrote:
-> > Dear Jason Gunthorpe,
+Hi Markus,
+
+On Tue, Nov 12, 2013 at 09:49:16AM +0800, Shawn Guo wrote:
+> Copy Nicolin.
+> 
+> Shawn
+> 
+> On Mon, Nov 11, 2013 at 05:03:36PM +0100, Markus Pargmann wrote:
+> > There is a hardware issue when using capture and playback at the same
+> > time. In the tested scenario, the capture stream was started slightly
+> > before the playback stream. The first time the application starts after
+> > a powerup, there is a high probability that the SSI unit does not send a
+> > request to the SDMA unit. The playback does not work. I tested this on
+> > i.MX53 with SSI unit 2 kernel 3.10.10.
+
+I've been tested SSI with WM8962 on i.MX6 series for a while, and never met
+this issue, well, not with 3.10.10 original code and i.MX53 though.
+
+Could you please provide me a reproducible flow? 
+
+If playback first and capture later, would this also reproduce the issue?
+
+Is there any command must be executed before the arecord | aplay, or just
+run it after system boot-up?
+
+By trying to reproduce it on i.MX6, we can confirm if it's a common issue
+to the IP or its driver, or just a hardware defect within i.MX53.
+
+Thank you,
+Nicolin Chen
+
+---
+
 > > 
-> > (Adding a bunch of mvebu people in Cc)
+> > Here is a register dump of the situation:
+> > SDMA
+> > 0x63fb0000
+> > 00000000: c0040000 00000000 0000001e 00000000
+> > 00000010: 00000001 ffffffff 00000000 e03efa41
+> > 00000020: 00000000 00000000 00000000 00000000
+> > 00000030: 00000064 00000000 00000003 00000000
+> > 00000040: 00000000 00000000 00000000 00006000
+> > 00000050: 00000000 00000000 00000001 00004050
+> > 00000060: 01208000 00000000 00000000 00000000 /* 0x60: EVT_MIRROR showing all received DMA requests */
+> >            ^ This should be a 3 instead. Bits 24 and 25 are the DMA requests for
+> >              RX and TX. Bit 25 is not set, DMA request 25 is missing.
 > > 
-> > On Wed, 6 Nov 2013 10:36:49 -0700, Jason Gunthorpe wrote:
+> > SSI
+> > 0x50014000
+> > 00000000: 00000000 00000000 0000005f 00000000
+> > 00000010: 00000457 000050c1 01f80f00 0000028d /* 0x14: ISR Interrupt status register */
+> >                           ^
+> > 	     At 0x14 we can clearly see the last bit is set (0x1) which
+> > 	     is TFE0, Transmit FIFO 0 empty. So it should automatically
+> > 	     request data from the DMA engine, but it doesn't.
 > > 
-> > > Thomas: There is one buglet here that I haven't had time to do
-> > > anything about. Notice the DT is listing the PEX memory window in its
-> > > ranges. I've done this for two reasons
-> > >  - The bootloader sets this address range up, so it is correct to
-> > >    include in the DT
+> > 00000020: 0000028d 0004e000 00040000 000010dd
+> > 00000030: 00001f1f 00000000 00000000 00000000
+> > 00000040: 00000000 00000000 00000000 00000000
+> > 00000050: 00000000 00000000 ........
+> > STATS (/sys/bus/platform/devices/50014000.ssi/statistics)
+> > rfrc=0
+> > tfrc=0
+> > roe1=0
+> > roe0=0
+> > tue1=0
+> > tue0=1094475
 > > 
-> > The fact that the bootloader sets this MBus window is more-or-less
-> > irrelevant because when the mvebu-mbus driver is initialized, it
-> > completely clears *all* existing MBus windows:
-> 
-> Yes, but it is not irrelevent. In my case this same DT is supporting
-> 3.10 and 3.12 kernels - 3.10 doesn't even have a MBUS driver or
-> dynamic PEX driver and it relies upon the ranges entry matching the
-> static bootloader configuration to work properly.
-> 
-> So the 'ranges matching bootloader' does have a use case.
-> 
-> > I indeed remember some objections, but I'm not sure what they were
-> > precisely. Maybe we didn't had a precise use case back at the time, to
-> > really make people objecting realize what the problem was?
-> 
-> That is about where I am at too..
-> 
-> > On the other hand, I think the of_*() API is quite limited when it
-> > comes to updating the DT. If I remember correctly, you can update some
-> > nodes, but you can never reclaim the memory that was used for the
-> > previous value of the node. So any change to the in-memory DT
-> > representation is basically a memory leak for the entire lifetime of
-> > the system (of course, I might be wrong on this, I haven't dived into
-> > all the hardcore details of DT manipulation in the kernel).
-> 
-> I'm not clear on that either, but it seems plausible..
-> 
-> > I'm not sure what would be the alternate mechanism to hook into the
-> > address translation. of_translate_one(), where all the translation
-> > through ranges takes place is really tied to the DT only, adding
-> > another mechanism to hook some custom address translation in there
-> > seems a bit weird, no?
-> 
-> I agree, some kind of callback scheme would really be needed.. Sort of
-> like the xlate callback we have for IRQs?
-> 
-> So the mbus would register an address xlate for its node that is
-> called instead of ranges parsing. For the example in my last message
-> the FPGA driver would register an xlate that made addresses relative
-> to its own BAR0 address.
-
-There are already bus-specific transations available. Take a look at
-struct of_bus in drivers/of/address.c
-
-g.
-
-> > However, it just works by pure luck: nothing guarantees you that the
-> > PCIe 0 memory window will start at 0xe0000000. Of course, since you
-> 
-> Right, the general case is totally borked here - the dynamic changes
-> to the address map by MBUS and PCI are not being reflected to the
-> of_address machinery, be they from MBUS or from PCI BAR assignment.
-> 
-> However, address assignment is very predicatble, so if you have a
-> constrained system it can work.
-
-Yes, the problem is that the DT probably can't have an accurate set of
-ranges for the devices under the PCIe bus since they are dynamically
-assigned. It would be really nice to wire this up properly so that the
-DT states the layout of stuff behind the bar, but leaves it to the OS to
-assign PCI regions.
-
-However, if firmware enumarates PCI and wants that to be passed through
-to the OS, then the DT really should be updated... even in that case
-though Linux should be able to pick up the PCI settings from the BAR
-registers and use those for dynamics translation.
-
-g.
+> > I could solve this issue by filling the transmit FIFO with data. After
+> > that, the SDMA unit receives DMA request 25 again and audio playback
+> > works.
+> > 
+> > This patch adds TUE0 interrupt handler which fills FIFO0 with arbitrary data.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> > 
+> > Hi,
+> > 
+> > does anyone have an idea why the SSI unit does not request DMA by its own at
+> > the beginning? Or is it a hardware errata that is not listed yet?
+> > 
+> > Regards,
+> > 
+> > Markus Pargmann
+> > 
+> > 
+> >  sound/soc/fsl/fsl_ssi.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+> > index 6b81d0c..8faf2b5 100644
+> > --- a/sound/soc/fsl/fsl_ssi.c
+> > +++ b/sound/soc/fsl/fsl_ssi.c
+> > @@ -269,9 +269,14 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+> >  	}
+> >  
+> >  	if (sisr & CCSR_SSI_SISR_TUE0) {
+> > +		int i;
+> > +
+> >  		ssi_private->stats.tue0++;
+> >  		sisr2 |= CCSR_SSI_SISR_TUE0;
+> >  		ret = IRQ_HANDLED;
+> > +
+> > +		for (i = 0; i != ssi_private->fifo_depth; ++i)
+> > +			write_ssi(0x0, &ssi->stx0);
+> >  	}
+> >  
+> >  	if (sisr & CCSR_SSI_SISR_TFS) {
+> > -- 
+> > 1.8.4.2
+> > 
