@@ -1,31 +1,56 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 12 Nov 2013 14:27:28 -0800
-Subject: [RFC PATCHv2 0/4] Intermix Lowmem and Vmalloc
-Message-ID: <1384295252-31778-1-git-send-email-lauraa@codeaurora.org>
+Date: Tue, 12 Nov 2013 14:27:32 -0800
+Subject: [RFC PATCHv2 4/4] mm/vmalloc.c: Treat the entire kernel virtual space
+ as vmalloc
+In-Reply-To: <1384295252-31778-1-git-send-email-lauraa@codeaurora.org>
+References: <1384295252-31778-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1384295252-31778-5-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With CONFIG_ENABLE_VMALLOC_SAVINGS, all lowmem is tracked in
+vmalloc. This means that all the kernel virtual address space
+can be treated as part of the vmalloc region. Allow vm areas
+to be allocated from the full kernel address range.
 
-This is v2 of a patch series to allow lowmem and vmalloc to be
-intermixed (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210578.html
-provides the full decriptions which I've omitted here for brevity)
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+---
+ mm/vmalloc.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-Nots I forgot to mention before:
-- as a side effect of how CMA is setup, the remapped lowmem regions are
-explicitly printed out in /proc/vmallocinfo which has turned out to be useful
-for debugging. I couldn't find a good way to support those and the lowmem
-regions in vmalloc short of adding partial region unmapping.
-- I still have a nagging concern about regions that straddle the lowmem/highmem
-boundary causing problems. I haven't been able to find a concrete issue yet
-though..
-
-v2: Fixed several comments by Kyungmin Park which led me to discover
-several issues with the is_vmalloc_addr implementation. is_vmalloc_addr
-is probably the ugliest part of the entire series and I debated if
-adding extra vmalloc flags would make it less ugly.
-
-Again, comments or suggestions on how to better accomplish this are welcome.
-
-Thanks,
-Laura
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 2ec9ac7..31644b6 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1394,16 +1394,27 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
+  */
+ struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
+ {
++#ifdef CONFIG_ENABLE_VMALLOC_SAVING
++	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
++				  NUMA_NO_NODE, GFP_KERNEL,
++				  __builtin_return_address(0));
++#else
+ 	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
+ 				  NUMA_NO_NODE, GFP_KERNEL,
+ 				  __builtin_return_address(0));
++#endif
+ }
+ 
+ struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
+ 				const void *caller)
+ {
++#ifdef CONFIG_ENABLE_VMALLOC_SAVING
++	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
++				  NUMA_NO_NODE, GFP_KERNEL, caller);
++#else
+ 	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
+ 				  NUMA_NO_NODE, GFP_KERNEL, caller);
++#endif
+ }
+ 
+ /**
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
