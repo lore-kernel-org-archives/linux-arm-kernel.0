@@ -1,44 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Nov 2013 17:04:55 +0000
-Subject: [PATCHv3 1/8] drm: Add the lacking DRM_MODE_FLAG_* for
- matching the DISPLAY_FLAGS_*
-In-Reply-To: <1384274965-30549-1-git-send-email-denis@eukrea.com>
-References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131112170455.GQ16735@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 12 Nov 2013 17:27:05 +0000
+Subject: [Xen-devel] [PATCH 2/2] swiotlb-xen: xen_swiotlb_map_page: do
+ not error out if dma_capable fails
+In-Reply-To: <20131112144832.GC9435@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
+ <1384265520-6833-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20131112144832.GC9435@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1311121704590.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 05:49:18PM +0100, Denis Carikli wrote:
-> diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> index fc2adb6..586c12f 100644
-> --- a/drivers/gpu/drm/drm_modes.c
-> +++ b/drivers/gpu/drm/drm_modes.c
-> @@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
->  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
->  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
->  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
-> +	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
-> +		dmode->flags |= DRM_MODE_FLAG_DE_LOW;
-> +	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
-> +		dmode->flags |= DRM_MODE_FLAG_DE_HIGH;
-> +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
-> +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_POSEDGE;
-> +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-> +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_NEGEDGE;
-> +
+Russell gave a great explanation of the issue so I am just going to
+limit myself to answering to:
 
-I'm still not convinced that these should be exposed in *any* way to
-userspace - I'm with Ville Syrj?l? on this point.
+On Tue, 12 Nov 2013, Konrad Rzeszutek Wilk wrote:
+> > Considering that we know that the swiotlb buffer has a low address,
+> > skip the check.
+> 
+> I am not following that sentence. Could you please explain to me
+> how the SWIOTLB buffer low address guarantees that we don't need
+> the check?
 
-Yes, you've moved their definition out of a uapi header file, but
-they're still leaking out of kernel space via calls (and with Xorg,
-they'll leak into the DisplayMode structures within the X server.)
+xen_swiotlb_fixup makes sure that the swiotlb buffer is lower than 4GB,
+probably lower than 3GB, by passing dma_bits to
+xen_create_contiguous_region.
+This meets the requirements of most devices out there.
+In fact we are not even running this check under the same conditions in
+swiotlb_map_sg_attrs.
+I admit that it is possible to come up with a scenario where the check
+would be useful, but it is far easier to come up with scenarios where
+not only is unneeded but it is even harmful.
 
-Now, here's the thing... The polarity of the display enable signal.
-That's a property of the connected device right?  It doesn't change
-with respect to the displayed mode unlike the hsync/vsync signals.
-If that's true, it should not be here.
+Alternatively (without Rob's "of: set dma_mask to point to
+coherent_dma_mask") Linux 3.13 is going to fail to get the network
+running on Midway. It is going to avoid fs mounting failures just
+because we don't do the same check in swiotlb_map_sg_attrs.
 
-Same goes for the pixel clock edge.  If it's a property of the
-connected device and doesn't have a dependence on the displayed
-mode, then it should not be in the DRM mode structure.
+FYI given that Rob's patch is probably going upstream soon anyway, I
+don't feel so strongly about this.
