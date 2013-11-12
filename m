@@ -1,52 +1,82 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 12 Nov 2013 14:21:04 +0100
-Subject: [PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-In-Reply-To: <20131112052625.GC28649@verge.net.au>
-References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131112051137.GB28649@verge.net.au> <20131112052625.GC28649@verge.net.au>
-Message-ID: <17979814.3ftdsWAt7J@avalon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Nov 2013 13:20:02 +0000
+Subject: Physical memory start contraints in the Linux kernel  (Was:
+ Re: Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel]
+ [xen-unstable test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
+References: <osstest-21486-mainreport@xen.org>
+ <1383731526.26213.25.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311061111580.26077@kaball.uk.xensource.com>
+ <1383736784.26213.72.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311061938080.26077@kaball.uk.xensource.com>
+ <1383822868.26213.181.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311111825090.26077@kaball.uk.xensource.com>
+ <1384250005.1883.35.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
+Message-ID: <20131112132001.GJ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, Nov 12, 2013 at 12:25:18PM +0000, Stefano Stabellini wrote:
+> Arnd, Olof,
 
-On Tuesday 12 November 2013 14:26:25 Simon Horman wrote:
-> On Tue, Nov 12, 2013 at 02:11:37PM +0900, Simon Horman wrote:
-> > On Sat, Nov 09, 2013 at 01:33:48PM +0100, Laurent Pinchart wrote:
-> > > SH-Mobile platforms are transitioning from non-multiplatform to
-> > > multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
-> > > been created to group all multiplatform-enabled SH-Mobile SoCs. The
-> > > existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
-> > > been converted yet.
-> > > 
-> > > This arrangement works fine for the arch/ code, but lots of drivers
-> > > needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
-> > > ARCH_SHMOBILE only. In order to avoid changing them, rename
-> > > ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
-> > > ARCH_SHMOBILE configuration symbol that is selected by both
-> > > ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
-> > > 
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > Acked-by: Magnus Damm <damm@opensource.se>
-> > 
-> > Thanks, I have queued this up.
+This isn't really an arm-soc thing, it's a core ARM thing...
+
+> we have been having this discussion on xen-devel regarding whether Xen
+> should be allowed to modify the start address of the physical memory
+> region in device tree before passing it to dom0 or not.
 > 
-> I have dropped this for now as it seems that all of the
-> shmobile defconfigs now need to be updated to use ARCH_SHMOBILE_LEGACY
-> instead of ARCH_SHMOBILE.
+> The reason why this question is coming up now, is that we realized that
+> we are going to have to live with the 1:1 pseudo-physical to physical
+> mapping for dom0 for a while. This limits the ability of the hypervisor
+> of allocating dom0 memory wherever it wants. Xen can allocate dom0
+> memory from the low end but maybe not exactly from the start.
+> 
+> As a result we would adjust the start of physical memory in device tree
+> to match the start of the memory region allocated for dom0. For example
+> on the Arndale it could be 0x80800000 instead of 0x80000000.
+> 
+> Unfortunately not all the platforms can cope with this very well. In
+> particular the Arndale seems to have issues.
 
-Indeed, I forgot about that.
+That should be no problem provided that:
 
-> It seems to me that needs to be part of this patch to avoid
-> breaking bisecatability. Any thoughts?
+(a) you load the kernel somewhere between 0x80800000 and 0x80ffffff -
+the decompressor will decide that the start of memory is 0x80800000, and
+place the kernel at 0x80808000.
+(b) _at the moment_ you modify DT to specify that memory starts at
+0x80800000 and not 0x80000000.
 
-The only bisection this would break is the defconfig bisection. I'm not sure 
-whether we need to care about that, Would that be a bit issue ? I'll submit a 
-separate patch, please feel free to squash it with this one if you believe it 
-should be.
+(b) is going to change soon: the shmobile and zynq platforms already have
+a problem with their memory setup which needs a patch in this area, and
+the patch will have the side effect of automatically removing (in your
+case) 0x80000000 to 0x80800000.  See the patch below.
 
--- 
-Regards,
+If there's any other issues with multiplatform, then yes, we want to hear
+about them.
 
-Laurent Pinchart
+ arch/arm/kernel/setup.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index f52150d2ec00..1957d54198ad 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -660,6 +660,17 @@ int __init arm_add_memory(u64 start, u64 size)
+ 	}
+ #endif
+ 
++	if (aligned_start < PHYS_OFFSET) {
++		if (aligned_start + size < PHYS_OFFSET) {
++			pr_info("Ignoring memory below PHYS_OFFSET: 0x%08llx-0x%08llx\n",
++				aligned_start, aligned_start + size);
++			return -EINVAL;
++		}
++
++		size -= PHYS_OFFSET - aligned_start;
++		aligned_start = PHYS_OFFSET;
++	}
++
+ 	bank->start = aligned_start;
+ 	bank->size = size & ~(phys_addr_t)(PAGE_SIZE - 1);
+ 
