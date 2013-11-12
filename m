@@ -1,42 +1,44 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 12 Nov 2013 09:53:34 +0100
-Subject: [PATCH v2 1/2] mmc: arasan: Add driver for Arasan SDHCI
-In-Reply-To: <b3f788b3-dfc3-422e-9a74-b796c0fd3207@DB8EHSMHS004.ehs.local>
-References: <1383151090-13885-1-git-send-email-soren.brinkmann@xilinx.com>
- <b3f788b3-dfc3-422e-9a74-b796c0fd3207@DB8EHSMHS004.ehs.local>
-Message-ID: <5281EC8E.90501@monstr.eu>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 12 Nov 2013 10:14:34 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <20131112083633.GB10318@1wt.eu> (Willy Tarreau's message of "Tue,
+ 12 Nov 2013 09:36:33 +0100")
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
+ <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
+Message-ID: <87a9hagex1.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi,
 
-On 11/06/2013 10:41 PM, S?ren Brinkmann wrote:
-> Hi Chris,
-> 
-> any comments from your side? Could you consider applying it to your
-> tree, please?
+Willy Tarreau <w@1wt.eu> writes:
 
-any update on this one?
+>> That been said, even if the driver is most probably not the only one to
+>> blame here (considering the result of bisect and current thread on
+>> netdev), I never managed to get the performance I have on my ReadyNAS
+>> Duo v2 (i.e. 108MB/s for a file served by an Apache) with a mvneta-based
+>> platform (RN102, RN104 or RN2120). Understanding why is on an already a
+>> long todo list. 
+>
+> Yes I found that your original numbers were already quite low,
 
-What's the naming convention we should follow?
+Tests for the rgression were done w/ scp, and were hence limited by the
+crypto (16MB/s using arcfour128). But I also did some tests w/ a simple
+wget for a file served by Apache *before* the regression and I never got
+more than 60MB/s from what I recall. Can you beat that? 
 
-Is sdhci-of-arasan.c OK? Or should we use sdhci-arasan.c instead?
+> so it is also possible that you have a different problem (eg: faulty
+> switch or auto-negociation problem where the switch goes to half
+> duplex because the neta does not advertise nway or whatever) that is
+> emphasized by the latest changes
 
-Thanks,
-Michal
+Tested w/ back to back connections to the NAS from various hosts and
+through different switch. Never saturated the link.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> I can confirm that I got this message from you on netdev so it should be OK
+> now.
 
+Good. Thanks for the info.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131112/fe6acd8f/attachment.sig>
+a+
