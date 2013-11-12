@@ -1,73 +1,50 @@
-From: luca@coelho.fi (Luca Coelho)
-Date: Tue, 12 Nov 2013 10:05:49 +0200
-Subject: [PATCH] clk: add flags to distinguish xtal clocks
-In-Reply-To: <20131111205910.GA26440@lukather>
-References: <1382528150.21526.25.camel@porter.coelho.fi>
- <1383933648-28595-1-git-send-email-balbi@ti.com>
- <20131110113716.GN26440@lukather> <20131111194247.GB19212@saruman.home>
- <1384199456.12583.27.camel@porter.coelho.fi>
- <20131111205910.GA26440@lukather>
-Message-ID: <1384243549.12583.36.camel@porter.coelho.fi>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Tue, 12 Nov 2013 09:11:33 +0100
+Subject: address translation for PCIe-to-localbus bridge
+In-Reply-To: <20131112080512.3992b2e4@skate>
+References: <527A1983.6020603@keymile.com>
+ <20131106173649.GA25515@obsidianresearch.com> <20131106190308.01f7a4a9@skate>
+ <20131106182457.GA25879@obsidianresearch.com>
+ <20131111155050.96290C41ABB@trevor.secretlab.ca>
+ <20131112080512.3992b2e4@skate>
+Message-ID: <5281E2B5.3080701@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-11-11 at 21:59 +0100, Maxime Ripard wrote:
-> Hi Luca,
-> 
-> On Mon, Nov 11, 2013 at 09:50:56PM +0200, Luca Coelho wrote:
-> > On Mon, 2013-11-11 at 13:42 -0600, Felipe Balbi wrote:
-> > > > > +	if (of_property_read_bool(node, "clock-xtal"))
-> > > > > +		flags |= CLK_IS_TYPE_XTAL;
-> > > > > +
-> > > > 
-> > > > Introducing a new compatible instead of a property would make more
-> > > > sense here I think.
-> > > > 
-> > > > Do you have a reason not to do so?
-> > > 
-> > > As you can see, this is original work from Luca but I disagree that
-> > > adding a new compatible makes more sense. This still related to a fixed
-> > > rate clock, we're just giving it one extra metadata which willAnd t
-> > > differentiate between crystal and oscilator fixed rate clocks.
-> > 
-> > I agree with Felipe.  This was discussed before [1].  While still at TI,
-> > I tried to figure out the exact need for the firmware to know whether it
-> > was an oscillator or not.  It was mostly because the stabilization time
-> > and such things differ with oscillators, but I wasn't able to find out
-> > how exactly this affected things.
-> > 
-> > In any case, as I concluded earlier (but it's not really my call), being
-> > a crystal or an oscillator *is* a characteristic of the hardware,
-> > regardless of whether that information is useful or not.  In the WiLink
-> > case it is, at least it can differentiate the clocks that are used in
-> > the HW modules it uses.
-> > 
-> > So IMHO it doesn't really hurt and it's not really against the DT
-> > principles.
-> 
-> Just to be clear, I'm not against your patch. If you need this to make
-> your driver work, then it's fine for me. Mike will probably know
-> better if we actually need some extra metadata.
+On 11/12/2013 08:05 AM, Thomas Petazzoni wrote:
+> Dear Grant Likely,
+>
+> On Mon, 11 Nov 2013 15:50:50 +0000, Grant Likely wrote:
+>
+>>> So the mbus would register an address xlate for its node that is
+>>> called instead of ranges parsing. For the example in my last message
+>>> the FPGA driver would register an xlate that made addresses relative
+>>> to its own BAR0 address.
+>>
+>> There are already bus-specific transations available. Take a look at
+>> struct of_bus in drivers/of/address.c
+>
+> Hum, right, but unless I'm wrong the of_busses[] array of struct of_bus
+> is fixed in drivers/of/address.c, and as it is, there is no way for a
+> specific bus driver to provide its own struct of_bus.
 
-:)
+That was exactly my understanding as well, and that's where I was 
+expecting some trickery to happen.
 
-I understand, we should really try to make this as clean as possible, DT
-should really be a good description of the hardware.
+> So that would need to be extended, right?
 
+The other approach I was foreseeing was to implement a way of 
+dynamically updating the DT when the PCI subsystem enumerates the 
+devices and assigns memory areas (namely, I would expect the ranges 
+property to reflect that). But this would imply a standard way of 
+defining the ranges property (I would expect something like <bar# 
+start_addr length>, with an arguable number of cells). And I could
+not find any such definition in the PCI bus binding document, so I'm 
+probably completely off-track here. Aren't I?
 
-> What I'm not really convinced about is *how* you carry that metadata
-> in the DT, that's all, nothing more.
+After all, we should expect a driver to behave (and expect) the same of 
+the DT, regardless of whether enumeration was performed by firmware or
+by the OS itself. Or am I wrong on this too?
 
-Okay, I get you.  My point is that being a crystal or not *is* a
-characteristic of the clock, so I think it could be part of the flags
-that describe it.
-
-In any case, it's not really my call.  This is about the clock and it's
-not even my home turf (wireless). ;)
-
-Thanks for your comments.  And I'm sorry if the tone of my previous
-email sounded harsh, it was not supposed to. :)
-
---
-Cheers,
-Luca.
+Thanks guys!
+Gerlando
