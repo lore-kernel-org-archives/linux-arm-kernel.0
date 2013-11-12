@@ -1,45 +1,48 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 12 Nov 2013 09:36:33 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <87y54u59zq.fsf@natisbad.org>
-References: <8761s0cqhh.fsf@natisbad.org>
- <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> <87y54u59zq.fsf@natisbad.org>
-Message-ID: <20131112083633.GB10318@1wt.eu>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 12 Nov 2013 10:39:44 +0200
+Subject: [PATCH 0/2] DaVinci: GPIO: fixes
+In-Reply-To: <5281C839.8070100@ti.com>
+References: <1383893156-28010-1-git-send-email-prabhakar.csengg@gmail.com>
+ <5280FB19.4020204@ti.com> <5281C839.8070100@ti.com>
+Message-ID: <5281E950.5090506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Hi Sekhar,
 
-On Tue, Nov 12, 2013 at 08:56:25AM +0100, Arnaud Ebalard wrote:
-> I had some offline (*) discussions w/ Eric and did some test w/ the patches
-> he sent. It does not fix the regression I see. It would be nice if someone
-> w/ the hardware and more knowledge of mvneta driver could reproduce the
-> issue and spend some time on it.
-
-I could give it a try but am falling very short of time at the moment.
-
-> That been said, even if the driver is most probably not the only one to
-> blame here (considering the result of bisect and current thread on
-> netdev), I never managed to get the performance I have on my ReadyNAS
-> Duo v2 (i.e. 108MB/s for a file served by an Apache) with a mvneta-based
-> platform (RN102, RN104 or RN2120). Understanding why is on an already a
-> long todo list. 
-
-Yes I found that your original numbers were already quite low, so it is
-also possible that you have a different problem (eg: faulty switch or
-auto-negociation problem where the switch goes to half duplex because
-the neta does not advertise nway or whatever) that is emphasized by the
-latest changes.
-
-> Cheers,
+On 11/12/2013 08:18 AM, Sekhar Nori wrote:
+> On Monday 11 November 2013 09:13 PM, Grygorii Strashko wrote:
+>> Hi Sekhar, Prabhakar Lad
+>>
+>> On 11/08/2013 08:45 AM, Prabhakar Lad wrote:> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>>
+>>> This patch series fixes gpio driver regestration
+>>> and offset check for unbanked gpio.
+>>>
+>>> Lad, Prabhakar (2):
+>>>     gpio: davinci: Fix a check for unbanked gpio
+>>>     ARM: davinci: Fix number of resources passed to
+>>>       davinci_gpio_register() call
+>>
+>> I've verified both patches - looks ok.
+>> Patch 1 - restores unbanked GPIO IRQs functionality
+>> Patch 2 - allows to register GPIO Platform devices and boot without issues.
+>>
+>> Could we move forward with these patches?
 > 
-> a+
+> Prabhakar, both patches look good to me. Thanks for the fixes.
 > 
-> (*): for some reasons, my messages to netdev and stable are not published
-> even though I can interact w/ {majordomo,autoanswer}@vger.kernel.org. I
-> poked postmaster@ bug got no reply yet.
+> Also Grygorii, have you actually verified that the unbanked IRQ support
+> works? Only DM365 uses it.
 
-I can confirm that I got this message from you on netdev so it should be OK
-now.
+Yes, I've verified it, but on Keystone which has similar GPIO IP
+which supports only unbanked IRQs.
 
-Willy
+> 
+> What do I add for you? Tested-by: or Acked-by:
+
+Reported-and-Reviewed-and-Tested-by: Grygorii Strashko <grygorii.strashko@ti.com> :P
+^Up to you :), but if I understand things right "Acked-by:" included all above
+
+Regards,
+- grygorii
