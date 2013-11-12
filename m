@@ -1,69 +1,48 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 12 Nov 2013 16:39:40 +0100
-Subject: [PATCH 00/11] Consolidate asm/fixmap.h files
-In-Reply-To: <1384262545-20875-1-git-send-email-msalter@redhat.com>
-References: <1384262545-20875-1-git-send-email-msalter@redhat.com>
-Message-ID: <52824BBC.9020401@monstr.eu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Nov 2013 15:39:04 +0000
+Subject: Physical memory start contraints in the Linux kernel  (Was:
+ Re: Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel]
+ [xen-unstable test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <5282483E.1000101@monstr.eu>
+References: <1383731526.26213.25.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311061111580.26077@kaball.uk.xensource.com>
+ <1383736784.26213.72.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311061938080.26077@kaball.uk.xensource.com>
+ <1383822868.26213.181.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311111825090.26077@kaball.uk.xensource.com>
+ <1384250005.1883.35.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
+ <20131112132001.GJ16735@n2100.arm.linux.org.uk> <5282483E.1000101@monstr.eu>
+Message-ID: <20131112153904.GP16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2013 02:22 PM, Mark Salter wrote:
-> Many architectures provide an asm/fixmap.h which defines support for
-> compile-time 'special' virtual mappings which need to be made before
-> paging_init() has run. This suport is also used for early ioremap
-> on x86. Much of this support is identical across the architectures.
-> This patch consolidates all of the common bits into asm-generic/fixmap.h
-> which is intended to be included from arch/*/include/asm/fixmap.h.
+On Tue, Nov 12, 2013 at 04:24:46PM +0100, Michal Simek wrote:
+> On 11/12/2013 02:20 PM, Russell King - ARM Linux wrote:
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index f52150d2ec00..1957d54198ad 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -660,6 +660,17 @@ int __init arm_add_memory(u64 start, u64 size)
+> >  	}
+> >  #endif
+> >  
+> > +	if (aligned_start < PHYS_OFFSET) {
+> > +		if (aligned_start + size < PHYS_OFFSET) {
 > 
-> This has been compiled on x86, arm, powerpc, and sh, but tested
-> on x86 only.
+> just a note I sent to Russell. Here should be "<=" instead of just "<"
 > 
-> Mark Salter (11):
->   Add generic fixmap.h
->   x86: use generic fixmap.h
->   arm: use generic fixmap.h
->   hexagon: use generic fixmap.h
->   metag: use generic fixmap.h
->   microblaze: use generic fixmap.h
->   mips: use generic fixmap.h
->   powerpc: use generic fixmap.h
->   sh: use generic fixmap.h
->   tile: use generic fixmap.h
->   um: use generic fixmap.h
+> > +			pr_info("Ignoring memory below PHYS_OFFSET: 0x%08llx-0x%08llx\n",
+> > +				aligned_start, aligned_start + size);
+> > +			return -EINVAL;
+> > +		}
+> > +
+> > +		size -= PHYS_OFFSET - aligned_start;
+> > +		aligned_start = PHYS_OFFSET;
 > 
->  arch/arm/include/asm/fixmap.h        |  25 ++------
->  arch/hexagon/include/asm/fixmap.h    |  40 +------------
->  arch/metag/include/asm/fixmap.h      |  32 +----------
->  arch/microblaze/include/asm/fixmap.h |  44 +-------------
->  arch/mips/include/asm/fixmap.h       |  33 +----------
->  arch/powerpc/include/asm/fixmap.h    |  44 +-------------
->  arch/sh/include/asm/fixmap.h         |  39 +------------
->  arch/tile/include/asm/fixmap.h       |  33 +----------
->  arch/um/include/asm/fixmap.h         |  40 +------------
->  arch/x86/include/asm/fixmap.h        |  59 +------------------
->  include/asm-generic/fixmap.h         | 107 +++++++++++++++++++++++++++++++++++
->  11 files changed, 125 insertions(+), 371 deletions(-)
->  create mode 100644 include/asm-generic/fixmap.h
+> We should printk a message here to be aware that alignment was done.
 
-Any repo/branch with all these patches will be helpful.
-
-Thanks,
-Michal
-
-
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131112/026a7f78/attachment.sig>
+Yep, you sent me an updated patch, I haven't added anything to my
+kernel tree for about a week and a bit now as I want to get what's
+already there into Linus' tree.  Once that stuff has gone, I'll see
+about adding some of these fixes we need into the queue.
