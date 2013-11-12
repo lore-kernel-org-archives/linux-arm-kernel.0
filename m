@@ -1,78 +1,148 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 12 Nov 2013 23:57:46 +0100 (CET)
-Subject: [GIT PULL] clockevents/clocksource: 3.12 fixes
-In-Reply-To: <20131112183553.GQ14892@pengutronix.de>
-References: <528234B9.7080402@linaro.org>
- <20131112183553.GQ14892@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1311122316270.30673@ionos.tec.linutronix.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 12 Nov 2013 15:00:52 -0800
+Subject: [PATCH v11 5/6] ARM: hi3xxx: add smp support
+In-Reply-To: <CAD6h2NRTc42YAKr6zLdMpiYbpBLatA9HNpZeFa3pZZpvJXBuCg@mail.gmail.com>
+ (Haojian Zhuang's message of "Tue, 12 Nov 2013 16:49:42 +0800")
+References: <1383813691-31587-1-git-send-email-haojian.zhuang@linaro.org>
+ <1383813691-31587-6-git-send-email-haojian.zhuang@linaro.org>
+ <527B6BCA.2010606@gmail.com>
+ <CAD6h2NRTc42YAKr6zLdMpiYbpBLatA9HNpZeFa3pZZpvJXBuCg@mail.gmail.com>
+Message-ID: <87txfhmdi3.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Nov 2013, Uwe Kleine-K?nig wrote:
-> On Tue, Nov 12, 2013 at 03:01:29PM +0100, Daniel Lezcano wrote:
-> > 
-> > Hi Ingo and Thomas,
-> > 
-> > this pull request has the following contain:
-> > 
-> >  * Laurent Pinchard fixed a missing a clk_put in case the
-> > registering of the sh_mtu[2] drivers fails.
-> > 
-> >  * Uwe Kleine-K?nig reuse clockevents_config_and_register for the
-> > at91rm9200_time timer as it was depending on the patch (commit
-> > a4578ea (clockevents: Sanitize ticks to nsec conversion).
-> > 
-> > I don't know why Thomas's patch "clockevents: Sanitize ticks to nsec
-> > conversion" appears in the request log because it is not part of the
-> > patches interval I specified for git request pull. The diffstat does
-> > not show the files which should have been changed by the patch. In
-> > any case I kept the changelog untouched since it is what gives me
-> > git and maybe someone can tell me why it appears.
-> Look at:
-> 
-> 	git log --oneline --graph --boundary 97b9410..42ab380
-> 
-> Then you see that there is Thomas' patch twice. Once the version he
-> committed and sent to Linus (97b9410) and once the version that you get
-> as part of my pull request (a4578ea). To fix this (assuming you don't
-> care much about a stable tree), simply do:
-> 
-> 	git rebase 97b9410 42ab380
-> 
-> and let the result pull.
+Haojian Zhuang <haojian.zhuang@linaro.org> writes:
 
-The whole misery starts that you decided to play maintainer and grab
-some patches from the mailinglist and then offering them via a pull
-request to me and others. Finally you tricked Daniel to take them,
-which is a different issue.
+> On 7 November 2013 18:30, Dinh Nguyen <dinh.linux@gmail.com> wrote:
+>>
+>> On 11/7/13 2:41 AM, Haojian Zhuang wrote:
+>>> From: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>
+>>> Enable SMP support on hi3xxx platform
+>>>
+>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
+>>> Tested-by: Li Xin <li.xin@linaro.org>
+>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>> ---
+>>>  .../bindings/arm/hisilicon/hisilicon.txt           | 30 ++++++--
+>>>  arch/arm/boot/dts/hi3620.dtsi                      | 38 ++++++++++
+>>>  arch/arm/mach-hi3xxx/Kconfig                       |  3 +
+>>>  arch/arm/mach-hi3xxx/Makefile                      |  1 +
+>>>  arch/arm/mach-hi3xxx/core.h                        | 11 +++
+>>>  arch/arm/mach-hi3xxx/hi3xxx.c                      | 34 +++++++++
+>>>  arch/arm/mach-hi3xxx/platsmp.c                     | 84 ++++++++++++++++++++++
+>>>  7 files changed, 197 insertions(+), 4 deletions(-)
+>>>  create mode 100644 arch/arm/mach-hi3xxx/core.h
+>>>  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>> index 3be60c8..8c7a465 100644
+>>> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>> @@ -1,10 +1,32 @@
+>>>  Hisilicon Platforms Device Tree Bindings
+>>>  ----------------------------------------------------
+>>>
+>>> -Hi3716 Development Board
+>>> -Required root node properties:
+>>> -     - compatible = "hisilicon,hi3716-dkb";
+>>> -
+>>>  Hi4511 Board
+>>>  Required root node properties:
+>>>       - compatible = "hisilicon,hi3620-hi4511";
+>>> +
+>>> +Hisilicon system controller
+>>> +
+>>> +Required properties:
+>>> +- compatible : "hisilicon,sysctrl"
+>>> +- reg : Register address and size
+>>> +
+>>> +Optional properties:
+>>> +- smp-offset : offset in sysctrl for notifying slave cpu booting
+>>> +             cpu 1, reg;
+>>> +             cpu 2, reg + 0x4;
+>>> +             cpu 3, reg + 0x8;
+>>> +             If reg value is not zero, cpun exit wfi and go
+>>> +- resume-offset : offset in sysctrl for notifying cpu0 when resume
+>>> +- reboot-offset : offset in sysctrl for system reboot
+>>> +
+>>> +Example:
+>>> +
+>>> +     /* for Hi3620 */
+>>> +     sysctrl: system-controller at fc802000 {
+>>> +             compatible = "hisilicon,sysctrl";
+>>> +             reg = <0xfc802000 0x1000>;
+>>> +             smp-offset = <0x31c>;
+>>> +             resume-offset = <0x308>;
+>>> +             reboot-offset = <0x4>;
+>>> +     };
+>>> diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
+>>> index b9d8679..e311937 100644
+>>> --- a/arch/arm/boot/dts/hi3620.dtsi
+>>> +++ b/arch/arm/boot/dts/hi3620.dtsi
+>>> @@ -39,6 +39,27 @@
+>>>                       reg = <0x0>;
+>>>                       next-level-cache = <&L2>;
+>>>               };
+>>> +
+>>> +             cpu at 1 {
+>>> +                     compatible = "arm,cortex-a9";
+>>> +                     device_type = "cpu";
+>>> +                     reg = <1>;
+>>> +                     next-level-cache = <&L2>;
+>>> +             };
+>>> +
+>>> +             cpu at 2 {
+>>> +                     compatible = "arm,cortex-a9";
+>>> +                     device_type = "cpu";
+>>> +                     reg = <2>;
+>>> +                     next-level-cache = <&L2>;
+>>> +             };
+>>> +
+>>> +             cpu at 3 {
+>>> +                     compatible = "arm,cortex-a9";
+>>> +                     device_type = "cpu";
+>>> +                     reg = <3>;
+>>> +                     next-level-cache = <&L2>;
+>>> +             };
+>>>       };
+>>>
+>>>       amba {
+>>> @@ -65,6 +86,17 @@
+>>>                       reg = <0x1000 0x1000>, <0x100 0x100>;
+>>>               };
+>>>
+>>> +             sysctrl: system-controller at 802000 {
+>>> +                     compatible = "hisilicon,sysctrl";
+>>> +                     reg = <0x802000 0x1000>;
+>>> +                     #address-cells = <1>;
+>>> +                     #size-cells = <0>;
+>>> +
+>>> +                     smp-offset = <0x31c>;
+>>> +                     resume-offset = <0x308>;
+>>> +                     reboot-offset = <0x4>;
+>>> +             };
+>>> +
+>>>               dual_timer0: dual_timer at 800000 {
+>>>                       compatible = "arm,sp804", "arm,primecell";
+>>>                       reg = <0x800000 0x1000>;
+>>> @@ -115,6 +147,12 @@
+>>>                       status = "disabled";
+>>>               };
+>>>
+>>> +             timer5: timer at 600 {
+>>> +                     compatible = "arm,cortex-a9-twd-timer";
+>>> +                     reg = <0x600 0x20>;
+>>> +                     interrupts = <1 13 0xf01>;
+>>> +             };
+>> Do you have a clocks node for this timer?
+>
+> As I mentioned in the 0th patch, clock binding are totally removed
+> in this patch. And clock driver will be append in another patch set.
 
-There is a reason why I ignored that pull request:
+Still, won't this timer still need a dummy fixed-rate clock until the
+real clocks are in place?  Otherwise it seems twd_get_clock() is going
+to fail.
 
- I generally do not pull git trees from people who I'm not
- trusting. And I have good reasons not to trust you at all.
-
-Aside of that, I decided to give you a chance and actually pulled
-your tree into a temporary branch and found out that it's missing a
-stable annotation. Which made the whole exercise go into /dev/null
-
-Now Linus pulled my version way before Daniel pulled your tree into
-his. And you even commented on my commit that I forgot to add a
-tested-by tag. Yes, I missed that in favour of the stable annotation.
-
-But instead of rebasing your tree or even just withdrawing it and
-resending the at91 patch, you let Daniel pull your thing.
-
-Of course Daniel failed to detect the pointless commit in your pull
-request at the point of merging it and then he starts asking questions
-when he sends the pull request for his aggregated stuff ....
-
-There is a good reason why most maintainers have a strict policy from
-whom they are pulling from and from whom they are just accepting
-patches by mail.
-
-Daniel, please provide me a rebased version, but be more careful
-versus integration of random pull requests next time.
-
-Thanks,
-
-	tglx
+Kevin
