@@ -1,37 +1,64 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 12 Nov 2013 14:26:25 +0900
-Subject: [PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-In-Reply-To: <20131112051137.GB28649@verge.net.au>
-References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1384000429-3590-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131112051137.GB28649@verge.net.au>
-Message-ID: <20131112052625.GC28649@verge.net.au>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 12 Nov 2013 11:11:04 +0530
+Subject: [PATCH V3 7/7] ARM: DRA: Enable Crossbar IP support for DRA7XX
+In-Reply-To: <1383657257-3458-8-git-send-email-r.sricharan@ti.com>
+References: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
+ <1383657257-3458-8-git-send-email-r.sricharan@ti.com>
+Message-ID: <5281BF70.4050708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 02:11:37PM +0900, Simon Horman wrote:
-> On Sat, Nov 09, 2013 at 01:33:48PM +0100, Laurent Pinchart wrote:
-> > SH-Mobile platforms are transitioning from non-multiplatform to
-> > multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
-> > been created to group all multiplatform-enabled SH-Mobile SoCs. The
-> > existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
-> > been converted yet.
-> > 
-> > This arrangement works fine for the arch/ code, but lots of drivers
-> > needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
-> > ARCH_SHMOBILE only. In order to avoid changing them, rename
-> > ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
-> > ARCH_SHMOBILE configuration symbol that is selected by both
-> > ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Acked-by: Magnus Damm <damm@opensource.se>
+On Tuesday 05 November 2013 06:44 PM, Sricharan R wrote:
+> Enable the crossbar IP support for DRA7xx soc.
 > 
-> Thanks, I have queued this up.
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig        |    1 +
+>  arch/arm/mach-omap2/omap4-common.c |    4 ++++
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index b5fb5f7..2086c65 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -141,6 +141,7 @@ config SOC_DRA7XX
+>  	select ARM_GIC
+>  	select HAVE_SMP
+>  	select COMMON_CLK
+> +	select IRQ_CROSSBAR
+>  
+>  comment "OMAP Core Type"
+>  	depends on ARCH_OMAP2
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> index 5791143..274cbfa 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/export.h>
+>  #include <linux/irqchip/arm-gic.h>
+> +#include <linux/irqchip/irq-crossbar.h>
+>  #include <linux/of_address.h>
+>  #include <linux/reboot.h>
+>  
+> @@ -282,9 +283,12 @@ void __init omap_gic_of_init(void)
+>  
+>  skip_errata_init:
+>  	omap_wakeupgen_init();
+> +	if (soc_is_dra7xx())
+> +		crossbar_init();
 
-I have dropped this for now as it seems that all of the
-shmobile defconfigs now need to be updated to use ARCH_SHMOBILE_LEGACY
-instead of ARCH_SHMOBILE.
+Its good if this is called irqcrossbar_init() to avoid confusion
+with the dma crossbar which also exists in dra7 devices.
 
-It seems to me that needs to be part of this patch to avoid
-breaking bisecatability. Any thoughts?
+>  	irqchip_init();
+>  }
+>  
+> +
+>  #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
+>  static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+>  {
+> 
