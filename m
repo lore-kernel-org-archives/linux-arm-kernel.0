@@ -1,115 +1,151 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 12 Nov 2013 17:49:18 +0100
-Subject: [PATCHv3 1/8] drm: Add the lacking DRM_MODE_FLAG_* for matching the
- DISPLAY_FLAGS_*
-Message-ID: <1384274965-30549-1-git-send-email-denis@eukrea.com>
+Date: Tue, 12 Nov 2013 17:49:19 +0100
+Subject: [PATCHv3 2/8] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel format.
+In-Reply-To: <1384274965-30549-1-git-send-email-denis@eukrea.com>
+References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
+Message-ID: <1384274965-30549-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without that fix, drivers using the drm_display_mode_from_videomode
-  function will not be able to get certain information because
-  some DISPLAY_FLAGS_* have no corresponding DRM_MODE_FLAG_*.
+That new macro is needed by the imx_drm staging driver
+  for supporting the QVGA display of the eukrea-cpuimx51 board.
 
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: driverdev-devel at linuxdriverproject.org
-Cc: Matt Sealey <neko@bakuhatsu.net>
 Cc: David Airlie <airlied@linux.ie>
-Cc: Ville Syrjala <syrjala@sci.fi>
 Cc: dri-devel at lists.freedesktop.org
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: linux-media at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
 ---
 ChangeLog v2->v3:
 - Added some interested people in the Cc list.
-- Removed a duplicated Cc.
-- Changed the flags names to match the one in DISPLAY_FLAGS.
-- Moved the flags out of the userspace headers.
-- Updated the rest of the code accordingly.
+- Added Mauro Carvalho Chehab's Ack.
+- Added documentation.
 ---
- drivers/gpu/drm/drm_modes.c |    9 +++++++++
- include/drm/drm_mode.h      |   34 ++++++++++++++++++++++++++++++++++
- include/uapi/drm/drm_mode.h |    4 ++--
- 3 files changed, 45 insertions(+), 2 deletions(-)
- create mode 100644 include/drm/drm_mode.h
+ .../DocBook/media/v4l/pixfmt-packed-rgb.xml        |   78 ++++++++++++++++++++
+ include/uapi/linux/videodev2.h                     |    1 +
+ 2 files changed, 79 insertions(+)
 
-diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-index fc2adb6..586c12f 100644
---- a/drivers/gpu/drm/drm_modes.c
-+++ b/drivers/gpu/drm/drm_modes.c
-@@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
- 		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
- 	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
- 		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
-+	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
-+		dmode->flags |= DRM_MODE_FLAG_DE_LOW;
-+	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
-+		dmode->flags |= DRM_MODE_FLAG_DE_HIGH;
-+	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
-+		dmode->flags |= DRM_MODE_FLAG_PIXDATA_POSEDGE;
-+	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-+		dmode->flags |= DRM_MODE_FLAG_PIXDATA_NEGEDGE;
-+
- 	drm_mode_set_name(dmode);
- 
- 	return 0;
-diff --git a/include/drm/drm_mode.h b/include/drm/drm_mode.h
-new file mode 100644
-index 0000000..07e5259
---- /dev/null
-+++ b/include/drm/drm_mode.h
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a
-+ * copy of this software and associated documentation files (the "Software"),
-+ * to deal in the Software without restriction, including without limitation
-+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
-+ * and/or sell copies of the Software, and to permit persons to whom the
-+ * Software is furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-+ * IN THE SOFTWARE.
-+ */
-+
-+#ifndef _DRM_MODE_H
-+#define _DRM_MODE_H
-+
-+#include <uapi/drm/drm_mode.h>
-+
-+/* DISPLAY_FLAGS DRM counterpart */
-+#define DRM_MODE_FLAG_DE_HIGH			(1<<22)
-+#define DRM_MODE_FLAG_DE_LOW			(1<<23)
-+#define DRM_MODE_FLAG_PIXDATA_POSEDGE		(1<<24)
-+#define DRM_MODE_FLAG_PIXDATA_NEGEDGE		(1<<25)
-+
-+#endif
-diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
-index 28acbaf..5681897 100644
---- a/include/uapi/drm/drm_mode.h
-+++ b/include/uapi/drm/drm_mode.h
-@@ -24,8 +24,8 @@
-  * IN THE SOFTWARE.
-  */
- 
--#ifndef _DRM_MODE_H
--#define _DRM_MODE_H
-+#ifndef _UAPI_DRM_MODE_H
-+#define _UAPI_DRM_MODE_H
- 
- #include <linux/types.h>
- 
+diff --git a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
+index 166c8d6..f6a3e84 100644
+--- a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
++++ b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
+@@ -279,6 +279,45 @@ colorspace <constant>V4L2_COLORSPACE_SRGB</constant>.</para>
+ 	    <entry></entry>
+ 	    <entry></entry>
+ 	  </row>
++	  <row id="V4L2-PIX-FMT-RGB666">
++	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
++	    <entry>'RGBH'</entry>
++	    <entry></entry>
++	    <entry>r<subscript>5</subscript></entry>
++	    <entry>r<subscript>4</subscript></entry>
++	    <entry>r<subscript>3</subscript></entry>
++	    <entry>r<subscript>2</subscript></entry>
++	    <entry>r<subscript>1</subscript></entry>
++	    <entry>r<subscript>0</subscript></entry>
++	    <entry>g<subscript>5</subscript></entry>
++	    <entry>g<subscript>4</subscript></entry>
++	    <entry></entry>
++	    <entry>g<subscript>3</subscript></entry>
++	    <entry>g<subscript>2</subscript></entry>
++	    <entry>g<subscript>1</subscript></entry>
++	    <entry>g<subscript>0</subscript></entry>
++	    <entry>b<subscript>5</subscript></entry>
++	    <entry>b<subscript>4</subscript></entry>
++	    <entry>b<subscript>3</subscript></entry>
++	    <entry>b<subscript>2</subscript></entry>
++	    <entry></entry>
++	    <entry>b<subscript>1</subscript></entry>
++	    <entry>b<subscript>0</subscript></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	  </row>
+ 	  <row id="V4L2-PIX-FMT-BGR24">
+ 	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
+ 	    <entry>'BGR3'</entry>
+@@ -781,6 +820,45 @@ defined in error. Drivers may interpret them as in <xref
+ 	    <entry></entry>
+ 	    <entry></entry>
+ 	  </row>
++	  <row><!-- id="V4L2-PIX-FMT-RGB666" -->
++	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
++	    <entry>'RGBH'</entry>
++	    <entry></entry>
++	    <entry>r<subscript>5</subscript></entry>
++	    <entry>r<subscript>4</subscript></entry>
++	    <entry>r<subscript>3</subscript></entry>
++	    <entry>r<subscript>2</subscript></entry>
++	    <entry>r<subscript>1</subscript></entry>
++	    <entry>r<subscript>0</subscript></entry>
++	    <entry>g<subscript>5</subscript></entry>
++	    <entry>g<subscript>4</subscript></entry>
++	    <entry></entry>
++	    <entry>g<subscript>3</subscript></entry>
++	    <entry>g<subscript>2</subscript></entry>
++	    <entry>g<subscript>1</subscript></entry>
++	    <entry>g<subscript>0</subscript></entry>
++	    <entry>b<subscript>5</subscript></entry>
++	    <entry>b<subscript>4</subscript></entry>
++	    <entry>b<subscript>3</subscript></entry>
++	    <entry>b<subscript>2</subscript></entry>
++	    <entry></entry>
++	    <entry>b<subscript>1</subscript></entry>
++	    <entry>b<subscript>0</subscript></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	  </row>
+ 	  <row><!-- id="V4L2-PIX-FMT-BGR24" -->
+ 	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
+ 	    <entry>'BGR3'</entry>
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 437f1b0..e8ff410 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -294,6 +294,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16  RGB-5-5-5 BE  */
+ #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B', 'R') /* 16  RGB-5-6-5 BE  */
+ #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B', 'G', 'R', 'H') /* 18  BGR-6-6-6	  */
++#define V4L2_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */
+ #define V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8     */
+ #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24  RGB-8-8-8     */
+ #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R', '4') /* 32  BGR-8-8-8-8   */
 -- 
 1.7.9.5
