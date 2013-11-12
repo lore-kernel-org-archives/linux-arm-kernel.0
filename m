@@ -1,195 +1,34 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon, 11 Nov 2013 22:41:00 -0800
-Subject: [PATCH 20/23] ARM: signal: sigreturn_codes should be endian
- neutral to work in BE8
-In-Reply-To: <20131111141258.GA3166@localhost.localdomain>
-References: <20131111141258.GA3166@localhost.localdomain>
-Message-ID: <CAA3XUr3jSj6BQPZY3hf7TSynEvx9=+_bP4iMzr6S5CTwU9rfaA@mail.gmail.com>
+From: xiyou.wangcong@gmail.com (Cong Wang)
+Date: Tue, 12 Nov 2013 06:48:59 +0000 (UTC)
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+References: <8761s0cqhh.fsf@natisbad.org>
+Message-ID: <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2013 06:13, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Nov 05, 2013 at 10:18:07PM +0100, Uwe Kleine-K?nig wrote:
->> Hello,
->>
->> On Wed, Oct 09, 2013 at 12:34:36AM +0200, Ben Dooks wrote:
->> > From: Victor Kamensky <victor.kamensky@linaro.org>
->> >
->> > In case of BE8 kernel data is in BE order whereas code stays in LE
->> > order. Move sigreturn_codes to separate .S file and use proper
->> > assembler mnemonics for these code snippets. In this case compiler
->> > will take care of proper instructions byteswaps for BE8 case.
->> > Change assumes that sufficiently Thumb-capable tools are used to
->> > build kernel.
->> >
->> > Problem was discovered during ltp testing of BE system: all rt_sig*
->> > tests failed. Tested against the same tests in both BE and LE modes.
->> >
->> > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
->> > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> > ---
->> >  arch/arm/kernel/Makefile          |  3 +-
->> >  arch/arm/kernel/signal.c          | 24 +-----------
->> >  arch/arm/kernel/sigreturn_codes.S | 80 +++++++++++++++++++++++++++++++++++++++
->> >  3 files changed, 83 insertions(+), 24 deletions(-)
->> >  create mode 100644 arch/arm/kernel/sigreturn_codes.S
->> >
->> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
->> > index 5140df5f..39c9834 100644
->> > --- a/arch/arm/kernel/Makefile
->> > +++ b/arch/arm/kernel/Makefile
->> > @@ -17,7 +17,8 @@ CFLAGS_REMOVE_return_address.o = -pg
->> >
->> >  obj-y              := elf.o entry-common.o irq.o opcodes.o \
->> >                process.o ptrace.o return_address.o \
->> > -              setup.o signal.o stacktrace.o sys_arm.o time.o traps.o
->> > +              setup.o signal.o sigreturn_codes.o \
->> > +              stacktrace.o sys_arm.o time.o traps.o
->> >
->> >  obj-$(CONFIG_ATAGS)                += atags_parse.o
->> >  obj-$(CONFIG_ATAGS_PROC)   += atags_proc.o
->> > diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
->> > index ab33042..64845fc 100644
->> > --- a/arch/arm/kernel/signal.c
->> > +++ b/arch/arm/kernel/signal.c
->> > @@ -21,29 +21,7 @@
->> >  #include <asm/unistd.h>
->> >  #include <asm/vfp.h>
->> >
->> > -/*
->> > - * For ARM syscalls, we encode the syscall number into the instruction.
->> > - */
->> > -#define SWI_SYS_SIGRETURN  (0xef000000|(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
->> > -#define SWI_SYS_RT_SIGRETURN       (0xef000000|(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
->> > -
->> > -/*
->> > - * With EABI, the syscall number has to be loaded into r7.
->> > - */
->> > -#define MOV_R7_NR_SIGRETURN        (0xe3a07000 | (__NR_sigreturn - __NR_SYSCALL_BASE))
->> > -#define MOV_R7_NR_RT_SIGRETURN     (0xe3a07000 | (__NR_rt_sigreturn - __NR_SYSCALL_BASE))
->> > -
->> > -/*
->> > - * For Thumb syscalls, we pass the syscall number via r7.  We therefore
->> > - * need two 16-bit instructions.
->> > - */
->> > -#define SWI_THUMB_SIGRETURN        (0xdf00 << 16 | 0x2700 | (__NR_sigreturn - __NR_SYSCALL_BASE))
->> > -#define SWI_THUMB_RT_SIGRETURN     (0xdf00 << 16 | 0x2700 | (__NR_rt_sigreturn - __NR_SYSCALL_BASE))
->> > -
->> > -static const unsigned long sigreturn_codes[7] = {
->> > -   MOV_R7_NR_SIGRETURN,    SWI_SYS_SIGRETURN,    SWI_THUMB_SIGRETURN,
->> > -   MOV_R7_NR_RT_SIGRETURN, SWI_SYS_RT_SIGRETURN, SWI_THUMB_RT_SIGRETURN,
->> > -};
->> > +extern const unsigned long sigreturn_codes[7];
->> >
->> >  static unsigned long signal_return_offset;
->> >
->> > diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
->> > new file mode 100644
->> > index 0000000..3c5d0f2
->> > --- /dev/null
->> > +++ b/arch/arm/kernel/sigreturn_codes.S
->> > @@ -0,0 +1,80 @@
->> > +/*
->> > + * sigreturn_codes.S - code sinpets for sigreturn syscalls
->> > + *
->> > + * Created by:     Victor Kamensky, 2013-08-13
->> > + * Copyright:      (C) 2013  Linaro Limited
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + */
->> > +
->> > +#include <asm/unistd.h>
->> > +
->> > +/*
->> > + * For ARM syscalls, we encode the syscall number into the instruction.
->> > + * With EABI, the syscall number has to be loaded into r7. As result
->> > + * ARM syscall sequence snippet will have move and svc in .arm encoding
->> > + *
->> > + * For Thumb syscalls, we pass the syscall number via r7.  We therefore
->> > + * need two 16-bit instructions in .thumb encoding
->> > + *
->> > + * Please note sigreturn_codes code are not executed in place. Instead
->> > + * they just copied by kernel into appropriate places. Code inside of
->> > + * arch/arm/kernel/signal.c is very sensitive to layout of these code
->> > + * snippets.
->> > + */
->> > +
->> > +#if __LINUX_ARM_ARCH__ <= 4
->> > +   /*
->> > +    * Note we manually set minimally required arch that supports
->> > +    * required thumb opcodes for early arch versions. It is OK
->> > +    * for this file to be used in combination with other
->> > +    * lower arch variants, since these code snippets are only
->> > +    * used as input data.
->> > +    */
->> > +   .arch armv4t
->> > +#endif
->> > +
->> > +   .section .rodata
->> > +   .global sigreturn_codes
->> > +   .type   sigreturn_codes, #object
->> > +
->> > +   .arm
->> This breaks a ARMv7-M build, see
->> http://arm-soc.lixom.net/buildlogs/misc/next-20131105-1-g2b29c44/buildall.arm.efm32_defconfig.log.failed
+On Sun, 10 Nov 2013 at 13:53 GMT, Arnaud Ebalard <arno@natisbad.org> wrote:
+> Hi,
 >
-> Hmmm, looks like we missed this scenario.
+> I decided to upgrade the kernel on one of my ReadyNAS 102 from 3.11.1 to 
+> 3.11.7. The device is based on Marvell Armada 370 SoC and uses mvneta
+> driver. Mine runs Debian armel unstable but I can confirm the issue also
+> happens on a debian harmhf unstable.
 >
-> Since the conditional .arch directive is supposed to set some CPU that
-> can assemble the relevant instructions, maybe we just need to change the
-> condition.
+[...]
 >
-> Does the following help?
+> Then, knowing that, I started a git bisect session on stable tree to end
+> up with the following suspects. I failed to go any further to a single
+> commit, due to crashes, but I could recompile a kernel w/ debug info and
+> report what I get if neeeded.
 >
-> Cheers
-> ---Dave
+> commit dc0791aee672 tcp: do not forget FIN in tcp_shifted_skb()     [bad]
+> commit 18ddf5127c9f tcp: must unclone packets before mangling them
+> commit 80bd5d8968d8 tcp: TSQ can use a dynamic limit
+> commit dbeb18b22197 tcp: TSO packets automatic sizing
+> commit 50704410d014 Linux 3.11.6                                    [good]
 >
->
-> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
-> index 3c5d0f2..bfec1ff 100644
-> --- a/arch/arm/kernel/sigreturn_codes.S
-> +++ b/arch/arm/kernel/sigreturn_codes.S
-> @@ -30,7 +30,7 @@
->   * snippets.
->   */
->
-> -#if __LINUX_ARM_ARCH__ <= 4
-> +#if __LINUX_ARM_ARCH__ <= 4 || defined(CONFIG_CPU_THUMBONLY)
->         /*
->          * Note we manually set minimally required arch that supports
->          * required thumb opcodes for early arch versions. It is OK
 
-Interesting ... I thought I've tried above, but turns out I've tried
+This regression is probably introduced the last TSQ commit, Eric has a patch
+for mvneta in the other thread:
 
-#ifdef CONFIG_CPU_THUMBONLY
-        .arch armv7a
-#endif
-
-And it fails as I mentioned in previous email. The error looks
-like this:
-
-arm-linux-gnueabihf-ld: error: arch/arm/kernel/sigreturn_codes.o:
-Conflicting architecture profiles A/M
-arm-linux-gnueabihf-ld: failed to merge target specific data of file
-arch/arm/kernel/sigreturn_codes.o
-
-I.e armv7a and armv7m are not compatible. But if I try
-literally as above it will do '.arch armv4t' and that one is
-compatible with armv7m! It links fine and sigreturn_opcodes
-looks correctly.
-
-This looks much cleaner. But I wonder whether such
-solution is fragile ... Any concerns/comments here?
-I will check binutils source tomorrow. And if it looks
-solid I will send V2 of patch based on this suggestion.
-
-Thanks,
-Victor
+http://article.gmane.org/gmane.linux.network/290359
