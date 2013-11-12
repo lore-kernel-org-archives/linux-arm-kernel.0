@@ -1,50 +1,134 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 12 Nov 2013 10:06:05 -0800
-Subject: [PATCH 2/7] arm: dt: zynq: Add 'cpus' node
-In-Reply-To: <528128A8.9060400@arm.com>
-References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383945677-29674-3-git-send-email-soren.brinkmann@xilinx.com>
- <528128A8.9060400@arm.com>
-Message-ID: <91c27955-2d9f-4e85-8d9e-b8a178b76cdb@CO9EHSMHS026.ehs.local>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 12 Nov 2013 19:00:51 +0100
+Subject: arm/arm64 UEFI boot protocol
+In-Reply-To: <20131112164241.GD25953@mudshark.cambridge.arm.com>
+References: <20131111174321.GQ1557@rocoto.smurfnet.nu>
+ <20131112164241.GD25953@mudshark.cambridge.arm.com>
+Message-ID: <20131112180050.GR1557@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 06:57:44PM +0000, Sudeep KarkadaNagesha wrote:
-> On 08/11/13 21:21, Soren Brinkmann wrote:
-> > Add a 'cpus' node to describe the CPU cores of Zynq.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-> > ---
-> >  arch/arm/boot/dts/zynq-7000.dtsi | 27 +++++++++++++++++++++++++++
-> >  1 file changed, 27 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> > index 27ebc1ba9671..37fc04525142 100644
-> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> > @@ -15,6 +15,33 @@
-> >  / {
-> >  	compatible = "xlnx,zynq-7000";
-> >  
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu at 0 {
-> > +			compatible = "arm,cortex-a9";
-> > +			device_type = "cpu";
-> > +			reg = <0>;
-> > +			clocks = <&clkc 3>;
-> > +			i-cache-size = <0x8000>;
-> > +			i-cache-line-size = <0x20>;
-> > +			d-cache-size = <0x8000>;
-> > +			d-cache-line-size = <0x20>;
+On Tue, Nov 12, 2013 at 04:42:41PM +0000, Will Deacon wrote:
+> > So, rather than sending out complete sets of patches for all these until
+> > consensus is reached, below is my proposed suggestion for a
+> > Documentation/arm/uefi.txt, to be shared for arm and arm64. If noone has
+> > strong objections to this, we can quickly send updated (and hopefully
+> > final-ish) versions of these sets.
 > 
-> These cache properties can be identified through CCSIDR(Cache Size ID Registers)
-> on ARMv7 Cortex implementations. It's better not to have these in DT if they can
-> be identified runtime.
-Sounds good to me. I'll go ahead an remove them.
+> In the absence of code, I'll play English teacher then :)
 
-	Thanks,
-	S?ren
+Yey - a reply!
+
+> > UEFI, the Unified Extensible Firmware Interface is a specification
+> 
+> Interface, is
+
+ok
+ 
+> > governing the behaviours of compatible firmware interfaces.
+> > It is maintained by the UEFI Forum - http://www.uefi.org/.
+> > Support for the AArch32 (arm) architecture was added in version 2.3 of
+> > the specification, and support for AAaarch64 (arm64) was added in
+> > version 2.4.
+> 
+> AArch64
+ 
+ok
+
+> > UEFI is an evolution of its predecessor 'EFI', so the terms EFI and
+> > EFI are used somewhat interchangeably in this document and associated
+> 
+> UEFI
+ 
+ok
+
+> > UEFI stub
+> > =========
+> > The "stub" is a feature that turns the Image/zImage/bzImage into a valid
+> 
+> We don't support bzImage for arm or arm64.
+ 
+Well, it works the same on x86, and the feature is called the same.
+Once we get the basic support in, I'm planning to write a
+Documentation/uefi.txt and move all of the non architecture-specific to.
+
+> > UEFI PE/COFF executable, including a loader application that makes it
+> > possible to load the kernel directly from the UEFI shell, boot menu, or
+> > one of the lightweight bootloaders like Gummiboot or rEFInd. 
+> > The kernel image built with stub support remains a valid kernel image
+> > for booting in the legacy fashion.
+> 
+> By legacy, you mean non-UEFI rather than EFI? I consider UEFI as a choice
+> rather than the future ;p
+
+So, "historical"? "Traditional"? Or just "non-UEFI"?
+ 
+> > UEFI kernel support on ARM
+> > ==========================
+> 
+> Wait, isn't this all under Documentation/arm/? You could probably combine
+> some of these sections together, since the scope is really tied to ARM here.
+ 
+Same reason as above, but I could squash for now.
+
+> > The implementation depends on receiving information about the UEFI
+> > environment in a Flattened Device Tree (FDT) - so is only available with
+> > CONFIG_OF.
+> 
+> You could mention this in your earlier list of dependencies.
+ 
+Ditto.
+
+> > UEFI support also depends on early_memremap().
+> 
+> Why is that worthy of note? Can a user even turn that off?
+ 
+Not really.
+
+> > The stub populates the FDT /chosen node with, and the kernel scans for
+> > the following parameters:
+> 
+> Sentence doesn't read very well. Maybe stick some brackets around (and the
+> kernel scans for)?
+ 
+ok
+
+> > ______________________________________________________________________________
+> > Name                      | Size   | Description
+> > ================================================================================
+> > linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
+> > --------------------------------------------------------------------------------
+> > linux,uefi-mmap           | 64-bit | Physical address of the UEFI memory map,
+> >                           |        | populated by the UEFI GetMemoryMap() call.
+> > --------------------------------------------------------------------------------
+> > linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
+> >                           |        | pointed to in previous entry.
+> > --------------------------------------------------------------------------------
+> > linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
+> >                           |        | memory map.
+> 
+> Do we actually need to define these sizes here, or can they be dealt with
+> using the usual #address-cells property? Also, I think you should describe
+> the binding in a separate document somewhere under Documentation/devicetree,
+> then cross-reference it from here.
+ 
+This is not a generic ABI, so I don't think it belongs in there (it will
+never be in a .dtb, and the only way it can be generated by something
+that isn't the stub is by lying).
+But I don't really care either way - as long as some general agreement
+can be had.
+
+> > --------------------------------------------------------------------------------
+> > linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+> > --------------------------------------------------------------------------------
+> 
+> Are you sure you want to refer to kernel symbols here? If somebody renames
+> that variable, they're not going to fix this file.
+
+There is a comment above the definition of linux_banner that says:
+/* FIXED STRINGS! Don't touch! */
+
+Sounded reliable enough to me :)
+
+/
+    Leif
