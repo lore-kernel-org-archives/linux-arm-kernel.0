@@ -1,118 +1,86 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 12 Nov 2013 17:26:34 +0100
-Subject: [PATCH 3/7] clocksource/cadence_ttc: Store timer frequency in
- driver data
-In-Reply-To: <1383945677-29674-4-git-send-email-soren.brinkmann@xilinx.com>
-References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383945677-29674-4-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <528256BA.7010801@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 12 Nov 2013 08:27:31 -0800
+Subject: Fwd: [PATCH 2/8] watchdog: davinci: use davinci_wdt_device
+ structure to hold device data
+In-Reply-To: <52824B20.9080002@ti.com>
+References: <1383680783-12114-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <527A2888.5030604@ti.com> <52824B20.9080002@ti.com>
+Message-ID: <20131112162731.GA5449@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 10:21 PM, Soren Brinkmann wrote:
-> It is not allowed to call clk_get_rate() from interrupt context. To
-> avoid such calls the timer input frequency is stored in the driver's
-> data struct which makes it accessible to the driver in any context.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
+On Tue, Nov 12, 2013 at 10:37:04AM -0500, Santosh Shilimkar wrote:
+> On Wednesday 06 November 2013 06:31 AM, ivan.khoronzhuk wrote:
+> > Some SoCs, like Keystone 2, can support more than one WDT and each
+> > watchdog device has to use it's own base address, clock source,
+> > wdd device, so add new davinci_wdt_device structure to hold device
+> In commit avoid struct names ;)
+> s/wdd/watchdog device
+> > data.
+> > 
+> > Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> > ---
+> >  drivers/watchdog/davinci_wdt.c |   74 ++++++++++++++++++++++++++--------------
+> >  1 file changed, 48 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+> > index a6eef71..1fc2093 100644
+> > --- a/drivers/watchdog/davinci_wdt.c
+> > +++ b/drivers/watchdog/davinci_wdt.c
+> 
+> [...]
+> 
+> > @@ -123,14 +135,21 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+> >  	struct device *dev = &pdev->dev;
+> >  	struct resource  *wdt_mem;
+> >  	struct watchdog_device *wdd;
+> > +	struct davinci_wdt_device *davinci_wdt;
+> > +
+> > +	davinci_wdt = devm_kzalloc(dev, sizeof(*davinci_wdt), GFP_KERNEL);
+> > +	if (!davinci_wdt)
+> > +		return -ENOMEM;
+> >  
+> > -	wdt_clk = devm_clk_get(dev, NULL);
+> > -	if (WARN_ON(IS_ERR(wdt_clk)))
+> > -		return PTR_ERR(wdt_clk);
+> > +	davinci_wdt->clk = devm_clk_get(dev, NULL);
+> > +	if (WARN_ON(IS_ERR(davinci_wdt->clk)))
+> > +		return PTR_ERR(davinci_wdt->clk);
+> >  
+> > -	clk_prepare_enable(wdt_clk);
+> > +	clk_prepare_enable(davinci_wdt->clk);
+> >  
+> > -	wdd			= &wdt_wdd;
+> > +	platform_set_drvdata(pdev, davinci_wdt);
+> > +
+> > +	wdd			= &davinci_wdt->wdd;
+> >  	wdd->info		= &davinci_wdt_info;
+> >  	wdd->ops		= &davinci_wdt_ops;
+> >  	wdd->min_timeout 	= 1;
+> > @@ -142,12 +161,13 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+> >  
+> >  	dev_info(dev, "heartbeat %d sec\n", wdd->timeout);
+> >  
+> > +	watchdog_set_drvdata(wdd, davinci_wdt);
+> >  	watchdog_set_nowayout(wdd, WATCHDOG_NOWAYOUT);
+> >  
+> >  	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > -	wdt_base = devm_ioremap_resource(dev, wdt_mem);
+> > -	if (IS_ERR(wdt_base))
+> > -		return PTR_ERR(wdt_base);
+> > +	davinci_wdt->base = devm_ioremap_resource(dev, wdt_mem);
+> > +	if (IS_ERR(davinci_wdt->base))
+> > +		return PTR_ERR(davinci_wdt->base);
+> You should free up davinci_wdt memory before returning, right ?
+> 
+No, devm should take care of that.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Guenter
 
->   drivers/clocksource/cadence_ttc_timer.c | 21 +++++++++++++--------
->   1 file changed, 13 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-> index b2bb3a4bc205..a92350b55d32 100644
-> --- a/drivers/clocksource/cadence_ttc_timer.c
-> +++ b/drivers/clocksource/cadence_ttc_timer.c
-> @@ -67,11 +67,13 @@
->    * struct ttc_timer - This definition defines local timer structure
->    *
->    * @base_addr:	Base address of timer
-> + * @freq:	Timer input clock frequency
->    * @clk:	Associated clock source
->    * @clk_rate_change_nb	Notifier block for clock rate changes
->    */
->   struct ttc_timer {
->   	void __iomem *base_addr;
-> +	unsigned long freq;
->   	struct clk *clk;
->   	struct notifier_block clk_rate_change_nb;
->   };
-> @@ -196,9 +198,8 @@ static void ttc_set_mode(enum clock_event_mode mode,
->
->   	switch (mode) {
->   	case CLOCK_EVT_MODE_PERIODIC:
-> -		ttc_set_interval(timer,
-> -				DIV_ROUND_CLOSEST(clk_get_rate(ttce->ttc.clk),
-> -					PRESCALE * HZ));
-> +		ttc_set_interval(timer, DIV_ROUND_CLOSEST(ttce->ttc.freq,
-> +						PRESCALE * HZ));
->   		break;
->   	case CLOCK_EVT_MODE_ONESHOT:
->   	case CLOCK_EVT_MODE_UNUSED:
-> @@ -273,6 +274,8 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
->   		return;
->   	}
->
-> +	ttccs->ttc.freq = clk_get_rate(ttccs->ttc.clk);
-> +
->   	ttccs->ttc.clk_rate_change_nb.notifier_call =
->   		ttc_rate_change_clocksource_cb;
->   	ttccs->ttc.clk_rate_change_nb.next = NULL;
-> @@ -298,16 +301,14 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
->   	__raw_writel(CNT_CNTRL_RESET,
->   		     ttccs->ttc.base_addr + TTC_CNT_CNTRL_OFFSET);
->
-> -	err = clocksource_register_hz(&ttccs->cs,
-> -			clk_get_rate(ttccs->ttc.clk) / PRESCALE);
-> +	err = clocksource_register_hz(&ttccs->cs, ttccs->ttc.freq / PRESCALE);
->   	if (WARN_ON(err)) {
->   		kfree(ttccs);
->   		return;
->   	}
->
->   	ttc_sched_clock_val_reg = base + TTC_COUNT_VAL_OFFSET;
-> -	setup_sched_clock(ttc_sched_clock_read, 16,
-> -			clk_get_rate(ttccs->ttc.clk) / PRESCALE);
-> +	setup_sched_clock(ttc_sched_clock_read, 16, ttccs->ttc.freq / PRESCALE);
->   }
->
->   static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
-> @@ -334,6 +335,9 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
->   				ndata->new_rate / PRESCALE);
->   		local_irq_restore(flags);
->
-> +		/* update cached frequency */
-> +		ttc->freq = ndata->new_rate;
-> +
->   		/* fall through */
->   	}
->   	case PRE_RATE_CHANGE:
-> @@ -367,6 +371,7 @@ static void __init ttc_setup_clockevent(struct clk *clk,
->   	if (clk_notifier_register(ttcce->ttc.clk,
->   				&ttcce->ttc.clk_rate_change_nb))
->   		pr_warn("Unable to register clock notifier.\n");
-> +	ttcce->ttc.freq = clk_get_rate(ttcce->ttc.clk);
->
->   	ttcce->ttc.base_addr = base;
->   	ttcce->ce.name = "ttc_clockevent";
-> @@ -396,7 +401,7 @@ static void __init ttc_setup_clockevent(struct clk *clk,
->   	}
->
->   	clockevents_config_and_register(&ttcce->ce,
-> -			clk_get_rate(ttcce->ttc.clk) / PRESCALE, 1, 0xfffe);
-> +			ttcce->ttc.freq / PRESCALE, 1, 0xfffe);
->   }
->
->   /**
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Other than that patch looks fine to me. With above fixed,
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
