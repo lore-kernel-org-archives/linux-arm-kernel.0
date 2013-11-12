@@ -1,57 +1,47 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 11 Nov 2013 18:12:57 -0600
-Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
-In-Reply-To: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1384215177.17054.2.camel@linux-builds1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Nov 2013 00:13:15 +0000
+Subject: [RFC 0/4] Intermix Lowmem and vmalloc
+In-Reply-To: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
+References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20131112001315.GD16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
-
-On Thu, 2013-11-07 at 16:07 +0100, Steffen Trumtrar wrote:
-> Hi!
+On Mon, Nov 11, 2013 at 03:26:48PM -0800, Laura Abbott wrote:
+> Hi,
 > 
-> This series includes two trivial fixes to the code (1,2),
-> then goes on to split the single clk.c file up into clock-type
-> specific files (3) and finally adds a divider to the peripheral
-> clock path.
+> This is an RFC for a feature to allow lowmem and vmalloc virtual address space
+> to be intermixed. This has currently only been tested on a narrow set of ARM
+> chips.
 > 
-> The patches are rebased to the for-next branch of
+> Currently on 32-bit systems we have
 > 
->         git://git.rocketboards.org/linux-socfpga-next.git
 > 
-> Regards,
-> Steffen
+>                   Virtual                             Physical
 > 
-> Steffen Trumtrar (4):
->   ARM: socfpga: clk: remove unused field
->   ARM: socfpga: clk: fix define typo
-
-The first two patches are fine.
-
->   ARM: socfpga: clk: split clk code
->   ARM: socfpga: clk: add clk_divider to periph
-
-These two patches are causing the ethernet driver to not be able to grab
-the correct clock during probe.
-
-Lets wait for 3.13-rc1 and I will push a new for-next that will be more
-up-to-date.
-
-Thanks,
-
-Dinh
+>    PAGE_OFFSET   +--------------+     PHYS_OFFSET   +------------+
+>                  |              |                   |            |
+>                  |              |                   |            |
+>                  |              |                   |            |
+>                  | lowmem       |                   |  direct    |
+>                  |              |                   |   mapped   |
+>                  |              |                   |            |
+>                  |              |                   |            |
+>                  |              |                   |            |
+>                  +--------------+------------------>x------------>
+>                  |              |                   |            |
+>                  |              |                   |            |
+>                  |              |                   |  not-direct|
+>                  |              |                   | mapped     |
+>                  | vmalloc      |                   |            |
+>                  |              |                   |            |
+>                  |              |                   |            |
+>                  |              |                   |            |
+>                  +--------------+                   +------------+
 > 
->  drivers/clk/socfpga/Makefile     |   3 +
->  drivers/clk/socfpga/clk-gate.c   | 197 ++++++++++++++++++++++++
->  drivers/clk/socfpga/clk-periph.c |  87 +++++++++++
->  drivers/clk/socfpga/clk-pll.c    | 114 ++++++++++++++
->  drivers/clk/socfpga/clk.c        | 313 +--------------------------------------
->  drivers/clk/socfpga/clk.h        |  56 +++++++
->  6 files changed, 458 insertions(+), 312 deletions(-)
->  create mode 100644 drivers/clk/socfpga/clk-gate.c
->  create mode 100644 drivers/clk/socfpga/clk-periph.c
->  create mode 100644 drivers/clk/socfpga/clk-pll.c
->  create mode 100644 drivers/clk/socfpga/clk.h
-> 
+> Where part of the virtual spaced above PHYS_OFFSET is reserved for direct
+> mapped lowmem and part of the virtual address space is reserved for vmalloc.
+
+Minor nit...
+
+ITYM PAGE_OFFSET here.  vmalloc space doesn't exist in physical memory.
