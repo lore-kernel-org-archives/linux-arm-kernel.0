@@ -1,392 +1,347 @@
 From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
-Date: Tue, 12 Nov 2013 13:53:03 +0000
-Subject: [PATCH RFC 08/10] net: stmmac:sti: Add STi SOC glue driver.
+Date: Tue, 12 Nov 2013 13:52:18 +0000
+Subject: [PATCH RFC 01/10] drivers: reset: STi SoC system configuration reset
+ controller support
 In-Reply-To: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
 References: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1384264383-7653-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1384264338-7353-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+From: Stephen Gallimore <stephen.gallimore@st.com>
 
-STi series SOCs have a glue layer on top of the synopsis gmac IP, this
-glue layer needs to be configured before the gmac driver starts using
-the IP.
+This patch adds a reset controller implementation for STMicroelectronics
+STi family SoCs; it allows a group of related reset like controls found
+in multiple system configuration registers to be represented by a single
+controller device. System configuration registers are accessed through
+the regmap framework and the mfd/syscon driver.
 
-This patch adds a platform driver for the glue layer which configures
-the IP before stmmac driver takes over.
+The implementation optionally supports waiting for the reset action to
+be acknowledged in a separate status register and supports both
+active high and active low reset lines. These properties are common across
+all the reset channels in a specific reset controller instance, hence
+all channels in a paritcular controller are expected to behave in the
+same way.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Signed-off-by: Stephen Gallimore <stephen.gallimore@st.com>
 ---
- .../devicetree/bindings/net/sti-dwmac.txt          |   45 +++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    |  294 ++++++++++++++++++++
- 3 files changed, 340 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/sti-dwmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+ drivers/reset/Kconfig            |    2 +
+ drivers/reset/Makefile           |    3 +
+ drivers/reset/sti/Kconfig        |    7 ++
+ drivers/reset/sti/Makefile       |    1 +
+ drivers/reset/sti/reset-syscfg.c |  186 ++++++++++++++++++++++++++++++++++++++
+ drivers/reset/sti/reset-syscfg.h |   69 ++++++++++++++
+ 6 files changed, 268 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/reset/sti/Kconfig
+ create mode 100644 drivers/reset/sti/Makefile
+ create mode 100644 drivers/reset/sti/reset-syscfg.c
+ create mode 100644 drivers/reset/sti/reset-syscfg.h
 
-diff --git a/Documentation/devicetree/bindings/net/sti-dwmac.txt b/Documentation/devicetree/bindings/net/sti-dwmac.txt
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index c9d04f7..0615f50 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -11,3 +11,5 @@ menuconfig RESET_CONTROLLER
+ 	  via GPIOs or SoC-internal reset controller modules.
+ 
+ 	  If unsure, say no.
++
++source "drivers/reset/sti/Kconfig"
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 1e2d83f..2b2a57c 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -1 +1,4 @@
+ obj-$(CONFIG_RESET_CONTROLLER) += core.o
++
++# SoC specific
++obj-$(CONFIG_ARCH_STI) += sti/
+diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
 new file mode 100644
-index 0000000..5431d9d
+index 0000000..ba13796
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/net/sti-dwmac.txt
-@@ -0,0 +1,45 @@
-+STMicroelectronics SoC DWMAC controller
++++ b/drivers/reset/sti/Kconfig
+@@ -0,0 +1,7 @@
++if ARCH_STI
 +
-+The device node has following properties.
++config STI_RESET_SYSCFG
++	bool
++	select RESET_CONTROLLER
 +
-+Required properties:
-+ - compatible	: Can be "st,stih415-dwmac", "st,stih416-dwmac" or
-+   "st,stid127-dwmac".
-+ - reg		: Offset of the glue configuration register map in system
-+   configuration regmap pointed by st,syscon property and size.
-+ - st,syscon	: Should be phandle to system configuration node which
-+   encompases this glue registers.
-+ - st,tx-retime-src: This specifies which clk is wired up to the mac for
-+   retimeing tx lines. This is totally board dependent and can take one of the
-+   posssible values from "txclk", "clk_125", "phyclk" or "clkgen".
-+
-+Optional properties:
-+ - resets	: phandle pointing to the system reset controller with correct
-+   reset line index for ethernet reset.
-+
-+Sub-nodes:
-+The dwmac core should be added as subnode to STMicroelectronics dwmac glue.
-+- dwmac :	The binding details of dwmac can be found in
-+  Documentation/devicetree/bindings/net/stmmac.txt
-+
-+Example:
-+
-+ethernet0: ethernet0{
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	compatible		= "st,stih415-dwmac";
-+	reg			= <0x148 0x4>;
-+	resets			= <&softreset STIH415_ETH0_SOFTRESET>;
-+	st,syscon		= <&syscfg_rear>;
-+	st,tx-retime-src	= "clk_125";
-+	ranges;
-+
-+	dwmac0:dwmac at fe810000 {
-+		device_type 	= "network";
-+		compatible	= "snps,dwmac", "snps,dwmac-3.610";
-+		reg 		= <0xfe810000 0x8000>;
-+		interrupts 	= <0 147 0>;
-+		interrupt-names = "macirq";
-+		...
-+	};
-+};
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-index 356a9dd..32db223 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Makefile
-+++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_STMMAC_ETH) += stmmac.o
- stmmac-$(CONFIG_STMMAC_PLATFORM) += stmmac_platform.o
- stmmac-$(CONFIG_STMMAC_PCI) += stmmac_pci.o
-+stmmac-$(CONFIG_ARCH_STI) += dwmac-sti.o
- stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
- 	      chain_mode.o dwmac_lib.o dwmac1000_core.o  dwmac1000_dma.o \
- 	      dwmac100_core.o dwmac100_dma.o enh_desc.o  norm_desc.o \
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
++endif
+diff --git a/drivers/reset/sti/Makefile b/drivers/reset/sti/Makefile
 new file mode 100644
-index 0000000..34cfa96
+index 0000000..c4a51d9
 --- /dev/null
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
-@@ -0,0 +1,294 @@
-+/**
-+ * dwmac-sti.c - STMicroelectronics DWMAC Specific Glue layer
++++ b/drivers/reset/sti/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_STI_RESET_SYSCFG) += reset-syscfg.o
+diff --git a/drivers/reset/sti/reset-syscfg.c b/drivers/reset/sti/reset-syscfg.c
+new file mode 100644
+index 0000000..a145cc0
+--- /dev/null
++++ b/drivers/reset/sti/reset-syscfg.c
+@@ -0,0 +1,186 @@
++/*
++ * Copyright (C) 2013 STMicroelectronics Limited
++ * Author: Stephen Gallimore <stephen.gallimore@st.com>
 + *
-+ * Copyright (C) 2003-2013 STMicroelectronics (R&D) Limited
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * Inspired by drivers/usb/dwc3/dwc3-exynos.c
++ * Inspired by mach-imx/src.c
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
 + */
-+
-+#include <linux/module.h>
 +#include <linux/kernel.h>
-+#include <linux/slab.h>
 +#include <linux/platform_device.h>
-+#include <linux/phy.h>
-+#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/types.h>
++#include <linux/of_device.h>
 +#include <linux/regmap.h>
-+#include <linux/reset.h>
-+#include <linux/clk.h>
-+#include <linux/of.h>
-+#include <linux/of_net.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
++#include <linux/mfd/syscon.h>
 +
-+#define BITS_MASK(lsb, msb)	((BIT(msb - lsb + 1) - 1) << lsb)
-+
-+#define TX_RETIME_SRC_MASK		BITS_MASK(6, 8)
-+#define ETH_SEL_TX_RETIME_CLK		BIT(8)
-+#define ETH_SEL_INTERNAL_NOTEXT_PHYCLK	BIT(7)
-+#define ETH_SEL_TXCLK_NOT_CLK125	BIT(6)
-+
-+#define ENMII_MASK			BITS_MASK(5, 5)
-+#define ENMII				BIT(5)
++#include "reset-syscfg.h"
 +
 +/**
-+ * 3 bits [4:2]
-+ *	000-GMII/MII
-+ *	001-RGMII
-+ *	010-SGMII
-+ *	100-RMII
-+*/
-+#define MII_PHY_SEL_MASK		BITS_MASK(2, 4)
-+#define ETH_PHY_SEL_RMII		BIT(4)
-+#define ETH_PHY_SEL_SGMII		BIT(3)
-+#define ETH_PHY_SEL_RGMII		BIT(2)
-+#define ETH_PHY_SEL_GMII		0x0
-+#define ETH_PHY_SEL_MII			0x0
-+
-+struct sti_dwmac {
-+	int	interface;
-+	int	tx_retime_src;
-+	int	reg;
-+	struct	device *dev;
-+	struct	regmap *regmap;
-+	struct	device_node *dwmac_np;
-+	struct	reset_control *rstc;
-+};
-+
-+static u32 phy_intf_sels[] = {
-+	[PHY_INTERFACE_MODE_MII]	= ETH_PHY_SEL_MII,
-+	[PHY_INTERFACE_MODE_GMII]	= ETH_PHY_SEL_GMII,
-+	[PHY_INTERFACE_MODE_RGMII]	= ETH_PHY_SEL_RGMII,
-+	[PHY_INTERFACE_MODE_RGMII_ID]	= ETH_PHY_SEL_RGMII,
-+	[PHY_INTERFACE_MODE_SGMII]	= ETH_PHY_SEL_SGMII,
-+	[PHY_INTERFACE_MODE_RMII]	= ETH_PHY_SEL_RMII,
-+};
-+
-+enum {
-+	TX_RETIME_SRC_NA,
-+	TX_RETIME_SRC_TXCLK,
-+	TX_RETIME_SRC_MII_CLK_125,
-+	TX_RETIME_SRC_PHYCLK,
-+	TX_RETIME_SRC_CLKGEN,
-+};
-+
-+static const char * const tx_retime_srcs[] = {
-+	[TX_RETIME_SRC_NA]		= "",
-+	[TX_RETIME_SRC_TXCLK]		= "txclk",
-+	[TX_RETIME_SRC_MII_CLK_125]	= "clk_125",
-+	[TX_RETIME_SRC_PHYCLK]		= "phyclk",
-+	[TX_RETIME_SRC_CLKGEN]		= "clkgen",
-+};
-+
-+/**
-+ * TX lines are always retimed with a clk, which can vary depending
-+ * on the board configuration. Below is the table of these bits
-+ * in eth configuration register depending on source of retime clk.
++ * Reset channel regmap configuration
 + *
-+ *---------------------------------------------------------------
-+ * src	 | tx_rt_clk	| int_not_ext_phyclk	| txclk_n_clk125|
-+ *---------------------------------------------------------------
-+ * txclk |	0	|	n/a		|	1	|
-+ *---------------------------------------------------------------
-+ * ck_125|	0	|	n/a		|	0	|
-+ *---------------------------------------------------------------
-+ * phyclk|	1	|	0		|	n/a	|
-+ *---------------------------------------------------------------
-+ * clkgen|	1	|	1		|	n/a	|
-+ *---------------------------------------------------------------
++ * @reset: regmap field for the channel's reset bit.
++ * @ack: regmap field for the channel's ack bit (optional).
 + */
-+
-+static u32 tx_retime_val[] = {
-+	[TX_RETIME_SRC_TXCLK]		= ETH_SEL_TXCLK_NOT_CLK125,
-+	[TX_RETIME_SRC_MII_CLK_125]	= 0x0,
-+	[TX_RETIME_SRC_PHYCLK]		= ETH_SEL_TX_RETIME_CLK,
-+	[TX_RETIME_SRC_CLKGEN]		= ETH_SEL_TX_RETIME_CLK |
-+					 ETH_SEL_INTERNAL_NOTEXT_PHYCLK,
++struct syscfg_reset_channel {
++	struct regmap_field *reset;
++	struct regmap_field *ack;
 +};
 +
-+static int sti_get_tx_retime_src(struct device_node *np)
-+{
-+	const char *rs;
-+	int err, i;
++/**
++ * A reset controller which groups together a set of related reset bits, which
++ * may be located in different system configuration registers.
++ *
++ * @rst: base reset controller structure.
++ * @active_low: are the resets in this controller active low, i.e. clearing
++ *              the reset bit puts the hardware into reset.
++ * @channels: An array of reset channels for this controller.
++ */
++struct syscfg_reset_controller {
++	struct reset_controller_dev rst;
++	bool active_low;
++	struct syscfg_reset_channel *channels;
++};
 +
-+	err = of_property_read_string(np, "st,tx-retime-src", &rs);
-+	if (err < 0)
++#define to_syscfg_reset_controller(_rst) \
++	container_of(_rst, struct syscfg_reset_controller, rst)
++
++static int syscfg_reset_program_hw(struct reset_controller_dev *rcdev,
++				   unsigned long idx, int assert)
++{
++	struct syscfg_reset_controller *rst = to_syscfg_reset_controller(rcdev);
++	const struct syscfg_reset_channel *ch;
++	u32 ctrl_val = rst->active_low ? !assert : !!assert;
++	int err;
++
++	if (idx >= rcdev->nr_resets)
++		return -EINVAL;
++
++	ch = &rst->channels[idx];
++
++	err = regmap_field_write(ch->reset, ctrl_val);
++	if (err)
 +		return err;
 +
-+	for (i = 0; i < ARRAY_SIZE(tx_retime_srcs); i++)
-+		if (!strcasecmp(rs, tx_retime_srcs[i]))
-+			return i;
++	if (ch->ack) {
++		unsigned long timeout = jiffies + msecs_to_jiffies(1000);
++		u32 ack_val;
 +
-+	return -EINVAL;
-+}
++		while (true) {
++			err = regmap_field_read(ch->ack, &ack_val);
++			if (err)
++				return err;
 +
-+static int sti_dwmac_parse_data(struct sti_dwmac *dwmac, struct device *dev)
-+{
-+	struct resource res;
-+	struct device_node *np	= dev->of_node;
-+	struct device_node *stmmac_np;
-+	struct regmap	*regmap;
-+	int tx_retime_src;
++			if (ack_val == ctrl_val)
++				break;
 +
-+	stmmac_np = of_get_next_available_child(np, NULL);
-+	if (!stmmac_np) {
-+		dev_info(dev, "No dwmac node found\n");
-+		return -EINVAL;
++			if (time_after(jiffies, timeout))
++				return -ETIME;
++
++			cpu_relax();
++		}
 +	}
-+
-+	if (!of_device_is_compatible(stmmac_np, "snps,dwmac")) {
-+		dev_info(dev, "dwmac node isn't compatible with snps,dwmac\n");
-+		return -EINVAL;
-+	}
-+
-+	dwmac->interface = of_get_phy_mode(stmmac_np);
-+	of_node_put(stmmac_np);
-+
-+	if (of_address_to_resource(np, 0, &res))
-+		return -EINVAL;
-+
-+	regmap = syscon_regmap_lookup_by_phandle(np, "st,syscon");
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+
-+	tx_retime_src = sti_get_tx_retime_src(np);
-+	if (tx_retime_src <= 0)
-+		return tx_retime_src;
-+
-+	dwmac->tx_retime_src = tx_retime_src;
-+	dwmac->regmap = regmap;
-+	dwmac->dwmac_np = stmmac_np;
-+	dwmac->reg = res.start;
-+	dwmac->dev = dev;
-+	dwmac->rstc = reset_control_get(dev, NULL);
-+
-+	if (IS_ERR(dwmac->rstc))
-+		dwmac->rstc = NULL;
 +
 +	return 0;
 +}
 +
-+static int sti_dwmac_setup(struct sti_dwmac *dwmac)
++static int syscfg_reset_assert(struct reset_controller_dev *rcdev,
++			       unsigned long idx)
 +{
-+	struct regmap	*regmap = dwmac->regmap;
-+	int tx_retime_src	= dwmac->tx_retime_src;
-+	int iface		= dwmac->interface;
-+	int reg			= dwmac->reg;
-+	u32 val;
-+
-+	regmap_update_bits(regmap, reg, MII_PHY_SEL_MASK,
-+					phy_intf_sels[iface]);
-+
-+	val = (iface == PHY_INTERFACE_MODE_REVMII) ? 0 : ENMII;
-+	regmap_update_bits(regmap, reg, ENMII_MASK, val);
-+
-+	regmap_update_bits(regmap, reg, TX_RETIME_SRC_MASK,
-+				tx_retime_val[tx_retime_src]);
-+
-+	/* Enable the IP */
-+	if (dwmac->rstc)
-+		reset_control_deassert(dwmac->rstc);
-+
-+	return 0;
++	return syscfg_reset_program_hw(rcdev, idx, true);
 +}
 +
-+static int sti_dwmac_probe(struct platform_device *pdev)
++static int syscfg_reset_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long idx)
 +{
-+	struct device		*dev = &pdev->dev;
-+	struct device_node	*node = dev->of_node;
-+	int			ret = -ENOMEM;
-+	struct sti_dwmac	*dwmac;
++	return syscfg_reset_program_hw(rcdev, idx, false);
++}
 +
-+	dwmac = devm_kzalloc(dev, sizeof(*dwmac), GFP_KERNEL);
++static int syscfg_reset_dev(struct reset_controller_dev *rcdev,
++			    unsigned long idx)
++{
++	int err = syscfg_reset_assert(rcdev, idx);
++	if (err)
++		return err;
 +
-+	if (!dwmac)
++	return syscfg_reset_deassert(rcdev, idx);
++}
++
++static struct reset_control_ops syscfg_reset_ops = {
++	.reset    = syscfg_reset_dev,
++	.assert   = syscfg_reset_assert,
++	.deassert = syscfg_reset_deassert,
++};
++
++static int syscfg_reset_controller_register(struct device *dev,
++				const struct syscfg_reset_controller_data *data)
++{
++	struct syscfg_reset_controller *rc;
++	size_t size;
++	int i, err;
++
++	rc = devm_kzalloc(dev, sizeof(*rc), GFP_KERNEL);
++	if (!rc)
 +		return -ENOMEM;
 +
-+	ret = sti_dwmac_parse_data(dwmac, dev);
-+	if (ret) {
-+		dev_err(dev, "Unable to parse OF data\n");
-+		return ret;
++	size = sizeof(struct syscfg_reset_channel) * data->nr_channels;
++
++	rc->channels = devm_kzalloc(dev, size, GFP_KERNEL);
++	if (!rc->channels)
++		return -ENOMEM;
++
++	rc->rst.ops = &syscfg_reset_ops,
++	rc->rst.of_node = dev->of_node;
++	rc->rst.nr_resets = data->nr_channels;
++	rc->active_low = data->active_low;
++
++	for (i = 0; i < data->nr_channels; i++) {
++		struct regmap *map;
++		struct regmap_field *f;
++		const char *compatible = data->channels[i].compatible;
++
++		map = syscon_regmap_lookup_by_compatible(compatible);
++		if (IS_ERR(map))
++			return PTR_ERR(map);
++
++		f = devm_regmap_field_alloc(dev, map, data->channels[i].reset);
++		if (IS_ERR(f))
++			return PTR_ERR(f);
++
++		rc->channels[i].reset = f;
++
++		if (!data->wait_for_ack)
++			continue;
++
++		f = devm_regmap_field_alloc(dev, map, data->channels[i].ack);
++		if (IS_ERR(f))
++			return PTR_ERR(f);
++
++		rc->channels[i].ack = f;
 +	}
 +
-+	ret = sti_dwmac_setup(dwmac);
-+	if (ret) {
-+		dev_err(dev, "couldn't setup SoC glue (%d)\n", ret);
-+		return ret;
-+	}
++	err = reset_controller_register(&rc->rst);
++	if (!err)
++		dev_info(dev, "registered\n");
 +
-+	if (node) {
-+		ret = of_platform_populate(node, NULL, NULL, dev);
-+		if (ret) {
-+			dev_err(dev, "failed to add dwmac core\n");
-+			return ret;
-+		}
-+	} else {
-+		dev_err(dev, "no device node, failed to add dwmac core\n");
++	return err;
++}
++
++int syscfg_reset_probe(struct platform_device *pdev)
++{
++	struct device *dev = pdev ? &pdev->dev : NULL;
++	const struct of_device_id *match;
++
++	if (!dev || !dev->driver)
 +		return -ENODEV;
-+	}
 +
-+	platform_set_drvdata(pdev, dwmac);
++	match = of_match_device(dev->driver->of_match_table, dev);
++	if (!match || !match->data)
++		return -EINVAL;
 +
-+	return 0;
++	return syscfg_reset_controller_register(dev, match->data);
 +}
+diff --git a/drivers/reset/sti/reset-syscfg.h b/drivers/reset/sti/reset-syscfg.h
+new file mode 100644
+index 0000000..2cc2283
+--- /dev/null
++++ b/drivers/reset/sti/reset-syscfg.h
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (C) 2013 STMicroelectronics (R&D) Limited
++ * Author: Stephen Gallimore <stephen.gallimore@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#ifndef __STI_RESET_SYSCFG_H
++#define __STI_RESET_SYSCFG_H
 +
-+static int sti_dwmac_remove(struct platform_device *pdev)
-+{
-+	return 0;
-+}
++#include <linux/device.h>
++#include <linux/regmap.h>
++#include <linux/reset-controller.h>
 +
-+#ifdef CONFIG_PM
-+static int sti_dwmac_suspend(struct device *dev)
-+{
-+	struct sti_dwmac *dwmac = dev_get_drvdata(dev);
-+
-+	if (!device_child_may_wakeup(dev))
-+		reset_control_assert(dwmac->rstc);
-+
-+	return 0;
-+}
-+
-+static int sti_dwmac_resume(struct device *dev)
-+{
-+	struct sti_dwmac *dwmac = dev_get_drvdata(dev);
-+
-+	if (!device_child_may_wakeup(dev))
-+		sti_dwmac_setup(dwmac);
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(sti_dwmac_pm_ops, sti_dwmac_suspend, sti_dwmac_resume);
-+#endif
-+
-+static const struct of_device_id sti_dwmac_match[] = {
-+	{ .compatible = "st,stih415-dwmac" },
-+	{ .compatible = "st,stih416-dwmac" },
-+	{ .compatible = "st,stid127-dwmac" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sti_dwmac_match);
-+
-+static struct platform_driver sti_dwmac_driver = {
-+	.probe		= sti_dwmac_probe,
-+	.remove		= sti_dwmac_remove,
-+	.driver		= {
-+		.name	= "sti-dwmac",
-+		.of_match_table = of_match_ptr(sti_dwmac_match),
-+#ifdef CONFIG_PM
-+		.pm     = &sti_dwmac_pm_ops,
-+#endif
-+	},
++/**
++ * Reset channel description for a system configuration register based
++ * reset controller.
++ *
++ * @compatible: Compatible string of the syscon regmap containing this
++ *              channel's control and ack (status) bits.
++ * @reset: Regmap field description of the channel's reset bit.
++ * @ack: Regmap field description of the channel's acknowledge bit.
++ */
++struct syscfg_reset_channel_data {
++	const char *compatible;
++	struct reg_field reset;
++	struct reg_field ack;
 +};
 +
-+module_platform_driver(sti_dwmac_driver);
++#define _SYSCFG_RST_CH(_c, _rr, _rb, _ar, _ab)		\
++	{ .compatible	= _c,				\
++	  .reset	= REG_FIELD(_rr, _rb, _rb),	\
++	  .ack		= REG_FIELD(_ar, _ab, _ab), }
 +
-+MODULE_ALIAS("platform:sti-dwmac");
-+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@st.com>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("STMicroelectronics DWMAC Glue Layer");
++#define _SYSCFG_RST_CH_NO_ACK(_c, _rr, _rb)		\
++	{ .compatible	= _c,			\
++	  .reset	= REG_FIELD(_rr, _rb, _rb), }
++
++/**
++ * Description of a system configuration register based reset controller.
++ *
++ * @wait_for_ack: The controller will wait for reset assert and de-assert to
++ *                be "ack'd" in a channel's ack field.
++ * @active_low: Are the resets in this controller active low, i.e. clearing
++ *              the reset bit puts the hardware into reset.
++ * @nr_channels: The number of reset channels in this controller.
++ * @channels: An array of reset channel descriptions.
++ */
++struct syscfg_reset_controller_data {
++	bool wait_for_ack;
++	bool active_low;
++	int nr_channels;
++	const struct syscfg_reset_channel_data *channels;
++};
++
++/**
++ * syscfg_reset_probe(): platform device probe function used by syscfg
++ *                       reset controller drivers. This registers a reset
++ *                       controller configured by the OF match data for
++ *                       the compatible device which should be of type
++ *                       "struct syscfg_reset_controller_data".
++ *
++ * @pdev: platform device
++ */
++int syscfg_reset_probe(struct platform_device *pdev);
++
++#endif /* __STI_RESET_SYSCFG_H */
 -- 
 1.7.6.5
