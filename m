@@ -1,74 +1,63 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 12 Nov 2013 10:17:18 +0530
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <CAOesGMiDt3d6Q3yXZ2QRENHeoNsAG=5HijbhJM36oUT9QDzucA@mail.gmail.com>
-References: <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
- <20131025042310.GC21230@intel.com>
- <Pine.LNX.4.64.1310250813370.6186@axis700.grange>
- <20131025054321.GD21230@intel.com>
- <Pine.LNX.4.64.1310250840350.6186@axis700.grange>
- <CAOesGMivD_3zSL503R0OaqyGv4Rj8qJqnbM2TdmjtxR2U63ztw@mail.gmail.com>
- <20131030130325.GA18788@intel.com>
- <20131111191339.GA10328@quad.lixom.net>
- <20131112040039.GE8834@intel.com>
- <CAOesGMiDt3d6Q3yXZ2QRENHeoNsAG=5HijbhJM36oUT9QDzucA@mail.gmail.com>
-Message-ID: <20131112044718.GF8834@intel.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 12 Nov 2013 11:17:21 +0530
+Subject: [PATCH V3 7/7] ARM: DRA: Enable Crossbar IP support for DRA7XX
+In-Reply-To: <5281BF70.4050708@ti.com>
+References: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
+ <1383657257-3458-8-git-send-email-r.sricharan@ti.com>
+ <5281BF70.4050708@ti.com>
+Message-ID: <5281C0E9.8020104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 09:11:18PM -0800, Olof Johansson wrote:
-> On Mon, Nov 11, 2013 at 8:00 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Mon, Nov 11, 2013 at 11:13:39AM -0800, Olof Johansson wrote:
-> >> On Wed, Oct 30, 2013 at 06:33:25PM +0530, Vinod Koul wrote:
-> >> > On Tue, Oct 29, 2013 at 09:47:55AM -0700, Olof Johansson wrote:
-> >> > > This patch broke some TI platforms (using edma) due to namespace
-> >> > > conflicts. The error is:
-> >> > >
-> >> > > ../../include/linux/dmaengine.h:54:2: error: expected identifier
-> >> > > before numeric constant   (for DMA_COMPLETE)
-> >> > >
-> >> > > .. it's because they define DMA_COMPLETE in include/platform_data/edma.h.
-> >> > >
-> >> > > The edma driver seems to overall lack prefixes and thus pollutes
-> >> > > global namespaces, so it should be fixed up.
-> >> > Yup this needs some work.
-> >> >
-> >> > I fixed up the error with below, can you pls verify. Pls note this is compile
-> >> > tested only!
-> >> >
-> >> > -----><8---------------------------
-> >> >
-> >> > From: Vinod Koul <vinod.koul@intel.com>
-> >> > Date: Wed, 30 Oct 2013 18:22:30 +0530
-> >> > Subject: [PATCH] dmanengine: fix edma driver to not define DMA_COMPLETE
-> >> >
-> >> > edma header defines DMA_COMPLETE, this causes issues as commit adfedd9a32e4 move
-> >> > DMA_SUCCESS to DMA_COMPLETE. edma should properly namespace its defines and
-> >> > needs a future fix
-> >> >
-> >> > Reported-by: Olof Johansson <olof@lixom.net>
-> >> > Signed-off-by: Vinod Koul <vinod.koul@intel.com>
-> >>
-> >> Thanks, I've applied this to fixes together with the follow-up from
-> >> Sebastian. Cc:ing Mark since it touches drivers/soc.
-> > I had applied this a while back and pushed only thing remaining was Sebastian's
-> > patch.  Since this is dependent on the series I am sending to Linus in a day ro
-> > two, would prefer things to go thru this tree only.
-> >
-> > Let me know if you are okay and will apply Sebastian fix on my next
-> 
-> Ah, go ahead -- I thought it hadn't been picked up yet since there
-> were still failures (i.e. due to Sebastian's fixes). Feel free to add
-> my Acked-by where you still can. :-)
-Sure, applied this one
+Hi Rajendra,
 
-> I have a couple of small fixes to take care of warnings with LPAE
-> configs that I hope to get out tonight or tomorrow morning, it'd be
-> nice to see them go in too (just printk format warning fixes).
-Sure, I will hold off for few more days for more coverage. Also if you/Sebastian
-can check more if anything still breaks and we fix it before sending would be
-good too
+On Tuesday 12 November 2013 11:11 AM, Rajendra Nayak wrote:
+> On Tuesday 05 November 2013 06:44 PM, Sricharan R wrote:
+>> Enable the crossbar IP support for DRA7xx soc.
+>>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/Kconfig        |    1 +
+>>  arch/arm/mach-omap2/omap4-common.c |    4 ++++
+>>  2 files changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>> index b5fb5f7..2086c65 100644
+>> --- a/arch/arm/mach-omap2/Kconfig
+>> +++ b/arch/arm/mach-omap2/Kconfig
+>> @@ -141,6 +141,7 @@ config SOC_DRA7XX
+>>  	select ARM_GIC
+>>  	select HAVE_SMP
+>>  	select COMMON_CLK
+>> +	select IRQ_CROSSBAR
+>>  
+>>  comment "OMAP Core Type"
+>>  	depends on ARCH_OMAP2
+>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+>> index 5791143..274cbfa 100644
+>> --- a/arch/arm/mach-omap2/omap4-common.c
+>> +++ b/arch/arm/mach-omap2/omap4-common.c
+>> @@ -22,6 +22,7 @@
+>>  #include <linux/of_platform.h>
+>>  #include <linux/export.h>
+>>  #include <linux/irqchip/arm-gic.h>
+>> +#include <linux/irqchip/irq-crossbar.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/reboot.h>
+>>  
+>> @@ -282,9 +283,12 @@ void __init omap_gic_of_init(void)
+>>  
+>>  skip_errata_init:
+>>  	omap_wakeupgen_init();
+>> +	if (soc_is_dra7xx())
+>> +		crossbar_init();
+> Its good if this is called irqcrossbar_init() to avoid confusion
+> with the dma crossbar which also exists in dra7 devices.
+>
+ Ya makes sense. Will change this.
 
---
-~Vinod
+Regards,
+ Sricharan
