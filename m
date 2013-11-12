@@ -1,56 +1,118 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 12 Nov 2013 11:22:44 +0800
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <20131111193236.GB16735@n2100.arm.linux.org.uk>
-References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
- <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
- <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
- <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
- <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
- <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
- <528110B1.4060402@arm.com>
- <20131111193236.GB16735@n2100.arm.linux.org.uk>
-Message-ID: <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 12 Nov 2013 07:32:09 +0400
+Subject: [PATCH 2/5] fbdev: sa1100fb: make use of device clock
+In-Reply-To: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
+References: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1384227132-10501-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 3:32 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 11, 2013 at 05:15:29PM +0000, Jonathan Austin wrote:
->> I've tested the patch below and it solves the ARM side of things - so
->> gives you an option other than a complete revert. Happy to put this in to
->> RMK's patch system if you'd prefer not to have to revert and he's happy
->> with the patch.
->
-> I think this is the right solution because it then means that this symbol
-> has the same meaning whether on MMU or !MMU - and getting rid of these
-> kinds of gratuitous variances are the only way that !MMU is going to
-> become less fragile.
+Use per-device clock (instead of calling cpufreq_get(0), which can
+return 0 if no cpu frequency driver is selected) to program timings.
 
-The patch only fixes problem on arm, and other !MMU&&!ARM archs
-should be affected too.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/video/sa1100fb.c | 24 +++++++++++++++++-------
+ drivers/video/sa1100fb.h |  1 +
+ 2 files changed, 18 insertions(+), 7 deletions(-)
 
-Also there is no CONFIG_PAGE_OFFSET defined for some ARCHs,
-such as 64bit ARCHs.
-
-Currently, I suggest to filter only on ARM as attachment patch if we plan
-to merge Jonathan's patch, otherwise a more complicated approach has
-to be figured out  to do the filter(such as, define a readonly symbol in
-kernel to store PAGE_OFFSET, and let scripts/kallsyms use it for
-filtering).
-
-
-
-Thanks,
+diff --git a/drivers/video/sa1100fb.c b/drivers/video/sa1100fb.c
+index de76da0..05d1b37 100644
+--- a/drivers/video/sa1100fb.c
++++ b/drivers/video/sa1100fb.c
+@@ -178,6 +178,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/mutex.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
+ 
+ #include <video/sa1100fb.h>
+ 
+@@ -413,9 +414,9 @@ sa1100fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+ 		var->transp.offset);
+ 
+ #ifdef CONFIG_CPU_FREQ
+-	dev_dbg(fbi->dev, "dma period = %d ps, clock = %d kHz\n",
++	dev_dbg(fbi->dev, "dma period = %d ps, clock = %ld kHz\n",
+ 		sa1100fb_display_dma_period(var),
+-		cpufreq_get(smp_processor_id()));
++		clk_get_rate(fbi->clk) / 1000);
+ #endif
+ 
+ 	return 0;
+@@ -586,9 +587,10 @@ static struct fb_ops sa1100fb_ops = {
+  * Calculate the PCD value from the clock rate (in picoseconds).
+  * We take account of the PPCR clock setting.
+  */
+-static inline unsigned int get_pcd(unsigned int pixclock, unsigned int cpuclock)
++static inline unsigned int get_pcd(struct sa1100fb_info *fbi,
++		unsigned int pixclock)
+ {
+-	unsigned int pcd = cpuclock / 100;
++	unsigned int pcd = clk_get_rate(fbi->clk) / 100 / 1000;
+ 
+ 	pcd *= pixclock;
+ 	pcd /= 10000000;
+@@ -667,7 +669,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
+ 		LCCR2_BegFrmDel(var->upper_margin) +
+ 		LCCR2_EndFrmDel(var->lower_margin);
+ 
+-	pcd = get_pcd(var->pixclock, cpufreq_get(0));
++	pcd = get_pcd(fbi, var->pixclock);
+ 	new_regs.lccr3 = LCCR3_PixClkDiv(pcd) | fbi->inf->lccr3 |
+ 		(var->sync & FB_SYNC_HOR_HIGH_ACT ? LCCR3_HorSnchH : LCCR3_HorSnchL) |
+ 		(var->sync & FB_SYNC_VERT_HIGH_ACT ? LCCR3_VrtSnchH : LCCR3_VrtSnchL);
+@@ -1003,7 +1005,6 @@ sa1100fb_freq_transition(struct notifier_block *nb, unsigned long val,
+ 			 void *data)
+ {
+ 	struct sa1100fb_info *fbi = TO_INF(nb, freq_transition);
+-	struct cpufreq_freqs *f = data;
+ 	u_int pcd;
+ 
+ 	switch (val) {
+@@ -1012,7 +1013,7 @@ sa1100fb_freq_transition(struct notifier_block *nb, unsigned long val,
+ 		break;
+ 
+ 	case CPUFREQ_POSTCHANGE:
+-		pcd = get_pcd(fbi->fb.var.pixclock, f->new);
++		pcd = get_pcd(fbi, fbi->fb.var.pixclock);
+ 		fbi->reg_lccr3 = (fbi->reg_lccr3 & ~0xff) | LCCR3_PixClkDiv(pcd);
+ 		set_ctrlr_state(fbi, C_ENABLE_CLKCHANGE);
+ 		break;
+@@ -1219,6 +1220,13 @@ static int sa1100fb_probe(struct platform_device *pdev)
+ 	if (!fbi)
+ 		goto failed;
+ 
++	fbi->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(fbi->clk)) {
++		ret = PTR_ERR(fbi->clk);
++		fbi->clk = NULL;
++		goto failed;
++	}
++
+ 	fbi->base = ioremap(res->start, resource_size(res));
+ 	if (!fbi->base)
+ 		goto failed;
+@@ -1271,6 +1279,8 @@ static int sa1100fb_probe(struct platform_device *pdev)
+  failed:
+ 	if (fbi)
+ 		iounmap(fbi->base);
++	if (fbi->clk)
++		clk_put(fbi->clk);
+ 	kfree(fbi);
+ 	release_mem_region(res->start, resource_size(res));
+ 	return ret;
+diff --git a/drivers/video/sa1100fb.h b/drivers/video/sa1100fb.h
+index fc5d429..0139d13 100644
+--- a/drivers/video/sa1100fb.h
++++ b/drivers/video/sa1100fb.h
+@@ -68,6 +68,7 @@ struct sa1100fb_info {
+ #endif
+ 
+ 	const struct sa1100fb_mach_info *inf;
++	struct clk *clk;
+ };
+ 
+ #define TO_INF(ptr,member)	container_of(ptr,struct sa1100fb_info,member)
 -- 
-Ming Lei
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: filter-only-on-arm.patch
-Type: text/x-patch
-Size: 531 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131112/66bf6a2d/attachment.bin>
+1.8.4.2
