@@ -1,110 +1,146 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Tue, 12 Nov 2013 16:25:26 +0530
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
- support
-In-Reply-To: <52820043.6090107@hitachi.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <528114C4.5000506@hitachi.com>
- <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
- <5281D848.7000502@hitachi.com>
- <CA+b37P2EgB0toYwhLny8k-cbrziBVXURST5kHNXcY7AF-CNVLg@mail.gmail.com>
- <52820043.6090107@hitachi.com>
-Message-ID: <CA+b37P1xLYWA-a0PwgxT7S7dNr5TdGFscLYFeQhAQUyO_E=Mzw@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 12 Nov 2013 11:57:38 +0100
+Subject: [RFC] ASoC: fsl-ssi: Missing DMA-Request workaround
+In-Reply-To: <20131112023033.GA23243@MrMyself>
+References: <1384185816-7730-1-git-send-email-mpa@pengutronix.de>
+ <20131112014913.GE11083@S2101-09.ap.freescale.net>
+ <20131112023033.GA23243@MrMyself>
+Message-ID: <20131112105738.GF30263@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2013 15:47, Masami Hiramatsu
-<masami.hiramatsu.pt@hitachi.com> wrote:
-> (2013/11/12 17:44), Sandeepa Prabhu wrote:
->> On 12 November 2013 12:57, Masami Hiramatsu
->> <masami.hiramatsu.pt@hitachi.com> wrote:
->>> (2013/11/12 15:23), Sandeepa Prabhu wrote:
->>>>>>> OK, I've ensured that the hw_breakpoint (from perf) can work
->>>>>>> with kprobes (from ftrace) at the same address on x86.
->>>>>>> So if arm64 already support hw_breakpoint on perf, kprobes should
->>>>>>> work with it.
->>>>>>
->>>>>> Single-stepping on x86 is different to the step behaviour on arm64 afaik. On
->>>>>> ARM, we have to manually remove the breakpoint, perform a single-step, then
->>>>>> add the breakpoint again. If we re-enable debug exceptions in the kprobe
->>>>>> handler, the step will complete early and we'll never step off the
->>>>>> breakpoint.
->>>>>
->>>>> I'm unsure about arm64's debug feature behavior, what does happen when
->>>>> it performs a single-step on sw-breakpoint?
->>>>>
->>>>>> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
->>>>>> I'm fairly sure it won't work as expected without some additional code.
->>>>>
->>>>> OK, anyway, for testing same one, we need to port ftrace first. So the next
->>>
->>> Sorry for confusion, s/next/fallback is what I meant. Making a kprobe module
->>> can be done without ftrace port.
->> Yes, got it, all my verification until now are done using sample
->> modules only,  looking out for perf (or some other mechanism: ptrace?)
->> that uses v8 hw breakpoint.
->
-> Yes, kprobe vs. perf and uprobe vs. ptrace :)
->
->
->>>>> plan is to make a kprobe module to put a probe (which just printk something)
->>>>> on a specific function (e.g. vfs_symlink), and run perf record with
->>>>> hw-breakpoint as below
->>>>>
->>>>> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
->>>>>
->>>>> Note that 0xXXXXXX is the address of vfs_symlink.
->>>>>
->>>>> After that, you can see the message in dmesg and also check the perf result
->>>>> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
->>>>> it works)
->>>> Thanks for steps, ARM64 ftrace patches are under review on arm mailing
->>>> list, I can contact the (linaro) developer implementing ftrace on
->>>> what's supported and then figure-out a way to test this concurrency of
->>>> kprobes breakpoint and hardware breakpoint.
->>>
->>> Would you mean this? :)
->>> http://www.spinics.net/lists/arm-kernel/msg278477.html
->>>
->>> Wow, it seems that this also has some works around instruction
->>> manipulation (and confusable filenames...)
->> I referred to: http://lwn.net/Articles/572323/  which is another
->> implementation and on LAKML
->
-> OK, I'll check that (and looks good at a glance).
-> By the way, I concern about Linaro guys who looks working a bit far
-> from the LKML and original feature maintainers. Please contact them,
-> I'm sure they don't bite your hand :)
-Hmm sure, will convey to our developers/leads :-)
+Hi,
 
->
-> BTW, I'm currently trying a general housecleaning of __kprobes
-> annotations. It may also have impact on your patch.
-> https://lkml.org/lkml/2013/11/8/187
-Hmm, we can help testing your patchset on arm64 platforms. Also have
-many doubts on the changes you are working [blacklisting probes etc]
+On Tue, Nov 12, 2013 at 10:30:34AM +0800, Nicolin Chen wrote:
+> Hi Markus,
+> 
+> On Tue, Nov 12, 2013 at 09:49:16AM +0800, Shawn Guo wrote:
+> > Copy Nicolin.
+> > 
+> > Shawn
+> > 
+> > On Mon, Nov 11, 2013 at 05:03:36PM +0100, Markus Pargmann wrote:
+> > > There is a hardware issue when using capture and playback at the same
+> > > time. In the tested scenario, the capture stream was started slightly
+> > > before the playback stream. The first time the application starts after
+> > > a powerup, there is a high probability that the SSI unit does not send a
+> > > request to the SDMA unit. The playback does not work. I tested this on
+> > > i.MX53 with SSI unit 2 kernel 3.10.10.
+> 
+> I've been tested SSI with WM8962 on i.MX6 series for a while, and never met
+> this issue, well, not with 3.10.10 original code and i.MX53 though.
+> 
+> Could you please provide me a reproducible flow? 
+> 
+> If playback first and capture later, would this also reproduce the issue?
+> 
+> Is there any command must be executed before the arecord | aplay, or just
+> run it after system boot-up?
+> 
+> By trying to reproduce it on i.MX6, we can confirm if it's a common issue
+> to the IP or its driver, or just a hardware defect within i.MX53.
 
-Basically I had tried placing kprobe on memcpy() and the model hung
-(insmod never returned back!). Fast-model I have does not have option
-of any debug so no clue what happened!.
-memcpy() is low-level call being used internally within kprobes, so
-probably we cannot handle probe on that routine, but then how to make
-sure all such API are rejected by kprobe sub-system ?
+I just tested a patch from J?rgen Beisert "fix SDMA starvation" [1]. It
+solves exactly this issue but was not applied. I will rebase the patch
+onto the latest sound tree and resend it.
 
-~Sandeepa
->
+Thanks,
+
+Markus Pargmann
+
+[1] http://thread.gmane.org/gmane.linux.sound/1724
+
+> 
 > Thank you,
->
-> --
-> Masami HIRAMATSU
-> IT Management Research Dept. Linux Technology Center
-> Hitachi, Ltd., Yokohama Research Laboratory
-> E-mail: masami.hiramatsu.pt at hitachi.com
->
->
+> Nicolin Chen
+> 
+> ---
+> 
+> > > 
+> > > Here is a register dump of the situation:
+> > > SDMA
+> > > 0x63fb0000
+> > > 00000000: c0040000 00000000 0000001e 00000000
+> > > 00000010: 00000001 ffffffff 00000000 e03efa41
+> > > 00000020: 00000000 00000000 00000000 00000000
+> > > 00000030: 00000064 00000000 00000003 00000000
+> > > 00000040: 00000000 00000000 00000000 00006000
+> > > 00000050: 00000000 00000000 00000001 00004050
+> > > 00000060: 01208000 00000000 00000000 00000000 /* 0x60: EVT_MIRROR showing all received DMA requests */
+> > >            ^ This should be a 3 instead. Bits 24 and 25 are the DMA requests for
+> > >              RX and TX. Bit 25 is not set, DMA request 25 is missing.
+> > > 
+> > > SSI
+> > > 0x50014000
+> > > 00000000: 00000000 00000000 0000005f 00000000
+> > > 00000010: 00000457 000050c1 01f80f00 0000028d /* 0x14: ISR Interrupt status register */
+> > >                           ^
+> > > 	     At 0x14 we can clearly see the last bit is set (0x1) which
+> > > 	     is TFE0, Transmit FIFO 0 empty. So it should automatically
+> > > 	     request data from the DMA engine, but it doesn't.
+> > > 
+> > > 00000020: 0000028d 0004e000 00040000 000010dd
+> > > 00000030: 00001f1f 00000000 00000000 00000000
+> > > 00000040: 00000000 00000000 00000000 00000000
+> > > 00000050: 00000000 00000000 ........
+> > > STATS (/sys/bus/platform/devices/50014000.ssi/statistics)
+> > > rfrc=0
+> > > tfrc=0
+> > > roe1=0
+> > > roe0=0
+> > > tue1=0
+> > > tue0=1094475
+> > > 
+> > > I could solve this issue by filling the transmit FIFO with data. After
+> > > that, the SDMA unit receives DMA request 25 again and audio playback
+> > > works.
+> > > 
+> > > This patch adds TUE0 interrupt handler which fills FIFO0 with arbitrary data.
+> > > 
+> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > ---
+> > > 
+> > > Hi,
+> > > 
+> > > does anyone have an idea why the SSI unit does not request DMA by its own at
+> > > the beginning? Or is it a hardware errata that is not listed yet?
+> > > 
+> > > Regards,
+> > > 
+> > > Markus Pargmann
+> > > 
+> > > 
+> > >  sound/soc/fsl/fsl_ssi.c | 5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > > 
+> > > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+> > > index 6b81d0c..8faf2b5 100644
+> > > --- a/sound/soc/fsl/fsl_ssi.c
+> > > +++ b/sound/soc/fsl/fsl_ssi.c
+> > > @@ -269,9 +269,14 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+> > >  	}
+> > >  
+> > >  	if (sisr & CCSR_SSI_SISR_TUE0) {
+> > > +		int i;
+> > > +
+> > >  		ssi_private->stats.tue0++;
+> > >  		sisr2 |= CCSR_SSI_SISR_TUE0;
+> > >  		ret = IRQ_HANDLED;
+> > > +
+> > > +		for (i = 0; i != ssi_private->fifo_depth; ++i)
+> > > +			write_ssi(0x0, &ssi->stx0);
+> > >  	}
+> > >  
+> > >  	if (sisr & CCSR_SSI_SISR_TFS) {
+> > > -- 
+> > > 1.8.4.2
+> > > 
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
