@@ -1,46 +1,42 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 12 Nov 2013 14:45:30 +0100
-Subject: change_page_attr() implementation for ARM?
-In-Reply-To: <20131017101325.GD23462@arm.com>
-References: <20131017.080523.1821831578701162178.hdoyu@nvidia.com><20131017101325.GD23462@arm.com>
-Message-ID: <20131112.154530.1203401124062257324.hdoyu@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Nov 2013 14:46:40 +0100
+Subject: [PATCH 01/11] Add generic fixmap.h
+In-Reply-To: <1384262545-20875-2-git-send-email-msalter@redhat.com>
+References: <1384262545-20875-1-git-send-email-msalter@redhat.com>
+ <1384262545-20875-2-git-send-email-msalter@redhat.com>
+Message-ID: <201311121446.40700.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Tuesday 12 November 2013, Mark Salter wrote:
+> Many architectures provide an asm/fixmap.h which defines support for
+> compile-time 'special' virtual mappings which need to be made before
+> paging_init() has run. This suport is also used for early ioremap
+> on x86. Much of this support is identical across the architectures.
+> This patch consolidates all of the common bits into asm-generic/fixmap.h
+> which is intended to be included from arch/*/include/asm/fixmap.h.
 
-Please clarify a few points inlined.
 
-Catalin Marinas <catalin.marinas@arm.com> wrote @ Thu, 17 Oct 2013 12:13:26 +0200:
+Good idea, 
 
-> On Thu, Oct 17, 2013 at 06:05:23AM +0100, Hiroshi Doyu wrote:
-> > I found a bit old discussion[1] about CPA support on ARM32(Cortex-A9).
-> > 
-> > It seesm that CPA API on ARM wasn't possible because maintaining
-> > multiple pagetables under SMP is difficult. Instead currently we are
-> > using precallocated memory via DMA API.
-> > 
-> > Is this situation still same for Cortex-A15 and ARM64? If the
-> > mismatched aliasing problem doesn't happen, is CPA API feasible?
-> 
-> On ARMv7+LPAE and AArch64 we use separate TTBR1 for the kernel (linear)
-> mapping so in theory you could implement change_page_attr(). The
-> mismatched aliases restriction still exists but it is clarified on what
-> is and isn't allowed (so you can have Normal non-cacheable and Normal
-> cacheable aliases, as long as you take care of removing any dirty cache
-> lines that could potentially corrupt your data). The DMA API already
-> takes care of this.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-In DMA API, creating a new map is done via ioremap_page_range() in
-kernel virtual address space. OTOH, the removing is done via
-unmap_kernel_range(). unmap_kernel_range() internally calls
-flush_cache_all(). So as long as kernel linear mapping side cache is
-kept clean, there's no risk that stale data(on linear side) is
-written back to RAM(corruption). That's why ARM doesn't need CPA API
-at all?
+On Tuesday 12 November 2013, Mark Salter wrote:
+> +static __always_inline unsigned long fix_to_virt(const unsigned int idx)
+> +{
+> +       /*
+> +        * this branch gets completely eliminated after inlining,
+> +        * except when someone tries to use fixaddr indices in an
+> +        * illegal way. (such as mixing up address types or using
+> +        * out-of-range indices).
+> +        *
+> +        * If it doesn't get removed, the linker will complain
+> +        * loudly with a reasonably clear error message..
+> +        */
+> +       if (idx >= __end_of_fixed_addresses)
+> +               __this_fixmap_does_not_exist();
+> +
 
-> So, is the DMA API not enough for what you need?
+You might be able to turn this into the more readable BUILD_BUG_ON().
 
-In DMA API, get_vm_area_caller() is used to allocate kernel virtual
-range, and the size VMALLOC range can be a limit if aggressively
-used. This is minor issue, though.
+	Arnd
