@@ -1,56 +1,38 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 12 Nov 2013 11:48:19 +0530
-Subject: [PATCH 1/2] gpio: davinci: Fix a check for unbanked gpio
-In-Reply-To: <1383893156-28010-2-git-send-email-prabhakar.csengg@gmail.com>
+Date: Tue, 12 Nov 2013 11:48:33 +0530
+Subject: [PATCH 0/2] DaVinci: GPIO: fixes
+In-Reply-To: <5280FB19.4020204@ti.com>
 References: <1383893156-28010-1-git-send-email-prabhakar.csengg@gmail.com>
- <1383893156-28010-2-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <5281C82B.9090402@ti.com>
+ <5280FB19.4020204@ti.com>
+Message-ID: <5281C839.8070100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 November 2013 12:15 PM, Prabhakar Lad wrote:
-> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+On Monday 11 November 2013 09:13 PM, Grygorii Strashko wrote:
+> Hi Sekhar, Prabhakar Lad
 > 
-> This patch fixes a check for offset in gpio_to_irq_unbanked()
-> and also assigns gpio_irq, gpio_unbanked of chips[0] to
-> appropriate values which is used in gpio_to_irq_unbanked()
-> function.
+> On 11/08/2013 08:45 AM, Prabhakar Lad wrote:> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> This patch series fixes gpio driver regestration
+>> and offset check for unbanked gpio.
+>>
+>> Lad, Prabhakar (2):
+>>    gpio: davinci: Fix a check for unbanked gpio
+>>    ARM: davinci: Fix number of resources passed to
+>>      davinci_gpio_register() call
 > 
-> Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> I've verified both patches - looks ok. 
+> Patch 1 - restores unbanked GPIO IRQs functionality
+> Patch 2 - allows to register GPIO Platform devices and boot without issues.
+> 
+> Could we move forward with these patches?
 
-You should note explicitly that this patch fixes broken unbanked IRQ
-support. You mostly just described what you are doing.
+Prabhakar, both patches look good to me. Thanks for the fixes.
 
-I will fixup while committing.
+Also Grygorii, have you actually verified that the unbanked IRQ support
+works? Only DM365 uses it.
+
+What do I add for you? Tested-by: or Acked-by:
 
 Thanks,
 Sekhar
-
-> ---
->  drivers/gpio/gpio-davinci.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index 8847adf..84be701 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -327,7 +327,7 @@ static int gpio_to_irq_unbanked(struct gpio_chip *chip, unsigned offset)
->  	 * NOTE:  we assume for now that only irqs in the first gpio_chip
->  	 * can provide direct-mapped IRQs to AINTC (up to 32 GPIOs).
->  	 */
-> -	if (offset < d->irq_base)
-> +	if (offset < d->gpio_unbanked)
->  		return d->gpio_irq + offset;
->  	else
->  		return -ENODEV;
-> @@ -419,6 +419,8 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->  
->  		/* pass "bank 0" GPIO IRQs to AINTC */
->  		chips[0].chip.to_irq = gpio_to_irq_unbanked;
-> +		chips[0].gpio_irq = bank_irq;
-> +		chips[0].gpio_unbanked = pdata->gpio_unbanked;
->  		binten = BIT(0);
->  
->  		/* AINTC handles mask/unmask; GPIO handles triggering */
-> 
