@@ -1,39 +1,60 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 12 Nov 2013 18:30:22 +0100
-Subject: [PATCH v2 0/5] ata: Add APM X-Gene SATA controller support
-In-Reply-To: <5282589C.2090606@cogentembedded.com>
-References: <1383980431-6572-1-git-send-email-lho@apm.com>
- <3056580.hyyOnlSqg9@amdc1032> <5282589C.2090606@cogentembedded.com>
-Message-ID: <2501719.LnLBBqadQB@amdc1032>
+From: Jonathan.Austin@arm.com (Jonathan Austin)
+Date: Tue, 12 Nov 2013 17:36:06 +0000
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
+References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+ <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+ <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
+ <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
+ <528110B1.4060402@arm.com>	<20131111193236.GB16735@n2100.arm.linux.org.uk>
+ <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
+Message-ID: <52826706.2080508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/11/13 03:22, Ming Lei wrote:
+> On Tue, Nov 12, 2013 at 3:32 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Nov 11, 2013 at 05:15:29PM +0000, Jonathan Austin wrote:
+>>> I've tested the patch below and it solves the ARM side of things - so
+>>> gives you an option other than a complete revert. Happy to put this in to
+>>> RMK's patch system if you'd prefer not to have to revert and he's happy
+>>> with the patch.
+>>
+>> I think this is the right solution because it then means that this symbol
+>> has the same meaning whether on MMU or !MMU - and getting rid of these
+>> kinds of gratuitous variances are the only way that !MMU is going to
+>> become less fragile.
+>
+> The patch only fixes problem on arm, and other !MMU&&!ARM archs
+> should be affected too.
+>
+> Also there is no CONFIG_PAGE_OFFSET defined for some ARCHs,
+> such as 64bit ARCHs.
+>
+> Currently, I suggest to filter only on ARM as attachment patch if we plan
+> to merge Jonathan's patch, otherwise a more complicated approach has
+> to be figured out  to do the filter(such as, define a readonly symbol in
+> kernel to store PAGE_OFFSET, and let scripts/kallsyms use it for
+> filtering).
 
-Hi Sergei,
+I'm happy with that approach, though allowing only ARM seems a bit
+conservative - is it the only architecture we actually expect to work?
 
-On Tuesday, November 12, 2013 08:34:36 PM Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 12-11-2013 19:40, Bartlomiej Zolnierkiewicz wrote:
-> 
-> > Please remember to include linux-ide at vger.kernel.org on CC: for ATA patches.
-> 
-> > Also from the quick look it seems that:
-> > - patch #4 ("ata: Add APM X-Gene SATA serdes functions") should come before
-> >    patch #3 ("ata: Add APM X-Gene SATA driver") as code in patch #3 depends
-> >    on the code in patch #4
-> > - patch #5 ("Documentation: Add documentation for APM X-Gene SATA DTS
-> >    binding") should come before patch #2 ("arm64: Add APM X-Gene DTS entry
-> >    for SATA controllers") or (even better) just be merged into patch #2
-> 
->     No, if it has to be merged then to the driver patch, not .dts patch.
+Jonny
+>
+>
+>
+> Thanks,
+>
 
-Oh, yes.  Driver patch is where these bindings are actually introduced.
 
-Also .dts patch (adding actual users of bindings) should ideally come last.
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
