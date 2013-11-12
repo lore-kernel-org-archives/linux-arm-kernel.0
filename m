@@ -1,48 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Nov 2013 15:48:22 -0700
-Subject: [PATCHv4 1/7] ARM: tegra: Create a DT header defining SWGROUP ID
-In-Reply-To: <1384158718-4756-2-git-send-email-hdoyu@nvidia.com>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
- <1384158718-4756-2-git-send-email-hdoyu@nvidia.com>
-Message-ID: <5282B036.9090604@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 12 Nov 2013 14:53:31 -0800
+Subject: [PATCH v11 5/6] ARM: hi3xxx: add smp support
+In-Reply-To: <1383813691-31587-6-git-send-email-haojian.zhuang@linaro.org>
+ (Haojian Zhuang's message of "Thu, 7 Nov 2013 16:41:30 +0800")
+References: <1383813691-31587-1-git-send-email-haojian.zhuang@linaro.org>
+ <1383813691-31587-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <8738n1nses.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
-> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-> binding. "swgroup" is a group of H/W clients which a Tegra SoC
-> supports. This unique ID can be used to calculate MC_SMMU_<swgroup
-> name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
-> register bit. This will allow the same header to be used by both
-> device tree files, and drivers implementing this binding, which
-> guarantees that the two stay in sync. This also makes device trees
-> more readable by using names instead of magic numbers. For HOTRESET
-> bit shifting we need another conversion table, which will come later.
+Haojian Zhuang <haojian.zhuang@linaro.org> writes:
 
-> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
+> From: Zhangfei Gao <zhangfei.gao@linaro.org>
+>
+> Enable SMP support on hi3xxx platform
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
+> Tested-by: Li Xin <li.xin@linaro.org>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  .../bindings/arm/hisilicon/hisilicon.txt           | 30 ++++++--
+>  arch/arm/boot/dts/hi3620.dtsi                      | 38 ++++++++++
+>  arch/arm/mach-hi3xxx/Kconfig                       |  3 +
+>  arch/arm/mach-hi3xxx/Makefile                      |  1 +
+>  arch/arm/mach-hi3xxx/core.h                        | 11 +++
+>  arch/arm/mach-hi3xxx/hi3xxx.c                      | 34 +++++++++
+>  arch/arm/mach-hi3xxx/platsmp.c                     | 84 ++++++++++++++++++++++
+>  7 files changed, 197 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/mach-hi3xxx/core.h
+>  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
+>
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> index 3be60c8..8c7a465 100644
+> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> @@ -1,10 +1,32 @@
+>  Hisilicon Platforms Device Tree Bindings
+>  ----------------------------------------------------
+>  
+> -Hi3716 Development Board
+> -Required root node properties:
+> -	- compatible = "hisilicon,hi3716-dkb";
+> -
 
-> +#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
-> +
-> +#define TEGRA_SWGROUP_MAX	64
-> +
-> +#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
+This was added in patch 1/6, then removed here.  If it's not
+needed/used, just drop it from patch 1 please.
 
-If I put the following into a DT and compile it:
-
-#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
-#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-/ {
-	test-prop = <(TEGRA_SWGROUP_BIT(PPCS2))>;
-};
-
-I get:
-
-Error: arch/arm/boot/dts/tegra20.dtsi:11.28-29 integer value out of
-range 0000000000000020 (32 bits)
-FATAL ERROR: Syntax error parsing input tree
-
-Is TEGRA_SWGROUP_BIT() not meant to be used in DT files? If it is, the
-definition is broken. If it is not, it should be defined in the driver
-not the header, since DT files have no use for it.
-
-Note: I mentioned this issue last time I reviewed this patch:-(
+Kevin
