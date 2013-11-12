@@ -1,259 +1,124 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 12 Nov 2013 22:54:02 +0100
-Subject: [PATCH v5 05/17] clk: at91: add PMC main clock
-In-Reply-To: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
-References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1384293242-4310-1-git-send-email-b.brezillon@overkiz.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 12 Nov 2013 22:56:55 +0100
+Subject: [PATCH 2/2] ARM: OMAP2+: move gpmc headers to
+ include/linux/platform_data
+In-Reply-To: <20131112205147.GB20260@localhost>
+References: <1384014842-4288-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1384014842-4288-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20131112205147.GB20260@localhost>
+Message-ID: <5282A427.9070300@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new at91 main oscillator clock implementation using common
-clk framework.
+On 11/12/2013 09:51 PM, Ezequiel Garcia wrote:
+> Hey Javier,
+>
 
-If rate is not provided during clock registration it is calculated using
-the slow clock (main clk parent in this case) rate and MCFR register.
+Hi Ezequiel, thanks a lot for your feedback.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/clk/at91/Makefile   |    1 +
- drivers/clk/at91/clk-main.c |  189 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/at91/pmc.c      |    5 ++
- drivers/clk/at91/pmc.h      |    3 +
- 4 files changed, 198 insertions(+)
- create mode 100644 drivers/clk/at91/clk-main.c
+> On Sat, Nov 09, 2013 at 05:34:02PM +0100, Javier Martinez Canillas wrote:
+>> The OMAP2+ General-Purpose Memory Controller (GPMC) driver
+>> should eventually be moved from arch/arm/mach-omap2 to
+>> drivers/memory. Unfortunately this is not trivial since it
+>> includes headers files that still resides under mach-omap2
+>> and can't be moved easilly.
+>> 
+>> This patch is the first step for taking the gpmc driver
+>> outside arch/arm/mach-omap2 by moving its related headers
+>> files to include/linux/platform_data.
+>> 
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>> 
+>> Hi Tony,
+>> 
+>> I wonder what's your plan to move drivers outside of mach-omap2.
+>> Currently this driver still includes soc.h and omap_device.h
+>> that are on mach-omap2.
+>> 
+>> If we want to move out these two headers files then also omap
+>> hwmod and per SoC family headers have to be moved out mach-omap2.
+>> 
+>> Do you want me to do a follow-up patch-set to move all these
+>> headers out of mach-omap2 so the gpmc and other drivers can
+>> be moved to drivers/? 
+>> 
+>> Is include/linux/platform_data the right place to put these
+>> headers or there is a better place for them?
+>> 
+>> Thanks a lot and best regards,
+>> Javier
+>> 
+>>  arch/arm/mach-omap2/board-2430sdp.c              |   5 +-
+>>  arch/arm/mach-omap2/board-3430sdp.c              |   4 +-
+>>  arch/arm/mach-omap2/board-cm-t35.c               |   6 +-
+>>  arch/arm/mach-omap2/board-cm-t3517.c             |   4 +-
+>>  arch/arm/mach-omap2/board-devkit8000.c           |   2 +-
+>>  arch/arm/mach-omap2/board-flash.c                |   6 +-
+>>  arch/arm/mach-omap2/board-flash.h                |   2 +-
+>>  arch/arm/mach-omap2/board-h4.c                   |   5 +-
+>>  arch/arm/mach-omap2/board-ldp.c                  |   4 +-
+>>  arch/arm/mach-omap2/board-n8x0.c                 |   3 +-
+>>  arch/arm/mach-omap2/board-omap3beagle.c          |   2 +-
+>>  arch/arm/mach-omap2/board-omap3logic.c           |   5 +-
+>>  arch/arm/mach-omap2/board-omap3pandora.c         |   3 +-
+>>  arch/arm/mach-omap2/board-omap3stalker.c         |   4 +-
+>>  arch/arm/mach-omap2/board-omap3touchbook.c       |   2 +-
+>>  arch/arm/mach-omap2/board-overo.c                |   4 +-
+>>  arch/arm/mach-omap2/board-rx51-peripherals.c     |   6 +-
+>>  arch/arm/mach-omap2/board-rx51.c                 |   2 +-
+>>  arch/arm/mach-omap2/gpmc-nand.c                  |   4 +-
+>>  arch/arm/mach-omap2/gpmc-nand.h                  |  27 ---
+>>  arch/arm/mach-omap2/gpmc-onenand.c               |   4 +-
+>>  arch/arm/mach-omap2/gpmc-onenand.h               |  24 ---
+>>  arch/arm/mach-omap2/gpmc-smc91x.c                |   4 +-
+>>  arch/arm/mach-omap2/gpmc-smc91x.h                |  42 -----
+>>  arch/arm/mach-omap2/gpmc-smsc911x.c              |   4 +-
+>>  arch/arm/mach-omap2/gpmc-smsc911x.h              |  35 ----
+>>  arch/arm/mach-omap2/gpmc.c                       |   7 +-
+>>  arch/arm/mach-omap2/gpmc.h                       | 231 -----------------------
+>>  arch/arm/mach-omap2/pm34xx.c                     |   2 +-
+>>  arch/arm/mach-omap2/usb-tusb6010.c               |   3 +-
+>>  include/linux/platform_data/gpmc-nand-omap.h     |  27 +++
+>>  include/linux/platform_data/gpmc-omap.h          | 231 +++++++++++++++++++++++
+>>  include/linux/platform_data/gpmc-onenand-omap.h  |  25 +++
+>>  include/linux/platform_data/gpmc-smc91x-omap.h   |  42 +++++
+>>  include/linux/platform_data/gpmc-smsc911x-omap.h |  35 ++++
+>>  35 files changed, 403 insertions(+), 413 deletions(-)
+>>  delete mode 100644 arch/arm/mach-omap2/gpmc-nand.h
+>>  delete mode 100644 arch/arm/mach-omap2/gpmc-onenand.h
+>>  delete mode 100644 arch/arm/mach-omap2/gpmc-smc91x.h
+>>  delete mode 100644 arch/arm/mach-omap2/gpmc-smsc911x.h
+>>  delete mode 100644 arch/arm/mach-omap2/gpmc.h
+>>  create mode 100644 include/linux/platform_data/gpmc-nand-omap.h
+>>  create mode 100644 include/linux/platform_data/gpmc-omap.h
+>>  create mode 100644 include/linux/platform_data/gpmc-onenand-omap.h
+>>  create mode 100644 include/linux/platform_data/gpmc-smc91x-omap.h
+>>  create mode 100644 include/linux/platform_data/gpmc-smsc911x-omap.h
+>> 
+> 
+> I'm not too convinced about the above diffstat. Maybe you can try a
+> a better approach of making the move by: 1) renaming/moving a file,
+> using 'git format-patch -M' and 2) then make the necessary changes
+> in the new place.
+> 
+> Or, if the above ends up not fully bisectable you can try first (2)
+> then (1).
+>
+> What bothers me most is seeing things like this:
+> 
+>   arch/arm/mach-omap2/gpmc-nand.h                  |  27 ---
+>   arch/arm/mach-omap2/gpmc.h                       | 231 -----------------------
+>   include/linux/platform_data/gpmc-nand-omap.h     |  27 +++
+>   include/linux/platform_data/gpmc-omap.h          | 231 +++++++++++++++++++++++
+> 
+> What do you think?
+> 
 
-diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index 1d4fb21..44105bd 100644
---- a/drivers/clk/at91/Makefile
-+++ b/drivers/clk/at91/Makefile
-@@ -3,3 +3,4 @@
- #
- 
- obj-y += pmc.o
-+obj-y += clk-main.o
-diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-new file mode 100644
-index 0000000..905ceff
---- /dev/null
-+++ b/drivers/clk/at91/clk-main.c
-@@ -0,0 +1,189 @@
-+/*
-+ * drivers/clk/at91/clk-main.c
-+ *
-+ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk/at91_pmc.h>
-+#include <linux/delay.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/sched.h>
-+#include <linux/wait.h>
-+
-+#include "pmc.h"
-+
-+#define SLOW_CLOCK_FREQ		32768
-+#define MAINF_DIV		16
-+#define MAINFRDY_TIMEOUT	(((MAINF_DIV + 1) * USEC_PER_SEC) / \
-+				 SLOW_CLOCK_FREQ)
-+#define MAINF_LOOP_MIN_WAIT	(USEC_PER_SEC / SLOW_CLOCK_FREQ)
-+#define MAINF_LOOP_MAX_WAIT	MAINFRDY_TIMEOUT
-+
-+struct clk_main {
-+	struct clk_hw hw;
-+	struct at91_pmc *pmc;
-+	unsigned long rate;
-+	unsigned int irq;
-+	wait_queue_head_t wait;
-+};
-+
-+#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
-+
-+static irqreturn_t clk_main_irq_handler(int irq, void *dev_id)
-+{
-+	struct clk_main *clkmain = (struct clk_main *)dev_id;
-+
-+	wake_up(&clkmain->wait);
-+	disable_irq_nosync(clkmain->irq);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int clk_main_prepare(struct clk_hw *hw)
-+{
-+	struct clk_main *clkmain = to_clk_main(hw);
-+	struct at91_pmc *pmc = clkmain->pmc;
-+	unsigned long halt_time, timeout;
-+	u32 tmp;
-+
-+	while (!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_MOSCS)) {
-+		enable_irq(clkmain->irq);
-+		wait_event(clkmain->wait,
-+			   pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_MOSCS);
-+	}
-+
-+	if (clkmain->rate)
-+		return 0;
-+
-+	timeout = jiffies + usecs_to_jiffies(MAINFRDY_TIMEOUT);
-+	do {
-+		halt_time = jiffies;
-+		tmp = pmc_read(pmc, AT91_CKGR_MCFR);
-+		if (tmp & AT91_PMC_MAINRDY)
-+			return 0;
-+		usleep_range(MAINF_LOOP_MIN_WAIT, MAINF_LOOP_MAX_WAIT);
-+	} while (time_before(halt_time, timeout));
-+
-+	return 0;
-+}
-+
-+static int clk_main_is_prepared(struct clk_hw *hw)
-+{
-+	struct clk_main *clkmain = to_clk_main(hw);
-+
-+	return !!(pmc_read(clkmain->pmc, AT91_PMC_SR) & AT91_PMC_MOSCS);
-+}
-+
-+static unsigned long clk_main_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	u32 tmp;
-+	struct clk_main *clkmain = to_clk_main(hw);
-+	struct at91_pmc *pmc = clkmain->pmc;
-+
-+	if (clkmain->rate)
-+		return clkmain->rate;
-+
-+	tmp = pmc_read(pmc, AT91_CKGR_MCFR) & AT91_PMC_MAINF;
-+	clkmain->rate = (tmp * parent_rate) / MAINF_DIV;
-+
-+	return clkmain->rate;
-+}
-+
-+static const struct clk_ops main_ops = {
-+	.prepare = clk_main_prepare,
-+	.is_prepared = clk_main_is_prepared,
-+	.recalc_rate = clk_main_recalc_rate,
-+};
-+
-+static struct clk * __init
-+at91_clk_register_main(struct at91_pmc *pmc,
-+		       unsigned int irq,
-+		       const char *name,
-+		       const char *parent_name,
-+		       unsigned long rate)
-+{
-+	int ret;
-+	struct clk_main *clkmain;
-+	struct clk *clk = NULL;
-+	struct clk_init_data init;
-+
-+	if (!pmc || !irq || !name)
-+		return ERR_PTR(-EINVAL);
-+
-+	if (!rate && !parent_name)
-+		return ERR_PTR(-EINVAL);
-+
-+	clkmain = kzalloc(sizeof(*clkmain), GFP_KERNEL);
-+	if (!clkmain)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &main_ops;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
-+	init.flags = parent_name ? 0 : CLK_IS_ROOT;
-+
-+	clkmain->hw.init = &init;
-+	clkmain->rate = rate;
-+	clkmain->pmc = pmc;
-+	clkmain->irq = irq;
-+	init_waitqueue_head(&clkmain->wait);
-+	irq_set_status_flags(clkmain->irq, IRQ_NOAUTOEN);
-+	ret = request_irq(clkmain->irq, clk_main_irq_handler,
-+			  IRQF_TRIGGER_HIGH, "clk-main", clkmain);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	clk = clk_register(NULL, &clkmain->hw);
-+	if (IS_ERR(clk)) {
-+		free_irq(clkmain->irq, clkmain);
-+		kfree(clkmain);
-+	}
-+
-+	return clk;
-+}
-+
-+
-+
-+static void __init
-+of_at91_clk_main_setup(struct device_node *np, struct at91_pmc *pmc)
-+{
-+	struct clk *clk;
-+	unsigned int irq;
-+	const char *parent_name;
-+	const char *name = np->name;
-+	u32 rate = 0;
-+
-+	parent_name = of_clk_get_parent_name(np, 0);
-+	of_property_read_string(np, "clock-output-names", &name);
-+	of_property_read_u32(np, "clock-frequency", &rate);
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq)
-+		return;
-+
-+	clk = at91_clk_register_main(pmc, irq, name, parent_name, rate);
-+	if (IS_ERR(clk))
-+		return;
-+
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+
-+void __init of_at91rm9200_clk_main_setup(struct device_node *np,
-+					 struct at91_pmc *pmc)
-+{
-+	of_at91_clk_main_setup(np, pmc);
-+}
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index c8a9a63..9b4719b 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -231,6 +231,11 @@ out_free_pmc:
- }
- 
- static const struct of_device_id pmc_clk_ids[] __initdata = {
-+	/* Main clock */
-+	{
-+		.compatible = "atmel,at91rm9200-clk-main",
-+		.data = of_at91rm9200_clk_main_setup
-+	},
- 	{ /*sentinel*/ }
- };
- 
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index d92b946..729aa46 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -58,4 +58,7 @@ static inline void pmc_write(struct at91_pmc *pmc, int offset, u32 value)
- int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 			  struct clk_range *range);
- 
-+extern void __init of_at91rm9200_clk_main_setup(struct device_node *np,
-+						struct at91_pmc *pmc);
-+
- #endif /* __PMC_H_ */
--- 
-1.7.9.5
+Agreed, I completely forgot about -M when generating the patches.
+
+I'll wait to see what Tony thinks about this approach to take the gpmc driver
+outside of mach-omap2 and send a v2 addressing the issues you pointed out.
+
+Best regards,
+Javier
