@@ -1,48 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Nov 2013 11:56:11 -0800
-Subject: [PATCH] pinctrl: single: call pcs_soc->rearm() whenever IRQ
- mask is changed
-In-Reply-To: <CACRpkdbo_TwX79hnJ5mCo8D4TSDd6OUzaOsFa8MgzjLy-H2U4Q@mail.gmail.com>
-References: <1381507996-15021-1-git-send-email-rogerq@ti.com>
- <CACRpkdb7iUypffB7O7-RhQhVf5WkjYdVCNLRz=BgySG4FET-xQ@mail.gmail.com>
- <20131011172337.GU29913@atomide.com>
- <CACRpkdbo_TwX79hnJ5mCo8D4TSDd6OUzaOsFa8MgzjLy-H2U4Q@mail.gmail.com>
-Message-ID: <20131112195611.GT15154@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Nov 2013 13:03:16 -0700
+Subject: [PATCH] ARM: tegra: init fuse before setting reset handler
+Message-ID: <1384286596-13761-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [131112 10:45]:
-> On Fri, Oct 11, 2013 at 7:23 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Linus Walleij <linus.walleij@linaro.org> [131011 09:27]:
-> >> On Fri, Oct 11, 2013 at 6:13 PM, Roger Quadros <rogerq@ti.com> wrote:
-> >>
-> >> > On OMAPs the IO ring must be rearmed each time the pad wakeup
-> >> > configuration is changed. So call pcs_soc->rearm() from
-> >> > pcs_irq_set().
-> >> >
-> >> > Signed-off-by: Roger Quadros <rogerq@ti.com>
-> >>
-> >> If Tony needs to apply this with the other patches: Acked-by.
-> >
-> > Just replied with a slightly modified version of Roger's patch
-> > suggesting you pull in the signed tag I posted for you yesterday
-> > and then you can pick up Roger's fix into the pinctrl tree :)
-> 
-> Hm now that I go over these old mails in my inbox I start to
-> worry that I missed something here, I have no memory of pulling
-> a tag for OMAP... is this all in the state
-> it needs to be for OMAP?
+From: Alexandre Courbot <acourbot@nvidia.com>
 
-The other pinctrl-single related patches are now merged to mainline:
+CPU reset handler was set before fuse is initialized, but
+tegra_cpu_reset_handler_enable() uses tegra_chip_id, which is set by
+tegra_init_fuse(). This patch reorders the calls so the CPU reset
+handler code does not read an uninitialized variable.
 
-1b9c0fb365cbb1154f4e7997061db972cbf58300 pinctrl: single: Fix build when not built on ARM
-dc7743aa3c49fabbc6dc9edbcf7df74d776ac32e pinctrl: single: Add support for auxdata
-3e6cee1786a13cb2308609b5f8c020e1754e37cf pinctrl: single: Add support for wake-up interrupts
-02e483f66deb6bd8df6af450726574614eb53be3 pinctrl: single: Prepare for supporting SoC specific features
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+arm-soc, if you could apply this as a fix for 3.13, that'd be great.
+Thanks.
 
-The fix from Roger is still missing. You can go ahead and queue
-it, or if you prefer me to do it I can add it to my fixes.
+ arch/arm/mach-tegra/tegra.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index ce553d557c31..73368176c6e8 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -90,9 +90,9 @@ static void __init tegra_init_cache(void)
+ 
+ static void __init tegra_init_early(void)
+ {
+-	tegra_cpu_reset_handler_init();
+ 	tegra_apb_io_init();
+ 	tegra_init_fuse();
++	tegra_cpu_reset_handler_init();
+ 	tegra_init_cache();
+ 	tegra_powergate_init();
+ 	tegra_hotplug_init();
+-- 
+1.8.1.5
