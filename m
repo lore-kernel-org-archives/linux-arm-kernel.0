@@ -1,30 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Nov 2013 18:06:49 +0100
-Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from device
- tree
-In-Reply-To: <20131112153057.GA9683@earth.universe>
-References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
- <20131112153057.GA9683@earth.universe>
-Message-ID: <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
+Date: Tue, 12 Nov 2013 18:08:57 +0100
+Subject: [PATCH 1/7] ARM: sa1100: switch to MULTI_IRQ_HANDLER
+In-Reply-To: <CAL_JsqJz6deAwLd1i+S-H59AQep3LWBosSRtzOSa+EQeeEd7VA@mail.gmail.com>
+References: <1384264061-6174-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_JsqJz6deAwLd1i+S-H59AQep3LWBosSRtzOSa+EQeeEd7VA@mail.gmail.com>
+Message-ID: <CACRpkdZHzv7x+BR1Z2QRoM9U4_UBTYWXtHsHtzJT1kRqYmnqWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 4:30 PM, Sebastian Reichel <sre@ring0.de> wrote:
-> On Tue, Nov 12, 2013 at 03:13:38PM +0100, Linus Walleij wrote:
+On Tue, Nov 12, 2013 at 3:19 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, Nov 12, 2013 at 7:47 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
->> +     plat->no_autorepeat = of_property_read_bool(np, "linux,no-autorepeat");
->> +     plat->enable_wakeup = of_property_read_bool(np, "linux,wakeup");
+>> +       .handle_irq     = sa1100_handle_irq,
 >
-> There is currently discussion going on for the property name of
-> autorepeat:
->
-> https://lkml.org/lkml/2013/11/11/680
+> In interest of shrinking the machine_desc, can you set the handler in
+> sa1100_init_irq instead? That is how the gic and vic initialization
+> work now. sa1100_handle_irq can also then become static.
 
-So this binding is documented for GPIO keys in:
-Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
-
-This is probably the most used binding as GPIO matrixes are
-not uncommon. But I don't know, yes it is a mess. (As usual.)
+It seems like Dmitry (E-S) will be running a MULTI_IRQ_HANDLER
+series rather than me since he has a stack of patches, so
+I'll refer to him for now, Dmitry take notice!
 
 Yours,
 Linus Walleij
