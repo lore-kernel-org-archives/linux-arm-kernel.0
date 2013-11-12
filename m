@@ -1,31 +1,37 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 13 Nov 2013 00:12:16 +0100
-Subject: arm/arm64 UEFI boot protocol
-In-Reply-To: <CACxGe6uCMjNiSm7qN4fTBN=WgzdJriod9d7qKOr-P-UaiWhULQ@mail.gmail.com>
-References: <20131111174321.GQ1557@rocoto.smurfnet.nu>
- <20131112164241.GD25953@mudshark.cambridge.arm.com>
- <20131112180050.GR1557@rocoto.smurfnet.nu>
- <CACxGe6uCMjNiSm7qN4fTBN=WgzdJriod9d7qKOr-P-UaiWhULQ@mail.gmail.com>
-Message-ID: <20131112231216.GS1557@rocoto.smurfnet.nu>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 13 Nov 2013 00:14:37 +0100
+Subject: [PATCH v2 10/19] mtd: sh_flctl: Enable the driver on all ARM
+ platforms
+In-Reply-To: <20131112231020.GA9468@ld-irv-0074.broadcom.com>
+References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383086274-11049-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131112231020.GA9468@ld-irv-0074.broadcom.com>
+Message-ID: <1701001.ctJ1xUAsnV@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 07:14:28AM +0900, Grant Likely wrote:
-> In the interest of bike shedding, I would name the properties
-> "linux,uefi-mmap-start" and "linux,uefi-mmap-size", but otherwise it
-> is fine by me.
+Hi Brian,
 
-That makes sense to me, and makes for a prettier table :)
+On Tuesday 12 November 2013 15:10:20 Brian Norris wrote:
+> On Tue, Oct 29, 2013 at 11:37:45PM +0100, Laurent Pinchart wrote:
+> > Renesas ARM platforms are transitioning from single-platform to
+> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> > and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
+> > COMPILE_TEST.
+> > 
+> > Cc: David Woodhouse <dwmw2@infradead.org>
+> > Cc: linux-mtd at lists.infradead.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Applied to l2-mtd.git, branch 'next' (for 3.14). Thanks.
 
-> Should you have a property for the descriptor version
-> as returned by GetMemoryMap()?
- 
-Yes, I should, really. I did in an earlier version, but dropped it on
-realising that this value has not changed since the inception of EFI.
-But it needs to be passed back to SetVirtualAddressMap(), so it should
-be kept. Mark never dropped it from his.
+Thank you, but if it's not too late, can you drop the patch ? :-) We've 
+settled for a different approach that renames Kconfig symbols and doesn't 
+require changes to individual drivers.
 
-So, "linux,uefi-mmap-desc-ver"?
+-- 
+Regards,
 
-/
-    Leif
+Laurent Pinchart
