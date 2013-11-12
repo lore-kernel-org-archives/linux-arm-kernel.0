@@ -1,46 +1,114 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Nov 2013 14:22:47 -0600
-Subject: [Xen-devel] [PATCH 2/2] swiotlb-xen: xen_swiotlb_map_page: do
- not error out if dma_capable fails
-In-Reply-To: <alpine.DEB.2.02.1311121704590.26077@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
- <1384265520-6833-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20131112144832.GC9435@phenom.dumpdata.com>
- <alpine.DEB.2.02.1311121704590.26077@kaball.uk.xensource.com>
-Message-ID: <52828E17.2040801@gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 12 Nov 2013 17:51:48 -0300
+Subject: [PATCH 2/2] ARM: OMAP2+: move gpmc headers to
+ include/linux/platform_data
+In-Reply-To: <1384014842-4288-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1384014842-4288-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1384014842-4288-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20131112205147.GB20260@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2013 11:27 AM, Stefano Stabellini wrote:
-> Russell gave a great explanation of the issue so I am just going to
-> limit myself to answering to:
-> 
-> On Tue, 12 Nov 2013, Konrad Rzeszutek Wilk wrote:
->>> Considering that we know that the swiotlb buffer has a low address,
->>> skip the check.
->>
->> I am not following that sentence. Could you please explain to me
->> how the SWIOTLB buffer low address guarantees that we don't need
->> the check?
-> 
-> xen_swiotlb_fixup makes sure that the swiotlb buffer is lower than 4GB,
-> probably lower than 3GB, by passing dma_bits to
-> xen_create_contiguous_region.
-> This meets the requirements of most devices out there.
-> In fact we are not even running this check under the same conditions in
-> swiotlb_map_sg_attrs.
-> I admit that it is possible to come up with a scenario where the check
-> would be useful, but it is far easier to come up with scenarios where
-> not only is unneeded but it is even harmful.
-> 
-> Alternatively (without Rob's "of: set dma_mask to point to
-> coherent_dma_mask") Linux 3.13 is going to fail to get the network
-> running on Midway. It is going to avoid fs mounting failures just
-> because we don't do the same check in swiotlb_map_sg_attrs.
-> 
-> FYI given that Rob's patch is probably going upstream soon anyway, I
-> don't feel so strongly about this.
+Hey Javier,
 
-It is in Linus' tree now.
+On Sat, Nov 09, 2013 at 05:34:02PM +0100, Javier Martinez Canillas wrote:
+> The OMAP2+ General-Purpose Memory Controller (GPMC) driver
+> should eventually be moved from arch/arm/mach-omap2 to
+> drivers/memory. Unfortunately this is not trivial since it
+> includes headers files that still resides under mach-omap2
+> and can't be moved easilly.
+> 
+> This patch is the first step for taking the gpmc driver
+> outside arch/arm/mach-omap2 by moving its related headers
+> files to include/linux/platform_data.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+> 
+> Hi Tony,
+> 
+> I wonder what's your plan to move drivers outside of mach-omap2.
+> Currently this driver still includes soc.h and omap_device.h
+> that are on mach-omap2.
+> 
+> If we want to move out these two headers files then also omap
+> hwmod and per SoC family headers have to be moved out mach-omap2.
+> 
+> Do you want me to do a follow-up patch-set to move all these
+> headers out of mach-omap2 so the gpmc and other drivers can
+> be moved to drivers/? 
+> 
+> Is include/linux/platform_data the right place to put these
+> headers or there is a better place for them?
+> 
+> Thanks a lot and best regards,
+> Javier
+> 
+>  arch/arm/mach-omap2/board-2430sdp.c              |   5 +-
+>  arch/arm/mach-omap2/board-3430sdp.c              |   4 +-
+>  arch/arm/mach-omap2/board-cm-t35.c               |   6 +-
+>  arch/arm/mach-omap2/board-cm-t3517.c             |   4 +-
+>  arch/arm/mach-omap2/board-devkit8000.c           |   2 +-
+>  arch/arm/mach-omap2/board-flash.c                |   6 +-
+>  arch/arm/mach-omap2/board-flash.h                |   2 +-
+>  arch/arm/mach-omap2/board-h4.c                   |   5 +-
+>  arch/arm/mach-omap2/board-ldp.c                  |   4 +-
+>  arch/arm/mach-omap2/board-n8x0.c                 |   3 +-
+>  arch/arm/mach-omap2/board-omap3beagle.c          |   2 +-
+>  arch/arm/mach-omap2/board-omap3logic.c           |   5 +-
+>  arch/arm/mach-omap2/board-omap3pandora.c         |   3 +-
+>  arch/arm/mach-omap2/board-omap3stalker.c         |   4 +-
+>  arch/arm/mach-omap2/board-omap3touchbook.c       |   2 +-
+>  arch/arm/mach-omap2/board-overo.c                |   4 +-
+>  arch/arm/mach-omap2/board-rx51-peripherals.c     |   6 +-
+>  arch/arm/mach-omap2/board-rx51.c                 |   2 +-
+>  arch/arm/mach-omap2/gpmc-nand.c                  |   4 +-
+>  arch/arm/mach-omap2/gpmc-nand.h                  |  27 ---
+>  arch/arm/mach-omap2/gpmc-onenand.c               |   4 +-
+>  arch/arm/mach-omap2/gpmc-onenand.h               |  24 ---
+>  arch/arm/mach-omap2/gpmc-smc91x.c                |   4 +-
+>  arch/arm/mach-omap2/gpmc-smc91x.h                |  42 -----
+>  arch/arm/mach-omap2/gpmc-smsc911x.c              |   4 +-
+>  arch/arm/mach-omap2/gpmc-smsc911x.h              |  35 ----
+>  arch/arm/mach-omap2/gpmc.c                       |   7 +-
+>  arch/arm/mach-omap2/gpmc.h                       | 231 -----------------------
+>  arch/arm/mach-omap2/pm34xx.c                     |   2 +-
+>  arch/arm/mach-omap2/usb-tusb6010.c               |   3 +-
+>  include/linux/platform_data/gpmc-nand-omap.h     |  27 +++
+>  include/linux/platform_data/gpmc-omap.h          | 231 +++++++++++++++++++++++
+>  include/linux/platform_data/gpmc-onenand-omap.h  |  25 +++
+>  include/linux/platform_data/gpmc-smc91x-omap.h   |  42 +++++
+>  include/linux/platform_data/gpmc-smsc911x-omap.h |  35 ++++
+>  35 files changed, 403 insertions(+), 413 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/gpmc-nand.h
+>  delete mode 100644 arch/arm/mach-omap2/gpmc-onenand.h
+>  delete mode 100644 arch/arm/mach-omap2/gpmc-smc91x.h
+>  delete mode 100644 arch/arm/mach-omap2/gpmc-smsc911x.h
+>  delete mode 100644 arch/arm/mach-omap2/gpmc.h
+>  create mode 100644 include/linux/platform_data/gpmc-nand-omap.h
+>  create mode 100644 include/linux/platform_data/gpmc-omap.h
+>  create mode 100644 include/linux/platform_data/gpmc-onenand-omap.h
+>  create mode 100644 include/linux/platform_data/gpmc-smc91x-omap.h
+>  create mode 100644 include/linux/platform_data/gpmc-smsc911x-omap.h
+> 
 
-Rob
+I'm not too convinced about the above diffstat. Maybe you can try a
+a better approach of making the move by: 1) renaming/moving a file,
+using 'git format-patch -M' and 2) then make the necessary changes
+in the new place.
+
+Or, if the above ends up not fully bisectable you can try first (2)
+then (1).
+
+What bothers me most is seeing things like this:
+
+  arch/arm/mach-omap2/gpmc-nand.h                  |  27 ---
+  arch/arm/mach-omap2/gpmc.h                       | 231 -----------------------
+  include/linux/platform_data/gpmc-nand-omap.h     |  27 +++
+  include/linux/platform_data/gpmc-omap.h          | 231 +++++++++++++++++++++++
+
+What do you think?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
