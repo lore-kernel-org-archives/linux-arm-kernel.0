@@ -1,393 +1,246 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 12 Nov 2013 23:00:29 +0100
-Subject: [PATCH v5 07/17] clk: at91: add PMC master clock
-In-Reply-To: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
-References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1384293629-4645-1-git-send-email-b.brezillon@overkiz.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Nov 2013 15:06:03 -0700
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <20131110110043.GB21328@voom.fritz.box>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <20131025232951.GD17659@voom.redhat.com> <5272C773.2030901@wwwdotorg.org>
+ <20131110110043.GB21328@voom.fritz.box>
+Message-ID: <5282A64B.3020706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new at91 master clock implementation using common clk
-framework.
+On 11/10/2013 04:00 AM, David Gibson wrote:
+> On Thu, Oct 31, 2013 at 03:11:15PM -0600, Stephen Warren wrote:
+>> On 10/25/2013 05:29 PM, David Gibson wrote:
+>>> On Thu, Oct 24, 2013 at 10:51:28PM +0100, Stephen Warren
+>>> wrote:
+>>>> From: Stephen Warren <swarren@nvidia.com>
+>>>> 
+>>>> This is a very quick proof-of-concept re: how a DT schema
+>>>> checker might look if written in C, and integrated into dtc.
+>> 
+>>>> diff --git a/schemas/schema.c b/schemas/schema.c
+>> 
+>>>> +int schema_check_node(struct node *node)
+>> ...
+>>>> +	if (!best_checker) { +		printf("WARNING: no schema for
+>>>> node %s\n", node->fullpath); +		return 0; +	} + +
+>>>> printf("INFO: Node %s selected checker %s\n", node->fullpath,
+>>>> + best_checker->name); + +	best_checker->checkfn(node);
+>>> 
+>>> IMO, thinking in terms of "the" schema for a node is a mistake.
+>>>  Instead, think in terms of a bunch of schemas, which "known"
+>>> what nodes they're relevant for.  Often that will be determined
+>>> by compatible, but it could also be determined by other things 
+>>> (presence of 'interrupts', parent node, explicitly implied by 
+>>> another schema).
+>> 
+>> I don't agree here.
+>> 
+>> Each node represents a single specific type of object, and the 
+>> representation uses a single specific overall schema.
+>> 
+>> I'll admit that sometimes that schema is picked via the
+>> compatible value (most cases), and other times via the node
+>> name/path (e.g. /chosen, /memory).
+>> 
+>> In particular, I don't think it's correct to say that e.g. both
+>> a "Tegra I2C controller" schema and an "interrupt" schema apply
+>> equally to a "Tegra I2C DT node".
+> 
+> Why not?  Both are mandatory.
 
-The master clock layout describe the MCKR register layout.
-There are 2 master clock layouts:
-- at91rm9200
-- at91sam9x5
+No. The interrupt schema isn't mandatory unless the Tegra I2C schema
+actively opts in to interrupt usage.
 
-Master clocks are given characteristics:
-- min/max clock output rate
+>> Instead, I think that the "interrupt" schema only applies because
+>> the "Tegra I2C controller" schema happens to inherit from, or
+>> aggregate, the "interrupt" schema.
+> 
+> So, explicit inheritence makes sense in many cases, but I don't
+> like seeing these universal rules as inheritence based.  They
+> should be just that - universal - not opt-in for any particular
+> device binding.
 
-These characteristics are checked during rate change to avoid
-over/underclocking.
+There isn't /an/ interrupt schema, there's a framework for interrupt
+schemas, where the specific "final" schema parameterizes the interrupt
+schema. It's impossible to fully evaluate whether an interrupts
+property conforms to the requirements unless you evaluate it in the
+context of a particular "final" schema.
 
-These characteristics are described in atmel's SoC datasheet in
-"Electrical Characteristics" paragraph.
+Also, while it would be silly, I've never seen a rule specifically
+stated that common properties such as interrupts, reg, *-gpios,
+*-supply, pinctrl-* are absolutely reserved for their typical meaning,
+and that no binding can ever use them for other local purposes. It
+would make sense to explicitly state this though.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/clk/at91/Makefile     |    2 +-
- drivers/clk/at91/clk-master.c |  272 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/at91/clk-pll.c    |   10 +-
- drivers/clk/at91/pmc.c        |    9 ++
- drivers/clk/at91/pmc.h        |    5 +
- 5 files changed, 289 insertions(+), 9 deletions(-)
- create mode 100644 drivers/clk/at91/clk-master.c
+In practical terms, what this means is that, without any knowledge of
+the final binding, you can check that an interrupts property conforms
+to some general rules such as: it's a list of phandle + specifier, and
+the specifier length must match the interrupt parent, and the number
+of entries in interrupts an interrupt-names (if present) must match.
 
-diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index 902bbf1..e28fb2b 100644
---- a/drivers/clk/at91/Makefile
-+++ b/drivers/clk/at91/Makefile
-@@ -3,4 +3,4 @@
- #
- 
- obj-y += pmc.o
--obj-y += clk-main.o clk-pll.o clk-plldiv.o
-+obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
-diff --git a/drivers/clk/at91/clk-master.c b/drivers/clk/at91/clk-master.c
-new file mode 100644
-index 0000000..65b81de
---- /dev/null
-+++ b/drivers/clk/at91/clk-master.c
-@@ -0,0 +1,272 @@
-+/*
-+ * drivers/clk/at91/clk-master.c
-+ *
-+ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk/at91_pmc.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/io.h>
-+#include <linux/wait.h>
-+#include <linux/sched.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+
-+#include "pmc.h"
-+
-+#define MASTER_SOURCE_MAX	4
-+
-+#define MASTER_PRES_MASK	0x7
-+#define MASTER_PRES_MAX		MASTER_PRES_MASK
-+#define MASTER_DIV_SHIFT	8
-+#define MASTER_DIV_MASK		0x3
-+
-+struct clk_master_characteristics {
-+	struct clk_range output;
-+	u32 divisors[4];
-+	u8 have_div3_pres;
-+};
-+
-+struct clk_master_layout {
-+	u32 mask;
-+	u8 pres_shift;
-+};
-+
-+#define to_clk_master(hw) container_of(hw, struct clk_master, hw)
-+
-+struct clk_master {
-+	struct clk_hw hw;
-+	struct at91_pmc *pmc;
-+	unsigned int irq;
-+	wait_queue_head_t wait;
-+	const struct clk_master_layout *layout;
-+	const struct clk_master_characteristics *characteristics;
-+};
-+
-+static irqreturn_t clk_master_irq_handler(int irq, void *dev_id)
-+{
-+	struct clk_master *master = (struct clk_master *)dev_id;
-+
-+	wake_up(&master->wait);
-+	disable_irq_nosync(master->irq);
-+
-+	return IRQ_HANDLED;
-+}
-+static int clk_master_prepare(struct clk_hw *hw)
-+{
-+	struct clk_master *master = to_clk_master(hw);
-+	struct at91_pmc *pmc = master->pmc;
-+
-+	while (!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_MCKRDY)) {
-+		enable_irq(master->irq);
-+		wait_event(master->wait,
-+			   pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_MCKRDY);
-+	}
-+
-+	return 0;
-+}
-+
-+static int clk_master_is_prepared(struct clk_hw *hw)
-+{
-+	struct clk_master *master = to_clk_master(hw);
-+
-+	return !!(pmc_read(master->pmc, AT91_PMC_SR) & AT91_PMC_MCKRDY);
-+}
-+
-+static unsigned long clk_master_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
-+{
-+	u8 pres;
-+	u8 div;
-+	unsigned long rate = parent_rate;
-+	struct clk_master *master = to_clk_master(hw);
-+	struct at91_pmc *pmc = master->pmc;
-+	const struct clk_master_layout *layout = master->layout;
-+	const struct clk_master_characteristics *characteristics =
-+						master->characteristics;
-+	u32 tmp;
-+
-+	pmc_lock(pmc);
-+	tmp = pmc_read(pmc, AT91_PMC_MCKR) & layout->mask;
-+	pmc_unlock(pmc);
-+
-+	pres = (tmp >> layout->pres_shift) & MASTER_PRES_MASK;
-+	div = (tmp >> MASTER_DIV_SHIFT) & MASTER_DIV_MASK;
-+
-+	if (characteristics->have_div3_pres && pres == MASTER_PRES_MAX)
-+		rate /= 3;
-+	else
-+		rate >>= pres;
-+
-+	rate /= characteristics->divisors[div];
-+
-+	if (rate < characteristics->output.min)
-+		pr_warn("master clk is underclocked");
-+	else if (rate > characteristics->output.max)
-+		pr_warn("master clk is overclocked");
-+
-+	return rate;
-+}
-+
-+static u8 clk_master_get_parent(struct clk_hw *hw)
-+{
-+	struct clk_master *master = to_clk_master(hw);
-+	struct at91_pmc *pmc = master->pmc;
-+
-+	return pmc_read(pmc, AT91_PMC_MCKR) & AT91_PMC_CSS;
-+}
-+
-+static const struct clk_ops master_ops = {
-+	.prepare = clk_master_prepare,
-+	.is_prepared = clk_master_is_prepared,
-+	.recalc_rate = clk_master_recalc_rate,
-+	.get_parent = clk_master_get_parent,
-+};
-+
-+static struct clk * __init
-+at91_clk_register_master(struct at91_pmc *pmc, unsigned int irq,
-+		const char *name, int num_parents,
-+		const char **parent_names,
-+		const struct clk_master_layout *layout,
-+		const struct clk_master_characteristics *characteristics)
-+{
-+	int ret;
-+	struct clk_master *master;
-+	struct clk *clk = NULL;
-+	struct clk_init_data init;
-+
-+	if (!pmc || !irq || !name || !num_parents || !parent_names)
-+		return ERR_PTR(-EINVAL);
-+
-+	master = kzalloc(sizeof(*master), GFP_KERNEL);
-+	if (!master)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &master_ops;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+	init.flags = 0;
-+
-+	master->hw.init = &init;
-+	master->layout = layout;
-+	master->characteristics = characteristics;
-+	master->pmc = pmc;
-+	master->irq = irq;
-+	init_waitqueue_head(&master->wait);
-+	irq_set_status_flags(master->irq, IRQ_NOAUTOEN);
-+	ret = request_irq(master->irq, clk_master_irq_handler,
-+			  IRQF_TRIGGER_HIGH, "clk-master", master);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	clk = clk_register(NULL, &master->hw);
-+	if (IS_ERR(clk))
-+		kfree(master);
-+
-+	return clk;
-+}
-+
-+
-+static const struct clk_master_layout at91rm9200_master_layout = {
-+	.mask = 0x31F,
-+	.pres_shift = 2,
-+};
-+
-+static const struct clk_master_layout at91sam9x5_master_layout = {
-+	.mask = 0x373,
-+	.pres_shift = 4,
-+};
-+
-+
-+static struct clk_master_characteristics * __init
-+of_at91_clk_master_get_characteristics(struct device_node *np)
-+{
-+	struct clk_master_characteristics *characteristics;
-+
-+	characteristics = kzalloc(sizeof(*characteristics), GFP_KERNEL);
-+	if (!characteristics)
-+		return NULL;
-+
-+	if (of_at91_get_clk_range(np, "atmel,clk-output-range", &characteristics->output))
-+		goto out_free_characteristics;
-+
-+	of_property_read_u32_array(np, "atmel,clk-divisors",
-+				   characteristics->divisors, 4);
-+
-+	characteristics->have_div3_pres =
-+		of_property_read_bool(np, "atmel,master-clk-have-div3-pres");
-+
-+	return characteristics;
-+
-+out_free_characteristics:
-+	kfree(characteristics);
-+	return NULL;
-+}
-+
-+static void __init
-+of_at91_clk_master_setup(struct device_node *np, struct at91_pmc *pmc,
-+			 const struct clk_master_layout *layout)
-+{
-+	struct clk *clk;
-+	int num_parents;
-+	int i;
-+	unsigned int irq;
-+	const char *parent_names[MASTER_SOURCE_MAX];
-+	const char *name = np->name;
-+	struct clk_master_characteristics *characteristics;
-+
-+	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-+	if (num_parents <= 0 || num_parents > MASTER_SOURCE_MAX)
-+		return;
-+
-+	for (i = 0; i < num_parents; ++i) {
-+		parent_names[i] = of_clk_get_parent_name(np, i);
-+		if (!parent_names[i])
-+			return;
-+	}
-+
-+	of_property_read_string(np, "clock-output-names", &name);
-+
-+	characteristics = of_at91_clk_master_get_characteristics(np);
-+	if (!characteristics)
-+		return;
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq)
-+		return;
-+
-+	clk = at91_clk_register_master(pmc, irq, name, num_parents,
-+				       parent_names, layout,
-+				       characteristics);
-+	if (IS_ERR(clk))
-+		goto out_free_characteristics;
-+
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	return;
-+
-+out_free_characteristics:
-+	kfree(characteristics);
-+}
-+
-+void __init of_at91rm9200_clk_master_setup(struct device_node *np,
-+					   struct at91_pmc *pmc)
-+{
-+	of_at91_clk_master_setup(np, pmc, &at91rm9200_master_layout);
-+}
-+
-+void __init of_at91sam9x5_clk_master_setup(struct device_node *np,
-+					   struct at91_pmc *pmc)
-+{
-+	of_at91_clk_master_setup(np, pmc, &at91sam9x5_master_layout);
-+}
-diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-index 57cedb5..c4d0dc8 100644
---- a/drivers/clk/at91/clk-pll.c
-+++ b/drivers/clk/at91/clk-pll.c
-@@ -82,6 +82,8 @@ static int clk_pll_prepare(struct clk_hw *hw)
- 	struct clk_pll *pll = to_clk_pll(hw);
- 	struct at91_pmc *pmc = pll->pmc;
- 	const struct clk_pll_layout *layout = pll->layout;
-+	const struct clk_pll_characteristics *characteristics =
-+							pll->characteristics;
- 	u8 id = pll->id;
- 	u32 mask = PLL_STATUS_MASK(id);
- 	int offset = PLL_REG(id);
-@@ -271,18 +273,10 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 			    unsigned long parent_rate)
- {
- 	struct clk_pll *pll = to_clk_pll(hw);
--	struct at91_pmc *pmc = pll->pmc;
--	const struct clk_pll_layout *layout = pll->layout;
--	const struct clk_pll_characteristics *characteristics =
--						pll->characteristics;
--	u8 id = pll->id;
--	int offset = PLL_REG(id);
- 	long ret;
- 	u32 div;
- 	u32 mul;
- 	u32 index;
--	u32 tmp;
--	u8 out = 0;
- 
- 	ret = clk_pll_get_best_div_mul(pll, rate, parent_rate,
- 				       &div, &mul, &index);
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index d26fdb7..d9975e7 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -257,6 +257,15 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
- 		.compatible = "atmel,at91sam9x5-clk-plldiv",
- 		.data = of_at91sam9x5_clk_plldiv_setup,
- 	},
-+	/* Master clock */
-+	{
-+		.compatible = "atmel,at91rm9200-clk-master",
-+		.data = of_at91rm9200_clk_master_setup,
-+	},
-+	{
-+		.compatible = "atmel,at91sam9x5-clk-master",
-+		.data = of_at91sam9x5_clk_master_setup,
-+	},
- 	{ /*sentinel*/ }
- };
- 
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index 15aaf38..be5c964 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -72,4 +72,9 @@ extern void __init of_sama5d3_clk_pll_setup(struct device_node *np,
- extern void __init of_at91sam9x5_clk_plldiv_setup(struct device_node *np,
- 						  struct at91_pmc *pmc);
- 
-+extern void __init of_at91rm9200_clk_master_setup(struct device_node *np,
-+						  struct at91_pmc *pmc);
-+extern void __init of_at91sam9x5_clk_master_setup(struct device_node *np,
-+						  struct at91_pmc *pmc);
-+
- #endif /* __PMC_H_ */
--- 
-1.7.9.5
+However, you can't check any of the following without specific
+knowledge of the final binding:
+
+* Some bindings don't use interrupts, and hence
+interrupts/interrupt-names/interrupt-parent must /not/ be present in
+the node.
+
+* The specific (range of) number of entries that must be present in
+interrupts.
+
+* The specific set of entries that must exist in interrupt-names.
+
+* Any ordering requirements on the names in interrupt-names (say the
+binding was first defined to use interrupts by index, then later
+extended to look up additional entries by name via interrupt-names).
+
+I don't think it makes sense to check the base interrupts syntax
+alone, then those other rules later. Instead, it makes sense to check
+all the interrupt-related rules at once, when you have enough
+knowledge of all the requirements.
+
+Also, interrupts is an easy case because the property name is static.
+What about GPIOs or regulators. Do the base GPIO/regulator schema
+checkers search for all properties name *-gpios and *-supply and check
+those? How would one avoid collisions with other bindings that happen
+to use those same property names. Explicitly disallowing property name
+collisions for single property names like interrupts seems reasonable.
+Disallowing whole patterns of property names seems a bit harder, and
+less reasonable.
+
+>> I see two important results from this distinction:
+>> 
+>> 1) We should only allow properties from the "interrupt" schema
+>> to exist within a node /if/ the top-level schema for the node
+>> actually does make use of the "interrupt" schema". This is
+>> important since it disallows e.g.:
+>> 
+>> battery: smart-battery at b { compatible = "ti,bq20z45",
+>> "sbs,sbs-battery"; reg = <0xb>; interrupt-parent = <&gpio>; 
+>> interrupts = <5 4>; };
+>> 
+>> ... since the ti,bq20z45/sbs,sbs-battery don't actually have an 
+>> interrupt output (assuming that the current binding doc for that 
+>> compatible value accurately reflects the HW here anyway).
+>> 
+>> If we allowed the "interrupt" schema to match the node simply
+>> because it saw an "interrupts" property there, that'd allow this
+>> unused property to exist in the DT, whereas we really do want to
+>> throw an error here, so the DT author is aware they made a
+>> mistake.
+> 
+> So.  To clarify my proposal of multiple applied schemas: in order
+> for the node to "pass" the checks, it must satisfy all constraints
+> of all applicable schemas - they don't override each other.
+> Furthermore, I'm not seeing any specific property as being owned by
+> a particular schema - multiple schemas applying to a node can place
+> overlapping constraints on the same property.
+> 
+> So in this case, the interrupt schema describes what the
+> interrupts property needs to look like if it exists, but the device
+> schema says that there should be no interrupts.  The only way to
+> satisfy both is to have no interrupts property, which is the right
+> answer.
+
+A big issue here is that if a node actually has an interrupts
+property, but the final schema says it shouldn't, the only way to
+check for that is for every schema that doesn't use interrupts to
+specifically check that no interrupts property is present. That
+explicit negative check has to be added for every common/generic/base
+schema. That doesn't seem scalable.
+
+Going back to the GPIOs/regulators case, if a base GPIO/regulator
+schema has "blessed" property xxx-gpios as being OK, how does the
+final schema for a node undo that; must it explicitly enumerate every
+property that's present in the node and check it against the list of
+valid properties? I had envisaged something more like:
+
+for each node:
+    mark each property as invalid
+    run all the schema checks
+      (marking properties as valid as they're checked)
+    for all properties in node:
+        if property is not marked valid, error out
+
+If we run the various schema checkers at unrelated times, because
+they're separate checks, then we end up with either:
+
+for each node:
+    run lots of sub-checkers
+    mark each property as invalid
+    run just the final schema checker
+      (marking properties as valid as they're checked)
+    for all properties in node:
+        if property is not marked valid, error out
+
+I don't like the special case for the final checker there.
+
+If the schema checkers start to run on the same node in parallel, or
+in any undefined order, then things start getting worse.
+
+> Actually, rather than a global "interrupts" schema here, more
+> useful would be a schema provided by the interrupt controller (and
+> so selected by the interrupt-parent property) which could validate
+> the internal format of the interrupt descriptors.  But, again,
+> this doesn't prevent the device schema from validating the number
+> of interrupt descriptors for this device.
+
+interrupts is a bit special here because there's historically only
+been one parent. However, not all "base" schemas have this benefit,
+and even with interrupts, the interrupts-extend property breaks this
+assumption. This means that n different "parent" (provider/supplier)
+nodes end up defining the format of a single property in a consumer
+node, which feels a bit messy. Having a single "check the entire
+interrupts property" function/schema, which goes and gets a little
+information from the provider/supplier (i.e. #interrupt-cells) feels a
+lot cleaner.
+
+>> 2) Some inheritance or aggregation of schemas is parameterized,
+>> e.g. on property name. For example, GPIO properties are named
+>> ${xxx}-gpios. However, I don't believe there's any hard rule that
+>> absolutely mandates that an /unrelated/ property cannot exist
+>> that matches the same naming rule. Admittedly, it would be
+>> suboptimal if such a conflicting property name were used, but if
+>> there's no hard rule against it, I don't think we should design
+>> our schema checker to assume that.
+> 
+> The schema checker, no.  The schemas themselves, maybe.  At least
+> for really well established things, like interrupts, I think it's 
+> reasonable that the schemas enforce best practice, not merely
+> minimal correctness.
+
+True. It sounds like we want a schema checker for the schemas, so that
+schema X can't (re-)define a property that schema Y defines the global
+meaning of!
+
+>> If the GPIO schema checker simply searched for any properties
+>> named according to that pattern, it might end up attempting to
+>> check properties that weren't actually generic GPIO specifiers.
+>> Instead, I'd prefer the node's top-level schema to explicitly
+>> state which properties should be checked according to which
+>> inherited schema(s).
+> 
+> So, in the case of GPIOs, I tend to agree.  For the case of 
+> interrupts, not so much.
+
+Surely we want to deal with everything in a uniform way though, rather
+than having some techniques that work for interrupts, and a different
+set of techniques that work for GPIOs.
+
+>> In particular, perhaps this conflict could occur in a slightly
+>> generic binding for a series of similar I2C GPIO expander chips,
+>> some of which have 4 GPIOs and others 8. Someone might choose a
+>> "count-gpios" or "number-of-gpios" property to represent that
+>> aspect of the HW.
+>> 
+>> So overall, I believe it's actually very important to first
+>> determine *the* exact schema for a node, then apply that one
+>> top-level checker, with it then invoking various (potentially
+>> parameterized) sub-checkers for any inherited/aggregated
+>> schemas.
+> 
+> So, I certainly think we want explicitly invoked subcheckers.  But
+> I think we want multiple independently applied schemas for a single
+> node too.
