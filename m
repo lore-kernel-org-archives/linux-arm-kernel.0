@@ -1,48 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 12 Nov 2013 17:29:45 +0100
-Subject: [PATCH 4/7] clocksource/cadence_ttc: Adjust interval in clock
- notifier
-In-Reply-To: <1383945677-29674-5-git-send-email-soren.brinkmann@xilinx.com>
-References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383945677-29674-5-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <52825779.2050106@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 12 Nov 2013 20:34:36 +0400
+Subject: [PATCH v2 0/5] ata: Add APM X-Gene SATA controller support
+In-Reply-To: <3056580.hyyOnlSqg9@amdc1032>
+References: <1383980431-6572-1-git-send-email-lho@apm.com>
+ <3056580.hyyOnlSqg9@amdc1032>
+Message-ID: <5282589C.2090606@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 10:21 PM, Soren Brinkmann wrote:
-> The clockevent has to be reprogrammed if the timer's input
-> clock frequency changes and the timer is in periodic mode, in order to
-> maintain the correct timer interval.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->   drivers/clocksource/cadence_ttc_timer.c | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-> index a92350b55d32..68a336038d8f 100644
-> --- a/drivers/clocksource/cadence_ttc_timer.c
-> +++ b/drivers/clocksource/cadence_ttc_timer.c
-> @@ -338,6 +338,10 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
->   		/* update cached frequency */
->   		ttc->freq = ndata->new_rate;
->
-> +		if (ttcce->ce.mode == CLOCK_EVT_MODE_PERIODIC)
-> +			ttc_set_interval(ttc, DIV_ROUND_CLOSEST(ttc->freq,
-> +						PRESCALE * HZ));
-> +
+Hello.
 
-Couldn't be racy ?
+On 12-11-2013 19:40, Bartlomiej Zolnierkiewicz wrote:
 
->   		/* fall through */
->   	}
->   	case PRE_RATE_CHANGE:
->
+> Please remember to include linux-ide at vger.kernel.org on CC: for ATA patches.
 
+> Also from the quick look it seems that:
+> - patch #4 ("ata: Add APM X-Gene SATA serdes functions") should come before
+>    patch #3 ("ata: Add APM X-Gene SATA driver") as code in patch #3 depends
+>    on the code in patch #4
+> - patch #5 ("Documentation: Add documentation for APM X-Gene SATA DTS
+>    binding") should come before patch #2 ("arm64: Add APM X-Gene DTS entry
+>    for SATA controllers") or (even better) just be merged into patch #2
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+    No, if it has to be merged then to the driver patch, not .dts patch.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+
+WBR, Sergei
