@@ -1,57 +1,43 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Tue, 12 Nov 2013 21:05:14 +0100
-Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from
- device tree
-In-Reply-To: <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
-References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
- <20131112153057.GA9683@earth.universe>
- <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
-Message-ID: <20131112200514.GA15413@earth.universe>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 12 Nov 2013 15:08:07 -0500
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <20131112194009.GA13577@lunn.ch>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <52814AFB.3070600@wwwdotorg.org>
+ <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
+ <528275B7.6050209@wwwdotorg.org>
+ <20131112193012.GR10335@titan.lakedaemon.net>
+ <20131112194009.GA13577@lunn.ch>
+Message-ID: <20131112200807.GS10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 06:06:49PM +0100, Linus Walleij wrote:
-> On Tue, Nov 12, 2013 at 4:30 PM, Sebastian Reichel <sre@ring0.de> wrote:
-> > On Tue, Nov 12, 2013 at 03:13:38PM +0100, Linus Walleij wrote:
+On Tue, Nov 12, 2013 at 08:40:09PM +0100, Andrew Lunn wrote:
+> > 2) right now: distributions are creating utilities, such a flash-kernel
+> > in Debian, that pick from a slew of dtbs, append it to the zImage, and
+> > create the uImage.  The bootloaders in these installs don't have support
+> > for fdt.
+> > 
+> > Our problem (as I see it) is that #2 is creating an ABI out of something
+> > we never realized would become an ABI, the filenames created by 'make
+> > dtbs'.
 > 
-> >> +     plat->no_autorepeat = of_property_read_bool(np, "linux,no-autorepeat");
-> >> +     plat->enable_wakeup = of_property_read_bool(np, "linux,wakeup");
-> >
-> > There is currently discussion going on for the property name of
-> > autorepeat:
-> >
-> > https://lkml.org/lkml/2013/11/11/680
+> Well, flash-kernel could be taught how to parse .dtb files to get the
+> compatibility strings out of them, rather than use filenames.
 > 
-> So this binding is documented for GPIO keys in:
-> Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
-> 
-> This is probably the most used binding as GPIO matrixes are
-> not uncommon. But I don't know, yes it is a mess. (As usual.)
+> It might still be early enough to give distributions some guidelines
+> about what DT folks consider ABI and what is not. How they should find
+> a fitting .dtb file and how they should not.
 
-I could find two boards using "gpio-matrix-keypad" in the mainline
-kernel and not a single instance of "linux,no-autorepeat":
+True, but this isn't a 'search /boot/config-X for CONFIG_Y so we can
+configure for Z' *cough* *grub* *cough*.  flash-kernel currently doesn't
+have any more correct way to select dtbs than by filename.
 
-arch $ grep "gpio-matrix-keypad" **/*.dts **/*.dtsi
-arm/boot/dts/am335x-evm.dts:               compatible = "gpio-matrix-keypad";
-powerpc/boot/dts/ac14xx.dts:               compatible = "gpio-matrix-keypad";
+It's normal to look for arch/<arch>/boot/zImage after a build.  Module
+names are not 1-1 with object files or source files, they are unique,
+and static.  Our failure was not providing a similar ABI for the dtbs.
+imho, we messed up, so we should fix it.
 
-arch $ grep "autorepeat" **/*.dts **/*.dtsi
-arch/arm/boot/dts/am335x-evm.dts:          autorepeat;
-arch/arm/boot/dts/ea3250.dts:              autorepeat;
-arch/arm/boot/dts/exynos4210-smdkv310.dts: linux,keypad-no-autorepeat;
-arch/arm/boot/dts/exynos4412-origen.dts:   linux,keypad-no-autorepeat;
-arch/arm/boot/dts/exynos4412-smdk4412.dts: linux,keypad-no-autorepeat;
-arch/arm/boot/dts/omap4-sdp.dts:           linux,input-no-autorepeat;
-arch/arm/boot/dts/spear1310-evb.dts:       autorepeat;
-arch/arm/boot/dts/spear1340-evb.dts:       autorepeat;
-arch/arm/boot/dts/spear300-evb.dts:        autorepeat;
-arch/arm/boot/dts/ste-stuib.dtsi:          st,no-autorepeat;
+thx,
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131112/4a785fd2/attachment.sig>
+Jason.
