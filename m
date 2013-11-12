@@ -1,48 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Nov 2013 15:39:04 +0000
-Subject: Physical memory start contraints in the Linux kernel  (Was:
- Re: Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel]
- [xen-unstable test] 21486: tolerable FAIL - PUSHED))
-In-Reply-To: <5282483E.1000101@monstr.eu>
-References: <1383731526.26213.25.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1311061111580.26077@kaball.uk.xensource.com>
- <1383736784.26213.72.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1311061938080.26077@kaball.uk.xensource.com>
- <1383822868.26213.181.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1311111825090.26077@kaball.uk.xensource.com>
- <1384250005.1883.35.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
- <20131112132001.GJ16735@n2100.arm.linux.org.uk> <5282483E.1000101@monstr.eu>
-Message-ID: <20131112153904.GP16735@n2100.arm.linux.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 12 Nov 2013 16:40:12 +0100
+Subject: [PATCH v2 0/5] ata: Add APM X-Gene SATA controller support
+In-Reply-To: <1383980431-6572-1-git-send-email-lho@apm.com>
+References: <1383980431-6572-1-git-send-email-lho@apm.com>
+Message-ID: <3056580.hyyOnlSqg9@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 04:24:46PM +0100, Michal Simek wrote:
-> On 11/12/2013 02:20 PM, Russell King - ARM Linux wrote:
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index f52150d2ec00..1957d54198ad 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -660,6 +660,17 @@ int __init arm_add_memory(u64 start, u64 size)
-> >  	}
-> >  #endif
-> >  
-> > +	if (aligned_start < PHYS_OFFSET) {
-> > +		if (aligned_start + size < PHYS_OFFSET) {
-> 
-> just a note I sent to Russell. Here should be "<=" instead of just "<"
-> 
-> > +			pr_info("Ignoring memory below PHYS_OFFSET: 0x%08llx-0x%08llx\n",
-> > +				aligned_start, aligned_start + size);
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		size -= PHYS_OFFSET - aligned_start;
-> > +		aligned_start = PHYS_OFFSET;
-> 
-> We should printk a message here to be aware that alignment was done.
 
-Yep, you sent me an updated patch, I haven't added anything to my
-kernel tree for about a week and a bit now as I want to get what's
-already there into Linus' tree.  Once that stuff has gone, I'll see
-about adding some of these fixes we need into the queue.
+Hi,
+
+Please remember to include linux-ide at vger.kernel.org on CC: for ATA patches.
+
+Also from the quick look it seems that:
+- patch #4 ("ata: Add APM X-Gene SATA serdes functions") should come before
+  patch #3 ("ata: Add APM X-Gene SATA driver") as code in patch #3 depends
+  on the code in patch #4
+- patch #5 ("Documentation: Add documentation for APM X-Gene SATA DTS
+  binding") should come before patch #2 ("arm64: Add APM X-Gene DTS entry
+  for SATA controllers") or (even better) just be merged into patch #2
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+On Saturday, November 09, 2013 12:00:26 AM Loc Ho wrote:
+> ata: Add APM X-Gene SATA controller support
+> 
+> v2:
+>  * Clean up file sata_xgene.c with Lindent and etc
+>  * Clean up file sata_xgene_serdes.c with Lindent and etc
+>  * Add description to each patch
+> 
+> v1:
+>  * inital version
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+> Loc Ho (5):
+>   ata: Export AHCI library functions required by APM X-Gene SATA driver
+>   arm64: Add APM X-Gene DTS entry for SATA controllers
+>   ata: Add APM X-Gene SATA driver
+>   ata: Add APM X-Gene SATA serdes functions
+>   Documentation: Add documentation for APM X-Gene SATA DTS binding
+> 
+>  .../devicetree/bindings/ata/apm-xgene.txt          |   84 +
+>  arch/arm64/boot/dts/apm-storm.dtsi                 |   73 +
+>  drivers/ata/Kconfig                                |    7 +
+>  drivers/ata/Makefile                               |    2 +
+>  drivers/ata/ahci.h                                 |    6 +
+>  drivers/ata/libahci.c                              |   13 +-
+>  drivers/ata/sata_xgene.c                           | 1394 ++++++++++++++
+>  drivers/ata/sata_xgene.h                           |  112 ++
+>  drivers/ata/sata_xgene_serdes.c                    | 2004 ++++++++++++++++++++
+>  9 files changed, 3690 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
+>  create mode 100644 drivers/ata/sata_xgene.c
+>  create mode 100644 drivers/ata/sata_xgene.h
+>  create mode 100644 drivers/ata/sata_xgene_serdes.c
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
