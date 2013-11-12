@@ -1,92 +1,25 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Nov 2013 17:08:30 -0600
-Subject: [PATCH V2] ARM: OMAP2+: omap_device: maintain sane runtime pm status
- around suspend/resume
-Message-ID: <1384297710-29694-1-git-send-email-nm@ti.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 12 Nov 2013 15:10:20 -0800
+Subject: [PATCH v2 10/19] mtd: sh_flctl: Enable the driver on all ARM
+ platforms
+In-Reply-To: <1383086274-11049-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383086274-11049-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131112231020.GA9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP device hooks around suspend|resume_noirq ensures that hwmod
-devices are forced to idle using omap_device_idle/enable as part of
-the last stage of suspend activity.
+On Tue, Oct 29, 2013 at 11:37:45PM +0100, Laurent Pinchart wrote:
+> Renesas ARM platforms are transitioning from single-platform to
+> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
+> COMPILE_TEST.
+> 
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: linux-mtd at lists.infradead.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-For a device such as i2c who uses autosuspend, it is possible to enter
-the suspend path with dev->power.runtime_status = RPM_ACTIVE.
+Applied to l2-mtd.git, branch 'next' (for 3.14). Thanks.
 
-As part of the suspend flow, the generic runtime logic would increment
-it's dev->power.disable_depth to 1. This should prevent further
-pm_runtime_get_sync from succeeding once the runtime_status has been
-set to RPM_SUSPENDED.
-
-Now, as part of the suspend_noirq handler in omap_device, we force the
-following: if the device status is !suspended, we force the device
-to idle using omap_device_idle (clocks are cut etc..). This ensures
-that from a hardware perspective, the device is "suspended". However,
-runtime_status is left to be active.
-
-*if* an operation is attempted after this point to
-pm_runtime_get_sync, runtime framework depends on runtime_status to
-indicate accurately the device status, and since it sees it to be
-ACTIVE, it assumes the module is functional and returns a non-error
-value. As a result the user will see pm_runtime_get succeed, however a
-register access will crash due to the lack of clocks.
-
-To prevent this from happening, we should ensure that runtime_status
-exactly indicates the device status. As a result of this change
-any further calls to pm_runtime_get* would return -EACCES (since
-disable_depth is 1). On resume, we restore the clocks and runtime
-status exactly as we suspended with.
-
-Reported-by: J Keerthy <j-keerthy@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Acked-by: Rajendra Nayak <rnayak@ti.com>
-Acked-by: Kevin Hilman <khilman@linaro.org>
----
-Changes in V2 (resend):
-	- dropped the unnecessary flag for runtime status restore
-	- picked up kevin's ack from https://patchwork.kernel.org/patch/3168371/
-
-v1: https://patchwork.kernel.org/patch/3154501/
-
-patch baseline: V3.12 tag (also applies on linux-next next-20131107 tag)
-
-Logs from 3.12 based vendor kernel:
-Before: http://pastebin.com/m5KxnB7a
-After: http://pastebin.com/8AfX4e7r
-The discussion on cpufreq side of the story which triggered this scenario:
-http://marc.info/?l=linux-pm&m=138263811321921&w=2
-
-Tested on TI vendor kernel (with dt boot):
-AM335x: evm, BBB, sk, BBW
-OMAP5uEVM, DRA7-evm
-
- arch/arm/mach-omap2/omap_device.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index b69dd9a..f97b34b 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -621,6 +621,7 @@ static int _od_suspend_noirq(struct device *dev)
- 
- 	if (!ret && !pm_runtime_status_suspended(dev)) {
- 		if (pm_generic_runtime_suspend(dev) == 0) {
-+			pm_runtime_set_suspended(dev);
- 			omap_device_idle(pdev);
- 			od->flags |= OMAP_DEVICE_SUSPENDED;
- 		}
-@@ -634,10 +635,10 @@ static int _od_resume_noirq(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_device *od = to_omap_device(pdev);
- 
--	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
--	    !pm_runtime_status_suspended(dev)) {
-+	if (od->flags & OMAP_DEVICE_SUSPENDED) {
- 		od->flags &= ~OMAP_DEVICE_SUSPENDED;
- 		omap_device_enable(pdev);
-+		pm_runtime_set_active(dev);
- 		pm_generic_runtime_resume(dev);
- 	}
- 
--- 
-1.7.9.5
+Brian
