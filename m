@@ -1,38 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 12 Nov 2013 09:51:08 -0500
-Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
-In-Reply-To: <52814AFB.3070600@wwwdotorg.org>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <52814AFB.3070600@wwwdotorg.org>
-Message-ID: <20131112145108.GQ10335@titan.lakedaemon.net>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Tue, 12 Nov 2013 14:52:00 +0000
+Subject: [Xen-devel] Physical memory start contraints in the Linux kernel
+ (Was: Re:	Xen osstest on Calxeda midway progress (Was: Re:
+ [xen-unstable test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <20131112144128.GL16735@n2100.arm.linux.org.uk>
+References: <osstest-21486-mainreport@xen.org>	<1384250005.1883.35.camel@kazak.uk.xensource.com>	<alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>	<201311121437.55826.arnd@arndb.de>
+ <52823C9E.2010007@linaro.org> <20131112144128.GL16735@n2100.arm.linux.org.uk>
+Message-ID: <52824090.8040203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 02:24:11PM -0700, Stephen Warren wrote:
-> On 11/11/2013 01:29 PM, Jason Cooper wrote:
-> > Consumers of the Linux kernel's build products are beginning to hardcode
-> > the filenames of the dtbs generated.  Since the dtb filenames are
-> > currently the dts filename s/dts/dtb/, this prevents the kernel
-> > community from renaming dts files as needed.
-> 
-> My take is that the DTB filenames are part of the ABI, and therefore the
-> DTS filenames are also part of the ABI. Why would we want to rename them?
 
-This idea originated from a conversation with Olof about starting to
-pre-pend the manufacturer name to the dts files:
 
-  https://lkml.org/lkml/2013/11/8/378
+On 11/12/2013 02:41 PM, Russell King - ARM Linux wrote:
+> On Tue, Nov 12, 2013 at 02:35:10PM +0000, Julien Grall wrote:
+>> During some debugging on the Arndale and Midway, I found another
+>> constraint with CONFIG_ARM_PATCH_PHYS_VIRT.
+>> I have noticed that all the kernel physical addresses must be lower than
+>> the corresponding virtual addresses. So the delta offset compute in
+>> __fixup_pv_table (arch/arm/kernel/head.S) must always be negative.
+>> If this assertion is not validated, when the kernel will browse the
+>> memory bank (sanity_check_info in arch/arm/mm/mmu.c), __phys(...) will
+>> compute a wrong address and will result to consider all memory bank as
+>> highmem.
+>>
+>> After digging in the code, it seems it's due to some optimization during
+>> opcode fixup in __fixup_a_pvtable. Is it a wanted constraint?
+>
+> Are you talking about the code in v3.12 or the code in -next ?
 
-imho, at some point there is going to be an ABI breakage wrt dtb names
-when the devicetree moves to a separate repository.  All users will have
-to rework their scripts at that point.
+I was talking about 3.12. I have just checked -next and my issue seems 
+to be fixed by the commit f52bb722547f43caeaecbcc62db9f3c3b80ead9b.
+I should have checked earlier, thanks.
 
-If that assumption is correct, why not put in place a _good_ ABI that
-allows us to be flexible as needed and specific for end users?  If you're
-still with me on this idea, shouldn't we put this in place now (as
-symlinks, thus retaining old names) so that we can switch over more
-easily later?
-
-thx,
-
-Jason.
+-- 
+Julien Grall
