@@ -1,68 +1,66 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 12 Nov 2013 14:17:27 +0000
-Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <20131112140436.GK16735@n2100.arm.linux.org.uk>
-References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.10.1311092357090.2314@knanqh.ubzr>
- <528193A0.7050505@codeaurora.org>
- <alpine.LFD.2.10.1311120839310.9667@knanqh.ubzr>
- <20131112140436.GK16735@n2100.arm.linux.org.uk>
-Message-ID: <52823877.60806@codethink.co.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Nov 2013 08:19:52 -0600
+Subject: [PATCH 1/7] ARM: sa1100: switch to MULTI_IRQ_HANDLER
+In-Reply-To: <1384264061-6174-1-git-send-email-linus.walleij@linaro.org>
+References: <1384264061-6174-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAL_JsqJz6deAwLd1i+S-H59AQep3LWBosSRtzOSa+EQeeEd7VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/13 14:04, Russell King - ARM Linux wrote:
-> On Tue, Nov 12, 2013 at 09:01:16AM -0500, Nicolas Pitre wrote:
->> What about this patch which I think is currently your best option.  Note
->> it would need to use the facilities from asm/opcodes.h to make it endian
->> agnostic.
->>
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index 6a1b8a81b1..379cffe4ab 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -383,6 +383,34 @@ static void __init cpuid_init_hwcaps(void)
->>   		elf_hwcap |= HWCAP_IDIVT;
->>   	}
->>
->> +	/*
->> +	 * Patch our division routines with the corresponding opcode
->> +	 * if the hardware supports it.
->> +	 */
->> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL) && (elf_hwcap & HWCAP_IDIVT)) {
->> +		extern char __aeabi_uidiv, __aeabi_idiv;
->> +		u16 *uidiv = (u16 *)&__aeabi_uidiv;
->> +		u16 *idiv = (u16 *)&__aeabi_idiv;
->> +
->> +		uidiv[0] = 0xfbb0;  /* udiv r0, r0, r1 */
->> +		uidiv[1] = 0xf0f1;
->> +		uidiv[2] = 0x4770;  /* bx lr */
->> +
->> +		idiv[0] = 0xfb90;  /* sdiv r0, r0, r1 */
->> +		idiv[1] = 0xf0f1;
->> +		idiv[2] = 0x4770;  /* bx lr */
->> +	} else if (!IS_ENABLED(CONFIG_THUMB2_KERNEL) && (elf_hwcap & HWCAP_IDIVA)) {
->> +		extern char __aeabi_uidiv, __aeabi_idiv;
->> +		u32 *uidiv = (u32 *)&__aeabi_uidiv;
->> +		u32 *idiv = (u32 *)&__aeabi_idiv;
->> +
->> +		uidiv[0] = 0xe730f110;  /* udiv r0, r0, r1 */
->> +		uidiv[1] = 0xe12fff1e;  /* bx lr */
->> +
->> +		idiv[0] = 0xe710f110;  /* sdiv r0, r0, r1 */
->> +		idiv[1] = 0xe12fff1e;  /* bx lr */
->> +	}
+On Tue, Nov 12, 2013 at 7:47 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This rewrites the entry-macro for the SA1100 in C and selects
+> MULTI_IRQ_HANDLER for this platform, creates a local struct for
+> two of the irq_chips in the SA1100 irq controller, and uses
+> an irqdomain to map the 32 non-cascaded IRQs on this platform.
 >
-> What about endianness, and what if XIP is enabled?
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/Kconfig                                |   2 +
+>  arch/arm/mach-sa1100/assabet.c                  |   1 +
+>  arch/arm/mach-sa1100/badge4.c                   |   1 +
+>  arch/arm/mach-sa1100/cerf.c                     |   1 +
+>  arch/arm/mach-sa1100/collie.c                   |   1 +
+>  arch/arm/mach-sa1100/generic.h                  |   3 +
+>  arch/arm/mach-sa1100/h3100.c                    |   1 +
+>  arch/arm/mach-sa1100/h3600.c                    |   1 +
+>  arch/arm/mach-sa1100/hackkit.c                  |   1 +
+>  arch/arm/mach-sa1100/include/mach/entry-macro.S |  41 ---------
+>  arch/arm/mach-sa1100/irq.c                      | 112 ++++++++++++++++--------
+>  arch/arm/mach-sa1100/jornada720.c               |   1 +
+>  arch/arm/mach-sa1100/lart.c                     |   1 +
+>  arch/arm/mach-sa1100/nanoengine.c               |   1 +
+>  arch/arm/mach-sa1100/pleb.c                     |   1 +
+>  arch/arm/mach-sa1100/shannon.c                  |   1 +
+>  arch/arm/mach-sa1100/simpad.c                   |   1 +
+>  17 files changed, 93 insertions(+), 78 deletions(-)
+>  delete mode 100644 arch/arm/mach-sa1100/include/mach/entry-macro.S
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1c0c4ea0582f..dedca8a21e77 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -687,7 +687,9 @@ config ARCH_SA1100
+>         select CPU_SA1100
+>         select GENERIC_CLOCKEVENTS
+>         select HAVE_IDE
+> +       select IRQ_DOMAIN
+>         select ISA
+> +       select MULTI_IRQ_HANDLER
+>         select NEED_MACH_MEMORY_H
+>         select SPARSE_IRQ
+>         help
+> diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+> index e838ba27e443..e0285a9581de 100644
+> --- a/arch/arm/mach-sa1100/assabet.c
+> +++ b/arch/arm/mach-sa1100/assabet.c
+> @@ -622,6 +622,7 @@ MACHINE_START(ASSABET, "Intel-Assabet")
+>         .map_io         = assabet_map_io,
+>         .nr_irqs        = SA1100_NR_IRQS,
+>         .init_irq       = sa1100_init_irq,
+> +       .handle_irq     = sa1100_handle_irq,
 
-I was also going to add a note about endian-ness.
+In interest of shrinking the machine_desc, can you set the handler in
+sa1100_init_irq instead? That is how the gic and vic initialization
+work now. sa1100_handle_irq can also then become static.
 
-Given these are single instructoins for ARM, is it possible we could
-make a table of all the callers and fix them up when we initialise
-as we do for the SMP/UP case and for page-offset?
-
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Rob
