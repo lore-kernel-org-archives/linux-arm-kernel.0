@@ -1,103 +1,67 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Nov 2013 15:13:38 +0100
-Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from device tree
-Message-ID: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 12 Nov 2013 09:16:32 -0500 (EST)
+Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <20131112140436.GK16735@n2100.arm.linux.org.uk>
+References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.10.1311092357090.2314@knanqh.ubzr>
+ <528193A0.7050505@codeaurora.org>
+ <alpine.LFD.2.10.1311120839310.9667@knanqh.ubzr>
+ <20131112140436.GK16735@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.10.1311120911530.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement device tree probing for the tc3589x keypad driver.
-This is modeled on the STMPE keypad driver and tested on the
-Ux500 TVK1281618 UIB.
+On Tue, 12 Nov 2013, Russell King - ARM Linux wrote:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Fix rows/columns binding to read two u32's insead of two
-  u8 /bits/ as noted by Mark Rutland.
----
- drivers/input/keyboard/tc3589x-keypad.c | 63 +++++++++++++++++++++++++++++++--
- 1 file changed, 61 insertions(+), 2 deletions(-)
+> On Tue, Nov 12, 2013 at 09:01:16AM -0500, Nicolas Pitre wrote:
+> > What about this patch which I think is currently your best option.  Note 
+> > it would need to use the facilities from asm/opcodes.h to make it endian 
+> > agnostic.
+> > 
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 6a1b8a81b1..379cffe4ab 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -383,6 +383,34 @@ static void __init cpuid_init_hwcaps(void)
+> >  		elf_hwcap |= HWCAP_IDIVT;
+> >  	}
+> >  
+> > +	/*
+> > +	 * Patch our division routines with the corresponding opcode
+> > +	 * if the hardware supports it.
+> > +	 */
+> > +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL) && (elf_hwcap & HWCAP_IDIVT)) {
+> > +		extern char __aeabi_uidiv, __aeabi_idiv;
+> > +		u16 *uidiv = (u16 *)&__aeabi_uidiv;
+> > +		u16 *idiv = (u16 *)&__aeabi_idiv;
+> > +
+> > +		uidiv[0] = 0xfbb0;  /* udiv r0, r0, r1 */
+> > +		uidiv[1] = 0xf0f1;
+> > +		uidiv[2] = 0x4770;  /* bx lr */
+> > +
+> > +		idiv[0] = 0xfb90;  /* sdiv r0, r0, r1 */
+> > +		idiv[1] = 0xf0f1;  
+> > +		idiv[2] = 0x4770;  /* bx lr */
+> > +	} else if (!IS_ENABLED(CONFIG_THUMB2_KERNEL) && (elf_hwcap & HWCAP_IDIVA)) {
+> > +		extern char __aeabi_uidiv, __aeabi_idiv;
+> > +		u32 *uidiv = (u32 *)&__aeabi_uidiv;
+> > +		u32 *idiv = (u32 *)&__aeabi_idiv;
+> > +
+> > +		uidiv[0] = 0xe730f110;  /* udiv r0, r0, r1 */
+> > +		uidiv[1] = 0xe12fff1e;  /* bx lr */
+> > +
+> > +		idiv[0] = 0xe710f110;  /* sdiv r0, r0, r1 */
+> > +		idiv[1] = 0xe12fff1e;  /* bx lr */
+> > +	}
+> 
+> What about endianness, and what if XIP is enabled?
 
-diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
-index 208de7cbb7fa..7b6637d8cfbc 100644
---- a/drivers/input/keyboard/tc3589x-keypad.c
-+++ b/drivers/input/keyboard/tc3589x-keypad.c
-@@ -297,6 +297,62 @@ static void tc3589x_keypad_close(struct input_dev *input)
- 	tc3589x_keypad_disable(keypad);
- }
- 
-+#ifdef CONFIG_OF
-+static const struct tc3589x_keypad_platform_data *
-+tc3589x_keypad_of_probe(struct device *dev)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct tc3589x_keypad_platform_data *plat;
-+	u32 debounce_ms;
-+	int proplen;
-+
-+	if (!np)
-+		return ERR_PTR(-ENODEV);
-+
-+	plat = devm_kzalloc(dev, sizeof(*plat), GFP_KERNEL);
-+	if (!plat)
-+		return ERR_PTR(-ENOMEM);
-+
-+	of_property_read_u32(np, "keypad,num-columns", &plat->kcol);
-+	of_property_read_u32(np, "keypad,num-rows", &plat->krow);
-+	if (!plat->krow || !plat->kcol ||
-+	     plat->krow > TC_KPD_ROWS || plat->kcol > TC_KPD_COLUMNS) {
-+		dev_err(dev,
-+			"keypad columns/rows not properly specified (%ux%u)\n",
-+			plat->kcol, plat->krow);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	if (!of_get_property(np, "linux,keymap", &proplen)) {
-+		dev_err(dev, "property linux,keymap not found\n");
-+		return ERR_PTR(-ENOENT);
-+	}
-+
-+	plat->no_autorepeat = of_property_read_bool(np, "linux,no-autorepeat");
-+	plat->enable_wakeup = of_property_read_bool(np, "linux,wakeup");
-+
-+	/* The custom delay format is ms/16 */
-+	of_property_read_u32(np, "debounce-delay-ms", &debounce_ms);
-+	if (debounce_ms)
-+		plat->debounce_period = debounce_ms * 16;
-+	else
-+		plat->debounce_period = TC_KPD_DEBOUNCE_PERIOD;
-+
-+	plat->settle_time = TC_KPD_SETTLE_TIME;
-+	/* FIXME: should be property of the IRQ resource? */
-+	plat->irqtype = IRQF_TRIGGER_FALLING;
-+
-+	return plat;
-+}
-+#else
-+static inline const struct tc3589x_keypad_platform_data *
-+tc3589x_keypad_of_probe(struct device *dev)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
-+#endif
-+
-+
- static int tc3589x_keypad_probe(struct platform_device *pdev)
- {
- 	struct tc3589x *tc3589x = dev_get_drvdata(pdev->dev.parent);
-@@ -307,8 +363,11 @@ static int tc3589x_keypad_probe(struct platform_device *pdev)
- 
- 	plat = tc3589x->pdata->keypad;
- 	if (!plat) {
--		dev_err(&pdev->dev, "invalid keypad platform data\n");
--		return -EINVAL;
-+		plat = tc3589x_keypad_of_probe(&pdev->dev);
-+		if (IS_ERR(plat)) {
-+			dev_err(&pdev->dev, "invalid keypad platform data\n");
-+			return PTR_ERR(plat);
-+		}
- 	}
- 
- 	irq = platform_get_irq(pdev, 0);
--- 
-1.8.3.1
+Just as I said above the diff: this needs refined.
+
+Obviously XIP can't use this and doesn't need it either as a XIP kernel 
+should be optimized for the very platform it will run onto i.e. gcc 
+should already emit those div opcodes inline if appropriate.
+
+
+Nicolas
