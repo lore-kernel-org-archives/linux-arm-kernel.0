@@ -1,48 +1,57 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 13 Nov 2013 00:20:21 +0100
-Subject: [PATCH v2 10/19] mtd: sh_flctl: Enable the driver on all ARM
- platforms
-In-Reply-To: <20131112231719.GB9468@ld-irv-0074.broadcom.com>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1701001.ctJ1xUAsnV@avalon> <20131112231719.GB9468@ld-irv-0074.broadcom.com>
-Message-ID: <3733738.K29aNVltiz@avalon>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Nov 2013 16:30:15 -0700
+Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
+In-Reply-To: <20131111113936.GH28302@mudshark.cambridge.arm.com>
+References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
+ <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
+ <20131111113936.GH28302@mudshark.cambridge.arm.com>
+Message-ID: <5282BA07.20506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
-
-On Tuesday 12 November 2013 15:17:19 Brian Norris wrote:
-> On Wed, Nov 13, 2013 at 12:14:37AM +0100, Laurent Pinchart wrote:
-> > On Tuesday 12 November 2013 15:10:20 Brian Norris wrote:
-> > > On Tue, Oct 29, 2013 at 11:37:45PM +0100, Laurent Pinchart wrote:
-> > > > Renesas ARM platforms are transitioning from single-platform to
-> > > > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> > > > driver available on all ARM platforms to enable it on both
-> > > > ARCH_SHMOBILE
-> > > > and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-> > > > COMPILE_TEST.
-> > > > 
-> > > > Cc: David Woodhouse <dwmw2@infradead.org>
-> > > > Cc: linux-mtd at lists.infradead.org
-> > > > Signed-off-by: Laurent Pinchart
-> > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > 
-> > > Applied to l2-mtd.git, branch 'next' (for 3.14). Thanks.
-> > 
-> > Thank you, but if it's not too late, can you drop the patch ? :-) We've
-> > settled for a different approach that renames Kconfig symbols and doesn't
-> > require changes to individual drivers.
+On 11/11/2013 04:39 AM, Will Deacon wrote:
+> On Mon, Nov 11, 2013 at 08:31:53AM +0000, Hiroshi Doyu wrote:
+>> An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
+>> are done later.
+>>
+>> With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
+>> identify whether a device is IOMMU'able or not. If a device is
+>> IOMMU'able, we'll defer to populate that device till an iommu device
+>> is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
+>> is set in the bus. Then, those defered IOMMU'able devices are
+>> populated and configured as IOMMU'abled with help of the already
+>> populated iommu device via iommu_ops->add_device().
+>>
+>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+>> ---
+>> Update:
+>> This is newly added, and the successor of the following RFC:
+>>   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
+>>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
 > 
-> No problem. It's dropped.
+> This generally looks like the right idea to me, but it would be good to have
+> the input from a DT maintainer on the use of "#stream-id-cells" as an indicator
+> that a device is behind an IOMMU. (aside: I think "iommuable" is a horrible
+> word!).
+> 
+> What happens if you do the deferring at the bus level? E.g. defer all device
+> probes on a bus, until the IOMMU is probed for that bus. That might fit
+> better with future work, where we will almost certainly need to expose more
+> of the bus topology to Linux. Of course, I can see that falling down for
+> monolithic virtual buses like the platform bus.
 
-Thank you.
+I don't think it's correct to think about "the IOMMU for the bus".
 
-> I was only paying attention to the cover letter, where that decision
-> apparently didn't show up :)
+There could easily be multiple different IOMMU slave-sides attached to a
+bus, and hence you'd need to defer probing until "all the IOMMs for the
+bus" to be available.
 
-I'll reply to the cover letter. Sorry about that.
+Equally, I assume that dev->bus->iommu_ops rather assumes that bus
+masters always master transactions onto the same bus that their control
+registers are slaves upon. That also doesn't seem like a reasonable
+assumption.
 
--- 
-Regards,
-
-Laurent Pinchart
+As such, I think an approach where each device waits for any IOMMUs that
+affect it (wherever/whatever and however many they may be) is better
+than one where we try to explicitly manage the probe order of devices
+based on their slave registers' location.
