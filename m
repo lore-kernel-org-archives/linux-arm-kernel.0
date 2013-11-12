@@ -1,55 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Nov 2013 15:16:42 +0000
-Subject: Physical memory start contraints in the Linux kernel  (Was:
- Re: Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel]
- [xen-unstable test] 21486: tolerable FAIL - PUSHED))
-In-Reply-To: <alpine.DEB.2.02.1311121449550.26077@kaball.uk.xensource.com>
-References: <osstest-21486-mainreport@xen.org>
- <1384250005.1883.35.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
- <201311121437.55826.arnd@arndb.de>
- <alpine.DEB.2.02.1311121449550.26077@kaball.uk.xensource.com>
-Message-ID: <20131112151642.GO16735@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 12 Nov 2013 10:20:10 -0500 (EST)
+Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <alpine.LFD.2.10.1311120948000.9667@knanqh.ubzr>
+References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.10.1311092357090.2314@knanqh.ubzr>
+ <528193A0.7050505@codeaurora.org>
+ <alpine.LFD.2.10.1311120839310.9667@knanqh.ubzr>
+ <20131112140436.GK16735@n2100.arm.linux.org.uk>
+ <52823877.60806@codethink.co.uk>
+ <alpine.LFD.2.10.1311120924330.9667@knanqh.ubzr>
+ <yw1x8uwtvg3i.fsf@unicorn.mansr.com>
+ <alpine.LFD.2.10.1311120948000.9667@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.10.1311121014530.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 03:00:40PM +0000, Stefano Stabellini wrote:
-> On Tue, 12 Nov 2013, Arnd Bergmann wrote:
-> > > Or is this a lost fight and should we find a workaround (see below if we
-> > > are curious) to make the start of memory look the same?
-> > 
-> > I don't see what hack you are referring to, can you elaborate?
+On Tue, 12 Nov 2013, Nicolas Pitre wrote:
+
+> On Tue, 12 Nov 2013, M?ns Rullg?rd wrote:
 > 
-> The hack would be mapping dom0 memory at the same start address as it
-> would be on the native platform but allocating its memory contiguously
-> at an offset.
+> > It might be possible to extract this information from relocation tables.
 > 
-> For example having dom0 psedo-physical memory start at 0x80000000 (as it
-> would expect) and end at 0x88000000 (because let's sat that we only give
-> 128MB of memory to dom0). The actual physical memory would be allocated
-> contiguously from 0xA0000000. The swiotlb-xen code in Linux would be
-> made aware of the offset 0xA0000000-0x80000000 via device tree and
-> would calculate the right physical address to use for dma operations.
-> Today swiotlb-xen assumes that pseudo-phisical addresses correspond to
-> physical addresses for dom0.
+> True, but only for individual .o files.  Once the linker puts them 
+> together the information is lost, and trying to infer what the linker 
+> has done is insane.
+> 
+> Filtering the compiler output to annotate idiv calls before it is 
+> assembled would probably be a better solution.
 
-First, let's get something right here.  Conceptually, DMA addresses have
-_never_ been the same as physical addresses in the kernel (with the
-exception of DMA masks being interpreted strangely.)
+Another solution is to patch the call site from within __aeabi_idiv at 
+run time using lr.  That wouldn't work in the presence of tail call 
+optimization though.
 
-Physical addresses have always been what's required to be programmed into
-things like the MMU to gain access to RAM.  We have virt_to_phys() etc
-for translations of this nature for lowmem, and kmap() etc for highmem.
+Again this might not be worth it and patching __aeabi_idiv instead might 
+be a good enough compromize.
 
-DMA addresses have always been the value which you program into the DMA
-controller for it to be able to access RAM.  These use the DMA API to
-obtain the DMA address.  Behind the DMA API, we have dma_to_virt() and
-virt_to_dma() etc which do the appropriate translation for this.
 
-Of course, for virtualisation, replacing the DMA ops is probably the
-better solution to deal with this, where you can hook into the mapping/
-unmapping/coherent functions and return the correct DMA addresses.
-
-Remember though - anything which assumes virtual_address =
-phys_to_virt(dma_addr_t) is basically violating the conceptual model
-here, and should be fixed.
+Nicolas
