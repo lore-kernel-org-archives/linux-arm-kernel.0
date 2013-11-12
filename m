@@ -1,28 +1,21 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 12 Nov 2013 14:11:37 +0900
-Subject: [PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-In-Reply-To: <1384000429-3590-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1384000429-3590-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131112051137.GB28649@verge.net.au>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 11 Nov 2013 21:19:41 -0800
+Subject: [PATCH v2 3/5] ata: Add APM X-Gene SATA driver
+In-Reply-To: <201311110954.32904.arnd@arndb.de>
+References: <1383980431-6572-1-git-send-email-lho@apm.com>
+ <1383980431-6572-4-git-send-email-lho@apm.com>
+ <CAOesGMjEpC9-i52zYb2LtmyfV7FZQQGeeo4Umg-LXOYytZ4E-A@mail.gmail.com>
+ <201311110954.32904.arnd@arndb.de>
+Message-ID: <CAPw-ZT=aVyw2yducpQMD2_rPPV7abKJZOH-Fs3bT2Ja=0tUNSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 09, 2013 at 01:33:48PM +0100, Laurent Pinchart wrote:
-> SH-Mobile platforms are transitioning from non-multiplatform to
-> multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
-> been created to group all multiplatform-enabled SH-Mobile SoCs. The
-> existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
-> been converted yet.
-> 
-> This arrangement works fine for the arch/ code, but lots of drivers
-> needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
-> ARCH_SHMOBILE only. In order to avoid changing them, rename
-> ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
-> ARCH_SHMOBILE configuration symbol that is selected by both
-> ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Acked-by: Magnus Damm <damm@opensource.se>
+Hi Arnd/Olof,
 
-Thanks, I have queued this up.
+I looked over the phy code for USB and NET. There isn't such PHY
+infrastructure for SATA from what I can tell. It seems like I will
+need to put this all together. I am thinking about porting the USB
+version over (with changes for SATA) and put it under
+"./drivers/ata/phy". Any suggestion?
+
+-Loc
