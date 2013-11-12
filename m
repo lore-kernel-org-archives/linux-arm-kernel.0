@@ -1,259 +1,141 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 12 Nov 2013 20:01:37 +0100
-Subject: [PATCH 5/7] clocksource/cadence_ttc: Overhaul clocksource
- frequency adjustment
-In-Reply-To: <1383945677-29674-6-git-send-email-soren.brinkmann@xilinx.com>
-References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383945677-29674-6-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <52827B11.5040308@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Nov 2013 13:13:00 -0600
+Subject: ARM: dts: add board dts file for EXYNOS4412 based TINY4412 board
+In-Reply-To: <1384268572-27055-1-git-send-email-kasimling@gmail.com>
+References: <1384268572-27055-1-git-send-email-kasimling@gmail.com>
+Message-ID: <52827DBC.9040606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 10:21 PM, Soren Brinkmann wrote:
-> The currently used method adjusting the clocksource to a changing input
-> frequency does not work on kernels from 3.11 on.
-> The new approach is to keep the timer frequency as constant as possible.
-> I.e.
->   - due to the TTC's prescaler limitations, allow frequency changes
->     only if the frequency scales by a power of 2
->   - adjust the counter's divider on the fly when a frequency change
->     occurs
->
-> When suspending though, the driver should not prevent rate changes in
-> order to allow the system to enter its low power state. For that
-> reason a PM notifier is added so rate changes can be ignored during
-> suspend/resume.
+On 11/12/2013 09:02 AM, Alex Ling wrote:
+> Add a minimal board dts file for EXYNOS4412 based FriendlyARM's
+> TINY4412 board. This patch including adds the node to support
+> peripherals like UART, SD card on SDMMC2 port, and this patch
+> adds GPIO connected LEDS and configure its properties like
+> following:
+> LED1: use 'heartbeat' trigger, blinking while the board is running.
+> LED4: use 'mmc0' trigger, on when mmc0 is accessing.
+> LED2 and LED3 can be controlled from userspace.
 
-It sounds very weird you have to add a PM notifier in this driver.
+Please send patches with [PATCH] prefix.
 
-Have you been facing an issue or do you assume it could happen ?
-
-> This limits cpufreq to scale by certain factors only.
-> But we may keep the time base somewhat constant, so that sleep() & co
-> keep working as expected, while supporting cpufreq and suspend.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Alex Ling <kasimling@gmail.com>
 > ---
->   drivers/clocksource/cadence_ttc_timer.c | 142 +++++++++++++++++++++++++++-----
->   1 file changed, 122 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-> index 68a336038d8f..421b942dd707 100644
-> --- a/drivers/clocksource/cadence_ttc_timer.c
-> +++ b/drivers/clocksource/cadence_ttc_timer.c
-> @@ -16,12 +16,14 @@
->    */
->
->   #include <linux/clk.h>
-> +#include <linux/clk-provider.h>
->   #include <linux/interrupt.h>
->   #include <linux/clockchips.h>
->   #include <linux/of_address.h>
->   #include <linux/of_irq.h>
->   #include <linux/slab.h>
->   #include <linux/sched_clock.h>
-> +#include <linux/suspend.h>
->
->   /*
->    * This driver configures the 2 16-bit count-up timers as follows:
-> @@ -52,6 +54,8 @@
->   #define TTC_CNT_CNTRL_DISABLE_MASK	0x1
->
->   #define TTC_CLK_CNTRL_CSRC_MASK		(1 << 5)	/* clock source */
-> +#define TTC_CLK_CNTRL_PSV_MASK		0x1e
-> +#define TTC_CLK_CNTRL_PSV_SHIFT		1
->
->   /*
->    * Setup the timers to use pre-scaling, using a fixed value for now that will
-> @@ -63,6 +67,8 @@
->   #define CLK_CNTRL_PRESCALE_EN	1
->   #define CNT_CNTRL_RESET		(1 << 4)
->
-> +#define MAX_F_ERR 50
+>  arch/arm/boot/dts/Makefile                |    1 +
+>  arch/arm/boot/dts/exynos4412-tiny4412.dts |   89 +++++++++++++++++++++++++++++
+>  2 files changed, 90 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos4412-tiny4412.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 802720e..91671a2 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -59,6 +59,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>  	exynos4412-odroidx.dtb \
+>  	exynos4412-origen.dtb \
+>  	exynos4412-smdk4412.dtb \
+> +	exynos4412-tiny4412.dtb \
+>  	exynos4412-trats2.dtb \
+>  	exynos5250-arndale.dtb \
+>  	exynos5250-smdk5250.dtb \
+> diff --git a/arch/arm/boot/dts/exynos4412-tiny4412.dts b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+> new file mode 100644
+> index 0000000..78ace14
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+> @@ -0,0 +1,89 @@
+> +/*
+> + * FriendlyARM's Exynos4412 based TINY4412 board device tree source
+> + *
+> + * Copyright (c) 2013 Alex Ling <kasimling@gmail.com>
+> + *
+> + * Device tree source file for FriendlyARM's TINY4412 board which is based on
+> + * Samsung's Exynos4412 SoC.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
->   /**
->    * struct ttc_timer - This definition defines local timer structure
->    *
-> @@ -82,8 +88,13 @@ struct ttc_timer {
->   		container_of(x, struct ttc_timer, clk_rate_change_nb)
->
->   struct ttc_timer_clocksource {
-> +	int			scale_dir;
-> +	u32			scale_clk_ctrl_reg_old;
-> +	u32			scale_clk_ctrl_reg_new;
-> +	int			suspending;
->   	struct ttc_timer	ttc;
->   	struct clocksource	cs;
-> +	struct notifier_block	suspend_nb;
->   };
->
->   #define to_ttc_timer_clksrc(x) \
-> @@ -228,33 +239,120 @@ static int ttc_rate_change_clocksource_cb(struct notifier_block *nb,
->   	struct ttc_timer_clocksource *ttccs = container_of(ttc,
->   			struct ttc_timer_clocksource, ttc);
->
-> +	if (ttccs->suspending)
-> +		return NOTIFY_OK;
+> +/dts-v1/;
+> +#include "exynos4412.dtsi"
+> +
+> +/ {
+> +	model = "FriendlyARM TINY4412 board based on Exynos4412";
+> +	compatible = "friendlyarm,tiny4412", "samsung,exynos4412";
 
-I don't see how it couldn't be racy. What prevents suspend to occur 
-right after this check ?
+The compatible string needs to be documented.
+
+Rob
 
 > +
->   	switch (event) {
-> -	case POST_RATE_CHANGE:
-> +	case PRE_RATE_CHANGE:
-> +	{
-> +		u32 psv;
-> +		unsigned long factor, rate_low, rate_high;
+> +	memory {
+> +		reg = <0x40000000 0x40000000>;
+> +	};
 > +
-> +		if (ndata->new_rate == ndata->old_rate) {
-> +			ttccs->scale_dir = 0;
-> +			return NOTIFY_OK;
-> +		}
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		led1 {
+> +			label = "led1:heart";
+> +			gpios = <&gpm4 0 1>;
+> +			default-state = "off";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +		led2 {
+> +			label = "led2";
+> +			gpios = <&gpm4 1 1>;
+> +			default-state = "off";
+> +		};
+> +		led3 {
+> +			label = "led3";
+> +			gpios = <&gpm4 2 1>;
+> +			default-state = "off";
+> +		};
+> +		led4 {
+> +			label = "led4:mmc0";
+> +			gpios = <&gpm4 3 1>;
+> +			default-state = "off";
+> +			linux,default-trigger = "mmc0";
+> +		};
+> +	};
 > +
-> +		if (ndata->new_rate > ndata->old_rate) {
-> +			factor = DIV_ROUND_CLOSEST(ndata->new_rate,
-> +					ndata->old_rate);
-> +			ttccs->scale_dir = 1;
-> +			rate_low = ndata->old_rate;
-> +			rate_high = ndata->new_rate;
-> +		} else {
-> +			factor = DIV_ROUND_CLOSEST(ndata->old_rate,
-> +					ndata->new_rate);
-> +			ttccs->scale_dir = -1;
-> +			rate_low = ndata->new_rate;
-> +			rate_high = ndata->old_rate;
-> +		}
-
-Hmm, it could be interesting if Viresh can give its opinion on this 
-patch [cc'ed].
-
+> +	rtc at 10070000 {
+> +		status = "okay";
+> +	};
 > +
-> +		if (!is_power_of_2(factor))
-> +				return NOTIFY_BAD;
+> +	sdhci at 12530000 {
+> +		bus-width = <4>;
+> +		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +	};
 > +
-> +		if (abs(rate_high - (factor * rate_low)) > MAX_F_ERR)
-> +			return NOTIFY_BAD;
+> +	serial at 13800000 {
+> +		status = "okay";
+> +	};
 > +
-> +		factor = __ilog2_u32(factor);
+> +	serial at 13810000 {
+> +		status = "okay";
+> +	};
 > +
->   		/*
-> -		 * Do whatever is necessary to maintain a proper time base
-> -		 *
-> -		 * I cannot find a way to adjust the currently used clocksource
-> -		 * to the new frequency. __clocksource_updatefreq_hz() sounds
-> -		 * good, but does not work. Not sure what's that missing.
-> -		 *
-> -		 * This approach works, but triggers two clocksource switches.
-> -		 * The first after unregister to clocksource jiffies. And
-> -		 * another one after the register to the newly registered timer.
-> -		 *
-> -		 * Alternatively we could 'waste' another HW timer to ping pong
-> -		 * between clock sources. That would also use one register and
-> -		 * one unregister call, but only trigger one clocksource switch
-> -		 * for the cost of another HW timer used by the OS.
-> +		 * store timer clock ctrl register so we can restore it in case
-> +		 * of an abort.
->   		 */
-> -		clocksource_unregister(&ttccs->cs);
-> -		clocksource_register_hz(&ttccs->cs,
-> -				ndata->new_rate / PRESCALE);
-> -		/* fall through */
-> -	case PRE_RATE_CHANGE:
-> +		ttccs->scale_clk_ctrl_reg_old =
-> +			__raw_readl(ttccs->ttc.base_addr +
-> +					TTC_CLK_CNTRL_OFFSET);
+> +	serial at 13820000 {
+> +		status = "okay";
+> +	};
 > +
-> +		psv = (ttccs->scale_clk_ctrl_reg_old &
-> +				TTC_CLK_CNTRL_PSV_MASK) >>
-> +				TTC_CLK_CNTRL_PSV_SHIFT;
-> +		if (ttccs->scale_dir < 0)
-> +			psv -= factor;
-> +		else
-> +			psv += factor;
+> +	serial at 13830000 {
+> +		status = "okay";
+> +	};
 > +
-> +		/* prescaler within legal range? */
-> +		if (psv & ~(TTC_CLK_CNTRL_PSV_MASK >> TTC_CLK_CNTRL_PSV_SHIFT))
-> +			return NOTIFY_BAD;
+> +	fixed-rate-clocks {
+> +		xxti {
+> +			compatible = "samsung,clock-xxti";
+> +			clock-frequency = <0>;
+> +		};
 > +
-> +		ttccs->scale_clk_ctrl_reg_new = ttccs->scale_clk_ctrl_reg_old &
-> +			~TTC_CLK_CNTRL_PSV_MASK;
-> +		ttccs->scale_clk_ctrl_reg_new |= psv << TTC_CLK_CNTRL_PSV_SHIFT;
-> +
-> +
-> +		/* scale down: adjust divider in post-change notification */
-> +		if (ttccs->scale_dir < 0)
-> +			return NOTIFY_DONE;
-> +
-> +		/* scale up: adjust divider now - before frequency change */
-> +		__raw_writel(ttccs->scale_clk_ctrl_reg_new,
-> +				ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
-> +		break;
-> +	}
-> +	case POST_RATE_CHANGE:
-> +		/* scale up: pre-change notification did the adjustment */
-> +		if (ttccs->scale_dir >= 0)
-> +			return NOTIFY_OK;
-> +
-> +		/* scale down: adjust divider now - after frequency change */
-> +		__raw_writel(ttccs->scale_clk_ctrl_reg_new,
-> +				ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
-> +		break;
-> +
->   	case ABORT_RATE_CHANGE:
-> +		/* we have to undo the adjustment in case we scale up */
-> +		if (ttccs->scale_dir <= 0)
-> +			return NOTIFY_OK;
-> +
-> +		/* restore original register value */
-> +		__raw_writel(ttccs->scale_clk_ctrl_reg_old,
-> +				ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
-> +		/* fall through */
->   	default:
->   		return NOTIFY_DONE;
->   	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static int ttc_suspend_notifier_cb(struct notifier_block *nb,
-> +		unsigned long event, void *data)
-> +{
-> +	struct ttc_timer_clocksource *ttccs = container_of(nb,
-> +			struct ttc_timer_clocksource, suspend_nb);
-> +
-> +	switch (event) {
-> +	case PM_SUSPEND_PREPARE:
-> +		ttccs->suspending = 1;
-> +		break;
-> +	case PM_POST_SUSPEND:
-> +		ttccs->suspending = 0;
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_DONE;
->   }
->
->   static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
-> @@ -283,6 +381,10 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
->   				&ttccs->ttc.clk_rate_change_nb))
->   		pr_warn("Unable to register clock notifier.\n");
->
-> +	ttccs->suspend_nb.notifier_call = ttc_suspend_notifier_cb;
-> +	if (register_pm_notifier(&ttccs->suspend_nb))
-> +		pr_warn("Unable to register PM notifier.\n");
-> +
->   	ttccs->ttc.base_addr = base;
->   	ttccs->cs.name = "ttc_clocksource";
->   	ttccs->cs.rating = 200;
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> +		xusbxti {
+> +			compatible = "samsung,clock-xusbxti";
+> +			clock-frequency = <24000000>;
+> +		};
+> +	};
+> +};
+> 
