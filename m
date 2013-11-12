@@ -1,132 +1,77 @@
-From: kasimling@gmail.com (Alex Ling)
-Date: Tue, 12 Nov 2013 23:02:52 +0800
-Subject: ARM: dts: add board dts file for EXYNOS4412 based TINY4412 board
-Message-ID: <1384268572-27055-1-git-send-email-kasimling@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Nov 2013 15:05:41 +0000
+Subject: [Xen-devel] [PATCH 2/2] swiotlb-xen: xen_swiotlb_map_page: do
+ not error out if dma_capable fails
+In-Reply-To: <20131112144832.GC9435@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
+ <1384265520-6833-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20131112144832.GC9435@phenom.dumpdata.com>
+Message-ID: <20131112150540.GN16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a minimal board dts file for EXYNOS4412 based FriendlyARM's
-TINY4412 board. This patch including adds the node to support
-peripherals like UART, SD card on SDMMC2 port, and this patch
-adds GPIO connected LEDS and configure its properties like
-following:
-LED1: use 'heartbeat' trigger, blinking while the board is running.
-LED4: use 'mmc0' trigger, on when mmc0 is accessing.
-LED2 and LED3 can be controlled from userspace.
+On Tue, Nov 12, 2013 at 09:48:32AM -0500, Konrad Rzeszutek Wilk wrote:
+> On Tue, Nov 12, 2013 at 02:12:00PM +0000, Stefano Stabellini wrote:
+> > Many ARM devices do not set the dma_mask correctly today.
+> > As a consequence dma_capable fails for them regardless of the address
+> > passed to it.
+> 
+> Wouldn't the DMA API debug warn of bad usage.
 
-Signed-off-by: Alex Ling <kasimling@gmail.com>
----
- arch/arm/boot/dts/Makefile                |    1 +
- arch/arm/boot/dts/exynos4412-tiny4412.dts |   89 +++++++++++++++++++++++++++++
- 2 files changed, 90 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos4412-tiny4412.dts
+No.  The problem is that dev->dma_mask is NULL, and that's generally
+interpreted as "this device doesn't do DMA".
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..91671a2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -59,6 +59,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4412-odroidx.dtb \
- 	exynos4412-origen.dtb \
- 	exynos4412-smdk4412.dtb \
-+	exynos4412-tiny4412.dtb \
- 	exynos4412-trats2.dtb \
- 	exynos5250-arndale.dtb \
- 	exynos5250-smdk5250.dtb \
-diff --git a/arch/arm/boot/dts/exynos4412-tiny4412.dts b/arch/arm/boot/dts/exynos4412-tiny4412.dts
-new file mode 100644
-index 0000000..78ace14
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4412-tiny4412.dts
-@@ -0,0 +1,89 @@
-+/*
-+ * FriendlyARM's Exynos4412 based TINY4412 board device tree source
-+ *
-+ * Copyright (c) 2013 Alex Ling <kasimling@gmail.com>
-+ *
-+ * Device tree source file for FriendlyARM's TINY4412 board which is based on
-+ * Samsung's Exynos4412 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+#include "exynos4412.dtsi"
-+
-+/ {
-+	model = "FriendlyARM TINY4412 board based on Exynos4412";
-+	compatible = "friendlyarm,tiny4412", "samsung,exynos4412";
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		led1 {
-+			label = "led1:heart";
-+			gpios = <&gpm4 0 1>;
-+			default-state = "off";
-+			linux,default-trigger = "heartbeat";
-+		};
-+		led2 {
-+			label = "led2";
-+			gpios = <&gpm4 1 1>;
-+			default-state = "off";
-+		};
-+		led3 {
-+			label = "led3";
-+			gpios = <&gpm4 2 1>;
-+			default-state = "off";
-+		};
-+		led4 {
-+			label = "led4:mmc0";
-+			gpios = <&gpm4 3 1>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc0";
-+		};
-+	};
-+
-+	rtc at 10070000 {
-+		status = "okay";
-+	};
-+
-+	sdhci at 12530000 {
-+		bus-width = <4>;
-+		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-+		pinctrl-names = "default";
-+		status = "okay";
-+	};
-+
-+	serial at 13800000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13810000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13820000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13830000 {
-+		status = "okay";
-+	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <0>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+};
--- 
-1.7.9.5
+ARM drivers have been particularly bad in respect of getting this right:
+there's an overwhelming problem here of "I don't need to do that so I'm
+not going to do it" rather than taking the attitude of "it's good
+practice to do X because it will save me hastles in the future".
+
+I'll admit that even I'm guilty of the former in this regard to some
+extent: I've not added the necessary dma_set_mask/dma_set_coherent_mask()
+calls to the various drivers because they haven't been a concern.  That
+was wrong, because the DMA API technically requires it.
+
+However, not having a DMA mask set when the device is created is
+something I'm not guilty of - I always ensured with the old board
+files that a DMA capabable device had a DMA mask set and those which
+weren't capable didn't: this causes the DMA API to behave correctly
+and report according to the way the device was declared whether it is
+DMA capable or not.
+
+Unfortunately, others decided (especially post DT) that the solution
+to this was to have the driver code - which could be modular - do things
+like this:
+
+static u64 mask = blah;
+
+foo_probe(dev)
+{
+	if (!dev->dma_mask)
+		dev->dma_mask = &mask;
+}
+
+which works nicely until you reload the module.
+
+I strongly suggest _not_ working around this problem in subsystem code
+but raising bug reports against the buggy drivers.  All drivers without
+exception using DMA should have something like this pattern:
+
+foo_probe(dev)
+{
+	int rc;
+
+	rc = dma_set_mask(dev, DMA_BIT_MASK(bits));
+	if (rc)
+		return rc;
+	dma_set_coherent_mask(dev, DMA_BIT_MASK(bits));
+	...
+}
+
+The first call is required if the driver uses dma_map_*, the second call
+is required if it makes use of coherent allocations and can be of the
+above form if it's previously used dma_set_mask with the same mask.
+Otherwise, the return value of dma_set_coherent_mask() must be checked.
+
+Of course, dma_set_mask() will fail if dev->dma_mask is NULL - and that's
+something which must be fixed where the device was created, not by the
+driver.
