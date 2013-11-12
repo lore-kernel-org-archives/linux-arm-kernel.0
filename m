@@ -1,33 +1,133 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 12 Nov 2013 20:34:36 +0400
-Subject: [PATCH v2 0/5] ata: Add APM X-Gene SATA controller support
-In-Reply-To: <3056580.hyyOnlSqg9@amdc1032>
-References: <1383980431-6572-1-git-send-email-lho@apm.com>
- <3056580.hyyOnlSqg9@amdc1032>
-Message-ID: <5282589C.2090606@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Nov 2013 16:42:41 +0000
+Subject: arm/arm64 UEFI boot protocol
+In-Reply-To: <20131111174321.GQ1557@rocoto.smurfnet.nu>
+References: <20131111174321.GQ1557@rocoto.smurfnet.nu>
+Message-ID: <20131112164241.GD25953@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Leif,
 
-On 12-11-2013 19:40, Bartlomiej Zolnierkiewicz wrote:
+On Mon, Nov 11, 2013 at 05:43:21PM +0000, Leif Lindholm wrote:
+> We currently have a few sets of patches floating around, for UEFI
+> runtime services, UEFI stub and GRUB support for Linux/UEFI on
+> arm/arm64.
+> 
+> The last version of Documentation/arm/uefi.txt I sent out raised a few
+> questions with regards to the boot protocol between UEFI and Linux, and
+> there is also upcoming support for ACPI which could use a few
+> clarifications in this area.
+> 
+> So, rather than sending out complete sets of patches for all these until
+> consensus is reached, below is my proposed suggestion for a
+> Documentation/arm/uefi.txt, to be shared for arm and arm64. If noone has
+> strong objections to this, we can quickly send updated (and hopefully
+> final-ish) versions of these sets.
 
-> Please remember to include linux-ide at vger.kernel.org on CC: for ATA patches.
+In the absence of code, I'll play English teacher then :)
 
-> Also from the quick look it seems that:
-> - patch #4 ("ata: Add APM X-Gene SATA serdes functions") should come before
->    patch #3 ("ata: Add APM X-Gene SATA driver") as code in patch #3 depends
->    on the code in patch #4
-> - patch #5 ("Documentation: Add documentation for APM X-Gene SATA DTS
->    binding") should come before patch #2 ("arm64: Add APM X-Gene DTS entry
->    for SATA controllers") or (even better) just be merged into patch #2
+> UEFI, the Unified Extensible Firmware Interface is a specification
 
-    No, if it has to be merged then to the driver patch, not .dts patch.
+Interface, is
 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
+> governing the behaviours of compatible firmware interfaces.
+> It is maintained by the UEFI Forum - http://www.uefi.org/.
+> Support for the AArch32 (arm) architecture was added in version 2.3 of
+> the specification, and support for AAaarch64 (arm64) was added in
+> version 2.4.
 
-WBR, Sergei
+AArch64
+
+> UEFI is an evolution of its predecessor 'EFI', so the terms EFI and
+> EFI are used somewhat interchangeably in this document and associated
+
+UEFI
+
+> source code. As a rule, anything new uses 'UEFI', whereas 'EFI' refers
+> to legacy code or specifications.  
+> 
+> UEFI support in Linux                                                           
+> =====================                                                           
+> Booting on a platform with firmware compliant with the UEFI
+> specification makes it possible for the kernel to support additional
+> features:
+> - UEFI Runtime Services
+> - Retrieving various configuration information through the standardised
+>   interface of UEFI configuration tables. (ACPI, SMBIOS, ...)
+> 
+> For actually enabling [U]EFI support, enable:
+> - CONFIG_EFI=y
+> - CONFIG_EFI_VARS=y or m
+> 
+> UEFI stub
+> =========
+> The "stub" is a feature that turns the Image/zImage/bzImage into a valid
+
+We don't support bzImage for arm or arm64.
+
+> UEFI PE/COFF executable, including a loader application that makes it
+> possible to load the kernel directly from the UEFI shell, boot menu, or
+> one of the lightweight bootloaders like Gummiboot or rEFInd. 
+> The kernel image built with stub support remains a valid kernel image
+> for booting in the legacy fashion.
+
+By legacy, you mean non-UEFI rather than EFI? I consider UEFI as a choice
+rather than the future ;p
+
+> UEFI kernel support on ARM
+> ==========================
+
+Wait, isn't this all under Documentation/arm/? You could probably combine
+some of these sections together, since the scope is really tied to ARM here.
+
+> The implementation depends on receiving information about the UEFI
+> environment in a Flattened Device Tree (FDT) - so is only available with
+> CONFIG_OF.
+
+You could mention this in your earlier list of dependencies.
+
+> UEFI support also depends on early_memremap().
+
+Why is that worthy of note? Can a user even turn that off?
+
+> UEFI kernel support on the ARM architectures (arm and arm64) is only
+> available when boot is performed through the stub.
+> 
+> When booting in UEFI mode, the kernel ignores any memory nodes in the
+> DT, and instead reads the UEFI memory map. To prevent confusion, the
+> stub deletes any memory nodes from a provided DT.
+> 
+> The stub populates the FDT /chosen node with, and the kernel scans for
+> the following parameters:
+
+Sentence doesn't read very well. Maybe stick some brackets around (and the
+kernel scans for)?
+
+> ______________________________________________________________________________
+> Name                      | Size   | Description
+> ================================================================================
+> linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
+> --------------------------------------------------------------------------------
+> linux,uefi-mmap           | 64-bit | Physical address of the UEFI memory map,
+>                           |        | populated by the UEFI GetMemoryMap() call.
+> --------------------------------------------------------------------------------
+> linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
+>                           |        | pointed to in previous entry.
+> --------------------------------------------------------------------------------
+> linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
+>                           |        | memory map.
+
+Do we actually need to define these sizes here, or can they be dealt with
+using the usual #address-cells property? Also, I think you should describe
+the binding in a separate document somewhere under Documentation/devicetree,
+then cross-reference it from here.
+
+> --------------------------------------------------------------------------------
+> linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+> --------------------------------------------------------------------------------
+
+Are you sure you want to refer to kernel symbols here? If somebody renames
+that variable, they're not going to fix this file.
+
+Will
