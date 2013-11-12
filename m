@@ -1,47 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Nov 2013 21:08:00 +0100
-Subject: Physical memory start contraints in the Linux kernel (Was: Re:
- Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel] [xen-unstable
- test] 21486: tolerable FAIL - PUSHED))
-In-Reply-To: <alpine.DEB.2.02.1311121843230.26077@kaball.uk.xensource.com>
-References: <osstest-21486-mainreport@xen.org>
- <201311121939.08971.arnd@arndb.de>
- <alpine.DEB.2.02.1311121843230.26077@kaball.uk.xensource.com>
-Message-ID: <201311122108.01331.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 12 Nov 2013 15:11:09 -0500
+Subject: [PATCHv2] ARM: mvebu: Add Netgear ReadyNAS 2120 board
+In-Reply-To: <87ppq5flnb.fsf@natisbad.org>
+References: <87ppq5flnb.fsf@natisbad.org>
+Message-ID: <20131112201109.GT10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 November 2013, Stefano Stabellini wrote:
-> On Tue, 12 Nov 2013, Arnd Bergmann wrote:
-> > On Tuesday 12 November 2013, Ian Campbell wrote:
-> > > On Tue, 2013-11-12 at 14:35 +0000, Julien Grall wrote:
-> > > > On 11/12/2013 01:37 PM, Arnd Bergmann wrote:
-> > > > > BTW, does Dom0 require an LPAE-enabled kernel or can it be a regular
-> > > > > non-LPAE ARMv6/v7 multiplatform build?
-> > > > 
-> > > > It can be both.
-> > > 
-> > > NB: v7 only, we don't do v6 at all. But yes either LPAE or regular is
-> > > fine with us.
-> > 
-> > Why not combined v6/v7 kernels for non-LPAE? I can't see a technical reason
-> > preventing you from running a Dom0 or DomU kernel that can also run on
-> > some ARMv6 platform as long as both platforms and CPUs are enabled in
-> > Kconfig.
+On Tue, Nov 12, 2013 at 08:46:48PM +0100, Arnaud Ebalard wrote:
 > 
-> Unfortunately today we can't support ARMv6.
-> From f880b67dcbdedb49453f88d2ccb1a0937b046d82:
->    
->     * ARMv6 does not support cmpxchg on 16-bit words that are used in the
->       Xen grant table code, so we must ensure that Xen support is only
->       built on ARMv7-only kernels not combined ARMv6/v7 kernels.
+> All hardware parts of the (mv78230 Armada XP based) NETGEAR ReadyNAS
+> 2120 are supported by mainline kernel (USB 3.0 and eSATA rear ports,
+> USB 2.0 front port, Gigabit controller and PHYs for the two rear ports,
+> serial port, LEDs, Buttons, 88SE9170 SATA controllers, three G762 fan
+> controllers, G751 temperature sensor) except for:
+> 
+>  - the Intersil ISL12057 I2C RTC Chip,
+>  - the Armada NAND controller.
+> 
+> Support for both of those is currently work in progress and does not
+> prevent boot.
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+> Hi,
+> 
+> Initial message:
+>  
+>   This one is intended for v3.14. This depends on the recent fix I pushed
+>   for mv78230 PCIe and also on a small patch Guenter Roeck just accepted
+>   to have lm75 driver support GMT G751 Temperature sensor (see 
+>   https://lkml.org/lkml/2013/11/9/273).
+>   
+>   Regarding the SATA presence and power pin definitions under pinctrl
+>   node if you wonder, I thought it would not harm to have them for
+>   reference even though they are currently not used. FWIW, I am currently
+>   looking if a GPIO regulator can make any use of those.
+>  
+> 
+> Note changed since v2 (i.e. kept for later cleanup session):
 
-Ah, I must have made a mistake there. It's not strictly a bug, but I think
-it would be better to undo the dependency I added in that patch and instead
-change the Makefile to build the grant table code with -march=armv7-a:
-This is safe because we know that this code will only /run/ on v7 even
-in a combined v6/v7 kernel, but it lets us get better build coverage because
-then we will enable Xen support in an allmodconfig or allyesconfig kernel
-that today enables both v6 and v7.
+I presume s/Note/Not/ ?  Otherwise, I'm really confused. :)
 
-	Arnd
+>  - move clocks = <&coreclk 0> in serial node to armada-370-xp.dtsi
+>  - add a label to most SoC nodes to avoid replaying the whole node hierarchy
+>  - see if g762 dt binding can be fixed (no remarks done during review)
+
+thx,
+
+Jason.
