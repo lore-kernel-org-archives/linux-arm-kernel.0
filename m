@@ -1,121 +1,100 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Nov 2013 14:48:05 +0100
-Subject: [PATCH 2/7] ARM: sa1100: use an irqdomain for the high GPIO IRQs
-Message-ID: <1384264085-6249-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 12 Nov 2013 14:48:13 +0100
+Subject: [PATCH 3/7] ARM: sa1100: refer to hardware IRQs step 1
+Message-ID: <1384264093-6291-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the remaining high GPIO IRQs over to be mapped
-using a legacy IRQ domain.
+This switches the references from Linux IRQ numbers to hardware
+IRQ numbers in the code driving the low GPIOs and the "normal"
+interrupt lines on the SA1100.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-sa1100/irq.c | 47 +++++++++++++++++++++++++++++++---------------
- 1 file changed, 32 insertions(+), 15 deletions(-)
+ arch/arm/mach-sa1100/irq.c | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index 15fd8a580391..ac032c84763c 100644
+index ac032c84763c..bf36b9abfaad 100644
 --- a/arch/arm/mach-sa1100/irq.c
 +++ b/arch/arm/mach-sa1100/irq.c
-@@ -170,15 +170,6 @@ static int sa1100_high_gpio_wake(struct irq_data *d, unsigned int on)
- 	return 0;
- }
+@@ -17,6 +17,7 @@
+ #include <linux/ioport.h>
+ #include <linux/syscore_ops.h>
+ #include <linux/irqdomain.h>
++#include <linux/bitops.h>
  
--static struct irq_chip sa1100_high_gpio_chip = {
--	.name		= "GPIO-h",
--	.irq_ack	= sa1100_high_gpio_ack,
--	.irq_mask	= sa1100_high_gpio_mask,
--	.irq_unmask	= sa1100_high_gpio_unmask,
--	.irq_set_type	= sa1100_gpio_type,
--	.irq_set_wake	= sa1100_high_gpio_wake,
--};
--
- /*
-  * We don't need to ACK IRQs on the SA1100 unless they're GPIOs
-  * this is for internal IRQs i.e. from 11 to 31.
-@@ -213,11 +204,16 @@ static int sa1100_set_wake(struct irq_data *d, unsigned int on)
-  * @domain: irqdomain used to map the irqs for these chips
-  * @low_gpio_chip: irqchip to handle hardware IRQs 0-10
-  * @normal_chip: irqchip to handle hardware IRQs 12-31
-+ * @high_domain: irqdomain for the high GPIO IRQs
-+ * @high_gpio_chip: irqchip handling the cascaded IRQs off
-+ * IRQ 11 on the normal chip.
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+@@ -76,25 +77,25 @@ static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
   */
- struct sa1100_sc {
- 	struct irq_domain *domain;
- 	struct irq_chip low_gpio_chip;
- 	struct irq_chip normal_chip;
-+	struct irq_domain *high_domain;
-+	struct irq_chip high_gpio_chip;
- };
+ static void sa1100_low_gpio_ack(struct irq_data *d)
+ {
+-	GEDR = (1 << d->irq);
++	GEDR = BIT(d->hwirq);
+ }
  
- static struct sa1100_sc sa1100_sc = {
-@@ -236,6 +232,14 @@ static struct sa1100_sc sa1100_sc = {
- 		.irq_unmask	= sa1100_unmask_irq,
- 		.irq_set_wake	= sa1100_set_wake,
- 	},
-+	.high_gpio_chip = {
-+		.name		= "GPIO-h",
-+		.irq_ack	= sa1100_high_gpio_ack,
-+		.irq_mask	= sa1100_high_gpio_mask,
-+		.irq_unmask	= sa1100_high_gpio_unmask,
-+		.irq_set_type	= sa1100_gpio_type,
-+		.irq_set_wake	= sa1100_high_gpio_wake,
-+	},
- };
+ static void sa1100_low_gpio_mask(struct irq_data *d)
+ {
+-	ICMR &= ~(1 << d->irq);
++	ICMR &= ~BIT(d->hwirq);
+ }
  
- asmlinkage void __exception_irq_entry sa1100_handle_irq(struct pt_regs *regs)
-@@ -266,6 +270,7 @@ static int sa1100_sc_irqdomain_map(struct irq_domain *d, unsigned int irq,
- 	if (hwirq >= 12 && hwirq <= 31)
- 		irq_set_chip_and_handler(irq, &sc->normal_chip,
- 					 handle_level_irq);
-+
- 	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+ static void sa1100_low_gpio_unmask(struct irq_data *d)
+ {
+-	ICMR |= 1 << d->irq;
++	ICMR |= BIT(d->hwirq);
+ }
+ 
+ static int sa1100_low_gpio_wake(struct irq_data *d, unsigned int on)
+ {
+ 	if (on)
+-		PWER |= 1 << d->irq;
++		PWER |= BIT(d->hwirq);
+ 	else
+-		PWER &= ~(1 << d->irq);
++		PWER &= ~BIT(d->hwirq);
  	return 0;
  }
-@@ -275,6 +280,22 @@ static struct irq_domain_ops sa1100_sc_irqdomain_ops = {
- 	.xlate = irq_domain_xlate_onetwocell,
- };
  
-+static int sa1100_sc_high_irqdomain_map(struct irq_domain *d, unsigned int irq,
-+					irq_hw_number_t hwirq)
-+{
-+	struct sa1100_sc *sc = d->host_data;
-+
-+	irq_set_chip_data(irq, sc);
-+	irq_set_chip_and_handler(irq, &sc->high_gpio_chip,
-+				 handle_edge_irq);
-+	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+	return 0;
-+}
-+
-+static struct irq_domain_ops sa1100_sc_high_irqdomain_ops = {
-+	.map = sa1100_sc_high_irqdomain_map,
-+	.xlate = irq_domain_xlate_onetwocell,
-+};
- 
- static struct resource irq_resource =
- 	DEFINE_RES_MEM_NAMED(0x90050000, SZ_64K, "irqs");
-@@ -346,7 +367,6 @@ device_initcall(sa1100irq_init_devicefs);
- 
- void __init sa1100_init_irq(void)
+@@ -176,12 +177,12 @@ static int sa1100_high_gpio_wake(struct irq_data *d, unsigned int on)
+  */
+ static void sa1100_mask_irq(struct irq_data *d)
  {
--	unsigned int irq;
- 	struct sa1100_sc *sc = &sa1100_sc;
- 
- 	request_resource(&iomem_resource, &irq_resource);
-@@ -371,10 +391,7 @@ void __init sa1100_init_irq(void)
- 	/* Register IRQs 0-31 using a legacy irqdomain */
- 	sc->domain = irq_domain_add_legacy(NULL, 32, 0, 0,
- 					   &sa1100_sc_irqdomain_ops, sc);
--	for (irq = 32; irq <= 48; irq++) {
--		irq_set_chip_and_handler(irq, &sa1100_high_gpio_chip,
--					 handle_edge_irq);
--		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--	}
-+	sc->high_domain = irq_domain_add_legacy(NULL, 17, 32, 0,
-+					   &sa1100_sc_high_irqdomain_ops, sc);
- 	sa1100_init_gpio();
+-	ICMR &= ~(1 << d->irq);
++	ICMR &= ~BIT(d->hwirq);
  }
+ 
+ static void sa1100_unmask_irq(struct irq_data *d)
+ {
+-	ICMR |= (1 << d->irq);
++	ICMR |= BIT(d->hwirq);
+ }
+ 
+ /*
+@@ -189,7 +190,7 @@ static void sa1100_unmask_irq(struct irq_data *d)
+  */
+ static int sa1100_set_wake(struct irq_data *d, unsigned int on)
+ {
+-	if (d->irq == IRQ_RTCAlrm) {
++	if (d->hwirq == IRQ_RTCAlrm) {
+ 		if (on)
+ 			PWER |= PWER_RTC;
+ 		else
+@@ -246,11 +247,11 @@ asmlinkage void __exception_irq_entry sa1100_handle_irq(struct pt_regs *regs)
+ {
+ 	struct sa1100_sc *sc = &sa1100_sc;
+ 	u32 status;
+-	int irq;
++	int hwirq;
+ 
+ 	while ((status = (ICIP & ICMR))) {
+-		irq = ffs(status) - 1;
+-		handle_IRQ(irq_find_mapping(sc->domain, irq), regs);
++		hwirq = ffs(status) - 1;
++		handle_IRQ(irq_find_mapping(sc->domain, hwirq), regs);
+ 	}
+ }
+ 
 -- 
 1.8.3.1
