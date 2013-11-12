@@ -1,84 +1,63 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 12 Nov 2013 08:40:28 +0100
-Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
-In-Reply-To: <5281A332.6060300@gmail.com>
-References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
- <1384215177.17054.2.camel@linux-builds1>
- <5281A332.6060300@gmail.com>
-Message-ID: <20131112074028.GW28790@pengutronix.de>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 12 Nov 2013 08:56:25 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> (Cong Wang's
+ message of "Tue, 12 Nov 2013 06:48:59 +0000 (UTC)")
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
+Message-ID: <87y54u59zq.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Hi,
 
-On Mon, Nov 11, 2013 at 09:40:34PM -0600, Dinh Nguyen wrote:
-> 
-> On 11/11/13 6:12 PM, Dinh Nguyen wrote:
-> > Hi Steffen,
-> >
-> > On Thu, 2013-11-07 at 16:07 +0100, Steffen Trumtrar wrote:
-> >> Hi!
-> >>
-> >> This series includes two trivial fixes to the code (1,2),
-> >> then goes on to split the single clk.c file up into clock-type
-> >> specific files (3) and finally adds a divider to the peripheral
-> >> clock path.
-> >>
-> >> The patches are rebased to the for-next branch of
-> >>
-> >>         git://git.rocketboards.org/linux-socfpga-next.git
-> >>
-> >> Regards,
-> >> Steffen
-> >>
-> >> Steffen Trumtrar (4):
-> >>   ARM: socfpga: clk: remove unused field
-> >>   ARM: socfpga: clk: fix define typo
-> > The first two patches are fine.
-> >
-> >>   ARM: socfpga: clk: split clk code
-> >>   ARM: socfpga: clk: add clk_divider to periph
-> > These two patches are causing the ethernet driver to not be able to grab
-> > the correct clock during probe.
-> >
-> > Lets wait for 3.13-rc1 and I will push a new for-next that will be more
-> > up-to-date.
-> 
+Thanks for the pointer. See below.
 
-Hm, okay. It works fine on my SoCKit. But maybe I missed something in the
-split up.
+Cong Wang <xiyou.wangcong@gmail.com> writes:
 
-> Also the values do not look correct with your patch:
-> 
-> per_nand_mmc_clk         1           1            52631578
->           nand_clk              0           0            13157894
->           nand_x_clk            0           0            52631578
->           sdmmc_clk             1           1            52631578
-> 
-> Without your patch:
-> 
->  per_nand_mmc_clk         1           1            50000000
->           nand_clk              0           0            12500000
->           nand_x_clk            0           0            50000000
->           sdmmc_clk             1           1            50000000
-> 
+> On Sun, 10 Nov 2013 at 13:53 GMT, Arnaud Ebalard <arno@natisbad.org> wrote:
+>> Hi,
+>>
+>> I decided to upgrade the kernel on one of my ReadyNAS 102 from 3.11.1 to 
+>> 3.11.7. The device is based on Marvell Armada 370 SoC and uses mvneta
+>> driver. Mine runs Debian armel unstable but I can confirm the issue also
+>> happens on a debian harmhf unstable.
+>>
+> [...]
+>>
+>> Then, knowing that, I started a git bisect session on stable tree to end
+>> up with the following suspects. I failed to go any further to a single
+>> commit, due to crashes, but I could recompile a kernel w/ debug info and
+>> report what I get if neeeded.
+>>
+>> commit dc0791aee672 tcp: do not forget FIN in tcp_shifted_skb()     [bad]
+>> commit 18ddf5127c9f tcp: must unclone packets before mangling them
+>> commit 80bd5d8968d8 tcp: TSQ can use a dynamic limit
+>> commit dbeb18b22197 tcp: TSO packets automatic sizing
+>> commit 50704410d014 Linux 3.11.6                                    [good]
+>>
+>
+> This regression is probably introduced the last TSQ commit, Eric has a patch
+> for mvneta in the other thread:
+>
+> http://article.gmane.org/gmane.linux.network/290359
 
-Yes. I can confirm that on my board, too. I actually seem to have read over
-those three values and missed them.
+I had some offline (*) discussions w/ Eric and did some test w/ the patches
+he sent. It does not fix the regression I see. It would be nice if someone
+w/ the hardware and more knowledge of mvneta driver could reproduce the
+issue and spend some time on it.
 
-Let's wait for 3.13-rc1, then.
+That been said, even if the driver is most probably not the only one to
+blame here (considering the result of bisect and current thread on
+netdev), I never managed to get the performance I have on my ReadyNAS
+Duo v2 (i.e. 108MB/s for a file served by an Apache) with a mvneta-based
+platform (RN102, RN104 or RN2120). Understanding why is on an already a
+long todo list. 
 
-I actually also wanted to change the l3_sp_clk, as it seems to be neglect
-the "1 or 2" divider from l3_mp_clk IIRC, but I couldn't come up with a good
-way without changing the binding or something. What do you thing about that?
-Is that wrong at the moment or do I miss something?
+Cheers,
 
+a+
 
-Thanks,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+(*): for some reasons, my messages to netdev and stable are not published
+even though I can interact w/ {majordomo,autoanswer}@vger.kernel.org. I
+poked postmaster@ bug got no reply yet.
