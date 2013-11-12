@@ -1,45 +1,67 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Nov 2013 16:34:20 -0700
-Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
-In-Reply-To: <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
- <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <5282BAFC.8070405@wwwdotorg.org>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Tue, 12 Nov 2013 23:39:11 +0000
+Subject: [PATCH 1/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <1383943488-6537-2-git-send-email-markus.mayer@linaro.org>
+References: <1383943488-6537-1-git-send-email-markus.mayer@linaro.org>
+ <1383943488-6537-2-git-send-email-markus.mayer@linaro.org>
+Message-ID: <20131112233911.16eba130@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
-> An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
-> are done later.
-> 
-> With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
-> identify whether a device is IOMMU'able or not. If a device is
-> IOMMU'able, we'll defer to populate that device till an iommu device
-> is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
-> is set in the bus. Then, those defered IOMMU'able devices are
-> populated and configured as IOMMU'abled with help of the already
-> populated iommu device via iommu_ops->add_device().
 
-This looks fairly neat and clean.
+> +static int bcm_kona_wdt_set_resolution_reg(struct bcm_kona_wdt *wdt)
+> +{
+> +	uint32_t val;
+> +	int timeout;
+> +	unsigned long flags;
+> +	int ret = 0;
+> +
+> +	if (wdt->resolution > SECWDOG_MAX_RES)
+> +		return -EINVAL;
+> +
+> +	spin_lock_irqsave(&wdt->lock, flags);
+> +
+> +	val = secure_register_read(wdt->base + SECWDOG_CTRL_REG, &timeout);
+> +	if (!timeout) {
+> +		val &= ~SECWDOG_RES_MASK;
+> +		val |= wdt->resolution << SECWDOG_CLKS_SHIFT;
+> +		writel_relaxed(val, wdt->base + SECWDOG_CTRL_REG);
+> +	} else {
+> +		ret = -EAGAIN;
 
-I'm still worried about using #stream-id-cells in DT nodes though. While
-I do understand that the *Linux* device model currently only allows each
-struct device to be affected by a single IOMMU, I worry that encoding
-that same restriction into DT is a mistake. I'd far rather see a
-property like:
+This is I think the wrong choice of return. If the register fails to read
+then presumably the device is b*ggered ? In which case return something
+like -EIO and log something nasty.
 
-SMMU:
-    smmu: smmu at xxxxxx {
-        #smmu-cells = <1>;
-    }
+EAGAIN has fairly specific semantics around signals and/or specific
+requests for an I/O operation not to wait.
 
-Affected device:
-    smmus = <&smmu 1>;
-    (perhaps with smmu-names too)
+> +	spin_lock_irqsave(&wdt->lock, flags);
+> +
+> +	val = secure_register_read(wdt->base + SECWDOG_CTRL_REG, &timeout);
+> +	if (!timeout) {
+> +		val &= ~SECWDOG_COUNT_MASK;
+> +		val |= SECS_TO_TICKS(wdog->timeout, wdt);
+> +		writel_relaxed(val, wdt->base + SECWDOG_CTRL_REG);
+> +	} else {
+> +		ret = -EAGAIN;
+> +	}
+> +
+> +	spin_unlock_irqrestore(&wdt->lock, flags);
 
-That would allow the DT to represent basically arbitrary HW configurations.
+As an aside you could fold most of these functions into one single helper
+method that read CTRL_REG, did the and and or and wrote the result back
+rather than repeating yourself. But hey if you like typing...
 
-The implementation of this patch would then be almost as trivial; you'd
-just need to walk the smmus property to find each phandle in turn, just
-like any other phandle+specifier property, and validate that the SMMU
-driver was already probe()d for each.
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+What if there is no resource present ?
+
+> +	dev_info(dev, "Broadcom Kona Watchdog Timer");
+
+The module load succeeded - the user knows it loaded from that. Likewise
+the unload spewage is unwanted and the kernel would just drown in such
+messages if we didn't keep them in check. If you need the for debug then
+mark them dev_dbg but otherwise bin them.
+
+Alan
