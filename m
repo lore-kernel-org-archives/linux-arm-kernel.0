@@ -1,116 +1,48 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 11 Nov 2013 17:23:02 -0800
-Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
- vmalloc
-In-Reply-To: <CAH9JG2Uh7PBEqRGPe5H6H+n1cnqwLFrFfB9aUOee8myG27DoiA@mail.gmail.com>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
- <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
- <CAH9JG2Uh7PBEqRGPe5H6H+n1cnqwLFrFfB9aUOee8myG27DoiA@mail.gmail.com>
-Message-ID: <528182F6.4070308@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 11 Nov 2013 17:23:12 -0800
+Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <CAHCPf3tCTUEX6oDLUndZwt=Hk+YxsKjPO96N=Zhx82+_LM66sQ@mail.gmail.com>
+References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
+ <CAHCPf3tCTUEX6oDLUndZwt=Hk+YxsKjPO96N=Zhx82+_LM66sQ@mail.gmail.com>
+Message-ID: <52818300.70003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 3:37 PM, Kyungmin Park wrote:
-> Hi Laura,
+On 11/08/13 22:46, Matt Sealey wrote:
+> On Fri, Nov 8, 2013 at 5:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> If we're running on a v7 ARM CPU, detect if the CPU supports the
+>> sdiv/udiv instructions and replace the signed and unsigned
+>> division library functions with an sdiv/udiv instruction.
+>>
+>> Running the perf messaging benchmark in pipe mode
+>>
+>>  $ perf bench sched messaging -p
+>>
+>> shows a modest improvement on my v7 CPU.
+>>
+>> before:
+>> (5.060 + 5.960 + 5.971 + 5.643 + 6.029 + 5.665 + 6.050 + 5.870 + 6.117 + 5.683) / 10 = 5.805
+>>
+>> after:
+>> (4.884 + 5.549 + 5.749 + 6.001 + 5.460 + 5.103 + 5.956 + 6.112 + 5.468 + 5.093) / 10 = 5.538
+>>
+>> (5.805 - 5.538) / 5.805 = 4.6%
+> Even with the change to the output constraint suggested by Mans, you
+> get absolutely identical benchmark results? There's a lot of variance
+> in any case..
+
+Yeah sorry I didn't run the testcase again to see if numbers changed
+because I assumed one less instruction would be in the noise. I agree
+there is a lot of variance so if you have any better
+benchmarks/testcases please let me know.
+
 >
-> On Tue, Nov 12, 2013 at 8:26 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
->> vmalloc is currently assumed to be a completely separate address space
->> from the lowmem region. While this may be true in the general case,
->> there are some instances where lowmem and virtual space intermixing
->> provides gains. One example is needing to steal a large chunk of physical
->> lowmem for another purpose outside the systems usage. Rather than
->> waste the precious lowmem space on a 32-bit system, we can allow the
->> virtual holes created by the physical holes to be used by vmalloc
->> for virtual addressing. Track lowmem allocations in vmalloc to
->> allow mixing of lowmem and vmalloc.
->>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> Signed-off-by: Neeti Desai <neetid@codeaurora.org>
->> ---
->>   include/linux/mm.h      |    6 ++++++
->>   include/linux/vmalloc.h |    1 +
->>   mm/Kconfig              |   11 +++++++++++
->>   mm/vmalloc.c            |   26 ++++++++++++++++++++++++++
->>   4 files changed, 44 insertions(+), 0 deletions(-)
->>
->> diff --git a/include/linux/mm.h b/include/linux/mm.h
->> index f022460..76df50d 100644
->> --- a/include/linux/mm.h
->> +++ b/include/linux/mm.h
->> @@ -308,6 +308,10 @@ unsigned long vmalloc_to_pfn(const void *addr);
->>    * On nommu, vmalloc/vfree wrap through kmalloc/kfree directly, so there
->>    * is no special casing required.
->>    */
->> +
->> +#ifdef CONFIG_VMALLOC_SAVING
-> mismatch below Kconfig. CONFIG_ENABLE_VMALLOC_SAVING?
+> BTW has there been any evaluation of the penalty for the extra
+> branching, or the performance hit for the ARMv7-without-division
+> cases?
 
-Argh, I folded in a wrong patch when integrating. I'll fix it.
-
->> +extern int is_vmalloc_addr(const void *x)
->> +#else
->>   static inline int is_vmalloc_addr(const void *x)
->>   {
->>   #ifdef CONFIG_MMU
->> @@ -318,6 +322,8 @@ static inline int is_vmalloc_addr(const void *x)
->>          return 0;
->>   #endif
->>   }
->> +#endif
->> +
->>   #ifdef CONFIG_MMU
->>   extern int is_vmalloc_or_module_addr(const void *x);
->>   #else
->> diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
->> index 4b8a891..e0c8c49 100644
->> --- a/include/linux/vmalloc.h
->> +++ b/include/linux/vmalloc.h
->> @@ -16,6 +16,7 @@ struct vm_area_struct;                /* vma defining user mapping in mm_types.h */
->>   #define VM_USERMAP             0x00000008      /* suitable for remap_vmalloc_range */
->>   #define VM_VPAGES              0x00000010      /* buffer for pages was vmalloc'ed */
->>   #define VM_UNINITIALIZED       0x00000020      /* vm_struct is not fully initialized */
->> +#define VM_LOWMEM              0x00000040      /* Tracking of direct mapped lowmem */
->>   /* bits [20..32] reserved for arch specific ioremap internals */
->>
->>   /*
->> diff --git a/mm/Kconfig b/mm/Kconfig
->> index 8028dcc..b3c459d 100644
->> --- a/mm/Kconfig
->> +++ b/mm/Kconfig
->> @@ -519,3 +519,14 @@ config MEM_SOFT_DIRTY
->>            it can be cleared by hands.
->>
->>            See Documentation/vm/soft-dirty.txt for more details.
->> +
->> +config ENABLE_VMALLOC_SAVING
->> +       bool "Intermix lowmem and vmalloc virtual space"
->> +       depends on ARCH_TRACKS_VMALLOC
->> +       help
->> +         Some memory layouts on embedded systems steal large amounts
->> +         of lowmem physical memory for purposes outside of the kernel.
->> +         Rather than waste the physical and virtual space, allow the
->> +         kernel to use the virtual space as vmalloc space.
->> +
->> +         If unsure, say N.
->> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
->> index 13a5495..c7b138b 100644
->> --- a/mm/vmalloc.c
->> +++ b/mm/vmalloc.c
->> @@ -204,6 +204,29 @@ static int vmap_page_range(unsigned long start, unsigned long end,
->>          return ret;
->>   }
->>
->> +#ifdef ENABLE_VMALLOC_SAVING
-> missing "CONFIG_"
->
-
-Yes, this is a mess and needs to be cleaned up.
-
-> Thank you,
-> Kyungimn Park
-
-Thanks,
-Laura
+I haven't done any. I'll factor that in for the next round.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
