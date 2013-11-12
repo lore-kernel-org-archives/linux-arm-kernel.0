@@ -1,32 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Nov 2013 19:31:03 -0200
-Subject: [PATCH] ARM: dts: imx6q-sabrelite: Remove duplicate GPIO entry
-Message-ID: <1384291863-18045-1-git-send-email-festevam@gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 12 Nov 2013 22:41:05 +0100
+Subject: [PATCH 3/4] ARM: mmp: stop using mach/timex.h
+In-Reply-To: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1384292466-31725-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+mach/timex.h is the last remaining header that is unused for multiarch
+builds but necessary for singlearch builds. To allow to get rid of it
+for singlearch builds, too, drop its usage in mmp arch code by
+substituting CLOCK_TICK_RATE by a local cpp symbol.
 
-MX6QDL_PAD_EIM_D23__GPIO3_IO23 appears twice in the hog pin group.
-
-Remove one of the occurrences.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-mmp/time.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index aa625bd..ec9e4c1 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -128,7 +128,6 @@
- 				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x80000000
- 				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0x1f0b0
- 				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x80000000
--				MX6QDL_PAD_EIM_D23__GPIO3_IO23	0x80000000
- 			>;
- 		};
+diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+index 7ac41e8..fb57d11 100644
+--- a/arch/arm/mach-mmp/time.c
++++ b/arch/arm/mach-mmp/time.c
+@@ -39,6 +39,12 @@
+ 
+ #include "clock.h"
+ 
++#ifdef CONFIG_CPU_MMP2
++#define MMP_CLOCK_FREQ		6500000
++#else
++#define MMP_CLOCK_FREQ		3250000
++#endif
++
+ #define TIMERS_VIRT_BASE	TIMERS1_VIRT_BASE
+ 
+ #define MAX_DELTA		(0xfffffffe)
+@@ -195,14 +201,14 @@ void __init timer_init(int irq)
+ {
+ 	timer_config();
+ 
+-	setup_sched_clock(mmp_read_sched_clock, 32, CLOCK_TICK_RATE);
++	setup_sched_clock(mmp_read_sched_clock, 32, MMP_CLOCK_FREQ);
+ 
+ 	ckevt.cpumask = cpumask_of(0);
+ 
+ 	setup_irq(irq, &timer_irq);
+ 
+-	clocksource_register_hz(&cksrc, CLOCK_TICK_RATE);
+-	clockevents_config_and_register(&ckevt, CLOCK_TICK_RATE,
++	clocksource_register_hz(&cksrc, MMP_CLOCK_FREQ);
++	clockevents_config_and_register(&ckevt, MMP_CLOCK_FREQ,
+ 					MIN_DELTA, MAX_DELTA);
+ }
  
 -- 
-1.8.1.2
+1.8.4.2
