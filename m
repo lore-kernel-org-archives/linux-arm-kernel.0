@@ -1,25 +1,28 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 12 Nov 2013 15:10:20 -0800
-Subject: [PATCH v2 10/19] mtd: sh_flctl: Enable the driver on all ARM
- platforms
-In-Reply-To: <1383086274-11049-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383086274-11049-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131112231020.GA9468@ld-irv-0074.broadcom.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 12 Nov 2013 17:10:40 -0600
+Subject: [PATCH] ARM: OMAP2+: omap_device: maintain sane runtime pm status
+ around suspend/resume
+In-Reply-To: <878uwtnwfc.fsf@linaro.org>
+References: <1383857942-23630-1-git-send-email-nm@ti.com>	<87iow3rd3y.fsf@linaro.org>
+ <527C2B78.2070201@ti.com>	<874n7npw1e.fsf@linaro.org>
+ <20131111162358.GA6451@kahuna> <878uwtnwfc.fsf@linaro.org>
+Message-ID: <5282B570.8020802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:37:45PM +0100, Laurent Pinchart wrote:
-> Renesas ARM platforms are transitioning from single-platform to
-> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-> COMPILE_TEST.
+On 11/12/2013 03:26 PM, Kevin Hilman wrote:
+[..]
+> Yes, the updated version looks much more sensible.  Please repost in its
+> own thread so it gets a better chance at broader review, and feel free
+> to add
 > 
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: linux-mtd at lists.infradead.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Acked-by: Kevin Hilman <khilman@linaro.org>
 
-Applied to l2-mtd.git, branch 'next' (for 3.14). Thanks.
+Thanks. this is done[1]
 
-Brian
+[1] https://patchwork.kernel.org/patch/3176501/
+
+
+-- 
+Regards,
+Nishanth Menon
