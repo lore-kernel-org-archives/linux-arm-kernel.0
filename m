@@ -1,70 +1,17 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 12 Nov 2013 16:40:12 +0100
-Subject: [PATCH v2 0/5] ata: Add APM X-Gene SATA controller support
-In-Reply-To: <1383980431-6572-1-git-send-email-lho@apm.com>
-References: <1383980431-6572-1-git-send-email-lho@apm.com>
-Message-ID: <3056580.hyyOnlSqg9@amdc1032>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 12 Nov 2013 10:40:19 -0500
+Subject: Fwd: [PATCH 6/8] watchdog: davinci: reuse driver for keystone arch
+In-Reply-To: <527A28DE.4030906@ti.com>
+References: <1383680783-12114-7-git-send-email-ivan.khoronzhuk@ti.com>
+ <527A28DE.4030906@ti.com>
+Message-ID: <52824BE3.40504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-Please remember to include linux-ide at vger.kernel.org on CC: for ATA patches.
-
-Also from the quick look it seems that:
-- patch #4 ("ata: Add APM X-Gene SATA serdes functions") should come before
-  patch #3 ("ata: Add APM X-Gene SATA driver") as code in patch #3 depends
-  on the code in patch #4
-- patch #5 ("Documentation: Add documentation for APM X-Gene SATA DTS
-  binding") should come before patch #2 ("arm64: Add APM X-Gene DTS entry
-  for SATA controllers") or (even better) just be merged into patch #2
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-On Saturday, November 09, 2013 12:00:26 AM Loc Ho wrote:
-> ata: Add APM X-Gene SATA controller support
+On Wednesday 06 November 2013 06:32 AM, ivan.khoronzhuk wrote:
+> The keystone arch use the same IP watchdog, so add "ti,keystone-wdt"
+> compatible and correct identity.
 > 
-> v2:
->  * Clean up file sata_xgene.c with Lindent and etc
->  * Clean up file sata_xgene_serdes.c with Lindent and etc
->  * Add description to each patch
-> 
-> v1:
->  * inital version
-> 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 > ---
-> Loc Ho (5):
->   ata: Export AHCI library functions required by APM X-Gene SATA driver
->   arm64: Add APM X-Gene DTS entry for SATA controllers
->   ata: Add APM X-Gene SATA driver
->   ata: Add APM X-Gene SATA serdes functions
->   Documentation: Add documentation for APM X-Gene SATA DTS binding
-> 
->  .../devicetree/bindings/ata/apm-xgene.txt          |   84 +
->  arch/arm64/boot/dts/apm-storm.dtsi                 |   73 +
->  drivers/ata/Kconfig                                |    7 +
->  drivers/ata/Makefile                               |    2 +
->  drivers/ata/ahci.h                                 |    6 +
->  drivers/ata/libahci.c                              |   13 +-
->  drivers/ata/sata_xgene.c                           | 1394 ++++++++++++++
->  drivers/ata/sata_xgene.h                           |  112 ++
->  drivers/ata/sata_xgene_serdes.c                    | 2004 ++++++++++++++++++++
->  9 files changed, 3690 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
->  create mode 100644 drivers/ata/sata_xgene.c
->  create mode 100644 drivers/ata/sata_xgene.h
->  create mode 100644 drivers/ata/sata_xgene_serdes.c
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
