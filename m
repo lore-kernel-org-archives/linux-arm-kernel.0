@@ -1,68 +1,117 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 11 Nov 2013 18:41:06 -0600
-Subject: [RFC] Refactoring and moving dmtimer code
-Message-ID: <52817922.8070408@ti.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 11 Nov 2013 17:23:02 -0800
+Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
+ vmalloc
+In-Reply-To: <CAH9JG2Uh7PBEqRGPe5H6H+n1cnqwLFrFfB9aUOee8myG27DoiA@mail.gmail.com>
+References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
+ <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
+ <CAH9JG2Uh7PBEqRGPe5H6H+n1cnqwLFrFfB9aUOee8myG27DoiA@mail.gmail.com>
+Message-ID: <528182F6.4070308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas and everyone,
+On 11/11/2013 3:37 PM, Kyungmin Park wrote:
+> Hi Laura,
+>
+> On Tue, Nov 12, 2013 at 8:26 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> vmalloc is currently assumed to be a completely separate address space
+>> from the lowmem region. While this may be true in the general case,
+>> there are some instances where lowmem and virtual space intermixing
+>> provides gains. One example is needing to steal a large chunk of physical
+>> lowmem for another purpose outside the systems usage. Rather than
+>> waste the precious lowmem space on a 32-bit system, we can allow the
+>> virtual holes created by the physical holes to be used by vmalloc
+>> for virtual addressing. Track lowmem allocations in vmalloc to
+>> allow mixing of lowmem and vmalloc.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+>> ---
+>>   include/linux/mm.h      |    6 ++++++
+>>   include/linux/vmalloc.h |    1 +
+>>   mm/Kconfig              |   11 +++++++++++
+>>   mm/vmalloc.c            |   26 ++++++++++++++++++++++++++
+>>   4 files changed, 44 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/include/linux/mm.h b/include/linux/mm.h
+>> index f022460..76df50d 100644
+>> --- a/include/linux/mm.h
+>> +++ b/include/linux/mm.h
+>> @@ -308,6 +308,10 @@ unsigned long vmalloc_to_pfn(const void *addr);
+>>    * On nommu, vmalloc/vfree wrap through kmalloc/kfree directly, so there
+>>    * is no special casing required.
+>>    */
+>> +
+>> +#ifdef CONFIG_VMALLOC_SAVING
+> mismatch below Kconfig. CONFIG_ENABLE_VMALLOC_SAVING?
 
-I'm currently trying to refactor our dmtimer code in various ways and there are
-different challenges in doing so, some goals are shorterm and others long term,
-but I need some guidance so that I can do things the right way to begin with.
+Argh, I folded in a wrong patch when integrating. I'll fix it.
 
-I wanted to start a discussion on what needs to be done, and sort of track
-what's blocking us and establish certain guidelines/recommendations before
-starting to do things etc.
+>> +extern int is_vmalloc_addr(const void *x)
+>> +#else
+>>   static inline int is_vmalloc_addr(const void *x)
+>>   {
+>>   #ifdef CONFIG_MMU
+>> @@ -318,6 +322,8 @@ static inline int is_vmalloc_addr(const void *x)
+>>          return 0;
+>>   #endif
+>>   }
+>> +#endif
+>> +
+>>   #ifdef CONFIG_MMU
+>>   extern int is_vmalloc_or_module_addr(const void *x);
+>>   #else
+>> diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+>> index 4b8a891..e0c8c49 100644
+>> --- a/include/linux/vmalloc.h
+>> +++ b/include/linux/vmalloc.h
+>> @@ -16,6 +16,7 @@ struct vm_area_struct;                /* vma defining user mapping in mm_types.h */
+>>   #define VM_USERMAP             0x00000008      /* suitable for remap_vmalloc_range */
+>>   #define VM_VPAGES              0x00000010      /* buffer for pages was vmalloc'ed */
+>>   #define VM_UNINITIALIZED       0x00000020      /* vm_struct is not fully initialized */
+>> +#define VM_LOWMEM              0x00000040      /* Tracking of direct mapped lowmem */
+>>   /* bits [20..32] reserved for arch specific ioremap internals */
+>>
+>>   /*
+>> diff --git a/mm/Kconfig b/mm/Kconfig
+>> index 8028dcc..b3c459d 100644
+>> --- a/mm/Kconfig
+>> +++ b/mm/Kconfig
+>> @@ -519,3 +519,14 @@ config MEM_SOFT_DIRTY
+>>            it can be cleared by hands.
+>>
+>>            See Documentation/vm/soft-dirty.txt for more details.
+>> +
+>> +config ENABLE_VMALLOC_SAVING
+>> +       bool "Intermix lowmem and vmalloc virtual space"
+>> +       depends on ARCH_TRACKS_VMALLOC
+>> +       help
+>> +         Some memory layouts on embedded systems steal large amounts
+>> +         of lowmem physical memory for purposes outside of the kernel.
+>> +         Rather than waste the physical and virtual space, allow the
+>> +         kernel to use the virtual space as vmalloc space.
+>> +
+>> +         If unsure, say N.
+>> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+>> index 13a5495..c7b138b 100644
+>> --- a/mm/vmalloc.c
+>> +++ b/mm/vmalloc.c
+>> @@ -204,6 +204,29 @@ static int vmap_page_range(unsigned long start, unsigned long end,
+>>          return ret;
+>>   }
+>>
+>> +#ifdef ENABLE_VMALLOC_SAVING
+> missing "CONFIG_"
+>
 
-(1)
-With ARCH_MULTIPLATFORM turned on, arch/arm/plat-*/include/plat/ is no longer
-accessible to drivers/. Due to this, all such drivers that need direct access to
-a *specific* dmtimer don't work and are disabled:
-drivers/media/rc/ir-rx51.c and
-drivers/staging/tidspbridge/core/dsp-clock.c
+Yes, this is a mess and needs to be cleaned up.
 
-We're also going to be having mailbox code needing dedicated timers at some point.
+> Thank you,
+> Kyungimn Park
 
-So as a first step, I'd like to split dmtimer.h
-(arch/arm/plat-omap/include/plat/dmtimer.h) into a public header.
+Thanks,
+Laura
 
-The header currently consists of 2 parts, First part is mostly "private" where
-__omap_dmtimer functions are defined, which should really not be accessible to
-users of the dmtimer API. Second mostly would be the public dmtimer API which
-*should* be public so that drivers that need it are not disabled with
-ARCH_MULTIPLATFORM.
-
-Could you suggest a good place for this header? I'd like to split this header
-and expose a second "dmtimer.h" in a suitable include directory.
-
-(2)
-Moving of dmtimer.c code out of plat-omap into a suitable drivers/ directory
-
-This could be the next step where we move dmtimer.c into a suitable place other
-than arch/arm/plat-omap/.
-The public dmtimer API will be declared through the above header. Drivers that
-need specific timers such as DSP and mailbox can use it.
-
-Though this part of the code would not deal with clocksource framework, does it
-makes sense to move it into drivers/clocksource/? Any other suggestions?
-
-(3)
-Establish an omap clocksource driver in drivers/clocksource/
-
-Currently all our system timer code resides in arch/arm/mach-omap2/timer.c, in
-the long run I'd like to convert this to a clocksource driver. But currently the
-code is a bit dependent and entangled with PM code (which we call hwmod). This
-work may have to wait till hwmod cleanups can happen, that's why I'm keeping it
-for last before we can finish with the baby steps. Suggestions are welcome here.
-
-(2) and (3) can indeed be combined into a single driver even and placed in a
-suitable location. But the big question I guess is, is drivers/clocksource/ the
-right place.
-
-Thanks in advance for your valuable guidance, looking forward to getting some
-momentum with this work.
-
-regards,
-
--Joel
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
