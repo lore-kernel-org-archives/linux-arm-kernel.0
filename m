@@ -1,77 +1,55 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Nov 2013 15:05:41 +0000
-Subject: [Xen-devel] [PATCH 2/2] swiotlb-xen: xen_swiotlb_map_page: do
- not error out if dma_capable fails
-In-Reply-To: <20131112144832.GC9435@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
- <1384265520-6833-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20131112144832.GC9435@phenom.dumpdata.com>
-Message-ID: <20131112150540.GN16735@n2100.arm.linux.org.uk>
+Date: Tue, 12 Nov 2013 15:16:42 +0000
+Subject: Physical memory start contraints in the Linux kernel  (Was:
+ Re: Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel]
+ [xen-unstable test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <alpine.DEB.2.02.1311121449550.26077@kaball.uk.xensource.com>
+References: <osstest-21486-mainreport@xen.org>
+ <1384250005.1883.35.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
+ <201311121437.55826.arnd@arndb.de>
+ <alpine.DEB.2.02.1311121449550.26077@kaball.uk.xensource.com>
+Message-ID: <20131112151642.GO16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 09:48:32AM -0500, Konrad Rzeszutek Wilk wrote:
-> On Tue, Nov 12, 2013 at 02:12:00PM +0000, Stefano Stabellini wrote:
-> > Many ARM devices do not set the dma_mask correctly today.
-> > As a consequence dma_capable fails for them regardless of the address
-> > passed to it.
+On Tue, Nov 12, 2013 at 03:00:40PM +0000, Stefano Stabellini wrote:
+> On Tue, 12 Nov 2013, Arnd Bergmann wrote:
+> > > Or is this a lost fight and should we find a workaround (see below if we
+> > > are curious) to make the start of memory look the same?
+> > 
+> > I don't see what hack you are referring to, can you elaborate?
 > 
-> Wouldn't the DMA API debug warn of bad usage.
+> The hack would be mapping dom0 memory at the same start address as it
+> would be on the native platform but allocating its memory contiguously
+> at an offset.
+> 
+> For example having dom0 psedo-physical memory start at 0x80000000 (as it
+> would expect) and end at 0x88000000 (because let's sat that we only give
+> 128MB of memory to dom0). The actual physical memory would be allocated
+> contiguously from 0xA0000000. The swiotlb-xen code in Linux would be
+> made aware of the offset 0xA0000000-0x80000000 via device tree and
+> would calculate the right physical address to use for dma operations.
+> Today swiotlb-xen assumes that pseudo-phisical addresses correspond to
+> physical addresses for dom0.
 
-No.  The problem is that dev->dma_mask is NULL, and that's generally
-interpreted as "this device doesn't do DMA".
+First, let's get something right here.  Conceptually, DMA addresses have
+_never_ been the same as physical addresses in the kernel (with the
+exception of DMA masks being interpreted strangely.)
 
-ARM drivers have been particularly bad in respect of getting this right:
-there's an overwhelming problem here of "I don't need to do that so I'm
-not going to do it" rather than taking the attitude of "it's good
-practice to do X because it will save me hastles in the future".
+Physical addresses have always been what's required to be programmed into
+things like the MMU to gain access to RAM.  We have virt_to_phys() etc
+for translations of this nature for lowmem, and kmap() etc for highmem.
 
-I'll admit that even I'm guilty of the former in this regard to some
-extent: I've not added the necessary dma_set_mask/dma_set_coherent_mask()
-calls to the various drivers because they haven't been a concern.  That
-was wrong, because the DMA API technically requires it.
+DMA addresses have always been the value which you program into the DMA
+controller for it to be able to access RAM.  These use the DMA API to
+obtain the DMA address.  Behind the DMA API, we have dma_to_virt() and
+virt_to_dma() etc which do the appropriate translation for this.
 
-However, not having a DMA mask set when the device is created is
-something I'm not guilty of - I always ensured with the old board
-files that a DMA capabable device had a DMA mask set and those which
-weren't capable didn't: this causes the DMA API to behave correctly
-and report according to the way the device was declared whether it is
-DMA capable or not.
+Of course, for virtualisation, replacing the DMA ops is probably the
+better solution to deal with this, where you can hook into the mapping/
+unmapping/coherent functions and return the correct DMA addresses.
 
-Unfortunately, others decided (especially post DT) that the solution
-to this was to have the driver code - which could be modular - do things
-like this:
-
-static u64 mask = blah;
-
-foo_probe(dev)
-{
-	if (!dev->dma_mask)
-		dev->dma_mask = &mask;
-}
-
-which works nicely until you reload the module.
-
-I strongly suggest _not_ working around this problem in subsystem code
-but raising bug reports against the buggy drivers.  All drivers without
-exception using DMA should have something like this pattern:
-
-foo_probe(dev)
-{
-	int rc;
-
-	rc = dma_set_mask(dev, DMA_BIT_MASK(bits));
-	if (rc)
-		return rc;
-	dma_set_coherent_mask(dev, DMA_BIT_MASK(bits));
-	...
-}
-
-The first call is required if the driver uses dma_map_*, the second call
-is required if it makes use of coherent allocations and can be of the
-above form if it's previously used dma_set_mask with the same mask.
-Otherwise, the return value of dma_set_coherent_mask() must be checked.
-
-Of course, dma_set_mask() will fail if dev->dma_mask is NULL - and that's
-something which must be fixed where the device was created, not by the
-driver.
+Remember though - anything which assumes virtual_address =
+phys_to_virt(dma_addr_t) is basically violating the conceptual model
+here, and should be fixed.
