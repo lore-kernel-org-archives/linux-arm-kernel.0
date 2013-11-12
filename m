@@ -1,56 +1,143 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 12 Nov 2013 14:27:32 -0800
-Subject: [RFC PATCHv2 4/4] mm/vmalloc.c: Treat the entire kernel virtual space
- as vmalloc
+Date: Tue, 12 Nov 2013 14:27:29 -0800
+Subject: [RFC PATCHv2 1/4] arm: mm: Add iotable_init_novmreserve
 In-Reply-To: <1384295252-31778-1-git-send-email-lauraa@codeaurora.org>
 References: <1384295252-31778-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1384295252-31778-5-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1384295252-31778-2-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_ENABLE_VMALLOC_SAVINGS, all lowmem is tracked in
-vmalloc. This means that all the kernel virtual address space
-can be treated as part of the vmalloc region. Allow vm areas
-to be allocated from the full kernel address range.
+iotable_init is currently used by dma_contiguous_remap to remap
+CMA memory appropriately. This has the side effect of reserving
+the area of CMA in the vmalloc tracking structures. This is fine
+under normal circumstances but it creates conflicts if we want
+to track lowmem in vmalloc. Since dma_contiguous_remap is only
+really concerned with the remapping, introduce iotable_init_novmreserve
+to allow remapping of pages without reserving the virtual address
+in vmalloc space.
 
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-Signed-off-by: Neeti Desai <neetid@codeaurora.org>
 ---
- mm/vmalloc.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/mach/map.h |    2 ++
+ arch/arm/mm/dma-mapping.c       |    2 +-
+ arch/arm/mm/ioremap.c           |    5 +++--
+ arch/arm/mm/mm.h                |    2 +-
+ arch/arm/mm/mmu.c               |   17 ++++++++++++++---
+ 5 files changed, 21 insertions(+), 7 deletions(-)
 
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 2ec9ac7..31644b6 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -1394,16 +1394,27 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 2fe141f..02e3509 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -37,6 +37,7 @@ struct map_desc {
+ 
+ #ifdef CONFIG_MMU
+ extern void iotable_init(struct map_desc *, int);
++extern void iotable_init_novmreserve(struct map_desc *, int);
+ extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
+ 				  void *caller);
+ 
+@@ -56,6 +57,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
+ 			const struct mem_type *mtype);
+ #else
+ #define iotable_init(map,num)	do { } while (0)
++#define iotable_init_novmreserve(map,num)	do { } while(0)
+ #define vm_reserve_area_early(a,s,c)	do { } while (0)
+ #endif
+ 
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7f9b179..bf80e43 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -435,7 +435,7 @@ void __init dma_contiguous_remap(void)
+ 		     addr += PMD_SIZE)
+ 			pmd_clear(pmd_off_k(addr));
+ 
+-		iotable_init(&map, 1);
++		iotable_init_novmreserve(&map, 1);
+ 	}
+ }
+ 
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index f123d6e..ad92d4f 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -84,14 +84,15 @@ struct static_vm *find_static_vm_vaddr(void *vaddr)
+ 	return NULL;
+ }
+ 
+-void __init add_static_vm_early(struct static_vm *svm)
++void __init add_static_vm_early(struct static_vm *svm, bool add_to_vm)
+ {
+ 	struct static_vm *curr_svm;
+ 	struct vm_struct *vm;
+ 	void *vaddr;
+ 
+ 	vm = &svm->vm;
+-	vm_area_add_early(vm);
++	if (add_to_vm)
++		vm_area_add_early(vm);
+ 	vaddr = vm->addr;
+ 
+ 	list_for_each_entry(curr_svm, &static_vmlist, list) {
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index d5a4e9a..27a3680 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -75,7 +75,7 @@ struct static_vm {
+ 
+ extern struct list_head static_vmlist;
+ extern struct static_vm *find_static_vm_vaddr(void *vaddr);
+-extern __init void add_static_vm_early(struct static_vm *svm);
++extern __init void add_static_vm_early(struct static_vm *svm, bool add_to_vm);
+ 
+ #endif
+ 
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 53cdbd3..b83ed88 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -817,7 +817,8 @@ static void __init create_mapping(struct map_desc *md)
+ /*
+  * Create the architecture specific mappings
   */
- struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
+-void __init iotable_init(struct map_desc *io_desc, int nr)
++static void __init __iotable_init(struct map_desc *io_desc, int nr,
++					bool add_to_vm)
  {
-+#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-+	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
-+				  NUMA_NO_NODE, GFP_KERNEL,
-+				  __builtin_return_address(0));
-+#else
- 	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
- 				  NUMA_NO_NODE, GFP_KERNEL,
- 				  __builtin_return_address(0));
-+#endif
+ 	struct map_desc *md;
+ 	struct vm_struct *vm;
+@@ -838,10 +839,20 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
+ 		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
+ 		vm->flags |= VM_ARM_MTYPE(md->type);
+ 		vm->caller = iotable_init;
+-		add_static_vm_early(svm++);
++		add_static_vm_early(svm++, add_to_vm);
+ 	}
  }
  
- struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
- 				const void *caller)
++void __init iotable_init(struct map_desc *io_desc, int nr)
++{
++	return __iotable_init(io_desc, nr, true);
++}
++
++void __init iotable_init_novmreserve(struct map_desc *io_desc, int nr)
++{
++	return __iotable_init(io_desc, nr, false);
++}
++
+ void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
+ 				  void *caller)
  {
-+#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-+	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
-+				  NUMA_NO_NODE, GFP_KERNEL, caller);
-+#else
- 	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
- 				  NUMA_NO_NODE, GFP_KERNEL, caller);
-+#endif
+@@ -855,7 +866,7 @@ void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
+ 	vm->size = size;
+ 	vm->flags = VM_IOREMAP | VM_ARM_EMPTY_MAPPING;
+ 	vm->caller = caller;
+-	add_static_vm_early(svm);
++	add_static_vm_early(svm, true);
  }
  
- /**
+ #ifndef CONFIG_ARM_LPAE
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
