@@ -1,103 +1,94 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 12 Nov 2013 09:50:09 +0100
-Subject: [PATCH v7 6/7] ARM: dts: imx27 phycore pinctrl
+Date: Tue, 12 Nov 2013 09:50:05 +0100
+Subject: [PATCH v7 2/7] ARM: dts: imx27 pingroups
 In-Reply-To: <1384246210-9257-1-git-send-email-mpa@pengutronix.de>
 References: <1384246210-9257-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1384246210-9257-7-git-send-email-mpa@pengutronix.de>
+Message-ID: <1384246210-9257-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl for phycore devices.
-
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 16 ++++++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm/boot/dts/imx27-pingrp.h | 71 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx27-pingrp.h
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index ad76d88..e792469 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -19,6 +19,24 @@
- 	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
- };
- 
-+&iomuxc {
-+	imx27_phycore_rdk {
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX27_UART1_PINGRP1
-+				MX27_UART1_RTSCTS_PINGRP1
-+			>;
-+		};
+diff --git a/arch/arm/boot/dts/imx27-pingrp.h b/arch/arm/boot/dts/imx27-pingrp.h
+new file mode 100644
+index 0000000..08d8d18
+--- /dev/null
++++ b/arch/arm/boot/dts/imx27-pingrp.h
+@@ -0,0 +1,71 @@
++/*
++ * Copyright 2013 Markus Pargmann <mpa@pengutronix.de>, Pengutronix
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#ifndef __DTS_IMX27_PINGRP_H
++#define __DTS_IMX27_PINGRP_H
 +
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				MX27_UART2_PINGRP1
-+				MX27_UART2_RTSCTS_PINGRP1
-+			>;
-+		};
-+	};
-+};
++#include "imx27-pinfunc.h"
 +
- &sdhci2 {
- 	bus-width = <4>;
- 	cd-gpios = <&gpio3 29 0>;
-@@ -29,11 +47,15 @@
- 
- &uart1 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
- 	status = "okay";
- };
- 
- &uart2 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index 648541a..56960c7 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -135,11 +135,15 @@
- 
- &fec {
- 	phy-reset-gpios = <&gpio3 30 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1>;
- 	status = "okay";
- };
- 
- &i2c2 {
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
- 	status = "okay";
- 
- 	at24 at 52 {
-@@ -159,6 +163,18 @@
- 	};
- };
- 
-+&iomuxc {
-+	imx27_phycard_s_som {
-+		pinctrl_fec1: fec1grp {
-+			fsl,pins = <MX27_FEC1_PINGRP1>;
-+		};
++#define MX27_FEC1_PINGRP1 \
++	MX27_PAD_SD3_CMD__FEC_TXD0 0x0 \
++	MX27_PAD_SD3_CLK__FEC_TXD1 0x0 \
++	MX27_PAD_ATA_DATA0__FEC_TXD2 0x0 \
++	MX27_PAD_ATA_DATA1__FEC_TXD3 0x0 \
++	MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0 \
++	MX27_PAD_ATA_DATA3__FEC_RXD1 0x0 \
++	MX27_PAD_ATA_DATA4__FEC_RXD2 0x0 \
++	MX27_PAD_ATA_DATA5__FEC_RXD3 0x0 \
++	MX27_PAD_ATA_DATA6__FEC_MDIO 0x0 \
++	MX27_PAD_ATA_DATA7__FEC_MDC 0x0 \
++	MX27_PAD_ATA_DATA8__FEC_CRS 0x0 \
++	MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0 \
++	MX27_PAD_ATA_DATA10__FEC_RXD0 0x0 \
++	MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0 \
++	MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0 \
++	MX27_PAD_ATA_DATA13__FEC_COL 0x0 \
++	MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0 \
++	MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
 +
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <MX27_I2C2_PINGRP1>;
-+		};
-+	};
-+};
++#define MX27_I2C1_PINGRP1 \
++	MX27_PAD_I2C_DATA__I2C_DATA 0x0 \
++	MX27_PAD_I2C_CLK__I2C_CLK 0x0
 +
- &nfc {
- 	nand-bus-width = <8>;
- 	nand-ecc-mode = "hw";
++#define MX27_I2C2_PINGRP1 \
++	MX27_PAD_I2C2_SDA__I2C2_SDA 0x0 \
++	MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
++
++#define MX27_OWIRE1_PINGRP1 \
++	MX27_PAD_RTCK__OWIRE 0x0
++
++#define MX27_UART1_PINGRP1 \
++	MX27_PAD_UART1_TXD__UART1_TXD 0x0 \
++	MX27_PAD_UART1_RXD__UART1_RXD 0x0
++
++#define MX27_UART1_RTSCTS_PINGRP1 \
++	MX27_PAD_UART1_CTS__UART1_CTS 0x0 \
++	MX27_PAD_UART1_RTS__UART1_RTS 0x0
++
++#define MX27_UART2_PINGRP1 \
++	MX27_PAD_UART2_TXD__UART2_TXD 0x0 \
++	MX27_PAD_UART2_RXD__UART2_RXD 0x0
++
++#define MX27_UART2_RTSCTS_PINGRP1 \
++	MX27_PAD_UART2_CTS__UART2_CTS 0x0 \
++	MX27_PAD_UART2_RTS__UART2_RTS 0x0
++
++#define MX27_UART3_PINGRP1 \
++	MX27_PAD_UART3_TXD__UART3_TXD 0x0 \
++	MX27_PAD_UART3_RXD__UART3_RXD 0x0
++
++#define MX27_UART3_RTSCTS_PINGRP1 \
++	MX27_PAD_UART3_CTS__UART3_CTS 0x0 \
++	MX27_PAD_UART3_RTS__UART3_RTS 0x0
++
++#endif /* __DTS_IMX27_PINGRP_H */
 -- 
 1.8.4.2
