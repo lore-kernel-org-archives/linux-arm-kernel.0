@@ -1,95 +1,118 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 12 Nov 2013 11:19:55 -0500
-Subject: [PATCH 12/12] arm: dts: keystone: add AEMIF/NAND device entry
-In-Reply-To: <4F5844B3A985794BA902E12C070812375F8D71@DNCE04.ent.ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-13-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D71@DNCE04.ent.ti.com>
-Message-ID: <5282552B.4000801@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 12 Nov 2013 17:26:34 +0100
+Subject: [PATCH 3/7] clocksource/cadence_ttc: Store timer frequency in
+ driver data
+In-Reply-To: <1383945677-29674-4-git-send-email-soren.brinkmann@xilinx.com>
+References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1383945677-29674-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <528256BA.7010801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 November 2013 12:13 PM, Khoronzhuk, Ivan wrote:
-> Add AEMIF/NAND device entry.
-> 
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+On 11/08/2013 10:21 PM, Soren Brinkmann wrote:
+> It is not allowed to call clk_get_rate() from interrupt context. To
+> avoid such calls the timer input frequency is stored in the driver's
+> data struct which makes it accessible to the driver in any context.
+>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > ---
->  arch/arm/boot/dts/keystone.dts |   63 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/keystone.dts b/arch/arm/boot/dts/keystone.dts
-> index 100bdf5..998da98 100644
-> --- a/arch/arm/boot/dts/keystone.dts
-> +++ b/arch/arm/boot/dts/keystone.dts
-> @@ -179,5 +179,68 @@
->                         interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
->                         clocks = <&clkspi>;
->                 };
-> +
-> +               aemif at 021000A00 {
-> +                       compatible = "ti,keystone-aemif";
-> +                       #address-cells = <2>;
-> +                       #size-cells = <1>;
-> +                       clocks = <&clkaemif>;
-> +                       clock-names = "aemif";
-> +                       clock-ranges;
-> +
-> +                       reg = <0x2100A00 0x00000100>;
-> +                       ranges = <0 0 0x30000000 0x10000000
-> +                                 1 0 0x21000A00 0x00000100>;
-> +
-> +                       nand:cs0 {
-> +                               compatible = "ti,davinci-cs";
-> +                               #address-cells = <2>;
-> +                               #size-cells = <1>;
-> +                               clock-ranges;
-> +                               ranges;
-> +
-> +                               /* all timings in nanoseconds */
-> +                               ti,davinci-cs-ta = <12>;
-> +                               ti,davinci-cs-rhold = <6>;
-> +                               ti,davinci-cs-rstrobe = <23>;
-> +                               ti,davinci-cs-rsetup = <9>;
-> +                               ti,davinci-cs-whold = <8>;
-> +                               ti,davinci-cs-wstrobe = <23>;
-> +                               ti,davinci-cs-wsetup = <8>;
-> +
-> +                               nand at 0,0 {
-> +                                       compatible = "ti,keystone-nand";
-> +                                       #address-cells = <1>;
-> +                                       #size-cells = <1>;
-> +                                       reg = <0 0 0x4000000
-> +                                              1 0 0x0000100>;
-> +
-> +                                       ti,davinci-chipselect = <0>;
-> +                                       ti,davinci-mask-ale = <0x2000>;
-> +                                       ti,davinci-mask-cle = <0x4000>;
-> +                                       ti,davinci-mask-chipsel = <0>;
-> +                                       nand-ecc-mode = "hw";
-> +                                       ti,davinci-ecc-bits = <4>;
-> +                                       nand-on-flash-bbt;
-> +
-> +                                       partition at 0 {
-> +                                               label = "u-boot";
-> +                                               reg = <0x0 0x100000>;
-> +                                               read-only;
-> +                                       };
-> +
-> +                                       partition at 100000 {
-> +                                               label = "params";
-> +                                               reg = <0x100000 0x80000>;
-> +                                               read-only;
-> +                                       };
-> +
-> +                                       partition at 180000 {
-> +                                               label = "ubifs";
-> +                                               reg = <0x180000 0x7E80000>;
-> +                                       };
-Lets create now board specific k2hk-evm.dts and rename keystone.dts
-to keystone.dtsi and include that in boards. That way you can add the
-board specific stuff in board files and common soc stuff in keystone.dtsi.
 
-You can update that once the bindings are blessed by DT folks.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Regards,
-Santosh
+>   drivers/clocksource/cadence_ttc_timer.c | 21 +++++++++++++--------
+>   1 file changed, 13 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
+> index b2bb3a4bc205..a92350b55d32 100644
+> --- a/drivers/clocksource/cadence_ttc_timer.c
+> +++ b/drivers/clocksource/cadence_ttc_timer.c
+> @@ -67,11 +67,13 @@
+>    * struct ttc_timer - This definition defines local timer structure
+>    *
+>    * @base_addr:	Base address of timer
+> + * @freq:	Timer input clock frequency
+>    * @clk:	Associated clock source
+>    * @clk_rate_change_nb	Notifier block for clock rate changes
+>    */
+>   struct ttc_timer {
+>   	void __iomem *base_addr;
+> +	unsigned long freq;
+>   	struct clk *clk;
+>   	struct notifier_block clk_rate_change_nb;
+>   };
+> @@ -196,9 +198,8 @@ static void ttc_set_mode(enum clock_event_mode mode,
+>
+>   	switch (mode) {
+>   	case CLOCK_EVT_MODE_PERIODIC:
+> -		ttc_set_interval(timer,
+> -				DIV_ROUND_CLOSEST(clk_get_rate(ttce->ttc.clk),
+> -					PRESCALE * HZ));
+> +		ttc_set_interval(timer, DIV_ROUND_CLOSEST(ttce->ttc.freq,
+> +						PRESCALE * HZ));
+>   		break;
+>   	case CLOCK_EVT_MODE_ONESHOT:
+>   	case CLOCK_EVT_MODE_UNUSED:
+> @@ -273,6 +274,8 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
+>   		return;
+>   	}
+>
+> +	ttccs->ttc.freq = clk_get_rate(ttccs->ttc.clk);
+> +
+>   	ttccs->ttc.clk_rate_change_nb.notifier_call =
+>   		ttc_rate_change_clocksource_cb;
+>   	ttccs->ttc.clk_rate_change_nb.next = NULL;
+> @@ -298,16 +301,14 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
+>   	__raw_writel(CNT_CNTRL_RESET,
+>   		     ttccs->ttc.base_addr + TTC_CNT_CNTRL_OFFSET);
+>
+> -	err = clocksource_register_hz(&ttccs->cs,
+> -			clk_get_rate(ttccs->ttc.clk) / PRESCALE);
+> +	err = clocksource_register_hz(&ttccs->cs, ttccs->ttc.freq / PRESCALE);
+>   	if (WARN_ON(err)) {
+>   		kfree(ttccs);
+>   		return;
+>   	}
+>
+>   	ttc_sched_clock_val_reg = base + TTC_COUNT_VAL_OFFSET;
+> -	setup_sched_clock(ttc_sched_clock_read, 16,
+> -			clk_get_rate(ttccs->ttc.clk) / PRESCALE);
+> +	setup_sched_clock(ttc_sched_clock_read, 16, ttccs->ttc.freq / PRESCALE);
+>   }
+>
+>   static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
+> @@ -334,6 +335,9 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
+>   				ndata->new_rate / PRESCALE);
+>   		local_irq_restore(flags);
+>
+> +		/* update cached frequency */
+> +		ttc->freq = ndata->new_rate;
+> +
+>   		/* fall through */
+>   	}
+>   	case PRE_RATE_CHANGE:
+> @@ -367,6 +371,7 @@ static void __init ttc_setup_clockevent(struct clk *clk,
+>   	if (clk_notifier_register(ttcce->ttc.clk,
+>   				&ttcce->ttc.clk_rate_change_nb))
+>   		pr_warn("Unable to register clock notifier.\n");
+> +	ttcce->ttc.freq = clk_get_rate(ttcce->ttc.clk);
+>
+>   	ttcce->ttc.base_addr = base;
+>   	ttcce->ce.name = "ttc_clockevent";
+> @@ -396,7 +401,7 @@ static void __init ttc_setup_clockevent(struct clk *clk,
+>   	}
+>
+>   	clockevents_config_and_register(&ttcce->ce,
+> -			clk_get_rate(ttcce->ttc.clk) / PRESCALE, 1, 0xfffe);
+> +			ttcce->ttc.freq / PRESCALE, 1, 0xfffe);
+>   }
+>
+>   /**
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
