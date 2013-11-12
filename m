@@ -1,29 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Nov 2013 12:38:23 -0800
-Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
- monitor
-In-Reply-To: <52828EF5.6090909@wwwdotorg.org>
-References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
- <52828EF5.6090909@wwwdotorg.org>
-Message-ID: <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Tue, 12 Nov 2013 21:40:14 +0100
+Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from
+ device tree
+In-Reply-To: <CACRpkdaAaLjm_b+OLj3tobxBN8YGUcTPnXJ=qtBqd02=FTxhjQ@mail.gmail.com>
+References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
+ <20131112153057.GA9683@earth.universe>
+ <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
+ <20131112200514.GA15413@earth.universe>
+ <CACRpkdaAaLjm_b+OLj3tobxBN8YGUcTPnXJ=qtBqd02=FTxhjQ@mail.gmail.com>
+Message-ID: <20131112204013.GA17674@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 12:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/07/2013 03:11 AM, Alexandre Courbot wrote:
->> Just a set of small fixes to address the concerns expressed on v9 with the
->> non-prefixed version DT properties. I hope there won't be a need for an
->> eleventh (!) version. :P
->
-> BTW, this version looks fine to me. On IRC, Olof said it looked OK to
-> him. I'm just waiting to hear back from Olof/Russell whether I should
-> merge this through the Tegra tree, or whether the first 1-3 patches
-> should go through Russell's tree.
+On Tue, Nov 12, 2013 at 09:11:40PM +0100, Linus Walleij wrote:
+> > I could find two boards using "gpio-matrix-keypad" in the mainline
+> > kernel and not a single instance of "linux,no-autorepeat":
+> 
+> In things connected to GPIO, I don't expect the in-kernel
+> device trees to be a good way so survey the usage of these
+> bindings. Anyone doing device trees on any system with a
+> few GPIOs can be using this.
+> 
+> But maybe we're lucky and won't break anyone's setup if
+> we change this?
 
-I pinged Russell, and he brought up the fact that there were earlier
-requests to move it to drivers/firmware. It would make sense to try to
-get that done before merging, especially if you anticipate someone
-using TF on 64-bit platforms.
+AFAIK Device Tree property names are considered as ABI, so existing
+property names must not be removed.
 
+But I guess we can add the standardized property name in addition
+to the deprecated one. New drivers can use the standardized property
+name from the beginning.
 
--Olof
+Thus I guess we should not use the name, which has the most adopters
+in kernel (or out of kernel). Instead the most fitting name should
+be used. Current suggestions (taken from kernel) are:
+
+* <<vendor>>,no-autorepeat
+* keypad,autorepeat
+* linux,keypad-no-autorepeat
+* linux,input-no-autorepeat
+* linux,no-autorepeat
+* autorepeat
+
+I do not really care, which one is chosen, except for two things:
+
+* <<vendor>> seems wrong. This is not vendor specific.
+* I would prefer "input-" over "keypad-", since then the same name
+  can be used for single keys, buttons, etc.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131112/2b00a301/attachment-0001.sig>
