@@ -1,40 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 12 Nov 2013 10:20:10 -0500 (EST)
-Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <alpine.LFD.2.10.1311120948000.9667@knanqh.ubzr>
-References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.10.1311092357090.2314@knanqh.ubzr>
- <528193A0.7050505@codeaurora.org>
- <alpine.LFD.2.10.1311120839310.9667@knanqh.ubzr>
- <20131112140436.GK16735@n2100.arm.linux.org.uk>
- <52823877.60806@codethink.co.uk>
- <alpine.LFD.2.10.1311120924330.9667@knanqh.ubzr>
- <yw1x8uwtvg3i.fsf@unicorn.mansr.com>
- <alpine.LFD.2.10.1311120948000.9667@knanqh.ubzr>
-Message-ID: <alpine.LFD.2.10.1311121014530.9667@knanqh.ubzr>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Tue, 12 Nov 2013 15:24:07 +0000
+Subject: [Xen-devel] Physical memory start contraints in the Linux kernel
+ (Was: Re:	Xen osstest on Calxeda midway progress (Was: Re:
+ [xen-unstable test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <1384268259.10204.29.camel@kazak.uk.xensource.com>
+References: <osstest-21486-mainreport@xen.org>		<1384250005.1883.35.camel@kazak.uk.xensource.com>		<alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>		<201311121437.55826.arnd@arndb.de>
+ <52823C9E.2010007@linaro.org>	
+ <20131112144128.GL16735@n2100.arm.linux.org.uk>	
+ <52824090.8040203@linaro.org>
+ <1384268259.10204.29.camel@kazak.uk.xensource.com>
+Message-ID: <52824817.7010404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Nov 2013, Nicolas Pitre wrote:
-
-> On Tue, 12 Nov 2013, M?ns Rullg?rd wrote:
-> 
-> > It might be possible to extract this information from relocation tables.
-> 
-> True, but only for individual .o files.  Once the linker puts them 
-> together the information is lost, and trying to infer what the linker 
-> has done is insane.
-> 
-> Filtering the compiler output to annotate idiv calls before it is 
-> assembled would probably be a better solution.
-
-Another solution is to patch the call site from within __aeabi_idiv at 
-run time using lr.  That wouldn't work in the presence of tail call 
-optimization though.
-
-Again this might not be worth it and patching __aeabi_idiv instead might 
-be a good enough compromize.
 
 
-Nicolas
+On 11/12/2013 02:57 PM, Ian Campbell wrote:
+> On Tue, 2013-11-12 at 14:52 +0000, Julien Grall wrote:
+>>
+>> On 11/12/2013 02:41 PM, Russell King - ARM Linux wrote:
+>>> On Tue, Nov 12, 2013 at 02:35:10PM +0000, Julien Grall wrote:
+>>>> During some debugging on the Arndale and Midway, I found another
+>>>> constraint with CONFIG_ARM_PATCH_PHYS_VIRT.
+>>>> I have noticed that all the kernel physical addresses must be lower than
+>>>> the corresponding virtual addresses. So the delta offset compute in
+>>>> __fixup_pv_table (arch/arm/kernel/head.S) must always be negative.
+>>>> If this assertion is not validated, when the kernel will browse the
+>>>> memory bank (sanity_check_info in arch/arm/mm/mmu.c), __phys(...) will
+>>>> compute a wrong address and will result to consider all memory bank as
+>>>> highmem.
+>>>>
+>>>> After digging in the code, it seems it's due to some optimization during
+>>>> opcode fixup in __fixup_a_pvtable. Is it a wanted constraint?
+>>>
+>>> Are you talking about the code in v3.12 or the code in -next ?
+>>
+>> I was talking about 3.12. I have just checked -next and my issue seems
+>> to be fixed by the commit f52bb722547f43caeaecbcc62db9f3c3b80ead9b.
+>> I should have checked earlier, thanks.
+>
+> Should we revert your Xen side fix^Wworkaround then:
+
+For now it's only in -next. I would wait until this commit is at least 
+in Linux master, otherwise we will likely break vanilla/distro kernel 
+for Xen 4.4.
+
+-- 
+Julien Grall
