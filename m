@@ -1,161 +1,42 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 12 Nov 2013 09:50:06 +0100
-Subject: [PATCH v7 3/7] ARM: dts: imx27 pinctrl
-In-Reply-To: <1384246210-9257-1-git-send-email-mpa@pengutronix.de>
-References: <1384246210-9257-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1384246210-9257-4-git-send-email-mpa@pengutronix.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 12 Nov 2013 09:53:34 +0100
+Subject: [PATCH v2 1/2] mmc: arasan: Add driver for Arasan SDHCI
+In-Reply-To: <b3f788b3-dfc3-422e-9a74-b796c0fd3207@DB8EHSMHS004.ehs.local>
+References: <1383151090-13885-1-git-send-email-soren.brinkmann@xilinx.com>
+ <b3f788b3-dfc3-422e-9a74-b796c0fd3207@DB8EHSMHS004.ehs.local>
+Message-ID: <5281EC8E.90501@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pinctrl driver node and pin group definitions for other driver nodes.
+Hi Chris,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/imx27.dtsi | 125 +++++++++++++++++++++++--------------------
- 1 file changed, 67 insertions(+), 58 deletions(-)
+On 11/06/2013 10:41 PM, S?ren Brinkmann wrote:
+> Hi Chris,
+> 
+> any comments from your side? Could you consider applying it to your
+> tree, please?
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index b7a1c6d..f119296 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -10,6 +10,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include "imx27-pingrp.h"
- 
- / {
- 	aliases {
-@@ -235,64 +236,72 @@
- 				status = "disabled";
- 			};
- 
--			gpio1: gpio at 10015000 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015000 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio2: gpio at 10015100 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015100 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio3: gpio at 10015200 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015200 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio4: gpio at 10015300 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015300 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio5: gpio at 10015400 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015400 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio6: gpio at 10015500 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015500 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
-+			iomuxc: iomuxc at 10015000 {
-+				compatible = "fsl,imx27-iomuxc";
-+				reg = <0x10015000 0x600>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				gpio1: gpio at 10015000 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015000 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio2: gpio at 10015100 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015100 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio3: gpio at 10015200 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015200 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio4: gpio at 10015300 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015300 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio5: gpio at 10015400 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015400 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio6: gpio at 10015500 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015500 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 			};
- 
- 			audmux: audmux at 10016000 {
+any update on this one?
+
+What's the naming convention we should follow?
+
+Is sdhci-of-arasan.c OK? Or should we use sdhci-arasan.c instead?
+
+Thanks,
+Michal
+
 -- 
-1.8.4.2
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131112/fe6acd8f/attachment.sig>
