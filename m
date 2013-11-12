@@ -1,55 +1,35 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Tue, 12 Nov 2013 07:35:55 +0000
-Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
- Interface driver.
-In-Reply-To: <20131112050226.GK8834@intel.com>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
- <526021B0.6050206@metafoo.de>
- <1DD289F6464F0949A2FCA5AA6DC23F8286A385@039-SN2MPN1-013.039d.mgd.msft.net>
- <20131112050226.GK8834@intel.com>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F8287E87B@039-SN2MPN1-013.039d.mgd.msft.net>
+From: olivier.clergeaud@st.com (Olivier CLERGEAUD)
+Date: Tue, 12 Nov 2013 08:39:47 +0100
+Subject: [PATCH] MAINTAINERS: drop discontinued mailing list
+In-Reply-To: <1384160657-2953-1-git-send-email-linus.walleij@linaro.org>
+References: <1384160657-2953-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <5281DB43.3090308@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > +static int fsl_sai_probe(struct platform_device *pdev) {
-> > > [...]
-> > > > +
-> > > > +	sai->dma_params_rx.addr = res->start + SAI_RDR;
-> > > > +	sai->dma_params_rx.maxburst = 6;
-> > > > +	index = of_property_match_string(np, "dma-names", "rx");
-> > > > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
-> index,
-> > > > +				&dma_args);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > > +	sai->dma_params_rx.slave_id = dma_args.args[1];
-> > > > +
-> > > > +	sai->dma_params_tx.addr = res->start + SAI_TDR;
-> > > > +	sai->dma_params_tx.maxburst = 6;
-> > > > +	index = of_property_match_string(np, "dma-names", "tx");
-> > > > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
-> index,
-> > > > +				&dma_args);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > > +	sai->dma_params_tx.slave_id = dma_args.args[1];
-> > >
-> > > The driver should not have to manually parse the dma devicetree
-> > > properties, this is something that should be handled by the dma
-> > > engine driver.
-> > >
-> >
-> > What do you think about the DMA slave_id ?
-> > I have been noticed by one colleague that this should be parsed here,
-> > which is from your opinions ?
-> Sure slave_id can be parsed here, but IMO it should be programmed via the
-> dma_slave_confog into the respective channel
-> 
-
-Actually, these are parsed for cpu_dai->playback_dma_data and cpu_dai->capture_dma_data dynamically, whose type is struct dma_slave_config.
-
-And now I must parse them here, because the platform eDMA driver's newest version will check and use the slave_ids to select and configure the eDMA channels via dma_device->device_control(). 
-
---
-Xiubo
+On 11/11/2013 10:04 AM, Linus Walleij wrote:
+> The ST-internal Nomadik mailing list is going down. Remove
+> it from the MAINTAINERS file.
+>
+> Cc: Olivier CLERGEAUD <olivier.clergeaud@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Olivier Clergeaud <olivier.clergeaud@st.com>
+> ---
+> ARM SoC folks: please apply this directly for fixes unless
+> there are some problems with it.
+> ---
+>   MAINTAINERS | 1 -
+>   1 file changed, 1 deletion(-)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 4d66a03e4f57..7d280b7c1400 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1056,7 +1056,6 @@ S:	Maintained
+>   ARM/NOMADIK ARCHITECTURE
+>   M:	Alessandro Rubini <rubini@unipv.it>
+>   M:	Linus Walleij <linus.walleij@linaro.org>
+> -M:	STEricsson <STEricsson_nomadik_linux@list.st.com>
+>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>   S:	Maintained
+>   F:	arch/arm/mach-nomadik/
