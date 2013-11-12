@@ -1,57 +1,45 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Nov 2013 16:30:15 -0700
+Date: Tue, 12 Nov 2013 16:34:20 -0700
 Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
-In-Reply-To: <20131111113936.GH28302@mudshark.cambridge.arm.com>
+In-Reply-To: <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
 References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
  <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
- <20131111113936.GH28302@mudshark.cambridge.arm.com>
-Message-ID: <5282BA07.20506@wwwdotorg.org>
+Message-ID: <5282BAFC.8070405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 04:39 AM, Will Deacon wrote:
-> On Mon, Nov 11, 2013 at 08:31:53AM +0000, Hiroshi Doyu wrote:
->> An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
->> are done later.
->>
->> With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
->> identify whether a device is IOMMU'able or not. If a device is
->> IOMMU'able, we'll defer to populate that device till an iommu device
->> is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
->> is set in the bus. Then, those defered IOMMU'able devices are
->> populated and configured as IOMMU'abled with help of the already
->> populated iommu device via iommu_ops->add_device().
->>
->> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->> ---
->> Update:
->> This is newly added, and the successor of the following RFC:
->>   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
->>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
+On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
+> An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
+> are done later.
 > 
-> This generally looks like the right idea to me, but it would be good to have
-> the input from a DT maintainer on the use of "#stream-id-cells" as an indicator
-> that a device is behind an IOMMU. (aside: I think "iommuable" is a horrible
-> word!).
-> 
-> What happens if you do the deferring at the bus level? E.g. defer all device
-> probes on a bus, until the IOMMU is probed for that bus. That might fit
-> better with future work, where we will almost certainly need to expose more
-> of the bus topology to Linux. Of course, I can see that falling down for
-> monolithic virtual buses like the platform bus.
+> With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
+> identify whether a device is IOMMU'able or not. If a device is
+> IOMMU'able, we'll defer to populate that device till an iommu device
+> is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
+> is set in the bus. Then, those defered IOMMU'able devices are
+> populated and configured as IOMMU'abled with help of the already
+> populated iommu device via iommu_ops->add_device().
 
-I don't think it's correct to think about "the IOMMU for the bus".
+This looks fairly neat and clean.
 
-There could easily be multiple different IOMMU slave-sides attached to a
-bus, and hence you'd need to defer probing until "all the IOMMs for the
-bus" to be available.
+I'm still worried about using #stream-id-cells in DT nodes though. While
+I do understand that the *Linux* device model currently only allows each
+struct device to be affected by a single IOMMU, I worry that encoding
+that same restriction into DT is a mistake. I'd far rather see a
+property like:
 
-Equally, I assume that dev->bus->iommu_ops rather assumes that bus
-masters always master transactions onto the same bus that their control
-registers are slaves upon. That also doesn't seem like a reasonable
-assumption.
+SMMU:
+    smmu: smmu at xxxxxx {
+        #smmu-cells = <1>;
+    }
 
-As such, I think an approach where each device waits for any IOMMUs that
-affect it (wherever/whatever and however many they may be) is better
-than one where we try to explicitly manage the probe order of devices
-based on their slave registers' location.
+Affected device:
+    smmus = <&smmu 1>;
+    (perhaps with smmu-names too)
+
+That would allow the DT to represent basically arbitrary HW configurations.
+
+The implementation of this patch would then be almost as trivial; you'd
+just need to walk the smmus property to find each phandle in turn, just
+like any other phandle+specifier property, and validate that the SMMU
+driver was already probe()d for each.
