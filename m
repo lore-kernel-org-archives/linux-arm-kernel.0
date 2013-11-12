@@ -1,36 +1,35 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 12 Nov 2013 14:11:21 +0000
-Subject: [PATCH 0/2] swiotlb-xen fixes
-Message-ID: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
+Date: Tue, 12 Nov 2013 14:11:59 +0000
+Subject: [PATCH 1/2] swiotlb-xen: add missing xen_dma_map_page call
+In-Reply-To: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
+Message-ID: <1384265520-6833-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series is just a couple of fixes for swiotlb-xen.
+swiotlb-xen is missing a xen_dma_map_page call in
+xen_swiotlb_map_sg_attrs, in the slow path.
 
-In particular the slow path (bouncing on the swiotlb buffer for dma
-operations) on ARM has two problems, each of them fixed by a separate
-patch:
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ drivers/xen/swiotlb-xen.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-- a xen_dma_map_page call is missing in xen_swiotlb_map_sg_attrs;
-
-- dma_capable often fails on ARM because devices don't set the dma_mask
-  correctly. This causes swiotlb-xen to take the slow path, and that is
-  bad enough, but in xen_swiotlb_map_page also causes the function to
-  return an error an fail.
-
-
-
-Stefano Stabellini (2):
-      swiotlb-xen: add missing xen_dma_map_page call
-      swiotlb-xen: xen_swiotlb_map_page: do not error out if dma_capable fails
-
- drivers/xen/swiotlb-xen.c |   12 +++++-------
- 1 files changed, 5 insertions(+), 7 deletions(-)
-
-
-git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git for-linus-3.13-fixes
-
-Cheers,
-
-Stefano
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index a224bc7..1eac073 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -555,6 +555,11 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+ 				sg_dma_len(sgl) = 0;
+ 				return 0;
+ 			}
++			xen_dma_map_page(hwdev, pfn_to_page(map >> PAGE_SHIFT),
++						map & ~PAGE_MASK,
++						sg->length,
++						dir,
++						attrs);
+ 			sg->dma_address = xen_phys_to_bus(map);
+ 		} else {
+ 			/* we are not interested in the dma_addr returned by
+-- 
+1.7.2.5
