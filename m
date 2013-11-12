@@ -1,61 +1,73 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 12 Nov 2013 08:59:29 +0100
-Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
- Interface driver.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F8287E87B@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
- <526021B0.6050206@metafoo.de>
- <1DD289F6464F0949A2FCA5AA6DC23F8286A385@039-SN2MPN1-013.039d.mgd.msft.net>
- <20131112050226.GK8834@intel.com>
- <1DD289F6464F0949A2FCA5AA6DC23F8287E87B@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <5281DFE1.3040904@metafoo.de>
+From: luca@coelho.fi (Luca Coelho)
+Date: Tue, 12 Nov 2013 10:05:49 +0200
+Subject: [PATCH] clk: add flags to distinguish xtal clocks
+In-Reply-To: <20131111205910.GA26440@lukather>
+References: <1382528150.21526.25.camel@porter.coelho.fi>
+ <1383933648-28595-1-git-send-email-balbi@ti.com>
+ <20131110113716.GN26440@lukather> <20131111194247.GB19212@saruman.home>
+ <1384199456.12583.27.camel@porter.coelho.fi>
+ <20131111205910.GA26440@lukather>
+Message-ID: <1384243549.12583.36.camel@porter.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2013 08:35 AM, Li Xiubo wrote:
->>>>> +static int fsl_sai_probe(struct platform_device *pdev) {
->>>> [...]
->>>>> +
->>>>> +	sai->dma_params_rx.addr = res->start + SAI_RDR;
->>>>> +	sai->dma_params_rx.maxburst = 6;
->>>>> +	index = of_property_match_string(np, "dma-names", "rx");
->>>>> +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
->> index,
->>>>> +				&dma_args);
->>>>> +	if (ret)
->>>>> +		return ret;
->>>>> +	sai->dma_params_rx.slave_id = dma_args.args[1];
->>>>> +
->>>>> +	sai->dma_params_tx.addr = res->start + SAI_TDR;
->>>>> +	sai->dma_params_tx.maxburst = 6;
->>>>> +	index = of_property_match_string(np, "dma-names", "tx");
->>>>> +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
->> index,
->>>>> +				&dma_args);
->>>>> +	if (ret)
->>>>> +		return ret;
->>>>> +	sai->dma_params_tx.slave_id = dma_args.args[1];
->>>>
->>>> The driver should not have to manually parse the dma devicetree
->>>> properties, this is something that should be handled by the dma
->>>> engine driver.
->>>>
->>>
->>> What do you think about the DMA slave_id ?
->>> I have been noticed by one colleague that this should be parsed here,
->>> which is from your opinions ?
->> Sure slave_id can be parsed here, but IMO it should be programmed via the
->> dma_slave_confog into the respective channel
->>
->
-> Actually, these are parsed for cpu_dai->playback_dma_data and cpu_dai->capture_dma_data dynamically, whose type is struct dma_slave_config.
->
-> And now I must parse them here, because the platform eDMA driver's newest version will check and use the slave_ids to select and configure the eDMA channels via dma_device->device_control().
+On Mon, 2013-11-11 at 21:59 +0100, Maxime Ripard wrote:
+> Hi Luca,
+> 
+> On Mon, Nov 11, 2013 at 09:50:56PM +0200, Luca Coelho wrote:
+> > On Mon, 2013-11-11 at 13:42 -0600, Felipe Balbi wrote:
+> > > > > +	if (of_property_read_bool(node, "clock-xtal"))
+> > > > > +		flags |= CLK_IS_TYPE_XTAL;
+> > > > > +
+> > > > 
+> > > > Introducing a new compatible instead of a property would make more
+> > > > sense here I think.
+> > > > 
+> > > > Do you have a reason not to do so?
+> > > 
+> > > As you can see, this is original work from Luca but I disagree that
+> > > adding a new compatible makes more sense. This still related to a fixed
+> > > rate clock, we're just giving it one extra metadata which willAnd t
+> > > differentiate between crystal and oscilator fixed rate clocks.
+> > 
+> > I agree with Felipe.  This was discussed before [1].  While still at TI,
+> > I tried to figure out the exact need for the firmware to know whether it
+> > was an oscillator or not.  It was mostly because the stabilization time
+> > and such things differ with oscillators, but I wasn't able to find out
+> > how exactly this affected things.
+> > 
+> > In any case, as I concluded earlier (but it's not really my call), being
+> > a crystal or an oscillator *is* a characteristic of the hardware,
+> > regardless of whether that information is useful or not.  In the WiLink
+> > case it is, at least it can differentiate the clocks that are used in
+> > the HW modules it uses.
+> > 
+> > So IMHO it doesn't really hurt and it's not really against the DT
+> > principles.
+> 
+> Just to be clear, I'm not against your patch. If you need this to make
+> your driver work, then it's fine for me. Mike will probably know
+> better if we actually need some extra metadata.
 
-Parsing them here is a layering violation. The format of the DMA specifier 
-depends on the DMA controller. A DMA slave should not make any assumptions 
-about how the specifier looks like, it should not even look at them. You should 
-fix the DMA controller driver to work without slave_id in the devicetree case.
+:)
 
-- Lars
+I understand, we should really try to make this as clean as possible, DT
+should really be a good description of the hardware.
+
+
+> What I'm not really convinced about is *how* you carry that metadata
+> in the DT, that's all, nothing more.
+
+Okay, I get you.  My point is that being a crystal or not *is* a
+characteristic of the clock, so I think it could be part of the flags
+that describe it.
+
+In any case, it's not really my call.  This is about the clock and it's
+not even my home turf (wireless). ;)
+
+Thanks for your comments.  And I'm sorry if the tone of my previous
+email sounded harsh, it was not supposed to. :)
+
+--
+Cheers,
+Luca.
