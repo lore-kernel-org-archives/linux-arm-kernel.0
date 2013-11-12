@@ -1,81 +1,200 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Tue, 12 Nov 2013 14:14:36 +0530
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
- support
-In-Reply-To: <5281D848.7000502@hitachi.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <528114C4.5000506@hitachi.com>
- <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
- <5281D848.7000502@hitachi.com>
-Message-ID: <CA+b37P2EgB0toYwhLny8k-cbrziBVXURST5kHNXcY7AF-CNVLg@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 12 Nov 2013 16:42:49 +0800
+Subject: [PATCH v11 1/6] ARM: hi3xxx: add board support with device tree
+In-Reply-To: <527B6266.9020107@gmail.com>
+References: <1383813691-31587-1-git-send-email-haojian.zhuang@linaro.org>
+ <1383813691-31587-2-git-send-email-haojian.zhuang@linaro.org>
+ <527B6266.9020107@gmail.com>
+Message-ID: <CAD6h2NQU8GCHK5yxXj7HAU5hKX4Jbdz7b+AqmiWJWstYu8A96g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2013 12:57, Masami Hiramatsu
-<masami.hiramatsu.pt@hitachi.com> wrote:
-> (2013/11/12 15:23), Sandeepa Prabhu wrote:
->>>>> OK, I've ensured that the hw_breakpoint (from perf) can work
->>>>> with kprobes (from ftrace) at the same address on x86.
->>>>> So if arm64 already support hw_breakpoint on perf, kprobes should
->>>>> work with it.
->>>>
->>>> Single-stepping on x86 is different to the step behaviour on arm64 afaik. On
->>>> ARM, we have to manually remove the breakpoint, perform a single-step, then
->>>> add the breakpoint again. If we re-enable debug exceptions in the kprobe
->>>> handler, the step will complete early and we'll never step off the
->>>> breakpoint.
->>>
->>> I'm unsure about arm64's debug feature behavior, what does happen when
->>> it performs a single-step on sw-breakpoint?
->>>
->>>> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
->>>> I'm fairly sure it won't work as expected without some additional code.
->>>
->>> OK, anyway, for testing same one, we need to port ftrace first. So the next
+On 7 November 2013 17:50, Dinh Nguyen <dinh.linux@gmail.com> wrote:
 >
-> Sorry for confusion, s/next/fallback is what I meant. Making a kprobe module
-> can be done without ftrace port.
-Yes, got it, all my verification until now are done using sample
-modules only,  looking out for perf (or some other mechanism: ptrace?)
-that uses v8 hw breakpoint.
->
->>> plan is to make a kprobe module to put a probe (which just printk something)
->>> on a specific function (e.g. vfs_symlink), and run perf record with
->>> hw-breakpoint as below
->>>
->>> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
->>>
->>> Note that 0xXXXXXX is the address of vfs_symlink.
->>>
->>> After that, you can see the message in dmesg and also check the perf result
->>> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
->>> it works)
->> Thanks for steps, ARM64 ftrace patches are under review on arm mailing
->> list, I can contact the (linaro) developer implementing ftrace on
->> what's supported and then figure-out a way to test this concurrency of
->> kprobes breakpoint and hardware breakpoint.
->
-> Would you mean this? :)
-> http://www.spinics.net/lists/arm-kernel/msg278477.html
->
-> Wow, it seems that this also has some works around instruction
-> manipulation (and confusable filenames...)
-I referred to: http://lwn.net/Articles/572323/  which is another
-implementation and on LAKML
+> On 11/7/13 2:41 AM, Haojian Zhuang wrote:
+>> Add board support with device tree for Hisilicon Hi3620 SoC platform.
+>>
+>> Changelog:
+>> v11:
+>> 1. Add comments for iotable.
+>>
+>> v10:
+>> 1. Add .map_io() & debug_ll_io_init() back. Since debug_ll_io_init() is
+>> only called if .map_io() isn't assigned. Use .map_io() to setup static
+>> IO mapping that is used in clock driver.
+>>
+>> v3:
+>> 1. Remove .map_io() in DT machine descriptor. Since debug_ll_io_init()
+>> is called by default.
+>> 2. Remove .init_machine() in DT machine descriptor. Since
+>> of_platform_populate() is called by default in DT mode.
+>>
+>> v2:
+>> 1. Remove .init_irq() in DT machine descriptor. Since irqchip_init()
+>> is called by default in DT mode.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>  .../bindings/arm/hisilicon/hisilicon.txt           | 10 ++++
+>>  arch/arm/Kconfig                                   |  2 +
+>>  arch/arm/Makefile                                  |  1 +
+>>  arch/arm/mach-hi3xxx/Kconfig                       | 12 +++++
+>>  arch/arm/mach-hi3xxx/Makefile                      |  5 ++
+>>  arch/arm/mach-hi3xxx/hi3xxx.c                      | 60 ++++++++++++++++++++++
+>>  6 files changed, 90 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+>>  create mode 100644 arch/arm/mach-hi3xxx/Makefile
+>>  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> new file mode 100644
+>> index 0000000..3be60c8
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> @@ -0,0 +1,10 @@
+>> +Hisilicon Platforms Device Tree Bindings
+>> +----------------------------------------------------
+>> +
+>> +Hi3716 Development Board
+>> +Required root node properties:
+>> +     - compatible = "hisilicon,hi3716-dkb";
+>> +
+>> +Hi4511 Board
+>> +Required root node properties:
+>> +     - compatible = "hisilicon,hi3620-hi4511";
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 3f7714d..0118443 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -946,6 +946,8 @@ source "arch/arm/mach-footbridge/Kconfig"
+>>
+>>  source "arch/arm/mach-gemini/Kconfig"
+>>
+>> +source "arch/arm/mach-hi3xxx/Kconfig"
+>> +
+>>  source "arch/arm/mach-highbank/Kconfig"
+>>
+>>  source "arch/arm/mach-integrator/Kconfig"
+>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+>> index a37a50f..23fb0b0 100644
+>> --- a/arch/arm/Makefile
+>> +++ b/arch/arm/Makefile
+>> @@ -155,6 +155,7 @@ machine-$(CONFIG_ARCH_EBSA110)            += ebsa110
+>>  machine-$(CONFIG_ARCH_EP93XX)                += ep93xx
+>>  machine-$(CONFIG_ARCH_EXYNOS)                += exynos
+>>  machine-$(CONFIG_ARCH_GEMINI)                += gemini
+>> +machine-$(CONFIG_ARCH_HI3xxx)                += hi3xxx
+>>  machine-$(CONFIG_ARCH_HIGHBANK)              += highbank
+>>  machine-$(CONFIG_ARCH_INTEGRATOR)    += integrator
+>>  machine-$(CONFIG_ARCH_IOP13XX)               += iop13xx
+>> diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
+>> new file mode 100644
+>> index 0000000..68bd26c
+>> --- /dev/null
+>> +++ b/arch/arm/mach-hi3xxx/Kconfig
+>> @@ -0,0 +1,12 @@
+>> +config ARCH_HI3xxx
+>> +     bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
+>> +     select ARM_AMBA
+>> +     select ARM_GIC
+>> +     select ARM_TIMER_SP804
+>> +     select CACHE_L2X0
+>> +     select CLKSRC_OF
+> I think you need COMMON_CLK here.
 
+Why? COMMON_CLK will be selected if ARCH_MULTIPLATFORM is enabled. Why
+do I need to choose it again?
+
+>> +     select GENERIC_CLOCKEVENTS
+>> +     select PINCTRL
+>> +     select PINCTRL_SINGLE
+>> +     help
+>> +       Support for Hisilicon Hi36xx/Hi37xx processor family
+>> diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
+>> new file mode 100644
+>> index 0000000..d68ebb3
+>> --- /dev/null
+>> +++ b/arch/arm/mach-hi3xxx/Makefile
+>> @@ -0,0 +1,5 @@
+>> +#
+>> +# Makefile for Hisilicon Hi36xx/Hi37xx processors line
+>> +#
+>> +
+>> +obj-y        += hi3xxx.o
+>> diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
+>> new file mode 100644
+>> index 0000000..925af13
+>> --- /dev/null
+>> +++ b/arch/arm/mach-hi3xxx/hi3xxx.c
+>> @@ -0,0 +1,60 @@
+>> +/*
+>> + * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
+>> + *
+>> + * Copyright (c) 2012-2013 Hisilicon Ltd.
+>> + * Copyright (c) 2012-2013 Linaro Ltd.
+>> + *
+>> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clocksource.h>
+>> +#include <linux/irqchip.h>
+>> +#include <linux/of_platform.h>
+>> +
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach/map.h>
+>> +
+>> +/*
+>> + * This table is only for optimization. Since ioremap() could always share
+>> + * the same mapping if it's defined as static IO mapping.
+>> + *
+>> + * Without this table, system could also work. The cost is some virtual address
+>> + * spaces wasted since ioremap() may be called multi times for the same
+>> + * IO space.
+>> + */
+>> +static struct map_desc hi3620_io_desc[] __initdata = {
+>> +     {
+>> +             .pfn            = __phys_to_pfn(0xfc802000),
+>> +             .virtual        = 0xfe802000,
+>> +             .length         = 0x1000,
+>> +             .type           = MT_DEVICE,
+>> +     },
+>> +};
+>> +
+>> +static void __init hi3620_map_io(void)
+>> +{
+>> +     debug_ll_io_init();
+>> +     iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
+>> +}
+>> +
+>> +static void __init hi3xxx_timer_init(void)
+>> +{
+>> +     of_clk_init(NULL);
+>> +     clocksource_of_init();
+>> +}
+> Once you have COMMON_CLK, then this function can go away.
+
+On v3.12-rcx, of_clk_init() must be called by platform driver. Now v3.13-rcx
+doesn't announce yet. This function will be removed in additional patch, not
+in this patch.
+
+>> +
+>> +static const char *hi3xxx_compat[] __initdata = {
+>> +     "hisilicon,hi3620-hi4511",
+>> +     NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+>> +     .map_io         = hi3620_map_io,
+>> +     .init_time      = hi3xxx_timer_init,
+> .init_time can go away if you have COMMON_CLK.
 >
-> Thank you,
->
-> --
-> Masami HIRAMATSU
-> IT Management Research Dept. Linux Technology Center
-> Hitachi, Ltd., Yokohama Research Laboratory
-> E-mail: masami.hiramatsu.pt at hitachi.com
->
+> Dinh
+>> +     .dt_compat      = hi3xxx_compat,
+>> +MACHINE_END
 >
