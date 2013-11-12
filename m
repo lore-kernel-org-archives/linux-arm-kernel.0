@@ -1,41 +1,28 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 12 Nov 2013 07:32:12 +0400
-Subject: [PATCH 5/5] pcmcia: sa1111: make use of device clock
+Date: Tue, 12 Nov 2013 07:32:11 +0400
+Subject: [PATCH 4/5] arm: sa1100: add a clock alias for sa1111 pcmcia device
 In-Reply-To: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
 References: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1384227132-10501-5-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1384227132-10501-4-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use per-device clock (instead of calling cpufreq_get(0), which can
-return 0 if no cpu frequency driver is selected) to program timings.
-
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/pcmcia/sa1111_generic.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-sa1100/clock.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
-index 65b02c3..c5988be 100644
---- a/drivers/pcmcia/sa1111_generic.c
-+++ b/drivers/pcmcia/sa1111_generic.c
-@@ -145,6 +145,9 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
- 			return -ENOMEM;
+diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
+index abf1dc1..cd4762d 100644
+--- a/arch/arm/mach-sa1100/clock.c
++++ b/arch/arm/mach-sa1100/clock.c
+@@ -124,6 +124,7 @@ static struct clk_lookup sa11xx_clkregs[] = {
+ 	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
+ 	CLKDEV_INIT("sa11x0-fb", NULL, &clk_cpu),
+ 	CLKDEV_INIT("sa11x0-pcmcia", NULL, &clk_cpu),
++	CLKDEV_INIT("1600", NULL, &clk_cpu), /* sa1111 pcmcia */
+ };
  
- 		s->soc.nr = ops->first + i;
-+		s->soc.clk = clk_get(&dev->dev, NULL);
-+		if (IS_ERR(s->soc.clk))
-+			return -ENODEV;
- 		soc_pcmcia_init_one(&s->soc, ops, &dev->dev);
- 		s->dev = dev;
- 		if (s->soc.nr) {
-@@ -220,6 +223,7 @@ static int pcmcia_remove(struct sa1111_dev *dev)
- 	for (; s; s = next) {
- 		next = s->next;
- 		soc_pcmcia_remove_one(&s->soc);
-+		clk_put(s->soc.clk);
- 		kfree(s);
- 	}
- 
+ static int __init sa11xx_clk_init(void)
 -- 
 1.8.4.2
