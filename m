@@ -1,28 +1,31 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Nov 2013 17:10:40 -0600
-Subject: [PATCH] ARM: OMAP2+: omap_device: maintain sane runtime pm status
- around suspend/resume
-In-Reply-To: <878uwtnwfc.fsf@linaro.org>
-References: <1383857942-23630-1-git-send-email-nm@ti.com>	<87iow3rd3y.fsf@linaro.org>
- <527C2B78.2070201@ti.com>	<874n7npw1e.fsf@linaro.org>
- <20131111162358.GA6451@kahuna> <878uwtnwfc.fsf@linaro.org>
-Message-ID: <5282B570.8020802@ti.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 13 Nov 2013 00:12:16 +0100
+Subject: arm/arm64 UEFI boot protocol
+In-Reply-To: <CACxGe6uCMjNiSm7qN4fTBN=WgzdJriod9d7qKOr-P-UaiWhULQ@mail.gmail.com>
+References: <20131111174321.GQ1557@rocoto.smurfnet.nu>
+ <20131112164241.GD25953@mudshark.cambridge.arm.com>
+ <20131112180050.GR1557@rocoto.smurfnet.nu>
+ <CACxGe6uCMjNiSm7qN4fTBN=WgzdJriod9d7qKOr-P-UaiWhULQ@mail.gmail.com>
+Message-ID: <20131112231216.GS1557@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2013 03:26 PM, Kevin Hilman wrote:
-[..]
-> Yes, the updated version looks much more sensible.  Please repost in its
-> own thread so it gets a better chance at broader review, and feel free
-> to add
-> 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+On Wed, Nov 13, 2013 at 07:14:28AM +0900, Grant Likely wrote:
+> In the interest of bike shedding, I would name the properties
+> "linux,uefi-mmap-start" and "linux,uefi-mmap-size", but otherwise it
+> is fine by me.
 
-Thanks. this is done[1]
+That makes sense to me, and makes for a prettier table :)
 
-[1] https://patchwork.kernel.org/patch/3176501/
+> Should you have a property for the descriptor version
+> as returned by GetMemoryMap()?
+ 
+Yes, I should, really. I did in an earlier version, but dropped it on
+realising that this value has not changed since the inception of EFI.
+But it needs to be passed back to SetVirtualAddressMap(), so it should
+be kept. Mark never dropped it from his.
 
+So, "linux,uefi-mmap-desc-ver"?
 
--- 
-Regards,
-Nishanth Menon
+/
+    Leif
