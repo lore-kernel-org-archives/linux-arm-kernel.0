@@ -1,57 +1,44 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 12 Nov 2013 15:32:37 +0000
-Subject: [Xen-devel] Physical memory start contraints in the Linux
- kernel (Was: Re:	Xen osstest on Calxeda midway progress (Was: Re:
- [xen-unstable test] 21486: tolerable FAIL - PUSHED))
-In-Reply-To: <52824817.7010404@linaro.org>
-References: <osstest-21486-mainreport@xen.org>
- <1384250005.1883.35.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
- <201311121437.55826.arnd@arndb.de> <52823C9E.2010007@linaro.org>
- <20131112144128.GL16735@n2100.arm.linux.org.uk>
- <52824090.8040203@linaro.org>
- <1384268259.10204.29.camel@kazak.uk.xensource.com>
- <52824817.7010404@linaro.org>
-Message-ID: <1384270357.10204.52.camel@kazak.uk.xensource.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 12 Nov 2013 16:34:24 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <20131112100126.GB23981@1wt.eu> (Willy Tarreau's message of "Tue,
+ 12 Nov 2013 11:01:26 +0100")
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
+ <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
+ <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
+Message-ID: <87vbzxd473.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-11-12 at 15:24 +0000, Julien Grall wrote:
-> 
-> On 11/12/2013 02:57 PM, Ian Campbell wrote:
-> > On Tue, 2013-11-12 at 14:52 +0000, Julien Grall wrote:
-> >>
-> >> On 11/12/2013 02:41 PM, Russell King - ARM Linux wrote:
-> >>> On Tue, Nov 12, 2013 at 02:35:10PM +0000, Julien Grall wrote:
-> >>>> During some debugging on the Arndale and Midway, I found another
-> >>>> constraint with CONFIG_ARM_PATCH_PHYS_VIRT.
-> >>>> I have noticed that all the kernel physical addresses must be lower than
-> >>>> the corresponding virtual addresses. So the delta offset compute in
-> >>>> __fixup_pv_table (arch/arm/kernel/head.S) must always be negative.
-> >>>> If this assertion is not validated, when the kernel will browse the
-> >>>> memory bank (sanity_check_info in arch/arm/mm/mmu.c), __phys(...) will
-> >>>> compute a wrong address and will result to consider all memory bank as
-> >>>> highmem.
-> >>>>
-> >>>> After digging in the code, it seems it's due to some optimization during
-> >>>> opcode fixup in __fixup_a_pvtable. Is it a wanted constraint?
-> >>>
-> >>> Are you talking about the code in v3.12 or the code in -next ?
-> >>
-> >> I was talking about 3.12. I have just checked -next and my issue seems
-> >> to be fixed by the commit f52bb722547f43caeaecbcc62db9f3c3b80ead9b.
-> >> I should have checked earlier, thanks.
-> >
-> > Should we revert your Xen side fix^Wworkaround then:
-> 
-> For now it's only in -next. I would wait until this commit is at least 
-> in Linux master, otherwise we will likely break vanilla/distro kernel 
-> for Xen 4.4.
+Hi,
 
-OK. Can you keep an eye on it and let me know if/when the time comes to
-revert?
+Willy Tarreau <w@1wt.eu> writes:
 
-Is the fix a candidate for stable? Seems like a bit of a big exciting
-fix for what was an quite recently an obscure corner case...
+> On Tue, Nov 12, 2013 at 10:14:34AM +0100, Arnaud Ebalard wrote:
+>> Tests for the rgression were done w/ scp, and were hence limited by the
+>> crypto (16MB/s using arcfour128). But I also did some tests w/ a simple
+>> wget for a file served by Apache *before* the regression and I never got
+>> more than 60MB/s from what I recall. Can you beat that? 
+>
+> Yes, I finally picked my mirabox out of my bag for a quick test. It boots
+> off 3.10.0-rc7 and I totally saturate one port (stable 988 Mbps) with even
+> a single TCP stream.
 
-Ian.
+Thanks for the feedback. That's interesting. What are you using for your tests
+(wget, ...)? 
+
+> With two systems, one directly connected (dockstar) and the other one via
+> a switch, I get 2*650 Mbps (a single TCP stream is enough on each).
+>
+> I'll have to re-run some tests using a more up to date kernel, but that
+> will probably not be today though.
+
+Can you give a pre-3.11.7 kernel a try if you find the time? I started
+working on RN102 during 3.10-rc cycle but do not remember if I did the
+first preformance tests on 3.10 or 3.11. And if you find more time,
+3.11.7 would be nice too ;-)
+
+Cheers,
+
+a+
