@@ -1,58 +1,44 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Tue, 12 Nov 2013 09:36:58 +0800
-Subject: [PATCHv6 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM.
-In-Reply-To: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1384220218-12716-5-git-send-email-Li.Xiubo@freescale.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 12 Nov 2013 11:30:44 +0900
+Subject: [PATCH/RFC] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+In-Reply-To: <9547447.Oq0RhNMWv3@avalon>
+References: <1383782061-7111-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CANqRtoRDo6_VYhaq9KkSCo2TnhmwW-vFK99HuBS=umrC1_fD_g@mail.gmail.com>
+ <20131108060803.GF9828@verge.net.au> <9547447.Oq0RhNMWv3@avalon>
+Message-ID: <20131112023043.GF9863@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Document for Freescale FTM PWM driver under
-Documentation/devicetree/bindings/pwm/.
+On Sat, Nov 09, 2013 at 01:34:31PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Friday 08 November 2013 15:08:05 Simon Horman wrote:
+> > On Thu, Nov 07, 2013 at 03:04:57PM +0900, Magnus Damm wrote:
+> > > On Thu, Nov 7, 2013 at 8:54 AM, Laurent Pinchart wrote:
+> > > > SH-Mobile platforms are transitioning from non-multiplatform to
+> > > > multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
+> > > > been created to group all multiplatform-enabled SH-Mobile SoCs. The
+> > > > existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
+> > > > been converted yet.
+> > > > 
+> > > > This arrangement works fine for the arch/ code, but lots of drivers
+> > > > needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
+> > > > ARCH_SHMOBILE only. In order to avoid changing them, rename
+> > > > ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
+> > > > ARCH_SHMOBILE configuration symbol that is selected by both
+> > > > ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
+> > > > 
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > 
+> > > Thanks, this looks good to me.
+> > > 
+> > > Acked-by: Magnus Damm <damm@opensource.se>
+> > 
+> > This seems reasonable to me.
+> > I would pick it up now but it is marked as "RFC".
+> > Please let me know if you wish me to pick it up.
+> 
+> I've sent a non-RFC series, please pick that one up.
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Kumar Gala <galak@codeaurora.org>
----
- .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-new file mode 100644
-index 0000000..5c1cd2b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-@@ -0,0 +1,29 @@
-+Freescale FlexTimer Module(FTM) PWM controller
-+
-+Required properties:
-+- compatible: Should be "fsl,vf610-ftm-pwm"
-+- reg: Physical base address and length of the controller's registers
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-+  the cells format.
-+- clock-names : Should includes the following module clock source entries:
-+    "ftm0" (module clock),
-+    "ftm0_counter" (counter clock),
-+- clocks : Must contain a clock specifier for each entry in clock-names,
-+  See clock/clock-bindings.txt for details of the property values.
-+- pinctrl-names: must contain a "default" entry.
-+- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-+  See pinctrl/pinctrl-bindings.txt for details of the property values.
-+
-+
-+Example:
-+
-+pwm0: pwm at 40038000 {
-+		compatible = "fsl,vf610-ftm-pwm";
-+		reg = <0x40038000 0x1000>;
-+		#pwm-cells = <3>;
-+		clock-names = "ftm0", "ftm0_counter;
-+		clocks = <&clks VF610_CLK_FTM0>,
-+			<&clks VF610_CLK_FTM0_FIX_SEL>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pwm0_1>;
-+};
--- 
-1.8.4
+Thanks, will do.
