@@ -1,52 +1,30 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 12 Nov 2013 17:03:42 +0000
-Subject: [Xen-devel] [PATCH 1/2] swiotlb-xen: add missing xen_dma_map_page
- call
-In-Reply-To: <20131112144500.GB9435@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
- <1384265520-6833-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20131112144500.GB9435@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1311121703340.26077@kaball.uk.xensource.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Nov 2013 18:06:49 +0100
+Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from device
+ tree
+In-Reply-To: <20131112153057.GA9683@earth.universe>
+References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
+ <20131112153057.GA9683@earth.universe>
+Message-ID: <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Nov 2013, Konrad Rzeszutek Wilk wrote:
-> On Tue, Nov 12, 2013 at 02:11:59PM +0000, Stefano Stabellini wrote:
-> > swiotlb-xen is missing a xen_dma_map_page call in
-> > xen_swiotlb_map_sg_attrs, in the slow path.
-> 
-> s/slow/bounce buffer/ I believe?
+On Tue, Nov 12, 2013 at 4:30 PM, Sebastian Reichel <sre@ring0.de> wrote:
+> On Tue, Nov 12, 2013 at 03:13:38PM +0100, Linus Walleij wrote:
 
-right
+>> +     plat->no_autorepeat = of_property_read_bool(np, "linux,no-autorepeat");
+>> +     plat->enable_wakeup = of_property_read_bool(np, "linux,wakeup");
+>
+> There is currently discussion going on for the property name of
+> autorepeat:
+>
+> https://lkml.org/lkml/2013/11/11/680
 
+So this binding is documented for GPIO keys in:
+Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  drivers/xen/swiotlb-xen.c |    5 +++++
-> >  1 files changed, 5 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> > index a224bc7..1eac073 100644
-> > --- a/drivers/xen/swiotlb-xen.c
-> > +++ b/drivers/xen/swiotlb-xen.c
-> > @@ -555,6 +555,11 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
-> >  				sg_dma_len(sgl) = 0;
-> >  				return 0;
-> >  			}
-> > +			xen_dma_map_page(hwdev, pfn_to_page(map >> PAGE_SHIFT),
-> > +						map & ~PAGE_MASK,
-> > +						sg->length,
-> > +						dir,
-> > +						attrs);
-> >  			sg->dma_address = xen_phys_to_bus(map);
-> >  		} else {
-> >  			/* we are not interested in the dma_addr returned by
-> > -- 
-> > 1.7.2.5
-> > 
-> > 
-> > _______________________________________________
-> > Xen-devel mailing list
-> > Xen-devel at lists.xen.org
-> > http://lists.xen.org/xen-devel
-> 
+This is probably the most used binding as GPIO matrixes are
+not uncommon. But I don't know, yes it is a mess. (As usual.)
+
+Yours,
+Linus Walleij
