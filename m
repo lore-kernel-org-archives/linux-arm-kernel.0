@@ -1,96 +1,50 @@
 From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
-Date: Tue, 12 Nov 2013 13:51:51 +0000
-Subject: [PATCH RFC 00/10] ARM: STi: Add dwmac glue and reset controller
-Message-ID: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+Date: Tue, 12 Nov 2013 13:52:51 +0000
+Subject: [PATCH RFC 06/10] ARM: STi: Add reset controller support to mach-sti
+ Kconfig
+In-Reply-To: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1384264371-7568-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+From: Stephen Gallimore <stephen.gallimore@st.com>
 
-Hi All,
+This patch selects reset controller support for ARCH_STI and
+selects the reset controllers for STiH415 and STiH416 SoCs.
 
-This patch series adds Ethernet support to STi series SOCs STiH415 and STiH416.
-STi SOC series integrates dwmac IP from synopsis, however there is a hardware
-glue on top of this standard IP, this glue needs to configured before the
-actual dwmac can be used.
-To add this a new driver dwmac-sti is introduced whose responsibility is to
-configure dwmac glue and before dwmac driver, this is achieved by making dwmac
-device node as child to ethernet glue node. Inspired by usb/dwc3.
-Also the glue needs to come out of softreset which is why we have added a
-softreset controller to driver which looked perfectly neat, rather then
-driving the softreset bit from the glue driver.
+Signed-off-by: Stephen Gallimore <stephen.gallimore@st.com>
+---
+ arch/arm/mach-sti/Kconfig |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Also as part of power management in glue driver, I found that there was no
-function to determine if the child device is a wakeup source or not.
-I have added a new api device_child_may_wakeup API which could be useful for
-drivers like this. "PM / wakeup : Introduce device_child_may_wakeup" patch has
-that new API and "net: stmmac:sti: Add STi SOC glue driver." glue driver uses
-this new API.
-
-The reason for combining all these patches in a same series is because of
-dependencies.
-
-This patch series is tested on B2000 and B2020 boards with STiH415, STiH416
-SOC on ethernet 100/1000 Links.
-
-Comments?
-
-Thanks,
-srini
-
-Srinivas Kandagatla (6):
-  drivers: reset: stih415: add softreset controller
-  drivers: reset: stih416: add softreset controller
-  PM / wakeup : Introduce device_child_may_wakeup
-  net: stmmac:sti: Add STi SOC glue driver.
-  ARM: STi: Add STiH415 ethernet support.
-  ARM: STi: Add STiH416 ethernet support.
-
-Stephen Gallimore (4):
-  drivers: reset: STi SoC system configuration reset controller support
-  drivers: reset: Reset controller driver for STiH415
-  drivers: reset: Reset controller driver for STiH416
-  ARM: STi: Add reset controller support to mach-sti Kconfig
-
- .../devicetree/bindings/net/sti-dwmac.txt          |   45 +++
- .../devicetree/bindings/reset/st,sti-powerdown.txt |   46 +++
- .../devicetree/bindings/reset/st,sti-softreset.txt |   45 +++
- arch/arm/boot/dts/stih415-clock.dtsi               |   14 +
- arch/arm/boot/dts/stih415-pinctrl.dtsi             |   82 ++++++
- arch/arm/boot/dts/stih415.dtsi                     |   67 +++++
- arch/arm/boot/dts/stih416-clock.dtsi               |   14 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi             |  106 +++++++
- arch/arm/boot/dts/stih416.dtsi                     |   69 +++++
- arch/arm/boot/dts/stih41x-b2000.dtsi               |   32 +++
- arch/arm/boot/dts/stih41x-b2020.dtsi               |   33 +++
- arch/arm/mach-sti/Kconfig                          |    3 +
- drivers/base/power/wakeup.c                        |   23 ++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    |  294 ++++++++++++++++++++
- drivers/reset/Kconfig                              |    2 +
- drivers/reset/Makefile                             |    3 +
- drivers/reset/sti/Kconfig                          |   15 +
- drivers/reset/sti/Makefile                         |    4 +
- drivers/reset/sti/reset-stih415.c                  |   99 +++++++
- drivers/reset/sti/reset-stih416.c                  |  101 +++++++
- drivers/reset/sti/reset-syscfg.c                   |  186 ++++++++++++
- drivers/reset/sti/reset-syscfg.h                   |   69 +++++
- .../dt-bindings/reset-controller/stih415-resets.h  |   23 ++
- .../dt-bindings/reset-controller/stih416-resets.h  |   25 ++
- include/linux/pm_wakeup.h                          |    1 +
- 26 files changed, 1402 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/sti-dwmac.txt
- create mode 100644 Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
- create mode 100644 Documentation/devicetree/bindings/reset/st,sti-softreset.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
- create mode 100644 drivers/reset/sti/Kconfig
- create mode 100644 drivers/reset/sti/Makefile
- create mode 100644 drivers/reset/sti/reset-stih415.c
- create mode 100644 drivers/reset/sti/reset-stih416.c
- create mode 100644 drivers/reset/sti/reset-syscfg.c
- create mode 100644 drivers/reset/sti/reset-syscfg.h
- create mode 100644 include/dt-bindings/reset-controller/stih415-resets.h
- create mode 100644 include/dt-bindings/reset-controller/stih416-resets.h
-
+diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+index 835833e..b7c527e 100644
+--- a/arch/arm/mach-sti/Kconfig
++++ b/arch/arm/mach-sti/Kconfig
+@@ -7,6 +7,7 @@ menuconfig ARCH_STI
+ 	select PINCTRL
+ 	select PINCTRL_ST
+ 	select MFD_SYSCON
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select HAVE_SMP
+ 	select HAVE_ARM_SCU if SMP
+@@ -28,6 +29,7 @@ if ARCH_STI
+ config SOC_STIH415
+ 	bool "STiH415 STMicroelectronics Consumer Electronics family"
+ 	default y
++	select STIH415_RESET
+ 	help
+ 	  This enables support for STMicroelectronics Digital Consumer
+ 	  Electronics family StiH415 parts, primarily targetted at set-top-box
+@@ -37,6 +39,7 @@ config SOC_STIH415
+ config SOC_STIH416
+ 	bool "STiH416 STMicroelectronics Consumer Electronics family"
+ 	default y
++	select STIH416_RESET
+ 	help
+ 	  This enables support for STMicroelectronics Digital Consumer
+ 	  Electronics family StiH416 parts, primarily targetted at set-top-box
 -- 
 1.7.6.5
