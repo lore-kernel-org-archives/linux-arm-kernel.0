@@ -1,48 +1,38 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 12 Nov 2013 22:41:04 +0100
-Subject: [PATCH 2/4] ARM: netx: stop using mach/timex.h
-In-Reply-To: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1384292466-31725-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Tue, 12 Nov 2013 22:41:02 +0100
+Subject: [PATCH 0/4] Getting rid of mach/timex.h usages below arch/arm
+Message-ID: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach/timex.h is the last remaining header that is unused for multiarch
-builds but necessary for singlearch builds. To allow to get rid of it
-for singlearch builds, too, drop its usage in netx arch code by
-substituting CLOCK_TICK_RATE by a local cpp symbol.
+Hello,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-netx/time.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+this patch series fixes all users of CLOCK_TICK_RATE to not use the the
+symbol provided by mach/timex.h. Together with a few patches I already
+sent out earlier [1] all users are fixed which should allow us to drop
+including mach/timex.h from asm/timex.h and remove all mach/timex.h
+files.
 
-diff --git a/arch/arm/mach-netx/time.c b/arch/arm/mach-netx/time.c
-index 6df42e6..0e29902 100644
---- a/arch/arm/mach-netx/time.c
-+++ b/arch/arm/mach-netx/time.c
-@@ -28,6 +28,8 @@
- #include <asm/mach/time.h>
- #include <mach/netx-regs.h>
- 
-+#define NETX_CLOCK_FREQ 100000000
-+
- #define TIMER_CLOCKEVENT 0
- #define TIMER_CLOCKSOURCE 1
- 
-@@ -137,11 +139,11 @@ void __init netx_timer_init(void)
- 			NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKSOURCE));
- 
- 	clocksource_mmio_init(NETX_GPIO_COUNTER_CURRENT(TIMER_CLOCKSOURCE),
--		"netx_timer", CLOCK_TICK_RATE, 200, 32, clocksource_mmio_readl_up);
-+		"netx_timer", NETX_CLOCK_FREQ, 200, 32, clocksource_mmio_readl_up);
- 
- 	/* with max_delta_ns >= delta2ns(0x800) the system currently runs fine.
- 	 * Adding some safety ... */
- 	netx_clockevent.cpumask = cpumask_of(0);
--	clockevents_config_and_register(&netx_clockevent, CLOCK_TICK_RATE,
-+	clockevents_config_and_register(&netx_clockevent, NETX_CLOCK_FREQ,
- 					0xa00, 0xfffffffe);
- }
+Best regards
+Uwe
+
+[1] 
+	ARM: u300: fix timekeeping when periodic mode is used
+	rtc: pxa: drop usage of CLOCK_TICK_RATE
+	clocksource: sirf/marco+prima2: drop usage of CLOCK_TICK_RATE
+	watchdog: sirf: don't depend on dummy value of CLOCK_TICK_RATE
+
+Uwe Kleine-K?nig (4):
+  ARM: sa1100: stop using mach/timex.h
+  ARM: netx: stop using mach/timex.h
+  ARM: mmp: stop using mach/timex.h
+  ARM: ep93xx: stop using mach/timex.h
+
+ arch/arm/mach-ep93xx/core.c |  3 ++-
+ arch/arm/mach-mmp/time.c    | 12 +++++++++---
+ arch/arm/mach-netx/time.c   |  6 ++++--
+ arch/arm/mach-sa1100/time.c |  4 +++-
+ 4 files changed, 18 insertions(+), 7 deletions(-)
+
 -- 
 1.8.4.2
