@@ -1,31 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 12 Nov 2013 09:31:44 +0100 (CET)
-Subject: [PATCH 0/2] genirq: arm64: perf: support for percpu pmu interrupt
-In-Reply-To: <CAPrCYkf60+9RJ2aJ5ep3-j+ThdniJQHnUj_8POrCr7X2veKRZQ@mail.gmail.com>
-References: <1383739658-10036-1-git-send-email-vkale@apm.com>
- <527D8A17.9020208@codeaurora.org>
- <20131111104432.GA28302@mudshark.cambridge.arm.com>
- <CAPrCYkf60+9RJ2aJ5ep3-j+ThdniJQHnUj_8POrCr7X2veKRZQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1311120924390.30673@ionos.tec.linutronix.de>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 12 Nov 2013 09:36:33 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <87y54u59zq.fsf@natisbad.org>
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> <87y54u59zq.fsf@natisbad.org>
+Message-ID: <20131112083633.GB10318@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Nov 2013, Vinayak Kale wrote:
-> On Mon, Nov 11, 2013 at 4:14 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > cleaner from a user perspective, I always get scared when I see
-> > 'desc->status_use_accessors' since it tends to incur the wrath of tglx :)
+Hi Arnaud,
 
-Nah, if it uses accessors, then it's fine.
+On Tue, Nov 12, 2013 at 08:56:25AM +0100, Arnaud Ebalard wrote:
+> I had some offline (*) discussions w/ Eric and did some test w/ the patches
+> he sent. It does not fix the regression I see. It would be nice if someone
+> w/ the hardware and more knowledge of mvneta driver could reproduce the
+> issue and spend some time on it.
 
-> > That said, I guess that should be fine in irqdesc.h (basically adding a new
-> > accessor). Chris went missing after sending those initial patches, so
-> > perhaps Vinayak could look at resurrecting those?
-> >
-> Okay, in next patch revision I will use that approach.
+I could give it a try but am falling very short of time at the moment.
 
-Works for me.
+> That been said, even if the driver is most probably not the only one to
+> blame here (considering the result of bisect and current thread on
+> netdev), I never managed to get the performance I have on my ReadyNAS
+> Duo v2 (i.e. 108MB/s for a file served by an Apache) with a mvneta-based
+> platform (RN102, RN104 or RN2120). Understanding why is on an already a
+> long todo list. 
 
-Thanks,
+Yes I found that your original numbers were already quite low, so it is
+also possible that you have a different problem (eg: faulty switch or
+auto-negociation problem where the switch goes to half duplex because
+the neta does not advertise nway or whatever) that is emphasized by the
+latest changes.
 
-	tglx
- 
+> Cheers,
+> 
+> a+
+> 
+> (*): for some reasons, my messages to netdev and stable are not published
+> even though I can interact w/ {majordomo,autoanswer}@vger.kernel.org. I
+> poked postmaster@ bug got no reply yet.
+
+I can confirm that I got this message from you on netdev so it should be OK
+now.
+
+Willy
