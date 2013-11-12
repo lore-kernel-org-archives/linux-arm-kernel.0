@@ -1,174 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Nov 2013 19:16:33 +0000
-Subject: [PATCHv3] dmaengine: Add support for BCM2835
-In-Reply-To: <528154A1.1050303@koalo.de>
-References: <528154A1.1050303@koalo.de>
-Message-ID: <20131112191633.GR16735@n2100.arm.linux.org.uk>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Tue, 12 Nov 2013 21:29:15 +0200
+Subject: [PATCH v2] ARM: kexec: Use the right ISA for relocate_new_kernel
+In-Reply-To: <20131108184625.GE2602@localhost.localdomain>
+References: <1383913444-9153-1-git-send-email-Dave.Martin@arm.com>
+ <20131108133426.GE17461@mudshark.cambridge.arm.com>
+ <20131108184625.GE2602@localhost.localdomain>
+Message-ID: <5282818B.9030903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 11:05:21PM +0100, Florian Meier wrote:
-> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
-> Currently it only supports cyclic DMA.
-> 
-> Signed-off-by: Florian Meier <florian.meier@koalo.de>
-> ---
-> 
-> Thank you for your comments!
-> I hope I have now removed all leftovers of the sg struct.
-> Regarding the endian-ness: I have not found any hint about that in the
-> datasheet. Therefore, I chose uint32_t. If you think fixed le32 is more
-> likely I will change it.
+Hi Dave
 
-I guess it's easy to change later if needed; there's likely a large
-number of drivers which fall into this same category.
+Yes. I've tested it on Pandaboard and results are quite weird.
+ARM->ARM, Thumb->Thumb and Thumb->ARM kernel transition works fine
+for both kexec and kdump ways. But ARM->Thumb works for only kdump
+via kernel panic. In case of "kexec -e" the second Thumb kernel
+doesn't come up.
 
-> The PAD fields do not seem to be used, but the datasheet states they
-> should be set to 0.
+I don't have JTAG now. I will check this tomorrow morning.
 
-Ok.  This now looks a lot better, and is smaller too!  There's a few
-issues which need to be resolved still...
+On 8 November 2013 20:46, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Fri, Nov 08, 2013 at 01:34:27PM +0000, Will Deacon wrote:
+>> On Fri, Nov 08, 2013 at 12:24:04PM +0000, Dave Martin wrote:
+>> > Copying a function with memcpy() and then trying to execute the
+>> > result isn't trivially portable to Thumb.
+>> >
+>> > This patch modifies the kexec soft restart code to copy its
+>> > assembler trampoline relocate_new_kernel() using fncpy() instead,
+>> > so that relocate_new_kernel can be in the same ISA as the rest of
+>> > the kernel without problems.
+>> >
+>> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> > ---
+>> > Changes since v1:
+>> >
+>> >   * Move ENDPROC() after relocate_new_kernel's literals, to be
+>> >     consistent the location of relocate_new_kernel_end and with the way
+>> >     GCC sets ELF symbol sizes for functions.  This is just a tidyup,
+>> >     with no functional impact.
+>>
+>> Cheers Dave:
+>>
+>>   Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Thanks
+>
+>
+> Are you still in a position to test this, Taras?
+>
+> Cheers
+> ---Dave
 
-> +struct bcm2835_desc {
-> +	struct virt_dma_desc vd;
-> +	enum dma_transfer_direction dir;
-> +	dma_addr_t dev_addr;
 
-I don't think you need dev_addr here anymore - it seems to only be used
-within bcm2835_dma_prep_dma_cyclic().
 
-> +static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-> +	int ret;
-> +	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(chan->device);
-> +	uint32_t chans = d->chans_available;
-
-Probably just uint32_t chans; here is sufficient.  Also, as you'll be
-touching this area again, a minor comment to order the variable
-declarations in a more tidy way here.
-
-> +	int chanID = 0;
-
-Is a channel ID of zero a legal channel number?
-
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&d->lock, flags);
-> +
-> +	chans = d->chans_available;
-> +
-> +	dev_dbg(c->vc.chan.device->dev,
-> +			"allocating channel for %u\n", c->dma_sig);
-> +
-> +	/* do not use the FIQ and BULK channels */
-> +	chans &= ~0xD;
-> +
-> +	if (!chans) {
-> +		spin_unlock_irqrestore(&d->lock, flags);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	/* return the ordinal of the first channel in the bitmap */
-> +	chanID = __ffs(chans);
-> +
-> +	/* claim the channel */
-> +	d->chans_available &= ~(1 << chanID);
-> +
-> +	c->dma_chan_base = BCM2835_DMA_CHANIO(d->dma_base, chanID);
-> +	c->dma_irq_number = d->dma_irq_numbers[chanID];
-> +	c->dma_ch = chanID;
-> +
-> +	ret = request_irq(c->dma_irq_number,
-> +			bcm2835_dma_callback, 0, "DMA IRQ", c);
-> +
-> +	spin_unlock_irqrestore(&d->lock, flags);
-
-Calling request_irq() from within a spinlocked region is not a nice thing
-to do.  May I suggest an alternative coding for this function?
-
-	int chanID = -1;
-
-	dev_dbg(c->vc.chan.device->dev,
-		"allocating channel for %u\n", c->dma_sig);
-
-	spin_lock_irqsave(&d->lock, flags);
-
-	chans = d->chans_available;
-	if (chans) {
-		/* return the ordinal of the first channel in the bitmap */
-		chanID = __ffs(chans);
-
-		d->chans_available &= ~(1 << chanID);
-	}
-
-	spin_unlock_irqrestore(&d->lock, flags);
-
-	if (chanID == -1)
-		return -ENOMEM;
-
-	c->dma_chan_base = BCM2835_DMA_CHANIO(d->dma_base, chanID);
-	c->dma_irq_number = d->dma_irq_numbers[chanID];
-	c->dma_ch = chanID;
-
-	ret = request_irq(c->dma_irq_number,
-			bcm2835_dma_callback, 0, "DMA IRQ", c);
-
-Now, don't forget to clean up if request_irq() fails...
-
-	if (ret < 0) {
-		spin_lock_irqsave(&d->lock, flags);
-		d->chans_available |= 1 << chanID;
-		spin_unlock_irqrestore(&d->lock, flags);
-	}
-
-	return ret;
-
-How does that look?
-
-> +
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +static void bcm2835_dma_free_chan_resources(struct dma_chan *chan)
-> +{
-> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-> +	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(chan->device);
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&d->lock, flags);
-> +	vchan_free_chan_resources(&c->vc);
-> +	d->chans_available |= 1 << c->dma_ch;
-> +	free_irq(c->dma_irq_number, c);
-> +	spin_unlock_irqrestore(&d->lock, flags);
-
-A better ordering here would be:
-
-	vchan_free_chan_resources(&c->vc);
-	free_irq(c->dma_irq_number, c);
-
-	spin_lock_irqsave(&d->lock, flags);
-	d->chans_available |= 1 << c->dma_ch;
-	spin_unlock_irqrestore(&d->lock, flags);
-
-You don't need to call the first two under the spinlock - all you need to
-protect is the read-modify-write of d->chans_available here and also in
-the above function.
-
-...
-> +		/*
-> +		 * Next block is the next frame.
-> +		 * This DMA engine driver currently only supports cyclic DMA.
-> +		 * Therefore, wrap around at number of frames.
-> +		 */
-> +		control_block->next = d->control_block_base_phys +
-> +			sizeof(struct bcm2835_dma_cb) * ((frame + 1) % (d->frames));
-
-Minor comment here - the parens around d->frames isn't required, and
-wrapping this a little better would be nice.  I'd suggest moving
-((frame + 1) % d->frames) onto the next line.
-
-Other than those comments, it's looking really quite good!  Well done.
+-- 
+Regards,
+Taras Kondratiuk
