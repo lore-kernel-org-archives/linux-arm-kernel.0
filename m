@@ -1,11 +1,11 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Nov 2013 16:58:56 -0700
+Date: Tue, 12 Nov 2013 16:53:17 -0700
 Subject: [PATCHv4 3/7] iommu/tegra: smmu: Register IOMMU'able devices
  dynamically
 In-Reply-To: <1384158718-4756-4-git-send-email-hdoyu@nvidia.com>
 References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
  <1384158718-4756-4-git-send-email-hdoyu@nvidia.com>
-Message-ID: <5282C0C0.6010708@wwwdotorg.org>
+Message-ID: <5282BF6D.8070801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,14 +26,35 @@ On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
 
 > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
 
-> +static int smmu_iommu_add_device(struct device *dev)
-> +{
-> +	int err = -EPROBE_DEFER;
-> +	u64 swgroups;
-> +	struct dma_iommu_mapping *map = NULL;
+> +enum {
+> +	SYSTEM_DEFAULT,
+> +	SYSTEM_PROTECTED,
+> +};
 > +
-> +	swgroups = smmu_of_get_memory_client(dev);
+...
+> +static int smmu_iommu_add_device(struct device *dev)
+...
+> +	switch (swgroups) {
+> +	case TEGRA_SWGROUP_BIT(PPCS):
+> +		map = smmu_handle->map[SYSTEM_PROTECTED];
+> +		break;
+> +	default:
+> +		map = smmu_handle->map[SYSTEM_DEFAULT];
+> +		break;
+> +	}
 
-BTW, that function doesn't seem to exist in this patch series nor
-next-20131107. This call is removed in patch 5/7, but this does make the
-series non-bisectable.
+As I think I mentioned before, this hard-codes some valid ASIDs.
+However, the number of valid ASIDs is configured dynamically from DT, in
+tegra_smmu_probe(), via:
+
+static int tegra_smmu_probe(struct platform_device *pdev)
+...
+        int i, asids, err = 0;
+...
+        if (of_property_read_u32(dev->of_node, "nvidia,#asids", &asids))
+                return -ENODEV;
+...
+        smmu->num_as = asids;
+
+Shouldn't tegra_smmu_probe() validate that asids >= SYSTEM_PROTECTED, or
+similar?
