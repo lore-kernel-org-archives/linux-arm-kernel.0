@@ -1,43 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 12 Nov 2013 15:08:07 -0500
-Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
-In-Reply-To: <20131112194009.GA13577@lunn.ch>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <52814AFB.3070600@wwwdotorg.org>
- <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
- <528275B7.6050209@wwwdotorg.org>
- <20131112193012.GR10335@titan.lakedaemon.net>
- <20131112194009.GA13577@lunn.ch>
-Message-ID: <20131112200807.GS10335@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Nov 2013 21:08:00 +0100
+Subject: Physical memory start contraints in the Linux kernel (Was: Re:
+ Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel] [xen-unstable
+ test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <alpine.DEB.2.02.1311121843230.26077@kaball.uk.xensource.com>
+References: <osstest-21486-mainreport@xen.org>
+ <201311121939.08971.arnd@arndb.de>
+ <alpine.DEB.2.02.1311121843230.26077@kaball.uk.xensource.com>
+Message-ID: <201311122108.01331.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 08:40:09PM +0100, Andrew Lunn wrote:
-> > 2) right now: distributions are creating utilities, such a flash-kernel
-> > in Debian, that pick from a slew of dtbs, append it to the zImage, and
-> > create the uImage.  The bootloaders in these installs don't have support
-> > for fdt.
+On Tuesday 12 November 2013, Stefano Stabellini wrote:
+> On Tue, 12 Nov 2013, Arnd Bergmann wrote:
+> > On Tuesday 12 November 2013, Ian Campbell wrote:
+> > > On Tue, 2013-11-12 at 14:35 +0000, Julien Grall wrote:
+> > > > On 11/12/2013 01:37 PM, Arnd Bergmann wrote:
+> > > > > BTW, does Dom0 require an LPAE-enabled kernel or can it be a regular
+> > > > > non-LPAE ARMv6/v7 multiplatform build?
+> > > > 
+> > > > It can be both.
+> > > 
+> > > NB: v7 only, we don't do v6 at all. But yes either LPAE or regular is
+> > > fine with us.
 > > 
-> > Our problem (as I see it) is that #2 is creating an ABI out of something
-> > we never realized would become an ABI, the filenames created by 'make
-> > dtbs'.
+> > Why not combined v6/v7 kernels for non-LPAE? I can't see a technical reason
+> > preventing you from running a Dom0 or DomU kernel that can also run on
+> > some ARMv6 platform as long as both platforms and CPUs are enabled in
+> > Kconfig.
 > 
-> Well, flash-kernel could be taught how to parse .dtb files to get the
-> compatibility strings out of them, rather than use filenames.
-> 
-> It might still be early enough to give distributions some guidelines
-> about what DT folks consider ABI and what is not. How they should find
-> a fitting .dtb file and how they should not.
+> Unfortunately today we can't support ARMv6.
+> From f880b67dcbdedb49453f88d2ccb1a0937b046d82:
+>    
+>     * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+>       Xen grant table code, so we must ensure that Xen support is only
+>       built on ARMv7-only kernels not combined ARMv6/v7 kernels.
 
-True, but this isn't a 'search /boot/config-X for CONFIG_Y so we can
-configure for Z' *cough* *grub* *cough*.  flash-kernel currently doesn't
-have any more correct way to select dtbs than by filename.
+Ah, I must have made a mistake there. It's not strictly a bug, but I think
+it would be better to undo the dependency I added in that patch and instead
+change the Makefile to build the grant table code with -march=armv7-a:
+This is safe because we know that this code will only /run/ on v7 even
+in a combined v6/v7 kernel, but it lets us get better build coverage because
+then we will enable Xen support in an allmodconfig or allyesconfig kernel
+that today enables both v6 and v7.
 
-It's normal to look for arch/<arch>/boot/zImage after a build.  Module
-names are not 1-1 with object files or source files, they are unique,
-and static.  Our failure was not providing a similar ABI for the dtbs.
-imho, we messed up, so we should fix it.
-
-thx,
-
-Jason.
+	Arnd
