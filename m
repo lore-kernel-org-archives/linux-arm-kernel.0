@@ -1,62 +1,34 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Tue, 12 Nov 2013 11:53:37 +0530
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping support
-In-Reply-To: <528114C4.5000506@hitachi.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <528114C4.5000506@hitachi.com>
-Message-ID: <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Tue, 12 Nov 2013 15:36:26 +0900
+Subject: [PATCH] ARM: tegra: init fuse before setting reset handler
+Message-ID: <1384238186-8473-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> OK, I've ensured that the hw_breakpoint (from perf) can work
->>> with kprobes (from ftrace) at the same address on x86.
->>> So if arm64 already support hw_breakpoint on perf, kprobes should
->>> work with it.
->>
->> Single-stepping on x86 is different to the step behaviour on arm64 afaik. On
->> ARM, we have to manually remove the breakpoint, perform a single-step, then
->> add the breakpoint again. If we re-enable debug exceptions in the kprobe
->> handler, the step will complete early and we'll never step off the
->> breakpoint.
->
-> I'm unsure about arm64's debug feature behavior, what does happen when
-> it performs a single-step on sw-breakpoint?
->
->> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
->> I'm fairly sure it won't work as expected without some additional code.
->
-> OK, anyway, for testing same one, we need to port ftrace first. So the next
-> plan is to make a kprobe module to put a probe (which just printk something)
-> on a specific function (e.g. vfs_symlink), and run perf record with
-> hw-breakpoint as below
->
-> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
->
-> Note that 0xXXXXXX is the address of vfs_symlink.
->
-> After that, you can see the message in dmesg and also check the perf result
-> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
-> it works)
-Thanks for steps, ARM64 ftrace patches are under review on arm mailing
-list, I can contact the (linaro) developer implementing ftrace on
-what's supported and then figure-out a way to test this concurrency of
-kprobes breakpoint and hardware breakpoint.
+CPU reset handler was set before fuse is initialized, but
+tegra_cpu_reset_handler_enable() uses tegra_chip_id, which is set by
+tegra_init_fuse(). This patch reorders the calls so the CPU reset
+handler code does not read an uninitialized variable.
 
-Thanks,
-Sandeepa
->
-> Thank you,
->
-> --
-> Masami HIRAMATSU
-> IT Management Research Dept. Linux Technology Center
-> Hitachi, Ltd., Yokohama Research Laboratory
-> E-mail: masami.hiramatsu.pt at hitachi.com
->
->
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm/mach-tegra/tegra.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 80b801a94677..0fbdadcd96b7 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -92,9 +92,9 @@ static void __init tegra_init_cache(void)
+ 
+ static void __init tegra_init_early(void)
+ {
+-	tegra_cpu_reset_handler_init();
+ 	tegra_apb_io_init();
+ 	tegra_init_fuse();
++	tegra_cpu_reset_handler_init();
+ 	tegra_init_cache();
+ 	tegra_powergate_init();
+ 	tegra_hotplug_init();
+-- 
+1.8.4.2
