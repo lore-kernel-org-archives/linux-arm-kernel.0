@@ -1,18 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Nov 2013 20:43:17 +0100
-Subject: [PATCH 04/13] ARM: ux500: Add DMA config bindings for MSP devices
-In-Reply-To: <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZ6q4Qoa+oM0NUBKT9S6sTsXy=y6hGSZi5=SXCG3QJPpA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Nov 2013 20:40:09 +0100
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <20131112193012.GR10335@titan.lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <52814AFB.3070600@wwwdotorg.org>
+ <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
+ <528275B7.6050209@wwwdotorg.org>
+ <20131112193012.GR10335@titan.lakedaemon.net>
+Message-ID: <20131112194009.GA13577@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 11:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 2) right now: distributions are creating utilities, such a flash-kernel
+> in Debian, that pick from a slew of dtbs, append it to the zImage, and
+> create the uImage.  The bootloaders in these installs don't have support
+> for fdt.
+> 
+> Our problem (as I see it) is that #2 is creating an ABI out of something
+> we never realized would become an ABI, the filenames created by 'make
+> dtbs'.
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Well, flash-kernel could be taught how to parse .dtb files to get the
+compatibility strings out of them, rather than use filenames.
 
-Patch applied to my ux500-devicetree branch, thanks!
+It might still be early enough to give distributions some guidelines
+about what DT folks consider ABI and what is not. How they should find
+a fitting .dtb file and how they should not.
 
-Yours,
-Linus Walleij
+  Andrew
