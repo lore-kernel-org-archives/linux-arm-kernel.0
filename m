@@ -1,44 +1,56 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 12 Nov 2013 20:42:42 +0900
-Subject: [Patch v4 0/2] Enable all cpus in Exynos5420
-In-Reply-To: <CANuQgHEx+pNdaybeJ_dpQ5kWYpA44hrYj4ikW9d60a3hEZZPDA@mail.gmail.com>
-References: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
- <CANuQgHEx+pNdaybeJ_dpQ5kWYpA44hrYj4ikW9d60a3hEZZPDA@mail.gmail.com>
-Message-ID: <086901cedf9c$4c1ffca0$e45ff5e0$@org>
+From: mad_soft@inbox.lv (Dmitry Artamonow)
+Date: Tue, 12 Nov 2013 16:00:59 +0400
+Subject: [PATCH 4/5] arm: sa1100: add a clock alias for sa1111 pcmcia
+ device
+In-Reply-To: <1384227132-10501-4-git-send-email-dbaryshkov@gmail.com>
+References: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
+ <1384227132-10501-4-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <5282187B.7040402@inbox.lv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chander Kashyap wrote:
-> 
-> Hi Kukjin,
-> 
-> On 7 October 2013 09:47, Chander Kashyap <chander.kashyap@linaro.org>
-> wrote:
-> > Exynos5420 is an octa-core SoC. This patch series enables the remaining
-> 4 cores.
-> >
-> > Changes in v2:
-> >         - Changed the cpu node @unit-address value to reg property
-value.
-> > Changes in v3:
-> >         - Removed leading 0x from @unit-address value.
-> > Changes in v4:
-> >         - Fixed typo and patch subject from "arm: dt" to "ARM: dt".
-> >
-> > Chander Kashyap (2):
-> >   clocksource: mct: extend mct to support 8 local interrupts for
-> >     Exynos5420
-> >   arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
-> >
-> >  arch/arm/boot/dts/exynos5420.dtsi |   37
-> +++++++++++++++++++++++++++++++++++--
-> >  drivers/clocksource/exynos_mct.c  |    4 ++++
-> >  2 files changed, 39 insertions(+), 2 deletions(-)
-> >
-> > --
-> > 1.7.9.5
+12.11.2013 07:32, Dmitry Eremin-Solenikov wrote:
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>   arch/arm/mach-sa1100/clock.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
+> index abf1dc1..cd4762d 100644
+> --- a/arch/arm/mach-sa1100/clock.c
+> +++ b/arch/arm/mach-sa1100/clock.c
+> @@ -124,6 +124,7 @@ static struct clk_lookup sa11xx_clkregs[] = {
+>   	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
+>   	CLKDEV_INIT("sa11x0-fb", NULL, &clk_cpu),
+>   	CLKDEV_INIT("sa11x0-pcmcia", NULL, &clk_cpu),
+> +	CLKDEV_INIT("1600", NULL, &clk_cpu), /* sa1111 pcmcia */
 
-Looks OK to me, applied.
+Shouldn't it be "1800" here? As I can see device name for sa1111 devices is
+initialized from offset in sa1111_init_one_child():
+         dev_set_name(&dev->dev, "%4.4lx", info->offset);
 
-Thanks,
-Kukjin
+And the offset for SA1111_PCMCIA is 0x1800:
+
+         {
+                 .offset         = 0x1800,
+                 .skpcr_mask     = 0,
+                 .devid          = SA1111_DEVID_PCMCIA,
+                 .irq = {
+                         IRQ_S0_READY_NINT,
+                         IRQ_S0_CD_VALID,
+                         IRQ_S0_BVD1_STSCHG,
+                         IRQ_S1_READY_NINT,
+                         IRQ_S1_CD_VALID,
+                         IRQ_S1_BVD1_STSCHG,
+                 },
+         },
+
+Also it would be nice if you could add some words about this strange 
+sa1111 device
+naming convention in commit changelog. It's really puzzling to see 
+string like
+"1600" in clock's devid.
+
+--
+Best regards,
+Dmitry
