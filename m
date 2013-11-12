@@ -1,92 +1,105 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Nov 2013 14:48:45 +0100
-Subject: [PATCH 7/7] ARM: sa1100: move state to the overall container
-Message-ID: <1384264125-6431-1-git-send-email-linus.walleij@linaro.org>
+From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
+Date: Tue, 12 Nov 2013 13:52:45 +0000
+Subject: [PATCH RFC 05/10] drivers: reset: stih416: add softreset controller
+In-Reply-To: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1384264365-7523-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of saving the state of registers in a special struct
-across suspend/resume, use some fields in the generic system
-controller state container struct.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+This patch adds softreset controller for STiH416 SOC, soft reset
+controller is based on system configuration registers which are mapped
+via regmap. This reset controller does not have any feedback or
+acknowledgement. With this patch a new device "st,stih416-softreset" is
+registered with system configuration registers based reset controller
+that controls the softreset state of the hardware such as Ethernet, IRB.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
- arch/arm/mach-sa1100/irq.c | 35 ++++++++++++++++-------------------
- 1 file changed, 16 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/stih416.dtsi                     |    5 ++++
+ drivers/reset/sti/reset-stih416.c                  |   22 ++++++++++++++++++++
+ .../dt-bindings/reset-controller/stih416-resets.h  |    4 +++
+ 3 files changed, 31 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index a6823f3281e2..ce847939ac65 100644
---- a/arch/arm/mach-sa1100/irq.c
-+++ b/arch/arm/mach-sa1100/irq.c
-@@ -40,6 +40,10 @@
-  * @gpio_falling: whether the IRQ for the GPIO corresponding to the
-  * bit in this word should trigger on falling edges.
-  * @gpio_mask: whether this GPIO is masked off.
-+ * @saved: indicates whether we have a saved state.
-+ * @icmr: saved state for the ICMR register.
-+ * @iclr: saved state for the ICLR register.
-+ * @iccr: saved state for the ICCR register.
-  */
- struct sa1100_sc {
- 	struct irq_domain *domain;
-@@ -50,6 +54,10 @@ struct sa1100_sc {
- 	u32 gpio_rising;
- 	u32 gpio_falling;
- 	u32 gpio_mask;
-+	bool saved;
-+	u32 icmr;
-+	u32 iclr;
-+	u32 iccr;
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index b8cabbb..a3831a3 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -32,6 +32,11 @@
+ 			compatible = "st,stih416-powerdown";
+ 		};
+ 
++		softreset: softreset-controller {
++			#reset-cells = <1>;
++			compatible = "st,stih416-softreset";
++		};
++
+ 		syscfg_sbc:sbc-syscfg at fe600000{
+ 			compatible	= "st,stih416-sbc-syscfg", "syscon";
+ 			reg		= <0xfe600000 0x1000>;
+diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
+index 0becfc5..685fd3b 100644
+--- a/drivers/reset/sti/reset-stih416.c
++++ b/drivers/reset/sti/reset-stih416.c
+@@ -37,6 +37,10 @@ static const char stih416_lpm[] = "st,stih416-lpm-syscfg";
+ #define SYSCFG_2525	0x834 /* Powerdown request USB/SATA/PCIe */
+ #define SYSSTAT_2583	0x91c /* Powerdown status USB/SATA/PCIe */
+ 
++#define SYSCFG_1539	0x86c /* Softreset Ethernet 0 */
++#define SYSCFG_510	0x7f8 /* Softreset Ethernet 1 */
++#define LPM_SYSCFG_1	0x4 /* Softreset IRB */
++
+ static const struct syscfg_reset_channel_data stih416_powerdowns[] = {
+ 	[STIH416_EMISS_POWERDOWN]	= STIH416_PDN_FRONT(0),
+ 	[STIH416_NAND_POWERDOWN]	= STIH416_PDN_FRONT(1),
+@@ -51,15 +55,33 @@ static const struct syscfg_reset_channel_data stih416_powerdowns[] = {
+ 	[STIH416_PCIE1_POWERDOWN]	= STIH416_PDN_REAR(5, 8),
  };
  
- static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
-@@ -286,22 +294,14 @@ static struct irq_domain_ops sa1100_sc_high_irqdomain_ops = {
- static struct resource irq_resource =
- 	DEFINE_RES_MEM_NAMED(0x90050000, SZ_64K, "irqs");
++static const struct syscfg_reset_channel_data stih416_softresets[] = {
++	[STIH416_ETH0_SOFTRESET] = _SYSCFG_RST_CH_NO_ACK(stih416_front,
++							SYSCFG_1539, 0),
++	[STIH416_ETH1_SOFTRESET] = _SYSCFG_RST_CH_NO_ACK(stih416_sbc,
++							SYSCFG_510, 0),
++	[STIH416_IRB_SOFTRESET]	 = _SYSCFG_RST_CH_NO_ACK(stih416_lpm,
++							LPM_SYSCFG_1, 6),
++};
++
+ static struct syscfg_reset_controller_data stih416_powerdown_controller = {
+ 	.wait_for_ack	= true,
+ 	.nr_channels	= ARRAY_SIZE(stih416_powerdowns),
+ 	.channels	= stih416_powerdowns,
+ };
  
--static struct sa1100irq_state {
--	unsigned int	saved;
--	unsigned int	icmr;
--	unsigned int	iclr;
--	unsigned int	iccr;
--} sa1100irq_state;
--
- static int sa1100irq_suspend(void)
- {
- 	struct sa1100_sc *sc = &sa1100_sc;
--	struct sa1100irq_state *st = &sa1100irq_state;
++static struct syscfg_reset_controller_data stih416_softreset_controller = {
++	.wait_for_ack = false,
++	.active_low = true,
++	.nr_channels = ARRAY_SIZE(stih416_softresets),
++	.channels = stih416_softresets,
++};
++
+ static struct of_device_id stih416_reset_match[] = {
+ 	{ .compatible = "st,stih416-powerdown",
+ 	  .data = &stih416_powerdown_controller, },
++	{ .compatible = "st,stih416-softreset",
++	  .data = &stih416_softreset_controller, },
+ 	{},
+ };
  
--	st->saved = 1;
--	st->icmr = ICMR;
--	st->iclr = ICLR;
--	st->iccr = ICCR;
-+	sc->saved = true;
-+	sc->icmr = ICMR;
-+	sc->iclr = ICLR;
-+	sc->iccr = ICCR;
+diff --git a/include/dt-bindings/reset-controller/stih416-resets.h b/include/dt-bindings/reset-controller/stih416-resets.h
+index d7da55f..ee8ccd0 100644
+--- a/include/dt-bindings/reset-controller/stih416-resets.h
++++ b/include/dt-bindings/reset-controller/stih416-resets.h
+@@ -18,4 +18,8 @@
+ #define STIH416_PCIE0_POWERDOWN		9
+ #define STIH416_PCIE1_POWERDOWN		10
  
- 	/*
- 	 * Disable all GPIO-based interrupts.
-@@ -327,16 +327,13 @@ static int sa1100irq_suspend(void)
- static void sa1100irq_resume(void)
- {
- 	struct sa1100_sc *sc = &sa1100_sc;
--	struct sa1100irq_state *st = &sa1100irq_state;
--
--	if (st->saved) {
--		ICCR = st->iccr;
--		ICLR = st->iclr;
- 
-+	if (sc->saved) {
-+		ICCR = sc->iccr;
-+		ICLR = sc->iclr;
- 		GRER = sc->gpio_rising & sc->gpio_mask;
- 		GFER = sc->gpio_falling & sc->gpio_mask;
--
--		ICMR = st->icmr;
-+		ICMR = sc->icmr;
- 	}
- }
- 
++#define STIH416_ETH0_SOFTRESET		0
++#define STIH416_ETH1_SOFTRESET		1
++#define STIH416_IRB_SOFTRESET		2
++
+ #endif /* _DT_BINDINGS_RESET_CONTROLLER_STIH416 */
 -- 
-1.8.3.1
+1.7.6.5
