@@ -1,54 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 12 Nov 2013 10:58:53 +0900
-Subject: [PATCH 03/14] ARM: shmobile: r8a7779: add HPB-DMAC support
-In-Reply-To: <5281501A.9070009@cogentembedded.com>
-References: <cover.1381293239.git.horms+renesas@verge.net.au>
- <441f750236f3d3d435a1e89ad885ec896832b9c6.1381293239.git.horms+renesas@verge.net.au>
- <52814F8E.4090606@cogentembedded.com>
- <5281501A.9070009@cogentembedded.com>
-Message-ID: <20131112015853.GC9863@verge.net.au>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Tue, 12 Nov 2013 09:36:54 +0800
+Subject: [PATCHv6 0/4] Add Freescale FTM PWM driver.
+Message-ID: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 12:46:02AM +0300, Sergei Shtylyov wrote:
-> On 11/12/2013 12:43 AM, Sergei Shtylyov wrote:
-> 
-> >>From: Max Filippov <max.filippov@cogentembedded.com>
-> 
-> >>Add HPB-DMAC platform device on R8A7779 SoC along with its slave and channel
-> >>configurations (only for SDHI0 so far).
-> 
-> >>Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-> >>[Sergei: moved *enum* declaring HPB-DMAC slave IDs from now removed
-> >><mach/dma.h>
-> >>to <mach/r8a7779.h>, removed #include <mach/dma.h> from setup-r8a7779.c,
-> >>removed
-> >>SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[] and
-> >>hpb_dmae_channels[], added ASYNCMDR.ASBTMD{20|24|43} and
-> >>ASYNCMDR.ASMD{20|24|43}
-> >>fields/values, fixed comments to ASYNCMDR.ASBTMD2[123] and ASYNCMDR.ASMD2[123]
-> >>fields/values, renamed all the bit/field/value #define's to include 'HBP_DMAE_'
-> >>prefix to match the driver, moved comments after the element initializers of
-> >>hpb_dmae_channels[].]
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>---
-> >>  arch/arm/mach-shmobile/include/mach/r8a7779.h |   7 ++
-> >>  arch/arm/mach-shmobile/setup-r8a7779.c        | 154
-> >>++++++++++++++++++++++++++
-> >>  2 files changed, 161 insertions(+)
-> 
-> >    Hm, Simon, do you know how this patch and the next one ended up being
-> >merged twice into Linus' tree?
-> 
->    Sorry, I followed up to the wrong patch. So, the question was
-> about this patch and the previous one.
-> 
-> >https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1eb6b5a0e55bfcfb0852b7d0f9442841ff807345
-> >https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=338c4991ed350abd7c5b3cb807fe022cb712a8ba
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a43e5bd76a4a3df58167d85e8020a1c9e566ad75
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=441f750236f3d3d435a1e89ad885ec896832b9c6
+Hello Therry,
 
-I assume that the reference to above git IDs implies that the answer
-to your question is yes.
+The series of patches for this version has been reviewed and acked already.
+To see each patch for detail.
+
+
+------------------
+------------------
+
+This patch series is the Freescale FTM PWM implementation. And there are 8 channels most supported by the FTM PWM. This implementation is only compatible with device tree definition.
+
+This patch series is based on linux-next and has been tested on Vybrid VF610 Tower board using device tree.
+
+
+
+Changes in v6:
+- Nothing.
+
+Changes in RFCv2 of PATVHv5:
+- Remove "fsl,pwm-counter-clk".
+
+Changes in v5:
+- Remove active/idle pinctrl stuff.
+
+Changes in v4:
+- Check for the result and return an error for devm_kzalloc().
+- Move pinmux setting from the SoC file to the board specific file.
+- Revise the written mistake of 'ret |= FTMSC_CLKEXT;' --> 'reg |= FTMSC_CLKEXT;'.
+
+
+Changes in v3:
+- Remove "availabe" field.
+- Remove "fsl,pwm-avaliable-chs" property.
+- ...
+
+Changes in v2:
+- Remove PWM CPWM/EPWM feature and sysfs.
+- Remove some redundant code.
+- Revise some code for more readable.
+- Remove "fsl,pwm-clk-ps", "fsl,pwm-number", "fsl,pwm-channels",etc.
+- Add "fsl,pwm-avaliable-chs", "fsl,pwm-counter-clk", etc.
+- Support 8 channels default in dtsi file.
+- Add counter clock source selection.
+- Rename some function name, macro name, etc.
+- Use PWM's and OF's existing function interfaces.
+- Split clk_unprepare_enable to clk_unprepare and clk_enable,etc.
+- ...
+
+Added in v1:
+- Add Freescale FTM PWM driver support.
+- Add Freescale FTM PWM node for VF610.
+- Enable Enables FTM PWM device for Vybrid VF610 TOWER.
+- Add device tree bindings for Freescale.
