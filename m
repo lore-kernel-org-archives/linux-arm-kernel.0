@@ -1,148 +1,92 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 12 Nov 2013 15:00:52 -0800
-Subject: [PATCH v11 5/6] ARM: hi3xxx: add smp support
-In-Reply-To: <CAD6h2NRTc42YAKr6zLdMpiYbpBLatA9HNpZeFa3pZZpvJXBuCg@mail.gmail.com>
- (Haojian Zhuang's message of "Tue, 12 Nov 2013 16:49:42 +0800")
-References: <1383813691-31587-1-git-send-email-haojian.zhuang@linaro.org>
- <1383813691-31587-6-git-send-email-haojian.zhuang@linaro.org>
- <527B6BCA.2010606@gmail.com>
- <CAD6h2NRTc42YAKr6zLdMpiYbpBLatA9HNpZeFa3pZZpvJXBuCg@mail.gmail.com>
-Message-ID: <87txfhmdi3.fsf@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 12 Nov 2013 17:08:30 -0600
+Subject: [PATCH V2] ARM: OMAP2+: omap_device: maintain sane runtime pm status
+ around suspend/resume
+Message-ID: <1384297710-29694-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+OMAP device hooks around suspend|resume_noirq ensures that hwmod
+devices are forced to idle using omap_device_idle/enable as part of
+the last stage of suspend activity.
 
-> On 7 November 2013 18:30, Dinh Nguyen <dinh.linux@gmail.com> wrote:
->>
->> On 11/7/13 2:41 AM, Haojian Zhuang wrote:
->>> From: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>
->>> Enable SMP support on hi3xxx platform
->>>
->>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>> Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
->>> Tested-by: Li Xin <li.xin@linaro.org>
->>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>> ---
->>>  .../bindings/arm/hisilicon/hisilicon.txt           | 30 ++++++--
->>>  arch/arm/boot/dts/hi3620.dtsi                      | 38 ++++++++++
->>>  arch/arm/mach-hi3xxx/Kconfig                       |  3 +
->>>  arch/arm/mach-hi3xxx/Makefile                      |  1 +
->>>  arch/arm/mach-hi3xxx/core.h                        | 11 +++
->>>  arch/arm/mach-hi3xxx/hi3xxx.c                      | 34 +++++++++
->>>  arch/arm/mach-hi3xxx/platsmp.c                     | 84 ++++++++++++++++++++++
->>>  7 files changed, 197 insertions(+), 4 deletions(-)
->>>  create mode 100644 arch/arm/mach-hi3xxx/core.h
->>>  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->>> index 3be60c8..8c7a465 100644
->>> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->>> @@ -1,10 +1,32 @@
->>>  Hisilicon Platforms Device Tree Bindings
->>>  ----------------------------------------------------
->>>
->>> -Hi3716 Development Board
->>> -Required root node properties:
->>> -     - compatible = "hisilicon,hi3716-dkb";
->>> -
->>>  Hi4511 Board
->>>  Required root node properties:
->>>       - compatible = "hisilicon,hi3620-hi4511";
->>> +
->>> +Hisilicon system controller
->>> +
->>> +Required properties:
->>> +- compatible : "hisilicon,sysctrl"
->>> +- reg : Register address and size
->>> +
->>> +Optional properties:
->>> +- smp-offset : offset in sysctrl for notifying slave cpu booting
->>> +             cpu 1, reg;
->>> +             cpu 2, reg + 0x4;
->>> +             cpu 3, reg + 0x8;
->>> +             If reg value is not zero, cpun exit wfi and go
->>> +- resume-offset : offset in sysctrl for notifying cpu0 when resume
->>> +- reboot-offset : offset in sysctrl for system reboot
->>> +
->>> +Example:
->>> +
->>> +     /* for Hi3620 */
->>> +     sysctrl: system-controller at fc802000 {
->>> +             compatible = "hisilicon,sysctrl";
->>> +             reg = <0xfc802000 0x1000>;
->>> +             smp-offset = <0x31c>;
->>> +             resume-offset = <0x308>;
->>> +             reboot-offset = <0x4>;
->>> +     };
->>> diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
->>> index b9d8679..e311937 100644
->>> --- a/arch/arm/boot/dts/hi3620.dtsi
->>> +++ b/arch/arm/boot/dts/hi3620.dtsi
->>> @@ -39,6 +39,27 @@
->>>                       reg = <0x0>;
->>>                       next-level-cache = <&L2>;
->>>               };
->>> +
->>> +             cpu at 1 {
->>> +                     compatible = "arm,cortex-a9";
->>> +                     device_type = "cpu";
->>> +                     reg = <1>;
->>> +                     next-level-cache = <&L2>;
->>> +             };
->>> +
->>> +             cpu at 2 {
->>> +                     compatible = "arm,cortex-a9";
->>> +                     device_type = "cpu";
->>> +                     reg = <2>;
->>> +                     next-level-cache = <&L2>;
->>> +             };
->>> +
->>> +             cpu at 3 {
->>> +                     compatible = "arm,cortex-a9";
->>> +                     device_type = "cpu";
->>> +                     reg = <3>;
->>> +                     next-level-cache = <&L2>;
->>> +             };
->>>       };
->>>
->>>       amba {
->>> @@ -65,6 +86,17 @@
->>>                       reg = <0x1000 0x1000>, <0x100 0x100>;
->>>               };
->>>
->>> +             sysctrl: system-controller at 802000 {
->>> +                     compatible = "hisilicon,sysctrl";
->>> +                     reg = <0x802000 0x1000>;
->>> +                     #address-cells = <1>;
->>> +                     #size-cells = <0>;
->>> +
->>> +                     smp-offset = <0x31c>;
->>> +                     resume-offset = <0x308>;
->>> +                     reboot-offset = <0x4>;
->>> +             };
->>> +
->>>               dual_timer0: dual_timer at 800000 {
->>>                       compatible = "arm,sp804", "arm,primecell";
->>>                       reg = <0x800000 0x1000>;
->>> @@ -115,6 +147,12 @@
->>>                       status = "disabled";
->>>               };
->>>
->>> +             timer5: timer at 600 {
->>> +                     compatible = "arm,cortex-a9-twd-timer";
->>> +                     reg = <0x600 0x20>;
->>> +                     interrupts = <1 13 0xf01>;
->>> +             };
->> Do you have a clocks node for this timer?
->
-> As I mentioned in the 0th patch, clock binding are totally removed
-> in this patch. And clock driver will be append in another patch set.
+For a device such as i2c who uses autosuspend, it is possible to enter
+the suspend path with dev->power.runtime_status = RPM_ACTIVE.
 
-Still, won't this timer still need a dummy fixed-rate clock until the
-real clocks are in place?  Otherwise it seems twd_get_clock() is going
-to fail.
+As part of the suspend flow, the generic runtime logic would increment
+it's dev->power.disable_depth to 1. This should prevent further
+pm_runtime_get_sync from succeeding once the runtime_status has been
+set to RPM_SUSPENDED.
 
-Kevin
+Now, as part of the suspend_noirq handler in omap_device, we force the
+following: if the device status is !suspended, we force the device
+to idle using omap_device_idle (clocks are cut etc..). This ensures
+that from a hardware perspective, the device is "suspended". However,
+runtime_status is left to be active.
+
+*if* an operation is attempted after this point to
+pm_runtime_get_sync, runtime framework depends on runtime_status to
+indicate accurately the device status, and since it sees it to be
+ACTIVE, it assumes the module is functional and returns a non-error
+value. As a result the user will see pm_runtime_get succeed, however a
+register access will crash due to the lack of clocks.
+
+To prevent this from happening, we should ensure that runtime_status
+exactly indicates the device status. As a result of this change
+any further calls to pm_runtime_get* would return -EACCES (since
+disable_depth is 1). On resume, we restore the clocks and runtime
+status exactly as we suspended with.
+
+Reported-by: J Keerthy <j-keerthy@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Acked-by: Rajendra Nayak <rnayak@ti.com>
+Acked-by: Kevin Hilman <khilman@linaro.org>
+---
+Changes in V2 (resend):
+	- dropped the unnecessary flag for runtime status restore
+	- picked up kevin's ack from https://patchwork.kernel.org/patch/3168371/
+
+v1: https://patchwork.kernel.org/patch/3154501/
+
+patch baseline: V3.12 tag (also applies on linux-next next-20131107 tag)
+
+Logs from 3.12 based vendor kernel:
+Before: http://pastebin.com/m5KxnB7a
+After: http://pastebin.com/8AfX4e7r
+The discussion on cpufreq side of the story which triggered this scenario:
+http://marc.info/?l=linux-pm&m=138263811321921&w=2
+
+Tested on TI vendor kernel (with dt boot):
+AM335x: evm, BBB, sk, BBW
+OMAP5uEVM, DRA7-evm
+
+ arch/arm/mach-omap2/omap_device.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index b69dd9a..f97b34b 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -621,6 +621,7 @@ static int _od_suspend_noirq(struct device *dev)
+ 
+ 	if (!ret && !pm_runtime_status_suspended(dev)) {
+ 		if (pm_generic_runtime_suspend(dev) == 0) {
++			pm_runtime_set_suspended(dev);
+ 			omap_device_idle(pdev);
+ 			od->flags |= OMAP_DEVICE_SUSPENDED;
+ 		}
+@@ -634,10 +635,10 @@ static int _od_resume_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_device *od = to_omap_device(pdev);
+ 
+-	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
+-	    !pm_runtime_status_suspended(dev)) {
++	if (od->flags & OMAP_DEVICE_SUSPENDED) {
+ 		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+ 		omap_device_enable(pdev);
++		pm_runtime_set_active(dev);
+ 		pm_generic_runtime_resume(dev);
+ 	}
+ 
+-- 
+1.7.9.5
