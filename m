@@ -1,96 +1,80 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 12 Nov 2013 07:32:08 +0400
-Subject: [PATCH 1/5] arm: sa1100: add cpu clock
-Message-ID: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 11 Nov 2013 21:40:34 -0600
+Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
+In-Reply-To: <1384215177.17054.2.camel@linux-builds1>
+References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1384215177.17054.2.camel@linux-builds1>
+Message-ID: <5281A332.6060300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both SA1100 framebuffer and PCMCIA drivers require knowledge of cpu
-frequency to correctly program timings.  Currently they receive timing
-information by calling cpufreq_get(0).  However if cpu frequency driver
-is not enabled (e.g. due to unsupported DRAM chip/board on sa1110)
-cpufreq_get(0) returns 0, causing incorrect timings to be programmed.
 
-Add cpu clock returning cpu frequency, to be used by sa11x0 fb and
-pcmcia drivers.
+On 11/11/13 6:12 PM, Dinh Nguyen wrote:
+> Hi Steffen,
+>
+> On Thu, 2013-11-07 at 16:07 +0100, Steffen Trumtrar wrote:
+>> Hi!
+>>
+>> This series includes two trivial fixes to the code (1,2),
+>> then goes on to split the single clk.c file up into clock-type
+>> specific files (3) and finally adds a divider to the peripheral
+>> clock path.
+>>
+>> The patches are rebased to the for-next branch of
+>>
+>>         git://git.rocketboards.org/linux-socfpga-next.git
+>>
+>> Regards,
+>> Steffen
+>>
+>> Steffen Trumtrar (4):
+>>   ARM: socfpga: clk: remove unused field
+>>   ARM: socfpga: clk: fix define typo
+> The first two patches are fine.
+>
+>>   ARM: socfpga: clk: split clk code
+>>   ARM: socfpga: clk: add clk_divider to periph
+> These two patches are causing the ethernet driver to not be able to grab
+> the correct clock during probe.
+>
+> Lets wait for 3.13-rc1 and I will push a new for-next that will be more
+> up-to-date.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/clock.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+Also the values do not look correct with your patch:
 
-diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index 172ebd0..abf1dc1 100644
---- a/arch/arm/mach-sa1100/clock.c
-+++ b/arch/arm/mach-sa1100/clock.c
-@@ -15,10 +15,12 @@
- #include <linux/clkdev.h>
- 
- #include <mach/hardware.h>
-+#include <mach/generic.h>
- 
- struct clkops {
- 	void			(*enable)(struct clk *);
- 	void			(*disable)(struct clk *);
-+	unsigned long		(*get_rate)(struct clk *);
- };
- 
- struct clk {
-@@ -51,6 +53,19 @@ static void clk_gpio27_disable(struct clk *clk)
- 	GAFR &= ~GPIO_32_768kHz;
- }
- 
-+static void clk_cpu_enable(struct clk *clk)
-+{
-+}
-+
-+static void clk_cpu_disable(struct clk *clk)
-+{
-+}
-+
-+static unsigned long clk_cpu_get_rate(struct clk *clk)
-+{
-+	return sa11x0_getspeed(0) * 1000;
-+}
-+
- int clk_enable(struct clk *clk)
- {
- 	unsigned long flags;
-@@ -80,16 +95,35 @@ void clk_disable(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_disable);
- 
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	if (clk && clk->ops && clk->ops->get_rate)
-+		return clk->ops->get_rate(clk);
-+	else
-+		return 0;
-+}
-+EXPORT_SYMBOL(clk_get_rate);
-+
- const struct clkops clk_gpio27_ops = {
- 	.enable		= clk_gpio27_enable,
- 	.disable	= clk_gpio27_disable,
- };
- 
-+const struct clkops clk_cpu_ops = {
-+	.enable		= clk_cpu_enable,
-+	.disable	= clk_cpu_disable,
-+	.get_rate	= clk_cpu_get_rate,
-+};
-+
- static DEFINE_CLK(gpio27, &clk_gpio27_ops);
- 
-+static DEFINE_CLK(cpu, &clk_cpu_ops);
-+
- static struct clk_lookup sa11xx_clkregs[] = {
- 	CLKDEV_INIT("sa1111.0", NULL, &clk_gpio27),
- 	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
-+	CLKDEV_INIT("sa11x0-fb", NULL, &clk_cpu),
-+	CLKDEV_INIT("sa11x0-pcmcia", NULL, &clk_cpu),
- };
- 
- static int __init sa11xx_clk_init(void)
--- 
-1.8.4.2
+per_nand_mmc_clk         1           1            52631578
+          nand_clk              0           0            13157894
+          nand_x_clk            0           0            52631578
+          sdmmc_clk             1           1            52631578
+
+Without your patch:
+
+ per_nand_mmc_clk         1           1            50000000
+          nand_clk              0           0            12500000
+          nand_x_clk            0           0            50000000
+          sdmmc_clk             1           1            50000000
+
+Dinh
+>
+> Thanks,
+>
+> Dinh
+>>  drivers/clk/socfpga/Makefile     |   3 +
+>>  drivers/clk/socfpga/clk-gate.c   | 197 ++++++++++++++++++++++++
+>>  drivers/clk/socfpga/clk-periph.c |  87 +++++++++++
+>>  drivers/clk/socfpga/clk-pll.c    | 114 ++++++++++++++
+>>  drivers/clk/socfpga/clk.c        | 313 +--------------------------------------
+>>  drivers/clk/socfpga/clk.h        |  56 +++++++
+>>  6 files changed, 458 insertions(+), 312 deletions(-)
+>>  create mode 100644 drivers/clk/socfpga/clk-gate.c
+>>  create mode 100644 drivers/clk/socfpga/clk-periph.c
+>>  create mode 100644 drivers/clk/socfpga/clk-pll.c
+>>  create mode 100644 drivers/clk/socfpga/clk.h
+>>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
