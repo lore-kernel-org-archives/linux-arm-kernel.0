@@ -1,242 +1,103 @@
-From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
-Date: Tue, 12 Nov 2013 13:53:15 +0000
-Subject: [PATCH RFC 10/10] ARM: STi: Add STiH416 ethernet support.
-In-Reply-To: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1384264395-7738-1-git-send-email-srinivas.kandagatla@st.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 12 Nov 2013 09:01:16 -0500 (EST)
+Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <528193A0.7050505@codeaurora.org>
+References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.10.1311092357090.2314@knanqh.ubzr>
+ <528193A0.7050505@codeaurora.org>
+Message-ID: <alpine.LFD.2.10.1311120839310.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Mon, 11 Nov 2013, Stephen Boyd wrote:
 
-This patch adds support to STiH416 SOC, which has two ethernet
-snps,dwmac controllers version 3.710. With this patch B2000 and B2020
-boards can boot with ethernet in MII and RGMII modes.
+> On 11/09/13 21:03, Nicolas Pitre wrote:
+> > Bah..... NAK. We are doing runtime patching of the kernel for many
+> > many things already. So why not do the same here?
+> 
+> static keys are a form of runtime patching, albeit not as extreme as
+> you're suggesting.
+> 
+> >
+> > The obvious strategy is to simply overwrite the start of the existing 
+> > __aeabi_idiv code with the "sdiv r0, r0, r1" and "bx lr" opcodes.  
+> >
+> > Similarly for the unsigned case.
+> 
+> I was thinking the same thing when I wrote this, but I didn't know how
+> to tell the compiler to either inline this function or to let me inilne
+> an assembly stub with some section magic.
+> 
+> >
+> > That let you test the hardware capability only once during boot instead 
+> > of everytime a divide operation is performed.
+> 
+> The test for hardware capability really isn't done more than once during
+> boot. The assembly is like so at compile time
+> 
+> 00000000 <__aeabi_idiv>:
+>    0:   nop     {0}
+>    4:   b       0 <___aeabi_idiv>
+>    8:   sdiv    r0, r0, r1
+>    c:   bx      lr
+> 
+> and after we test and find support for the instruction it will be
+> replaced with
+> 
+> 00000000 <__aeabi_idiv>:
+>    0:   b       8
+>    4:   b       0 <___aeabi_idiv>
+>    8:   sdiv    r0, r0, r1
+>    c:   bx      lr
+> 
+> Unfortunately we still have to jump to this function. It would be great
+> if we could inline this function at the call site but as I already said
+> I don't know how to do that.
 
-Tested on both B2020 and B2000.
+What about this patch which I think is currently your best option.  Note 
+it would need to use the facilities from asm/opcodes.h to make it endian 
+agnostic.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
----
- arch/arm/boot/dts/stih416-clock.dtsi   |   14 ++++
- arch/arm/boot/dts/stih416-pinctrl.dtsi |  106 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih416.dtsi         |   58 +++++++++++++++++
- 3 files changed, 178 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/stih416-clock.dtsi b/arch/arm/boot/dts/stih416-clock.dtsi
-index 7026bf1..a6942c7 100644
---- a/arch/arm/boot/dts/stih416-clock.dtsi
-+++ b/arch/arm/boot/dts/stih416-clock.dtsi
-@@ -37,5 +37,19 @@
- 			clock-frequency = <100000000>;
- 			clock-output-names = "CLK_S_ICN_REG_0";
- 		};
-+
-+		CLK_S_GMAC0_PHY: clockgenA1 at 7 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <25000000>;
-+			clock-output-names = "CLK_S_GMAC0_PHY";
-+		};
-+
-+		CLK_S_ETH1_PHY: clockgenA0 at 7 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <25000000>;
-+			clock-output-names = "CLK_S_ETH1_PHY";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index 0f246c9..216754f 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -97,6 +97,59 @@
- 					};
- 				};
- 			};
-+
-+			gmac1 {
-+				pinctrl_mii1: mii1 {
-+					st,pins {
-+						txd0 = <&PIO0 0 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd1 = <&PIO0 1 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd2 = <&PIO0 2 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd3 = <&PIO0 3 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txer = <&PIO0 4 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txen = <&PIO0 5 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txclk = <&PIO0 6 ALT1 IN NICLK 0 CLK_A>;
-+						col =   <&PIO0 7 ALT1 IN BYPASS 1000>;
-+
-+						mdio =  <&PIO1 0 ALT1 OUT BYPASS 1500>;
-+						mdc =   <&PIO1 1 ALT1 OUT NICLK 0 CLK_A>;
-+						crs =   <&PIO1 2 ALT1 IN BYPASS 1000>;
-+						mdint = <&PIO1 3 ALT1 IN BYPASS 0>;
-+						rxd0 =  <&PIO1 4 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd1 =  <&PIO1 5 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd2 =  <&PIO1 6 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd3 =  <&PIO1 7 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+
-+						rxdv =  <&PIO2 0 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rx_er = <&PIO2 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxclk = <&PIO2 2 ALT1 IN NICLK 0 CLK_A>;
-+					 	phyclk = <&PIO2 3 ALT1 OUT NICLK 0 CLK_A>;
-+					};
-+				};
-+				pinctrl_rgmii1: rgmii1-0 {
-+					st,pins {
-+						txd0 =  <&PIO0 0 ALT1 OUT DE_IO 500 CLK_A>;
-+						txd1 =  <&PIO0 1 ALT1 OUT DE_IO 500 CLK_A>;
-+						txd2 =  <&PIO0 2 ALT1 OUT DE_IO 500 CLK_A>;
-+						txd3 =  <&PIO0 3 ALT1 OUT DE_IO 500 CLK_A>;
-+						txen =  <&PIO0 5 ALT1 OUT DE_IO 0   CLK_A>;
-+						txclk = <&PIO0 6 ALT1 IN  NICLK 0   CLK_A>;
-+
-+						mdio = <&PIO1 0 ALT1 OUT BYPASS 0>;
-+						mdc  = <&PIO1 1 ALT1 OUT NICLK  0 CLK_A>;
-+						rxd0 = <&PIO1 4 ALT1 IN DE_IO 500 CLK_A>;
-+						rxd1 = <&PIO1 5 ALT1 IN DE_IO 500 CLK_A>;
-+						rxd2 = <&PIO1 6 ALT1 IN DE_IO 500 CLK_A>;
-+						rxd3 = <&PIO1 7 ALT1 IN DE_IO 500 CLK_A>;
-+
-+						rxdv   = <&PIO2 0 ALT1 IN  DE_IO 500 CLK_A>;
-+						rxclk  = <&PIO2 2 ALT1 IN  NICLK 0   CLK_A>;
-+						phyclk = <&PIO2 3 ALT4 OUT NICLK 0   CLK_B>;
-+
-+						clk125= <&PIO3 7 ALT4 IN NICLK 0 CLK_A>;
-+					};
-+				};
-+			};
-+
- 		};
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6a1b8a81b1..379cffe4ab 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -383,6 +383,34 @@ static void __init cpuid_init_hwcaps(void)
+ 		elf_hwcap |= HWCAP_IDIVT;
+ 	}
  
- 		pin-controller-front {
-@@ -230,6 +283,59 @@
- 					};
- 				};
- 			};
++	/*
++	 * Patch our division routines with the corresponding opcode
++	 * if the hardware supports it.
++	 */
++	if (IS_ENABLED(CONFIG_THUMB2_KERNEL) && (elf_hwcap & HWCAP_IDIVT)) {
++		extern char __aeabi_uidiv, __aeabi_idiv;
++		u16 *uidiv = (u16 *)&__aeabi_uidiv;
++		u16 *idiv = (u16 *)&__aeabi_idiv;
 +
-+			gmac0 {
-+				pinctrl_mii0: mii0 {
-+					st,pins {
-+						mdint = <&PIO13 6 ALT2 IN  BYPASS      0>;
-+						txen =  <&PIO13 7 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd0 =  <&PIO14 0 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd1 =  <&PIO14 1 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd2 =  <&PIO14 2 ALT2 OUT SE_NICLK_IO 0 CLK_B>;
-+						txd3 =  <&PIO14 3 ALT2 OUT SE_NICLK_IO 0 CLK_B>;
++		uidiv[0] = 0xfbb0;  /* udiv r0, r0, r1 */
++		uidiv[1] = 0xf0f1;
++		uidiv[2] = 0x4770;  /* bx lr */
 +
-+						txclk = <&PIO15 0 ALT2 IN  NICLK       0 CLK_A>;
-+						txer =  <&PIO15 1 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						crs = <&PIO15 2 ALT2 IN  BYPASS 1000>;
-+						col = <&PIO15 3 ALT2 IN  BYPASS 1000>;
-+						mdio= <&PIO15 4 ALT2 OUT BYPASS 1500>;
-+						mdc = <&PIO15 5 ALT2 OUT NICLK  0    CLK_B>;
++		idiv[0] = 0xfb90;  /* sdiv r0, r0, r1 */
++		idiv[1] = 0xf0f1;  
++		idiv[2] = 0x4770;  /* bx lr */
++	} else if (!IS_ENABLED(CONFIG_THUMB2_KERNEL) && (elf_hwcap & HWCAP_IDIVA)) {
++		extern char __aeabi_uidiv, __aeabi_idiv;
++		u32 *uidiv = (u32 *)&__aeabi_uidiv;
++		u32 *idiv = (u32 *)&__aeabi_idiv;
 +
-+						rxd0 =  <&PIO16 0 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd1 =  <&PIO16 1 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd2 =  <&PIO16 2 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd3 =  <&PIO16 3 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxdv =  <&PIO15 6 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rx_er = <&PIO15 7 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxclk = <&PIO17 0 ALT2 IN NICLK 0 CLK_A>;
-+					 	phyclk = <&PIO13 5 ALT2 OUT NICLK 0 CLK_B>;
-+					};
-+				};
++		uidiv[0] = 0xe730f110;  /* udiv r0, r0, r1 */
++		uidiv[1] = 0xe12fff1e;  /* bx lr */
 +
-+				pinctrl_rgmii0: rgmii0 {
-+					st,pins {
-+						 phyclk = <&PIO13  5 ALT4 OUT NICLK 0 CLK_B>;
-+						 txen = <&PIO13 7 ALT2 OUT DE_IO 0 CLK_A>;
-+						 txd0  = <&PIO14 0 ALT2 OUT DE_IO 500 CLK_A>;
-+						 txd1  = <&PIO14 1 ALT2 OUT DE_IO 500 CLK_A>;
-+						 txd2  = <&PIO14 2 ALT2 OUT DE_IO 500 CLK_B>;
-+						 txd3  = <&PIO14 3 ALT2 OUT DE_IO 500 CLK_B>;
-+						 txclk = <&PIO15 0 ALT2 IN NICLK 0 CLK_A>;
++		idiv[0] = 0xe710f110;  /* sdiv r0, r0, r1 */
++		idiv[1] = 0xe12fff1e;  /* bx lr */
++	}
 +
-+						 mdio = <&PIO15 4 ALT2 OUT BYPASS 0>;
-+						 mdc = <&PIO15 5 ALT2 OUT NICLK 0 CLK_B>;
-+
-+						 rxdv = <&PIO15 6 ALT2 IN DE_IO 500 CLK_A>;
-+						 rxd0 =<&PIO16 0 ALT2 IN DE_IO	500 CLK_A>;
-+						 rxd1 =<&PIO16 1 ALT2 IN DE_IO	500 CLK_A>;
-+						 rxd2 =<&PIO16 2 ALT2 IN DE_IO	500 CLK_A>;
-+						 rxd3  =<&PIO16 3 ALT2 IN DE_IO 500 CLK_A>;
-+						 rxclk =<&PIO17 0 ALT2 IN NICLK 0 CLK_A>;
-+
-+						 clk125=<&PIO17 6 ALT1 IN NICLK 0 CLK_A>;
-+					};
-+				};
-+			};
- 		};
- 
- 		pin-controller-fvdp-fe {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index a3831a3..bf052fb 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -103,5 +103,63 @@
- 			pinctrl-0 	= <&pinctrl_sbc_serial1>;
- 			clocks          = <&CLK_SYSIN>;
- 		};
-+
-+		ethernet0: ethernet0{
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status 		= "disabled";
-+			compatible		= "st,stih416-dwmac";
-+			reg			= <0x8bc 0x4>;
-+			st,syscon		= <&syscfg_rear>;
-+			resets			= <&softreset STIH416_ETH0_SOFTRESET>;
-+			ranges;
-+
-+			dwmac at fe810000 {
-+				device_type 	= "network";
-+				compatible	= "snps,dwmac", "snps,dwmac-3.710";
-+				status 		= "disabled";
-+				reg 		= <0xfe810000 0x8000>;
-+
-+				interrupts = <0 133 0>, <0 134 0>, <0 135 0>;
-+				interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
-+
-+				snps,pbl 	= <32>;
-+				snps,mixed-burst;
-+
-+				pinctrl-names 	= "default";
-+				pinctrl-0	= <&pinctrl_mii0>;
-+				clock-names	= "stmmaceth";
-+				clocks		= <&CLK_S_GMAC0_PHY>;
-+			};
-+		};
-+
-+		ethernet1: ethernet1 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status 		= "disabled";
-+			compatible		= "st,stih416-dwmac";
-+			reg			= <0x7f0 0x4>;
-+			st,syscon		= <&syscfg_sbc>;
-+			resets			= <&softreset STIH416_ETH1_SOFTRESET>;
-+			ranges;
-+
-+			dwmac at fef08000 {
-+				device_type = "network";
-+				compatible	= "snps,dwmac", "snps,dwmac-3.710";
-+				status 		= "disabled";
-+				reg		= <0xfef08000 0x8000>;
-+				interrupts = <0 136 0>, <0 137 0>, <0 138 0>;
-+				interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
-+
-+				snps,pbl	= <32>;
-+				snps,mixed-burst;
-+
-+				pinctrl-names 	= "default";
-+				pinctrl-0	= <&pinctrl_mii1>;
-+				clock-names	= "stmmaceth";
-+				clocks		= <&CLK_S_ETH1_PHY>;
-+			};
-+		};
-+
- 	};
- };
--- 
-1.7.6.5
+ 	/* LPAE implies atomic ldrd/strd instructions */
+ 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+ 	if (vmsa >= 5)
+
+
+Nicolas
