@@ -1,44 +1,18 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 12 Nov 2013 10:14:34 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <20131112083633.GB10318@1wt.eu> (Willy Tarreau's message of "Tue,
- 12 Nov 2013 09:36:33 +0100")
-References: <8761s0cqhh.fsf@natisbad.org>
- <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
- <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
-Message-ID: <87a9hagex1.fsf@natisbad.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Nov 2013 09:57:06 +0000
+Subject: [PATCH 1/5] arm: sa1100: add cpu clock
+In-Reply-To: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
+References: <1384227132-10501-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20131112095706.GE16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 12, 2013 at 07:32:08AM +0400, Dmitry Eremin-Solenikov wrote:
+> Both SA1100 framebuffer and PCMCIA drivers require knowledge of cpu
+> frequency to correctly program timings.  Currently they receive timing
+> information by calling cpufreq_get(0).  However if cpu frequency driver
+> is not enabled (e.g. due to unsupported DRAM chip/board on sa1110)
+> cpufreq_get(0) returns 0, causing incorrect timings to be programmed.
 
-Willy Tarreau <w@1wt.eu> writes:
-
->> That been said, even if the driver is most probably not the only one to
->> blame here (considering the result of bisect and current thread on
->> netdev), I never managed to get the performance I have on my ReadyNAS
->> Duo v2 (i.e. 108MB/s for a file served by an Apache) with a mvneta-based
->> platform (RN102, RN104 or RN2120). Understanding why is on an already a
->> long todo list. 
->
-> Yes I found that your original numbers were already quite low,
-
-Tests for the rgression were done w/ scp, and were hence limited by the
-crypto (16MB/s using arcfour128). But I also did some tests w/ a simple
-wget for a file served by Apache *before* the regression and I never got
-more than 60MB/s from what I recall. Can you beat that? 
-
-> so it is also possible that you have a different problem (eg: faulty
-> switch or auto-negociation problem where the switch goes to half
-> duplex because the neta does not advertise nway or whatever) that is
-> emphasized by the latest changes
-
-Tested w/ back to back connections to the NAS from various hosts and
-through different switch. Never saturated the link.
-
-> I can confirm that I got this message from you on netdev so it should be OK
-> now.
-
-Good. Thanks for the info.
-
-a+
+I added a select statement back in 1937f5b91833e2e8e53bcc821fc7a5fbe6ccb9b5
+which avoids this problem.  Does this not work?
