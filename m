@@ -1,17 +1,28 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Tue, 12 Nov 2013 14:17:34 -0600
-Subject: [alsa-devel] [PATCH] ASoC: fsl-ssi: fix SDMA starvation
-In-Reply-To: <20131112132441.GG30263@pengutronix.de>
-References: <1384255056-25673-1-git-send-email-mpa@pengutronix.de>
- <52822529.5090502@tabi.org> <20131112132441.GG30263@pengutronix.de>
-Message-ID: <CAOZdJXUWv3_ZV6p9VQ+zYqwUDVQC6BMb-VhVoVtEh1yC23VuTg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Nov 2013 13:23:13 -0700
+Subject: [PATCH v10 4/7] ARM: tegra: add support for Trusted Foundations
+In-Reply-To: <1383819106-1400-5-git-send-email-acourbot@nvidia.com>
+References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
+ <1383819106-1400-5-git-send-email-acourbot@nvidia.com>
+Message-ID: <52828E31.8010408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 7:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
->
-> No, I don't have access on PowerPC hardware, so I didn't test it on
-> PowerPC.
+On 11/07/2013 03:11 AM, Alexandre Courbot wrote:
+> Register the firmware operations for Trusted Foundations if the device
+> tree indicates it is active on the device.
 
-Can you change the code so that the interrupts are enabled only on
-i.MX?  On PowerPC, the interrupts are used only for debugging.
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+
+>  void __init tegra_init_early(void)
+>  {
+> +	of_register_trusted_foundations();
+>  	tegra_cpu_reset_handler_init();
+>  	tegra_apb_io_init();
+>  	tegra_init_fuse();
+
+Your other bugfix patch for 3.13 moved tegra_cpu_reset_handler_init().
+Should the call to of_register_trusted_foundations() move with it when
+this is applied, or should it just stay right at the start of
+tegra_init_early()? Either way is fine; just let me know which way to
+fix up the conflict when this gets applied.
