@@ -1,67 +1,34 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 12 Nov 2013 14:57:39 +0000
-Subject: [Xen-devel] Physical memory start contraints in the Linux
- kernel (Was: Re:	Xen osstest on Calxeda midway progress (Was: Re:
- [xen-unstable test] 21486: tolerable FAIL - PUSHED))
-In-Reply-To: <52824090.8040203@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 12 Nov 2013 15:00:40 +0000
+Subject: Physical memory start contraints in the Linux kernel  (Was: Re:
+ Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel] [xen-unstable
+ test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <201311121437.55826.arnd@arndb.de>
 References: <osstest-21486-mainreport@xen.org>
  <1384250005.1883.35.camel@kazak.uk.xensource.com>
  <alpine.DEB.2.02.1311121212240.26077@kaball.uk.xensource.com>
- <201311121437.55826.arnd@arndb.de> <52823C9E.2010007@linaro.org>
- <20131112144128.GL16735@n2100.arm.linux.org.uk>
- <52824090.8040203@linaro.org>
-Message-ID: <1384268259.10204.29.camel@kazak.uk.xensource.com>
+ <201311121437.55826.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.02.1311121449550.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-11-12 at 14:52 +0000, Julien Grall wrote:
+On Tue, 12 Nov 2013, Arnd Bergmann wrote:
+> > Or is this a lost fight and should we find a workaround (see below if we
+> > are curious) to make the start of memory look the same?
 > 
-> On 11/12/2013 02:41 PM, Russell King - ARM Linux wrote:
-> > On Tue, Nov 12, 2013 at 02:35:10PM +0000, Julien Grall wrote:
-> >> During some debugging on the Arndale and Midway, I found another
-> >> constraint with CONFIG_ARM_PATCH_PHYS_VIRT.
-> >> I have noticed that all the kernel physical addresses must be lower than
-> >> the corresponding virtual addresses. So the delta offset compute in
-> >> __fixup_pv_table (arch/arm/kernel/head.S) must always be negative.
-> >> If this assertion is not validated, when the kernel will browse the
-> >> memory bank (sanity_check_info in arch/arm/mm/mmu.c), __phys(...) will
-> >> compute a wrong address and will result to consider all memory bank as
-> >> highmem.
-> >>
-> >> After digging in the code, it seems it's due to some optimization during
-> >> opcode fixup in __fixup_a_pvtable. Is it a wanted constraint?
-> >
-> > Are you talking about the code in v3.12 or the code in -next ?
-> 
-> I was talking about 3.12. I have just checked -next and my issue seems 
-> to be fixed by the commit f52bb722547f43caeaecbcc62db9f3c3b80ead9b.
-> I should have checked earlier, thanks.
+> I don't see what hack you are referring to, can you elaborate?
 
-Should we revert your Xen side fix^Wworkaround then:
+The hack would be mapping dom0 memory at the same start address as it
+would be on the native platform but allocating its memory contiguously
+at an offset.
 
-commit 6c21cb36e263de2db8716b477157a5b6cd531e1e
-Author: Julien Grall <julien.grall@linaro.org>
-Date:   Tue Oct 22 11:51:48 2013 +0100
+For example having dom0 psedo-physical memory start at 0x80000000 (as it
+would expect) and end at 0x88000000 (because let's sat that we only give
+128MB of memory to dom0). The actual physical memory would be allocated
+contiguously from 0xA0000000. The swiotlb-xen code in Linux would be
+made aware of the offset 0xA0000000-0x80000000 via device tree and
+would calculate the right physical address to use for dma operations.
+Today swiotlb-xen assumes that pseudo-phisical addresses correspond to
+physical addresses for dom0.
 
-    xen/arm: Allocate memory for dom0 from the bottom with the 1:1 Workaround
-    
-    On Linux, the option CONFIG_ARM_PATCH_PHYS_VIRT (by default enabled) allow
-    the Kernel to be loaded anywhere (or nearly) by patching the translation
-    pv<->virt at boot time.
-    
-    The current solution in Linux assuming that the delta physical address -
-    virtual address is always negative. A positive delta will destroy all the
-    optimisation to modify only a part of the translation instruction (add/sub
-    
-    By default, Xen is allocating memory from the top of memory and then
-    goes down. To avoid booting issue with Linux, we must allocate memory
-    from the bottom (ie starting from 0).
-    
-    Signed-off-by: Julien Grall <julien.grall@linaro.org>
-    Acked-by: Ian Campbell <ian.campbell@citrix.com>
-
-The plus side of reverting it is that we can help find any future issues
-with Linux. The down side of reverting it is that we can help find any
-future issues with Linux...
-
-Ian.
+It feels to me like an hack to work around Linux limitations.
