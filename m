@@ -1,17 +1,42 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 12 Nov 2013 10:40:19 -0500
-Subject: Fwd: [PATCH 6/8] watchdog: davinci: reuse driver for keystone arch
-In-Reply-To: <527A28DE.4030906@ti.com>
-References: <1383680783-12114-7-git-send-email-ivan.khoronzhuk@ti.com>
- <527A28DE.4030906@ti.com>
-Message-ID: <52824BE3.40504@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 12 Nov 2013 13:40:23 -0200
+Subject: [PATCH] ARM: dts: imx6q-udoo: Add Ethernet support
+Message-ID: <1384270823-13229-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 November 2013 06:32 AM, ivan.khoronzhuk wrote:
-> The keystone arch use the same IP watchdog, so add "ti,keystone-wdt"
-> compatible and correct identity.
-> 
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Add Ethernet support for imx6q udoo board.
+
+Tested by booting a kernel via NFS.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-udoo.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
+index 1b5104d..1c7f7a1 100644
+--- a/arch/arm/boot/dts/imx6q-udoo.dts
++++ b/arch/arm/boot/dts/imx6q-udoo.dts
+@@ -21,8 +21,19 @@
+ 	};
+ };
+ 
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
+ &iomuxc {
+ 	imx6q-udoo {
++		pinctrl_enet: enetgrp {
++			fsl,pins = <MX6QDL_ENET_PINGRP1>;
++		};
++
+ 		pinctrl_uart2: uart2grp {
+ 			fsl,pins = <MX6QDL_UART2_PINGRP1>;
+ 		};
+-- 
+1.8.1.2
