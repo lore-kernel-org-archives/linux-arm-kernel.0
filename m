@@ -1,40 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 12 Nov 2013 17:27:05 +0000
-Subject: [Xen-devel] [PATCH 2/2] swiotlb-xen: xen_swiotlb_map_page: do
- not error out if dma_capable fails
-In-Reply-To: <20131112144832.GC9435@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1311121404590.26077@kaball.uk.xensource.com>
- <1384265520-6833-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20131112144832.GC9435@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1311121704590.26077@kaball.uk.xensource.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 12 Nov 2013 18:30:22 +0100
+Subject: [PATCH v2 0/5] ata: Add APM X-Gene SATA controller support
+In-Reply-To: <5282589C.2090606@cogentembedded.com>
+References: <1383980431-6572-1-git-send-email-lho@apm.com>
+ <3056580.hyyOnlSqg9@amdc1032> <5282589C.2090606@cogentembedded.com>
+Message-ID: <2501719.LnLBBqadQB@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell gave a great explanation of the issue so I am just going to
-limit myself to answering to:
 
-On Tue, 12 Nov 2013, Konrad Rzeszutek Wilk wrote:
-> > Considering that we know that the swiotlb buffer has a low address,
-> > skip the check.
+Hi Sergei,
+
+On Tuesday, November 12, 2013 08:34:36 PM Sergei Shtylyov wrote:
+> Hello.
 > 
-> I am not following that sentence. Could you please explain to me
-> how the SWIOTLB buffer low address guarantees that we don't need
-> the check?
+> On 12-11-2013 19:40, Bartlomiej Zolnierkiewicz wrote:
+> 
+> > Please remember to include linux-ide at vger.kernel.org on CC: for ATA patches.
+> 
+> > Also from the quick look it seems that:
+> > - patch #4 ("ata: Add APM X-Gene SATA serdes functions") should come before
+> >    patch #3 ("ata: Add APM X-Gene SATA driver") as code in patch #3 depends
+> >    on the code in patch #4
+> > - patch #5 ("Documentation: Add documentation for APM X-Gene SATA DTS
+> >    binding") should come before patch #2 ("arm64: Add APM X-Gene DTS entry
+> >    for SATA controllers") or (even better) just be merged into patch #2
+> 
+>     No, if it has to be merged then to the driver patch, not .dts patch.
 
-xen_swiotlb_fixup makes sure that the swiotlb buffer is lower than 4GB,
-probably lower than 3GB, by passing dma_bits to
-xen_create_contiguous_region.
-This meets the requirements of most devices out there.
-In fact we are not even running this check under the same conditions in
-swiotlb_map_sg_attrs.
-I admit that it is possible to come up with a scenario where the check
-would be useful, but it is far easier to come up with scenarios where
-not only is unneeded but it is even harmful.
+Oh, yes.  Driver patch is where these bindings are actually introduced.
 
-Alternatively (without Rob's "of: set dma_mask to point to
-coherent_dma_mask") Linux 3.13 is going to fail to get the network
-running on Midway. It is going to avoid fs mounting failures just
-because we don't do the same check in swiotlb_map_sg_attrs.
+Also .dts patch (adding actual users of bindings) should ideally come last.
 
-FYI given that Rob's patch is probably going upstream soon anyway, I
-don't feel so strongly about this.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
