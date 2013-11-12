@@ -1,60 +1,48 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Tue, 12 Nov 2013 15:46:21 -0400
-Subject: [PATCHv5 19/20] arm: dts: make OMAP4460 bandgap node to belong to OCP
-In-Reply-To: <1384285582-16933-1-git-send-email-eduardo.valentin@ti.com>
-References: <1384285582-16933-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1384285582-16933-20-git-send-email-eduardo.valentin@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Nov 2013 11:56:11 -0800
+Subject: [PATCH] pinctrl: single: call pcs_soc->rearm() whenever IRQ
+ mask is changed
+In-Reply-To: <CACRpkdbo_TwX79hnJ5mCo8D4TSDd6OUzaOsFa8MgzjLy-H2U4Q@mail.gmail.com>
+References: <1381507996-15021-1-git-send-email-rogerq@ti.com>
+ <CACRpkdb7iUypffB7O7-RhQhVf5WkjYdVCNLRz=BgySG4FET-xQ@mail.gmail.com>
+ <20131011172337.GU29913@atomide.com>
+ <CACRpkdbo_TwX79hnJ5mCo8D4TSDd6OUzaOsFa8MgzjLy-H2U4Q@mail.gmail.com>
+Message-ID: <20131112195611.GT15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Small fix on representation. Bandgap node belongs to OCP.
+* Linus Walleij <linus.walleij@linaro.org> [131112 10:45]:
+> On Fri, Oct 11, 2013 at 7:23 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Linus Walleij <linus.walleij@linaro.org> [131011 09:27]:
+> >> On Fri, Oct 11, 2013 at 6:13 PM, Roger Quadros <rogerq@ti.com> wrote:
+> >>
+> >> > On OMAPs the IO ring must be rearmed each time the pad wakeup
+> >> > configuration is changed. So call pcs_soc->rearm() from
+> >> > pcs_irq_set().
+> >> >
+> >> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> >>
+> >> If Tony needs to apply this with the other patches: Acked-by.
+> >
+> > Just replied with a slightly modified version of Roger's patch
+> > suggesting you pull in the signed tag I posted for you yesterday
+> > and then you can pick up Roger's fix into the pinctrl tree :)
+> 
+> Hm now that I go over these old mails in my inbox I start to
+> worry that I missed something here, I have no memory of pulling
+> a tag for OMAP... is this all in the state
+> it needs to be for OMAP?
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Suggested-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
----
- arch/arm/boot/dts/omap4460.dtsi | 18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+The other pinctrl-single related patches are now merged to mainline:
 
-diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-index dc22719..def8183 100644
---- a/arch/arm/boot/dts/omap4460.dtsi
-+++ b/arch/arm/boot/dts/omap4460.dtsi
-@@ -39,14 +39,16 @@
- 		#include "omap4-cpu-thermal.dtsi"
- 	};
- 
--	bandgap: bandgap {
--		reg = <0x4a002260 0x4
--		       0x4a00232C 0x4
--		       0x4a002378 0x18>;
--		compatible = "ti,omap4460-bandgap";
--		interrupts = <0 126 IRQ_TYPE_LEVEL_HIGH>; /* talert */
--		gpios = <&gpio3 22 0>; /* tshut */
-+	ocp {
-+		bandgap: bandgap {
-+			reg = <0x4a002260 0x4
-+			       0x4a00232C 0x4
-+			       0x4a002378 0x18>;
-+			compatible = "ti,omap4460-bandgap";
-+			interrupts = <0 126 IRQ_TYPE_LEVEL_HIGH>; /* talert */
-+			gpios = <&gpio3 22 0>; /* tshut */
- 
--		#thermal-sensor-cells = <0>;
-+			#thermal-sensor-cells = <0>;
-+		};
- 	};
- };
--- 
-1.8.2.1.342.gfa7285d
+1b9c0fb365cbb1154f4e7997061db972cbf58300 pinctrl: single: Fix build when not built on ARM
+dc7743aa3c49fabbc6dc9edbcf7df74d776ac32e pinctrl: single: Add support for auxdata
+3e6cee1786a13cb2308609b5f8c020e1754e37cf pinctrl: single: Add support for wake-up interrupts
+02e483f66deb6bd8df6af450726574614eb53be3 pinctrl: single: Prepare for supporting SoC specific features
+
+The fix from Roger is still missing. You can go ahead and queue
+it, or if you prefer me to do it I can add it to my fixes.
+
+Regards,
+
+Tony
