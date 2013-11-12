@@ -1,40 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Nov 2013 20:39:12 -0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_HIGHMEM
-Message-ID: <1384295952-10619-1-git-send-email-festevam@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Nov 2013 15:48:22 -0700
+Subject: [PATCHv4 1/7] ARM: tegra: Create a DT header defining SWGROUP ID
+In-Reply-To: <1384158718-4756-2-git-send-email-hdoyu@nvidia.com>
+References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
+ <1384158718-4756-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <5282B036.9090604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
+> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
+> binding. "swgroup" is a group of H/W clients which a Tegra SoC
+> supports. This unique ID can be used to calculate MC_SMMU_<swgroup
+> name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
+> register bit. This will allow the same header to be used by both
+> device tree files, and drivers implementing this binding, which
+> guarantees that the two stay in sync. This also makes device trees
+> more readable by using names instead of magic numbers. For HOTRESET
+> bit shifting we need another conversion table, which will come later.
 
-Booting a mx6q wandboard with 2GB of RAM we see the following on boot:
+> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
 
-Booting Linux on physical CPU 0x0                                               
-Linux version 3.12.0-next-20131112+ (fabio at fabio-Latitude-E6410) (gcc version 43
-CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d                
-CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache        
-Machine model: Wandboard i.MX6 Quad Board                                       
-Truncating RAM at 10000000-8fffffff to -7f7fffff (vmalloc region overlap)
-...
+> +#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
+> +
+> +#define TEGRA_SWGROUP_MAX	64
+> +
+> +#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
 
-Select CONFIG_HIGHMEM to avoid the vmalloc region overlap.
+If I put the following into a DT and compile it:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
+#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
+/ {
+	test-prop = <(TEGRA_SWGROUP_BIT(PPCS2))>;
+};
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index c814e0e..f1c9bfa 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -42,6 +42,7 @@ CONFIG_VMSPLIT_2G=y
- CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
-+CONFIG_HIGHMEM=y
- CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
- CONFIG_VFP=y
- CONFIG_NEON=y
--- 
-1.8.1.2
+I get:
+
+Error: arch/arm/boot/dts/tegra20.dtsi:11.28-29 integer value out of
+range 0000000000000020 (32 bits)
+FATAL ERROR: Syntax error parsing input tree
+
+Is TEGRA_SWGROUP_BIT() not meant to be used in DT files? If it is, the
+definition is broken. If it is not, it should be defined in the driver
+not the header, since DT files have no use for it.
+
+Note: I mentioned this issue last time I reviewed this patch:-(
