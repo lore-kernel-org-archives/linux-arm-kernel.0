@@ -1,25 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Nov 2013 18:08:57 +0100
-Subject: [PATCH 1/7] ARM: sa1100: switch to MULTI_IRQ_HANDLER
-In-Reply-To: <CAL_JsqJz6deAwLd1i+S-H59AQep3LWBosSRtzOSa+EQeeEd7VA@mail.gmail.com>
-References: <1384264061-6174-1-git-send-email-linus.walleij@linaro.org>
- <CAL_JsqJz6deAwLd1i+S-H59AQep3LWBosSRtzOSa+EQeeEd7VA@mail.gmail.com>
-Message-ID: <CACRpkdZHzv7x+BR1Z2QRoM9U4_UBTYWXtHsHtzJT1kRqYmnqWA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Nov 2013 17:04:55 +0000
+Subject: [PATCHv3 1/8] drm: Add the lacking DRM_MODE_FLAG_* for
+ matching the DISPLAY_FLAGS_*
+In-Reply-To: <1384274965-30549-1-git-send-email-denis@eukrea.com>
+References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131112170455.GQ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 3:19 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Nov 12, 2013 at 7:47 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Tue, Nov 12, 2013 at 05:49:18PM +0100, Denis Carikli wrote:
+> diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+> index fc2adb6..586c12f 100644
+> --- a/drivers/gpu/drm/drm_modes.c
+> +++ b/drivers/gpu/drm/drm_modes.c
+> @@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
+>  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
+>  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
+>  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
+> +	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
+> +		dmode->flags |= DRM_MODE_FLAG_DE_LOW;
+> +	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
+> +		dmode->flags |= DRM_MODE_FLAG_DE_HIGH;
+> +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
+> +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_POSEDGE;
+> +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+> +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_NEGEDGE;
+> +
 
->> +       .handle_irq     = sa1100_handle_irq,
->
-> In interest of shrinking the machine_desc, can you set the handler in
-> sa1100_init_irq instead? That is how the gic and vic initialization
-> work now. sa1100_handle_irq can also then become static.
+I'm still not convinced that these should be exposed in *any* way to
+userspace - I'm with Ville Syrj?l? on this point.
 
-It seems like Dmitry (E-S) will be running a MULTI_IRQ_HANDLER
-series rather than me since he has a stack of patches, so
-I'll refer to him for now, Dmitry take notice!
+Yes, you've moved their definition out of a uapi header file, but
+they're still leaking out of kernel space via calls (and with Xorg,
+they'll leak into the DisplayMode structures within the X server.)
 
-Yours,
-Linus Walleij
+Now, here's the thing... The polarity of the display enable signal.
+That's a property of the connected device right?  It doesn't change
+with respect to the displayed mode unlike the hsync/vsync signals.
+If that's true, it should not be here.
+
+Same goes for the pixel clock edge.  If it's a property of the
+connected device and doesn't have a dependence on the displayed
+mode, then it should not be in the DRM mode structure.
