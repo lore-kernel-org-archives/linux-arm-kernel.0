@@ -1,101 +1,67 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 12 Nov 2013 16:54:26 +0530
-Subject: [PATCH] ARM: dts: AM437x GP EVM support
-Message-ID: <1384255468-2453-1-git-send-email-afzal@ti.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 12 Nov 2013 11:28:57 +0000
+Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <528193A0.7050505@codeaurora.org> (Stephen Boyd's message of
+ "Mon, 11 Nov 2013 18:34:08 -0800")
+References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.10.1311092357090.2314@knanqh.ubzr>
+ <528193A0.7050505@codeaurora.org>
+Message-ID: <yw1xli0tvoxy.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-AM437x GP EVM DTS with pinmux information to make I2C on EVM usable.
+> On 11/09/13 21:03, Nicolas Pitre wrote:
+>> Bah..... NAK. We are doing runtime patching of the kernel for many
+>> many things already. So why not do the same here?
+>
+> static keys are a form of runtime patching, albeit not as extreme as
+> you're suggesting.
+>
+>>
+>> The obvious strategy is to simply overwrite the start of the existing 
+>> __aeabi_idiv code with the "sdiv r0, r0, r1" and "bx lr" opcodes.  
+>>
+>> Similarly for the unsigned case.
+>
+> I was thinking the same thing when I wrote this, but I didn't know how
+> to tell the compiler to either inline this function or to let me inilne
+> an assembly stub with some section magic.
+>
+>>
+>> That let you test the hardware capability only once during boot instead 
+>> of everytime a divide operation is performed.
+>
+> The test for hardware capability really isn't done more than once during
+> boot. The assembly is like so at compile time
+>
+> 00000000 <__aeabi_idiv>:
+>    0:   nop     {0}
+>    4:   b       0 <___aeabi_idiv>
+>    8:   sdiv    r0, r0, r1
+>    c:   bx      lr
+>
+> and after we test and find support for the instruction it will be
+> replaced with
+>
+> 00000000 <__aeabi_idiv>:
+>    0:   b       8
+>    4:   b       0 <___aeabi_idiv>
+>    8:   sdiv    r0, r0, r1
+>    c:   bx      lr
+>
+> Unfortunately we still have to jump to this function. It would be great
+> if we could inline this function at the call site but as I already said
+> I don't know how to do that.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- .../devicetree/bindings/arm/omap/omap.txt          |  3 ++
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/am437x-gp-evm.dts                | 47 ++++++++++++++++++++++
- 3 files changed, 51 insertions(+)
- create mode 100644 arch/arm/boot/dts/am437x-gp-evm.dts
+Ideally the bl instruction at the call site would be patched over with
+sdiv/udiv when supported.  This would leave things exactly as they are
+for hardware without div capability and incur only the call setup cost
+(but no actual call) on div-capable hardware.  No, I don't know how to
+achieve this.
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index 808c154..be5f365 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -61,5 +61,8 @@ Boards:
- - AM43x EPOS EVM
-   compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
- 
-+- AM437x GP EVM
-+  compatible = "ti,am437x-gp-evm", "ti,am4372", "ti,am43"
-+
- - DRA7 EVM:  Software Developement Board for DRA7XX
-   compatible = "ti,dra7-evm", "ti,dra7"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d57c1a6..85626e4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -203,6 +203,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	am3517-evm.dtb \
- 	am3517_mt_ventoux.dtb \
- 	am43x-epos-evm.dtb \
-+	am437x-gp-evm.dtb \
- 	dra7-evm.dtb
- dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-new file mode 100644
-index 0000000..11d93ba
---- /dev/null
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/* AM437x GP EVM */
-+
-+/dts-v1/;
-+
-+#include "am4372.dtsi"
-+#include <dt-bindings/pinctrl/am43xx.h>
-+
-+/ {
-+	model = "TI AM437x GP EVM";
-+	compatible = "ti,am437x-gp-evm","ti,am4372","ti,am43";
-+};
-+
-+&am43xx_pinmux {
-+	i2c0_pins: i2c0_pins {
-+		pinctrl-single,pins = <
-+			0x188 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_sda.i2c0_sda */
-+			0x18c (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_scl.i2c0_scl */
-+		>;
-+	};
-+
-+	i2c1_pins: i2c1_pins {
-+		pinctrl-single,pins = <
-+			0x15c (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE2)  /* spi0_cs0.i2c1_scl */
-+			0x158 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE2)  /* spi0_d1.i2c1_sda  */
-+		>;
-+	};
-+};
-+
-+&i2c0 {
-+        status = "okay";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&i2c0_pins>;
-+};
-+
-+&i2c1 {
-+        status = "okay";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&i2c1_pins>;
-+};
 -- 
-1.8.3.4
+M?ns Rullg?rd
+mans at mansr.com
