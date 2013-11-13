@@ -1,98 +1,74 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Wed, 13 Nov 2013 21:49:59 +0000
-Subject: [PATCH v2 1/2] dt: binding: add specified-clock for discoverable rate
- clocks
-In-Reply-To: <1384379400-24776-1-git-send-email-james.hogan@imgtec.com>
-References: <1384379400-24776-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <1384379400-24776-2-git-send-email-james.hogan@imgtec.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Nov 2013 13:56:31 -0800
+Subject: [PATCH] ARM: omap: fix warning with LPAE build
+In-Reply-To: <CAOesGMidmOXvnCWQ_5v7Mn-aELD2RvseWVQ-gqRy+xZc-GVbEA@mail.gmail.com>
+References: <1384325630-26998-1-git-send-email-olof@lixom.net>
+ <20131113200527.GA10317@atomide.com>
+ <CAOesGMhcg732xXtXUmpzvc9WzR_rGM2pjkNmzf3_40zkTFJRKA@mail.gmail.com>
+ <CAOesGMidmOXvnCWQ_5v7Mn-aELD2RvseWVQ-gqRy+xZc-GVbEA@mail.gmail.com>
+Message-ID: <20131113215630.GB10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The frequency of some fixed rate external oscillators on some SoCs (for
-example TZ1090's XTAL1) are specified by the board using pull-ups and
-pull-downs of configuration pins which are automatically latched on
-reset and available in an SoC register, so that the boot ROM and OS can
-automatically discover it.
+* Olof Johansson <olof@lixom.net> [131113 13:23]:
+> On Wed, Nov 13, 2013 at 12:31 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Wed, Nov 13, 2013 at 12:05 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> * Olof Johansson <olof@lixom.net> [131112 22:53]:
+> >>> Some omap3 code is throwing a warning:
+> >>> arch/arm/mach-omap2/pm34xx.c: In function 'omap3_save_secure_ram_context':
+> >>> arch/arm/mach-omap2/pm34xx.c:123:32: warning: cast to pointer from
+> >>>   integer of different size [-Wint-to-pointer-cast]
+> >>>
+> >>> In reality this code will never actually execute with LPAE=y, since
+> >>> Cortex-A8 doesn't support it. So downcasting the __pa() is safe in
+> >>> this case.
+> >>>
+> >>> Signed-off-by: Olof Johansson <olof@lixom.net>
+> >>> ---
+> >>>
+> >>> Tony, queue up if you have a fixes branch please, otherwise I can apply
+> >>> directly.
+> >>>
+> >>>  arch/arm/mach-omap2/pm34xx.c |    2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> >>> index 93b80e5..1f3770a 100644
+> >>> --- a/arch/arm/mach-omap2/pm34xx.c
+> >>> +++ b/arch/arm/mach-omap2/pm34xx.c
+> >>> @@ -120,7 +120,7 @@ static void omap3_save_secure_ram_context(void)
+> >>>                * will hang the system.
+> >>>                */
+> >>>               pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+> >>> -             ret = _omap_save_secure_sram((u32 *)
+> >>> +             ret = _omap_save_secure_sram((u32 *)(unsigned long)
+> >>>                               __pa(omap3_secure_ram_storage));
+> >>>               pwrdm_set_next_pwrst(mpu_pwrdm, mpu_next_state);
+> >>>               /* Following is for error tracking, it should not happen */
+> >>
+> >> Hmm maybe the function prototype should be changed instead if
+> >> it takes the physical address.
+> >>
+> >> How do you you reproduce this warning? I did not get it after
+> >> enabling LPAE in multi_v7_defconfig with current mainline.
+> >
+> > Of course. No more late night patching for me. :)
 
-These clocks are very similar to fixed-clocks since the rate never
-changes, but we still want to be able to automatically discover the
-frequency, so add a new binding to describe such clocks. Instead of
-using a "clock-frequency" property, use "reg", "bit-mask", "bit-shift"
-properties to describe the register field. The mapping from register
-values to clock frequencies is specified in a "table" property which
-contains pairs of register values and frequencies.
+Ah OK so it's in next.
+ 
+> Actually, that is getting a little hairy. It's a function pointer to
+> an assembly function, so we'd need to make it deal with the size of
+> phys_addr_t there. It's probably easier to just go with the original
+> patch here, at least I don't see much payoff from doing it the other
+> way.
 
-There is scope to extend the binding further in future to handle other
-mapping types, by using different properties instead of "table".
+OK, please go ahead and apply:
 
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: devicetree at vger.kernel.org
-Cc: Rob Landley <rob@landley.net>
-Cc: linux-doc at vger.kernel.org
----
-I could easily have extended the fixed-rate binding instead, but there'd
-be no properties in common except the standard common clock properties
-so it seemed like it deserved a separate binding. I'm open to arguments
-to the contrary or better compatible string names though.
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-Changes in v2:
- * Borrow bit-mask and bit-shift bindings from Mike's mux clock binding
-   proposals.
----
- .../devicetree/bindings/clock/specified-clock.txt  | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/specified-clock.txt
+I'm still sorting out my fixes, and so far it looks like I don't
+need to touch this file.
 
-diff --git a/Documentation/devicetree/bindings/clock/specified-clock.txt b/Documentation/devicetree/bindings/clock/specified-clock.txt
-new file mode 100644
-index 000000000000..fa5010ffd903
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/specified-clock.txt
-@@ -0,0 +1,38 @@
-+Binding for discoverable-fixed-rate clock sources.
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be "specified-clock".
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- reg : Base address of configuration register specifying the frequency.
-+- bit-mask : Mask of bits in the field specifying the frequency.
-+- table : array of integer pairs defining register field values and
-+  corresponding clock frequencies in Hz.
-+
-+Optional properties:
-+- bit-shift : Number of bits to shift the masked register value,
-+  defaults to (ffs(bit-mask) - 1) if absent.
-+- gpios : From common gpio binding; gpio connection to clock enable pin.
-+- clock-output-names : From common clock binding.
-+
-+Example:
-+	clock {
-+		compatible = "specified-clock";
-+		#clock-cells = <0>;
-+		reg = <0x02004004 0x4>;		/* CR_PERIP_RESET_CFG */
-+		bit-mask = <0x00000f00>;	/* FXTAL */
-+		table =	/*	FXTAL	Frequency */
-+				<0	16384000>,
-+				<1	19200000>,
-+				<2	24000000>,
-+				<3	24576000>,
-+				<4	26000000>,
-+				<5	36000000>,
-+				<6	36864000>,
-+				<7	38400000>,
-+				<8	40000000>;
-+		clock-output-names = "xtal1";
-+	};
--- 
-1.8.1.2
+Regards,
+
+Tony
