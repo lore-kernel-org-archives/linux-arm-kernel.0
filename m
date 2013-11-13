@@ -1,65 +1,30 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Wed, 13 Nov 2013 22:55:25 +0800
-Subject: [PATCH v7 2/4] dma: imx-sdma: Add new dma type for ssi dual fifo
- script
-In-Reply-To: <cover.1384352281.git.b42378@freescale.com>
-References: <cover.1384352281.git.b42378@freescale.com>
-Message-ID: <5dde8bd3ac0ff25335d896fd617429aa75d0dcd6.1384352281.git.b42378@freescale.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 Nov 2013 14:54:41 +0000
+Subject: [PATCH] dmaengine: Add support for BCM2835.
+In-Reply-To: <20131113133536.GZ8834@intel.com>
+References: <527D1DDA.2040004@koalo.de> <20131108181743.GR2493@sirena.org.uk>
+ <20131113050017.GO8834@intel.com>
+ <20131113125111.GE878@sirena.org.uk>
+ <20131113133536.GZ8834@intel.com>
+Message-ID: <20131113145441.GQ878@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new DMA_TYPE for SSI dual FIFO script, included
-in SDMA firmware version 2. This script would allow SSI use dual
-fifo mode to transimit/receive data without occasional hardware
-underrun/overrun.
+On Wed, Nov 13, 2013 at 07:05:36PM +0530, Vinod Koul wrote:
+> On Wed, Nov 13, 2013 at 12:51:11PM +0000, Mark Brown wrote:
 
-Signed-off-by: Nicolin Chen <b42378@freescale.com>
-Acked-by: Kumar Gala <galak@codeaurora.org>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt | 1 +
- drivers/dma/imx-sdma.c                                 | 4 ++++
- include/linux/platform_data/dma-imx.h                  | 1 +
- 3 files changed, 6 insertions(+)
+> > I'm probably going to be looking at that at some point, though perhaps
+> > Martin will get to it since he seems to be looking at this.
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-index 4fa814d..68b83ec 100644
---- a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-+++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-@@ -42,6 +42,7 @@ The full ID of peripheral types can be found below.
- 	19	IPU Memory
- 	20	ASRC
- 	21	ESAI
-+	22	SSI Dual FIFO	(needs firmware ver >= 2)
- 
- The third cell specifies the transfer priority as below.
- 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 43a8441..efe9d6a 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -725,6 +725,10 @@ static void sdma_get_pc(struct sdma_channel *sdmac,
- 		per_2_emi = sdma->script_addrs->app_2_mcu_addr;
- 		emi_2_per = sdma->script_addrs->mcu_2_app_addr;
- 		break;
-+	case IMX_DMATYPE_SSI_DUAL:
-+		per_2_emi = sdma->script_addrs->ssish_2_mcu_addr;
-+		emi_2_per = sdma->script_addrs->mcu_2_ssish_addr;
-+		break;
- 	case IMX_DMATYPE_SSI_SP:
- 	case IMX_DMATYPE_MMC:
- 	case IMX_DMATYPE_SDHC:
-diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
-index beac6b8..bcbc6c3 100644
---- a/include/linux/platform_data/dma-imx.h
-+++ b/include/linux/platform_data/dma-imx.h
-@@ -39,6 +39,7 @@ enum sdma_peripheral_type {
- 	IMX_DMATYPE_IPU_MEMORY,	/* IPU Memory */
- 	IMX_DMATYPE_ASRC,	/* ASRC */
- 	IMX_DMATYPE_ESAI,	/* ESAI */
-+	IMX_DMATYPE_SSI_DUAL,	/* SSI Dual FIFO */
- };
- 
- enum imx_dma_prio {
--- 
-1.8.4
+> Okay sounds good. This will also help in streamline the implementations..
+
+Yes, though I think some of the stuff Martin was talking about will need
+changes to the dmaengine APIs.  He was wanting to reuse DMA lists which
+currently dmaengine needs to have built up each time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/5844b38d/attachment-0001.sig>
