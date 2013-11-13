@@ -1,125 +1,80 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Wed, 13 Nov 2013 20:35:22 +0100
-Subject: [PATCHv4] dmaengine: Add support for BCM2835
-In-Reply-To: <3722902.ByNK8Ptc5Y@flatron>
-References: <5283BC93.1090801@koalo.de> <3722902.ByNK8Ptc5Y@flatron>
-Message-ID: <5283D47A.7060503@koalo.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Nov 2013 20:42:32 +0100
+Subject: Physical memory start contraints in the Linux kernel (Was: Re:
+ Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel] [xen-unstable
+ test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <alpine.DEB.2.02.1311131417030.4714@kaball.uk.xensource.com>
+References: <osstest-21486-mainreport@xen.org>
+ <1384339849.5406.52.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311131417030.4714@kaball.uk.xensource.com>
+Message-ID: <201311132042.32725.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.11.2013 19:43, Tomasz Figa wrote:
-> Hi Florian,
-> 
-> Seems like I accidentally replied to some old version of this patch.
-> Not sure how many of those comments were still relevant for V3, but
-> let me look at this version and see whether we can still improve things
-> a bit. Please see my comments inline.
+On Wednesday 13 November 2013, Stefano Stabellini wrote:
+>  
+> -#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
+> +#ifdef CONFIG_GENERIC_ATOMIC64
+> +/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
+> + * atomic64_xchg function because it is implemented using spin locks.
+> + * Here we need proper atomic instructions to read and write memory
+> + * shared with the hypervisor.
+> + */
+> +static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
+> +{
+> +	u64 result;
+> +	unsigned long tmp;
+> +
+> +	smp_mb();
+> +
+> +	__asm__ __volatile__("@ xen_atomic64_xchg\n"
+> +"1:	ldrexd	%0, %H0, [%3]\n"
+> +"	strexd	%1, %4, %H4, [%3]\n"
+> +"	teq	%1, #0\n"
+> +"	bne	1b"
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
+> +	: "r" (&ptr->counter), "r" (new)
+> +	: "cc");
+> +
+> +	smp_mb();
+> +
+> +	return result;
+> +}
+> +#else
+> +#define xen_atomic64_xchg atomic64_xchg
+> +#endif
 
-Some were still helpful (especially the idea to use the chan_init
-function for setting the irq), thanks.
+I would prefer not duplicating this code. Maybe we can instead change
+the ARM code to always provide this function under the name of
+armv7_atomic64_xchg() and conditionally defining atomic64_xchg
+to use it. Let's see if Russell has an opinion on this, or perhaps
+a better solution.
 
->> ....
->> diff --git a/Documentation/devicetree/bindings/dma/bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
->> new file mode 100644
->> index 0000000..bca5e84
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
->> @@ -0,0 +1,59 @@
->> +* BCM2835 DMA controller
->> +
->> +Required properties:
->> +- compatible: Should be "brcm,bcm2835-dma".
->> +- reg: Should contain DMA registers location and length.
->> +- interrupts: Should contain the DMA interrupts associated
->> +		to the DMA channels in ascending order.
->> +		First cell is the IRQ bank.
->> +		Second cell is the IRQ number.
->> +- #dma-cells: Must be <1>, used to represent the number of integer cells in
->> +		the dmas property of client devices.
->> +- dma-channels: Maximum number of DMA channels available.
->> +- dma-requests: Number of DMA Requests.
+> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+> index 62ccf54..d668c3c 100644
+> --- a/drivers/xen/grant-table.c
+> +++ b/drivers/xen/grant-table.c
+> @@ -33,6 +33,14 @@
+>  
+>  #define pr_fmt(fmt) "xen:" KBUILD_MODNAME ": " fmt
+>  
+> +/* This is required because cmpxchg only support 32-bits operands on
+> + * ARMv6, so if CONFIG_CPU_V6 is defined the cmpxchg implemention will
+> + * be limited to 32-bits operands.
+> + * However we know for sure that if Linux is running on Xen, the
+> + * platform is >= ARMv7, so here we can safely undef CONFIG_CPU_V6.
+> + */
+> +#undef CONFIG_CPU_V6
+> +
+>  #include <linux/module.h>
+>  #include <linux/sched.h>
+>  #include <linux/mm.h>
 > 
-> The two properties above do not seem to be used anywhere in the driver.
 
-Aren't they necessary for the DMA engine core?
+Same here: I'd prefer making this more explicit by changing the cmpxchg
+implementation: we could split out the 16-bit cmpxchg case into a separate
+function with "armv7" in the name and only call that from the main
+cmpxchg() implementations when building an armv7-only kernel, but still
+let you call it from Xen code that is known to run only on armv7.
 
->> +- brcm,dma-channel-mask: Bit mask representing the channels available.
-> 
-> What does the value of this property depend on? Could you describe the
-> structure of this DMA controller?
-> 
->> +
->> +Example:
->> +
->> +dma: dma at 7e007000 {
->> +	compatible = "brcm,bcm2835-dma";
->> +	reg = <0x7e007000 0xf00>;
->> +	interrupts = <1 16
->> +		      1 17
->> +		      1 18
->> +		      1 19
->> +		      1 20
->> +		      1 21
->> +		      1 22
->> +		      1 23
->> +		      1 24
->> +		      1 25
->> +		      1 26
->> +		      1 27
->> +		      1 28>;
-> 
-> There are 13 interrupts specified here, but...
-> 
->> +
->> +	#dma-cells = <1>;
->> +	dma-channels = <16>;
-> 
-> ...16 channels here...
-> 
->> +	dma-requests = <32>;
->> +	brcm,dma-channel-mask = <0x7f35>;
-> 
-> ...and 11 set bits here. May I ask you to explain this to me, please?
-
-How I understand this DMA controller:
-There are 16 DMA channels in the DMA controller, but only 13 interrupts
-are available at the IRQ controller. Therefore, the upper DMA channels
-can just not be used. Maybe because there are to many other IRQs and
-they didn't want to implement another IRQ bank.
-Furthermore, some of the DMA channels are already used by the
-VideoCore/GPU/firmware. This is what dma-channel-mask indicates. This
-should be automatically set by the firmware in the future.
-Finally, there are some channels with special functionality that should
-not be used by DMA engine, too. Therefore, these lines:
-		/* do not use the FIQ and BULK channels */
-		chans_available &= ~0xD;
-
-> [snip]
->> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
->> new file mode 100644
->> index 0000000..baf072e
->> --- /dev/null
->> +++ b/drivers/dma/bcm2835-dma.c
-> [snip]
->> +static int bcm2835_dma_probe(struct platform_device *pdev)
->> +{
->> +	struct bcm2835_dmadev *od;
->> +	struct resource *dma_res = NULL;
->> +	void __iomem *dma_base = NULL;
->> +	int rc = 0;
->> +	int i = 0;
->> +	int irq;
->> +	uint32_t chans_available;
-> [snip]
->> +	if (pdev->dev.of_node) {
-> 
-> Is this driver supposed to support non-DT based instantation (aka board
-> files)? If not, maybe it would be cleaner to simply check for
-> !pdev->dev.of_node at the beginning of probe and return an error?
-
-I would like to maintain the possibility for board file based
-instatiation, because the Raspberry Pi downstream kernel still doesn't
-support device tree. If this is a no-go, I will accept that.
-
-Greetings,
-Florian
+	Arnd 
