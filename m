@@ -1,84 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Nov 2013 14:24:06 +0000
-Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from
- device tree
-In-Reply-To: <20131112204013.GA17674@earth.universe>
-References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
- <20131112153057.GA9683@earth.universe>
- <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
- <20131112200514.GA15413@earth.universe>
- <CACRpkdaAaLjm_b+OLj3tobxBN8YGUcTPnXJ=qtBqd02=FTxhjQ@mail.gmail.com>
- <20131112204013.GA17674@earth.universe>
-Message-ID: <20131113142406.GH21713@e106331-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Nov 2013 14:31:10 +0000
+Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
+ support
+In-Reply-To: <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
+References: <20131108165639.GD15074@mudshark.cambridge.arm.com>
+ <527DFC1C.1020107@hitachi.com>
+ <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
+ <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
+ <20131111105812.GC28302@mudshark.cambridge.arm.com>
+ <528114C4.5000506@hitachi.com>
+ <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
+ <5281D848.7000502@hitachi.com>
+ <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
+Message-ID: <20131113143110.GF28881@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 08:40:14PM +0000, Sebastian Reichel wrote:
-> On Tue, Nov 12, 2013 at 09:11:40PM +0100, Linus Walleij wrote:
-> > > I could find two boards using "gpio-matrix-keypad" in the mainline
-> > > kernel and not a single instance of "linux,no-autorepeat":
-> > 
-> > In things connected to GPIO, I don't expect the in-kernel
-> > device trees to be a good way so survey the usage of these
-> > bindings. Anyone doing device trees on any system with a
-> > few GPIOs can be using this.
-> > 
-> > But maybe we're lucky and won't break anyone's setup if
-> > we change this?
+On Wed, Nov 13, 2013 at 06:55:33AM +0000, Sandeepa Prabhu wrote:
+> >>> I'm unsure about arm64's debug feature behavior, what does happen when
+> >>> it performs a single-step on sw-breakpoint?
+> >>>
+> >>>> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
+> >>>> I'm fairly sure it won't work as expected without some additional code.
+> >>>
+> >>> OK, anyway, for testing same one, we need to port ftrace first. So the next
+> >
+> > Sorry for confusion, s/next/fallback is what I meant. Making a kprobe module
+> > can be done without ftrace port.
+> >
+> >>> plan is to make a kprobe module to put a probe (which just printk something)
+> >>> on a specific function (e.g. vfs_symlink), and run perf record with
+> >>> hw-breakpoint as below
+> >>>
+> >>> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
+> >>>
+> >>> Note that 0xXXXXXX is the address of vfs_symlink.
+> >>>
+> >>> After that, you can see the message in dmesg and also check the perf result
+> >>> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
+> >>> it works)
+> Hi Will, Masami,
 > 
-> AFAIK Device Tree property names are considered as ABI, so existing
-> property names must not be removed.
-
-To an extent. We shouldn't pointlessly break existing bindings, and we
-can typically support newer / "better" bindings without breaking support
-for existing bindings.
-
-There may be cases where we have to remove support for bindings (i.e.
-when a binding is so badly used in practice that relying on it means
-we're likely to damage hardware, or where it's so ambiguous that it
-provides no useful information), but I don't think we've hit any of
-those yet.
-
-If a portions of a binding are no longer used in practice, then I see no
-problem in removing support from them. However I'd expect them to remain
-documented as deprecated / unsupported by Linux, and for those names to
-not be re-used.
-
+> I am not sure of 'perf' right now (my minimal rootfs doesn't have) but
+> I tried to test hardware breakpoints using sample modules
+> "samples/hw_breakpoint/" on arm64 upstream branch. This should use
+> same kernel api as perf I believe.
 > 
-> But I guess we can add the standardized property name in addition
-> to the deprecated one. New drivers can use the standardized property
-> name from the beginning.
+> 1.  Placing watchpoint ( attr.bp_type = HW_BREAKPOINT_W |
+> HW_BREAKPOINT_R) upon vfs_symlink symbol, but seems watch-point is not
+> triggering at all.
 
-This is precisely how I'd expect bindings to evolve. New properties can
-be added, or existing properties can be extended, as long as those
-modifications don't impair existing device trees which are in use.
+vfs_symlink is a function. Why would you expect to write it?
 
-If we need to change things substantially, then we can allocate a new
-compatible string for the new binding. That doesn't seem to be necessary
-here.
+> 2.  Placing text breakpoint (modified sample module with attr.bp_type
+> = HW_BREAKPOINT_X) upon vfs_symlink, and run "ln -s /dev/null
+> /tmp/foo".  This time, breakpoint hit but exception is re-cursing
+> infinitely!
 
-> 
-> Thus I guess we should not use the name, which has the most adopters
-> in kernel (or out of kernel). Instead the most fitting name should
-> be used. Current suggestions (taken from kernel) are:
-> 
-> * <<vendor>>,no-autorepeat
-> * keypad,autorepeat
-> * linux,keypad-no-autorepeat
-> * linux,input-no-autorepeat
-> * linux,no-autorepeat
-> * autorepeat
-> 
-> I do not really care, which one is chosen, except for two things:
-> 
-> * <<vendor>> seems wrong. This is not vendor specific.
-> * I would prefer "input-" over "keypad-", since then the same name
->   can be used for single keys, buttons, etc.
+The problem here is that we expect the overflow handler to deal with the
+stepping (like GDB does via ptrace). If you don't register a handler, the
+kernel will do the step (like you would get if you used perf stat -e
+mem:0xNNNN:x).
 
-Both of those sound valid to me, but I think it may make sense to keep
-the "linux," prefix. As I understand it this is really telling the Linux
-input subsystem to react to a device acting in a certain way, rather
-than describing or configuring the device in a certain way.
-
-Thanks,
-Mark.
+Will
