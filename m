@@ -1,66 +1,169 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 13 Nov 2013 11:41:33 +0900
-Subject: [PATCH 03/14] ARM: shmobile: r8a7779: add HPB-DMAC support
-In-Reply-To: <528253AE.4040708@cogentembedded.com>
-References: <cover.1381293239.git.horms+renesas@verge.net.au>
- <441f750236f3d3d435a1e89ad885ec896832b9c6.1381293239.git.horms+renesas@verge.net.au>
- <52814F8E.4090606@cogentembedded.com>
- <5281501A.9070009@cogentembedded.com>
- <20131112015853.GC9863@verge.net.au>
- <528253AE.4040708@cogentembedded.com>
-Message-ID: <20131113024133.GA22484@verge.net.au>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 13 Nov 2013 03:47:27 +0100
+Subject: [PATCHv3 2/8] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel
+ format.
+In-Reply-To: <1384274965-30549-2-git-send-email-denis@eukrea.com>
+References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
+ <1384274965-30549-2-git-send-email-denis@eukrea.com>
+Message-ID: <1980062.zhsfvmMMmI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 08:13:34PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 12-11-2013 5:58, Simon Horman wrote:
-> 
-> >>>>From: Max Filippov <max.filippov@cogentembedded.com>
-> 
-> >>>>Add HPB-DMAC platform device on R8A7779 SoC along with its slave and channel
-> >>>>configurations (only for SDHI0 so far).
-> 
-> >>>>Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-> >>>>[Sergei: moved *enum* declaring HPB-DMAC slave IDs from now removed
-> >>>><mach/dma.h>
-> >>>>to <mach/r8a7779.h>, removed #include <mach/dma.h> from setup-r8a7779.c,
-> >>>>removed
-> >>>>SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[] and
-> >>>>hpb_dmae_channels[], added ASYNCMDR.ASBTMD{20|24|43} and
-> >>>>ASYNCMDR.ASMD{20|24|43}
-> >>>>fields/values, fixed comments to ASYNCMDR.ASBTMD2[123] and ASYNCMDR.ASMD2[123]
-> >>>>fields/values, renamed all the bit/field/value #define's to include 'HBP_DMAE_'
-> >>>>prefix to match the driver, moved comments after the element initializers of
-> >>>>hpb_dmae_channels[].]
-> >>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>>>---
-> >>>>  arch/arm/mach-shmobile/include/mach/r8a7779.h |   7 ++
-> >>>>  arch/arm/mach-shmobile/setup-r8a7779.c        | 154
-> >>>>++++++++++++++++++++++++++
-> >>>>  2 files changed, 161 insertions(+)
-> 
-> >>>    Hm, Simon, do you know how this patch and the next one ended up being
-> >>>merged twice into Linus' tree?
-> 
-> >>    Sorry, I followed up to the wrong patch. So, the question was
-> >>about this patch and the previous one.
-> 
-> >>>https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1eb6b5a0e55bfcfb0852b7d0f9442841ff807345
-> >>>https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=338c4991ed350abd7c5b3cb807fe022cb712a8ba
-> 
-> >>https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a43e5bd76a4a3df58167d85e8020a1c9e566ad75
-> >>https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=441f750236f3d3d435a1e89ad885ec896832b9c6
-> 
-> >I assume that the reference to above git IDs implies that the answer
-> >to your question is yes.
-> 
->    And answer to the question "how" is? :-)
+Hi Denis,
 
-Due to a rebasing error on my part two versions of a branch containing
-these patches and several others were merged. I checked and it looks
-like the code-changes made by both versions of the branch are the same.
-So at this stage I think the only problem is that this causes some
-confusion as there are duplicates of some patches in git, permanently.
+(Dropping the DT reviewers from the CC list to avoid spamming them)
+
+Thank you for the patch.
+
+On Tuesday 12 November 2013 17:49:19 Denis Carikli wrote:
+> That new macro is needed by the imx_drm staging driver
+>   for supporting the QVGA display of the eukrea-cpuimx51 board.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: driverdev-devel at linuxdriverproject.org
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: linux-media at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> ChangeLog v2->v3:
+> - Added some interested people in the Cc list.
+> - Added Mauro Carvalho Chehab's Ack.
+> - Added documentation.
+> ---
+>  .../DocBook/media/v4l/pixfmt-packed-rgb.xml        |   78
+> ++++++++++++++++++++ include/uapi/linux/videodev2.h                     |  
+>  1 +
+>  2 files changed, 79 insertions(+)
+> 
+> diff --git a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
+> b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml index
+> 166c8d6..f6a3e84 100644
+> --- a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
+> +++ b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
+> @@ -279,6 +279,45 @@ colorspace
+> <constant>V4L2_COLORSPACE_SRGB</constant>.</para> <entry></entry>
+>  	    <entry></entry>
+>  	  </row>
+> +	  <row id="V4L2-PIX-FMT-RGB666">
+> +	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
+> +	    <entry>'RGBH'</entry>
+> +	    <entry></entry>
+> +	    <entry>r<subscript>5</subscript></entry>
+> +	    <entry>r<subscript>4</subscript></entry>
+> +	    <entry>r<subscript>3</subscript></entry>
+> +	    <entry>r<subscript>2</subscript></entry>
+> +	    <entry>r<subscript>1</subscript></entry>
+> +	    <entry>r<subscript>0</subscript></entry>
+> +	    <entry>g<subscript>5</subscript></entry>
+> +	    <entry>g<subscript>4</subscript></entry>
+> +	    <entry></entry>
+> +	    <entry>g<subscript>3</subscript></entry>
+> +	    <entry>g<subscript>2</subscript></entry>
+> +	    <entry>g<subscript>1</subscript></entry>
+> +	    <entry>g<subscript>0</subscript></entry>
+> +	    <entry>b<subscript>5</subscript></entry>
+> +	    <entry>b<subscript>4</subscript></entry>
+> +	    <entry>b<subscript>3</subscript></entry>
+> +	    <entry>b<subscript>2</subscript></entry>
+> +	    <entry></entry>
+> +	    <entry>b<subscript>1</subscript></entry>
+> +	    <entry>b<subscript>0</subscript></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	  </row>
+>  	  <row id="V4L2-PIX-FMT-BGR24">
+>  	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
+>  	    <entry>'BGR3'</entry>
+> @@ -781,6 +820,45 @@ defined in error. Drivers may interpret them as in
+> <xref <entry></entry>
+>  	    <entry></entry>
+>  	  </row>
+> +	  <row><!-- id="V4L2-PIX-FMT-RGB666" -->
+> +	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
+> +	    <entry>'RGBH'</entry>
+> +	    <entry></entry>
+> +	    <entry>r<subscript>5</subscript></entry>
+> +	    <entry>r<subscript>4</subscript></entry>
+> +	    <entry>r<subscript>3</subscript></entry>
+> +	    <entry>r<subscript>2</subscript></entry>
+> +	    <entry>r<subscript>1</subscript></entry>
+> +	    <entry>r<subscript>0</subscript></entry>
+> +	    <entry>g<subscript>5</subscript></entry>
+> +	    <entry>g<subscript>4</subscript></entry>
+> +	    <entry></entry>
+> +	    <entry>g<subscript>3</subscript></entry>
+> +	    <entry>g<subscript>2</subscript></entry>
+> +	    <entry>g<subscript>1</subscript></entry>
+> +	    <entry>g<subscript>0</subscript></entry>
+> +	    <entry>b<subscript>5</subscript></entry>
+> +	    <entry>b<subscript>4</subscript></entry>
+> +	    <entry>b<subscript>3</subscript></entry>
+> +	    <entry>b<subscript>2</subscript></entry>
+> +	    <entry></entry>
+> +	    <entry>b<subscript>1</subscript></entry>
+> +	    <entry>b<subscript>0</subscript></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	    <entry></entry>
+> +	  </row>
+>  	  <row><!-- id="V4L2-PIX-FMT-BGR24" -->
+>  	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
+>  	    <entry>'BGR3'</entry>
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 437f1b0..e8ff410 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -294,6 +294,7 @@ struct v4l2_pix_format {
+>  #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16 
+> RGB-5-5-5 BE  */ #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B',
+> 'R') /* 16  RGB-5-6-5 BE  */ #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B',
+> 'G', 'R', 'H') /* 18  BGR-6-6-6	  */ +#define V4L2_PIX_FMT_RGB666 
+> v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */ #define
+> V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8    
+> */ #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24 
+> RGB-8-8-8     */ #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R',
+> '4') /* 32  BGR-8-8-8-8   */
+-- 
+Regards,
+
+Laurent Pinchart
