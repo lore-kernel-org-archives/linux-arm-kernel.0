@@ -1,33 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Nov 2013 14:20:39 +0000
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping support
-In-Reply-To: <20131113135807.GJ26898@twins.programming.kicks-ass.net>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <20131113135807.GJ26898@twins.programming.kicks-ass.net>
-Message-ID: <20131113142039.GE28881@mudshark.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Nov 2013 14:24:06 +0000
+Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from
+ device tree
+In-Reply-To: <20131112204013.GA17674@earth.universe>
+References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
+ <20131112153057.GA9683@earth.universe>
+ <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
+ <20131112200514.GA15413@earth.universe>
+ <CACRpkdaAaLjm_b+OLj3tobxBN8YGUcTPnXJ=qtBqd02=FTxhjQ@mail.gmail.com>
+ <20131112204013.GA17674@earth.universe>
+Message-ID: <20131113142406.GH21713@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 01:58:07PM +0000, Peter Zijlstra wrote:
-> On Mon, Nov 11, 2013 at 10:58:12AM +0000, Will Deacon wrote:
-> > Single-stepping on x86 is different to the step behaviour on arm64 afaik. On
-> > ARM, we have to manually remove the breakpoint, perform a single-step, then
-> > add the breakpoint again. If we re-enable debug exceptions in the kprobe
-> > handler, the step will complete early and we'll never step off the
-> > breakpoint.
+On Tue, Nov 12, 2013 at 08:40:14PM +0000, Sebastian Reichel wrote:
+> On Tue, Nov 12, 2013 at 09:11:40PM +0100, Linus Walleij wrote:
+> > > I could find two boards using "gpio-matrix-keypad" in the mainline
+> > > kernel and not a single instance of "linux,no-autorepeat":
+> > 
+> > In things connected to GPIO, I don't expect the in-kernel
+> > device trees to be a good way so survey the usage of these
+> > bindings. Anyone doing device trees on any system with a
+> > few GPIOs can be using this.
+> > 
+> > But maybe we're lucky and won't break anyone's setup if
+> > we change this?
 > 
-> This is about hardware breakpoints right? Which are per-cpu? Otherwise
-> removing the breakpoint would open up a hole for another thread to slip
-> through while you're single stepping.
+> AFAIK Device Tree property names are considered as ABI, so existing
+> property names must not be removed.
 
-Correct, but our hardware breakpoints don't have any resume feature, so they
-have to be disabled on the relevant CPU, then stepped on that same CPU
-before they can be reactivated.
+To an extent. We shouldn't pointlessly break existing bindings, and we
+can typically support newer / "better" bindings without breaking support
+for existing bindings.
 
-Will
+There may be cases where we have to remove support for bindings (i.e.
+when a binding is so badly used in practice that relying on it means
+we're likely to damage hardware, or where it's so ambiguous that it
+provides no useful information), but I don't think we've hit any of
+those yet.
+
+If a portions of a binding are no longer used in practice, then I see no
+problem in removing support from them. However I'd expect them to remain
+documented as deprecated / unsupported by Linux, and for those names to
+not be re-used.
+
+> 
+> But I guess we can add the standardized property name in addition
+> to the deprecated one. New drivers can use the standardized property
+> name from the beginning.
+
+This is precisely how I'd expect bindings to evolve. New properties can
+be added, or existing properties can be extended, as long as those
+modifications don't impair existing device trees which are in use.
+
+If we need to change things substantially, then we can allocate a new
+compatible string for the new binding. That doesn't seem to be necessary
+here.
+
+> 
+> Thus I guess we should not use the name, which has the most adopters
+> in kernel (or out of kernel). Instead the most fitting name should
+> be used. Current suggestions (taken from kernel) are:
+> 
+> * <<vendor>>,no-autorepeat
+> * keypad,autorepeat
+> * linux,keypad-no-autorepeat
+> * linux,input-no-autorepeat
+> * linux,no-autorepeat
+> * autorepeat
+> 
+> I do not really care, which one is chosen, except for two things:
+> 
+> * <<vendor>> seems wrong. This is not vendor specific.
+> * I would prefer "input-" over "keypad-", since then the same name
+>   can be used for single keys, buttons, etc.
+
+Both of those sound valid to me, but I think it may make sense to keep
+the "linux," prefix. As I understand it this is really telling the Linux
+input subsystem to react to a device acting in a certain way, rather
+than describing or configuring the device in a certain way.
+
+Thanks,
+Mark.
