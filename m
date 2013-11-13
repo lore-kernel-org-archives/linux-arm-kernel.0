@@ -1,48 +1,62 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Wed, 13 Nov 2013 11:14:00 +0900
-Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
- monitor
-In-Reply-To: <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
-References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>	<52828EF5.6090909@wwwdotorg.org>
- <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
-Message-ID: <5282E068.1070608@nvidia.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 13 Nov 2013 10:16:48 +0800
+Subject: [PATCH 3/4] ARM: mmp: stop using mach/timex.h
+In-Reply-To: <1384292466-31725-4-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1384292466-31725-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAN1soZzSEgy1nz4NK_R8WLLCT3=CjDucQLryDYJA55aoQKWQMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2013 05:38 AM, Olof Johansson wrote:
-> On Tue, Nov 12, 2013 at 12:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 11/07/2013 03:11 AM, Alexandre Courbot wrote:
->>> Just a set of small fixes to address the concerns expressed on v9 with the
->>> non-prefixed version DT properties. I hope there won't be a need for an
->>> eleventh (!) version. :P
->>
->> BTW, this version looks fine to me. On IRC, Olof said it looked OK to
->> him. I'm just waiting to hear back from Olof/Russell whether I should
->> merge this through the Tegra tree, or whether the first 1-3 patches
->> should go through Russell's tree.
+On Wed, Nov 13, 2013 at 5:41 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> mach/timex.h is the last remaining header that is unused for multiarch
+> builds but necessary for singlearch builds. To allow to get rid of it
+> for singlearch builds, too, drop its usage in mmp arch code by
+> substituting CLOCK_TICK_RATE by a local cpp symbol.
 >
-> I pinged Russell, and he brought up the fact that there were earlier
-> requests to move it to drivers/firmware. It would make sense to try to
-> get that done before merging, especially if you anticipate someone
-> using TF on 64-bit platforms.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-mmp/time.c | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+> index 7ac41e8..fb57d11 100644
+> --- a/arch/arm/mach-mmp/time.c
+> +++ b/arch/arm/mach-mmp/time.c
+> @@ -39,6 +39,12 @@
+>
+>  #include "clock.h"
+>
+> +#ifdef CONFIG_CPU_MMP2
+> +#define MMP_CLOCK_FREQ         6500000
+> +#else
+> +#define MMP_CLOCK_FREQ         3250000
+> +#endif
+> +
+>  #define TIMERS_VIRT_BASE       TIMERS1_VIRT_BASE
+>
+>  #define MAX_DELTA              (0xfffffffe)
+> @@ -195,14 +201,14 @@ void __init timer_init(int irq)
+>  {
+>         timer_config();
+>
+> -       setup_sched_clock(mmp_read_sched_clock, 32, CLOCK_TICK_RATE);
+> +       setup_sched_clock(mmp_read_sched_clock, 32, MMP_CLOCK_FREQ);
+>
+>         ckevt.cpumask = cpumask_of(0);
+>
+>         setup_irq(irq, &timer_irq);
+>
+> -       clocksource_register_hz(&cksrc, CLOCK_TICK_RATE);
+> -       clockevents_config_and_register(&ckevt, CLOCK_TICK_RATE,
+> +       clocksource_register_hz(&cksrc, MMP_CLOCK_FREQ);
+> +       clockevents_config_and_register(&ckevt, MMP_CLOCK_FREQ,
+>                                         MIN_DELTA, MAX_DELTA);
+>  }
+>
+> --
+> 1.8.4.2
+>
 
-IIRC when we discussed this point your last comment was as follows:
-
-On Tue, Oct 29, 2013 at 6:55 AM, Olof Johansson <olof@lixom.net> wrote:
- > I think we can probably merge this under arch/arm now, and when we
- > figure out what needs to be common with ARM64 we can move it out to a
- > good location. It might be that mostly just a header file with ABI
- > conventions needs to be shared, not actual implementation, for
- > example.
-
-So I thought we agreed on that. If in the end we prefer to move the ARM 
-firmware interface into drivers/firmware, I'm fine with that too (Tomasz 
-also confirmed he would be ok with it) but I wonder if that would not be 
-somehow premature.
-
-Another worry of mine is that this might delay this patchset some more. 
-Support for TF is one of the last remaining step towards making NVIDIA 
-branded Tegra retail devices (SHIELD and TegraNote at the moment) run 
-upstream directly. I missed 3.13, I'd like to make sure I won't miss 
-3.14. Would it be acceptable if we move the ARM firmware interface to a 
-common place after this patchset is merged?
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
