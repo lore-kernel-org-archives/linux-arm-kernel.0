@@ -1,113 +1,241 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 13 Nov 2013 10:23:20 +0100
-Subject: [PATCHv4][ 4/7] staging: imx-drm: parallel display: add regulator
- support.
+Date: Wed, 13 Nov 2013 10:23:21 +0100
+Subject: [PATCHv4][ 5/7] ARM: dts: mbimx51sd: Add display support.
 In-Reply-To: <1384334603-14208-1-git-send-email-denis@eukrea.com>
 References: <1384334603-14208-1-git-send-email-denis@eukrea.com>
-Message-ID: <1384334603-14208-4-git-send-email-denis@eukrea.com>
+Message-ID: <1384334603-14208-5-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: driverdev-devel at linuxdriverproject.org
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
+The CMO-QVGA, DVI-SVGA and DVI-VGA are added.
+
 Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v2->v3:
-- Added some interested people in the Cc list.
-- the lcd-supply is now called display-supply (not all display are LCD).
-- The code and documentation was updated accordingly.
-- regulator_is_enabled now guard the regulator enables/disables because
-  regulator_disable does not check the regulator state.
+- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
+- This patch now only adds display support.
+- Added some interested people in the Cc list, and removed some people that
+  might be annoyed by the receiving of that patch which is unrelated to their
+  subsystem.
+- rebased and reworked the dts displays addition.
+- Also rebased and reworked the fsl,pins usage.
 ---
- .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    1 +
- drivers/staging/imx-drm/parallel-display.c         |   22 ++++++++++++++++++++
- 2 files changed, 23 insertions(+)
+ .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |   61 ++++++++++++++++++++
+ .../imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts  |   47 +++++++++++++++
+ .../imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts   |   47 +++++++++++++++
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |   13 +++++
+ 4 files changed, 168 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
+ create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts
+ create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-index 2d24425..4dd7ce5 100644
---- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-@@ -28,6 +28,7 @@ Required properties:
- - compatible: Should be "fsl,imx-parallel-display"
- - crtc: the crtc this display is connected to, see below
- Optional properties:
-+- display-supply : phandle to the regulator device tree node if needed.
- - interface_pix_fmt: How this display is connected to the
-   crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
- - edid: verbatim EDID data block describing attached display.
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index 46b6fce..195ec60 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -22,6 +22,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_fb_helper.h>
- #include <drm/drm_crtc_helper.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/videodev2.h>
- 
- #include "imx-drm.h"
-@@ -35,6 +36,7 @@ struct imx_parallel_display {
- 	struct drm_encoder encoder;
- 	struct imx_drm_encoder *imx_drm_encoder;
- 	struct device *dev;
-+	struct regulator *disp_reg;
- 	void *edid;
- 	int edid_len;
- 	u32 interface_pix_fmt;
-@@ -139,6 +141,12 @@ static void imx_pd_encoder_prepare(struct drm_encoder *encoder)
- {
- 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
- 
-+	if (imxpd->disp_reg && !regulator_is_enabled(imxpd->disp_reg)) {
-+		if (regulator_enable(imxpd->disp_reg))
-+			dev_err(imxpd->dev,
-+				"Failed to enable regulator.\n");
-+	}
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
+new file mode 100644
+index 0000000..4c781e7
+--- /dev/null
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
+@@ -0,0 +1,61 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
 +
- 	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_NONE,
- 			imxpd->interface_pix_fmt);
- }
-@@ -155,6 +163,12 @@ static void imx_pd_encoder_mode_set(struct drm_encoder *encoder,
- 
- static void imx_pd_encoder_disable(struct drm_encoder *encoder)
- {
-+	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
++#include "imx51-eukrea-mbimxsd51-baseboard.dts"
 +
-+	if (imxpd->disp_reg && regulator_is_enabled(imxpd->disp_reg)) {
-+		if (regulator_disable(imxpd->disp_reg))
-+			dev_err(imxpd->dev, "Failed to disable regulator.\n");
-+	}
- }
- 
- static void imx_pd_encoder_destroy(struct drm_encoder *encoder)
-@@ -258,6 +272,14 @@ static int imx_pd_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	imxpd->disp_reg = devm_regulator_get(&pdev->dev, "display");
-+	if (IS_ERR(imxpd->disp_reg)) {
-+		dev_warn(&pdev->dev, "Operating without display regulator.\n");
-+		imxpd->disp_reg = NULL;
-+	} else {
-+		dev_info(&pdev->dev, "Using display regulator.\n");
-+	}
++/ {
++	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
++	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
 +
- 	ret = imx_drm_encoder_add_possible_crtcs(imxpd->imx_drm_encoder, np);
++	reg_lcd_3v3: lcd-en {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
++		regulator-name = "lcd-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio3 13 0>;
++		enable-active-high;
++	};
++
++};
++
++&display {
++	display-supply = <&reg_lcd_3v3>;
++	status = "okay";
++	display-timings {
++		model = "CMO-QVGA";
++		bits-per-pixel = <16>;
++		cmoqvga {
++			native-mode;
++			clock-frequency = <6500000>;
++			hactive = <320>;
++			vactive = <240>;
++			hfront-porch = <20>;
++			hback-porch = <38>;
++			vfront-porch = <4>;
++			vback-porch = <15>;
++			hsync-len = <30>;
++			vsync-len = <3>;
++			hsync-active = <0>;
++			vsync-active = <0>;
++			de-active = <0>;
++			pixelclk-active = <1>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts
+new file mode 100644
+index 0000000..e9be19c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts
+@@ -0,0 +1,47 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include "imx51-eukrea-mbimxsd51-baseboard.dts"
++
++/ {
++	model = "Eukrea MBIMXSD51 with the DVI-SVGA Display";
++	compatible = "eukrea,mbimxsd51-baseboard-dvi-svga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
++};
++
++&display {
++	status = "okay";
++	display-timings {
++		model = "DVI-SVGA";
++		bits-per-pixel = <16>;
++		svga {
++			clock-frequency = <38251000>;
++			hactive = <800>;
++			vactive = <600>;
++			hback-porch = <112>;
++			hfront-porch = <32>;
++			vback-porch = <3>;
++			vfront-porch = <17>;
++			hsync-len = <80>;
++			vsync-len = <4>;
++			hsync-active = <1>;
++			vsync-active = <1>;
++			de-active = <1>;
++			pixelclk-active = <0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts
+new file mode 100644
+index 0000000..aa99551
+--- /dev/null
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts
+@@ -0,0 +1,47 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include "imx51-eukrea-mbimxsd51-baseboard.dts"
++
++/ {
++	model = "Eukrea MBIMXSD51 with the DVI-VGA Display";
++	compatible = "eukrea,mbimxsd51-baseboard-dvi-vga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
++};
++
++&display {
++	status = "okay";
++	display-timings {
++		model = "DVI-VGA";
++		bits-per-pixel = <16>;
++		vga {
++			clock-frequency = <23750000>;
++			hactive = <640>;
++			vactive = <480>;
++			hback-porch = <80>;
++			hfront-porch = <16>;
++			vback-porch = <3>;
++			vfront-porch = <13>;
++			hsync-len = <64>;
++			vsync-len = <4>;
++			hsync-active = <1>;
++			vsync-active = <1>;
++			de-active = <1>;
++			pixelclk-active = <0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+index d44a85d..71c2829 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -23,6 +23,15 @@
+ 	model = "Eukrea CPUIMX51";
+ 	compatible = "eukrea,mbimxsd51","eukrea,cpuimx51", "fsl,imx51";
  
- 	platform_set_drvdata(pdev, imxpd);
++	display: display at di0 {
++		compatible = "fsl,imx-parallel-display";
++		crtcs = <&ipu 0>;
++		interface-pix-fmt = "rgb666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu_disp1>;
++		status = "disabled";
++	};
++
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
+@@ -116,6 +125,10 @@
+ 			>;
+ 		};
+ 
++		pinctrl_ipu_disp1: ipudisp1grp {
++			fsl,pins = <MX51_IPU_DISP1_PINGRP1>;
++		};
++
+ 		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
+ 			fsl,pins = <
+ 				MX51_PAD_CSI1_D9__GPIO3_13 0x1f5
 -- 
 1.7.9.5
