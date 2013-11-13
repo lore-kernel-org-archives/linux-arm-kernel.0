@@ -1,42 +1,29 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 14 Nov 2013 07:34:06 +0900
-Subject: [PATCH] ARM: shmobile: Use ->init_late() on Lager
-Message-ID: <20131113223406.20634.52693.sendpatchset@w520>
+Date: Thu, 14 Nov 2013 07:40:26 +0900
+Subject: [PATCH] ARM: shmobile: lager: mark GPIO keys as wake-up sources
+Message-ID: <20131113224026.20904.35898.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 
-Hook in shmobile_init_late() on Lager. This enables some PM
-related things like CPUIdle and Suspend-to-RAM.
+Enable wakeup for the GPIO keys on the Lager board.
 
-With this patch applied it is possible to use Suspend-to-RAM:
-# echo enabled > /sys/class/tty/ttySC6/power/wakeup
-# echo mem > /sys/power/state 
-(wake by sending a character on the serial console)
-
+Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/board-lager-reference.c |    1 +
- arch/arm/mach-shmobile/board-lager.c           |    1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/mach-shmobile/board-lager.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- 0001/arch/arm/mach-shmobile/board-lager-reference.c
-+++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-11-13 16:55:46.000000000 +0900
-@@ -41,5 +41,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_early	= r8a7790_init_early,
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= lager_add_standard_devices,
-+	.init_late	= shmobile_init_late,
- 	.dt_compat	= lager_boards_compat_dt,
- MACHINE_END
---- 0001/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2013-11-13 16:55:38.000000000 +0900
-@@ -259,5 +259,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_early	= r8a7790_init_early,
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= lager_init,
-+	.init_late	= shmobile_init_late,
- 	.dt_compat	= lager_boards_compat_dt,
- MACHINE_END
+--- 0002/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2013-11-13 17:22:08.000000000 +0900
+@@ -121,7 +121,7 @@ static const struct gpio_led_platform_da
+ /* GPIO KEY */
+ #define GPIO_KEY(c, g, d, ...) \
+ 	{ .code = c, .gpio = g, .desc = d, .active_low = 1, \
+-	  .debounce_interval = 20 }
++	  .wakeup = 1, .debounce_interval = 20 }
+ 
+ static struct gpio_keys_button gpio_buttons[] = {
+ 	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
