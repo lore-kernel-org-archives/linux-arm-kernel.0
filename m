@@ -1,63 +1,83 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 13 Nov 2013 11:46:49 +0000
-Subject: [PATCH 1/2] ARM: default PHYS_OFFSET if !MMU
-In-Reply-To: <1384341351-4110-2-git-send-email-tom.leiming@gmail.com>
-References: <1384341351-4110-1-git-send-email-tom.leiming@gmail.com>
- <1384341351-4110-2-git-send-email-tom.leiming@gmail.com>
-Message-ID: <528366A9.7060504@arm.com>
+From: csmanjuvijay@gmail.com (Majunath Goudar)
+Date: Wed, 13 Nov 2013 17:40:15 +0530
+Subject: [PATCH V4 0/6]USB: OHCI:Properly handle ohci_suspend()routine in bus
+ glue
+In-Reply-To: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1384344621-6981-1-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ming,
+Suspend scenario in case of ohci bus glue was not properly handled as
+it was not suspending generic part of ohci controller. Alan Stern suggested,
+properly handle ohci suspend scenario.
 
-On 13/11/13 11:15, Ming Lei wrote:
-> From: Jonathan Austin <jonathan.austin@arm.com>
-> 
-> Set CONFIG_PAGE_OFFSET as PHYS_OFFSET when !MMU so that
-> we can keep CONFIG_PAGE_OFFSET same with PAGE_OFFSET.
->
+Calling explicitly the ohci_suspend()routine will ensure proper handling
+of suspend scenario.
 
-I'm not so sure about this commit message - I don't think
-it makes sense...Should it not be more like:
+This patch set is rebased on greghk/usb-next 3.13-rc1 and successfully 
+built without any build error.
 
-------->8-------
-Subject: ARM: set PAGE_OFFSET = PHYS_OFFSET if !MMU
+V3->V4:
+     -Dropped "[PATCH 5/7] USB: OHCI: Properly handle ohci-ep93xx suspend" in
+      this version, as H Hartley Sweeten has just submitted a patch to remove
+      ohci-ep93xx entirely.
 
-With !MMU we still set PAGE_OFFSET to 0xC0000000, which
-makes little sense and causes a regression on !MMU after
-f6537f2f0eba4eba ("scripts/kallsyms: filter symbols not
-kernel address space")
+     -[PATCH 2/6] The ohci_suspend() calling after enable_irq_wake, if ohci_suspend
+      fails disabling the irq.
 
-This patch sets PAGE_OFFSET to PHYS_OFFSET in the !MMU
-case, fixing the regression (Tested on Cortex-R7/Vexpress)
---------8<---------
+     -Added Alan acked-by.
 
-Russell: Will you pick this patch up from the list or does
-it need to go in through the patch system?
 
-Jonny
+V2->V3:
+      -Rewrote the remaining patches on top of the latest Greg usb-next branch.
+      This patch set not gives any build error. Patch set is required for proper
+      suspend of ohci host controller as Alan mentioned.
 
-> This patch and patch 2/2 fix regression on !MMU by
-> f6537f2f0eba4eba("scripts/kallsyms: filter symbols not
-> in kernel address space")
-> 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->   arch/arm/Kconfig |    1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 799ef94..db708c4 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1560,6 +1560,7 @@ endchoice
->   
->   config PAGE_OFFSET
->   	hex
-> +	default PHYS_OFFSET if !MMU
->   	default 0x40000000 if VMSPLIT_1G
->   	default 0x80000000 if VMSPLIT_2G
->   	default 0xC0000000
-> 
+      -Initially when I wrote this patch set I was working in Linaro, now I am not
+      part of Linaro that is why Linaro id is bouncing. Sending this patch set
+      from personal mail id.
+
+V1->V2:
+       -This version is fixing the ohci-ep93xx build error reported by Olof Johansson:
+
+        drivers/usb/host/ohci-ep93xx.c: In function 'ohci_hcd_ep93xx_drv_suspend':
+        drivers/usb/host/ohci-ep93xx.c:126:2: error: implicit declaration of
+        function 'ep93xx_stop_hc'
+
+        Due to the build failure on  "[PATCH 5/11] USB: OHCI: Properly handle
+        ohci-ep93xx suspend" following patches were reverted.
+        [PATCH 1/11]USB: OHCI: Properly handle OHCI controller suspend
+        [PATCH 2/11] USB: OHCI: Properly handle ohci-at91 suspend
+        [PATCH 3/11] USB: OHCI: Properly handle ohci-s3c2410 suspend
+        [PATCH 4/11] USB: OHCI: Properly handle ohci-da8xx suspend
+        [PATCH 5/11] USB: OHCI: Properly handle ohci-ep93xx suspend
+        [PATCH 6/11] USB: OHCI: Properly handle ohci-exynos suspend
+        [PATCH 11/11] USB: OHCI: Properly handle ohci-spear suspend
+
+        The following 4 patches are fine and present in usb-next
+        Commit id "10abfa13"[PATCH 7/11] Properly handle ohci-omap suspend.
+        Commit id "39dbd7df"[PATCH 8/11] Properly handle ohci-platform suspend.
+        Commit id "4ceaa893"[PATCH 9/11] Properly handle ohci-pxa suspend.
+        Commit id "f3c60599"[PATCH 10/11] Properly handle ohci-sm501 suspend.
+
+        This patch set is working properly.
+
+Majunath Goudar (6):
+  USB: OHCI: Properly handle OHCI controller suspend
+  USB: OHCI: Properly handle ohci-at91 suspend
+  USB: OHCI: Properly handle ohci-s3c2410 suspend
+  USB: OHCI: Properly handle ohci-da8xx suspend
+  USB: OHCI: Properly handle ohci-exynos suspend
+  USB: OHCI: Properly handle ohci-spear suspend
+
+ drivers/usb/host/ohci-at91.c    |   11 +++++++++--
+ drivers/usb/host/ohci-da8xx.c   |   16 ++++++++++++----
+ drivers/usb/host/ohci-exynos.c  |   22 ++++++----------------
+ drivers/usb/host/ohci-hcd.c     |    9 ++++++++-
+ drivers/usb/host/ohci-s3c2410.c |   21 ++++-----------------
+ drivers/usb/host/ohci-spear.c   |   12 +++++++++---
+ 6 files changed, 48 insertions(+), 43 deletions(-)
+
+-- 
+1.7.9.5
