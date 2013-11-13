@@ -1,106 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Nov 2013 10:49:08 -0700
-Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
-In-Reply-To: <20131113092354.5b65f29bacc4f37083f81e2e@nvidia.com>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>	<1384158718-4756-3-git-send-email-hdoyu@nvidia.com>	<5282BAFC.8070405@wwwdotorg.org>
- <20131113092354.5b65f29bacc4f37083f81e2e@nvidia.com>
-Message-ID: <5283BB94.6060400@wwwdotorg.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Nov 2013 18:49:20 +0100
+Subject: [PATCH v3 0/2] ARM: at91: sama5d3: add sama5d36ek support
+In-Reply-To: <1383732072-24938-1-git-send-email-josh.wu@atmel.com>
+References: <1383732072-24938-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <5283BBA0.8000106@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2013 12:23 AM, Hiroshi Doyu wrote:
-> On Wed, 13 Nov 2013 00:34:20 +0100
-> Stephen Warren <swarren@wwwdotorg.org> wrote:
-> 
->> On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
->>> An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
->>> are done later.
->>>
->>> With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
->>> identify whether a device is IOMMU'able or not. If a device is
->>> IOMMU'able, we'll defer to populate that device till an iommu device
->>> is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
->>> is set in the bus. Then, those defered IOMMU'able devices are
->>> populated and configured as IOMMU'abled with help of the already
->>> populated iommu device via iommu_ops->add_device().
->>
->> This looks fairly neat and clean.
->>
->> I'm still worried about using #stream-id-cells in DT nodes though. While
->> I do understand that the *Linux* device model currently only allows each
->> struct device to be affected by a single IOMMU, I worry that encoding
->> that same restriction into DT is a mistake. I'd far rather see a
->> property like:
->>
->> SMMU:
->>     smmu: smmu at xxxxxx {
->>         #smmu-cells = <1>;
->>     }
->>
->> Affected device:
->>     smmus = <&smmu 1>;
->>     (perhaps with smmu-names too)
->>
->> That would allow the DT to represent basically arbitrary HW configurations.
-> 
-> True, and also can solve multi IOMMU problem as well.
-> 
->> The implementation of this patch would then be almost as trivial; you'd
->> just need to walk the smmus property to find each phandle in turn, just
->> like any other phandle+specifier property, and validate that the SMMU
->> driver was already probe()d for each.
-> 
-> This seems to be almost same as the previous v3 DT bindings, and if we
-> introduce 64 bitmap newly, this DT bindings would be something like
-> below:
-> 
->    smmu: iommu at xxxxxx {
->        #smmu-cells = <2>;
->        ......
->    };
-> 
->    host1x {
->            compatible = "nvidia,tegra30-host1x", "simple-bus";
->            nvidia,memory-clients = <&smmu 0x??????? 0x???????>;
->            ....
->            gr3d {
->                    compatible = "nvidia,tegra30-gr3d";
->                    nvidia,memory-clients = <&smmu 0x??????? 0x???????>;
->            }
-> 
-> If a device is attached to multiple IOMMU H/Ws,
-> 
->            gr3d {
->                    compatible = "nvidia,tegra30-gr3d";
->                    nvidia,memory-clients = <&smmu 0x??????? 0x??????? &gart 0x???????>;
->                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> 
-> Then, the problem is the binding "name" and its "scope". This original
-> patch works with "#stream-id-cells" in driver core because I assumed
-> that "#stream-id-cells" can indicate globally that a device can be an
-> IOMMU master.
+On 06/11/2013 11:01, Josh Wu :
+> This patch series add support for sama5d36 in sama5d3x family.
+> It also adds the dts & dtsi file for sama5d36ek board.
+>
+> v2 --> v3:
 
-For example, the pinctrl bindings have the same issue, since they're
-interpreted "globally", and by (code called from) the generic device
-probing code.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-We simply decided that the properties "pinctrl-names" and "pinctrl-n"
-(n=0...) were globally defined by the pinctrl subsystem, and hence could
-be parsed in any node.
+I'll integrate them in at91-3.14-dt branch.
 
-We could do the same with "smmus" and "smmu-names" in this case.
+Thank, best regards,
 
-> We may be able to have some kind of callback function which checks
-> "#stream-id-cells" *in* SMMU driver, but at least this function needs to
-> be registered in the bus at very early stage, iommu_ops->is_iommu_master().
-> But this cannot be done with bus->iommu_ops since bus->iommu_ops is set
-> after IOMMU is populated. A kind of Chikin or the egg problem.
 
-I think this is simply the normal deferred probe.
+>    change the copyright.
+>
+> v1 --> v2:
+>    base on the at91-3.13-cleanup tree.
+>    add a new sama5d36.dtsi to include the splitted peripherals.
+>
+> Josh Wu (2):
+>    ARM: at91: sama5d3: add support for sama5d36 chip
+>    ARM: at91: sama5d3/dt: add sama5d36ek dts files
+>
+>   arch/arm/boot/dts/Makefile            |    1 +
+>   arch/arm/boot/dts/sama5d3.dtsi        |    2 +-
+>   arch/arm/boot/dts/sama5d36.dtsi       |   20 +++++++++++++
+>   arch/arm/boot/dts/sama5d36ek.dts      |   53 +++++++++++++++++++++++++++++++++
+>   arch/arm/mach-at91/Kconfig            |    2 +-
+>   arch/arm/mach-at91/include/mach/cpu.h |    3 +-
+>   arch/arm/mach-at91/sama5d3.c          |    7 ++---
+>   arch/arm/mach-at91/setup.c            |    4 +++
+>   8 files changed, 85 insertions(+), 7 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/sama5d36.dtsi
+>   create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
+>
 
-When device X attempts to probe, the core SMMU code (called from the
-core device probing code) iterates over the smmus property. If any of
-the phandles listed there don't have a registered SMMU driver, then
-defer probe of device X. Eventually, the SMMU driver will appear, and
-the driver core will attempt to re-probe device X, and all the SMMUs
-have devices probed already, and everything will work.
+
+-- 
+Nicolas Ferre
