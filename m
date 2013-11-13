@@ -1,44 +1,33 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 12 Nov 2013 22:57:47 -0800
-Subject: [PATCH v2] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
-In-Reply-To: <1384325867-5140-1-git-send-email-victor.kamensky@linaro.org>
-References: <1384325867-5140-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1384325867-5140-2-git-send-email-victor.kamensky@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 12 Nov 2013 23:01:59 -0800
+Subject: [PATCH] ARM: Fix warning for V7M builds
+Message-ID: <1384326119-3491-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of armv7-m architecture arm instructions are not allowed.
-For this architecture CONFIG_CPU_THUMBONLY is set. Let's
-explicitly set minimal architecture that allows both required
-thumb and arm opcodes. It is OK to do, since file as used as
-array of code snippets, which is indexed by signal.c code.
+Fixes a harmless warning when building for V7M (!MMU):
+ arch/arm/kernel/traps.c:859:123: warning: 'kuser_init' defined but not used [-Wunused-function]
 
-Suggested-by: Dave Martin <Dave.Martin@arm.com>
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+By making the stub static inline instead of just static.
+
+Fixes: f6f91b0d9fd9 ('ARM: allow kuser helpers to be removed from the vector page')
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/kernel/sigreturn_codes.S | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/kernel/traps.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
-index 3c5d0f2..081a041 100644
---- a/arch/arm/kernel/sigreturn_codes.S
-+++ b/arch/arm/kernel/sigreturn_codes.S
-@@ -30,12 +30,12 @@
-  * snippets.
-  */
- 
--#if __LINUX_ARM_ARCH__ <= 4
-+#if (__LINUX_ARM_ARCH__ <= 4) || defined(CONFIG_CPU_THUMBONLY)
- 	/*
- 	 * Note we manually set minimally required arch that supports
--	 * required thumb opcodes for early arch versions. It is OK
--	 * for this file to be used in combination with other
--	 * lower arch variants, since these code snippets are only
-+	 * required thumb and arm opcodes for early arch versions or
-+	 * thumb only CPU. It is OK for this file to be used in combination
-+	 * with other arch variants, since these code snippets are only
- 	 * used as input data.
- 	 */
- 	.arch armv4t
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 6125f25..dbf0923 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -856,7 +856,7 @@ static void __init kuser_init(void *vectors)
+ 		memcpy(vectors + 0xfe0, vectors + 0xfe8, 4);
+ }
+ #else
+-static void __init kuser_init(void *vectors)
++static inline void __init kuser_init(void *vectors)
+ {
+ }
+ #endif
 -- 
-1.8.1.4
+1.7.10.4
