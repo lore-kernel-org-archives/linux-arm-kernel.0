@@ -1,85 +1,61 @@
 From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Wed, 13 Nov 2013 17:40:16 +0530
-Subject: [PATCH V4 1/6] USB: OHCI: Properly handle OHCI controller suspend
+Date: Wed, 13 Nov 2013 17:40:17 +0530
+Subject: [PATCH 2/6] USB: OHCI: Properly handle ohci-at91 suspend
 In-Reply-To: <1384344621-6981-1-git-send-email-csmanjuvijay@gmail.com>
 References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
  <1384344621-6981-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1384344621-6981-2-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1384344621-6981-3-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of OHCI was not properly
-handled in ochi_suspend()routine. Alan Stern
-suggested, properly handle OHCI suspend scenario.
+Suspend scenario in case of ohci-at91 glue was not properly handled
+as it was not suspending generic part of ohci controller. Alan Stern
+suggested, properly handle ohci-at91 suspend scenario.
 
-This does generic proper handling of suspend
-scenario to all OHCI SOC.
+Calling explicitly the ohci_suspend() routine in ohci_hcd_at91_drv_suspend()
+will ensure proper handling of suspend scenario. This task is sugested
+by Alan Stern.
 
 Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Acked-by:  Alan Stern <stern@rowland.harvard.edu>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
 ---
- V3->V4:
-     - No changes, only added Alan Acked-by.
+ drivers/usb/host/ohci-at91.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-V2->V3 :
-     - No changes.
-       As a build failure on ep93xx patch, reverted this patch(reveart
-       commit id 476e4b). Rewrote this patch on top of latest Greg usb-next
-       branch. This patch not gives any build error. patch is required for
-       proper suspending as Alan mentioned. It is having common ohci suspend
-       features w/o this following patches(still in usb-next) are not useful.
-
-       Commit id "10abfa13"[PATCH 7/11] Properly handle ohci-omap suspend.
-       Commit id "39dbd7df"[PATCH 8/11] Properly handle ohci-platform suspend.
-       Commit id "4ceaa893"[PATCH 9/11] Properly handle ohci-pxa suspend.
-       Commit id "f3c60599"[PATCH 10/11] Properly handle ohci-sm501 suspend.
-
-      Initially when I wrote this patch I was working in Linaro, now I am not
-      part of Linaro that is why Linaro id is bouncing. Sending this patch
-      from personal mail id.
-
-V1->V2:
-     - No change.
-       Due to build failure on ep93xx reverted this patch. This patch is
-       needed as Alan mentioned, it is having common ohci suspend features
-       w/o this following patches(still in usb-next) are not useful.
-
-        Commit id "10abfa13"[PATCH 7/11] Properly handle ohci-omap suspend.
-        Commit id "39dbd7df"[PATCH 8/11] Properly handle ohci-platform suspend.
-        Commit id "4ceaa893"[PATCH 9/11] Properly handle ohci-pxa suspend.
-        Commit id "f3c60599"[PATCH 10/11] Properly handle ohci-sm501 suspend.
-
- drivers/usb/host/ohci-hcd.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 8ada13f..310bcfe 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1036,6 +1036,7 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 476b5a5..71eff0b 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -636,10 +636,17 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
  {
- 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
- 	unsigned long	flags;
-+	int		rc = 0;
+ 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
+ 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	bool		do_wakeup = device_may_wakeup(&pdev->dev);
++	int		ret;
  
- 	/* Disable irq emission and mark HW unaccessible. Use
- 	 * the spinlock to properly synchronize with possible pending
-@@ -1048,7 +1049,13 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
- 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
- 	spin_unlock_irqrestore (&ohci->lock, flags);
+-	if (device_may_wakeup(&pdev->dev))
++	if (do_wakeup)
+ 		enable_irq_wake(hcd->irq);
+ 
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret) {
++		disable_irq_wake(hcd->irq);
++		return ret;
++	}
+ 	/*
+ 	 * The integrated transceivers seem unable to notice disconnect,
+ 	 * reconnect, or wakeup without the 48 MHz clock active.  so for
+@@ -658,7 +665,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 		at91_stop_clock();
+ 	}
  
 -	return 0;
-+	synchronize_irq(hcd->irq);
-+
-+	if (do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
-+		ohci_resume(hcd, false);
-+		rc = -EBUSY;
-+	}
-+	return rc;
++	return ret;
  }
- EXPORT_SYMBOL_GPL(ohci_suspend);
  
+ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
 -- 
 1.7.9.5
