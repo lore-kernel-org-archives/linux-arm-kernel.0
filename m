@@ -1,67 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Nov 2013 14:38:04 +0000
-Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
-In-Reply-To: <5282BAFC.8070405@wwwdotorg.org>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
- <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
- <5282BAFC.8070405@wwwdotorg.org>
-Message-ID: <20131113143804.GA11928@mudshark.cambridge.arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 13 Nov 2013 15:38:26 +0100
+Subject: [PATCH] clk: add specified-rate clock
+In-Reply-To: <52838D3D.6060007@imgtec.com>
+References: <1368189862-17119-1-git-send-email-james.hogan@imgtec.com>
+ <5867382.IN2EZ2ivg4@flatron> <52838D3D.6060007@imgtec.com>
+Message-ID: <1874762.a1UESS7e53@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 11:34:20PM +0000, Stephen Warren wrote:
-> On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
-> > An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
-> > are done later.
+On Wednesday 13 of November 2013 14:31:25 James Hogan wrote:
+> On 13/11/13 14:18, Tomasz Figa wrote:
+> > Hi James, Mike,
 > > 
-> > With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
-> > identify whether a device is IOMMU'able or not. If a device is
-> > IOMMU'able, we'll defer to populate that device till an iommu device
-> > is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
-> > is set in the bus. Then, those defered IOMMU'able devices are
-> > populated and configured as IOMMU'abled with help of the already
-> > populated iommu device via iommu_ops->add_device().
+> > On Wednesday 13 of November 2013 14:09:56 James Hogan wrote:
+> >> On 29/05/13 18:39, Mike Turquette wrote:
+> >>> Quoting James Hogan (2013-05-10 05:44:22)
+> >>>> The frequency of some SoC's external oscillators (for example TZ1090's
+> >>>> XTAL1) are configured by the board using pull-ups/pull-downs of
+> >>>> configuration pins, the logic values of which are automatically latched
+> >>>> on reset and available in an SoC register. Add a generic clock component
+> >>>> and DT bindings to handle this.
+> >>>>
+> >>>> It behaves similar to a fixed rate clock (read-only), except it needs
+> >>>> information about a register field (reg, shift, width), and the
+> >>>> clock-frequency is a mapping from register field values to clock
+> >>>> frequencies.
+> >>>>
+> >>>
+> >>> James,
+> >>>
+> >>> Thanks for sending this!  It looks mostly good and is a useful clock
+> >>> type to support.  Comments below.
+> >>
+> >> Hi Mike,
+> >>
+> >> Sorry for slight delay getting back to you. I had another think about
+> >> this stuff yesterday...
+> >>
+> > 
+> > Just a random idea that came to my mind while reading this thread:
+> > 
+> > What about modelling this as a set of fixed rate clocks fed into
+> > a read-only mux?
 > 
-> This looks fairly neat and clean.
-> 
-> I'm still worried about using #stream-id-cells in DT nodes though. While
-> I do understand that the *Linux* device model currently only allows each
-> struct device to be affected by a single IOMMU, I worry that encoding
-> that same restriction into DT is a mistake. I'd far rather see a
-> property like:
-> 
-> SMMU:
->     smmu: smmu at xxxxxx {
->         #smmu-cells = <1>;
->     }
-> 
-> Affected device:
->     smmus = <&smmu 1>;
->     (perhaps with smmu-names too)
-> 
-> That would allow the DT to represent basically arbitrary HW configurations.
-> 
-> The implementation of this patch would then be almost as trivial; you'd
-> just need to walk the smmus property to find each phandle in turn, just
-> like any other phandle+specifier property, and validate that the SMMU
-> driver was already probe()d for each.
+> Yes, that had occurred to me too. I suppose the arguments against would be:
+> * it doesn't describe the hardware, there is no mux, just a fixed rate
+> clock with a discoverable frequency.
 
-There are a few problems with that:
+For me, a set of configuration pins that select clock frequency sounds
+like a mux. I'd rather say that there are no physical clocks that would
+be its inputs, but that's probably just an implementation detail.
 
-  1.) It assumes all devices sharing an SMMU have the same number of
-      "smmu cells"
+> * it would sort of work for my small case of only having 9 possible
+> frequencies (although it would be a bit verbose), but wouldn't scale
+> nicely or be extendible to if the frequency was encoded more
+> continuously in the register value. E.g. if the frequency was 1MHz *
+> (the register value - 1) or something crazy like that.
 
-  2.) It moves SMMU-specific data out to the device, which makes it
-      impossible to describe more complicated topologies where IDs can be
-      remapped/remastered, potentially by multiple SMMUs and/or bus bridges.
+I guess you would need an implementation specific code to calculate the
+frequency in such cases, which is not what you suggested above (but
+rather "a mapping from register field values to clock frequencies"
+inside a property).
 
-When writing the binding for the ARM SMMU driver, I originally started with
-something similar to what you're suggesting, but was later forced down a
-different route when I realised what sort of systems were being built.
-
-We will have similar problems for PCIe RIDs and GIC DIDs (I spoke about this
-at the ARM mini-summit). They are not fixed across the system: they
-originate from a device, but can change as they traverse the system
-topology.
-
-Will
+Best regards,
+Tomasz
