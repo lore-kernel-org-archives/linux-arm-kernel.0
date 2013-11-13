@@ -1,59 +1,39 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 13 Nov 2013 01:57:48 +0100
-Subject: [PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-In-Reply-To: <20131113005329.GA25694@verge.net.au>
-References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <17979814.3ftdsWAt7J@avalon> <20131113005329.GA25694@verge.net.au>
-Message-ID: <2038217.6aK6L4rUYc@avalon>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 13 Nov 2013 09:31:12 +0800
+Subject: [PATCH v11 0/2] Enable clock driver of Hi3620 SoC
+Message-ID: <1384306274-27315-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Enable common clock driver of Hi3620 SoC.
 
-On Wednesday 13 November 2013 09:53:29 Simon Horman wrote:
-> On Tue, Nov 12, 2013 at 02:21:04PM +0100, Laurent Pinchart wrote:
-> > On Tuesday 12 November 2013 14:26:25 Simon Horman wrote:
-> > > On Tue, Nov 12, 2013 at 02:11:37PM +0900, Simon Horman wrote:
-> > > > On Sat, Nov 09, 2013 at 01:33:48PM +0100, Laurent Pinchart wrote:
-> > > > > SH-Mobile platforms are transitioning from non-multiplatform to
-> > > > > multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol
-> > > > > has been created to group all multiplatform-enabled SH-Mobile SoCs.
-> > > > > The existing ARCH_SHMOBILE configuration symbol groups SoCs that
-> > > > > haven't been converted yet.
-> > > > > 
-> > > > > This arrangement works fine for the arch/ code, but lots of drivers
-> > > > > needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
-> > > > > ARCH_SHMOBILE only. In order to avoid changing them, rename
-> > > > > ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
-> > > > > ARCH_SHMOBILE configuration symbol that is selected by both
-> > > > > ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
-> > > > > 
-> > > > > Signed-off-by: Laurent Pinchart
-> > > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > Acked-by: Magnus Damm <damm@opensource.se>
-> > > > 
-> > > > Thanks, I have queued this up.
-> > > 
-> > > I have dropped this for now as it seems that all of the
-> > > shmobile defconfigs now need to be updated to use ARCH_SHMOBILE_LEGACY
-> > > instead of ARCH_SHMOBILE.
-> > 
-> > Indeed, I forgot about that.
-> > 
-> > > It seems to me that needs to be part of this patch to avoid
-> > > breaking bisecatability. Any thoughts?
-> > 
-> > The only bisection this would break is the defconfig bisection. I'm not
-> > sure whether we need to care about that, Would that be a bit issue ? I'll
-> > submit a separate patch, please feel free to squash it with this one if
-> > you believe it should be.
-> 
-> To be honest I'm unsure.
-> But I think that I am leaning towards keeping the patches separate.
+v11:
+  1. Abandon original solution on parsing all clock from DTS file. Create
+  the clock tree in c code. So clock identifier is added into DTS file.
+  2. Avoid to use hi3xxx prefix. Use hisi prefix instead.
 
-You got both patches, it's your call ;-)
+Haojian Zhuang (2):
+  clk: hisilicon: add common clock support
+  ARM: dts: enable clock binding on Hi3620
+
+ .../devicetree/bindings/clock/hi3620-clock.txt     |  19 ++
+ arch/arm/boot/dts/hi3620.dtsi                      |  79 ++++---
+ arch/arm/boot/dts/hi4511.dts                       |   3 +-
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/hisilicon/Makefile                     |   5 +
+ drivers/clk/hisilicon/clk-hi3620.c                 | 242 +++++++++++++++++++++
+ drivers/clk/hisilicon/clk.c                        | 171 +++++++++++++++
+ drivers/clk/hisilicon/clk.h                        | 103 +++++++++
+ drivers/clk/hisilicon/clkgate-seperated.c          | 130 +++++++++++
+ include/dt-bindings/clock/hi3620-clock.h           | 152 +++++++++++++
+ 10 files changed, 869 insertions(+), 36 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3620-clock.txt
+ create mode 100644 drivers/clk/hisilicon/Makefile
+ create mode 100644 drivers/clk/hisilicon/clk-hi3620.c
+ create mode 100644 drivers/clk/hisilicon/clk.c
+ create mode 100644 drivers/clk/hisilicon/clk.h
+ create mode 100644 drivers/clk/hisilicon/clkgate-seperated.c
+ create mode 100644 include/dt-bindings/clock/hi3620-clock.h
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.3.2
