@@ -1,63 +1,72 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Thu, 14 Nov 2013 01:05:23 +0900
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping support
-In-Reply-To: <20131112115935.23d05236@gandalf.local.home>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <528114C4.5000506@hitachi.com>
- <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
- <5281D848.7000502@hitachi.com>
- <CA+b37P2EgB0toYwhLny8k-cbrziBVXURST5kHNXcY7AF-CNVLg@mail.gmail.com>
- <52820043.6090107@hitachi.com>
- <CA+b37P1xLYWA-a0PwgxT7S7dNr5TdGFscLYFeQhAQUyO_E=Mzw@mail.gmail.com>
- <20131112115935.23d05236@gandalf.local.home>
-Message-ID: <5283A343.1000305@hitachi.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 13 Nov 2013 17:06:10 +0100
+Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
+In-Reply-To: <20131113143804.GA11928@mudshark.cambridge.arm.com>
+References: <1384158718-4756-3-git-send-email-hdoyu@nvidia.com><5282BAFC.8070405@wwwdotorg.org><20131113143804.GA11928@mudshark.cambridge.arm.com>
+Message-ID: <20131113.180610.823304139654159769.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/11/13 1:59), Steven Rostedt wrote:
-> On Tue, 12 Nov 2013 16:25:26 +0530
-> Sandeepa Prabhu <sandeepa.prabhu@linaro.org> wrote:
-> 
-> 
->>>
->>> BTW, I'm currently trying a general housecleaning of __kprobes
->>> annotations. It may also have impact on your patch.
->>> https://lkml.org/lkml/2013/11/8/187
->> Hmm, we can help testing your patchset on arm64 platforms. Also have
->> many doubts on the changes you are working [blacklisting probes etc]
->>
->> Basically I had tried placing kprobe on memcpy() and the model hung
->> (insmod never returned back!). Fast-model I have does not have option
->> of any debug so no clue what happened!.
->> memcpy() is low-level call being used internally within kprobes, so
->> probably we cannot handle probe on that routine, but then how to make
->> sure all such API are rejected by kprobe sub-system ?
-> 
-> Working on ports of ftrace, I found that many of the functions in lib/
-> are used by several locations that just can't be traced, due to how
-> low level they are. I just simply blacklisted the entire lib/
-> directory (See the top of lib/Makefile)
-> 
-> I wonder if there's an easy way to blacklist entire directories from
-> being used by kprobes too. Or at least do it by a file per file basis.
+Will Deacon <will.deacon@arm.com> wrote @ Wed, 13 Nov 2013 15:38:04 +0100:
 
-Hm, perhaps we can do some magic in post-build script as kallsyms does.
-1) make an object file
-2) extract symbols from the file
-3) put the symbols into data section as a list of strings
-4) analyze the list at boot (init) time by using kallsyms
-how about this? :)
+> On Tue, Nov 12, 2013 at 11:34:20PM +0000, Stephen Warren wrote:
+> > On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
+> > > An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
+> > > are done later.
+> > > 
+> > > With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
+> > > identify whether a device is IOMMU'able or not. If a device is
+> > > IOMMU'able, we'll defer to populate that device till an iommu device
+> > > is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
+> > > is set in the bus. Then, those defered IOMMU'able devices are
+> > > populated and configured as IOMMU'abled with help of the already
+> > > populated iommu device via iommu_ops->add_device().
+> > 
+> > This looks fairly neat and clean.
+> > 
+> > I'm still worried about using #stream-id-cells in DT nodes though. While
+> > I do understand that the *Linux* device model currently only allows each
+> > struct device to be affected by a single IOMMU, I worry that encoding
+> > that same restriction into DT is a mistake. I'd far rather see a
+> > property like:
+> > 
+> > SMMU:
+> >     smmu: smmu at xxxxxx {
+> >         #smmu-cells = <1>;
+> >     }
+> > 
+> > Affected device:
+> >     smmus = <&smmu 1>;
+> >     (perhaps with smmu-names too)
+> > 
+> > That would allow the DT to represent basically arbitrary HW configurations.
+> > 
+> > The implementation of this patch would then be almost as trivial; you'd
+> > just need to walk the smmus property to find each phandle in turn, just
+> > like any other phandle+specifier property, and validate that the SMMU
+> > driver was already probe()d for each.
+> 
+> There are a few problems with that:
+> 
+>   1.) It assumes all devices sharing an SMMU have the same number of
+>       "smmu cells"
 
-Thank you,
+This can be solved with introducing the fixed size of bitmap. The size
+of bitmap can be fixed even per SoC. In tegra we used 64(2 cells)
+which I expect at most.
 
--- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+>   2.) It moves SMMU-specific data out to the device, which makes it
+>       impossible to describe more complicated topologies where IDs can be
+>       remapped/remastered, potentially by multiple SMMUs and/or bus bridges.
+> 
+> When writing the binding for the ARM SMMU driver, I originally started with
+> something similar to what you're suggesting, but was later forced down a
+> different route when I realised what sort of systems were being built.
+> 
+> We will have similar problems for PCIe RIDs and GIC DIDs (I spoke about this
+> at the ARM mini-summit). They are not fixed across the system: they
+> originate from a device, but can change as they traverse the system
+> topology.
+
+Is there any chance to overwrite SMMU driver specific params during
+setting up topologies?
