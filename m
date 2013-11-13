@@ -1,13 +1,14 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 13 Nov 2013 10:23:19 +0100
-Subject: [PATCHv4][ 3/7] staging: imx-drm: Add RGB666 support for parallel
- display.
+Date: Wed, 13 Nov 2013 10:23:20 +0100
+Subject: [PATCHv4][ 4/7] staging: imx-drm: parallel display: add regulator
+ support.
 In-Reply-To: <1384334603-14208-1-git-send-email-denis@eukrea.com>
 References: <1384334603-14208-1-git-send-email-denis@eukrea.com>
-Message-ID: <1384334603-14208-3-git-send-email-denis@eukrea.com>
+Message-ID: <1384334603-14208-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Cc: Dan Carpenter <dan.carpenter@oracle.com>
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
@@ -18,9 +19,6 @@ Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: driverdev-devel at linuxdriverproject.org
 Cc: David Airlie <airlied@linux.ie>
 Cc: dri-devel at lists.freedesktop.org
-Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: linux-media at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
@@ -29,75 +27,87 @@ Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v2->v3:
 - Added some interested people in the Cc list.
-- Removed the commit message long desciption that was just a copy of the short
-  description.
-- Rebased the patch.
-- Fixed a copy-paste error in the ipu_dc_map_clear parameter.
+- the lcd-supply is now called display-supply (not all display are LCD).
+- The code and documentation was updated accordingly.
+- regulator_is_enabled now guard the regulator enables/disables because
+  regulator_disable does not check the regulator state.
 ---
- .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
- drivers/staging/imx-drm/parallel-display.c         |    2 ++
- 3 files changed, 12 insertions(+), 1 deletion(-)
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    1 +
+ drivers/staging/imx-drm/parallel-display.c         |   22 ++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-index b876d49..2d24425 100644
+index 2d24425..4dd7ce5 100644
 --- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
 +++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-@@ -29,7 +29,7 @@ Required properties:
+@@ -28,6 +28,7 @@ Required properties:
+ - compatible: Should be "fsl,imx-parallel-display"
  - crtc: the crtc this display is connected to, see below
  Optional properties:
++- display-supply : phandle to the regulator device tree node if needed.
  - interface_pix_fmt: How this display is connected to the
--  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
-+  crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
+   crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
  - edid: verbatim EDID data block describing attached display.
- - ddc: phandle describing the i2c bus handling the display data
-   channel
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index d0e3bc3..bcc7680 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -92,6 +92,7 @@ enum ipu_dc_map {
- 	IPU_DC_MAP_GBR24, /* TVEv2 */
- 	IPU_DC_MAP_BGR666,
- 	IPU_DC_MAP_BGR24,
-+	IPU_DC_MAP_RGB666,
- };
- 
- struct ipu_dc {
-@@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
- 		return IPU_DC_MAP_BGR666;
- 	case V4L2_PIX_FMT_BGR24:
- 		return IPU_DC_MAP_BGR24;
-+	case V4L2_PIX_FMT_RGB666:
-+		return IPU_DC_MAP_RGB666;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -404,6 +407,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
- 
-+	/* rgb666 */
-+	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
-+
- 	return 0;
- }
- 
 diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index b34f3a3..46b6fce 100644
+index 46b6fce..195ec60 100644
 --- a/drivers/staging/imx-drm/parallel-display.c
 +++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -248,6 +248,8 @@ static int imx_pd_probe(struct platform_device *pdev)
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
- 		else if (!strcmp(fmt, "bgr666"))
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
-+		else if (!strcmp(fmt, "rgb666"))
-+			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
- 	}
+@@ -22,6 +22,7 @@
+ #include <drm/drmP.h>
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_crtc_helper.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/videodev2.h>
  
- 	imxpd->dev = &pdev->dev;
+ #include "imx-drm.h"
+@@ -35,6 +36,7 @@ struct imx_parallel_display {
+ 	struct drm_encoder encoder;
+ 	struct imx_drm_encoder *imx_drm_encoder;
+ 	struct device *dev;
++	struct regulator *disp_reg;
+ 	void *edid;
+ 	int edid_len;
+ 	u32 interface_pix_fmt;
+@@ -139,6 +141,12 @@ static void imx_pd_encoder_prepare(struct drm_encoder *encoder)
+ {
+ 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
+ 
++	if (imxpd->disp_reg && !regulator_is_enabled(imxpd->disp_reg)) {
++		if (regulator_enable(imxpd->disp_reg))
++			dev_err(imxpd->dev,
++				"Failed to enable regulator.\n");
++	}
++
+ 	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_NONE,
+ 			imxpd->interface_pix_fmt);
+ }
+@@ -155,6 +163,12 @@ static void imx_pd_encoder_mode_set(struct drm_encoder *encoder,
+ 
+ static void imx_pd_encoder_disable(struct drm_encoder *encoder)
+ {
++	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
++
++	if (imxpd->disp_reg && regulator_is_enabled(imxpd->disp_reg)) {
++		if (regulator_disable(imxpd->disp_reg))
++			dev_err(imxpd->dev, "Failed to disable regulator.\n");
++	}
+ }
+ 
+ static void imx_pd_encoder_destroy(struct drm_encoder *encoder)
+@@ -258,6 +272,14 @@ static int imx_pd_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	imxpd->disp_reg = devm_regulator_get(&pdev->dev, "display");
++	if (IS_ERR(imxpd->disp_reg)) {
++		dev_warn(&pdev->dev, "Operating without display regulator.\n");
++		imxpd->disp_reg = NULL;
++	} else {
++		dev_info(&pdev->dev, "Using display regulator.\n");
++	}
++
+ 	ret = imx_drm_encoder_add_possible_crtcs(imxpd->imx_drm_encoder, np);
+ 
+ 	platform_set_drvdata(pdev, imxpd);
 -- 
 1.7.9.5
