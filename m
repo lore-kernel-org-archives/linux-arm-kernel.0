@@ -1,33 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Nov 2013 23:05:29 -0800
-Subject: [PATCH] ARM: nommu: add missing include of asm/procinfo.h
-Message-ID: <1384326329-8281-1-git-send-email-olof@lixom.net>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 13 Nov 2013 12:34:29 +0530
+Subject: [PATCH] ARM: dts: AM437x GP EVM support
+In-Reply-To: <20131112142206.GD31721@saruman.home>
+References: <1384255468-2453-1-git-send-email-afzal@ti.com>
+ <20131112142206.GD31721@saruman.home>
+Message-ID: <5283247D.7010106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building for nommu, the following warning results:
+Hi Felipe,
 
-arch/arm/mm/nommu.c:303:17: warning: 'struct proc_info_list' declared
-    inside parameter list
+On Tuesday 12 November 2013 07:52 PM, Felipe Balbi wrote:
+> On Tue, Nov 12, 2013 at 04:54:26PM +0530, Afzal Mohammed wrote:
+>> From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Add the missing include of asm/procinfo.h.
+>> AM437x GP EVM DTS with pinmux information to make I2C on EVM usable.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mm/nommu.c |    1 +
- 1 file changed, 1 insertion(+)
+> could you instead send the much more complete version we already have
+> at [1] ? It's pointless to repatch all of that in this file if we *know*
+> those are already working.
 
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 5c668b7..55764a7 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -18,6 +18,7 @@
- #include <asm/mach/arch.h>
- #include <asm/cputype.h>
- #include <asm/mpu.h>
-+#include <asm/procinfo.h>
- 
- #include "mm.h"
- 
--- 
-1.7.10.4
+By taking those changes and testing on mainline, I couldn't get mmc
+working and was not confident about ethernet changes, I2C changes were
+verified and boot test was done (with DT clock series). I posted only
+the changes that I felt confident.
+
+Basic DT file and I2C are dependency for others, it was necessary to
+remove dependencies at the earliest.
+
+Regards
+Afzal
+
+> [1] http://git.ti.com/cgit/cgit.cgi/ti-linux-kernel/ti-linux-kernel.git/tree/arch/arm/boot/dts/am437x-gp-evm.dts?h=ti-linux-3.12.y
