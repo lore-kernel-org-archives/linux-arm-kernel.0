@@ -1,78 +1,68 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Wed, 13 Nov 2013 15:18:34 +0000
-Subject: [PATCH] clk: add specified-rate clock
-In-Reply-To: <1874762.a1UESS7e53@flatron>
-References: <1368189862-17119-1-git-send-email-james.hogan@imgtec.com>
- <5867382.IN2EZ2ivg4@flatron> <52838D3D.6060007@imgtec.com>
- <1874762.a1UESS7e53@flatron>
-Message-ID: <5283984A.4010208@imgtec.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 13 Nov 2013 09:20:01 -0600
+Subject: [PATCH V2] ARM: OMAP2+: omap_device: maintain sane runtime pm
+ status around suspend/resume
+In-Reply-To: <52839306.7050701@ti.com>
+References: <1384297710-29694-1-git-send-email-nm@ti.com>
+ <20131113125149.GB28192@saruman.home> <52839306.7050701@ti.com>
+Message-ID: <20131113152001.GC29226@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/13 14:38, Tomasz Figa wrote:
-> On Wednesday 13 of November 2013 14:31:25 James Hogan wrote:
->> On 13/11/13 14:18, Tomasz Figa wrote:
->>> Hi James, Mike,
->>>
->>> On Wednesday 13 of November 2013 14:09:56 James Hogan wrote:
->>>> On 29/05/13 18:39, Mike Turquette wrote:
->>>>> Quoting James Hogan (2013-05-10 05:44:22)
->>>>>> The frequency of some SoC's external oscillators (for example TZ1090's
->>>>>> XTAL1) are configured by the board using pull-ups/pull-downs of
->>>>>> configuration pins, the logic values of which are automatically latched
->>>>>> on reset and available in an SoC register. Add a generic clock component
->>>>>> and DT bindings to handle this.
->>>>>>
->>>>>> It behaves similar to a fixed rate clock (read-only), except it needs
->>>>>> information about a register field (reg, shift, width), and the
->>>>>> clock-frequency is a mapping from register field values to clock
->>>>>> frequencies.
->>>>>>
->>>>>
->>>>> James,
->>>>>
->>>>> Thanks for sending this!  It looks mostly good and is a useful clock
->>>>> type to support.  Comments below.
->>>>
->>>> Hi Mike,
->>>>
->>>> Sorry for slight delay getting back to you. I had another think about
->>>> this stuff yesterday...
->>>>
->>>
->>> Just a random idea that came to my mind while reading this thread:
->>>
->>> What about modelling this as a set of fixed rate clocks fed into
->>> a read-only mux?
->>
->> Yes, that had occurred to me too. I suppose the arguments against would be:
->> * it doesn't describe the hardware, there is no mux, just a fixed rate
->> clock with a discoverable frequency.
+On Wed, Nov 13, 2013 at 08:56:06AM -0600, Nishanth Menon wrote:
+> On 11/13/2013 06:51 AM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Tue, Nov 12, 2013 at 05:08:30PM -0600, Nishanth Menon wrote:
+> >> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> >> index b69dd9a..f97b34b 100644
+> >> --- a/arch/arm/mach-omap2/omap_device.c
+> >> +++ b/arch/arm/mach-omap2/omap_device.c
+> >> @@ -621,6 +621,7 @@ static int _od_suspend_noirq(struct device *dev)
+> >>  
+> >>  	if (!ret && !pm_runtime_status_suspended(dev)) {
+> >>  		if (pm_generic_runtime_suspend(dev) == 0) {
+> >> +			pm_runtime_set_suspended(dev);
+> > 
+> > don't you have to disable pm_runtime around status changes ? Or is
+> > pm_runtime already disabled by the time we get here ?
 > 
-> For me, a set of configuration pins that select clock frequency sounds
-> like a mux. I'd rather say that there are no physical clocks that would
-> be its inputs, but that's probably just an implementation detail.
-
-Sure, it sounds a bit like one and has a similar register interface, but
-it's still not one. The hardware to latch the pins on reset and present
-the logic values in a register is independent of the hardware to get the
-clock signal from the fixed rate oscillator on the board into the SoC.
-
->> * it would sort of work for my small case of only having 9 possible
->> frequencies (although it would be a bit verbose), but wouldn't scale
->> nicely or be extendible to if the frequency was encoded more
->> continuously in the register value. E.g. if the frequency was 1MHz *
->> (the register value - 1) or something crazy like that.
+> pm_runtime is already disabled by the time no_irq suspend is invoked.
 > 
-> I guess you would need an implementation specific code to calculate the
-> frequency in such cases, which is not what you suggested above (but
-> rather "a mapping from register field values to clock frequencies"
-> inside a property).
+> > 
+> >> @@ -634,10 +635,10 @@ static int _od_resume_noirq(struct device *dev)
+> >>  	struct platform_device *pdev = to_platform_device(dev);
+> >>  	struct omap_device *od = to_omap_device(pdev);
+> >>  
+> >> -	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
+> >> -	    !pm_runtime_status_suspended(dev)) {
+> >> +	if (od->flags & OMAP_DEVICE_SUSPENDED) {
+> >>  		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+> >>  		omap_device_enable(pdev);
+> >> +		pm_runtime_set_active(dev);
+> > 
+> > ditto, also pm_runtime_set_active() may fail.
+> > 
+> again, pm_runtime is not yet active here yet - we just restore the pm
+> runtime state with which we went down with -> and that is not expected
+> to fail either - So, how about just adding a WARN if our expectation
+> of balanced operation was somehow broken in the future with changes to
+> runtime framework?
 
-Indeed. It's worth noting though that we already have a variety of such
-variations handled by the generic clock divider driver (table based
-lookup, one based, power of two, etc), so we should probably allow for
-others to extend this later too.
+you mean:
 
-Cheers
-James
+WARN(pm_runtime_set_active(dev));  ?
+
+sounds good
+
+thanks
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/01bd71b0/attachment.sig>
