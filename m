@@ -1,78 +1,31 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 13 Nov 2013 17:13:53 +0000
-Subject: [PATCH v2 10/13] kprobes: Remove uneeded kernel dependency on
- struct arch_specific_insn
-In-Reply-To: <1381871068-27660-11-git-send-email-dave.long@linaro.org>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-11-git-send-email-dave.long@linaro.org>
-Message-ID: <1384362833.3392.42.camel@linaro1.home>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 13 Nov 2013 09:14:59 -0800
+Subject: [PATCH 5/7] clocksource/cadence_ttc: Overhaul clocksource
+ frequency adjustment
+In-Reply-To: <CAKohpo=KaM97jJ2MnZxSeBz=Mf9cSmzk_EFQTL=EVPPvSH=Wag@mail.gmail.com>
+References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1383945677-29674-6-git-send-email-soren.brinkmann@xilinx.com>
+ <52827B11.5040308@linaro.org>
+ <CAKohpo=KaM97jJ2MnZxSeBz=Mf9cSmzk_EFQTL=EVPPvSH=Wag@mail.gmail.com>
+Message-ID: <2c13b204-2022-4091-95be-1749e8cc60b0@CH1EHSMHS026.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+On Wed, Nov 13, 2013 at 01:33:52PM +0530, Viresh Kumar wrote:
+> On 13 November 2013 00:31, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> > Hmm, it could be interesting if Viresh can give its opinion on this patch
+> > [cc'ed].
 > 
-> Instead of depending on include/asm/kprobes.h to provide a dummy definition
-> for struct arch_specific_insn, do so in include/linux/kprobes.h.
-
-That change description doesn't quite seem to quite make sense to me.
-
-Anyway, what we're trying to do with this patch is to allow us to use
-arch_specific_insn for purposes additional to implementing kprobes. This
-patch enables that but I'm wary that the kprobes code assumes that ainsn
-is a struct arch_specific_insn, e.g. in linux/kernel/kprobes.c we have:
-
-	memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
-
-Now, that code isn't compiled when kprobes isn't configured, but it
-seams to me to be safer if that was also changed to 
-
-	memcpy(&p->ainsn, &ap->ainsn, sizeof(p->ainsn));
-
-However, I also wonder if we should instead leave arch_specific_insn as
-a kprobes specific structure and on ARM define it in terms of a new more
-generic 'struct probe_insn'? The drawback with that is that we'd
-probably end up with a struct just containing a single member which
-seems a bit redundant:
-
-struct arch_specific_insn {
-	struct probe_insn pinsn;
-};
-
-Thought's anyone?
-
+> I am not sure if I understood the problem completely, but if this is about
+> not allowing frequency transitions from cpufreq when we have started to
+> suspend our system, then you must have a look at this thread:
 > 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  include/linux/kprobes.h | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-> index 925eaf2..4b5a74d 100644
-> --- a/include/linux/kprobes.h
-> +++ b/include/linux/kprobes.h
-> @@ -52,9 +52,6 @@
->  
->  #else /* CONFIG_KPROBES */
->  typedef int kprobe_opcode_t;
-> -struct arch_specific_insn {
-> -	int dummy;
-> -};
->  #endif /* CONFIG_KPROBES */
->  
->  struct kprobe;
-> @@ -110,7 +107,11 @@ struct kprobe {
->  	kprobe_opcode_t opcode;
->  
->  	/* copy of the original instruction */
-> +#ifdef CONFIG_KPROBES
->  	struct arch_specific_insn ainsn;
-> +#else
-> +	int ainsn;
-> +#endif
->  
->  	/*
->  	 * Indicates various status flags.
+> https://lkml.org/lkml/2013/10/24/369
 
--- 
-Tixy
+Thanks for the link. I had problems in that direction at some point too.
+But the current issue, is not cpufreq changing the frequency, but our
+suspend code in prepare_late() causes a frequency change of this timer
+when the PLLs are powered down (it's done through a CCF clk_set_parent()
+operation).
+
+	S?ren
