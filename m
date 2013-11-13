@@ -1,67 +1,60 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 13 Nov 2013 15:26:28 +0900
-Subject: address translation for PCIe-to-localbus bridge
-In-Reply-To: <5281E2B5.3080701@keymile.com>
-References: <527A1983.6020603@keymile.com>
- <20131106173649.GA25515@obsidianresearch.com> <20131106190308.01f7a4a9@skate>
- <20131106182457.GA25879@obsidianresearch.com>
- <20131111155050.96290C41ABB@trevor.secretlab.ca>
- <20131112080512.3992b2e4@skate> <5281E2B5.3080701@keymile.com>
-Message-ID: <20131113062628.18272C41F54@trevor.secretlab.ca>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Wed, 13 Nov 2013 09:31:16 +0100
+Subject: [alsa-devel] [PATCH] ASoC: fsl-ssi: fix SDMA starvation
+In-Reply-To: <CAOZdJXUWv3_ZV6p9VQ+zYqwUDVQC6BMb-VhVoVtEh1yC23VuTg@mail.gmail.com>
+References: <1384255056-25673-1-git-send-email-mpa@pengutronix.de>
+ <20131112132441.GG30263@pengutronix.de>
+ <CAOZdJXUWv3_ZV6p9VQ+zYqwUDVQC6BMb-VhVoVtEh1yC23VuTg@mail.gmail.com>
+Message-ID: <201311130931.16238.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Nov 2013 09:11:33 +0100, Gerlando Falauto <gerlando.falauto@keymile.com> wrote:
-> On 11/12/2013 08:05 AM, Thomas Petazzoni wrote:
-> > Dear Grant Likely,
-> >
-> > On Mon, 11 Nov 2013 15:50:50 +0000, Grant Likely wrote:
-> >
-> >>> So the mbus would register an address xlate for its node that is
-> >>> called instead of ranges parsing. For the example in my last message
-> >>> the FPGA driver would register an xlate that made addresses relative
-> >>> to its own BAR0 address.
-> >>
-> >> There are already bus-specific transations available. Take a look at
-> >> struct of_bus in drivers/of/address.c
-> >
-> > Hum, right, but unless I'm wrong the of_busses[] array of struct of_bus
-> > is fixed in drivers/of/address.c, and as it is, there is no way for a
-> > specific bus driver to provide its own struct of_bus.
-> 
-> That was exactly my understanding as well, and that's where I was 
-> expecting some trickery to happen.
-> 
-> > So that would need to be extended, right?
-> 
-> The other approach I was foreseeing was to implement a way of 
-> dynamically updating the DT when the PCI subsystem enumerates the 
-> devices and assigns memory areas (namely, I would expect the ranges 
-> property to reflect that). But this would imply a standard way of 
-> defining the ranges property (I would expect something like <bar# 
-> start_addr length>, with an arguable number of cells). And I could
-> not find any such definition in the PCI bus binding document, so I'm 
-> probably completely off-track here. Aren't I?
+Hi Timur,
 
-The ranges property is pretty well defined already. The format is
-<parent-addr-specifier> <child-addr-specifier> <size-specifier>, and
-then use assigned-addresses for each BAR to encode the address it is
-assigned to in the PCI address space.
+On Tuesday 12 November 2013 21:17:34 Timur Tabi wrote:
+> On Tue, Nov 12, 2013 at 7:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> > No, I don't have access on PowerPC hardware, so I didn't test it on
+> > PowerPC.
+>
+> Can you change the code so that the interrupts are enabled only on
+> i.MX?  On PowerPC, the interrupts are used only for debugging.
 
-Ranges provides the windows into the parent bus, and assigned-address
-is used to map the child into the parent. Using it should make the
-of_bus translations work without changes.
+Hmm, you are right. My patch is partially bogus. It enables the
+CCSR_SSI_SIER_TDMAE and CCSR_SSI_SIER_RDMAE bits on demand, but this setting
+will be overwritten by the "write_ssi(sier_bits, &ssi->sier);" just a few
+lines below. :(
 
-Grep the source tree for assigned-addresses to get examples.
+But this patch works, because it removes the CCSR_SSI_SIER_TDMAE and
+CCSR_SSI_SIER_RDMAE from the SIER_FLAGS macro. Its content is set
+_unconditionally_ in lines 570 and 575 and is written to the register in line
+607. This should hit PowerPC as well.
 
-> After all, we should expect a driver to behave (and expect) the same of 
-> the DT, regardless of whether enumeration was performed by firmware or
-> by the OS itself. Or am I wrong on this too?
+So, the real (and small) fix is to remove these bits from the SIER_FLAGS
+macro:
 
-Yes, that is a reasonable expectation and it is a limitation of the
-current implementation. We've got two choices here.  Modify the DT at
-boot time, or extend the DT translation code to ask the PCI device for
-BAR settings. I'm not going to make a call on which is better until I
-see some prototype code.
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index c6b7439..f176e34 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -107,10 +107,10 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+ #endif
+ 
+ /* SIER bitflag of interrupts to enable */
+-#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | CCSR_SSI_SIER_TDMAE | \
++#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | \
+ 		    CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TUE0_EN | \
+ 		    CCSR_SSI_SIER_TUE1_EN | CCSR_SSI_SIER_RFRC_EN | \
+-		    CCSR_SSI_SIER_RDMAE | CCSR_SSI_SIER_RIE | \
++		    CCSR_SSI_SIER_RIE | \
+ 		    CCSR_SSI_SIER_ROE0_EN | CCSR_SSI_SIER_ROE1_EN)
+ 
+ /**
 
-g.
+@Markus: can you please test it on your hardware?
+
+Thanks
+jbe
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
