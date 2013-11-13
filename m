@@ -1,23 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Nov 2013 22:38:13 -0800
-Subject: [PATCH] spi: davinci: Fix the build warning with CONFIG_ARM_LPAE=y
-In-Reply-To: <20131001104840.GL19304@sirena.org.uk>
-References: <1380567179-20174-1-git-send-email-santosh.shilimkar@ti.com>
- <20131001104840.GL19304@sirena.org.uk>
-Message-ID: <CAOesGMhRoEvsQoSvoCSY=zm71zeZec3MG_FpHOy1zUkYronZcw@mail.gmail.com>
+Date: Tue, 12 Nov 2013 22:53:50 -0800
+Subject: [PATCH] ARM: omap: fix warning with LPAE build
+Message-ID: <1384325630-26998-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some omap3 code is throwing a warning:
+arch/arm/mach-omap2/pm34xx.c: In function 'omap3_save_secure_ram_context':
+arch/arm/mach-omap2/pm34xx.c:123:32: warning: cast to pointer from
+  integer of different size [-Wint-to-pointer-cast]
 
-On Tue, Oct 1, 2013 at 3:48 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Sep 30, 2013 at 02:52:59PM -0400, Santosh Shilimkar wrote:
->> With CONFIG_ARM_LPAE=y spi driver throws below warning
->
-> Applied, thanks.
+In reality this code will never actually execute with LPAE=y, since
+Cortex-A8 doesn't support it. So downcasting the __pa() is safe in
+this case.
 
-These warnings are showing up (again?), so wherever it was applied is
-not making it into -next. Did it fall between the cracks?
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
+Tony, queue up if you have a fixes branch please, otherwise I can apply
+directly.
 
--Olof
+ arch/arm/mach-omap2/pm34xx.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 93b80e5..1f3770a 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -120,7 +120,7 @@ static void omap3_save_secure_ram_context(void)
+ 		 * will hang the system.
+ 		 */
+ 		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+-		ret = _omap_save_secure_sram((u32 *)
++		ret = _omap_save_secure_sram((u32 *)(unsigned long)
+ 				__pa(omap3_secure_ram_storage));
+ 		pwrdm_set_next_pwrst(mpu_pwrdm, mpu_next_state);
+ 		/* Following is for error tracking, it should not happen */
+-- 
+1.7.10.4
