@@ -1,36 +1,36 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 13 Nov 2013 08:04:19 +0200
-Subject: [PATCHv4 0/7] Unifying SMMU driver among Tegra SoCs
-In-Reply-To: <5282AE55.1040701@wwwdotorg.org>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
- <5282AE55.1040701@wwwdotorg.org>
-Message-ID: <20131113080419.23aa9406a443523670e46dea@nvidia.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 13 Nov 2013 07:10:26 +0100
+Subject: [PATCH v5 10/17] clk: at91: add peripheral clk macros for peripheral
+ clk dt bindings
+In-Reply-To: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
+References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1384323026-5294-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Nov 2013 23:40:21 +0100
-Stephen Warren <swarren@wwwdotorg.org> wrote:
+This patch adds the peripheral divisors macros (for sam9x5 compatible IPs)
+which will be used by peripheral clk dt definitions.
 
-> On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
-> > Hi,
-> > 
-> > This series provides:
-> > 
-> > (1) Unified SMMU driver among Tegra SoCs
-> > (2) Multiple Address Space support(MASID) in IOMMU(SMMMU)
-> > (3) Tegra IOMMU'able devices, most of platform devices are IOMMU'able.
-> > 
-> > There's been some discussion[1] about device population order, and I
-> > added a IOMMU hook in driver core:
-> > 
-> >   [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
-> > 
-> > which is based on the following RFC patch:
-> > 
-> >   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
-> >   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
-> 
-> I assume that "based on" means "is a new version of", so I don't need to
-> look at the "PATCHv3+" patch, since this series replaces it?
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ include/dt-bindings/clk/at91.h |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Right.
+diff --git a/include/dt-bindings/clk/at91.h b/include/dt-bindings/clk/at91.h
+index 0b4cb99..a3b07ca 100644
+--- a/include/dt-bindings/clk/at91.h
++++ b/include/dt-bindings/clk/at91.h
+@@ -19,4 +19,10 @@
+ #define AT91_PMC_MOSCRCS	17		/* Main On-Chip RC */
+ #define AT91_PMC_CFDEV		18		/* Clock Failure Detector Event */
+ 
++/* sam9x5 peripheral divisors */
++#define AT91SAM9X5_PERIPH_CLK_DIV1	0
++#define AT91SAM9X5_PERIPH_CLK_DIV2	1
++#define AT91SAM9X5_PERIPH_CLK_DIV4	2
++#define AT91SAM9X5_PERIPH_CLK_DIV8	3
++
+ #endif
+-- 
+1.7.9.5
