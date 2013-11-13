@@ -1,39 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 13 Nov 2013 22:06:51 +0800
-Subject: [PATCHv12][ 4/8] pinctrl: pinctrl-imx: add imx25 pinctrl driver
-In-Reply-To: <5283538D.8060807@eukrea.com>
-References: <1383727939-4190-1-git-send-email-denis@eukrea.com>
- <1383727939-4190-4-git-send-email-denis@eukrea.com>
- <20131107081721.GC6500@S2101-09.ap.freescale.net>
- <5283538D.8060807@eukrea.com>
-Message-ID: <20131113140647.GA17819@S2101-09.ap.freescale.net>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Wed, 13 Nov 2013 23:07:17 +0900
+Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
+ support
+In-Reply-To: <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131108165639.GD15074@mudshark.cambridge.arm.com>
+ <527DFC1C.1020107@hitachi.com>
+ <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
+ <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
+ <20131111105812.GC28302@mudshark.cambridge.arm.com>
+ <528114C4.5000506@hitachi.com>
+ <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
+ <5281D848.7000502@hitachi.com>
+ <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
+Message-ID: <52838795.2090106@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 11:25:17AM +0100, Denis Carikli wrote:
-> On 11/07/2013 09:17 AM, Shawn Guo wrote:
-> >Acked-by: Shawn Guo <shawn.guo@linaro.org>
+(2013/11/13 15:55), Sandeepa Prabhu wrote:
+>>>> I'm unsure about arm64's debug feature behavior, what does happen when
+>>>> it performs a single-step on sw-breakpoint?
+>>>>
+>>>>> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
+>>>>> I'm fairly sure it won't work as expected without some additional code.
+>>>>
+>>>> OK, anyway, for testing same one, we need to port ftrace first. So the next
+>>
+>> Sorry for confusion, s/next/fallback is what I meant. Making a kprobe module
+>> can be done without ftrace port.
+>>
+>>>> plan is to make a kprobe module to put a probe (which just printk something)
+>>>> on a specific function (e.g. vfs_symlink), and run perf record with
+>>>> hw-breakpoint as below
+>>>>
+>>>> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
+>>>>
+>>>> Note that 0xXXXXXX is the address of vfs_symlink.
+>>>>
+>>>> After that, you can see the message in dmesg and also check the perf result
+>>>> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
+>>>> it works)
+> Hi Will, Masami,
 > 
-> Thanks,
+> I am not sure of 'perf' right now (my minimal rootfs doesn't have) but
+> I tried to test hardware breakpoints using sample modules
+> "samples/hw_breakpoint/" on arm64 upstream branch. This should use
+> same kernel api as perf I believe.
 > 
-> In linux-next's master of 20131113 [1], I saw that this patch made it:
-> 7887424 ARM i.MX25: build in pinctrl support.
-> 
-> However that other patch seems not to be in linux-next's master or
-> in your for-next tree:
-> cd435c4 pinctrl: pinctrl-imx: add imx25 pinctrl driver
+> 1.  Placing watchpoint ( attr.bp_type = HW_BREAKPOINT_W |
+> HW_BREAKPOINT_R) upon vfs_symlink symbol, but seems watch-point is not
+> triggering at all.
+> 2.  Placing text breakpoint (modified sample module with attr.bp_type
+> = HW_BREAKPOINT_X) upon vfs_symlink, and run "ln -s /dev/null
+> /tmp/foo".  This time, breakpoint hit but exception is re-cursing
+> infinitely!
 
-As stated in the message [1], I only applied #5, #6 and #7.  The first 3
-should be applied by FB maintainer while #4 should be applied by pinctrl
-maintainer.  As the last one patch has some DT bindings introduced in
-#2, I cannot apply it until patch #2 gets accepted.
+Did you this without kprobes? If so, the hw_breakpoint porting
+on arm64 may have a bug.
 
-Shawn
+> I have attached the kernel logs for reference. So wanted to check if
+> hw breakpoint/watch-points are working on the upstream branch? Has it
+> been tested recently with sample modules  or perf/ptrace?
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/278078/focus=51080
+I've tested on x86 with the latest tip-tree kernel and it worked.
 
-> 
-> References:
-> [1] 84ea88b Add linux-next specific files for 20131113
-> 
-> Denis.
+Thank you,
+
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
