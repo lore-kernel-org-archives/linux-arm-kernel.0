@@ -1,69 +1,45 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Wed, 13 Nov 2013 14:26:55 +0530
-Subject: [PATCH v4 3/4] AArch64: KGDB: Add step debugging support
-In-Reply-To: <20131111150013.GJ28302@mudshark.cambridge.arm.com>
-References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
- <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
- <20131108141841.GI17461@mudshark.cambridge.arm.com>
- <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
- <20131111150013.GJ28302@mudshark.cambridge.arm.com>
-Message-ID: <CALicx6u0G7ZO1cJHi-3xNw3vS72cSS9ge948Uj3giowXHJzJGQ@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 13 Nov 2013 10:04:39 +0100
+Subject: [PATCH 1/3] can: mcp251x: Convert driver to use common clk
+ framework
+In-Reply-To: <1384332144-15211-1-git-send-email-shc_work@mail.ru>
+References: <1384332144-15211-1-git-send-email-shc_work@mail.ru>
+Message-ID: <528340A7.9080708@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 8:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 11, 2013 at 11:09:46AM +0000, Vijay Kilari wrote:
->> On Fri, Nov 8, 2013 at 7:48 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Nov 05, 2013 at 08:45:45AM +0000, vijay.kilari at gmail.com wrote:
->> >> @@ -153,6 +166,8 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
->> >>                * Packet D (Detach), k (kill). No special handling
->> >>                * is required here
->> >>                */
->> >> +             atomic_set(&kgdb_cpu_doing_single_step, -1);
->> >> +             kgdb_single_step =  0;
->> >
->> > This looks really weird: you have two variables, which you attempt to keep
->> > in sync, only one of them is an atomic access and you don't have any
->> > locking or memory barriers between them, so it must be ok if they're not
->> > in-sync. In which case, why do we have two variables?
->> >
->> IMHO, two variables are being used by kgdb framework
->> The variables 'kgdb_cpu_doing_single_step'  holds the cpu on which
->> step debugging
->> is happening. With this, when during step debugging, it ensures that on next
->> step debug exception only this CPU aquires master lock and step
->> debugging is performed.
->>
->> The variable 'kgdb_single_step' is used to know if step debugging is
->> ongoing or not.
->> If so, the non-primary cpu's are not released untill the continue
->> command is received
->> So, with this the cpu's are not released and acquired for every step command
->
-> Ok, but in what situation would you have both kgdb_cpu_doing_single_step == -1
-> and kgdb_single_step == 1 (ignoring races between setting the two variables)?
->
-> In other words, can we reduce this to a single variable?
->
-More elaborately,
-The kgdb_cpu_doing_single_step holds the cpu number which is used to
-store the task information that is currently being step debugged in the
-corresponding cpu structure. so we cannot get rid of this variable.
-Also this variable tells which cpu should take the exception for step debugging
-so it waits for this paricular cpu to get the chance to take exception in case
-if exception has been taken by other cpu.
+Hello,
 
-The kgdb_single_step variable, it only tells if cpu's that don't get
-debug exception
-should be released & acquired for every step debug or not
+as this series adds device tree bindings, please add
+devicetree at vger.kernel.org on Cc for the whole series.
 
-So, both variables are used for different purpose. we can make an attempt to
-make to use one variable, but I think, the flexibility is lost.
-Moreover, I see that these variables are declared in generic kgdb code and
-different architectures use this based on their requirement.
+On 11/13/2013 09:42 AM, Alexander Shiyan wrote:
+> This patch converts mcp251x driver to using common clk framework
+> for getting input frequency. The change was made for the preparation
+> of the driver work with the devicetree. As a result private header
+> for the driver is eliminated.
+> Additionally, all existing users of the driver was converted to use
+> this feature.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-The race will not happen because, only one cpu will be executing this
-function at
-any point of the time and all other cpu's will be spinning.
+Looks good from my point of view. I'll take the whole series via the
+linux-can tree, if there are no objections. I'd like to have the pxa and
+imx maintainer's Ack and an Ack from the DT list.
 
-> Will
+Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/529c9290/attachment-0001.sig>
