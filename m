@@ -1,64 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Nov 2013 11:33:59 +0100
-Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
- no nand detected
-In-Reply-To: <20131113084418.GA16999@norris.computersforpeace.net>
-References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
- <20131107083932.GJ3805@norris.computersforpeace.net>
- <527B6ADF.1090201@atmel.com>
- <20131107180942.GU20061@ld-irv-0074.broadcom.com> <527C5E96.40805@atmel.com>
- <20131113001022.GC9468@ld-irv-0074.broadcom.com> <5282F164.3040509@atmel.com>
- <20131113084418.GA16999@norris.computersforpeace.net>
-Message-ID: <52835597.2010802@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 13 Nov 2013 11:36:32 +0100
+Subject: [GIT PULL] clockevents/clocksource: 3.12 fixes
+In-Reply-To: <alpine.DEB.2.02.1311122316270.30673@ionos.tec.linutronix.de>
+References: <528234B9.7080402@linaro.org>
+ <20131112183553.GQ14892@pengutronix.de>
+ <alpine.DEB.2.02.1311122316270.30673@ionos.tec.linutronix.de>
+Message-ID: <20131113103632.GV14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/2013 09:44, Brian Norris :
-> Hi Josh,
->
-> On Wed, Nov 13, 2013 at 11:26:28AM +0800, Josh Wu wrote:
->> On 11/13/2013 8:10 AM, Brian Norris wrote:
->>> On Fri, Nov 08, 2013 at 11:46:30AM +0800, Josh Wu wrote:
->>>> On 11/8/2013 2:09 AM, Brian Norris wrote:
->>>>>    if (nand_nfc.is_initialized) {
->>>>>      ...
->>>> Yes, exactly.
->>>> And the NAND probe will also load the NFC device before it reach
->>>> above check code.
->>> No, it loads the *driver*, not the *device*. I'm not familiar with the
->>> driver core guarantees, but I don't think you can guarantee that just
->>> because a driver was registered before another that the corresponding
->>> devices will be probed in that order. Or are you relying on the
->>> dependencies captured by device tree? (I don't think even the
->>> parent/child dependency between NAND/NFC gives you enough.)
->>
->> I put  more code here to make it clearer:
->>
->> arch/arm/boot/dts/sama5d3.dtsi:
->> nand0: nand at 60000000 {
->>              compatible = "atmel,at91rm9200-nand";
->>              ...
->>              ranges;
->>              ...
->>              nfc at 70000000 {
->>                  compatible = "atmel,sama5d3-nfc";
->>                  ...
->>              };
->>          };
->
-> Ah, so you're focusing purely on the device tree support? It seems this
-> driver also supports traditional platform devices, but nobody uses NFC
-> without DT? That explains some things.
+Hi Thomas,
 
-Absolutely: the NFC is only available on SoC that are pure-DT.
+On Tue, Nov 12, 2013 at 11:57:46PM +0100, Thomas Gleixner wrote:
+> The whole misery starts that you decided to play maintainer and grab
+> some patches from the mailinglist and then offering them via a pull
+> request to me and others. Finally you tricked Daniel to take them,
+>From my POV this isn't "playing maintainer". You stopped reacting on the
+issue and I thought I make it easier for you (and others) to handle the
+patches in case you didn't take because of being busy with other stuff.
 
-The traditional platform device support is for older SoC that can use 
-this driver but do not have the NFC.
+> which is a different issue.
+> 
+> There is a reason why I ignored that pull request:
+> 
+>  I generally do not pull git trees from people who I'm not
+>  trusting. And I have good reasons not to trust you at all.
+> 
+> Aside of that, I decided to give you a chance and actually pulled
+> your tree into a temporary branch and found out that it's missing a
+> stable annotation. Which made the whole exercise go into /dev/null
+I didn't add that stable annotation because I didn't want to add it
+without you being ok with it. And actually it's easy to get a patch into
+stable that isn't annotated. The other way round is harder.
+ 
+> Now Linus pulled my version way before Daniel pulled your tree into
+> his. And you even commented on my commit that I forgot to add a
+> tested-by tag. Yes, I missed that in favour of the stable annotation.
+> 
+> But instead of rebasing your tree or even just withdrawing it and
+> resending the at91 patch, you let Daniel pull your thing.
+To be fair Daniel said to take my pull request a few days before your
+tip-bot told me that you finally took the patch. I could argue that it
+was your turn to tell Daniel that you took a part of the patches that
+were in my pull request. (But I don't as the situation it handled now
+and even if not, the only bad thing that would have happend is that
+another patch is duplicated in the history. shrug)
 
-I let Josh continue the discussion on the registration topic.
+Best regards
+Uwe
 
-[..]
-
-Bye,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
