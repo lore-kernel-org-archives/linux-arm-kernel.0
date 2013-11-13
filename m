@@ -1,36 +1,42 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 13 Nov 2013 20:01:01 +0530
-Subject: [PATCH] dmaengine: Add support for BCM2835.
-In-Reply-To: <20131113145441.GQ878@sirena.org.uk>
-References: <527D1DDA.2040004@koalo.de> <20131108181743.GR2493@sirena.org.uk>
- <20131113050017.GO8834@intel.com>
- <20131113125111.GE878@sirena.org.uk>
- <20131113133536.GZ8834@intel.com>
- <20131113145441.GQ878@sirena.org.uk>
-Message-ID: <20131113143101.GD8834@intel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 13 Nov 2013 10:27:08 -0500
+Subject: [PATCH V3 2/7] DRIVERS: IRQCHIP: CROSSBAR: Add support for
+ Crossbar IP
+In-Reply-To: <1383657257-3458-3-git-send-email-r.sricharan@ti.com>
+References: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
+ <1383657257-3458-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <52839A4C.9080601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 02:54:41PM +0000, Mark Brown wrote:
-> On Wed, Nov 13, 2013 at 07:05:36PM +0530, Vinod Koul wrote:
-> > On Wed, Nov 13, 2013 at 12:51:11PM +0000, Mark Brown wrote:
+On Tuesday 05 November 2013 08:14 AM, Sricharan R wrote:
+> Some socs have a large number of interrupts requests to service
+> the needs of its many peripherals and subsystems. All of the
+> interrupt lines from the subsystems are not needed at the same
+> time, so they have to be muxed to the irq-controller appropriately.
+> In such places a interrupt controllers are preceded by an CROSSBAR
+> that provides flexibility in muxing the device requests to the controller
+> inputs.
 > 
-> > > I'm probably going to be looking at that at some point, though perhaps
-> > > Martin will get to it since he seems to be looking at this.
+> This driver takes care a allocating a free irq and then configuring the
+> crossbar IP as a part of the mpu's irqchip callbacks. crossbar_init should
+> be called right before the irqchip_init, so that it is setup to handle the
+> irqchip callbacks.
 > 
-> > Okay sounds good. This will also help in streamline the implementations..
-> 
-> Yes, though I think some of the stuff Martin was talking about will need
-> changes to the dmaengine APIs.  He was wanting to reuse DMA lists which
-> currently dmaengine needs to have built up each time.
-Can you elobrate a bit more on what you guys want to do here?
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> Acked-by: Kumar Gala <galak@codeaurora.org> (for DT binding portion)
+> ---
+As someone commented already, lets call the driver as irq-crossbar
+since there might need of something similar for DMA and IO's.
 
---
-~Vinod
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/a7067c05/attachment.sig>
+So rename the code accordingly. Other than that,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
