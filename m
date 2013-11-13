@@ -1,30 +1,87 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 13 Nov 2013 14:54:41 +0000
-Subject: [PATCH] dmaengine: Add support for BCM2835.
-In-Reply-To: <20131113133536.GZ8834@intel.com>
-References: <527D1DDA.2040004@koalo.de> <20131108181743.GR2493@sirena.org.uk>
- <20131113050017.GO8834@intel.com>
- <20131113125111.GE878@sirena.org.uk>
- <20131113133536.GZ8834@intel.com>
-Message-ID: <20131113145441.GQ878@sirena.org.uk>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Wed, 13 Nov 2013 22:55:26 +0800
+Subject: [PATCH v7 3/4] ASoC: fsl_ssi: Add dual fifo mode support
+In-Reply-To: <cover.1384352281.git.b42378@freescale.com>
+References: <cover.1384352281.git.b42378@freescale.com>
+Message-ID: <6ee839eec507d6b928beb7c04765acfa9cca8d7a.1384352281.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 07:05:36PM +0530, Vinod Koul wrote:
-> On Wed, Nov 13, 2013 at 12:51:11PM +0000, Mark Brown wrote:
+By enabling dual fifo mode, it would allow SSI enter a better performance
+to transimit/receive data without occasional hardware underrun/overrun.
 
-> > I'm probably going to be looking at that at some point, though perhaps
-> > Martin will get to it since he seems to be looking at this.
+Signed-off-by: Nicolin Chen <b42378@freescale.com>
+Acked-by: Timur Tabi <timur@tabi.org>
+Acked-by: Mark Brown <broonie@linaro.org>
+---
+ sound/soc/fsl/fsl_ssi.c | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-> Okay sounds good. This will also help in streamline the implementations..
-
-Yes, though I think some of the stuff Martin was talking about will need
-changes to the dmaengine APIs.  He was wanting to reuse DMA lists which
-currently dmaengine needs to have built up each time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/5844b38d/attachment-0001.sig>
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 35e2773..f43be6d 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -143,6 +143,7 @@ struct fsl_ssi_private {
+ 	bool ssi_on_imx;
+ 	bool imx_ac97;
+ 	bool use_dma;
++	bool use_dual_fifo;
+ 	struct clk *clk;
+ 	struct snd_dmaengine_dai_dma_data dma_params_tx;
+ 	struct snd_dmaengine_dai_dma_data dma_params_rx;
+@@ -413,6 +414,12 @@ static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
+ 		write_ssi(CCSR_SSI_SOR_WAIT(3), &ssi->sor);
+ 	}
+ 
++	if (ssi_private->use_dual_fifo) {
++		write_ssi_mask(&ssi->srcr, 0, CCSR_SSI_SRCR_RFEN1);
++		write_ssi_mask(&ssi->stcr, 0, CCSR_SSI_STCR_TFEN1);
++		write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_TCH_EN);
++	}
++
+ 	return 0;
+ }
+ 
+@@ -480,6 +487,15 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		ssi_private->second_stream = substream;
+ 	}
+ 
++	/* When using dual fifo mode, it is safer to ensure an even period
++	 * size. If appearing to an odd number while DMA always starts its
++	 * task from fifo0, fifo1 would be neglected at the end of each
++	 * period. But SSI would still access fifo1 with an invalid data.
++	 */
++	if (ssi_private->use_dual_fifo)
++		snd_pcm_hw_constraint_step(substream->runtime, 0,
++				SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 2);
++
+ 	return 0;
+ }
+ 
+@@ -947,7 +963,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		ssi_private->fifo_depth = 8;
+ 
+ 	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx21-ssi")) {
+-		u32 dma_events[2];
++		u32 dma_events[2], dmas[4];
+ 		ssi_private->ssi_on_imx = true;
+ 
+ 		ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
+@@ -1001,6 +1017,15 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+ 		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
+ 			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
++		if (!of_property_read_u32_array(pdev->dev.of_node, "dmas", dmas, 4)
++				&& dmas[2] == IMX_DMATYPE_SSI_DUAL) {
++			ssi_private->use_dual_fifo = true;
++			/* When using dual fifo mode, we need to keep watermark
++			 * as even numbers due to dma script limitation.
++			 */
++			ssi_private->dma_params_tx.maxburst &= ~0x1;
++			ssi_private->dma_params_rx.maxburst &= ~0x1;
++		}
+ 	} else if (ssi_private->use_dma) {
+ 		/* The 'name' should not have any slashes in it. */
+ 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
+-- 
+1.8.4
