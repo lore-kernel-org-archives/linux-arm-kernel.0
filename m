@@ -1,65 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Nov 2013 14:31:10 +0000
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
- support
-In-Reply-To: <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
-References: <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <528114C4.5000506@hitachi.com>
- <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
- <5281D848.7000502@hitachi.com>
- <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
-Message-ID: <20131113143110.GF28881@mudshark.cambridge.arm.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Wed, 13 Nov 2013 14:31:25 +0000
+Subject: [PATCH] clk: add specified-rate clock
+In-Reply-To: <5867382.IN2EZ2ivg4@flatron>
+References: <1368189862-17119-1-git-send-email-james.hogan@imgtec.com>
+ <20130529173938.6058.96646@quantum> <52838834.4010104@imgtec.com>
+ <5867382.IN2EZ2ivg4@flatron>
+Message-ID: <52838D3D.6060007@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 06:55:33AM +0000, Sandeepa Prabhu wrote:
-> >>> I'm unsure about arm64's debug feature behavior, what does happen when
-> >>> it performs a single-step on sw-breakpoint?
-> >>>
-> >>>> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
-> >>>> I'm fairly sure it won't work as expected without some additional code.
-> >>>
-> >>> OK, anyway, for testing same one, we need to port ftrace first. So the next
-> >
-> > Sorry for confusion, s/next/fallback is what I meant. Making a kprobe module
-> > can be done without ftrace port.
-> >
-> >>> plan is to make a kprobe module to put a probe (which just printk something)
-> >>> on a specific function (e.g. vfs_symlink), and run perf record with
-> >>> hw-breakpoint as below
-> >>>
-> >>> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
-> >>>
-> >>> Note that 0xXXXXXX is the address of vfs_symlink.
-> >>>
-> >>> After that, you can see the message in dmesg and also check the perf result
-> >>> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
-> >>> it works)
-> Hi Will, Masami,
+On 13/11/13 14:18, Tomasz Figa wrote:
+> Hi James, Mike,
 > 
-> I am not sure of 'perf' right now (my minimal rootfs doesn't have) but
-> I tried to test hardware breakpoints using sample modules
-> "samples/hw_breakpoint/" on arm64 upstream branch. This should use
-> same kernel api as perf I believe.
+> On Wednesday 13 of November 2013 14:09:56 James Hogan wrote:
+>> On 29/05/13 18:39, Mike Turquette wrote:
+>>> Quoting James Hogan (2013-05-10 05:44:22)
+>>>> The frequency of some SoC's external oscillators (for example TZ1090's
+>>>> XTAL1) are configured by the board using pull-ups/pull-downs of
+>>>> configuration pins, the logic values of which are automatically latched
+>>>> on reset and available in an SoC register. Add a generic clock component
+>>>> and DT bindings to handle this.
+>>>>
+>>>> It behaves similar to a fixed rate clock (read-only), except it needs
+>>>> information about a register field (reg, shift, width), and the
+>>>> clock-frequency is a mapping from register field values to clock
+>>>> frequencies.
+>>>>
+>>>
+>>> James,
+>>>
+>>> Thanks for sending this!  It looks mostly good and is a useful clock
+>>> type to support.  Comments below.
+>>
+>> Hi Mike,
+>>
+>> Sorry for slight delay getting back to you. I had another think about
+>> this stuff yesterday...
+>>
 > 
-> 1.  Placing watchpoint ( attr.bp_type = HW_BREAKPOINT_W |
-> HW_BREAKPOINT_R) upon vfs_symlink symbol, but seems watch-point is not
-> triggering at all.
+> Just a random idea that came to my mind while reading this thread:
+> 
+> What about modelling this as a set of fixed rate clocks fed into
+> a read-only mux?
 
-vfs_symlink is a function. Why would you expect to write it?
+Yes, that had occurred to me too. I suppose the arguments against would be:
+* it doesn't describe the hardware, there is no mux, just a fixed rate
+clock with a discoverable frequency.
+* it would sort of work for my small case of only having 9 possible
+frequencies (although it would be a bit verbose), but wouldn't scale
+nicely or be extendible to if the frequency was encoded more
+continuously in the register value. E.g. if the frequency was 1MHz *
+(the register value - 1) or something crazy like that. Of course that's
+conjecture and SoC designers probably aren't going to want to use more
+pins for bootstrap config than necessary.
 
-> 2.  Placing text breakpoint (modified sample module with attr.bp_type
-> = HW_BREAKPOINT_X) upon vfs_symlink, and run "ln -s /dev/null
-> /tmp/foo".  This time, breakpoint hit but exception is re-cursing
-> infinitely!
-
-The problem here is that we expect the overflow handler to deal with the
-stepping (like GDB does via ptrace). If you don't register a handler, the
-kernel will do the step (like you would get if you used perf stat -e
-mem:0xNNNN:x).
-
-Will
+Cheers
+James
