@@ -1,76 +1,69 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 13 Nov 2013 00:44:18 -0800
-Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
- no nand detected
-In-Reply-To: <5282F164.3040509@atmel.com>
-References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
- <20131107083932.GJ3805@norris.computersforpeace.net>
- <527B6ADF.1090201@atmel.com>
- <20131107180942.GU20061@ld-irv-0074.broadcom.com>
- <527C5E96.40805@atmel.com>
- <20131113001022.GC9468@ld-irv-0074.broadcom.com>
- <5282F164.3040509@atmel.com>
-Message-ID: <20131113084418.GA16999@norris.computersforpeace.net>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Wed, 13 Nov 2013 14:26:55 +0530
+Subject: [PATCH v4 3/4] AArch64: KGDB: Add step debugging support
+In-Reply-To: <20131111150013.GJ28302@mudshark.cambridge.arm.com>
+References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
+ <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
+ <20131108141841.GI17461@mudshark.cambridge.arm.com>
+ <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
+ <20131111150013.GJ28302@mudshark.cambridge.arm.com>
+Message-ID: <CALicx6u0G7ZO1cJHi-3xNw3vS72cSS9ge948Uj3giowXHJzJGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On Mon, Nov 11, 2013 at 8:30 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 11, 2013 at 11:09:46AM +0000, Vijay Kilari wrote:
+>> On Fri, Nov 8, 2013 at 7:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Nov 05, 2013 at 08:45:45AM +0000, vijay.kilari at gmail.com wrote:
+>> >> @@ -153,6 +166,8 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+>> >>                * Packet D (Detach), k (kill). No special handling
+>> >>                * is required here
+>> >>                */
+>> >> +             atomic_set(&kgdb_cpu_doing_single_step, -1);
+>> >> +             kgdb_single_step =  0;
+>> >
+>> > This looks really weird: you have two variables, which you attempt to keep
+>> > in sync, only one of them is an atomic access and you don't have any
+>> > locking or memory barriers between them, so it must be ok if they're not
+>> > in-sync. In which case, why do we have two variables?
+>> >
+>> IMHO, two variables are being used by kgdb framework
+>> The variables 'kgdb_cpu_doing_single_step'  holds the cpu on which
+>> step debugging
+>> is happening. With this, when during step debugging, it ensures that on next
+>> step debug exception only this CPU aquires master lock and step
+>> debugging is performed.
+>>
+>> The variable 'kgdb_single_step' is used to know if step debugging is
+>> ongoing or not.
+>> If so, the non-primary cpu's are not released untill the continue
+>> command is received
+>> So, with this the cpu's are not released and acquired for every step command
+>
+> Ok, but in what situation would you have both kgdb_cpu_doing_single_step == -1
+> and kgdb_single_step == 1 (ignoring races between setting the two variables)?
+>
+> In other words, can we reduce this to a single variable?
+>
+More elaborately,
+The kgdb_cpu_doing_single_step holds the cpu number which is used to
+store the task information that is currently being step debugged in the
+corresponding cpu structure. so we cannot get rid of this variable.
+Also this variable tells which cpu should take the exception for step debugging
+so it waits for this paricular cpu to get the chance to take exception in case
+if exception has been taken by other cpu.
 
-On Wed, Nov 13, 2013 at 11:26:28AM +0800, Josh Wu wrote:
-> On 11/13/2013 8:10 AM, Brian Norris wrote:
-> >On Fri, Nov 08, 2013 at 11:46:30AM +0800, Josh Wu wrote:
-> >>On 11/8/2013 2:09 AM, Brian Norris wrote:
-> >>>   if (nand_nfc.is_initialized) {
-> >>>     ...
-> >>Yes, exactly.
-> >>And the NAND probe will also load the NFC device before it reach
-> >>above check code.
-> >No, it loads the *driver*, not the *device*. I'm not familiar with the
-> >driver core guarantees, but I don't think you can guarantee that just
-> >because a driver was registered before another that the corresponding
-> >devices will be probed in that order. Or are you relying on the
-> >dependencies captured by device tree? (I don't think even the
-> >parent/child dependency between NAND/NFC gives you enough.)
-> 
-> I put  more code here to make it clearer:
-> 
-> arch/arm/boot/dts/sama5d3.dtsi:
-> nand0: nand at 60000000 {
->             compatible = "atmel,at91rm9200-nand";
->             ...
->             ranges;
->             ...
->             nfc at 70000000 {
->                 compatible = "atmel,sama5d3-nfc";
->                 ...
->             };
->         };
+The kgdb_single_step variable, it only tells if cpu's that don't get
+debug exception
+should be released & acquired for every step debug or not
 
-Ah, so you're focusing purely on the device tree support? It seems this
-driver also supports traditional platform devices, but nobody uses NFC
-without DT? That explains some things.
+So, both variables are used for different purpose. we can make an attempt to
+make to use one variable, but I think, the flexibility is lost.
+Moreover, I see that these variables are declared in generic kgdb code and
+different architectures use this based on their requirement.
 
-> drivers/mtd/nand/atmel_nand.c
-> int atmel_of_init_port() {
->    ...
->    /* load the nfc driver if there is */
->   of_platform_populate(np, NULL, NULL, host->dev);   # <--- Manually
-> populate the sub node (NFC node) to load NFC driver
->   ...
-> }
+The race will not happen because, only one cpu will be executing this
+function at
+any point of the time and all other cpu's will be spinning.
 
-Right, that makes sense. So the ordering of the driver registration
-stuff is kind of a distraction in this case, then. It's this portion of
-the NAND probe that triggers bus_probe_device() to initialize the NFC
-device before continuing on.
-
-[snip rest of explanation; thanks!]
-
-So I don't think you have a problem for device tree platforms. But if
-someone were to try to instantiate these devices via
-platform_device_register(), they will have a problem.
-
-Please, do follow up with the cleanup to the driver registration that
-you mentioned.
-
-Brian
+> Will
