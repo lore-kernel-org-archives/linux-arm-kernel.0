@@ -1,27 +1,31 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 13 Nov 2013 11:25:17 +0100
-Subject: [PATCHv12][ 4/8] pinctrl: pinctrl-imx: add imx25 pinctrl driver
-In-Reply-To: <20131107081721.GC6500@S2101-09.ap.freescale.net>
-References: <1383727939-4190-1-git-send-email-denis@eukrea.com>
- <1383727939-4190-4-git-send-email-denis@eukrea.com>
- <20131107081721.GC6500@S2101-09.ap.freescale.net>
-Message-ID: <5283538D.8060807@eukrea.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 13 Nov 2013 11:29:30 +0100
+Subject: [PATCH 5/7] clocksource/cadence_ttc: Overhaul clocksource
+ frequency adjustment
+In-Reply-To: <CAKohpo=KaM97jJ2MnZxSeBz=Mf9cSmzk_EFQTL=EVPPvSH=Wag@mail.gmail.com>
+References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>	<1383945677-29674-6-git-send-email-soren.brinkmann@xilinx.com>	<52827B11.5040308@linaro.org>
+ <CAKohpo=KaM97jJ2MnZxSeBz=Mf9cSmzk_EFQTL=EVPPvSH=Wag@mail.gmail.com>
+Message-ID: <5283548A.8050903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2013 09:17 AM, Shawn Guo wrote:
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On 11/13/2013 09:03 AM, Viresh Kumar wrote:
+> On 13 November 2013 00:31, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> Hmm, it could be interesting if Viresh can give its opinion on this patch
+>> [cc'ed].
+>
+> I am not sure if I understood the problem completely, but if this is about
+> not allowing frequency transitions from cpufreq when we have started to
+> suspend our system, then you must have a look at this thread:
+>
+> https://lkml.org/lkml/2013/10/24/369
 
-Thanks,
+Thanks Viresh for the pointer.
 
-In linux-next's master of 20131113 [1], I saw that this patch made it:
-7887424 ARM i.MX25: build in pinctrl support.
 
-However that other patch seems not to be in linux-next's master or in 
-your for-next tree:
-cd435c4 pinctrl: pinctrl-imx: add imx25 pinctrl driver
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-References:
-[1] 84ea88b Add linux-next specific files for 20131113
-
-Denis.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
