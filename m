@@ -1,36 +1,70 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 13 Nov 2013 10:24:34 -0500
-Subject: [PATCH V3 1/7] DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable
- irqs
-In-Reply-To: <1383657257-3458-2-git-send-email-r.sricharan@ti.com>
-References: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
- <1383657257-3458-2-git-send-email-r.sricharan@ti.com>
-Message-ID: <528399B2.8010308@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 13 Nov 2013 23:26:51 +0800
+Subject: [PATCHv8][ 1/5] ARM i.MX35: Add devicetree support.
+In-Reply-To: <1384255459-15134-1-git-send-email-denis@eukrea.com>
+References: <1384255459-15134-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131113152622.GE17816@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 November 2013 08:14 AM, Sricharan R wrote:
-> In some socs the gic can be preceded by a crossbar IP which
-> routes the peripheral interrupts to the gic inputs. The peripheral
-> interrupts are associated with a fixed crossbar input line and the
-> crossbar routes that to one of the free gic input line.
+On Tue, Nov 12, 2013 at 12:24:15PM +0100, Denis Carikli wrote:
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/imx35-dt.c
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright 2012 Steffen Trumtrar, Pengutronix
+> + *
+> + * based on imx27-dt.c
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +
+> +#include <linux/irq.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +#include "common.h"
+> +#include "mx35.h"
+> +
+> +static void __init imx35_dt_init(void)
+> +{
+> +	mxc_arch_reset_init_dt();
+> +
+> +	of_platform_populate(NULL, of_default_bus_match_table,
+> +			     NULL, NULL);
+> +}
+> +
+> +static void __init imx35_timer_init(void)
+> +{
+> +	mx35_clocks_init_dt();
+> +}
+> +
+> +static const char *imx35_dt_board_compat[] __initdata = {
+> +	"fsl,imx35",
+> +	NULL
+> +};
+> +
+> +DT_MACHINE_START(IMX35_DT, "Freescale i.MX35 (Device Tree Support)")
+> +	.map_io		= mx35_map_io,
+> +	.init_early	= imx35_init_early,
+> +	.init_irq	= mx35_init_irq,
+> +	.handle_irq	= imx35_handle_irq,
+> +	.init_time	= imx35_timer_init,
+
+Please use CLK_OF_DECLARE() to save this hook.  You can look at imx51
+clock driver for example.
+
+Shawn
+
+> +	.init_machine	= imx35_dt_init,
+> +	.dt_compat	= imx35_dt_board_compat,
+> +	.restart	= mxc_restart,
+> +MACHINE_END
+> -- 
+> 1.7.9.5
 > 
-> The DT entries for peripherals provides the fixed crossbar input line
-> as its interrupt number and the mapping code should associate this with
-> a free gic input line. This patch adds the support inside the gic irqchip
-> to handle such routable irqs. The routable irqs are registered in a linear
-> domain. The registered routable domain's callback should be implemented
-> to get a free irq and to configure the IP to route it.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
