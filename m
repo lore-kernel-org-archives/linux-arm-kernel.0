@@ -1,83 +1,26 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 14 Nov 2013 08:03:45 +0900
-Subject: [PATCH] ARM: shmobile: Enable DSW2 with gpio-keys on KZM9D
-Message-ID: <20131113230345.21482.36997.sendpatchset@w520>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 13 Nov 2013 18:10:19 -0500
+Subject: [PATCH 04/24] mm/block: remove unnecessary inclusion of bootmem.h
+In-Reply-To: <20131113020918.GA25143@kernel.dk>
+References: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
+ <1383954120-24368-5-git-send-email-santosh.shilimkar@ti.com>
+ <20131113020918.GA25143@kernel.dk>
+Message-ID: <528406DB.7070605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Tuesday 12 November 2013 09:09 PM, Jens Axboe wrote:
+> On Fri, Nov 08 2013, Santosh Shilimkar wrote:
+>> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>>
+>> Clean-up to remove depedency with bootmem headers.
+> 
+> Thanks, cleaned up for after merge window inclusion. Changed the wording
+> to make it more correct and fixed the spelling error:
+> 
+> block: cleanup removing dependency on bootmem headers
+> 
+Thanks !!
 
-Use the gpio-keys driver to support the 4 pins on the
-dip switch DSW2 which is mounted on the KZM9D board.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/boot/dts/emev2-kzm9d.dts |   39 ++++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/emev2.dtsi      |    2 -
- 2 files changed, 39 insertions(+), 2 deletions(-)
-
---- 0001/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ work/arch/arm/boot/dts/emev2-kzm9d.dts	2013-11-13 20:21:27.000000000 +0900
-@@ -9,7 +9,9 @@
-  */
- /dts-v1/;
- 
--/include/ "emev2.dtsi"
-+#include "emev2.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "EMEV2 KZM9D Board";
-@@ -54,4 +56,39 @@
- 		vddvario-supply = <&reg_1p8v>;
- 		vdd33a-supply = <&reg_3p3v>;
- 	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		button at 1 {
-+			debounce_interval = <50>;
-+			wakeup = <1>;
-+			label = "DSW2-1";
-+			linux,code = <KEY_1>;
-+			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 2 {
-+			debounce_interval = <50>;
-+			wakeup = <1>;
-+			label = "DSW2-2";
-+			linux,code = <KEY_2>;
-+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 3 {
-+			debounce_interval = <50>;
-+			wakeup = <1>;
-+			label = "DSW2-3";
-+			linux,code = <KEY_3>;
-+			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 4 {
-+			debounce_interval = <50>;
-+			wakeup = <1>;
-+			label = "DSW2-4";
-+			linux,code = <KEY_4>;
-+			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
- };
---- 0001/arch/arm/boot/dts/emev2.dtsi
-+++ work/arch/arm/boot/dts/emev2.dtsi	2013-11-13 20:20:03.000000000 +0900
-@@ -8,7 +8,7 @@
-  * kind, whether express or implied.
-  */
- 
--/include/ "skeleton.dtsi"
-+#include "skeleton.dtsi"
- 
- / {
- 	compatible = "renesas,emev2";
+regards,
+Santosh
