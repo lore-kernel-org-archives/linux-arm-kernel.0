@@ -1,169 +1,201 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 13 Nov 2013 03:47:27 +0100
-Subject: [PATCHv3 2/8] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel
- format.
-In-Reply-To: <1384274965-30549-2-git-send-email-denis@eukrea.com>
-References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
- <1384274965-30549-2-git-send-email-denis@eukrea.com>
-Message-ID: <1980062.zhsfvmMMmI@avalon>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 13 Nov 2013 11:26:28 +0800
+Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
+ no nand detected
+In-Reply-To: <20131113001022.GC9468@ld-irv-0074.broadcom.com>
+References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
+ <20131107083932.GJ3805@norris.computersforpeace.net>
+ <527B6ADF.1090201@atmel.com>
+ <20131107180942.GU20061@ld-irv-0074.broadcom.com> <527C5E96.40805@atmel.com>
+ <20131113001022.GC9468@ld-irv-0074.broadcom.com>
+Message-ID: <5282F164.3040509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+On 11/13/2013 8:10 AM, Brian Norris wrote:
+> + Greg KH
+>
+> Hi Josh,
+>
+> On Fri, Nov 08, 2013 at 11:46:30AM +0800, Josh Wu wrote:
+>> On 11/8/2013 2:09 AM, Brian Norris wrote:
+>>> On Thu, Nov 07, 2013 at 06:26:39PM +0800, Josh Wu wrote:
+>>>> On 11/7/2013 4:39 PM, Brian Norris wrote:
+>>>>> On Tue, Nov 05, 2013 at 05:59:07PM +0800, Josh Wu wrote:
+>>>>>> In the atmel driver probe function, the code shows like following:
+>>>>>>    atmel_nand_probe(...) {
+>>>>>>          ...
+>>>>>>
+>>>>>>    err_nand_ioremap:
+>>>>>>          platform_driver_unregister(&atmel_nand_nfc_driver);
+>>>>>>          return res;
+>>>>>>    }
+>>>>>>
+>>>>>> If no nand flash detected, the driver probe function will goto
+>>>>>> err_nand_ioremap label.
+>>>>>> Then platform_driver_unregister() will be called. It will get the
+>>>>>> lock of atmel_nand device since it is parent of nfc_device. The
+>>>>>> problem is the lock is already hold by atmel_nand_probe itself.
+>>>>>> So system will be in a dead lock.
+>>>>>>
+>>>>>> This patch just simply removed to platform_driver_unregister() call.
+>>>>>> When atmel_nand driver is quit the platform_driver_unregister() will
+>>>>>> be called in atmel_nand_remove().
+>>>>> The real key, here, is that the platform-driver probe() has no business
+>>>>> un-registering another driver, right?
+>>>> right.
+>>>>
+>>>>> Shouldn't both drivers just be
+>>>>> registered/unregistered in the module init/exit, and not in probe()?
+>>>> currently the NFC driver is registered in the beginning of nand
+>>>> probe function. After NFC driver is initialized, the rest of the
+>>>> nand probe function
+>>>> will check the NFC driver status.
+>>>> I am not sure it is proper to registered another driver in a probe().
+>>> This whole 2-driver registration process seems like a totally racy mess.
+>>>
+>>> Unless I'm reading this wrong, the code is entirely wrong. You are not
+>>> properly expressing the dependency between the NFC device and the
+>>> atmel_nand device, so I think you're relying purely on happenstance that
+>>> when the NAND probe registers the NFC driver, it will complete the NFC
+>>> probe before the NAND probe reaches:
+>>>
+>>>    if (nand_nfc.is_initialized) {
+>>>      ...
+>> Yes, exactly.
+>> And the NAND probe will also load the NFC device before it reach
+>> above check code.
+> No, it loads the *driver*, not the *device*. I'm not familiar with the
+> driver core guarantees, but I don't think you can guarantee that just
+> because a driver was registered before another that the corresponding
+> devices will be probed in that order. Or are you relying on the
+> dependencies captured by device tree? (I don't think even the
+> parent/child dependency between NAND/NFC gives you enough.)
+Hi, Brain
 
-(Dropping the DT reviewers from the CC list to avoid spamming them)
+I put  more code here to make it clearer:
 
-Thank you for the patch.
+arch/arm/boot/dts/sama5d3.dtsi:
+nand0: nand at 60000000 {
+             compatible = "atmel,at91rm9200-nand";
+             ...
+             ranges;
+             ...
+             nfc at 70000000 {
+                 compatible = "atmel,sama5d3-nfc";
+                 ...
+             };
+         };
 
-On Tuesday 12 November 2013 17:49:19 Denis Carikli wrote:
-> That new macro is needed by the imx_drm staging driver
->   for supporting the QVGA display of the eukrea-cpuimx51 board.
-> 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: driverdev-devel at linuxdriverproject.org
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: linux-media at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+drivers/mtd/nand/atmel_nand.c
+int atmel_of_init_port() {
+    ...
+    /* load the nfc driver if there is */
+   of_platform_populate(np, NULL, NULL, host->dev);   # <--- Manually 
+populate the sub node (NFC node) to load NFC driver
+   ...
+}
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+static int atmel_nand_nfc_probe(struct platform_device *pdev)
+{
+     struct atmel_nfc *nfc = &nand_nfc;
+     ...
+     nfc->is_initialized = true;
+     dev_info(&pdev->dev, "NFC is probed.\n");
+     return 0;
+}
 
-> ---
-> ChangeLog v2->v3:
-> - Added some interested people in the Cc list.
-> - Added Mauro Carvalho Chehab's Ack.
-> - Added documentation.
-> ---
->  .../DocBook/media/v4l/pixfmt-packed-rgb.xml        |   78
-> ++++++++++++++++++++ include/uapi/linux/videodev2.h                     |  
->  1 +
->  2 files changed, 79 insertions(+)
-> 
-> diff --git a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-> b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml index
-> 166c8d6..f6a3e84 100644
-> --- a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-> +++ b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-> @@ -279,6 +279,45 @@ colorspace
-> <constant>V4L2_COLORSPACE_SRGB</constant>.</para> <entry></entry>
->  	    <entry></entry>
->  	  </row>
-> +	  <row id="V4L2-PIX-FMT-RGB666">
-> +	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
-> +	    <entry>'RGBH'</entry>
-> +	    <entry></entry>
-> +	    <entry>r<subscript>5</subscript></entry>
-> +	    <entry>r<subscript>4</subscript></entry>
-> +	    <entry>r<subscript>3</subscript></entry>
-> +	    <entry>r<subscript>2</subscript></entry>
-> +	    <entry>r<subscript>1</subscript></entry>
-> +	    <entry>r<subscript>0</subscript></entry>
-> +	    <entry>g<subscript>5</subscript></entry>
-> +	    <entry>g<subscript>4</subscript></entry>
-> +	    <entry></entry>
-> +	    <entry>g<subscript>3</subscript></entry>
-> +	    <entry>g<subscript>2</subscript></entry>
-> +	    <entry>g<subscript>1</subscript></entry>
-> +	    <entry>g<subscript>0</subscript></entry>
-> +	    <entry>b<subscript>5</subscript></entry>
-> +	    <entry>b<subscript>4</subscript></entry>
-> +	    <entry>b<subscript>3</subscript></entry>
-> +	    <entry>b<subscript>2</subscript></entry>
-> +	    <entry></entry>
-> +	    <entry>b<subscript>1</subscript></entry>
-> +	    <entry>b<subscript>0</subscript></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	  </row>
->  	  <row id="V4L2-PIX-FMT-BGR24">
->  	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
->  	    <entry>'BGR3'</entry>
-> @@ -781,6 +820,45 @@ defined in error. Drivers may interpret them as in
-> <xref <entry></entry>
->  	    <entry></entry>
->  	  </row>
-> +	  <row><!-- id="V4L2-PIX-FMT-RGB666" -->
-> +	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
-> +	    <entry>'RGBH'</entry>
-> +	    <entry></entry>
-> +	    <entry>r<subscript>5</subscript></entry>
-> +	    <entry>r<subscript>4</subscript></entry>
-> +	    <entry>r<subscript>3</subscript></entry>
-> +	    <entry>r<subscript>2</subscript></entry>
-> +	    <entry>r<subscript>1</subscript></entry>
-> +	    <entry>r<subscript>0</subscript></entry>
-> +	    <entry>g<subscript>5</subscript></entry>
-> +	    <entry>g<subscript>4</subscript></entry>
-> +	    <entry></entry>
-> +	    <entry>g<subscript>3</subscript></entry>
-> +	    <entry>g<subscript>2</subscript></entry>
-> +	    <entry>g<subscript>1</subscript></entry>
-> +	    <entry>g<subscript>0</subscript></entry>
-> +	    <entry>b<subscript>5</subscript></entry>
-> +	    <entry>b<subscript>4</subscript></entry>
-> +	    <entry>b<subscript>3</subscript></entry>
-> +	    <entry>b<subscript>2</subscript></entry>
-> +	    <entry></entry>
-> +	    <entry>b<subscript>1</subscript></entry>
-> +	    <entry>b<subscript>0</subscript></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	    <entry></entry>
-> +	  </row>
->  	  <row><!-- id="V4L2-PIX-FMT-BGR24" -->
->  	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
->  	    <entry>'BGR3'</entry>
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 437f1b0..e8ff410 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -294,6 +294,7 @@ struct v4l2_pix_format {
->  #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16 
-> RGB-5-5-5 BE  */ #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B',
-> 'R') /* 16  RGB-5-6-5 BE  */ #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B',
-> 'G', 'R', 'H') /* 18  BGR-6-6-6	  */ +#define V4L2_PIX_FMT_RGB666 
-> v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */ #define
-> V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8    
-> */ #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24 
-> RGB-8-8-8     */ #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R',
-> '4') /* 32  BGR-8-8-8-8   */
--- 
-Regards,
+atmel_nand_probe() {
+    ...
+    res = platform_driver_register(&atmel_nand_nfc_driver);  # Register 
+NFC driver.
+    ...
+    if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
+       res = atmel_of_init_port(host, pdev->dev.of_node);
+       #       ^^^^^^^^^^ ^^^^^^  In this function, it will populate the 
+NFC node shows in above code block.
+       #   It triggers the NFC driver's probe() function. Which will set 
+the 'nand_nfc.is_initialized' as true.
 
-Laurent Pinchart
+    } else {
+       ...
+    }
+    ...
+
+    if (nand_nfc.is_initialized) {               # now we know the NFC 
+driver is probed.
+       ...
+    }
+    ...
+}
+
+in summary, the following flow to make sure NFC is initialized in 
+atmel_nand_probe():
+    atmel_nand_probe() {
+       Register NFC.
+       dt property check. That populates the NFC dt node.
+           Via the NFC compatible string, system find the registered NFC 
+driver, so call the NFC probe() function.
+           NFC probe will initialized the NFC.
+       Check NFC is initialized or not.
+    }
+
+>
+>> That is what I want: make *nfc probe function* is running before
+>> reach above check code.
+>>
+>>> This is a race, no?
+>> So I don't think there is a race, as NFC probe will always run
+>> before the check code:
+>>    if (nand_nfc.is_initialized) {
+>>      ...
+> It is not clear to me how you guarantee this.
+>
+>>> Anyway, I think the current patch (fixing a deadlock) is still ready for
+>>> stable, while I would expect you can fix up this racy situation in a
+>>> subsequent patch. Or perhaps I'm misreading something?
+>> I think my subsequent patch is to move the register/unregister()
+>> function to the module_init/exit().
+>> And in the module_init(), make sure register NFC driver before NAND driver.
+>> That means I will revert the change that convert module_init/exit()
+>> to module_platform_driver_probe().
+>>
+>> So the whole flow will like that:
+>>
+>> module_init()
+>>    register nfc driver
+>>    register nand driver
+>>
+>> nand driver probe() {
+>>      # register nfc driver --> move to module_init()
+>>      populate nfc device
+> How do you guarantee this "populate" happens here?
+
+>
+>>        since nfc driver is registered, so nfc_probe() is called (init nfc)
+> I'm not sure where you get this. Can you point to a line in the code?
+atmel_nand_probe() {
+    ...
+    atmel_of_init_port(host, pdev->dev.of_node);
+    ...
+}
+
+int atmel_of_init_port() {
+    ...
+    /* load the nfc driver if there is */
+   of_platform_populate(np, NULL, NULL, host->dev);
+   ...
+}
+
+>
+>>      check whether nfc is initialized
+>>      ...
+>>    }
+>>
+>> module_exit()
+>>    unregister nand driver
+>>    unregister nfc driver
+> Brian
+
+Best Regards,
+Josh Wu
