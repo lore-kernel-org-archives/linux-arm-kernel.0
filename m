@@ -1,71 +1,91 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 13 Nov 2013 01:05:05 +0100
-Subject: [PATCH 2/2] ARM: OMAP2+: move gpmc headers to
- include/linux/platform_data
-In-Reply-To: <20131112221212.GU15154@atomide.com>
-References: <1384014842-4288-1-git-send-email-javier.martinez@collabora.co.uk>
- <1384014842-4288-2-git-send-email-javier.martinez@collabora.co.uk>
- <20131112205147.GB20260@localhost> <5282A427.9070300@collabora.co.uk>
- <20131112221212.GU15154@atomide.com>
-Message-ID: <5282C231.6070605@collabora.co.uk>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Tue, 12 Nov 2013 16:08:56 -0800
+Subject: [PATCH 1/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <20131112233911.16eba130@alan.etchedpixels.co.uk>
+References: <1383943488-6537-1-git-send-email-markus.mayer@linaro.org>
+ <1383943488-6537-2-git-send-email-markus.mayer@linaro.org>
+ <20131112233911.16eba130@alan.etchedpixels.co.uk>
+Message-ID: <CAPdLdqnKvKbU_6M4uUBAwtq1YUaKMtrZcR7mzJfxjZva=duPHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2013 11:12 PM, Tony Lindgren wrote:
-> * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131112 13:58]:
->> On 11/12/2013 09:51 PM, Ezequiel Garcia wrote:
->> > 
->> > I'm not too convinced about the above diffstat. Maybe you can try a
->> > a better approach of making the move by: 1) renaming/moving a file,
->> > using 'git format-patch -M' and 2) then make the necessary changes
->> > in the new place.
->> > 
->> > Or, if the above ends up not fully bisectable you can try first (2)
->> > then (1).
->> >
->> > What bothers me most is seeing things like this:
->> > 
->> >   arch/arm/mach-omap2/gpmc-nand.h                  |  27 ---
->> >   arch/arm/mach-omap2/gpmc.h                       | 231 -----------------------
->> >   include/linux/platform_data/gpmc-nand-omap.h     |  27 +++
->> >   include/linux/platform_data/gpmc-omap.h          | 231 +++++++++++++++++++++++
->> > 
->> > What do you think?
->> > 
->> 
->> Agreed, I completely forgot about -M when generating the patches.
->> 
->> I'll wait to see what Tony thinks about this approach to take the gpmc driver
->> outside of mach-omap2 and send a v2 addressing the issues you pointed out.
+On 12 November 2013 15:39, One Thousand Gnomes
+<gnomes@lxorguk.ukuu.org.uk> wrote:
 >
-
-Hi Tony,
-
-> Well the headers in include/linux/platform_data should only
-> contain platform data passed to the driver. So you should
-> keep arch/arm/mach-omap2 specific stuff in the local headers,
-> then have the driver specific stuff private to the drivers,
-> and then have separate minimal platform data headers.
-> 
-
-Thanks a lot for the explanation. It wasn't clear to me before what should be
-included in include/linux/platform_data and what should be kept in
-arch/arm/mach-omap2.
-
-> Please also try to avoid patching all the board-*.c files if
-> possible by keeping the the local headers in place as the board
-> files will be going away for v3.14 anyways. You can include
-> the new platform data header from those local files as that
-> cuts down extra churn in the board-*.c files a bit ;)
+>> +static int bcm_kona_wdt_set_resolution_reg(struct bcm_kona_wdt *wdt)
+>> +{
+>> +     uint32_t val;
+>> +     int timeout;
+>> +     unsigned long flags;
+>> +     int ret = 0;
+>> +
+>> +     if (wdt->resolution > SECWDOG_MAX_RES)
+>> +             return -EINVAL;
+>> +
+>> +     spin_lock_irqsave(&wdt->lock, flags);
+>> +
+>> +     val = secure_register_read(wdt->base + SECWDOG_CTRL_REG, &timeout);
+>> +     if (!timeout) {
+>> +             val &= ~SECWDOG_RES_MASK;
+>> +             val |= wdt->resolution << SECWDOG_CLKS_SHIFT;
+>> +             writel_relaxed(val, wdt->base + SECWDOG_CTRL_REG);
+>> +     } else {
+>> +             ret = -EAGAIN;
 >
+> This is I think the wrong choice of return. If the register fails to read
+> then presumably the device is b*ggered ? In which case return something
+> like -EIO and log something nasty.
+>
+> EAGAIN has fairly specific semantics around signals and/or specific
+> requests for an I/O operation not to wait.
 
-Yes, In fact I guess is just better to wait after v3.14 (when board files are
-finally removed) in order to avoid unnecessary merge conflicts :)
+I will change that based on Guenter's and your comments.
 
-> Regards,
-> 
-> Tony
-> 
+>> +     spin_lock_irqsave(&wdt->lock, flags);
+>> +
+>> +     val = secure_register_read(wdt->base + SECWDOG_CTRL_REG, &timeout);
+>> +     if (!timeout) {
+>> +             val &= ~SECWDOG_COUNT_MASK;
+>> +             val |= SECS_TO_TICKS(wdog->timeout, wdt);
+>> +             writel_relaxed(val, wdt->base + SECWDOG_CTRL_REG);
+>> +     } else {
+>> +             ret = -EAGAIN;
+>> +     }
+>> +
+>> +     spin_unlock_irqrestore(&wdt->lock, flags);
+>
+> As an aside you could fold most of these functions into one single helper
+> method that read CTRL_REG, did the and and or and wrote the result back
+> rather than repeating yourself. But hey if you like typing...
 
-Best regards,
-Javier
+I'll look into that.
+
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>
+> What if there is no resource present ?
+
+Then devm_ioremap_resource() will print an error message and return
+with ERR_PTR(-EINVAL). Subsequently probe() will fail. So it'll work
+as intended.
+
+>> +     dev_info(dev, "Broadcom Kona Watchdog Timer");
+>
+> The module load succeeded - the user knows it loaded from that. Likewise
+> the unload spewage is unwanted and the kernel would just drown in such
+> messages if we didn't keep them in check. If you need the for debug then
+> mark them dev_dbg but otherwise bin them.
+
+I already changed them all to "debug" in my local tree. For this one
+message, I am feeling a bit ambivalent, though. The user only knows
+loading of the module succeeded if the user manually loaded the module
+-- which, I imagine, would almost never be the case. The driver is
+either going to be built in or loaded automatically by some facility.
+In which case it might be nice to have some confirmation of that fact
+in the logs.
+
+Regards,
+-Markus
+
+-- 
+Markus Mayer
+Broadcom Landing Team
