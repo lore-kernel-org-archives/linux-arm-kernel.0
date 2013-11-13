@@ -1,40 +1,90 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 13 Nov 2013 13:16:30 +0100
-Subject: [alsa-devel] [PATCH] ASoC: fsl-ssi: fix SDMA starvation
-In-Reply-To: <CAOZdJXUWv3_ZV6p9VQ+zYqwUDVQC6BMb-VhVoVtEh1yC23VuTg@mail.gmail.com>
-References: <1384255056-25673-1-git-send-email-mpa@pengutronix.de>
- <52822529.5090502@tabi.org> <20131112132441.GG30263@pengutronix.de>
- <CAOZdJXUWv3_ZV6p9VQ+zYqwUDVQC6BMb-VhVoVtEh1yC23VuTg@mail.gmail.com>
-Message-ID: <20131113121630.GH30263@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Nov 2013 12:39:27 +0000
+Subject: [PATCH v11 1/2] clk: hisilicon: add common clock support
+In-Reply-To: <1384306274-27315-2-git-send-email-haojian.zhuang@gmail.com>
+References: <1384306274-27315-1-git-send-email-haojian.zhuang@gmail.com>
+ <1384306274-27315-2-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20131113123927.GG21713@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 13, 2013 at 01:31:13AM +0000, Haojian Zhuang wrote:
+> Enable common clock driver of Hi3620 SoC. clkgate-seperated driver is
+> used to support the clock gate that enable/disable/status registers
+> are seperated.
 
-On Tue, Nov 12, 2013 at 02:17:34PM -0600, Timur Tabi wrote:
-> On Tue, Nov 12, 2013 at 7:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> >
-> > No, I don't have access on PowerPC hardware, so I didn't test it on
-> > PowerPC.
+Typo: s/seperated/separated/
+
+That seems to apply throughout the code and comments too.
+
 > 
-> Can you change the code so that the interrupts are enabled only on
-> i.MX?  On PowerPC, the interrupts are used only for debugging.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  .../devicetree/bindings/clock/hi3620-clock.txt     |  19 ++
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/hisilicon/Makefile                     |   5 +
+>  drivers/clk/hisilicon/clk-hi3620.c                 | 242 +++++++++++++++++++++
+>  drivers/clk/hisilicon/clk.c                        | 171 +++++++++++++++
+>  drivers/clk/hisilicon/clk.h                        | 103 +++++++++
+>  drivers/clk/hisilicon/clkgate-seperated.c          | 130 +++++++++++
+>  include/dt-bindings/clock/hi3620-clock.h           | 152 +++++++++++++
+>  8 files changed, 823 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hi3620-clock.txt
+>  create mode 100644 drivers/clk/hisilicon/Makefile
+>  create mode 100644 drivers/clk/hisilicon/clk-hi3620.c
+>  create mode 100644 drivers/clk/hisilicon/clk.c
+>  create mode 100644 drivers/clk/hisilicon/clk.h
+>  create mode 100644 drivers/clk/hisilicon/clkgate-seperated.c
+>  create mode 100644 include/dt-bindings/clock/hi3620-clock.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/hi3620-clock.txt b/Documentation/devicetree/bindings/clock/hi3620-clock.txt
+> new file mode 100644
+> index 0000000..80e134d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/hi3620-clock.txt
+> @@ -0,0 +1,19 @@
+> +* Hisilicon Hi3620 Clock Controller
+> +
+> +The Hi3620 clock controller generates and supplies clock to various
+> +controllers within the Hi3620 SoC.
+> +
+> +Required Properties:
+> +
+> +- comptible: should be one of the following.
 
-Why is this necessary? The interrupts were enabled for all
-architectures before.
+s/comptible/compatible/
 
-However, this patch is wrong as J?rgen mentioned, the SIER_FLAGS are
-written to the SIER register after we enable the DMA enable bits which
-leads to missing DMA enable bits at the end.
-I created a new patch to cleanup the whole interrupt flag setup. I will
-post it later.
+> +  - "hisilicon,hi3620-clock" - controller compatible with Hi3620 SoC.
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +Each clock is assigned an identifier and client nodes use this identifier
+> +to specify the clock which they consume.
+> +
+> +All these identifier could be found in <dt-bindings/clock/hi3620-clock.h>.
 
-Regards,
+With the typo fixed, the binding looks fine to me.
 
-Markus
+[...]
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +struct clk *hisi_register_clkgate_sep(struct device *dev, const char *name,
+> +                                     const char *parent_name,
+> +                                     unsigned long flags,
+> +                                     void __iomem *reg, u8 bit_idx,
+> +                                     u8 clk_gate_flags, spinlock_t *lock)
+> +{
+> +       struct clkgate_seperated *sclk;
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       sclk = kzalloc(sizeof(struct clkgate_seperated), GFP_KERNEL);
+
+This could be neater:
+
+sclk = kzalloc(sizeof(*sclk), GFP_KERNEL);
+
+Thanks,
+Mark.
