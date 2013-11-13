@@ -1,80 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Nov 2013 20:42:32 +0100
-Subject: Physical memory start contraints in the Linux kernel (Was: Re:
- Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel] [xen-unstable
- test] 21486: tolerable FAIL - PUSHED))
-In-Reply-To: <alpine.DEB.2.02.1311131417030.4714@kaball.uk.xensource.com>
-References: <osstest-21486-mainreport@xen.org>
- <1384339849.5406.52.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1311131417030.4714@kaball.uk.xensource.com>
-Message-ID: <201311132042.32725.arnd@arndb.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 13 Nov 2013 20:48:20 +0100
+Subject: [PATCHv4][ 3/7] staging: imx-drm: Add RGB666 support for parallel
+ display.
+In-Reply-To: <20131113191230.GU16735@n2100.arm.linux.org.uk>
+References: <1384334603-14208-1-git-send-email-denis@eukrea.com>
+ <5283C860.3020103@boundarydevices.com>
+ <20131113191230.GU16735@n2100.arm.linux.org.uk>
+Message-ID: <21976620.UIvc2kPlHX@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 November 2013, Stefano Stabellini wrote:
->  
-> -#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
-> +#ifdef CONFIG_GENERIC_ATOMIC64
-> +/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
-> + * atomic64_xchg function because it is implemented using spin locks.
-> + * Here we need proper atomic instructions to read and write memory
-> + * shared with the hypervisor.
-> + */
-> +static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
-> +{
-> +	u64 result;
-> +	unsigned long tmp;
-> +
-> +	smp_mb();
-> +
-> +	__asm__ __volatile__("@ xen_atomic64_xchg\n"
-> +"1:	ldrexd	%0, %H0, [%3]\n"
-> +"	strexd	%1, %4, %H4, [%3]\n"
-> +"	teq	%1, #0\n"
-> +"	bne	1b"
-> +	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
-> +	: "r" (&ptr->counter), "r" (new)
-> +	: "cc");
-> +
-> +	smp_mb();
-> +
-> +	return result;
-> +}
-> +#else
-> +#define xen_atomic64_xchg atomic64_xchg
-> +#endif
+Hi Russell,
 
-I would prefer not duplicating this code. Maybe we can instead change
-the ARM code to always provide this function under the name of
-armv7_atomic64_xchg() and conditionally defining atomic64_xchg
-to use it. Let's see if Russell has an opinion on this, or perhaps
-a better solution.
-
-> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-> index 62ccf54..d668c3c 100644
-> --- a/drivers/xen/grant-table.c
-> +++ b/drivers/xen/grant-table.c
-> @@ -33,6 +33,14 @@
->  
->  #define pr_fmt(fmt) "xen:" KBUILD_MODNAME ": " fmt
->  
-> +/* This is required because cmpxchg only support 32-bits operands on
-> + * ARMv6, so if CONFIG_CPU_V6 is defined the cmpxchg implemention will
-> + * be limited to 32-bits operands.
-> + * However we know for sure that if Linux is running on Xen, the
-> + * platform is >= ARMv7, so here we can safely undef CONFIG_CPU_V6.
-> + */
-> +#undef CONFIG_CPU_V6
-> +
->  #include <linux/module.h>
->  #include <linux/sched.h>
->  #include <linux/mm.h>
+On Wednesday 13 November 2013 19:12:30 Russell King - ARM Linux wrote:
+> On Wed, Nov 13, 2013 at 11:43:44AM -0700, Troy Kisky wrote:
+> > On 11/13/2013 2:23 AM, Denis Carikli wrote:
+> >>   +	/* rgb666 */
+> >> 
+> >> +	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
+> >> +	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
+> >> +	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
+> >> +	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
+> >> +
+> >>   	return 0;
+> >>   }
+> > 
+> > Since,  rgb24 and bgr24 reverse the byte numbers
+> > /* rgb24 */
+> >         ipu_dc_map_clear(priv, IPU_DC_MAP_RGB24);
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_RGB24, 0, 7, 0xff); /* blue */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_RGB24, 1, 15, 0xff); /* green
+> >         */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_RGB24, 2, 23, 0xff); /* red */
+> > 
+> > /* bgr24 */
+> >         ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 2, 7, 0xff); /* red */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green
+> >         */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
+> > 
+> > Shouldn't rgb666 and bgr666 do the same?
+> > Currently we have,
+> > 
+> > /* bgr666 */
+> >         ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /*
+> > green */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
 > 
+> Yes, I concur - this doesn't make sense to me.  BGR666 would mean in
+> memory:
+> 
+>         1    11
+>         7    21    65    0
+>         BBBBBBGGGGGGRRRRRR
+> 
+> which reflects the same order for "RGB24" above.
 
-Same here: I'd prefer making this more explicit by changing the cmpxchg
-implementation: we could split out the 16-bit cmpxchg case into a separate
-function with "armv7" in the name and only call that from the main
-cmpxchg() implementations when building an armv7-only kernel, but still
-let you call it from Xen code that is known to run only on armv7.
+Beside component order and number of bits per component, an in-memory RGB 
+format also defines the memory endianness and, for formats that don't span an 
+interger number of bytes, the left or right alignment.
 
-	Arnd 
+BGR666 is currently defined in V4L2 as
+
+Byte 0                         1                        2
+Bit  7  6  5  4  3  2  1  0    7  6  5  4  3  2  1  0   7  6  5  4  3  2  1  0
+
+     b5 b4 b3 b2 b1 b0 g5 g4  g3 g2 g1 g0 r5 r4 r3 r2  r1 r0  -  -  -  -  -  -
+
+(see the *second* table in http://linuxtv.org/downloads/v4l-dvb-apis/packed-rgb.html)
+
+I would thus expect RGB666 to be
+
+Byte 0                         1                        2
+Bit  7  6  5  4  3  2  1  0    7  6  5  4  3  2  1  0   7  6  5  4  3  2  1  0
+
+     r5 r4 r3 r2 r1 r0 g5 g4  g3 g2 g1 g0 b5 b4 b3 b2  b1 b0  -  -  -  -  -  -
+
+We can also define right-aligned formats if needed.
+
+> > Where I'd expect to see
+> > /* bgr666 */
+> > 
+> >         ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue
+> >         */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /*
+> > green */
+> >         ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
+> 
+> So this makes sense to me.
+
+-- 
+Regards,
+
+Laurent Pinchart
