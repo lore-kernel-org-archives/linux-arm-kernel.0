@@ -1,74 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Nov 2013 13:56:31 -0800
-Subject: [PATCH] ARM: omap: fix warning with LPAE build
-In-Reply-To: <CAOesGMidmOXvnCWQ_5v7Mn-aELD2RvseWVQ-gqRy+xZc-GVbEA@mail.gmail.com>
-References: <1384325630-26998-1-git-send-email-olof@lixom.net>
- <20131113200527.GA10317@atomide.com>
- <CAOesGMhcg732xXtXUmpzvc9WzR_rGM2pjkNmzf3_40zkTFJRKA@mail.gmail.com>
- <CAOesGMidmOXvnCWQ_5v7Mn-aELD2RvseWVQ-gqRy+xZc-GVbEA@mail.gmail.com>
-Message-ID: <20131113215630.GB10317@atomide.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 13 Nov 2013 23:07:19 +0100
+Subject: [PATCH 1/2] dmaengine: add msm bam dma driver
+In-Reply-To: <20131030203105.GA14525@agross>
+References: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
+ <20131029175603.GF21983@codeaurora.org> <20131030203105.GA14525@agross>
+Message-ID: <3732966.zLLfiChgvH@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [131113 13:23]:
-> On Wed, Nov 13, 2013 at 12:31 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Wed, Nov 13, 2013 at 12:05 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >> * Olof Johansson <olof@lixom.net> [131112 22:53]:
-> >>> Some omap3 code is throwing a warning:
-> >>> arch/arm/mach-omap2/pm34xx.c: In function 'omap3_save_secure_ram_context':
-> >>> arch/arm/mach-omap2/pm34xx.c:123:32: warning: cast to pointer from
-> >>>   integer of different size [-Wint-to-pointer-cast]
-> >>>
-> >>> In reality this code will never actually execute with LPAE=y, since
-> >>> Cortex-A8 doesn't support it. So downcasting the __pa() is safe in
-> >>> this case.
-> >>>
-> >>> Signed-off-by: Olof Johansson <olof@lixom.net>
-> >>> ---
-> >>>
-> >>> Tony, queue up if you have a fixes branch please, otherwise I can apply
-> >>> directly.
-> >>>
-> >>>  arch/arm/mach-omap2/pm34xx.c |    2 +-
-> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> >>> index 93b80e5..1f3770a 100644
-> >>> --- a/arch/arm/mach-omap2/pm34xx.c
-> >>> +++ b/arch/arm/mach-omap2/pm34xx.c
-> >>> @@ -120,7 +120,7 @@ static void omap3_save_secure_ram_context(void)
-> >>>                * will hang the system.
-> >>>                */
-> >>>               pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
-> >>> -             ret = _omap_save_secure_sram((u32 *)
-> >>> +             ret = _omap_save_secure_sram((u32 *)(unsigned long)
-> >>>                               __pa(omap3_secure_ram_storage));
-> >>>               pwrdm_set_next_pwrst(mpu_pwrdm, mpu_next_state);
-> >>>               /* Following is for error tracking, it should not happen */
-> >>
-> >> Hmm maybe the function prototype should be changed instead if
-> >> it takes the physical address.
-> >>
-> >> How do you you reproduce this warning? I did not get it after
-> >> enabling LPAE in multi_v7_defconfig with current mainline.
-> >
-> > Of course. No more late night patching for me. :)
+Hi Andy,
 
-Ah OK so it's in next.
- 
-> Actually, that is getting a little hairy. It's a function pointer to
-> an assembly function, so we'd need to make it deal with the size of
-> phys_addr_t there. It's probably easier to just go with the original
-> patch here, at least I don't see much payoff from doing it the other
-> way.
+On Wednesday 30 of October 2013 15:31:05 Andy Gross wrote:
+> On Tue, Oct 29, 2013 at 10:56:03AM -0700, Stephen Boyd wrote:
+> > On 10/25, Andy Gross wrote:
+> > > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> > > index f238cfd..a71b415 100644
+> > > --- a/drivers/dma/Kconfig
+> > > +++ b/drivers/dma/Kconfig
+> > > @@ -364,4 +364,13 @@ config DMATEST
+> > >  	  Simple DMA test client. Say N unless you're debugging a
+> > >  	  DMA Device driver.
+> > >  
+> > > +
+> > > +config MSM_BAM_DMA
+> > > +	tristate "MSM BAM DMA support"
+> > > +	depends on ARCH_MSM
+> > 
+> > It would be nice if we didn't have to rely on ARCH_MSM here so we
+> > get more build coverage.
+>  
+> I can remove that.  There is nothing that forces this depend option.
 
-OK, please go ahead and apply:
+Instead of removing, please add "|| COMPILE_TEST". This is the right way
+to allow drivers not supposed to be run on given platform to build on it.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-I'm still sorting out my fixes, and so far it looks like I don't
-need to touch this file.
-
-Regards,
-
-Tony
+Best regards,
+Tomasz
