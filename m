@@ -1,61 +1,67 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 13 Nov 2013 22:36:00 +0800
-Subject: [PATCH v7 0/7] pinctrl: imx27: imx27 pincontrol driver
-In-Reply-To: <1384246210-9257-1-git-send-email-mpa@pengutronix.de>
-References: <1384246210-9257-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131113143557.GA17816@S2101-09.ap.freescale.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Nov 2013 14:38:04 +0000
+Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
+In-Reply-To: <5282BAFC.8070405@wwwdotorg.org>
+References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
+ <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
+ <5282BAFC.8070405@wwwdotorg.org>
+Message-ID: <20131113143804.GA11928@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 09:50:03AM +0100, Markus Pargmann wrote:
-> Hi,
+On Tue, Nov 12, 2013 at 11:34:20PM +0000, Stephen Warren wrote:
+> On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
+> > An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
+> > are done later.
+> > 
+> > With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
+> > identify whether a device is IOMMU'able or not. If a device is
+> > IOMMU'able, we'll defer to populate that device till an iommu device
+> > is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
+> > is set in the bus. Then, those defered IOMMU'able devices are
+> > populated and configured as IOMMU'abled with help of the already
+> > populated iommu device via iommu_ops->add_device().
 > 
-> This series contains only DTS changes for imx27-pinctrl. It depends on the
-> incremental driver patch which allows iomux subdevices [1].
+> This looks fairly neat and clean.
+> 
+> I'm still worried about using #stream-id-cells in DT nodes though. While
+> I do understand that the *Linux* device model currently only allows each
+> struct device to be affected by a single IOMMU, I worry that encoding
+> that same restriction into DT is a mistake. I'd far rather see a
+> property like:
+> 
+> SMMU:
+>     smmu: smmu at xxxxxx {
+>         #smmu-cells = <1>;
+>     }
+> 
+> Affected device:
+>     smmus = <&smmu 1>;
+>     (perhaps with smmu-names too)
+> 
+> That would allow the DT to represent basically arbitrary HW configurations.
+> 
+> The implementation of this patch would then be almost as trivial; you'd
+> just need to walk the smmus property to find each phandle in turn, just
+> like any other phandle+specifier property, and validate that the SMMU
+> driver was already probe()d for each.
 
-Applied patches #1, #2 and #7.
+There are a few problems with that:
 
-Unless LinusW create a topic branch for that dependency, I cannot apply
-the rest.
+  1.) It assumes all devices sharing an SMMU have the same number of
+      "smmu cells"
 
-Shawn
+  2.) It moves SMMU-specific data out to the device, which makes it
+      impossible to describe more complicated topologies where IDs can be
+      remapped/remastered, potentially by multiple SMMUs and/or bus bridges.
 
-> 
-> Regards,
-> 
-> Markus Pargmann
-> 
-> 
-> [1] [PATCH] pinctrl: imx1-core populate subdevices
->     <1384193987-20740-1-git-send-email-mpa@pengutronix.de>
->     http://thread.gmane.org/gmane.linux.drivers.devicetree/51584
-> 
-> Changes in v7:
->  - Added patch for imx27-pingrp.h
->  - Pin nodes moved to board dts files
->  - gpio nodes in imx27.dtsi moved to iomux node
-> 
-> Markus Pargmann (7):
->   ARM: dts: imx27 pin functions
->   ARM: dts: imx27 pingroups
->   ARM: dts: imx27 pinctrl
->   ARM: dts: imx27 phyCARD-S pinctrl
->   ARM: dts: imx27 phycore move uart1 to rdk
->   ARM: dts: imx27 phycore pinctrl
->   ARM: imx27: enable pinctrl
-> 
->  arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts |  43 ++
->  arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts |  16 +
->  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts   |  23 +
->  arch/arm/boot/dts/imx27-phytec-phycore-som.dts   |  20 +-
->  arch/arm/boot/dts/imx27-pinfunc.h                | 526 +++++++++++++++++++++++
->  arch/arm/boot/dts/imx27-pingrp.h                 |  71 +++
->  arch/arm/boot/dts/imx27.dtsi                     | 125 +++---
->  arch/arm/mach-imx/Kconfig                        |   2 +
->  8 files changed, 764 insertions(+), 62 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
->  create mode 100644 arch/arm/boot/dts/imx27-pingrp.h
-> 
-> -- 
-> 1.8.4.2
-> 
+When writing the binding for the ARM SMMU driver, I originally started with
+something similar to what you're suggesting, but was later forced down a
+different route when I realised what sort of systems were being built.
+
+We will have similar problems for PCIe RIDs and GIC DIDs (I spoke about this
+at the ARM mini-summit). They are not fixed across the system: they
+originate from a device, but can change as they traverse the system
+topology.
+
+Will
