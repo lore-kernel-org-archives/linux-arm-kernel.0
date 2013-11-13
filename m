@@ -1,38 +1,42 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 13 Nov 2013 23:07:19 +0100
-Subject: [PATCH 1/2] dmaengine: add msm bam dma driver
-In-Reply-To: <20131030203105.GA14525@agross>
-References: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
- <20131029175603.GF21983@codeaurora.org> <20131030203105.GA14525@agross>
-Message-ID: <3732966.zLLfiChgvH@flatron>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 14 Nov 2013 07:34:06 +0900
+Subject: [PATCH] ARM: shmobile: Use ->init_late() on Lager
+Message-ID: <20131113223406.20634.52693.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+From: Magnus Damm <damm@opensource.se>
 
-On Wednesday 30 of October 2013 15:31:05 Andy Gross wrote:
-> On Tue, Oct 29, 2013 at 10:56:03AM -0700, Stephen Boyd wrote:
-> > On 10/25, Andy Gross wrote:
-> > > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> > > index f238cfd..a71b415 100644
-> > > --- a/drivers/dma/Kconfig
-> > > +++ b/drivers/dma/Kconfig
-> > > @@ -364,4 +364,13 @@ config DMATEST
-> > >  	  Simple DMA test client. Say N unless you're debugging a
-> > >  	  DMA Device driver.
-> > >  
-> > > +
-> > > +config MSM_BAM_DMA
-> > > +	tristate "MSM BAM DMA support"
-> > > +	depends on ARCH_MSM
-> > 
-> > It would be nice if we didn't have to rely on ARCH_MSM here so we
-> > get more build coverage.
->  
-> I can remove that.  There is nothing that forces this depend option.
+Hook in shmobile_init_late() on Lager. This enables some PM
+related things like CPUIdle and Suspend-to-RAM.
 
-Instead of removing, please add "|| COMPILE_TEST". This is the right way
-to allow drivers not supposed to be run on given platform to build on it.
+With this patch applied it is possible to use Suspend-to-RAM:
+# echo enabled > /sys/class/tty/ttySC6/power/wakeup
+# echo mem > /sys/power/state 
+(wake by sending a character on the serial console)
 
-Best regards,
-Tomasz
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ arch/arm/mach-shmobile/board-lager-reference.c |    1 +
+ arch/arm/mach-shmobile/board-lager.c           |    1 +
+ 2 files changed, 2 insertions(+)
+
+--- 0001/arch/arm/mach-shmobile/board-lager-reference.c
++++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-11-13 16:55:46.000000000 +0900
+@@ -41,5 +41,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+--- 0001/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2013-11-13 16:55:38.000000000 +0900
+@@ -259,5 +259,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_init,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
