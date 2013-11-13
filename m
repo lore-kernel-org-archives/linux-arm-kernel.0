@@ -1,55 +1,118 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Wed, 13 Nov 2013 17:58:24 +0800
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
-References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
- <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
- <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
- <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
- <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
- <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
- <528110B1.4060402@arm.com>
- <20131111193236.GB16735@n2100.arm.linux.org.uk>
- <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
-Message-ID: <CAFRkauACb7wPdisp-PEic_-ko5MhhnAyigcpg5gfjLEFUuJqGw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 13 Nov 2013 11:18:33 +0100
+Subject: [GIT PULL] clockevents/clocksource: 3.12 fixes
+In-Reply-To: <alpine.DEB.2.02.1311122316270.30673@ionos.tec.linutronix.de>
+References: <528234B9.7080402@linaro.org>
+ <20131112183553.GQ14892@pengutronix.de>
+ <alpine.DEB.2.02.1311122316270.30673@ionos.tec.linutronix.de>
+Message-ID: <528351F9.3040101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/12 Ming Lei <tom.leiming@gmail.com>:
-> On Tue, Nov 12, 2013 at 3:32 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Mon, Nov 11, 2013 at 05:15:29PM +0000, Jonathan Austin wrote:
->>> I've tested the patch below and it solves the ARM side of things - so
->>> gives you an option other than a complete revert. Happy to put this in to
->>> RMK's patch system if you'd prefer not to have to revert and he's happy
->>> with the patch.
+On 11/12/2013 11:57 PM, Thomas Gleixner wrote:
+> On Tue, 12 Nov 2013, Uwe Kleine-K?nig wrote:
+>> On Tue, Nov 12, 2013 at 03:01:29PM +0100, Daniel Lezcano wrote:
+>>>
+>>> Hi Ingo and Thomas,
+>>>
+>>> this pull request has the following contain:
+>>>
+>>>   * Laurent Pinchard fixed a missing a clk_put in case the
+>>> registering of the sh_mtu[2] drivers fails.
+>>>
+>>>   * Uwe Kleine-K?nig reuse clockevents_config_and_register for the
+>>> at91rm9200_time timer as it was depending on the patch (commit
+>>> a4578ea (clockevents: Sanitize ticks to nsec conversion).
+>>>
+>>> I don't know why Thomas's patch "clockevents: Sanitize ticks to nsec
+>>> conversion" appears in the request log because it is not part of the
+>>> patches interval I specified for git request pull. The diffstat does
+>>> not show the files which should have been changed by the patch. In
+>>> any case I kept the changelog untouched since it is what gives me
+>>> git and maybe someone can tell me why it appears.
+>> Look at:
 >>
->> I think this is the right solution because it then means that this symbol
->> has the same meaning whether on MMU or !MMU - and getting rid of these
->> kinds of gratuitous variances are the only way that !MMU is going to
->> become less fragile.
+>> 	git log --oneline --graph --boundary 97b9410..42ab380
+>>
+>> Then you see that there is Thomas' patch twice. Once the version he
+>> committed and sent to Linus (97b9410) and once the version that you get
+>> as part of my pull request (a4578ea). To fix this (assuming you don't
+>> care much about a stable tree), simply do:
+>>
+>> 	git rebase 97b9410 42ab380
+>>
+>> and let the result pull.
 >
-> The patch only fixes problem on arm, and other !MMU&&!ARM archs
-> should be affected too.
+> The whole misery starts that you decided to play maintainer and grab
+> some patches from the mailinglist and then offering them via a pull
+> request to me and others. Finally you tricked Daniel to take them,
+> which is a different issue.
 >
-> Also there is no CONFIG_PAGE_OFFSET defined for some ARCHs,
-> such as 64bit ARCHs.
+> There is a reason why I ignored that pull request:
 >
-> Currently, I suggest to filter only on ARM as attachment patch if we plan
-> to merge Jonathan's patch, otherwise a more complicated approach has
-> to be figured out  to do the filter(such as, define a readonly symbol in
-> kernel to store PAGE_OFFSET, and let scripts/kallsyms use it for
-> filtering).
+>   I generally do not pull git trees from people who I'm not
+>   trusting. And I have good reasons not to trust you at all.
+>
+> Aside of that, I decided to give you a chance and actually pulled
+> your tree into a temporary branch and found out that it's missing a
+> stable annotation. Which made the whole exercise go into /dev/null
+>
+> Now Linus pulled my version way before Daniel pulled your tree into
+> his. And you even commented on my commit that I forgot to add a
+> tested-by tag. Yes, I missed that in favour of the stable annotation.
+>
+> But instead of rebasing your tree or even just withdrawing it and
+> resending the at91 patch, you let Daniel pull your thing.
+>
+> Of course Daniel failed to detect the pointless commit in your pull
+> request at the point of merging it and then he starts asking questions
+> when he sends the pull request for his aggregated stuff ....
+>
+> There is a good reason why most maintainers have a strict policy from
+> whom they are pulling from and from whom they are just accepting
+> patches by mail.
+>
+> Daniel, please provide me a rebased version, but be more careful
+> versus integration of random pull requests next time.
 
-Hi Ming,
-You missed "; then" in the end of if statement in your patch.
+    Yes I will. Thanks for catching this.
 
-So I got below error with your patch:
-scripts/link-vmlinux.sh: line 87: syntax error near unexpected token `fi'
-make: *** [vmlinuxclean] Error 2
+I overwrote my branch with a rebased version.
 
-Regards,
-Axel
+The following changes since commit 97b9410643475d6557d2517c2aff9fd2221141a9:
+
+   clockevents: Sanitize ticks to nsec conversion (2013-10-23 12:51:21 
++0200)
+
+are available in the git repository at:
+
+   git://git.linaro.org/people/dlezcano/linux.git clockevents/fixes
+
+for you to fetch changes up to f578caebe38b87e7923cc03fb135d1e759912709:
+
+   clocksource: sh_tmu: Add clk_prepare/unprepare support (2013-11-13 
+11:06:50 +0100)
+
+----------------------------------------------------------------
+Laurent Pinchart (4):
+       clocksource: sh_mtu2: Release clock when sh_mtu2_register() fails
+       clocksource: sh_mtu2: Add clk_prepare/unprepare support
+       clocksource: sh_tmu: Release clock when sh_tmu_register() fails
+       clocksource: sh_tmu: Add clk_prepare/unprepare support
+
+Uwe Kleine-K?nig (1):
+       ARM: at91: rm9200: switch back to clockevents_config_and_register
+
+  arch/arm/mach-at91/at91rm9200_time.c |    7 ++-----
+  drivers/clocksource/sh_mtu2.c        |   16 ++++++++++++++--
+  drivers/clocksource/sh_tmu.c         |   20 +++++++++++++++++---
+  3 files changed, 33 insertions(+), 10 deletions(-)
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
