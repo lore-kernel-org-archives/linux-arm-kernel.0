@@ -1,50 +1,143 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 13 Nov 2013 14:39:52 +0100
-Subject: [PATCH 1/2] ARM: default PHYS_OFFSET if !MMU
-In-Reply-To: <528366A9.7060504@arm.com>
-References: <1384341351-4110-1-git-send-email-tom.leiming@gmail.com>
- <1384341351-4110-2-git-send-email-tom.leiming@gmail.com>
- <528366A9.7060504@arm.com>
-Message-ID: <20131113133952.GW14892@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 13 Nov 2013 14:43:50 +0100
+Subject: [PATCH] ASoC: fsl-ssi: Fix interrupt enable/disable
+In-Reply-To: <1384348330-23117-1-git-send-email-mpa@pengutronix.de>
+References: <1384348330-23117-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131113134350.GJ30263@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 11:46:49AM +0000, Jonathan Austin wrote:
-> Hi Ming,
+On Wed, Nov 13, 2013 at 02:12:10PM +0100, Markus Pargmann wrote:
+> The fsl_ssi_trigger function enables all interrupts (for RX and TX) when a stream is
+> started. The enabled interrupts are never cleared. We don't need all
+> interrupts enabled for one active stream, e.g. RX interrupts are not
+> necessary for playback. Next to the interrupts, the DMA enable bits are
+> set at the same time. This can lead to lost DMA requests and SDMA
+> starvation.
 > 
-> On 13/11/13 11:15, Ming Lei wrote:
-> > From: Jonathan Austin <jonathan.austin@arm.com>
-> > 
-> > Set CONFIG_PAGE_OFFSET as PHYS_OFFSET when !MMU so that
-> > we can keep CONFIG_PAGE_OFFSET same with PAGE_OFFSET.
-> >
-> 
-> I'm not so sure about this commit message - I don't think
-> it makes sense...Should it not be more like:
-> 
-> ------->8-------
-> Subject: ARM: set PAGE_OFFSET = PHYS_OFFSET if !MMU
-> 
-> With !MMU we still set PAGE_OFFSET to 0xC0000000, which
-> makes little sense and causes a regression on !MMU after
-> f6537f2f0eba4eba ("scripts/kallsyms: filter symbols not
-> kernel address space")
-> 
-> This patch sets PAGE_OFFSET to PHYS_OFFSET in the !MMU
-> case, fixing the regression (Tested on Cortex-R7/Vexpress)
-> --------8<---------
-I like this commit log better, too.
+> This patch seperates the SIER flags into DMA_TX and DMA_RX flags to
+> seperatly enable/disable the TX/RX channels.
 
-As CONFIG_PAGE_OFFSET is only used in scripts/kallsyms.c and
-scripts/link-vmlinux.sh for !MMU.
+This patch is not correct either, sorry.
 
-Booting on efm32 with this patch works just fine, so if you want add my
-Tested-by. But I'm unsure how valuable it is as I don't see a breakage
-without it.
+imx53 reference manual does not list registers which may not be modified
+while the SSI unit is enabled, but e.g. imx27 reference manual contains
+such a list. SIER TDMAE and RDMAE is listed there, so it is not correct
+to change these bits for some SoCs when the ssi unit is already running.
 
-Best regards
-Uwe
+I am not sure what's the best thing to do here as we can run into issues
+with the SDMA unit on imx53 when we have RDMAE and TDMAE enabled the
+whole time. We could set the SIER flags in different functions for
+different chips, but this doesn't seem the best way. Any ideas?
+
+Regards,
+
+Markus
+
+> 
+> Based on J?rgen Beisert's patch 'ASoC: fsl-ssi: fix SDMA starvation'.
+> 
+> Cc: J?rgen Beisert <jbe@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  sound/soc/fsl/fsl_ssi.c | 33 ++++++++++++++++++++-------------
+>  1 file changed, 20 insertions(+), 13 deletions(-)
+> 
+> diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+> index 6b81d0c..905b8db 100644
+> --- a/sound/soc/fsl/fsl_ssi.c
+> +++ b/sound/soc/fsl/fsl_ssi.c
+> @@ -107,11 +107,18 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+>  #endif
+>  
+>  /* SIER bitflag of interrupts to enable */
+> -#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | CCSR_SSI_SIER_TDMAE | \
+> -		    CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TUE0_EN | \
+> -		    CCSR_SSI_SIER_TUE1_EN | CCSR_SSI_SIER_RFRC_EN | \
+> -		    CCSR_SSI_SIER_RDMAE | CCSR_SSI_SIER_RIE | \
+> -		    CCSR_SSI_SIER_ROE0_EN | CCSR_SSI_SIER_ROE1_EN)
+> +#define FSLSSI_TX_SIER_FLAGS (CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN)
+> +#define FSLSSI_RX_SIER_FLAGS (CCSR_SSI_SIER_RIE | CCSR_SSI_SIER_RFF0_EN)
+> +
+> +#define FSLSSI_DMA_TX_SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | \
+> +		CCSR_SSI_SIER_TDMAE | CCSR_SSI_SIER_TIE | \
+> +		CCSR_SSI_SIER_TUE0_EN | CCSR_SSI_SIER_TUE1_EN)
+> +#define FSLSSI_DMA_RX_SIER_FLAGS (CCSR_SSI_SIER_RFRC_EN | \
+> +		CCSR_SSI_SIER_RDMAE | CCSR_SSI_SIER_RIE | \
+> +		CCSR_SSI_SIER_ROE0_EN | CCSR_SSI_SIER_ROE1_EN)
+> +
+> +#define FSLSSI_SISR_MASK (FSLSSI_TX_SIER_FLAGS | FSLSSI_RX_SIER_FLAGS | \
+> +		FSLSSI_DMA_TX_SIER_FLAGS | FSLSSI_DMA_RX_SIER_FLAGS)
+>  
+>  /**
+>   * fsl_ssi_private: per-SSI private data
+> @@ -201,7 +208,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+>  	   were interrupted for.  We mask it with the Interrupt Enable register
+>  	   so that we only check for events that we're interested in.
+>  	 */
+> -	sisr = read_ssi(&ssi->sisr) & SIER_FLAGS;
+> +	sisr = read_ssi(&ssi->sisr) & FSLSSI_SISR_MASK;
+>  
+>  	if (sisr & CCSR_SSI_SISR_RFRC) {
+>  		ssi_private->stats.rfrc++;
+> @@ -567,19 +574,20 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+>  
+>  	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+>  		if (ssi_private->use_dma)
+> -			sier_bits = SIER_FLAGS;
+> +			sier_bits = FSLSSI_DMA_TX_SIER_FLAGS;
+>  		else
+> -			sier_bits = CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN;
+> +			sier_bits = FSLSSI_TX_SIER_FLAGS;
+>  	} else {
+>  		if (ssi_private->use_dma)
+> -			sier_bits = SIER_FLAGS;
+> +			sier_bits = FSLSSI_DMA_RX_SIER_FLAGS;
+>  		else
+> -			sier_bits = CCSR_SSI_SIER_RIE | CCSR_SSI_SIER_RFF0_EN;
+> +			sier_bits = FSLSSI_RX_SIER_FLAGS;
+>  	}
+>  
+>  	switch (cmd) {
+>  	case SNDRV_PCM_TRIGGER_START:
+>  	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		write_ssi_mask(&ssi->sier, 0, sier_bits);
+>  		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+>  			write_ssi_mask(&ssi->scr, 0,
+>  				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE);
+> @@ -590,6 +598,7 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+>  
+>  	case SNDRV_PCM_TRIGGER_STOP:
+>  	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> +		write_ssi_mask(&ssi->sier, sier_bits, 0);
+>  		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+>  			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TE, 0);
+>  		else
+> @@ -604,8 +613,6 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+>  		return -EINVAL;
+>  	}
+>  
+> -	write_ssi(sier_bits, &ssi->sier);
+> -
+>  	return 0;
+>  }
+>  
+> @@ -801,7 +808,7 @@ static struct snd_ac97_bus_ops fsl_ssi_ac97_ops = {
+>   */
+>  #define SIER_SHOW(flag, name) \
+>  	do { \
+> -		if (SIER_FLAGS & CCSR_SSI_SIER_##flag) \
+> +		if (FSLSSI_SISR_MASK & CCSR_SSI_SIER_##flag) \
+>  			length += sprintf(buf + length, #name "=%u\n", \
+>  				ssi_private->stats.name); \
+>  	} while (0)
+> -- 
+> 1.8.4.2
+> 
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
