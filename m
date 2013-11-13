@@ -1,53 +1,40 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 13 Nov 2013 19:18:54 +0800
-Subject: [PATCH v2 0/5] mmc: sdhci-esdhc-imx: add runtime pm support
-In-Reply-To: <20131105020335.GC19770@S2101-09.ap.freescale.net>
-References: <1383554309-29065-1-git-send-email-b29396@freescale.com>
- <20131105020335.GC19770@S2101-09.ap.freescale.net>
-Message-ID: <CAA+hA=R4JmfhP9kA55Baf_Hj-omh10avCb9iG_nVuMRaD_gD4g@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 13 Nov 2013 19:30:38 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CAFRkauACb7wPdisp-PEic_-ko5MhhnAyigcpg5gfjLEFUuJqGw@mail.gmail.com>
+References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+ <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+ <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
+ <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
+ <528110B1.4060402@arm.com>
+ <20131111193236.GB16735@n2100.arm.linux.org.uk>
+ <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
+ <CAFRkauACb7wPdisp-PEic_-ko5MhhnAyigcpg5gfjLEFUuJqGw@mail.gmail.com>
+Message-ID: <CACVXFVPPK-s8ToH0L06Rq0DY9cvfomyHpYKJ7ufbbVoJq69mnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Axel,
 
-On Tue, Nov 5, 2013 at 10:03 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Nov 04, 2013 at 04:38:24PM +0800, Dong Aisheng wrote:
->> We disable root clock in runtime pm to save power.
->>
->> Patch 2~4 are some fixes needed for enable runtime pm or it may
->> break the UHS cards(SD3.0/eMMC4.5).
->>
->> Below are some tests result i ran which passed mmc_test tool after enable rpm:
->> SDHC UHS1 on imx6q sabreauto
->> eMMC 4.5 on imx6sl evk
->> SDXC UHS1 on imx6sl evk
->> eMMC DDR on imx6q sabresd
->> SDHC on imx6q sabresd
->>
->> ChangeLog:
->> v1->v2: only patch 5 changed. Add pm_runtime_set_active
->>       based on Ulf's comments.
->>
->> Dong Aisheng (5):
->>   mmc: sdhci-pltfm: export pltfm suspend/resume api
->>   mmc: sdhci-esdhc-imx: tuning bits should not be cleared during reset
->>   mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING should not affect
->>     other bits
->>   mmc: sdhci-esdhc-imx: fix runtime pm unblance issue
->>   mmc: sdhci-esdhc-imx: add runtime pm support
+On Wed, Nov 13, 2013 at 5:58 PM, Axel Lin <axel.lin@ingics.com> wrote:
 >
-> For the series,
+> Hi Ming,
+> You missed "; then" in the end of if statement in your patch.
 >
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->
+> So I got below error with your patch:
+> scripts/link-vmlinux.sh: line 87: syntax error near unexpected token `fi'
+> make: *** [vmlinuxclean] Error 2
 
-Would you help pick this series with Ulf's ack?
+Thanks for your test, and I have fixed it and post a formal one for merge,
+and you can find these two patches on arm list, but forget to Cc you, sorry
+for that.
 
-Regards
-Dong Aisheng
 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+-- 
+Ming Lei
