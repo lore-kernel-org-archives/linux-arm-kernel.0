@@ -1,45 +1,67 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 13 Nov 2013 10:04:39 +0100
-Subject: [PATCH 1/3] can: mcp251x: Convert driver to use common clk
- framework
-In-Reply-To: <1384332144-15211-1-git-send-email-shc_work@mail.ru>
-References: <1384332144-15211-1-git-send-email-shc_work@mail.ru>
-Message-ID: <528340A7.9080708@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 13 Nov 2013 10:05:09 +0100
+Subject: [PATCHv3 1/8] drm: Add the lacking DRM_MODE_FLAG_* for matching
+ the DISPLAY_FLAGS_*
+In-Reply-To: <20131113085318.394991f3@e6520eb>
+References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
+ <20131112170455.GQ16735@n2100.arm.linux.org.uk>
+ <20131113085318.394991f3@e6520eb>
+Message-ID: <1384333509.4706.5.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Eric,
 
-as this series adds device tree bindings, please add
-devicetree at vger.kernel.org on Cc for the whole series.
-
-On 11/13/2013 09:42 AM, Alexander Shiyan wrote:
-> This patch converts mcp251x driver to using common clk framework
-> for getting input frequency. The change was made for the preparation
-> of the driver work with the devicetree. As a result private header
-> for the driver is eliminated.
-> Additionally, all existing users of the driver was converted to use
-> this feature.
+Am Mittwoch, den 13.11.2013, 08:53 +0100 schrieb Eric B?nard:
+> Hi Russell,
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Le Tue, 12 Nov 2013 17:04:55 +0000,
+> Russell King - ARM Linux <linux@arm.linux.org.uk> a ?crit :
+> > On Tue, Nov 12, 2013 at 05:49:18PM +0100, Denis Carikli wrote:
+> > > diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+> > > index fc2adb6..586c12f 100644
+> > > --- a/drivers/gpu/drm/drm_modes.c
+> > > +++ b/drivers/gpu/drm/drm_modes.c
+> > > @@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
+> > >  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
+> > >  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
+> > >  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
+> > > +	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
+> > > +		dmode->flags |= DRM_MODE_FLAG_DE_LOW;
+> > > +	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
+> > > +		dmode->flags |= DRM_MODE_FLAG_DE_HIGH;
+> > > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
+> > > +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_POSEDGE;
+> > > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+> > > +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_NEGEDGE;
+> > > +
+> > 
+> > I'm still not convinced that these should be exposed in *any* way to
+> > userspace - I'm with Ville Syrj?l? on this point.
+> > 
+> > Yes, you've moved their definition out of a uapi header file, but
+> > they're still leaking out of kernel space via calls (and with Xorg,
+> > they'll leak into the DisplayMode structures within the X server.)
+> > 
+> > Now, here's the thing... The polarity of the display enable signal.
+> > That's a property of the connected device right?  It doesn't change
+> > with respect to the displayed mode unlike the hsync/vsync signals.
+> > If that's true, it should not be here.
+> > 
+> > Same goes for the pixel clock edge.  If it's a property of the
+> > connected device and doesn't have a dependence on the displayed
+> > mode, then it should not be in the DRM mode structure.
+> 
+> What would be the right way to configure these settings without
+> exposing them to userspace ?
 
-Looks good from my point of view. I'll take the whole series via the
-linux-can tree, if there are no objections. I'd like to have the pxa and
-imx maintainer's Ack and an Ack from the DT list.
+I think as a property of the connected device, this should be obtained
+from the device tree node of the panel. In the v4l2 style device tree
+model this could also be made a property of the link (endpoint).
 
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> As explained in my answer to Fabio, these settings are currently
+> hardcoded into ipuv3-crtc and we need to configure them to support more
+> TFT panels using the IPUV3 Parallel Display Interface.
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/529c9290/attachment-0001.sig>
+regards
+Philipp
