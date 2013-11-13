@@ -1,13 +1,11 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 13 Nov 2013 10:23:21 +0100
-Subject: [PATCHv4][ 5/7] ARM: dts: mbimx51sd: Add display support.
+Date: Wed, 13 Nov 2013 10:23:22 +0100
+Subject: [PATCHv4][ 6/7] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
 In-Reply-To: <1384334603-14208-1-git-send-email-denis@eukrea.com>
 References: <1384334603-14208-1-git-send-email-denis@eukrea.com>
-Message-ID: <1384334603-14208-5-git-send-email-denis@eukrea.com>
+Message-ID: <1384334603-14208-6-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-The CMO-QVGA, DVI-SVGA and DVI-VGA are added.
 
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -17,225 +15,32 @@ Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v2->v3:
 - Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds display support.
+- This patch now only adds backlight support.
 - Added some interested people in the Cc list, and removed some people that
   might be annoyed by the receiving of that patch which is unrelated to their
   subsystem.
-- rebased and reworked the dts displays addition.
-- Also rebased and reworked the fsl,pins usage.
 ---
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |   61 ++++++++++++++++++++
- .../imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts  |   47 +++++++++++++++
- .../imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts   |   47 +++++++++++++++
- .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |   13 +++++
- 4 files changed, 168 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts
+ .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..4c781e7
---- /dev/null
+index 4c781e7..73b00b7 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
 +++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -0,0 +1,61 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include "imx51-eukrea-mbimxsd51-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
-+
-+	reg_lcd_3v3: lcd-en {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+		regulator-name = "lcd-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio3 13 0>;
-+		enable-active-high;
-+	};
-+
-+};
-+
-+&display {
-+	display-supply = <&reg_lcd_3v3>;
-+	status = "okay";
-+	display-timings {
-+		model = "CMO-QVGA";
-+		bits-per-pixel = <16>;
-+		cmoqvga {
-+			native-mode;
-+			clock-frequency = <6500000>;
-+			hactive = <320>;
-+			vactive = <240>;
-+			hfront-porch = <20>;
-+			hback-porch = <38>;
-+			vfront-porch = <4>;
-+			vback-porch = <15>;
-+			hsync-len = <30>;
-+			vsync-len = <3>;
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			de-active = <0>;
-+			pixelclk-active = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..e9be19c
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include "imx51-eukrea-mbimxsd51-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD51 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd51-baseboard-dvi-svga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
-+};
-+
-+&display {
-+	status = "okay";
-+	display-timings {
-+		model = "DVI-SVGA";
-+		bits-per-pixel = <16>;
-+		svga {
-+			clock-frequency = <38251000>;
-+			hactive = <800>;
-+			vactive = <600>;
-+			hback-porch = <112>;
-+			hfront-porch = <32>;
-+			vback-porch = <3>;
-+			vfront-porch = <17>;
-+			hsync-len = <80>;
-+			vsync-len = <4>;
-+			hsync-active = <1>;
-+			vsync-active = <1>;
-+			de-active = <1>;
-+			pixelclk-active = <0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..aa99551
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include "imx51-eukrea-mbimxsd51-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD51 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd51-baseboard-dvi-vga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
-+};
-+
-+&display {
-+	status = "okay";
-+	display-timings {
-+		model = "DVI-VGA";
-+		bits-per-pixel = <16>;
-+		vga {
-+			clock-frequency = <23750000>;
-+			hactive = <640>;
-+			vactive = <480>;
-+			hback-porch = <80>;
-+			hfront-porch = <16>;
-+			vback-porch = <3>;
-+			vfront-porch = <13>;
-+			hsync-len = <64>;
-+			vsync-len = <4>;
-+			hsync-active = <1>;
-+			vsync-active = <1>;
-+			de-active = <1>;
-+			pixelclk-active = <0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-index d44a85d..71c2829 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-@@ -23,6 +23,15 @@
- 	model = "Eukrea CPUIMX51";
- 	compatible = "eukrea,mbimxsd51","eukrea,cpuimx51", "fsl,imx51";
+@@ -22,6 +22,14 @@
+ 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
+ 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
  
-+	display: display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		crtcs = <&ipu 0>;
-+		interface-pix-fmt = "rgb666";
++	backlight {
++		compatible = "gpio-backlight";
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp1>;
-+		status = "disabled";
++		pinctrl-0 = <&pinctrl_backlight_1>;
++		gpios = <&gpio3 4 0>;
++		default-brightness-level = <1>;
 +	};
 +
- 	gpio_keys {
- 		compatible = "gpio-keys";
+ 	reg_lcd_3v3: lcd-en {
+ 		compatible = "regulator-fixed";
  		pinctrl-names = "default";
-@@ -116,6 +125,10 @@
- 			>;
- 		};
- 
-+		pinctrl_ipu_disp1: ipudisp1grp {
-+			fsl,pins = <MX51_IPU_DISP1_PINGRP1>;
-+		};
-+
- 		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
- 			fsl,pins = <
- 				MX51_PAD_CSI1_D9__GPIO3_13 0x1f5
 -- 
 1.7.9.5
