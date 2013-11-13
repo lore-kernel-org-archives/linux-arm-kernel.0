@@ -1,43 +1,53 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Wed, 13 Nov 2013 19:15:51 +0800
-Subject: [PATCH 2/2] scripts/link-vmlinux.sh: only filter kernel symbols for
- arm
-In-Reply-To: <1384341351-4110-1-git-send-email-tom.leiming@gmail.com>
-References: <1384341351-4110-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <1384341351-4110-3-git-send-email-tom.leiming@gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 13 Nov 2013 19:18:54 +0800
+Subject: [PATCH v2 0/5] mmc: sdhci-esdhc-imx: add runtime pm support
+In-Reply-To: <20131105020335.GC19770@S2101-09.ap.freescale.net>
+References: <1383554309-29065-1-git-send-email-b29396@freescale.com>
+ <20131105020335.GC19770@S2101-09.ap.freescale.net>
+Message-ID: <CAA+hA=R4JmfhP9kA55Baf_Hj-omh10avCb9iG_nVuMRaD_gD4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actually CONFIG_PAGE_OFFSET isn't same with PAGE_OFFSET, so
-it isn't easy to figue out PAGE_OFFSET defined in header
-file from scripts.
+Hi Chris,
 
-Because CONFIG_PAGE_OFFSET may not be defined in some ARCHs(
-64bit ARCH), or defined as bogus value in !MMU case, so
-this patch only applys the filter on ARM when CONFIG_PAGE_OFFSET
-is defined as the original problem is only on ARM.
+On Tue, Nov 5, 2013 at 10:03 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Mon, Nov 04, 2013 at 04:38:24PM +0800, Dong Aisheng wrote:
+>> We disable root clock in runtime pm to save power.
+>>
+>> Patch 2~4 are some fixes needed for enable runtime pm or it may
+>> break the UHS cards(SD3.0/eMMC4.5).
+>>
+>> Below are some tests result i ran which passed mmc_test tool after enable rpm:
+>> SDHC UHS1 on imx6q sabreauto
+>> eMMC 4.5 on imx6sl evk
+>> SDXC UHS1 on imx6sl evk
+>> eMMC DDR on imx6q sabresd
+>> SDHC on imx6q sabresd
+>>
+>> ChangeLog:
+>> v1->v2: only patch 5 changed. Add pm_runtime_set_active
+>>       based on Ulf's comments.
+>>
+>> Dong Aisheng (5):
+>>   mmc: sdhci-pltfm: export pltfm suspend/resume api
+>>   mmc: sdhci-esdhc-imx: tuning bits should not be cleared during reset
+>>   mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING should not affect
+>>     other bits
+>>   mmc: sdhci-esdhc-imx: fix runtime pm unblance issue
+>>   mmc: sdhci-esdhc-imx: add runtime pm support
+>
+> For the series,
+>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>
 
-Cc: <stable@vger.kernel.org>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Singed-off-by: Ming Lei <tom.leiming@gmail.com>
----
- scripts/link-vmlinux.sh |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Would you help pick this series with Ulf's ack?
 
-diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
-index 32b10f5..2dcb377 100644
---- a/scripts/link-vmlinux.sh
-+++ b/scripts/link-vmlinux.sh
-@@ -82,7 +82,9 @@ kallsyms()
- 		kallsymopt="${kallsymopt} --all-symbols"
- 	fi
- 
--	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
-+	if [ -n "${CONFIG_ARM}" ] && [ -n "${CONFIG_PAGE_OFFSET}" ]; then
-+		kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
-+	fi
- 
- 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
- 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
--- 
-1.7.9.5
+Regards
+Dong Aisheng
+
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
