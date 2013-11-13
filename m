@@ -1,60 +1,55 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Wed, 13 Nov 2013 09:31:16 +0100
-Subject: [alsa-devel] [PATCH] ASoC: fsl-ssi: fix SDMA starvation
-In-Reply-To: <CAOZdJXUWv3_ZV6p9VQ+zYqwUDVQC6BMb-VhVoVtEh1yC23VuTg@mail.gmail.com>
-References: <1384255056-25673-1-git-send-email-mpa@pengutronix.de>
- <20131112132441.GG30263@pengutronix.de>
- <CAOZdJXUWv3_ZV6p9VQ+zYqwUDVQC6BMb-VhVoVtEh1yC23VuTg@mail.gmail.com>
-Message-ID: <201311130931.16238.jbe@pengutronix.de>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 13 Nov 2013 09:32:06 +0100
+Subject: [PATCH v3 0/6] ARM: at91: use new at91 clks for samad3 SoCs
+Message-ID: <1384331532-2951-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
+Hello,
 
-On Tuesday 12 November 2013 21:17:34 Timur Tabi wrote:
-> On Tue, Nov 12, 2013 at 7:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > No, I don't have access on PowerPC hardware, so I didn't test it on
-> > PowerPC.
->
-> Can you change the code so that the interrupts are enabled only on
-> i.MX?  On PowerPC, the interrupts are used only for debugging.
+This patch series moves sama5d3 SoCs and boards to the new at91 clk framework
+(based on common clk framework).
 
-Hmm, you are right. My patch is partially bogus. It enables the
-CCSR_SSI_SIER_TDMAE and CCSR_SSI_SIER_RDMAE bits on demand, but this setting
-will be overwritten by the "write_ssi(sier_bits, &ssi->sier);" just a few
-lines below. :(
+This patch series depends on following patch series:
+1) "ARM: at91/dt: split sama5d3 definition" (v1)
+3) "ARM: at91: move to common clk framework" (v5)
 
-But this patch works, because it removes the CCSR_SSI_SIER_TDMAE and
-CCSR_SSI_SIER_RDMAE from the SIER_FLAGS macro. Its content is set
-_unconditionally_ in lines 570 and 575 and is written to the register in line
-607. This should hit PowerPC as well.
+Best Regards,
 
-So, the real (and small) fix is to remove these bits from the SIER_FLAGS
-macro:
+Boris
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index c6b7439..f176e34 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -107,10 +107,10 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
- #endif
- 
- /* SIER bitflag of interrupts to enable */
--#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | CCSR_SSI_SIER_TDMAE | \
-+#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | \
- 		    CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TUE0_EN | \
- 		    CCSR_SSI_SIER_TUE1_EN | CCSR_SSI_SIER_RFRC_EN | \
--		    CCSR_SSI_SIER_RDMAE | CCSR_SSI_SIER_RIE | \
-+		    CCSR_SSI_SIER_RIE | \
- 		    CCSR_SSI_SIER_ROE0_EN | CCSR_SSI_SIER_ROE1_EN)
- 
- /**
+Changes since v2:
+ - rework dt bindings:
+   * replace "atmel,clk-id" property by the standard "reg" property
+   * reference system, peripheral and programmable clks using the direct
+     clk node instead of the parent node plus a clk id
+ - add usb_clk to usb ehci controller node
 
-@Markus: can you please test it on your hardware?
+Changes since v1:
+ - remove references to peripheral id macros
+ - remove old clk definitions after moving to new clk framework
 
-Thanks
-jbe
+Boris BREZILLON (6):
+  ARM: at91: prepare sama5 dt boards transition to common clk
+  ARM: at91: prepare common clk transition for sama5d3 SoC
+  ARM: at91/dt: define sama5d3 clocks
+  ARM: at91/dt: define sama5d3xek's main clk frequency
+  ARM: at91: move sama5d3 SoC to common clk
+  ARM: at91/dt: remove old clk material
+
+ arch/arm/boot/dts/sama5d3.dtsi      |  379 ++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/sama5d3_can.dtsi  |   20 ++
+ arch/arm/boot/dts/sama5d3_emac.dtsi |   11 +
+ arch/arm/boot/dts/sama5d3_gmac.dtsi |   11 +
+ arch/arm/boot/dts/sama5d3_lcd.dtsi  |   17 ++
+ arch/arm/boot/dts/sama5d3_mci2.dtsi |   12 ++
+ arch/arm/boot/dts/sama5d3_tcb1.dtsi |   12 ++
+ arch/arm/boot/dts/sama5d3_uart.dtsi |   21 ++
+ arch/arm/boot/dts/sama5d3xcm.dtsi   |   17 +-
+ arch/arm/mach-at91/Kconfig          |    1 -
+ arch/arm/mach-at91/board-dt-sama5.c |   10 +-
+ arch/arm/mach-at91/sama5d3.c        |  342 -------------------------------
+ 12 files changed, 497 insertions(+), 356 deletions(-)
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+1.7.9.5
