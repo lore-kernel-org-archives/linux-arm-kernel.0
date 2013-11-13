@@ -1,48 +1,25 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 13 Nov 2013 14:53:05 +0100 (CET)
-Subject: [GIT PULL] clockevents/clocksource: 3.12 fixes
-In-Reply-To: <20131113103632.GV14892@pengutronix.de>
-References: <528234B9.7080402@linaro.org>
- <20131112183553.GQ14892@pengutronix.de>
- <alpine.DEB.2.02.1311122316270.30673@ionos.tec.linutronix.de>
- <20131113103632.GV14892@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1311131358310.30673@ionos.tec.linutronix.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 13 Nov 2013 14:58:07 +0100
+Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping support
+In-Reply-To: <20131111105812.GC28302@mudshark.cambridge.arm.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131108165639.GD15074@mudshark.cambridge.arm.com>
+ <527DFC1C.1020107@hitachi.com>
+ <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
+ <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
+ <20131111105812.GC28302@mudshark.cambridge.arm.com>
+Message-ID: <20131113135807.GJ26898@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Nov 2013, Uwe Kleine-K?nig wrote:
-> On Tue, Nov 12, 2013 at 11:57:46PM +0100, Thomas Gleixner wrote:
-> > The whole misery starts that you decided to play maintainer and grab
-> > some patches from the mailinglist and then offering them via a pull
-> > request to me and others. Finally you tricked Daniel to take them,
-> >From my POV this isn't "playing maintainer". You stopped reacting on the
-> issue and I thought I make it easier for you (and others) to handle the
-> patches in case you didn't take because of being busy with other stuff.
+On Mon, Nov 11, 2013 at 10:58:12AM +0000, Will Deacon wrote:
+> Single-stepping on x86 is different to the step behaviour on arm64 afaik. On
+> ARM, we have to manually remove the breakpoint, perform a single-step, then
+> add the breakpoint again. If we re-enable debug exceptions in the kprobe
+> handler, the step will complete early and we'll never step off the
+> breakpoint.
 
-Yes, I vanished for a few weeks because I was busy otherwise. Where is
-the problem? The world was still turning and the fix was not a highly
-critical issue.
-
-And your "make it easier" thing is utter bullshit. It takes me less
-time to apply a single patch from mail than pulling a tree and
-verifying the commit.
-
-Aside of that, core code goes always directly through me and not via
-Daniel.
-
-Dammit, there are established workflows and there is no reason, except
-for a highly critical bug fix to circumvent them. And if such a
-situation happens, then the correct thing is to resend the patch to
-Andrew and Linus and explaining, why its critical and can't wait for
-the lazy maintainer to reappear.
-
-Me and others have observed your busybody behaviour often enough. It
-does not really earn you trust and respect.
-
-Just for the record: I'm not pulling anything from you and I'm not
-going to pull a tree from my submaintainers which contains a merge
-from you.
-
-Thanks,
-
-	tglx
+This is about hardware breakpoints right? Which are per-cpu? Otherwise
+removing the breakpoint would open up a hole for another thread to slip
+through while you're single stepping.
