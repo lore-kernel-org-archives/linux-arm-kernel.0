@@ -1,18 +1,20 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 13 Nov 2013 12:29:11 +0900
-Subject: [PATCH] ARM: shmobile: Select USE_OF on EMEV2
-In-Reply-To: <20131108100934.24755.56317.sendpatchset@w520>
-References: <20131108100934.24755.56317.sendpatchset@w520>
-Message-ID: <20131113032909.GE22484@verge.net.au>
+Date: Wed, 13 Nov 2013 12:30:29 +0900
+Subject: [PATCH] ARM: shmobile: kzm9d: Enable AUTO_ZRELADDR in defconfig
+In-Reply-To: <1383954465-6056-1-git-send-email-horms+renesas@verge.net.au>
+References: <1383954465-6056-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20131113033029.GF22484@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 07:09:34PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Sat, Nov 09, 2013 at 08:47:45AM +0900, Simon Horman wrote:
+> This is required to allow the load address to be supplied
+> as an environment variable when building a uImage.
 > 
-> Now when the legacy KZM9D board code is gone, make sure
-> USE_OF is selected in case of the EMEV2 SoC.
+> LOADADDR=0x40008000 ARCH=arm make uImage
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> This is necessary since "ARM: shmobile: Remove legacy KZM9D board code"
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks, I have queued this up.
+I have queued this up.
