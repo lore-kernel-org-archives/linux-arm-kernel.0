@@ -1,162 +1,47 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 13 Nov 2013 16:35:25 +0530
-Subject: [PATCH V2 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1384340725-26073-1-git-send-email-vkale@apm.com>
-References: <1384340725-26073-1-git-send-email-vkale@apm.com>
-Message-ID: <1384340725-26073-3-git-send-email-vkale@apm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 13 Nov 2013 15:42:01 +0530
+Subject: [PATCH v5 0/5] dma: mxs-dma bugfixes and cleanup
+In-Reply-To: <1383032869-12863-1-git-send-email-mpa@pengutronix.de>
+References: <1383032869-12863-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131113101201.GV8834@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for irq registration when pmu interrupt is percpu.
+On Tue, Oct 29, 2013 at 08:47:44AM +0100, Markus Pargmann wrote:
+> Hi,
+> 
+> v5 is rebased onto your dma_complete branch. It includes one bugfix.
+> 
+> This series contains a number of bugfixes for the mxs DMA engine.
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
----
- arch/arm64/kernel/perf_event.c |  102 +++++++++++++++++++++++++++++-----------
- 1 file changed, 74 insertions(+), 28 deletions(-)
+Thanks,
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index cea1594..a6c01cb 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/bitmap.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/perf_event.h>
-@@ -363,22 +364,51 @@ validate_group(struct perf_event *event)
- }
- 
- static void
-+armpmu_disable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-+	disable_percpu_irq(irq);
-+}
-+
-+static void
- armpmu_release_hardware(struct arm_pmu *armpmu)
- {
- 	int i, irq, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
- 
--	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+	irq = platform_get_irq(pmu_device, 0);
- 
--	for (i = 0; i < irqs; ++i) {
--		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
--			continue;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, armpmu);
-+	if (irq_is_percpu(irq)) {
-+		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
-+		free_percpu_irq(irq, &cpu_hw_events);
-+	} else {
-+		irqs = min(pmu_device->num_resources, num_possible_cpus());
-+
-+		for (i = 0; i < irqs; ++i) {
-+			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-+				continue;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq >= 0)
-+				free_irq(irq, armpmu);
-+		}
- 	}
- }
- 
-+static void
-+armpmu_enable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	enable_percpu_irq(irq, 0);
-+	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-+}
-+
- static int
- armpmu_reserve_hardware(struct arm_pmu *armpmu)
- {
-@@ -396,34 +426,50 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 		return -ENODEV;
- 	}
- 
--	for (i = 0; i < irqs; ++i) {
--		err = 0;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq < 0)
--			continue;
-+	irq = platform_get_irq(pmu_device, 0);
- 
--		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
--		 */
--		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
--			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				    irq, i);
--			continue;
--		}
-+	if (irq_is_percpu(irq)) {
-+		err = request_percpu_irq(irq, armpmu->handle_irq,
-+				"arm-pmu", &cpu_hw_events);
- 
--		err = request_irq(irq, armpmu->handle_irq,
--				  IRQF_NOBALANCING,
--				  "arm-pmu", armpmu);
- 		if (err) {
--			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
-+			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
-+					irq);
- 			armpmu_release_hardware(armpmu);
- 			return err;
- 		}
- 
--		cpumask_set_cpu(i, &armpmu->active_irqs);
-+		on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			err = 0;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq < 0)
-+				continue;
-+
-+			/*
-+			 * If we have a single PMU interrupt that we can't shift,
-+			 * assume that we're running on a uniprocessor machine and
-+			 * continue. Otherwise, continue without this interrupt.
-+			 */
-+			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-+				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+						irq, i);
-+				continue;
-+			}
-+
-+			err = request_irq(irq, armpmu->handle_irq,
-+					IRQF_NOBALANCING,
-+					"arm-pmu", armpmu);
-+			if (err) {
-+				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+						irq);
-+				armpmu_release_hardware(armpmu);
-+				return err;
-+			}
-+
-+			cpumask_set_cpu(i, &armpmu->active_irqs);
-+		}
- 	}
- 
- 	return 0;
+I am going to apply this. But as noted in residue patch I think the restriction
+of single descriptor is an artficial one and we cna do better in SW. This also
+bring the abuse the completion status to track the channel status which shouldnt
+be required/gone once we do multiple descriptors. But those should be handled
+as another patch series!
+
+--
+~Vinod
+> 
+> Regards,
+> 
+> Markus Pargmann
+> 
+> 
+> Markus Pargmann (5):
+>   dma: mxs-dma: Cleanup interrupt handler
+>   dma: mxs-dma: Report correct residue for cyclic DMA
+>   dma: mxs-dma: Fix channel reset hardware bug
+>   dma: mxs-dma: Update state after channel reset
+>   dma: mxs-dma: Use semaphores for cyclic DMA
+> 
+>  drivers/dma/mxs-dma.c | 176 +++++++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 137 insertions(+), 39 deletions(-)
+> 
+> -- 
+> 1.8.4.rc3
+> 
+
 -- 
-1.7.9.5
