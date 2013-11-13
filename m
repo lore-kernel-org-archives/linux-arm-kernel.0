@@ -1,46 +1,59 @@
 From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Wed, 13 Nov 2013 08:50:32 +0100
-Subject: [PATCHv3 3/8] staging: imx-drm: ipuv3-crtc: don't harcode some
- mode flags.
-In-Reply-To: <CAOMZO5ASDO22eHVLn18dQ31TJEjemtGp+SQqHk9XtYj6Hx3aLg@mail.gmail.com>
+Date: Wed, 13 Nov 2013 08:53:18 +0100
+Subject: [PATCHv3 1/8] drm: Add the lacking DRM_MODE_FLAG_* for matching
+ the DISPLAY_FLAGS_*
+In-Reply-To: <20131112170455.GQ16735@n2100.arm.linux.org.uk>
 References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
- <1384274965-30549-3-git-send-email-denis@eukrea.com>
- <CAOMZO5ASDO22eHVLn18dQ31TJEjemtGp+SQqHk9XtYj6Hx3aLg@mail.gmail.com>
-Message-ID: <20131113085032.5be4bc4b@e6520eb>
+ <20131112170455.GQ16735@n2100.arm.linux.org.uk>
+Message-ID: <20131113085318.394991f3@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi Russell,
 
-Le Wed, 13 Nov 2013 01:52:25 -0200,
-Fabio Estevam <festevam@gmail.com> a ?crit :
-> On Tue, Nov 12, 2013 at 2:49 PM, Denis Carikli <denis@eukrea.com> wrote:
-> > +       if (mode->flags & DRM_MODE_FLAG_DE_HIGH)
-> > +               sig_cfg.enable_pol = 1;
-> > +       if (mode->flags & DRM_MODE_FLAG_PIXDATA_POSEDGE)
-> > +               sig_cfg.clk_pol = 1;
-> >
-> > -       sig_cfg.enable_pol = 1;
-> > -       sig_cfg.clk_pol = 1;
+Le Tue, 12 Nov 2013 17:04:55 +0000,
+Russell King - ARM Linux <linux@arm.linux.org.uk> a ?crit :
+> On Tue, Nov 12, 2013 at 05:49:18PM +0100, Denis Carikli wrote:
+> > diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+> > index fc2adb6..586c12f 100644
+> > --- a/drivers/gpu/drm/drm_modes.c
+> > +++ b/drivers/gpu/drm/drm_modes.c
+> > @@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
+> >  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
+> >  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
+> >  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
+> > +	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
+> > +		dmode->flags |= DRM_MODE_FLAG_DE_LOW;
+> > +	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
+> > +		dmode->flags |= DRM_MODE_FLAG_DE_HIGH;
+> > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
+> > +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_POSEDGE;
+> > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+> > +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_NEGEDGE;
+> > +
 > 
+> I'm still not convinced that these should be exposed in *any* way to
+> userspace - I'm with Ville Syrj?l? on this point.
 > 
-> What are the sig_cfg.enable_pol and sig_cfg.clk_pol values you need
-> for your display to operate correctly?
+> Yes, you've moved their definition out of a uapi header file, but
+> they're still leaking out of kernel space via calls (and with Xorg,
+> they'll leak into the DisplayMode structures within the X server.)
+> 
+> Now, here's the thing... The polarity of the display enable signal.
+> That's a property of the connected device right?  It doesn't change
+> with respect to the displayed mode unlike the hsync/vsync signals.
+> If that's true, it should not be here.
+> 
+> Same goes for the pixel clock edge.  If it's a property of the
+> connected device and doesn't have a dependence on the displayed
+> mode, then it should not be in the DRM mode structure.
 
-in ipuv3-crtc, line 159 :
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/staging/imx-drm/ipuv3-crtc.c#n159
+What would be the right way to configure these settings without
+exposing them to userspace ?
 
-polarity of the enable signal and the pixel clock are hard coded to 1.
+As explained in my answer to Fabio, these settings are currently
+hardcoded into ipuv3-crtc and we need to configure them to support more
+TFT panels using the IPUV3 Parallel Display Interface.
 
-These settings are then used in ipu-di.c to configurer the IPU display
-interface :
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/staging/imx-drm/ipu-v3/ipu-di.c#n631
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/staging/imx-drm/ipu-v3/ipu-di.c#n642
-
-This is a problem as the polarity of these signals can vary from one
-TFT panel to an other. In our case, we need and active low enable and a
-negative edge clock but currently there is no way to configure these
-settings in ipuv3-crtc as they are hardcoded to 1 : that's what Denis
-is trying to fix.
-
+Thanks
 Eric
