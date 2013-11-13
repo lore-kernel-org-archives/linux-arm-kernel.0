@@ -1,50 +1,78 @@
 From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 13 Nov 2013 17:11:08 +0000
-Subject: [PATCH v2 08/13] ARM: use a function table for determining
- instruction interpreter actions
-In-Reply-To: <1381871068-27660-9-git-send-email-dave.long@linaro.org>
+Date: Wed, 13 Nov 2013 17:13:53 +0000
+Subject: [PATCH v2 10/13] kprobes: Remove uneeded kernel dependency on
+ struct arch_specific_insn
+In-Reply-To: <1381871068-27660-11-git-send-email-dave.long@linaro.org>
 References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-9-git-send-email-dave.long@linaro.org>
-Message-ID: <1384362668.3392.41.camel@linaro1.home>
+ <1381871068-27660-11-git-send-email-dave.long@linaro.org>
+Message-ID: <1384362833.3392.42.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
 > From: "David A. Long" <dave.long@linaro.org>
 > 
-> When interpreting instructions use a client-supplied array of functions
-> to take action.  This array can then be provided by krpobes, uprobes, or
+> Instead of depending on include/asm/kprobes.h to provide a dummy definition
+> for struct arch_specific_insn, do so in include/linux/kprobes.h.
 
-'to take action' sounds a bit weird to me, how about 'to specify
-actions'?
+That change description doesn't quite seem to quite make sense to me.
 
-> possibly some other client subsystem.  The interpreter assigns a group
-> number to each recognized instruction and invokes the corresponding action
-> function.
+Anyway, what we're trying to do with this patch is to allow us to use
+arch_specific_insn for purposes additional to implementing kprobes. This
+patch enables that but I'm wary that the kprobes code assumes that ainsn
+is a struct arch_specific_insn, e.g. in linux/kernel/kprobes.c we have:
+
+	memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
+
+Now, that code isn't compiled when kprobes isn't configured, but it
+seams to me to be safer if that was also changed to 
+
+	memcpy(&p->ainsn, &ap->ainsn, sizeof(p->ainsn));
+
+However, I also wonder if we should instead leave arch_specific_insn as
+a kprobes specific structure and on ARM define it in terms of a new more
+generic 'struct probe_insn'? The drawback with that is that we'd
+probably end up with a struct just containing a single member which
+seems a bit redundant:
+
+struct arch_specific_insn {
+	struct probe_insn pinsn;
+};
+
+Thought's anyone?
+
 > 
 > Signed-off-by: David A. Long <dave.long@linaro.org>
 > ---
->  arch/arm/kernel/Makefile         |    2 +-
->  arch/arm/kernel/kprobes-arm.c    |   41 ++
->  arch/arm/kernel/kprobes-common.c |    3 +-
->  arch/arm/kernel/kprobes-thumb.c  | 1016 ++++----------------------------------
->  arch/arm/kernel/kprobes.c        |   10 +-
->  arch/arm/kernel/kprobes.h        |   14 +-
->  arch/arm/kernel/probes-arm.c     |  114 ++---
->  arch/arm/kernel/probes-arm.h     |   37 ++
->  arch/arm/kernel/probes-thumb.c   |  875 ++++++++++++++++++++++++++++++++
->  arch/arm/kernel/probes-thumb.h   |  136 +++++
->  arch/arm/kernel/probes.c         |    9 +-
->  arch/arm/kernel/probes.h         |   15 +-
->  12 files changed, 1288 insertions(+), 984 deletions(-)
->  create mode 100644 arch/arm/kernel/probes-thumb.c
->  create mode 100644 arch/arm/kernel/probes-thumb.h
-
-As I mentioned in comments to patch 7, this patch seems to accidentally
-include the thumb code reorg of moving code from kprobes-thumb.c to
-probes-thumb.c
-
-I've no other comments on the patch so trimmed the rest...
+>  include/linux/kprobes.h | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
+> index 925eaf2..4b5a74d 100644
+> --- a/include/linux/kprobes.h
+> +++ b/include/linux/kprobes.h
+> @@ -52,9 +52,6 @@
+>  
+>  #else /* CONFIG_KPROBES */
+>  typedef int kprobe_opcode_t;
+> -struct arch_specific_insn {
+> -	int dummy;
+> -};
+>  #endif /* CONFIG_KPROBES */
+>  
+>  struct kprobe;
+> @@ -110,7 +107,11 @@ struct kprobe {
+>  	kprobe_opcode_t opcode;
+>  
+>  	/* copy of the original instruction */
+> +#ifdef CONFIG_KPROBES
+>  	struct arch_specific_insn ainsn;
+> +#else
+> +	int ainsn;
+> +#endif
+>  
+>  	/*
+>  	 * Indicates various status flags.
 
 -- 
 Tixy
