@@ -1,44 +1,63 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 13 Nov 2013 19:46:30 +0530
-Subject: [PATCH 01/13] dma: ste_dma40: Expand DT binding to accept
- 'high-priority channel' flag
-In-Reply-To: <1383732985-18928-2-git-send-email-lee.jones@linaro.org>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131113141630.GC8834@intel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 13 Nov 2013 23:16:01 +0800
+Subject: [PATCHv8][ 3/5] ARM: dts: Add support for the i.MX35.
+In-Reply-To: <1384255459-15134-3-git-send-email-denis@eukrea.com>
+References: <1384255459-15134-1-git-send-email-denis@eukrea.com>
+ <1384255459-15134-3-git-send-email-denis@eukrea.com>
+Message-ID: <20131113151559.GC17816@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 10:16:13AM +0000, Lee Jones wrote:
-> This is used for MSP (audio) devices which is about to be fully DT:ed.
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+On Tue, Nov 12, 2013 at 12:24:17PM +0100, Denis Carikli wrote:
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx35.dtsi
+> @@ -0,0 +1,312 @@
+> +/*
+> + * Copyright 2012 Steffen Trumtrar, Pengutronix
+> + *
+> + * based on imx27.dtsi
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +
+> +#include "skeleton.dtsi"
+> +#include "imx35-pinfunc.h"
+> +#include "imx35-pingrp.h"
+> +
+> +/ {
+> +	aliases {
+> +		gpio0 = &gpio1;
+> +		gpio1 = &gpio2;
+> +		gpio2 = &gpio3;
+> +		serial0 = &uart1;
+> +		serial1 = &uart2;
+> +		serial2 = &uart3;
+> +	};
+> +
+> +	avic: avic-interrupt-controller at 68000000 {
+> +		compatible = "fsl,imx35-avic", "fsl,avic";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		reg = <0x68000000 0x10000000>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		ckil {
+> +			compatible = "fsl,imx-ckil", "fixed-clock";
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		osc {
+> +			compatible = "fsl,imx-osc", "fixed-clock";
+> +			clock-frequency = <24000000>;
+> +		};
+> +	};
 
---
-~Vinod
-> ---
->  Documentation/devicetree/bindings/dma/ste-dma40.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
-> index a8c21c2..1f5729f 100644
-> --- a/Documentation/devicetree/bindings/dma/ste-dma40.txt
-> +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
-> @@ -50,6 +50,9 @@ Each dmas request consists of 4 cells:
->          0x00000008: Use fixed channel:
->                  Use automatic channel selection when unset
->                  Use DMA request line number when set
-> +        0x00000010: Set channel as high priority:
-> +                Normal priority when unset
-> +                High priority when set
->  
->  Example:
->  
-> -- 
-> 1.8.1.2
-> 
+Are these clocks available for imx35?  If not, please remove them.
 
--- 
+Shawn
