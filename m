@@ -1,59 +1,21 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Wed, 13 Nov 2013 08:53:18 +0100
-Subject: [PATCHv3 1/8] drm: Add the lacking DRM_MODE_FLAG_* for matching
- the DISPLAY_FLAGS_*
-In-Reply-To: <20131112170455.GQ16735@n2100.arm.linux.org.uk>
-References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
- <20131112170455.GQ16735@n2100.arm.linux.org.uk>
-Message-ID: <20131113085318.394991f3@e6520eb>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 13 Nov 2013 13:33:52 +0530
+Subject: [PATCH 5/7] clocksource/cadence_ttc: Overhaul clocksource
+ frequency adjustment
+In-Reply-To: <52827B11.5040308@linaro.org>
+References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1383945677-29674-6-git-send-email-soren.brinkmann@xilinx.com>
+ <52827B11.5040308@linaro.org>
+Message-ID: <CAKohpo=KaM97jJ2MnZxSeBz=Mf9cSmzk_EFQTL=EVPPvSH=Wag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 13 November 2013 00:31, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> Hmm, it could be interesting if Viresh can give its opinion on this patch
+> [cc'ed].
 
-Le Tue, 12 Nov 2013 17:04:55 +0000,
-Russell King - ARM Linux <linux@arm.linux.org.uk> a ?crit :
-> On Tue, Nov 12, 2013 at 05:49:18PM +0100, Denis Carikli wrote:
-> > diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> > index fc2adb6..586c12f 100644
-> > --- a/drivers/gpu/drm/drm_modes.c
-> > +++ b/drivers/gpu/drm/drm_modes.c
-> > @@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
-> >  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
-> >  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
-> >  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
-> > +	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
-> > +		dmode->flags |= DRM_MODE_FLAG_DE_LOW;
-> > +	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
-> > +		dmode->flags |= DRM_MODE_FLAG_DE_HIGH;
-> > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
-> > +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_POSEDGE;
-> > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-> > +		dmode->flags |= DRM_MODE_FLAG_PIXDATA_NEGEDGE;
-> > +
-> 
-> I'm still not convinced that these should be exposed in *any* way to
-> userspace - I'm with Ville Syrj?l? on this point.
-> 
-> Yes, you've moved their definition out of a uapi header file, but
-> they're still leaking out of kernel space via calls (and with Xorg,
-> they'll leak into the DisplayMode structures within the X server.)
-> 
-> Now, here's the thing... The polarity of the display enable signal.
-> That's a property of the connected device right?  It doesn't change
-> with respect to the displayed mode unlike the hsync/vsync signals.
-> If that's true, it should not be here.
-> 
-> Same goes for the pixel clock edge.  If it's a property of the
-> connected device and doesn't have a dependence on the displayed
-> mode, then it should not be in the DRM mode structure.
+I am not sure if I understood the problem completely, but if this is about
+not allowing frequency transitions from cpufreq when we have started to
+suspend our system, then you must have a look at this thread:
 
-What would be the right way to configure these settings without
-exposing them to userspace ?
-
-As explained in my answer to Fabio, these settings are currently
-hardcoded into ipuv3-crtc and we need to configure them to support more
-TFT panels using the IPUV3 Parallel Display Interface.
-
-Thanks
-Eric
+https://lkml.org/lkml/2013/10/24/369
