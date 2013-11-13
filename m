@@ -1,121 +1,66 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 13 Nov 2013 17:16:54 +0000
-Subject: [PATCH v2 11/13] ARM: Finish renaming ARM kprobes APIs for
- sharing with uprobes
-In-Reply-To: <1381871068-27660-12-git-send-email-dave.long@linaro.org>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-12-git-send-email-dave.long@linaro.org>
-Message-ID: <1384363014.3392.44.camel@linaro1.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Nov 2013 17:31:42 +0000
+Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
+In-Reply-To: <20131113.180610.823304139654159769.hdoyu@nvidia.com>
+References: <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
+ <5282BAFC.8070405@wwwdotorg.org>
+ <20131113143804.GA11928@mudshark.cambridge.arm.com>
+ <20131113.180610.823304139654159769.hdoyu@nvidia.com>
+Message-ID: <20131113173142.GF11928@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+On Wed, Nov 13, 2013 at 04:06:10PM +0000, Hiroshi Doyu wrote:
+> Will Deacon <will.deacon@arm.com> wrote @ Wed, 13 Nov 2013 15:38:04 +0100:
 > 
-> Use the prefix "probes_" for APIs and definitions to be shared between
-> kprobes and uprobes. Pass additional information into the lower-level decoding
-> functions to avoid having to duplicate architecture-specfific data structures.
-> Make susbsystem-specific APIs static (non-global) again.  Make a couple of utility
-> functions (probes_simulate_nop and probes_emulate_none) sharable and in a common
-> file. Keep the current "action" tables specific to kprobes, as this is where
-> uprobes functionality will be connected up to the instruction interpreter.
+> > On Tue, Nov 12, 2013 at 11:34:20PM +0000, Stephen Warren wrote:
+> > > SMMU:
+> > >     smmu: smmu at xxxxxx {
+> > >         #smmu-cells = <1>;
+> > >     }
+> > > 
+> > > Affected device:
+> > >     smmus = <&smmu 1>;
+> > >     (perhaps with smmu-names too)
+> > > 
+> > > That would allow the DT to represent basically arbitrary HW configurations.
+> > > 
+> > > The implementation of this patch would then be almost as trivial; you'd
+> > > just need to walk the smmus property to find each phandle in turn, just
+> > > like any other phandle+specifier property, and validate that the SMMU
+> > > driver was already probe()d for each.
+> > 
+> > There are a few problems with that:
+> > 
+> >   1.) It assumes all devices sharing an SMMU have the same number of
+> >       "smmu cells"
+> 
+> This can be solved with introducing the fixed size of bitmap. The size
+> of bitmap can be fixed even per SoC. In tegra we used 64(2 cells)
+> which I expect at most.
 
-That's a rather long list of things this patch is reorganising and makes
-it very difficult to review. For those class of changes which are
-independent of each other, can you do them as separate patches?
+That really doesn't sound like a good idea where you have bridges (like a
+PCIe host controller) which could have a significant chunk of StreamID
+space. You'd also need to pad everything out with some dummy IDs for parsing
+purposes. Yuck!
 
-Particularly, the change from using the function arguments
+> >   2.) It moves SMMU-specific data out to the device, which makes it
+> >       impossible to describe more complicated topologies where IDs can be
+> >       remapped/remastered, potentially by multiple SMMUs and/or bus bridges.
+> > 
+> > When writing the binding for the ARM SMMU driver, I originally started with
+> > something similar to what you're suggesting, but was later forced down a
+> > different route when I realised what sort of systems were being built.
+> > 
+> > We will have similar problems for PCIe RIDs and GIC DIDs (I spoke about this
+> > at the ARM mini-summit). They are not fixed across the system: they
+> > originate from a device, but can change as they traverse the system
+> > topology.
+> 
+> Is there any chance to overwrite SMMU driver specific params during
+> setting up topologies?
 
-    struct kprobe *p'
+Not sure I understand what you're getting at here. Could you elaborate
+please?
 
-to
-    probes_opcode_t opcode, probes_opcode_t *addr, struct arch_specific_insn *asi
-
-should be in it's own separate patch as that is spread out across multiple files
-and functions.
-
-I have a few general comments on this patch...
-
-1. I don't think we actually need to pass 'probes_opcode_t *addr' to the
-simulation functions, this will be the same as regs->ARM_pc (except that
-for thumb code 'addr' has bit0 set, which we don't actually care about).
-So drop the new 'addr' argument, and we can also delete the definition of
-thumb_probe_pc() and replace its use with 'regs->ARM_pc + 4' 
-
-2. Now we pass 'probes_opcode_t opcode' to simulation functions a lot of
-them end up doing the redundant...
-
-   kprobe_opcode_t insn = opcode
-
-I would suggest deleting all of these assignments and either rename all
-use of 'insn' to 'opcode' or just changing the function argument name to
-'insn'.
-
-3. I've a comment about the change to probes_decode_insn, I've snipped
-the rest of the patch...
-
-[...]
->  int __kprobes
-> -kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
-> +probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
->  				const union decode_item *table, bool thumb,
-> -				const union decode_item *actions)
-> +				bool usermode, const union decode_item *actions)
->  {
-
-The new argument 'usermode' is named for the use you are using it for,
-i.e. uprobes, I think the code is more intuitive if it was called
-something like 'no_emulate', because what the argument does is force all
-emulate operations to become 'custom'.
-
-Perhaps to avoid double negatives like !no_emulate, the logic of the
-argument could be inverted and it called 'use_emulation' or something.
-
-> -	const struct decode_header *h = (struct decode_header *)table;
-> -	const struct decode_header *next;
-> +	struct decode_header *h = (struct decode_header *)table;
-> +	struct decode_header *next;
->  	bool matched = false;
->  
-> -	insn = prepare_emulated_insn(insn, asi, thumb);
-> +	if (!usermode)
-> +		insn = prepare_emulated_insn(insn, asi, thumb);
->  
->  	for (;; h = next) {
->  		enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
-> @@ -401,7 +412,7 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->  		if (!matched && (insn & h->mask.bits) != h->value.bits)
->  			continue;
->  
-> -		if (!decode_regs(&insn, regs))
-> +		if (!decode_regs(&insn, regs, !usermode))
->  			return INSN_REJECTED;
->  
->  		switch (type) {
-> @@ -414,7 +425,8 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->  
->  		case DECODE_TYPE_CUSTOM: {
->  			struct decode_custom *d = (struct decode_custom *)h;
-> -			return actions[d->decoder.bits].decoder(insn, asi, h);
-> +			return actions[d->decoder.bits].decoder(insn,
-> +					asi, h);
->  		}
->  
->  		case DECODE_TYPE_SIMULATE: {
-> @@ -425,6 +437,11 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->  
->  		case DECODE_TYPE_EMULATE: {
->  			struct decode_emulate *d = (struct decode_emulate *)h;
-> +
-> +			if (usermode)
-> +				return actions[d->handler.bits].decoder(insn,
-> +								asi, h);
-> +
->  			asi->insn_handler = actions[d->handler.bits].handler;
->  			set_emulated_insn(insn, asi, thumb);
->  			return INSN_GOOD;
-
-[...]
-
--- 
-Tixy
+Will
