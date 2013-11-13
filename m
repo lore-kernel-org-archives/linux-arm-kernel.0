@@ -1,52 +1,90 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 13 Nov 2013 07:14:30 +0100
-Subject: [PATCH v5 11/17] clk: at91: add PMC programmable clocks
+Date: Wed, 13 Nov 2013 07:17:23 +0100
+Subject: [PATCH v5 12/17] clk: at91: add PMC utmi clock
 In-Reply-To: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
 References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1384323270-5461-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1384323443-5515-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new at91 programmable clocks implementation using common clk
-framework.
-A programmable clock is a clock which can be exported on a given pin to clock
-external devices.
-Each programmable clock is given an id (from 0 to 8).
-The number of available programmable clocks depends on the SoC you're using.
-Programmable clock driver only implements the clock setting (clock rate and
-parent setting). It must be chained to a system clock in order to
-enable/disable the generated clock.
-The PCKX pins used to output the clock signals must be assigned to the
-appropriate peripheral (see atmel's datasheets).
+This adds new at91 utmi clock implementation using common clk framework.
+
+This clock is a pll with a fixed factor (x40).
+It is used as a source for usb clock.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/clk/at91/Makefile           |    2 +
- drivers/clk/at91/clk-programmable.c |  368 +++++++++++++++++++++++++++++++++++
- drivers/clk/at91/pmc.c              |   15 ++
- drivers/clk/at91/pmc.h              |    9 +
- 4 files changed, 394 insertions(+)
- create mode 100644 drivers/clk/at91/clk-programmable.c
+ arch/arm/mach-at91/Kconfig  |    7 ++
+ drivers/clk/at91/Makefile   |    1 +
+ drivers/clk/at91/clk-utmi.c |  162 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/at91/pmc.c      |    7 ++
+ drivers/clk/at91/pmc.h      |    5 ++
+ 5 files changed, 182 insertions(+)
+ create mode 100644 drivers/clk/at91/clk-utmi.c
 
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 85b53a4..6ad37da 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -1,5 +1,8 @@
+ if ARCH_AT91
+ 
++config HAVE_AT91_UTMI
++	bool
++
+ config HAVE_AT91_DBGU0
+ 	bool
+ 
+@@ -78,6 +81,7 @@ config SOC_SAMA5D3
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_AT91_DBGU1
+ 	select AT91_USE_OLD_CLK
++	select HAVE_AT91_UTMI
+ 	help
+ 	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
+ 	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35.
+@@ -124,6 +128,7 @@ config SOC_AT91SAM9RL
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
+ 	select AT91_USE_OLD_CLK
++	select HAVE_AT91_UTMI
+ 
+ config SOC_AT91SAM9G45
+ 	bool "AT91SAM9G45 or AT91SAM9M10 families"
+@@ -131,6 +136,7 @@ config SOC_AT91SAM9G45
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
+ 	select AT91_USE_OLD_CLK
++	select HAVE_AT91_UTMI
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
+ 	  This support covers AT91SAM9G45, AT91SAM9G46, AT91SAM9M10 and AT91SAM9M11.
+@@ -141,6 +147,7 @@ config SOC_AT91SAM9X5
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
+ 	select AT91_USE_OLD_CLK
++	select HAVE_AT91_UTMI
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
+ 	  This means that your SAM9 name finishes with a '5' (except if it is
 diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index 04deba3..3873b62 100644
+index 3873b62..a824883 100644
 --- a/drivers/clk/at91/Makefile
 +++ b/drivers/clk/at91/Makefile
-@@ -5,3 +5,5 @@
- obj-y += pmc.o
- obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
+@@ -7,3 +7,4 @@ obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
  obj-y += clk-system.o clk-peripheral.o
-+
-+obj-$(CONFIG_AT91_PROGRAMMABLE_CLOCKS)	+= clk-programmable.o
-diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+ 
+ obj-$(CONFIG_AT91_PROGRAMMABLE_CLOCKS)	+= clk-programmable.o
++obj-$(CONFIG_HAVE_AT91_UTMI)		+= clk-utmi.o
+diff --git a/drivers/clk/at91/clk-utmi.c b/drivers/clk/at91/clk-utmi.c
 new file mode 100644
-index 0000000..1daa05f
+index 0000000..9a133df
 --- /dev/null
-+++ b/drivers/clk/at91/clk-programmable.c
-@@ -0,0 +1,368 @@
++++ b/drivers/clk/at91/clk-utmi.c
+@@ -0,0 +1,162 @@
 +/*
-+ * drivers/clk/at91/clk-programmable.c
++ * drivers/clk/at91/clk-utmi.c
 + *
 + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
 + *
@@ -60,399 +98,181 @@ index 0000000..1daa05f
 +#include <linux/clk-provider.h>
 +#include <linux/clkdev.h>
 +#include <linux/clk/at91_pmc.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/of_irq.h>
 +#include <linux/io.h>
-+#include <linux/wait.h>
 +#include <linux/sched.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
++#include <linux/wait.h>
 +
 +#include "pmc.h"
 +
-+#define PROG_SOURCE_MAX		5
-+#define PROG_ID_MAX		7
++#define UTMI_FIXED_MUL		40
 +
-+#define PROG_STATUS_MASK(id)	(1 << ((id) + 8))
-+#define PROG_PRES_MASK		0x7
-+#define PROG_MAX_RM9200_CSS	3
-+
-+struct clk_programmable_layout {
-+	u8 pres_shift;
-+	u8 css_mask;
-+	u8 have_slck_mck;
-+};
-+
-+struct clk_programmable {
++struct clk_utmi {
 +	struct clk_hw hw;
 +	struct at91_pmc *pmc;
 +	unsigned int irq;
 +	wait_queue_head_t wait;
-+	u8 id;
-+	u8 css;
-+	u8 pres;
-+	u8 slckmck;
-+	const struct clk_programmable_layout *layout;
 +};
 +
-+#define to_clk_programmable(hw) container_of(hw, struct clk_programmable, hw)
++#define to_clk_utmi(hw) container_of(hw, struct clk_utmi, hw)
 +
-+
-+static irqreturn_t clk_programmable_irq_handler(int irq, void *dev_id)
++static irqreturn_t clk_utmi_irq_handler(int irq, void *dev_id)
 +{
-+	struct clk_programmable *prog = (struct clk_programmable *)dev_id;
++	struct clk_utmi *utmi = (struct clk_utmi *)dev_id;
 +
-+	wake_up(&prog->wait);
++	wake_up(&utmi->wait);
++	disable_irq_nosync(utmi->irq);
 +
 +	return IRQ_HANDLED;
 +}
 +
-+static int clk_programmable_prepare(struct clk_hw *hw)
++static int clk_utmi_prepare(struct clk_hw *hw)
 +{
-+	u32 tmp;
-+	struct clk_programmable *prog = to_clk_programmable(hw);
-+	struct at91_pmc *pmc = prog->pmc;
-+	const struct clk_programmable_layout *layout = prog->layout;
-+	u8 id = prog->id;
-+	u32 mask = PROG_STATUS_MASK(id);
++	struct clk_utmi *utmi = to_clk_utmi(hw);
++	struct at91_pmc *pmc = utmi->pmc;
++	u32 tmp = at91_pmc_read(AT91_CKGR_UCKR) | AT91_PMC_UPLLEN |
++		  AT91_PMC_UPLLCOUNT | AT91_PMC_BIASEN;
 +
-+	tmp = prog->css | (prog->pres << layout->pres_shift);
-+	if (layout->have_slck_mck && prog->slckmck)
-+		tmp |= AT91_PMC_CSSMCK_MCK;
++	pmc_write(pmc, AT91_CKGR_UCKR, tmp);
 +
-+	pmc_write(pmc, AT91_PMC_PCKR(id), tmp);
-+
-+	while (!(pmc_read(pmc, AT91_PMC_SR) & mask))
-+		wait_event(prog->wait, pmc_read(pmc, AT91_PMC_SR) & mask);
++	while (!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_LOCKU)) {
++		enable_irq(utmi->irq);
++		wait_event(utmi->wait,
++			   pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_LOCKU);
++	}
 +
 +	return 0;
 +}
 +
-+static int clk_programmable_is_ready(struct clk_hw *hw)
++static int clk_utmi_is_ready(struct clk_hw *hw)
 +{
-+	struct clk_programmable *prog = to_clk_programmable(hw);
-+	struct at91_pmc *pmc = prog->pmc;
++	struct clk_utmi *utmi = to_clk_utmi(hw);
++	struct at91_pmc *pmc = utmi->pmc;
 +
-+	return !!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_PCKR(prog->id));
++	return !!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_LOCKU);
 +}
 +
-+static unsigned long clk_programmable_recalc_rate(struct clk_hw *hw,
-+						  unsigned long parent_rate)
++static void clk_utmi_disable(struct clk_hw *hw)
 +{
-+	u32 tmp;
-+	struct clk_programmable *prog = to_clk_programmable(hw);
-+	struct at91_pmc *pmc = prog->pmc;
-+	const struct clk_programmable_layout *layout = prog->layout;
++	struct clk_utmi *utmi = to_clk_utmi(hw);
++	struct at91_pmc *pmc = utmi->pmc;
++	u32 tmp = at91_pmc_read(AT91_CKGR_UCKR) & ~AT91_PMC_UPLLEN;
 +
-+	tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id));
-+	prog->pres = (tmp >> layout->pres_shift) & PROG_PRES_MASK;
-+
-+	return parent_rate >> prog->pres;
++	pmc_write(pmc, AT91_CKGR_UCKR, tmp);
 +}
 +
-+static long clk_programmable_round_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long *parent_rate)
++static unsigned long clk_utmi_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
 +{
-+	unsigned long best_rate = *parent_rate;
-+	unsigned long best_diff;
-+	unsigned long new_diff;
-+	unsigned long cur_rate;
-+	int shift = shift;
-+
-+	if (rate > *parent_rate)
-+		return *parent_rate;
-+	else
-+		best_diff = *parent_rate - rate;
-+
-+	if (!best_diff)
-+		return best_rate;
-+
-+	for (shift = 1; shift < PROG_PRES_MASK; shift++) {
-+		cur_rate = *parent_rate >> shift;
-+
-+		if (cur_rate > rate)
-+			new_diff = cur_rate - rate;
-+		else
-+			new_diff = rate - cur_rate;
-+
-+		if (!new_diff)
-+			return cur_rate;
-+
-+		if (new_diff < best_diff) {
-+			best_diff = new_diff;
-+			best_rate = cur_rate;
-+		}
-+
-+		if (rate > cur_rate)
-+			break;
-+	}
-+
-+	return best_rate;
++	/* UTMI clk is a fixed clk multiplier */
++	return parent_rate * UTMI_FIXED_MUL;
 +}
 +
-+static int clk_programmable_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_programmable *prog = to_clk_programmable(hw);
-+	const struct clk_programmable_layout *layout = prog->layout;
-+	if (index > layout->css_mask) {
-+		if (index > PROG_MAX_RM9200_CSS && layout->have_slck_mck) {
-+			prog->css = 0;
-+			prog->slckmck = 1;
-+			return 0;
-+		} else {
-+			return -EINVAL;
-+		}
-+	}
-+
-+	prog->css = index;
-+	return 0;
-+}
-+
-+static u8 clk_programmable_get_parent(struct clk_hw *hw)
-+{
-+	u32 tmp;
-+	u8 ret;
-+	struct clk_programmable *prog = to_clk_programmable(hw);
-+	struct at91_pmc *pmc = prog->pmc;
-+	const struct clk_programmable_layout *layout = prog->layout;
-+
-+	tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id));
-+	prog->css = tmp & layout->css_mask;
-+	ret = prog->css;
-+	if (layout->have_slck_mck) {
-+		prog->slckmck = !!(tmp & AT91_PMC_CSSMCK_MCK);
-+		if (prog->slckmck && !ret)
-+			ret = PROG_MAX_RM9200_CSS + 1;
-+	}
-+
-+	return ret;
-+}
-+
-+static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
-+				     unsigned long parent_rate)
-+{
-+	struct clk_programmable *prog = to_clk_programmable(hw);
-+	unsigned long best_rate = parent_rate;
-+	unsigned long best_diff;
-+	unsigned long new_diff;
-+	unsigned long cur_rate;
-+	int shift = 0;
-+
-+	if (rate > parent_rate)
-+		return parent_rate;
-+	else
-+		best_diff = parent_rate - rate;
-+
-+	if (!best_diff) {
-+		prog->pres = shift;
-+		return 0;
-+	}
-+
-+	for (shift = 1; shift < PROG_PRES_MASK; shift++) {
-+		cur_rate = parent_rate >> shift;
-+
-+		if (cur_rate > rate)
-+			new_diff = cur_rate - rate;
-+		else
-+			new_diff = rate - cur_rate;
-+
-+		if (!new_diff)
-+			break;
-+
-+		if (new_diff < best_diff) {
-+			best_diff = new_diff;
-+			best_rate = cur_rate;
-+		}
-+
-+		if (rate > cur_rate)
-+			break;
-+	}
-+
-+	prog->pres = shift;
-+	return 0;
-+}
-+
-+static const struct clk_ops programmable_ops = {
-+	.prepare = clk_programmable_prepare,
-+	.is_prepared = clk_programmable_is_ready,
-+	.recalc_rate = clk_programmable_recalc_rate,
-+	.round_rate = clk_programmable_round_rate,
-+	.get_parent = clk_programmable_get_parent,
-+	.set_parent = clk_programmable_set_parent,
-+	.set_rate = clk_programmable_set_rate,
++static const struct clk_ops utmi_ops = {
++	.prepare = clk_utmi_prepare,
++	.is_prepared = clk_utmi_is_ready,
++	.disable = clk_utmi_disable,
++	.is_enabled = clk_utmi_is_ready,
++	.recalc_rate = clk_utmi_recalc_rate,
 +};
 +
 +static struct clk * __init
-+at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
-+			       const char *name, const char **parent_names,
-+			       u8 num_parents, u8 id,
-+			       const struct clk_programmable_layout *layout)
++at91_clk_register_utmi(struct at91_pmc *pmc, unsigned int irq,
++		       const char *name, const char *parent_name)
 +{
 +	int ret;
-+	struct clk_programmable *prog;
++	struct clk_utmi *utmi;
 +	struct clk *clk = NULL;
 +	struct clk_init_data init;
-+	char irq_name[11];
 +
-+	if (id > PROG_ID_MAX)
-+		return ERR_PTR(-EINVAL);
-+
-+	prog = kzalloc(sizeof(*prog), GFP_KERNEL);
-+	if (!prog)
++	utmi = kzalloc(sizeof(*utmi), GFP_KERNEL);
++	if (!utmi)
 +		return ERR_PTR(-ENOMEM);
 +
 +	init.name = name;
-+	init.ops = &programmable_ops;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
++	init.ops = &utmi_ops;
++	init.parent_names = parent_name ? &parent_name : NULL;
++	init.num_parents = parent_name ? 1 : 0;
++	init.flags = CLK_SET_RATE_GATE;
 +
-+	prog->id = id;
-+	prog->layout = layout;
-+	prog->hw.init = &init;
-+	prog->pmc = pmc;
-+	prog->irq = irq;
-+	init_waitqueue_head(&prog->wait);
-+	irq_set_status_flags(prog->irq, IRQ_NOAUTOEN);
-+	snprintf(irq_name, sizeof(irq_name), "clk-prog%d", id);
-+	ret = request_irq(prog->irq, clk_programmable_irq_handler,
-+			  IRQF_TRIGGER_HIGH, irq_name, prog);
++	utmi->hw.init = &init;
++	utmi->pmc = pmc;
++	utmi->irq = irq;
++	init_waitqueue_head(&utmi->wait);
++	irq_set_status_flags(utmi->irq, IRQ_NOAUTOEN);
++	ret = request_irq(utmi->irq, clk_utmi_irq_handler,
++			  IRQF_TRIGGER_HIGH, "clk-utmi", utmi);
 +	if (ret)
 +		return ERR_PTR(ret);
 +
-+	clk = clk_register(NULL, &prog->hw);
++	clk = clk_register(NULL, &utmi->hw);
 +	if (IS_ERR(clk))
-+		kfree(prog);
++		kfree(utmi);
 +
 +	return clk;
 +}
 +
-+static const struct clk_programmable_layout at91rm9200_programmable_layout = {
-+	.pres_shift = 2,
-+	.css_mask = 0x3,
-+	.have_slck_mck = 0,
-+};
-+
-+static const struct clk_programmable_layout at91sam9g45_programmable_layout = {
-+	.pres_shift = 2,
-+	.css_mask = 0x3,
-+	.have_slck_mck = 1,
-+};
-+
-+static const struct clk_programmable_layout at91sam9x5_programmable_layout = {
-+	.pres_shift = 4,
-+	.css_mask = 0x7,
-+	.have_slck_mck = 0,
-+};
-+
 +static void __init
-+of_at91_clk_prog_setup(struct device_node *np, struct at91_pmc *pmc,
-+		       const struct clk_programmable_layout *layout)
++of_at91_clk_utmi_setup(struct device_node *np, struct at91_pmc *pmc)
 +{
-+	int num;
-+	u32 id;
-+	int i;
 +	unsigned int irq;
 +	struct clk *clk;
-+	int num_parents;
-+	const char *parent_names[PROG_SOURCE_MAX];
-+	const char *name;
-+	struct device_node *progclknp;
++	const char *parent_name;
++	const char *name = np->name;
 +
-+	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-+	if (num_parents <= 0 || num_parents > PROG_SOURCE_MAX)
++	parent_name = of_clk_get_parent_name(np, 0);
++
++	of_property_read_string(np, "clock-output-names", &name);
++
++	irq = irq_of_parse_and_map(np, 0);
++	if (!irq)
 +		return;
 +
-+	for (i = 0; i < num_parents; ++i) {
-+		parent_names[i] = of_clk_get_parent_name(np, i);
-+		if (!parent_names[i])
-+			return;
-+	}
-+
-+	num = of_get_child_count(np);
-+	if (!num || num > (PROG_ID_MAX + 1))
++	clk = at91_clk_register_utmi(pmc, irq, name, parent_name);
++	if (IS_ERR(clk))
 +		return;
 +
-+	for_each_child_of_node(np, progclknp) {
-+		if (of_property_read_u32(progclknp, "reg", &id))
-+			continue;
-+
-+		if (of_property_read_string(np, "clock-output-names", &name))
-+			name = progclknp->name;
-+
-+		irq = irq_of_parse_and_map(np, 0);
-+		if (!irq)
-+			continue;
-+
-+		clk = at91_clk_register_programmable(pmc, irq, name,
-+						     parent_names, num_parents,
-+						     id, layout);
-+		if (IS_ERR(clk))
-+			continue;
-+
-+		of_clk_add_provider(progclknp, of_clk_src_simple_get, clk);
-+	}
++	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++	return;
 +}
 +
-+
-+void __init of_at91rm9200_clk_prog_setup(struct device_node *np,
++void __init of_at91sam9x5_clk_utmi_setup(struct device_node *np,
 +					 struct at91_pmc *pmc)
 +{
-+	of_at91_clk_prog_setup(np, pmc, &at91rm9200_programmable_layout);
-+}
-+
-+void __init of_at91sam9g45_clk_prog_setup(struct device_node *np,
-+					  struct at91_pmc *pmc)
-+{
-+	of_at91_clk_prog_setup(np, pmc, &at91sam9g45_programmable_layout);
-+}
-+
-+void __init of_at91sam9x5_clk_prog_setup(struct device_node *np,
-+					 struct at91_pmc *pmc)
-+{
-+	of_at91_clk_prog_setup(np, pmc, &at91sam9x5_programmable_layout);
++	of_at91_clk_utmi_setup(np, pmc);
 +}
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 09dfa63..ffe8ac8 100644
+index ffe8ac8..009d1b2 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
-@@ -280,6 +280,21 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
- 		.compatible = "atmel,at91sam9x5-clk-peripheral",
- 		.data = of_at91sam9x5_clk_periph_setup,
+@@ -295,6 +295,13 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
+ 		.data = of_at91sam9x5_clk_prog_setup,
  	},
-+	/* Programmable clocks */
-+#if defined(CONFIG_AT91_PROGRAMMABLE_CLOCKS)
+ #endif
++	/* UTMI clock */
++#if defined(CONFIG_HAVE_AT91_UTMI)
 +	{
-+		.compatible = "atmel,at91rm9200-clk-programmable",
-+		.data = of_at91rm9200_clk_prog_setup,
-+	},
-+	{
-+		.compatible = "atmel,at91sam9g45-clk-programmable",
-+		.data = of_at91sam9g45_clk_prog_setup,
-+	},
-+	{
-+		.compatible = "atmel,at91sam9x5-clk-programmable",
-+		.data = of_at91sam9x5_clk_prog_setup,
++		.compatible = "atmel,at91sam9x5-clk-utmi",
++		.data = of_at91sam9x5_clk_utmi_setup,
 +	},
 +#endif
  	{ /*sentinel*/ }
  };
  
 diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index a09212b..6eeed49 100644
+index 6eeed49..8e18ab0 100644
 --- a/drivers/clk/at91/pmc.h
 +++ b/drivers/clk/at91/pmc.h
-@@ -85,4 +85,13 @@ extern void __init of_at91rm9200_clk_periph_setup(struct device_node *np,
- extern void __init of_at91sam9x5_clk_periph_setup(struct device_node *np,
- 						  struct at91_pmc *pmc);
+@@ -94,4 +94,9 @@ extern void __init of_at91sam9x5_clk_prog_setup(struct device_node *np,
+ 						struct at91_pmc *pmc);
+ #endif
  
-+#if defined(CONFIG_AT91_PROGRAMMABLE_CLOCKS)
-+extern void __init of_at91rm9200_clk_prog_setup(struct device_node *np,
-+						struct at91_pmc *pmc);
-+extern void __init of_at91sam9g45_clk_prog_setup(struct device_node *np,
-+						 struct at91_pmc *pmc);
-+extern void __init of_at91sam9x5_clk_prog_setup(struct device_node *np,
++#if defined(CONFIG_HAVE_AT91_UTMI)
++extern void __init of_at91sam9x5_clk_utmi_setup(struct device_node *np,
 +						struct at91_pmc *pmc);
 +#endif
 +
