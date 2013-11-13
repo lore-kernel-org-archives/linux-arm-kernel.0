@@ -1,27 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 13 Nov 2013 23:46:20 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_HIGHMEM
-In-Reply-To: <1384295952-10619-1-git-send-email-festevam@gmail.com>
-References: <1384295952-10619-1-git-send-email-festevam@gmail.com>
-Message-ID: <20131113154544.GH17816@S2101-09.ap.freescale.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 13 Nov 2013 07:45:12 -0800
+Subject: [PATCH V2] ARM: OMAP2+: omap_device: maintain sane runtime pm
+ status around suspend/resume
+In-Reply-To: <52839306.7050701@ti.com> (Nishanth Menon's message of "Wed, 13
+ Nov 2013 08:56:06 -0600")
+References: <1384297710-29694-1-git-send-email-nm@ti.com>
+ <20131113125149.GB28192@saruman.home> <52839306.7050701@ti.com>
+Message-ID: <87vbzwl307.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 08:39:12PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Booting a mx6q wandboard with 2GB of RAM we see the following on boot:
-> 
-> Booting Linux on physical CPU 0x0                                               
-> Linux version 3.12.0-next-20131112+ (fabio at fabio-Latitude-E6410) (gcc version 43
-> CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d                
-> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache        
-> Machine model: Wandboard i.MX6 Quad Board                                       
-> Truncating RAM at 10000000-8fffffff to -7f7fffff (vmalloc region overlap)
-> ...
-> 
-> Select CONFIG_HIGHMEM to avoid the vmalloc region overlap.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Nishanth Menon <nm@ti.com> writes:
 
-Applied, thanks.
+> On 11/13/2013 06:51 AM, Felipe Balbi wrote:
+>> Hi,
+>> 
+>> On Tue, Nov 12, 2013 at 05:08:30PM -0600, Nishanth Menon wrote:
+>>> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+>>> index b69dd9a..f97b34b 100644
+>>> --- a/arch/arm/mach-omap2/omap_device.c
+>>> +++ b/arch/arm/mach-omap2/omap_device.c
+>>> @@ -621,6 +621,7 @@ static int _od_suspend_noirq(struct device *dev)
+>>>  
+>>>  	if (!ret && !pm_runtime_status_suspended(dev)) {
+>>>  		if (pm_generic_runtime_suspend(dev) == 0) {
+>>> +			pm_runtime_set_suspended(dev);
+>> 
+>> don't you have to disable pm_runtime around status changes ? Or is
+>> pm_runtime already disabled by the time we get here ?
+>
+> pm_runtime is already disabled by the time no_irq suspend is invoked.
+>
+>> 
+>>> @@ -634,10 +635,10 @@ static int _od_resume_noirq(struct device *dev)
+>>>  	struct platform_device *pdev = to_platform_device(dev);
+>>>  	struct omap_device *od = to_omap_device(pdev);
+>>>  
+>>> -	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
+>>> -	    !pm_runtime_status_suspended(dev)) {
+>>> +	if (od->flags & OMAP_DEVICE_SUSPENDED) {
+>>>  		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+>>>  		omap_device_enable(pdev);
+>>> +		pm_runtime_set_active(dev);
+>> 
+>> ditto, also pm_runtime_set_active() may fail.
+>> 
+> again, pm_runtime is not yet active here yet - we just restore the pm
+> runtime state with which we went down with -> and that is not expected
+> to fail either - So, how about just adding a WARN if our expectation
+> of balanced operation was somehow broken in the future with changes to
+> runtime framework?
+
+And also a note in the changelog (or comment at the WARN) about the
+assumption that runtime PM is disabled at this point.
+
+Kevin
