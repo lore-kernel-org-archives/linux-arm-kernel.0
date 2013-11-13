@@ -1,53 +1,30 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 Nov 2013 08:56:06 -0600
-Subject: [PATCH V2] ARM: OMAP2+: omap_device: maintain sane runtime pm
- status around suspend/resume
-In-Reply-To: <20131113125149.GB28192@saruman.home>
-References: <1384297710-29694-1-git-send-email-nm@ti.com>
- <20131113125149.GB28192@saruman.home>
-Message-ID: <52839306.7050701@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 13 Nov 2013 16:02:02 +0100
+Subject: [PATCH v7 3/7] ARM: dts: imx27 pinctrl
+In-Reply-To: <20131113144139.GB17816@S2101-09.ap.freescale.net>
+References: <1384246210-9257-1-git-send-email-mpa@pengutronix.de>
+ <1384246210-9257-4-git-send-email-mpa@pengutronix.de>
+ <20131113144139.GB17816@S2101-09.ap.freescale.net>
+Message-ID: <20131113150202.GK30263@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2013 06:51 AM, Felipe Balbi wrote:
-> Hi,
+On Wed, Nov 13, 2013 at 10:41:41PM +0800, Shawn Guo wrote:
+> On Tue, Nov 12, 2013 at 09:50:06AM +0100, Markus Pargmann wrote:
+> > Pinctrl driver node and pin group definitions for other driver nodes.
 > 
-> On Tue, Nov 12, 2013 at 05:08:30PM -0600, Nishanth Menon wrote:
->> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
->> index b69dd9a..f97b34b 100644
->> --- a/arch/arm/mach-omap2/omap_device.c
->> +++ b/arch/arm/mach-omap2/omap_device.c
->> @@ -621,6 +621,7 @@ static int _od_suspend_noirq(struct device *dev)
->>  
->>  	if (!ret && !pm_runtime_status_suspended(dev)) {
->>  		if (pm_generic_runtime_suspend(dev) == 0) {
->> +			pm_runtime_set_suspended(dev);
-> 
-> don't you have to disable pm_runtime around status changes ? Or is
-> pm_runtime already disabled by the time we get here ?
+> Neither patch subject nor commit log is telling anything useful, like
+> what is the change and why the changes.
 
-pm_runtime is already disabled by the time no_irq suspend is invoked.
+Sorry, I forgot to update the commit message. I will do this for the
+next version.
 
-> 
->> @@ -634,10 +635,10 @@ static int _od_resume_noirq(struct device *dev)
->>  	struct platform_device *pdev = to_platform_device(dev);
->>  	struct omap_device *od = to_omap_device(pdev);
->>  
->> -	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
->> -	    !pm_runtime_status_suspended(dev)) {
->> +	if (od->flags & OMAP_DEVICE_SUSPENDED) {
->>  		od->flags &= ~OMAP_DEVICE_SUSPENDED;
->>  		omap_device_enable(pdev);
->> +		pm_runtime_set_active(dev);
-> 
-> ditto, also pm_runtime_set_active() may fail.
-> 
-again, pm_runtime is not yet active here yet - we just restore the pm
-runtime state with which we went down with -> and that is not expected
-to fail either - So, how about just adding a WARN if our expectation
-of balanced operation was somehow broken in the future with changes to
-runtime framework?
+Thanks,
+
+Markus
 
 -- 
-Regards,
-Nishanth Menon
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
