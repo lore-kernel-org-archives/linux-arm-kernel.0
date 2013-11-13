@@ -1,221 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 13 Nov 2013 16:02:16 +0100
-Subject: [PATCH] dmaengine: Add support for BCM2835.
-In-Reply-To: <527D1DDA.2040004@koalo.de>
-References: <527D1DDA.2040004@koalo.de>
-Message-ID: <4133885.XyqaHYljiZ@flatron>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 13 Nov 2013 19:46:18 +0530
+Subject: [PATCH 02/13] dma: ste_dma40: Parse flags property for new
+ 'high priority channel' request
+In-Reply-To: <1383732985-18928-3-git-send-email-lee.jones@linaro.org>
+References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
+ <1383732985-18928-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131113141617.GB8834@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-Most of technical issues have been already mentioned by Russell, but let
-me also point those that I found. Please see my comments inline.
-
-On Friday 08 of November 2013 18:22:34 Florian Meier wrote:
-> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
-> Currently it only supports cyclic DMA for serving the I2S driver.
+On Wed, Nov 06, 2013 at 10:16:14AM +0000, Lee Jones wrote:
+> This is used for MSP (audio) devices which is about to be fully DT:ed.
 > 
-> Signed-off-by: Florian Meier <florian.meier@koalo.de>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
+
+--
+~Vinod
 > ---
->  arch/arm/boot/dts/bcm2835.dtsi |   22 +
->  drivers/dma/Kconfig            |    6 +
->  drivers/dma/Makefile           |    1 +
->  drivers/dma/bcm2835-dma.c      |  880 ++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 909 insertions(+)
->  create mode 100644 drivers/dma/bcm2835-dma.c
+>  drivers/dma/ste_dma40.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-> index 1e12aef..1514198 100644
-> --- a/arch/arm/boot/dts/bcm2835.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835.dtsi
-> @@ -103,6 +103,28 @@
->  			clocks = <&clk_mmc>;
->  			status = "disabled";
->  		};
-> +
-> +		dma: dma at 7e007000 {
-> +			compatible = "brcm,bcm2835-dma";
-> +			reg = <0x7e007000 0xf00>;
-> +			interrupts = <1 16
-> +				      1 17
-> +				      1 18
-> +				      1 19
-> +				      1 20
-> +				      1 21
-> +				      1 22
-> +				      1 23
-> +				      1 24
-> +				      1 25
-> +				      1 26
-> +				      1 27
-> +				      1 28>;
-> +
-> +			#dma-cells = <1>;
-> +			dma-channels = <15>;   /* DMA channel 15 is not handled yet */
-
-This should represent the real configuration of the hardware, regardless
-of what the driver supports.
-
-> +			dma-requests = <32>;
-> +		};
->  	};
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index b8c031b..00a2de9 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -2409,6 +2409,7 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
+>  #define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
+>  #define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
+>  #define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
+> +#define D40_DT_FLAGS_HIGH_PRIO(flags)  ((flags >> 4) & 0x1)
 >  
->  	clocks {
-
-This should be a separate patch, following the one adding the driver.
-
-In addition, you are introducing a new device tree binding with this
-patch, so you should document it in appropriate location under
-Documentation/devicetree/bindings.
-
-> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> new file mode 100644
-> index 0000000..c3e53b3
-> --- /dev/null
-> +++ b/drivers/dma/bcm2835-dma.c
-> @@ -0,0 +1,880 @@
-[snip]
-> +struct bcm2835_dma_cb {
-> +	unsigned long info;
-> +	unsigned long src;
-> +	unsigned long dst;
-> +	unsigned long length;
-> +	unsigned long stride;
-> +	unsigned long next;
-> +	unsigned long pad[2];
-> +};
-
-Is unsigned long really what you want here, not some explicitly sized
-types, such as u32 or uint32_t? This seems to be some kind of hardware
-interface, so the latter sounds more reasonable to me.
-
-[snip]
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id bcm2835_dma_of_match[] = {
-> +	{
-> +		.compatible = "brcm,bcm2835-dma",
-> +	}
-
-A dummy terminating entry is needed here.
-
-> +};
-> +MODULE_DEVICE_TABLE(of, bcm2835_dma_of_match);
-> +#endif
+>  static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+>  				  struct of_dma *ofdma)
+> @@ -2446,6 +2447,9 @@ static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+>  		cfg.use_fixed_channel = true;
+>  	}
+>  
+> +	if (D40_DT_FLAGS_HIGH_PRIO(flags))
+> +		cfg.high_priority = true;
 > +
-> +static int bcm2835_dma_probe(struct platform_device *pdev)
-> +{
-> +	struct bcm2835_dmadev *od;
-> +	struct resource *dma_res = NULL;
-> +	void __iomem *dma_base = NULL;
-> +	int rc = 0;
-> +	int i;
-> +	struct resource *irq;
-> +	int irq_resources;
-> +
-> +	od = devm_kzalloc(&pdev->dev, sizeof(*od), GFP_KERNEL);
-> +	if (!od)
-> +		return -ENOMEM;
-> +
-> +	dma_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	dma_base = devm_ioremap_resource(&pdev->dev, dma_res);
-> +	if (IS_ERR(dma_base))
-> +		return PTR_ERR(dma_base);
-> +
-> +	od->dma_base = dma_base;
-> +	od->chans_available = BCM2835_DMA_CHANNEL_MASK;
-> +
-> +	dma_cap_set(DMA_SLAVE, od->ddev.cap_mask);
-> +	dma_cap_set(DMA_CYCLIC, od->ddev.cap_mask);
-> +	od->ddev.device_alloc_chan_resources = bcm2835_dma_alloc_chan_resources;
-> +	od->ddev.device_free_chan_resources = bcm2835_dma_free_chan_resources;
-> +	od->ddev.device_tx_status = bcm2835_dma_tx_status;
-> +	od->ddev.device_issue_pending = bcm2835_dma_issue_pending;
-> +	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
-> +	od->ddev.device_control = bcm2835_dma_control;
-> +	od->ddev.dev = &pdev->dev;
-> +	INIT_LIST_HEAD(&od->ddev.channels);
-> +	INIT_LIST_HEAD(&od->pending);
-> +	spin_lock_init(&od->lock);
-> +
-> +	tasklet_init(&od->task, bcm2835_dma_sched, (unsigned long)od);
+>  	return dma_request_channel(cap, stedma40_filter, &cfg);
+>  }
+>  
+> -- 
+> 1.8.1.2
+> 
 
-Just a question out of curiosity, as I don't really know much about the
-DMA engine subsystem:
-
-What is the reason to use tasklets here instead of, let's say, a workqueue?
-
-> +
-> +	irq_resources = 0;
-> +
-> +	for (i = 0; i < pdev->num_resources; i++) {
-> +		if (IORESOURCE_IRQ == resource_type(&pdev->resource[i]))
-> +			irq_resources++;
-> +	}
-> +
-> +	od->dma_irq_numbers = devm_kzalloc(&pdev->dev,
-> +			irq_resources*sizeof(int), GFP_KERNEL);
-> +	if (!od)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < irq_resources; i++) {
-
-You could call platform_get_irq() here and break out of the loop if it
-fails with -ENXIO. Then the IRQ number could be passed to
-bcm2835_dma_chan_init() and stored in per-channel struct. This way you
-could remove the ugly IRQ counting code above and IRQ array allocation.
-
-> +		rc = bcm2835_dma_chan_init(od, i);
-> +		if (rc) {
-> +			bcm2835_dma_free(od);
-> +			return rc;
-> +		}
-> +
-> +		irq = platform_get_resource(pdev, IORESOURCE_IRQ, i);
-
-There is platform_get_irq() for reading IRQ resources specifically.
-
-> +		if (!irq) {
-> +			dev_err(&pdev->dev,
-> +					"No IRQ resource for channel %i\n", i);
-> +			return -ENODEV;
-> +		}
-> +		od->dma_irq_numbers[i] = irq->start;
-> +	}
-> +
-> +	rc = dma_async_device_register(&od->ddev);
-
-This should be called at the end of probe, to ensure that any potential
-users can start generating requests to your DMA engine as soon as
-it is registered.
-
-> +	if (rc) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to register slave DMA engine device: %d\n", rc);
-> +		bcm2835_dma_free(od);
-> +		return rc;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, od);
-[snip]
-> +
-> +static const struct platform_device_info bcm2835_dma_dev_info = {
-> +	.name = "bcm2835-dma",
-> +	.id = -1,
-> +	.dma_mask = DMA_BIT_MASK(32),
-> +};
-
-What's this?
-
-> +
-> +static int bcm2835_dma_init(void)
-> +{
-> +	int rc = platform_driver_register(&bcm2835_dma_driver);
-> +	return rc;
-> +}
-> +subsys_initcall(bcm2835_dma_init);
-
-Do you really need subsys_initcall here?
-
-Best regards,
-Tomasz
+-- 
