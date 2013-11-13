@@ -1,141 +1,121 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 13 Nov 2013 21:00:52 +0100
-Subject: [PATCH] clocksource: sirf/marco+prima2: drop usage of
- CLOCK_TICK_RATE
-In-Reply-To: <1384201236-8689-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384201236-8689-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <5283DA74.9080402@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 13 Nov 2013 14:04:04 -0600
+Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
+In-Reply-To: <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
+References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>	<CACxGe6sMXjcsGNEiGQ923_yEKXwaAj_qfqZQPpXqHgh1znsF0Q@mail.gmail.com>	<CAL_Jsq+hO_euGM4eBtpeFUaQdo5rDgmyD0HaU0GEHN=S27f0Vg@mail.gmail.com>	<20131111173826.GA8809@quad.lixom.net>	<5283CC3F.7030306@gmail.com>
+ <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
+Message-ID: <5283DB34.9050301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 09:20 PM, Uwe Kleine-K?nig wrote:
-> As CSR SiRF is converted to multi platform CLOCK_TICK_RATE is a dummy
-> value that seems to match the right value is used.
-> (arch/arm/mach-prima2/include/mach/timex.h which defined CLOCK_TICK_RATE
-> to 1000000 was removed in commit cf82e0e (ARM: sirf: enable
-> multiplatform support); marco used the same file.)
->
-> To not depend on that dummy value use a local #define instead.
+On 11/13/2013 01:21 PM, Olof Johansson wrote:
+> On Wed, Nov 13, 2013 at 11:00 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 11/11/2013 11:38 AM, Olof Johansson wrote:
+>>> On Tue, Nov 05, 2013 at 08:34:56AM -0600, Rob Herring wrote:
+>>>> On Mon, Nov 4, 2013 at 5:36 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>>>> On Sun, Nov 3, 2013 at 8:50 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>>>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>>>>
+>>>>>> As part of the effort to ultimately remove struct machine_desc, the
+>>>>>> machine name is not really needed. It is only used for /proc/cpuinfo
+>>>>>> "Hardware" field. Get this information from the DT instead and remove
+>>>>>> the name string in the machine descriptor for DT machine descriptors. The
+>>>>>> model or machine compatible property from the DT is used instead.
+>>>>>
+>>>>> I've obviously missed some discussions because I wasn't aware of the
+>>>>> plan to remove machine_desc. That's neither here not there, but for as
+>>>>> long as the structure still exists it is really useful to discover
+>>>>> which machine_desc the kernel chooses at boot time. If you're going to
+>>>>> remove this, then at the very least I would embed the filename or
+>>>>> something similar into the machine desc so it is available for
+>>>>> debugging. It can go away when the structure is removed.
+>>>>
+>>>> It's a very long term goal to remove it completely, but it is now
+>>>> optional for "simple" platforms with the default machine_desc and
+>>>> default init ptrs. You might want to look at the patches and the WIP
+>>>> branch I posted[1] which removes the machine_desc for highbank.
+>>>> There's some core boilerplate I'd like your opinion on. Also, I'm sure
+>>>> you are aware of the resistance to add a machine_desc to arm64, so I'm
+>>>> looking at this from that perspective as well. I'm sure there will be
+>>>> platforms which look very similar across arm and arm64.
+>>>>
+>>>> On boot, the model or compatible string from the DTB is printed out
+>>>> (that change is actually in my DT arch clean-up series, not this
+>>>> patch). This has made what is printed out on boot consistent across
+>>>> arches using DT. There is no good reason for this to be arch specific.
+>>>> Presumably the compatible string is unique and just as easily grepped
+>>>> for in the kernel source as the machine_desc name is. Adding a
+>>>> filename string here seems like useless bloat to me.
+>>>
+>>> I think I agree a bit with Grant's concern here.
+>>>
+>>> The compatible string is unique, but the machine descriptors might not
+>>> be -- a given device tree might match two of them (one more generic,
+>>> one more specific) -- it would be useful to know which one was used. Or,
+>>> if you missed to enable the platform support for your board so it booted
+>>> with the generic descriptor, but you still needed your own.
+>>
+>> I would push back on anyone having multiple machine descriptors for that
+>> purpose.
+>>
+>>> Matching it back to which devicetree the kernel was booted with shouldn't be
+>>> hard, I agree -- but knowing which machine entry was picked at boot time
+>>> is still useful information.
+>>
+>> We need to separate what we print on boot vs. what is in /proc/cpuinfo.
+>>
+>> One issue I'm trying to solve here is customers complain that Midway
+>> systems print "Calxeda Highbank" in /proc/cpuinfo. I don't think adding
+>> a machine desc only for adding a string for Midway would be right. Also,
+>> I'm close to removing the highbank machine descriptor altogether and
+>> printing out "Generic DT" from the default machine desc is not
+>> particularly useful. Do we at least have agreement that the "right"
+>> thing to print in cpuinfo is the model or compatible from DT?
+>>
+>> What is printed on boot is already changed to be based on DT, but that
+>> seems to be what you and Grant care about. Does something like this work
+>> for you? This will print either "Machine model: model string (matched
+>> compat)" or "Machine model: 1st compat str (matched compat)"
+> 
+> 
+> PowerPC prints both platform (which is the equivalent to machine
+> descriptor name on ARM), _and_ the /model property from the device
+> tree:
 
-I don't get this patch. It is to fix a compilation error ?
+IMHO, pointless architectural variation.
 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->   drivers/clocksource/timer-marco.c  | 13 +++++++------
->   drivers/clocksource/timer-prima2.c | 14 ++++++++------
->   2 files changed, 15 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
-> index 09a17d9a..0d367a7 100644
-> --- a/drivers/clocksource/timer-marco.c
-> +++ b/drivers/clocksource/timer-marco.c
-> @@ -19,7 +19,8 @@
->   #include <linux/of_irq.h>
->   #include <linux/of_address.h>
->   #include <linux/sched_clock.h>
-> -#include <asm/mach/time.h>
+> chitra:~# cat /proc/cpuinfo
+> processor : 0
+> cpu : PA6T, altivec supported
+> clock : 500.000000MHz
+> revision : 1.2 (pvr 0090 0102)
+> 
+> processor : 1
+> cpu : PA6T, altivec supported
+> clock : 500.000000MHz
+> revision : 1.2 (pvr 0090 0102)
+> 
+> timebase : 66666666
+> platform : PA Semi PWRficient
+> model : pasemi,chitra
+> chitra:~#
+> 
+> (Not sure why we chose "pasemi,chitra" instead of a clear-text model
+> name in this case :-)
+> 
+> Maybe that's the best of both worlds, to add a Model-equivalent entry
+> in /proc/cpuinfo? Ideally we'd like to rename the "Hardware" one to
+> "Platform", but since that's an ABI it'll be hard.
+> 
+> Perhaps it's better to use the /model string for Hardware:, and add a
+> "Machine type" under it? In your case the machine type would
+> (eventually) be "Generic DT", which should be acceptable.
 
-Why do you remove this header ? It is related to CLOCK_TICK_RATE ?
+I'm not inclined to expand cpuinfo and prior attempts to add more info
+to cpuinfo like SoC name have failed. The differences between x86 and
+arm cpuinfo already cause issues for arm. lscpu does not really work on arm.
 
-> +
-> +#define CLOCK_FREQ 1000000
+I'd actually prefer If you really want more system info, then go read
+/proc/device-tree.
 
-Why don't you include <linux/timex.h> where <asm/timex.h> is pulled with 
-the CLOCK_TICK_RATE definition for the multiplatform ?
-
-
->   #define SIRFSOC_TIMER_32COUNTER_0_CTRL			0x0000
->   #define SIRFSOC_TIMER_32COUNTER_1_CTRL			0x0004
-> @@ -191,7 +192,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
->   	ce->rating = 200;
->   	ce->set_mode = sirfsoc_timer_set_mode;
->   	ce->set_next_event = sirfsoc_timer_set_next_event;
-> -	clockevents_calc_mult_shift(ce, CLOCK_TICK_RATE, 60);
-> +	clockevents_calc_mult_shift(ce, CLOCK_FREQ, 60);
->   	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
->   	ce->min_delta_ns = clockevent_delta2ns(2, ce);
->   	ce->cpumask = cpumask_of(cpu);
-> @@ -263,11 +264,11 @@ static void __init sirfsoc_marco_timer_init(void)
->   	BUG_ON(IS_ERR(clk));
->   	rate = clk_get_rate(clk);
->
-> -	BUG_ON(rate < CLOCK_TICK_RATE);
-> -	BUG_ON(rate % CLOCK_TICK_RATE);
-> +	BUG_ON(rate < CLOCK_FREQ);
-> +	BUG_ON(rate % CLOCK_FREQ);
->
->   	/* Initialize the timer dividers */
-> -	timer_div = rate / CLOCK_TICK_RATE - 1;
-> +	timer_div = rate / CLOCK_FREQ - 1;
->   	writel_relaxed(timer_div << 16, sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
->   	writel_relaxed(timer_div << 16, sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL);
->   	writel_relaxed(timer_div << 16, sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_1_CTRL);
-> @@ -283,7 +284,7 @@ static void __init sirfsoc_marco_timer_init(void)
->   	/* Clear all interrupts */
->   	writel_relaxed(0xFFFF, sirfsoc_timer_base + SIRFSOC_TIMER_INTR_STATUS);
->
-> -	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
-> +	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_FREQ));
->
->   	sirfsoc_clockevent_init();
->   }
-> diff --git a/drivers/clocksource/timer-prima2.c b/drivers/clocksource/timer-prima2.c
-> index 8a492d3..ff7d49e 100644
-> --- a/drivers/clocksource/timer-prima2.c
-> +++ b/drivers/clocksource/timer-prima2.c
-> @@ -21,6 +21,8 @@
->   #include <linux/sched_clock.h>
->   #include <asm/mach/time.h>
->
-> +#define CLOCK_FREQ 1000000
-> +
->   #define SIRFSOC_TIMER_COUNTER_LO	0x0000
->   #define SIRFSOC_TIMER_COUNTER_HI	0x0004
->   #define SIRFSOC_TIMER_MATCH_0		0x0008
-> @@ -173,7 +175,7 @@ static u64 notrace sirfsoc_read_sched_clock(void)
->   static void __init sirfsoc_clockevent_init(void)
->   {
->   	sirfsoc_clockevent.cpumask = cpumask_of(0);
-> -	clockevents_config_and_register(&sirfsoc_clockevent, CLOCK_TICK_RATE,
-> +	clockevents_config_and_register(&sirfsoc_clockevent, CLOCK_FREQ,
->   					2, -2);
->   }
->
-> @@ -190,8 +192,8 @@ static void __init sirfsoc_prima2_timer_init(struct device_node *np)
->
->   	rate = clk_get_rate(clk);
->
-> -	BUG_ON(rate < CLOCK_TICK_RATE);
-> -	BUG_ON(rate % CLOCK_TICK_RATE);
-> +	BUG_ON(rate < CLOCK_FREQ);
-> +	BUG_ON(rate % CLOCK_FREQ);
->
->   	sirfsoc_timer_base = of_iomap(np, 0);
->   	if (!sirfsoc_timer_base)
-> @@ -199,14 +201,14 @@ static void __init sirfsoc_prima2_timer_init(struct device_node *np)
->
->   	sirfsoc_timer_irq.irq = irq_of_parse_and_map(np, 0);
->
-> -	writel_relaxed(rate / CLOCK_TICK_RATE / 2 - 1, sirfsoc_timer_base + SIRFSOC_TIMER_DIV);
-> +	writel_relaxed(rate / CLOCK_FREQ / 2 - 1, sirfsoc_timer_base + SIRFSOC_TIMER_DIV);
->   	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_LO);
->   	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_HI);
->   	writel_relaxed(BIT(0), sirfsoc_timer_base + SIRFSOC_TIMER_STATUS);
->
-> -	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
-> +	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_FREQ));
->
-> -	sched_clock_register(sirfsoc_read_sched_clock, 64, CLOCK_TICK_RATE);
-> +	sched_clock_register(sirfsoc_read_sched_clock, 64, CLOCK_FREQ);
->
->   	BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
->
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Rob
