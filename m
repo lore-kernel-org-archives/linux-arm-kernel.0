@@ -1,76 +1,181 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Wed, 13 Nov 2013 15:43:11 -0800
-Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <CACRpkdaf9dVqpE5uFQ5L64n+wXO0AYr5-e1WvYc4rWjVTsTg1w@mail.gmail.com>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
- <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
- <201311050026.56321.heiko@sntech.de> <527835FE.2030102@wwwdotorg.org>
- <5279A319.5060701@broadcom.com>
- <CACRpkdaxPv6CLMjab_4umyUvbBVYcazjmwx_LGRK76vxT4VUqA@mail.gmail.com>
- <527C3080.5050202@broadcom.com>
- <CACRpkdaf9dVqpE5uFQ5L64n+wXO0AYr5-e1WvYc4rWjVTsTg1w@mail.gmail.com>
-Message-ID: <52840E8F.3060803@broadcom.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 14 Nov 2013 00:57:01 +0100
+Subject: [PATCH] ARM: shmobile: r7s72100 GPIO DT nodes for GPIO RZ
+In-Reply-To: <20131113233927.1559.99212.sendpatchset@w520>
+References: <20131113233927.1559.99212.sendpatchset@w520>
+Message-ID: <5286379.6UUfAggTmV@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-11-11 02:01 AM, Linus Walleij wrote:
->> I would imagine that the platform-specific device tree bindings would need
->> to clearly explain what the valid values are, as they should.
->
-> But this is not a platform-specific binding. These are the
-> generic pin configuration bindings we're talking about.
+Hi Magnus,
 
-Yes, the properties are generic, but I was under the impression that the 
-values can be "custom", such as these:
+Thank you for the patch.
 
-  * @PIN_CONFIG_INPUT_SCHMITT: this will configure an input pin to run in
-  *	schmitt-trigger mode. If the schmitt-trigger has adjustable hysteresis,
-  *	the threshold value is given on a custom format as argument when
-  *	setting pins to this mode.
+On Thursday 14 November 2013 08:39:27 Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Add a total of 13 GPIO DT device nodes for r7s72100.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  arch/arm/boot/dts/r7s72100.dtsi |  131 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 131 insertions(+)
+> 
+> --- 0001/arch/arm/boot/dts/r7s72100.dtsi
+> +++ work/arch/arm/boot/dts/r7s72100.dtsi	2013-11-13 22:33:56.000000000 
++0900
+> @@ -14,6 +14,22 @@
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> 
+> +	aliases {
+> +		gpio0 = &p0;
+> +		gpio1 = &p1;
+> +		gpio2 = &p2;
+> +		gpio3 = &p3;
+> +		gpio4 = &p4;
+> +		gpio5 = &p5;
+> +		gpio6 = &p6;
+> +		gpio7 = &p7;
+> +		gpio8 = &p8;
+> +		gpio9 = &p9;
+> +		gpio10 = &p10;
+> +		gpio11 = &p11;
 
-and
+I would have called the phandles gpio[0-9]* instead of p[0-9]*. Shorter names 
+may clash with something else later.
 
-  * @PIN_CONFIG_SLEW_RATE: if the pin can select slew rate, the argument to
-  *	this parameter (on a custom format) tells the driver which alternative
-  *	slew rate to use.
+> +		gpio12 = &jp0;
 
->
->> If we're
->> using integers, we could either have a) !0 and 0, or b) just 1 and 0, and
->> everything else is an error.  Or c) the platform could decide that the value
->> provides addition info like pull-up-strength, so 0 = no pull up, >0 = pull
->> up enabled and the number is the pull up strength in Ohm (bindings should
->> indicate which values are valid), and everything else is an error.
->
-> That seems to make sense, I've just not seen any system (using
-> device tree) that can actually set the pull up/down resistance.
->
->>> That said, if you can patch the OF core and the generic pin config
->>> parser to do what you want with lists like that, it's your pick.
->>> It may take some time though.
->>
->> I don't mind patching the generic pin config, and I don't think the core
->> needs to change,
->
-> If you want arrays of booleans that is a matter for the OF core
-> parser I think.
+What is this special GPIO controller instance ?
 
-I was thinking of just using integers and accepting only 1 and 0, 
-everything else is error.
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -33,4 +49,119 @@
+>  		reg = <0xe8201000 0x1000>,
+>  			<0xe8202000 0x1000>;
+>  	};
+> +
+> +	p0: gpio at fcfe3100 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3100 0x4>, /* PSR */
+> +		  	  <0xfcfe3200 0x2>, /* PPR */
+> +			  <0xfcfe3800 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p1: gpio at fcfe3104 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3104 0x4>, /* PSR */
+> +		  	  <0xfcfe3204 0x2>, /* PPR */
+> +			  <0xfcfe3804 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p2: gpio at fcfe3108 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3108 0x4>, /* PSR */
+> +		  	  <0xfcfe3208 0x2>, /* PPR */
+> +			  <0xfcfe3808 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p3: gpio at fcfe310c {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe310c 0x4>, /* PSR */
+> +		  	  <0xfcfe320c 0x2>, /* PPR */
+> +			  <0xfcfe380c 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p4: gpio at fcfe3110 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3110 0x4>, /* PSR */
+> +		  	  <0xfcfe3210 0x2>, /* PPR */
+> +			  <0xfcfe3810 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p5: gpio at fcfe3114 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3114 0x4>, /* PSR */
+> +		  	  <0xfcfe3214 0x2>, /* PPR */
+> +			  <0xfcfe3814 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p6: gpio at fcfe3118 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3118 0x4>, /* PSR */
+> +		  	  <0xfcfe3218 0x2>, /* PPR */
+> +			  <0xfcfe3818 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p7: gpio at fcfe311c {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe311c 0x4>, /* PSR */
+> +		  	  <0xfcfe321c 0x2>, /* PPR */
+> +			  <0xfcfe381c 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p8: gpio at fcfe3120 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3120 0x4>, /* PSR */
+> +		  	  <0xfcfe3220 0x2>, /* PPR */
+> +			  <0xfcfe3820 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p9: gpio at fcfe3124 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3124 0x4>, /* PSR */
+> +		  	  <0xfcfe3224 0x2>, /* PPR */
+> +			  <0xfcfe3824 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p10: gpio at fcfe3128 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe3128 0x4>, /* PSR */
+> +		  	  <0xfcfe3228 0x2>, /* PPR */
+> +			  <0xfcfe3828 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	p11: gpio at fcfe312c {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe312c 0x4>, /* PSR */
+> +		  	  <0xfcfe322c 0x2>, /* PPR */
+> +			  <0xfcfe382c 0x4>; /* PMSR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	jp0: gpio at fcfe7b20 {
+> +		compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> +		reg = <0xfcfe7b20 0x2>; /* JPPR */
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+>  };
+-- 
+Regards,
 
->>> What about you patch include/linux/pinctrl/pinconf-generic.h
->>> to add PIN_CONFIG_INPUT_DISABLE with this semantic
->>> and also patch the generic pinconf parser in
->>> drivers/pinctrl/pinconf-generic.c
->>> to handle this?
->>
->> Sure, I can add PIN_CONFIG_INPUT_DISABLE.  However I suspect people might be
->> confused by this and PIN_CONFIG_OUTPUT.
->
-> Just make sure you put in good documentation in that file
-> right there, it's using kerneldoc and for a good reason...
-
-
-Thanks,
-Sherman
+Laurent Pinchart
