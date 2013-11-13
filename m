@@ -1,74 +1,55 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 13 Nov 2013 23:07:17 +0900
-Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
- support
-In-Reply-To: <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-3-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108165639.GD15074@mudshark.cambridge.arm.com>
- <527DFC1C.1020107@hitachi.com>
- <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
- <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
- <20131111105812.GC28302@mudshark.cambridge.arm.com>
- <528114C4.5000506@hitachi.com>
- <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
- <5281D848.7000502@hitachi.com>
- <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
-Message-ID: <52838795.2090106@hitachi.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 13 Nov 2013 14:08:15 +0000
+Subject: [PATCH V2 1/2] genirq: Add an accessor for IRQ_PER_CPU flag
+In-Reply-To: <1384340725-26073-2-git-send-email-vkale@apm.com>
+References: <1384340725-26073-1-git-send-email-vkale@apm.com>
+ <1384340725-26073-2-git-send-email-vkale@apm.com>
+Message-ID: <528387CF.5090105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/11/13 15:55), Sandeepa Prabhu wrote:
->>>> I'm unsure about arm64's debug feature behavior, what does happen when
->>>> it performs a single-step on sw-breakpoint?
->>>>
->>>>> Sandeepa: I think you need to retry Masami's test on the arm64 model, since
->>>>> I'm fairly sure it won't work as expected without some additional code.
->>>>
->>>> OK, anyway, for testing same one, we need to port ftrace first. So the next
->>
->> Sorry for confusion, s/next/fallback is what I meant. Making a kprobe module
->> can be done without ftrace port.
->>
->>>> plan is to make a kprobe module to put a probe (which just printk something)
->>>> on a specific function (e.g. vfs_symlink), and run perf record with
->>>> hw-breakpoint as below
->>>>
->>>> $ perf record -e "mem:0xXXXXXX:k" ln -s /dev/null /tmp/foo
->>>>
->>>> Note that 0xXXXXXX is the address of vfs_symlink.
->>>>
->>>> After that, you can see the message in dmesg and also check the perf result
->>>> with "sudo perf script --dump" (you can find a PERF_RECORD_SAMPLE entry if
->>>> it works)
-> Hi Will, Masami,
+Hi Vinayak,
+
+On 13/11/13 11:05, Vinayak Kale wrote:
+> This patch adds an accessor function for IRQ_PER_CPU flag.
+> The accessor function is useful to dertermine whether an IRQ is percpu or not.
 > 
-> I am not sure of 'perf' right now (my minimal rootfs doesn't have) but
-> I tried to test hardware breakpoints using sample modules
-> "samples/hw_breakpoint/" on arm64 upstream branch. This should use
-> same kernel api as perf I believe.
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> ---
+>  include/linux/irqdesc.h |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> 1.  Placing watchpoint ( attr.bp_type = HW_BREAKPOINT_W |
-> HW_BREAKPOINT_R) upon vfs_symlink symbol, but seems watch-point is not
-> triggering at all.
-> 2.  Placing text breakpoint (modified sample module with attr.bp_type
-> = HW_BREAKPOINT_X) upon vfs_symlink, and run "ln -s /dev/null
-> /tmp/foo".  This time, breakpoint hit but exception is re-cursing
-> infinitely!
+> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+> index 56fb646..acd8a3f 100644
+> --- a/include/linux/irqdesc.h
+> +++ b/include/linux/irqdesc.h
+> @@ -152,6 +152,14 @@ static inline int irq_balancing_disabled(unsigned int irq)
+>  	return desc->status_use_accessors & IRQ_NO_BALANCING_MASK;
+>  }
+>  
+> +static inline int irq_is_percpu(unsigned int irq)
+> +{
+> +	struct irq_desc *desc;
+> +
+> +	desc = irq_to_desc(irq);
+> +	return (desc && (desc->status_use_accessors & IRQ_PER_CPU)) ? 1 : 0;
 
-Did you this without kprobes? If so, the hw_breakpoint porting
-on arm64 may have a bug.
+I don't think it is worth checking for the validity of "desc" here. All
+the other accessors assume that you've not passed a stupid "irq" value.
 
-> I have attached the kernel logs for reference. So wanted to check if
-> hw breakpoint/watch-points are working on the upstream branch? Has it
-> been tested recently with sample modules  or perf/ptrace?
+Simply having
+	return !!(desc->status_use_accessors & IRQ_PER_CPU);
+should be enough.
 
-I've tested on x86 with the latest tip-tree kernel and it worked.
+> +}
+> +
+>  static inline void
+>  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+>  {
+> 
 
-Thank you,
+Cheers,
 
+	M.
 -- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Jazz is not dead. It just smells funny...
