@@ -1,72 +1,77 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Nov 2013 09:57:57 -0800
-Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
- monitor
-In-Reply-To: <5282E068.1070608@nvidia.com>
-References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
- <52828EF5.6090909@wwwdotorg.org>
- <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
- <5282E068.1070608@nvidia.com>
-Message-ID: <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Nov 2013 10:58:23 -0700
+Subject: [PATCHv4 5/7] iommu/tegra: smmu: Support "mmu-masters" binding
+In-Reply-To: <20131113094517.4608edf4302b61e3c4402a25@nvidia.com>
+References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>	<1384158718-4756-6-git-send-email-hdoyu@nvidia.com>	<5282C512.5090900@wwwdotorg.org>
+ <20131113094517.4608edf4302b61e3c4402a25@nvidia.com>
+Message-ID: <5283BDBF.9020509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 6:14 PM, Alex Courbot <acourbot@nvidia.com> wrote:
-> On 11/13/2013 05:38 AM, Olof Johansson wrote:
+On 11/13/2013 12:45 AM, Hiroshi Doyu wrote:
+> On Wed, 13 Nov 2013 01:17:22 +0100
+> Stephen Warren <swarren@wwwdotorg.org> wrote:
+> 
+>>> +		mmu-masters = <&host1x TEGRA_SWGROUP_HC>,
+>>> +			      <&mpe TEGRA_SWGROUP_MPE>,
+>>> +			      <&vi TEGRA_SWGROUP_VI>,
+>>> +			      <&epp TEGRA_SWGROUP_EPP>,
+>>> +			      <&isp TEGRA_SWGROUP_ISP>,
+>>> +			      <&gr2d TEGRA_SWGROUP_G2>,
+>>> +			      <&gr3d TEGRA_SWGROUP_NV TEGRA_SWGROUP_NV2>,
 >>
->> On Tue, Nov 12, 2013 at 12:26 PM, Stephen Warren <swarren@wwwdotorg.org>
->> wrote:
->>>
->>> On 11/07/2013 03:11 AM, Alexandre Courbot wrote:
->>>>
->>>> Just a set of small fixes to address the concerns expressed on v9 with
->>>> the
->>>> non-prefixed version DT properties. I hope there won't be a need for an
->>>> eleventh (!) version. :P
->>>
->>>
->>> BTW, this version looks fine to me. On IRC, Olof said it looked OK to
->>> him. I'm just waiting to hear back from Olof/Russell whether I should
->>> merge this through the Tegra tree, or whether the first 1-3 patches
->>> should go through Russell's tree.
->>
->>
->> I pinged Russell, and he brought up the fact that there were earlier
->> requests to move it to drivers/firmware. It would make sense to try to
->> get that done before merging, especially if you anticipate someone
->> using TF on 64-bit platforms.
->
->
-> IIRC when we discussed this point your last comment was as follows:
+>> So right now, the driver is statically assigning clients to a couple of
+>> specific ASIDs. What if we want to configure that mapping from DT; does
+>> that make sense? Instead of mmu-masters being a list of <phandle
+>> streamid*>, should it be <phandle ASID streamid*> or <phandle (streamid
+>> ASID)*>?
+> 
+> That's possible.
+> 
+> Here, swgroup ID == stream ID, and a device is statically bind to a
+> specific swgroup ID(hard coded). ASID is dynamically assigned to
+> swgroup(devices). So assigning ASID belongs to a policy, but we can
+> consider this assigning as board specifc policy since it's hard to
+> change after kernel boots up in general. So assigning ASID in a board
+> DT makes sense. The format would be:
+> 
+>   <phandle "swgroup ID" "asid">,
+> 
+> ex:
+>   <&host1x TEGRA_SWGROUP_HC 0>,
+> 
+> The above depends on the discussion of the standard IOMMU bindings,
+> but the number of argument can be set by each IOMMU driver.
+> 
+> If we take the the other way,
+> 
+>  smmu: iommu at xxxxxx {
+>        #iommu-cells = <3>;
+>        ^^^^^^^^^^^^^^^^^^
+>    };
+> 
+>    host1x {
+>            compatible = "nvidia,tegra30-host1x", "simple-bus";
+>            iommu = <&smmu 0x??????? 0x??????? "asid">;
+> 	   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^#######
+>            gr3d {
+>                    compatible = "nvidia,tegra30-gr3d";
+>                    iommu = <&smmu 0x??????? 0x???????>;
+>            }
+> 
+> I think that this "asid" part can be set 0 in tegra??.dtsi and the
+> actual value can be overwritten in tegra??-<boardname>.dts file.
 
-Touche. :) Thanks for the reminder.
+The one issue here is that we can only override entire properties, so
+it's not possible for a board file to *just* replace the ASID, it'd have
+to duplicate the entire property, just to change the one value.
 
-> On Tue, Oct 29, 2013 at 6:55 AM, Olof Johansson <olof@lixom.net> wrote:
->> I think we can probably merge this under arch/arm now, and when we
->> figure out what needs to be common with ARM64 we can move it out to a
->> good location. It might be that mostly just a header file with ABI
->> conventions needs to be shared, not actual implementation, for
->> example.
->
-> So I thought we agreed on that. If in the end we prefer to move the ARM
-> firmware interface into drivers/firmware, I'm fine with that too (Tomasz
-> also confirmed he would be ok with it) but I wonder if that would not be
-> somehow premature.
->
-> Another worry of mine is that this might delay this patchset some more.
-> Support for TF is one of the last remaining step towards making NVIDIA
-> branded Tegra retail devices (SHIELD and TegraNote at the moment) run
-> upstream directly. I missed 3.13, I'd like to make sure I won't miss 3.14.
-> Would it be acceptable if we move the ARM firmware interface to a common
-> place after this patchset is merged?
+Is the ASID mapping really likely to be board-specific though? To my
+naive thinking, it seems that the chip design (e.g. number of
+peripherals, number of available ASIDs) would tend to imply the
+device->ASID mapping, since it would have been considered as part of
+chip design. Hence, wouldn't soc.dtsi typically specify the expected
+ASID mapping, and boards rarely if ever override it?
 
-Well, as I already said I'm ok with things going into arch/arm to
-start with, as long as Russell is. Once we see 64-bit needs for the
-same we'll move it out -- it's not like it's a whole lot of code to
-start with. But Russell has veto on the topic. :-)
-
-Russell still has his pull requests outstanding so I'm not sure where
-things are at, but I don't think this will miss 3.14 at this rate.
-
-
--Olof
+If the ASID mapping really is likely to vary per board, perhaps it makes
+sense to put it into a separate property somehow so it's easier to override?
