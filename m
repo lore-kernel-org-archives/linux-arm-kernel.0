@@ -1,48 +1,110 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Nov 2013 15:40:10 +0100
-Subject: [PATCH] clk: add flags to distinguish xtal clocks
-In-Reply-To: <1384243549.12583.36.camel@porter.coelho.fi>
-References: <1382528150.21526.25.camel@porter.coelho.fi>
- <1383933648-28595-1-git-send-email-balbi@ti.com>
- <20131110113716.GN26440@lukather>
- <20131111194247.GB19212@saruman.home>
- <1384199456.12583.27.camel@porter.coelho.fi>
- <20131111205910.GA26440@lukather>
- <1384243549.12583.36.camel@porter.coelho.fi>
-Message-ID: <20131113144010.GB3538@lukather>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 13 Nov 2013 16:48:17 +0200
+Subject: [PATCH] ARM: davinci: Fix McASP mem resource names
+Message-ID: <1384354097-1163-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 10:05:49AM +0200, Luca Coelho wrote:
-> > What I'm not really convinced about is *how* you carry that metadata
-> > in the DT, that's all, nothing more.
-> 
-> Okay, I get you.  My point is that being a crystal or not *is* a
-> characteristic of the clock, so I think it could be part of the flags
-> that describe it.
+The ASoC McASP driver looks for the mem resources by name and:
+"mpu" and "dat" regions.
+Change/add the needed name for the mem resources so the driver can pick the
+correct resource.
 
-Yeah, but then, a crystal has a slightly different behaviour and
-property than a oscillator, therefore the two aren't fully
-"compatible" with each other.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+Hi,
 
-> In any case, it's not really my call.  This is about the clock and it's
-> not even my home turf (wireless). ;)
-> 
-> Thanks for your comments.  And I'm sorry if the tone of my previous
-> email sounded harsh, it was not supposed to. :)
+This is needed for 3.13.
 
-That's fine, don't worry :)
+Regards,
+Peter
 
-Maxime
+ arch/arm/mach-davinci/devices-da8xx.c | 4 ++--
+ arch/arm/mach-davinci/dm355.c         | 1 +
+ arch/arm/mach-davinci/dm365.c         | 1 +
+ arch/arm/mach-davinci/dm644x.c        | 1 +
+ arch/arm/mach-davinci/dm646x.c        | 4 ++--
+ 5 files changed, 7 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index c46eccb..78829c5 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -487,7 +487,7 @@ int __init da8xx_register_emac(void)
+ 
+ static struct resource da830_mcasp1_resources[] = {
+ 	{
+-		.name	= "mcasp1",
++		.name	= "mpu",
+ 		.start	= DAVINCI_DA830_MCASP1_REG_BASE,
+ 		.end	= DAVINCI_DA830_MCASP1_REG_BASE + (SZ_1K * 12) - 1,
+ 		.flags	= IORESOURCE_MEM,
+@@ -515,7 +515,7 @@ static struct platform_device da830_mcasp1_device = {
+ 
+ static struct resource da850_mcasp_resources[] = {
+ 	{
+-		.name	= "mcasp",
++		.name	= "mpu",
+ 		.start	= DAVINCI_DA8XX_MCASP0_REG_BASE,
+ 		.end	= DAVINCI_DA8XX_MCASP0_REG_BASE + (SZ_1K * 12) - 1,
+ 		.flags	= IORESOURCE_MEM,
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index ef9ff1f..d4baf4f 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -641,6 +641,7 @@ static struct platform_device dm355_edma_device = {
+ 
+ static struct resource dm355_asp1_resources[] = {
+ 	{
++		.name	= "mpu",
+ 		.start	= DAVINCI_ASP1_BASE,
+ 		.end	= DAVINCI_ASP1_BASE + SZ_8K - 1,
+ 		.flags	= IORESOURCE_MEM,
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 1511a06..9c68e3f 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -942,6 +942,7 @@ static struct platform_device dm365_edma_device = {
+ 
+ static struct resource dm365_asp_resources[] = {
+ 	{
++		.name	= "mpu",
+ 		.start	= DAVINCI_DM365_ASP0_BASE,
+ 		.end	= DAVINCI_DM365_ASP0_BASE + SZ_8K - 1,
+ 		.flags	= IORESOURCE_MEM,
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 143a321..79847d0 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -572,6 +572,7 @@ static struct platform_device dm644x_edma_device = {
+ /* DM6446 EVM uses ASP0; line-out is a pair of RCA jacks */
+ static struct resource dm644x_asp_resources[] = {
+ 	{
++		.name	= "mpu",
+ 		.start	= DAVINCI_ASP0_BASE,
+ 		.end	= DAVINCI_ASP0_BASE + SZ_8K - 1,
+ 		.flags	= IORESOURCE_MEM,
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 2a73f29..45de58c 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -621,7 +621,7 @@ static struct platform_device dm646x_edma_device = {
+ 
+ static struct resource dm646x_mcasp0_resources[] = {
+ 	{
+-		.name	= "mcasp0",
++		.name	= "mpu",
+ 		.start 	= DAVINCI_DM646X_MCASP0_REG_BASE,
+ 		.end 	= DAVINCI_DM646X_MCASP0_REG_BASE + (SZ_1K << 1) - 1,
+ 		.flags 	= IORESOURCE_MEM,
+@@ -641,7 +641,7 @@ static struct resource dm646x_mcasp0_resources[] = {
+ 
+ static struct resource dm646x_mcasp1_resources[] = {
+ 	{
+-		.name	= "mcasp1",
++		.name	= "mpu",
+ 		.start	= DAVINCI_DM646X_MCASP1_REG_BASE,
+ 		.end	= DAVINCI_DM646X_MCASP1_REG_BASE + (SZ_1K << 1) - 1,
+ 		.flags	= IORESOURCE_MEM,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/1233f854/attachment.sig>
+1.8.4.2
