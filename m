@@ -1,54 +1,98 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 13 Nov 2013 01:52:25 -0200
-Subject: [PATCHv3 3/8] staging: imx-drm: ipuv3-crtc: don't harcode some
- mode flags.
-In-Reply-To: <1384274965-30549-3-git-send-email-denis@eukrea.com>
-References: <1384274965-30549-1-git-send-email-denis@eukrea.com>
- <1384274965-30549-3-git-send-email-denis@eukrea.com>
-Message-ID: <CAOMZO5ASDO22eHVLn18dQ31TJEjemtGp+SQqHk9XtYj6Hx3aLg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 12 Nov 2013 20:00:15 -0800
+Subject: [PATCH 1/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <CAPdLdqn5bvxnURdcy0JATBWmyJsbL=EJ65repSVxchw7srWpfQ@mail.gmail.com>
+References: <1383943488-6537-1-git-send-email-markus.mayer@linaro.org>	<1383943488-6537-2-git-send-email-markus.mayer@linaro.org>	<20131111173434.GA25532@roeck-us.net>
+ <CAPdLdqn5bvxnURdcy0JATBWmyJsbL=EJ65repSVxchw7srWpfQ@mail.gmail.com>
+Message-ID: <5282F94F.2060208@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+On 11/12/2013 02:17 PM, Markus Mayer wrote:
 
-On Tue, Nov 12, 2013 at 2:49 PM, Denis Carikli <denis@eukrea.com> wrote:
-> This change is needed for making the eukrea-cpuimx51
->   QVGA display work.
+>>> +
+>>> +     if (!timeout)
+>>> +             dev_info(wdog->dev, "Watchdog timer stopped");
+>>> +
+>> All that noise.
 >
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: driverdev-devel at linuxdriverproject.org
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  drivers/staging/imx-drm/ipuv3-crtc.c |    6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> ChangeLog v2->v3:
-> - Added some interested people in the Cc list.
-> - Ajusted the flags to match the changes in "drm: Add the lacking
->   DRM_MODE_FLAG_* for matching the DISPLAY_FLAGS_*"
-> ---
-> diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-> index 670a56a..917818c 100644
-> --- a/drivers/staging/imx-drm/ipuv3-crtc.c
-> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-> @@ -155,9 +155,11 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
->                 sig_cfg.Hsync_pol = 1;
->         if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->                 sig_cfg.Vsync_pol = 1;
-> +       if (mode->flags & DRM_MODE_FLAG_DE_HIGH)
-> +               sig_cfg.enable_pol = 1;
-> +       if (mode->flags & DRM_MODE_FLAG_PIXDATA_POSEDGE)
-> +               sig_cfg.clk_pol = 1;
+> Would it be acceptable to turn these calls into dev_dbg() calls, here
+> and elsewhere?
 >
-> -       sig_cfg.enable_pol = 1;
-> -       sig_cfg.clk_pol = 1;
+
+Ok with me.
 
 
-What are the sig_cfg.enable_pol and sig_cfg.clk_pol values you need
-for your display to operate correctly?
+>>> +
+>>> +     wdt->resolution = SECWDOG_DEFAULT_RESOLUTION;
+>>> +     ret = bcm_kona_wdt_set_resolution_reg(wdt);
+>>> +     if (ret) {
+>>> +             dev_err(dev, "Failed to set resolution (error: %d)", ret);
+>>
+>> ret can be -EAGAIN or -EINVAL. -EINVAL suggests a bad internale error (hopefully
+>> SECWDOG_DEFAULT_RESOLUTION is defined to be smaller than SECWDOG_MAX_RES),
+>> and if it is -EAGAIN there should be no error message.
+>>
+>> Actually, bcm_kona_wdt_set_resolution_reg is only called from here, meaning the
+>> error check in the function is really unnecessary.
+>
+> This again goes back to making resolution available to userland. Then
+> bcm_kona_wdt_set_resolution_reg() would be called from elsewhere. Why
+> is it bad to print an error message on timeout? Would this still apply
+
+That was related to -EAGAIN. Which would be bad here anyway as it could result
+in an endless loop if there is a problem with the chip.
+
+> if I switch the code to -ETIMEDOUT?
+>
+That is one option, or -EIO if the condition indicates a chip error.
+
+>>> +             return ret;
+>>> +     }
+>>> +
+>>> +     spin_lock_init(&wdt->lock);
+>>> +     platform_set_drvdata(pdev, wdt);
+>>> +     watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
+>>> +
+>>> +     ret = bcm_kona_wdt_set_timeout_reg(&bcm_kona_wdt_wdd);
+>>> +     if (ret) {
+>>> +             dev_err(dev, "Failed set watchdog timeout");
+>>
+>> The only error case is -EAGAIN. I don't think there should be an error mesasge
+>> in this case (though I am not sure what the reaction should be).
+>
+> I am thinking that probe() needs to return an error if setting the
+> timeout fails, as it can't really rely on the watchdog timer or let
+> the system use it. Shouldn't that be accompanied by an error message
+> letting the user know what happened?
+>
+Oh, I agree it should return an error, and an error message is ok as well.
+I am just sure it should not be -EAGAIN, but I don't know what it should be.
+Maybe -ETIMEDOUT, or -EIO.
+
+>>> +             return ret;
+>>> +     }
+>>> +
+>>> +     ret = watchdog_register_device(&bcm_kona_wdt_wdd);
+>>> +     if (ret) {
+>>> +             dev_err(dev, "Failed to register watchdog device");
+>>> +             return ret;
+>>> +     }
+>>> +
+>>> +#ifdef CONFIG_BCM_KONA_WDT_DEBUG
+>>> +     wdt->debugfs = bcm_kona_wdt_debugfs_init(wdt, &bcm_kona_wdt_wdd);
+>>> +#endif
+>>> +     dev_info(dev, "Broadcom Kona Watchdog Timer");
+>>> +
+>> Such messages are in general considered nuisance nowadays. I would suggest to
+>> remove it (or ask Greg KH for advice).
+>>
+
+Referring to your other mail.... seems those messages are falling out of favor.
+I consider it a nuisance, though so far I let it go through. The messages do
+increase boot time, especially on systems with slow serial console, and IMO
+do not provide any real value. Users either don't care, or can check if the
+driver is loaded by other means. I would suggest to at least make it dev_dbg.
+
+Thanks,
+Guenter
