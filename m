@@ -1,51 +1,116 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Nov 2013 22:45:54 +0100
-Subject: [linux-sunxi] [PATCH 2/2] ARM: sun6i: Add SMP support for the
- Allwinner A31
-In-Reply-To: <1384188485.19117.90.camel@kazak.uk.xensource.com>
-References: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
- <1383471013-21695-3-git-send-email-maxime.ripard@free-electrons.com>
- <1383583997.8826.123.camel@kazak.uk.xensource.com>
- <20131108084056.GB26440@lukather>
- <1383906355.3189.77.camel@kazak.uk.xensource.com>
- <20131110100312.GI26440@lukather>
- <1384188485.19117.90.camel@kazak.uk.xensource.com>
-Message-ID: <20131113214554.GC3538@lukather>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Wed, 13 Nov 2013 21:50:00 +0000
+Subject: [PATCH v2 2/2] clk-fixed-rate: support specified-clock binding
+In-Reply-To: <1384379400-24776-1-git-send-email-james.hogan@imgtec.com>
+References: <1384379400-24776-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1384379400-24776-3-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 04:48:05PM +0000, Ian Campbell wrote:
-> > > Anyway, once I get to the point of being able to do something I'll
-> > > coordinate with Marc etc and figure out what to do. In the meantime I
-> > > think having the kernel do the bringup (like this patch does) is
-> > > sensible. It's very likely to be what we want to do in the absence of
-> > > any instruction to the contrary (DTB or otherwise) in the future anyway.
-> > 
-> > Yep.
-> > 
-> > A part from the discussion on the approach, do you have any comments
-> > on the patches themselves?
-> 
-> I know approximately diddly about how one is supposed to bring up these
-> processors, but I did correlate what you were doing as best I could with
-> the A20 manual for the registers and it looked sensible to me, modulo
-> the fact that I was looking at the manual for a slightly different
-> processor ;-)
-> 
-> Not a terribly strong statement, sorry.
+Implement the new specified-clock DT binding which uses a table to look
+up the fixed frequency based on the value in a register.
 
-Fair enough :)
+The discovery is done entirely within of_specified_clk_setup() since the
+clock rate is still fixed so there's no need to dynamically rediscover
+the rate. The register is iomapped, read, and iounmapped, then the field
+value is extracted and used to look up the clock frequency in the table
+property.
 
-Maxime
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+Changes in v2:
+ * Rewrite to use a fixed clock instead of an entirely new clock type.
+---
+ drivers/clk/clk-fixed-rate.c | 51 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |  1 +
+ 2 files changed, 52 insertions(+)
 
+diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+index 1ed591ab8b1d..7d7ec4094961 100644
+--- a/drivers/clk/clk-fixed-rate.c
++++ b/drivers/clk/clk-fixed-rate.c
+@@ -9,12 +9,14 @@
+  * Fixed rate clock implementation
+  */
+ 
++#include <linux/bitops.h>
+ #include <linux/clk-provider.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ 
+ /*
+  * DOC: basic fixed-rate clock that cannot gate
+@@ -103,4 +105,53 @@ void of_fixed_clk_setup(struct device_node *node)
+ }
+ EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
+ CLK_OF_DECLARE(fixed_clk, "fixed-clock", of_fixed_clk_setup);
++
++/**
++ * of_specified_clk_setup() - Setup function for discoverable fixed rate clock
++ */
++void of_specified_clk_setup(struct device_node *node)
++{
++	struct clk *clk;
++	const char *clk_name = node->name;
++	u32 shift, mask, rate, reg_val, val;
++	void __iomem *reg;
++	struct property *prop;
++	const __be32 *p;
++
++	/* Iomap and read the configuration register */
++	reg = of_iomap(node, 0);
++	if (!reg)
++		return;
++	reg_val = readl(reg);
++	iounmap(reg);
++
++	/* Apply bit-mask */
++	if (of_property_read_u32(node, "bit-mask", &mask))
++		return;
++	reg_val &= mask;
++	/* Apply bit-shift */
++	if (of_property_read_u32(node, "bit-shift", &shift))
++		shift = ffs(mask) - 1;
++	reg_val >>= shift;
++
++	/* Look through the mapping for a matching frequency */
++	of_property_for_each_u32(node, "table", prop, p, val) {
++		p = of_prop_next_u32(prop, p, &rate);
++		if (!p)
++			break;
++		if (val == reg_val)
++			goto found_rate;
++	}
++	/* No match found */
++	return;
++found_rate:
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
++	if (!IS_ERR(clk))
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++EXPORT_SYMBOL_GPL(of_specified_clk_setup);
++CLK_OF_DECLARE(specified_clk, "specified-clock", of_specified_clk_setup);
+ #endif
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 7e59253b8603..0e1312504da9 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -203,6 +203,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		unsigned long fixed_rate);
+ 
+ void of_fixed_clk_setup(struct device_node *np);
++void of_specified_clk_setup(struct device_node *np);
+ 
+ /**
+  * struct clk_gate - gating clock
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/d60f51a1/attachment.sig>
+1.8.1.2
