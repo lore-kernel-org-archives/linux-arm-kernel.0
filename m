@@ -1,59 +1,106 @@
-From: giometti@enneenne.com (Rodolfo Giometti)
-Date: Wed, 13 Nov 2013 18:46:24 +0100
-Subject: [RFC PATCH v2] ARM: at91: add support for Cosino board series by
- HCE Engineering
-In-Reply-To: <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1383754767-5398-1-git-send-email-giometti@linux.it>
- <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20131113174624.GC10964@enneenne.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Nov 2013 10:49:08 -0700
+Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
+In-Reply-To: <20131113092354.5b65f29bacc4f37083f81e2e@nvidia.com>
+References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>	<1384158718-4756-3-git-send-email-hdoyu@nvidia.com>	<5282BAFC.8070405@wwwdotorg.org>
+ <20131113092354.5b65f29bacc4f37083f81e2e@nvidia.com>
+Message-ID: <5283BB94.6060400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 06:34:30PM +0100, Nicolas Ferre wrote:
-> From: Rodolfo Giometti <giometti@linux.it>
+On 11/13/2013 12:23 AM, Hiroshi Doyu wrote:
+> On Wed, 13 Nov 2013 00:34:20 +0100
+> Stephen Warren <swarren@wwwdotorg.org> wrote:
 > 
-> This patch adds the Cosino at91sam9g35 based CPU module and the
-> Cosino Mega 2560 extension board.
+>> On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
+>>> An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
+>>> are done later.
+>>>
+>>> With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
+>>> identify whether a device is IOMMU'able or not. If a device is
+>>> IOMMU'able, we'll defer to populate that device till an iommu device
+>>> is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
+>>> is set in the bus. Then, those defered IOMMU'able devices are
+>>> populated and configured as IOMMU'abled with help of the already
+>>> populated iommu device via iommu_ops->add_device().
+>>
+>> This looks fairly neat and clean.
+>>
+>> I'm still worried about using #stream-id-cells in DT nodes though. While
+>> I do understand that the *Linux* device model currently only allows each
+>> struct device to be affected by a single IOMMU, I worry that encoding
+>> that same restriction into DT is a mistake. I'd far rather see a
+>> property like:
+>>
+>> SMMU:
+>>     smmu: smmu at xxxxxx {
+>>         #smmu-cells = <1>;
+>>     }
+>>
+>> Affected device:
+>>     smmus = <&smmu 1>;
+>>     (perhaps with smmu-names too)
+>>
+>> That would allow the DT to represent basically arbitrary HW configurations.
 > 
-> Web site: http://www.cosino.it
+> True, and also can solve multi IOMMU problem as well.
 > 
-> Signed-off-by: Rodolfo Giometti <giometti@linux.it>
-> [nicolas.ferre at atmel.com: adapted to newer kernel, modified commit message]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Rodolfo,
+>> The implementation of this patch would then be almost as trivial; you'd
+>> just need to walk the smmus property to find each phandle in turn, just
+>> like any other phandle+specifier property, and validate that the SMMU
+>> driver was already probe()d for each.
 > 
-> Can you please review this adaptation of your previous patch to newer kernel.
-> I hope to integrate your board in upcoming 3.14.
+> This seems to be almost same as the previous v3 DT bindings, and if we
+> introduce 64 bitmap newly, this DT bindings would be something like
+> below:
 > 
-> You will see that I addressed the remarks by Jean-Christophe and Russell (about
-> commit message). Please tell me if it is good on your side.
+>    smmu: iommu at xxxxxx {
+>        #smmu-cells = <2>;
+>        ......
+>    };
+> 
+>    host1x {
+>            compatible = "nvidia,tegra30-host1x", "simple-bus";
+>            nvidia,memory-clients = <&smmu 0x??????? 0x???????>;
+>            ....
+>            gr3d {
+>                    compatible = "nvidia,tegra30-gr3d";
+>                    nvidia,memory-clients = <&smmu 0x??????? 0x???????>;
+>            }
+> 
+> If a device is attached to multiple IOMMU H/Ws,
+> 
+>            gr3d {
+>                    compatible = "nvidia,tegra30-gr3d";
+>                    nvidia,memory-clients = <&smmu 0x??????? 0x??????? &gart 0x???????>;
+>                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 
+> Then, the problem is the binding "name" and its "scope". This original
+> patch works with "#stream-id-cells" in driver core because I assumed
+> that "#stream-id-cells" can indicate globally that a device can be an
+> IOMMU master.
 
-I did some changes... attached are the correct patches.
+For example, the pinctrl bindings have the same issue, since they're
+interpreted "globally", and by (code called from) the generic device
+probing code.
 
-Here the changelog V1 -> V2:
+We simply decided that the properties "pinctrl-names" and "pinctrl-n"
+(n=0...) were globally defined by the pinctrl subsystem, and hence could
+be parsed in any node.
 
-[Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>]
-* prefix "at91-" added
-* atmel,mux-mask stuff removed
-* "compatible" stuff is now on the same line for easy-grep(TM)
-* lcd binding dropped
+We could do the same with "smmus" and "smmu-names" in this case.
 
-Ciao,
+> We may be able to have some kind of callback function which checks
+> "#stream-id-cells" *in* SMMU driver, but at least this function needs to
+> be registered in the bus at very early stage, iommu_ops->is_iommu_master().
+> But this cannot be done with bus->iommu_ops since bus->iommu_ops is set
+> after IOMMU is populated. A kind of Chikin or the egg problem.
 
-Rodolfo
+I think this is simply the normal deferred probe.
 
--- 
-
-GNU/Linux Solutions                  e-mail: giometti at enneenne.com
-Linux Device Driver                          giometti at linux.it
-Embedded Systems                     phone:  +39 349 2432127
-UNIX programming                     skype:  rodolfo.giometti
-Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-arm-mach-at91-add-support-for-Cosino-board-series-by.patch
-Type: text/x-diff
-Size: 6038 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131113/0b99b342/attachment.bin>
+When device X attempts to probe, the core SMMU code (called from the
+core device probing code) iterates over the smmus property. If any of
+the phandles listed there don't have a registered SMMU driver, then
+defer probe of device X. Eventually, the SMMU driver will appear, and
+the driver core will attempt to re-probe device X, and all the SMMUs
+have devices probed already, and everything will work.
