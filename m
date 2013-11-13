@@ -1,54 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Nov 2013 17:27:21 -0700
-Subject: [PATCHv4 7/7] iommu/tegra: smmu: Allow duplicate ASID wirte
-In-Reply-To: <1384158718-4756-8-git-send-email-hdoyu@nvidia.com>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
- <1384158718-4756-8-git-send-email-hdoyu@nvidia.com>
-Message-ID: <5282C769.9040202@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 13 Nov 2013 09:53:29 +0900
+Subject: [PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+In-Reply-To: <17979814.3ftdsWAt7J@avalon>
+References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131112051137.GB28649@verge.net.au>
+ <20131112052625.GC28649@verge.net.au> <17979814.3ftdsWAt7J@avalon>
+Message-ID: <20131113005329.GA25694@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
-> The device, which belongs to the same ASID, can try to enable the same
-> ASID as the other swgroup devices. This should be allowed but just
-> skip the actual register write. If the write value is different, it
-> will return -EINVAL.
+On Tue, Nov 12, 2013 at 02:21:04PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Tuesday 12 November 2013 14:26:25 Simon Horman wrote:
+> > On Tue, Nov 12, 2013 at 02:11:37PM +0900, Simon Horman wrote:
+> > > On Sat, Nov 09, 2013 at 01:33:48PM +0100, Laurent Pinchart wrote:
+> > > > SH-Mobile platforms are transitioning from non-multiplatform to
+> > > > multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
+> > > > been created to group all multiplatform-enabled SH-Mobile SoCs. The
+> > > > existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
+> > > > been converted yet.
+> > > > 
+> > > > This arrangement works fine for the arch/ code, but lots of drivers
+> > > > needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
+> > > > ARCH_SHMOBILE only. In order to avoid changing them, rename
+> > > > ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
+> > > > ARCH_SHMOBILE configuration symbol that is selected by both
+> > > > ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
+> > > > 
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > Acked-by: Magnus Damm <damm@opensource.se>
+> > > 
+> > > Thanks, I have queued this up.
+> > 
+> > I have dropped this for now as it seems that all of the
+> > shmobile defconfigs now need to be updated to use ARCH_SHMOBILE_LEGACY
+> > instead of ARCH_SHMOBILE.
+> 
+> Indeed, I forgot about that.
+> 
+> > It seems to me that needs to be part of this patch to avoid
+> > breaking bisecatability. Any thoughts?
+> 
+> The only bisection this would break is the defconfig bisection. I'm not sure 
+> whether we need to care about that, Would that be a bit issue ? I'll submit a 
+> separate patch, please feel free to squash it with this one if you believe it 
+> should be.
 
-That's pretty confusing. I'm not at all sure I understand what it means.
-
-I /think/ you're saying that multiple devices can exist whose swgroup
-values are the same, and when setting up those devices, the ASID
-register for that swgroup gets written multiple times, once per device.
-This change allows that, assuming that all the different devices attempt
-to select the same ASID for that swgroup. If so,
-
-Giving some specific examples of devices with the same swgroup value
-would be useful. Along with sternly talking to the HW designers and
-telling them to just give everything unique IDs:-(
-
-> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-
-> @@ -346,8 +346,11 @@ static int __smmu_client_set_swgroups(struct smmu_client *c,
->  		offs = SWGROUP_ASID_REG(i);
->  		val = smmu_read(smmu, offs);
->  		if (on) {
-> -			if (WARN_ON(val & mask))
-> -				goto err_hw_busy;
-> +			if (val) {
-
-Why only check this if (val)? Surely the check is valid if (val == 0)
-too; you don't want to go writing 0 into the ASID register if it's
-already configured to point at something else?
-
-Or, is "val" a bitmask of ASIDs, not an integer representing the ASID?
-
-> +				if (WARN_ON(val != mask))
-> +					return -EINVAL;
-> +				goto skip;
-> +			}
->  			val |= mask;
-
-... I guess this would imply it's a bitmask.
-
-But then that begs the question: if (on) means that ASID mapping is
-being enabled, then isn't that invalid if (!mask)?
+To be honest I'm unsure.
+But I think that I am leaning towards keeping the patches separate.
