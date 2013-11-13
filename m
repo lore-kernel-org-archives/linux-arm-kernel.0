@@ -1,55 +1,71 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 13 Nov 2013 09:32:06 +0100
-Subject: [PATCH v3 0/6] ARM: at91: use new at91 clks for samad3 SoCs
-Message-ID: <1384331532-2951-1-git-send-email-b.brezillon@overkiz.com>
+Date: Wed, 13 Nov 2013 09:32:07 +0100
+Subject: [PATCH v3 1/6] ARM: at91: prepare sama5 dt boards transition to
+ common clk
+In-Reply-To: <1384331532-2951-1-git-send-email-b.brezillon@overkiz.com>
+References: <1384331532-2951-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1384331532-2951-2-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch prepare the transition to common clk for sama5 dt boards by
+replacing the timer init callback.
 
-This patch series moves sama5d3 SoCs and boards to the new at91 clk framework
-(based on common clk framework).
+Clocks registration cannot be done in early init callback (as formerly done
+by the old clk implementation) because it requires dynamic allocation
+which is not ready yet during early init.
 
-This patch series depends on following patch series:
-1) "ARM: at91/dt: split sama5d3 definition" (v1)
-3) "ARM: at91: move to common clk framework" (v5)
+In the other hand, at91 clocks must be registered before
+at91sam926x_pit_init is called because PIT (Periodic Interval Timer) driver
+request the master clk (mck).
 
-Best Regards,
+A new function (at91sama5_dt_timer_init) is created to fullfil these needs.
+This function registers all at91 clks using the dt definition before
+calling the PIT init function.
+The device tree clock registration is enabled only if common clk is
+selected. Else the old clk registration is been done during
+at91_dt_initialize call.
 
-Boris
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/board-dt-sama5.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Changes since v2:
- - rework dt bindings:
-   * replace "atmel,clk-id" property by the standard "reg" property
-   * reference system, peripheral and programmable clks using the direct
-     clk node instead of the parent node plus a clk id
- - add usb_clk to usb ehci controller node
-
-Changes since v1:
- - remove references to peripheral id macros
- - remove old clk definitions after moving to new clk framework
-
-Boris BREZILLON (6):
-  ARM: at91: prepare sama5 dt boards transition to common clk
-  ARM: at91: prepare common clk transition for sama5d3 SoC
-  ARM: at91/dt: define sama5d3 clocks
-  ARM: at91/dt: define sama5d3xek's main clk frequency
-  ARM: at91: move sama5d3 SoC to common clk
-  ARM: at91/dt: remove old clk material
-
- arch/arm/boot/dts/sama5d3.dtsi      |  379 ++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/sama5d3_can.dtsi  |   20 ++
- arch/arm/boot/dts/sama5d3_emac.dtsi |   11 +
- arch/arm/boot/dts/sama5d3_gmac.dtsi |   11 +
- arch/arm/boot/dts/sama5d3_lcd.dtsi  |   17 ++
- arch/arm/boot/dts/sama5d3_mci2.dtsi |   12 ++
- arch/arm/boot/dts/sama5d3_tcb1.dtsi |   12 ++
- arch/arm/boot/dts/sama5d3_uart.dtsi |   21 ++
- arch/arm/boot/dts/sama5d3xcm.dtsi   |   17 +-
- arch/arm/mach-at91/Kconfig          |    1 -
- arch/arm/mach-at91/board-dt-sama5.c |   10 +-
- arch/arm/mach-at91/sama5d3.c        |  342 -------------------------------
- 12 files changed, 497 insertions(+), 356 deletions(-)
-
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index bf00d15..075ec05 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -16,6 +16,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
++#include <linux/clk-provider.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/irq.h>
+@@ -26,6 +27,13 @@
+ #include "at91_aic.h"
+ #include "generic.h"
+ 
++static void __init sama5_dt_timer_init(void)
++{
++#if defined(CONFIG_COMMON_CLK)
++	of_clk_init(NULL);
++#endif
++	at91sam926x_pit_init();
++}
+ 
+ static const struct of_device_id irq_of_match[] __initconst = {
+ 
+@@ -72,7 +80,7 @@ static const char *sama5_dt_board_compat[] __initdata = {
+ 
+ DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= sama5_dt_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic5_handle_irq,
+ 	.init_early	= at91_dt_initialize,
 -- 
 1.7.9.5
