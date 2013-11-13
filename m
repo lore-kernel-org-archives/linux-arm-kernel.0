@@ -1,98 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 12 Nov 2013 20:00:15 -0800
-Subject: [PATCH 1/2] watchdog: bcm281xx: Watchdog Driver
-In-Reply-To: <CAPdLdqn5bvxnURdcy0JATBWmyJsbL=EJ65repSVxchw7srWpfQ@mail.gmail.com>
-References: <1383943488-6537-1-git-send-email-markus.mayer@linaro.org>	<1383943488-6537-2-git-send-email-markus.mayer@linaro.org>	<20131111173434.GA25532@roeck-us.net>
- <CAPdLdqn5bvxnURdcy0JATBWmyJsbL=EJ65repSVxchw7srWpfQ@mail.gmail.com>
-Message-ID: <5282F94F.2060208@roeck-us.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 13 Nov 2013 12:41:55 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <52826706.2080508@arm.com>
+References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+ <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+ <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
+ <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
+ <528110B1.4060402@arm.com>
+ <20131111193236.GB16735@n2100.arm.linux.org.uk>
+ <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
+ <52826706.2080508@arm.com>
+Message-ID: <CACVXFVPauU_8BTPtutF8_pDT-KCw_P+gVs4z+X227qm7629AhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2013 02:17 PM, Markus Mayer wrote:
-
->>> +
->>> +     if (!timeout)
->>> +             dev_info(wdog->dev, "Watchdog timer stopped");
->>> +
->> All that noise.
+On Wed, Nov 13, 2013 at 1:36 AM, Jonathan Austin
+<Jonathan.Austin@arm.com> wrote:
+>> Currently, I suggest to filter only on ARM as attachment patch if we plan
+>> to merge Jonathan's patch, otherwise a more complicated approach has
+>> to be figured out  to do the filter(such as, define a readonly symbol in
+>> kernel to store PAGE_OFFSET, and let scripts/kallsyms use it for
+>> filtering).
 >
-> Would it be acceptable to turn these calls into dev_dbg() calls, here
-> and elsewhere?
 >
+> I'm happy with that approach, though allowing only ARM seems a bit
+> conservative - is it the only architecture we actually expect to work?
 
-Ok with me.
+Yes, the problem is only reported on ARM, so let's do it.
 
-
->>> +
->>> +     wdt->resolution = SECWDOG_DEFAULT_RESOLUTION;
->>> +     ret = bcm_kona_wdt_set_resolution_reg(wdt);
->>> +     if (ret) {
->>> +             dev_err(dev, "Failed to set resolution (error: %d)", ret);
->>
->> ret can be -EAGAIN or -EINVAL. -EINVAL suggests a bad internale error (hopefully
->> SECWDOG_DEFAULT_RESOLUTION is defined to be smaller than SECWDOG_MAX_RES),
->> and if it is -EAGAIN there should be no error message.
->>
->> Actually, bcm_kona_wdt_set_resolution_reg is only called from here, meaning the
->> error check in the function is really unnecessary.
->
-> This again goes back to making resolution available to userland. Then
-> bcm_kona_wdt_set_resolution_reg() would be called from elsewhere. Why
-> is it bad to print an error message on timeout? Would this still apply
-
-That was related to -EAGAIN. Which would be bad here anyway as it could result
-in an endless loop if there is a problem with the chip.
-
-> if I switch the code to -ETIMEDOUT?
->
-That is one option, or -EIO if the condition indicates a chip error.
-
->>> +             return ret;
->>> +     }
->>> +
->>> +     spin_lock_init(&wdt->lock);
->>> +     platform_set_drvdata(pdev, wdt);
->>> +     watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
->>> +
->>> +     ret = bcm_kona_wdt_set_timeout_reg(&bcm_kona_wdt_wdd);
->>> +     if (ret) {
->>> +             dev_err(dev, "Failed set watchdog timeout");
->>
->> The only error case is -EAGAIN. I don't think there should be an error mesasge
->> in this case (though I am not sure what the reaction should be).
->
-> I am thinking that probe() needs to return an error if setting the
-> timeout fails, as it can't really rely on the watchdog timer or let
-> the system use it. Shouldn't that be accompanied by an error message
-> letting the user know what happened?
->
-Oh, I agree it should return an error, and an error message is ok as well.
-I am just sure it should not be -EAGAIN, but I don't know what it should be.
-Maybe -ETIMEDOUT, or -EIO.
-
->>> +             return ret;
->>> +     }
->>> +
->>> +     ret = watchdog_register_device(&bcm_kona_wdt_wdd);
->>> +     if (ret) {
->>> +             dev_err(dev, "Failed to register watchdog device");
->>> +             return ret;
->>> +     }
->>> +
->>> +#ifdef CONFIG_BCM_KONA_WDT_DEBUG
->>> +     wdt->debugfs = bcm_kona_wdt_debugfs_init(wdt, &bcm_kona_wdt_wdd);
->>> +#endif
->>> +     dev_info(dev, "Broadcom Kona Watchdog Timer");
->>> +
->> Such messages are in general considered nuisance nowadays. I would suggest to
->> remove it (or ask Greg KH for advice).
->>
-
-Referring to your other mail.... seems those messages are falling out of favor.
-I consider it a nuisance, though so far I let it go through. The messages do
-increase boot time, especially on systems with slow serial console, and IMO
-do not provide any real value. Users either don't care, or can check if the
-driver is loaded by other means. I would suggest to at least make it dev_dbg.
 
 Thanks,
-Guenter
+-- 
+Ming Lei
