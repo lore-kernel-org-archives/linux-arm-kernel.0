@@ -1,45 +1,528 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 14 Nov 2013 14:02:07 -0700
-Subject: [PATCH 1/8] ARM: dts: imx: pinfunc: add
- MX6QDL_PAD_SD1_CLK__OSC32K_32K_OUT
+Date: Thu, 14 Nov 2013 14:02:14 -0700
+Subject: [PATCH 8/8] ARM: dts: imx: sabrelite: add dualLite support
 In-Reply-To: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1384462934-17390-2-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1384462934-17390-9-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The solo/duallite reference manual does not mention
-this setting, but it works.
+This makes the structure of imx6qdl-sabrelite.dtsi the same
+as imx6qdl-sabresd.dtsi so that they are easier to compare.
+
+It also adds the file imx6dl-sabrelite.dts for dualLite
+support.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +
- arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/imx6dl-sabrelite.dts   |  20 +++
+ arch/arm/boot/dts/imx6q-sabrelite.dts    | 214 +----------------------------
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 226 +++++++++++++++++++++++++++++++
+ 4 files changed, 248 insertions(+), 213 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6dl-sabrelite.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
 
-diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h b/arch/arm/boot/dts/imx6dl-pinfunc.h
-index b81a7a4..7499eee 100644
---- a/arch/arm/boot/dts/imx6dl-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
-@@ -950,6 +950,7 @@
- #define MX6QDL_PAD_RGMII_TXC__GPIO6_IO19            0x2d8 0x6c0 0x000 0x5 0x0
- #define MX6QDL_PAD_RGMII_TXC__XTALOSC_REF_CLK_24M   0x2d8 0x6c0 0x000 0x7 0x0
- #define MX6QDL_PAD_SD1_CLK__SD1_CLK                 0x2dc 0x6c4 0x928 0x0 0x1
-+#define MX6QDL_PAD_SD1_CLK__OSC32K_32K_OUT          0x2dc 0x6c4 0x000 0x2 0x0
- #define MX6QDL_PAD_SD1_CLK__GPT_CLKIN               0x2dc 0x6c4 0x000 0x3 0x0
- #define MX6QDL_PAD_SD1_CLK__GPIO1_IO20              0x2dc 0x6c4 0x000 0x5 0x0
- #define MX6QDL_PAD_SD1_CMD__SD1_CMD                 0x2e0 0x6c8 0x000 0x0 0x0
-diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
-index 97ed081..e5834b2 100644
---- a/arch/arm/boot/dts/imx6q-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6q-pinfunc.h
-@@ -1024,6 +1024,7 @@
- #define MX6QDL_PAD_SD1_DAT2__WDOG1_RESET_B_DEB      0x34c 0x734 0x000 0x6 0x0
- #define MX6QDL_PAD_SD1_CLK__SD1_CLK                 0x350 0x738 0x000 0x0 0x0
- #define MX6QDL_PAD_SD1_CLK__ECSPI5_SCLK             0x350 0x738 0x828 0x1 0x0
-+#define MX6QDL_PAD_SD1_CLK__OSC32K_32K_OUT          0x350 0x738 0x000 0x2 0x0
- #define MX6QDL_PAD_SD1_CLK__GPT_CLKIN               0x350 0x738 0x000 0x3 0x0
- #define MX6QDL_PAD_SD1_CLK__GPIO1_IO20              0x350 0x738 0x000 0x5 0x0
- #define MX6QDL_PAD_SD2_CLK__SD2_CLK                 0x354 0x73c 0x000 0x0 0x0
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b14bb11..743fbd8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -144,6 +144,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6dl-gw53xx.dtb \
+ 	imx6dl-gw54xx.dtb \
+ 	imx6dl-sabreauto.dtb \
++	imx6dl-sabrelite.dtb \
+ 	imx6dl-sabresd.dtb \
+ 	imx6dl-wandboard.dtb \
+ 	imx6q-arm2.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts b/arch/arm/boot/dts/imx6dl-sabrelite.dts
+new file mode 100644
+index 0000000..2de0447
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
+@@ -0,0 +1,20 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++#include "imx6dl.dtsi"
++#include "imx6qdl-sabrelite.dtsi"
++
++/ {
++	model = "Freescale i.MX6 DualLite SABRE Lite Board";
++	compatible = "fsl,imx6dl-sabrelite", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index b5f0edd..96e4688 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -12,225 +12,13 @@
+ 
+ /dts-v1/;
+ #include "imx6q.dtsi"
++#include "imx6qdl-sabrelite.dtsi"
+ 
+ / {
+ 	model = "Freescale i.MX6 Quad SABRE Lite Board";
+ 	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+-
+-	memory {
+-		reg = <0x10000000 0x40000000>;
+-	};
+-
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		reg_2p5v: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "2P5V";
+-			regulator-min-microvolt = <2500000>;
+-			regulator-max-microvolt = <2500000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_3p3v: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_usb_otg_vbus: regulator at 2 {
+-			compatible = "regulator-fixed";
+-			reg = <2>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio3 22 0>;
+-			enable-active-high;
+-		};
+-	};
+-
+-	sound {
+-		compatible = "fsl,imx6q-sabrelite-sgtl5000",
+-			     "fsl,imx-audio-sgtl5000";
+-		model = "imx6q-sabrelite-sgtl5000";
+-		ssi-controller = <&ssi1>;
+-		audio-codec = <&codec>;
+-		audio-routing =
+-			"MIC_IN", "Mic Jack",
+-			"Mic Jack", "Mic Bias",
+-			"Headphone Jack", "HP_OUT";
+-		mux-int-port = <1>;
+-		mux-ext-port = <4>;
+-	};
+-};
+-
+-&audmux {
+-	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_audmux>;
+-};
+-
+-&ecspi1 {
+-	fsl,spi-num-chipselects = <1>;
+-	cs-gpios = <&gpio3 19 0>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_ecspi1>;
+-	status = "okay";
+-
+-	flash: m25p80 at 0 {
+-		compatible = "sst,sst25vf016b";
+-		spi-max-frequency = <20000000>;
+-		reg = <0>;
+-	};
+-};
+-
+-&fec {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_enet>;
+-	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio3 23 0>;
+-	status = "okay";
+-};
+-
+-&i2c1 {
+-	status = "okay";
+-	clock-frequency = <100000>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c1>;
+-
+-	codec: sgtl5000 at 0a {
+-		compatible = "fsl,sgtl5000";
+-		reg = <0x0a>;
+-		clocks = <&clks 201>;
+-		VDDA-supply = <&reg_2p5v>;
+-		VDDIO-supply = <&reg_3p3v>;
+-	};
+-};
+-
+-&iomuxc {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_hog>;
+-
+-	imx6q-sabrelite {
+-		pinctrl_hog: hoggrp {
+-			fsl,pins = <
+-				MX6QDL_PAD_NANDF_D6__GPIO2_IO06 0x80000000
+-				MX6QDL_PAD_NANDF_D7__GPIO2_IO07 0x80000000
+-				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+-				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
+-				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
+-				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x80000000
+-				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0x1f0b0
+-				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x80000000
+-			>;
+-		};
+-
+-		pinctrl_audmux: audmuxgrp {
+-			fsl,pins = <MX6QDL_AUDMUX_PINGRP1>;
+-		};
+-
+-		pinctrl_ecspi1: ecspi1grp {
+-			fsl,pins = <MX6QDL_ECSPI1_PINGRP1>;
+-		};
+-
+-		pinctrl_enet: enetgrp {
+-			fsl,pins = <MX6QDL_ENET_PINGRP1>;
+-		};
+-
+-		pinctrl_i2c1: i2c1grp {
+-			fsl,pins = <MX6QDL_I2C1_PINGRP1>;
+-		};
+-
+-		pinctrl_uart2: uart2grp {
+-			fsl,pins = <MX6QDL_UART2_PINGRP1>;
+-		};
+-
+-		pinctrl_usbotg: usbotggrp {
+-			fsl,pins = <MX6QDL_USBOTG_PINGRP1>;
+-		};
+-
+-		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+-		};
+-
+-		pinctrl_usdhc4: usdhc4grp {
+-			fsl,pins = <MX6QDL_USDHC4_PINGRP_D4>;
+-		};
+-	};
+-};
+-
+-&ldb {
+-	status = "okay";
+-
+-	lvds-channel at 0 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <18>;
+-		status = "okay";
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: hsd100pxn1 {
+-				clock-frequency = <65000000>;
+-				hactive = <1024>;
+-				vactive = <768>;
+-				hback-porch = <220>;
+-				hfront-porch = <40>;
+-				vback-porch = <21>;
+-				vfront-porch = <7>;
+-				hsync-len = <60>;
+-				vsync-len = <10>;
+-			};
+-		};
+-	};
+ };
+ 
+ &sata {
+ 	status = "okay";
+ };
+-
+-&ssi1 {
+-	fsl,mode = "i2s-slave";
+-	status = "okay";
+-};
+-
+-&uart2 {
+-	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart2>;
+-};
+-
+-&usbh1 {
+-	status = "okay";
+-};
+-
+-&usbotg {
+-	vbus-supply = <&reg_usb_otg_vbus>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usbotg>;
+-	disable-over-current;
+-	status = "okay";
+-};
+-
+-&usdhc3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc3>;
+-	cd-gpios = <&gpio7 0 0>;
+-	wp-gpios = <&gpio7 1 0>;
+-	vmmc-supply = <&reg_3p3v>;
+-	status = "okay";
+-};
+-
+-&usdhc4 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc4>;
+-	cd-gpios = <&gpio2 6 0>;
+-	wp-gpios = <&gpio2 7 0>;
+-	vmmc-supply = <&reg_3p3v>;
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+new file mode 100644
+index 0000000..2797566
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -0,0 +1,226 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/ {
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_2p5v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "2P5V";
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
++			regulator-always-on;
++		};
++
++		reg_3p3v: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++		reg_usb_otg_vbus: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 22 0>;
++			enable-active-high;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx6q-sabrelite-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx6q-sabrelite-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <4>;
++	};
++};
++
++&audmux {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++};
++
++&ecspi1 {
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio3 19 0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1>;
++	status = "okay";
++
++	flash: m25p80 at 0 {
++		compatible = "sst,sst25vf016b";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-mode = "rgmii";
++	phy-reset-gpios = <&gpio3 23 0>;
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks 201>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	imx6q-sabrelite {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_D6__GPIO2_IO06 0x80000000
++				MX6QDL_PAD_NANDF_D7__GPIO2_IO07 0x80000000
++				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
++				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
++				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
++				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x80000000
++				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0x1f0b0
++				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x80000000
++			>;
++		};
++
++		pinctrl_audmux: audmuxgrp {
++			fsl,pins = <MX6QDL_AUDMUX_PINGRP1>;
++		};
++
++		pinctrl_ecspi1: ecspi1grp {
++			fsl,pins = <MX6QDL_ECSPI1_PINGRP1>;
++		};
++
++		pinctrl_enet: enetgrp {
++			fsl,pins = <MX6QDL_ENET_PINGRP1>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <MX6QDL_I2C1_PINGRP1>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <MX6QDL_UART2_PINGRP1>;
++		};
++
++		pinctrl_usbotg: usbotggrp {
++			fsl,pins = <MX6QDL_USBOTG_PINGRP1>;
++		};
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
++		};
++
++		pinctrl_usdhc4: usdhc4grp {
++			fsl,pins = <MX6QDL_USDHC4_PINGRP_D4>;
++		};
++	};
++};
++
++&ldb {
++	status = "okay";
++
++	lvds-channel at 0 {
++		fsl,data-mapping = "spwg";
++		fsl,data-width = <18>;
++		status = "okay";
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: hsd100pxn1 {
++				clock-frequency = <65000000>;
++				hactive = <1024>;
++				vactive = <768>;
++				hback-porch = <220>;
++				hfront-porch = <40>;
++				vback-porch = <21>;
++				vfront-porch = <7>;
++				hsync-len = <60>;
++				vsync-len = <10>;
++			};
++		};
++	};
++};
++
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	disable-over-current;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	cd-gpios = <&gpio7 0 0>;
++	wp-gpios = <&gpio7 1 0>;
++	vmmc-supply = <&reg_3p3v>;
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	cd-gpios = <&gpio2 6 0>;
++	wp-gpios = <&gpio2 7 0>;
++	vmmc-supply = <&reg_3p3v>;
++	status = "okay";
++};
 -- 
 1.8.1.2
