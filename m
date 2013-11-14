@@ -1,150 +1,331 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Nov 2013 18:25:39 -0300
-Subject: [PATCH v5 14/14] mtd: nand: pxa3xx: Add ECC BCH correctable errors
- detection
+Date: Thu, 14 Nov 2013 18:25:37 -0300
+Subject: [PATCH v5 12/14] mtd: nand: pxa3xx: Introduce multiple page I/O
+ support
 In-Reply-To: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1384464339-6817-15-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1384464339-6817-13-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extends the ECC correctable error detection to include
-ECC BCH errors. The number of BCH correctable errors can be any up to 16,
-and the actual value is exposed in the NDSR register.
+As preparation work to fully support large pages, this commit adds
+the initial infrastructure to support splitted (aka chunked) I/O
+operation. This commit adds support for read, and follow-up patches
+will add write support.
 
-Therefore, we change some symbol names to refer to correctable or
-uncorrectable (instead of single-bit or double-bit as it was in the
-Hamming case) and while at it, cleanup the detection code slightly.
+When a read (aka READ0) command is issued, the driver loops issuing
+the same command until all the requested data is transfered, changing
+the 'extended' command field as needed.
+
+For instance, if the driver is required to read a 4 KiB page, using a
+chunk size of 2 KiB, the transaction is splitted in:
+1. Monolithic read, first 2 KiB page chunk is read
+2. Last naked read, second and last 2KiB page chunk is read
+
+If ECC is enabled it is calculated on each chunk transfered and added
+at a controller-fixed location after the data chunk that must be
+spare area.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 57 ++++++++++++++++++++++++++----------------
- 1 file changed, 35 insertions(+), 22 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 182 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 172 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index be28b81..16a8f93 100644
+index 8e16eeb..838068f 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -85,6 +85,9 @@
- #define NDCR_INT_MASK           (0xFFF)
+@@ -103,6 +103,8 @@
+ #define NDCB0_ST_ROW_EN         (0x1 << 26)
+ #define NDCB0_AUTO_RS		(0x1 << 25)
+ #define NDCB0_CSEL		(0x1 << 24)
++#define NDCB0_EXT_CMD_TYPE_MASK	(0x7 << 29)
++#define NDCB0_EXT_CMD_TYPE(x)	(((x) << 29) & NDCB0_EXT_CMD_TYPE_MASK)
+ #define NDCB0_CMD_TYPE_MASK	(0x7 << 21)
+ #define NDCB0_CMD_TYPE(x)	(((x) << 21) & NDCB0_CMD_TYPE_MASK)
+ #define NDCB0_NC		(0x1 << 20)
+@@ -113,6 +115,14 @@
+ #define NDCB0_CMD1_MASK		(0xff)
+ #define NDCB0_ADDR_CYC_SHIFT	(16)
  
- #define NDSR_MASK		(0xfff)
-+#define NDSR_ERR_CNT_OFF	(16)
-+#define NDSR_ERR_CNT_MASK       (0x1f)
-+#define NDSR_ERR_CNT(sr)	((sr >> NDSR_ERR_CNT_OFF) & NDSR_ERR_CNT_MASK)
- #define NDSR_RDY                (0x1 << 12)
- #define NDSR_FLASH_RDY          (0x1 << 11)
- #define NDSR_CS0_PAGED		(0x1 << 10)
-@@ -93,8 +96,8 @@
- #define NDSR_CS1_CMDD		(0x1 << 7)
- #define NDSR_CS0_BBD		(0x1 << 6)
- #define NDSR_CS1_BBD		(0x1 << 5)
--#define NDSR_DBERR		(0x1 << 4)
--#define NDSR_SBERR		(0x1 << 3)
-+#define NDSR_UNCORERR		(0x1 << 4)
-+#define NDSR_CORERR		(0x1 << 3)
- #define NDSR_WRDREQ		(0x1 << 2)
- #define NDSR_RDDREQ		(0x1 << 1)
- #define NDSR_WRCMDREQ		(0x1)
-@@ -135,9 +138,9 @@ enum {
- 	ERR_NONE	= 0,
- 	ERR_DMABUSERR	= -1,
- 	ERR_SENDCMD	= -2,
--	ERR_DBERR	= -3,
-+	ERR_UNCORERR	= -3,
- 	ERR_BBERR	= -4,
--	ERR_SBERR	= -5,
-+	ERR_CORERR	= -5,
- };
++#define EXT_CMD_TYPE_DISPATCH	6 /* Command dispatch */
++#define EXT_CMD_TYPE_NAKED_RW	5 /* Naked read or Naked write */
++#define EXT_CMD_TYPE_READ	4 /* Read */
++#define EXT_CMD_TYPE_DISP_WR	4 /* Command dispatch with write */
++#define EXT_CMD_TYPE_FINAL	3 /* Final command */
++#define EXT_CMD_TYPE_LAST_RW	1 /* Last naked read/write */
++#define EXT_CMD_TYPE_MONO	0 /* Monolithic read/write */
++
+ /* macros for registers read/write */
+ #define nand_writel(info, off, val)	\
+ 	__raw_writel((val), (info)->mmio_base + (off))
+@@ -206,8 +216,8 @@ struct pxa3xx_nand_info {
+ 	int			use_spare;	/* use spare ? */
+ 	int			need_wait;
  
- enum {
-@@ -221,6 +224,8 @@ struct pxa3xx_nand_info {
+-	unsigned int		fifo_size;	/* max. data size in the FIFO */
+ 	unsigned int		data_size;	/* data to be read from FIFO */
++	unsigned int		chunk_size;	/* split commands chunk size */
  	unsigned int		oob_size;
  	unsigned int		spare_size;
  	unsigned int		ecc_size;
-+	unsigned int		ecc_err_cnt;
-+	unsigned int		max_bitflips;
- 	int 			retcode;
+@@ -271,6 +281,31 @@ static struct nand_bbt_descr bbt_mirror_descr = {
+ 	.pattern = bbt_mirror_pattern
+ };
  
- 	/* cached register value */
-@@ -571,10 +576,25 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
- 
- 	status = nand_readl(info, NDSR);
- 
--	if (status & NDSR_DBERR)
--		info->retcode = ERR_DBERR;
--	if (status & NDSR_SBERR)
--		info->retcode = ERR_SBERR;
-+	if (status & NDSR_UNCORERR)
-+		info->retcode = ERR_UNCORERR;
-+	if (status & NDSR_CORERR) {
-+		info->retcode = ERR_CORERR;
-+		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370 &&
-+		    info->ecc_bch)
-+			info->ecc_err_cnt = NDSR_ERR_CNT(status);
-+		else
-+			info->ecc_err_cnt = 1;
++static struct nand_ecclayout ecc_layout_4KB_bch4bit = {
++	.eccbytes = 64,
++	.eccpos = {
++		32,  33,  34,  35,  36,  37,  38,  39,
++		40,  41,  42,  43,  44,  45,  46,  47,
++		48,  49,  50,  51,  52,  53,  54,  55,
++		56,  57,  58,  59,  60,  61,  62,  63,
++		96,  97,  98,  99,  100, 101, 102, 103,
++		104, 105, 106, 107, 108, 109, 110, 111,
++		112, 113, 114, 115, 116, 117, 118, 119,
++		120, 121, 122, 123, 124, 125, 126, 127},
++	/* Bootrom looks in bytes 0 & 5 for bad blocks */
++	.oobfree = { {6, 26}, { 64, 32} }
++};
 +
-+		/*
-+		 * Each chunk composing a page is corrected independently,
-+		 * and we need to store maximum number of corrected bitflips
-+		 * to return it to the MTD layer in ecc.read_page().
-+		 */
-+		info->max_bitflips = max_t(unsigned int,
-+					   info->max_bitflips,
-+					   info->ecc_err_cnt);
-+	}
- 	if (status & (NDSR_RDDREQ | NDSR_WRDREQ)) {
- 		/* whether use dma to transfer data */
- 		if (info->use_dma) {
-@@ -672,6 +692,7 @@ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
- 	info->use_ecc		= 0;
- 	info->use_spare		= 1;
- 	info->retcode		= ERR_NONE;
-+	info->ecc_err_cnt	= 0;
- 	info->ndcb3		= 0;
++static struct nand_ecclayout ecc_layout_4KB_bch8bit = {
++	.eccbytes = 128,
++	.eccpos = {
++		32,  33,  34,  35,  36,  37,  38,  39,
++		40,  41,  42,  43,  44,  45,  46,  47,
++		48,  49,  50,  51,  52,  53,  54,  55,
++		56,  57,  58,  59,  60,  61,  62,  63},
++	.oobfree = { }
++};
++
+ /* Define a default flash type setting serve as flash detecting only */
+ #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
  
- 	switch (command) {
-@@ -1053,26 +1074,18 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
+@@ -433,7 +468,7 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+ 
+ static void handle_data_pio(struct pxa3xx_nand_info *info)
  {
- 	struct pxa3xx_nand_host *host = mtd->priv;
- 	struct pxa3xx_nand_info *info = host->info_data;
--	int max_bitflips = 0;
+-	unsigned int do_bytes = min(info->data_size, info->fifo_size);
++	unsigned int do_bytes = min(info->data_size, info->chunk_size);
  
- 	chip->read_buf(mtd, buf, mtd->writesize);
- 	chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
- 
--	if (info->retcode == ERR_SBERR) {
--		switch (info->use_ecc) {
--		case 1:
--			max_bitflips = 1;
--			mtd->ecc_stats.corrected++;
--			break;
--		case 0:
--		default:
--			break;
--		}
--	} else if (info->retcode == ERR_DBERR) {
-+	if (info->retcode == ERR_CORERR && info->use_ecc) {
-+		mtd->ecc_stats.corrected += info->ecc_err_cnt;
-+
-+	} else if (info->retcode == ERR_UNCORERR) {
- 		/*
- 		 * for blank page (all 0xff), HW will calculate its ECC as
- 		 * 0, which is different from the ECC information within
--		 * OOB, ignore such double bit errors
-+		 * OOB, ignore such ucorrectable errors
- 		 */
- 		if (is_buf_blank(buf, mtd->writesize))
- 			info->retcode = ERR_NONE;
-@@ -1080,7 +1093,7 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
- 			mtd->ecc_stats.failed++;
- 	}
- 
--	return max_bitflips;
-+	return info->max_bitflips;
+ 	switch (info->state) {
+ 	case STATE_PIO_WRITING:
+@@ -670,7 +705,7 @@ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
  }
  
- static uint8_t pxa3xx_nand_read_byte(struct mtd_info *mtd)
+ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
+-		uint16_t column, int page_addr)
++		int ext_cmd_type, uint16_t column, int page_addr)
+ {
+ 	int addr_cycle, exec_cmd;
+ 	struct pxa3xx_nand_host *host;
+@@ -703,9 +738,20 @@ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
+ 		if (command == NAND_CMD_READOOB)
+ 			info->buf_start += mtd->writesize;
+ 
+-		/* Second command setting for large pages */
+-		if (mtd->writesize >= PAGE_CHUNK_SIZE)
++		/*
++		 * Multiple page read needs an 'extended command type' field,
++		 * which is either naked-read or last-read according to the
++		 * state.
++		 */
++		if (mtd->writesize == PAGE_CHUNK_SIZE) {
+ 			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8);
++		} else if (mtd->writesize > PAGE_CHUNK_SIZE) {
++			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8)
++					| NDCB0_LEN_OVRD
++					| NDCB0_EXT_CMD_TYPE(ext_cmd_type);
++			info->ndcb3 = info->chunk_size +
++				      info->oob_size;
++		}
+ 
+ 		set_command_address(info, mtd->writesize, column, page_addr);
+ 		break;
+@@ -821,7 +867,8 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 	prepare_start_command(info, command);
+ 
+ 	info->state = STATE_PREPARED;
+-	exec_cmd = prepare_set_command(info, command, column, page_addr);
++	exec_cmd = prepare_set_command(info, command, 0, column, page_addr);
++
+ 	if (exec_cmd) {
+ 		init_completion(&info->cmd_complete);
+ 		init_completion(&info->dev_ready);
+@@ -839,6 +886,93 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 	info->state = STATE_IDLE;
+ }
+ 
++static void armada370_nand_cmdfunc(struct mtd_info *mtd,
++				   const unsigned command,
++				   int column, int page_addr)
++{
++	struct pxa3xx_nand_host *host = mtd->priv;
++	struct pxa3xx_nand_info *info = host->info_data;
++	int ret, exec_cmd, ext_cmd_type;
++
++	/*
++	 * if this is a x16 device then convert the input
++	 * "byte" address into a "word" address appropriate
++	 * for indexing a word-oriented device
++	 */
++	if (info->reg_ndcr & NDCR_DWIDTH_M)
++		column /= 2;
++
++	/*
++	 * There may be different NAND chip hooked to
++	 * different chip select, so check whether
++	 * chip select has been changed, if yes, reset the timing
++	 */
++	if (info->cs != host->cs) {
++		info->cs = host->cs;
++		nand_writel(info, NDTR0CS0, info->ndtr0cs0);
++		nand_writel(info, NDTR1CS0, info->ndtr1cs0);
++	}
++
++	/* Select the extended command for the first command */
++	switch (command) {
++	case NAND_CMD_READ0:
++	case NAND_CMD_READOOB:
++		ext_cmd_type = EXT_CMD_TYPE_MONO;
++		break;
++	default:
++		ext_cmd_type = 0;
++	}
++
++	prepare_start_command(info, command);
++
++	/*
++	 * Prepare the "is ready" completion before starting a command
++	 * transaction sequence. If the command is not executed the
++	 * completion will be completed, see below.
++	 *
++	 * We can do that inside the loop because the command variable
++	 * is invariant and thus so is the exec_cmd.
++	 */
++	info->need_wait = 1;
++	init_completion(&info->dev_ready);
++	do {
++		info->state = STATE_PREPARED;
++		exec_cmd = prepare_set_command(info, command, ext_cmd_type,
++					       column, page_addr);
++		if (!exec_cmd) {
++			info->need_wait = 0;
++			complete(&info->dev_ready);
++			break;
++		}
++
++		init_completion(&info->cmd_complete);
++		pxa3xx_nand_start(info);
++
++		ret = wait_for_completion_timeout(&info->cmd_complete,
++				CHIP_DELAY_TIMEOUT);
++		if (!ret) {
++			dev_err(&info->pdev->dev, "Wait time out!!!\n");
++			/* Stop State Machine for next command cycle */
++			pxa3xx_nand_stop(info);
++			break;
++		}
++
++		/* Check if the sequence is complete */
++		if (info->data_size == 0)
++			break;
++
++		if (command == NAND_CMD_READ0 || command == NAND_CMD_READOOB) {
++			/* Last read: issue a 'last naked read' */
++			if (info->data_size == info->chunk_size)
++				ext_cmd_type = EXT_CMD_TYPE_LAST_RW;
++			else
++				ext_cmd_type = EXT_CMD_TYPE_NAKED_RW;
++		}
++	} while (1);
++
++	info->state = STATE_IDLE;
++}
++
+ static int pxa3xx_nand_write_page_hwecc(struct mtd_info *mtd,
+ 		struct nand_chip *chip, const uint8_t *buf, int oob_required)
+ {
+@@ -1019,13 +1153,14 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
+ 
+ 	if (ndcr & NDCR_PAGE_SZ) {
+ 		/* Controller's FIFO size */
+-		info->fifo_size = 2048;
++		info->chunk_size = 2048;
+ 		host->read_id_bytes = 4;
+ 	} else {
+-		info->fifo_size = 512;
++		info->chunk_size = 512;
+ 		host->read_id_bytes = 2;
+ 	}
+ 
++	/* Set an initial chunk size */
+ 	info->reg_ndcr = ndcr & ~NDCR_INT_MASK;
+ 	info->ndtr0cs0 = nand_readl(info, NDTR0CS0);
+ 	info->ndtr1cs0 = nand_readl(info, NDTR1CS0);
+@@ -1129,6 +1264,7 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
+ 	 * is used with non-ONFI compliant devices.
+ 	 */
+ 	if (page_size == 2048) {
++		info->chunk_size = 2048;
+ 		info->spare_size = 40;
+ 		info->ecc_size = 24;
+ 		ecc->mode = NAND_ECC_HW;
+@@ -1137,6 +1273,7 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
+ 		return 1;
+ 
+ 	} else if (page_size == 512) {
++		info->chunk_size = 512;
+ 		info->spare_size = 8;
+ 		info->ecc_size = 8;
+ 		ecc->mode = NAND_ECC_HW;
+@@ -1151,7 +1288,28 @@ static int armada370_ecc_init(struct pxa3xx_nand_info *info,
+ 			      struct nand_ecc_ctrl *ecc,
+ 			      int strength, int page_size)
+ {
+-	/* Unimplemented yet */
++	if (strength == 4 && page_size == 4096) {
++		info->ecc_bch = 1;
++		info->chunk_size = 2048;
++		info->spare_size = 32;
++		info->ecc_size = 32;
++		ecc->mode = NAND_ECC_HW;
++		ecc->size = info->chunk_size;
++		ecc->layout = &ecc_layout_4KB_bch4bit;
++		ecc->strength = 16;
++		return 1;
++
++	} else if (strength == 8 && page_size == 4096) {
++		info->ecc_bch = 1;
++		info->chunk_size = 1024;
++		info->spare_size = 0;
++		info->ecc_size = 32;
++		ecc->mode = NAND_ECC_HW;
++		ecc->size = info->chunk_size;
++		ecc->layout = &ecc_layout_4KB_bch8bit;
++		ecc->strength = 16;
++		return 1;
++	}
+ 	return 0;
+ }
+ 
+@@ -1319,12 +1477,16 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 		chip->controller        = &info->controller;
+ 		chip->waitfunc		= pxa3xx_nand_waitfunc;
+ 		chip->select_chip	= pxa3xx_nand_select_chip;
+-		chip->cmdfunc		= pxa3xx_nand_cmdfunc;
+ 		chip->read_word		= pxa3xx_nand_read_word;
+ 		chip->read_byte		= pxa3xx_nand_read_byte;
+ 		chip->read_buf		= pxa3xx_nand_read_buf;
+ 		chip->write_buf		= pxa3xx_nand_write_buf;
+ 		chip->options		|= NAND_NO_SUBPAGE_WRITE;
++
++		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
++			chip->cmdfunc = armada370_nand_cmdfunc;
++		else
++			chip->cmdfunc = pxa3xx_nand_cmdfunc;
+ 	}
+ 
+ 	spin_lock_init(&chip->controller->lock);
 -- 
 1.8.1.5
