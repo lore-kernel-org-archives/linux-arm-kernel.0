@@ -1,70 +1,64 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Thu, 14 Nov 2013 11:48:37 -0800
-Subject: [PATCH v3] ARM: bcm: Add DEBUG_LL console support
-In-Reply-To: <CAEPRUYqV-9P6spmxGsqOS6JGbZW79L7m4SO66Jbkyq4Kam=bRQ@mail.gmail.com>
-References: <1380987809-4886-1-git-send-email-bcm@fixthebug.org>
- <CAEPRUYqnc0C_fEG97sFVs6uAtPyZCzXuJ09Hsb3unjAZtc5shA@mail.gmail.com>
- <CAEPRUYqV-9P6spmxGsqOS6JGbZW79L7m4SO66Jbkyq4Kam=bRQ@mail.gmail.com>
-Message-ID: <CAPdLdqnvHGxkXzT02rDg6knBHmzG+Ebu1V0L80L7SGGQN80uzw@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Nov 2013 16:49:07 -0300
+Subject: [PATCH v4 06/31] mtd: nand: pxa3xx: Add documentation about the
+ controller
+In-Reply-To: <20131114190004.GP9468@ld-irv-0074.broadcom.com>
+References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383837455-30721-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131114190004.GP9468@ld-irv-0074.broadcom.com>
+Message-ID: <20131114194906.GD9912@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2013 23:30, Christian Daudt <bcm@fixthebug.org> wrote:
-> On Wed, Oct 16, 2013 at 11:12 PM, Christian Daudt <bcm@fixthebug.org> wrote:
->> On Sat, Oct 5, 2013 at 8:43 AM, Christian Daudt <bcm@fixthebug.org> wrote:
->>> This patch adds low level debug uart support to Broadcom
->>>  mobile based SOCs.
->>>
->>> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
->>>
->>> Changes from V2:
->>>  - Changed to follow hex ordering on entries
->>>  - Dropped defconfig changes
->>>
->>> Changes from V1:
->>>  - Switched to use the common 8250 debug introduced in 3.12-rc1
->>>
->>
->> Hi Russell,
->>  Does V3 look ok ?
->>
->>  Thanks,
->>    csd
-> Hi,
->  Can anyone provide an ack on this mod ?
->
->  Thanks,
->    csd
+On Thu, Nov 14, 2013 at 11:00:04AM -0800, Brian Norris wrote:
+> On Thu, Nov 07, 2013 at 12:17:10PM -0300, Ezequiel Garcia wrote:
+> > Given there's no public specification to this date, and in order
+> > to capture some important details and singularities about the
+> > controller let's document them once and for good.
+> 
+> Made a few small tweaks for spelling and such (see the following diff)
+> and pushed patches 5 through 14 to l2-mtd.git/next.
+> 
 
-Tested-by: Markus Mayer <markus.mayer@linaro.org>
+The below diff looks ok. I had to rework a few patches after the
+completion patch rework, and I'm running some tests.
 
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Initializing cgroup subsys cpu
-[    0.000000] Initializing cgroup subsys cpuacct
-[    0.000000] Linux version 3.12.0+ (mmayer at lbrmn-lnxub70.ric.broadcom.com)
-[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
-instruction cache
-[    0.000000] Machine: BCM281xx Broadcom Application Processor,
-model: BCM28155 AP board
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Truncating RAM at 90000000-bfffffff to -bf7fffff
-(vmalloc region overlap).
-[    0.000000] Memory policy: ECC disabled, Data cache writeback
-[    0.000000] CPU: All CPU(s) started in SVC mode.
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.
-Total pages: 193040
-[    0.000000] Kernel command line: console=ttyS0,115200n8
-root=/dev/mmcblk0p8 rootwait rootfstype=ext4 earlyprintk
-[...]
-[    0.200000] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-[    0.210000] 3e000000.uart: ttyS0 at MMIO 0x3e000000 (irq = 99,
-base_baud = 812500) is a 16550A
-[    0.220000] console [ttyS0] enabled, bootconsole disabled
-[    0.220000] console [ttyS0] enabled, bootconsole disabled
-[    0.230000] mousedev: PS/2 mouse device common for all mice
-[...]
+I'll submit the series as soon as the tests are done.
+
+> Thanks,
+> Brian
+> 
+> diff --git a/Documentation/mtd/nand/pxa3xx-nand.txt b/Documentation/mtd/nand/pxa3xx-nand.txt
+> index 00e601c..840fd41 100644
+> --- a/Documentation/mtd/nand/pxa3xx-nand.txt
+> +++ b/Documentation/mtd/nand/pxa3xx-nand.txt
+> @@ -36,7 +36,7 @@ OOB, one per chunk read.
+>  So, in order to achieve reading (for instance), we issue several READ0 commands
+>  (with some additional controller-specific magic) and read two chunks of 2080B
+>  (2048 data + 32 spare) each.
+> -The driver accomodates this data to expose the NAND core a contiguous buffer
+> +The driver accommodates this data to expose the NAND core a contiguous buffer
+>  (4096 data + spare) or (4096 + spare + ECC + spare + ECC).
+>  
+>  ECC
+> @@ -81,7 +81,7 @@ an *entire* page.
+>  Factory bad blocks handling
+>  ===========================
+>  
+> -Given the ECC BCH requires to layout the device's pages in a splitted
+> +Given the ECC BCH requires to layout the device's pages in a split
+>  data/OOB/data/OOB way, the controller has a view of the flash page that's
+>  different from the specified (aka the manufacturer's) view. In other words,
+>  
+> @@ -109,5 +109,5 @@ disabled by using the NAND_BBT_NO_OOB_BBM option in the driver. The rationale
+>  for this is that there's no point in marking a block as bad, because good
+>  blocks are also 'marked as bad' (in the OOB BBM sense) under normal usage.
+>  
+> -Instead, the drive relies in the bad block table alone, and should only perform
+> +Instead, the driver relies on the bad block table alone, and should only perform
+>  the bad block scan on the very first time (when the device hasn't been used).
 
 -- 
-Markus Mayer
-Broadcom Landing Team
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
