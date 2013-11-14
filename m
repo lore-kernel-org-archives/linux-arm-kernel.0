@@ -1,35 +1,139 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 14 Nov 2013 17:23:08 +0100
-Subject: [PATCHv4] dmaengine: Add support for BCM2835
-In-Reply-To: <CABDT8WyUK6tDneDEm0G3o0zJHXaVTZp8JAMxOp5LRKQYG-7Umw@mail.gmail.com>
-References: <5283BC93.1090801@koalo.de> <2385512.qcT1vt8HYp@flatron>
- <CABDT8WyUK6tDneDEm0G3o0zJHXaVTZp8JAMxOp5LRKQYG-7Umw@mail.gmail.com>
-Message-ID: <11018682.0TjgocUWod@flatron>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 14 Nov 2013 17:28:10 +0100
+Subject: [RFC PATCH v2] ARM: at91: add support for Cosino board series by
+ HCE Engineering
+In-Reply-To: <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1383754767-5398-1-git-send-email-giometti@linux.it>
+ <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20131114162810.GJ28304@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 of November 2013 17:14:31 Florian Meier wrote:
-> >> >> I am becoming desperate anyway that this migration will ever fully
-> >> >> take place....
-> >> >
-> >> > Why not? It's just a matter of people like you working on this (and
-> >> > addressing some review comments ;)).
-> >>
-> >> The most common comment about this is that people will not put effort in
-> >> the upstream kernel as long as there is no comfortable way for debugging
-> >> in the upstream kernel (i.e. at least USB support).......
-> >
-> > Right, you need USB to have ethernet working. Still, IMHO UART (for
-> > console) + ethernet (for file transfer or NFS root) is the reasonable
-> > setup allowing you to debug further drivers in a comfortable way.
+On 18:34 Wed 13 Nov     , Nicolas Ferre wrote:
+> From: Rodolfo Giometti <giometti@linux.it>
 > 
-> I am fine with UART and switching SD cards :-)
-> But apparently this is not generally accepted.
-
-Still, isn't some work on USB support for RPi already going on? I believe
-Matt Porter (now on Cc) has been working on unifying dwc2 host-mode
-driver with Samsung s3c-hsotg device-mode driver (for the same IP) to
-get full OTG support on all applicable platforms.
-
-Best regards,
-Tomasz
+> This patch adds the Cosino at91sam9g35 based CPU module and the
+> Cosino Mega 2560 extension board.
+> 
+> Web site: http://www.cosino.it
+> 
+> Signed-off-by: Rodolfo Giometti <giometti@linux.it>
+> [nicolas.ferre at atmel.com: adapted to newer kernel, modified commit message]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Rodolfo,
+> 
+> Can you please review this adaptation of your previous patch to newer kernel.
+> I hope to integrate your board in upcoming 3.14.
+> 
+> You will see that I addressed the remarks by Jean-Christophe and Russell (about
+> commit message). Please tell me if it is good on your side.
+> 
+> Ciao,
+> 
+> 
+>  arch/arm/boot/dts/Makefile                 |   1 +
+>  arch/arm/boot/dts/at91-cosino.dtsi         | 122 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/at91-cosino_mega2560.dts |  85 ++++++++++++++++++++
+>  3 files changed, 208 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-cosino.dtsi
+>  create mode 100644 arch/arm/boot/dts/at91-cosino_mega2560.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index d57c1a6..772a30e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -30,6 +30,7 @@ dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
+>  # sam9x5
+>  dtb-$(CONFIG_ARCH_AT91) += at91-ariag25.dtb
+> +dtb-$(CONFIG_ARCH_AT91) += at91-cosino_mega2560.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9g15ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9g25ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9g35ek.dtb
+> diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
+> new file mode 100644
+> index 0000000..53f2b01
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-cosino.dtsi
+> @@ -0,0 +1,122 @@
+> +/*
+> + * at91-cosino.dtsi - Device Tree file for Cosino core module
+> + *
+> + * Copyright (C) 2013 - Rodolfo Giometti <giometti@linux.it>
+> + *			HCE Engineering
+> + *
+> + * Derived from at91sam9x5ek.dtsi by:
+> + *	Copyright (C) 2012 Atmel,
+> + *	2012 Nicolas Ferre <nicolas.ferre@atmel.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include "at91sam9g35.dtsi"
+> +
+> +/ {
+> +	model = "HCE Cosino core module";
+> +	compatible = "hce,cosino", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+is this really sam9xek compatible?
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait";
+> +	};
+> +
+...
+> +/ {
+> +	model = "HCE Cosino Mega 2560";
+> +	compatible = "hce,cosino_mega2560", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+ditto
+> +
+> +	ahb {
+> +		apb {
+> +			macb0: ethernet at f802c000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			adc0: adc at f804c000 {
+> +				atmel,adc-clock-rate = <1000000>;
+> +				atmel,adc-ts-wires = <4>;
+> +				atmel,adc-ts-pressure-threshold = <10000>;
+> +				status = "okay";
+> +			};
+> +
+> +
+> +			tsadcc: tsadcc at f804c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			rtc at fffffeb0 {
+> +				status = "okay";
+> +			};
+> +
+> +			usart1: serial at f8020000 {
+> +			       status = "okay";
+tab no space
+> +			};
+> +
+> +			usart2: serial at f8024000 {
+> +			       status = "okay";
+tab no space
+> +			};
+> +
+> +			usb2: gadget at f803c000 {
+> +				atmel,vbus-gpio = <&pioB 16 GPIO_ACTIVE_HIGH>;
+> +				status = "okay";
+> +			};
+> +
+> +		usb0: ohci at 00600000 {
+> +			status = "okay";
+> +			num-ports = <3>;
+> +			atmel,vbus-gpio = <0 /* &pioD 18 GPIO_ACTIVE_LOW *//* Activate to have access to port A */
+do we really need the comment code?
+> +					   &pioD 19 GPIO_ACTIVE_LOW
+> +					   &pioD 20 GPIO_ACTIVE_LOW
+> +					  >;
+> +		};
+> +
+Best Regards,
+J.
