@@ -1,62 +1,52 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 14 Nov 2013 13:02:12 -0800
-Subject: [PATCH v2 1/5] Documentation: dt: Add i2c-bcm-kona binding
+Date: Thu, 14 Nov 2013 13:02:16 -0800
+Subject: [PATCH v2 5/5] ARM: dts: bcm28155-ap: Enable all the i2c busses
 In-Reply-To: <1384462936-7906-1-git-send-email-tim.kryger@linaro.org>
 References: <1384462936-7906-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1384462936-7906-2-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1384462936-7906-6-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the binding description for the i2c-bcm-kona block found on
-Broadcom's mobile SoCs.
+Enable all available i2c busses.
 
 Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Christian Daudt <csd@broadcom.com>
 Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 ---
- .../devicetree/bindings/i2c/i2c-bcm-kona.txt       | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt
+ arch/arm/boot/dts/bcm28155-ap.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt b/Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt
-new file mode 100644
-index 0000000..1b87b74
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt
-@@ -0,0 +1,35 @@
-+Broadcom Kona Family I2C
-+=========================
+diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+index 08e47c2..bab302d 100644
+--- a/arch/arm/boot/dts/bcm28155-ap.dts
++++ b/arch/arm/boot/dts/bcm28155-ap.dts
+@@ -27,6 +27,26 @@
+ 		status = "okay";
+ 	};
+ 
++	i2c at 3e016000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
 +
-+This I2C controller is used in the following Broadcom SoCs:
++	i2c at 3e017000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
 +
-+  BCM11130
-+  BCM11140
-+  BCM11351
-+  BCM28145
-+  BCM28155
++	i2c at 3e018000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
 +
-+Required Properties
-+-------------------
-+- compatible: "brcm,bcm11351-i2c", "brcm,kona-i2c"
-+- reg: Physical base address and length of controller registers
-+- interrupts: The interrupt number used by the controller
-+- clocks: clock specifier for the kona i2c external clock
-+- clock-frequency: The I2C bus frequency in Hz
-+- #address-cells: Should be <1>
-+- #size-cells: Should be <0>
++	i2c at 3500d000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
 +
-+Refer to clocks/clock-bindings.txt for generic clock consumer
-+properties.
-+
-+Example:
-+
-+i2c at 3e016000 {
-+	compatible = "brcm,bcm11351-i2c","brcm,kona-i2c";
-+	reg = <0x3e016000 0x80>;
-+	interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&bsc1_clk>;
-+	clock-frequency = <400000>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+};
+ 	sdio1: sdio at 3f180000 {
+ 		max-frequency = <48000000>;
+ 		status = "okay";
 -- 
 1.8.0.1
