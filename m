@@ -1,54 +1,307 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 10:24:48 -0800
-Subject: [PATCH] pinctrl: single: call pcs_soc->rearm() whenever IRQ
- mask is changed
-In-Reply-To: <20131112195611.GT15154@atomide.com>
-References: <1381507996-15021-1-git-send-email-rogerq@ti.com>
- <CACRpkdb7iUypffB7O7-RhQhVf5WkjYdVCNLRz=BgySG4FET-xQ@mail.gmail.com>
- <20131011172337.GU29913@atomide.com>
- <CACRpkdbo_TwX79hnJ5mCo8D4TSDd6OUzaOsFa8MgzjLy-H2U4Q@mail.gmail.com>
- <20131112195611.GT15154@atomide.com>
-Message-ID: <20131114182447.GJ10317@atomide.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 14 Nov 2013 18:28:38 +0000
+Subject: [PATCH v2] arch: arm: uapi: be sure of "_UAPI" prefix for all
+ guard macros
+In-Reply-To: <52843897.8000907@asianux.com>
+References: <527C5ECD.8010208@asianux.com>
+ <52843897.8000907@asianux.com>
+Message-ID: <20131114182838.GA20516@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131112 11:57]:
-> * Linus Walleij <linus.walleij@linaro.org> [131112 10:45]:
-> > On Fri, Oct 11, 2013 at 7:23 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > > * Linus Walleij <linus.walleij@linaro.org> [131011 09:27]:
-> > >> On Fri, Oct 11, 2013 at 6:13 PM, Roger Quadros <rogerq@ti.com> wrote:
-> > >>
-> > >> > On OMAPs the IO ring must be rearmed each time the pad wakeup
-> > >> > configuration is changed. So call pcs_soc->rearm() from
-> > >> > pcs_irq_set().
-> > >> >
-> > >> > Signed-off-by: Roger Quadros <rogerq@ti.com>
-> > >>
-> > >> If Tony needs to apply this with the other patches: Acked-by.
-> > >
-> > > Just replied with a slightly modified version of Roger's patch
-> > > suggesting you pull in the signed tag I posted for you yesterday
-> > > and then you can pick up Roger's fix into the pinctrl tree :)
-> > 
-> > Hm now that I go over these old mails in my inbox I start to
-> > worry that I missed something here, I have no memory of pulling
-> > a tag for OMAP... is this all in the state
-> > it needs to be for OMAP?
+On Thu, Nov 14, 2013 at 10:42:31AM +0800, Chen Gang wrote:
+> For all uapi headers, need use "_UAPI" prefix for its guard macro
+> (which will be stripped by "scripts/headers_installer.sh").
 > 
-> The other pinctrl-single related patches are now merged to mainline:
+> Additional completions:
 > 
-> 1b9c0fb365cbb1154f4e7997061db972cbf58300 pinctrl: single: Fix build when not built on ARM
-> dc7743aa3c49fabbc6dc9edbcf7df74d776ac32e pinctrl: single: Add support for auxdata
-> 3e6cee1786a13cb2308609b5f8c020e1754e37cf pinctrl: single: Add support for wake-up interrupts
-> 02e483f66deb6bd8df6af450726574614eb53be3 pinctrl: single: Prepare for supporting SoC specific features
+>  - be sure that all "endif" need be appended related comment, also it
+>    has and only has one empty line above and no any lines below either.
 > 
-> The fix from Roger is still missing. You can go ahead and queue
-> it, or if you prefer me to do it I can add it to my fixes.
+>  - be sure that all normal uapi header files need content guard macro.
+> 
+>  - remove the default "kvm_para.h" and add 'generic-y' in Kbuild.
+> 
+>  - remove the detail address of Free Software Foundation (or can not
+>    pass "scripts/checkpatch.pl").
+> 
 
-Actually Linus, I'll queue this with your ack as the interrupts-extended
-property is now merged in and I can also enable some minimal wake-up
-events for omap3.
+for the kvm/arm part I guess it looks fine.
 
-Regards,
+-Christoffer
 
-Tony
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/include/uapi/asm/Kbuild        |    3 ++-
+>  arch/arm/include/uapi/asm/byteorder.h   |    7 +++----
+>  arch/arm/include/uapi/asm/fcntl.h       |    6 +++---
+>  arch/arm/include/uapi/asm/ioctls.h      |    6 +++---
+>  arch/arm/include/uapi/asm/kvm.h         |    8 ++++----
+>  arch/arm/include/uapi/asm/kvm_para.h    |    1 -
+>  arch/arm/include/uapi/asm/mman.h        |    5 +++++
+>  arch/arm/include/uapi/asm/perf_regs.h   |    7 ++++---
+>  arch/arm/include/uapi/asm/posix_types.h |    6 +++---
+>  arch/arm/include/uapi/asm/ptrace.h      |    1 -
+>  arch/arm/include/uapi/asm/setup.h       |    1 -
+>  arch/arm/include/uapi/asm/sigcontext.h  |    7 +++----
+>  arch/arm/include/uapi/asm/signal.h      |    1 -
+>  arch/arm/include/uapi/asm/stat.h        |    6 +++---
+>  arch/arm/include/uapi/asm/statfs.h      |    7 ++++---
+>  15 files changed, 37 insertions(+), 35 deletions(-)
+>  delete mode 100644 arch/arm/include/uapi/asm/kvm_para.h
+> 
+> diff --git a/arch/arm/include/uapi/asm/Kbuild b/arch/arm/include/uapi/asm/Kbuild
+> index 70a1c9d..12a65af 100644
+> --- a/arch/arm/include/uapi/asm/Kbuild
+> +++ b/arch/arm/include/uapi/asm/Kbuild
+> @@ -1,11 +1,12 @@
+>  # UAPI Header export list
+>  include include/uapi/asm-generic/Kbuild.asm
+>  
+> +generic-y += kvm_para.h
+> +
+>  header-y += byteorder.h
+>  header-y += fcntl.h
+>  header-y += hwcap.h
+>  header-y += ioctls.h
+> -header-y += kvm_para.h
+>  header-y += mman.h
+>  header-y += perf_regs.h
+>  header-y += posix_types.h
+> diff --git a/arch/arm/include/uapi/asm/byteorder.h b/arch/arm/include/uapi/asm/byteorder.h
+> index 7737974..ffd1e93 100644
+> --- a/arch/arm/include/uapi/asm/byteorder.h
+> +++ b/arch/arm/include/uapi/asm/byteorder.h
+> @@ -12,8 +12,8 @@
+>   * and word accesses (data or instruction) appear as:
+>   *  d0...d31
+>   */
+> -#ifndef __ASM_ARM_BYTEORDER_H
+> -#define __ASM_ARM_BYTEORDER_H
+> +#ifndef _UAPI__ASM_ARM_BYTEORDER_H
+> +#define _UAPI__ASM_ARM_BYTEORDER_H
+>  
+>  #ifdef __ARMEB__
+>  #include <linux/byteorder/big_endian.h>
+> @@ -21,5 +21,4 @@
+>  #include <linux/byteorder/little_endian.h>
+>  #endif
+>  
+> -#endif
+> -
+> +#endif /* _UAPI__ASM_ARM_BYTEORDER_H */
+> diff --git a/arch/arm/include/uapi/asm/fcntl.h b/arch/arm/include/uapi/asm/fcntl.h
+> index a80b660..4cde9c4 100644
+> --- a/arch/arm/include/uapi/asm/fcntl.h
+> +++ b/arch/arm/include/uapi/asm/fcntl.h
+> @@ -1,5 +1,5 @@
+> -#ifndef _ARM_FCNTL_H
+> -#define _ARM_FCNTL_H
+> +#ifndef _UAPI_ARM_FCNTL_H
+> +#define _UAPI_ARM_FCNTL_H
+>  
+>  #define O_DIRECTORY	 040000	/* must be a directory */
+>  #define O_NOFOLLOW	0100000	/* don't follow links */
+> @@ -8,4 +8,4 @@
+>  
+>  #include <asm-generic/fcntl.h>
+>  
+> -#endif
+> +#endif /* _UAPI_ARM_FCNTL_H */
+> diff --git a/arch/arm/include/uapi/asm/ioctls.h b/arch/arm/include/uapi/asm/ioctls.h
+> index 9c96298..a9d8008 100644
+> --- a/arch/arm/include/uapi/asm/ioctls.h
+> +++ b/arch/arm/include/uapi/asm/ioctls.h
+> @@ -1,8 +1,8 @@
+> -#ifndef __ASM_ARM_IOCTLS_H
+> -#define __ASM_ARM_IOCTLS_H
+> +#ifndef _UAPI__ASM_ARM_IOCTLS_H
+> +#define _UAPI__ASM_ARM_IOCTLS_H
+>  
+>  #define FIOQSIZE	0x545E
+>  
+>  #include <asm-generic/ioctls.h>
+>  
+> -#endif
+> +#endif /* _UAPI__ASM_ARM_IOCTLS_H */
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index c498b60..f44fad1 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -13,11 +13,11 @@
+>   *
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program; if not, write to the Free Software
+> - * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> + * Foundation (the address is in a copy of the GPL).
+>   */
+>  
+> -#ifndef __ARM_KVM_H__
+> -#define __ARM_KVM_H__
+> +#ifndef _UAPI__ARM_KVM_H__
+> +#define _UAPI__ARM_KVM_H__
+>  
+>  #include <linux/types.h>
+>  #include <asm/ptrace.h>
+> @@ -178,4 +178,4 @@ struct kvm_arch_memory_slot {
+>  #define KVM_PSCI_RET_INVAL		((unsigned long)-2)
+>  #define KVM_PSCI_RET_DENIED		((unsigned long)-3)
+>  
+> -#endif /* __ARM_KVM_H__ */
+> +#endif /* _UAPI__ARM_KVM_H__ */
+> diff --git a/arch/arm/include/uapi/asm/kvm_para.h b/arch/arm/include/uapi/asm/kvm_para.h
+> deleted file mode 100644
+> index 14fab8f..0000000
+> --- a/arch/arm/include/uapi/asm/kvm_para.h
+> +++ /dev/null
+> @@ -1 +0,0 @@
+> -#include <asm-generic/kvm_para.h>
+> diff --git a/arch/arm/include/uapi/asm/mman.h b/arch/arm/include/uapi/asm/mman.h
+> index 41f99c5..bf6ac7c 100644
+> --- a/arch/arm/include/uapi/asm/mman.h
+> +++ b/arch/arm/include/uapi/asm/mman.h
+> @@ -1,4 +1,9 @@
+> +#ifndef _UAPI_ARM_MMAN_H
+> +#define _UAPI_ARM_MMAN_H
+> +
+>  #include <asm-generic/mman.h>
+>  
+>  #define arch_mmap_check(addr, len, flags) \
+>  	(((flags) & MAP_FIXED && (addr) < FIRST_USER_ADDRESS) ? -EINVAL : 0)
+> +
+> +#endif /* _UAPI_ARM_MMAN_H */
+> diff --git a/arch/arm/include/uapi/asm/perf_regs.h b/arch/arm/include/uapi/asm/perf_regs.h
+> index ce59448..61e86fb 100644
+> --- a/arch/arm/include/uapi/asm/perf_regs.h
+> +++ b/arch/arm/include/uapi/asm/perf_regs.h
+> @@ -1,5 +1,5 @@
+> -#ifndef _ASM_ARM_PERF_REGS_H
+> -#define _ASM_ARM_PERF_REGS_H
+> +#ifndef _UAPI_ASM_ARM_PERF_REGS_H
+> +#define _UAPI_ASM_ARM_PERF_REGS_H
+>  
+>  enum perf_event_arm_regs {
+>  	PERF_REG_ARM_R0,
+> @@ -20,4 +20,5 @@ enum perf_event_arm_regs {
+>  	PERF_REG_ARM_PC,
+>  	PERF_REG_ARM_MAX,
+>  };
+> -#endif /* _ASM_ARM_PERF_REGS_H */
+> +
+> +#endif /* _UAPI_ASM_ARM_PERF_REGS_H */
+> diff --git a/arch/arm/include/uapi/asm/posix_types.h b/arch/arm/include/uapi/asm/posix_types.h
+> index d2de9cb..d0e3856 100644
+> --- a/arch/arm/include/uapi/asm/posix_types.h
+> +++ b/arch/arm/include/uapi/asm/posix_types.h
+> @@ -10,8 +10,8 @@
+>   *  Changelog:
+>   *   27-06-1996	RMK	Created
+>   */
+> -#ifndef __ARCH_ARM_POSIX_TYPES_H
+> -#define __ARCH_ARM_POSIX_TYPES_H
+> +#ifndef _UAPI__ARCH_ARM_POSIX_TYPES_H
+> +#define _UAPI__ARCH_ARM_POSIX_TYPES_H
+>  
+>  /*
+>   * This file is generally used by user-level software, so you need to
+> @@ -34,4 +34,4 @@ typedef unsigned short		__kernel_old_dev_t;
+>  
+>  #include <asm-generic/posix_types.h>
+>  
+> -#endif
+> +#endif /* _UAPI__ARCH_ARM_POSIX_TYPES_H */
+> diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
+> index 5af0ed1..9fd79dd 100644
+> --- a/arch/arm/include/uapi/asm/ptrace.h
+> +++ b/arch/arm/include/uapi/asm/ptrace.h
+> @@ -151,7 +151,6 @@ struct pt_regs {
+>   */
+>  #define ARM_VFPREGS_SIZE ( 32 * 8 /*fpregs*/ + 4 /*fpscr*/ )
+>  
+> -
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif /* _UAPI__ASM_ARM_PTRACE_H */
+> diff --git a/arch/arm/include/uapi/asm/setup.h b/arch/arm/include/uapi/asm/setup.h
+> index 979ff40..be889f3 100644
+> --- a/arch/arm/include/uapi/asm/setup.h
+> +++ b/arch/arm/include/uapi/asm/setup.h
+> @@ -183,5 +183,4 @@ struct tagtable {
+>  #define for_each_tag(t,base)		\
+>  	for (t = base; t->hdr.size; t = tag_next(t))
+>  
+> -
+>  #endif /* _UAPI__ASMARM_SETUP_H */
+> diff --git a/arch/arm/include/uapi/asm/sigcontext.h b/arch/arm/include/uapi/asm/sigcontext.h
+> index fc0b80b..f6aa372 100644
+> --- a/arch/arm/include/uapi/asm/sigcontext.h
+> +++ b/arch/arm/include/uapi/asm/sigcontext.h
+> @@ -1,5 +1,5 @@
+> -#ifndef _ASMARM_SIGCONTEXT_H
+> -#define _ASMARM_SIGCONTEXT_H
+> +#ifndef _UAPI_ASMARM_SIGCONTEXT_H
+> +#define _UAPI_ASMARM_SIGCONTEXT_H
+>  
+>  /*
+>   * Signal context structure - contains all info to do with the state
+> @@ -30,5 +30,4 @@ struct sigcontext {
+>  	unsigned long fault_address;
+>  };
+>  
+> -
+> -#endif
+> +#endif /* _UAPI_ASMARM_SIGCONTEXT_H */
+> diff --git a/arch/arm/include/uapi/asm/signal.h b/arch/arm/include/uapi/asm/signal.h
+> index 33073bd..8954e9a 100644
+> --- a/arch/arm/include/uapi/asm/signal.h
+> +++ b/arch/arm/include/uapi/asm/signal.h
+> @@ -116,5 +116,4 @@ typedef struct sigaltstack {
+>  	size_t ss_size;
+>  } stack_t;
+>  
+> -
+>  #endif /* _UAPI_ASMARM_SIGNAL_H */
+> diff --git a/arch/arm/include/uapi/asm/stat.h b/arch/arm/include/uapi/asm/stat.h
+> index 42c0c13..57addf5 100644
+> --- a/arch/arm/include/uapi/asm/stat.h
+> +++ b/arch/arm/include/uapi/asm/stat.h
+> @@ -1,5 +1,5 @@
+> -#ifndef _ASMARM_STAT_H
+> -#define _ASMARM_STAT_H
+> +#ifndef _UAPI_ASMARM_STAT_H
+> +#define _UAPI_ASMARM_STAT_H
+>  
+>  struct __old_kernel_stat {
+>  	unsigned short st_dev;
+> @@ -84,4 +84,4 @@ struct stat64 {
+>  	unsigned long long	st_ino;
+>  };
+>  
+> -#endif
+> +#endif /* _UAPI_ASMARM_STAT_H */
+> diff --git a/arch/arm/include/uapi/asm/statfs.h b/arch/arm/include/uapi/asm/statfs.h
+> index 079447c..ebcb391 100644
+> --- a/arch/arm/include/uapi/asm/statfs.h
+> +++ b/arch/arm/include/uapi/asm/statfs.h
+> @@ -1,5 +1,5 @@
+> -#ifndef _ASMARM_STATFS_H
+> -#define _ASMARM_STATFS_H
+> +#ifndef _UAPI_ASMARM_STATFS_H
+> +#define _UAPI_ASMARM_STATFS_H
+>  
+>  /*
+>   * With EABI there is 4 bytes of padding added to this structure.
+> @@ -9,4 +9,5 @@
+>  #define ARCH_PACK_STATFS64 __attribute__((packed,aligned(4)))
+>  
+>  #include <asm-generic/statfs.h>
+> -#endif
+> +
+> +#endif /* _UAPI_ASMARM_STATFS_H */
+> -- 
+> 1.7.7.6
+
+-- 
+Christoffer
