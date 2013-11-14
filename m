@@ -1,43 +1,86 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 14 Nov 2013 16:23:05 +0100
-Subject: [PATCH v2 0/7] Renesas R8A7790 Common Clock Framework support
-In-Reply-To: <CANqRtoRfBb_mZ3erk_iSmmjuFJAWetN3THjGQcBhEjVE__2wWg@mail.gmail.com>
-References: <1384052977-30616-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CANqRtoRfBb_mZ3erk_iSmmjuFJAWetN3THjGQcBhEjVE__2wWg@mail.gmail.com>
-Message-ID: <9051092.bb2GyTMq0G@avalon>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 14 Nov 2013 15:24:14 +0000
+Subject: Physical memory start contraints in the Linux kernel (Was: Re:
+ Xen osstest on Calxeda midway progress (Was: Re: [Xen-devel] [xen-unstable
+ test] 21486: tolerable FAIL - PUSHED))
+In-Reply-To: <201311132042.32725.arnd@arndb.de>
+References: <osstest-21486-mainreport@xen.org>
+ <1384339849.5406.52.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1311131417030.4714@kaball.uk.xensource.com>
+ <201311132042.32725.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.02.1311141520150.4714@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
-
-On Thursday 14 November 2013 19:16:05 Magnus Damm wrote:
-> Hi Laurent,
+On Wed, 13 Nov 2013, Arnd Bergmann wrote:
+> On Wednesday 13 November 2013, Stefano Stabellini wrote:
+> >  
+> > -#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
+> > +#ifdef CONFIG_GENERIC_ATOMIC64
+> > +/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
+> > + * atomic64_xchg function because it is implemented using spin locks.
+> > + * Here we need proper atomic instructions to read and write memory
+> > + * shared with the hypervisor.
+> > + */
+> > +static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
+> > +{
+> > +	u64 result;
+> > +	unsigned long tmp;
+> > +
+> > +	smp_mb();
+> > +
+> > +	__asm__ __volatile__("@ xen_atomic64_xchg\n"
+> > +"1:	ldrexd	%0, %H0, [%3]\n"
+> > +"	strexd	%1, %4, %H4, [%3]\n"
+> > +"	teq	%1, #0\n"
+> > +"	bne	1b"
+> > +	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
+> > +	: "r" (&ptr->counter), "r" (new)
+> > +	: "cc");
+> > +
+> > +	smp_mb();
+> > +
+> > +	return result;
+> > +}
+> > +#else
+> > +#define xen_atomic64_xchg atomic64_xchg
+> > +#endif
 > 
-> Thanks for V2, it is looking better and better. Great that r8a7791 and
-> r8a7790 can share the CPG code. I have now finally got my r8a7791 board
-> replaced so I intend to try your code out on Lager and then see if I can
-> cook something up on Koelsch.
+> I would prefer not duplicating this code. Maybe we can instead change
+> the ARM code to always provide this function under the name of
+> armv7_atomic64_xchg() and conditionally defining atomic64_xchg
+> to use it. Let's see if Russell has an opinion on this, or perhaps
+> a better solution.
+> 
+> > diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+> > index 62ccf54..d668c3c 100644
+> > --- a/drivers/xen/grant-table.c
+> > +++ b/drivers/xen/grant-table.c
+> > @@ -33,6 +33,14 @@
+> >  
+> >  #define pr_fmt(fmt) "xen:" KBUILD_MODNAME ": " fmt
+> >  
+> > +/* This is required because cmpxchg only support 32-bits operands on
+> > + * ARMv6, so if CONFIG_CPU_V6 is defined the cmpxchg implemention will
+> > + * be limited to 32-bits operands.
+> > + * However we know for sure that if Linux is running on Xen, the
+> > + * platform is >= ARMv7, so here we can safely undef CONFIG_CPU_V6.
+> > + */
+> > +#undef CONFIG_CPU_V6
+> > +
+> >  #include <linux/module.h>
+> >  #include <linux/sched.h>
+> >  #include <linux/mm.h>
+> > 
+> 
+> Same here: I'd prefer making this more explicit by changing the cmpxchg
+> implementation: we could split out the 16-bit cmpxchg case into a separate
+> function with "armv7" in the name and only call that from the main
+> cmpxchg() implementations when building an armv7-only kernel, but still
+> let you call it from Xen code that is known to run only on armv7.
+ 
+what do you think of:
 
-I was actually planning to test the code on the Koelsch board. I don't want to 
-step on anyone's toes, so please let me know if someone is already working on 
-CCF patches for M2, otherwise I'll send them.
+http://marc.info/?l=linux-arm-kernel&m=138444245625671&w=2
 
-> I have one question related to the CPG. What is your plan regarding CPU
-> Frequency scaling? I'd like to see "z_clk" and "z2_clk" implemented together
-> with some way to let CPUFreq scale "z_clk". Can you please spend some time
-> on that?
-
-Z2 is a fixed factor clock, I'll just add it to DT.
-
-Z is a bit more tricky. It's the output of a pure multiplier (PLL0) followed 
-by a pure divisor (SYS-CPU divider 1). I can easily model the two as separate 
-clock devices, but I'm unsure about what should be done at runtime when 
-setting the Z clock frequency. Would it be enough to have a fixed PLL0 
-frequency and configure the SYS-CPU divider 1 only (from 1/1 to 1/32), or 
-would we need to configure the PLL0 multiplier as well for a more fine-grained 
-Z frequency configuration ?
-
--- 
-Regards,
-
-Laurent Pinchart
+?
