@@ -1,54 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 14 Nov 2013 09:56:01 +0100
-Subject: [RFC PATCH v2] ARM: at91: add support for Cosino board series
- by HCE Engineering
-In-Reply-To: <20131113174624.GC10964@enneenne.com>
-References: <1383754767-5398-1-git-send-email-giometti@linux.it>
- <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
- <20131113174624.GC10964@enneenne.com>
-Message-ID: <52849021.4060809@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 14 Nov 2013 10:07:05 +0100
+Subject: [PATCH] clocksource: sirf/marco+prima2: drop usage of
+ CLOCK_TICK_RATE
+In-Reply-To: <5283DA74.9080402@linaro.org>
+References: <1384201236-8689-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5283DA74.9080402@linaro.org>
+Message-ID: <20131114090705.GX14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/2013 18:46, Rodolfo Giometti :
-> On Wed, Nov 13, 2013 at 06:34:30PM +0100, Nicolas Ferre wrote:
->> From: Rodolfo Giometti <giometti@linux.it>
->>
->> This patch adds the Cosino at91sam9g35 based CPU module and the
->> Cosino Mega 2560 extension board.
->>
->> Web site: http://www.cosino.it
->>
->> Signed-off-by: Rodolfo Giometti <giometti@linux.it>
->> [nicolas.ferre at atmel.com: adapted to newer kernel, modified commit message]
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> Rodolfo,
->>
->> Can you please review this adaptation of your previous patch to newer kernel.
->> I hope to integrate your board in upcoming 3.14.
->>
->> You will see that I addressed the remarks by Jean-Christophe and Russell (about
->> commit message). Please tell me if it is good on your side.
->
-> I did some changes... attached are the correct patches.
+On Wed, Nov 13, 2013 at 09:00:52PM +0100, Daniel Lezcano wrote:
+> On 11/11/2013 09:20 PM, Uwe Kleine-K?nig wrote:
+> >As CSR SiRF is converted to multi platform CLOCK_TICK_RATE is a dummy
+> >value that seems to match the right value is used.
+> >(arch/arm/mach-prima2/include/mach/timex.h which defined CLOCK_TICK_RATE
+> >to 1000000 was removed in commit cf82e0e (ARM: sirf: enable
+> >multiplatform support); marco used the same file.)
+> >
+> >To not depend on that dummy value use a local #define instead.
+> 
+> I don't get this patch. It is to fix a compilation error ?
+No, the problem is that CLOCK_TICK_RATE used to be defined in a platform
+specific header <mach/timex.h>. For the ARM multiplatform stuff, this
+was dropped and now all multiplatform kernels use 1000000. For some
+platform (like SiRF) this happens to be correct, but actually it's pure
+luck. Further down the road I'd like to drop defining CLOCK_TICK_RATE
+for all platforms, so this is a preparing patch. But even independant
+from that it feels wrong to use a dummy value that was only introduced
+to prevent compile breakage.
 
-Doing the diff between our patch I only seen a difference in nand binding:
-nand-on-flash-bbt;
-is present in my adaptation while it is not in yours but I do not think 
-it is a problem to keep it.
+Would this change log be better:
 
-> Here the changelog V1 -> V2:
->
-> [Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>]
-> * prefix "at91-" added
-> * atmel,mux-mask stuff removed
-> * "compatible" stuff is now on the same line for easy-grep(TM)
-> * lcd binding dropped
+	Since CSR SiRF was converted to multi platform in cf82e0e (ARM:
+	sirf: enable multiplatform support) the symbol CLOCK_TICK_RATE
+	isn't the platform specific definition any more, but a global
+	dummy value. There was no harm introduced in cf82e0e because the
+	global value happens to match the old platform specific one,
+	still this dummy value isn't intended to be used and will
+	hopefully disappear soon, so introduce a local #define and use
+	that instead.
 
-Absolutely, I will add it to the commit log and integrate in the 
-upcoming at91-3.14-dt branch.
+So it's not urgent, but would be a nice cleanup for 3.14-rc1.
 
-Thanks for your quick feedback. Bye,
+Best regards
+Uwe
+
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
