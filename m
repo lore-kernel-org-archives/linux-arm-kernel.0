@@ -1,82 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 14 Nov 2013 00:09:47 -0200
-Subject: [PATCH 2/2] ARM: dts: imx6q-udoo: Add USB host support
-In-Reply-To: <1384394987-15134-1-git-send-email-festevam@gmail.com>
-References: <1384394987-15134-1-git-send-email-festevam@gmail.com>
-Message-ID: <1384394987-15134-2-git-send-email-festevam@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Nov 2013 18:35:29 -0800
+Subject: [PATCH 0/8] Various omap device tree usability fixes for v3.13 merge
+ window
+Message-ID: <1384396537-3486-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-Udoo board has USBH1 port connected to a USB2514 hub.
+Hi all,
 
-Add support for it.
+Here are some patches to fix various issue for device tree based
+booting for omaps that I've ran into recently while working on
+removing legacy platform data for mach-omap2.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-udoo.dts | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+Regards,
 
-diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
-index 1c7f7a1..109b997 100644
---- a/arch/arm/boot/dts/imx6q-udoo.dts
-+++ b/arch/arm/boot/dts/imx6q-udoo.dts
-@@ -19,6 +19,23 @@
- 	memory {
- 		reg = <0x10000000 0x40000000>;
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_usb_h1_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "usb_h1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
-+			gpio = <&gpio7 12 0>;
-+		};
-+	};
- };
- 
- &fec {
-@@ -29,7 +46,17 @@
- };
- 
- &iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
- 	imx6q-udoo {
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
-+				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
-+			>;
-+		};
-+
- 		pinctrl_enet: enetgrp {
- 			fsl,pins = <MX6QDL_ENET_PINGRP1>;
- 		};
-@@ -54,6 +81,13 @@
- 	status = "okay";
- };
- 
-+&usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	clocks = <&clks 201>;
-+	clock-names = "phy";
-+	status = "okay";
-+};
-+
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3>;
+Tony
+
+
+Tony Lindgren (8):
+  net: smc91x: Fix device tree based configuration so it's usable
+  mmc: omap: Fix DMA configuration to not rely on device id
+  mmc: omap: Fix I2C dependency and make driver usable with device tree
+  i2c: omap: Fix missing device tree flags for omap2
+  gpio: twl4030: Fix regression for twl gpio output
+  gpio: twl4030: Fix passing of pdata in the device tree case
+  ARM: OMAP2+: Fix GPMC and simplify bootloader timings for 8250 and
+    smc91x
+  ARM: dts: Fix omap2 specific dtsi files by adding the missing entries
+
+ .../devicetree/bindings/net/smsc-lan91c111.txt     |  4 +
+ arch/arm/boot/dts/omap-zoom-common.dtsi            |  2 +-
+ arch/arm/boot/dts/omap2.dtsi                       | 96 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap2420.dtsi                    | 23 ++++++
+ arch/arm/boot/dts/omap2430.dtsi                    | 49 +++++++++++
+ arch/arm/mach-omap2/gpmc.c                         | 58 +++++--------
+ drivers/gpio/gpio-twl4030.c                        | 13 ++-
+ drivers/i2c/busses/i2c-omap.c                      | 22 +++++
+ drivers/mmc/host/omap.c                            | 42 +++++-----
+ drivers/net/ethernet/smsc/smc91x.c                 | 52 +++++++++---
+ 10 files changed, 285 insertions(+), 76 deletions(-)
+
 -- 
-1.8.1.2
+1.8.1.1
