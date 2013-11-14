@@ -1,189 +1,112 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Nov 2013 09:29:12 +0000
-Subject: [PATCH 1/4] mfd: rtsx: Generify call-back operations in order to
- reduce code duplication
+Date: Thu, 14 Nov 2013 09:29:13 +0000
+Subject: [PATCH 2/4] mfd: rtsx: Generify the switch voltage routine
 In-Reply-To: <1384421355-4434-1-git-send-email-lee.jones@linaro.org>
 References: <1384421355-4434-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1384421355-4434-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1384421355-4434-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With only a few variations between devices, it seems silly to keep bolting
-on entirely new and mostly duplicated operation structs when a generic one
-could be defined and the small differences could be handled in the init
-functions.
+Other, upcoming devices will want to change the shift value when using
+the switch voltage call-back routine. In this patch we will ensure that
+unnecessary code duplication shall not occur.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/rtl8411.c        | 118 ++++++++++++++++++-------------------------
- include/linux/mfd/rtsx_pci.h |   2 +-
- 2 files changed, 50 insertions(+), 70 deletions(-)
+ drivers/mfd/rtl8411.c        | 12 ++++++++----
+ drivers/mfd/rtsx_pcr.c       |  3 ++-
+ include/linux/mfd/rtsx_pci.h |  3 ++-
+ 3 files changed, 12 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mfd/rtl8411.c b/drivers/mfd/rtl8411.c
-index 5280135..92e9bf6 100644
+index 92e9bf6..9bba4e2 100644
 --- a/drivers/mfd/rtl8411.c
 +++ b/drivers/mfd/rtl8411.c
-@@ -279,38 +279,6 @@ static int rtl8411_conv_clk_and_div_n(int input, int dir)
- 	return output;
+@@ -191,24 +191,25 @@ static int rtl8411_card_power_off(struct rtsx_pcr *pcr, int card)
+ 			BPP_LDO_POWB, BPP_LDO_SUSPEND);
  }
  
--static const struct pcr_ops rtl8411_pcr_ops = {
--	.fetch_vendor_settings = rtl8411_fetch_vendor_settings,
--	.extra_init_hw = rtl8411_extra_init_hw,
--	.optimize_phy = NULL,
--	.turn_on_led = rtl8411_turn_on_led,
--	.turn_off_led = rtl8411_turn_off_led,
--	.enable_auto_blink = rtl8411_enable_auto_blink,
--	.disable_auto_blink = rtl8411_disable_auto_blink,
--	.card_power_on = rtl8411_card_power_on,
--	.card_power_off = rtl8411_card_power_off,
--	.switch_output_voltage = rtl8411_switch_output_voltage,
--	.cd_deglitch = rtl8411_cd_deglitch,
--	.conv_clk_and_div_n = rtl8411_conv_clk_and_div_n,
--	.force_power_down = rtl8411_force_power_down,
--};
--
--static const struct pcr_ops rtl8411b_pcr_ops = {
--	.fetch_vendor_settings = rtl8411b_fetch_vendor_settings,
--	.extra_init_hw = rtl8411b_extra_init_hw,
--	.optimize_phy = NULL,
--	.turn_on_led = rtl8411_turn_on_led,
--	.turn_off_led = rtl8411_turn_off_led,
--	.enable_auto_blink = rtl8411_enable_auto_blink,
--	.disable_auto_blink = rtl8411_disable_auto_blink,
--	.card_power_on = rtl8411_card_power_on,
--	.card_power_off = rtl8411_card_power_off,
--	.switch_output_voltage = rtl8411_switch_output_voltage,
--	.cd_deglitch = rtl8411_cd_deglitch,
--	.conv_clk_and_div_n = rtl8411_conv_clk_and_div_n,
--	.force_power_down = rtl8411_force_power_down,
--};
--
- /* SD Pull Control Enable:
-  *     SD_DAT[3:0] ==> pull up
-  *     SD_CD       ==> pull up
-@@ -441,60 +409,72 @@ static const u32 rtl8411b_qfn48_ms_pull_ctl_disable_tbl[] = {
- 	0,
- };
- 
--void rtl8411_init_params(struct rtsx_pcr *pcr)
-+#define set_pull_ctrl_tables(__device) \
-+	pcr->sd_pull_ctl_enable_tbl  = __device##_sd_pull_ctl_enable_tbl;  \
-+	pcr->sd_pull_ctl_disable_tbl = __device##_sd_pull_ctl_disable_tbl; \
-+	pcr->ms_pull_ctl_enable_tbl  = __device##_ms_pull_ctl_enable_tbl;  \
-+	pcr->ms_pull_ctl_disable_tbl = __device##_ms_pull_ctl_disable_tbl;
-+
-+static struct pcr_ops rtl84xx_pcr_generic_ops = {
-+	.fetch_vendor_settings = NULL, /* Dynamic */
-+	.extra_init_hw = NULL,         /* Dynamic */
-+	.optimize_phy = NULL,
-+	.turn_on_led = rtl8411_turn_on_led,
-+	.turn_off_led = rtl8411_turn_off_led,
-+	.enable_auto_blink = rtl8411_enable_auto_blink,
-+	.disable_auto_blink = rtl8411_disable_auto_blink,
-+	.card_power_on = rtl8411_card_power_on,
-+	.card_power_off = rtl8411_card_power_off,
-+	.switch_output_voltage = rtl84xx_switch_output_voltage,
-+	.cd_deglitch = rtl8411_cd_deglitch,
-+	.conv_clk_and_div_n = rtl8411_conv_clk_and_div_n,
-+	.force_power_down = rtl8411_force_power_down,
-+};
-+
-+void rtl84xx_generic_params(struct rtsx_pcr *pcr)
+-static int rtl8411_switch_output_voltage(struct rtsx_pcr *pcr, u8 voltage)
++static int rtl84xx_switch_output_voltage(struct rtsx_pcr *pcr,
++					 u8 voltage, int shift)
  {
-+	pcr->ops = &rtl84xx_pcr_generic_ops;
-+
- 	pcr->extra_caps = EXTRA_CAPS_SD_SDR50 | EXTRA_CAPS_SD_SDR104;
- 	pcr->num_slots = 2;
--	pcr->ops = &rtl8411_pcr_ops;
+ 	u8 mask, val;
+ 	int err;
  
- 	pcr->flags = 0;
- 	pcr->card_drive_sel = RTL8411_CARD_DRIVE_DEFAULT;
- 	pcr->sd30_drive_sel_1v8 = DRIVER_TYPE_B;
- 	pcr->sd30_drive_sel_3v3 = DRIVER_TYPE_D;
- 	pcr->aspm_en = ASPM_L1_EN;
--	pcr->tx_initial_phase = SET_CLOCK_PHASE(23, 7, 14);
--	pcr->rx_initial_phase = SET_CLOCK_PHASE(4, 3, 10);
+-	mask = (BPP_REG_TUNED18 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_MASK;
++	mask = (BPP_REG_TUNED18 << shift) | BPP_PAD_MASK;
+ 	if (voltage == OUTPUT_3V3) {
+ 		err = rtsx_pci_write_register(pcr,
+ 				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_3v3);
+ 		if (err < 0)
+ 			return err;
+-		val = (BPP_ASIC_3V3 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_3V3;
++		val = (BPP_ASIC_3V3 << shift) | BPP_PAD_3V3;
+ 	} else if (voltage == OUTPUT_1V8) {
+ 		err = rtsx_pci_write_register(pcr,
+ 				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_1v8);
+ 		if (err < 0)
+ 			return err;
+-		val = (BPP_ASIC_1V8 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_1V8;
++		val = (BPP_ASIC_1V8 << shift) | BPP_PAD_1V8;
+ 	} else {
+ 		return -EINVAL;
+ 	}
+@@ -426,6 +427,7 @@ static struct pcr_ops rtl84xx_pcr_generic_ops = {
+ 	.card_power_on = rtl8411_card_power_on,
+ 	.card_power_off = rtl8411_card_power_off,
+ 	.switch_output_voltage = rtl84xx_switch_output_voltage,
++	.voltage_reg_shift = 0,        /* Dynamic */
+ 	.cd_deglitch = rtl8411_cd_deglitch,
+ 	.conv_clk_and_div_n = rtl8411_conv_clk_and_div_n,
+ 	.force_power_down = rtl8411_force_power_down,
+@@ -455,6 +457,7 @@ void rtl8411_init_params(struct rtsx_pcr *pcr)
+ 	/* Device Ops variation. */
+ 	pcr->ops->fetch_vendor_settings = rtl8411_fetch_vendor_settings;
+ 	pcr->ops->extra_init_hw = rtl8411_extra_init_hw;
++	pcr->ops->voltage_reg_shift = BPP_TUNED18_SHIFT_8411;
  
- 	pcr->ic_version = rtl8411_get_ic_version(pcr);
--	pcr->sd_pull_ctl_enable_tbl = rtl8411_sd_pull_ctl_enable_tbl;
--	pcr->sd_pull_ctl_disable_tbl = rtl8411_sd_pull_ctl_disable_tbl;
--	pcr->ms_pull_ctl_enable_tbl = rtl8411_ms_pull_ctl_enable_tbl;
--	pcr->ms_pull_ctl_disable_tbl = rtl8411_ms_pull_ctl_disable_tbl;
-+}
-+
-+void rtl8411_init_params(struct rtsx_pcr *pcr)
-+{
-+	/* Fill in common parameters. */
-+	rtl84xx_generic_params(pcr);
-+
-+	/* Device Ops variation. */
-+	pcr->ops->fetch_vendor_settings = rtl8411_fetch_vendor_settings;
-+	pcr->ops->extra_init_hw = rtl8411_extra_init_hw;
-+
-+	pcr->rx_initial_phase = SET_CLOCK_PHASE(4, 3, 10);
-+
-+	set_pull_ctrl_tables(rtl8411);
- }
- 
- void rtl8411b_init_params(struct rtsx_pcr *pcr)
- {
--	pcr->extra_caps = EXTRA_CAPS_SD_SDR50 | EXTRA_CAPS_SD_SDR104;
--	pcr->num_slots = 2;
--	pcr->ops = &rtl8411b_pcr_ops;
-+	/* Fill in common parameters. */
-+	rtl84xx_generic_params(pcr);
-+
-+	/* Device Ops variation. */
-+	pcr->ops->fetch_vendor_settings = rtl8411b_fetch_vendor_settings;
-+	pcr->ops->extra_init_hw = rtl8411b_extra_init_hw;
- 
--	pcr->flags = 0;
--	pcr->card_drive_sel = RTL8411_CARD_DRIVE_DEFAULT;
--	pcr->sd30_drive_sel_1v8 = DRIVER_TYPE_B;
--	pcr->sd30_drive_sel_3v3 = DRIVER_TYPE_D;
--	pcr->aspm_en = ASPM_L1_EN;
- 	pcr->tx_initial_phase = SET_CLOCK_PHASE(23, 7, 14);
  	pcr->rx_initial_phase = SET_CLOCK_PHASE(4, 3, 10);
  
--	pcr->ic_version = rtl8411_get_ic_version(pcr);
--
--	if (rtl8411b_is_qfn48(pcr)) {
--		pcr->sd_pull_ctl_enable_tbl =
--			rtl8411b_qfn48_sd_pull_ctl_enable_tbl;
--		pcr->sd_pull_ctl_disable_tbl =
--			rtl8411b_qfn48_sd_pull_ctl_disable_tbl;
--		pcr->ms_pull_ctl_enable_tbl =
--			rtl8411b_qfn48_ms_pull_ctl_enable_tbl;
--		pcr->ms_pull_ctl_disable_tbl =
--			rtl8411b_qfn48_ms_pull_ctl_disable_tbl;
--	} else {
--		pcr->sd_pull_ctl_enable_tbl =
--			rtl8411b_qfn64_sd_pull_ctl_enable_tbl;
--		pcr->sd_pull_ctl_disable_tbl =
--			rtl8411b_qfn64_sd_pull_ctl_disable_tbl;
--		pcr->ms_pull_ctl_enable_tbl =
--			rtl8411b_qfn64_ms_pull_ctl_enable_tbl;
--		pcr->ms_pull_ctl_disable_tbl =
--			rtl8411b_qfn64_ms_pull_ctl_disable_tbl;
--	}
-+	if (rtl8411b_is_qfn48(pcr))
-+		set_pull_ctrl_tables(rtl8411b_qfn48);
-+	else
-+		set_pull_ctrl_tables(rtl8411b_qfn64);
+@@ -469,6 +472,7 @@ void rtl8411b_init_params(struct rtsx_pcr *pcr)
+ 	/* Device Ops variation. */
+ 	pcr->ops->fetch_vendor_settings = rtl8411b_fetch_vendor_settings;
+ 	pcr->ops->extra_init_hw = rtl8411b_extra_init_hw;
++	pcr->ops->voltage_reg_shift = BPP_TUNED18_SHIFT_8411;
+ 
+ 	pcr->tx_initial_phase = SET_CLOCK_PHASE(23, 7, 14);
+ 	pcr->rx_initial_phase = SET_CLOCK_PHASE(4, 3, 10);
+diff --git a/drivers/mfd/rtsx_pcr.c b/drivers/mfd/rtsx_pcr.c
+index e6ae772..f41ee8f 100644
+--- a/drivers/mfd/rtsx_pcr.c
++++ b/drivers/mfd/rtsx_pcr.c
+@@ -734,7 +734,8 @@ EXPORT_SYMBOL_GPL(rtsx_pci_card_exclusive_check);
+ int rtsx_pci_switch_output_voltage(struct rtsx_pcr *pcr, u8 voltage)
+ {
+ 	if (pcr->ops->switch_output_voltage)
+-		return pcr->ops->switch_output_voltage(pcr, voltage);
++		return pcr->ops->switch_output_voltage(pcr, voltage,
++					pcr->ops->voltage_reg_shift);
+ 
+ 	return 0;
  }
 diff --git a/include/linux/mfd/rtsx_pci.h b/include/linux/mfd/rtsx_pci.h
-index d1382df..f5f3ffc 100644
+index f5f3ffc..5afc448 100644
 --- a/include/linux/mfd/rtsx_pci.h
 +++ b/include/linux/mfd/rtsx_pci.h
-@@ -855,7 +855,7 @@ struct rtsx_pcr {
- 	const u32			*ms_pull_ctl_enable_tbl;
- 	const u32			*ms_pull_ctl_disable_tbl;
+@@ -774,11 +774,12 @@ struct pcr_ops {
+ 	int		(*card_power_on)(struct rtsx_pcr *pcr, int card);
+ 	int		(*card_power_off)(struct rtsx_pcr *pcr, int card);
+ 	int		(*switch_output_voltage)(struct rtsx_pcr *pcr,
+-						u8 voltage);
++						 u8 voltage, int shift);
+ 	unsigned int	(*cd_deglitch)(struct rtsx_pcr *pcr);
+ 	int		(*conv_clk_and_div_n)(int clk, int dir);
+ 	void		(*fetch_vendor_settings)(struct rtsx_pcr *pcr);
+ 	void		(*force_power_down)(struct rtsx_pcr *pcr, u8 pm_state);
++	int		voltage_reg_shift;
+ };
  
--	const struct pcr_ops		*ops;
-+	struct pcr_ops			*ops;
- 	enum PDEV_STAT			state;
- 
- 	int				num_slots;
+ enum PDEV_STAT  {PDEV_STAT_IDLE, PDEV_STAT_RUN};
 -- 
 1.8.1.2
