@@ -1,64 +1,119 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Nov 2013 16:49:07 -0300
-Subject: [PATCH v4 06/31] mtd: nand: pxa3xx: Add documentation about the
- controller
-In-Reply-To: <20131114190004.GP9468@ld-irv-0074.broadcom.com>
-References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383837455-30721-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131114190004.GP9468@ld-irv-0074.broadcom.com>
-Message-ID: <20131114194906.GD9912@localhost>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 14 Nov 2013 15:33:13 -0500
+Subject: [PATCH v2 10/13] kprobes: Remove uneeded kernel dependency on
+ struct arch_specific_insn
+In-Reply-To: <1384438551.3388.78.camel@linaro1.home>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-11-git-send-email-dave.long@linaro.org>
+ <1384362833.3392.42.camel@linaro1.home> <52842F2C.1030701@hitachi.com>
+ <1384438551.3388.78.camel@linaro1.home>
+Message-ID: <52853389.7080105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 11:00:04AM -0800, Brian Norris wrote:
-> On Thu, Nov 07, 2013 at 12:17:10PM -0300, Ezequiel Garcia wrote:
-> > Given there's no public specification to this date, and in order
-> > to capture some important details and singularities about the
-> > controller let's document them once and for good.
-> 
-> Made a few small tweaks for spelling and such (see the following diff)
-> and pushed patches 5 through 14 to l2-mtd.git/next.
-> 
+On 11/14/13 09:15, Jon Medhurst (Tixy) wrote:
+> On Thu, 2013-11-14 at 11:02 +0900, Masami Hiramatsu wrote:
+>> (2013/11/14 2:13), Jon Medhurst (Tixy) wrote:
+>>> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
+>>>> From: "David A. Long" <dave.long@linaro.org>
+>>>>
+>>>> Instead of depending on include/asm/kprobes.h to provide a dummy definition
+>>>> for struct arch_specific_insn, do so in include/linux/kprobes.h.
+>>>
+>>> That change description doesn't quite seem to quite make sense to me.
+>>>
+>>> Anyway, what we're trying to do with this patch is to allow us to use
+>>> arch_specific_insn for purposes additional to implementing kprobes. This
+>>> patch enables that but I'm wary that the kprobes code assumes that ainsn
+>>> is a struct arch_specific_insn, e.g. in linux/kernel/kprobes.c we have:
+>>>
+>>> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
+>>>
+>>> Now, that code isn't compiled when kprobes isn't configured, but it
+>>> seams to me to be safer if that was also changed to
+>>>
+>>> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(p->ainsn));
+>>
 
-The below diff looks ok. I had to rework a few patches after the
-completion patch rework, and I'm running some tests.
+That does look like an important improvement.
 
-I'll submit the series as soon as the tests are done.
+>> This kind of cleanup looks good for me, but I don't agree to change
+>> the type of the member (removing is OK) by Kconfig.
+>
+> Wouldn't that still require an #ifdef CONFIG_KPROBES around ainsn?
+> Admittedly a less ugly one than one to change its type to an int.
+>
 
-> Thanks,
-> Brian
-> 
-> diff --git a/Documentation/mtd/nand/pxa3xx-nand.txt b/Documentation/mtd/nand/pxa3xx-nand.txt
-> index 00e601c..840fd41 100644
-> --- a/Documentation/mtd/nand/pxa3xx-nand.txt
-> +++ b/Documentation/mtd/nand/pxa3xx-nand.txt
-> @@ -36,7 +36,7 @@ OOB, one per chunk read.
->  So, in order to achieve reading (for instance), we issue several READ0 commands
->  (with some additional controller-specific magic) and read two chunks of 2080B
->  (2048 data + 32 spare) each.
-> -The driver accomodates this data to expose the NAND core a contiguous buffer
-> +The driver accommodates this data to expose the NAND core a contiguous buffer
->  (4096 data + spare) or (4096 + spare + ECC + spare + ECC).
->  
->  ECC
-> @@ -81,7 +81,7 @@ an *entire* page.
->  Factory bad blocks handling
->  ===========================
->  
-> -Given the ECC BCH requires to layout the device's pages in a splitted
-> +Given the ECC BCH requires to layout the device's pages in a split
->  data/OOB/data/OOB way, the controller has a view of the flash page that's
->  different from the specified (aka the manufacturer's) view. In other words,
->  
-> @@ -109,5 +109,5 @@ disabled by using the NAND_BBT_NO_OOB_BBM option in the driver. The rationale
->  for this is that there's no point in marking a block as bad, because good
->  blocks are also 'marked as bad' (in the OOB BBM sense) under normal usage.
->  
-> -Instead, the drive relies in the bad block table alone, and should only perform
-> +Instead, the driver relies on the bad block table alone, and should only perform
->  the bad block scan on the very first time (when the device hasn't been used).
+It is also possible to make the include of asm/kprobes.h unconditional, 
+although that might only cause the #ifdef to appear in more than one 
+include file.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+>>   If you want to
+>> change the framework of kprobes and uprobes itself (unification),
+>> I'm appreciate to discuss with you and uprobes people, because it
+>> will involve all arch dependent code change, *NOT ONLY* the ARM issue.
+>
+> Well, I don't think the goal wasn't unification as such. For kprobes on
+> ARM we have to decode and simulate pretty much the entire instruction
+> set(s) and the attempt to implement uprobes on ARM have tried to make
+> use of as much of that as possible. The tricky bit has been as to where
+> to try and draw the level of abstraction, and it seems this may well be
+> leaking out of the arch specific arena.
+>
+> Bit of background, Dave Long has been working on ARM uprobes based on
+> Rabin Vincent's earlier work, and I, as author of a large part of the
+> current ARM kprobes code, have been reviewing (not very satisfactorily I
+> admit) the bits that impact that. One of my motivations has been to push
+> the kprobes instruction decoding to be more generic, rather than special
+> casing things to cope with uprobes. This is because I'm aware of the
+> reoccurring theme on the ARM lists that it would be good to not have all
+> the different methods of instruction decoding, for probes, debug and
+> simulation, etc. (I'm sceptical that a one-size-fits-all is possible,
+> but consolidation where practical is good).
+>
+>>
+>>> However, I also wonder if we should instead leave arch_specific_insn as
+>>> a kprobes specific structure and on ARM define it in terms of a new more
+>>> generic 'struct probe_insn'? The drawback with that is that we'd
+>>> probably end up with a struct just containing a single member which
+>>> seems a bit redundant:
+>>>
+>>> struct arch_specific_insn {
+>>> 	struct probe_insn pinsn;
+>>> };
+>>
+>> I also disagree it. If you have a plan to integrate uprobes and kprobes
+>> arch specific code, please share it with us.
+>
+> There's not really a 'plan', just an attempt to reuse the instruction
+> decoding code used by kprobes in the implementation of uprobes, i.e. the
+> patch series [1] which this mail thread is in reply to.
+>
+> [1] http://thread.gmane.org/gmane.linux.kernel/1579985
+>
+>>   I'm happy to work with you.
+>> There are already many maintainers on each feature who is responsible for
+>> it (even it is a piece of code), and scripts/get_maintainers.pl gives you
+>> who are.
+>>
+
+Sorry, that would indeed have told me that you were responsible for 
+include/linux/kprobes.h.
+
+>>
+>> Srikar, Oleg, I think it's a good time to merge such arch_specific mechanism
+>> of uprobes and kprobes. Would you think we can do similar thing on x86 too?
+>
+
+I welcome input from people who have experience in this area.  I have no 
+desire to complicate efforts that might be attempted on other 
+architectures, but the existing code was unique to ARM and the goal here 
+was just to share it on ARM in implementing the currently non-existant 
+ARM uprobes feature.  It seems to me the leakage of these changes into 
+generic kprobes code is exceedingly small, and unlikely to be a 
+hinderance to any future work (if any is even needed or planned) 
+supporting uprobes or kprobes on other architectures.  In the meantime 
+we have ARM users who have been asking for uprobes support for a while 
+and this is, IMHO, a fairly clean approach to providing it.
+
+-dl
