@@ -1,47 +1,40 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Nov 2013 14:37:41 -0500
-Subject: [PATCH 1/6] arm64: mm: Add __virt_to_idmap() to keep kvm build happy
+Date: Thu, 14 Nov 2013 14:37:45 -0500
+Subject: [PATCH 5/6] ARM: kvm: Use phys_addr_t instead of unsigned long in mm
+ code
 In-Reply-To: <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
 References: <y>
  <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1384457866-16135-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1384457866-16135-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM kvm code will make use of __virt_to_idmap() on arm32
-machines as hardware interconnect supported alias of physical
-memory for idmap purposes. The same code is shared with arm64
-bit and hence will break the builds. So we add __virt_to_idmap()
-which is just __virt_to_phys() on arm64 bit to keep build happy.
+The unsigned long datatype is not sufficient for mapping physical addresses
+greater than 4GB.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+So fix the KVM mm code accordingly. Special thanks to Christopher for debug
+help to figure out the bug.
+
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm64/include/asm/memory.h |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/kvm/mmu.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 3776217..d9341ee 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -75,6 +75,14 @@
- #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
- 
- /*
-+ * Added to keep arm64 kvm build working which shares code with
-+ * 32bit port. ARM kvm code makes use of __virt_to_idmap() on arm32
-+ * machines as hardware interconnect supported alias of physical
-+ * memory for idmap purposes.
-+ */
-+#define virt_to_idmap(x)	__virt_to_phys(x)
-+
-+/*
-  * Convert a physical address to a Page Frame Number and back
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 3bd652f..657f15e 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -318,7 +318,7 @@ out:
   */
- #define	__phys_to_pfn(paddr)	((unsigned long)((paddr) >> PAGE_SHIFT))
+ int create_hyp_mappings(void *from, void *to)
+ {
+-	unsigned long phys_addr = virt_to_phys(from);
++	phys_addr_t phys_addr = virt_to_phys(from);
+ 	unsigned long start = KERN_TO_HYP((unsigned long)from);
+ 	unsigned long end = KERN_TO_HYP((unsigned long)to);
+ 
 -- 
 1.7.9.5
