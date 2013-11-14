@@ -1,55 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 14 Nov 2013 08:46:14 -0600
-Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <CACxGe6uMWjfmB4WDKs+vu05224jqpbDZBHT_ZXnqxw17JzUqvw@mail.gmail.com>
-References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
- <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
- <5283DB34.9050301@gmail.com> <201311141332.58498.arnd@arndb.de>
- <CACxGe6uMWjfmB4WDKs+vu05224jqpbDZBHT_ZXnqxw17JzUqvw@mail.gmail.com>
-Message-ID: <5284E236.1000606@gmail.com>
+From: srinivas.kandagatla@st.com (Srinivas Kandagatla)
+Date: Thu, 14 Nov 2013 14:53:08 +0000
+Subject: [PATCH] ARM: orion5x: Fix typo in device_type property of phy node
+Message-ID: <1384440788-3529-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2013 07:33 AM, Grant Likely wrote:
-> On Thu, Nov 14, 2013 at 9:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Wednesday 13 November 2013, Rob Herring wrote:
->>> I'm not inclined to expand cpuinfo and prior attempts to add more info
->>> to cpuinfo like SoC name have failed. The differences between x86 and
->>> arm cpuinfo already cause issues for arm. lscpu does not really work on arm.
->>
->> Well, they turned into drivers/base/soc.c, which adds the information in
->> a structured way in sysfs, but is only used on a couple of platforms.
->>
->>> I'd actually prefer If you really want more system info, then go read
->>> /proc/device-tree.
-> 
-> I really don't mind pulling that information out of /proc/cpuinfo. My
-> point is merely that it is incredibly useful to be able to easily find
-> out exactly which machine_desc got chosen on any given platform. I
-> don't think I should have to grep the source tree to figure that out.
-> 
-> The kernel log is useful, but it is also helpful to have it in a /proc
-> or /sysfs file for when the kernel log overflows. /proc/device-tree
-> doesn't give that information.
+This patch fixes a typo for device_type property of phy node.
+This can work as of today but once a checks are added in generic code
+this typo will stop phy from working.
 
-Either we want to shrink/remove machine_desc or we don't. If we do, then
-the name has to go at some point. So what is the reason to remove it
-later rather than sooner? Later means we will have "Generic DT based
-system" in cpuinfo as platforms transition. Perhaps that is useful to
-know in the short term, but once all platforms print the same thing the
-information becomes useless. Then we either remove Hardware field from
-cpuinfo or change to use DT info. That's changing the string twice
-rather than once.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+---
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-We probably have at least a dozen machine_desc's we are close to being
-able to remove (sunxi, picoxcell, highbank, dove, rockchip, virt,
-several sh-mobile). There's also more that probably can be combined
-together which will change the string in /proc/cpuinfo.
-
-If this is a required feature then we should make machine_desc common
-(or at least part of it) with the other arches that have copied arm and
-then add it to arm64 as well. Then I could do further consolidation of
-the FDT machine matching code. Otherwise this is all just pointless
-architecture variation that really has nothing to do with the architecture.
-
-Rob
+diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+index aed83de..fcc5bb6 100644
+--- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
++++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+@@ -58,7 +58,7 @@
+ 	status = "okay";
+ 
+ 	ethphy: ethernet-phy {
+-		device-type = "ethernet-phy";
++		device_type = "ethernet-phy";
+ 		reg = <8>;
+ 	};
+ };
+-- 
+1.7.6.5
