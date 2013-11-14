@@ -1,44 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Nov 2013 11:07:21 +0000
-Subject: [PATCH 4/8] i2c: omap: Fix missing device tree flags for omap2
-In-Reply-To: <1384396537-3486-5-git-send-email-tony@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-5-git-send-email-tony@atomide.com>
-Message-ID: <20131114110721.GE16396@e106331-lin.cambridge.arm.com>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Thu, 14 Nov 2013 19:07:10 +0800
+Subject: [PATCH 2/2] ASoC: fsl_ssi: Add monaural audio support for non-ac97
+ interface
+In-Reply-To: <1384427230-979-1-git-send-email-b42378@freescale.com>
+References: <1384427230-979-1-git-send-email-b42378@freescale.com>
+Message-ID: <1384427230-979-3-git-send-email-b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:35:33AM +0000, Tony Lindgren wrote:
-> As we claim to support device tree for mach-omap2, we
-> should have the necessary flags in the driver to make it
-> usable.
-> 
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: linux-i2c at vger.kernel.org
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
-> 
-> If this looks OK, I'd like to merge this as a fix via arm-soc tree
-> along with the other patches in this series as my later patches
-> depend on patches in this series.
-> 
-> ---
->  drivers/i2c/busses/i2c-omap.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+The normal mode of SSI allows it to send/receive data to/from the first
+slot of each period. So we can use this normal mode to trick I2S signal
+by puting/getting data to/from the first slot only (the left channel)
+so as to support monaural audio playback and recording.
 
-[...]
+Signed-off-by: Nicolin Chen <b42378@freescale.com>
+---
+ sound/soc/fsl/fsl_ssi.c | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-> +	{
-> +		.compatible = "ti,omap2430-i2c",
-> +		.data = &omap2430_pdata,
-> +	},
-> +	{
-> +		.compatible = "ti,omap2420-i2c",
-> +		.data = &omap2420_pdata,
-
-Please update Documentation/devicetree/bindings/i2c/i2c-omap.txt
-
-Otherwise, this is fine.
-
-Thanks,
-Mark.
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index f43be6d..ccf1d38 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -517,10 +517,12 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ {
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	unsigned int channels = params_channels(hw_params);
+ 	unsigned int sample_size =
+ 		snd_pcm_format_width(params_format(hw_params));
+ 	u32 wl = CCSR_SSI_SxCCR_WL(sample_size);
+ 	int enabled = read_ssi(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
++	static u8 i2s_mode;
+ 
+ 	/*
+ 	 * If we're in synchronous mode, and the SSI is already enabled,
+@@ -546,6 +548,21 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 	else
+ 		write_ssi_mask(&ssi->srccr, CCSR_SSI_SxCCR_WL_MASK, wl);
+ 
++	if (ssi_private->imx_ac97)
++		return 0;
++
++	/* Save i2s mode configuration so that we can restore it later */
++	switch (read_ssi(&ssi->scr) & CCSR_SSI_SCR_I2S_MODE_MASK) {
++	case CCSR_SSI_SCR_I2S_MODE_SLAVE:
++	case CCSR_SSI_SCR_I2S_MODE_MASTER:
++		i2s_mode = read_ssi(&ssi->scr) & CCSR_SSI_SCR_I2S_MODE_MASK;
++	default:
++		break;
++	}
++
++	write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_NET | CCSR_SSI_SCR_I2S_MODE_MASK,
++			channels == 1 ? 0 : CCSR_SSI_SCR_NET | i2s_mode);
++
+ 	return 0;
+ }
+ 
+@@ -658,14 +675,13 @@ static const struct snd_soc_dai_ops fsl_ssi_dai_ops = {
+ static struct snd_soc_dai_driver fsl_ssi_dai_template = {
+ 	.probe = fsl_ssi_dai_probe,
+ 	.playback = {
+-		/* The SSI does not support monaural audio. */
+-		.channels_min = 2,
++		.channels_min = 1,
+ 		.channels_max = 2,
+ 		.rates = FSLSSI_I2S_RATES,
+ 		.formats = FSLSSI_I2S_FORMATS,
+ 	},
+ 	.capture = {
+-		.channels_min = 2,
++		.channels_min = 1,
+ 		.channels_max = 2,
+ 		.rates = FSLSSI_I2S_RATES,
+ 		.formats = FSLSSI_I2S_FORMATS,
+-- 
+1.8.4
