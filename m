@@ -1,38 +1,44 @@
 From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Thu, 14 Nov 2013 10:32:16 +0000
-Subject: [PATCH 1/2] ARM: sti: only select errata 764369 if SMP
-In-Reply-To: <1384389974-6229-1-git-send-email-olof@lixom.net>
-References: <1384389974-6229-1-git-send-email-olof@lixom.net>
-Message-ID: <5284A6B0.5060002@st.com>
+Date: Thu, 14 Nov 2013 10:36:39 +0000
+Subject: [PATCH 0/2] Fixes for STi SOCs
+In-Reply-To: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <5284A7B7.4070406@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the patch.
+Hi Arnd/Olof,
 
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+I think, these patches some how missed 3.13 window.
+Can you please consider these fixes at least for 3.13-rc1?
+
+Without these patches we can not get the serial output with
+multi_v7_defconfig on STi SOCs.
 
 
-On 14/11/13 00:46, Olof Johansson wrote:
-> 764369 depends on SMP, so don't select it on !SMP configs.
+Thanks,
+srini
+
+On 17/09/13 10:26, Srinivas KANDAGATLA wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Cc: Stuart Menefy <stuart.menefy@st.com>
-> ---
->  arch/arm/mach-sti/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Hi Arnd/Olof, 
 > 
-> diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-> index 835833e3c4f8..939ddb8f482b 100644
-> --- a/arch/arm/mach-sti/Kconfig
-> +++ b/arch/arm/mach-sti/Kconfig
-> @@ -12,7 +12,7 @@ menuconfig ARCH_STI
->  	select HAVE_ARM_SCU if SMP
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_ERRATA_754322
-> -	select ARM_ERRATA_764369
-> +	select ARM_ERRATA_764369 if SMP
->  	select ARM_ERRATA_775420
->  	select PL310_ERRATA_753970 if CACHE_PL310
->  	select PL310_ERRATA_769419 if CACHE_PL310
+> These two are very minor fixes for STi SOCs.
+> One of the fix is a typo and other is to add two new options to
+> multi_v7_defconfig to get STi SOC based boards boot with nfs root with serial
+> console.
+> 
+> These patches are based on v3.12-rc1.
+> 
+> Thanks,
+> srini
+> 
+> Srinivas Kandagatla (2):
+>   ARM: STi: OF: Fix a typo in pincfg header
+>   ARM: multi_v7_defconfig: Fix STi support
+> 
+>  arch/arm/boot/dts/st-pincfg.h       |    2 +-
+>  arch/arm/configs/multi_v7_defconfig |    3 +++
+>  2 files changed, 4 insertions(+), 1 deletions(-)
 > 
