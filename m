@@ -1,114 +1,62 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 14 Nov 2013 22:16:36 +0530
-Subject: [PATCH V4 1/4] DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable
- irqs
-In-Reply-To: <20131114140103.GA28328@e106331-lin.cambridge.arm.com>
-References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
- <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
- <20131114140103.GA28328@e106331-lin.cambridge.arm.com>
-Message-ID: <5284FE6C.9040901@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 14 Nov 2013 08:54:58 -0800
+Subject: [PATCH V4] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
+ host
+In-Reply-To: <CALrVBkuTQYWPYLxr51WVouWAmB-xc1cLE4TZVapPW5OpN53ndQ@mail.gmail.com>
+References: <1374471119-26461-1-git-send-email-anup.patel@linaro.org>
+ <CAAhSdy29wvVcmwaUh5PfJTrw4R+MeDrLoWWOPwpnhw2hDvKmKg@mail.gmail.com>
+ <51F7B80E.3040905@arm.com>
+ <CALrVBkt3eBM4hJ7W0orgdS9O=dU26Mb8Fd0Q+wozV87YZQjEHw@mail.gmail.com>
+ <CALrVBkt+qMDcemR62ZgH88AsXUKDVWpz-Uf3JKJt6XoQh_dvXw@mail.gmail.com>
+ <52849E87.3010109@arm.com>
+ <CALrVBkuTQYWPYLxr51WVouWAmB-xc1cLE4TZVapPW5OpN53ndQ@mail.gmail.com>
+Message-ID: <CAMJs5B_TS8gdGEa2XEpvCNq5aD3NfEykhh34C580Opnf5o9LiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Thursday 14 November 2013 07:31 PM, Mark Rutland wrote:
-> On Thu, Nov 14, 2013 at 12:18:47PM +0000, Sricharan R wrote:
->> In some socs the gic can be preceded by a crossbar IP which
->> routes the peripheral interrupts to the gic inputs. The peripheral
->> interrupts are associated with a fixed crossbar input line and the
->> crossbar routes that to one of the free gic input line.
+On 14 November 2013 05:45, Anup Patel <anup.patel@linaro.org> wrote:
+> On 14 November 2013 15:27, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 14/11/13 04:27, Anup Patel wrote:
+>>> On 9 November 2013 10:32, Anup Patel <anup.patel@linaro.org> wrote:
+>>>> On 30 July 2013 18:26, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> On 30/07/13 12:57, Anup Patel wrote:
+>>>>>> On Mon, Jul 22, 2013 at 11:01 AM, Anup Patel <anup.patel@linaro.org> wrote:
+>>>>>>> This patch allows us to have X-Gene guest VCPU when using KVM arm64
+>>>>>>> on APM X-Gene host.
+>>>>>>>
+>>>>>>> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
+>>>>>>> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
+>>>>>>> when running on X-Gene host with Potenza core.
+>>>>>
+>>>>> [...]
+>>>>>
+>>>>>> Hi Marc,
+>>>>>>
+>>>>>> Do you think more changes are required to this patch ?
+>>>>>
+>>>>> Hi Anup,
+>>>>>
+>>>>> It looks OK to me as it is. I'll queue it for 3.12.
+>>>>
+>>>> Hi Marc,
+>>>>
+>>>> I think this patch was missed for 3.12
+>>>>
+>>>> Do you want me to resend this patch ??
+>>>
+>>> Hi Marc,
+>>>
+>>> What is missing in this patch ??
+>>>
+>>> Do you want me to resend this patch ??
 >>
->> The DT entries for peripherals provides the fixed crossbar input line
->> as its interrupt number and the mapping code should associate this with
->> a free gic input line. This patch adds the support inside the gic irqchip
->> to handle such routable irqs. The routable irqs are registered in a linear
->> domain. The registered routable domain's callback should be implemented
->> to get a free irq and to configure the IP to route it.
->>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  [V2] Added default routable-irqs functions to avoid
->>       unnecessary if checks as per Thomas Gleixner comments
->>       and renamed routable-irq binding as per
->>       Kumar Gala <galak@codeaurora.org> comments.
->>
->>  [V3] Addressed unnecessary warn-on and updated default
->>       xlate function as per Thomas Gleixner comments
->>
->>  Documentation/devicetree/bindings/arm/gic.txt |    6 ++
->>  drivers/irqchip/irq-gic.c                     |   81 ++++++++++++++++++++++---
->>  include/linux/irqchip/arm-gic.h               |    7 ++-
->>  3 files changed, 83 insertions(+), 11 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
->> index 3dfb0c0..5357745 100644
->> --- a/Documentation/devicetree/bindings/arm/gic.txt
->> +++ b/Documentation/devicetree/bindings/arm/gic.txt
->> @@ -49,6 +49,11 @@ Optional
->>    regions, used when the GIC doesn't have banked registers. The offset is
->>    cpu-offset * cpu-nr.
->>  
->> +- arm,routable-irqs : Total number of gic irq inputs which are not directly
->> +		  connected from the peripherals, but are routed dynamically
->> +		  by a crossbar/multiplexer preceding the GIC. The GIC irq
->> +		  input line is assigned dynamically when the corresponding
->> +		  peripheral's crossbar line is mapped.
-> I'm not keen on the design of the arm,routable-irqs property. The set of
-> IRQs which the crossbar IP can use is a property of which IRQ lines it
-> has routed to the GIC. I don't see why that should be considered a
-> property of the GIC; it's a property of the crossbar IP's attachment to
-> the GIC.
+>> I appear to have misplaced it somehow.
+>> Please resend it .
 >
-> Given we already have a mechanism for describing the attachment (i.e.
-> the interrupts property) where the property appears on the node for the
-> device generating/propagating the interrupt, I don't see why we should
-> do differently here.
- We did try using interrupts=<> property for all peripherals and
- mapping them as crossbar's parent. But that approach of representing
- crossbar as a interrupt parent was not accepted, since the crossbar
- was just routing the interrupts from peripherals to GIC and nothing more.
- Also  mapping all the interrupts using interrupt-map like property by a fixed way
- in DTS itself was considered hacky
-> Listing 160 interrupts in the crossbar node is clearly something we
-> don't want to have to do.  If we had a property that we could use to
-> define a range (or multiple ranges) of interrupts, then the crossbar
-> driver could go and request those ranges from its interrupt-parent (the
-> GIC) and the GIC driver could reserve/allocate the irqdomain at that
-> time.
-Again, this kind of approach of crossbar requesting irqs from GIC
-was tried earlier and it did not go anywhere. Subsequently after lot of
-discussions this design was considered the best one.
-
-http://www.spinics.net/lists/linux-omap/msg97085.html
-> This feels like a point-hack, counter in style to the vast majority of
-> provider/consumer bindings. It only allows for one multiplexer before
-> the GIC. What if we had multiple multiplexers feeding into the GIC?
-> Describing the attachment on the multiplexer allows that to be handled,
-> describing that on the GIC does not.
- This is case where the interrupts to GIC is not coming from full irqchip,
- but just a router and support added in the GIC helps to handle
- such cases. In the case of more than one multiplexer, the crossbar
- driver should really take care of handling the downward muxes and
- crossbar like driver can be expanded to handle if such a scenario happens.
-> Describing the attachement on the multiplexer would also prevent the
-> duplication of information (i.e. the max-irqs property in the crossbar
-> binding).
+> I have rechecked this patch against latest Linux stable
+> tree. It still applies on latest Linux stable tree hence
+> no need to re-base this patch on latest code.
 >
-> Thanks,
-> Mark.
-Here max-irqs is the total number of output lines of the crossbar itself and
-its property.
+FYI: a better test is to make sure it applies to kvm/next.
 
-Regards,
- Sricharan
+-Christoffer
