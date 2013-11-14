@@ -1,66 +1,98 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Thu, 14 Nov 2013 11:02:20 +0900
-Subject: [PATCH v2 10/13] kprobes: Remove uneeded kernel dependency
- on struct arch_specific_insn
-In-Reply-To: <1384362833.3392.42.camel@linaro1.home>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-11-git-send-email-dave.long@linaro.org>
- <1384362833.3392.42.camel@linaro1.home>
-Message-ID: <52842F2C.1030701@hitachi.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 14 Nov 2013 00:09:46 -0200
+Subject: [PATCH 1/2] chipidea: ci_hdrc_imx: Allow handling the clock for an
+ USB phy/hub
+Message-ID: <1384394987-15134-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/11/14 2:13), Jon Medhurst (Tixy) wrote:
-> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Instead of depending on include/asm/kprobes.h to provide a dummy definition
->> for struct arch_specific_insn, do so in include/linux/kprobes.h.
-> 
-> That change description doesn't quite seem to quite make sense to me.
-> 
-> Anyway, what we're trying to do with this patch is to allow us to use
-> arch_specific_insn for purposes additional to implementing kprobes. This
-> patch enables that but I'm wary that the kprobes code assumes that ainsn
-> is a struct arch_specific_insn, e.g. in linux/kernel/kprobes.c we have:
-> 
-> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
-> 
-> Now, that code isn't compiled when kprobes isn't configured, but it
-> seams to me to be safer if that was also changed to 
-> 
-> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(p->ainsn));
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-This kind of cleanup looks good for me, but I don't agree to change
-the type of the member (removing is OK) by Kconfig. If you want to
-change the framework of kprobes and uprobes itself (unification),
-I'm appreciate to discuss with you and uprobes people, because it
-will involve all arch dependent code change, *NOT ONLY* the ARM issue.
+When using external USB PHY or USB hub, it is common that they require a clock
+input.
 
-> However, I also wonder if we should instead leave arch_specific_insn as
-> a kprobes specific structure and on ARM define it in terms of a new more
-> generic 'struct probe_insn'? The drawback with that is that we'd
-> probably end up with a struct just containing a single member which
-> seems a bit redundant:
->
-> struct arch_specific_insn {
-> 	struct probe_insn pinsn;
-> };
+Add a 'clk_phy' clock, so that it can be retrieved from the device tree and 
+enabled in the driver, so that the clock can properly drive the external 
+USB phy/hub.
 
-I also disagree it. If you have a plan to integrate uprobes and kprobes
-arch specific code, please share it with us. I'm happy to work with you.
-There are already many maintainers on each feature who is responsible for
-it (even it is a piece of code), and scripts/get_maintainers.pl gives you
-who are.
+Tested on a imx6q-udoo board, that connects via USBH1 to a USB2514 hub.
 
-Srikar, Oleg, I think it's a good time to merge such arch_specific mechanism
-of uprobes and kprobes. Would you think we can do similar thing on x86 too?
+In this board the USB2514 is clocked from a 24MHz clock that comes from the 
+imx6q CLKO2 pin.
 
-Thank you,
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ .../devicetree/bindings/usb/ci13xxx-imx.txt          |  2 ++
+ drivers/usb/chipidea/ci_hdrc_imx.c                   | 20 +++++++++++++++++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
-
+diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+index b4b5b79..07ba38c 100644
+--- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
++++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+@@ -18,6 +18,8 @@ Optional properties:
+ - vbus-supply: regulator for vbus
+ - disable-over-current: disable over current detect
+ - external-vbus-divider: enables off-chip resistor divider for Vbus
++- clocks: phandle to the clock that drives the USB hub
++- clock-names: must be "phy"
+ 
+ Examples:
+ usb at 02184000 { /* USB OTG */
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index bb5d976..a197748 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -27,6 +27,7 @@ struct ci_hdrc_imx_data {
+ 	struct usb_phy *phy;
+ 	struct platform_device *ci_pdev;
+ 	struct clk *clk;
++	struct clk *clk_phy;
+ 	struct imx_usbmisc_data *usbmisc_data;
+ };
+ 
+@@ -107,10 +108,22 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	data->clk_phy = devm_clk_get(&pdev->dev, "phy");
++	if (IS_ERR(data->clk_phy)) {
++		data->clk_phy = NULL;
++	} else {
++		ret = clk_prepare_enable(data->clk_phy);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"Failed to enable clk_phy: %d\n", ret);
++			goto err_clk;
++		}
++	}
++
+ 	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
+ 	if (IS_ERR(data->phy)) {
+ 		ret = PTR_ERR(data->phy);
+-		goto err_clk;
++		goto err_clk_phy;
+ 	}
+ 
+ 	pdata.phy = data->phy;
+@@ -157,6 +170,9 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 
+ disable_device:
+ 	ci_hdrc_remove_device(data->ci_pdev);
++err_clk_phy:
++	if (data->clk_phy)
++		clk_disable_unprepare(data->clk_phy);
+ err_clk:
+ 	clk_disable_unprepare(data->clk);
+ 	return ret;
+@@ -168,6 +184,8 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
+ 
+ 	pm_runtime_disable(&pdev->dev);
+ 	ci_hdrc_remove_device(data->ci_pdev);
++	if (data->clk_phy)
++		clk_disable_unprepare(data->clk_phy);
+ 	clk_disable_unprepare(data->clk);
+ 
+ 	return 0;
 -- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+1.8.1.2
