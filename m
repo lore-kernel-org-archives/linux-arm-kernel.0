@@ -1,96 +1,118 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Nov 2013 18:25:25 -0300
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-Message-ID: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Thu, 14 Nov 2013 18:25:28 -0300
+Subject: [PATCH v5 03/14] mtd: nand: pxa3xx: Add bad block handling
+In-Reply-To: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1384464339-6817-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Changes from v4
+Add support for flash-based bad block table using Marvell's
+custom in-flash bad block table layout. The support is enabled
+a 'flash_bbt' platform data or device tree parameter.
 
-  * Rebased on top of l2-mtd.git origin/next branch
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ .../devicetree/bindings/mtd/pxa3xx-nand.txt        |  2 ++
+ drivers/mtd/nand/pxa3xx_nand.c                     | 37 ++++++++++++++++++++++
+ include/linux/platform_data/mtd-nand-pxa3xx.h      |  3 ++
+ 3 files changed, 42 insertions(+)
 
-  * Fixed is_ready flag reset, renamed by a more descriptive
-    and readble "need_wait".
-
-* Changes from v3 (feedback from Brian Norris)
-
-  * Add binding documentation for the nand-flash-bbt DT property.
-
-  * Expand in the documentation and in a comment the reason for
-    setting the NAND_BBT_NO_OOB_BBM option.
-
-  * Reworked the 'is_ready' completion handler. We still have
-    two completions, but we've dropped the atomic_t type as
-    now the variable is no longer accesed from interruption context.
-
-  * Fixed the ecc.read_page() which lacked the max_bitflip return.
-
-  * Reworked the ECC strength and size setting. This is important
-    to allow the MTD layer to properly report on bitflip threshold
-    situation.
-
-  * Dropped an unused fifo_size state variable
-
-  * Use '0' instead of the wrong '-1' when the extended command type
-    doesn't matter or extended semantics are not supposed to be used.
-
-* Changes from v2 (some minor fixes as per Huang's good feedback)
-
-  * Add some more details to the commit log in patch
-    "mtd: nand: pxa3xx: Early variant detection"
-
-  * Add an empty line between variable declaration and function body
-    in patch "mtd: nand: pxa3xx: Use chip->cmdfunc instead of the internal".
-
-  * Fix a build break caused by incomplete variable replacement:
-    "mtd: nand: pxa3xx: Replace host->page_size by mtd->writesize"
-
-* Changes from v1
-
-Aside from several changes based in Brian's feedback, the main changes
-from v1 are:
-
-  * The controller's clock source is now fully modeled, see patche 1 to 4.
-    Of course, none of those patches should be taken through the mtd
-    subsystem, but I'm adding them here for completeness.
-
-  * The chip's cmdfunc() is now independently implemented in each SoC variant.
-    The rationale behind this decision is that 'chunked' I/O is the only tested
-    mode on the Armada370 variant, while the old 'vanilla' I/O is the only
-    tested mode on the PXA variant.
-
-    So it's safer to have an implementation for each variant.
-
-  * Added support for BCH-8, in other words: 8-bits of correction in a 512-byte
-    region. This is obtained by using a data chunk size of 1024B, thus doubling
-    the ECC BCH strength, as per this ECC engine mechanism.
-
-  * The ECC layout in use, which must be set according to the page size and
-    desired ECC strength is now strictly chosen to match only the tested
-    combinations.
-
-
-Ezequiel Garcia (14):
-  mtd: nand: pxa3xx: Use a completion to signal device ready
-  mtd: nand: pxa3xx: Use waitfunc() to wait for the device to be ready
-  mtd: nand: pxa3xx: Add bad block handling
-  mtd: nand: pxa3xx: Add driver-specific ECC BCH support
-  mtd: nand: pxa3xx: Clear cmd buffer #3 (NDCB3) on command start
-  mtd: nand: pxa3xx: Add helper function to set page address
-  mtd: nand: pxa3xx: Remove READ0 switch/case falltrough
-  mtd: nand: pxa3xx: Split prepare_command_pool() in two stages
-  mtd: nand: pxa3xx: Move the data buffer clean to
-    prepare_start_command()
-  mtd: nand: pxa3xx: Fix SEQIN column address set
-  mtd: nand: pxa3xx: Add a read/write buffers markers
-  mtd: nand: pxa3xx: Introduce multiple page I/O support
-  mtd: nand: pxa3xx: Add multiple chunk write support
-  mtd: nand: pxa3xx: Add ECC BCH correctable errors detection
-
- .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   2 +
- drivers/mtd/nand/pxa3xx_nand.c                     | 613 +++++++++++++++++----
- include/linux/platform_data/mtd-nand-pxa3xx.h      |   3 +
- 3 files changed, 505 insertions(+), 113 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+index bed8390..86e0a56 100644
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -15,6 +15,8 @@ Optional properties:
+  - marvell,nand-keep-config:	Set to keep the NAND controller config as set
+ 				by the bootloader
+  - num-cs:			Number of chipselect lines to usw
++ - nand-on-flash-bbt: 		boolean to enable on flash bbt option if
++				not present false
+ 
+ Example:
+ 
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 8af4746..6293ff4 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -26,6 +26,7 @@
+ #include <linux/slab.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_mtd.h>
+ 
+ #if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
+ #define ARCH_HAS_DMA
+@@ -241,6 +242,29 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+ { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
+ };
+ 
++static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
++static u8 bbt_mirror_pattern[] = {'1', 't', 'b', 'B', 'V', 'M' };
++
++static struct nand_bbt_descr bbt_main_descr = {
++	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
++		| NAND_BBT_2BIT | NAND_BBT_VERSION,
++	.offs =	8,
++	.len = 6,
++	.veroffs = 14,
++	.maxblocks = 8,		/* Last 8 blocks in each chip */
++	.pattern = bbt_pattern
++};
++
++static struct nand_bbt_descr bbt_mirror_descr = {
++	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
++		| NAND_BBT_2BIT | NAND_BBT_VERSION,
++	.offs =	8,
++	.len = 6,
++	.veroffs = 14,
++	.maxblocks = 8,		/* Last 8 blocks in each chip */
++	.pattern = bbt_mirror_pattern
++};
++
+ /* Define a default flash type setting serve as flash detecting only */
+ #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
+ 
+@@ -1126,6 +1150,18 @@ KEEP_CONFIG:
+ 
+ 	if (nand_scan_ident(mtd, 1, def))
+ 		return -ENODEV;
++
++	if (pdata->flash_bbt) {
++		/*
++		 * We'll use a bad block table stored in-flash and don't
++		 * allow writing the bad block marker to the flash.
++		 */
++		chip->bbt_options |= NAND_BBT_USE_FLASH |
++				     NAND_BBT_NO_OOB_BBM;
++		chip->bbt_td = &bbt_main_descr;
++		chip->bbt_md = &bbt_mirror_descr;
++	}
++
+ 	/* calculate addressing information */
+ 	if (mtd->writesize >= 2048)
+ 		host->col_addr_cycles = 2;
+@@ -1320,6 +1356,7 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
+ 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
+ 		pdata->keep_config = 1;
+ 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
++	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
+ 
+ 	pdev->dev.platform_data = pdata;
+ 
+diff --git a/include/linux/platform_data/mtd-nand-pxa3xx.h b/include/linux/platform_data/mtd-nand-pxa3xx.h
+index ffb8019..a941471 100644
+--- a/include/linux/platform_data/mtd-nand-pxa3xx.h
++++ b/include/linux/platform_data/mtd-nand-pxa3xx.h
+@@ -55,6 +55,9 @@ struct pxa3xx_nand_platform_data {
+ 	/* indicate how many chip selects will be used */
+ 	int	num_cs;
+ 
++	/* use an flash-based bad block table */
++	bool	flash_bbt;
++
+ 	const struct mtd_partition		*parts[NUM_CHIP_SELECT];
+ 	unsigned int				nr_parts[NUM_CHIP_SELECT];
+ 
 -- 
 1.8.1.5
