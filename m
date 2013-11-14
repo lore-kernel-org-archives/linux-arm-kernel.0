@@ -1,26 +1,31 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Nov 2013 11:03:24 +0000
-Subject: [PATCH 1/8] net: smc91x: Fix device tree based configuration
- so it's usable
-In-Reply-To: <1384396537-3486-2-git-send-email-tony@atomide.com>
+Date: Thu, 14 Nov 2013 11:05:33 +0000
+Subject: [PATCH 3/8] mmc: omap: Fix I2C dependency and make driver
+ usable with device tree
+In-Reply-To: <1384396537-3486-4-git-send-email-tony@atomide.com>
 References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-2-git-send-email-tony@atomide.com>
-Message-ID: <20131114110324.GC16396@e106331-lin.cambridge.arm.com>
+ <1384396537-3486-4-git-send-email-tony@atomide.com>
+Message-ID: <20131114110533.GD16396@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:35:30AM +0000, Tony Lindgren wrote:
-> Commit 89ce376c6bdc (drivers/net: Use of_match_ptr() macro in smc91x.c)
-> added minimal device tree support to smc91x, but it's not working on
-> many platforms because of the lack of some key configuration bits.
+On Thu, Nov 14, 2013 at 02:35:32AM +0000, Tony Lindgren wrote:
+> Some features can be configured by the companion I2C chips,
+> which may not be available at the probe time. Fix the issue
+> by returning -EPROBE_DEFER when the MMC controller slots
+> are not configured.
 > 
-> Fix the issue by parsing the necessary configuration like the
-> smc911x driver is doing.
+> While at it, let's also add minimal device tree support so
+> omap24xx platforms can use this driver without legacy mode
+> since we claim to support device tree for mach-omap2 based
+> systems.
 > 
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: netdev at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
+> Although adding the minimal device tree support is not strictly
+> a fix, it does remove one of the last blockers for dropping a
+> bunch of legacy platform data for mach-omap2.
+> 
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
 > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
 > 
@@ -29,29 +34,39 @@ On Thu, Nov 14, 2013 at 02:35:30AM +0000, Tony Lindgren wrote:
 > depend on patches in this series.
 > 
 > ---
->  .../devicetree/bindings/net/smsc-lan91c111.txt     |  4 ++
->  drivers/net/ethernet/smsc/smc91x.c                 | 52 +++++++++++++++++-----
->  2 files changed, 46 insertions(+), 10 deletions(-)
+>  drivers/mmc/host/omap.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
-> index 953049b..53d69e3 100644
-> --- a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
-> +++ b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
-> @@ -8,3 +8,7 @@ Required properties:
->  Optional properties:
->  - phy-device : phandle to Ethernet phy
->  - local-mac-address : Ethernet mac address to use
-> +- reg-io-width : Specify the size (in bytes) of the IO accesses that
-> +  should be performed on the device.  Valid value for SMSC LAN is
-> +  1, 2 or 4.  If it's omitted or invalid, the size would be 2.
+> diff --git a/drivers/mmc/host/omap.c b/drivers/mmc/host/omap.c
+> index ed56868..43c66ad 100644
+> --- a/drivers/mmc/host/omap.c
+> +++ b/drivers/mmc/host/omap.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/timer.h>
+> +#include <linux/of.h>
+>  #include <linux/omap-dma.h>
+>  #include <linux/mmc/host.h>
+>  #include <linux/mmc/card.h>
+> @@ -1330,7 +1331,7 @@ static int mmc_omap_probe(struct platform_device *pdev)
+>  	}
+>  	if (pdata->nr_slots == 0) {
+>  		dev_err(&pdev->dev, "no slots\n");
+> -		return -ENXIO;
+> +		return -EPROBE_DEFER;
+>  	}
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -1553,6 +1554,12 @@ static int mmc_omap_resume(struct platform_device *pdev)
+>  #define mmc_omap_resume		NULL
+>  #endif
+>  
+> +#if IS_BUILTIN(CONFIG_OF)
+> +static const struct of_device_id mmc_omap_match[] = {
+> +	{ .compatible = "ti,omap2420-mmc", },
 
-In the driver the supported access sizes are not mutually exclusive.  It
-would be nice for the binding to have the same property.
-
-> +- smsc,nowait : Setup for fast register access with no waits
-
-I'm confused by what this means. When would this be selected, and when
-wouldn't it be?
+Missing binding document.
 
 Thanks,
 Mark.
