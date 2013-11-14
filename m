@@ -1,71 +1,44 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Thu, 14 Nov 2013 19:07:09 +0800
-Subject: [PATCH 1/2] ARM: dts: imx: specify the value of audmux pinctrl
- instead of 0x80000000
-In-Reply-To: <1384427230-979-1-git-send-email-b42378@freescale.com>
-References: <1384427230-979-1-git-send-email-b42378@freescale.com>
-Message-ID: <1384427230-979-2-git-send-email-b42378@freescale.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Nov 2013 11:07:21 +0000
+Subject: [PATCH 4/8] i2c: omap: Fix missing device tree flags for omap2
+In-Reply-To: <1384396537-3486-5-git-send-email-tony@atomide.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-5-git-send-email-tony@atomide.com>
+Message-ID: <20131114110721.GE16396@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must specify the value of audmux pinctrl if we want to use pinctrl_pm().
-Thus change bypass value 0x80000000 to what we exactly need.
+On Thu, Nov 14, 2013 at 02:35:33AM +0000, Tony Lindgren wrote:
+> As we claim to support device tree for mach-omap2, we
+> should have the necessary flags in the driver to make it
+> usable.
+> 
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: linux-i2c at vger.kernel.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+> 
+> If this looks OK, I'd like to merge this as a fix via arm-soc tree
+> along with the other patches in this series as my later patches
+> depend on patches in this series.
+> 
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 
-This patch also seperately unset PUE bit for TXD so that IOMUX won't pull
-up/down the pin after turning into tristate. When we use SSI normal mode to
-playback monaural audio via I2S signal, there'd be a pulled curve occur to
-its signal at the second slot if setting PUE bit for TXD. And it will make
-the second channel to play a constant noise. So by keeping the signal level
-in the second slot, we can get a constant high level signal (-1) or a low
-level one (0).
+[...]
 
-Signed-off-by: Nicolin Chen <b42378@freescale.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+> +	{
+> +		.compatible = "ti,omap2430-i2c",
+> +		.data = &omap2430_pdata,
+> +	},
+> +	{
+> +		.compatible = "ti,omap2420-i2c",
+> +		.data = &omap2420_pdata,
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 6e096ca..6b76e55 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -601,27 +601,27 @@
- 				audmux {
- 					pinctrl_audmux_1: audmux-1 {
- 						fsl,pins = <
--							MX6QDL_PAD_SD2_DAT0__AUD4_RXD  0x80000000
--							MX6QDL_PAD_SD2_DAT3__AUD4_TXC  0x80000000
--							MX6QDL_PAD_SD2_DAT2__AUD4_TXD  0x80000000
--							MX6QDL_PAD_SD2_DAT1__AUD4_TXFS 0x80000000
-+							MX6QDL_PAD_SD2_DAT0__AUD4_RXD  0x130b0
-+							MX6QDL_PAD_SD2_DAT3__AUD4_TXC  0x130b0
-+							MX6QDL_PAD_SD2_DAT2__AUD4_TXD  0x110b0
-+							MX6QDL_PAD_SD2_DAT1__AUD4_TXFS 0x130b0
- 						>;
- 					};
- 
- 					pinctrl_audmux_2: audmux-2 {
- 						fsl,pins = <
--							MX6QDL_PAD_CSI0_DAT7__AUD3_RXD  0x80000000
--							MX6QDL_PAD_CSI0_DAT4__AUD3_TXC  0x80000000
--							MX6QDL_PAD_CSI0_DAT5__AUD3_TXD  0x80000000
--							MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS 0x80000000
-+							MX6QDL_PAD_CSI0_DAT7__AUD3_RXD  0x130b0
-+							MX6QDL_PAD_CSI0_DAT4__AUD3_TXC  0x130b0
-+							MX6QDL_PAD_CSI0_DAT5__AUD3_TXD  0x110b0
-+							MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS 0x130b0
- 						>;
- 					};
- 
- 					pinctrl_audmux_3: audmux-3 {
- 						fsl,pins = <
--							MX6QDL_PAD_DISP0_DAT16__AUD5_TXC  0x80000000
--							MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS 0x80000000
--							MX6QDL_PAD_DISP0_DAT19__AUD5_RXD  0x80000000
-+							MX6QDL_PAD_DISP0_DAT16__AUD5_TXC  0x130b0
-+							MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS 0x130b0
-+							MX6QDL_PAD_DISP0_DAT19__AUD5_RXD  0x130b0
- 						>;
- 					};
- 				};
--- 
-1.8.4
+Please update Documentation/devicetree/bindings/i2c/i2c-omap.txt
+
+Otherwise, this is fine.
+
+Thanks,
+Mark.
