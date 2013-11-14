@@ -1,44 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 10:39:56 -0800
-Subject: [GIT PULL] ARM: OMAP2+: clock fixes for v3.13
-In-Reply-To: <alpine.DEB.2.02.1310241550050.10391@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1310241550050.10391@utopia.booyaka.com>
-Message-ID: <20131114183956.GO10317@atomide.com>
+Date: Thu, 14 Nov 2013 10:41:08 -0800
+Subject: [PATCH] ARM: OMAP2+: smsc911x: fix return value check in
+ gpmc_smsc911x_init()
+In-Reply-To: <52761C55.5080609@compulab.co.il>
+References: <CAPgLHd9V0=GHGYgfuL7cCkzmZT7HVzuNg0iwwsOcipbnJ90bVw@mail.gmail.com>
+ <52761C55.5080609@compulab.co.il>
+Message-ID: <20131114184108.GP10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [131024 09:01]:
-> Hi Tony,
+* Igor Grinberg <grinberg@compulab.co.il> [131103 01:50]:
+> On 10/25/13 11:31, Wei Yongjun wrote:
+> > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> > 
+> > In case of error, the function platform_device_register_resndata()
+> > returns ERR_PTR() and never returns NULL. The NULL test in the return
+> > value check should be replaced with IS_ERR().
+> > 
+> > Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
-> 
->   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/clock-fixes-a
-> 
-> for you to fetch changes up to 4ff7e3b65c8e1d8062365296b738fd262cfc2e9c:
-> 
->   ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers (2013-10-24 09:07:23 -0600)
-> 
-> ----------------------------------------------------------------
-> Several OMAP2+ DSS-related clock fixes for v3.13 from Tomi Valkeinen.
-> 
-> Basic test logs at:
-> 
->    http://www.pwsan.com/omap/testlogs/clock_fixes_v3.13/20131024090906/
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
-Thanks pulling into omap-for-v3.13/fixes.
+Thanks applying into omap-for-v3.13/fixes.
 
 Tony
  
-> ----------------------------------------------------------------
-> Tomi Valkeinen (3):
->       ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
->       ARM: OMAP3: use CLK_SET_RATE_PARENT for dss clocks
->       ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
+> > ---
+> >  arch/arm/mach-omap2/gpmc-smsc911x.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+> > index ef99011..2757504 100644
+> > --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
+> > +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+> > @@ -83,7 +83,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *gpmc_cfg)
+> >  	pdev = platform_device_register_resndata(NULL, "smsc911x", gpmc_cfg->id,
+> >  		 gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
+> >  		 &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
+> > -	if (!pdev) {
+> > +	if (IS_ERR(pdev)) {
+> >  		pr_err("Unable to register platform device\n");
+> >  		gpio_free(gpmc_cfg->gpio_reset);
+> >  		goto free2;
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
 > 
->  arch/arm/mach-omap2/cclock3xxx_data.c | 58 +++++++++++++++++++++++++++++------
->  arch/arm/mach-omap2/cclock44xx_data.c |  3 +-
->  2 files changed, 51 insertions(+), 10 deletions(-)
+> -- 
+> Regards,
+> Igor.
