@@ -1,39 +1,21 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 14 Nov 2013 17:55:27 +0530
-Subject: [PATCH V4 3/3] ARM: DTS: DRA7: Add routable-irqs property for gic node
-In-Reply-To: <1384431928-2328-1-git-send-email-r.sricharan@ti.com>
-References: <1384431928-2328-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1384431928-2328-4-git-send-email-r.sricharan@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 Nov 2013 12:30:57 +0000
+Subject: [PATCH 1/2] regulator: pfuze100: allow misprogrammed ID
+In-Reply-To: <1383715045-15341-1-git-send-email-tharvey@gateworks.com>
+References: <1383715045-15341-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <20131114123057.GO26614@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a IRQ crossbar device in the soc, which maps the
-irq requests from the peripherals to the mpu interrupt
-controller's inputs. The gic provides the support for such
-IPs in the form of routable-irqs. So adding the property
-here to gic node.
+On Tue, Nov 05, 2013 at 09:17:25PM -0800, Tim Harvey wrote:
+> prior to week 08 of 2013 Freescale misprogrammed between 1 and 3% of
+> PFUZE1000 parts with a ID=0x8 instead of the expected ID=0x0
 
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 8b93b7a..fd58a09 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -67,6 +67,7 @@
- 		compatible = "arm,cortex-a15-gic";
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		arm,routable-irqs = <160>;
- 		reg = <0x48211000 0x1000>,
- 		      <0x48212000 0x1000>,
- 		      <0x48214000 0x2000>,
--- 
-1.7.9.5
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131114/f8d63c59/attachment-0001.sig>
