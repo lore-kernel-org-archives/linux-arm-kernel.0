@@ -1,48 +1,70 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Nov 2013 14:37:43 -0500
-Subject: [PATCH 3/6] ARM: mm: Drop the lowmem watermark check from
- virt_addr_valid()
-In-Reply-To: <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
-References: <y>
- <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Thu, 14 Nov 2013 11:48:37 -0800
+Subject: [PATCH v3] ARM: bcm: Add DEBUG_LL console support
+In-Reply-To: <CAEPRUYqV-9P6spmxGsqOS6JGbZW79L7m4SO66Jbkyq4Kam=bRQ@mail.gmail.com>
+References: <1380987809-4886-1-git-send-email-bcm@fixthebug.org>
+ <CAEPRUYqnc0C_fEG97sFVs6uAtPyZCzXuJ09Hsb3unjAZtc5shA@mail.gmail.com>
+ <CAEPRUYqV-9P6spmxGsqOS6JGbZW79L7m4SO66Jbkyq4Kam=bRQ@mail.gmail.com>
+Message-ID: <CAPdLdqnvHGxkXzT02rDg6knBHmzG+Ebu1V0L80L7SGGQN80uzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Slab allocator can allocate memory beyond the lowmem watermark
-which can lead to false failure of virt_addr_valid().
+On 29 October 2013 23:30, Christian Daudt <bcm@fixthebug.org> wrote:
+> On Wed, Oct 16, 2013 at 11:12 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+>> On Sat, Oct 5, 2013 at 8:43 AM, Christian Daudt <bcm@fixthebug.org> wrote:
+>>> This patch adds low level debug uart support to Broadcom
+>>>  mobile based SOCs.
+>>>
+>>> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
+>>>
+>>> Changes from V2:
+>>>  - Changed to follow hex ordering on entries
+>>>  - Dropped defconfig changes
+>>>
+>>> Changes from V1:
+>>>  - Switched to use the common 8250 debug introduced in 3.12-rc1
+>>>
+>>
+>> Hi Russell,
+>>  Does V3 look ok ?
+>>
+>>  Thanks,
+>>    csd
+> Hi,
+>  Can anyone provide an ack on this mod ?
+>
+>  Thanks,
+>    csd
 
-So drop the check. The issue was seen with percpu_alloc()
-in KVM code which was allocating memory beyond lowmem watermark.
+Tested-by: Markus Mayer <markus.mayer@linaro.org>
 
-Am not completly sure whether this is the right fix and if it could
-impact any other user of virt_addr_valid(). Without this fix as
-pointed out the KVM init was failing in my testing.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Initializing cgroup subsys cpuacct
+[    0.000000] Linux version 3.12.0+ (mmayer at lbrmn-lnxub70.ric.broadcom.com)
+[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
+instruction cache
+[    0.000000] Machine: BCM281xx Broadcom Application Processor,
+model: BCM28155 AP board
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Truncating RAM at 90000000-bfffffff to -bf7fffff
+(vmalloc region overlap).
+[    0.000000] Memory policy: ECC disabled, Data cache writeback
+[    0.000000] CPU: All CPU(s) started in SVC mode.
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.
+Total pages: 193040
+[    0.000000] Kernel command line: console=ttyS0,115200n8
+root=/dev/mmcblk0p8 rootwait rootfstype=ext4 earlyprintk
+[...]
+[    0.200000] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.210000] 3e000000.uart: ttyS0 at MMIO 0x3e000000 (irq = 99,
+base_baud = 812500) is a 16550A
+[    0.220000] console [ttyS0] enabled, bootconsole disabled
+[    0.220000] console [ttyS0] enabled, bootconsole disabled
+[    0.230000] mousedev: PS/2 mouse device common for all mice
+[...]
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/memory.h |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 4dd2145..412da47 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -343,8 +343,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
- #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
- 
- #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
--#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
--
-+#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET)
- #endif
- 
- #include <asm-generic/memory_model.h>
 -- 
-1.7.9.5
+Markus Mayer
+Broadcom Landing Team
