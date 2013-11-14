@@ -1,72 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Nov 2013 11:05:33 +0000
-Subject: [PATCH 3/8] mmc: omap: Fix I2C dependency and make driver
- usable with device tree
-In-Reply-To: <1384396537-3486-4-git-send-email-tony@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-4-git-send-email-tony@atomide.com>
-Message-ID: <20131114110533.GD16396@e106331-lin.cambridge.arm.com>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Thu, 14 Nov 2013 19:07:08 +0800
+Subject: [PATCH 0/2] Add monaural audio support for fsl_ssi.c
+Message-ID: <1384427230-979-1-git-send-email-b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:35:32AM +0000, Tony Lindgren wrote:
-> Some features can be configured by the companion I2C chips,
-> which may not be available at the probe time. Fix the issue
-> by returning -EPROBE_DEFER when the MMC controller slots
-> are not configured.
-> 
-> While at it, let's also add minimal device tree support so
-> omap24xx platforms can use this driver without legacy mode
-> since we claim to support device tree for mach-omap2 based
-> systems.
-> 
-> Although adding the minimal device tree support is not strictly
-> a fix, it does remove one of the last blockers for dropping a
-> bunch of legacy platform data for mach-omap2.
-> 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
-> 
-> If this looks OK, I'd like to merge this as a fix via arm-soc tree
-> along with the other patches in this series as my later patches
-> depend on patches in this series.
-> 
-> ---
->  drivers/mmc/host/omap.c | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/omap.c b/drivers/mmc/host/omap.c
-> index ed56868..43c66ad 100644
-> --- a/drivers/mmc/host/omap.c
-> +++ b/drivers/mmc/host/omap.c
-> @@ -22,6 +22,7 @@
->  #include <linux/delay.h>
->  #include <linux/spinlock.h>
->  #include <linux/timer.h>
-> +#include <linux/of.h>
->  #include <linux/omap-dma.h>
->  #include <linux/mmc/host.h>
->  #include <linux/mmc/card.h>
-> @@ -1330,7 +1331,7 @@ static int mmc_omap_probe(struct platform_device *pdev)
->  	}
->  	if (pdata->nr_slots == 0) {
->  		dev_err(&pdev->dev, "no slots\n");
-> -		return -ENXIO;
-> +		return -EPROBE_DEFER;
->  	}
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -1553,6 +1554,12 @@ static int mmc_omap_resume(struct platform_device *pdev)
->  #define mmc_omap_resume		NULL
->  #endif
->  
-> +#if IS_BUILTIN(CONFIG_OF)
-> +static const struct of_device_id mmc_omap_match[] = {
-> +	{ .compatible = "ti,omap2420-mmc", },
+This series of patches need to be applied into one single tree because
+the second patch depends on the first one. Without it, SSI would playback
+constant noise to the right channel when playback monaural audio files on
+i.MX6 Series board.
 
-Missing binding document.
+We might also need to apply the iomux change to the other i.MX platforms,
+just currently I don't have those boards so I drop their changes for now.
 
-Thanks,
-Mark.
+Nicolin Chen (2):
+  ARM: dts: imx: specify the value of audmux pinctrl instead of
+    0x80000000
+  ASoC: fsl_ssi: Add monaural audio support for non-ac97 interface
+
+ arch/arm/boot/dts/imx6qdl.dtsi | 22 +++++++++++-----------
+ sound/soc/fsl/fsl_ssi.c        | 22 +++++++++++++++++++---
+ 2 files changed, 30 insertions(+), 14 deletions(-)
+
+-- 
+1.8.4
