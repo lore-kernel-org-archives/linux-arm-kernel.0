@@ -1,37 +1,77 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Nov 2013 17:05:05 -0800
-Subject: [PATCH 2/2] ARM: highbank: only select errata 764369 if SMP
-In-Reply-To: <52842136.1020001@gmail.com>
-References: <1384389974-6229-1-git-send-email-olof@lixom.net>
- <1384389974-6229-2-git-send-email-olof@lixom.net>
- <52841E98.2020807@gmail.com>
- <20131114005426.GV16735@n2100.arm.linux.org.uk>
- <52842136.1020001@gmail.com>
-Message-ID: <CAOesGMhKOpDyhRBb4c00jQjADoNxGxTqvBOnt74K-vNJyrFwLg@mail.gmail.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Thu, 14 Nov 2013 10:20:19 +0900
+Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
+ monitor
+In-Reply-To: <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
+References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
+ <52828EF5.6090909@wwwdotorg.org>
+ <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
+ <5282E068.1070608@nvidia.com>
+ <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
+Message-ID: <52842553.2080807@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 5:02 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 11/13/2013 06:54 PM, Russell King - ARM Linux wrote:
->> On Wed, Nov 13, 2013 at 06:51:36PM -0600, Rob Herring wrote:
->>> On 11/13/2013 06:46 PM, Olof Johansson wrote:
->>>> 764369 depends on SMP, so don't select it on !SMP configs.
+On 11/14/2013 02:57 AM, Olof Johansson wrote:
+> On Tue, Nov 12, 2013 at 6:14 PM, Alex Courbot <acourbot@nvidia.com> wrote:
+>> On 11/13/2013 05:38 AM, Olof Johansson wrote:
 >>>
->>> I think Russell has a fix for these in his tree.
+>>> On Tue, Nov 12, 2013 at 12:26 PM, Stephen Warren <swarren@wwwdotorg.org>
+>>> wrote:
+>>>>
+>>>> On 11/07/2013 03:11 AM, Alexandre Courbot wrote:
+>>>>>
+>>>>> Just a set of small fixes to address the concerns expressed on v9 with
+>>>>> the
+>>>>> non-prefixed version DT properties. I hope there won't be a need for an
+>>>>> eleventh (!) version. :P
+>>>>
+>>>>
+>>>> BTW, this version looks fine to me. On IRC, Olof said it looked OK to
+>>>> him. I'm just waiting to hear back from Olof/Russell whether I should
+>>>> merge this through the Tegra tree, or whether the first 1-3 patches
+>>>> should go through Russell's tree.
+>>>
+>>>
+>>> I pinged Russell, and he brought up the fact that there were earlier
+>>> requests to move it to drivers/firmware. It would make sense to try to
+>>> get that done before merging, especially if you anticipate someone
+>>> using TF on 64-bit platforms.
 >>
->> Not this one.  I have:
 >>
->>       select ARM_ERRATA_798181 if SMP
->>
->> for highbank, which is now in mainline.  Olof's patch is in response to
->> me pasting the Kconfig warning from last nights failed omap4 randconfig
->> build.  This wasn't the cause, but it's something that should be fixed
->> in any case.
+>> IIRC when we discussed this point your last comment was as follows:
 >
-> In that case:
+> Touche. :) Thanks for the reminder.
 >
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>> On Tue, Oct 29, 2013 at 6:55 AM, Olof Johansson <olof@lixom.net> wrote:
+>>> I think we can probably merge this under arch/arm now, and when we
+>>> figure out what needs to be common with ARM64 we can move it out to a
+>>> good location. It might be that mostly just a header file with ABI
+>>> conventions needs to be shared, not actual implementation, for
+>>> example.
+>>
+>> So I thought we agreed on that. If in the end we prefer to move the ARM
+>> firmware interface into drivers/firmware, I'm fine with that too (Tomasz
+>> also confirmed he would be ok with it) but I wonder if that would not be
+>> somehow premature.
+>>
+>> Another worry of mine is that this might delay this patchset some more.
+>> Support for TF is one of the last remaining step towards making NVIDIA
+>> branded Tegra retail devices (SHIELD and TegraNote at the moment) run
+>> upstream directly. I missed 3.13, I'd like to make sure I won't miss 3.14.
+>> Would it be acceptable if we move the ARM firmware interface to a common
+>> place after this patchset is merged?
+>
+> Well, as I already said I'm ok with things going into arch/arm to
+> start with, as long as Russell is. Once we see 64-bit needs for the
+> same we'll move it out -- it's not like it's a whole lot of code to
+> start with. But Russell has veto on the topic. :-)
 
-Thanks!
+Thanks Olof. Russell, are you ok with the patchset in its current form? 
+I can start moving the firmware interface out of arch/arm if that's what 
+you want (there is no user outside of ARM at the moment, but as Olof 
+pointed out that's not too much code) but I'd really like to see this 
+series secured for 3.14.
 
--Olof
+Thanks,
+Alex.
