@@ -1,35 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 14 Nov 2013 17:14:22 +0100
-Subject: [PATCH 4/4] arm64: advertise CPU features for modalias matching
-In-Reply-To: <20131114152907.GL20261@arm.com>
-References: <1384165175-16134-1-git-send-email-ard.biesheuvel@linaro.org>
- <1384165175-16134-5-git-send-email-ard.biesheuvel@linaro.org>
- <20131114152907.GL20261@arm.com>
-Message-ID: <CAKv+Gu8ORgnhPpt-mK2cghiP5CpjSQ=L5JwvMu+wYMaDU7xbtA@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 14 Nov 2013 17:23:08 +0100
+Subject: [PATCHv4] dmaengine: Add support for BCM2835
+In-Reply-To: <CABDT8WyUK6tDneDEm0G3o0zJHXaVTZp8JAMxOp5LRKQYG-7Umw@mail.gmail.com>
+References: <5283BC93.1090801@koalo.de> <2385512.qcT1vt8HYp@flatron>
+ <CABDT8WyUK6tDneDEm0G3o0zJHXaVTZp8JAMxOp5LRKQYG-7Umw@mail.gmail.com>
+Message-ID: <11018682.0TjgocUWod@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 November 2013 16:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Nov 11, 2013 at 10:19:35AM +0000, Ard Biesheuvel wrote:
->> +ssize_t arch_print_cpu_modalias(struct device *dev,
->> +                             struct device_attribute *attr,
->> +                             char *buf)
->> +{
->> +     unsigned int caps;
->> +     ssize_t n;
->> +     int i;
->> +
->> +     /*
->> +      * With 32 features maximum (taking 5 bytes each to print), we don't
->> +      * need to worry about overrunning the PAGE_SIZE sized buffer.
->> +      */
->> +     n = sprintf(buf, "cpu:type:arm64:feature:");
->
-> I would use "aarch64" here instead of arm64 for consistency with the
-> architecture mode, compiler triplet and ELF_PLATFORM definition in the
-> kernel.
+On Thursday 14 of November 2013 17:14:31 Florian Meier wrote:
+> >> >> I am becoming desperate anyway that this migration will ever fully
+> >> >> take place....
+> >> >
+> >> > Why not? It's just a matter of people like you working on this (and
+> >> > addressing some review comments ;)).
+> >>
+> >> The most common comment about this is that people will not put effort in
+> >> the upstream kernel as long as there is no comfortable way for debugging
+> >> in the upstream kernel (i.e. at least USB support).......
+> >
+> > Right, you need USB to have ethernet working. Still, IMHO UART (for
+> > console) + ethernet (for file transfer or NFS root) is the reasonable
+> > setup allowing you to debug further drivers in a comfortable way.
+> 
+> I am fine with UART and switching SD cards :-)
+> But apparently this is not generally accepted.
 
-OK, I will change that.
+Still, isn't some work on USB support for RPi already going on? I believe
+Matt Porter (now on Cc) has been working on unifying dwc2 host-mode
+driver with Samsung s3c-hsotg device-mode driver (for the same IP) to
+get full OTG support on all applicable platforms.
 
-Regards,
-Ard,
+Best regards,
+Tomasz
