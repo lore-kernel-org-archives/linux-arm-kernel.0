@@ -1,19 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Nov 2013 18:35:31 -0800
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on device id
+Date: Wed, 13 Nov 2013 18:35:30 -0800
+Subject: [PATCH 1/8] net: smc91x: Fix device tree based configuration so it's
+ usable
 In-Reply-To: <1384396537-3486-1-git-send-email-tony@atomide.com>
 References: <1384396537-3486-1-git-send-email-tony@atomide.com>
-Message-ID: <1384396537-3486-3-git-send-email-tony@atomide.com>
+Message-ID: <1384396537-3486-2-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are wrongly relying on device id for the DMA configuration
-which can lead to wrong DMA channel being selected.
+Commit 89ce376c6bdc (drivers/net: Use of_match_ptr() macro in smc91x.c)
+added minimal device tree support to smc91x, but it's not working on
+many platforms because of the lack of some key configuration bits.
 
-Fix the issue by using the standard resources like we should.
+Fix the issue by parsing the necessary configuration like the
+smc911x driver is doing.
 
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: netdev at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
 
@@ -22,62 +27,116 @@ along with the other patches in this series as my later patches
 depend on patches in this series.
 
 ---
+ .../devicetree/bindings/net/smsc-lan91c111.txt     |  4 ++
+ drivers/net/ethernet/smsc/smc91x.c                 | 52 +++++++++++++++++-----
+ 2 files changed, 46 insertions(+), 10 deletions(-)
 
- drivers/mmc/host/omap.c | 32 +++++++++++---------------------
- 1 file changed, 11 insertions(+), 21 deletions(-)
-
-diff --git a/drivers/mmc/host/omap.c b/drivers/mmc/host/omap.c
-index b94f38e..ed56868 100644
---- a/drivers/mmc/host/omap.c
-+++ b/drivers/mmc/host/omap.c
-@@ -90,17 +90,6 @@
- #define OMAP_MMC_CMDTYPE_AC	2
- #define OMAP_MMC_CMDTYPE_ADTC	3
+diff --git a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
+index 953049b..53d69e3 100644
+--- a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
++++ b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
+@@ -8,3 +8,7 @@ Required properties:
+ Optional properties:
+ - phy-device : phandle to Ethernet phy
+ - local-mac-address : Ethernet mac address to use
++- reg-io-width : Specify the size (in bytes) of the IO accesses that
++  should be performed on the device.  Valid value for SMSC LAN is
++  1, 2 or 4.  If it's omitted or invalid, the size would be 2.
++- smsc,nowait : Setup for fast register access with no waits
+diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
+index 73be7f3..93d4b7d 100644
+--- a/drivers/net/ethernet/smsc/smc91x.c
++++ b/drivers/net/ethernet/smsc/smc91x.c
+@@ -82,6 +82,7 @@ static const char version[] =
+ #include <linux/mii.h>
+ #include <linux/workqueue.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
  
--#define OMAP_DMA_MMC_TX		21
--#define OMAP_DMA_MMC_RX		22
--#define OMAP_DMA_MMC2_TX	54
--#define OMAP_DMA_MMC2_RX	55
--
--#define OMAP24XX_DMA_MMC2_TX	47
--#define OMAP24XX_DMA_MMC2_RX	48
--#define OMAP24XX_DMA_MMC1_TX	61
--#define OMAP24XX_DMA_MMC1_RX	62
--
--
- #define DRIVER_NAME "mmci-omap"
+ #include <linux/netdevice.h>
+ #include <linux/etherdevice.h>
+@@ -2189,6 +2190,15 @@ static void smc_release_datacs(struct platform_device *pdev, struct net_device *
+ 	}
+ }
  
- /* Specifies how often in millisecs to poll for card status changes
-@@ -1408,19 +1397,20 @@ static int mmc_omap_probe(struct platform_device *pdev)
- 	host->dma_tx_burst = -1;
- 	host->dma_rx_burst = -1;
- 
--	if (mmc_omap2())
--		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX : OMAP24XX_DMA_MMC2_TX;
--	else
--		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
--	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
-+	if (res)
-+		sig = res->start;
-+	host->dma_tx = dma_request_slave_channel_compat(mask,
-+				omap_dma_filter_fn, &sig, &pdev->dev, "tx");
- 	if (!host->dma_tx)
- 		dev_warn(host->dev, "unable to obtain TX DMA engine channel %u\n",
- 			sig);
--	if (mmc_omap2())
--		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_RX : OMAP24XX_DMA_MMC2_RX;
--	else
--		sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
--	host->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
++#if IS_BUILTIN(CONFIG_OF)
++static const struct of_device_id smc91x_match[] = {
++	{ .compatible = "smsc,lan91c94", },
++	{ .compatible = "smsc,lan91c111", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, smc91x_match);
++#endif
 +
-+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
-+	if (res)
-+		sig = res->start;
-+	host->dma_rx = dma_request_slave_channel_compat(mask,
-+				omap_dma_filter_fn, &sig, &pdev->dev, "rx");
- 	if (!host->dma_rx)
- 		dev_warn(host->dev, "unable to obtain RX DMA engine channel %u\n",
- 			sig);
+ /*
+  * smc_init(void)
+  *   Input parameters:
+@@ -2203,6 +2213,8 @@ static void smc_release_datacs(struct platform_device *pdev, struct net_device *
+ static int smc_drv_probe(struct platform_device *pdev)
+ {
+ 	struct smc91x_platdata *pd = dev_get_platdata(&pdev->dev);
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *match = NULL;
+ 	struct smc_local *lp;
+ 	struct net_device *ndev;
+ 	struct resource *res, *ires;
+@@ -2222,11 +2234,40 @@ static int smc_drv_probe(struct platform_device *pdev)
+ 	 */
+ 
+ 	lp = netdev_priv(ndev);
++	lp->cfg.flags = 0;
+ 
+ 	if (pd) {
+ 		memcpy(&lp->cfg, pd, sizeof(lp->cfg));
+ 		lp->io_shift = SMC91X_IO_SHIFT(lp->cfg.flags);
+-	} else {
++	}
++
++#if IS_BUILTIN(CONFIG_OF)
++	match = of_match_device(of_match_ptr(smc91x_match), &pdev->dev);
++	if (match) {
++		u32 val;
++
++		of_property_read_u32(np, "reg-io-width", &val);
++		switch (val) {
++		case 1:
++			lp->cfg.flags |= SMC91X_USE_8BIT;
++			break;
++		case 2:
++			lp->cfg.flags |= SMC91X_USE_16BIT;
++			break;
++		case 4:
++			lp->cfg.flags |= SMC91X_USE_32BIT;
++			break;
++		default:
++			lp->cfg.flags |= SMC91X_USE_16BIT;
++			break;
++		}
++
++		if (of_get_property(np, "smsc,nowait", NULL))
++			lp->cfg.flags |= SMC91X_NOWAIT;
++	}
++#endif
++
++	if (!pd && !match) {
+ 		lp->cfg.flags |= (SMC_CAN_USE_8BIT)  ? SMC91X_USE_8BIT  : 0;
+ 		lp->cfg.flags |= (SMC_CAN_USE_16BIT) ? SMC91X_USE_16BIT : 0;
+ 		lp->cfg.flags |= (SMC_CAN_USE_32BIT) ? SMC91X_USE_32BIT : 0;
+@@ -2375,15 +2416,6 @@ static int smc_drv_resume(struct device *dev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_OF
+-static const struct of_device_id smc91x_match[] = {
+-	{ .compatible = "smsc,lan91c94", },
+-	{ .compatible = "smsc,lan91c111", },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, smc91x_match);
+-#endif
+-
+ static struct dev_pm_ops smc_drv_pm_ops = {
+ 	.suspend	= smc_drv_suspend,
+ 	.resume		= smc_drv_resume,
 -- 
 1.8.1.1
