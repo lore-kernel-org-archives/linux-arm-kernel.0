@@ -1,25 +1,16 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Nov 2013 13:32:58 +0100
-Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <5283DB34.9050301@gmail.com>
-References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
- <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
- <5283DB34.9050301@gmail.com>
-Message-ID: <201311141332.58498.arnd@arndb.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 14 Nov 2013 13:33:16 +0100 (CET)
+Subject: [PATCH V4 1/4] DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable
+ irqs
+In-Reply-To: <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
+References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
+ <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <alpine.DEB.2.02.1311141332350.30673@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 November 2013, Rob Herring wrote:
-> I'm not inclined to expand cpuinfo and prior attempts to add more info
-> to cpuinfo like SoC name have failed. The differences between x86 and
-> arm cpuinfo already cause issues for arm. lscpu does not really work on arm.
+On Thu, 14 Nov 2013, Sricharan R wrote:
+>  [V3] Addressed unnecessary warn-on and updated default
+>       xlate function as per Thomas Gleixner comments
 
-Well, they turned into drivers/base/soc.c, which adds the information in
-a structured way in sysfs, but is only used on a couple of platforms.
-
-> I'd actually prefer If you really want more system info, then go read
-> /proc/device-tree.
-
-Good point.
-
-	Arnd
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
