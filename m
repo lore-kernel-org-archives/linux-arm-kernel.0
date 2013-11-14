@@ -1,50 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 10:37:42 -0800
-Subject: [PATCH] include/linux/usb/usb_phy_gen_xceiv.h: check built-in
- or module for swithing usb_nop_xceiv_register() implementation
-In-Reply-To: <52679D19.903@asianux.com>
-References: <52679D19.903@asianux.com>
-Message-ID: <20131114183742.GN10317@atomide.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 14 Nov 2013 12:38:26 -0600
+Subject: [PATCH v2 3/4] ARM: imx51: use clock defines in DTS files
+In-Reply-To: <1384423816-10834-3-git-send-email-l.stach@pengutronix.de>
+References: <1384423816-10834-1-git-send-email-l.stach@pengutronix.de>
+ <1384423816-10834-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <CAHCPf3ugZkZ9cegVNh0xVqAUB6w6t_gbd8JYGx7HLHF0ttxK-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Gang <gang.chen@asianux.com> [131023 02:57]:
-> When CONFIG_NOP_USB_XCEIV is as 'm', usb_nop_xceiv_register() will be
-> exported when the related module is loaded. So for built-in source
-> code, still need use the empty one.
-> 
-> Or it will can not pass compiling, the related error (for arm, with 
-> allmodconfig):
-> 
->   arch/arm/mach-omap2/built-in.o: In function `omap3_evm_init':
->   arch/arm/mach-omap2/board-omap3evm.c:703: undefined reference to `usb_nop_xceiv_register'
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+On Thu, Nov 14, 2013 at 4:10 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> For better readablitity and no need to look up numbers
+> in the documentation anymore.
+> +                       clocks = <&clks IMX5_CLK_CPU_PODF>;
 
-Added Felipe to cc, he should probably deal with this one.
+The patch reinforces trading off device tree size (because for some
+reason, someone decided device trees should be totally abstract and
+not actually describe devices) for huge swaths of static
+initialization code.. and another include to support "readable trees"
+to work around the actual binding for i.MX clocks sucking shouldn't go
+any further than to ease a transition to a fully tree-specified clock
+infrastructure where every clock passed to every device is an actual
+phandle to an actual defined clock (and not to a provider with an
+arbitrary index derived from the
+order-in-which-we-remembered-this-clock-exists).
 
-Regards,
+The aforementioned transition doesn't get eased at all by this patch,
+and implies significant churn later on when (not if) it occurs.
 
-Tony
+Let's put this down in stone now and forever; if you need to use
+preprocessor macros like this to make device trees "more readable",
+then your binding might actually be totally busted.
 
-> ---
->  include/linux/usb/usb_phy_gen_xceiv.h |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/include/linux/usb/usb_phy_gen_xceiv.h b/include/linux/usb/usb_phy_gen_xceiv.h
-> index f9a7e7b..8515958 100644
-> --- a/include/linux/usb/usb_phy_gen_xceiv.h
-> +++ b/include/linux/usb/usb_phy_gen_xceiv.h
-> @@ -12,7 +12,8 @@ struct usb_phy_gen_xceiv_platform_data {
->  	unsigned int needs_reset:1;
->  };
->  
-> -#if IS_ENABLED(CONFIG_NOP_USB_XCEIV)
-> +#if IS_BUILTIN(CONFIG_NOP_USB_XCEIV) || \
-> +	(IS_MODULE(CONFIG_NOP_USB_XCEIV) && defined(MODULE))
->  /* sometimes transceivers are accessed only through e.g. ULPI */
->  extern void usb_nop_xceiv_register(void);
->  extern void usb_nop_xceiv_unregister(void);
-> -- 
-> 1.7.7.6
+Also, no matter what, please use macro arguments and stringification
+if you can reduce code size by doing it.
+
+Wouldn't
+
+#define IMX5_CLK_cpu_podf  24
+#define IMX5_CLK_fec_gate  42
+
+#define CLK_P(prov, id)  prov IMX5_CLK_##id
+#define CLK_I(id) clk[IMX5_CLK_##id]
+
+In DT:
+
+clocks = <CLK_P(&clks, fec_gate)>
+clocks = <CLK_P(&clks, cpu_podf)>
+
+And then in the driver code:
+
+clk_register_clkdev(CLK_I(fec_gate), NULL, "imx25-fec.0");
+
+You could even do:
+
+#define CLK_R(id, con, name) clk_register_clkdev(CLK_I(id), con, name)
+:
+CLK_R(fec_gate, NULL, "imx25-fec.0");
+
+For example? OMAP does this, but it'll go away... Go the whole hog if
+you're going to do it.
+
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
