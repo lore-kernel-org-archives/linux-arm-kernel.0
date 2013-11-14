@@ -1,148 +1,84 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 14 Nov 2013 17:01:35 +0100
-Subject: [PATCHv4] dmaengine: Add support for BCM2835
-In-Reply-To: <CABDT8WyUH=z67_bOy-DF9NQn6R0eKsGJPDWSwijrhLRyNLvaSQ@mail.gmail.com>
-References: <5283BC93.1090801@koalo.de> <4043887.oz5IYRs5go@flatron>
- <CABDT8WyUH=z67_bOy-DF9NQn6R0eKsGJPDWSwijrhLRyNLvaSQ@mail.gmail.com>
-Message-ID: <2385512.qcT1vt8HYp@flatron>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Nov 2013 08:08:13 -0800
+Subject: [PATCH 1/8] net: smc91x: Fix device tree based configuration
+ so it's usable
+In-Reply-To: <20131114110324.GC16396@e106331-lin.cambridge.arm.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-2-git-send-email-tony@atomide.com>
+ <20131114110324.GC16396@e106331-lin.cambridge.arm.com>
+Message-ID: <20131114160813.GC10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 of November 2013 16:41:56 Florian Meier wrote:
-> 2013/11/14 Tomasz Figa <tomasz.figa@gmail.com>:
-> > On Thursday 14 of November 2013 15:44:05 Florian Meier wrote:
-> >> 2013/11/14 Tomasz Figa <tomasz.figa@gmail.com>:
-> >> > On Thursday 14 of November 2013 08:12:46 Florian Meier wrote:
-> >> >> On 13.11.2013 21:39, Tomasz Figa wrote:
-> >> >> > On Wednesday 13 of November 2013 20:35:22 Florian Meier wrote:
-> >> >> >>>> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> >> >> >>>> new file mode 100644
-> >> >> >>>> index 0000000..baf072e
-> >> >> >>>> --- /dev/null
-> >> >> >>>> +++ b/drivers/dma/bcm2835-dma.c
-> >> >> >>> [snip]
-> >> >> >>>> +static int bcm2835_dma_probe(struct platform_device *pdev)
-> >> >> >>>> +{
-> >> >> >>>> +        struct bcm2835_dmadev *od;
-> >> >> >>>> +        struct resource *dma_res = NULL;
-> >> >> >>>> +        void __iomem *dma_base = NULL;
-> >> >> >>>> +        int rc = 0;
-> >> >> >>>> +        int i = 0;
-> >> >> >>>> +        int irq;
-> >> >> >>>> +        uint32_t chans_available;
-> >> >> >>> [snip]
-> >> >> >>>> +        if (pdev->dev.of_node) {
-> >> >> >>>
-> >> >> >>> Is this driver supposed to support non-DT based instantation (aka board
-> >> >> >>> files)? If not, maybe it would be cleaner to simply check for
-> >> >> >>> !pdev->dev.of_node at the beginning of probe and return an error?
-> >> >> >>
-> >> >> >> I would like to maintain the possibility for board file based
-> >> >> >> instatiation, because the Raspberry Pi downstream kernel still doesn't
-> >> >> >> support device tree. If this is a no-go, I will accept that.
-> >> >> >
-> >> >> > Sure, you are free to do so.
-> >> >> >
-> >> >> > What I meant is that your probe won't call bcm2835_dma_chan_init() at all
-> >> >> > if there is no pdev->dev.of_node, because the loop iterating over channels
-> >> >> > is under the if clause.
-> >> >>
-> >> >> Yes you are right, but I think it will make the patching easier, later.
-> >> >> Currently, nothing bad happens without device tree - it just allocates
-> >> >> no channels.
-> >> >
-> >> > But isn't it really an error condition, if no channels are allocated?
-> >>
-> >> A fridge is still a working fridge, even if no beer is inside ;-)
-> >> Ok, bad example, but you will get an error message anyway when you try
-> >> to get a channel.
-> >>
-> >> > Anyway, back to my point about leaving non-DT support in a driver, the
-> >> > point is still valid only for drivers, not for platforms/boards. So if
-> >> > there are no boards supported using board files in mainline that could
-> >> > benefit from this driver, then this driver can be safely made DT-only,
-> >> > because no new non-DT platforms/boards can be added.
-> >>
-> >> I don't have a telling argument against this, but just thought writing
-> >> it this way will
-> >> make the migration of the downstream kernel to upstream easier, but if you say I
-> >> should change it, I will of course do that.
-> >
-> > I'm just presenting you the possible options. You are still free to have
-> > non-DT support in the driver, but if you don't need it (because you can't
-> > have any new non-DT platforms in mainline) then you can simplify some
-> > code.
-> >
-> > However the driver shouldn't be left with illusionary support for non-DT
-> > platforms until you decide to implement that. Instead, if you don't want
-> > to add non-DT support now, just make the driver DT-only, while keeping
-> > its design in a way allowing you to add non-DT support in future.
+* Mark Rutland <mark.rutland@arm.com> [131114 03:04]:
+> On Thu, Nov 14, 2013 at 02:35:30AM +0000, Tony Lindgren wrote:
+> > Commit 89ce376c6bdc (drivers/net: Use of_match_ptr() macro in smc91x.c)
+> > added minimal device tree support to smc91x, but it's not working on
+> > many platforms because of the lack of some key configuration bits.
+> > 
+> > Fix the issue by parsing the necessary configuration like the
+> > smc911x driver is doing.
+> > 
+> > Cc: Nicolas Pitre <nico@fluxnic.net>
+> > Cc: "David S. Miller" <davem@davemloft.net>
+> > Cc: netdev at vger.kernel.org
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> > 
+> > If this looks OK, I'd like to merge this as a fix via arm-soc tree
+> > along with the other patches in this series as my later patches
+> > depend on patches in this series.
+> > 
+> > ---
+> >  .../devicetree/bindings/net/smsc-lan91c111.txt     |  4 ++
+> >  drivers/net/ethernet/smsc/smc91x.c                 | 52 +++++++++++++++++-----
+> >  2 files changed, 46 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
+> > index 953049b..53d69e3 100644
+> > --- a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
+> > +++ b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
+> > @@ -8,3 +8,7 @@ Required properties:
+> >  Optional properties:
+> >  - phy-device : phandle to Ethernet phy
+> >  - local-mac-address : Ethernet mac address to use
+> > +- reg-io-width : Specify the size (in bytes) of the IO accesses that
+> > +  should be performed on the device.  Valid value for SMSC LAN is
+> > +  1, 2 or 4.  If it's omitted or invalid, the size would be 2.
 > 
-> This statement hits the nail on the head. Thank you!
+> In the driver the supported access sizes are not mutually exclusive.  It
+> would be nice for the binding to have the same property.
+
+Hmm indeed. How about we add reg-io-width-mask:
+
+	1 = 8-bit access
+	2 = 16-bit access
+	4 = 32-bit access
+	...
+
+So for a driver to support 8, 16 and 32-bit access the mask would
+be:
+	reg-io-width-mask = <7>;
+
+Although the values for reg-io-width would support masks too, it
+might be better to have reg-io-width-mask to avoid confusion.
+
+Or do you have any better ideas?
+ 
+> > +- smsc,nowait : Setup for fast register access with no waits
 > 
-> > In other words, a driver should not be able to probe using board files
-> > if support for such probing method is not available in it yet.
-> 
-> That is meaningful. So would the following be ok?
-> 
-> + .....
-> +       if (pdev->dev.of_node) {
-> + .....
-> +       } else {
-> +               dev_err(&pdev->dev,
-> +                       "Failed to initialize channels, because device
-> tree not available: %d\n", rc);
-> +               bcm2835_dma_free(od);
-> +               return rc;
-> +      }
-> +
-> +       dev_dbg(&pdev->dev, "Initialized %i DMA channels\n", i);
-> +
-> + .....
-> 
+> I'm confused by what this means. When would this be selected, and when
+> wouldn't it be?
 
-I mean, something closer to:
+The driver has a module parameter for it and the comments say:
 
-static int bcm2835_dma_probe(struct platform_device *pdev)
-{
-	uint32_t chan_mask;
-	// ...
+"nowait  = 0 for normal wait states, 1 eliminates additional wait states"
 
-	if (pdev->dev.of_node) {
-		rc = of_property_read_u32(..., &chan_mask);
-		if (rc) {
-			// Error out
-		}
-	} else {
-		// Error message
-		return -EINVAL;
-	}
+Most platforms seem to set it, but the default is to not set it.
+I guess we could that be a module parameter for now as that's a
+timing optimization.
 
-	// ...
-	// Channel registration loop (independent of any OF functions)
-	// ...
+Regards,
 
-	if (pdev->dev.of_node) {
-		rc = of_dma_controller_register(...);
-		// ...
-	}
-
-	// ...
-}
-
-> >> I am becoming desperate anyway that this migration will ever fully
-> >> take place....
-> >
-> > Why not? It's just a matter of people like you working on this (and
-> > addressing some review comments ;)).
-> 
-> The most common comment about this is that people will not put effort in
-> the upstream kernel as long as there is no comfortable way for debugging
-> in the upstream kernel (i.e. at least USB support).......
-
-Right, you need USB to have ethernet working. Still, IMHO UART (for
-console) + ethernet (for file transfer or NFS root) is the reasonable
-setup allowing you to debug further drivers in a comfortable way.
-
-Best regards,
-Tomasz
+Tony
