@@ -1,48 +1,44 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 14 Nov 2013 10:39:23 -0800
-Subject: [PATCH v4 15/31] mtd: nand: pxa3xx: Use a completion to signal
- device ready
-In-Reply-To: <1383837455-30721-16-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383837455-30721-16-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131114183923.GO9468@ld-irv-0074.broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Nov 2013 10:39:56 -0800
+Subject: [GIT PULL] ARM: OMAP2+: clock fixes for v3.13
+In-Reply-To: <alpine.DEB.2.02.1310241550050.10391@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1310241550050.10391@utopia.booyaka.com>
+Message-ID: <20131114183956.GO10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 07, 2013 at 12:17:19PM -0300, Ezequiel Garcia wrote:
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -863,21 +867,28 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
->  {
->  	struct pxa3xx_nand_host *host = mtd->priv;
->  	struct pxa3xx_nand_info *info = host->info_data;
-> +	int ret;
-> +
-> +	/* Need to wait? */
-> +	if (!info->is_ready) {
-> +		ret = wait_for_completion_timeout(&info->dev_ready,
-> +				CHIP_DELAY_TIMEOUT);
-> +		if (!ret) {
-> +			dev_err(&info->pdev->dev, "Ready time out!!!\n");
-> +			return NAND_STATUS_FAIL;
-> +		}
-> +		info->is_ready = 1;
+* Paul Walmsley <paul@pwsan.com> [131024 09:01]:
+> Hi Tony,
+> 
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+> 
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/clock-fixes-a
+> 
+> for you to fetch changes up to 4ff7e3b65c8e1d8062365296b738fd262cfc2e9c:
+> 
+>   ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers (2013-10-24 09:07:23 -0600)
+> 
+> ----------------------------------------------------------------
+> Several OMAP2+ DSS-related clock fixes for v3.13 from Tomi Valkeinen.
+> 
+> Basic test logs at:
+> 
+>    http://www.pwsan.com/omap/testlogs/clock_fixes_v3.13/20131024090906/
 
-Shouldn't the is_ready=1 line to be above the if (!ret) condition? I
-think you want to set is_ready=1 in either case (success or timeout).
-With this code, any timeout will cause subsequent waitfunc()'s to block,
-even if they are never going to catch an interrupt.
+Thanks pulling into omap-for-v3.13/fixes.
 
-I think this kind of mistake is easier to make now, since the 'is_ready'
-field isn't properly descriptive any more. It doesn't represent "is the
-device ready"; it represents "is there a pending command on which I need
-to wait". (I don't care if you change the name; I'm just pointing this
-out.)
-
-> +	}
->  
-
-I think all the other patches up to this one are good. I may push them
-to l2-mtd.git now, unless you object.
-
-Brian
+Tony
+ 
+> ----------------------------------------------------------------
+> Tomi Valkeinen (3):
+>       ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
+>       ARM: OMAP3: use CLK_SET_RATE_PARENT for dss clocks
+>       ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
+> 
+>  arch/arm/mach-omap2/cclock3xxx_data.c | 58 +++++++++++++++++++++++++++++------
+>  arch/arm/mach-omap2/cclock44xx_data.c |  3 +-
+>  2 files changed, 51 insertions(+), 10 deletions(-)
