@@ -1,175 +1,93 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 14 Nov 2013 16:01:10 +0100
-Subject: [PATCHv4] dmaengine: Add support for BCM2835
-In-Reply-To: <CABDT8Wz4r0iN-Ady41tpdZgPF1wC=Qap5_jNGmKbSYQmRdPAHg@mail.gmail.com>
-References: <5283BC93.1090801@koalo.de> <5235663.VIm8z9qphx@flatron>
- <CABDT8Wz4r0iN-Ady41tpdZgPF1wC=Qap5_jNGmKbSYQmRdPAHg@mail.gmail.com>
-Message-ID: <4043887.oz5IYRs5go@flatron>
+Date: Thu, 14 Nov 2013 16:06:33 +0100
+Subject: [RFC 0/4] Add basic support for ASV
+In-Reply-To: <CAKew6eUK9ZtoVgVu_b13Bn20iMNWzHnWjSHMjxD1Y+zDtvoCWw@mail.gmail.com>
+References: <1378898048-25205-1-git-send-email-yadi.brar@samsung.com>
+ <CAKew6eUK9ZtoVgVu_b13Bn20iMNWzHnWjSHMjxD1Y+zDtvoCWw@mail.gmail.com>
+Message-ID: <1906951.EFsdgbeaob@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 of November 2013 15:44:05 Florian Meier wrote:
-> 2013/11/14 Tomasz Figa <tomasz.figa@gmail.com>:
-> > On Thursday 14 of November 2013 08:12:46 Florian Meier wrote:
-> >> On 13.11.2013 21:39, Tomasz Figa wrote:
-> >> > On Wednesday 13 of November 2013 20:35:22 Florian Meier wrote:
-> >> >>>> +- brcm,dma-channel-mask: Bit mask representing the channels available.
-> >> >>>
-> >> >>> What does the value of this property depend on? Could you describe the
-> >> >>> structure of this DMA controller?
-> >> >>>
-> >> >>>> +
-> >> >>>> +Example:
-> >> >>>> +
-> >> >>>> +dma: dma at 7e007000 {
-> >> >>>> +        compatible = "brcm,bcm2835-dma";
-> >> >>>> +        reg = <0x7e007000 0xf00>;
-> >> >>>> +        interrupts = <1 16
-> >> >>>> +                      1 17
-> >> >>>> +                      1 18
-> >> >>>> +                      1 19
-> >> >>>> +                      1 20
-> >> >>>> +                      1 21
-> >> >>>> +                      1 22
-> >> >>>> +                      1 23
-> >> >>>> +                      1 24
-> >> >>>> +                      1 25
-> >> >>>> +                      1 26
-> >> >>>> +                      1 27
-> >> >>>> +                      1 28>;
-> >> >>>
-> >> >>> There are 13 interrupts specified here, but...
-> >> >>>
-> >> >>>> +
-> >> >>>> +        #dma-cells = <1>;
-> >> >>>> +        dma-channels = <16>;
-> >> >>>
-> >> >>> ...16 channels here...
-> >> >>>
-> >> >>>> +        dma-requests = <32>;
-> >> >>>> +        brcm,dma-channel-mask = <0x7f35>;
-> >> >>>
-> >> >>> ...and 11 set bits here. May I ask you to explain this to me, please?
-> >> >>
-> >> >> How I understand this DMA controller:
-> >> >> There are 16 DMA channels in the DMA controller, but only 13 interrupts
-> >> >> are available at the IRQ controller. Therefore, the upper DMA channels
-> >> >> can just not be used. Maybe because there are to many other IRQs and
-> >> >> they didn't want to implement another IRQ bank.
-> >> >> Furthermore, some of the DMA channels are already used by the
-> >> >> VideoCore/GPU/firmware. This is what dma-channel-mask indicates. This
-> >> >> should be automatically set by the firmware in the future.
-> >> >> Finally, there are some channels with special functionality that should
-> >> >> not be used by DMA engine, too. Therefore, these lines:
-> >> >>            /* do not use the FIQ and BULK channels */
-> >> >>            chans_available &= ~0xD;
-> >> >
-> >> > OK, this makes it much more clear.
-> >> >
-> >> > So, my only comment remaining here is that you shouldn't include the
-> >> > channels without interrupt signal in the mask. This would allow you
-> >> > to define it as a mask of channels that are operable and then just
-> >> > iterate over all set bits in the driver, instead of using tricks with
-> >> > interrupt resources. What do you think?
-> >>
-> >> Since the mask will come directly from the firmware, this would require
-> >> patching the firmware. I think that is not worth the effort.
-> >
-> > Now I'm slightly confused. Do you already have code in your firmware that
-> > adds this property to your device tree?
-> >
-> > Otherwise in what circumstances such patching would take place? On given
-> > hardware (unless it's an FPGA) the configuration of available DMA channels
-> > that have interrupt signals should not change.
-> 
-> It is very confusing. I agree.
-> There is already a DMA driver with a proprietary API in the downstream
-> kernel. The firmware already creates this mask and passes it to this
-> proprietary driver.
-> There was already a discussion about this in the first version thread
-> that (as long as I understand it) resulted in "we should pass this
-> mask on to the driver via device tree". So I did that. I have no idea
-> about how this firmware->devicetree interface will take place, but
-> since I didn't want to run in circles I hardcoded it in the device
-> tree.
-> 
+Hi Yadwinder,
 
-OK. So the firmware defines what set and clear bits in the mask mean.
-It's fine then.
+On Monday 11 of November 2013 23:27:08 Yadwinder Singh Brar wrote:
+> gentle ping for suggestions/reviews ..
 
-> 
-> >> >>> [snip]
-> >> >>>> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> >> >>>> new file mode 100644
-> >> >>>> index 0000000..baf072e
-> >> >>>> --- /dev/null
-> >> >>>> +++ b/drivers/dma/bcm2835-dma.c
-> >> >>> [snip]
-> >> >>>> +static int bcm2835_dma_probe(struct platform_device *pdev)
-> >> >>>> +{
-> >> >>>> +        struct bcm2835_dmadev *od;
-> >> >>>> +        struct resource *dma_res = NULL;
-> >> >>>> +        void __iomem *dma_base = NULL;
-> >> >>>> +        int rc = 0;
-> >> >>>> +        int i = 0;
-> >> >>>> +        int irq;
-> >> >>>> +        uint32_t chans_available;
-> >> >>> [snip]
-> >> >>>> +        if (pdev->dev.of_node) {
-> >> >>>
-> >> >>> Is this driver supposed to support non-DT based instantation (aka board
-> >> >>> files)? If not, maybe it would be cleaner to simply check for
-> >> >>> !pdev->dev.of_node at the beginning of probe and return an error?
-> >> >>
-> >> >> I would like to maintain the possibility for board file based
-> >> >> instatiation, because the Raspberry Pi downstream kernel still doesn't
-> >> >> support device tree. If this is a no-go, I will accept that.
-> >> >
-> >> > Sure, you are free to do so.
-> >> >
-> >> > What I meant is that your probe won't call bcm2835_dma_chan_init() at all
-> >> > if there is no pdev->dev.of_node, because the loop iterating over channels
-> >> > is under the if clause.
-> >>
-> >> Yes you are right, but I think it will make the patching easier, later.
-> >> Currently, nothing bad happens without device tree - it just allocates
-> >> no channels.
-> >
-> > But isn't it really an error condition, if no channels are allocated?
-> 
-> A fridge is still a working fridge, even if no beer is inside ;-)
-> Ok, bad example, but you will get an error message anyway when you try
-> to get a channel.
-> 
-> > Anyway, back to my point about leaving non-DT support in a driver, the
-> > point is still valid only for drivers, not for platforms/boards. So if
-> > there are no boards supported using board files in mainline that could
-> > benefit from this driver, then this driver can be safely made DT-only,
-> > because no new non-DT platforms/boards can be added.
-> 
-> I don't have a telling argument against this, but just thought writing
-> it this way will
-> make the migration of the downstream kernel to upstream easier, but if you say I
-> should change it, I will of course do that.
+Hmm, I must have somehow missed this series when you orignally sent it.
+Can I ask you to resend it, as I don't have it in my e-mail client archive
+any longer?
 
-I'm just presenting you the possible options. You are still free to have
-non-DT support in the driver, but if you don't need it (because you can't
-have any new non-DT platforms in mainline) then you can simplify some
-code.
+While at it, I would also ask you to add my private e-mail address 
+(this one) and linux-pm mailing list to Cc list.
 
-However the driver shouldn't be left with illusionary support for non-DT
-platforms until you decide to implement that. Instead, if you don't want
-to add non-DT support now, just make the driver DT-only, while keeping
-its design in a way allowing you to add non-DT support in future.
-
-In other words, a driver should not be able to probe using board files
-if support for such probing method is not available in it yet.
-
-> I am becoming desperate anyway that this migration will ever fully
-> take place....
-
-Why not? It's just a matter of people like you working on this (and
-addressing some review comments ;)).
+Thanks in advance.
 
 Best regards,
 Tomasz
+
+> 
+> 
+> On Wed, Sep 11, 2013 at 8:14 PM, Yadwinder Singh Brar
+> <yadi.brar@samsung.com> wrote:
+> > This series is to add basic common infrastructure for ASV.
+> >  Basically ASV is a technique used on samsung SoCs, which provides the
+> > recommended supply voltage for dvfs of arm, mif etc. For a given operating
+> > frequency, the voltage is recommended based on SoC's ASV group.
+> > ASV group gets fussed on SoCs during process of mass production.
+> >
+> > This series includes:
+> >  - basic common infrastructue for ASV. It provides common APIs for user drivers
+> > like cpufreq & devfreq and and an interface for SoC specific drivers to
+> > register ASV members(instances)
+> >  - a common platform driver to register ASV members for exynos SoCs
+> >  - an example providing minimal support (only for ARM ASV) for exynos5250 chips
+> >
+> > Its just basic skelton which I wanted to get it reviewed or discussed in
+> > early stage, before going ahead on further development based on it.
+> >  Presently example is based on static ASV table provided in SoC specific file,
+> > which I expects to go into DT. But exactly how and where needs to be discussed,
+> > may be in next revisions once we get through the basic skelton.
+> >  Also the location of driver in kernel may also seem odd to someone and
+> > many more things :).
+> >
+> > Looking for your valuable reviews and suggestions.
+> >
+> > Thanks
+> >
+> > Yadwinder Singh Brar (4):
+> >   power: asv: Add common ASV support for samsung SoCs
+> >   power: asv: Add a common asv driver for exynos SoCs.
+> >   power: asv: Add support for exynos5250
+> >   arm: exynos5: Register static platform device for ASV.
+> >
+> >  arch/arm/mach-exynos/mach-exynos5-dt.c   |    3 +
+> >  drivers/power/Kconfig                    |    1 +
+> >  drivers/power/Makefile                   |    1 +
+> >  drivers/power/asv/Kconfig                |   24 ++++
+> >  drivers/power/asv/Makefile               |    2 +
+> >  drivers/power/asv/exynos-asv.c           |   81 ++++++++++++++
+> >  drivers/power/asv/exynos-asv.h           |   22 ++++
+> >  drivers/power/asv/exynos5250-asv.c       |  141 ++++++++++++++++++++++++
+> >  drivers/power/asv/samsung-asv.c          |  175 ++++++++++++++++++++++++++++++
+> >  include/linux/power/samsung-asv-driver.h |   61 +++++++++++
+> >  include/linux/power/samsung-asv.h        |   37 +++++++
+> >  11 files changed, 548 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/power/asv/Kconfig
+> >  create mode 100644 drivers/power/asv/Makefile
+> >  create mode 100644 drivers/power/asv/exynos-asv.c
+> >  create mode 100644 drivers/power/asv/exynos-asv.h
+> >  create mode 100644 drivers/power/asv/exynos5250-asv.c
+> >  create mode 100644 drivers/power/asv/samsung-asv.c
+> >  create mode 100644 include/linux/power/samsung-asv-driver.h
+> >  create mode 100644 include/linux/power/samsung-asv.h
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
