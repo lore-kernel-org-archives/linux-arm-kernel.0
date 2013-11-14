@@ -1,37 +1,76 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Thu, 14 Nov 2013 17:32:53 +0100
-Subject: [PATCHv4] dmaengine: Add support for BCM2835
-In-Reply-To: <11018682.0TjgocUWod@flatron>
-References: <5283BC93.1090801@koalo.de> <2385512.qcT1vt8HYp@flatron>
- <CABDT8WyUK6tDneDEm0G3o0zJHXaVTZp8JAMxOp5LRKQYG-7Umw@mail.gmail.com>
- <11018682.0TjgocUWod@flatron>
-Message-ID: <CABDT8Wxy-aA5CbZUSXRtod3i_9rBhXqGyGi+tBYGkYtygQmmpw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 14 Nov 2013 17:38:17 +0100
+Subject: [PATCH v6 1/2] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <52846D94.5090608@atmel.com>
+References: <1383292767-11211-1-git-send-email-voice.shen@atmel.com>
+ <20131113095628.GI28304@ns203013.ovh.net>
+ <52846D94.5090608@atmel.com>
+Message-ID: <20131114163817.GK28304@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/14 Tomasz Figa <tomasz.figa@gmail.com>:
-> On Thursday 14 of November 2013 17:14:31 Florian Meier wrote:
->> >> >> I am becoming desperate anyway that this migration will ever fully
->> >> >> take place....
->> >> >
->> >> > Why not? It's just a matter of people like you working on this (and
->> >> > addressing some review comments ;)).
->> >>
->> >> The most common comment about this is that people will not put effort in
->> >> the upstream kernel as long as there is no comfortable way for debugging
->> >> in the upstream kernel (i.e. at least USB support).......
->> >
->> > Right, you need USB to have ethernet working. Still, IMHO UART (for
->> > console) + ethernet (for file transfer or NFS root) is the reasonable
->> > setup allowing you to debug further drivers in a comfortable way.
->>
->> I am fine with UART and switching SD cards :-)
->> But apparently this is not generally accepted.
->
-> Still, isn't some work on USB support for RPi already going on? I believe
-> Matt Porter (now on Cc) has been working on unifying dwc2 host-mode
-> driver with Samsung s3c-hsotg device-mode driver (for the same IP) to
-> get full OTG support on all applicable platforms.
-
-That sounds great! I never heard about that.
-Maybe some day it really happens that Raspbian uses the upstream kernel :-)
+> >>+MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
+> >>+#endif
+> >>+
+> >>+static int atmel_pwm_probe(struct platform_device *pdev)
+> >>+{
+> >>+	const struct of_device_id *of_id =
+> >>+		of_match_device(atmel_pwm_dt_ids, &pdev->dev);
+> >>+	const struct atmel_pwm_data *data;
+> >>+	struct atmel_pwm_chip *atmel_pwm;
+> >>+	struct resource *res;
+> >>+	int ret;
+> >>+
+> >>+	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
+> >>+	if (!atmel_pwm)
+> >>+		return -ENOMEM;
+> >>+
+> >>+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>+	if (!res)
+> >>+		return -ENODEV;
+> >>+
+> >>+	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
+> >>+	if (IS_ERR(atmel_pwm->base))
+> >>+		return PTR_ERR(atmel_pwm->base);
+> >>+
+> >>+	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
+> >>+	if (IS_ERR(atmel_pwm->clk))
+> >>+		return PTR_ERR(atmel_pwm->clk);
+> >>+
+> >>+	ret = clk_prepare(atmel_pwm->clk);
+> >>+	if (ret) {
+> >>+		dev_err(&pdev->dev, "failed to prepare pwm clock\n");
+> >>+		return ret;
+> >>+	}
+> >>+
+> >>+	atmel_pwm->chip.dev = &pdev->dev;
+> >>+	atmel_pwm->chip.ops = &atmel_pwm_ops;
+> >I get one issue here for non-dt platform
+> 
+> I will fix this issue for none-dt in next version.
+> 
+> >>+	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+> >>+	atmel_pwm->chip.of_pwm_n_cells = 3;
+> >those 3 no need
+> 
+> Which "those 3"?
+> for dt / none-dt compatible, I will use following code
+> --->8---
+> if (pdev->dev.of_node) {
+> 	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+>         atmel_pwm->chip.of_pwm_n_cells = 3;
+>         atmel_pwm->chip.base = -1;
+> } else {
+> 	atmel_pwm->chip.base = 0;
+base need to choose by the board not 0
+> }
+> ---8<---
+> 
+> >>+	atmel_pwm->chip.base = -1;
+> >here we need specify the base from the board so we known which pwn to use
+> >for DT -1 is good as we use phandle
+> 
+> I will fix this issue for none-dt in next version.
+> 
+Best Regards,
+J.
