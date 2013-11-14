@@ -1,139 +1,77 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 14 Nov 2013 17:28:10 +0100
-Subject: [RFC PATCH v2] ARM: at91: add support for Cosino board series by
- HCE Engineering
-In-Reply-To: <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1383754767-5398-1-git-send-email-giometti@linux.it>
- <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20131114162810.GJ28304@ns203013.ovh.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 14 Nov 2013 11:28:59 -0500
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <52828C77.20001@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <52814AFB.3070600@wwwdotorg.org>
+ <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
+ <528275B7.6050209@wwwdotorg.org>
+ <20131112193012.GR10335@titan.lakedaemon.net>
+ <52828C77.20001@wwwdotorg.org>
+Message-ID: <20131114162859.GX10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:34 Wed 13 Nov     , Nicolas Ferre wrote:
-> From: Rodolfo Giometti <giometti@linux.it>
+On Tue, Nov 12, 2013 at 01:15:51PM -0700, Stephen Warren wrote:
+> On 11/12/2013 12:30 PM, Jason Cooper wrote:
+> > On Tue, Nov 12, 2013 at 11:38:47AM -0700, Stephen Warren wrote:
+> >> On 11/12/2013 08:29 AM, Rob Herring wrote:
+> >>> On Mon, Nov 11, 2013 at 3:24 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> >>>> On 11/11/2013 01:29 PM, Jason Cooper wrote:
+> >>>>> Consumers of the Linux kernel's build products are beginning to hardcode
+> >>>>> the filenames of the dtbs generated.  Since the dtb filenames are
+> >>>>> currently the dts filename s/dts/dtb/, this prevents the kernel
+> >>>>> community from renaming dts files as needed.
+> >>>>
+> >>>> My take is that the DTB filenames are part of the ABI, and therefore the
+> >>>> DTS filenames are also part of the ABI. Why would we want to rename them?
+> >>>
+> >>> I agree with the ABI part, but for long term I think compatible
+> >>> strings are a better choice for the ABI than filenames. A link
+> >>> provides for a way to transition.
+> >>
+> >> But this change isn't making the compatible value be the ABI, it's still
+> >> keeping the filename as the ABI, but creating a different way of
+> >> choosing the filename.
+> > 
+> > Right, which provides a path towards a slightly more sane ABI.  If we
+> > choose to implement this, or another variant, we get to shape a
+> > migration path towards an ABI we designed.  As opposed to locked in to
+> > one we didn't even see coming.
 > 
-> This patch adds the Cosino at91sam9g35 based CPU module and the
-> Cosino Mega 2560 extension board.
-> 
-> Web site: http://www.cosino.it
-> 
-> Signed-off-by: Rodolfo Giometti <giometti@linux.it>
-> [nicolas.ferre at atmel.com: adapted to newer kernel, modified commit message]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Rodolfo,
-> 
-> Can you please review this adaptation of your previous patch to newer kernel.
-> I hope to integrate your board in upcoming 3.14.
-> 
-> You will see that I addressed the remarks by Jean-Christophe and Russell (about
-> commit message). Please tell me if it is good on your side.
-> 
-> Ciao,
-> 
-> 
->  arch/arm/boot/dts/Makefile                 |   1 +
->  arch/arm/boot/dts/at91-cosino.dtsi         | 122 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91-cosino_mega2560.dts |  85 ++++++++++++++++++++
->  3 files changed, 208 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-cosino.dtsi
->  create mode 100644 arch/arm/boot/dts/at91-cosino_mega2560.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d57c1a6..772a30e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -30,6 +30,7 @@ dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
->  dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
->  # sam9x5
->  dtb-$(CONFIG_ARCH_AT91) += at91-ariag25.dtb
-> +dtb-$(CONFIG_ARCH_AT91) += at91-cosino_mega2560.dtb
->  dtb-$(CONFIG_ARCH_AT91) += at91sam9g15ek.dtb
->  dtb-$(CONFIG_ARCH_AT91) += at91sam9g25ek.dtb
->  dtb-$(CONFIG_ARCH_AT91) += at91sam9g35ek.dtb
-> diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
-> new file mode 100644
-> index 0000000..53f2b01
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91-cosino.dtsi
-> @@ -0,0 +1,122 @@
-> +/*
-> + * at91-cosino.dtsi - Device Tree file for Cosino core module
-> + *
-> + * Copyright (C) 2013 - Rodolfo Giometti <giometti@linux.it>
-> + *			HCE Engineering
-> + *
-> + * Derived from at91sam9x5ek.dtsi by:
-> + *	Copyright (C) 2012 Atmel,
-> + *	2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#include "at91sam9g35.dtsi"
-> +
-> +/ {
-> +	model = "HCE Cosino core module";
-> +	compatible = "hce,cosino", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-is this really sam9xek compatible?
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait";
-> +	};
-> +
+> I don't really agree here; I specifically named all the Tegra DTB/.dts
+> files in a sane fashion precisely so that U-Boot could easily determine
+> which one to load. It's hard to see how this wasn't a predictable issue.
+
+This is the difference between a commercial effort and a hobbyist
+effort.  I think I have a plan for how we can both get what we want.  I
+could change the argument to 'dtc ... -L arch/arm/boot ...'.  Thus:
+
+$ cd arch/arm/boot
+$ ls -l *.dtb        # minus a few columns
 ...
-> +/ {
-> +	model = "HCE Cosino Mega 2560";
-> +	compatible = "hce,cosino_mega2560", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-ditto
-> +
-> +	ahb {
-> +		apb {
-> +			macb0: ethernet at f802c000 {
-> +				phy-mode = "rmii";
-> +				status = "okay";
-> +			};
-> +
-> +			adc0: adc at f804c000 {
-> +				atmel,adc-clock-rate = <1000000>;
-> +				atmel,adc-ts-wires = <4>;
-> +				atmel,adc-ts-pressure-threshold = <10000>;
-> +				status = "okay";
-> +			};
-> +
-> +
-> +			tsadcc: tsadcc at f804c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			rtc at fffffeb0 {
-> +				status = "okay";
-> +			};
-> +
-> +			usart1: serial at f8020000 {
-> +			       status = "okay";
-tab no space
-> +			};
-> +
-> +			usart2: serial at f8024000 {
-> +			       status = "okay";
-tab no space
-> +			};
-> +
-> +			usb2: gadget at f803c000 {
-> +				atmel,vbus-gpio = <&pioB 16 GPIO_ACTIVE_HIGH>;
-> +				status = "okay";
-> +			};
-> +
-> +		usb0: ohci at 00600000 {
-> +			status = "okay";
-> +			num-ports = <3>;
-> +			atmel,vbus-gpio = <0 /* &pioD 18 GPIO_ACTIVE_LOW *//* Activate to have access to port A */
-do we really need the comment code?
-> +					   &pioD 19 GPIO_ACTIVE_LOW
-> +					   &pioD 20 GPIO_ACTIVE_LOW
-> +					  >;
-> +		};
-> +
-Best Regards,
-J.
+globalscale,mirabox.dtb -> dts/armada-370-mirabox.dtb
+...
+
+
+This way, aftermarket users (debian installers, etc) could go to the
+same place they go for zImages, and find a standard named dtb.  They
+wouldn't need to parse the dtbs, just look at the current compatible
+string for the board they are installing on and find the matching file.
+For commercial efforts, nothing changes, the well-thought out *.dtb
+filenames are still in the same place they always were.  A self-imposed
+vendor ABI, if you will.
+
+Then, in situations where dts filenames need to change, that can happen
+(typically per vendor) because the ABI, from the kernel maintainers pov,
+is the symlinks in arch/arm/boot/.
+
+As for the migration, there wouldn't need to be one beyond this first
+step of providing symlinks.  That way, vendor-preferred filenames stay
+as they are.
+
+Would that work better for you?
+
+thx,
+
+Jason.
