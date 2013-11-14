@@ -1,87 +1,86 @@
-From: dave.hansen@intel.com (Dave Hansen)
-Date: Thu, 14 Nov 2013 09:26:18 -0800
-Subject: [RFC PATCH 4/4] mm/vmalloc.c: Treat the entire kernel virtual
- space as vmalloc
-In-Reply-To: <1384212412-21236-5-git-send-email-lauraa@codeaurora.org>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
- <1384212412-21236-5-git-send-email-lauraa@codeaurora.org>
-Message-ID: <528507BA.9010101@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Nov 2013 09:30:57 -0800
+Subject: [PATCH 4/8] i2c: omap: Fix missing device tree flags for omap2
+In-Reply-To: <20131114110721.GE16396@e106331-lin.cambridge.arm.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-5-git-send-email-tony@atomide.com>
+ <20131114110721.GE16396@e106331-lin.cambridge.arm.com>
+Message-ID: <20131114173057.GE10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 03:26 PM, Laura Abbott wrote:
-> With CONFIG_ENABLE_VMALLOC_SAVINGS, all lowmem is tracked in
-> vmalloc. This means that all the kernel virtual address space
-> can be treated as part of the vmalloc region. Allow vm areas
-> to be allocated from the full kernel address range.
+* Mark Rutland <mark.rutland@arm.com> [131114 03:08]:
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> Signed-off-by: Neeti Desai <neetid@codeaurora.org>
-> ---
->  mm/vmalloc.c |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
+> Please update Documentation/devicetree/bindings/i2c/i2c-omap.txt
 > 
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index c7b138b..181247d 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -1385,16 +1385,27 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
->   */
->  struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
->  {
-> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
-> +				  NUMA_NO_NODE, GFP_KERNEL,
-> +				  __builtin_return_address(0));
-> +#else
->  	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
->  				  NUMA_NO_NODE, GFP_KERNEL,
->  				  __builtin_return_address(0));
-> +#endif
->  }
->  
->  struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
->  				const void *caller)
->  {
-> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
-> +				  NUMA_NO_NODE, GFP_KERNEL, caller);
-> +#else
->  	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
->  				  NUMA_NO_NODE, GFP_KERNEL, caller);
-> +#endif
->  }
+> Otherwise, this is fine.
 
-Couple of nits: first of all, there's no reason to copy, paste, and
-#ifdef this much code.  This just invites one of the copies to bitrot.
-I'd much rather see this:
+Here's this one with updated documentation.
 
-#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-#define LOWEST_VMALLOC_VADDR PAGE_OFFSET
-#else
-#define LOWEST_VMALLOC_VADDR VMALLOC_START
-#endif
+Regards,
 
-Then just replace the PAGE_OFFSET in the function arguments with
-LOWEST_VMALLOC_VADDR.
+Tony
 
-Have you done any audits to make sure that the rest of the code that
-deals with vmalloc addresses in the kernel is using is_vmalloc_addr()?
-I'd be a bit worried that we might have picked up an assumption or two
-that *all* vmalloc addresses are _above_ VMALLOC_START.
 
-The percpu.c code looks like it might do this, and maybe the kcore code.
- The vmalloc.c code itself has this in get_vmalloc_info():
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 13 Nov 2013 16:36:37 -0800
+Subject: [PATCH] i2c: omap: Fix missing device tree flags for omap2
 
->                 /*
->                  * Some archs keep another range for modules in vmalloc space
->                  */
->                 if (addr < VMALLOC_START)
->                         continue;
+As we claim to support device tree for mach-omap2, we
+should have the necessary flags in the driver to make it
+usable.
 
-Seems like that would break as well.
+Cc: linux-i2c at vger.kernel.org
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-With this patch, VMALLOC_START loses enough of its meaning that I wonder
-if we should even keep it around.  It's the start of the _dedicated_
-vmalloc space, but it's mostly useless and obscure enough that maybe we
-should get rid of its use in common code.
+--- a/Documentation/devicetree/bindings/i2c/i2c-omap.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-omap.txt
+@@ -1,7 +1,8 @@
+ I2C for OMAP platforms
+ 
+ Required properties :
+-- compatible : Must be "ti,omap3-i2c" or "ti,omap4-i2c"
++- compatible : Must be "ti,omap2420-i2c", "ti,omap2430-i2c", "ti,omap3-i2c"
++  or "ti,omap4-i2c"
+ - ti,hwmods : Must be "i2c<n>", n being the instance number (1-based)
+ - #address-cells = <1>;
+ - #size-cells = <0>;
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1037,6 +1037,20 @@ static const struct i2c_algorithm omap_i2c_algo = {
+ };
+ 
+ #ifdef CONFIG_OF
++static struct omap_i2c_bus_platform_data omap2420_pdata = {
++	.rev = OMAP_I2C_IP_VERSION_1,
++	.flags = OMAP_I2C_FLAG_NO_FIFO |
++			OMAP_I2C_FLAG_SIMPLE_CLOCK |
++			OMAP_I2C_FLAG_16BIT_DATA_REG |
++			OMAP_I2C_FLAG_BUS_SHIFT_2,
++};
++
++static struct omap_i2c_bus_platform_data omap2430_pdata = {
++	.rev = OMAP_I2C_IP_VERSION_1,
++	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2 |
++			OMAP_I2C_FLAG_FORCE_19200_INT_CLK,
++};
++
+ static struct omap_i2c_bus_platform_data omap3_pdata = {
+ 	.rev = OMAP_I2C_IP_VERSION_1,
+ 	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2,
+@@ -1055,6 +1069,14 @@ static const struct of_device_id omap_i2c_of_match[] = {
+ 		.compatible = "ti,omap3-i2c",
+ 		.data = &omap3_pdata,
+ 	},
++	{
++		.compatible = "ti,omap2430-i2c",
++		.data = &omap2430_pdata,
++	},
++	{
++		.compatible = "ti,omap2420-i2c",
++		.data = &omap2420_pdata,
++	},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
