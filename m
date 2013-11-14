@@ -1,81 +1,55 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 14 Nov 2013 11:45:51 +0200
-Subject: [PATCH 5/8] gpio: twl4030: Fix regression for twl gpio output
-In-Reply-To: <1384396537-3486-6-git-send-email-tony@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-6-git-send-email-tony@atomide.com>
-Message-ID: <52849BCF.6060203@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 14 Nov 2013 10:39:49 +0100
+Subject: [PATCH 00/11] Consolidate asm/fixmap.h files
+In-Reply-To: <1384271711.24631.5.camel@deneb.redhat.com>
+References: <1384262545-20875-1-git-send-email-msalter@redhat.com>
+ <52824BBC.9020401@monstr.eu> <1384271711.24631.5.camel@deneb.redhat.com>
+Message-ID: <52849A65.9030500@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 11/12/2013 04:55 PM, Mark Salter wrote:
+> On Tue, 2013-11-12 at 16:39 +0100, Michal Simek wrote:
+>> On 11/12/2013 02:22 PM, Mark Salter wrote:
+>>>
+>>>  arch/arm/include/asm/fixmap.h        |  25 ++------
+>>>  arch/hexagon/include/asm/fixmap.h    |  40 +------------
+>>>  arch/metag/include/asm/fixmap.h      |  32 +----------
+>>>  arch/microblaze/include/asm/fixmap.h |  44 +-------------
+>>>  arch/mips/include/asm/fixmap.h       |  33 +----------
+>>>  arch/powerpc/include/asm/fixmap.h    |  44 +-------------
+>>>  arch/sh/include/asm/fixmap.h         |  39 +------------
+>>>  arch/tile/include/asm/fixmap.h       |  33 +----------
+>>>  arch/um/include/asm/fixmap.h         |  40 +------------
+>>>  arch/x86/include/asm/fixmap.h        |  59 +------------------
+>>>  include/asm-generic/fixmap.h         | 107 +++++++++++++++++++++++++++++++++++
+>>>  11 files changed, 125 insertions(+), 371 deletions(-)
+>>>  create mode 100644 include/asm-generic/fixmap.h
+>>
+>> Any repo/branch with all these patches will be helpful.
+> 
+> https://github.com/mosalter/linux (fixmap branch)
 
-On 11/14/2013 04:35 AM, Tony Lindgren wrote:
-> Commit c111feabe2e2 (gpio: twl4030: Cache the direction and output
-> states in private data) improved things in general, but caused a
-> regression for setting the GPIO output direction.
-> 
-> The change reorganized twl_direction_out() and twl_set() and swapped
-> the function names around in the process. While doing that, a bug got
-> introduced that's not obvious while reading the patch as it appears
-> as no change to the code.
-> 
-> The bug is we now call function twl4030_set_gpio_dataout() twice in
-> both twl_direction_out() and twl_set(). Instead, we should first
-> call twl_direction_out() in twl_direction_out() followed by
-> twl4030_set_gpio_dataout() in twl_set().
-> 
-> This regression probably has gone unnoticed for a long time as the
-> bootloader may have set the GPIO direction properly in many cases.
-> This fixes at least the LCD panel not turning on omap3 LDP for
-> example.
+Thanks,
 
-Thanks for catching this. I have a recollection that I have tested the GPIO
-and it appeared to be working fine..
+For Microblaze
+Tested-by: Michal Simek <monstr@monstr.eu>
 
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: linux-gpio at vger.kernel.org
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
-> 
-> If this looks OK, I'd like to merge this as a fix via arm-soc tree
-> along with the other patches in this series as my later patches
-> depend on patches in this series.
-> 
-> ---
->  drivers/gpio/gpio-twl4030.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
-> index 0c7e891..5738d5a 100644
-> --- a/drivers/gpio/gpio-twl4030.c
-> +++ b/drivers/gpio/gpio-twl4030.c
-> @@ -354,17 +354,18 @@ static void twl_set(struct gpio_chip *chip, unsigned offset, int value)
->  static int twl_direction_out(struct gpio_chip *chip, unsigned offset, int value)
->  {
->  	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
-> +	int ret = -EINVAL;
->  
->  	mutex_lock(&priv->mutex);
->  	if (offset < TWL4030_GPIO_MAX)
-> -		twl4030_set_gpio_dataout(offset, value);
-> +		ret = twl4030_set_gpio_direction(offset, 0);
->  
->  	priv->direction |= BIT(offset);
->  	mutex_unlock(&priv->mutex);
->  
->  	twl_set(chip, offset, value);
->  
-> -	return 0;
-> +	return ret;
->  }
->  
->  static int twl_to_irq(struct gpio_chip *chip, unsigned offset)
-> 
-
+Thanks,
+Michal
 
 -- 
-P?ter
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131114/0d24ff52/attachment.sig>
