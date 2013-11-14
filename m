@@ -1,62 +1,40 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 14 Nov 2013 08:54:58 -0800
-Subject: [PATCH V4] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
- host
-In-Reply-To: <CALrVBkuTQYWPYLxr51WVouWAmB-xc1cLE4TZVapPW5OpN53ndQ@mail.gmail.com>
-References: <1374471119-26461-1-git-send-email-anup.patel@linaro.org>
- <CAAhSdy29wvVcmwaUh5PfJTrw4R+MeDrLoWWOPwpnhw2hDvKmKg@mail.gmail.com>
- <51F7B80E.3040905@arm.com>
- <CALrVBkt3eBM4hJ7W0orgdS9O=dU26Mb8Fd0Q+wozV87YZQjEHw@mail.gmail.com>
- <CALrVBkt+qMDcemR62ZgH88AsXUKDVWpz-Uf3JKJt6XoQh_dvXw@mail.gmail.com>
- <52849E87.3010109@arm.com>
- <CALrVBkuTQYWPYLxr51WVouWAmB-xc1cLE4TZVapPW5OpN53ndQ@mail.gmail.com>
-Message-ID: <CAMJs5B_TS8gdGEa2XEpvCNq5aD3NfEykhh34C580Opnf5o9LiQ@mail.gmail.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Thu, 14 Nov 2013 11:55:36 -0500
+Subject: [PATCHv4] dmaengine: Add support for BCM2835
+In-Reply-To: <11018682.0TjgocUWod@flatron>
+References: <5283BC93.1090801@koalo.de> <2385512.qcT1vt8HYp@flatron>
+ <CABDT8WyUK6tDneDEm0G3o0zJHXaVTZp8JAMxOp5LRKQYG-7Umw@mail.gmail.com>
+ <11018682.0TjgocUWod@flatron>
+Message-ID: <20131114165536.GQ13284@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 November 2013 05:45, Anup Patel <anup.patel@linaro.org> wrote:
-> On 14 November 2013 15:27, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 14/11/13 04:27, Anup Patel wrote:
->>> On 9 November 2013 10:32, Anup Patel <anup.patel@linaro.org> wrote:
->>>> On 30 July 2013 18:26, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> On 30/07/13 12:57, Anup Patel wrote:
->>>>>> On Mon, Jul 22, 2013 at 11:01 AM, Anup Patel <anup.patel@linaro.org> wrote:
->>>>>>> This patch allows us to have X-Gene guest VCPU when using KVM arm64
->>>>>>> on APM X-Gene host.
->>>>>>>
->>>>>>> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
->>>>>>> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
->>>>>>> when running on X-Gene host with Potenza core.
->>>>>
->>>>> [...]
->>>>>
->>>>>> Hi Marc,
->>>>>>
->>>>>> Do you think more changes are required to this patch ?
->>>>>
->>>>> Hi Anup,
->>>>>
->>>>> It looks OK to me as it is. I'll queue it for 3.12.
->>>>
->>>> Hi Marc,
->>>>
->>>> I think this patch was missed for 3.12
->>>>
->>>> Do you want me to resend this patch ??
->>>
->>> Hi Marc,
->>>
->>> What is missing in this patch ??
->>>
->>> Do you want me to resend this patch ??
->>
->> I appear to have misplaced it somehow.
->> Please resend it .
->
-> I have rechecked this patch against latest Linux stable
-> tree. It still applies on latest Linux stable tree hence
-> no need to re-base this patch on latest code.
->
-FYI: a better test is to make sure it applies to kvm/next.
+On Thu, Nov 14, 2013 at 05:23:08PM +0100, Tomasz Figa wrote:
+> On Thursday 14 of November 2013 17:14:31 Florian Meier wrote:
+> > >> >> I am becoming desperate anyway that this migration will ever fully
+> > >> >> take place....
+> > >> >
+> > >> > Why not? It's just a matter of people like you working on this (and
+> > >> > addressing some review comments ;)).
+> > >>
+> > >> The most common comment about this is that people will not put effort in
+> > >> the upstream kernel as long as there is no comfortable way for debugging
+> > >> in the upstream kernel (i.e. at least USB support).......
+> > >
+> > > Right, you need USB to have ethernet working. Still, IMHO UART (for
+> > > console) + ethernet (for file transfer or NFS root) is the reasonable
+> > > setup allowing you to debug further drivers in a comfortable way.
+> > 
+> > I am fine with UART and switching SD cards :-)
+> > But apparently this is not generally accepted.
+> 
+> Still, isn't some work on USB support for RPi already going on? I believe
+> Matt Porter (now on Cc) has been working on unifying dwc2 host-mode
+> driver with Samsung s3c-hsotg device-mode driver (for the same IP) to
+> get full OTG support on all applicable platforms.
 
--Christoffer
+Baby steps in that direction, yes. I need to finish the basic s3c-hsotg
+and dwc2 host only enablement for my platform and then will be focused on
+combining them.
+
+-Matt
