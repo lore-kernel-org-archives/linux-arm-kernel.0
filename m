@@ -1,77 +1,54 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 14 Nov 2013 17:45:22 +0900
-Subject: [PATCH] ARM: shmobile: Enable DSW2 with gpio-keys on KZM9D
-In-Reply-To: <20131114062735.GF22870@verge.net.au>
-References: <20131113230345.21482.36997.sendpatchset@w520>
- <20131114052204.GD22870@verge.net.au>
- <20131114062735.GF22870@verge.net.au>
-Message-ID: <CANqRtoTb-93b8UPyRLOBS11eXVuoqSB0A5CkGFYMhw42DGsKaQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 14 Nov 2013 09:56:01 +0100
+Subject: [RFC PATCH v2] ARM: at91: add support for Cosino board series
+ by HCE Engineering
+In-Reply-To: <20131113174624.GC10964@enneenne.com>
+References: <1383754767-5398-1-git-send-email-giometti@linux.it>
+ <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
+ <20131113174624.GC10964@enneenne.com>
+Message-ID: <52849021.4060809@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Thu, Nov 14, 2013 at 3:27 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Nov 14, 2013 at 02:22:06PM +0900, Simon Horman wrote:
->> On Thu, Nov 14, 2013 at 08:03:45AM +0900, Magnus Damm wrote:
->> > From: Magnus Damm <damm@opensource.se>
->> >
->> > Use the gpio-keys driver to support the 4 pins on the
->> > dip switch DSW2 which is mounted on the KZM9D board.
->> >
->> > Signed-off-by: Magnus Damm <damm@opensource.se>
+On 13/11/2013 18:46, Rodolfo Giometti :
+> On Wed, Nov 13, 2013 at 06:34:30PM +0100, Nicolas Ferre wrote:
+>> From: Rodolfo Giometti <giometti@linux.it>
 >>
->> Hi Magnus,
+>> This patch adds the Cosino at91sam9g35 based CPU module and the
+>> Cosino Mega 2560 extension board.
 >>
->> I have tried enabling the following on a config produced
->> using the kzm9d_defconfig:
+>> Web site: http://www.cosino.it
 >>
->> CONFIG_INPUT_KEYBOARD
->> CONFIG_INPUT_EVDEV
->> CONFIG_KEYBOARD_GPIO
+>> Signed-off-by: Rodolfo Giometti <giometti@linux.it>
+>> [nicolas.ferre at atmel.com: adapted to newer kernel, modified commit message]
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>> Rodolfo,
 >>
->> But all I see so far in dmsg is:
+>> Can you please review this adaptation of your previous patch to newer kernel.
+>> I hope to integrate your board in upcoming 3.14.
 >>
->> # dmesg | grep gpio
->> platform gpio_keys.3: Driver gpio-keys requests probe deferral
->>
->> I was expecting something more along the lines of:
->> input: gpio-keys as /devices/platform/gpio-keys/input/input0
->>
->> Could you give me some guidance on how to test this?
+>> You will see that I addressed the remarks by Jean-Christophe and Russell (about
+>> commit message). Please tell me if it is good on your side.
 >
-> I now notice that I also need
-> "[PATCH 00/03] gpio: R-Car and EM GPIO update"
+> I did some changes... attached are the correct patches.
+
+Doing the diff between our patch I only seen a difference in nand binding:
+nand-on-flash-bbt;
+is present in my adaptation while it is not in yours but I do not think 
+it is a problem to keep it.
+
+> Here the changelog V1 -> V2:
 >
-> But with that applied I now see:
->
-> # dmesg  | grep gpio
-> gpio-keys gpio_keys.3: Failed to request GPIO 14, error -517
-> platform gpio_keys.3: Driver gpio-keys requests probe deferral
+> [Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>]
+> * prefix "at91-" added
+> * atmel,mux-mask stuff removed
+> * "compatible" stuff is now on the same line for easy-grep(TM)
+> * lcd binding dropped
 
-Thanks for testing. In case of EMEV2 we don't have any PFC support, so
-because of that you probably need to deselect PINCTRL. The patch below
-does the trick, but for proper operation you probably have to split
-this up per-SoC. And these days KZM9D is MULTIPLATFORM only where
-PINCTRL probably wants to be set as a global default, so I suppose the
-proper way to support this is to add PFC support for EMEV2.
+Absolutely, I will add it to the commit log and integrate in the 
+upcoming at91-3.14-dt branch.
 
-Another option would be to make these two cases behave the same:
-- PINCTRL=y but no pinctrl support for the SoC
-- PINCTRL=n
-
---- 0001/arch/arm/Kconfig
-+++ work/arch/arm/Kconfig    2013-11-14 17:42:36.000000000 +0900
-@@ -655,7 +655,7 @@ config ARCH_SHMOBILE
-     select MIGHT_HAVE_CACHE_L2X0
-     select MULTI_IRQ_HANDLER
-     select NO_IOPORT
--    select PINCTRL
-+#    select PINCTRL
-     select PM_GENERIC_DOMAINS if PM
-     select SPARSE_IRQ
-     help
-
-Cheers,
-
-/ magnus
+Thanks for your quick feedback. Bye,
+-- 
+Nicolas Ferre
