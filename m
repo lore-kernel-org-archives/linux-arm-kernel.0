@@ -1,31 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 14 Nov 2013 15:29:07 +0000
-Subject: [PATCH 4/4] arm64: advertise CPU features for modalias matching
-In-Reply-To: <1384165175-16134-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1384165175-16134-1-git-send-email-ard.biesheuvel@linaro.org>
- <1384165175-16134-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20131114152907.GL20261@arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Nov 2013 12:40:27 -0300
+Subject: [PATCH v4 26/31] mtd: nand: pxa3xx: Introduce multiple page I/O
+ support
+In-Reply-To: <20131108004600.GZ20061@ld-irv-0074.broadcom.com>
+References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383837455-30721-27-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131107234459.GB2467@localhost>
+ <20131108004600.GZ20061@ld-irv-0074.broadcom.com>
+Message-ID: <20131114154026.GD7076@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 10:19:35AM +0000, Ard Biesheuvel wrote:
-> +ssize_t arch_print_cpu_modalias(struct device *dev,
-> +				struct device_attribute *attr,
-> +				char *buf)
-> +{
-> +	unsigned int caps;
-> +	ssize_t n;
-> +	int i;
-> +
-> +	/*
-> +	 * With 32 features maximum (taking 5 bytes each to print), we don't
-> +	 * need to worry about overrunning the PAGE_SIZE sized buffer.
-> +	 */
-> +	n = sprintf(buf, "cpu:type:arm64:feature:");
+On Thu, Nov 07, 2013 at 04:46:00PM -0800, Brian Norris wrote:
+> 
+> I haven't taken a look at all your changes yet, but I'll get this
 
-I would use "aarch64" here instead of arm64 for consistency with the
-architecture mode, compiler triplet and ELF_PLATFORM definition in the
-kernel.
+Any comments on the v4?
 
+I don't think there are any open issues to reply, but maybe my memory
+is failing, so feel free to refresh it :-)
+
+I'll re-submit the series as soon as v3.13-rc1 is out.
 -- 
-Catalin
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
