@@ -1,71 +1,165 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Thu, 14 Nov 2013 19:15:53 +0530
-Subject: [PATCH V4] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
- host
-In-Reply-To: <52849E87.3010109@arm.com>
-References: <1374471119-26461-1-git-send-email-anup.patel@linaro.org>
- <CAAhSdy29wvVcmwaUh5PfJTrw4R+MeDrLoWWOPwpnhw2hDvKmKg@mail.gmail.com>
- <51F7B80E.3040905@arm.com>
- <CALrVBkt3eBM4hJ7W0orgdS9O=dU26Mb8Fd0Q+wozV87YZQjEHw@mail.gmail.com>
- <CALrVBkt+qMDcemR62ZgH88AsXUKDVWpz-Uf3JKJt6XoQh_dvXw@mail.gmail.com>
- <52849E87.3010109@arm.com>
-Message-ID: <CALrVBkuTQYWPYLxr51WVouWAmB-xc1cLE4TZVapPW5OpN53ndQ@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 14 Nov 2013 14:48:10 +0100
+Subject: [PATCHv4] dmaengine: Add support for BCM2835
+In-Reply-To: <528477EE.4060407@koalo.de>
+References: <5283BC93.1090801@koalo.de> <2049375.GR9Xb2zuek@flatron>
+ <528477EE.4060407@koalo.de>
+Message-ID: <5235663.VIm8z9qphx@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 November 2013 15:27, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 14/11/13 04:27, Anup Patel wrote:
->> On 9 November 2013 10:32, Anup Patel <anup.patel@linaro.org> wrote:
->>> On 30 July 2013 18:26, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 30/07/13 12:57, Anup Patel wrote:
->>>>> On Mon, Jul 22, 2013 at 11:01 AM, Anup Patel <anup.patel@linaro.org> wrote:
->>>>>> This patch allows us to have X-Gene guest VCPU when using KVM arm64
->>>>>> on APM X-Gene host.
->>>>>>
->>>>>> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
->>>>>> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
->>>>>> when running on X-Gene host with Potenza core.
->>>>
->>>> [...]
->>>>
->>>>> Hi Marc,
->>>>>
->>>>> Do you think more changes are required to this patch ?
->>>>
->>>> Hi Anup,
->>>>
->>>> It looks OK to me as it is. I'll queue it for 3.12.
->>>
->>> Hi Marc,
->>>
->>> I think this patch was missed for 3.12
->>>
->>> Do you want me to resend this patch ??
->>
->> Hi Marc,
->>
->> What is missing in this patch ??
->>
->> Do you want me to resend this patch ??
->
-> I appear to have misplaced it somehow.
-> Please resend it .
+On Thursday 14 of November 2013 08:12:46 Florian Meier wrote:
+> On 13.11.2013 21:39, Tomasz Figa wrote:
+> > On Wednesday 13 of November 2013 20:35:22 Florian Meier wrote:
+> >> On 13.11.2013 19:43, Tomasz Figa wrote:
+> >>>> ....
+> >>>> diff --git a/Documentation/devicetree/bindings/dma/bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
+> >>>> new file mode 100644
+> >>>> index 0000000..bca5e84
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
+> >>>> @@ -0,0 +1,59 @@
+> >>>> +* BCM2835 DMA controller
+> >>>> +
+> >>>> +Required properties:
+> >>>> +- compatible: Should be "brcm,bcm2835-dma".
+> >>>> +- reg: Should contain DMA registers location and length.
+> >>>> +- interrupts: Should contain the DMA interrupts associated
+> >>>> +		to the DMA channels in ascending order.
+> >>>> +		First cell is the IRQ bank.
+> >>>> +		Second cell is the IRQ number.
+> >>>> +- #dma-cells: Must be <1>, used to represent the number of integer cells in
+> >>>> +		the dmas property of client devices.
+> >>>> +- dma-channels: Maximum number of DMA channels available.
+> >>>> +- dma-requests: Number of DMA Requests.
+> >>>
+> >>> The two properties above do not seem to be used anywhere in the driver.
+> >>
+> >> Aren't they necessary for the DMA engine core?
+> > 
+> > Honestly, looking at the DMA bindings documentation, these two are quite
+> > a mystery for me. They don't seem to be used in DMA engine core, but
+> > instead several drivers use them for private purposes.
+> > 
+> > So, since they are optional and you don't seem to need them, I wouldn't
+> > list them.
+> 
+> Ok
+> 
+> >>>> +- brcm,dma-channel-mask: Bit mask representing the channels available.
+> >>>
+> >>> What does the value of this property depend on? Could you describe the
+> >>> structure of this DMA controller?
+> >>>
+> >>>> +
+> >>>> +Example:
+> >>>> +
+> >>>> +dma: dma at 7e007000 {
+> >>>> +	compatible = "brcm,bcm2835-dma";
+> >>>> +	reg = <0x7e007000 0xf00>;
+> >>>> +	interrupts = <1 16
+> >>>> +		      1 17
+> >>>> +		      1 18
+> >>>> +		      1 19
+> >>>> +		      1 20
+> >>>> +		      1 21
+> >>>> +		      1 22
+> >>>> +		      1 23
+> >>>> +		      1 24
+> >>>> +		      1 25
+> >>>> +		      1 26
+> >>>> +		      1 27
+> >>>> +		      1 28>;
+> >>>
+> >>> There are 13 interrupts specified here, but...
+> >>>
+> >>>> +
+> >>>> +	#dma-cells = <1>;
+> >>>> +	dma-channels = <16>;
+> >>>
+> >>> ...16 channels here...
+> >>>
+> >>>> +	dma-requests = <32>;
+> >>>> +	brcm,dma-channel-mask = <0x7f35>;
+> >>>
+> >>> ...and 11 set bits here. May I ask you to explain this to me, please?
+> >>
+> >> How I understand this DMA controller:
+> >> There are 16 DMA channels in the DMA controller, but only 13 interrupts
+> >> are available at the IRQ controller. Therefore, the upper DMA channels
+> >> can just not be used. Maybe because there are to many other IRQs and
+> >> they didn't want to implement another IRQ bank.
+> >> Furthermore, some of the DMA channels are already used by the
+> >> VideoCore/GPU/firmware. This is what dma-channel-mask indicates. This
+> >> should be automatically set by the firmware in the future.
+> >> Finally, there are some channels with special functionality that should
+> >> not be used by DMA engine, too. Therefore, these lines:
+> >> 		/* do not use the FIQ and BULK channels */
+> >> 		chans_available &= ~0xD;
+> > 
+> > OK, this makes it much more clear.
+> > 
+> > So, my only comment remaining here is that you shouldn't include the
+> > channels without interrupt signal in the mask. This would allow you
+> > to define it as a mask of channels that are operable and then just
+> > iterate over all set bits in the driver, instead of using tricks with
+> > interrupt resources. What do you think?
+> 
+> Since the mask will come directly from the firmware, this would require
+> patching the firmware. I think that is not worth the effort.
 
-I have rechecked this patch against latest Linux stable
-tree. It still applies on latest Linux stable tree hence
-no need to re-base this patch on latest code.
+Now I'm slightly confused. Do you already have code in your firmware that
+adds this property to your device tree?
 
-Please get the patch from this mail thread itself.
+Otherwise in what circumstances such patching would take place? On given
+hardware (unless it's an FPGA) the configuration of available DMA channels
+that have interrupt signals should not change.
 
-Is it possible to merge this patch for 3.13 ??
+> 
+> >>> [snip]
+> >>>> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+> >>>> new file mode 100644
+> >>>> index 0000000..baf072e
+> >>>> --- /dev/null
+> >>>> +++ b/drivers/dma/bcm2835-dma.c
+> >>> [snip]
+> >>>> +static int bcm2835_dma_probe(struct platform_device *pdev)
+> >>>> +{
+> >>>> +	struct bcm2835_dmadev *od;
+> >>>> +	struct resource *dma_res = NULL;
+> >>>> +	void __iomem *dma_base = NULL;
+> >>>> +	int rc = 0;
+> >>>> +	int i = 0;
+> >>>> +	int irq;
+> >>>> +	uint32_t chans_available;
+> >>> [snip]
+> >>>> +	if (pdev->dev.of_node) {
+> >>>
+> >>> Is this driver supposed to support non-DT based instantation (aka board
+> >>> files)? If not, maybe it would be cleaner to simply check for
+> >>> !pdev->dev.of_node at the beginning of probe and return an error?
+> >>
+> >> I would like to maintain the possibility for board file based
+> >> instatiation, because the Raspberry Pi downstream kernel still doesn't
+> >> support device tree. If this is a no-go, I will accept that.
+> > 
+> > Sure, you are free to do so.
+> > 
+> > What I meant is that your probe won't call bcm2835_dma_chan_init() at all
+> > if there is no pdev->dev.of_node, because the loop iterating over channels
+> > is under the if clause.
+> 
+> Yes you are right, but I think it will make the patching easier, later.
+> Currently, nothing bad happens without device tree - it just allocates
+> no channels.
 
-Regards,
-Anup
+But isn't it really an error condition, if no channels are allocated?
 
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+Anyway, back to my point about leaving non-DT support in a driver, the
+point is still valid only for drivers, not for platforms/boards. So if
+there are no boards supported using board files in mainline that could
+benefit from this driver, then this driver can be safely made DT-only,
+because no new non-DT platforms/boards can be added.
+
+Best regards,
+Tomasz
