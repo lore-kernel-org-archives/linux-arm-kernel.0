@@ -1,21 +1,25 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 14 Nov 2013 18:04:56 +0530
-Subject: [PATCH V4 1/4] DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable
- irqs
-In-Reply-To: <alpine.DEB.2.02.1311141332350.30673@ionos.tec.linutronix.de>
-References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
- <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1311141332350.30673@ionos.tec.linutronix.de>
-Message-ID: <5284C370.1030308@ti.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Thu, 14 Nov 2013 13:37:24 +0100
+Subject: a bug on NO_HZ_FULL_ALL
+In-Reply-To: <20131114120845.GA16735@n2100.arm.linux.org.uk>
+References: <CANHzE=2EOJmjFqLUDSfxTvgQhrUogOxH8Qux9hBFTGf8HiWWEw@mail.gmail.com>
+ <52843855.5060509@linaro.org> <52847FBE.9070501@linaro.org>
+ <CAKfTPtD7fo08mjQoLXMMDpyxQuyoCZLS33qBnnUcQEmzYai2VQ@mail.gmail.com>
+ <52848547.9080604@linaro.org>
+ <CANHzE=0yshUSnxRRhQ_hBjo8ze4pSzuWQq+SAWdosq+wdP8hFg@mail.gmail.com>
+ <20131114115313.GC16501@localhost.localdomain>
+ <20131114120845.GA16735@n2100.arm.linux.org.uk>
+Message-ID: <20131114123722.GA1802@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 November 2013 06:03 PM, Thomas Gleixner wrote:
-> On Thu, 14 Nov 2013, Sricharan R wrote:
->>  [V3] Addressed unnecessary warn-on and updated default
->>       xlate function as per Thomas Gleixner comments
-> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
- Thanks Thomas..
+On Thu, Nov 14, 2013 at 12:08:46PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 14, 2013 at 12:53:15PM +0100, Frederic Weisbecker wrote:
+> > BTW, support for ARM's full dynticks is uncomplete without
+> > "[PATCH] ARM: Support arch_irq_work_raise() via self IPIs"
+> > 
+> > ...which I'm not sure is applied upstream, or even any ARM tree yet.
+> 
+> It's in mainline as of last night, along with a fix to the above patch.
 
-Regards,
- Sricharan
+Great, thanks!
