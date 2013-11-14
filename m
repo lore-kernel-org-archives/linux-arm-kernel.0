@@ -1,24 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Nov 2013 18:35:30 -0800
-Subject: [PATCH 1/8] net: smc91x: Fix device tree based configuration so it's
- usable
+Date: Wed, 13 Nov 2013 18:35:34 -0800
+Subject: [PATCH 5/8] gpio: twl4030: Fix regression for twl gpio output
 In-Reply-To: <1384396537-3486-1-git-send-email-tony@atomide.com>
 References: <1384396537-3486-1-git-send-email-tony@atomide.com>
-Message-ID: <1384396537-3486-2-git-send-email-tony@atomide.com>
+Message-ID: <1384396537-3486-6-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 89ce376c6bdc (drivers/net: Use of_match_ptr() macro in smc91x.c)
-added minimal device tree support to smc91x, but it's not working on
-many platforms because of the lack of some key configuration bits.
+Commit c111feabe2e2 (gpio: twl4030: Cache the direction and output
+states in private data) improved things in general, but caused a
+regression for setting the GPIO output direction.
 
-Fix the issue by parsing the necessary configuration like the
-smc911x driver is doing.
+The change reorganized twl_direction_out() and twl_set() and swapped
+the function names around in the process. While doing that, a bug got
+introduced that's not obvious while reading the patch as it appears
+as no change to the code.
 
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: netdev at vger.kernel.org
-Cc: devicetree at vger.kernel.org
+The bug is we now call function twl4030_set_gpio_dataout() twice in
+both twl_direction_out() and twl_set(). Instead, we should first
+call twl_direction_out() in twl_direction_out() followed by
+twl4030_set_gpio_dataout() in twl_set().
+
+This regression probably has gone unnoticed for a long time as the
+bootloader may have set the GPIO direction properly in many cases.
+This fixes at least the LCD panel not turning on omap3 LDP for
+example.
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: linux-gpio at vger.kernel.org
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
 
@@ -27,116 +37,33 @@ along with the other patches in this series as my later patches
 depend on patches in this series.
 
 ---
- .../devicetree/bindings/net/smsc-lan91c111.txt     |  4 ++
- drivers/net/ethernet/smsc/smc91x.c                 | 52 +++++++++++++++++-----
- 2 files changed, 46 insertions(+), 10 deletions(-)
+ drivers/gpio/gpio-twl4030.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
-index 953049b..53d69e3 100644
---- a/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
-+++ b/Documentation/devicetree/bindings/net/smsc-lan91c111.txt
-@@ -8,3 +8,7 @@ Required properties:
- Optional properties:
- - phy-device : phandle to Ethernet phy
- - local-mac-address : Ethernet mac address to use
-+- reg-io-width : Specify the size (in bytes) of the IO accesses that
-+  should be performed on the device.  Valid value for SMSC LAN is
-+  1, 2 or 4.  If it's omitted or invalid, the size would be 2.
-+- smsc,nowait : Setup for fast register access with no waits
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 73be7f3..93d4b7d 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -82,6 +82,7 @@ static const char version[] =
- #include <linux/mii.h>
- #include <linux/workqueue.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <linux/netdevice.h>
- #include <linux/etherdevice.h>
-@@ -2189,6 +2190,15 @@ static void smc_release_datacs(struct platform_device *pdev, struct net_device *
- 	}
- }
- 
-+#if IS_BUILTIN(CONFIG_OF)
-+static const struct of_device_id smc91x_match[] = {
-+	{ .compatible = "smsc,lan91c94", },
-+	{ .compatible = "smsc,lan91c111", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, smc91x_match);
-+#endif
-+
- /*
-  * smc_init(void)
-  *   Input parameters:
-@@ -2203,6 +2213,8 @@ static void smc_release_datacs(struct platform_device *pdev, struct net_device *
- static int smc_drv_probe(struct platform_device *pdev)
+diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+index 0c7e891..5738d5a 100644
+--- a/drivers/gpio/gpio-twl4030.c
++++ b/drivers/gpio/gpio-twl4030.c
+@@ -354,17 +354,18 @@ static void twl_set(struct gpio_chip *chip, unsigned offset, int value)
+ static int twl_direction_out(struct gpio_chip *chip, unsigned offset, int value)
  {
- 	struct smc91x_platdata *pd = dev_get_platdata(&pdev->dev);
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *match = NULL;
- 	struct smc_local *lp;
- 	struct net_device *ndev;
- 	struct resource *res, *ires;
-@@ -2222,11 +2234,40 @@ static int smc_drv_probe(struct platform_device *pdev)
- 	 */
+ 	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
++	int ret = -EINVAL;
  
- 	lp = netdev_priv(ndev);
-+	lp->cfg.flags = 0;
+ 	mutex_lock(&priv->mutex);
+ 	if (offset < TWL4030_GPIO_MAX)
+-		twl4030_set_gpio_dataout(offset, value);
++		ret = twl4030_set_gpio_direction(offset, 0);
  
- 	if (pd) {
- 		memcpy(&lp->cfg, pd, sizeof(lp->cfg));
- 		lp->io_shift = SMC91X_IO_SHIFT(lp->cfg.flags);
--	} else {
-+	}
-+
-+#if IS_BUILTIN(CONFIG_OF)
-+	match = of_match_device(of_match_ptr(smc91x_match), &pdev->dev);
-+	if (match) {
-+		u32 val;
-+
-+		of_property_read_u32(np, "reg-io-width", &val);
-+		switch (val) {
-+		case 1:
-+			lp->cfg.flags |= SMC91X_USE_8BIT;
-+			break;
-+		case 2:
-+			lp->cfg.flags |= SMC91X_USE_16BIT;
-+			break;
-+		case 4:
-+			lp->cfg.flags |= SMC91X_USE_32BIT;
-+			break;
-+		default:
-+			lp->cfg.flags |= SMC91X_USE_16BIT;
-+			break;
-+		}
-+
-+		if (of_get_property(np, "smsc,nowait", NULL))
-+			lp->cfg.flags |= SMC91X_NOWAIT;
-+	}
-+#endif
-+
-+	if (!pd && !match) {
- 		lp->cfg.flags |= (SMC_CAN_USE_8BIT)  ? SMC91X_USE_8BIT  : 0;
- 		lp->cfg.flags |= (SMC_CAN_USE_16BIT) ? SMC91X_USE_16BIT : 0;
- 		lp->cfg.flags |= (SMC_CAN_USE_32BIT) ? SMC91X_USE_32BIT : 0;
-@@ -2375,15 +2416,6 @@ static int smc_drv_resume(struct device *dev)
- 	return 0;
+ 	priv->direction |= BIT(offset);
+ 	mutex_unlock(&priv->mutex);
+ 
+ 	twl_set(chip, offset, value);
+ 
+-	return 0;
++	return ret;
  }
  
--#ifdef CONFIG_OF
--static const struct of_device_id smc91x_match[] = {
--	{ .compatible = "smsc,lan91c94", },
--	{ .compatible = "smsc,lan91c111", },
--	{},
--};
--MODULE_DEVICE_TABLE(of, smc91x_match);
--#endif
--
- static struct dev_pm_ops smc_drv_pm_ops = {
- 	.suspend	= smc_drv_suspend,
- 	.resume		= smc_drv_resume,
+ static int twl_to_irq(struct gpio_chip *chip, unsigned offset)
 -- 
 1.8.1.1
