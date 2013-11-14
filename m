@@ -1,53 +1,47 @@
-From: dave@sr71.net (Dave Hansen)
-Date: Thu, 14 Nov 2013 09:45:27 -0800
-Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
- vmalloc
-In-Reply-To: <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
- <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
-Message-ID: <52850C37.1080506@sr71.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 14 Nov 2013 18:49:13 +0100
+Subject: [PATCH 4/8] i2c: omap: Fix missing device tree flags for omap2
+In-Reply-To: <20131114173429.GF10317@atomide.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-5-git-send-email-tony@atomide.com>
+ <20131114065830.GA2738@katana> <20131114173429.GF10317@atomide.com>
+Message-ID: <20131114174913.GJ11022@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 03:26 PM, Laura Abbott wrote:
-> +config ENABLE_VMALLOC_SAVING
-> +	bool "Intermix lowmem and vmalloc virtual space"
-> +	depends on ARCH_TRACKS_VMALLOC
-> +	help
-> +	  Some memory layouts on embedded systems steal large amounts
-> +	  of lowmem physical memory for purposes outside of the kernel.
-> +	  Rather than waste the physical and virtual space, allow the
-> +	  kernel to use the virtual space as vmalloc space.
 
-I really don't think this needs to be exposed with help text and so
-forth.   How about just defining a 'def_bool n' with some comments and
-let the architecture 'select' it?
+> > It would have been helpful if the message "PATCH [0/x]" would have been
+> > sent to the i2c-list also.
+> 
+> Thanks, next time I'll try check the cc list in the cover letter
+> manually after running git format patch. I guess there's no way
+> to deal with that in an automated way.
 
-> +#ifdef ENABLE_VMALLOC_SAVING
-> +int is_vmalloc_addr(const void *x)
-> +{
-> +	struct rb_node *n;
-> +	struct vmap_area *va;
-> +	int ret = 0;
-> +
-> +	spin_lock(&vmap_area_lock);
-> +
-> +	for (n = rb_first(vmap_area_root); n; rb_next(n)) {
-> +		va = rb_entry(n, struct vmap_area, rb_node);
-> +		if (x >= va->va_start && x < va->va_end) {
-> +			ret = 1;
-> +			break;
-> +		}
-> +	}
-> +
-> +	spin_unlock(&vmap_area_lock);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(is_vmalloc_addr);
-> +#endif
+I use this hackish script as --cc-cmd with git:
 
-It's probably worth noting that this makes is_vmalloc_addr() a *LOT*
-more expensive than it was before.  There are a couple dozen of these in
-the tree in kinda weird places (ext4, netlink, tcp).  You didn't
-mention it here, but you probably want to at least make sure you're not
-adding a spinlock and a tree walk in some critical path.
+#! /bin/sh
+#
+# cocci_cc - send cover letter to all mailing lists referenced in a patch series
+# done by Wolfram Sang in 2012 - WTFPLv2
+
+name=${1##*/}
+num=${name%%-*}
+
+if [ "$num" = "0000" ]; then
+	dir=${1%/*}
+	for f in $dir/*; do
+		patchname=${f##*/}
+		[ "${patchname%%-*}" = "0000" ] && continue
+		scripts/get_maintainer.pl --no-m $f
+	done | sort -u
+else
+	scripts/get_maintainer.pl $1
+fi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131114/147fd74a/attachment-0001.sig>
