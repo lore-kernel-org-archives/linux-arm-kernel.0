@@ -1,26 +1,19 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 14 Nov 2013 14:12:12 -0800
-Subject: [PATCH v5 03/14] mtd: nand: pxa3xx: Add bad block handling
-In-Reply-To: <1384464339-6817-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1384464339-6817-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131114221212.GR9468@ld-irv-0074.broadcom.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 15 Nov 2013 02:14:45 +0300
+Subject: [PATCH 0/2] Add Ether support for R8A7791/Koelsch board
+Message-ID: <201311150214.46245.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 06:25:28PM -0300, Ezequiel Garcia wrote:
-> --- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-> @@ -15,6 +15,8 @@ Optional properties:
->   - marvell,nand-keep-config:	Set to keep the NAND controller config as set
->  				by the bootloader
->   - num-cs:			Number of chipselect lines to usw
-> + - nand-on-flash-bbt: 		boolean to enable on flash bbt option if
-> +				not present false
+Hello.
 
-It's not really your problem, but I just noticed that this binding
-description is particularly badly worded! No need to change it in this
-patch, since it's a copy-and-paste from the generic nand.txt, but it's
-probably worth rewriting all of them sometime.
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-v3.12-20131112' tag. Here we add the Ether support to the
+R8A7791/Koelsch board. The patchset requires the 'sh_eth' driver R8A7791
+support patch posted earlier in order to work.
 
-Brian
+[1/3] ARM: shmobile: r8a7791: add Ether clock
+[2/3] ARM: shmobile: Koelsch: add Ether support
+[3/3] ARM: shmobile: Koelsch: enable Ether in defconfig
+
+WBR, Sergei
