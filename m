@@ -1,35 +1,22 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Fri, 15 Nov 2013 08:15:52 +0900
-Subject: [RFC 0/4] Add basic support for ASV
-In-Reply-To: <1906951.EFsdgbeaob@flatron>
-References: <1378898048-25205-1-git-send-email-yadi.brar@samsung.com>
- <CAKew6eUK9ZtoVgVu_b13Bn20iMNWzHnWjSHMjxD1Y+zDtvoCWw@mail.gmail.com>
- <1906951.EFsdgbeaob@flatron>
-Message-ID: <CAKew6eVJiXNWpyE8E69MminsHjr+ip8syX6kx8wuY3R78QW=iA@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 14 Nov 2013 15:17:49 -0800
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <20131114231528.GA9793@localhost>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131114230436.GV9468@ld-irv-0074.broadcom.com>
+ <20131114230540.GW9468@ld-irv-0074.broadcom.com>
+ <20131114231528.GA9793@localhost>
+Message-ID: <CAN8TOE_699ME6BAi2hv1RuR1XFpJyxBZ+nDpZsc0Ssg+tR4W1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Sachin]
+On Thu, Nov 14, 2013 at 3:15 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Other than that, since I could solve my PXA board issues I can now test PXA
+> non-DMA and DMA. I must thank the Compulab guys for that.
 
-Hi Tomasz,
+Ah, I thought you mentioned having a working PXA platform, but I
+couldn't find the email quickly. That's good enough for now, then. Of
+course, the more testers the better!
 
-On Fri, Nov 15, 2013 at 12:06 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Yadwinder,
->
-> On Monday 11 of November 2013 23:27:08 Yadwinder Singh Brar wrote:
->> gentle ping for suggestions/reviews ..
->
-> Hmm, I must have somehow missed this series when you orignally sent it.
-> Can I ask you to resend it, as I don't have it in my e-mail client archive
-> any longer?
->
-> While at it, I would also ask you to add my private e-mail address
-> (this one) and linux-pm mailing list to Cc list.
->
-
-hmm, I am on travel still for few more days, so it may be difficult for me
-to resend it quickly. But I think Sachin may help me here.
-Sachin can you please rebase and repost it ?
-
-Regards,
-Yadwinder
+Brian
