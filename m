@@ -1,21 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Nov 2013 12:08:46 +0000
-Subject: a bug on NO_HZ_FULL_ALL
-In-Reply-To: <20131114115313.GC16501@localhost.localdomain>
-References: <CANHzE=2EOJmjFqLUDSfxTvgQhrUogOxH8Qux9hBFTGf8HiWWEw@mail.gmail.com>
- <52843855.5060509@linaro.org> <52847FBE.9070501@linaro.org>
- <CAKfTPtD7fo08mjQoLXMMDpyxQuyoCZLS33qBnnUcQEmzYai2VQ@mail.gmail.com>
- <52848547.9080604@linaro.org>
- <CANHzE=0yshUSnxRRhQ_hBjo8ze4pSzuWQq+SAWdosq+wdP8hFg@mail.gmail.com>
- <20131114115313.GC16501@localhost.localdomain>
-Message-ID: <20131114120845.GA16735@n2100.arm.linux.org.uk>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 14 Nov 2013 17:48:46 +0530
+Subject: [PATCH V4 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+Message-ID: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 12:53:15PM +0100, Frederic Weisbecker wrote:
-> BTW, support for ARM's full dynticks is uncomplete without
-> "[PATCH] ARM: Support arch_irq_work_raise() via self IPIs"
-> 
-> ...which I'm not sure is applied upstream, or even any ARM tree yet.
+Some socs have a large number of interrupts requests to service
+the needs of its many peripherals and subsystems. All of the interrupt
+requests lines from the subsystems are not needed at the same
+time, so they have to be muxed to the controllers appropriately.
+In such places a interrupt controllers are preceded by an
+IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+requests to the controller inputs.
 
-It's in mainline as of last night, along with a fix to the above patch.
+This series models the peripheral interrupts that can be routed through
+the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
+in a separate linear domain inside the GIC. The registered routable domain's
+callback are invoked as a part of the GIC's callback, which in turn should
+allocate a free irq line and configure the IP accordingly. So every peripheral
+in the dts files mentions the fixed crossbar number as its interrupt. A free
+gic line for that gets allocated and configured when the peripheral interrupts
+are mapped.
+
+The minimal crossbar driver to track and allocate free GIC lines and configure the
+crossbar is added here, along with the DT bindings.
+
+V4:
+   Addressed a couple of comments and split the DTS file updates in to
+   a separate series.
+
+V3:
+   Addressed few more comments from Thomas Gleixner <tglx@linutronix.de>
+
+   Rebased patches 3,4,5,7 which updates the DTS file on top of below branch
+	   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+	   for_3.13/dts
+
+   Rebased patches 1,2,6 on top of 3.12 mainline
+   Updated Commit tags
+
+V2:
+   Addressed Thomas Gleixner <tglx@linutronix.de> comments and
+   Kumar Gala <galak@codeaurora.org>
+
+   Split updating the DRA7.dtsi file for adding the routable-irqs
+
+Previous discussions that led to this is at
+	https://lkml.org/lkml/2013/9/18/540
+
+The V1,V2,V3 post of these patches is at
+      [V1]  https://lkml.org/lkml/2013/9/30/283
+      [V2]  http://www.spinics.net/lists/linux-omap/msg99540.html
+      [V3]  http://www.kernelhub.org/?msg=356470&p=2
+
+Sricharan R (4):
+  DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+  DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+  ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+  ARM: DRA: Enable Crossbar IP support for DRA7XX
+
+ Documentation/devicetree/bindings/arm/gic.txt      |    6 +
+ .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+ arch/arm/mach-omap2/Kconfig                        |    1 +
+ arch/arm/mach-omap2/omap-wakeupgen.c               |    4 +-
+ arch/arm/mach-omap2/omap4-common.c                 |    3 +
+ drivers/irqchip/Kconfig                            |    8 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-crossbar.c                     |  206 ++++++++++++++++++++
+ drivers/irqchip/irq-gic.c                          |   81 +++++++-
+ include/linux/irqchip/arm-gic.h                    |    7 +-
+ include/linux/irqchip/irq-crossbar.h               |   11 ++
+ 11 files changed, 342 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+ create mode 100644 drivers/irqchip/irq-crossbar.c
+ create mode 100644 include/linux/irqchip/irq-crossbar.h
+
+-- 
+1.7.9.5
