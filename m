@@ -1,38 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 15:08:42 -0800
-Subject: [PATCH 9/8] i2c: Fix device tree binding for i2c-cbus-gpio
-In-Reply-To: <1384396537-3486-1-git-send-email-tony@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
-Message-ID: <20131114230842.GU10317@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Nov 2013 20:15:29 -0300
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <20131114230540.GW9468@ld-irv-0074.broadcom.com>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131114230436.GV9468@ld-irv-0074.broadcom.com>
+ <20131114230540.GW9468@ld-irv-0074.broadcom.com>
+Message-ID: <20131114231528.GA9793@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like we're missing two lines needed to make it
-work properly with device tree.
+On Thu, Nov 14, 2013 at 03:05:40PM -0800, Brian Norris wrote:
+> + Daniel (missed the CC)
+> 
+> On Thu, Nov 14, 2013 at 03:04:36PM -0800, Brian Norris wrote:
+> > On Thu, Nov 14, 2013 at 06:25:25PM -0300, Ezequiel Garcia wrote:
+> > > * Changes from v4
+> > > 
+> > >   * Rebased on top of l2-mtd.git origin/next branch
+> > > 
+> > >   * Fixed is_ready flag reset, renamed by a more descriptive
+> > >     and readble "need_wait".
+> > > 
+> > 
+> > ...
+> > 
+> > I think this series is now good as-is. Pushing to l2-mtd.git/next.
+> > Thanks for the efforts! I can submit my extra diff from patch 12 as a
+> > separate patch for review.
+> > 
+> > Do you have any available regression tests? Or was there somebody else
+> > we could run this by for some Tested-by's? Daniel Mack, perhaps?
+> 
+> Brian
 
-Cc: linux-i2c at vger.kernel.org
-Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
+Yes, if Daniel (or anybody else) can push a Tested-by, that's better because
+he's a "third-party" tester.
 
-Wolfram, I found one more bug booting omaps with device tree.
+Other than that, since I could solve my PXA board issues I can now test PXA
+non-DMA and DMA. I must thank the Compulab guys for that.
 
---- a/drivers/i2c/busses/i2c-cbus-gpio.c
-+++ b/drivers/i2c/busses/i2c-cbus-gpio.c
-@@ -246,6 +246,7 @@ static int cbus_i2c_probe(struct platform_device *pdev)
- 	adapter->owner		= THIS_MODULE;
- 	adapter->class		= I2C_CLASS_HWMON;
- 	adapter->dev.parent	= &pdev->dev;
-+	adapter->dev.of_node	= pdev->dev.of_node;
- 	adapter->nr		= pdev->id;
- 	adapter->timeout	= HZ;
- 	adapter->algo		= &cbus_i2c_algo;
-@@ -289,6 +290,7 @@ static struct platform_driver cbus_i2c_driver = {
- 	.driver	= {
- 		.owner	= THIS_MODULE,
- 		.name	= "i2c-cbus-gpio",
-+		.of_match_table = of_match_ptr(i2c_cbus_dt_ids),
- 	},
- };
- module_platform_driver(cbus_i2c_driver);
+And of course, I'll test my Armada 370 and Armada XP boxes.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
