@@ -1,36 +1,29 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Thu, 14 Nov 2013 23:03:33 +0000
-Subject: [PATCH 1/4] wl1251: split wl251 platform data to a separate
- structure
-In-Reply-To: <20131114185132.GQ10317@atomide.com>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-2-git-send-email-sre@debian.org>
- <20131114185132.GQ10317@atomide.com>
-Message-ID: <20131114230330.GB6383@earth.universe>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 14 Nov 2013 15:04:36 -0800
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131114230436.GV9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 10:51:33AM -0800, Tony Lindgren wrote:
-> [...]
->
-> If this is not going into v3.13, these will cause conflicts
-> with the mach-omap2/board-*.c files for v3.14.
+On Thu, Nov 14, 2013 at 06:25:25PM -0300, Ezequiel Garcia wrote:
+> * Changes from v4
 > 
-> So it might be best to do a minimal header patch first that
-> can be merged in by both linux-omap and wireless trees.
+>   * Rebased on top of l2-mtd.git origin/next branch
+> 
+>   * Fixed is_ready flag reset, renamed by a more descriptive
+>     and readble "need_wait".
+> 
 
-I guess this patch is pretty minimal. It also seems to be acked by
-the involved Maintainers, so maybe just merge Patch 1 without the
-other patches?
+...
 
-This does not solve the problem with the struct modification from
-the second patch, but I guess it's the more intrusive patch.
+I think this series is now good as-is. Pushing to l2-mtd.git/next.
+Thanks for the efforts! I can submit my extra diff from patch 12 as a
+separate patch for review.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131114/6203cf0b/attachment.sig>
+Do you have any available regression tests? Or was there somebody else
+we could run this by for some Tested-by's? Daniel Mack, perhaps?
+
+Thanks,
+Brian
