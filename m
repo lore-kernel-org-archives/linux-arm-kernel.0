@@ -1,127 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Nov 2013 14:12:25 +0000
-Subject: [PATCH V4 2/4] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <1384431530-2166-3-git-send-email-r.sricharan@ti.com>
-References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
- <1384431530-2166-3-git-send-email-r.sricharan@ti.com>
-Message-ID: <20131114141225.GB28328@e106331-lin.cambridge.arm.com>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 14 Nov 2013 09:13:28 -0500
+Subject: [PATCH v2 07/13] ARM: move generic thumb instruction parsing
+ code to new files for use by other features
+In-Reply-To: <1384362541.3392.40.camel@linaro1.home>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-8-git-send-email-dave.long@linaro.org>
+ <1384362541.3392.40.camel@linaro1.home>
+Message-ID: <5284DA88.6060809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 12:18:48PM +0000, Sricharan R wrote:
-> Some socs have a large number of interrupts requests to service
-> the needs of its many peripherals and subsystems. All of the
-> interrupt lines from the subsystems are not needed at the same
-> time, so they have to be muxed to the irq-controller appropriately.
-> In such places a interrupt controllers are preceded by an CROSSBAR
-> that provides flexibility in muxing the device requests to the controller
-> inputs.
-> 
-> This driver takes care a allocating a free irq and then configuring the
-> crossbar IP as a part of the mpu's irqchip callbacks. crossbar_init should
-> be called right before the irqchip_init, so that it is setup to handle the
-> irqchip callbacks.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> Acked-by: Kumar Gala <galak@codeaurora.org> (for DT binding portion)
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  [V2] Addressed Thomas Gleixner <tglx@linutronix.de> comments
->       and renamed the bindings as per Kumar Gala <galak@codeaurora.org>
->       comments.
->  [V3] Changed static inline const to static inline int and removed
->       unnecessary variable initialization as per
->       Thomas Gleixner <tglx@linutronix.de>. Updated commit tags
->  [V4] Renamed crossbar_init as irqcrossbar_init as per
->       Rajendra Nayak <rnayak@ti.com> suggestion.
-> 
->  .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
->  drivers/irqchip/Kconfig                            |    8 +
->  drivers/irqchip/Makefile                           |    1 +
->  drivers/irqchip/irq-crossbar.c                     |  206 ++++++++++++++++++++
->  include/linux/irqchip/irq-crossbar.h               |   11 ++
->  5 files changed, 253 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
->  create mode 100644 drivers/irqchip/irq-crossbar.c
->  create mode 100644 include/linux/irqchip/irq-crossbar.h
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-> new file mode 100644
-> index 0000000..fb88585
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-> @@ -0,0 +1,27 @@
-> +Some socs have a large number of interrupts requests to service
-> +the needs of its many peripherals and subsystems. All of the
-> +interrupt lines from the subsystems are not needed at the same
-> +time, so they have to be muxed to the irq-controller appropriately.
-> +In such places a interrupt controllers are preceded by an CROSSBAR
-> +that provides flexibility in muxing the device requests to the controller
-> +inputs.
-> +
-> +Required properties:
-> +- compatible : Should be "ti,irq-crossbar"
-> +- reg: Base address and the size of the crossbar registers.
-> +- ti,max-irqs: Total number of irqs available at the interrupt controller.
-> +- ti,reg-size: Size of a individual register in bytes. Every individual
-> +	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
-> +- ti,irqs-reserved: List of the reserved irq lines that are not muxed using
-> +		 crossbar. These interrupt lines are reserved in the soc,
-> +		 so crossbar bar driver should not consider them as free
-> +		 lines.
+On 11/13/13 12:09, Jon Medhurst (Tixy) wrote:
+> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Move the thumb version of the kprobes instruction parsing code into more generic
+>
+> This patch is moving the 'ARM' instructions, not 'thumb' instructions,
+> so both description and title needs fixing for that.
 
-The combination of the ti,max-irqs and ti,irqs-reserved properties seems
-backwards to me. Why can we not describe the set of IRQs that _can_ be
-used?
+Indeed.  I've fixed it for the next version.
 
-> +
-> +Examples:
-> +		crossbar_mpu: @4a020000 {
-> +			compatible = "ti,irq-crossbar";
-> +			reg = <0x4a002a48 0x130>;
-> +			ti,max-irqs = <160>;
-> +			ti,reg-size = <2>;
-> +			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-> +		};
+> Actually, after looking at patch 08/13, that one seems to erroneously
+> include the thumb reorg, I'm guessing that was meant to be in this patch
+> instead, or in a standalone patch?
 
-[...]
+I've now broken the thumb reorg out into its own patch with appropriate 
+description.
 
-> +	/* Get and mark reserved irqs */
-> +	irqsr = of_get_property(node, "ti,irqs-reserved", &size);
-> +	if (irqsr) {
-> +		size /= sizeof(__be32);
-> +
-> +		for (i = 0; i < size; i++) {
-> +			entry = be32_to_cpup(irqsr + i);
-> +			if (entry > max) {
-> +				pr_err("Invalid reserved entry\n");
-> +				goto err3;
-> +			}
-> +			cb->irq_map[entry] = 0;
-> +		}
-> +	}
+>> files from where it can be used by uprobes and possibly other subsystems. The
+>> symbol names will be made more generic in a subsequent part of this patchset.
+>>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> ---
+>>   arch/arm/include/asm/probes.h    |   2 +
+>>   arch/arm/kernel/Makefile         |   4 +-
+>>   arch/arm/kernel/kprobes-arm.c    | 723 +-------------------------------------
+>>   arch/arm/kernel/kprobes-common.c | 422 +---------------------
+>>   arch/arm/kernel/kprobes-test.c   |   1 +
+>>   arch/arm/kernel/kprobes-thumb.c  |   1 +
+>>   arch/arm/kernel/kprobes.c        |   1 +
+>>   arch/arm/kernel/kprobes.h        | 372 --------------------
+>>   arch/arm/kernel/probes-arm.c     | 730 +++++++++++++++++++++++++++++++++++++++
+>>   arch/arm/kernel/probes-arm.h     |  38 ++
+>>   arch/arm/kernel/probes.c         | 441 +++++++++++++++++++++++
+>>   arch/arm/kernel/probes.h         | 395 +++++++++++++++++++++
+>>   12 files changed, 1622 insertions(+), 1508 deletions(-)
+>>   create mode 100644 arch/arm/kernel/probes-arm.c
+>>   create mode 100644 arch/arm/kernel/probes-arm.h
+>>   create mode 100644 arch/arm/kernel/probes.c
+>>   create mode 100644 arch/arm/kernel/probes.h
+>
+> A git tip: if you use the -C argument with git format-patch (and
+> send-email I assume) then it will detect files which are copies of
+> others and produce a much smaller patch, as well as a more informative
+> file summary. I believe that this is OK for submissions posted to
+> mailing lists, I know that I've seen people regularly reminded to use -M
+> (which detects file renames).
+>
+> [...]
 
-Don't deal with the raw DTB. Use of_property_read_u32_index.
+I will give this a try with the next round.
 
-> +
-> +	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
-> +	if (!cb->register_offsets)
-> +		goto err3;
-> +
-> +	of_property_read_u32(node, "ti,reg-size", &size);
+>
+>> --- a/arch/arm/kernel/kprobes-arm.c
+>> +++ b/arch/arm/kernel/kprobes-arm.c
+>> @@ -63,10 +63,8 @@
+>>   #include <linux/module.h>
+>>
+>>   #include "kprobes.h"
+>> -
+>> -#define sign_extend(x, signbit) ((x) | (0 - ((x) & (1 << (signbit)))))
+>> -
+>> -#define branch_displacement(insn) sign_extend(((insn) & 0xffffff) << 2, 25)
+>> +#include "probes.h"
+>
+> Rather than include "probes.h" after "kprobes.h" here, (and in the other
+> 7 places in this patch, and other patches) I think it would make more
+> sense to have kprobes.h include probes.h as kprobes code is always going
+> to depend on the new generic probe functions.
 
-If "ti,reg-size" isn't present, size is uninitialized. Please check the
-return value of of_property_read_u32.
+Suggested change applied for next version.
 
-Thanks,
-Mark.
+-dl
