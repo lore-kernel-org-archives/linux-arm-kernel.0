@@ -1,647 +1,678 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 14 Nov 2013 14:02:13 -0700
-Subject: [PATCH 7/8] ARM: dts: imx: imx6qdl.dtsi: use IRQ_TYPE_LEVEL_HIGH
+Date: Thu, 14 Nov 2013 14:02:09 -0700
+Subject: [PATCH 3/8] ARM: dts: imx: imx6sl/qdl-pingrp: reorganize USDHCx pad
+ groups
 In-Reply-To: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1384462934-17390-8-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1384462934-17390-4-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the interrupts node slightly more readable.
+Use helper macros to avoid repetition.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 162 +++++++++++++++++++++++------------------
- 1 file changed, 92 insertions(+), 70 deletions(-)
+ arch/arm/boot/dts/imx6q-arm2.dts           |   4 +-
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts    |   2 +-
+ arch/arm/boot/dts/imx6q-gw5400-a.dts       |   2 +-
+ arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   4 +-
+ arch/arm/boot/dts/imx6q-sabrelite.dts      |   4 +-
+ arch/arm/boot/dts/imx6q-sbc6x.dts          |   2 +-
+ arch/arm/boot/dts/imx6q-udoo.dts           |   2 +-
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi      |   2 +-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi      |   2 +-
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi      |   2 +-
+ arch/arm/boot/dts/imx6qdl-pingrp.h         | 188 +++++++++++++----------------
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi   |   6 +-
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi     |   4 +-
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi   |   6 +-
+ arch/arm/boot/dts/imx6sl-evk.dts           |  18 +--
+ arch/arm/boot/dts/imx6sl-pingrp.h          | 169 +++++++++++++-------------
+ 16 files changed, 201 insertions(+), 216 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 8a38161..23f63cb 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -75,7 +75,10 @@
- 		dma_apbh: dma-apbh at 00110000 {
- 			compatible = "fsl,imx6q-dma-apbh", "fsl,imx28-dma-apbh";
- 			reg = <0x00110000 0x2000>;
--			interrupts = <0 13 0x04>, <0 13 0x04>, <0 13 0x04>, <0 13 0x04>;
-+			interrupts = <0 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 13 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
- 			#dma-cells = <1>;
- 			dma-channels = <4>;
-@@ -88,7 +91,7 @@
- 			#size-cells = <1>;
- 			reg = <0x00112000 0x2000>, <0x00114000 0x2000>;
- 			reg-names = "gpmi-nand", "bch";
--			interrupts = <0 15 0x04>;
-+			interrupts = <0 15 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "bch";
- 			clocks = <&clks 152>, <&clks 153>, <&clks 151>,
- 				 <&clks 150>, <&clks 149>;
-@@ -109,7 +112,7 @@
- 		L2: l2-cache at 00a02000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0x00a02000 0x1000>;
--			interrupts = <0 92 0x04>;
-+			interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
- 			cache-unified;
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
-@@ -126,7 +129,7 @@
- 				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
- 				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
- 			num-lanes = <1>;
--			interrupts = <0 123 0x04>;
-+			interrupts = <0 123 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
- 			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
- 			status = "disabled";
-@@ -134,7 +137,7 @@
- 
- 		pmu {
- 			compatible = "arm,cortex-a9-pmu";
--			interrupts = <0 94 0x04>;
-+			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index ff922cc..9c00b73 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -95,7 +95,7 @@
  		};
  
- 		aips-bus at 02000000 { /* AIPS1 */
-@@ -154,7 +157,7 @@
- 				spdif: spdif at 02004000 {
- 					compatible = "fsl,imx35-spdif";
- 					reg = <0x02004000 0x4000>;
--					interrupts = <0 52 0x04>;
-+					interrupts = <0 52 IRQ_TYPE_LEVEL_HIGH>;
- 					dmas = <&sdma 14 18 0>,
- 					       <&sdma 15 18 0>;
- 					dma-names = "rx", "tx";
-@@ -176,7 +179,7 @@
- 					#size-cells = <0>;
- 					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
- 					reg = <0x02008000 0x4000>;
--					interrupts = <0 31 0x04>;
-+					interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 112>, <&clks 112>;
- 					clock-names = "ipg", "per";
- 					status = "disabled";
-@@ -187,7 +190,7 @@
- 					#size-cells = <0>;
- 					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
- 					reg = <0x0200c000 0x4000>;
--					interrupts = <0 32 0x04>;
-+					interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 113>, <&clks 113>;
- 					clock-names = "ipg", "per";
- 					status = "disabled";
-@@ -198,7 +201,7 @@
- 					#size-cells = <0>;
- 					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
- 					reg = <0x02010000 0x4000>;
--					interrupts = <0 33 0x04>;
-+					interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 114>, <&clks 114>;
- 					clock-names = "ipg", "per";
- 					status = "disabled";
-@@ -209,7 +212,7 @@
- 					#size-cells = <0>;
- 					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
- 					reg = <0x02014000 0x4000>;
--					interrupts = <0 34 0x04>;
-+					interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 115>, <&clks 115>;
- 					clock-names = "ipg", "per";
- 					status = "disabled";
-@@ -218,7 +221,7 @@
- 				uart1: serial at 02020000 {
- 					compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
- 					reg = <0x02020000 0x4000>;
--					interrupts = <0 26 0x04>;
-+					interrupts = <0 26 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 160>, <&clks 161>;
- 					clock-names = "ipg", "per";
- 					dmas = <&sdma 25 4 0>, <&sdma 26 4 0>;
-@@ -228,13 +231,13 @@
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP1>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D8>;
+ 		};
  
- 				esai: esai at 02024000 {
- 					reg = <0x02024000 0x4000>;
--					interrupts = <0 51 0x04>;
-+					interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
- 				};
+ 		pinctrl_usdhc3_cdwp: usdhc3cdwp {
+@@ -106,7 +106,7 @@
+ 		};
  
- 				ssi1: ssi at 02028000 {
- 					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
--					interrupts = <0 46 0x04>;
-+					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 178>;
- 					dmas = <&sdma 37 1 0>,
- 					       <&sdma 38 1 0>;
-@@ -247,7 +250,7 @@
- 				ssi2: ssi at 0202c000 {
- 					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
--					interrupts = <0 47 0x04>;
-+					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 179>;
- 					dmas = <&sdma 41 1 0>,
- 					       <&sdma 42 1 0>;
-@@ -260,7 +263,7 @@
- 				ssi3: ssi at 02030000 {
- 					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
--					interrupts = <0 48 0x04>;
-+					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 180>;
- 					dmas = <&sdma 45 1 0>,
- 					       <&sdma 46 1 0>;
-@@ -272,7 +275,7 @@
+ 		pinctrl_usdhc4: usdhc4grp {
+-			fsl,pins = <MX6QDL_USDHC4_PINGRP1>;
++			fsl,pins = <MX6QDL_USDHC4_PINGRP_D8>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+index 5d6bab3..84f5143 100644
+--- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
++++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+@@ -139,7 +139,7 @@
+ 		};
  
- 				asrc: asrc at 02034000 {
- 					reg = <0x02034000 0x4000>;
--					interrupts = <0 50 0x04>;
-+					interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
- 				};
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+index 63c641d..5f76342 100644
+--- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
++++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+@@ -427,7 +427,7 @@
+ 		};
  
- 				spba at 0203c000 {
-@@ -282,7 +285,8 @@
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+index 0519903..05b4796 100644
+--- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+@@ -154,11 +154,11 @@
+ 		};
  
- 			vpu: vpu at 02040000 {
- 				reg = <0x02040000 0x3c000>;
--				interrupts = <0 3 0x04 0 12 0x04>;
-+				interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>,
-+				             <0 12 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc2: usdhc2grp {
+-			fsl,pins = <MX6QDL_USDHC2_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC2_PINGRP_D4>;
+ 		};
  
- 			aipstz at 0207c000 { /* AIPSTZ1 */
-@@ -293,7 +297,7 @@
- 				#pwm-cells = <2>;
- 				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x02080000 0x4000>;
--				interrupts = <0 83 0x04>;
-+				interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 62>, <&clks 145>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -302,7 +306,7 @@
- 				#pwm-cells = <2>;
- 				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x02084000 0x4000>;
--				interrupts = <0 84 0x04>;
-+				interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 62>, <&clks 146>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -311,7 +315,7 @@
- 				#pwm-cells = <2>;
- 				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x02088000 0x4000>;
--				interrupts = <0 85 0x04>;
-+				interrupts = <0 85 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 62>, <&clks 147>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -320,7 +324,7 @@
- 				#pwm-cells = <2>;
- 				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x0208c000 0x4000>;
--				interrupts = <0 86 0x04>;
-+				interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 62>, <&clks 148>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -328,7 +332,7 @@
- 			can1: flexcan at 02090000 {
- 				compatible = "fsl,imx6q-flexcan";
- 				reg = <0x02090000 0x4000>;
--				interrupts = <0 110 0x04>;
-+				interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 108>, <&clks 109>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
-@@ -337,7 +341,7 @@
- 			can2: flexcan at 02094000 {
- 				compatible = "fsl,imx6q-flexcan";
- 				reg = <0x02094000 0x4000>;
--				interrupts = <0 111 0x04>;
-+				interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 110>, <&clks 111>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
-@@ -346,7 +350,7 @@
- 			gpt: gpt at 02098000 {
- 				compatible = "fsl,imx6q-gpt", "fsl,imx31-gpt";
- 				reg = <0x02098000 0x4000>;
--				interrupts = <0 55 0x04>;
-+				interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 119>, <&clks 120>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -354,7 +358,8 @@
- 			gpio1: gpio at 0209c000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";
- 				reg = <0x0209c000 0x4000>;
--				interrupts = <0 66 0x04 0 67 0x04>;
-+				interrupts = <0 66 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 67 IRQ_TYPE_LEVEL_HIGH>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -364,7 +369,8 @@
- 			gpio2: gpio at 020a0000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";
- 				reg = <0x020a0000 0x4000>;
--				interrupts = <0 68 0x04 0 69 0x04>;
-+				interrupts = <0 68 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 69 IRQ_TYPE_LEVEL_HIGH>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -374,7 +380,8 @@
- 			gpio3: gpio at 020a4000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";
- 				reg = <0x020a4000 0x4000>;
--				interrupts = <0 70 0x04 0 71 0x04>;
-+				interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 71 IRQ_TYPE_LEVEL_HIGH>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -384,7 +391,8 @@
- 			gpio4: gpio at 020a8000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";
- 				reg = <0x020a8000 0x4000>;
--				interrupts = <0 72 0x04 0 73 0x04>;
-+				interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 73 IRQ_TYPE_LEVEL_HIGH>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -394,7 +402,8 @@
- 			gpio5: gpio at 020ac000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";
- 				reg = <0x020ac000 0x4000>;
--				interrupts = <0 74 0x04 0 75 0x04>;
-+				interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 75 IRQ_TYPE_LEVEL_HIGH>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -404,7 +413,8 @@
- 			gpio6: gpio at 020b0000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";
- 				reg = <0x020b0000 0x4000>;
--				interrupts = <0 76 0x04 0 77 0x04>;
-+				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 77 IRQ_TYPE_LEVEL_HIGH>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -414,7 +424,8 @@
- 			gpio7: gpio at 020b4000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";
- 				reg = <0x020b4000 0x4000>;
--				interrupts = <0 78 0x04 0 79 0x04>;
-+				interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 79 IRQ_TYPE_LEVEL_HIGH>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -423,20 +434,20 @@
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
  
- 			kpp: kpp at 020b8000 {
- 				reg = <0x020b8000 0x4000>;
--				interrupts = <0 82 0x04>;
-+				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc3_cdwp: usdhc3cdwp {
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index ec9e4c1..b5f0edd 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -156,11 +156,11 @@
+ 		};
  
- 			wdog1: wdog at 020bc000 {
- 				compatible = "fsl,imx6q-wdt", "fsl,imx21-wdt";
- 				reg = <0x020bc000 0x4000>;
--				interrupts = <0 80 0x04>;
-+				interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 0>;
- 			};
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
  
- 			wdog2: wdog at 020c0000 {
- 				compatible = "fsl,imx6q-wdt", "fsl,imx21-wdt";
- 				reg = <0x020c0000 0x4000>;
--				interrupts = <0 81 0x04>;
-+				interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 0>;
- 				status = "disabled";
- 			};
-@@ -444,14 +455,17 @@
- 			clks: ccm at 020c4000 {
- 				compatible = "fsl,imx6q-ccm";
- 				reg = <0x020c4000 0x4000>;
--				interrupts = <0 87 0x04 0 88 0x04>;
-+				interrupts = <0 87 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 88 IRQ_TYPE_LEVEL_HIGH>;
- 				#clock-cells = <1>;
- 			};
+ 		pinctrl_usdhc4: usdhc4grp {
+-			fsl,pins = <MX6QDL_USDHC4_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC4_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q-sbc6x.dts b/arch/arm/boot/dts/imx6q-sbc6x.dts
+index 230977f..852675a 100644
+--- a/arch/arm/boot/dts/imx6q-sbc6x.dts
++++ b/arch/arm/boot/dts/imx6q-sbc6x.dts
+@@ -40,7 +40,7 @@
+ 		};
  
- 			anatop: anatop at 020c8000 {
- 				compatible = "fsl,imx6q-anatop", "syscon", "simple-bus";
- 				reg = <0x020c8000 0x1000>;
--				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
-+				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 54 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 127 IRQ_TYPE_LEVEL_HIGH>;
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
+index 1c7f7a1..47a5eda 100644
+--- a/arch/arm/boot/dts/imx6q-udoo.dts
++++ b/arch/arm/boot/dts/imx6q-udoo.dts
+@@ -39,7 +39,7 @@
+ 		};
  
- 				regulator-1p1 at 110 {
- 					compatible = "fsl,anatop-regulator";
-@@ -549,7 +563,7 @@
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index ffc1e66..a6c77b5 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -363,7 +363,7 @@
+ 		};
  
- 			tempmon: tempmon {
- 				compatible = "fsl,imx6q-tempmon";
--				interrupts = <0 49 0x04>;
-+				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
- 				fsl,tempmon = <&anatop>;
- 				fsl,tempmon-data = <&ocotp>;
- 			};
-@@ -557,14 +571,14 @@
- 			usbphy1: usbphy at 020c9000 {
- 				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
--				interrupts = <0 44 0x04>;
-+				interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 182>;
- 			};
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index 79c2589..35028a5 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -400,7 +400,7 @@
+ 		};
  
- 			usbphy2: usbphy at 020ca000 {
- 				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020ca000 0x1000>;
--				interrupts = <0 45 0x04>;
-+				interrupts = <0 45 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 183>;
- 			};
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index cb112d3..34b26b9 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -422,7 +422,7 @@
+ 		};
  
-@@ -577,31 +591,34 @@
- 				snvs-rtc-lp at 34 {
- 					compatible = "fsl,sec-v4.0-mon-rtc-lp";
- 					reg = <0x34 0x58>;
--					interrupts = <0 19 0x04 0 20 0x04>;
-+					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
-+						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
- 				};
- 			};
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-pingrp.h b/arch/arm/boot/dts/imx6qdl-pingrp.h
+index a326e93..98abe0c 100644
+--- a/arch/arm/boot/dts/imx6qdl-pingrp.h
++++ b/arch/arm/boot/dts/imx6qdl-pingrp.h
+@@ -387,109 +387,91 @@
+ #define MX6QDL_USBH3_PINGRP2 \
+ 	MX6QDL_PAD_RGMII_RXC__USB_H3_STROBE		0x40017030
  
- 			epit1: epit at 020d0000 { /* EPIT1 */
- 				reg = <0x020d0000 0x4000>;
--				interrupts = <0 56 0x04>;
-+				interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+-#define MX6QDL_USDHC1_PINGRP1 \
+-	MX6QDL_PAD_SD1_CMD__SD1_CMD			0x17059 \
+-	MX6QDL_PAD_SD1_CLK__SD1_CLK			0x10059 \
+-	MX6QDL_PAD_SD1_DAT0__SD1_DATA0			0x17059 \
+-	MX6QDL_PAD_SD1_DAT1__SD1_DATA1			0x17059 \
+-	MX6QDL_PAD_SD1_DAT2__SD1_DATA2			0x17059 \
+-	MX6QDL_PAD_SD1_DAT3__SD1_DATA3			0x17059 \
+-	MX6QDL_PAD_NANDF_D0__SD1_DATA4			0x17059 \
+-	MX6QDL_PAD_NANDF_D1__SD1_DATA5			0x17059 \
+-	MX6QDL_PAD_NANDF_D2__SD1_DATA6			0x17059 \
+-	MX6QDL_PAD_NANDF_D3__SD1_DATA7			0x17059
+-
+-#define MX6QDL_USDHC1_PINGRP2 \
+-	MX6QDL_PAD_SD1_CMD__SD1_CMD			0x17059 \
+-	MX6QDL_PAD_SD1_CLK__SD1_CLK			0x10059 \
+-	MX6QDL_PAD_SD1_DAT0__SD1_DATA0			0x17059 \
+-	MX6QDL_PAD_SD1_DAT1__SD1_DATA1			0x17059 \
+-	MX6QDL_PAD_SD1_DAT2__SD1_DATA2			0x17059 \
+-	MX6QDL_PAD_SD1_DAT3__SD1_DATA3			0x17059
+-
+-#define MX6QDL_USDHC2_PINGRP1 \
+-	MX6QDL_PAD_SD2_CMD__SD2_CMD			0x17059 \
+-	MX6QDL_PAD_SD2_CLK__SD2_CLK			0x10059 \
+-	MX6QDL_PAD_SD2_DAT0__SD2_DATA0			0x17059 \
+-	MX6QDL_PAD_SD2_DAT1__SD2_DATA1			0x17059 \
+-	MX6QDL_PAD_SD2_DAT2__SD2_DATA2			0x17059 \
+-	MX6QDL_PAD_SD2_DAT3__SD2_DATA3			0x17059 \
+-	MX6QDL_PAD_NANDF_D4__SD2_DATA4			0x17059 \
+-	MX6QDL_PAD_NANDF_D5__SD2_DATA5			0x17059 \
+-	MX6QDL_PAD_NANDF_D6__SD2_DATA6			0x17059 \
+-	MX6QDL_PAD_NANDF_D7__SD2_DATA7			0x17059
+-
+-#define MX6QDL_USDHC2_PINGRP2 \
+-	MX6QDL_PAD_SD2_CMD__SD2_CMD			0x17059 \
+-	MX6QDL_PAD_SD2_CLK__SD2_CLK			0x10059 \
+-	MX6QDL_PAD_SD2_DAT0__SD2_DATA0			0x17059 \
+-	MX6QDL_PAD_SD2_DAT1__SD2_DATA1			0x17059 \
+-	MX6QDL_PAD_SD2_DAT2__SD2_DATA2			0x17059 \
+-	MX6QDL_PAD_SD2_DAT3__SD2_DATA3			0x17059
+-
+-#define MX6QDL_USDHC3_PINGRP1 \
+-	MX6QDL_PAD_SD3_CMD__SD3_CMD			0x17059 \
+-	MX6QDL_PAD_SD3_CLK__SD3_CLK			0x10059 \
+-	MX6QDL_PAD_SD3_DAT0__SD3_DATA0			0x17059 \
+-	MX6QDL_PAD_SD3_DAT1__SD3_DATA1			0x17059 \
+-	MX6QDL_PAD_SD3_DAT2__SD3_DATA2			0x17059 \
+-	MX6QDL_PAD_SD3_DAT3__SD3_DATA3			0x17059 \
+-	MX6QDL_PAD_SD3_DAT4__SD3_DATA4			0x17059 \
+-	MX6QDL_PAD_SD3_DAT5__SD3_DATA5			0x17059 \
+-	MX6QDL_PAD_SD3_DAT6__SD3_DATA6			0x17059 \
+-	MX6QDL_PAD_SD3_DAT7__SD3_DATA7			0x17059
+-
+-#define MX6QDL_USDHC3_PINGRP1_100MHZ \
+-	MX6QDL_PAD_SD3_CMD__SD3_CMD			0x170b9 \
+-	MX6QDL_PAD_SD3_CLK__SD3_CLK			0x100b9 \
+-	MX6QDL_PAD_SD3_DAT0__SD3_DATA0			0x170b9 \
+-	MX6QDL_PAD_SD3_DAT1__SD3_DATA1			0x170b9 \
+-	MX6QDL_PAD_SD3_DAT2__SD3_DATA2			0x170b9 \
+-	MX6QDL_PAD_SD3_DAT3__SD3_DATA3			0x170b9 \
+-	MX6QDL_PAD_SD3_DAT4__SD3_DATA4			0x170b9 \
+-	MX6QDL_PAD_SD3_DAT5__SD3_DATA5			0x170b9 \
+-	MX6QDL_PAD_SD3_DAT6__SD3_DATA6			0x170b9 \
+-	MX6QDL_PAD_SD3_DAT7__SD3_DATA7			0x170b9
+-
+-#define MX6QDL_USDHC3_PINGRP1_200MHZ \
+-	MX6QDL_PAD_SD3_CMD__SD3_CMD			0x170f9 \
+-	MX6QDL_PAD_SD3_CLK__SD3_CLK			0x100f9 \
+-	MX6QDL_PAD_SD3_DAT0__SD3_DATA0			0x170f9 \
+-	MX6QDL_PAD_SD3_DAT1__SD3_DATA1			0x170f9 \
+-	MX6QDL_PAD_SD3_DAT2__SD3_DATA2			0x170f9 \
+-	MX6QDL_PAD_SD3_DAT3__SD3_DATA3			0x170f9 \
+-	MX6QDL_PAD_SD3_DAT4__SD3_DATA4			0x170f9 \
+-	MX6QDL_PAD_SD3_DAT5__SD3_DATA5			0x170f9 \
+-	MX6QDL_PAD_SD3_DAT6__SD3_DATA6			0x170f9 \
+-	MX6QDL_PAD_SD3_DAT7__SD3_DATA7			0x170f9
+-
+-#define MX6QDL_USDHC3_PINGRP2 \
+-	MX6QDL_PAD_SD3_CMD__SD3_CMD			0x17059 \
+-	MX6QDL_PAD_SD3_CLK__SD3_CLK			0x10059 \
+-	MX6QDL_PAD_SD3_DAT0__SD3_DATA0			0x17059 \
+-	MX6QDL_PAD_SD3_DAT1__SD3_DATA1			0x17059 \
+-	MX6QDL_PAD_SD3_DAT2__SD3_DATA2			0x17059 \
+-	MX6QDL_PAD_SD3_DAT3__SD3_DATA3			0x17059
+-
+-#define MX6QDL_USDHC4_PINGRP1 \
+-	MX6QDL_PAD_SD4_CMD__SD4_CMD			0x17059 \
+-	MX6QDL_PAD_SD4_CLK__SD4_CLK			0x10059 \
+-	MX6QDL_PAD_SD4_DAT0__SD4_DATA0			0x17059 \
+-	MX6QDL_PAD_SD4_DAT1__SD4_DATA1			0x17059 \
+-	MX6QDL_PAD_SD4_DAT2__SD4_DATA2			0x17059 \
+-	MX6QDL_PAD_SD4_DAT3__SD4_DATA3			0x17059 \
+-	MX6QDL_PAD_SD4_DAT4__SD4_DATA4			0x17059 \
+-	MX6QDL_PAD_SD4_DAT5__SD4_DATA5			0x17059 \
+-	MX6QDL_PAD_SD4_DAT6__SD4_DATA6			0x17059 \
+-	MX6QDL_PAD_SD4_DAT7__SD4_DATA7			0x17059
+-
+-#define MX6QDL_USDHC4_PINGRP2 \
+-	MX6QDL_PAD_SD4_CMD__SD4_CMD			0x17059 \
+-	MX6QDL_PAD_SD4_CLK__SD4_CLK			0x10059 \
+-	MX6QDL_PAD_SD4_DAT0__SD4_DATA0			0x17059 \
+-	MX6QDL_PAD_SD4_DAT1__SD4_DATA1			0x17059 \
+-	MX6QDL_PAD_SD4_DAT2__SD4_DATA2			0x17059 \
+-	MX6QDL_PAD_SD4_DAT3__SD4_DATA3			0x17059
++#define MX6QDL_USDHC1_D4(pad, pad_clk) \
++	MX6QDL_PAD_SD1_CMD__SD1_CMD			pad \
++	MX6QDL_PAD_SD1_CLK__SD1_CLK			pad_clk \
++	MX6QDL_PAD_SD1_DAT0__SD1_DATA0			pad \
++	MX6QDL_PAD_SD1_DAT1__SD1_DATA1			pad \
++	MX6QDL_PAD_SD1_DAT2__SD1_DATA2			pad \
++	MX6QDL_PAD_SD1_DAT3__SD1_DATA3			pad
++
++#define MX6QDL_USDHC1_D8(pad, pad_clk)	MX6QDL_USDHC1_D4(pad, pad_clk) \
++	MX6QDL_PAD_NANDF_D0__SD1_DATA4			pad \
++	MX6QDL_PAD_NANDF_D1__SD1_DATA5			pad \
++	MX6QDL_PAD_NANDF_D2__SD1_DATA6			pad \
++	MX6QDL_PAD_NANDF_D3__SD1_DATA7			pad
++
++
++#define MX6QDL_USDHC2_D4(pad, pad_clk) \
++	MX6QDL_PAD_SD2_CMD__SD2_CMD			pad \
++	MX6QDL_PAD_SD2_CLK__SD2_CLK			pad_clk \
++	MX6QDL_PAD_SD2_DAT0__SD2_DATA0			pad \
++	MX6QDL_PAD_SD2_DAT1__SD2_DATA1			pad \
++	MX6QDL_PAD_SD2_DAT2__SD2_DATA2			pad \
++	MX6QDL_PAD_SD2_DAT3__SD2_DATA3			pad
++
++#define MX6QDL_USDHC2_D8(pad, pad_clk)	MX6QDL_USDHC2_D4(pad, pad_clk) \
++	MX6QDL_PAD_NANDF_D4__SD2_DATA4			pad \
++	MX6QDL_PAD_NANDF_D5__SD2_DATA5			pad \
++	MX6QDL_PAD_NANDF_D6__SD2_DATA6			pad \
++	MX6QDL_PAD_NANDF_D7__SD2_DATA7			pad
++
++
++#define MX6QDL_USDHC3_D4(pad, pad_clk) \
++	MX6QDL_PAD_SD3_CMD__SD3_CMD			pad \
++	MX6QDL_PAD_SD3_CLK__SD3_CLK			pad_clk \
++	MX6QDL_PAD_SD3_DAT0__SD3_DATA0			pad \
++	MX6QDL_PAD_SD3_DAT1__SD3_DATA1			pad \
++	MX6QDL_PAD_SD3_DAT2__SD3_DATA2			pad \
++	MX6QDL_PAD_SD3_DAT3__SD3_DATA3			pad
++
++#define MX6QDL_USDHC3_D8(pad, pad_clk)	MX6QDL_USDHC3_D4(pad, pad_clk) \
++	MX6QDL_PAD_SD3_DAT4__SD3_DATA4			pad \
++	MX6QDL_PAD_SD3_DAT5__SD3_DATA5			pad \
++	MX6QDL_PAD_SD3_DAT6__SD3_DATA6			pad \
++	MX6QDL_PAD_SD3_DAT7__SD3_DATA7			pad
++
++#define MX6QDL_USDHC4_D4(pad, pad_clk) \
++	MX6QDL_PAD_SD4_CMD__SD4_CMD			pad \
++	MX6QDL_PAD_SD4_CLK__SD4_CLK			pad_clk \
++	MX6QDL_PAD_SD4_DAT0__SD4_DATA0			pad \
++	MX6QDL_PAD_SD4_DAT1__SD4_DATA1			pad \
++	MX6QDL_PAD_SD4_DAT2__SD4_DATA2			pad \
++	MX6QDL_PAD_SD4_DAT3__SD4_DATA3			pad
++
++#define MX6QDL_USDHC4_D8(pad, pad_clk)	MX6QDL_USDHC4_D4(pad, pad_clk) \
++	MX6QDL_PAD_SD4_DAT4__SD4_DATA4			pad \
++	MX6QDL_PAD_SD4_DAT5__SD4_DATA5			pad \
++	MX6QDL_PAD_SD4_DAT6__SD4_DATA6			pad \
++	MX6QDL_PAD_SD4_DAT7__SD4_DATA7			pad
++
++#define MX6QDL_USDHC1_PINGRP_D4		MX6QDL_USDHC1_D4(0x17059, 0x10059)
++#define MX6QDL_USDHC1_PINGRP_D4_100MHZ	MX6QDL_USDHC1_D4(0x170b9, 0x100b9)
++#define MX6QDL_USDHC1_PINGRP_D4_200MHZ	MX6QDL_USDHC1_D4(0x170f9, 0x100f9)
++#define MX6QDL_USDHC1_PINGRP_D8		MX6QDL_USDHC1_D8(0x17059, 0x10059)
++#define MX6QDL_USDHC1_PINGRP_D8_100MHZ	MX6QDL_USDHC1_D8(0x170b9, 0x100b9)
++#define MX6QDL_USDHC1_PINGRP_D8_200MHZ	MX6QDL_USDHC1_D8(0x170f9, 0x100f9)
++
++#define MX6QDL_USDHC2_PINGRP_D4		MX6QDL_USDHC2_D4(0x17059, 0x10059)
++#define MX6QDL_USDHC2_PINGRP_D4_100MHZ	MX6QDL_USDHC2_D4(0x170b9, 0x100b9)
++#define MX6QDL_USDHC2_PINGRP_D4_200MHZ	MX6QDL_USDHC2_D4(0x170f9, 0x100f9)
++#define MX6QDL_USDHC2_PINGRP_D8		MX6QDL_USDHC2_D8(0x17059, 0x10059)
++#define MX6QDL_USDHC2_PINGRP_D8_100MHZ	MX6QDL_USDHC2_D8(0x170b9, 0x100b9)
++#define MX6QDL_USDHC2_PINGRP_D8_200MHZ	MX6QDL_USDHC2_D8(0x170f9, 0x100f9)
++
++#define MX6QDL_USDHC3_PINGRP_D4		MX6QDL_USDHC3_D4(0x17059, 0x10059)
++#define MX6QDL_USDHC3_PINGRP_D4_100MHZ	MX6QDL_USDHC3_D4(0x170b9, 0x100b9)
++#define MX6QDL_USDHC3_PINGRP_D4_200MHZ	MX6QDL_USDHC3_D4(0x170f9, 0x100f9)
++#define MX6QDL_USDHC3_PINGRP_D8		MX6QDL_USDHC3_D8(0x17059, 0x10059)
++#define MX6QDL_USDHC3_PINGRP_D8_100MHZ	MX6QDL_USDHC3_D8(0x170b9, 0x100b9)
++#define MX6QDL_USDHC3_PINGRP_D8_200MHZ	MX6QDL_USDHC3_D8(0x170f9, 0x100f9)
++
++#define MX6QDL_USDHC4_PINGRP_D4		MX6QDL_USDHC4_D4(0x17059, 0x10059)
++#define MX6QDL_USDHC4_PINGRP_D4_100MHZ	MX6QDL_USDHC4_D4(0x170b9, 0x100b9)
++#define MX6QDL_USDHC4_PINGRP_D4_200MHZ	MX6QDL_USDHC4_D4(0x170f9, 0x100f9)
++#define MX6QDL_USDHC4_PINGRP_D8		MX6QDL_USDHC4_D8(0x17059, 0x10059)
++#define MX6QDL_USDHC4_PINGRP_D8_100MHZ	MX6QDL_USDHC4_D8(0x170b9, 0x100b9)
++#define MX6QDL_USDHC4_PINGRP_D8_200MHZ	MX6QDL_USDHC4_D8(0x170f9, 0x100f9)
  
- 			epit2: epit at 020d4000 { /* EPIT2 */
- 				reg = <0x020d4000 0x4000>;
--				interrupts = <0 57 0x04>;
-+				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ #define MX6QDL_WEIM_CS0_PINGRP1 \
+ 	MX6QDL_PAD_EIM_CS0__EIM_CS0_B			0xb0b1
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 719c3a7..a526796 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -81,15 +81,15 @@
+ 		};
  
- 			src: src at 020d8000 {
- 				compatible = "fsl,imx6q-src", "fsl,imx51-src";
- 				reg = <0x020d8000 0x4000>;
--				interrupts = <0 91 0x04 0 96 0x04>;
-+				interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 96 IRQ_TYPE_LEVEL_HIGH>;
- 				#reset-cells = <1>;
- 			};
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP1>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D8>;
+ 		};
  
- 			gpc: gpc at 020dc000 {
- 				compatible = "fsl,imx6q-gpc";
- 				reg = <0x020dc000 0x4000>;
--				interrupts = <0 89 0x04 0 90 0x04>;
-+				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc3_100mhz: usdhc3grp100mhz {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP1_100MHZ>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D8_100MHZ>;
+ 		};
  
- 			gpr: iomuxc-gpr at 020e0000 {
-@@ -634,18 +651,18 @@
+ 		pinctrl_usdhc3_200mhz: usdhc3grp200mhz {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP1_200MHZ>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D8_200MHZ>;
+ 		};
  
- 			dcic1: dcic at 020e4000 {
- 				reg = <0x020e4000 0x4000>;
--				interrupts = <0 124 0x04>;
-+				interrupts = <0 124 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_weim_cs0: weimcs0grp {
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 4239ef9..570767f 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -223,11 +223,11 @@
+ 		};
  
- 			dcic2: dcic at 020e8000 {
- 				reg = <0x020e8000 0x4000>;
--				interrupts = <0 125 0x04>;
-+				interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc2: usdhc2grp {
+-			fsl,pins = <MX6QDL_USDHC2_PINGRP1>;
++			fsl,pins = <MX6QDL_USDHC2_PINGRP_D8>;
+ 		};
  
- 			sdma: sdma at 020ec000 {
- 				compatible = "fsl,imx6q-sdma", "fsl,imx35-sdma";
- 				reg = <0x020ec000 0x4000>;
--				interrupts = <0 2 0x04>;
-+				interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 155>, <&clks 155>;
- 				clock-names = "ipg", "ahb";
- 				#dma-cells = <3>;
-@@ -662,7 +679,8 @@
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP1>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D8>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 10ed94a..88894b1 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -125,15 +125,15 @@
+ 		};
  
- 			caam at 02100000 {
- 				reg = <0x02100000 0x40000>;
--				interrupts = <0 105 0x04 0 106 0x04>;
-+				interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 106 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc1: usdhc1grp {
+-			fsl,pins = <MX6QDL_USDHC1_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC1_PINGRP_D4>;
+ 		};
  
- 			aipstz at 0217c000 { /* AIPSTZ2 */
-@@ -672,7 +690,7 @@
- 			usbotg: usb at 02184000 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
- 				reg = <0x02184000 0x200>;
--				interrupts = <0 43 0x04>;
-+				interrupts = <0 43 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 162>;
- 				fsl,usbphy = <&usbphy1>;
- 				fsl,usbmisc = <&usbmisc 0>;
-@@ -682,7 +700,7 @@
- 			usbh1: usb at 02184200 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
- 				reg = <0x02184200 0x200>;
--				interrupts = <0 40 0x04>;
-+				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 162>;
- 				fsl,usbphy = <&usbphy2>;
- 				fsl,usbmisc = <&usbmisc 1>;
-@@ -692,7 +710,7 @@
- 			usbh2: usb at 02184400 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
- 				reg = <0x02184400 0x200>;
--				interrupts = <0 41 0x04>;
-+				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 162>;
- 				fsl,usbmisc = <&usbmisc 2>;
- 				status = "disabled";
-@@ -701,7 +719,7 @@
- 			usbh3: usb at 02184600 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
- 				reg = <0x02184600 0x200>;
--				interrupts = <0 42 0x04>;
-+				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 162>;
- 				fsl,usbmisc = <&usbmisc 3>;
- 				status = "disabled";
-@@ -717,7 +735,8 @@
- 			fec: ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
--				interrupts = <0 118 0x04 0 119 0x04>;
-+				interrupts = <0 118 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 119 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 117>, <&clks 117>, <&clks 190>;
- 				clock-names = "ipg", "ahb", "ptp";
- 				status = "disabled";
-@@ -725,13 +744,15 @@
+ 		pinctrl_usdhc2: usdhc2grp {
+-			fsl,pins = <MX6QDL_USDHC2_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC2_PINGRP_D4>;
+ 		};
  
- 			mlb at 0218c000 {
- 				reg = <0x0218c000 0x4000>;
--				interrupts = <0 53 0x04 0 117 0x04 0 126 0x04>;
-+				interrupts = <0 53 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 117 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 126 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6QDL_USDHC3_PINGRP2>;
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index e565989..f5e4513 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -102,39 +102,39 @@
+ 		};
  
- 			usdhc1: usdhc at 02190000 {
- 				compatible = "fsl,imx6q-usdhc";
- 				reg = <0x02190000 0x4000>;
--				interrupts = <0 22 0x04>;
-+				interrupts = <0 22 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 163>, <&clks 163>, <&clks 163>;
- 				clock-names = "ipg", "ahb", "per";
- 				bus-width = <4>;
-@@ -741,7 +762,7 @@
- 			usdhc2: usdhc at 02194000 {
- 				compatible = "fsl,imx6q-usdhc";
- 				reg = <0x02194000 0x4000>;
--				interrupts = <0 23 0x04>;
-+				interrupts = <0 23 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 164>, <&clks 164>, <&clks 164>;
- 				clock-names = "ipg", "ahb", "per";
- 				bus-width = <4>;
-@@ -751,7 +772,7 @@
- 			usdhc3: usdhc at 02198000 {
- 				compatible = "fsl,imx6q-usdhc";
- 				reg = <0x02198000 0x4000>;
--				interrupts = <0 24 0x04>;
-+				interrupts = <0 24 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 165>, <&clks 165>, <&clks 165>;
- 				clock-names = "ipg", "ahb", "per";
- 				bus-width = <4>;
-@@ -761,7 +782,7 @@
- 			usdhc4: usdhc at 0219c000 {
- 				compatible = "fsl,imx6q-usdhc";
- 				reg = <0x0219c000 0x4000>;
--				interrupts = <0 25 0x04>;
-+				interrupts = <0 25 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 166>, <&clks 166>, <&clks 166>;
- 				clock-names = "ipg", "ahb", "per";
- 				bus-width = <4>;
-@@ -773,7 +794,7 @@
- 				#size-cells = <0>;
- 				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
- 				reg = <0x021a0000 0x4000>;
--				interrupts = <0 36 0x04>;
-+				interrupts = <0 36 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 125>;
- 				status = "disabled";
- 			};
-@@ -783,7 +804,7 @@
- 				#size-cells = <0>;
- 				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
- 				reg = <0x021a4000 0x4000>;
--				interrupts = <0 37 0x04>;
-+				interrupts = <0 37 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 126>;
- 				status = "disabled";
- 			};
-@@ -793,7 +814,7 @@
- 				#size-cells = <0>;
- 				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
- 				reg = <0x021a8000 0x4000>;
--				interrupts = <0 38 0x04>;
-+				interrupts = <0 38 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 127>;
- 				status = "disabled";
- 			};
-@@ -814,7 +835,7 @@
- 			weim: weim at 021b8000 {
- 				compatible = "fsl,imx6q-weim";
- 				reg = <0x021b8000 0x4000>;
--				interrupts = <0 14 0x04>;
-+				interrupts = <0 14 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 196>;
- 			};
+ 		pinctrl_usdhc1: usdhc1grp {
+-			fsl,pins = <MX6SL_USDHC1_PINGRP1>;
++			fsl,pins = <MX6SL_USDHC1_PINGRP_D8>;
+ 		};
  
-@@ -825,12 +846,12 @@
+ 		pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
+-			fsl,pins = <MX6SL_USDHC1_PINGRP1_100MHZ>;
++			fsl,pins = <MX6SL_USDHC1_PINGRP_D8_100MHZ>;
+ 		};
  
- 			tzasc at 021d0000 { /* TZASC1 */
- 				reg = <0x021d0000 0x4000>;
--				interrupts = <0 108 0x04>;
-+				interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
+-			fsl,pins = <MX6SL_USDHC1_PINGRP1_200MHZ>;
++			fsl,pins = <MX6SL_USDHC1_PINGRP_D8_200MHZ>;
+ 		};
  
- 			tzasc at 021d4000 { /* TZASC2 */
- 				reg = <0x021d4000 0x4000>;
--				interrupts = <0 109 0x04>;
-+				interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc2: usdhc2grp {
+-			fsl,pins = <MX6SL_USDHC2_PINGRP1>;
++			fsl,pins = <MX6SL_USDHC2_PINGRP_D4>;
+ 		};
  
- 			audmux: audmux at 021d8000 {
-@@ -849,13 +870,13 @@
+ 		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
+-			fsl,pins = <MX6SL_USDHC2_PINGRP1_100MHZ>;
++			fsl,pins = <MX6SL_USDHC2_PINGRP_D4_100MHZ>;
+ 		};
  
- 			vdoa at 021e4000 {
- 				reg = <0x021e4000 0x4000>;
--				interrupts = <0 18 0x04>;
-+				interrupts = <0 18 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+ 		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
+-			fsl,pins = <MX6SL_USDHC2_PINGRP1_200MHZ>;
++			fsl,pins = <MX6SL_USDHC2_PINGRP_D4_200MHZ>;
+ 		};
  
- 			uart2: serial at 021e8000 {
- 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021e8000 0x4000>;
--				interrupts = <0 27 0x04>;
-+				interrupts = <0 27 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
- 				dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
-@@ -866,7 +887,7 @@
- 			uart3: serial at 021ec000 {
- 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021ec000 0x4000>;
--				interrupts = <0 28 0x04>;
-+				interrupts = <0 28 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
- 				dmas = <&sdma 29 4 0>, <&sdma 30 4 0>;
-@@ -877,7 +898,7 @@
- 			uart4: serial at 021f0000 {
- 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021f0000 0x4000>;
--				interrupts = <0 29 0x04>;
-+				interrupts = <0 29 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
- 				dmas = <&sdma 31 4 0>, <&sdma 32 4 0>;
-@@ -888,7 +909,7 @@
- 			uart5: serial at 021f4000 {
- 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021f4000 0x4000>;
--				interrupts = <0 30 0x04>;
-+				interrupts = <0 30 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
- 				dmas = <&sdma 33 4 0>, <&sdma 34 4 0>;
-@@ -901,7 +922,8 @@
- 			#crtc-cells = <1>;
- 			compatible = "fsl,imx6q-ipu";
- 			reg = <0x02400000 0x400000>;
--			interrupts = <0 6 0x4 0 5 0x4>;
-+			interrupts = <0 6 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 5 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clks 130>, <&clks 131>, <&clks 132>;
- 			clock-names = "bus", "di0", "di1";
- 			resets = <&src 2>;
+ 		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <MX6SL_USDHC3_PINGRP1>;
++			fsl,pins = <MX6SL_USDHC3_PINGRP_D4>;
+ 		};
+ 
+ 		pinctrl_usdhc3_100mhz: usdhc3grp100mhz {
+-			fsl,pins = <MX6SL_USDHC3_PINGRP1_100MHZ>;
++			fsl,pins = <MX6SL_USDHC3_PINGRP_D4_100MHZ>;
+ 		};
+ 
+ 		pinctrl_usdhc3_200mhz: usdhc3grp200mhz {
+-			fsl,pins = <MX6SL_USDHC3_PINGRP1_200MHZ>;
++			fsl,pins = <MX6SL_USDHC3_PINGRP_D4_200MHZ>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6sl-pingrp.h b/arch/arm/boot/dts/imx6sl-pingrp.h
+index 984077b..f35af4a 100644
+--- a/arch/arm/boot/dts/imx6sl-pingrp.h
++++ b/arch/arm/boot/dts/imx6sl-pingrp.h
+@@ -57,88 +57,91 @@
+ #define MX6SL_USBOTG2_PINGRP4 \
+ 	MX6SL_PAD_SD3_DAT2__USB_OTG2_OC			0x17059
+ 
+-#define MX6SL_USDHC1_PINGRP1 \
+-	MX6SL_PAD_SD1_CMD__SD1_CMD			0x17059 \
+-	MX6SL_PAD_SD1_CLK__SD1_CLK			0x10059 \
+-	MX6SL_PAD_SD1_DAT0__SD1_DATA0			0x17059 \
+-	MX6SL_PAD_SD1_DAT1__SD1_DATA1			0x17059 \
+-	MX6SL_PAD_SD1_DAT2__SD1_DATA2			0x17059 \
+-	MX6SL_PAD_SD1_DAT3__SD1_DATA3			0x17059 \
+-	MX6SL_PAD_SD1_DAT4__SD1_DATA4			0x17059 \
+-	MX6SL_PAD_SD1_DAT5__SD1_DATA5			0x17059 \
+-	MX6SL_PAD_SD1_DAT6__SD1_DATA6			0x17059 \
+-	MX6SL_PAD_SD1_DAT7__SD1_DATA7			0x17059
+-
+-#define MX6SL_USDHC1_PINGRP1_100MHZ \
+-	MX6SL_PAD_SD1_CMD__SD1_CMD			0x170b9 \
+-	MX6SL_PAD_SD1_CLK__SD1_CLK			0x100b9 \
+-	MX6SL_PAD_SD1_DAT0__SD1_DATA0			0x170b9 \
+-	MX6SL_PAD_SD1_DAT1__SD1_DATA1			0x170b9 \
+-	MX6SL_PAD_SD1_DAT2__SD1_DATA2			0x170b9 \
+-	MX6SL_PAD_SD1_DAT3__SD1_DATA3			0x170b9 \
+-	MX6SL_PAD_SD1_DAT4__SD1_DATA4			0x170b9 \
+-	MX6SL_PAD_SD1_DAT5__SD1_DATA5			0x170b9 \
+-	MX6SL_PAD_SD1_DAT6__SD1_DATA6			0x170b9 \
+-	MX6SL_PAD_SD1_DAT7__SD1_DATA7			0x170b9
+-
+-#define MX6SL_USDHC1_PINGRP1_200MHZ \
+-	MX6SL_PAD_SD1_CMD__SD1_CMD			0x170f9 \
+-	MX6SL_PAD_SD1_CLK__SD1_CLK			0x100f9 \
+-	MX6SL_PAD_SD1_DAT0__SD1_DATA0			0x170f9 \
+-	MX6SL_PAD_SD1_DAT1__SD1_DATA1			0x170f9 \
+-	MX6SL_PAD_SD1_DAT2__SD1_DATA2			0x170f9 \
+-	MX6SL_PAD_SD1_DAT3__SD1_DATA3			0x170f9 \
+-	MX6SL_PAD_SD1_DAT4__SD1_DATA4			0x170f9 \
+-	MX6SL_PAD_SD1_DAT5__SD1_DATA5			0x170f9 \
+-	MX6SL_PAD_SD1_DAT6__SD1_DATA6			0x170f9 \
+-	MX6SL_PAD_SD1_DAT7__SD1_DATA7			0x170f9
+-
+-#define MX6SL_USDHC2_PINGRP1 \
+-	MX6SL_PAD_SD2_CMD__SD2_CMD			0x17059 \
+-	MX6SL_PAD_SD2_CLK__SD2_CLK			0x10059 \
+-	MX6SL_PAD_SD2_DAT0__SD2_DATA0			0x17059 \
+-	MX6SL_PAD_SD2_DAT1__SD2_DATA1			0x17059 \
+-	MX6SL_PAD_SD2_DAT2__SD2_DATA2			0x17059 \
+-	MX6SL_PAD_SD2_DAT3__SD2_DATA3			0x17059
+-
+-#define MX6SL_USDHC2_PINGRP1_100MHZ \
+-	MX6SL_PAD_SD2_CMD__SD2_CMD			0x170b9 \
+-	MX6SL_PAD_SD2_CLK__SD2_CLK			0x100b9 \
+-	MX6SL_PAD_SD2_DAT0__SD2_DATA0			0x170b9 \
+-	MX6SL_PAD_SD2_DAT1__SD2_DATA1			0x170b9 \
+-	MX6SL_PAD_SD2_DAT2__SD2_DATA2			0x170b9 \
+-	MX6SL_PAD_SD2_DAT3__SD2_DATA3			0x170b9
+-
+-#define MX6SL_USDHC2_PINGRP1_200MHZ \
+-	MX6SL_PAD_SD2_CMD__SD2_CMD			0x170f9 \
+-	MX6SL_PAD_SD2_CLK__SD2_CLK			0x100f9 \
+-	MX6SL_PAD_SD2_DAT0__SD2_DATA0			0x170f9 \
+-	MX6SL_PAD_SD2_DAT1__SD2_DATA1			0x170f9 \
+-	MX6SL_PAD_SD2_DAT2__SD2_DATA2			0x170f9 \
+-	MX6SL_PAD_SD2_DAT3__SD2_DATA3			0x170f9
+-
+-#define MX6SL_USDHC3_PINGRP1 \
+-	MX6SL_PAD_SD3_CMD__SD3_CMD			0x17059 \
+-	MX6SL_PAD_SD3_CLK__SD3_CLK			0x10059 \
+-	MX6SL_PAD_SD3_DAT0__SD3_DATA0			0x17059 \
+-	MX6SL_PAD_SD3_DAT1__SD3_DATA1			0x17059 \
+-	MX6SL_PAD_SD3_DAT2__SD3_DATA2			0x17059 \
+-	MX6SL_PAD_SD3_DAT3__SD3_DATA3			0x17059
+-
+-#define MX6SL_USDHC3_PINGRP1_100MHZ \
+-	MX6SL_PAD_SD3_CMD__SD3_CMD			0x170b9 \
+-	MX6SL_PAD_SD3_CLK__SD3_CLK			0x100b9 \
+-	MX6SL_PAD_SD3_DAT0__SD3_DATA0			0x170b9 \
+-	MX6SL_PAD_SD3_DAT1__SD3_DATA1			0x170b9 \
+-	MX6SL_PAD_SD3_DAT2__SD3_DATA2			0x170b9 \
+-	MX6SL_PAD_SD3_DAT3__SD3_DATA3			0x170b9
+-
+-#define MX6SL_USDHC3_PINGRP1_200MHZ \
+-	MX6SL_PAD_SD3_CMD__SD3_CMD			0x170f9 \
+-	MX6SL_PAD_SD3_CLK__SD3_CLK			0x100f9 \
+-	MX6SL_PAD_SD3_DAT0__SD3_DATA0			0x170f9 \
+-	MX6SL_PAD_SD3_DAT1__SD3_DATA1			0x170f9 \
+-	MX6SL_PAD_SD3_DAT2__SD3_DATA2			0x170f9 \
+-	MX6SL_PAD_SD3_DAT3__SD3_DATA3			0x170f9
++
++#define MX6SL_USDHC1_D4(pad, pad_clk) \
++	MX6SL_PAD_SD1_CMD__SD1_CMD			pad \
++	MX6SL_PAD_SD1_CLK__SD1_CLK			pad_clk \
++	MX6SL_PAD_SD1_DAT0__SD1_DATA0			pad \
++	MX6SL_PAD_SD1_DAT1__SD1_DATA1			pad \
++	MX6SL_PAD_SD1_DAT2__SD1_DATA2			pad \
++	MX6SL_PAD_SD1_DAT3__SD1_DATA3			pad
++
++#define MX6SL_USDHC1_D8(pad, pad_clk)	MX6SL_USDHC1_D4(pad, pad_clk) \
++	MX6SL_PAD_SD1_DAT4__SD1_DATA4			pad \
++	MX6SL_PAD_SD1_DAT5__SD1_DATA5			pad \
++	MX6SL_PAD_SD1_DAT6__SD1_DATA6			pad \
++	MX6SL_PAD_SD1_DAT7__SD1_DATA7			pad
++
++
++#define MX6SL_USDHC2_D4(pad, pad_clk) \
++	MX6SL_PAD_SD2_CMD__SD2_CMD			pad \
++	MX6SL_PAD_SD2_CLK__SD2_CLK			pad_clk \
++	MX6SL_PAD_SD2_DAT0__SD2_DATA0			pad \
++	MX6SL_PAD_SD2_DAT1__SD2_DATA1			pad \
++	MX6SL_PAD_SD2_DAT2__SD2_DATA2			pad \
++	MX6SL_PAD_SD2_DAT3__SD2_DATA3			pad
++
++#define MX6SL_USDHC2_D8(pad, pad_clk)	MX6SL_USDHC2_D4(pad, pad_clk) \
++	MX6SL_PAD_SD2_DAT4__SD2_DATA4			pad \
++	MX6SL_PAD_SD2_DAT5__SD2_DATA5			pad \
++	MX6SL_PAD_SD2_DAT6__SD2_DATA6			pad \
++	MX6SL_PAD_SD2_DAT7__SD2_DATA7			pad
++
++
++#define MX6SL_USDHC3_D4(pad, pad_clk) \
++	MX6SL_PAD_SD3_CMD__SD3_CMD			pad \
++	MX6SL_PAD_SD3_CLK__SD3_CLK			pad_clk \
++	MX6SL_PAD_SD3_DAT0__SD3_DATA0			pad \
++	MX6SL_PAD_SD3_DAT1__SD3_DATA1			pad \
++	MX6SL_PAD_SD3_DAT2__SD3_DATA2			pad \
++	MX6SL_PAD_SD3_DAT3__SD3_DATA3			pad
++
++#define MX6SL_USDHC3_D8(pad, pad_clk)	MX6SL_USDHC3_D4(pad, pad_clk) \
++	MX6SL_PAD_SD2_DAT4__SD3_DATA4			pad \
++	MX6SL_PAD_SD2_DAT5__SD3_DATA5			pad \
++	MX6SL_PAD_SD2_DAT6__SD3_DATA6			pad \
++	MX6SL_PAD_SD2_DAT7__SD3_DATA7			pad
++
++#define MX6SL_USDHC4_D4(pad, pad_clk) \
++	MX6SL_PAD_EPDC_BDR1__SD4_CMD			pad \
++	MX6SL_PAD_EPDC_BDR0__SD4_CLK			pad_clk \
++	MX6SL_PAD_EPDC_PWRCOM__SD4_DATA0		pad \
++	MX6SL_PAD_EPDC_PWRINT__SD4_DATA1		pad \
++	MX6SL_PAD_EPDC_PWRSTAT__SD4_DATA2		pad \
++	MX6SL_PAD_EPDC_PWRWAKEUP__SD4_DATA3		pad
++
++#define MX6SL_USDHC4_D8(pad, pad_clk)	MX6SL_USDHC4_D4(pad, pad_clk) \
++	MX6SL_PAD_KEY_COL7__SD4_DATA4			pad \
++	MX6SL_PAD_KEY_ROW7__SD4_DATA5			pad \
++	MX6SL_PAD_KEY_COL3__SD4_DATA6			pad \
++	MX6SL_PAD_KEY_ROW3__SD4_DATA7			pad
++
++#define MX6SL_USDHC1_PINGRP_D4		MX6SL_USDHC1_D4(0x17059, 0x10059)
++#define MX6SL_USDHC1_PINGRP_D4_100MHZ	MX6SL_USDHC1_D4(0x170b9, 0x100b9)
++#define MX6SL_USDHC1_PINGRP_D4_200MHZ	MX6SL_USDHC1_D4(0x170f9, 0x100f9)
++#define MX6SL_USDHC1_PINGRP_D8		MX6SL_USDHC1_D8(0x17059, 0x10059)
++#define MX6SL_USDHC1_PINGRP_D8_100MHZ	MX6SL_USDHC1_D8(0x170b9, 0x100b9)
++#define MX6SL_USDHC1_PINGRP_D8_200MHZ	MX6SL_USDHC1_D8(0x170f9, 0x100f9)
++
++#define MX6SL_USDHC2_PINGRP_D4		MX6SL_USDHC2_D4(0x17059, 0x10059)
++#define MX6SL_USDHC2_PINGRP_D4_100MHZ	MX6SL_USDHC2_D4(0x170b9, 0x100b9)
++#define MX6SL_USDHC2_PINGRP_D4_200MHZ	MX6SL_USDHC2_D4(0x170f9, 0x100f9)
++#define MX6SL_USDHC2_PINGRP_D8		MX6SL_USDHC2_D8(0x17059, 0x10059)
++#define MX6SL_USDHC2_PINGRP_D8_100MHZ	MX6SL_USDHC2_D8(0x170b9, 0x100b9)
++#define MX6SL_USDHC2_PINGRP_D8_200MHZ	MX6SL_USDHC2_D8(0x170f9, 0x100f9)
++
++#define MX6SL_USDHC3_PINGRP_D4		MX6SL_USDHC3_D4(0x17059, 0x10059)
++#define MX6SL_USDHC3_PINGRP_D4_100MHZ	MX6SL_USDHC3_D4(0x170b9, 0x100b9)
++#define MX6SL_USDHC3_PINGRP_D4_200MHZ	MX6SL_USDHC3_D4(0x170f9, 0x100f9)
++#define MX6SL_USDHC3_PINGRP_D8		MX6SL_USDHC3_D8(0x17059, 0x10059)
++#define MX6SL_USDHC3_PINGRP_D8_100MHZ	MX6SL_USDHC3_D8(0x170b9, 0x100b9)
++#define MX6SL_USDHC3_PINGRP_D8_200MHZ	MX6SL_USDHC3_D8(0x170f9, 0x100f9)
++
++#define MX6SL_USDHC4_PINGRP_D4		MX6SL_USDHC4_D4(0x17059, 0x10059)
++#define MX6SL_USDHC4_PINGRP_D4_100MHZ	MX6SL_USDHC4_D4(0x170b9, 0x100b9)
++#define MX6SL_USDHC4_PINGRP_D4_200MHZ	MX6SL_USDHC4_D4(0x170f9, 0x100f9)
++#define MX6SL_USDHC4_PINGRP_D8		MX6SL_USDHC4_D8(0x17059, 0x10059)
++#define MX6SL_USDHC4_PINGRP_D8_100MHZ	MX6SL_USDHC4_D8(0x170b9, 0x100b9)
++#define MX6SL_USDHC4_PINGRP_D8_200MHZ	MX6SL_USDHC4_D8(0x170f9, 0x100f9)
+ 
+ #endif /* __DTS_IMX6SL_PINGRP_H */
 -- 
 1.8.1.2
