@@ -1,95 +1,40 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 14 Nov 2013 11:10:40 -0800
-Subject: [PATCH v3 5/8] mmc: sdhci-bcm-kona: Add basic use of clocks
-In-Reply-To: <1384456243-27053-1-git-send-email-tim.kryger@linaro.org>
-References: <1384456243-27053-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1384456243-27053-6-git-send-email-tim.kryger@linaro.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 14 Nov 2013 12:16:22 -0700
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <52851DC8.203@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <52814AFB.3070600@wwwdotorg.org>
+ <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
+ <528275B7.6050209@wwwdotorg.org>
+ <20131112193012.GR10335@titan.lakedaemon.net>
+ <52828C77.20001@wwwdotorg.org>
+ <20131114162859.GX10335@titan.lakedaemon.net>
+ <52851DC8.203@wwwdotorg.org>
+Message-ID: <20131114191622.GC21549@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the external clock needed by the host controller during the
-probe and disable it during the remove.
+On Thu, Nov 14, 2013 at 12:00:24PM -0700, Stephen Warren wrote:
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- drivers/mmc/host/sdhci-bcm-kona.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+> I don't think a distro should need to know the DTB filename at all.
+> Rather, the/a bootloader should know which platform it's running on, and
+> provide a variable/... to the boot script/... that defines the DTB
+> filename. That would completely remove all the knowledge of DTB
+> filenames from distros.
 
-diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
-index 85472d3..bffbb40 100644
---- a/drivers/mmc/host/sdhci-bcm-kona.c
-+++ b/drivers/mmc/host/sdhci-bcm-kona.c
-@@ -54,6 +54,7 @@
- 
- struct sdhci_bcm_kona_dev {
- 	struct mutex	write_lock; /* protect back to back writes */
-+	struct clk	*external_clk;
- };
- 
- 
-@@ -257,6 +258,24 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
- 		goto err_pltfm_free;
- 	}
- 
-+	/* Get and enable the external clock */
-+	kona_dev->external_clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(kona_dev->external_clk)) {
-+		dev_err(dev, "Failed to get external clock\n");
-+		ret = PTR_ERR(kona_dev->external_clk);
-+		goto err_pltfm_free;
-+	}
-+
-+	if (clk_set_rate(kona_dev->external_clk, host->mmc->f_max) != 0) {
-+		dev_err(dev, "Failed to set rate external clock\n");
-+		goto err_pltfm_free;
-+	}
-+
-+	if (clk_prepare_enable(kona_dev->external_clk) != 0) {
-+		dev_err(dev, "Failed to enable external clock\n");
-+		goto err_pltfm_free;
-+	}
-+
- 	dev_dbg(dev, "non-removable=%c\n",
- 		(host->mmc->caps & MMC_CAP_NONREMOVABLE) ? 'Y' : 'N');
- 	dev_dbg(dev, "cd_gpio %c, wp_gpio %c\n",
-@@ -271,7 +290,7 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
- 
- 	ret = sdhci_bcm_kona_sd_reset(host);
- 	if (ret)
--		goto err_pltfm_free;
-+		goto err_clk_disable;
- 
- 	sdhci_bcm_kona_sd_init(host);
- 
-@@ -307,6 +326,9 @@ err_remove_host:
- err_reset:
- 	sdhci_bcm_kona_sd_reset(host);
- 
-+err_clk_disable:
-+	clk_disable_unprepare(kona_dev->external_clk);
-+
- err_pltfm_free:
- 	sdhci_pltfm_free(pdev);
- 
-@@ -317,6 +339,8 @@ err_pltfm_free:
- static int __exit sdhci_bcm_kona_remove(struct platform_device *pdev)
- {
- 	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	struct sdhci_pltfm_host *pltfm_priv = sdhci_priv(host);
-+	struct sdhci_bcm_kona_dev *kona_dev = sdhci_pltfm_priv(pltfm_priv);
- 	int dead;
- 	u32 scratch;
- 
-@@ -326,6 +350,8 @@ static int __exit sdhci_bcm_kona_remove(struct platform_device *pdev)
- 		dead = 1;
- 	sdhci_remove_host(host, dead);
- 
-+	clk_disable_unprepare(kona_dev->external_clk);
-+
- 	sdhci_free_host(host);
- 
- 	return 0;
--- 
-1.8.0.1
+At some point the distro has to install a dtb into some cannonical
+place so the bootloader can find it..
+
+Are you thinking that distros will have to ship a /boot/dtbs/*.dtb
+with every dtb from the kernel build?
+
+What happens when you install two different versions of the kernel?
+
+What about boot schemes that can load a kernel version dependent dtb?
+
+I've said this before - I really think the kernel community will do
+itself a big favor if it encourages boot schemes that can handle a
+kernel version dependent dtb, rather that design schemes that
+absolutely can't allow for that.
+
+Jason
