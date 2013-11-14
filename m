@@ -1,48 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Nov 2013 17:36:11 -0500
-Subject: [PATCH 6/6] ARM: kvm: TMP: Commit the hyp page tables to main
- memory
-In-Reply-To: <1384457866-16135-7-git-send-email-santosh.shilimkar@ti.com>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-7-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <5285505B.9080108@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Nov 2013 19:37:52 -0300
+Subject: [PATCH v5 03/14] mtd: nand: pxa3xx: Add bad block handling
+In-Reply-To: <20131114221212.GR9468@ld-irv-0074.broadcom.com>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1384464339-6817-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131114221212.GR9468@ld-irv-0074.broadcom.com>
+Message-ID: <20131114223751.GA24184@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 November 2013 02:37 PM, Santosh Shilimkar wrote:
-> This is a temporary hack which I have to use to avoid a weired crash while
-> starting the guest OS on Keystsone. They are random crashesh while the
-> guest os userspace starts. Additional data point is, it seen only with first
-> guest OS lanch. Subsequest guest OS starts normal.
->     
-> I still don't know why this is needed but it helps to get around the issue
-> and hence including the patch in the series for the discussion
+On Thu, Nov 14, 2013 at 02:12:12PM -0800, Brian Norris wrote:
+> On Thu, Nov 14, 2013 at 06:25:28PM -0300, Ezequiel Garcia wrote:
+> > --- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+> > @@ -15,6 +15,8 @@ Optional properties:
+> >   - marvell,nand-keep-config:	Set to keep the NAND controller config as set
+> >  				by the bootloader
+> >   - num-cs:			Number of chipselect lines to usw
+> > + - nand-on-flash-bbt: 		boolean to enable on flash bbt option if
+> > +				not present false
 > 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> It's not really your problem, but I just noticed that this binding
+> description is particularly badly worded! No need to change it in this
+> patch, since it's a copy-and-paste from the generic nand.txt, but it's
+> probably worth rewriting all of them sometime.
 > 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
 
-Ignore this patch. I thought it helps but in more testing I found
-that issue still comes up even with the below change. 
-
->  arch/arm/kvm/mmu.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 657f15e..5f6f460 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -826,6 +826,7 @@ int kvm_mmu_init(void)
->  		goto out;
->  	}
->  
-> +	flush_cache_all();
->  	return 0;
->  out:
->  	free_hyp_pgds();
-> 
+Indeed. And it's a bit embarrasing that I did such obviously mediocre
+copy-paste.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
