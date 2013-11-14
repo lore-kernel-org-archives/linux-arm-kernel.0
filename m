@@ -1,64 +1,109 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Nov 2013 15:53:57 -0300
-Subject: [PATCH v4 15/31] mtd: nand: pxa3xx: Use a completion to signal
- device ready
-In-Reply-To: <20131114183923.GO9468@ld-irv-0074.broadcom.com>
-References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383837455-30721-16-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131114183923.GO9468@ld-irv-0074.broadcom.com>
-Message-ID: <20131114185356.GA9912@localhost>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Nov 2013 12:55:58 -0600
+Subject: [PATCH V3] ARM: OMAP2+: omap_device: maintain sane runtime pm
+ status around suspend/resume
+In-Reply-To: <1384448716-3186-1-git-send-email-nm@ti.com>
+References: <1384297710-29694-1-git-send-email-nm@ti.com>
+ <1384448716-3186-1-git-send-email-nm@ti.com>
+Message-ID: <20131114185558.GB16529@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Brian,
+Hi,
 
-On Thu, Nov 14, 2013 at 10:39:23AM -0800, Brian Norris wrote:
-> On Thu, Nov 07, 2013 at 12:17:19PM -0300, Ezequiel Garcia wrote:
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -863,21 +867,28 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
-> >  {
-> >  	struct pxa3xx_nand_host *host = mtd->priv;
-> >  	struct pxa3xx_nand_info *info = host->info_data;
-> > +	int ret;
-> > +
-> > +	/* Need to wait? */
-> > +	if (!info->is_ready) {
-> > +		ret = wait_for_completion_timeout(&info->dev_ready,
-> > +				CHIP_DELAY_TIMEOUT);
-> > +		if (!ret) {
-> > +			dev_err(&info->pdev->dev, "Ready time out!!!\n");
-> > +			return NAND_STATUS_FAIL;
-> > +		}
-> > +		info->is_ready = 1;
+On Thu, Nov 14, 2013 at 11:05:16AM -0600, Nishanth Menon wrote:
+> OMAP device hooks around suspend|resume_noirq ensures that hwmod
+> devices are forced to idle using omap_device_idle/enable as part of
+> the last stage of suspend activity.
 > 
-> Shouldn't the is_ready=1 line to be above the if (!ret) condition? I
-> think you want to set is_ready=1 in either case (success or timeout).
-> With this code, any timeout will cause subsequent waitfunc()'s to block,
-> even if they are never going to catch an interrupt.
+> For a device such as i2c who uses autosuspend, it is possible to enter
+> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
 > 
-
-Yes, good catch!
-
-> I think this kind of mistake is easier to make now, since the 'is_ready'
-> field isn't properly descriptive any more. It doesn't represent "is the
-> device ready"; it represents "is there a pending command on which I need
-> to wait". (I don't care if you change the name; I'm just pointing this
-> out.)
+> As part of the suspend flow, the generic runtime logic would increment
+> it's dev->power.disable_depth to 1. This should prevent further
+> pm_runtime_get_sync from succeeding once the runtime_status has been
+> set to RPM_SUSPENDED.
 > 
-
-Yes, I agree. Maybe, "need_wait" or something like that would fit
-better. Let me submit a new patch for this one.
-
-> > +	}
-> >  
+> Now, as part of the suspend_noirq handler in omap_device, we force the
+> following: if the device status is !suspended, we force the device
+> to idle using omap_device_idle (clocks are cut etc..). This ensures
+> that from a hardware perspective, the device is "suspended". However,
+> runtime_status is left to be active.
 > 
-> I think all the other patches up to this one are good. I may push them
-> to l2-mtd.git now, unless you object.
+> *if* an operation is attempted after this point to
+> pm_runtime_get_sync, runtime framework depends on runtime_status to
+> indicate accurately the device status, and since it sees it to be
+> ACTIVE, it assumes the module is functional and returns a non-error
+> value. As a result the user will see pm_runtime_get succeed, however a
+> register access will crash due to the lack of clocks.
 > 
+> To prevent this from happening, we should ensure that runtime_status
+> exactly indicates the device status. As a result of this change
+> any further calls to pm_runtime_get* would return -EACCES (since
+> disable_depth is 1). On resume, we restore the clocks and runtime
+> status exactly as we suspended with. These operations are not expected
+> to fail as we update the states after the core runtime framework has
+> suspended itself and restore before the core runtime framework has
+> resumed.
+> 
+> Reported-by: J Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Acked-by: Rajendra Nayak <rnayak@ti.com>
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> Changes in V3:
+> 	- Added WARN in case of unexpected failure of runtime pm status restore
+> v2: https://patchwork.kernel.org/patch/3176501/
+> v1: https://patchwork.kernel.org/patch/3154501/
+> 
+> patch baseline: V3.12 tag (also applies on linux-next next-20131107 tag)
+> 
+>  arch/arm/mach-omap2/omap_device.c |   13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index b69dd9a..53f0735 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -621,6 +621,7 @@ static int _od_suspend_noirq(struct device *dev)
+>  
+>  	if (!ret && !pm_runtime_status_suspended(dev)) {
+>  		if (pm_generic_runtime_suspend(dev) == 0) {
+> +			pm_runtime_set_suspended(dev);
+>  			omap_device_idle(pdev);
+>  			od->flags |= OMAP_DEVICE_SUSPENDED;
+>  		}
+> @@ -634,10 +635,18 @@ static int _od_resume_noirq(struct device *dev)
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct omap_device *od = to_omap_device(pdev);
+>  
+> -	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
+> -	    !pm_runtime_status_suspended(dev)) {
+> +	if (od->flags & OMAP_DEVICE_SUSPENDED) {
+>  		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+>  		omap_device_enable(pdev);
+> +		/*
+> +		 * XXX: we run before core runtime pm has resumed itself. At
+> +		 * this point in time, we just restore the runtime pm state and
+> +		 * considering symmetric operations in resume, we donot expect
+> +		 * to fail. If we failed, something changed in core runtime_pm
+> +		 * framework OR some device driver messed things up, hence, WARN
+> +		 */
+> +		WARN(pm_runtime_set_active(dev),
+> +		     "Could not set %s runtime state active\n", dev_name(dev));
 
-Great, thanks a lot for reviewing and for all the feedback!
+if you want to print the device name, how about dev_WARN() ?
+
+no strong feelings though:
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131114/843ad991/attachment-0001.sig>
