@@ -1,41 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 10:53:55 -0800
-Subject: [PATCH] ARM: OMAP3: Beagle: fix return value check in
- beagle_opp_init()
-In-Reply-To: <CAPgLHd_DZkrzaSa9cdYYUBL=p18s=P=5RFyTJTT+toFgTqNZGQ@mail.gmail.com>
-References: <CAPgLHd_DZkrzaSa9cdYYUBL=p18s=P=5RFyTJTT+toFgTqNZGQ@mail.gmail.com>
-Message-ID: <20131114185355.GR10317@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Nov 2013 15:53:57 -0300
+Subject: [PATCH v4 15/31] mtd: nand: pxa3xx: Use a completion to signal
+ device ready
+In-Reply-To: <20131114183923.GO9468@ld-irv-0074.broadcom.com>
+References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383837455-30721-16-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131114183923.GO9468@ld-irv-0074.broadcom.com>
+Message-ID: <20131114185356.GA9912@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Wei Yongjun <weiyj.lk@gmail.com> [131029 22:23]:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function get_cpu_device() returns NULL pointer
-> not ERR_PTR(). The IS_ERR() test in the return value check should be
-> replaced with NULL test.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Brian,
 
-Thanks applying into omap-for-v3.13/fixes.
-
-Tony
-
-> ---
->  arch/arm/mach-omap2/board-omap3beagle.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Nov 14, 2013 at 10:39:23AM -0800, Brian Norris wrote:
+> On Thu, Nov 07, 2013 at 12:17:19PM -0300, Ezequiel Garcia wrote:
+> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> > @@ -863,21 +867,28 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
+> >  {
+> >  	struct pxa3xx_nand_host *host = mtd->priv;
+> >  	struct pxa3xx_nand_info *info = host->info_data;
+> > +	int ret;
+> > +
+> > +	/* Need to wait? */
+> > +	if (!info->is_ready) {
+> > +		ret = wait_for_completion_timeout(&info->dev_ready,
+> > +				CHIP_DELAY_TIMEOUT);
+> > +		if (!ret) {
+> > +			dev_err(&info->pdev->dev, "Ready time out!!!\n");
+> > +			return NAND_STATUS_FAIL;
+> > +		}
+> > +		info->is_ready = 1;
 > 
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index a516c1b..d6ed819 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -510,7 +510,7 @@ static int __init beagle_opp_init(void)
->  		mpu_dev = get_cpu_device(0);
->  		iva_dev = omap_device_get_by_hwmod_name("iva");
->  
-> -		if (IS_ERR(mpu_dev) || IS_ERR(iva_dev)) {
-> +		if (!mpu_dev || IS_ERR(iva_dev)) {
->  			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
->  				__func__, mpu_dev, iva_dev);
->  			return -ENODEV;
+> Shouldn't the is_ready=1 line to be above the if (!ret) condition? I
+> think you want to set is_ready=1 in either case (success or timeout).
+> With this code, any timeout will cause subsequent waitfunc()'s to block,
+> even if they are never going to catch an interrupt.
 > 
+
+Yes, good catch!
+
+> I think this kind of mistake is easier to make now, since the 'is_ready'
+> field isn't properly descriptive any more. It doesn't represent "is the
+> device ready"; it represents "is there a pending command on which I need
+> to wait". (I don't care if you change the name; I'm just pointing this
+> out.)
+> 
+
+Yes, I agree. Maybe, "need_wait" or something like that would fit
+better. Let me submit a new patch for this one.
+
+> > +	}
+> >  
+> 
+> I think all the other patches up to this one are good. I may push them
+> to l2-mtd.git now, unless you object.
+> 
+
+Great, thanks a lot for reviewing and for all the feedback!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
