@@ -1,42 +1,77 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 14 Nov 2013 10:07:30 -0800
-Subject: [PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
-Message-ID: <1384452450-26308-1-git-send-email-tim.kryger@linaro.org>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 14 Nov 2013 12:07:49 -0600
+Subject: [PATCH 2/2] usb: chipidea: usbmisc: Add support for i.MX51 CPU
+In-Reply-To: <1384067901-9377-2-git-send-email-shc_work@mail.ru>
+References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+ <1384067901-9377-2-git-send-email-shc_work@mail.ru>
+Message-ID: <CAHCPf3tOxKESwbooR0sz0w=A8n6uEDOmaawDxick0+AMBRAQfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board schematic states that the "SD_CARD_DET_N gets pulled to GND
-when card is inserted" so the polarity has been updated to active low.
+I'd prefer this was kept separated out a little bit, as follows:
 
-Polarity is now specified with a GPIO define instead of a magic number.
+On Sun, Nov 10, 2013 at 1:18 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> This adds i.MX51 as the next user of the usbmisc driver.
+> Since the functional is similar i.MX53, we just rename the
+> definitions and add an alias for the new CPU.
+>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/usb/chipidea/usbmisc_imx.c | 40 +++++++++++++++++++++-----------------
+>  1 file changed, 22 insertions(+), 18 deletions(-)
+>
+>
+> -static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
+> +static int usbmisc_imx5_init(struct imx_usbmisc_data *data)
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Can we keep usbmisc_imx53_init named this?
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 08e47c2..27dd110 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -13,6 +13,8 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- #include "bcm11351.dtsi"
- 
- / {
-@@ -40,7 +42,7 @@
- 
- 	sdio4: sdio at 3f1b0000 {
- 		max-frequency = <48000000>;
--		cd-gpios = <&gpio 14 0>;
-+		cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
- 		status = "okay";
- 	};
- };
--- 
-1.8.0.1
+There is more to do here on i.MX5 for cases where the bootloader did
+not already try to set up USB (or did it badly) such as the
+transceiver reference clock rate and also setting the USB sysclk clock
+source (internal DPLL or from external transceiver in the external
+ULPI case) and so on, which is related and needs doing on both, but is
+different on i.MX51 than i.MX53. This is information sort of best
+passed in the PHY node that goes along with this, but it's set within
+the usbmisc block of the chips so the usbmisc driver will have a
+responsibility to go see if it's an external PHY that is feeding it's
+clock back into the USB block in this way.
+
+I am not sure we (Peter etc.) discussed how best to do this, the code
+to pull the correct information out always seems kind of misplaced no
+matter where it goes, but the responsibility for tweaking those
+registers is most certainly this driver.
+
+Essentially the layout of usbmisc->base + 0x10 register (USB_CTRL_1)
+is different when doing the above, and dependent on a board-specific
+option for the input clock to the transceiver. We could reduce a
+little churn, later, when usbmisc_imx could be given related usbphy
+information and actually do the right thing. I have a patch kinda
+sitting in the wings to do this.. and two *real* pieces of consumer
+hardware that need it, and some other kicking, to make USB work in the
+never-touched-before-Linux case.
+
+> -static const struct usbmisc_ops imx53_usbmisc_ops = {
+> -       .init = usbmisc_imx53_init,
+> +static const struct usbmisc_ops imx5_usbmisc_ops = {
+> +       .init = usbmisc_imx5_init,
+>  };
+
+And keep imx53_usbmisc_ops named this?
+
+>  static const struct usbmisc_ops imx6q_usbmisc_ops = {
+> @@ -204,8 +204,12 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
+>                 .data = &imx27_usbmisc_ops,
+>         },
+>         {
+> +               .compatible = "fsl,imx51-usbmisc",
+> +               .data = &imx5_usbmisc_ops,
+
+And then just use &imx53_usbmisc_ops?
+
+This gives us some breathing room later to actually do the right thing
+without additionally performing renames all over the place to make
+imx5 -> imx53 (again)/imx51 (new).
+
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
