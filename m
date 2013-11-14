@@ -1,117 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Nov 2013 02:11:35 +0300
-Subject: [PATCH] sh_eth: add R8A7791 support
-Message-ID: <201311150211.36049.sergei.shtylyov@cogentembedded.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 14 Nov 2013 16:12:14 -0600
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <528542AC.4080405@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <52814AFB.3070600@wwwdotorg.org>
+ <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
+ <528275B7.6050209@wwwdotorg.org>
+ <20131112193012.GR10335@titan.lakedaemon.net>
+ <52828C77.20001@wwwdotorg.org>
+ <20131114162859.GX10335@titan.lakedaemon.net>
+ <52851DC8.203@wwwdotorg.org>
+ <20131114191622.GC21549@obsidianresearch.com>
+ <528542AC.4080405@wwwdotorg.org>
+Message-ID: <CAHCPf3tbX383j6j+fOnpjzNdJPZsqwm0qzOi9zA+f0T=UPRL7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for yet another ARM member of the R-Car family, R-Car M2, also known
-as R8A7791 -- it will share the code and data with previously added R8A7790.
-Since  the Ether devices in these SoCs are indistinguishable at least from the
-driver's point of view,  do not introduce  a new platform device ID but modify
-device name "r8a7790-ether" to "r8a779x-ether" throughout the files (and also
-'r8a7790_data' to 'r8a779x_data' in the driver), just like the names used for
-R8A7778/9 SoCs.
+On Thu, Nov 14, 2013 at 3:37 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/14/2013 12:16 PM, Jason Gunthorpe wrote:
+>> On Thu, Nov 14, 2013 at 12:00:24PM -0700, Stephen Warren wrote:
+>>
+>>> I don't think a distro should need to know the DTB filename at all.
+>>> Rather, the/a bootloader should know which platform it's running on, and
+>>> provide a variable/... to the boot script/... that defines the DTB
+>>> filename. That would completely remove all the knowledge of DTB
+>>> filenames from distros.
+>>
+>> At some point the distro has to install a dtb into some cannonical
+>> place so the bootloader can find it..
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Right, and this place can be *anywhere* with *any name* in the scripted case.
 
----
-This patch is atop of 'renesas-devel-v3.12-20131112' tag of Simon Horman's
-'renesas.git' repo and I intend to push it thru this tree in order to satisfy
-runtime dependencies of the R8A7791/Koelsch Ether support patches to follow.
-Not posting this to netdev at vger.kernel.org since Dave has closed 'net-next.git'
-for now; Dave, I hope you'll ACK this patch...
+In a non-scripted case, it just needs to match the bootloader name and
+where it differs from the one in the kernel right now, this would be
+hellish. To use GlobalScale as an example, since the patch did - if
+Marvell or GlobalScale ship a U-Boot that boots the board, that has a
+fixed name and *then* rename their tree in the kernel source, they
+should be shot. The kernel community should be careful about it if
+they're not Marvell or GlobalScale and didn't check with the
+bootloader situation.. but when it happens, this is *entirely* a
+packaging problem for your package maintainers. *ENTIRELY*.
 
- arch/arm/mach-shmobile/board-lager.c   |   12 ++++++------
- arch/arm/mach-shmobile/clock-r8a7790.c |    2 +-
- drivers/net/ethernet/renesas/Kconfig   |    2 +-
- drivers/net/ethernet/renesas/sh_eth.c  |    6 +++---
- 4 files changed, 11 insertions(+), 11 deletions(-)
+In the case where it gets flashed into the board rather than left on a
+filesystem, then it doesn't matter one jot what the filename is as
+long as it goes to the right offset - which is going to end up
+hardcoded in your distro, right? So stop hardcoding it (flash-kernel
+does a particularly crappy, but eventually usable job of this under
+Debian/Ubuntu right now already so they're safe).
 
-Index: renesas/arch/arm/mach-shmobile/board-lager.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-lager.c
-+++ renesas/arch/arm/mach-shmobile/board-lager.c
-@@ -186,13 +186,13 @@ static const struct pinctrl_map lager_pi
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.1", "pfc-r8a7790",
- 				  "mmc1_ctrl", "mmc1"),
- 	/* Ether */
--	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
- 				  "eth_link", "eth"),
--	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
- 				  "eth_mdio", "eth"),
--	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
- 				  "eth_rmii", "eth"),
--	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
- 				  "intc_irq0", "intc"),
- };
- 
-@@ -217,7 +217,7 @@ static void __init lager_add_standard_de
- 					  mmcif1_resources, ARRAY_SIZE(mmcif1_resources),
- 					  &mmcif1_pdata, sizeof(mmcif1_pdata));
- 
--	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
-+	platform_device_register_resndata(&platform_bus, "r8a779x-ether", -1,
- 					  ether_resources,
- 					  ARRAY_SIZE(ether_resources),
- 					  &ether_pdata, sizeof(ether_pdata));
-@@ -246,7 +246,7 @@ static void __init lager_init(void)
- {
- 	lager_add_standard_devices();
- 
--	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-+	phy_register_fixup_for_id("r8a779x-ether-ff:01", lager_ksz8041_fixup);
- }
- 
- static const char * const lager_boards_compat_dt[] __initconst = {
-Index: renesas/arch/arm/mach-shmobile/clock-r8a7790.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ renesas/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -285,7 +285,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e6518000.i2c", &mstp_clks[MSTP930]),
- 	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP929]),
- 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
--	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
-+	CLKDEV_DEV_ID("r8a779x-ether", &mstp_clks[MSTP813]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("ee200000.mmc", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
-Index: renesas/drivers/net/ethernet/renesas/Kconfig
-===================================================================
---- renesas.orig/drivers/net/ethernet/renesas/Kconfig
-+++ renesas/drivers/net/ethernet/renesas/Kconfig
-@@ -13,4 +13,4 @@ config SH_ETH
- 	  Renesas SuperH Ethernet device driver.
- 	  This driver supporting CPUs are:
- 		- SH7619, SH7710, SH7712, SH7724, SH7734, SH7763, SH7757,
--		  R8A7740, R8A777x and R8A7790.
-+		  R8A7740, R8A777x and R8A779x.
-Index: renesas/drivers/net/ethernet/renesas/sh_eth.c
-===================================================================
---- renesas.orig/drivers/net/ethernet/renesas/sh_eth.c
-+++ renesas/drivers/net/ethernet/renesas/sh_eth.c
-@@ -395,8 +395,8 @@ static struct sh_eth_cpu_data r8a777x_da
- 	.hw_swap	= 1,
- };
- 
--/* R8A7790 */
--static struct sh_eth_cpu_data r8a7790_data = {
-+/* R8A7790/1 */
-+static struct sh_eth_cpu_data r8a779x_data = {
- 	.set_duplex	= sh_eth_set_duplex,
- 	.set_rate	= sh_eth_set_rate_r8a777x,
- 
-@@ -2807,7 +2807,7 @@ static struct platform_device_id sh_eth_
- 	{ "sh7763-gether", (kernel_ulong_t)&sh7763_data },
- 	{ "r8a7740-gether", (kernel_ulong_t)&r8a7740_data },
- 	{ "r8a777x-ether", (kernel_ulong_t)&r8a777x_data },
--	{ "r8a7790-ether", (kernel_ulong_t)&r8a7790_data },
-+	{ "r8a779x-ether", (kernel_ulong_t)&r8a779x_data },
- 	{ }
- };
- MODULE_DEVICE_TABLE(platform, sh_eth_id_table);
+>> Are you thinking that distros will have to ship a /boot/dtbs/*.dtb
+>> with every dtb from the kernel build?
+>
+> Yes. How else would the distro support booting the install on arbitrary
+> boards?
+
+There are LOTS of ways. Mark and Russell insist on me being more
+concise, so I'll simply say the distros have to do more work and
+there's not really any way around it. Specifying "requirements for a
+distro boot" means making everything comply with that, which is a lot
+of work for distros anyway. May as well make your distro work around
+the problems where they actually have some control - distro scripting,
+distro board support, and not esoteric kernel build behaviors, or
+having distro teams work on fixing non-compliant bootloaders.
+
+Ta,
+Matt Sealey <neko@bakuhatsu.net>
