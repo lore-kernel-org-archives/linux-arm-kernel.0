@@ -1,42 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 14 Nov 2013 14:37:48 -0700
-Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
-In-Reply-To: <20131114191622.GC21549@obsidianresearch.com>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <52814AFB.3070600@wwwdotorg.org>
- <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
- <528275B7.6050209@wwwdotorg.org>
- <20131112193012.GR10335@titan.lakedaemon.net> <52828C77.20001@wwwdotorg.org>
- <20131114162859.GX10335@titan.lakedaemon.net> <52851DC8.203@wwwdotorg.org>
- <20131114191622.GC21549@obsidianresearch.com>
-Message-ID: <528542AC.4080405@wwwdotorg.org>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 14 Nov 2013 14:39:09 -0700
+Subject: [PATCH v3 0/4] ata: Add APM X-Gene SoC SATA host controller support
+Message-ID: <1384465153-29902-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2013 12:16 PM, Jason Gunthorpe wrote:
-> On Thu, Nov 14, 2013 at 12:00:24PM -0700, Stephen Warren wrote:
-> 
->> I don't think a distro should need to know the DTB filename at all.
->> Rather, the/a bootloader should know which platform it's running on, and
->> provide a variable/... to the boot script/... that defines the DTB
->> filename. That would completely remove all the knowledge of DTB
->> filenames from distros.
-> 
-> At some point the distro has to install a dtb into some cannonical
-> place so the bootloader can find it..
-> 
-> Are you thinking that distros will have to ship a /boot/dtbs/*.dtb
-> with every dtb from the kernel build?
+ata: Add APM X-Gene SoC SATA host controller support
 
-Yes. How else would the distro support booting the install on arbitrary
-boards?
+This patch adds support for the APM X-Gene SoC SATA host controller. In 
+order for the host controller to work, the corresponding SATA PHY driver
+musts also be available.
 
-> What happens when you install two different versions of the kernel?
+v3:
+ * Move out the SATA PHY to another driver
+ * Remove the clock-cells entry from DTS
+ * Remove debug wrapper
+ * Remove delay functions wrapper
+ * Clean up resource and IRQ query
+ * Remove query clock name
+ * Switch to use dma_set_mask/dma_coherent_mask
+ * Remove un-necessary devm_kfree
+ * Update GPL license header to v2
+ * Spilt up function xgene_ahci_hardreset
+ * Spilt up function xgene_ahci_probe
+ * Remove all reference of CONFIG_ARCH_MSLIM
+ * Clean up chip revision code
 
-/boot/zImage-$version
-/boot/dtbs-$version/*.dtb
+v2:
+ * Clean up file sata_xgene.c with Lindent and etc
+ * Clean up file sata_xgene_serdes.c with Lindent and etc
+ * Add description to each patch
 
-> What about boot schemes that can load a kernel version dependent dtb?
+v1:
+ * inital version
 
-I think that's solved by installing the DTB files in a
-kernel-version-specific directory.
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Olof Johansson <olof@lixom.net>
+---
+Loc Ho (4):
+  ata: Export required functions by APM X-Gene SATA driver
+  Documentation: Add documentation for APM X-Gene SATA controllor DTS
+    binding
+  ata: Add APM X-Gene SoC SATA host controller driver
+  arm64: Add APM X-Gene SoC SATA host controller DTS entries
+
+ .../devicetree/bindings/ata/apm-xgene.txt          |   62 +-
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   70 ++
+ drivers/ata/Kconfig                                |    8 +
+ drivers/ata/Makefile                               |    1 +
+ drivers/ata/ahci.h                                 |    6 +
+ drivers/ata/libahci.c                              |   13 +-
+ drivers/ata/sata_xgene.c                           | 1271 ++++++++++++++++++++
+ drivers/ata/sata_xgene.h                           |   96 ++
+ 8 files changed, 1521 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/ata/sata_xgene.c
+ create mode 100644 drivers/ata/sata_xgene.h
