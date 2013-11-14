@@ -1,53 +1,47 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Nov 2013 14:37:42 -0500
-Subject: [PATCH 2/6] ARM: kvm: Use virt_to_idmap instead of virt_to_phys for
- idmap mappings
+Date: Thu, 14 Nov 2013 14:37:44 -0500
+Subject: [PATCH 4/6] arm64: mm: Drop the lowmem watermark check from
+ virt_addr_valid()
 In-Reply-To: <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
 References: <y>
  <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1384457866-16135-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1384457866-16135-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM initialisation fails on architectures implementing virt_to_idmap() because
-virt_to_phys() on such architectures won't fetch you the correct idmap page.
+Slab allocator can allocate memory beyond the lowmem watermark
+which can lead to false failure of virt_addr_valid().
 
-So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
+So drop the check. The issue was seen with percpu_alloc()
+in KVM code which was allocating memory beyond lowmem watermark.
+
+Am not completly sure whether this is the right fix and if it could
+impact any other user of virt_addr_valid(). Without this fix as
+pointed out the KVM init was failing in my testing.
 
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kvm/mmu.c |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/memory.h |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index b0de86b..3bd652f 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -747,9 +747,9 @@ int kvm_mmu_init(void)
- {
- 	int err;
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index d9341ee..d04d047 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -154,8 +154,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
  
--	hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
--	hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
--	hyp_idmap_vector = virt_to_phys(__kvm_hyp_init);
-+	hyp_idmap_start = virt_to_idmap(__hyp_idmap_text_start);
-+	hyp_idmap_end = virt_to_idmap(__hyp_idmap_text_end);
-+	hyp_idmap_vector = virt_to_idmap(__kvm_hyp_init);
+ #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+-#define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
+-				 ((void *)(kaddr) < (void *)high_memory))
++#define	virt_addr_valid(kaddr)	((void *)(kaddr) >= (void *)PAGE_OFFSET)
  
- 	if ((hyp_idmap_start ^ hyp_idmap_end) & PAGE_MASK) {
- 		/*
-@@ -775,8 +775,7 @@ int kvm_mmu_init(void)
- 		 * caches off at that point.
- 		 */
- 		kvm_flush_dcache_to_poc(init_bounce_page, len);
--
--		phys_base = virt_to_phys(init_bounce_page);
-+		phys_base = virt_to_idmap(init_bounce_page);
- 		hyp_idmap_vector += phys_base - hyp_idmap_start;
- 		hyp_idmap_start = phys_base;
- 		hyp_idmap_end = phys_base + len;
+ #endif
+ 
 -- 
 1.7.9.5
