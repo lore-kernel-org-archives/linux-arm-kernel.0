@@ -1,116 +1,87 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 09:25:27 -0800
-Subject: [PATCH 3/8] mmc: omap: Fix I2C dependency and make driver
- usable with device tree
-In-Reply-To: <20131114110533.GD16396@e106331-lin.cambridge.arm.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-4-git-send-email-tony@atomide.com>
- <20131114110533.GD16396@e106331-lin.cambridge.arm.com>
-Message-ID: <20131114172527.GD10317@atomide.com>
+From: dave.hansen@intel.com (Dave Hansen)
+Date: Thu, 14 Nov 2013 09:26:18 -0800
+Subject: [RFC PATCH 4/4] mm/vmalloc.c: Treat the entire kernel virtual
+ space as vmalloc
+In-Reply-To: <1384212412-21236-5-git-send-email-lauraa@codeaurora.org>
+References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
+ <1384212412-21236-5-git-send-email-lauraa@codeaurora.org>
+Message-ID: <528507BA.9010101@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Rutland <mark.rutland@arm.com> [131114 03:06]:
->
-> Missing binding document.
+On 11/11/2013 03:26 PM, Laura Abbott wrote:
+> With CONFIG_ENABLE_VMALLOC_SAVINGS, all lowmem is tracked in
+> vmalloc. This means that all the kernel virtual address space
+> can be treated as part of the vmalloc region. Allow vm areas
+> to be allocated from the full kernel address range.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+> ---
+>  mm/vmalloc.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> index c7b138b..181247d 100644
+> --- a/mm/vmalloc.c
+> +++ b/mm/vmalloc.c
+> @@ -1385,16 +1385,27 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
+>   */
+>  struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
+>  {
+> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
+> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
+> +				  NUMA_NO_NODE, GFP_KERNEL,
+> +				  __builtin_return_address(0));
+> +#else
+>  	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
+>  				  NUMA_NO_NODE, GFP_KERNEL,
+>  				  __builtin_return_address(0));
+> +#endif
+>  }
+>  
+>  struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
+>  				const void *caller)
+>  {
+> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
+> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
+> +				  NUMA_NO_NODE, GFP_KERNEL, caller);
+> +#else
+>  	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
+>  				  NUMA_NO_NODE, GFP_KERNEL, caller);
+> +#endif
+>  }
 
-Here's this one updated with a minimal binding document. The
-ti,hwmods is still needed until we have removed the dependencies
-to hwmod code for omaps.
+Couple of nits: first of all, there's no reason to copy, paste, and
+#ifdef this much code.  This just invites one of the copies to bitrot.
+I'd much rather see this:
 
-Regards,
+#ifdef CONFIG_ENABLE_VMALLOC_SAVING
+#define LOWEST_VMALLOC_VADDR PAGE_OFFSET
+#else
+#define LOWEST_VMALLOC_VADDR VMALLOC_START
+#endif
 
-Tony
+Then just replace the PAGE_OFFSET in the function arguments with
+LOWEST_VMALLOC_VADDR.
 
+Have you done any audits to make sure that the rest of the code that
+deals with vmalloc addresses in the kernel is using is_vmalloc_addr()?
+I'd be a bit worried that we might have picked up an assumption or two
+that *all* vmalloc addresses are _above_ VMALLOC_START.
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 13 Nov 2013 16:36:37 -0800
-Subject: [PATCH] mmc: omap: Fix I2C dependency and make driver usable with device tree
+The percpu.c code looks like it might do this, and maybe the kcore code.
+ The vmalloc.c code itself has this in get_vmalloc_info():
 
-Some features can be configured by the companion I2C chips,
-which may not be available at the probe time. Fix the issue
-by returning -EPROBE_DEFER when the MMC controller slots
-are not configured.
+>                 /*
+>                  * Some archs keep another range for modules in vmalloc space
+>                  */
+>                 if (addr < VMALLOC_START)
+>                         continue;
 
-While at it, let's also add minimal device tree support so
-omap24xx platforms can use this driver without legacy mode
-since we claim to support device tree for mach-omap2 based
-systems.
+Seems like that would break as well.
 
-Although adding the minimal device tree support is not strictly
-a fix, it does remove one of the last blockers for dropping a
-bunch of legacy platform data for mach-omap2.
-
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-+++ b/Documentation/devicetree/bindings/mmc/ti-omap.txt
-@@ -0,0 +1,27 @@
-+* TI MMC host controller for OMAP1 and 2420
-+
-+The MMC Host Controller on TI OMAP1 and 2420 family provides
-+an interface for MMC, SD, and SDIO types of memory cards.
-+
-+This file documents differences between the core properties described
-+by mmc.txt and the properties used by the omap mmc driver.
-+
-+Note that this driver will not work with omap2430 or later omaps,
-+please see the omap hsmmc driver for the current omaps.
-+
-+Required properties:
-+- compatible: Must be "ti,omap2420-mmc", for OMAP2420 controllers
-+- ti,hwmods: For 2420, must be "msdi<n>", where n is controller
-+  instance starting 1
-+
-+Examples:
-+
-+	msdi1: mmc at 4809c000 {
-+		compatible = "ti,omap2420-mmc";
-+		ti,hwmods = "msdi1";
-+		reg = <0x4809c000 0x80>;
-+		interrupts = <83>;
-+		dmas = <&sdma 61 &sdma 62>;
-+		dma-names = "tx", "rx";
-+	};
-+
---- a/drivers/mmc/host/omap.c
-+++ b/drivers/mmc/host/omap.c
-@@ -22,6 +22,7 @@
- #include <linux/delay.h>
- #include <linux/spinlock.h>
- #include <linux/timer.h>
-+#include <linux/of.h>
- #include <linux/omap-dma.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
-@@ -1330,7 +1331,7 @@ static int mmc_omap_probe(struct platform_device *pdev)
- 	}
- 	if (pdata->nr_slots == 0) {
- 		dev_err(&pdev->dev, "no slots\n");
--		return -ENXIO;
-+		return -EPROBE_DEFER;
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -1553,6 +1554,12 @@ static int mmc_omap_resume(struct platform_device *pdev)
- #define mmc_omap_resume		NULL
- #endif
- 
-+#if IS_BUILTIN(CONFIG_OF)
-+static const struct of_device_id mmc_omap_match[] = {
-+	{ .compatible = "ti,omap2420-mmc", },
-+	{ },
-+};
-+#endif
- static struct platform_driver mmc_omap_driver = {
- 	.probe		= mmc_omap_probe,
- 	.remove		= mmc_omap_remove,
-@@ -1561,6 +1568,7 @@ static struct platform_driver mmc_omap_driver = {
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(mmc_omap_match),
- 	},
- };
- 
+With this patch, VMALLOC_START loses enough of its meaning that I wonder
+if we should even keep it around.  It's the start of the _dedicated_
+vmalloc space, but it's mostly useless and obscure enough that maybe we
+should get rid of its use in common code.
