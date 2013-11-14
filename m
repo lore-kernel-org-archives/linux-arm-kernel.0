@@ -1,118 +1,144 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Nov 2013 18:25:28 -0300
-Subject: [PATCH v5 03/14] mtd: nand: pxa3xx: Add bad block handling
+Date: Thu, 14 Nov 2013 18:25:26 -0300
+Subject: [PATCH v5 01/14] mtd: nand: pxa3xx: Use a completion to signal device
+ ready
 In-Reply-To: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1384464339-6817-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1384464339-6817-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for flash-based bad block table using Marvell's
-custom in-flash bad block table layout. The support is enabled
-a 'flash_bbt' platform data or device tree parameter.
+The expected behavior of the waitfunc() NAND chip call is to wait
+for the device to be READY (this is a standard chip line).
+However, the current implementation does almost nothing, which opens
+the possibility of issuing a command to a non-ready device.
+
+Fix this by adding a new completion to wait for the ready event to arrive.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- .../devicetree/bindings/mtd/pxa3xx-nand.txt        |  2 ++
- drivers/mtd/nand/pxa3xx_nand.c                     | 37 ++++++++++++++++++++++
- include/linux/platform_data/mtd-nand-pxa3xx.h      |  3 ++
- 3 files changed, 42 insertions(+)
+ drivers/mtd/nand/pxa3xx_nand.c | 38 ++++++++++++++++++++++++--------------
+ 1 file changed, 24 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-index bed8390..86e0a56 100644
---- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-@@ -15,6 +15,8 @@ Optional properties:
-  - marvell,nand-keep-config:	Set to keep the NAND controller config as set
- 				by the bootloader
-  - num-cs:			Number of chipselect lines to usw
-+ - nand-on-flash-bbt: 		boolean to enable on flash bbt option if
-+				not present false
- 
- Example:
- 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 8af4746..6293ff4 100644
+index f9156f3..ea2f907 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -26,6 +26,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_mtd.h>
+@@ -37,6 +37,7 @@
  
- #if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
- #define ARCH_HAS_DMA
-@@ -241,6 +242,29 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
- { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
- };
+ #include <linux/platform_data/mtd-nand-pxa3xx.h>
  
-+static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
-+static u8 bbt_mirror_pattern[] = {'1', 't', 'b', 'B', 'V', 'M' };
-+
-+static struct nand_bbt_descr bbt_main_descr = {
-+	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
-+		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-+	.offs =	8,
-+	.len = 6,
-+	.veroffs = 14,
-+	.maxblocks = 8,		/* Last 8 blocks in each chip */
-+	.pattern = bbt_pattern
-+};
-+
-+static struct nand_bbt_descr bbt_mirror_descr = {
-+	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
-+		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-+	.offs =	8,
-+	.len = 6,
-+	.veroffs = 14,
-+	.maxblocks = 8,		/* Last 8 blocks in each chip */
-+	.pattern = bbt_mirror_pattern
-+};
-+
- /* Define a default flash type setting serve as flash detecting only */
- #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
++#define NAND_DEV_READY_TIMEOUT  50
+ #define	CHIP_DELAY_TIMEOUT	(2 * HZ/10)
+ #define NAND_STOP_DELAY		(2 * HZ/50)
+ #define PAGE_CHUNK_SIZE		(2048)
+@@ -168,7 +169,7 @@ struct pxa3xx_nand_info {
+ 	struct clk		*clk;
+ 	void __iomem		*mmio_base;
+ 	unsigned long		mmio_phys;
+-	struct completion	cmd_complete;
++	struct completion	cmd_complete, dev_ready;
  
-@@ -1126,6 +1150,18 @@ KEEP_CONFIG:
+ 	unsigned int 		buf_start;
+ 	unsigned int		buf_count;
+@@ -198,7 +199,7 @@ struct pxa3xx_nand_info {
+ 	int			use_ecc;	/* use HW ECC ? */
+ 	int			use_dma;	/* use DMA ? */
+ 	int			use_spare;	/* use spare ? */
+-	int			is_ready;
++	int			need_wait;
  
- 	if (nand_scan_ident(mtd, 1, def))
- 		return -ENODEV;
+ 	unsigned int		fifo_size;	/* max. data size in the FIFO */
+ 	unsigned int		data_size;	/* data to be read from FIFO */
+@@ -480,7 +481,7 @@ static void start_data_dma(struct pxa3xx_nand_info *info)
+ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ {
+ 	struct pxa3xx_nand_info *info = devid;
+-	unsigned int status, is_completed = 0;
++	unsigned int status, is_completed = 0, is_ready = 0;
+ 	unsigned int ready, cmd_done;
+ 
+ 	if (info->cs == 0) {
+@@ -516,8 +517,8 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 		is_completed = 1;
+ 	}
+ 	if (status & ready) {
+-		info->is_ready = 1;
+ 		info->state = STATE_READY;
++		is_ready = 1;
+ 	}
+ 
+ 	if (status & NDSR_WRCMDREQ) {
+@@ -546,6 +547,8 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	nand_writel(info, NDSR, status);
+ 	if (is_completed)
+ 		complete(&info->cmd_complete);
++	if (is_ready)
++		complete(&info->dev_ready);
+ NORMAL_IRQ_EXIT:
+ 	return IRQ_HANDLED;
+ }
+@@ -576,7 +579,6 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 	info->oob_size		= 0;
+ 	info->use_ecc		= 0;
+ 	info->use_spare		= 1;
+-	info->is_ready		= 0;
+ 	info->retcode		= ERR_NONE;
+ 	if (info->cs != 0)
+ 		info->ndcb0 = NDCB0_CSEL;
+@@ -749,6 +751,8 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 	exec_cmd = prepare_command_pool(info, command, column, page_addr);
+ 	if (exec_cmd) {
+ 		init_completion(&info->cmd_complete);
++		init_completion(&info->dev_ready);
++		info->need_wait = 1;
+ 		pxa3xx_nand_start(info);
+ 
+ 		ret = wait_for_completion_timeout(&info->cmd_complete,
+@@ -863,21 +867,27 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
+ {
+ 	struct pxa3xx_nand_host *host = mtd->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
++	int ret;
 +
-+	if (pdata->flash_bbt) {
-+		/*
-+		 * We'll use a bad block table stored in-flash and don't
-+		 * allow writing the bad block marker to the flash.
-+		 */
-+		chip->bbt_options |= NAND_BBT_USE_FLASH |
-+				     NAND_BBT_NO_OOB_BBM;
-+		chip->bbt_td = &bbt_main_descr;
-+		chip->bbt_md = &bbt_mirror_descr;
++	if (info->need_wait) {
++		ret = wait_for_completion_timeout(&info->dev_ready,
++				CHIP_DELAY_TIMEOUT);
++		info->need_wait = 0;
++		if (!ret) {
++			dev_err(&info->pdev->dev, "Ready time out!!!\n");
++			return NAND_STATUS_FAIL;
++		}
 +	}
-+
- 	/* calculate addressing information */
- 	if (mtd->writesize >= 2048)
- 		host->col_addr_cycles = 2;
-@@ -1320,6 +1356,7 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
- 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
- 		pdata->keep_config = 1;
- 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
-+	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
  
- 	pdev->dev.platform_data = pdata;
+ 	/* pxa3xx_nand_send_command has waited for command complete */
+ 	if (this->state == FL_WRITING || this->state == FL_ERASING) {
+ 		if (info->retcode == ERR_NONE)
+ 			return 0;
+-		else {
+-			/*
+-			 * any error make it return 0x01 which will tell
+-			 * the caller the erase and write fail
+-			 */
+-			return 0x01;
+-		}
++		else
++			return NAND_STATUS_FAIL;
+ 	}
  
-diff --git a/include/linux/platform_data/mtd-nand-pxa3xx.h b/include/linux/platform_data/mtd-nand-pxa3xx.h
-index ffb8019..a941471 100644
---- a/include/linux/platform_data/mtd-nand-pxa3xx.h
-+++ b/include/linux/platform_data/mtd-nand-pxa3xx.h
-@@ -55,6 +55,9 @@ struct pxa3xx_nand_platform_data {
- 	/* indicate how many chip selects will be used */
- 	int	num_cs;
+-	return 0;
++	return NAND_STATUS_READY;
+ }
  
-+	/* use an flash-based bad block table */
-+	bool	flash_bbt;
-+
- 	const struct mtd_partition		*parts[NUM_CHIP_SELECT];
- 	unsigned int				nr_parts[NUM_CHIP_SELECT];
+ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+@@ -1030,7 +1040,7 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
+ 		return ret;
  
+ 	chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
+-	if (info->is_ready)
++	if (!info->need_wait)
+ 		return 0;
+ 
+ 	return -ENODEV;
 -- 
 1.8.1.5
