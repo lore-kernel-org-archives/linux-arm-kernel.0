@@ -1,19 +1,25 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Thu, 14 Nov 2013 13:39:43 +0530
-Subject: a bug on NO_HZ_FULL_ALL
-In-Reply-To: <CAKfTPtD7fo08mjQoLXMMDpyxQuyoCZLS33qBnnUcQEmzYai2VQ@mail.gmail.com>
-References: <CANHzE=2EOJmjFqLUDSfxTvgQhrUogOxH8Qux9hBFTGf8HiWWEw@mail.gmail.com>	<52843855.5060509@linaro.org>	<52847FBE.9070501@linaro.org>
- <CAKfTPtD7fo08mjQoLXMMDpyxQuyoCZLS33qBnnUcQEmzYai2VQ@mail.gmail.com>
-Message-ID: <52848547.9080604@linaro.org>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 14 Nov 2013 11:22:54 +0300
+Subject: [patch] pinctrl: rockchip: missing unlock on error in
+ rockchip_set_pull()
+Message-ID: <20131114082254.GE8150@elgon.mountain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 November 2013 01:35 PM, Vincent Guittot wrote:
-> AFAICT, It's a none issue. In full nohz, a timer fires periodically
-> (around 4sec period on ARM IIRC) on one cpu (cpu0).
+We need to unlock here before returning -EINVAL.
 
-Timer should always be running on CPU0, its out of nohz-full domain. Its
-cpu 1, where it will fire after long delays..
+Fixes: 6ca5274d1d12 ('pinctrl: rockchip: add rk3188 specifics')
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-
-https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/AdaptiveTickless
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index e939c28..bfd1824 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -504,6 +504,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+ 			data |= (3 << bit);
+ 			break;
+ 		default:
++			spin_unlock_irqrestore(&bank->slock, flags);
+ 			dev_err(info->dev, "unsupported pull setting %d\n",
+ 				pull);
+ 			return -EINVAL;
