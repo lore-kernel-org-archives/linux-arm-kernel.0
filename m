@@ -1,21 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Nov 2013 12:30:57 +0000
-Subject: [PATCH 1/2] regulator: pfuze100: allow misprogrammed ID
-In-Reply-To: <1383715045-15341-1-git-send-email-tharvey@gateworks.com>
-References: <1383715045-15341-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20131114123057.GO26614@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Nov 2013 13:32:58 +0100
+Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
+In-Reply-To: <5283DB34.9050301@gmail.com>
+References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
+ <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
+ <5283DB34.9050301@gmail.com>
+Message-ID: <201311141332.58498.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:17:25PM -0800, Tim Harvey wrote:
-> prior to week 08 of 2013 Freescale misprogrammed between 1 and 3% of
-> PFUZE1000 parts with a ID=0x8 instead of the expected ID=0x0
+On Wednesday 13 November 2013, Rob Herring wrote:
+> I'm not inclined to expand cpuinfo and prior attempts to add more info
+> to cpuinfo like SoC name have failed. The differences between x86 and
+> arm cpuinfo already cause issues for arm. lscpu does not really work on arm.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131114/f8d63c59/attachment-0001.sig>
+Well, they turned into drivers/base/soc.c, which adds the information in
+a structured way in sysfs, but is only used on a couple of platforms.
+
+> I'd actually prefer If you really want more system info, then go read
+> /proc/device-tree.
+
+Good point.
+
+	Arnd
