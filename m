@@ -1,62 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Nov 2013 02:23:40 +0300
-Subject: [PATCH v2 3/3] ARM: shmobile: Koelsch: enable Ether in defconfig
-In-Reply-To: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
-References: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201311150223.40632.sergei.shtylyov@cogentembedded.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 14 Nov 2013 14:25:54 -0800
+Subject: [PATCH v5 09/14] mtd: nand: pxa3xx: Move the data buffer clean
+ to prepare_start_command()
+In-Reply-To: <1384464339-6817-10-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1384464339-6817-10-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131114222554.GT9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Ether driver in 'koelsch_defconfig' along with DHCP autoconfiguration
-and NFS root.
+On Thu, Nov 14, 2013 at 06:25:34PM -0300, Ezequiel Garcia wrote:
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -633,6 +636,19 @@ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
+>  		info->ndcb2 = 0;
+>  		break;
+>  	}
+> +
+> +	/*
+> +	 * If we are about to isse a read command, or about to set
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+s/isse/issue/
 
----
-Changes in version 2:
-- new patch in the series.
+> +	 * the write address, then clean the data buffer.
+> +	 */
+> +	if (command == NAND_CMD_READ0 ||
+> +	    command == NAND_CMD_READOOB ||
+> +	    command == NAND_CMD_SEQIN) {
+> +
 
- arch/arm/configs/koelsch_defconfig |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Superfluous blank line?
 
-Index: renesas/arch/arm/configs/koelsch_defconfig
-===================================================================
---- renesas.orig/arch/arm/configs/koelsch_defconfig
-+++ renesas/arch/arm/configs/koelsch_defconfig
-@@ -29,7 +29,27 @@ CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_PM_RUNTIME=y
-+CONFIG_NET=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_VENDOR_ARC is not set
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+CONFIG_SH_ETH=y
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_LEGACY_PTYS is not set
-@@ -49,6 +69,8 @@ CONFIG_LEDS_CLASS=y
- CONFIG_TMPFS=y
- CONFIG_CONFIGFS_FS=y
- # CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- # CONFIG_ARM_UNWIND is not set
+> +		info->buf_count = mtd->writesize + mtd->oobsize;
+> +		memset(info->data_buff, 0xFF, info->buf_count);
+> +	}
+> +
+>  }
+>  
+>  static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
+
+I'll make these changes myself, if I take the series. The rest of the
+series is looking good so far (up to this point), so it's not worth a
+respin.
+
+Brian
