@@ -1,31 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Nov 2013 16:46:13 -0800
-Subject: [PATCH 1/2] ARM: sti: only select errata 764369 if SMP
-Message-ID: <1384389974-6229-1-git-send-email-olof@lixom.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 13 Nov 2013 19:02:46 -0600
+Subject: [PATCH 2/2] ARM: highbank: only select errata 764369 if SMP
+In-Reply-To: <20131114005426.GV16735@n2100.arm.linux.org.uk>
+References: <1384389974-6229-1-git-send-email-olof@lixom.net>
+ <1384389974-6229-2-git-send-email-olof@lixom.net>
+ <52841E98.2020807@gmail.com> <20131114005426.GV16735@n2100.arm.linux.org.uk>
+Message-ID: <52842136.1020001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-764369 depends on SMP, so don't select it on !SMP configs.
+On 11/13/2013 06:54 PM, Russell King - ARM Linux wrote:
+> On Wed, Nov 13, 2013 at 06:51:36PM -0600, Rob Herring wrote:
+>> On 11/13/2013 06:46 PM, Olof Johansson wrote:
+>>> 764369 depends on SMP, so don't select it on !SMP configs.
+>>
+>> I think Russell has a fix for these in his tree.
+> 
+> Not this one.  I have:
+> 
+> 	select ARM_ERRATA_798181 if SMP
+> 
+> for highbank, which is now in mainline.  Olof's patch is in response to
+> me pasting the Kconfig warning from last nights failed omap4 randconfig
+> build.  This wasn't the cause, but it's something that should be fixed
+> in any case.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Cc: Stuart Menefy <stuart.menefy@st.com>
----
- arch/arm/mach-sti/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+In that case:
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index 835833e3c4f8..939ddb8f482b 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -12,7 +12,7 @@ menuconfig ARCH_STI
- 	select HAVE_ARM_SCU if SMP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_754322
--	select ARM_ERRATA_764369
-+	select ARM_ERRATA_764369 if SMP
- 	select ARM_ERRATA_775420
- 	select PL310_ERRATA_753970 if CACHE_PL310
- 	select PL310_ERRATA_769419 if CACHE_PL310
--- 
-1.8.4.1.601.g02b3b1d
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+> 
+> (There's build failures in drivers/usb/gadget...)
+> 
