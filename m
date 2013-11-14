@@ -1,107 +1,117 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Nov 2013 18:25:33 -0300
-Subject: [PATCH v5 08/14] mtd: nand: pxa3xx: Split prepare_command_pool() in
- two stages
+Date: Thu, 14 Nov 2013 18:25:36 -0300
+Subject: [PATCH v5 11/14] mtd: nand: pxa3xx: Add a read/write buffers markers
 In-Reply-To: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1384464339-6817-9-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1384464339-6817-12-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit splits the prepare_command_pool() function into two
-stages: prepare_start_command() / prepare_set_command().
+In preparation to support multiple (aka chunked, aka splitted)
+page I/O, this commit adds 'data_buff_pos' and 'oob_buff_pos' fields
+to keep track of where the next read (or write) should be done.
 
-This is a preparation patch without any functionality changes,
-and is meant to allow support for multiple page reading/writing
-operations.
+This will allow multiple calls to handle_data_pio() to continue
+the read (or write) operation.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 44 ++++++++++++++++++++++++------------------
- 1 file changed, 25 insertions(+), 19 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 40 +++++++++++++++++++++++++++++-----------
+ 1 file changed, 29 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index eea1ff8..b66f32b 100644
+index d15aee6..8e16eeb 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -607,18 +607,8 @@ static void set_command_address(struct pxa3xx_nand_info *info,
+@@ -176,6 +176,8 @@ struct pxa3xx_nand_info {
+ 	unsigned int 		buf_start;
+ 	unsigned int		buf_count;
+ 	unsigned int		buf_size;
++	unsigned int		data_buff_pos;
++	unsigned int		oob_buff_pos;
+ 
+ 	/* DMA information */
+ 	int			drcmr_dat;
+@@ -338,11 +340,12 @@ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_host *host,
+  * spare and ECC configuration.
+  * Only applicable to READ0, READOOB and PAGEPROG commands.
+  */
+-static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
++static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info,
++				struct mtd_info *mtd)
+ {
+ 	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
+ 
+-	info->data_size = info->fifo_size;
++	info->data_size = mtd->writesize;
+ 	if (!oob_enable)
+ 		return;
+ 
+@@ -430,26 +433,39 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+ 
+ static void handle_data_pio(struct pxa3xx_nand_info *info)
+ {
++	unsigned int do_bytes = min(info->data_size, info->fifo_size);
++
+ 	switch (info->state) {
+ 	case STATE_PIO_WRITING:
+-		__raw_writesl(info->mmio_base + NDDB, info->data_buff,
+-				DIV_ROUND_UP(info->data_size, 4));
++		__raw_writesl(info->mmio_base + NDDB,
++			      info->data_buff + info->data_buff_pos,
++			      DIV_ROUND_UP(do_bytes, 4));
++
+ 		if (info->oob_size > 0)
+-			__raw_writesl(info->mmio_base + NDDB, info->oob_buff,
+-					DIV_ROUND_UP(info->oob_size, 4));
++			__raw_writesl(info->mmio_base + NDDB,
++				      info->oob_buff + info->oob_buff_pos,
++				      DIV_ROUND_UP(info->oob_size, 4));
+ 		break;
+ 	case STATE_PIO_READING:
+-		__raw_readsl(info->mmio_base + NDDB, info->data_buff,
+-				DIV_ROUND_UP(info->data_size, 4));
++		__raw_readsl(info->mmio_base + NDDB,
++			     info->data_buff + info->data_buff_pos,
++			     DIV_ROUND_UP(do_bytes, 4));
++
+ 		if (info->oob_size > 0)
+-			__raw_readsl(info->mmio_base + NDDB, info->oob_buff,
+-					DIV_ROUND_UP(info->oob_size, 4));
++			__raw_readsl(info->mmio_base + NDDB,
++				     info->oob_buff + info->oob_buff_pos,
++				     DIV_ROUND_UP(info->oob_size, 4));
+ 		break;
+ 	default:
+ 		dev_err(&info->pdev->dev, "%s: invalid state %d\n", __func__,
+ 				info->state);
+ 		BUG();
  	}
++
++	/* Update buffer pointers for multi-page read/write */
++	info->data_buff_pos += do_bytes;
++	info->oob_buff_pos += info->oob_size;
++	info->data_size -= do_bytes;
  }
  
--static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
--		uint16_t column, int page_addr)
-+static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
- {
--	int addr_cycle, exec_cmd;
--	struct pxa3xx_nand_host *host;
--	struct mtd_info *mtd;
--
--	host = info->host[info->cs];
--	mtd = host->mtd;
--	addr_cycle = 0;
--	exec_cmd = 1;
--
- 	/* reset data and oob column point to handle data */
+ #ifdef ARCH_HAS_DMA
+@@ -616,6 +632,8 @@ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
  	info->buf_start		= 0;
  	info->buf_count		= 0;
-@@ -627,10 +617,6 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 	info->oob_size		= 0;
++	info->data_buff_pos	= 0;
++	info->oob_buff_pos	= 0;
+ 	info->use_ecc		= 0;
  	info->use_spare		= 1;
  	info->retcode		= ERR_NONE;
- 	info->ndcb3		= 0;
--	if (info->cs != 0)
--		info->ndcb0 = NDCB0_CSEL;
--	else
--		info->ndcb0 = 0;
- 
- 	switch (command) {
- 	case NAND_CMD_READ0:
-@@ -642,14 +628,32 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+@@ -626,7 +644,7 @@ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
+ 	case NAND_CMD_PAGEPROG:
+ 		info->use_ecc = 1;
+ 	case NAND_CMD_READOOB:
+-		pxa3xx_set_datasize(info);
++		pxa3xx_set_datasize(info, mtd);
+ 		break;
  	case NAND_CMD_PARAM:
  		info->use_spare = 0;
- 		break;
--	case NAND_CMD_SEQIN:
--		exec_cmd = 0;
--		break;
- 	default:
- 		info->ndcb1 = 0;
- 		info->ndcb2 = 0;
- 		break;
- 	}
-+}
-+
-+static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
-+		uint16_t column, int page_addr)
-+{
-+	int addr_cycle, exec_cmd;
-+	struct pxa3xx_nand_host *host;
-+	struct mtd_info *mtd;
-+
-+	host = info->host[info->cs];
-+	mtd = host->mtd;
-+	addr_cycle = 0;
-+	exec_cmd = 1;
-+
-+	if (info->cs != 0)
-+		info->ndcb0 = NDCB0_CSEL;
-+	else
-+		info->ndcb0 = 0;
-+
-+	if (command == NAND_CMD_SEQIN)
-+		exec_cmd = 0;
- 
- 	addr_cycle = NDCB0_ADDR_CYC(host->row_addr_cycles
- 				    + host->col_addr_cycles);
-@@ -784,8 +788,10 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
- 		nand_writel(info, NDTR1CS0, info->ndtr1cs0);
- 	}
- 
-+	prepare_start_command(info, command);
-+
- 	info->state = STATE_PREPARED;
--	exec_cmd = prepare_command_pool(info, command, column, page_addr);
-+	exec_cmd = prepare_set_command(info, command, column, page_addr);
- 	if (exec_cmd) {
- 		init_completion(&info->cmd_complete);
- 		init_completion(&info->dev_ready);
 -- 
 1.8.1.5
