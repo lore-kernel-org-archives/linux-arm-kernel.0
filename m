@@ -1,21 +1,29 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Nov 2013 02:17:23 +0300
-Subject: [PATCH v2 0/3] Add Ether support for R8A7791/Koelsch board
-Message-ID: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 14 Nov 2013 14:18:14 -0800
+Subject: [PATCH v5 05/14] mtd: nand: pxa3xx: Clear cmd buffer #3
+ (NDCB3) on command start
+In-Reply-To: <1384464339-6817-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1384464339-6817-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131114221814.GS9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Nov 14, 2013 at 06:25:30PM -0300, Ezequiel Garcia wrote:
+> Command buffer #3 is not properly cleared and it keeps the last
+> set value. Fix this by clearing when a command is setup.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-   Resending with correct subject...
+Does this have any bugfix ramifications for -stable? You started using
+ndcb3 in:
 
-   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-v3.12-20131112' tag. Here we add the Ether support to the
-R8A7791/Koelsch board. The patchset requires the 'sh_eth' driver R8A7791
-support patch posted earlier in order to work.
+commit 41a634303f8dbf97c8087773b9d66914d2a9c0fd
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Mon Aug 12 14:14:51 2013 -0300
 
-[1/3] ARM: shmobile: r8a7791: add Ether clock
-[2/3] ARM: shmobile: Koelsch: add Ether support
-[3/3] ARM: shmobile: Koelsch: enable Ether in defconfig
+    mtd: nand: pxa3xx: Use 'length override' in ONFI paramater page read
 
-WBR, Sergei
+This was merged for 3.12.
+
+Brian
