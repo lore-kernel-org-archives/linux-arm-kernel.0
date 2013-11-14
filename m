@@ -1,38 +1,76 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Nov 2013 18:25:35 -0300
-Subject: [PATCH v5 10/14] mtd: nand: pxa3xx: Fix SEQIN column address set
+Date: Thu, 14 Nov 2013 18:25:31 -0300
+Subject: [PATCH v5 06/14] mtd: nand: pxa3xx: Add helper function to set page
+ address
 In-Reply-To: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1384464339-6817-11-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1384464339-6817-7-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support page programming with a non-zero "column"
-address setting. This is important to support OOB writing, through
-command sequences such as:
-
-  cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize, ofs);
-  write_buf(mtd, oob_buf, 6);
-  cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
+Let's simplify the code by first introducing a helper function
+to set the page address, as done by the READ0, READOOB and SEQIN
+commands.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 36 +++++++++++++++++++++---------------
+ 1 file changed, 21 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 1a9849f..d15aee6 100644
+index 5b5243f..5e0d201 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -694,7 +694,8 @@ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
+@@ -587,6 +587,26 @@ static inline int is_buf_blank(uint8_t *buf, size_t len)
+ 	return 1;
+ }
+ 
++static void set_command_address(struct pxa3xx_nand_info *info,
++		unsigned int page_size, uint16_t column, int page_addr)
++{
++	/* small page addr setting */
++	if (page_size < PAGE_CHUNK_SIZE) {
++		info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
++				| (column & 0xFF);
++
++		info->ndcb2 = 0;
++	} else {
++		info->ndcb1 = ((page_addr & 0xFFFF) << 16)
++				| (column & 0xFFFF);
++
++		if (page_addr & 0xFF0000)
++			info->ndcb2 = (page_addr & 0xFF0000) >> 16;
++		else
++			info->ndcb2 = 0;
++	}
++}
++
+ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 		uint16_t column, int page_addr)
+ {
+@@ -650,22 +670,8 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8);
  
  	case NAND_CMD_SEQIN:
+-		/* small page addr setting */
+-		if (unlikely(mtd->writesize < PAGE_CHUNK_SIZE)) {
+-			info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
+-					| (column & 0xFF);
+-
+-			info->ndcb2 = 0;
+-		} else {
+-			info->ndcb1 = ((page_addr & 0xFFFF) << 16)
+-					| (column & 0xFFFF);
+-
+-			if (page_addr & 0xFF0000)
+-				info->ndcb2 = (page_addr & 0xFF0000) >> 16;
+-			else
+-				info->ndcb2 = 0;
+-		}
  
--		set_command_address(info, mtd->writesize, column, page_addr);
-+		info->buf_start = column;
-+		set_command_address(info, mtd->writesize, 0, page_addr);
- 		break;
++		set_command_address(info, mtd->writesize, column, page_addr);
+ 		info->buf_count = mtd->writesize + mtd->oobsize;
+ 		memset(info->data_buff, 0xFF, info->buf_count);
  
- 	case NAND_CMD_PAGEPROG:
 -- 
 1.8.1.5
