@@ -1,56 +1,32 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 14 Nov 2013 14:02:06 -0700
-Subject: [PATCH 0/8] imx6 dts cleanup series
-Message-ID: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
+Date: Thu, 14 Nov 2013 14:02:08 -0700
+Subject: [PATCH 2/8] ARM: dts: imx: imx6qdl.dtsi: add mipi_csi tag
+In-Reply-To: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1384462934-17390-3-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a cleanup series. Only patch 8 adds new functionality,
-dualLite support for the sabrelite board.
+We will reference mipi_csi from board
+dts files.
 
-patches 1-6 can be applied in any order
-patch 7 depends on patches 4,5
-patch 8 depends on patch 3
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Troy Kisky (8):
-  ARM: dts: imx: pinfunc: add MX6QDL_PAD_SD1_CLK__OSC32K_32K_OUT
-  ARM: dts: imx: imx6qdl.dtsi: add mipi_csi tag
-  ARM: dts: imx: imx6sl/qdl-pingrp: reorganize USDHCx pad groups
-  ARM: dts: imx: imx6q.dtsi: use IRQ_TYPE_LEVEL_HIGH
-  ARM: dts: imx: imx6dl.dtsi: use IRQ_TYPE_LEVEL_HIGH
-  ARM: dts: imx: imx6sl.dtsi: use IRQ_TYPE_LEVEL_HIGH
-  ARM: dts: imx: imx6qdl.dtsi: use IRQ_TYPE_LEVEL_HIGH
-  ARM: dts: imx: sabrelite: add dualLite support
-
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/imx6dl-pinfunc.h         |   1 +
- arch/arm/boot/dts/imx6dl-sabrelite.dts     |  20 +++
- arch/arm/boot/dts/imx6dl.dtsi              |   9 +-
- arch/arm/boot/dts/imx6q-arm2.dts           |   4 +-
- arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts    |   2 +-
- arch/arm/boot/dts/imx6q-gw5400-a.dts       |   2 +-
- arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   4 +-
- arch/arm/boot/dts/imx6q-pinfunc.h          |   1 +
- arch/arm/boot/dts/imx6q-sabrelite.dts      | 214 +--------------------------
- arch/arm/boot/dts/imx6q-sbc6x.dts          |   2 +-
- arch/arm/boot/dts/imx6q-udoo.dts           |   2 +-
- arch/arm/boot/dts/imx6q.dtsi               |   8 +-
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi      |   2 +-
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi      |   2 +-
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi      |   2 +-
- arch/arm/boot/dts/imx6qdl-pingrp.h         | 188 +++++++++++-------------
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi   |   6 +-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi   | 226 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi     |   4 +-
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi   |   6 +-
- arch/arm/boot/dts/imx6qdl.dtsi             | 164 ++++++++++++---------
- arch/arm/boot/dts/imx6sl-evk.dts           |  18 +--
- arch/arm/boot/dts/imx6sl-pingrp.h          | 169 ++++++++++-----------
- arch/arm/boot/dts/imx6sl.dtsi              | 125 ++++++++--------
- 25 files changed, 620 insertions(+), 562 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6dl-sabrelite.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index dcab03b..8a38161 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -839,7 +839,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			mipi at 021dc000 { /* MIPI-CSI */
++			mipi_csi: mipi at 021dc000 {
+ 				reg = <0x021dc000 0x4000>;
+ 			};
+ 
 -- 
 1.8.1.2
