@@ -1,165 +1,93 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 14 Nov 2013 14:48:10 +0100
-Subject: [PATCHv4] dmaengine: Add support for BCM2835
-In-Reply-To: <528477EE.4060407@koalo.de>
-References: <5283BC93.1090801@koalo.de> <2049375.GR9Xb2zuek@flatron>
- <528477EE.4060407@koalo.de>
-Message-ID: <5235663.VIm8z9qphx@flatron>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Nov 2013 14:01:03 +0000
+Subject: [PATCH V4 1/4] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
+ routable irqs
+In-Reply-To: <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
+References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
+ <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <20131114140103.GA28328@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 of November 2013 08:12:46 Florian Meier wrote:
-> On 13.11.2013 21:39, Tomasz Figa wrote:
-> > On Wednesday 13 of November 2013 20:35:22 Florian Meier wrote:
-> >> On 13.11.2013 19:43, Tomasz Figa wrote:
-> >>>> ....
-> >>>> diff --git a/Documentation/devicetree/bindings/dma/bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
-> >>>> new file mode 100644
-> >>>> index 0000000..bca5e84
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
-> >>>> @@ -0,0 +1,59 @@
-> >>>> +* BCM2835 DMA controller
-> >>>> +
-> >>>> +Required properties:
-> >>>> +- compatible: Should be "brcm,bcm2835-dma".
-> >>>> +- reg: Should contain DMA registers location and length.
-> >>>> +- interrupts: Should contain the DMA interrupts associated
-> >>>> +		to the DMA channels in ascending order.
-> >>>> +		First cell is the IRQ bank.
-> >>>> +		Second cell is the IRQ number.
-> >>>> +- #dma-cells: Must be <1>, used to represent the number of integer cells in
-> >>>> +		the dmas property of client devices.
-> >>>> +- dma-channels: Maximum number of DMA channels available.
-> >>>> +- dma-requests: Number of DMA Requests.
-> >>>
-> >>> The two properties above do not seem to be used anywhere in the driver.
-> >>
-> >> Aren't they necessary for the DMA engine core?
-> > 
-> > Honestly, looking at the DMA bindings documentation, these two are quite
-> > a mystery for me. They don't seem to be used in DMA engine core, but
-> > instead several drivers use them for private purposes.
-> > 
-> > So, since they are optional and you don't seem to need them, I wouldn't
-> > list them.
+On Thu, Nov 14, 2013 at 12:18:47PM +0000, Sricharan R wrote:
+> In some socs the gic can be preceded by a crossbar IP which
+> routes the peripheral interrupts to the gic inputs. The peripheral
+> interrupts are associated with a fixed crossbar input line and the
+> crossbar routes that to one of the free gic input line.
 > 
-> Ok
+> The DT entries for peripherals provides the fixed crossbar input line
+> as its interrupt number and the mapping code should associate this with
+> a free gic input line. This patch adds the support inside the gic irqchip
+> to handle such routable irqs. The routable irqs are registered in a linear
+> domain. The registered routable domain's callback should be implemented
+> to get a free irq and to configure the IP to route it.
 > 
-> >>>> +- brcm,dma-channel-mask: Bit mask representing the channels available.
-> >>>
-> >>> What does the value of this property depend on? Could you describe the
-> >>> structure of this DMA controller?
-> >>>
-> >>>> +
-> >>>> +Example:
-> >>>> +
-> >>>> +dma: dma at 7e007000 {
-> >>>> +	compatible = "brcm,bcm2835-dma";
-> >>>> +	reg = <0x7e007000 0xf00>;
-> >>>> +	interrupts = <1 16
-> >>>> +		      1 17
-> >>>> +		      1 18
-> >>>> +		      1 19
-> >>>> +		      1 20
-> >>>> +		      1 21
-> >>>> +		      1 22
-> >>>> +		      1 23
-> >>>> +		      1 24
-> >>>> +		      1 25
-> >>>> +		      1 26
-> >>>> +		      1 27
-> >>>> +		      1 28>;
-> >>>
-> >>> There are 13 interrupts specified here, but...
-> >>>
-> >>>> +
-> >>>> +	#dma-cells = <1>;
-> >>>> +	dma-channels = <16>;
-> >>>
-> >>> ...16 channels here...
-> >>>
-> >>>> +	dma-requests = <32>;
-> >>>> +	brcm,dma-channel-mask = <0x7f35>;
-> >>>
-> >>> ...and 11 set bits here. May I ask you to explain this to me, please?
-> >>
-> >> How I understand this DMA controller:
-> >> There are 16 DMA channels in the DMA controller, but only 13 interrupts
-> >> are available at the IRQ controller. Therefore, the upper DMA channels
-> >> can just not be used. Maybe because there are to many other IRQs and
-> >> they didn't want to implement another IRQ bank.
-> >> Furthermore, some of the DMA channels are already used by the
-> >> VideoCore/GPU/firmware. This is what dma-channel-mask indicates. This
-> >> should be automatically set by the firmware in the future.
-> >> Finally, there are some channels with special functionality that should
-> >> not be used by DMA engine, too. Therefore, these lines:
-> >> 		/* do not use the FIQ and BULK channels */
-> >> 		chans_available &= ~0xD;
-> > 
-> > OK, this makes it much more clear.
-> > 
-> > So, my only comment remaining here is that you shouldn't include the
-> > channels without interrupt signal in the mask. This would allow you
-> > to define it as a mask of channels that are operable and then just
-> > iterate over all set bits in the driver, instead of using tricks with
-> > interrupt resources. What do you think?
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  [V2] Added default routable-irqs functions to avoid
+>       unnecessary if checks as per Thomas Gleixner comments
+>       and renamed routable-irq binding as per
+>       Kumar Gala <galak@codeaurora.org> comments.
 > 
-> Since the mask will come directly from the firmware, this would require
-> patching the firmware. I think that is not worth the effort.
-
-Now I'm slightly confused. Do you already have code in your firmware that
-adds this property to your device tree?
-
-Otherwise in what circumstances such patching would take place? On given
-hardware (unless it's an FPGA) the configuration of available DMA channels
-that have interrupt signals should not change.
-
+>  [V3] Addressed unnecessary warn-on and updated default
+>       xlate function as per Thomas Gleixner comments
 > 
-> >>> [snip]
-> >>>> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> >>>> new file mode 100644
-> >>>> index 0000000..baf072e
-> >>>> --- /dev/null
-> >>>> +++ b/drivers/dma/bcm2835-dma.c
-> >>> [snip]
-> >>>> +static int bcm2835_dma_probe(struct platform_device *pdev)
-> >>>> +{
-> >>>> +	struct bcm2835_dmadev *od;
-> >>>> +	struct resource *dma_res = NULL;
-> >>>> +	void __iomem *dma_base = NULL;
-> >>>> +	int rc = 0;
-> >>>> +	int i = 0;
-> >>>> +	int irq;
-> >>>> +	uint32_t chans_available;
-> >>> [snip]
-> >>>> +	if (pdev->dev.of_node) {
-> >>>
-> >>> Is this driver supposed to support non-DT based instantation (aka board
-> >>> files)? If not, maybe it would be cleaner to simply check for
-> >>> !pdev->dev.of_node at the beginning of probe and return an error?
-> >>
-> >> I would like to maintain the possibility for board file based
-> >> instatiation, because the Raspberry Pi downstream kernel still doesn't
-> >> support device tree. If this is a no-go, I will accept that.
-> > 
-> > Sure, you are free to do so.
-> > 
-> > What I meant is that your probe won't call bcm2835_dma_chan_init() at all
-> > if there is no pdev->dev.of_node, because the loop iterating over channels
-> > is under the if clause.
+>  Documentation/devicetree/bindings/arm/gic.txt |    6 ++
+>  drivers/irqchip/irq-gic.c                     |   81 ++++++++++++++++++++++---
+>  include/linux/irqchip/arm-gic.h               |    7 ++-
+>  3 files changed, 83 insertions(+), 11 deletions(-)
 > 
-> Yes you are right, but I think it will make the patching easier, later.
-> Currently, nothing bad happens without device tree - it just allocates
-> no channels.
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 3dfb0c0..5357745 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -49,6 +49,11 @@ Optional
+>    regions, used when the GIC doesn't have banked registers. The offset is
+>    cpu-offset * cpu-nr.
+>  
+> +- arm,routable-irqs : Total number of gic irq inputs which are not directly
+> +		  connected from the peripherals, but are routed dynamically
+> +		  by a crossbar/multiplexer preceding the GIC. The GIC irq
+> +		  input line is assigned dynamically when the corresponding
+> +		  peripheral's crossbar line is mapped.
 
-But isn't it really an error condition, if no channels are allocated?
+I'm not keen on the design of the arm,routable-irqs property. The set of
+IRQs which the crossbar IP can use is a property of which IRQ lines it
+has routed to the GIC. I don't see why that should be considered a
+property of the GIC; it's a property of the crossbar IP's attachment to
+the GIC.
 
-Anyway, back to my point about leaving non-DT support in a driver, the
-point is still valid only for drivers, not for platforms/boards. So if
-there are no boards supported using board files in mainline that could
-benefit from this driver, then this driver can be safely made DT-only,
-because no new non-DT platforms/boards can be added.
+Given we already have a mechanism for describing the attachment (i.e.
+the interrupts property) where the property appears on the node for the
+device generating/propagating the interrupt, I don't see why we should
+do differently here.
 
-Best regards,
-Tomasz
+Listing 160 interrupts in the crossbar node is clearly something we
+don't want to have to do.  If we had a property that we could use to
+define a range (or multiple ranges) of interrupts, then the crossbar
+driver could go and request those ranges from its interrupt-parent (the
+GIC) and the GIC driver could reserve/allocate the irqdomain at that
+time.
+
+This feels like a point-hack, counter in style to the vast majority of
+provider/consumer bindings. It only allows for one multiplexer before
+the GIC. What if we had multiple multiplexers feeding into the GIC?
+Describing the attachment on the multiplexer allows that to be handled,
+describing that on the GIC does not.
+
+Describing the attachement on the multiplexer would also prevent the
+duplication of information (i.e. the max-irqs property in the crossbar
+binding).
+
+Thanks,
+Mark.
