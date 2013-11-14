@@ -1,37 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Nov 2013 16:16:53 +0000
-Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
-In-Reply-To: <5283BCA0.40300@wwwdotorg.org>
-References: <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
- <5282BAFC.8070405@wwwdotorg.org>
- <20131113143804.GA11928@mudshark.cambridge.arm.com>
- <20131113.180610.823304139654159769.hdoyu@nvidia.com>
- <20131113173142.GF11928@mudshark.cambridge.arm.com>
- <5283BCA0.40300@wwwdotorg.org>
-Message-ID: <20131114161652.GE2622@mudshark.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 14 Nov 2013 17:14:22 +0100
+Subject: [PATCH 4/4] arm64: advertise CPU features for modalias matching
+In-Reply-To: <20131114152907.GL20261@arm.com>
+References: <1384165175-16134-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1384165175-16134-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20131114152907.GL20261@arm.com>
+Message-ID: <CAKv+Gu8ORgnhPpt-mK2cghiP5CpjSQ=L5JwvMu+wYMaDU7xbtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 05:53:36PM +0000, Stephen Warren wrote:
-> On 11/13/2013 10:31 AM, Will Deacon wrote:
-> > On Wed, Nov 13, 2013 at 04:06:10PM +0000, Hiroshi Doyu wrote:
-> >> This can be solved with introducing the fixed size of bitmap. The size
-> >> of bitmap can be fixed even per SoC. In tegra we used 64(2 cells)
-> >> which I expect at most.
-> > 
-> > That really doesn't sound like a good idea where you have bridges (like a
-> > PCIe host controller) which could have a significant chunk of StreamID
-> > space. You'd also need to pad everything out with some dummy IDs for parsing
-> > purposes. Yuck!
-> 
-> Can't you solve this by having the SMMU include a stream ID mapping
-> table. In the case of stream IDs having a large "address" space, then
-> just define the mapping table syntax to allow easy specification of
-> ranges using start/length, start/end, or value/mask pairs. Similar to
-> ranges or PCI's interrupt-map{,-mask}.
+On 14 November 2013 16:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Nov 11, 2013 at 10:19:35AM +0000, Ard Biesheuvel wrote:
+>> +ssize_t arch_print_cpu_modalias(struct device *dev,
+>> +                             struct device_attribute *attr,
+>> +                             char *buf)
+>> +{
+>> +     unsigned int caps;
+>> +     ssize_t n;
+>> +     int i;
+>> +
+>> +     /*
+>> +      * With 32 features maximum (taking 5 bytes each to print), we don't
+>> +      * need to worry about overrunning the PAGE_SIZE sized buffer.
+>> +      */
+>> +     n = sprintf(buf, "cpu:type:arm64:feature:");
+>
+> I would use "aarch64" here instead of arm64 for consistency with the
+> architecture mode, compiler triplet and ELF_PLATFORM definition in the
+> kernel.
 
-That may work for windows, but the mapping from input stream IDs to output
-IDs can be arbitrary (I *really* hope people stick to windows for requester
-IDs though).
+OK, I will change that.
 
-Will
+Regards,
+Ard,
