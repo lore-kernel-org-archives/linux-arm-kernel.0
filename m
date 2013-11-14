@@ -1,9 +1,9 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 14 Nov 2013 11:18:58 +0100
-Subject: [PATCH v3 2/4] ARM: imx53: use clock defines in DTS files
+Date: Thu, 14 Nov 2013 11:19:00 +0100
+Subject: [PATCH v3 4/4] ARM: imx50: use clock defines in DTS files
 In-Reply-To: <1384424340-24991-1-git-send-email-l.stach@pengutronix.de>
 References: <1384424340-24991-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1384424340-24991-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1384424340-24991-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,77 +11,26 @@ For better readability and no need to look up numbers
 in the documentation anymore.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+--
+v3: add missing include
 ---
- arch/arm/boot/dts/imx53-m53evk.dts |   2 +-
- arch/arm/boot/dts/imx53-mba53.dts  |   2 +-
- arch/arm/boot/dts/imx53-qsb.dts    |   2 +-
- arch/arm/boot/dts/imx53.dtsi       | 122 +++++++++++++++++++++++--------------
- 4 files changed, 80 insertions(+), 48 deletions(-)
+ arch/arm/boot/dts/imx50.dtsi | 79 ++++++++++++++++++++++++++++----------------
+ 1 file changed, 51 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 75834499e888..912163dd3248 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -146,7 +146,7 @@
- 		reg = <0x0a>;
- 		VDDA-supply = <&reg_3p2v>;
- 		VDDIO-supply = <&reg_3p2v>;
--		clocks = <&clks 150>;
-+		clocks = <&clks IMX5_CLK_SSI_EXT1_GATE>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
-index 3897bd8a6bf0..0358366c5a17 100644
---- a/arch/arm/boot/dts/imx53-mba53.dts
-+++ b/arch/arm/boot/dts/imx53-mba53.dts
-@@ -163,7 +163,7 @@
- 	codec: sgtl5000 at a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
--		clocks = <&clks 150>;
-+		clocks = <&clks IMX5_CLK_SSI_EXT1_GATE>;
- 		VDDA-supply = <&reg_3p2v>;
- 		VDDIO-supply = <&reg_3p2v>;
- 	};
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 6d05822db8d0..aae06bbd821b 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -219,7 +219,7 @@
- 		reg = <0x0a>;
- 		VDDA-supply = <&reg_3p2v>;
- 		VDDIO-supply = <&reg_3p2v>;
--		clocks = <&clks 150>;
-+		clocks = <&clks IMX5_CLK_SSI_EXT1_GATE>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index cffdda2d966e..b330ef758bcb 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -13,6 +13,7 @@
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index c547e29b8e87..fd3a50a25622 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -14,6 +14,7 @@
  #include "skeleton.dtsi"
- #include "imx53-pinfunc.h"
- #include "imx53-pingrp.h"
+ #include "imx50-pinfunc.h"
+ #include "imx50-pingrp.h"
 +#include <dt-bindings/clock/imx5-clock.h>
  
  / {
  	aliases {
-@@ -90,7 +91,9 @@
- 			compatible = "fsl,imx53-ipu";
- 			reg = <0x18000000 0x080000000>;
- 			interrupts = <11 10>;
--			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
-+			clocks = <&clks IMX5_CLK_IPU_GATE>,
-+			         <&clks IMX5_CLK_IPU_DI0_GATE>,
-+			         <&clks IMX5_CLK_IPU_DI1_GATE>;
- 			clock-names = "bus", "di0", "di1";
- 			resets = <&src 2>;
- 		};
-@@ -113,7 +116,9 @@
- 					compatible = "fsl,imx53-esdhc";
+@@ -97,7 +98,9 @@
+ 					compatible = "fsl,imx50-esdhc";
  					reg = <0x50004000 0x4000>;
  					interrupts = <1>;
 -					clocks = <&clks 44>, <&clks 0>, <&clks 71>;
@@ -91,8 +40,8 @@ index cffdda2d966e..b330ef758bcb 100644
  					clock-names = "ipg", "ahb", "per";
  					bus-width = <4>;
  					status = "disabled";
-@@ -123,7 +128,9 @@
- 					compatible = "fsl,imx53-esdhc";
+@@ -107,7 +110,9 @@
+ 					compatible = "fsl,imx50-esdhc";
  					reg = <0x50008000 0x4000>;
  					interrupts = <2>;
 -					clocks = <&clks 45>, <&clks 0>, <&clks 72>;
@@ -102,8 +51,8 @@ index cffdda2d966e..b330ef758bcb 100644
  					clock-names = "ipg", "ahb", "per";
  					bus-width = <4>;
  					status = "disabled";
-@@ -133,7 +140,8 @@
- 					compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+@@ -117,7 +122,8 @@
+ 					compatible = "fsl,imx50-uart", "fsl,imx21-uart";
  					reg = <0x5000c000 0x4000>;
  					interrupts = <33>;
 -					clocks = <&clks 32>, <&clks 33>;
@@ -112,8 +61,8 @@ index cffdda2d966e..b330ef758bcb 100644
  					clock-names = "ipg", "per";
  					status = "disabled";
  				};
-@@ -144,7 +152,8 @@
- 					compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
+@@ -128,7 +134,8 @@
+ 					compatible = "fsl,imx50-ecspi", "fsl,imx51-ecspi";
  					reg = <0x50010000 0x4000>;
  					interrupts = <36>;
 -					clocks = <&clks 51>, <&clks 52>;
@@ -122,17 +71,17 @@ index cffdda2d966e..b330ef758bcb 100644
  					clock-names = "ipg", "per";
  					status = "disabled";
  				};
-@@ -153,7 +162,7 @@
- 					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
+@@ -137,7 +144,7 @@
+ 					compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
  					reg = <0x50014000 0x4000>;
  					interrupts = <30>;
 -					clocks = <&clks 49>;
 +					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
- 					dmas = <&sdma 24 1 0>,
- 					       <&sdma 25 1 0>;
- 					dma-names = "rx", "tx";
-@@ -166,7 +175,9 @@
- 					compatible = "fsl,imx53-esdhc";
+ 					fsl,fifo-depth = <15>;
+ 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
+ 					status = "disabled";
+@@ -147,7 +154,9 @@
+ 					compatible = "fsl,imx50-esdhc";
  					reg = <0x50020000 0x4000>;
  					interrupts = <3>;
 -					clocks = <&clks 46>, <&clks 0>, <&clks 73>;
@@ -142,8 +91,8 @@ index cffdda2d966e..b330ef758bcb 100644
  					clock-names = "ipg", "ahb", "per";
  					bus-width = <4>;
  					status = "disabled";
-@@ -176,7 +187,9 @@
- 					compatible = "fsl,imx53-esdhc";
+@@ -157,7 +166,9 @@
+ 					compatible = "fsl,imx50-esdhc";
  					reg = <0x50024000 0x4000>;
  					interrupts = <4>;
 -					clocks = <&clks 47>, <&clks 0>, <&clks 74>;
@@ -153,96 +102,52 @@ index cffdda2d966e..b330ef758bcb 100644
  					clock-names = "ipg", "ahb", "per";
  					bus-width = <4>;
  					status = "disabled";
-@@ -185,14 +198,14 @@
- 
- 			usbphy0: usbphy at 0 {
- 				compatible = "usb-nop-xceiv";
--				clocks = <&clks 124>;
-+				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
- 				clock-names = "main_clk";
- 				status = "okay";
- 			};
- 
- 			usbphy1: usbphy at 1 {
- 				compatible = "usb-nop-xceiv";
--				clocks = <&clks 125>;
-+				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
- 				clock-names = "main_clk";
- 				status = "okay";
- 			};
-@@ -201,7 +214,7 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
+@@ -168,7 +179,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
  				reg = <0x53f80000 0x0200>;
  				interrupts = <18>;
--				clocks = <&clks 108>;
-+				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 0>;
- 				fsl,usbphy = <&usbphy0>;
+-				clocks = <&clks 124>;
++				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
  				status = "disabled";
-@@ -211,7 +224,7 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
+ 			};
+ 
+@@ -176,7 +187,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
  				reg = <0x53f80200 0x0200>;
  				interrupts = <14>;
--				clocks = <&clks 108>;
-+				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				fsl,usbphy = <&usbphy1>;
+-				clocks = <&clks 125>;
++				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
  				status = "disabled";
-@@ -221,7 +234,7 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
+ 			};
+ 
+@@ -184,7 +195,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
  				reg = <0x53f80400 0x0200>;
  				interrupts = <16>;
 -				clocks = <&clks 108>;
 +				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 2>;
  				status = "disabled";
  			};
-@@ -230,7 +243,7 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
+ 
+@@ -192,7 +203,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
  				reg = <0x53f80600 0x0200>;
  				interrupts = <17>;
 -				clocks = <&clks 108>;
 +				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 3>;
- 				status = "disabled";
- 			};
-@@ -239,7 +252,7 @@
- 				#index-cells = <1>;
- 				compatible = "fsl,imx53-usbmisc";
- 				reg = <0x53f80800 0x200>;
--				clocks = <&clks 108>;
-+				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 			};
- 
- 			gpio1: gpio at 53f84000 {
-@@ -286,7 +299,7 @@
- 				compatible = "fsl,imx53-kpp", "fsl,imx21-kpp";
- 				reg = <0x53f94000 0x4000>;
- 				interrupts = <60>;
--				clocks = <&clks 0>;
-+				clocks = <&clks IMX5_CLK_DUMMY>;
  				status = "disabled";
  			};
  
-@@ -294,14 +307,14 @@
- 				compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
+@@ -240,14 +251,15 @@
+ 				compatible = "fsl,imx50-wdt", "fsl,imx21-wdt";
  				reg = <0x53f98000 0x4000>;
  				interrupts = <58>;
 -				clocks = <&clks 0>;
 +				clocks = <&clks IMX5_CLK_DUMMY>;
  			};
  
- 			wdog2: wdog at 53f9c000 {
- 				compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
- 				reg = <0x53f9c000 0x4000>;
- 				interrupts = <59>;
--				clocks = <&clks 0>;
-+				clocks = <&clks IMX5_CLK_DUMMY>;
- 				status = "disabled";
- 			};
- 
-@@ -309,7 +322,8 @@
- 				compatible = "fsl,imx53-gpt", "fsl,imx31-gpt";
+ 			gpt: timer at 53fa0000 {
+ 				compatible = "fsl,imx50-gpt", "fsl,imx31-gpt";
  				reg = <0x53fa0000 0x4000>;
  				interrupts = <39>;
 -				clocks = <&clks 36>, <&clks 41>;
@@ -251,25 +156,9 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  			};
  
-@@ -329,9 +343,12 @@
- 				compatible = "fsl,imx53-ldb";
- 				reg = <0x53fa8008 0x4>;
- 				gpr = <&gpr>;
--				clocks = <&clks 122>, <&clks 120>,
--					 <&clks 115>, <&clks 116>,
--					 <&clks 123>, <&clks 85>;
-+				clocks = <&clks IMX5_CLK_LDB_DI0_SEL>,
-+				         <&clks IMX5_CLK_LDB_DI1_SEL>,
-+				         <&clks IMX5_CLK_IPU_DI0_SEL>,
-+				         <&clks IMX5_CLK_IPU_DI1_SEL>,
-+				         <&clks IMX5_CLK_LDB_DI0_GATE>,
-+				         <&clks IMX5_CLK_LDB_DI1_GATE>;
- 				clock-names = "di0_pll", "di1_pll",
- 					      "di0_sel", "di1_sel",
- 					      "di0", "di1";
-@@ -354,7 +371,8 @@
+@@ -265,7 +277,8 @@
  				#pwm-cells = <2>;
- 				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
+ 				compatible = "fsl,imx50-pwm", "fsl,imx27-pwm";
  				reg = <0x53fb4000 0x4000>;
 -				clocks = <&clks 37>, <&clks 38>;
 +				clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
@@ -277,9 +166,9 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				interrupts = <61>;
  			};
-@@ -363,7 +381,8 @@
+@@ -274,7 +287,8 @@
  				#pwm-cells = <2>;
- 				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
+ 				compatible = "fsl,imx50-pwm", "fsl,imx27-pwm";
  				reg = <0x53fb8000 0x4000>;
 -				clocks = <&clks 39>, <&clks 40>;
 +				clocks = <&clks IMX5_CLK_PWM2_IPG_GATE>,
@@ -287,8 +176,8 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				interrupts = <94>;
  			};
-@@ -372,7 +391,8 @@
- 				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+@@ -283,7 +297,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
  				reg = <0x53fbc000 0x4000>;
  				interrupts = <31>;
 -				clocks = <&clks 28>, <&clks 29>;
@@ -297,8 +186,8 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				status = "disabled";
  			};
-@@ -381,7 +401,8 @@
- 				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+@@ -292,7 +307,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
  				reg = <0x53fc0000 0x4000>;
  				interrupts = <32>;
 -				clocks = <&clks 30>, <&clks 31>;
@@ -307,28 +196,8 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				status = "disabled";
  			};
-@@ -390,7 +411,8 @@
- 				compatible = "fsl,imx53-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x53fc8000 0x4000>;
- 				interrupts = <82>;
--				clocks = <&clks 158>, <&clks 157>;
-+				clocks = <&clks IMX5_CLK_CAN1_IPG_GATE>,
-+				         <&clks IMX5_CLK_CAN1_SERIAL_GATE>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
-@@ -399,7 +421,8 @@
- 				compatible = "fsl,imx53-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x53fcc000 0x4000>;
- 				interrupts = <83>;
--				clocks = <&clks 87>, <&clks 86>;
-+				clocks = <&clks IMX5_CLK_CAN2_IPG_GATE>,
-+				         <&clks IMX5_CLK_CAN2_SERIAL_GATE>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
-@@ -453,7 +476,7 @@
- 				compatible = "fsl,imx53-i2c", "fsl,imx21-i2c";
+@@ -336,7 +352,7 @@
+ 				compatible = "fsl,imx50-i2c", "fsl,imx21-i2c";
  				reg = <0x53fec000 0x4000>;
  				interrupts = <64>;
 -				clocks = <&clks 88>;
@@ -336,8 +205,8 @@ index cffdda2d966e..b330ef758bcb 100644
  				status = "disabled";
  			};
  
-@@ -461,7 +484,8 @@
- 				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+@@ -344,7 +360,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
  				reg = <0x53ff0000 0x4000>;
  				interrupts = <13>;
 -				clocks = <&clks 65>, <&clks 66>;
@@ -346,16 +215,8 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				status = "disabled";
  			};
-@@ -478,14 +502,15 @@
- 				compatible = "fsl,imx53-iim", "fsl,imx27-iim";
- 				reg = <0x63f98000 0x4000>;
- 				interrupts = <69>;
--				clocks = <&clks 107>;
-+				clocks = <&clks IMX5_CLK_IIM_GATE>;
- 			};
- 
- 			uart5: serial at 63f90000 {
- 				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+@@ -361,7 +378,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
  				reg = <0x63f90000 0x4000>;
  				interrupts = <86>;
 -				clocks = <&clks 67>, <&clks 68>;
@@ -364,17 +225,17 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				status = "disabled";
  			};
-@@ -493,7 +518,7 @@
+@@ -369,7 +387,7 @@
  			owire: owire at 63fa4000 {
- 				compatible = "fsl,imx53-owire", "fsl,imx21-owire";
+ 				compatible = "fsl,imx50-owire", "fsl,imx21-owire";
  				reg = <0x63fa4000 0x4000>;
 -				clocks = <&clks 159>;
 +				clocks = <&clks IMX5_CLK_OWIRE_GATE>;
  				status = "disabled";
  			};
  
-@@ -503,7 +528,8 @@
- 				compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
+@@ -379,7 +397,8 @@
+ 				compatible = "fsl,imx50-ecspi", "fsl,imx51-ecspi";
  				reg = <0x63fac000 0x4000>;
  				interrupts = <37>;
 -				clocks = <&clks 53>, <&clks 54>;
@@ -383,18 +244,18 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				status = "disabled";
  			};
-@@ -512,7 +538,8 @@
- 				compatible = "fsl,imx53-sdma", "fsl,imx35-sdma";
+@@ -388,7 +407,8 @@
+ 				compatible = "fsl,imx50-sdma", "fsl,imx35-sdma";
  				reg = <0x63fb0000 0x4000>;
  				interrupts = <6>;
 -				clocks = <&clks 56>, <&clks 56>;
 +				clocks = <&clks IMX5_CLK_SDMA_GATE>,
 +				         <&clks IMX5_CLK_SDMA_GATE>;
  				clock-names = "ipg", "ahb";
- 				#dma-cells = <3>;
- 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
-@@ -524,7 +551,8 @@
- 				compatible = "fsl,imx53-cspi", "fsl,imx35-cspi";
+ 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx50.bin";
+ 			};
+@@ -399,7 +419,8 @@
+ 				compatible = "fsl,imx50-cspi", "fsl,imx35-cspi";
  				reg = <0x63fc0000 0x4000>;
  				interrupts = <38>;
 -				clocks = <&clks 55>, <&clks 55>;
@@ -403,8 +264,8 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "per";
  				status = "disabled";
  			};
-@@ -535,7 +563,7 @@
- 				compatible = "fsl,imx53-i2c", "fsl,imx21-i2c";
+@@ -410,7 +431,7 @@
+ 				compatible = "fsl,imx50-i2c", "fsl,imx21-i2c";
  				reg = <0x63fc4000 0x4000>;
  				interrupts = <63>;
 -				clocks = <&clks 35>;
@@ -412,8 +273,8 @@ index cffdda2d966e..b330ef758bcb 100644
  				status = "disabled";
  			};
  
-@@ -545,7 +573,7 @@
- 				compatible = "fsl,imx53-i2c", "fsl,imx21-i2c";
+@@ -420,7 +441,7 @@
+ 				compatible = "fsl,imx50-i2c", "fsl,imx21-i2c";
  				reg = <0x63fc8000 0x4000>;
  				interrupts = <62>;
 -				clocks = <&clks 34>;
@@ -421,34 +282,16 @@ index cffdda2d966e..b330ef758bcb 100644
  				status = "disabled";
  			};
  
-@@ -553,7 +581,7 @@
- 				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
+@@ -428,7 +449,7 @@
+ 				compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
  				reg = <0x63fcc000 0x4000>;
  				interrupts = <29>;
 -				clocks = <&clks 48>;
 +				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
- 				dmas = <&sdma 28 0 0>,
- 				       <&sdma 29 0 0>;
- 				dma-names = "rx", "tx";
-@@ -572,7 +600,7 @@
- 				compatible = "fsl,imx53-nand";
- 				reg = <0x63fdb000 0x1000 0xf7ff0000 0x10000>;
- 				interrupts = <8>;
--				clocks = <&clks 60>;
-+				clocks = <&clks IMX5_CLK_NFC_GATE>;
+ 				fsl,fifo-depth = <15>;
+ 				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
  				status = "disabled";
- 			};
- 
-@@ -580,7 +608,7 @@
- 				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
- 				reg = <0x63fe8000 0x4000>;
- 				interrupts = <96>;
--				clocks = <&clks 50>;
-+				clocks = <&clks IMX5_CLK_SSI3_IPG_GATE>;
- 				dmas = <&sdma 46 0 0>,
- 				       <&sdma 47 0 0>;
- 				dma-names = "rx", "tx";
-@@ -593,7 +621,9 @@
+@@ -444,7 +465,9 @@
  				compatible = "fsl,imx53-fec", "fsl,imx25-fec";
  				reg = <0x63fec000 0x4000>;
  				interrupts = <87>;
@@ -459,34 +302,5 @@ index cffdda2d966e..b330ef758bcb 100644
  				clock-names = "ipg", "ahb", "ptp";
  				status = "disabled";
  			};
-@@ -602,7 +632,8 @@
- 				compatible = "fsl,imx53-tve";
- 				reg = <0x63ff0000 0x1000>;
- 				interrupts = <92>;
--				clocks = <&clks 69>, <&clks 116>;
-+				clocks = <&clks IMX5_CLK_TVE_GATE>,
-+				         <&clks IMX5_CLK_IPU_DI1_SEL>;
- 				clock-names = "tve", "di_sel";
- 				crtcs = <&ipu 1>;
- 				status = "disabled";
-@@ -612,7 +643,8 @@
- 				compatible = "fsl,imx53-vpu";
- 				reg = <0x63ff4000 0x1000>;
- 				interrupts = <9>;
--				clocks = <&clks 63>, <&clks 63>;
-+				clocks = <&clks IMX5_CLK_VPU_GATE>,
-+				         <&clks IMX5_CLK_VPU_GATE>;
- 				clock-names = "per", "ahb";
- 				iram = <&ocram>;
- 				status = "disabled";
-@@ -622,7 +654,7 @@
- 		ocram: sram at f8000000 {
- 			compatible = "mmio-sram";
- 			reg = <0xf8000000 0x20000>;
--			clocks = <&clks 186>;
-+			clocks = <&clks IMX5_CLK_OCRAM>;
- 		};
- 	};
- };
 -- 
 1.8.4.2
