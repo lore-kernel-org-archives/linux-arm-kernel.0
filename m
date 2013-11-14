@@ -1,32 +1,296 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 14 Nov 2013 19:07:12 +0900
-Subject: [PATCH] ARM: Kconfig: Mention R-Mobile and R-Car in addition to
- SH-Mobile
-In-Reply-To: <1384351179-4593-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1384351179-4593-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CANqRtoTXdcjoTVDShoA_071YoNznx88YgLTumdYTviLBaK76=g@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 14 Nov 2013 11:10:16 +0100
+Subject: [PATCH v2 4/4] ARM: imx50: use clock defines in DTS files
+In-Reply-To: <1384423816-10834-1-git-send-email-l.stach@pengutronix.de>
+References: <1384423816-10834-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1384423816-10834-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+For better readablitity and no need to look up numbers
+in the documentation anymore.
 
-On Wed, Nov 13, 2013 at 10:59 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-> External engineers working on R-Car platforms sometimes can't find
-> upstream platform support as the combination of the SH-Mobile name and
-> using the product number proved an effective method of concealment. Make
-> sure to mention R-Mobile and R-Car in the Kconfig comments and help
-> texts.
->
-> Reported-by: Phil Edworthy <phil.edworthy@renesas.com>
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx50.dtsi | 78 ++++++++++++++++++++++++++++----------------
+ 1 file changed, 50 insertions(+), 28 deletions(-)
 
-Thanks for your efforts on this. I think this is a good idea, but to
-make things a bit more complex I think you should know that r7s72100
-is part of the "RZ Family". Also EMEV2 is part of the "Emma" series.
-
-May I propose "Renesas SoC" as a generic description?
-
-Thanks,
-
-/ magnus
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index c547e29b8e87..4de61a5edb35 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -97,7 +97,9 @@
+ 					compatible = "fsl,imx50-esdhc";
+ 					reg = <0x50004000 0x4000>;
+ 					interrupts = <1>;
+-					clocks = <&clks 44>, <&clks 0>, <&clks 71>;
++					clocks = <&clks IMX5_CLK_ESDHC1_IPG_GATE>,
++					         <&clks IMX5_CLK_DUMMY>,
++					         <&clks IMX5_CLK_ESDHC1_PER_GATE>;
+ 					clock-names = "ipg", "ahb", "per";
+ 					bus-width = <4>;
+ 					status = "disabled";
+@@ -107,7 +109,9 @@
+ 					compatible = "fsl,imx50-esdhc";
+ 					reg = <0x50008000 0x4000>;
+ 					interrupts = <2>;
+-					clocks = <&clks 45>, <&clks 0>, <&clks 72>;
++					clocks = <&clks IMX5_CLK_ESDHC2_IPG_GATE>,
++					         <&clks IMX5_CLK_DUMMY>,
++					         <&clks IMX5_CLK_ESDHC2_PER_GATE>;
+ 					clock-names = "ipg", "ahb", "per";
+ 					bus-width = <4>;
+ 					status = "disabled";
+@@ -117,7 +121,8 @@
+ 					compatible = "fsl,imx50-uart", "fsl,imx21-uart";
+ 					reg = <0x5000c000 0x4000>;
+ 					interrupts = <33>;
+-					clocks = <&clks 32>, <&clks 33>;
++					clocks = <&clks IMX5_CLK_UART3_IPG_GATE>,
++					         <&clks IMX5_CLK_UART3_PER_GATE>;
+ 					clock-names = "ipg", "per";
+ 					status = "disabled";
+ 				};
+@@ -128,7 +133,8 @@
+ 					compatible = "fsl,imx50-ecspi", "fsl,imx51-ecspi";
+ 					reg = <0x50010000 0x4000>;
+ 					interrupts = <36>;
+-					clocks = <&clks 51>, <&clks 52>;
++					clocks = <&clks IMX5_CLK_ECSPI1_IPG_GATE>,
++					         <&clks IMX5_CLK_ECSPI1_PER_GATE>;
+ 					clock-names = "ipg", "per";
+ 					status = "disabled";
+ 				};
+@@ -137,7 +143,7 @@
+ 					compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
+ 					reg = <0x50014000 0x4000>;
+ 					interrupts = <30>;
+-					clocks = <&clks 49>;
++					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
+ 					fsl,fifo-depth = <15>;
+ 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
+ 					status = "disabled";
+@@ -147,7 +153,9 @@
+ 					compatible = "fsl,imx50-esdhc";
+ 					reg = <0x50020000 0x4000>;
+ 					interrupts = <3>;
+-					clocks = <&clks 46>, <&clks 0>, <&clks 73>;
++					clocks = <&clks IMX5_CLK_ESDHC3_IPG_GATE>,
++					         <&clks IMX5_CLK_DUMMY>,
++					         <&clks IMX5_CLK_ESDHC3_PER_GATE>;
+ 					clock-names = "ipg", "ahb", "per";
+ 					bus-width = <4>;
+ 					status = "disabled";
+@@ -157,7 +165,9 @@
+ 					compatible = "fsl,imx50-esdhc";
+ 					reg = <0x50024000 0x4000>;
+ 					interrupts = <4>;
+-					clocks = <&clks 47>, <&clks 0>, <&clks 74>;
++					clocks = <&clks IMX5_CLK_ESDHC4_IPG_GATE>,
++					         <&clks IMX5_CLK_DUMMY>,
++					         <&clks IMX5_CLK_ESDHC4_PER_GATE>;
+ 					clock-names = "ipg", "ahb", "per";
+ 					bus-width = <4>;
+ 					status = "disabled";
+@@ -168,7 +178,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
+ 				reg = <0x53f80000 0x0200>;
+ 				interrupts = <18>;
+-				clocks = <&clks 124>;
++				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -176,7 +186,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
+ 				reg = <0x53f80200 0x0200>;
+ 				interrupts = <14>;
+-				clocks = <&clks 125>;
++				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -184,7 +194,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
+ 				reg = <0x53f80400 0x0200>;
+ 				interrupts = <16>;
+-				clocks = <&clks 108>;
++				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -192,7 +202,7 @@
+ 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
+ 				reg = <0x53f80600 0x0200>;
+ 				interrupts = <17>;
+-				clocks = <&clks 108>;
++				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -240,14 +250,15 @@
+ 				compatible = "fsl,imx50-wdt", "fsl,imx21-wdt";
+ 				reg = <0x53f98000 0x4000>;
+ 				interrupts = <58>;
+-				clocks = <&clks 0>;
++				clocks = <&clks IMX5_CLK_DUMMY>;
+ 			};
+ 
+ 			gpt: timer at 53fa0000 {
+ 				compatible = "fsl,imx50-gpt", "fsl,imx31-gpt";
+ 				reg = <0x53fa0000 0x4000>;
+ 				interrupts = <39>;
+-				clocks = <&clks 36>, <&clks 41>;
++				clocks = <&clks IMX5_CLK_GPT_IPG_GATE>,
++				         <&clks IMX5_CLK_GPT_HF_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+@@ -265,7 +276,8 @@
+ 				#pwm-cells = <2>;
+ 				compatible = "fsl,imx50-pwm", "fsl,imx27-pwm";
+ 				reg = <0x53fb4000 0x4000>;
+-				clocks = <&clks 37>, <&clks 38>;
++				clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
++				         <&clks IMX5_CLK_PWM1_HF_GATE>;
+ 				clock-names = "ipg", "per";
+ 				interrupts = <61>;
+ 			};
+@@ -274,7 +286,8 @@
+ 				#pwm-cells = <2>;
+ 				compatible = "fsl,imx50-pwm", "fsl,imx27-pwm";
+ 				reg = <0x53fb8000 0x4000>;
+-				clocks = <&clks 39>, <&clks 40>;
++				clocks = <&clks IMX5_CLK_PWM2_IPG_GATE>,
++				         <&clks IMX5_CLK_PWM2_HF_GATE>;
+ 				clock-names = "ipg", "per";
+ 				interrupts = <94>;
+ 			};
+@@ -283,7 +296,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
+ 				reg = <0x53fbc000 0x4000>;
+ 				interrupts = <31>;
+-				clocks = <&clks 28>, <&clks 29>;
++				clocks = <&clks IMX5_CLK_UART1_IPG_GATE>,
++				         <&clks IMX5_CLK_UART1_PER_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -292,7 +306,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
+ 				reg = <0x53fc0000 0x4000>;
+ 				interrupts = <32>;
+-				clocks = <&clks 30>, <&clks 31>;
++				clocks = <&clks IMX5_CLK_UART2_IPG_GATE>,
++				         <&clks IMX5_CLK_UART2_PER_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -336,7 +351,7 @@
+ 				compatible = "fsl,imx50-i2c", "fsl,imx21-i2c";
+ 				reg = <0x53fec000 0x4000>;
+ 				interrupts = <64>;
+-				clocks = <&clks 88>;
++				clocks = <&clks IMX5_CLK_I2C3_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -344,7 +359,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
+ 				reg = <0x53ff0000 0x4000>;
+ 				interrupts = <13>;
+-				clocks = <&clks 65>, <&clks 66>;
++				clocks = <&clks IMX5_CLK_UART4_IPG_GATE>,
++				         <&clks IMX5_CLK_UART4_PER_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -361,7 +377,8 @@
+ 				compatible = "fsl,imx50-uart", "fsl,imx21-uart";
+ 				reg = <0x63f90000 0x4000>;
+ 				interrupts = <86>;
+-				clocks = <&clks 67>, <&clks 68>;
++				clocks = <&clks IMX5_CLK_UART5_IPG_GATE>,
++				         <&clks IMX5_CLK_UART5_PER_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -369,7 +386,7 @@
+ 			owire: owire at 63fa4000 {
+ 				compatible = "fsl,imx50-owire", "fsl,imx21-owire";
+ 				reg = <0x63fa4000 0x4000>;
+-				clocks = <&clks 159>;
++				clocks = <&clks IMX5_CLK_OWIRE_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -379,7 +396,8 @@
+ 				compatible = "fsl,imx50-ecspi", "fsl,imx51-ecspi";
+ 				reg = <0x63fac000 0x4000>;
+ 				interrupts = <37>;
+-				clocks = <&clks 53>, <&clks 54>;
++				clocks = <&clks IMX5_CLK_ECSPI2_IPG_GATE>,
++				         <&clks IMX5_CLK_ECSPI2_PER_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -388,7 +406,8 @@
+ 				compatible = "fsl,imx50-sdma", "fsl,imx35-sdma";
+ 				reg = <0x63fb0000 0x4000>;
+ 				interrupts = <6>;
+-				clocks = <&clks 56>, <&clks 56>;
++				clocks = <&clks IMX5_CLK_SDMA_GATE>,
++				         <&clks IMX5_CLK_SDMA_GATE>;
+ 				clock-names = "ipg", "ahb";
+ 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx50.bin";
+ 			};
+@@ -399,7 +418,8 @@
+ 				compatible = "fsl,imx50-cspi", "fsl,imx35-cspi";
+ 				reg = <0x63fc0000 0x4000>;
+ 				interrupts = <38>;
+-				clocks = <&clks 55>, <&clks 55>;
++				clocks = <&clks IMX5_CLK_CSPI_IPG_GATE>,
++				         <&clks IMX5_CLK_CSPI_IPG_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -410,7 +430,7 @@
+ 				compatible = "fsl,imx50-i2c", "fsl,imx21-i2c";
+ 				reg = <0x63fc4000 0x4000>;
+ 				interrupts = <63>;
+-				clocks = <&clks 35>;
++				clocks = <&clks IMX5_CLK_I2C2_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -420,7 +440,7 @@
+ 				compatible = "fsl,imx50-i2c", "fsl,imx21-i2c";
+ 				reg = <0x63fc8000 0x4000>;
+ 				interrupts = <62>;
+-				clocks = <&clks 34>;
++				clocks = <&clks IMX5_CLK_I2C1_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -428,7 +448,7 @@
+ 				compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
+ 				reg = <0x63fcc000 0x4000>;
+ 				interrupts = <29>;
+-				clocks = <&clks 48>;
++				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
+ 				fsl,fifo-depth = <15>;
+ 				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
+ 				status = "disabled";
+@@ -444,7 +464,9 @@
+ 				compatible = "fsl,imx53-fec", "fsl,imx25-fec";
+ 				reg = <0x63fec000 0x4000>;
+ 				interrupts = <87>;
+-				clocks = <&clks 42>, <&clks 42>, <&clks 42>;
++				clocks = <&clks IMX5_CLK_FEC_GATE>,
++				         <&clks IMX5_CLK_FEC_GATE>,
++				         <&clks IMX5_CLK_FEC_GATE>;
+ 				clock-names = "ipg", "ahb", "ptp";
+ 				status = "disabled";
+ 			};
+-- 
+1.8.4.2
