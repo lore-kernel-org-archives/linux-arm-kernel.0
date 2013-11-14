@@ -1,15 +1,16 @@
 From: lho@apm.com (Loc Ho)
-Date: Thu, 14 Nov 2013 14:39:11 -0700
-Subject: [PATCH v3 2/4] Documentation: Add documentation for APM X-Gene SATA
- controllor DTS binding
-In-Reply-To: <1384465153-29902-2-git-send-email-lho@apm.com>
+Date: Thu, 14 Nov 2013 14:39:13 -0700
+Subject: [PATCH v4 4/4] arm64: Add APM X-Gene SoC SATA DTS entries
+In-Reply-To: <1384465153-29902-4-git-send-email-lho@apm.com>
 References: <1384465153-29902-1-git-send-email-lho@apm.com>
  <1384465153-29902-2-git-send-email-lho@apm.com>
-Message-ID: <1384465153-29902-3-git-send-email-lho@apm.com>
+ <1384465153-29902-3-git-send-email-lho@apm.com>
+ <1384465153-29902-4-git-send-email-lho@apm.com>
+Message-ID: <1384465153-29902-5-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation:: Add documentation for APM X-Gene SoC SATA host controller DTS binding
+arm64: Add APM X-Gene SoC SATA host controller and clock DTS entries
 
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Tuan Phan <tphan@apm.com>
@@ -17,44 +18,55 @@ Signed-off-by: Suman Tripathi <stripathi@apm.com>
 Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 Reviewed-by: Olof Johansson <olof@lixom.net>
 ---
- .../devicetree/bindings/ata/apm-xgene.txt          |   62 +++++++++++++++++++-
- 1 files changed, 61 insertions(+), 1 deletions(-)
+ arch/arm64/boot/dts/apm-storm.dtsi |   70 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 70 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/ata/apm-xgene.txt b/Documentation/devicetree/bindings/ata/apm-xgene.txt
-index d18db67..0d16bfe 100644
---- a/Documentation/devicetree/bindings/ata/apm-xgene.txt
-+++ b/Documentation/devicetree/bindings/ata/apm-xgene.txt
-@@ -1,4 +1,4 @@
--* APM X-Gene 6.0 Gb/s SATA PHY nodes
-+* APM X-Gene 6.0 Gb/s SATA PHY and controller nodes
- 
- SATA PHY nodes are defined to describe on-chip Serial ATA PHY. Each SATA PHY
- (pair of PHY) has its own node.
-@@ -67,3 +67,63 @@ Example:
- 			status = "ok";
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index b29b465..14f3d5b 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -176,6 +176,36 @@
+ 				reg-names = "csr-reg";
+ 				clock-output-names = "eth8clk";
+ 			};
++
++			eth01clk: eth01clk at 1f21c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "eth01clk";
++	                        reg = <0x0 0x1f21c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "eth01clk";
++			};
++
++			eth23clk: eth23clk at 1f22c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "eth23clk";
++	                        reg = <0x0 0x1f22c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "eth23clk";
++			};
++
++			sata45clk: sata45clk at 1f23c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "sata45clk";
++	                        reg = <0x0 0x1f23c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sata45clk";
++			};
  		};
  
-+SATA host controller nodes are defined to describe on-chip Serial ATA
-+controllers. Each SATA controller (pair of ports) have its own node.
+ 		serial0: serial at 1c020000 {
+@@ -218,5 +248,45 @@
+ 			#phy-cells = <0>;
+ 			status = "ok";
+ 		};
 +
-+Required properties:
-+- compatible		: Shall be "apm,xgene-ahci"
-+- reg			: First memory resource shall be the AHCI memory
-+			  resource.
-+			  Second memory resource shall be the host controller
-+			  memory resource.
-+- id			: Controller ID (0 = first, 1 = second, 2 = third)
-+- interrupt-parent	: Interrupt controller
-+- interrupts		: Interrupt mapping for SATA host controller IRQ
-+- clocks		: Reference to the clock entry
-+- phys			: PHY reference
-+- phy-names		: Name of the PHY reference
-+
-+Optional properties:
-+- status		: Shall be "ok" if enabled or "na" if disabled.
-+			  Default is "ok".
-+
-+Example:
 +		sata0: sata at 1a000000 {
 +			compatible = "apm,xgene-ahci";
 +			id = <0>;
@@ -94,5 +106,7 @@ index d18db67..0d16bfe 100644
 +			phys = <&sataphy2>;
 +			phy-names = "sataphy2";
 +		};
+ 	};
+ };
 -- 
 1.5.5
