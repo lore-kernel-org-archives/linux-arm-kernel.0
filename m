@@ -1,39 +1,64 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 15 Nov 2013 12:47:51 +0400
-Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
-Message-ID: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+Date: Fri, 15 Nov 2013 12:47:56 +0400
+Subject: [PATCH 5/9] ARM: sa1100: add platform functions to handle PWER
+ settings
+In-Reply-To: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1384505280-25389-6-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a considerable rework of my previous attempt to update sa1100 irq
-handling. IRQ code is updated to support MULTI_IRQ_HANDLER and is mostly
-prepared to be converted to irqchip driver (if the need arises in future).
-I have integrated idea of Linus Waleij to use irq domains. GPIO irq handling
-is split to gpio driver, which also undergo an update/rewrite.
+PWER settings logically belongs neither to GPIO nor to system IRQ code.
+Add special functions to handle PWER (for GPIO and for system IRQs)
+from platform code.
 
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-sa1100/generic.c | 21 +++++++++++++++++++++
+ arch/arm/mach-sa1100/generic.h |  2 ++
+ 2 files changed, 23 insertions(+)
 
-Dmitry Eremin-Solenikov (9):
-      ARM: sa1100 collie: use gpio-charger instead of pda-power
-      ARM: locomo: don't clobber chip data for chained irq
-      ARM: sa1100: switch to MULTI_IRQ_HANDLER
-      ARM: sa1100: convert gpio driver to be a proper platform driver
-      ARM: sa1100: add platform functions to handle PWER settings
-      ARM: sa1100: enable IRQ domains
-      ARM: sa1100: move gpio irq handling to GPIO driver
-      ARM: sa1100: move per-IRQ PWER settings to core code
-      ARM: sa1100: refactor irq driver
-
- arch/arm/Kconfig                                |   2 +
- arch/arm/common/locomo.c                        |   4 +-
- arch/arm/mach-sa1100/collie.c                   |  55 ++-------------
- arch/arm/mach-sa1100/generic.c                  |  46 +++++++++++-
- arch/arm/mach-sa1100/generic.h                  |   3 +-
- arch/arm/mach-sa1100/include/mach/SA-1100.h     |   2 +
- arch/arm/mach-sa1100/include/mach/entry-macro.S |  41 -----------
- arch/arm/mach-sa1100/include/mach/irqs.h        |  73 +++++++++++--------
- arch/arm/mach-sa1100/irq.c                      | 322 +++++++++++++++++++++--------------------------------------------------------------
- drivers/gpio/Kconfig                            |   6 ++
- drivers/gpio/Makefile                           |   2 +-
- drivers/gpio/gpio-sa1100.c                      | 332 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++------
- 12 files changed, 500 insertions(+), 388 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/include/mach/entry-macro.S
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index c2718f0..702f18c 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -421,3 +421,24 @@ void sa1110_mb_enable(void)
+ 	local_irq_restore(flags);
+ }
+ 
++int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on)
++{
++	if (on)
++		PWER |= 1 << gpio;
++	else
++		PWER &= ~(1 << gpio);
++
++	return 0;
++}
++
++int sa11x0_sc_set_wake(unsigned int irq, unsigned int on)
++{
++	if (irq != IRQ_RTCAlrm)
++		return -EINVAL;
++
++	if (on)
++		PWER |= PWER_RTC;
++	else
++		PWER &= ~PWER_RTC;
++	return 0;
++}
+diff --git a/arch/arm/mach-sa1100/generic.h b/arch/arm/mach-sa1100/generic.h
+index 0b68b95..39753c4 100644
+--- a/arch/arm/mach-sa1100/generic.h
++++ b/arch/arm/mach-sa1100/generic.h
+@@ -11,6 +11,8 @@ extern void __init sa1100_map_io(void);
+ extern void __init sa1100_init_irq(void);
+ extern void sa11x0_restart(enum reboot_mode, const char *);
+ extern void sa11x0_init_late(void);
++extern int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on);
++extern int sa11x0_sc_set_wake(unsigned int irq, unsigned int on);
+ 
+ #define SET_BANK(__nr,__start,__size) \
+ 	mi->bank[__nr].start = (__start), \
+-- 
+1.8.4.2
