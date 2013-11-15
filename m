@@ -1,52 +1,47 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 15 Nov 2013 15:22:32 +0100
-Subject: [PATCH 1/3] irqchip: orion: reverse irq handling priority
+Date: Fri, 15 Nov 2013 15:22:34 +0100
+Subject: [PATCH 3/3] mmc: mvsdio: silence card detect notice
 In-Reply-To: <1384525354-901-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1384525354-901-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1384525354-901-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384525354-901-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Non-DT irq handlers were working through irq causes from most-significant
-to least-significant bit, while DT irqchip driver does it the other way
-round. This revealed some more HW issues on Kirkwood peripheral IP, where
-spurious sdio irqs can happen although IP's irq enable registers are all
-zero. Although, not directly related with the described issue, reverse
-irq bit handling back to original order by replacing ffs() with fls().
+mvsdio reports method of card detection with dev_notice, while for
+removable cards it may be sane, for non-removable cards it is not.
+Also, as the user cannot do anything about it, silence the message
+by reducing it from dev_notice to dev_dbg.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-mmc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/irqchip/irq-orion.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/mmc/host/mvsdio.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-index e51d400..de30d5c 100644
---- a/drivers/irqchip/irq-orion.c
-+++ b/drivers/irqchip/irq-orion.c
-@@ -42,7 +42,7 @@ __exception_irq_entry orion_handle_irq(struct pt_regs *regs)
- 		u32 stat = readl_relaxed(gc->reg_base + ORION_IRQ_CAUSE) &
- 			gc->mask_cache;
- 		while (stat) {
--			u32 hwirq = ffs(stat) - 1;
-+			u32 hwirq = __fls(stat);
- 			u32 irq = irq_find_mapping(orion_irq_domain,
- 						   gc->irq_base + hwirq);
- 			handle_IRQ(irq, regs);
-@@ -116,7 +116,7 @@ static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		   gc->mask_cache;
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 25f51be..d17b399 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -816,10 +816,9 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 		goto out;
  
- 	while (stat) {
--		u32 hwirq = ffs(stat) - 1;
-+		u32 hwirq = __fls(stat);
+ 	if (!(mmc->caps & MMC_CAP_NEEDS_POLL))
+-		dev_notice(&pdev->dev, "using GPIO for card detection\n");
++		dev_dbg(&pdev->dev, "using GPIO for card detection\n");
+ 	else
+-		dev_notice(&pdev->dev,
+-			   "lacking card detect (fall back to polling)\n");
++		dev_dbg(&pdev->dev, "lacking card detect, fall back to polling\n");
+ 	return 0;
  
- 		generic_handle_irq(irq_find_mapping(d, gc->irq_base + hwirq));
- 		stat &= ~(1 << hwirq);
+ out:
 -- 
 1.7.2.5
