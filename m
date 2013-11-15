@@ -1,41 +1,69 @@
-From: linville@tuxdriver.com (John W. Linville)
-Date: Fri, 15 Nov 2013 09:32:55 -0500
-Subject: [PATCH 1/4] wl1251: split wl251 platform data to a separate
- structure
-In-Reply-To: <20131114232217.GV10317@atomide.com>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-2-git-send-email-sre@debian.org>
- <20131114185132.GQ10317@atomide.com>
- <20131114230330.GB6383@earth.universe>
- <20131114232217.GV10317@atomide.com>
-Message-ID: <20131115143254.GA7079@tuxdriver.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 15 Nov 2013 15:49:56 +0100
+Subject: [PATCH 01/11] ARM: at91: dt: at91rm9200ek: add emac and nor flash
+ support
+In-Reply-To: <20131115143855.GR28304@ns203013.ovh.net>
+References: <20131115143855.GR28304@ns203013.ovh.net>
+Message-ID: <1384527006-9040-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 03:22:18PM -0800, Tony Lindgren wrote:
-> * Sebastian Reichel <sre@debian.org> [131114 15:04]:
-> > On Thu, Nov 14, 2013 at 10:51:33AM -0800, Tony Lindgren wrote:
-> > > [...]
-> > >
-> > > If this is not going into v3.13, these will cause conflicts
-> > > with the mach-omap2/board-*.c files for v3.14.
-> > > 
-> > > So it might be best to do a minimal header patch first that
-> > > can be merged in by both linux-omap and wireless trees.
-> > 
-> > I guess this patch is pretty minimal. It also seems to be acked by
-> > the involved Maintainers, so maybe just merge Patch 1 without the
-> > other patches?
-> > 
-> > This does not solve the problem with the struct modification from
-> > the second patch, but I guess it's the more intrusive patch.
-> 
-> Once at least the first two patches are ready, how about I queue
-> them after -rc1 and set up an immutable branch that can be merged
-> in by linux-omap tree and the wireless tree?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91rm9200ek.dts | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-That sounds reasonable to me.
-
+diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
+index d2d72c3..3ad79b0 100644
+--- a/arch/arm/boot/dts/at91rm9200ek.dts
++++ b/arch/arm/boot/dts/at91rm9200ek.dts
+@@ -63,12 +63,46 @@
+ 					reg = <0>;
+ 				};
+ 			};
++
++			macb0: ethernet at fffbc000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
+ 		};
+ 
+ 		usb0: ohci at 00300000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
++
++		nor_flash at 10000000 {
++			compatible = "cfi-flash";
++			reg = <0x10000000 0x800000>;
++			linux,mtd-name = "physmap-flash.0";
++			bank-width = <2>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			barebox at 0 {
++				label = "barebox";
++				reg = <0x00000 0x40000>;
++			};
++
++			bareboxenv at 40000 {
++				label = "bareboxenv";
++				reg = <0x40000 0x10000>;
++			};
++
++			kernel at 50000 {
++				label = "kernel";
++				reg = <0x50000 0x300000>;
++			};
++
++			root at 350000  {
++				label = "root";
++				reg = <0x350000 0x4B0000>;
++			};
++		};
+ 	};
+ 
+ 	leds {
 -- 
-John W. Linville		Someday the world will need a hero, and you
-linville at tuxdriver.com			might be all we have.  Be ready.
+1.8.4.rc3
