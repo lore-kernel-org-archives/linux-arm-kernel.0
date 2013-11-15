@@ -1,61 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Nov 2013 15:37:08 +0000
-Subject: [PATCH 2/4] mfd: rtsx: Generify the switch voltage routine
-In-Reply-To: <52858DF6.7010800@realsil.com.cn>
-References: <1384421355-4434-1-git-send-email-lee.jones@linaro.org>
- <1384421355-4434-3-git-send-email-lee.jones@linaro.org>
- <52858DF6.7010800@realsil.com.cn>
-Message-ID: <20131115153708.GE4996@lee--X1>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 15 Nov 2013 15:44:17 +0000
+Subject: [PATCH v4] dt: update PSCI binding documentation for v0.2
+In-Reply-To: <5286401E.5090400@gmail.com>
+References: <1379625868-5395-1-git-send-email-robherring2@gmail.com>
+ <alpine.DEB.2.02.1311151447590.4714@kaball.uk.xensource.com>
+ <5286401E.5090400@gmail.com>
+Message-ID: <alpine.DEB.2.02.1311151540550.4714@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Switch output voltage may have some problem here.
-> 1. modify params of function in pcr_ops may affect other chips, like
-> rts52xx, and we may add other registers or value in the future, just
-> add params may not enough to handle this case. So I think different
-> chip should use a different function here, and modify the function
-> will not affect others.
-
-Okay, I agree to a certain extent. I'll drop this patch for now.
-
-Can you please try to find a way to consolidate them. I'm really not
-keen on keeping 6 functions around that are mostly identical.
-
-> 2. rtl8402 has another difference with 8411 here, it doesn't use
->  BPP_ASIC_1V8, but use BPP_ASIC_2V0.
+On Fri, 15 Nov 2013, Rob Herring wrote:
+> On 11/15/2013 08:48 AM, Stefano Stabellini wrote:
+> > On Thu, 19 Sep 2013, Rob Herring wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> The PSCI spec from ARM has been updated to 0.2 version. Update the
+> >> binding document to reflect the spec changes. For the binding, the
+> >> major changes are the addition of psci_version, affinity_info,
+> >> migrate_info_type, migrate_info_up_cpu, system_reset and system_off
+> >> functions. The recommended function ID numbering has also changed.
+> >>
+> >> This update also defines 32 and 64 bit calling conventions. The calling
+> >> convention is defined on a per function ID basis.
+> >>
+> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >> Cc: Dave Martin <Dave.Martin@arm.com>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Ian Campbell <Ian.Campbell@citrix.com>
+> >> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>,
+> >> Cc: Charles Garcia-Tobin <Charles.Garcia-Tobin@arm.com>
+> >> Cc: Matt Sealey <neko@bakuhatsu.net>
+> >> Cc: devicetree at vger.kernel.org
+> > 
+> > Rob,
+> > I noticed that this patch hasn't gone upstream yet. Is the interface
+> > still under discussion?
+> > I am thinking of implementing the Xen side of it.
 > 
-> so, I will send another patch to fix this problem.
-> 
-> >-static int rtl8411_switch_output_voltage(struct rtsx_pcr *pcr, u8 voltage)
-> >+static int rtl84xx_switch_output_voltage(struct rtsx_pcr *pcr,
-> >+					 u8 voltage, int shift)
-> >  {
-> >  	u8 mask, val;
-> >  	int err;
-> >-	mask = (BPP_REG_TUNED18 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_MASK;
-> >+	mask = (BPP_REG_TUNED18 << shift) | BPP_PAD_MASK;
-> >  	if (voltage == OUTPUT_3V3) {
-> >  		err = rtsx_pci_write_register(pcr,
-> >  				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_3v3);
-> >  		if (err < 0)
-> >  			return err;
-> >-		val = (BPP_ASIC_3V3 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_3V3;
-> >+		val = (BPP_ASIC_3V3 << shift) | BPP_PAD_3V3;
-> >  	} else if (voltage == OUTPUT_1V8) {
-> >  		err = rtsx_pci_write_register(pcr,
-> >  				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_1v8);
-> >  		if (err < 0)
-> >  			return err;
-> >-		val = (BPP_ASIC_1V8 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_1V8;
-> >+		val = (BPP_ASIC_1V8 << shift) | BPP_PAD_1V8;
-> >  	} else {
-> >  		return -EINVAL;
-> >  	}
-> 
-> 
+> Since we can't seem to agree on how to extend the binding, I plan to go
+> back to something more simple which is simply adding 2 optional
+> properties to the existing "arm,psci" binding. This would be enough to
+> meet the needs of KVM, Xen, and highbank. A future binding can deal with
+> the whole 32 and 64-bit calling convention issue.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+OK. TBH Xen doesn't need anything more than what is already specified in
+"arm,psci".
+However it would have been nice to fully implement the latest PSCI spec.
