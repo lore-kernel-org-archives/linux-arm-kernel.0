@@ -1,26 +1,42 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 15 Nov 2013 20:49:46 +0200
-Subject: [PATCH 9/8] i2c: Fix device tree binding for i2c-cbus-gpio
-In-Reply-To: <20131114230842.GU10317@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <20131114230842.GU10317@atomide.com>
-Message-ID: <20131115184946.GB10997@blackmetal.musicnaut.iki.fi>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 15 Nov 2013 19:54:58 +0100
+Subject: [PATCH v2 0/3] arm: [U]EFI runtime services support
+In-Reply-To: <CAOesGMh+2Qs_cVMtdkpyXR44NJkQscs0eP_=pxwKXHkopaAKog@mail.gmail.com>
+References: <1380799481-5470-1-git-send-email-leif.lindholm@linaro.org>
+ <CAOesGMh+2Qs_cVMtdkpyXR44NJkQscs0eP_=pxwKXHkopaAKog@mail.gmail.com>
+Message-ID: <20131115185458.GA30374@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Olof,
 
-On Thu, Nov 14, 2013 at 03:08:42PM -0800, Tony Lindgren wrote:
-> Looks like we're missing two lines needed to make it
-> work properly with device tree.
-> 
-> Cc: linux-i2c at vger.kernel.org
-> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+Many thanks for having a look.
 
-You can change this to: Tested-by: <aaro.koskinen@iki.fi>
+On Fri, Nov 15, 2013 at 10:04:22AM -0800, Olof Johansson wrote:
+> This series is generally looking sane to me without looking at the
+> code in very close detail.
 
-I booted DT-N800 with Tony's patches, and it works.
+In the interest of full disclosure, I would like to point out that I
+will be posting another version next week, based on the output of the
+discussions around the DT bindings and documentation.
+ 
+This set needs to be tested in combination with Roy's UEFI stub patches
+is recommended, as this is the intended boot mechanism on UEFI
+platforms. https://wiki.linaro.org/LEG/Engineering/Kernel/UEFI/EFIstub
 
-Thanks,
+> Do you have a test setup that you've been using for this that you
+> could give a pointer to?
 
-A.
+Well, I have been using vexpress ca9 and ca15_a7 (TC2), or the ARM
+commercial software models (RTSM) of the same. I have also tested on
+Arndale, but I don't know if that is fully supported by mainline yet.
+
+Prebuilt UEFI images are available from
+http://releases.linaro.org/13.09/components/kernel/uefi-linaro
+
+efibootmgr is probably the best utility to test the runtime services,
+if scanning the /sys entries are not sufficient. It builds for armhf
+without modification.
+
+/
+    Leif
