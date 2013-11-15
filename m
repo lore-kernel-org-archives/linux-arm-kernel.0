@@ -1,77 +1,108 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Fri, 15 Nov 2013 18:33:20 +0000
-Subject: [PATCH v2] ARM: kexec: Use the right ISA for relocate_new_kernel
-In-Reply-To: <528663DF.1010008@linaro.org>
-References: <1383913444-9153-1-git-send-email-Dave.Martin@arm.com>
- <20131108133426.GE17461@mudshark.cambridge.arm.com>
- <20131108184625.GE2602@localhost.localdomain>
- <5282818B.9030903@linaro.org> <52860555.7010307@linaro.org>
- <20131115173113.GB4028@e103592.cambridge.arm.com>
- <528663DF.1010008@linaro.org>
-Message-ID: <20131115183320.GM2290@e103592.cambridge.arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 15 Nov 2013 15:35:40 -0300
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <CAN8TOE88uoitm+8J6fXAnAWf1Rb4favyVqCvjCU+WHdBZ9m8cA@mail.gmail.com>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131114230436.GV9468@ld-irv-0074.broadcom.com>
+ <20131114230540.GW9468@ld-irv-0074.broadcom.com>
+ <20131114231528.GA9793@localhost> <5285D44C.7080501@gmail.com>
+ <20131115130711.GA2496@localhost> <528625EA.8060406@gmail.com>
+ <20131115142659.GB2496@localhost> <52862FED.20501@gmail.com>
+ <CAN8TOE88uoitm+8J6fXAnAWf1Rb4favyVqCvjCU+WHdBZ9m8cA@mail.gmail.com>
+Message-ID: <20131115183539.GB9252@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 06:11:43PM +0000, Taras Kondratiuk wrote:
-> On 11/15/2013 07:38 PM, Dave Martin wrote:
-> > On Fri, Nov 15, 2013 at 01:28:21PM +0200, Taras Kondratiuk wrote:
-> >> And the issue I'm frequently facing in reloaded kernel (Thumb from ARM)
-> >> is random crashes caused by undefined instructions.
+On Fri, Nov 15, 2013 at 10:05:35AM -0800, Brian Norris wrote:
+> On Fri, Nov 15, 2013 at 6:30 AM, Daniel Mack <zonque@gmail.com> wrote:
+> > On 11/15/2013 03:27 PM, Ezequiel Garcia wrote:
+> >> On Fri, Nov 15, 2013 at 02:47:22PM +0100, Daniel Mack wrote:
+> >>> On 11/15/2013 02:07 PM, Ezequiel Garcia wrote:
+> >>>> On Fri, Nov 15, 2013 at 08:59:08AM +0100, Daniel Mack wrote:
+> >>>>> On 11/15/2013 12:15 AM, Ezequiel Garcia wrote:
+> >>>>>> On Thu, Nov 14, 2013 at 03:05:40PM -0800, Brian Norris wrote:
+> >>>>>>> + Daniel (missed the CC)
+> >>>>>>>
+> >>>>>>> On Thu, Nov 14, 2013 at 03:04:36PM -0800, Brian Norris wrote:
+> >>>>>>>> On Thu, Nov 14, 2013 at 06:25:25PM -0300, Ezequiel Garcia wrote:
+> >>>>>>>>> * Changes from v4
+> >>>>>>>>>
+> >>>>>>>>>   * Rebased on top of l2-mtd.git origin/next branch
+> >>>>>>>>>
+> >>>>>>>>>   * Fixed is_ready flag reset, renamed by a more descriptive
+> >>>>>>>>>     and readble "need_wait".
+> >>>>>>>>>
+> >>>>>>>>
+> >>>>>>>> ...
+> >>>>>>>>
+> >>>>>>>> I think this series is now good as-is. Pushing to l2-mtd.git/next.
+> >>>>>>>> Thanks for the efforts! I can submit my extra diff from patch 12 as a
+> >>>>>>>> separate patch for review.
+> >>>>>>>>
+> >>>>>>>> Do you have any available regression tests? Or was there somebody else
+> >>>>>>>> we could run this by for some Tested-by's? Daniel Mack, perhaps?
+> >>>>>>>
+> >>>>>>> Brian
+> >>>>>>
+> >>>>>> Yes, if Daniel (or anybody else) can push a Tested-by, that's better because
+> >>>>>> he's a "third-party" tester.
+> >>>>>
+> >>>>> Yes. Sorry, I could only partially follow all the discussions around
+> >>>>> these patch sets, but I can certainly do a quick regression test on my
+> >>>>> pxa3xx platform.
+> >>>>>
+> >>>>> Ezequiel, could you maybe point me to a repository where I can pull
+> >>>>> everything from you want me to have a look at?
+> >>>>>
+> >>>>
+> >>>> Latest work is at the next branch in l2-mtd.git:
+> >>>>
+> >>>> http://git.infradead.org/l2-mtd.git/shortlog/refs/heads/next
+> >>>>
+> >>>> You could try that, with Brian's latest patch:
+> >>>>
+> >>>> http://patchwork.ozlabs.org/patch/291408/
+> >>>
+> >>> Thanks Ezequiel! Tested with and without DMA on my PXA3xx platform and
+> >>> it seems to work just well. Awesome work :)
+> >>>
+> >>> [    2.675715] NAND device: Manufacturer ID: 0x20, Chip ID: 0xa1 (ST
+> >>> Micro NAND01GR3B2CZA6)
+> >>> [    2.683965] NAND device: 128MiB, SLC, page size: 2048, OOB size: 64
+> >>> [    2.690867] Scanning device for bad blocks
+> >>> [    2.977987] Bad eraseblock 528 at 0x000004200000
+> >>> [    2.983394] Bad eraseblock 529 at 0x000004220000
+> >>> [    3.251150] 4 ofpart partitions found on MTD device pxa3xx_nand-0
+> >>> [    3.257313] Creating 4 MTD partitions on "pxa3xx_nand-0":
+> >>> [    3.263051] 0x000000000000-0x0000000a0000 : "Bootloader"
+> >>> [    3.278845] 0x0000000a0000-0x0000000c0000 : "BootloaderEnvironment"
+> >>> [    3.296388] 0x0000000c0000-0x000000120000 : "BootloaderSplashScreen"
+> >>> [    3.314704] 0x000000120000-0x000008000000 : "UBI"
+> >>>
 > >>
-> >> My observation summary:
-> >> - Before starting a second kernel I'm dumping loaded zImage and then
-> >>   unpacked Image at final location and they are correct, so no issue
-> >>   with loading.
-> >> - I observe two types of crash:
-> >>   1) Undefined instruction in the middle of kernel code. After a crash
-> >>      I check failing address and there is always a *valid* Thumb
-> >>      instruction (CPU is in Thumb mode).
-> >>   2) Jump to a wrong address which consequently causes undefined
-> >>      instruction exception. A trace of one example of a wrong jump is
-> >>      captured in [1]. Instead of jumping to 0xC049097C code gets
-> >>      executed at 0xED85E008. BTW the wrong address suspiciously looks
-> >>      like an ARM instruction.
-> > 
-> > That jump to 0xED85E008 certainly looks strange ... I wonder whether
-> > there could be some instructions missing from the trace.
-> > 
-> > 
-> > How early do these crashes happen?
+> >> Good news! Have you tried with Brian's patch [1]?
+> >
+> > Yes. l2-mtd 'next' branch + Brian's patch.
+> >
+> >> In that case, is this a Tested-by?
+> >>
+> >> [1] http://patchwork.ozlabs.org/patch/291408/
+> >
+> >   Tested-by: Daniel Mack <zonque@gmail.com>
 > 
-> At very early stages starting from setup_arch() up to early initcalls.
+> Well, that last patch wouldn't be relevant to the PXA platform,
+
+Ah, right. Forgot about that.
+
+> but I'll add your Tested-by to the whole series. Thanks!
 > 
-> > Is this happening on SMP, and if so, what is the state of secondary
-> > CPUs across kexec?
+> Ezequiel, is that an "acked-by" for my last patch?
 > 
-> I have disabled CONFIG_SMP. Second CPU is busy-looping in ROM code and
-> shouldn't cause any issues.
 
-OK, that sounds reasonable.
+No, I want to give it a try on the boards. I just haven't found
+time to work on it.
 
-> > If secondary CPUs are not safely parked, or their caches are not drained
-> > before the kexec occurs, this can cause corruption of the new kernel
-> > or unpredictable behaviour of the secondary CPUs.
-> > 
-> >> - If second kernel is placed at different address (like in kdump case),
-> >>   then it boots fine and I don't observe any crashes.
-> >> - If I check failing address in the first kernel (ARM) the code there
-> >>   is really undefined instruction if executed as Thumb.
-> >> - Looks like pieces of old ARM kernel gets executed instead of new
-> >>   Thumb kernel. But as I've mentioned I'm reading physical memory via
-> >>   JTAG before starting second kernel and memory is matching a compiled
-> >>   Thumb 'Image'. Icache also gets cleaned...
-> >> - Once when stopped on breakpoint I've seen a piece of ARM code in
-> >>   Thumb kernel. Interesting that I was looking at the same memory
-> > 
-> > Thumb kernels do contain a small amount of ARM code, in the vectors
-> > page for example.  But it's possible you were also looking at stale
-> > data.
-> 
-> Right, but I mean there was an ARM code in place where definitely a
-> Thumb code should be.
-
-Sure.  Well, I guess this remains unexplained for now, but keep me
-posted.
-
-Cheers
----Dave
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
