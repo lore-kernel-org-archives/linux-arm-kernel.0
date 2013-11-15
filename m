@@ -1,39 +1,49 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 15 Nov 2013 01:03:17 +0100
-Subject: [RFC 0/4] Add basic support for ASV
-In-Reply-To: <CAKew6eVJiXNWpyE8E69MminsHjr+ip8syX6kx8wuY3R78QW=iA@mail.gmail.com>
-References: <1378898048-25205-1-git-send-email-yadi.brar@samsung.com>
- <1906951.EFsdgbeaob@flatron>
- <CAKew6eVJiXNWpyE8E69MminsHjr+ip8syX6kx8wuY3R78QW=iA@mail.gmail.com>
-Message-ID: <2338470.hOrBbPnbxW@flatron>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Nov 2013 00:09:17 +0000
+Subject: [PATCH 5/6] ARM: kvm: Use phys_addr_t instead of unsigned long
+ in mm code
+In-Reply-To: <1384457866-16135-6-git-send-email-santosh.shilimkar@ti.com>
+References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
+ <1384457866-16135-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131115000917.GB20516@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 of November 2013 08:15:52 Yadwinder Singh Brar wrote:
-> [adding Sachin]
+On Thu, Nov 14, 2013 at 02:37:45PM -0500, Santosh Shilimkar wrote:
+> The unsigned long datatype is not sufficient for mapping physical addresses
+> greater than 4GB.
 > 
-> Hi Tomasz,
+> So fix the KVM mm code accordingly. Special thanks to Christopher for debug
+> help to figure out the bug.
 > 
-> On Fri, Nov 15, 2013 at 12:06 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> > Hi Yadwinder,
-> >
-> > On Monday 11 of November 2013 23:27:08 Yadwinder Singh Brar wrote:
-> >> gentle ping for suggestions/reviews ..
-> >
-> > Hmm, I must have somehow missed this series when you orignally sent it.
-> > Can I ask you to resend it, as I don't have it in my e-mail client archive
-> > any longer?
-> >
-> > While at it, I would also ask you to add my private e-mail address
-> > (this one) and linux-pm mailing list to Cc list.
-> >
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> hmm, I am on travel still for few more days, so it may be difficult for me
-> to resend it quickly. But I think Sachin may help me here.
-> Sachin can you please rebase and repost it ?
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/kvm/mmu.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 3bd652f..657f15e 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -318,7 +318,7 @@ out:
+>   */
+>  int create_hyp_mappings(void *from, void *to)
+>  {
+> -	unsigned long phys_addr = virt_to_phys(from);
+> +	phys_addr_t phys_addr = virt_to_phys(from);
+>  	unsigned long start = KERN_TO_HYP((unsigned long)from);
+>  	unsigned long end = KERN_TO_HYP((unsigned long)to);
+>  
+> -- 
+> 1.7.9.5
+> 
 
-OK. No need to hurry. I will look at the patches on some ML archives
-and then only post my comments once you resend the series.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Best regards,
-Tomasz
+I can just apply this to kvm-arm-next immediately, or we can wait and
+pull it in with your series if you prefer.  Let me know.
+
+-Christoffer
