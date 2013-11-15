@@ -1,441 +1,302 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 15 Nov 2013 12:58:00 -0800
-Subject: [PATCH v2 1/2] watchdog: bcm281xx: Watchdog Driver
-In-Reply-To: <1384549081-9571-1-git-send-email-markus.mayer@linaro.org>
-References: <1384549081-9571-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1384549081-9571-2-git-send-email-markus.mayer@linaro.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 15 Nov 2013 13:05:45 -0800
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
+ <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+Message-ID: <CAPcyv4i8+AjHfwo0WGyyMC1JR8ty_OUrfDZXcnpUPr5cz2hkoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for the watchdog timer used on the BCM281xx
-family of SoCs.
+[ Also adding Andy to comment on the acpi-dma.c question ]
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- drivers/watchdog/Kconfig        |   22 +++
- drivers/watchdog/Makefile       |    1 +
- drivers/watchdog/bcm_kona_wdt.c |  367 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 390 insertions(+)
- create mode 100644 drivers/watchdog/bcm_kona_wdt.c
-
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index d1d53f3..fe8bd21 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -1121,6 +1121,28 @@ config BCM2835_WDT
- 	  To compile this driver as a loadable module, choose M here.
- 	  The module will be called bcm2835_wdt.
- 
-+config BCM_KONA_WDT
-+	tristate "BCM Kona Watchdog"
-+	depends on ARCH_BCM
-+	select WATCHDOG_CORE
-+	help
-+	  Support for the watchdog timer on the following Broadcom BCM281xx 
-+	  family, which includes BCM11130, BCM11140, BCM11351, BCM28145 and
-+	  BCM28155 variants.
-+
-+	  Say 'Y' or 'M' here to enable the driver. The module will be called
-+	  bcm_kona_wdt.
-+
-+config BCM_KONA_WDT_DEBUG
-+	bool "DEBUGFS support for BCM Kona Watchdog"
-+	depends on BCM_KONA_WDT
-+	help
-+	  If enabled, adds /sys/kernel/debug/bcm-kona-wdt/info which provides
-+	  access to the driver's internal data structures as well as watchdog
-+	  timer hardware registres.
-+
-+	  If in doubt, say 'N'.
-+
- config LANTIQ_WDT
- 	tristate "Lantiq SoC watchdog"
- 	depends on LANTIQ
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 6c5bb27..7c860ca 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -55,6 +55,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
- obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
- obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
- obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-+obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
-new file mode 100644
-index 0000000..5a03d5a
---- /dev/null
-+++ b/drivers/watchdog/bcm_kona_wdt.c
-@@ -0,0 +1,367 @@
-+/*
-+ * Copyright (C) 2013 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/debugfs.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/miscdevice.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/watchdog.h>
-+
-+#define SECWDOG_CTRL_REG		0x00000000
-+#define SECWDOG_COUNT_REG		0x00000004
-+
-+#define SECWDOG_RESERVED_MASK		0x1dffffff
-+#define SECWDOG_WD_LOAD_FLAG		0x10000000
-+#define SECWDOG_EN_MASK			0x08000000
-+#define SECWDOG_SRSTEN_MASK		0x04000000
-+#define SECWDOG_RES_MASK		0x00f00000
-+#define SECWDOG_COUNT_MASK		0x000fffff
-+
-+#define SECWDOG_MAX_COUNT		SECWDOG_COUNT_MASK
-+#define SECWDOG_CLKS_SHIFT		20
-+#define SECWDOG_MAX_RES			15
-+#define SECWDOG_DEFAULT_RESOLUTION	4
-+#define SECWDOG_MAX_TRY			1000
-+
-+#define SECS_TO_TICKS(x, w)		((x) << (w)->resolution)
-+#define TICKS_TO_SECS(x, w)		((x) >> (w)->resolution)
-+
-+#define BCM_KONA_WDT_NAME		"bcm-kona-wdt"
-+
-+struct bcm_kona_wdt {
-+	void __iomem *base;
-+	/*
-+	 * One watchdog tick is 1/(2^resolution) seconds. Resolution can take
-+	 * the values 0-15, meaning one tick can be 1s to 30.52us. Our default
-+	 * resolution of 4 means one tick is 62.5ms.
-+	 *
-+	 * The watchdog counter is 20 bits. Depending on resolution, the maximum
-+	 * counter value of 0xfffff expires after about 12 days (resolution 0)
-+	 * down to only 32s (resolution 15). The default resolution of 4 gives
-+	 * us a maximum of about 18 hours and 12 minutes before the watchdog
-+	 * times out.
-+	 */
-+	int resolution;
-+	spinlock_t lock;
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+	struct dentry *debugfs;
-+#endif
-+};
-+
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+static unsigned long busy_count = 0;
-+#endif
-+
-+static int secure_register_read(void __iomem *addr)
-+{
-+	uint32_t val;
-+	unsigned count = 0;
-+
-+	/*
-+	 * If the WD_LOAD_FLAG is set, the watchdog counter field is being
-+	 * updated in hardware. Once the WD timer is updated in hardware, it
-+	 * gets cleared.
-+	 */
-+	do {
-+		if (unlikely(count > 1)) {
-+			udelay(5);
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+			/* To keep track how often we get stalled here. */
-+			busy_count++;
-+#endif
-+		}
-+		val = readl_relaxed(addr);
-+		count++;
-+	} while ((val & SECWDOG_WD_LOAD_FLAG) && count < SECWDOG_MAX_TRY);
-+
-+	/* This is the only place we return a negative value. */
-+	if (val & SECWDOG_WD_LOAD_FLAG) {
-+		return -ETIMEDOUT;
-+	}
-+
-+	/* We always mask out reserved bits. */
-+	val &= SECWDOG_RESERVED_MASK;
-+
-+	return val;
-+}
-+
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+
-+static int bcm_kona_wdt_dbg_show(struct seq_file *s, void *data)
-+{
-+	int ctl_val, cur_val, ret;
-+	unsigned long flags;
-+	struct bcm_kona_wdt *wdt = s->private;
-+
-+	if (!wdt)
-+		return seq_printf(s, "No device pointer\n");
-+
-+	spin_lock_irqsave(&wdt->lock, flags);
-+	ctl_val = secure_register_read(wdt->base + SECWDOG_CTRL_REG);
-+	cur_val = secure_register_read(wdt->base + SECWDOG_COUNT_REG);
-+	spin_unlock_irqrestore(&wdt->lock, flags);
-+
-+	if (ctl_val < 0 || cur_val < 0) {
-+		ret = seq_printf(s, "Error accessing hardware\n");
-+	} else {
-+		int ctl, cur, ctl_sec, cur_sec, res;
-+
-+		ctl = ctl_val & SECWDOG_COUNT_MASK;
-+		res = (ctl_val & SECWDOG_RES_MASK) >> SECWDOG_CLKS_SHIFT;
-+		cur = cur_val & SECWDOG_COUNT_MASK;
-+		ctl_sec = TICKS_TO_SECS(ctl, wdt);
-+		cur_sec = TICKS_TO_SECS(cur, wdt);
-+		ret = seq_printf(s, "Resolution: %d / %d\n"
-+				"Control: %d s / %d (%#x) ticks\n"
-+				"Current: %d s / %d (%#x) ticks\n"
-+				"Busy count: %lu\n", res,
-+				wdt->resolution, ctl_sec, ctl, ctl, cur_sec,
-+				cur, cur, busy_count);
-+	}
-+
-+	return ret;
-+}
-+
-+static int bcm_kona_dbg_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, bcm_kona_wdt_dbg_show, inode->i_private);
-+}
-+
-+static const struct file_operations bcm_kona_dbg_operations = {
-+	.open		= bcm_kona_dbg_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
-+};
-+
-+static struct dentry *bcm_kona_wdt_debugfs_init(struct bcm_kona_wdt *wdt,
-+	struct watchdog_device *wdd)
-+{
-+	struct dentry *dir;
-+
-+	dir = debugfs_create_dir(BCM_KONA_WDT_NAME, NULL);
-+	if (IS_ERR_OR_NULL(dir))
-+		return NULL;
-+
-+	if (debugfs_create_file("info", S_IFREG | S_IRUGO, dir, wdt,
-+				&bcm_kona_dbg_operations))
-+		return dir;
-+
-+	/* Clean up */
-+	debugfs_remove_recursive(dir);
-+	return NULL;
-+}
-+
-+static void bcm_kona_debugfs_exit(struct dentry *dir)
-+{
-+	debugfs_remove_recursive(dir);
-+}
-+
-+#endif /* CONFIG_BCM_KONA_WDT_DEBUG */
-+
-+static int bcm_kona_wdt_ctrl_reg_modify(struct bcm_kona_wdt *wdt,
-+					unsigned mask, unsigned newval)
-+{
-+	int val;
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	spin_lock_irqsave(&wdt->lock, flags);
-+
-+	val = secure_register_read(wdt->base + SECWDOG_CTRL_REG);
-+	if (val < 0) {
-+		ret = val;
-+	} else {
-+		val &= ~mask;
-+		val |= newval;
-+		writel_relaxed(val, wdt->base + SECWDOG_CTRL_REG);
-+	}
-+
-+	spin_unlock_irqrestore(&wdt->lock, flags);
-+
-+	return ret;
-+}
-+
-+static int bcm_kona_wdt_set_resolution_reg(struct bcm_kona_wdt *wdt)
-+{
-+	if (wdt->resolution > SECWDOG_MAX_RES)
-+		return -EINVAL;
-+
-+	return bcm_kona_wdt_ctrl_reg_modify(wdt, SECWDOG_RES_MASK,
-+					wdt->resolution << SECWDOG_CLKS_SHIFT);
-+}
-+
-+static int bcm_kona_wdt_set_timeout_reg(struct watchdog_device *wdog,
-+					unsigned watchdog_flags)
-+{
-+	struct bcm_kona_wdt *wdt = watchdog_get_drvdata(wdog);
-+
-+	return bcm_kona_wdt_ctrl_reg_modify(wdt, SECWDOG_COUNT_MASK,
-+					SECS_TO_TICKS(wdog->timeout, wdt) |
-+					watchdog_flags);
-+}
-+
-+static int bcm_kona_wdt_set_timeout(struct watchdog_device *wdog,
-+	unsigned int t)
-+{
-+	wdog->timeout = t;
-+	return 0;
-+}
-+
-+static unsigned int bcm_kona_wdt_get_timeleft(struct watchdog_device *wdog)
-+{
-+	struct bcm_kona_wdt *wdt = watchdog_get_drvdata(wdog);
-+	int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&wdt->lock, flags);
-+	val = secure_register_read(wdt->base + SECWDOG_COUNT_REG);
-+	spin_unlock_irqrestore(&wdt->lock, flags);
-+
-+	if (val < 0)
-+		return val;
-+
-+	return TICKS_TO_SECS(val & SECWDOG_COUNT_MASK, wdt);
-+}
-+
-+static int bcm_kona_wdt_start(struct watchdog_device *wdog)
-+{
-+	return bcm_kona_wdt_set_timeout_reg(wdog,
-+					SECWDOG_EN_MASK | SECWDOG_SRSTEN_MASK);
-+}
-+
-+static int bcm_kona_wdt_stop(struct watchdog_device *wdog)
-+{
-+	struct bcm_kona_wdt *wdt = watchdog_get_drvdata(wdog);
-+
-+	return bcm_kona_wdt_ctrl_reg_modify(wdt, SECWDOG_EN_MASK |
-+						SECWDOG_SRSTEN_MASK, 0);
-+}
-+
-+static struct watchdog_ops bcm_kona_wdt_ops = {
-+	.owner =	THIS_MODULE,
-+	.start =	bcm_kona_wdt_start,
-+	.stop =		bcm_kona_wdt_stop,
-+	.set_timeout =	bcm_kona_wdt_set_timeout,
-+	.get_timeleft =	bcm_kona_wdt_get_timeleft,
-+};
-+
-+static struct watchdog_info bcm_kona_wdt_info = {
-+	.options =	WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE |
-+			WDIOF_KEEPALIVEPING,
-+	.identity =	"Broadcom Kona Watchdog Timer",
-+};
-+
-+static struct watchdog_device bcm_kona_wdt_wdd = {
-+	.info =		&bcm_kona_wdt_info,
-+	.ops =		&bcm_kona_wdt_ops,
-+	.min_timeout =	1,
-+	.max_timeout =	SECWDOG_MAX_COUNT >> SECWDOG_DEFAULT_RESOLUTION,
-+	.timeout =	SECWDOG_MAX_COUNT >> SECWDOG_DEFAULT_RESOLUTION,
-+};
-+
-+static void bcm_kona_wdt_shutdown(struct platform_device *pdev)
-+{
-+	bcm_kona_wdt_stop(&bcm_kona_wdt_wdd);
-+}
-+
-+static int bcm_kona_wdt_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct bcm_kona_wdt *wdt;
-+	struct resource *res;
-+	int ret;
-+
-+	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt) {
-+		dev_err(dev, "Failed to allocate memory for watchdog device");
-+		return -ENOMEM;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	wdt->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(wdt->base))
-+		return -ENODEV;
-+
-+	wdt->resolution = SECWDOG_DEFAULT_RESOLUTION;
-+	ret = bcm_kona_wdt_set_resolution_reg(wdt);
-+	if (ret) {
-+		dev_err(dev, "Failed to set resolution (error: %d)", ret);
-+		return ret;
-+	}
-+
-+	spin_lock_init(&wdt->lock);
-+	platform_set_drvdata(pdev, wdt);
-+	watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
-+
-+	ret = bcm_kona_wdt_set_timeout_reg(&bcm_kona_wdt_wdd, 0);
-+	if (ret) {
-+		dev_err(dev, "Failed set watchdog timeout");
-+		return ret;
-+	}
-+
-+	ret = watchdog_register_device(&bcm_kona_wdt_wdd);
-+	if (ret) {
-+		dev_err(dev, "Failed to register watchdog device");
-+		return ret;
-+	}
-+
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+	wdt->debugfs = bcm_kona_wdt_debugfs_init(wdt, &bcm_kona_wdt_wdd);
-+#endif
-+	dev_dbg(dev, "Broadcom Kona Watchdog Timer");
-+
-+	return 0;
-+}
-+
-+static int bcm_kona_wdt_remove(struct platform_device *pdev)
-+{
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+	struct bcm_kona_wdt *wdt = platform_get_drvdata(pdev);
-+
-+	if (wdt->debugfs)
-+		bcm_kona_debugfs_exit(wdt->debugfs);
-+#endif /* CONFIG_BCM_KONA_WDT_DEBUG */
-+	bcm_kona_wdt_shutdown(pdev);
-+	watchdog_unregister_device(&bcm_kona_wdt_wdd);
-+	dev_dbg(&pdev->dev, "Watchdog driver disabled");
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bcm_kona_wdt_of_match[] = {
-+	{ .compatible = "brcm,kona-wdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcm_kona_wdt_of_match);
-+
-+static struct platform_driver bcm_kona_wdt_driver = {
-+	.driver = {
-+			.name = BCM_KONA_WDT_NAME,
-+			.owner = THIS_MODULE,
-+			.of_match_table = bcm_kona_wdt_of_match,
-+		  },
-+	.probe = bcm_kona_wdt_probe,
-+	.remove = bcm_kona_wdt_remove,
-+	.shutdown = bcm_kona_wdt_shutdown,
-+};
-+
-+module_platform_driver(bcm_kona_wdt_driver);
-+
-+MODULE_AUTHOR("Markus Mayer <mmayer@broadcom.com>");
-+MODULE_DESCRIPTION("Broadcom Kona Watchdog Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+On Fri, Nov 15, 2013 at 1:01 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> [ adding dmaengine list and Vinod ]
+>
+> On Fri, Nov 15, 2013 at 12:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> dma_request_slave_channel() simply returns NULL whenever DMA channel
+>> lookup fails. Lookup could fail for two distinct reasons:
+>>
+>> a) No DMA specification exists for the channel name.
+>>    This includes situations where no DMA specifications exist at all, or
+>>    other general lookup problems.
+>>
+>> b) A DMA specification does exist, yet the driver for that channel is not
+>>    yet registered.
+>>
+>> Case (b) should trigger deferred probe in client drivers. However, since
+>> they have no way to differentiate the two situations, it cannot.
+>>
+>> Implement new function dma_request_slave_channel_or_err(), which performs
+>> identically to dma_request_slave_channel(), except that it returns an
+>> error-pointer rather than NULL, which allows callers to detect when
+>> deferred probe should occur.
+>>
+>> Eventually, all drivers should be converted to this new API, the old API
+>> removed, and the new API renamed to the more desirable name. This patch
+>> doesn't convert the existing API and all drivers in one go, since some
+>> drivers call dma_request_slave_channel() then dma_request_channel() if
+>> that fails. That would require modifying dma_request_channel() in the
+>> same way, which would then require modifying close to 100 drivers at once,
+>> rather than just the 15-20 or so that use dma_request_slave_channel(),
+>> which might be tenable in a single patch.
+>>
+>> acpi_dma_request_slave_chan_by_index() doesn't actually implement
+>> deferred probe. Perhaps it should?
+>>
+>> Cc: treding at nvidia.com
+>> Cc: pdeschrijver at nvidia.com
+>> Cc: linux-tegra at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: Dan Williams <dan.j.williams@intel.com>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> This patch is part of a series with strong internal depdendencies. I'm
+>> looking for an ack so that I can take the entire series through the Tegra
+>> and arm-soc trees. The series will be part of a stable branch that can be
+>> merged into other subsystems if needed to avoid/resolve dependencies.
+>> ---
+>>  drivers/dma/acpi-dma.c    | 12 ++++++------
+>>  drivers/dma/dmaengine.c   | 44 ++++++++++++++++++++++++++++++++++++++++----
+>>  drivers/dma/of-dma.c      | 12 +++++++-----
+>>  include/linux/dmaengine.h |  7 +++++++
+>>  include/linux/of_dma.h    |  9 ++++++---
+>>  5 files changed, 66 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/drivers/dma/acpi-dma.c b/drivers/dma/acpi-dma.c
+>> index e69b03c0fa50..c83d40f14467 100644
+>> --- a/drivers/dma/acpi-dma.c
+>> +++ b/drivers/dma/acpi-dma.c
+>> @@ -334,7 +334,7 @@ static int acpi_dma_parse_fixed_dma(struct acpi_resource *res, void *data)
+>>   * @dev:       struct device to get DMA request from
+>>   * @index:     index of FixedDMA descriptor for @dev
+>>   *
+>> - * Returns pointer to appropriate dma channel on success or NULL on error.
+>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>>   */
+>>  struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+>>                 size_t index)
+>> @@ -349,10 +349,10 @@ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+>>
+>>         /* Check if the device was enumerated by ACPI */
+>>         if (!dev || !ACPI_HANDLE(dev))
+>> -               return NULL;
+>> +               return ERR_PTR(-ENODEV);
+>>
+>>         if (acpi_bus_get_device(ACPI_HANDLE(dev), &adev))
+>> -               return NULL;
+>> +               return ERR_PTR(-ENODEV);
+>>
+>>         memset(&pdata, 0, sizeof(pdata));
+>>         pdata.index = index;
+>> @@ -367,7 +367,7 @@ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+>>         acpi_dev_free_resource_list(&resource_list);
+>>
+>>         if (dma_spec->slave_id < 0 || dma_spec->chan_id < 0)
+>> -               return NULL;
+>> +               return ERR_PTR(-ENODEV);
+>>
+>>         mutex_lock(&acpi_dma_lock);
+>>
+>> @@ -403,7 +403,7 @@ EXPORT_SYMBOL_GPL(acpi_dma_request_slave_chan_by_index);
+>>   * translate the names "tx" and "rx" here based on the most common case where
+>>   * the first FixedDMA descriptor is TX and second is RX.
+>>   *
+>> - * Returns pointer to appropriate dma channel on success or NULL on error.
+>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>>   */
+>>  struct dma_chan *acpi_dma_request_slave_chan_by_name(struct device *dev,
+>>                 const char *name)
+>> @@ -415,7 +415,7 @@ struct dma_chan *acpi_dma_request_slave_chan_by_name(struct device *dev,
+>>         else if (!strcmp(name, "rx"))
+>>                 index = 1;
+>>         else
+>> -               return NULL;
+>> +               return ERR_PTR(-ENODEV);
+>>
+>>         return acpi_dma_request_slave_chan_by_index(dev, index);
+>>  }
+>> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+>> index ea806bdc12ef..5e7f8af2f0ec 100644
+>> --- a/drivers/dma/dmaengine.c
+>> +++ b/drivers/dma/dmaengine.c
+>> @@ -540,6 +540,8 @@ EXPORT_SYMBOL_GPL(dma_get_slave_channel);
+>>   * @mask: capabilities that the channel must satisfy
+>>   * @fn: optional callback to disposition available channels
+>>   * @fn_param: opaque parameter to pass to dma_filter_fn
+>> + *
+>> + * Returns pointer to appropriate dma channel on success or NULL.
+>>   */
+>>  struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+>>                                        dma_filter_fn fn, void *fn_param)
+>> @@ -588,24 +590,58 @@ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+>>  EXPORT_SYMBOL_GPL(__dma_request_channel);
+>>
+>>  /**
+>> - * dma_request_slave_channel - try to allocate an exclusive slave channel
+>> + * __dma_request_slave_channel - try to allocate an exclusive slave
+>> + *   channel
+>>   * @dev:       pointer to client device structure
+>>   * @name:      slave channel name
+>> + *
+>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>>   */
+>> -struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name)
+>> +static struct dma_chan *__dma_request_slave_channel(struct device *dev,
+>> +                                       const char *name, bool defer)
+>>  {
+>>         /* If device-tree is present get slave info from here */
+>>         if (dev->of_node)
+>> -               return of_dma_request_slave_channel(dev->of_node, name);
+>> +               return of_dma_request_slave_channel(dev->of_node, name, defer);
+>>
+>>         /* If device was enumerated by ACPI get slave info from here */
+>>         if (ACPI_HANDLE(dev))
+>>                 return acpi_dma_request_slave_chan_by_name(dev, name);
+>>
+>> -       return NULL;
+>> +       return ERR_PTR(-ENODEV);
+>> +}
+>> +
+>> +/**
+>> + * dma_request_slave_channel - try to allocate an exclusive slave channel
+>> + * @dev:       pointer to client device structure
+>> + * @name:      slave channel name
+>> + *
+>> + * Returns pointer to appropriate dma channel on success or NULL.
+>> + */
+>> +struct dma_chan *dma_request_slave_channel(struct device *dev,
+>> +                                          const char *name)
+>> +{
+>> +       struct dma_chan *ch = __dma_request_slave_channel(dev, name, false);
+>> +       if (IS_ERR(ch))
+>> +               return NULL;
+>> +       return ch;
+>>  }
+>>  EXPORT_SYMBOL_GPL(dma_request_slave_channel);
+>>
+>> +/**
+>> + * dma_request_slave_channel_or_err - try to allocate an exclusive slave channel
+>> + * @dev:       pointer to client device structure
+>> + * @name:      slave channel name
+>> + *
+>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>> + */
+>> +struct dma_chan *dma_request_slave_channel_or_err(struct device *dev,
+>> +                                                 const char *name)
+>> +{
+>> +       return __dma_request_slave_channel(dev, name, true);
+>> +}
+>> +EXPORT_SYMBOL_GPL(dma_request_slave_channel_or_err);
+>> +
+>>  void dma_release_channel(struct dma_chan *chan)
+>>  {
+>>         mutex_lock(&dma_list_mutex);
+>> diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+>> index 0b88dd3d05f4..928141f6f21b 100644
+>> --- a/drivers/dma/of-dma.c
+>> +++ b/drivers/dma/of-dma.c
+>> @@ -143,10 +143,10 @@ static int of_dma_match_channel(struct device_node *np, const char *name,
+>>   * @np:                device node to get DMA request from
+>>   * @name:      name of desired channel
+>>   *
+>> - * Returns pointer to appropriate dma channel on success or NULL on error.
+>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>>   */
+>>  struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>> -                                             const char *name)
+>> +                                             const char *name, bool defer)
+>>  {
+>>         struct of_phandle_args  dma_spec;
+>>         struct of_dma           *ofdma;
+>> @@ -155,14 +155,14 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>>
+>>         if (!np || !name) {
+>>                 pr_err("%s: not enough information provided\n", __func__);
+>> -               return NULL;
+>> +               return ERR_PTR(-ENODEV);
+>>         }
+>>
+>>         count = of_property_count_strings(np, "dma-names");
+>>         if (count < 0) {
+>>                 pr_err("%s: dma-names property of node '%s' missing or empty\n",
+>>                         __func__, np->full_name);
+>> -               return NULL;
+>> +               return ERR_PTR(-ENODEV);
+>>         }
+>>
+>>         for (i = 0; i < count; i++) {
+>> @@ -181,11 +181,13 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>>
+>>                 of_node_put(dma_spec.np);
+>>
+>> +               if (!ofdma && defer)
+>> +                       return ERR_PTR(-EPROBE_DEFER);
+>>                 if (chan)
+>>                         return chan;
+>>         }
+>>
+>> -       return NULL;
+>> +       return ERR_PTR(-ENODEV);
+>>  }
+>>
+>>  /**
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index 41cf0c399288..b908b0fda72b 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -1041,6 +1041,8 @@ void dma_issue_pending_all(void);
+>>  struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+>>                                         dma_filter_fn fn, void *fn_param);
+>>  struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name);
+>> +struct dma_chan *dma_request_slave_channel_or_err(struct device *dev,
+>> +                                                 const char *name);
+>>  void dma_release_channel(struct dma_chan *chan);
+>>  #else
+>>  static inline struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type)
+>> @@ -1068,6 +1070,11 @@ static inline struct dma_chan *dma_request_slave_channel(struct device *dev,
+>>  {
+>>         return NULL;
+>>  }
+>> +static inline struct dma_chan *dma_request_slave_channel_or_err(
+>> +                                       struct device *dev, const char *name)
+>> +{
+>> +       return ERR_PTR(-ENODEV);
+>> +}
+>>  static inline void dma_release_channel(struct dma_chan *chan)
+>>  {
+>>  }
+>> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+>> index ae36298ba076..0504461574c6 100644
+>> --- a/include/linux/of_dma.h
+>> +++ b/include/linux/of_dma.h
+>> @@ -38,7 +38,8 @@ extern int of_dma_controller_register(struct device_node *np,
+>>                 void *data);
+>>  extern void of_dma_controller_free(struct device_node *np);
+>>  extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>> -                                                    const char *name);
+>> +                                                    const char *name,
+>> +                                                    bool defer);
+>>  extern struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+>>                 struct of_dma *ofdma);
+>>  #else
+>> @@ -54,8 +55,10 @@ static inline void of_dma_controller_free(struct device_node *np)
+>>  {
+>>  }
+>>
+>> -static inline struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>> -                                                    const char *name)
+>> +static inline struct dma_chan *of_dma_request_slave_channel(
+>> +                                       struct device_node *np,
+>> +                                       const char *name,
+>> +                                       bool defer)
+>>  {
+>>         return NULL;
+>>  }
+>> --
+>> 1.8.1.5
+>>
