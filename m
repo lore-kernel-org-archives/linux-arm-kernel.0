@@ -1,46 +1,57 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Nov 2013 15:23:27 +0100
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131115142327.GQ28304@ns203013.ovh.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 15 Nov 2013 15:22:33 +0100
+Subject: [PATCH 2/3] mmc: mvsdio: workaround for spurious irqs
+In-Reply-To: <1384525354-901-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384525354-901-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384525354-901-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:00 Fri 15 Nov     , Uwe Kleine-K??nig wrote:
-> The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
-> 
-> So better include it explicitly not only because the last link will go
-> away soon.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+SDIO controllers found on Marvell Kirkwood SoCs seem to cause a late,
+spurious irq although all interrupts have been disabled. This irq
+doesn't do any harm, neither to HW nor driver. To avoid some
+"unexpected irq" warning later, we workaround above issue by bailing
+out of irq handler early, if we didn't expect any.
 
-we should never use this symbol you need to request the clock clk32k
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: linux-mmc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/mmc/host/mvsdio.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-Best Regards,
-J.
-> ---
->  drivers/rtc/rtc-at91sam9.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> index 309b8b3..5963743 100644
-> --- a/drivers/rtc/rtc-at91sam9.c
-> +++ b/drivers/rtc/rtc-at91sam9.c
-> @@ -24,7 +24,7 @@
->  
->  #include <mach/at91_rtt.h>
->  #include <mach/cpu.h>
-> -
-> +#include <mach/hardware.h>
->  
->  /*
->   * This driver uses two configurable hardware resources that live in the
-> -- 
-> 1.8.4.2
-> 
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 06c5b0b..25f51be 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -354,6 +354,21 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
+ 		intr_status, mvsd_read(MVSD_NOR_INTR_EN),
+ 		mvsd_read(MVSD_HW_STATE));
+ 
++	/*
++	 * It looks like, SDIO IP can issue one late, spurious irq
++	 * although all irqs should be disabled. To work around this,
++	 * bail out early, if we didn't expect any irqs to occur.
++	 */
++	if (!mvsd_read(MVSD_NOR_INTR_EN) && !mvsd_read(MVSD_ERR_INTR_EN)) {
++		dev_dbg(host->dev,
++			"spurious irq detected intr 0x%04x intr_en 0x%04x erri 0x%04x erri_en 0x%04x\n",
++			mvsd_read(MVSD_NOR_INTR_STATUS),
++			mvsd_read(MVSD_NOR_INTR_EN),
++			mvsd_read(MVSD_ERR_INTR_STATUS),
++			mvsd_read(MVSD_ERR_INTR_EN));
++		return IRQ_HANDLED;
++	}
++
+ 	spin_lock(&host->lock);
+ 
+ 	/* PIO handling, if needed. Messy business... */
+-- 
+1.7.2.5
