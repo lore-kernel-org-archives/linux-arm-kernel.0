@@ -1,30 +1,60 @@
-From: dave@sr71.net (Dave Hansen)
-Date: Fri, 15 Nov 2013 07:53:34 -0800
-Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
- vmalloc
-In-Reply-To: <5285A896.3030204@codeaurora.org>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
- <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
- <52850C37.1080506@sr71.net> <5285A896.3030204@codeaurora.org>
-Message-ID: <5286437E.6040905@sr71.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 15 Nov 2013 10:57:18 -0500
+Subject: [PATCH] arm/arm64: KVM: introduce new mapping API for percpu
+ mappings
+In-Reply-To: <1384530008-18181-1-git-send-email-marc.zyngier@arm.com>
+References: <1384530008-18181-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5286445E.2090300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2013 08:52 PM, Laura Abbott wrote:
-> free (ptr) {
->     if (is_vmalloc_addr(ptr)
->         vfree
->     else
->         kfree
-> }
+On Friday 15 November 2013 10:40 AM, Marc Zyngier wrote:
+> Using virt_to_phys on percpu mappings is horribly wrong (my own bad).
+> Thankfully, the kernel offers a way to obtain the physical address
+> of such a mapping.
 > 
-> so my hypothesis would be that any path would have to be willing to take
-> the penalty of vmalloc anyway. The actual cost would depend on the
-> vmalloc / kmalloc ratio. I haven't had a chance to get profiling data
-> yet to see the performance difference.
+> Add a new create_hyp_percpu_mappings function to deal with those.
+> 
+> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Santosh, can you please give this new patch a spin on your HW?
+> 
+Works except to make guest boot on my machine, phys_addr_t
+update is needed as discussed ;-)
 
-Well, either that, or these kinds of things where it is a fallback:
 
->         hc = kmalloc(hsize, GFP_NOFS | __GFP_NOWARN);
->         if (hc == NULL)
->                 hc = __vmalloc(hsize, GFP_NOFS, PAGE_KERNEL);
+> 
+>  arch/arm/include/asm/kvm_mmu.h   |  1 +
+>  arch/arm/kvm/arm.c               |  2 +-
+>  arch/arm/kvm/mmu.c               | 32 ++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/kvm_mmu.h |  1 +
+>  4 files changed, 35 insertions(+), 1 deletion(-)
+> 
+[..]
+
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index b0de86b..f2a552b 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -331,6 +331,38 @@ int create_hyp_mappings(void *from, void *to)
+>  }
+>  
+>  /**
+> + * create_hyp_percpu_mappings - duplicate a percpu kernel virtual address
+> + *				range in Hyp mode
+> + * @from:	The virtual kernel start address of the range
+> + * @to:		The virtual kernel end address of the range (exclusive)
+> + *
+> + * The same virtual address as the kernel virtual address is also used
+> + * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
+> + * physical pages. It *has* to be a percpu region.
+> + */
+> +int create_hyp_percpu_mappings(void *from, void *to)
+> +{
+> +	unsigned long phys_addr;
+s/unsigned long/phys_addr_t
+
+regards,
+Santosh
