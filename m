@@ -1,49 +1,85 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Nov 2013 00:09:17 +0000
-Subject: [PATCH 5/6] ARM: kvm: Use phys_addr_t instead of unsigned long
- in mm code
-In-Reply-To: <1384457866-16135-6-git-send-email-santosh.shilimkar@ti.com>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-6-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131115000917.GB20516@lvm>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Nov 2013 16:09:50 -0800
+Subject: [PATCH 03/11] ARM: OMAP2+: Add support for board specific auxdata
+ quirks
+In-Reply-To: <1384474198-20756-1-git-send-email-tony@atomide.com>
+References: <1384474198-20756-1-git-send-email-tony@atomide.com>
+Message-ID: <1384474198-20756-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:37:45PM -0500, Santosh Shilimkar wrote:
-> The unsigned long datatype is not sufficient for mapping physical addresses
-> greater than 4GB.
-> 
-> So fix the KVM mm code accordingly. Special thanks to Christopher for debug
-> help to figure out the bug.
-> 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/kvm/mmu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 3bd652f..657f15e 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -318,7 +318,7 @@ out:
->   */
->  int create_hyp_mappings(void *from, void *to)
->  {
-> -	unsigned long phys_addr = virt_to_phys(from);
-> +	phys_addr_t phys_addr = virt_to_phys(from);
->  	unsigned long start = KERN_TO_HYP((unsigned long)from);
->  	unsigned long end = KERN_TO_HYP((unsigned long)to);
->  
-> -- 
-> 1.7.9.5
-> 
+Looks like some boards need to fill in the auxdata before
+we call of_platform_populate(). Let's add support for
+auxdata quirks like we already have for pdata quirks for
+legacy drivers.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/pdata-quirks.c | 32 +++++++++++++++++++++++++-------
+ 1 file changed, 25 insertions(+), 7 deletions(-)
 
-I can just apply this to kvm-arm-next immediately, or we can wait and
-pull it in with your series if you prefer.  Let me know.
-
--Christoffer
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 10c7145..cb2863d 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -125,7 +125,18 @@ void omap_pcs_legacy_init(int irq, void (*rearm)(void))
+ 	pcs_pdata.rearm = rearm;
+ }
+ 
++/*
++ * Few boards still need auxdata populated before we populate
++ * the dev entries in of_platform_populate().
++ */
++static struct pdata_init auxdata_quirks[] __initdata = {
++	{ /* sentinel */ },
++};
++
+ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
++#ifdef CONFIG_MACH_NOKIA_N8X0
++	OF_DEV_AUXDATA("ti,omap2420-mmc", 0x4809c000, "mmci-omap.0", NULL),
++#endif
+ #ifdef CONFIG_ARCH_OMAP3
+ 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002030, "48002030.pinmux", &pcs_pdata),
+ 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
+@@ -137,6 +148,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 	{ /* sentinel */ },
+ };
+ 
++/*
++ * Few boards still need to initialize some legacy devices with
++ * platform data until the drivers support device tree.
++ */
+ static struct pdata_init pdata_quirks[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP3
+ 	{ "nokia,omap3-n9", hsmmc2_internal_input_clk, },
+@@ -155,14 +170,8 @@ static struct pdata_init pdata_quirks[] __initdata = {
+ 	{ /* sentinel */ },
+ };
+ 
+-void __init pdata_quirks_init(struct of_device_id *omap_dt_match_table)
++static void pdata_quirks_check(struct pdata_init *quirks)
+ {
+-	struct pdata_init *quirks = pdata_quirks;
+-
+-	omap_sdrc_init(NULL, NULL);
+-	of_platform_populate(NULL, omap_dt_match_table,
+-			     omap_auxdata_lookup, NULL);
+-
+ 	while (quirks->compatible) {
+ 		if (of_machine_is_compatible(quirks->compatible)) {
+ 			if (quirks->fn)
+@@ -172,3 +181,12 @@ void __init pdata_quirks_init(struct of_device_id *omap_dt_match_table)
+ 		quirks++;
+ 	}
+ }
++
++void __init pdata_quirks_init(struct of_device_id *omap_dt_match_table)
++{
++	omap_sdrc_init(NULL, NULL);
++	pdata_quirks_check(auxdata_quirks);
++	of_platform_populate(NULL, omap_dt_match_table,
++			     omap_auxdata_lookup, NULL);
++	pdata_quirks_check(pdata_quirks);
++}
+-- 
+1.8.1.1
