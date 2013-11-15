@@ -1,81 +1,106 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Nov 2013 14:29:22 +0900
-Subject: [PATCH v2 3/3] ARM: shmobile: Koelsch: enable Ether in defconfig
-In-Reply-To: <201311150223.40632.sergei.shtylyov@cogentembedded.com>
-References: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
- <201311150223.40632.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20131115052919.GA16854@verge.net.au>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 14 Nov 2013 21:34:14 -0800
+Subject: [RFC PATCH 4/4] mm/vmalloc.c: Treat the entire kernel virtual
+ space as vmalloc
+In-Reply-To: <528507BA.9010101@intel.com>
+References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
+ <1384212412-21236-5-git-send-email-lauraa@codeaurora.org>
+ <528507BA.9010101@intel.com>
+Message-ID: <5285B256.6050403@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 02:23:40AM +0300, Sergei Shtylyov wrote:
-> Enable the Ether driver in 'koelsch_defconfig' along with DHCP autoconfiguration
-> and NFS root.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On 11/14/2013 9:26 AM, Dave Hansen wrote:
+> On 11/11/2013 03:26 PM, Laura Abbott wrote:
+>> With CONFIG_ENABLE_VMALLOC_SAVINGS, all lowmem is tracked in
+>> vmalloc. This means that all the kernel virtual address space
+>> can be treated as part of the vmalloc region. Allow vm areas
+>> to be allocated from the full kernel address range.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+>> ---
+>>   mm/vmalloc.c |   11 +++++++++++
+>>   1 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+>> index c7b138b..181247d 100644
+>> --- a/mm/vmalloc.c
+>> +++ b/mm/vmalloc.c
+>> @@ -1385,16 +1385,27 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
+>>    */
+>>   struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
+>>   {
+>> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
+>> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
+>> +				  NUMA_NO_NODE, GFP_KERNEL,
+>> +				  __builtin_return_address(0));
+>> +#else
+>>   	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
+>>   				  NUMA_NO_NODE, GFP_KERNEL,
+>>   				  __builtin_return_address(0));
+>> +#endif
+>>   }
+>>
+>>   struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
+>>   				const void *caller)
+>>   {
+>> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
+>> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
+>> +				  NUMA_NO_NODE, GFP_KERNEL, caller);
+>> +#else
+>>   	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
+>>   				  NUMA_NO_NODE, GFP_KERNEL, caller);
+>> +#endif
+>>   }
+>
+> Couple of nits: first of all, there's no reason to copy, paste, and
+> #ifdef this much code.  This just invites one of the copies to bitrot.
+> I'd much rather see this:
+>
+> #ifdef CONFIG_ENABLE_VMALLOC_SAVING
+> #define LOWEST_VMALLOC_VADDR PAGE_OFFSET
+> #else
+> #define LOWEST_VMALLOC_VADDR VMALLOC_START
+> #endif
+>
+> Then just replace the PAGE_OFFSET in the function arguments with
+> LOWEST_VMALLOC_VADDR.
+>
 
-Thanks.
+Good point.
 
-I think it is also appropriate to remove these too.
-To be hones their inclusion appears to have been an error on my part.
-And if nfsroot is being enabled it seems to be a good opportunity
-to get rid of them.
+> Have you done any audits to make sure that the rest of the code that
+> deals with vmalloc addresses in the kernel is using is_vmalloc_addr()?
+> I'd be a bit worried that we might have picked up an assumption or two
+> that *all* vmalloc addresses are _above_ VMALLOC_START.
+>
+> The percpu.c code looks like it might do this, and maybe the kcore code.
+>   The vmalloc.c code itself has this in get_vmalloc_info():
+>
+>>                  /*
+>>                   * Some archs keep another range for modules in vmalloc space
+>>                   */
+>>                  if (addr < VMALLOC_START)
+>>                          continue;
+>
+> Seems like that would break as well.
+>
+> With this patch, VMALLOC_START loses enough of its meaning that I wonder
+> if we should even keep it around.  It's the start of the _dedicated_
+> vmalloc space, but it's mostly useless and obscure enough that maybe we
+> should get rid of its use in common code.
+>
 
-CONFIG_BLK_DEV_INITRD=y
-CONFIG_INITRAMFS_SOURCE="../../initramfs/out/rootfs.arm.cpio"
-CONFIG_INITRAMFS_COMPRESSION_GZIP=y
+Yes, there are plenty of clients who are using VMALLOC_START. There 
+might still be a use for VMALLOC_START as marking 'no more direct mapped 
+memory above this address' . To start making some if the cleanup easier, 
+it would help to have an already calculated total amount of vmalloc for 
+the clients who are trying to work off a vmalloc percentage.
 
-> 
-> ---
-> Changes in version 2:
-> - new patch in the series.
-> 
->  arch/arm/configs/koelsch_defconfig |   22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> Index: renesas/arch/arm/configs/koelsch_defconfig
-> ===================================================================
-> --- renesas.orig/arch/arm/configs/koelsch_defconfig
-> +++ renesas/arch/arm/configs/koelsch_defconfig
-> @@ -29,7 +29,27 @@ CONFIG_VFP=y
->  CONFIG_NEON=y
->  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
->  CONFIG_PM_RUNTIME=y
-> +CONFIG_NET=y
-> +CONFIG_INET=y
-> +CONFIG_IP_PNP=y
-> +CONFIG_IP_PNP_DHCP=y
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> +CONFIG_NETDEVICES=y
-> +# CONFIG_NET_VENDOR_ARC is not set
-> +# CONFIG_NET_CADENCE is not set
-> +# CONFIG_NET_VENDOR_BROADCOM is not set
-> +# CONFIG_NET_VENDOR_CIRRUS is not set
-> +# CONFIG_NET_VENDOR_FARADAY is not set
-> +# CONFIG_NET_VENDOR_INTEL is not set
-> +# CONFIG_NET_VENDOR_MARVELL is not set
-> +# CONFIG_NET_VENDOR_MICREL is not set
-> +# CONFIG_NET_VENDOR_NATSEMI is not set
-> +CONFIG_SH_ETH=y
-> +# CONFIG_NET_VENDOR_SEEQ is not set
-> +# CONFIG_NET_VENDOR_SMSC is not set
-> +# CONFIG_NET_VENDOR_STMICRO is not set
-> +# CONFIG_NET_VENDOR_VIA is not set
-> +# CONFIG_NET_VENDOR_WIZNET is not set
->  # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
->  # CONFIG_INPUT_MOUSE is not set
->  # CONFIG_LEGACY_PTYS is not set
-> @@ -49,6 +69,8 @@ CONFIG_LEDS_CLASS=y
->  CONFIG_TMPFS=y
->  CONFIG_CONFIGFS_FS=y
->  # CONFIG_MISC_FILESYSTEMS is not set
-> +CONFIG_NFS_FS=y
-> +CONFIG_ROOT_NFS=y
->  # CONFIG_ENABLE_WARN_DEPRECATED is not set
->  # CONFIG_ENABLE_MUST_CHECK is not set
->  # CONFIG_ARM_UNWIND is not set
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
