@@ -1,106 +1,179 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 14 Nov 2013 21:34:14 -0800
-Subject: [RFC PATCH 4/4] mm/vmalloc.c: Treat the entire kernel virtual
- space as vmalloc
-In-Reply-To: <528507BA.9010101@intel.com>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
- <1384212412-21236-5-git-send-email-lauraa@codeaurora.org>
- <528507BA.9010101@intel.com>
-Message-ID: <5285B256.6050403@codeaurora.org>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
+Date: Fri, 15 Nov 2013 11:17:45 +0530
+Subject: [PATCH 2/3] Phy: Exynos: Add Exynos5250 sata phy driver
+In-Reply-To: <52846442.2020307@ti.com>
+References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>
+ <524AC56C.1060501@ti.com>
+ <CA+NduCAwnqz4_YNoVnpfV3O6fn=2QTdv4zgEdYRv4qjMRvWeag@mail.gmail.com>
+ <52846442.2020307@ti.com>
+Message-ID: <CAKuRcOK8XDKGsY3w2fwnrqtyH2HN0LjrqE6AoE0dSkaVOy5ozA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2013 9:26 AM, Dave Hansen wrote:
-> On 11/11/2013 03:26 PM, Laura Abbott wrote:
->> With CONFIG_ENABLE_VMALLOC_SAVINGS, all lowmem is tracked in
->> vmalloc. This means that all the kernel virtual address space
->> can be treated as part of the vmalloc region. Allow vm areas
->> to be allocated from the full kernel address range.
->>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> Signed-off-by: Neeti Desai <neetid@codeaurora.org>
->> ---
->>   mm/vmalloc.c |   11 +++++++++++
->>   1 files changed, 11 insertions(+), 0 deletions(-)
->>
->> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
->> index c7b138b..181247d 100644
->> --- a/mm/vmalloc.c
->> +++ b/mm/vmalloc.c
->> @@ -1385,16 +1385,27 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
->>    */
->>   struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
->>   {
->> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
->> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
->> +				  NUMA_NO_NODE, GFP_KERNEL,
->> +				  __builtin_return_address(0));
->> +#else
->>   	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
->>   				  NUMA_NO_NODE, GFP_KERNEL,
->>   				  __builtin_return_address(0));
->> +#endif
->>   }
->>
->>   struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
->>   				const void *caller)
->>   {
->> +#ifdef CONFIG_ENABLE_VMALLOC_SAVING
->> +	return __get_vm_area_node(size, 1, flags, PAGE_OFFSET, VMALLOC_END,
->> +				  NUMA_NO_NODE, GFP_KERNEL, caller);
->> +#else
->>   	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
->>   				  NUMA_NO_NODE, GFP_KERNEL, caller);
->> +#endif
->>   }
+On Thu, Nov 14, 2013 at 11:18 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
 >
-> Couple of nits: first of all, there's no reason to copy, paste, and
-> #ifdef this much code.  This just invites one of the copies to bitrot.
-> I'd much rather see this:
+> On Monday 07 October 2013 07:35 PM, Yuvaraj Cd wrote:
+>> On Tue, Oct 1, 2013 at 6:21 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> On Tuesday 01 October 2013 12:03 PM, Yuvaraj Kumar C D wrote:
+>>>> This patch adds the sata phy driver for Exynos5250.Exynos5250 sata
+>>>> phy comprises of CMU and TRSV blocks which are of I2C register Map.
+>>>> So this patch also adds a i2c client driver, which is used configure
+>>>> the CMU and TRSV block of exynos5250 SATA PHY.
+>>>
+>>> Why not make the Exynos5250 sata phy as a i2c client driver instead?
+>>>>
+>>>> This patch incorporates the generic phy framework to deal with sata
+>>>> phy.
+>>>>
+>>>> This patch depends on the below patch
+>>>>       [1].drivers: phy: add generic PHY framework
+>>>>               by Kishon Vijay Abraham I<kishon@ti.com>
+>>>>
+>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>>> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>>>> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+>>>> ---
+>>>>  drivers/phy/Kconfig                      |    6 +
+>>>>  drivers/phy/Makefile                     |    1 +
+>>>>  drivers/phy/exynos/Kconfig               |    5 +
+>>>>  drivers/phy/exynos/Makefile              |    5 +
+>>>>  drivers/phy/exynos/exynos5250_phy_i2c.c  |   53 +++++++
+>>>>  drivers/phy/exynos/sata_phy_exynos5250.c |  248 ++++++++++++++++++++++++++++++
+>>>>  drivers/phy/exynos/sata_phy_exynos5250.h |   33 ++++
+>>>>  7 files changed, 351 insertions(+)
+>>>>  create mode 100644 drivers/phy/exynos/Kconfig
+>>>>  create mode 100644 drivers/phy/exynos/Makefile
+>>>>  create mode 100644 drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>>  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.c
+>>>>  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.h
+>>>>
+>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>> index 5f85909..ab3d1c6 100644
+>>>> --- a/drivers/phy/Kconfig
+>>>> +++ b/drivers/phy/Kconfig
+>>>> @@ -11,3 +11,9 @@ menuconfig GENERIC_PHY
+>>>>         devices present in the kernel. This layer will have the generic
+>>>>         API by which phy drivers can create PHY using the phy framework and
+>>>>         phy users can obtain reference to the PHY.
+>>>> +
+>>>> +if GENERIC_PHY
+>>>
+>>> NAK. Just select GENERIC_PHY from your driver Kconfig.
+>>>> +
+>>>> +source "drivers/phy/exynos/Kconfig"
+>>>> +
+>>>> +endif
+>>>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>>>> index 9e9560f..e0223d7 100644
+>>>> --- a/drivers/phy/Makefile
+>>>> +++ b/drivers/phy/Makefile
+>>>> @@ -3,3 +3,4 @@
+>>>>  #
+>>>>
+>>>>  obj-$(CONFIG_GENERIC_PHY)    += phy-core.o
+>>>> +obj-$(CONFIG_PHY_SAMSUNG_SATA)       += exynos/
+>>>
+>>> simply have phy-exynos5250 in drivers/phy.
+>> ok.
+>>>> diff --git a/drivers/phy/exynos/Kconfig b/drivers/phy/exynos/Kconfig
+>>>> new file mode 100644
+>>>> index 0000000..fa125fb
+>>>> --- /dev/null
+>>>> +++ b/drivers/phy/exynos/Kconfig
+>>>> @@ -0,0 +1,5 @@
+>>>> +config PHY_SAMSUNG_SATA
+>>>> +     tristate "Samsung Sata SerDes/PHY driver"
+>>>> +     help
+>>>> +       Support for Samsung sata SerDes/Phy found on Samsung
+>>>> +       SoCs.
+>>>> diff --git a/drivers/phy/exynos/Makefile b/drivers/phy/exynos/Makefile
+>>>> new file mode 100644
+>>>> index 0000000..50dc7eb
+>>>> --- /dev/null
+>>>> +++ b/drivers/phy/exynos/Makefile
+>>>> @@ -0,0 +1,5 @@
+>>>> +#
+>>>> +# Makefile for the exynos phy drivers.
+>>>> +#
+>>>> +ccflags-y := -Idrivers/phy/exynos
+>>>> +obj-$(CONFIG_PHY_SAMSUNG_SATA)       += sata_phy_exynos5250.o exynos5250_phy_i2c.o
+>>>> diff --git a/drivers/phy/exynos/exynos5250_phy_i2c.c b/drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>> new file mode 100644
+>>>> index 0000000..9c75d3b
+>>>> --- /dev/null
+>>>> +++ b/drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>> @@ -0,0 +1,53 @@
+>>>> +/*
+>>>> + * Copyright (C) 2013 Samsung Electronics Co.Ltd
+>>>> + * Author:
+>>>> + *   Yuvaraj C D <yuvaraj.cd@samsung.com>
+>>>> + *
+>>>> + * This program is free software; you can redistribute  it and/or modify it
+>>>> + * under  the terms of  the GNU General  Public License as published by the
+>>>> + * Free Software Foundation;  either version 2 of the  License, or (at your
+>>>> + * option) any later version.
+>>>> + *
+>>>> + */
+>>>> +
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/i2c.h>
+>>>> +#include <linux/module.h>
+>>>> +#include "sata_phy_exynos5250.h"
+>>>> +
+>>>> +static int exynos_sata_i2c_probe(struct i2c_client *client,
+>>>> +             const struct i2c_device_id *i2c_id)
+>>>> +{
+>>>> +     sataphy_attach_i2c_client(client);
+>>>> +
+>>>> +     dev_info(&client->adapter->dev,
+>>>> +             "attached %s into i2c adapter successfully\n",
+>>>> +             client->name);
+>>>> +
+>>>> +     return 0;
+>>>> +}
+>>>> +
+>>>> +static int exynos_sata_i2c_remove(struct i2c_client *client)
+>>>> +{
+>>>> +     dev_info(&client->adapter->dev,
+>>>> +             "detached %s from i2c adapter successfully\n",
+>>>> +             client->name);
+>>>> +
+>>>> +     return 0;
+>>>> +}
+>>>> +
+>>>> +static const struct i2c_device_id phy_i2c_device_match[] = {
+>>>> +     { "sata-phy-i2c", 0 },
+>>>> +};
+>>>> +MODULE_DEVICE_TABLE(of, phy_i2c_device_match);
+>>>> +
+>>>> +struct i2c_driver sataphy_i2c_driver = {
+>>>> +     .probe    = exynos_sata_i2c_probe,
+>>>> +     .id_table = phy_i2c_device_match,
+>>>> +     .remove         = exynos_sata_i2c_remove,
+>>>> +     .driver   = {
+>>>> +             .name = "sata-phy-i2c",
+>>>> +             .owner = THIS_MODULE,
+>>>> +             .of_match_table = (void *)phy_i2c_device_match,
+>>>> +             },
+>>>> +};
+>>>
+>>> As I just mentioned above, we can merge this driver with the below one.
+>> True, Initially it was merged.But already existing drivers of which
+>> are of similar to this kind were done in this way.
+>> Please refer  /drivers/gpu/drm//exynos/exynos_hdmiphy.c
 >
-> #ifdef CONFIG_ENABLE_VMALLOC_SAVING
-> #define LOWEST_VMALLOC_VADDR PAGE_OFFSET
-> #else
-> #define LOWEST_VMALLOC_VADDR VMALLOC_START
-> #endif
->
-> Then just replace the PAGE_OFFSET in the function arguments with
-> LOWEST_VMALLOC_VADDR.
->
+> Can you point to any discussions where it was decided to go with this approach?
+Sorry,what I meant is exynos_hdmiphy.c is already exist in the
+mainline with this approach.
 
-Good point.
+Initially it was merged on my local patches(Not upstreamed).But after
+referring to the
+exynos_hdmiphy.c driver and with lot of internal discussions ,it was
+decided to go with
+the already existing approach.
 
-> Have you done any audits to make sure that the rest of the code that
-> deals with vmalloc addresses in the kernel is using is_vmalloc_addr()?
-> I'd be a bit worried that we might have picked up an assumption or two
-> that *all* vmalloc addresses are _above_ VMALLOC_START.
 >
-> The percpu.c code looks like it might do this, and maybe the kcore code.
->   The vmalloc.c code itself has this in get_vmalloc_info():
->
->>                  /*
->>                   * Some archs keep another range for modules in vmalloc space
->>                   */
->>                  if (addr < VMALLOC_START)
->>                          continue;
->
-> Seems like that would break as well.
->
-> With this patch, VMALLOC_START loses enough of its meaning that I wonder
-> if we should even keep it around.  It's the start of the _dedicated_
-> vmalloc space, but it's mostly useless and obscure enough that maybe we
-> should get rid of its use in common code.
->
-
-Yes, there are plenty of clients who are using VMALLOC_START. There 
-might still be a use for VMALLOC_START as marking 'no more direct mapped 
-memory above this address' . To start making some if the cleanup easier, 
-it would help to have an already calculated total amount of vmalloc for 
-the clients who are trying to work off a vmalloc percentage.
-
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> Thanks
+> Kishon
