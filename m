@@ -1,99 +1,77 @@
 From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Fri, 15 Nov 2013 19:11:57 +0900
+Date: Fri, 15 Nov 2013 19:23:41 +0900
 Subject: [PATCH v2 10/13] kprobes: Remove uneeded kernel dependency
  on struct arch_specific_insn
-In-Reply-To: <1384438551.3388.78.camel@linaro1.home>
+In-Reply-To: <52853389.7080105@linaro.org>
 References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
  <1381871068-27660-11-git-send-email-dave.long@linaro.org>
  <1384362833.3392.42.camel@linaro1.home> <52842F2C.1030701@hitachi.com>
- <1384438551.3388.78.camel@linaro1.home>
-Message-ID: <5285F36D.7010708@hitachi.com>
+ <1384438551.3388.78.camel@linaro1.home> <52853389.7080105@linaro.org>
+Message-ID: <5285F62D.5010407@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/11/14 23:15), Jon Medhurst (Tixy) wrote:
-> On Thu, 2013-11-14 at 11:02 +0900, Masami Hiramatsu wrote:
->> (2013/11/14 2:13), Jon Medhurst (Tixy) wrote:
->>> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
->>>> From: "David A. Long" <dave.long@linaro.org>
+(2013/11/15 5:33), David Long wrote:
+> On 11/14/13 09:15, Jon Medhurst (Tixy) wrote:
+>> On Thu, 2013-11-14 at 11:02 +0900, Masami Hiramatsu wrote:
+>>> (2013/11/14 2:13), Jon Medhurst (Tixy) wrote:
+>>>> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
+>>>>> From: "David A. Long" <dave.long@linaro.org>
+>>>>>
+>>>>> Instead of depending on include/asm/kprobes.h to provide a dummy definition
+>>>>> for struct arch_specific_insn, do so in include/linux/kprobes.h.
 >>>>
->>>> Instead of depending on include/asm/kprobes.h to provide a dummy definition
->>>> for struct arch_specific_insn, do so in include/linux/kprobes.h.
+>>>> That change description doesn't quite seem to quite make sense to me.
+>>>>
+>>>> Anyway, what we're trying to do with this patch is to allow us to use
+>>>> arch_specific_insn for purposes additional to implementing kprobes. This
+>>>> patch enables that but I'm wary that the kprobes code assumes that ainsn
+>>>> is a struct arch_specific_insn, e.g. in linux/kernel/kprobes.c we have:
+>>>>
+>>>> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
+>>>>
+>>>> Now, that code isn't compiled when kprobes isn't configured, but it
+>>>> seams to me to be safer if that was also changed to
+>>>>
+>>>> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(p->ainsn));
 >>>
->>> That change description doesn't quite seem to quite make sense to me.
->>>
->>> Anyway, what we're trying to do with this patch is to allow us to use
->>> arch_specific_insn for purposes additional to implementing kprobes. This
->>> patch enables that but I'm wary that the kprobes code assumes that ainsn
->>> is a struct arch_specific_insn, e.g. in linux/kernel/kprobes.c we have:
->>>
->>> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
->>>
->>> Now, that code isn't compiled when kprobes isn't configured, but it
->>> seams to me to be safer if that was also changed to 
->>>
->>> 	memcpy(&p->ainsn, &ap->ainsn, sizeof(p->ainsn));
+> 
+> That does look like an important improvement.
+
+Agreed.
+
+>>> This kind of cleanup looks good for me, but I don't agree to change
+>>> the type of the member (removing is OK) by Kconfig.
 >>
->> This kind of cleanup looks good for me, but I don't agree to change
->> the type of the member (removing is OK) by Kconfig.
-> 
-> Wouldn't that still require an #ifdef CONFIG_KPROBES around ainsn?
-> Admittedly a less ugly one than one to change its type to an int.
-
-Yeah, that's the point.
-
-> 
->>  If you want to
->> change the framework of kprobes and uprobes itself (unification),
->> I'm appreciate to discuss with you and uprobes people, because it
->> will involve all arch dependent code change, *NOT ONLY* the ARM issue.
-> 
-> Well, I don't think the goal wasn't unification as such. For kprobes on
-> ARM we have to decode and simulate pretty much the entire instruction
-> set(s) and the attempt to implement uprobes on ARM have tried to make
-> use of as much of that as possible. The tricky bit has been as to where
-> to try and draw the level of abstraction, and it seems this may well be
-> leaking out of the arch specific arena.
-
-I see, I've heard that from Sandeepa who are working on arm64 kprobes.
-His patch series now has generic interface of decoder/simulator.
-
-> Bit of background, Dave Long has been working on ARM uprobes based on
-> Rabin Vincent's earlier work, and I, as author of a large part of the
-> current ARM kprobes code, have been reviewing (not very satisfactorily I
-> admit) the bits that impact that. One of my motivations has been to push
-> the kprobes instruction decoding to be more generic, rather than special
-> casing things to cope with uprobes. This is because I'm aware of the
-> reoccurring theme on the ARM lists that it would be good to not have all
-> the different methods of instruction decoding, for probes, debug and
-> simulation, etc. (I'm sceptical that a one-size-fits-all is possible,
-> but consolidation where practical is good).
-
-Same as x86, we still have different code base of kprobes and uprobes
-Fortunately, x86 instruction decoder is separated, but single-stepping
-and other parts are not well shared.
-
->>> However, I also wonder if we should instead leave arch_specific_insn as
->>> a kprobes specific structure and on ARM define it in terms of a new more
->>> generic 'struct probe_insn'? The drawback with that is that we'd
->>> probably end up with a struct just containing a single member which
->>> seems a bit redundant:
->>>
->>> struct arch_specific_insn {
->>> 	struct probe_insn pinsn;
->>> };
+>> Wouldn't that still require an #ifdef CONFIG_KPROBES around ainsn?
+>> Admittedly a less ugly one than one to change its type to an int.
 >>
->> I also disagree it. If you have a plan to integrate uprobes and kprobes
->> arch specific code, please share it with us.
 > 
-> There's not really a 'plan', just an attempt to reuse the instruction
-> decoding code used by kprobes in the implementation of uprobes, i.e. the
-> patch series [1] which this mail thread is in reply to.
-> 
-> [1] http://thread.gmane.org/gmane.linux.kernel/1579985
+> It is also possible to make the include of asm/kprobes.h unconditional, 
+> although that might only cause the #ifdef to appear in more than one 
+> include file.
 
-OK, and I think similar method we can use on x86 too. :)
-In that case, we may be able to simplify the arch_specific_insn.
+Good point!
+
+>>> Srikar, Oleg, I think it's a good time to merge such arch_specific mechanism
+>>> of uprobes and kprobes. Would you think we can do similar thing on x86 too?
+>>
+> 
+> I welcome input from people who have experience in this area.  I have no 
+> desire to complicate efforts that might be attempted on other 
+> architectures, but the existing code was unique to ARM and the goal here 
+> was just to share it on ARM in implementing the currently non-existant 
+> ARM uprobes feature.  It seems to me the leakage of these changes into 
+> generic kprobes code is exceedingly small, and unlikely to be a 
+> hinderance to any future work (if any is even needed or planned) 
+> supporting uprobes or kprobes on other architectures.  In the meantime 
+> we have ARM users who have been asking for uprobes support for a while 
+> and this is, IMHO, a fairly clean approach to providing it.
+
+I see. I'd just like to suggest you that your improvement on ONE arch
+can also be useful idea for the other archs. In that case, there would be
+better, more efficient way to do that.
+Since we are on the same (or, next) track, we can learn many things each other. :)
 
 Thank you,
 
