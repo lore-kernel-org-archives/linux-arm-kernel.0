@@ -1,867 +1,115 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Fri, 15 Nov 2013 18:35:07 +0100
-Subject: [PATCHv6] dmaengine: Add support for BCM2835
-Message-ID: <52865B4B.7030708@koalo.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 15 Nov 2013 17:38:53 +0000
+Subject: [PATCH v2] ARM: kexec: Use the right ISA for relocate_new_kernel
+In-Reply-To: <52860555.7010307@linaro.org>
+References: <1383913444-9153-1-git-send-email-Dave.Martin@arm.com>
+ <20131108133426.GE17461@mudshark.cambridge.arm.com>
+ <20131108184625.GE2602@localhost.localdomain>
+ <5282818B.9030903@linaro.org> <52860555.7010307@linaro.org>
+Message-ID: <20131115173113.GB4028@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
-Currently it only supports cyclic DMA.
+On Fri, Nov 15, 2013 at 01:28:21PM +0200, Taras Kondratiuk wrote:
+> On 11/12/2013 09:29 PM, Taras Kondratiuk wrote:
+> > Hi Dave
+> > 
+> > Yes. I've tested it on Pandaboard and results are quite weird.
+> > ARM->ARM, Thumb->Thumb and Thumb->ARM kernel transition works fine
+> > for both kexec and kdump ways. But ARM->Thumb works for only kdump
+> > via kernel panic. In case of "kexec -e" the second Thumb kernel
+> > doesn't come up.
+> > 
+> > I don't have JTAG now. I will check this tomorrow morning.
+> 
+> Hi Dave, Will
+> 
+> The issue I observed is not caused by this patch.
+> I was able to reproduce it with my initial simple patch.
+> 
+> So for this one:
+> Reported-and-Tested-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
 
-Signed-off-by: Florian Meier <florian.meier@koalo.de>
----
+Thanks for that.
 
-Sixth version with some style improvements by Joe.
-sizeof(s128) doesn't work. Therefore, still hardcoded byte counts.
+> 
+> And the issue I'm frequently facing in reloaded kernel (Thumb from ARM)
+> is random crashes caused by undefined instructions.
+> 
+> My observation summary:
+> - Before starting a second kernel I'm dumping loaded zImage and then
+>   unpacked Image at final location and they are correct, so no issue
+>   with loading.
+> - I observe two types of crash:
+>   1) Undefined instruction in the middle of kernel code. After a crash
+>      I check failing address and there is always a *valid* Thumb
+>      instruction (CPU is in Thumb mode).
+>   2) Jump to a wrong address which consequently causes undefined
+>      instruction exception. A trace of one example of a wrong jump is
+>      captured in [1]. Instead of jumping to 0xC049097C code gets
+>      executed at 0xED85E008. BTW the wrong address suspiciously looks
+>      like an ARM instruction.
 
- .../devicetree/bindings/dma/bcm2835-dma.txt        |  56 ++
- drivers/dma/Kconfig                                |   6 +
- drivers/dma/Makefile                               |   1 +
- drivers/dma/bcm2835-dma.c                          | 744 +++++++++++++++++++++
- 4 files changed, 807 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/bcm2835-dma.txt
- create mode 100644 drivers/dma/bcm2835-dma.c
+That jump to 0xED85E008 certainly looks strange ... I wonder whether
+there could be some instructions missing from the trace.
 
-diff --git a/Documentation/devicetree/bindings/dma/bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
-new file mode 100644
-index 0000000..7d91019
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
-@@ -0,0 +1,56 @@
-+* BCM2835 DMA controller
-+
-+Required properties:
-+- compatible: Should be "brcm,bcm2835-dma".
-+- reg: Should contain DMA registers location and length.
-+- interrupts: Should contain the DMA interrupts associated
-+		to the DMA channels in ascending order.
-+		First cell is the IRQ bank.
-+		Second cell is the IRQ number.
-+- #dma-cells: Must be <1>, used to represent the number of integer cells in
-+		the dmas property of client devices.
-+- brcm,dma-channel-mask: Bit mask representing the channels
-+			 not used by the firmware.
-+
-+Example:
-+
-+dma: dma at 7e007000 {
-+	compatible = "brcm,bcm2835-dma";
-+	reg = <0x7e007000 0xf00>;
-+	interrupts = <1 16
-+		      1 17
-+		      1 18
-+		      1 19
-+		      1 20
-+		      1 21
-+		      1 22
-+		      1 23
-+		      1 24
-+		      1 25
-+		      1 26
-+		      1 27
-+		      1 28>;
-+
-+	#dma-cells = <1>;
-+	brcm,dma-channel-mask = <0x7f35>;
-+};
-+
-+DMA clients connected to the BCM2835 DMA controller must use the format
-+described in the dma.txt file, using a two-cell specifier for each channel:
-+a phandle plus one integer cells.
-+The two cells in order are:
-+
-+1. A phandle pointing to the DMA controller.
-+2. The DREQ number.
-+
-+Example:
-+
-+bcm2835_i2s: i2s at 7e203000 {
-+	compatible = "brcm,bcm2835-i2s";
-+	reg = <	0x7e203000 0x20
-+		0x7e101098 0x02>;
-+
-+	dmas = <&dma 2
-+		&dma 3>;
-+	dma-names = "tx", "rx";
-+};
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index c61a6ec..880e723 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -300,6 +300,12 @@ config DMA_OMAP
- 	select DMA_ENGINE
- 	select DMA_VIRTUAL_CHANNELS
- 
-+config DMA_BCM2835
-+	tristate "BCM2835 DMA engine support"
-+	depends on (ARCH_BCM2835 || MACH_BCM2708)
-+	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+
- config TI_CPPI41
- 	tristate "AM33xx CPPI41 DMA support"
- 	depends on ARCH_OMAP
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 0ce2da9..0a6f08e 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
- obj-$(CONFIG_DMA_SA11X0) += sa11x0-dma.o
- obj-$(CONFIG_MMP_TDMA) += mmp_tdma.o
- obj-$(CONFIG_DMA_OMAP) += omap-dma.o
-+obj-$(CONFIG_DMA_BCM2835) += bcm2835-dma.o
- obj-$(CONFIG_MMP_PDMA) += mmp_pdma.o
- obj-$(CONFIG_DMA_JZ4740) += dma-jz4740.o
- obj-$(CONFIG_TI_CPPI41) += cppi41.o
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-new file mode 100644
-index 0000000..23c7fb6
---- /dev/null
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -0,0 +1,744 @@
-+/*
-+ * BCM2835 DMA engine support
-+ *
-+ * This driver only supports cyclic DMA transfers
-+ * as needed for the I2S module.
-+ *
-+ * Author:      Florian Meier, <florian.meier@koalo.de>
-+ *              Copyright 2013
-+ *
-+ * based on
-+ *	OMAP DMAengine support by Russell King
-+ *
-+ *	BCM2708 DMA Driver
-+ *	Copyright (C) 2010 Broadcom
-+ *
-+ *	Raspberry Pi PCM I2S ALSA Driver
-+ *	Copyright (c) by Phil Poole 2013
-+ *
-+ *	MARVELL MMP Peripheral DMA Driver
-+ *	Copyright 2012 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/spinlock.h>
-+#include <linux/of.h>
-+#include <linux/of_dma.h>
-+
-+#include "virt-dma.h"
-+
-+struct bcm2835_dmadev {
-+	struct dma_device ddev;
-+	spinlock_t lock;
-+	void __iomem *dma_base;
-+	struct device_dma_parameters dma_parms;
-+};
-+
-+struct bcm2835_dma_cb {
-+	uint32_t info;
-+	uint32_t src;
-+	uint32_t dst;
-+	uint32_t length;
-+	uint32_t stride;
-+	uint32_t next;
-+	uint32_t pad[2];
-+};
-+
-+struct bcm2835_chan {
-+	struct virt_dma_chan vc;
-+	struct list_head node;
-+
-+	struct dma_slave_config	cfg;
-+	bool cyclic;
-+	unsigned dreq;
-+
-+	int dma_ch;
-+	struct bcm2835_desc *desc;
-+
-+	void __iomem *dma_chan_base;
-+	int dma_irq_number;
-+};
-+
-+struct bcm2835_desc {
-+	struct virt_dma_desc vd;
-+	enum dma_transfer_direction dir;
-+
-+	unsigned int control_block_size;
-+	struct bcm2835_dma_cb *control_block_base;
-+	dma_addr_t control_block_base_phys;
-+
-+	unsigned frames;
-+	size_t size;
-+};
-+
-+#define BCM2835_DMA_CS		0x00
-+#define BCM2835_DMA_ADDR	0x04
-+#define BCM2835_DMA_SOURCE_AD	0x0c
-+#define BCM2835_DMA_DEST_AD	0x10
-+#define BCM2835_DMA_NEXTCB	0x1C
-+
-+/* DMA CS Control and Status bits */
-+#define BCM2835_DMA_ACTIVE	BIT(0)
-+#define BCM2835_DMA_INT	BIT(2)
-+#define BCM2835_DMA_ISPAUSED	BIT(4)  /* Pause requested or not active */
-+#define BCM2835_DMA_ISHELD	BIT(5)  /* Is held by DREQ flow control */
-+#define BCM2835_DMA_ERR	BIT(8)
-+#define BCM2835_DMA_ABORT	BIT(30) /* stop current CB, go to next, WO */
-+#define BCM2835_DMA_RESET	BIT(31) /* WO, self clearing */
-+
-+#define BCM2835_DMA_INT_EN	BIT(0)
-+#define BCM2835_DMA_D_INC	BIT(4)
-+#define BCM2835_DMA_D_DREQ	BIT(6)
-+#define BCM2835_DMA_S_INC	BIT(8)
-+#define BCM2835_DMA_S_DREQ	BIT(10)
-+
-+#define BCM2835_DMA_PER_MAP(x)	((x) << 16)
-+
-+#define BCM2835_DMA_DATA_TYPE_S8 1
-+#define BCM2835_DMA_DATA_TYPE_S16 2
-+#define BCM2835_DMA_DATA_TYPE_S32 4
-+#define BCM2835_DMA_DATA_TYPE_S128 16
-+
-+/* valid only for channels 0 - 14, 15 has its own base address */
-+#define BCM2835_DMA_CHAN(n)	((n) << 8) /* base address */
-+#define BCM2835_DMA_CHANIO(dma_base, n) ((dma_base) + BCM2835_DMA_CHAN(n))
-+
-+static inline struct bcm2835_dmadev *to_bcm2835_dma_dev(struct dma_device *d)
-+{
-+	return container_of(d, struct bcm2835_dmadev, ddev);
-+}
-+
-+static inline struct bcm2835_chan *to_bcm2835_dma_chan(struct dma_chan *c)
-+{
-+	return container_of(c, struct bcm2835_chan, vc.chan);
-+}
-+
-+static inline struct bcm2835_desc *to_bcm2835_dma_desc(
-+		struct dma_async_tx_descriptor *t)
-+{
-+	return container_of(t, struct bcm2835_desc, vd.tx);
-+}
-+
-+static void bcm2835_dma_desc_free(struct virt_dma_desc *vd)
-+{
-+	struct bcm2835_desc *desc = container_of(vd, struct bcm2835_desc, vd);
-+	dma_free_coherent(desc->vd.tx.chan->device->dev,
-+			desc->control_block_size,
-+			desc->control_block_base,
-+			desc->control_block_base_phys);
-+	kfree(desc);
-+}
-+
-+static int bcm2835_dma_abort(void __iomem *dma_chan_base)
-+{
-+	unsigned long int cs;
-+	long int timeout = 10000;
-+
-+	cs = readl(dma_chan_base + BCM2835_DMA_CS);
-+	if (!(cs & BCM2835_DMA_ACTIVE))
-+		return 0;
-+
-+	/* write 0 to the active bit - pause the DMA */
-+	writel(0, dma_chan_base + BCM2835_DMA_CS);
-+
-+	/* wait for any current AXI transfer to complete */
-+	while ((cs & BCM2835_DMA_ISPAUSED) && --timeout >= 0)
-+		cs = readl(dma_chan_base + BCM2835_DMA_CS);
-+
-+	/* we'll un-pause when we set of our next DMA */
-+	if (cs & BCM2835_DMA_ISPAUSED)
-+		return -ETIMEDOUT;
-+
-+	if (!(cs & BCM2835_DMA_ACTIVE))
-+		return 0;
-+
-+	/* terminate the control block chain */
-+	writel(0, dma_chan_base + BCM2835_DMA_NEXTCB);
-+
-+	/* abort the whole DMA */
-+	writel(BCM2835_DMA_ABORT | BCM2835_DMA_ACTIVE,
-+	       dma_chan_base + BCM2835_DMA_CS);
-+
-+	return 0;
-+}
-+
-+static void bcm2835_dma_start_desc(struct bcm2835_chan *c)
-+{
-+	struct virt_dma_desc *vd = vchan_next_desc(&c->vc);
-+	struct bcm2835_desc *d;
-+
-+	if (!vd) {
-+		c->desc = NULL;
-+		return;
-+	}
-+
-+	list_del(&vd->node);
-+
-+	c->desc = d = to_bcm2835_dma_desc(&vd->tx);
-+
-+	dsb();	/* ARM data synchronization (push) operation */
-+
-+	writel(d->control_block_base_phys, c->dma_chan_base + BCM2835_DMA_ADDR);
-+	writel(BCM2835_DMA_ACTIVE, c->dma_chan_base + BCM2835_DMA_CS);
-+}
-+
-+static irqreturn_t bcm2835_dma_callback(int irq, void *data)
-+{
-+	struct bcm2835_chan *c = data;
-+	struct bcm2835_desc *d;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+
-+	/* acknowledge interrupt */
-+	writel(BCM2835_DMA_INT, c->dma_chan_base + BCM2835_DMA_CS);
-+
-+	d = c->desc;
-+
-+	if (d) {
-+		/* TODO Only works for cyclic DMA */
-+		vchan_cyclic_callback(&d->vd);
-+	}
-+
-+	/* keep the DMA engine running */
-+	dsb(); /* ARM synchronization barrier */
-+	writel(BCM2835_DMA_ACTIVE, c->dma_chan_base + BCM2835_DMA_CS);
-+
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
-+{
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+
-+	dev_dbg(c->vc.chan.device->dev,
-+			"Allocating DMA channel %i\n", c->dma_ch);
-+
-+	return request_irq(c->dma_irq_number,
-+			bcm2835_dma_callback, 0, "DMA IRQ", c);
-+}
-+
-+static void bcm2835_dma_free_chan_resources(struct dma_chan *chan)
-+{
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+
-+	vchan_free_chan_resources(&c->vc);
-+	free_irq(c->dma_irq_number, c);
-+
-+	dev_dbg(c->vc.chan.device->dev, "Freeing DMA channel %u\n", c->dma_ch);
-+}
-+
-+static size_t bcm2835_dma_desc_size(struct bcm2835_desc *d)
-+{
-+	return d->size;
-+}
-+
-+static size_t bcm2835_dma_desc_size_pos(struct bcm2835_desc *d, dma_addr_t addr)
-+{
-+	unsigned i;
-+	size_t size = 0;
-+
-+	for (i = 0; i < d->frames; i++) {
-+		struct bcm2835_dma_cb *control_block =
-+			&d->control_block_base[i];
-+		size_t this_size = control_block->length;
-+		dma_addr_t dma;
-+
-+		if (d->dir == DMA_DEV_TO_MEM)
-+			dma = control_block->dst;
-+		else
-+			dma = control_block->src;
-+
-+		if (size)
-+			size += this_size;
-+		else if (addr >= dma && addr < dma + this_size)
-+			size += dma + this_size - addr;
-+	}
-+
-+	return size;
-+}
-+
-+static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
-+	dma_cookie_t cookie, struct dma_tx_state *txstate)
-+{
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+	struct virt_dma_desc *vd;
-+	enum dma_status ret;
-+	unsigned long flags;
-+
-+	ret = dma_cookie_status(chan, cookie, txstate);
-+	if (ret == DMA_SUCCESS || !txstate)
-+		return ret;
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+	vd = vchan_find_desc(&c->vc, cookie);
-+	if (vd) {
-+		txstate->residue =
-+			bcm2835_dma_desc_size(to_bcm2835_dma_desc(&vd->tx));
-+	} else if (c->desc && c->desc->vd.tx.cookie == cookie) {
-+		struct bcm2835_desc *d = c->desc;
-+		dma_addr_t pos;
-+
-+		if (d->dir == DMA_MEM_TO_DEV)
-+			pos = readl(c->dma_chan_base + BCM2835_DMA_SOURCE_AD);
-+		else if (d->dir == DMA_DEV_TO_MEM)
-+			pos = readl(c->dma_chan_base + BCM2835_DMA_DEST_AD);
-+		else
-+			pos = 0;
-+
-+		txstate->residue = bcm2835_dma_desc_size_pos(d, pos);
-+	} else {
-+		txstate->residue = 0;
-+	}
-+
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+
-+	return ret;
-+}
-+
-+static void bcm2835_dma_issue_pending(struct dma_chan *chan)
-+{
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+	unsigned long flags;
-+
-+	c->cyclic = true; /* nothing else is implemented */
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+	if (vchan_issue_pending(&c->vc) && !c->desc)
-+		bcm2835_dma_start_desc(c);
-+
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+}
-+
-+
-+static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
-+	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-+	size_t period_len, enum dma_transfer_direction direction,
-+	unsigned long flags, void *context)
-+{
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+	enum dma_slave_buswidth dev_width;
-+	struct bcm2835_desc *d;
-+	dma_addr_t dev_addr;
-+	unsigned es, sync_type;
-+	unsigned frame;
-+
-+	/* Grab configuration */
-+	if (direction == DMA_DEV_TO_MEM) {
-+		dev_addr = c->cfg.src_addr;
-+		dev_width = c->cfg.src_addr_width;
-+		sync_type = BCM2835_DMA_S_DREQ;
-+	} else if (direction == DMA_MEM_TO_DEV) {
-+		dev_addr = c->cfg.dst_addr;
-+		dev_width = c->cfg.dst_addr_width;
-+		sync_type = BCM2835_DMA_D_DREQ;
-+	} else {
-+		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
-+		return NULL;
-+	}
-+
-+	/* Bus width translates to the element size (ES) */
-+	switch (dev_width) {
-+	case DMA_SLAVE_BUSWIDTH_4_BYTES:
-+		es = BCM2835_DMA_DATA_TYPE_S32;
-+		break;
-+	default:
-+		return NULL;
-+	}
-+
-+	/* Now allocate and setup the descriptor. */
-+	d = kzalloc(sizeof(*d), GFP_NOWAIT);
-+	if (!d)
-+		return NULL;
-+
-+	d->dir = direction;
-+	d->frames = buf_len / period_len;
-+
-+	/* Allocate memory for control blocks */
-+	d->control_block_size = d->frames * sizeof(struct bcm2835_dma_cb);
-+	d->control_block_base = dma_zalloc_coherent(chan->device->dev,
-+			d->control_block_size, &d->control_block_base_phys,
-+			GFP_NOWAIT);
-+
-+	if (!d->control_block_base) {
-+		kfree(d);
-+		return NULL;
-+	}
-+
-+	/*
-+	 * Iterate over all frames, create a control block
-+	 * for each frame and link them together.
-+	 */
-+	for (frame = 0; frame < d->frames; frame++) {
-+		struct bcm2835_dma_cb *control_block =
-+			&d->control_block_base[frame];
-+
-+		/* Setup adresses */
-+		if (d->dir == DMA_DEV_TO_MEM) {
-+			control_block->info = BCM2835_DMA_D_INC;
-+			control_block->src = dev_addr;
-+			control_block->dst = buf_addr + frame * period_len;
-+		} else {
-+			control_block->info = BCM2835_DMA_S_INC;
-+			control_block->src = buf_addr + frame * period_len;
-+			control_block->dst = dev_addr;
-+		}
-+
-+		/* Enable interrupt */
-+		control_block->info |= BCM2835_DMA_INT_EN;
-+
-+		/* Setup synchronization */
-+		if (sync_type != 0)
-+			control_block->info |= sync_type;
-+
-+		/* Setup DREQ channel */
-+		if (c->dreq != 0)
-+			control_block->info |=
-+				BCM2835_DMA_PER_MAP(c->dreq);
-+
-+		/* Length of a frame */
-+		control_block->length = period_len;
-+		d->size += control_block->length;
-+
-+		/*
-+		 * Next block is the next frame.
-+		 * This DMA engine driver currently only supports cyclic DMA.
-+		 * Therefore, wrap around at number of frames.
-+		 */
-+		control_block->next = d->control_block_base_phys +
-+			sizeof(struct bcm2835_dma_cb)
-+			* ((frame + 1) % d->frames);
-+
-+		/* The following fields are not used here */
-+		control_block->stride = 0;
-+		control_block->pad[0] = 0;
-+		control_block->pad[1] = 0;
-+	}
-+
-+	return vchan_tx_prep(&c->vc, &d->vd, flags);
-+}
-+
-+static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
-+		struct dma_slave_config *cfg)
-+{
-+	if ((cfg->direction == DMA_DEV_TO_MEM &&
-+	     cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-+	    (cfg->direction == DMA_MEM_TO_DEV &&
-+	     cfg->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-+	    (cfg->direction != DMA_DEV_TO_MEM &&
-+	     cfg->direction != DMA_MEM_TO_DEV)) {
-+		return -EINVAL;
-+	}
-+
-+	c->cfg = *cfg;
-+
-+	return 0;
-+}
-+
-+static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
-+{
-+	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(c->vc.chan.device);
-+	unsigned long flags;
-+	int timeout = 1000;
-+	LIST_HEAD(head);
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+
-+	/* Prevent this channel being scheduled */
-+	spin_lock(&d->lock);
-+	list_del_init(&c->node);
-+	spin_unlock(&d->lock);
-+
-+	/*
-+	 * Stop DMA activity: we assume the callback will not be called
-+	 * after bcm_dma_abort() returns (even if it does, it will see
-+	 * c->desc is NULL and exit.)
-+	 */
-+	if (c->desc) {
-+		c->desc = NULL;
-+		bcm2835_dma_abort(c->dma_chan_base);
-+
-+		/* Wait for stopping */
-+		while (timeout > 0) {
-+			timeout--;
-+			if (!(readl(c->dma_chan_base + BCM2835_DMA_CS) &
-+						BCM2835_DMA_ACTIVE))
-+				break;
-+
-+			cpu_relax();
-+		}
-+
-+		if (timeout <= 0)
-+			dev_err(d->ddev.dev, "DMA transfer could not be terminated\n");
-+	}
-+
-+	vchan_get_all_descriptors(&c->vc, &head);
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+	vchan_dma_desc_free_list(&c->vc, &head);
-+
-+	return 0;
-+}
-+
-+static int bcm2835_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-+	unsigned long arg)
-+{
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+	int ret;
-+
-+	switch (cmd) {
-+	case DMA_SLAVE_CONFIG:
-+		return bcm2835_dma_slave_config(c,
-+				(struct dma_slave_config *)arg);
-+
-+	case DMA_TERMINATE_ALL:
-+		bcm2835_dma_terminate_all(c);
-+		break;
-+
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
-+{
-+	struct bcm2835_chan *c;
-+
-+	c = kzalloc(sizeof(*c), GFP_KERNEL);
-+	if (!c)
-+		return -ENOMEM;
-+
-+	c->vc.desc_free = bcm2835_dma_desc_free;
-+	vchan_init(&c->vc, &d->ddev);
-+	INIT_LIST_HEAD(&c->node);
-+
-+	d->ddev.chancnt++;
-+
-+	c->dma_chan_base = BCM2835_DMA_CHANIO(d->dma_base, chan_id);
-+	c->dma_ch = chan_id;
-+	c->dma_irq_number = irq;
-+
-+	return 0;
-+}
-+
-+static void bcm2835_dma_free(struct bcm2835_dmadev *od)
-+{
-+	while (!list_empty(&od->ddev.channels)) {
-+		struct bcm2835_chan *c = list_first_entry(&od->ddev.channels,
-+			struct bcm2835_chan, vc.chan.device_node);
-+
-+		list_del(&c->vc.chan.device_node);
-+		tasklet_kill(&c->vc.task);
-+		kfree(c);
-+	}
-+}
-+
-+#if defined(CONFIG_OF)
-+static const struct of_device_id bcm2835_dma_of_match[] = {
-+	{ .compatible = "brcm,bcm2835-dma", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcm2835_dma_of_match);
-+#endif
-+
-+static struct dma_chan *bcm2835_dma_xlate(struct of_phandle_args *dma_spec,
-+					   struct of_dma *ofdma)
-+{
-+	struct bcm2835_dmadev *d = ofdma->of_dma_data;
-+	struct dma_chan *chan, *candidate;
-+
-+retry:
-+	candidate = NULL;
-+
-+	/* walk the list of channels registered with the current instance and
-+	 * find one that is currently unused */
-+	list_for_each_entry(chan, &d->ddev.channels, device_node)
-+		if (chan->client_count == 0) {
-+			candidate = chan;
-+			break;
-+		}
-+
-+	if (!candidate)
-+		return NULL;
-+
-+	/* dma_get_slave_channel will return NULL if we lost a race between
-+	 * the lookup and the reservation */
-+	chan = dma_get_slave_channel(candidate);
-+
-+	if (chan) {
-+		struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+
-+		/* Set DREQ from param */
-+		c->dreq = dma_spec->args[0];
-+
-+		return chan;
-+	}
-+
-+	goto retry;
-+}
-+
-+static int bcm2835_dma_device_slave_caps(struct dma_chan *dchan,
-+	struct dma_slave_caps *caps)
-+{
-+	caps->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	caps->dstn_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	caps->cmd_pause = false;
-+	caps->cmd_terminate = true;
-+
-+	return 0;
-+}
-+
-+static int bcm2835_dma_probe(struct platform_device *pdev)
-+{
-+	struct bcm2835_dmadev *od;
-+	struct resource *dma_res = NULL;
-+	void __iomem *dma_base = NULL;
-+	int rc = 0;
-+	int i = 0;
-+	int irq;
-+	uint32_t chans_available;
-+
-+	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-+
-+	rc = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	if (rc)
-+		return rc;
-+	dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-+
-+	od = devm_kzalloc(&pdev->dev, sizeof(*od), GFP_KERNEL);
-+	if (!od)
-+		return -ENOMEM;
-+
-+	pdev->dev.dma_parms = &od->dma_parms;
-+	dma_set_max_seg_size(&pdev->dev, 0x3FFFFFFF);
-+
-+	dma_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	dma_base = devm_ioremap_resource(&pdev->dev, dma_res);
-+	if (IS_ERR(dma_base))
-+		return PTR_ERR(dma_base);
-+
-+	od->dma_base = dma_base;
-+
-+	dma_cap_set(DMA_SLAVE, od->ddev.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, od->ddev.cap_mask);
-+	od->ddev.device_alloc_chan_resources = bcm2835_dma_alloc_chan_resources;
-+	od->ddev.device_free_chan_resources = bcm2835_dma_free_chan_resources;
-+	od->ddev.device_tx_status = bcm2835_dma_tx_status;
-+	od->ddev.device_issue_pending = bcm2835_dma_issue_pending;
-+	od->ddev.device_slave_caps = bcm2835_dma_device_slave_caps;
-+	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
-+	od->ddev.device_control = bcm2835_dma_control;
-+	od->ddev.dev = &pdev->dev;
-+	INIT_LIST_HEAD(&od->ddev.channels);
-+	spin_lock_init(&od->lock);
-+
-+	platform_set_drvdata(pdev, od);
-+
-+	if (pdev->dev.of_node) {
-+		/* Request DMA channel mask from device tree */
-+		if (of_property_read_u32(pdev->dev.of_node,
-+				"brcm,dma-channel-mask",
-+				&chans_available)) {
-+			dev_err(&pdev->dev, "Failed to get channel mask\n");
-+			bcm2835_dma_free(od);
-+			return -EINVAL;
-+		}
-+	} else {
-+		dev_err(&pdev->dev, "Failed to get channel mask. No device tree.\n");
-+		bcm2835_dma_free(od);
-+		return -EINVAL;
-+	}
-+
-+	/* do not use the FIQ and BULK channels */
-+	chans_available &= ~0xD;
-+
-+	for (i = 0; i < pdev->num_resources; i++) {
-+		irq = platform_get_irq(pdev, i);
-+		if (irq < 0)
-+			break;
-+
-+		if (chans_available & (1 << i)) {
-+			rc = bcm2835_dma_chan_init(od, i, irq);
-+			if (rc) {
-+				bcm2835_dma_free(od);
-+				return rc;
-+			}
-+		}
-+	}
-+
-+	dev_dbg(&pdev->dev, "Initialized %i DMA channels\n", i);
-+
-+	if (pdev->dev.of_node) {
-+		/* Device-tree DMA controller registration */
-+		rc = of_dma_controller_register(pdev->dev.of_node,
-+				bcm2835_dma_xlate, od);
-+		if (rc) {
-+			dev_err(&pdev->dev, "Failed to register DMA controller\n");
-+			bcm2835_dma_free(od);
-+			return rc;
-+		}
-+	}
-+
-+	rc = dma_async_device_register(&od->ddev);
-+	if (rc) {
-+		dev_err(&pdev->dev,
-+			"Failed to register slave DMA engine device: %d\n", rc);
-+		bcm2835_dma_free(od);
-+		return rc;
-+	}
-+
-+	dev_dbg(&pdev->dev, "Load BCM2835 DMA engine driver\n");
-+
-+	return rc;
-+}
-+
-+static int bcm2835_dma_remove(struct platform_device *pdev)
-+{
-+	struct bcm2835_dmadev *od = platform_get_drvdata(pdev);
-+
-+	dma_async_device_unregister(&od->ddev);
-+	bcm2835_dma_free(od);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver bcm2835_dma_driver = {
-+	.probe	= bcm2835_dma_probe,
-+	.remove	= bcm2835_dma_remove,
-+	.driver = {
-+		.name = "bcm2835-dma",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(bcm2835_dma_of_match),
-+	},
-+};
-+
-+module_platform_driver(bcm2835_dma_driver);
-+
-+MODULE_ALIAS("platform:bcm2835-dma");
-+MODULE_DESCRIPTION("BCM2835 DMA engine driver");
-+MODULE_AUTHOR("Florian Meier <florian.meier@koalo.de>");
-+MODULE_LICENSE("GPL v2");
--- 
-1.8.1.2
+
+How early do these crashes happen?
+
+Is this happening on SMP, and if so, what is the state of secondary
+CPUs across kexec?
+
+If secondary CPUs are not safely parked, or their caches are not drained
+before the kexec occurs, this can cause corruption of the new kernel
+or unpredictable behaviour of the secondary CPUs.
+
+> - If second kernel is placed at different address (like in kdump case),
+>   then it boots fine and I don't observe any crashes.
+> - If I check failing address in the first kernel (ARM) the code there
+>   is really undefined instruction if executed as Thumb.
+> - Looks like pieces of old ARM kernel gets executed instead of new
+>   Thumb kernel. But as I've mentioned I'm reading physical memory via
+>   JTAG before starting second kernel and memory is matching a compiled
+>   Thumb 'Image'. Icache also gets cleaned...
+> - Once when stopped on breakpoint I've seen a piece of ARM code in
+>   Thumb kernel. Interesting that I was looking at the same memory
+
+Thumb kernels do contain a small amount of ARM code, in the vectors
+page for example.  But it's possible you were also looking at stale
+data.
+
+>   location via physical and virtual addresses simultaneously and only
+>   virtual address showed an old code. After a few memory browsing
+
+It's possible that those views could be inconsistent either due to
+the behaviour of the debugger, or because inconsistent memory types
+are used to construct the two views.
+
+>   operations, data at both addresses got synced to correct Thumb code.
+>   Sure it could be a debugger lag, but it fits nicely with other
+>   observations.
+> 
+> Do you have some ideas what could cause such behavior?
+
+Not really, apart from the above ideas.
+
+> 
+> Unfortunately I don't have more time now to debug it further,
+> but I will try to return to this later.
+
+OK ... let me know if you see this again or get any more clues.
+
+Cheers
+---Dave
+
+> 
+> [1]
+> https://drive.google.com/file/d/0ByfnRzd5ZYtdQWJKc1k0VmxrZlE/edit?usp=sharing
+> 
+> -- 
+> Taras Kondratiuk
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
