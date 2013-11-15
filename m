@@ -1,44 +1,61 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Nov 2013 10:40:05 -0500
-Subject: [PATCH 3/6] ARM: mm: Drop the lowmem watermark check from
- virt_addr_valid()
-In-Reply-To: <20131115142014.GN16735@n2100.arm.linux.org.uk>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
- <20131115142014.GN16735@n2100.arm.linux.org.uk>
-Message-ID: <52864055.4010200@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Nov 2013 15:37:08 +0000
+Subject: [PATCH 2/4] mfd: rtsx: Generify the switch voltage routine
+In-Reply-To: <52858DF6.7010800@realsil.com.cn>
+References: <1384421355-4434-1-git-send-email-lee.jones@linaro.org>
+ <1384421355-4434-3-git-send-email-lee.jones@linaro.org>
+ <52858DF6.7010800@realsil.com.cn>
+Message-ID: <20131115153708.GE4996@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013 09:20 AM, Russell King - ARM Linux wrote:
-> On Thu, Nov 14, 2013 at 02:37:43PM -0500, Santosh Shilimkar wrote:
->> Slab allocator can allocate memory beyond the lowmem watermark
->> which can lead to false failure of virt_addr_valid().
-> 
-> This is definitely going to cause problems.
-> 
->> So drop the check. The issue was seen with percpu_alloc()
->> in KVM code which was allocating memory beyond lowmem watermark.
->>
->> Am not completly sure whether this is the right fix and if it could
->> impact any other user of virt_addr_valid(). Without this fix as
->> pointed out the KVM init was failing in my testing.
-> 
-> virt_addr_valid() gets used in some places to check whether the virtual
-> address is part of the lowmem mapping and explicitly not part of vmalloc()
-> or DMA coherent space:
-> 
-> drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> drivers/net/wireless/ath/ath6kl/sdio.c
-> 
-> It opens up the checks in include/linux/scatterlist.h to start accepting
-> non-streaming DMA capable buffers as well.
-> 
-> It also bypasses a check in the slab code to ensure that it's a potentially
-> valid pointer that was handed out by slab.
-> 
-Thanks for the additional information Russell. We are going with an alternate
-approach from Marc so this patch will be dropped any ways.
+> Switch output voltage may have some problem here.
+> 1. modify params of function in pcr_ops may affect other chips, like
+> rts52xx, and we may add other registers or value in the future, just
+> add params may not enough to handle this case. So I think different
+> chip should use a different function here, and modify the function
+> will not affect others.
 
-Regards,
-Santosh
+Okay, I agree to a certain extent. I'll drop this patch for now.
+
+Can you please try to find a way to consolidate them. I'm really not
+keen on keeping 6 functions around that are mostly identical.
+
+> 2. rtl8402 has another difference with 8411 here, it doesn't use
+>  BPP_ASIC_1V8, but use BPP_ASIC_2V0.
+> 
+> so, I will send another patch to fix this problem.
+> 
+> >-static int rtl8411_switch_output_voltage(struct rtsx_pcr *pcr, u8 voltage)
+> >+static int rtl84xx_switch_output_voltage(struct rtsx_pcr *pcr,
+> >+					 u8 voltage, int shift)
+> >  {
+> >  	u8 mask, val;
+> >  	int err;
+> >-	mask = (BPP_REG_TUNED18 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_MASK;
+> >+	mask = (BPP_REG_TUNED18 << shift) | BPP_PAD_MASK;
+> >  	if (voltage == OUTPUT_3V3) {
+> >  		err = rtsx_pci_write_register(pcr,
+> >  				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_3v3);
+> >  		if (err < 0)
+> >  			return err;
+> >-		val = (BPP_ASIC_3V3 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_3V3;
+> >+		val = (BPP_ASIC_3V3 << shift) | BPP_PAD_3V3;
+> >  	} else if (voltage == OUTPUT_1V8) {
+> >  		err = rtsx_pci_write_register(pcr,
+> >  				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_1v8);
+> >  		if (err < 0)
+> >  			return err;
+> >-		val = (BPP_ASIC_1V8 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_1V8;
+> >+		val = (BPP_ASIC_1V8 << shift) | BPP_PAD_1V8;
+> >  	} else {
+> >  		return -EINVAL;
+> >  	}
+> 
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
