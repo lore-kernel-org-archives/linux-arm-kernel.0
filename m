@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Nov 2013 15:26:13 -0800
-Subject: [PATCH 05/17] ARM: integrator: Switch to sched_clock_register()
+Date: Fri, 15 Nov 2013 15:26:21 -0800
+Subject: [PATCH 13/17] ARM: u300: Switch to sched_clock_register()
 In-Reply-To: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
 References: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1384557985-9414-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1384557985-9414-14-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,31 +14,31 @@ interface.
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-integrator/integrator_ap.c | 4 ++--
+ arch/arm/mach-u300/timer.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index d50dc2d..473e21b 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -277,7 +277,7 @@ struct amba_pl010_data ap_uart_data = {
+diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
+index 9a5f9fb..9724e4e 100644
+--- a/arch/arm/mach-u300/timer.c
++++ b/arch/arm/mach-u300/timer.c
+@@ -341,7 +341,7 @@ static struct irqaction u300_timer_irq = {
+  * stamp. (Inspired by OMAP implementation.)
+  */
  
- static unsigned long timer_reload;
- 
--static u32 notrace integrator_read_sched_clock(void)
-+static u64 notrace integrator_read_sched_clock(void)
+-static u32 notrace u300_read_sched_clock(void)
++static u64 notrace u300_read_sched_clock(void)
  {
- 	return -readl((void __iomem *) TIMER2_VA_BASE + TIMER_VALUE);
+ 	return readl(u300_timer_base + U300_TIMER_APP_GPT2CC);
  }
-@@ -298,7 +298,7 @@ static void integrator_clocksource_init(unsigned long inrate,
+@@ -379,7 +379,7 @@ static void __init u300_timer_init_of(struct device_node *np)
+ 	clk_prepare_enable(clk);
+ 	rate = clk_get_rate(clk);
  
- 	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
- 			rate, 200, 16, clocksource_mmio_readl_down);
--	setup_sched_clock(integrator_read_sched_clock, 16, rate);
-+	sched_clock_register(integrator_read_sched_clock, 16, rate);
- }
+-	setup_sched_clock(u300_read_sched_clock, 32, rate);
++	sched_clock_register(u300_read_sched_clock, 32, rate);
  
- static void __iomem * clkevt_base;
+ 	u300_delay_timer.read_current_timer = &u300_read_current_timer;
+ 	u300_delay_timer.freq = rate;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
