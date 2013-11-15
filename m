@@ -1,145 +1,120 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 16:09:49 -0800
-Subject: [PATCH 02/11] ARM: dts: Add basic Nokia N8X0 support
+Date: Thu, 14 Nov 2013 16:09:53 -0800
+Subject: [PATCH 06/11] ARM: OMAP2+: Add quirks support for n8x0
 In-Reply-To: <1384474198-20756-1-git-send-email-tony@atomide.com>
 References: <1384474198-20756-1-git-send-email-tony@atomide.com>
-Message-ID: <1384474198-20756-3-git-send-email-tony@atomide.com>
+Message-ID: <1384474198-20756-7-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal device tree support for n8x0 boards so we
-can make omap2 device tree only. Note that we still need
-to initialize various platform data quirks to keep
-things working until n8x0 drivers support device tree.
+This allows us to keep things working when booted with
+device tree. Note that we still need to initialize most
+things with platform data as the drivers are lacking
+support for device tree.
 
-Here's a rough todo list for the people using n8x0:
-
-1. Update menelaus for device tree and set up
-   regulators at least for the MMC driver
-
-2. Remove the MMC regulator platform data callback
-   by using the Menlaus regulators directly in the
-   driver passed from the .dts file
-
-3. Update GPMC connected devices for onenand and
-   tusb6010 for device tree
-
-We're planning to remove all legacy platform data
-for mach-omap2 over next few merge cycles, so if
-people are still using n8x0, please fix the issues
-above.
-
-Cc: devicetree at vger.kernel.org
 Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/Makefile                  |  3 +++
- arch/arm/boot/dts/omap2420-n800.dts         |  8 +++++++
- arch/arm/boot/dts/omap2420-n810-wimax.dts   |  8 +++++++
- arch/arm/boot/dts/omap2420-n810.dts         |  8 +++++++
- arch/arm/boot/dts/omap2420-n8x0-common.dtsi | 34 +++++++++++++++++++++++++++++
- 5 files changed, 61 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap2420-n800.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n810-wimax.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n810.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+ arch/arm/mach-omap2/board-n8x0.c           | 21 ++++++++++++++++++++-
+ arch/arm/mach-omap2/common-board-devices.h |  1 +
+ arch/arm/mach-omap2/pdata-quirks.c         | 14 ++++++++++++++
+ 3 files changed, 35 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 73022b1..de37094 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -174,6 +174,9 @@ dtb-$(CONFIG_ARCH_NSPIRE) += nspire-cx.dtb \
- 	nspire-clp.dtb
- dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap2430-sdp.dtb \
-+	omap2420-n800.dtb \
-+	omap2420-n810.dtb \
-+	omap2420-n810-wimax.dtb \
- 	omap3430-sdp.dtb \
- 	omap3-beagle.dtb \
- 	omap3-devkit8000.dtb \
-diff --git a/arch/arm/boot/dts/omap2420-n800.dts b/arch/arm/boot/dts/omap2420-n800.dts
-new file mode 100644
-index 0000000..d8c1b42
---- /dev/null
-+++ b/arch/arm/boot/dts/omap2420-n800.dts
-@@ -0,0 +1,8 @@
-+/dts-v1/;
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index c9eef2b..da0d494 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -529,7 +529,7 @@ static void n8x0_mmc_cleanup(struct device *dev)
+  * MMC controller2 is not in use.
+  */
+ static struct omap_mmc_platform_data mmc1_data = {
+-	.nr_slots			= 2,
++	.nr_slots			= 0,
+ 	.switch_slot			= n8x0_mmc_switch_slot,
+ 	.init				= n8x0_mmc_late_init,
+ 	.cleanup			= n8x0_mmc_cleanup,
+@@ -596,6 +596,7 @@ static void __init n8x0_mmc_init(void)
+ 		}
+ 	}
+ 
++	mmc1_data.nr_slots = 2;
+ 	mmc_data[0] = &mmc1_data;
+ 	if (!of_have_populated_dt())
+ 		omap242x_init_mmc(mmc_data);
+@@ -746,6 +747,24 @@ static int __init n8x0_late_initcall(void)
+ }
+ omap_late_initcall(n8x0_late_initcall);
+ 
++/*
++ * Legacy init pdata init for n8x0. Note that we want to follow the
++ * I2C bus numbering starting at 0 for device tree like other omaps.
++ */
++void * __init n8x0_legacy_init(void)
++{
++	board_check_revision();
++	spi_register_board_info(n800_spi_board_info,
++				ARRAY_SIZE(n800_spi_board_info));
++	i2c_register_board_info(0, n8x0_i2c_board_info_1,
++				ARRAY_SIZE(n8x0_i2c_board_info_1));
++	if (board_is_n810())
++		i2c_register_board_info(1, n810_i2c_board_info_2,
++					ARRAY_SIZE(n810_i2c_board_info_2));
 +
-+#include "omap2420-n8x0-common.dtsi"
++	return &mmc1_data;
++}
 +
-+/ {
-+	model = "Nokia N800";
-+	compatible = "nokia,n800", "nokia,n8x0", "ti,omap2420", "ti,omap2";
-+};
-diff --git a/arch/arm/boot/dts/omap2420-n810-wimax.dts b/arch/arm/boot/dts/omap2420-n810-wimax.dts
-new file mode 100644
-index 0000000..6b25b03
---- /dev/null
-+++ b/arch/arm/boot/dts/omap2420-n810-wimax.dts
-@@ -0,0 +1,8 @@
-+/dts-v1/;
+ static void __init n8x0_init_machine(void)
+ {
+ 	board_check_revision();
+diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
+index 72bb41b..f338177 100644
+--- a/arch/arm/mach-omap2/common-board-devices.h
++++ b/arch/arm/mach-omap2/common-board-devices.h
+@@ -10,5 +10,6 @@ struct ads7846_platform_data;
+ 
+ void omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+ 		       struct ads7846_platform_data *board_pdata);
++void *n8x0_legacy_init(void);
+ 
+ #endif /* __OMAP_COMMON_BOARD_DEVICES__ */
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index cb2863d..7f0ff2a 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -26,6 +26,8 @@ struct pdata_init {
+ 	void (*fn)(void);
+ };
+ 
++struct of_dev_auxdata omap_auxdata_lookup[];
 +
-+#include "omap2420-n8x0-common.dtsi"
+ /*
+  * Create alias for USB host PHY clock.
+  * Remove this when clock phandle can be provided via DT
+@@ -68,6 +70,13 @@ static inline void legacy_init_wl12xx(unsigned ref_clock,
+ }
+ #endif
+ 
++#ifdef CONFIG_SOC_OMAP2420
++static void __init omap2420_n8x0_legacy_init(void)
++{
++	omap_auxdata_lookup[0].platform_data = n8x0_legacy_init();
++}
++#endif
 +
-+/ {
-+	model = "Nokia N810 WiMax";
-+	compatible = "nokia,n810-wimax", "nokia,n8x0", "ti,omap2420", "ti,omap2";
-+};
-diff --git a/arch/arm/boot/dts/omap2420-n810.dts b/arch/arm/boot/dts/omap2420-n810.dts
-new file mode 100644
-index 0000000..21baec1
---- /dev/null
-+++ b/arch/arm/boot/dts/omap2420-n810.dts
-@@ -0,0 +1,8 @@
-+/dts-v1/;
-+
-+#include "omap2420-n8x0-common.dtsi"
-+
-+/ {
-+	model = "Nokia N810";
-+	compatible = "nokia,n810", "nokia,n8x0", "ti,omap2420", "ti,omap2";
-+};
-diff --git a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
-new file mode 100644
-index 0000000..c539693
---- /dev/null
-+++ b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
-@@ -0,0 +1,34 @@
-+#include "omap2420.dtsi"
-+
-+/ {
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x8000000>; /* 128 MB */
-+	};
-+
-+	ocp {
-+		i2c at 0 {
-+			compatible = "i2c-cbus-gpio";
-+			gpios = <&gpio3 2 0 /* gpio66 clk */
-+				 &gpio3 1 0 /* gpio65 dat */
-+				 &gpio3 0 0 /* gpio64 sel */
-+				>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			retu_mfd: retu at 1 {
-+				compatible = "retu-mfd";
-+				interrupt-parent = <&gpio4>;
-+				interrupts = <12 IRQ_TYPE_EDGE_RISING>;
-+				reg = <0x1>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
+ #ifdef CONFIG_ARCH_OMAP3
+ static void __init hsmmc2_internal_input_clk(void)
+ {
+@@ -130,6 +139,11 @@ void omap_pcs_legacy_init(int irq, void (*rearm)(void))
+  * the dev entries in of_platform_populate().
+  */
+ static struct pdata_init auxdata_quirks[] __initdata = {
++#ifdef CONFIG_SOC_OMAP2420
++	{ "nokia,n800", omap2420_n8x0_legacy_init, },
++	{ "nokia,n810", omap2420_n8x0_legacy_init, },
++	{ "nokia,n810-wimax", omap2420_n8x0_legacy_init, },
++#endif
+ 	{ /* sentinel */ },
+ };
+ 
 -- 
 1.8.1.1
