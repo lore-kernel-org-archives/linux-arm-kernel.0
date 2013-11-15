@@ -1,51 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Nov 2013 11:58:50 +0000
-Subject: [PATCH 5/6] ARM: kvm: Use phys_addr_t instead of unsigned long
- in mm code
-In-Reply-To: <1384457866-16135-6-git-send-email-santosh.shilimkar@ti.com>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-6-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <52860C7A.1020109@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Nov 2013 12:04:17 +0000
+Subject: [PATCH 3/8] ARM: dts: imx: imx6sl/qdl-pingrp: reorganize
+ USDHCx pad groups
+In-Reply-To: <1384462934-17390-4-git-send-email-troy.kisky@boundarydevices.com>
+References: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1384462934-17390-4-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20131115120417.GJ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/13 19:37, Santosh Shilimkar wrote:
-> The unsigned long datatype is not sufficient for mapping physical addresses
-> greater than 4GB.
-> 
-> So fix the KVM mm code accordingly. Special thanks to Christopher for debug
-> help to figure out the bug.
-> 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Thu, Nov 14, 2013 at 02:02:09PM -0700, Troy Kisky wrote:
+> +#define MX6QDL_USDHC1_D4(pad, pad_clk) \
+> +	MX6QDL_PAD_SD1_CMD__SD1_CMD			pad \
+> +	MX6QDL_PAD_SD1_CLK__SD1_CLK			pad_clk \
+> +	MX6QDL_PAD_SD1_DAT0__SD1_DATA0			pad \
+> +	MX6QDL_PAD_SD1_DAT1__SD1_DATA1			pad \
+> +	MX6QDL_PAD_SD1_DAT2__SD1_DATA2			pad \
+> +	MX6QDL_PAD_SD1_DAT3__SD1_DATA3			pad
 
-Nice catch.
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
-
-> ---
->  arch/arm/kvm/mmu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 3bd652f..657f15e 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -318,7 +318,7 @@ out:
->   */
->  int create_hyp_mappings(void *from, void *to)
->  {
-> -	unsigned long phys_addr = virt_to_phys(from);
-> +	phys_addr_t phys_addr = virt_to_phys(from);
->  	unsigned long start = KERN_TO_HYP((unsigned long)from);
->  	unsigned long end = KERN_TO_HYP((unsigned long)to);
->  
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+DATA3 should be specified separately as you may want that to have a
+different pull direction due to the workarounds in the driver interfering
+with the card present detection.
