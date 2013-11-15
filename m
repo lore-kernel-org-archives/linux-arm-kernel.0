@@ -1,57 +1,42 @@
-From: micky_ching@realsil.com.cn (micky)
-Date: Fri, 15 Nov 2013 10:59:02 +0800
-Subject: [PATCH 2/4] mfd: rtsx: Generify the switch voltage routine
-In-Reply-To: <1384421355-4434-3-git-send-email-lee.jones@linaro.org>
-References: <1384421355-4434-1-git-send-email-lee.jones@linaro.org>
- <1384421355-4434-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <52858DF6.7010800@realsil.com.cn>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 15 Nov 2013 11:02:49 +0800
+Subject: [PATCH 0/2] Add monaural audio support for fsl_ssi.c
+In-Reply-To: <1384427230-979-1-git-send-email-b42378@freescale.com>
+References: <1384427230-979-1-git-send-email-b42378@freescale.com>
+Message-ID: <20131115030247.GC11014@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee
+On Thu, Nov 14, 2013 at 07:07:08PM +0800, Nicolin Chen wrote:
+> This series of patches need to be applied into one single tree because
+> the second patch depends on the first one. Without it, SSI would playback
+> constant noise to the right channel when playback monaural audio files on
+> i.MX6 Series board.
 
-Thank you for your work.
+Let me try to understand if the dependency is true.
 
-Switch output voltage may have some problem here.
-1. modify params of function in pcr_ops may affect other chips, like
-rts52xx, and we may add other registers or value in the future, just
-add params may not enough to handle this case. So I think different
-chip should use a different function here, and modify the function
-will not affect others.
+Saying I apply the DTS patch on IMX tree while Mark apply the fsl_ssi
+patch on his tree, will there be any regression on either IMX tree or
+Mark's tree?  The monaural playback on imx6qdl never worked, so it's not
+a regression.  If there is no regression on either tree, there is no
+dependency to maintain.
 
-2. rtl8402 has another difference with 8411 here, it doesn't use
-  BPP_ASIC_1V8, but use BPP_ASIC_2V0.
+Shawn
 
-so, I will send another patch to fix this problem.
-
-> -static int rtl8411_switch_output_voltage(struct rtsx_pcr *pcr, u8 voltage)
-> +static int rtl84xx_switch_output_voltage(struct rtsx_pcr *pcr,
-> +					 u8 voltage, int shift)
->   {
->   	u8 mask, val;
->   	int err;
->   
-> -	mask = (BPP_REG_TUNED18 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_MASK;
-> +	mask = (BPP_REG_TUNED18 << shift) | BPP_PAD_MASK;
->   	if (voltage == OUTPUT_3V3) {
->   		err = rtsx_pci_write_register(pcr,
->   				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_3v3);
->   		if (err < 0)
->   			return err;
-> -		val = (BPP_ASIC_3V3 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_3V3;
-> +		val = (BPP_ASIC_3V3 << shift) | BPP_PAD_3V3;
->   	} else if (voltage == OUTPUT_1V8) {
->   		err = rtsx_pci_write_register(pcr,
->   				SD30_DRIVE_SEL, 0x07, pcr->sd30_drive_sel_1v8);
->   		if (err < 0)
->   			return err;
-> -		val = (BPP_ASIC_1V8 << BPP_TUNED18_SHIFT_8411) | BPP_PAD_1V8;
-> +		val = (BPP_ASIC_1V8 << shift) | BPP_PAD_1V8;
->   	} else {
->   		return -EINVAL;
->   	}
-
-
--- 
-Best Regards
-Micky.
+> 
+> We might also need to apply the iomux change to the other i.MX platforms,
+> just currently I don't have those boards so I drop their changes for now.
+> 
+> Nicolin Chen (2):
+>   ARM: dts: imx: specify the value of audmux pinctrl instead of
+>     0x80000000
+>   ASoC: fsl_ssi: Add monaural audio support for non-ac97 interface
+> 
+>  arch/arm/boot/dts/imx6qdl.dtsi | 22 +++++++++++-----------
+>  sound/soc/fsl/fsl_ssi.c        | 22 +++++++++++++++++++---
+>  2 files changed, 30 insertions(+), 14 deletions(-)
+> 
+> -- 
+> 1.8.4
+> 
+> 
