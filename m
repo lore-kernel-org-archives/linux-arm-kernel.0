@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Nov 2013 15:26:11 -0800
-Subject: [PATCH 03/17] ARM: davinci: Switch to sched_clock_register()
+Date: Fri, 15 Nov 2013 15:26:10 -0800
+Subject: [PATCH 02/17] ARM: clps711x: Switch to sched_clock_register()
 In-Reply-To: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
 References: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1384557985-9414-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1384557985-9414-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,35 +11,34 @@ The 32 bit sched_clock interface now supports 64 bits. Upgrade to
 the 64 bit function to allow us to remove the 32 bit registration
 interface.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Alexander Shiyan <shc_work@mail.ru>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-davinci/time.c | 4 ++--
+ arch/arm/mach-clps711x/common.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-index 56c6eb5..24ad30f 100644
---- a/arch/arm/mach-davinci/time.c
-+++ b/arch/arm/mach-davinci/time.c
-@@ -285,7 +285,7 @@ static struct clocksource clocksource_davinci = {
- /*
-  * Overwrite weak default sched_clock with something more precise
-  */
--static u32 notrace davinci_read_sched_clock(void)
-+static u64 notrace davinci_read_sched_clock(void)
- {
- 	return timer32_read(&timers[TID_CLOCKSOURCE]);
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 134641d..a193591 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -259,7 +259,7 @@ asmlinkage void __exception_irq_entry clps711x_handle_irq(struct pt_regs *regs)
+ 	} while (1);
  }
-@@ -391,7 +391,7 @@ void __init davinci_timer_init(void)
- 				    davinci_clock_tick_rate))
- 		printk(err, clocksource_davinci.name);
  
--	setup_sched_clock(davinci_read_sched_clock, 32,
-+	sched_clock_register(davinci_read_sched_clock, 32,
- 			  davinci_clock_tick_rate);
+-static u32 notrace clps711x_sched_clock_read(void)
++static u64 notrace clps711x_sched_clock_read(void)
+ {
+ 	return ~readw_relaxed(CLPS711X_VIRT_BASE + TC1D);
+ }
+@@ -366,7 +366,7 @@ void __init clps711x_timer_init(void)
+ 	tmp = clps_readl(SYSCON1) & ~(SYSCON1_TC1S | SYSCON1_TC1M);
+ 	clps_writel(tmp, SYSCON1);
  
- 	/* setup clockevent */
+-	setup_sched_clock(clps711x_sched_clock_read, 16, timl);
++	sched_clock_register(clps711x_sched_clock_read, 16, timl);
+ 
+ 	clocksource_mmio_init(CLPS711X_VIRT_BASE + TC1D,
+ 			      "clps711x_clocksource", timl, 300, 16,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
