@@ -1,70 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Nov 2013 13:46:16 +0100
-Subject: [PATCH 2/3] ata: Add APM X-Gene SoC 6.0Gbps SATA PHY driver
-In-Reply-To: <1384457519-21335-3-git-send-email-lho@apm.com>
-References: <1384457519-21335-1-git-send-email-lho@apm.com>
- <1384457519-21335-2-git-send-email-lho@apm.com>
- <1384457519-21335-3-git-send-email-lho@apm.com>
-Message-ID: <201311151346.17231.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Nov 2013 12:48:55 +0000
+Subject: [PATCH -next] iommu/arm-smmu: fix error return code in
+ arm_smmu_device_dt_probe()
+In-Reply-To: <CAPgLHd8siM4ZpmaqHWa9JXFmcGBvvb6J=Vo2DvP5=zMQE0d0fA@mail.gmail.com>
+References: <CAPgLHd8siM4ZpmaqHWa9JXFmcGBvvb6J=Vo2DvP5=zMQE0d0fA@mail.gmail.com>
+Message-ID: <20131115124855.GC19468@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 November 2013, Loc Ho wrote:
-> +
-> +/* SATA port 4 - 5 force power down VCO */
-> +static void xgene_phy_sata45_macro_pdwn_force_vco(struct xgene_ahci_phy_ctx
-> +						     *ctx)
-> +{
-> +	sds_pcie_toggle1to0(ctx->pcie_base, KC_CLKMACRO_CMU_REGS_CMU_REG0_ADDR,
-> +			    CMU_REG0_PDOWN_MASK);
-> +	sds_pcie_toggle1to0(ctx->pcie_base,
-> +			    KC_CLKMACRO_CMU_REGS_CMU_REG32_ADDR,
-> +			    CMU_REG32_FORCE_VCOCAL_START_MASK);
-> +}
+On Fri, Nov 15, 2013 at 09:42:30AM +0000, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Fix to return -ENODEV instead of 0 when context interrupt number
+> does no match in arm_smmu_device_dt_probe().
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  drivers/iommu/arm-smmu.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 2349d62..2bc977b 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1858,6 +1858,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>  		dev_err(dev,
+>  			"found only %d context interrupt(s) but %d required\n",
+>  			smmu->num_context_irqs, smmu->num_context_banks);
+> +		err = -ENODEV;
+>  		goto out_put_parent;
+>  	}
 
-I think it's bad to have knowledge of specific port numbers in the driver.
-Can you change this so that the driver treats all PHYs the same way but
-gets the differences between sata/eth/pcie mode from DT properties?
+Applied to my devel branch. Thanks!
 
-
-> +void xgene_ahci_serdes_reset_rxa_rxd(struct xgene_ahci_phy_ctx *ctx, int chan)
-
-All functions in the driver should be 'static'. You are not calling these
-directly from the SATA driver, are you?
-
-> +	/* Select SATA mux for SATA port 0 - 3 which shared with SGMII ETH */
-> +	if (ctx->id < 2) {
-> +		if (xgene_phy_host_sata_select(ctx) != 0) {
-> +			dev_err(ctx->dev, "SATA%d can not select SATA MUX\n",
-> +				ctx->id);
-> +			return -1;
-> +		}
-> +	}
-
-I think all checks for the "id" field are to find out what kind of PHY you
-are talking to, the driver itself does not need to know the id, and the
-field can be removed if you find that out in a different way.
-
-> +	if (ctx->id == 2) {
-> +		/* For 3rd controller, we must also program another resource */
-> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +		if (!res) {
-> +			dev_err(&pdev->dev,
-> +				"no SATA/PCIE PHY resource address\n");
-> +			goto error;
-> +		}
-> +		ctx->pcie_base = devm_ioremap(&pdev->dev, res->start,
-> +					      resource_size(res));
-> +		if (!ctx->pcie_base) {
-> +			dev_err(&pdev->dev,
-> +				"can't map SATA/PCIe PHY resource\n");
-> +			rc = -ENOMEM;
-> +			goto error;
-> +		}
-> +	}
-
-If you need a second memory resource, I take that as a hint that
-the device is actually different from the others, so using a separate
-"compatible" string in DT might be more appropriate.
-
-	Arnd
+Will
