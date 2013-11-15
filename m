@@ -1,56 +1,58 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Nov 2013 00:11:15 +0000
-Subject: [PATCH 6/6] ARM: kvm: TMP: Commit the hyp page tables to main
- memory
-In-Reply-To: <1384457866-16135-7-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 15 Nov 2013 00:12:42 +0000
+Subject: [PATCH 2/6] ARM: kvm: Use virt_to_idmap instead of virt_to_phys
+ for idmap mappings
+In-Reply-To: <1384457866-16135-3-git-send-email-santosh.shilimkar@ti.com>
 References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-7-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131115001115.GC20516@lvm>
+ <1384457866-16135-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131115001242.GD20516@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:37:46PM -0500, Santosh Shilimkar wrote:
-> This is a temporary hack which I have to use to avoid a weired crash while
-> starting the guest OS on Keystsone. They are random crashesh while the
-> guest os userspace starts. Additional data point is, it seen only with first
-> guest OS lanch. Subsequest guest OS starts normal.
->     
-
-what crashes?  The guest?  Where, how?
-
-
-> I still don't know why this is needed but it helps to get around the issue
-> and hence including the patch in the series for the discussion
-
-It may not be needed but is just hiding the issue.  I'm afraid you're
-going to have to dig a little more into this.
-
--Christoffer
-
+On Thu, Nov 14, 2013 at 02:37:42PM -0500, Santosh Shilimkar wrote:
+> KVM initialisation fails on architectures implementing virt_to_idmap() because
+> virt_to_phys() on such architectures won't fetch you the correct idmap page.
+> 
+> So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
 > 
 > Cc: Christoffer Dall <christoffer.dall@linaro.org>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
 > 
 > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  arch/arm/kvm/mmu.c |    1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/kvm/mmu.c |    9 ++++-----
+>  1 file changed, 4 insertions(+), 5 deletions(-)
 > 
 > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 657f15e..5f6f460 100644
+> index b0de86b..3bd652f 100644
 > --- a/arch/arm/kvm/mmu.c
 > +++ b/arch/arm/kvm/mmu.c
-> @@ -826,6 +826,7 @@ int kvm_mmu_init(void)
->  		goto out;
->  	}
+> @@ -747,9 +747,9 @@ int kvm_mmu_init(void)
+>  {
+>  	int err;
 >  
-> +	flush_cache_all();
->  	return 0;
->  out:
->  	free_hyp_pgds();
+> -	hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
+> -	hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
+> -	hyp_idmap_vector = virt_to_phys(__kvm_hyp_init);
+> +	hyp_idmap_start = virt_to_idmap(__hyp_idmap_text_start);
+> +	hyp_idmap_end = virt_to_idmap(__hyp_idmap_text_end);
+> +	hyp_idmap_vector = virt_to_idmap(__kvm_hyp_init);
+>  
+>  	if ((hyp_idmap_start ^ hyp_idmap_end) & PAGE_MASK) {
+>  		/*
+> @@ -775,8 +775,7 @@ int kvm_mmu_init(void)
+>  		 * caches off at that point.
+>  		 */
+>  		kvm_flush_dcache_to_poc(init_bounce_page, len);
+> -
+> -		phys_base = virt_to_phys(init_bounce_page);
+> +		phys_base = virt_to_idmap(init_bounce_page);
+>  		hyp_idmap_vector += phys_base - hyp_idmap_start;
+>  		hyp_idmap_start = phys_base;
+>  		hyp_idmap_end = phys_base + len;
 > -- 
 > 1.7.9.5
 > 
+Looks good to me.
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
