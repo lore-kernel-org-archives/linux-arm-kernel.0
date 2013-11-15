@@ -1,430 +1,322 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 16:09:55 -0800
-Subject: [PATCH 08/11] ARM: OMAP2+: Remove board file for H4
+Date: Thu, 14 Nov 2013 16:09:54 -0800
+Subject: [PATCH 07/11] ARM: OMAP2+: Remove legacy booting support for n8x0
 In-Reply-To: <1384474198-20756-1-git-send-email-tony@atomide.com>
 References: <1384474198-20756-1-git-send-email-tony@atomide.com>
-Message-ID: <1384474198-20756-9-git-send-email-tony@atomide.com>
+Message-ID: <1384474198-20756-8-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old 2420 based H4 is probably not used at all as 2420
-was Nokia specific SoC. I have one, but I'm not using it because
-of it's large size, and I doubt anybody else is using it either.
+Now we can boot n8x with the appended device tree with:
 
-We do have minimal omap2420-h4.dts in place, so if anybody wants
-more support on H4, patches are welcome.
+$ ARCH=arm CROSS_COMPILE=/usr/bin/arm-linux-gnueabi- make omap2420-n800.dtb
+$ cat arch/arm/boot/zImage arch/arm/boot/dts/omap2420-n800.dtb > /tmp/zImage
 
-So let's just remove it as that helps us making mach-omap2 to
-be device tree only.
+Note that you need at least the following enabled:
 
+CONFIG_ARM_APPENDED_DTB=y
+CONFIG_ARM_ATAG_DTB_COMPAT=y
+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+CONFIG_PINCTRL=y
+CONFIG_PINCTRL_SINGLE=y
+
+Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Kconfig    |   7 -
- arch/arm/mach-omap2/Makefile   |   1 -
- arch/arm/mach-omap2/board-h4.c | 365 -----------------------------------------
- 3 files changed, 373 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/board-h4.c
+ arch/arm/mach-omap2/board-n8x0.c | 158 ---------------------------------------
+ arch/arm/mach-omap2/msdi.c       |  69 -----------------
+ 2 files changed, 227 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index dc21df1..f2f71c2 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -192,13 +192,6 @@ config MACH_OMAP2_TUSB6010
- 	depends on ARCH_OMAP2 && SOC_OMAP2420
- 	default y if MACH_NOKIA_N8X0
- 
--config MACH_OMAP_H4
--	bool "OMAP 2420 H4 board"
--	depends on SOC_OMAP2420
--	default y
--	select OMAP_DEBUG_DEVICES
--	select OMAP_PACKAGE_ZAF
--
- config MACH_OMAP_2430SDP
- 	bool "OMAP 2430 SDP board"
- 	depends on SOC_OMAP2430
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index e15ac00..8ec6c89 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -237,7 +237,6 @@ obj-$(CONFIG_SOC_OMAP2420)		+= msdi.o
- 
- # Specific board support
- obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o pdata-quirks.o
--obj-$(CONFIG_MACH_OMAP_H4)		+= board-h4.o
- obj-$(CONFIG_MACH_OMAP_2430SDP)		+= board-2430sdp.o
- obj-$(CONFIG_MACH_OMAP3_BEAGLE)		+= board-omap3beagle.o
- obj-$(CONFIG_MACH_DEVKIT8000)     	+= board-devkit8000.o
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-deleted file mode 100644
-index 87e41a8..0000000
---- a/arch/arm/mach-omap2/board-h4.c
-+++ /dev/null
-@@ -1,365 +0,0 @@
--/*
-- * linux/arch/arm/mach-omap2/board-h4.c
-- *
-- * Copyright (C) 2005 Nokia Corporation
-- * Author: Paul Mundt <paul.mundt@nokia.com>
-- *
-- * Modified from mach-omap/omap1/board-generic.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/gpio.h>
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/partitions.h>
--#include <linux/mtd/physmap.h>
--#include <linux/delay.h>
--#include <linux/workqueue.h>
--#include <linux/i2c.h>
--#include <linux/i2c/at24.h>
--#include <linux/input.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--#include <linux/input/matrix_keypad.h>
--#include <linux/mfd/menelaus.h>
--#include <linux/omap-dma.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--
--#include <video/omapdss.h>
--#include <video/omap-panel-data.h>
--
--#include "common.h"
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index da0d494..5e04bdc8 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -21,7 +21,6 @@
+ #include <linux/i2c.h>
+ #include <linux/spi/spi.h>
+ #include <linux/usb/musb.h>
+-#include <linux/platform_data/i2c-cbus-gpio.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/mtd-onenand-omap2.h>
+ #include <linux/mfd/menelaus.h>
+@@ -33,7 +32,6 @@
+ #include "common.h"
+ #include "mmc.h"
+ #include "soc.h"
 -#include "mux.h"
--#include "control.h"
--#include "gpmc.h"
--#include "gpmc-smc91x.h"
--
--#define H4_FLASH_CS	0
--
--#if defined(CONFIG_KEYBOARD_MATRIX) || defined(CONFIG_KEYBOARD_MATRIX_MODULE)
--static const uint32_t board_matrix_keys[] = {
--	KEY(0, 0, KEY_LEFT),
--	KEY(1, 0, KEY_RIGHT),
--	KEY(2, 0, KEY_A),
--	KEY(3, 0, KEY_B),
--	KEY(4, 0, KEY_C),
--	KEY(0, 1, KEY_DOWN),
--	KEY(1, 1, KEY_UP),
--	KEY(2, 1, KEY_E),
--	KEY(3, 1, KEY_F),
--	KEY(4, 1, KEY_G),
--	KEY(0, 2, KEY_ENTER),
--	KEY(1, 2, KEY_I),
--	KEY(2, 2, KEY_J),
--	KEY(3, 2, KEY_K),
--	KEY(4, 2, KEY_3),
--	KEY(0, 3, KEY_M),
--	KEY(1, 3, KEY_N),
--	KEY(2, 3, KEY_O),
--	KEY(3, 3, KEY_P),
--	KEY(4, 3, KEY_Q),
--	KEY(0, 4, KEY_R),
--	KEY(1, 4, KEY_4),
--	KEY(2, 4, KEY_T),
--	KEY(3, 4, KEY_U),
--	KEY(4, 4, KEY_ENTER),
--	KEY(0, 5, KEY_V),
--	KEY(1, 5, KEY_W),
--	KEY(2, 5, KEY_L),
--	KEY(3, 5, KEY_S),
--	KEY(4, 5, KEY_ENTER),
--};
--
--static const struct matrix_keymap_data board_keymap_data = {
--	.keymap			= board_matrix_keys,
--	.keymap_size		= ARRAY_SIZE(board_matrix_keys),
--};
--
--static unsigned int board_keypad_row_gpios[] = {
--	88, 89, 124, 11, 6, 96
--};
--
--static unsigned int board_keypad_col_gpios[] = {
--	90, 91, 100, 36, 12, 97, 98
--};
--
--static struct matrix_keypad_platform_data board_keypad_platform_data = {
--	.keymap_data	= &board_keymap_data,
--	.row_gpios	= board_keypad_row_gpios,
--	.num_row_gpios	= ARRAY_SIZE(board_keypad_row_gpios),
--	.col_gpios	= board_keypad_col_gpios,
--	.num_col_gpios	= ARRAY_SIZE(board_keypad_col_gpios),
--	.active_low	= 1,
--
--	.debounce_ms		= 20,
--	.col_scan_delay_us	= 5,
--};
--
--static struct platform_device board_keyboard = {
--	.name	= "matrix-keypad",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &board_keypad_platform_data,
--	},
--};
--static void __init board_mkp_init(void)
--{
--	omap_mux_init_gpio(88, OMAP_PULL_ENA | OMAP_PULL_UP);
--	omap_mux_init_gpio(89, OMAP_PULL_ENA | OMAP_PULL_UP);
--	omap_mux_init_gpio(124, OMAP_PULL_ENA | OMAP_PULL_UP);
--	omap_mux_init_signal("mcbsp2_dr.gpio_11", OMAP_PULL_ENA | OMAP_PULL_UP);
--	if (omap_has_menelaus()) {
--		omap_mux_init_signal("sdrc_a14.gpio0",
--			OMAP_PULL_ENA | OMAP_PULL_UP);
--		omap_mux_init_signal("vlynq_rx0.gpio_15", 0);
--		omap_mux_init_signal("gpio_98", 0);
--		board_keypad_row_gpios[5] = 0;
--		board_keypad_col_gpios[2] = 15;
--		board_keypad_col_gpios[6] = 18;
+ #include "gpmc-onenand.h"
+ 
+ #define TUSB6010_ASYNC_CS	1
+@@ -61,58 +59,12 @@ static void board_check_revision(void)
+ 			board_caps = NOKIA_N810;
+ 		else if (of_machine_is_compatible("nokia,n810-wimax"))
+ 			board_caps = NOKIA_N810_WIMAX;
 -	} else {
--		omap_mux_init_signal("gpio_96", OMAP_PULL_ENA | OMAP_PULL_UP);
--		omap_mux_init_signal("gpio_100", 0);
--		omap_mux_init_signal("gpio_98", 0);
--	}
--	omap_mux_init_signal("gpio_90", 0);
--	omap_mux_init_signal("gpio_91", 0);
--	omap_mux_init_signal("gpio_36", 0);
--	omap_mux_init_signal("mcbsp2_clkx.gpio_12", 0);
--	omap_mux_init_signal("gpio_97", 0);
+-		if (machine_is_nokia_n800())
+-			board_caps = NOKIA_N800;
+-		else if (machine_is_nokia_n810())
+-			board_caps = NOKIA_N810;
+-		else if (machine_is_nokia_n810_wimax())
+-			board_caps = NOKIA_N810_WIMAX;
+ 	}
+ 
+ 	if (!board_caps)
+ 		pr_err("Unknown board\n");
+ }
+ 
+-#if defined(CONFIG_I2C_CBUS_GPIO) || defined(CONFIG_I2C_CBUS_GPIO_MODULE)
+-static struct i2c_cbus_platform_data n8x0_cbus_data = {
+-	.clk_gpio = 66,
+-	.dat_gpio = 65,
+-	.sel_gpio = 64,
+-};
 -
--	platform_device_register(&board_keyboard);
--}
--#else
--static inline void board_mkp_init(void)
--{
--}
--#endif
--
--static struct mtd_partition h4_partitions[] = {
--	/* bootloader (U-Boot, etc) in first sector */
--	{
--	      .name		= "bootloader",
--	      .offset		= 0,
--	      .size		= SZ_128K,
--	      .mask_flags	= MTD_WRITEABLE, /* force read-only */
+-static struct platform_device n8x0_cbus_device = {
+-	.name	= "i2c-cbus-gpio",
+-	.id	= 3,
+-	.dev	= {
+-		.platform_data = &n8x0_cbus_data,
 -	},
--	/* bootloader params in the next sector */
+-};
+-
+-static struct i2c_board_info n8x0_i2c_board_info_3[] __initdata = {
 -	{
--	      .name		= "params",
--	      .offset		= MTDPART_OFS_APPEND,
--	      .size		= SZ_128K,
--	      .mask_flags	= 0,
+-		I2C_BOARD_INFO("retu-mfd", 0x01),
 -	},
--	/* kernel */
--	{
--	      .name		= "kernel",
--	      .offset		= MTDPART_OFS_APPEND,
--	      .size		= SZ_2M,
--	      .mask_flags	= 0
--	},
--	/* file system */
--	{
--	      .name		= "filesystem",
--	      .offset		= MTDPART_OFS_APPEND,
--	      .size		= MTDPART_SIZ_FULL,
--	      .mask_flags	= 0
--	}
 -};
 -
--static struct physmap_flash_data h4_flash_data = {
--	.width		= 2,
--	.parts		= h4_partitions,
--	.nr_parts	= ARRAY_SIZE(h4_partitions),
--};
--
--static struct resource h4_flash_resource = {
--	.flags		= IORESOURCE_MEM,
--};
--
--static struct platform_device h4_flash_device = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev		= {
--		.platform_data	= &h4_flash_data,
--	},
--	.num_resources	= 1,
--	.resource	= &h4_flash_resource,
--};
--
--static const struct display_timing cm_t35_lcd_videomode = {
--	.pixelclock	= { 0, 6250000, 0 },
--
--	.hactive = { 0, 240, 0 },
--	.hfront_porch = { 0, 15, 0 },
--	.hback_porch = { 0, 60, 0 },
--	.hsync_len = { 0, 15, 0 },
--
--	.vactive = { 0, 320, 0 },
--	.vfront_porch = { 0, 1, 0 },
--	.vback_porch = { 0, 1, 0 },
--	.vsync_len = { 0, 1, 0 },
--
--	.flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH |
--		DISPLAY_FLAGS_DE_HIGH | DISPLAY_FLAGS_PIXDATA_POSEDGE,
--};
--
--static struct panel_dpi_platform_data cm_t35_lcd_pdata = {
--	.name                   = "lcd",
--	.source                 = "dpi.0",
--
--	.data_lines		= 16,
--
--	.display_timing		= &cm_t35_lcd_videomode,
--
--	.enable_gpio		= -1,
--	.backlight_gpio		= -1,
--};
--
--static struct platform_device cm_t35_lcd_device = {
--	.name                   = "panel-dpi",
--	.id                     = 0,
--	.dev.platform_data      = &cm_t35_lcd_pdata,
--};
--
--static struct platform_device *h4_devices[] __initdata = {
--	&h4_flash_device,
--	&cm_t35_lcd_device,
--};
--
--static struct omap_dss_board_info h4_dss_data = {
--	.default_display_name = "lcd",
--};
--
--/* 2420 Sysboot setup (2430 is different) */
--static u32 get_sysboot_value(void)
+-static void __init n8x0_cbus_init(void)
 -{
--	return (omap_ctrl_readl(OMAP24XX_CONTROL_STATUS) &
--		(OMAP2_SYSBOOT_5_MASK | OMAP2_SYSBOOT_4_MASK |
--		 OMAP2_SYSBOOT_3_MASK | OMAP2_SYSBOOT_2_MASK |
--		 OMAP2_SYSBOOT_1_MASK | OMAP2_SYSBOOT_0_MASK));
--}
+-	const int retu_irq_gpio = 108;
 -
--/* H4-2420's always used muxed mode, H4-2422's always use non-muxed
-- *
-- * Note: OMAP-GIT doesn't correctly do is_cpu_omap2422 and is_cpu_omap2423
-- *  correctly.  The macro needs to look at production_id not just hawkeye.
-- */
--static u32 is_gpmc_muxed(void)
--{
--	u32 mux;
--	mux = get_sysboot_value();
--	if ((mux & 0xF) == 0xd)
--		return 1;	/* NAND config (could be either) */
--	if (mux & 0x2)		/* if mux'ed */
--		return 1;
--	else
--		return 0;
--}
--
--#if IS_ENABLED(CONFIG_SMC91X)
--
--static struct omap_smc91x_platform_data board_smc91x_data = {
--	.cs		= 1,
--	.gpio_irq	= 92,
--	.flags		= GPMC_TIMINGS_SMC91C96 | IORESOURCE_IRQ_LOWLEVEL,
--};
--
--static void __init board_smc91x_init(void)
--{
--	if (is_gpmc_muxed())
--		board_smc91x_data.flags |= GPMC_MUX_ADD_DATA;
--
--	omap_mux_init_gpio(board_smc91x_data.gpio_irq, OMAP_PIN_INPUT);
--	gpmc_smc91x_init(&board_smc91x_data);
--}
--
--#else
--
--static inline void board_smc91x_init(void)
--{
--}
--
--#endif
--
--static void __init h4_init_flash(void)
--{
--	unsigned long base;
--
--	if (gpmc_cs_request(H4_FLASH_CS, SZ_64M, &base) < 0) {
--		printk("Can't request GPMC CS for flash\n");
+-	if (gpio_request_one(retu_irq_gpio, GPIOF_IN, "Retu IRQ"))
 -		return;
--	}
--	h4_flash_resource.start	= base;
--	h4_flash_resource.end	= base + SZ_64M - 1;
+-	irq_set_irq_type(gpio_to_irq(retu_irq_gpio), IRQ_TYPE_EDGE_RISING);
+-	n8x0_i2c_board_info_3[0].irq = gpio_to_irq(retu_irq_gpio);
+-	i2c_register_board_info(3, n8x0_i2c_board_info_3,
+-				ARRAY_SIZE(n8x0_i2c_board_info_3));
+-	platform_device_register(&n8x0_cbus_device);
 -}
+-#else /* CONFIG_I2C_CBUS_GPIO */
+-static void __init n8x0_cbus_init(void)
+-{
+-}
+-#endif /* CONFIG_I2C_CBUS_GPIO */
 -
--static struct at24_platform_data m24c01 = {
--	.byte_len	= SZ_1K / 8,
--	.page_size	= 16,
--};
--
--static struct i2c_board_info __initdata h4_i2c_board_info[] = {
--	{
--		I2C_BOARD_INFO("isp1301_omap", 0x2d),
--	},
--	{	/* EEPROM on mainboard */
--		I2C_BOARD_INFO("24c01", 0x52),
--		.platform_data	= &m24c01,
--	},
--	{	/* EEPROM on cpu card */
--		I2C_BOARD_INFO("24c01", 0x57),
--		.platform_data	= &m24c01,
--	},
--};
--
+ #if defined(CONFIG_USB_MUSB_TUSB6010) || defined(CONFIG_USB_MUSB_TUSB6010_MODULE)
+ /*
+  * Enable or disable power to TUSB6010. When enabling, turn on 3.3 V and
+@@ -598,8 +550,6 @@ static void __init n8x0_mmc_init(void)
+ 
+ 	mmc1_data.nr_slots = 2;
+ 	mmc_data[0] = &mmc1_data;
+-	if (!of_have_populated_dt())
+-		omap242x_init_mmc(mmc_data);
+ }
+ #else
+ 
+@@ -684,54 +634,6 @@ static struct i2c_board_info n810_i2c_board_info_2[] __initdata = {
+ 	},
+ };
+ 
 -#ifdef CONFIG_OMAP_MUX
 -static struct omap_board_mux board_mux[] __initdata = {
+-	/* I2S codec port pins for McBSP block */
+-	OMAP2420_MUX(EAC_AC_SCLK, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
+-	OMAP2420_MUX(EAC_AC_FS, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
+-	OMAP2420_MUX(EAC_AC_DIN, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
+-	OMAP2420_MUX(EAC_AC_DOUT, OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT),
 -	{ .reg_offset = OMAP_MUX_TERMINATOR },
 -};
--#endif
 -
--static void __init omap_h4_init(void)
+-static struct omap_device_pad serial2_pads[] __initdata = {
+-	{
+-		.name	= "uart3_rx_irrx.uart3_rx_irrx",
+-		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+-		.enable	= OMAP_MUX_MODE0,
+-		.idle	= OMAP_MUX_MODE3	/* Mux as GPIO for idle */
+-	},
+-};
+-
+-static inline void board_serial_init(void)
 -{
--	omap2420_mux_init(board_mux, OMAP_PACKAGE_ZAF);
+-	struct omap_board_data bdata;
 -
--	/*
--	 * Make sure the serial ports are muxed on at this point.
--	 * You have to mux them off in device drivers later on
--	 * if not needed.
--	 */
+-	bdata.flags = 0;
+-	bdata.pads = NULL;
+-	bdata.pads_cnt = 0;
 -
--	board_mkp_init();
--	h4_i2c_board_info[0].irq = gpio_to_irq(125);
--	i2c_register_board_info(1, h4_i2c_board_info,
--			ARRAY_SIZE(h4_i2c_board_info));
+-	bdata.id = 0;
+-	omap_serial_init_port(&bdata, NULL);
 -
--	platform_add_devices(h4_devices, ARRAY_SIZE(h4_devices));
--	omap_serial_init();
--	omap_sdrc_init(NULL, NULL);
--	h4_init_flash();
--	board_smc91x_init();
+-	bdata.id = 1;
+-	omap_serial_init_port(&bdata, NULL);
 -
--	omap_display_init(&h4_dss_data);
+-	bdata.id = 2;
+-	bdata.pads = serial2_pads;
+-	bdata.pads_cnt = ARRAY_SIZE(serial2_pads);
+-	omap_serial_init_port(&bdata, NULL);
 -}
 -
--MACHINE_START(OMAP_H4, "OMAP2420 H4 board")
--	/* Maintainer: Paul Mundt <paul.mundt@nokia.com> */
+-#else
+-
+-static inline void board_serial_init(void)
+-{
+-	omap_serial_init();
+-}
+-
+-#endif
+-
+ static int __init n8x0_late_initcall(void)
+ {
+ 	if (!board_caps)
+@@ -740,8 +642,6 @@ static int __init n8x0_late_initcall(void)
+ 	gpmc_onenand_init(board_onenand_data);
+ 	n8x0_mmc_init();
+ 	n8x0_usb_init();
+-	if (!of_have_populated_dt())
+-		n8x0_cbus_init();
+ 
+ 	return 0;
+ }
+@@ -764,61 +664,3 @@ void * __init n8x0_legacy_init(void)
+ 
+ 	return &mmc1_data;
+ }
+-
+-static void __init n8x0_init_machine(void)
+-{
+-	board_check_revision();
+-	omap2420_mux_init(board_mux, OMAP_PACKAGE_ZAC);
+-	/* FIXME: add n810 spi devices */
+-	spi_register_board_info(n800_spi_board_info,
+-				ARRAY_SIZE(n800_spi_board_info));
+-	omap_register_i2c_bus(1, 400, n8x0_i2c_board_info_1,
+-			      ARRAY_SIZE(n8x0_i2c_board_info_1));
+-	omap_register_i2c_bus(2, 400, NULL, 0);
+-	if (board_is_n810())
+-		i2c_register_board_info(2, n810_i2c_board_info_2,
+-					ARRAY_SIZE(n810_i2c_board_info_2));
+-	if (!of_have_populated_dt()) {
+-		board_serial_init();
+-		omap_sdrc_init(NULL, NULL);
+-	}
+-}
+-
+-MACHINE_START(NOKIA_N800, "Nokia N800")
 -	.atag_offset	= 0x100,
 -	.reserve	= omap_reserve,
 -	.map_io		= omap242x_map_io,
 -	.init_early	= omap2420_init_early,
 -	.init_irq	= omap2_init_irq,
 -	.handle_irq	= omap2_intc_handle_irq,
--	.init_machine	= omap_h4_init,
+-	.init_machine	= n8x0_init_machine,
 -	.init_late	= omap2420_init_late,
 -	.init_time	= omap2_sync32k_timer_init,
 -	.restart	= omap2xxx_restart,
 -MACHINE_END
+-
+-MACHINE_START(NOKIA_N810, "Nokia N810")
+-	.atag_offset	= 0x100,
+-	.reserve	= omap_reserve,
+-	.map_io		= omap242x_map_io,
+-	.init_early	= omap2420_init_early,
+-	.init_irq	= omap2_init_irq,
+-	.handle_irq	= omap2_intc_handle_irq,
+-	.init_machine	= n8x0_init_machine,
+-	.init_late	= omap2420_init_late,
+-	.init_time	= omap2_sync32k_timer_init,
+-	.restart	= omap2xxx_restart,
+-MACHINE_END
+-
+-MACHINE_START(NOKIA_N810_WIMAX, "Nokia N810 WiMAX")
+-	.atag_offset	= 0x100,
+-	.reserve	= omap_reserve,
+-	.map_io		= omap242x_map_io,
+-	.init_early	= omap2420_init_early,
+-	.init_irq	= omap2_init_irq,
+-	.handle_irq	= omap2_intc_handle_irq,
+-	.init_machine	= n8x0_init_machine,
+-	.init_late	= omap2420_init_late,
+-	.init_time	= omap2_sync32k_timer_init,
+-	.restart	= omap2xxx_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-omap2/msdi.c b/arch/arm/mach-omap2/msdi.c
+index c52d8b4..828e0db 100644
+--- a/arch/arm/mach-omap2/msdi.c
++++ b/arch/arm/mach-omap2/msdi.c
+@@ -88,72 +88,3 @@ int omap_msdi_reset(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
+-
+-#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
+-
+-static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
+-				    *mmc_controller)
+-{
+-	if ((mmc_controller->slots[0].switch_pin > 0) && \
+-		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
+-					OMAP_PIN_INPUT_PULLUP);
+-	if ((mmc_controller->slots[0].gpio_wp > 0) && \
+-		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+-					OMAP_PIN_INPUT_PULLUP);
+-
+-	omap_mux_init_signal("sdmmc_cmd", 0);
+-	omap_mux_init_signal("sdmmc_clki", 0);
+-	omap_mux_init_signal("sdmmc_clko", 0);
+-	omap_mux_init_signal("sdmmc_dat0", 0);
+-	omap_mux_init_signal("sdmmc_dat_dir0", 0);
+-	omap_mux_init_signal("sdmmc_cmd_dir", 0);
+-	if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
+-		omap_mux_init_signal("sdmmc_dat1", 0);
+-		omap_mux_init_signal("sdmmc_dat2", 0);
+-		omap_mux_init_signal("sdmmc_dat3", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir1", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir2", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir3", 0);
+-	}
+-
+-	/*
+-	 * Use internal loop-back in MMC/SDIO Module Input Clock
+-	 * selection
+-	 */
+-	if (mmc_controller->slots[0].internal_clock) {
+-		u32 v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
+-		v |= (1 << 24);
+-		omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
+-	}
+-}
+-
+-void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+-{
+-	struct platform_device *pdev;
+-	struct omap_hwmod *oh;
+-	int id = 0;
+-	char *oh_name = "msdi1";
+-	char *dev_name = "mmci-omap";
+-
+-	if (!mmc_data[0]) {
+-		pr_err("%s fails: Incomplete platform data\n", __func__);
+-		return;
+-	}
+-
+-	omap242x_mmc_mux(mmc_data[0]);
+-
+-	oh = omap_hwmod_lookup(oh_name);
+-	if (!oh) {
+-		pr_err("Could not look up %s\n", oh_name);
+-		return;
+-	}
+-	pdev = omap_device_build(dev_name, id, oh, mmc_data[0],
+-				 sizeof(struct omap_mmc_platform_data));
+-	if (IS_ERR(pdev))
+-		WARN(1, "Can'd build omap_device for %s:%s.\n",
+-					dev_name, oh->name);
+-}
+-
+-#endif
 -- 
 1.8.1.1
