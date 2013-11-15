@@ -1,86 +1,81 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 14 Nov 2013 20:52:38 -0800
-Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
- vmalloc
-In-Reply-To: <52850C37.1080506@sr71.net>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
- <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
- <52850C37.1080506@sr71.net>
-Message-ID: <5285A896.3030204@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Nov 2013 14:29:22 +0900
+Subject: [PATCH v2 3/3] ARM: shmobile: Koelsch: enable Ether in defconfig
+In-Reply-To: <201311150223.40632.sergei.shtylyov@cogentembedded.com>
+References: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
+ <201311150223.40632.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20131115052919.GA16854@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2013 9:45 AM, Dave Hansen wrote:
-> On 11/11/2013 03:26 PM, Laura Abbott wrote:
->> +config ENABLE_VMALLOC_SAVING
->> +	bool "Intermix lowmem and vmalloc virtual space"
->> +	depends on ARCH_TRACKS_VMALLOC
->> +	help
->> +	  Some memory layouts on embedded systems steal large amounts
->> +	  of lowmem physical memory for purposes outside of the kernel.
->> +	  Rather than waste the physical and virtual space, allow the
->> +	  kernel to use the virtual space as vmalloc space.
->
-> I really don't think this needs to be exposed with help text and so
-> forth.   How about just defining a 'def_bool n' with some comments and
-> let the architecture 'select' it?
->
->> +#ifdef ENABLE_VMALLOC_SAVING
->> +int is_vmalloc_addr(const void *x)
->> +{
->> +	struct rb_node *n;
->> +	struct vmap_area *va;
->> +	int ret = 0;
->> +
->> +	spin_lock(&vmap_area_lock);
->> +
->> +	for (n = rb_first(vmap_area_root); n; rb_next(n)) {
->> +		va = rb_entry(n, struct vmap_area, rb_node);
->> +		if (x >= va->va_start && x < va->va_end) {
->> +			ret = 1;
->> +			break;
->> +		}
->> +	}
->> +
->> +	spin_unlock(&vmap_area_lock);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL(is_vmalloc_addr);
->> +#endif
->
-> It's probably worth noting that this makes is_vmalloc_addr() a *LOT*
-> more expensive than it was before.  There are a couple dozen of these in
-> the tree in kinda weird places (ext4, netlink, tcp).  You didn't
-> mention it here, but you probably want to at least make sure you're not
-> adding a spinlock and a tree walk in some critical path.
->
+On Fri, Nov 15, 2013 at 02:23:40AM +0300, Sergei Shtylyov wrote:
+> Enable the Ether driver in 'koelsch_defconfig' along with DHCP autoconfiguration
+> and NFS root.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Yes, that was a concern I had as well. If is_vmalloc_addr returned true 
-the spinlock/tree walk would happen anyway so essentially this is 
-getting rid of the fast path. This is typically used in the idiom
+Thanks.
 
-alloc(size) {
-	if (size > some metric)
-		vmalloc
-	else
-		kmalloc
-}
+I think it is also appropriate to remove these too.
+To be hones their inclusion appears to have been an error on my part.
+And if nfsroot is being enabled it seems to be a good opportunity
+to get rid of them.
 
-free (ptr) {
-	if (is_vmalloc_addr(ptr)
-		vfree
-	else
-		kfree
-}
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE="../../initramfs/out/rootfs.arm.cpio"
+CONFIG_INITRAMFS_COMPRESSION_GZIP=y
 
-so my hypothesis would be that any path would have to be willing to take 
-the penalty of vmalloc anyway. The actual cost would depend on the 
-vmalloc / kmalloc ratio. I haven't had a chance to get profiling data 
-yet to see the performance difference.
-
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> ---
+> Changes in version 2:
+> - new patch in the series.
+> 
+>  arch/arm/configs/koelsch_defconfig |   22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
+> Index: renesas/arch/arm/configs/koelsch_defconfig
+> ===================================================================
+> --- renesas.orig/arch/arm/configs/koelsch_defconfig
+> +++ renesas/arch/arm/configs/koelsch_defconfig
+> @@ -29,7 +29,27 @@ CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+>  CONFIG_PM_RUNTIME=y
+> +CONFIG_NET=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> +CONFIG_NETDEVICES=y
+> +# CONFIG_NET_VENDOR_ARC is not set
+> +# CONFIG_NET_CADENCE is not set
+> +# CONFIG_NET_VENDOR_BROADCOM is not set
+> +# CONFIG_NET_VENDOR_CIRRUS is not set
+> +# CONFIG_NET_VENDOR_FARADAY is not set
+> +# CONFIG_NET_VENDOR_INTEL is not set
+> +# CONFIG_NET_VENDOR_MARVELL is not set
+> +# CONFIG_NET_VENDOR_MICREL is not set
+> +# CONFIG_NET_VENDOR_NATSEMI is not set
+> +CONFIG_SH_ETH=y
+> +# CONFIG_NET_VENDOR_SEEQ is not set
+> +# CONFIG_NET_VENDOR_SMSC is not set
+> +# CONFIG_NET_VENDOR_STMICRO is not set
+> +# CONFIG_NET_VENDOR_VIA is not set
+> +# CONFIG_NET_VENDOR_WIZNET is not set
+>  # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+>  # CONFIG_INPUT_MOUSE is not set
+>  # CONFIG_LEGACY_PTYS is not set
+> @@ -49,6 +69,8 @@ CONFIG_LEDS_CLASS=y
+>  CONFIG_TMPFS=y
+>  CONFIG_CONFIGFS_FS=y
+>  # CONFIG_MISC_FILESYSTEMS is not set
+> +CONFIG_NFS_FS=y
+> +CONFIG_ROOT_NFS=y
+>  # CONFIG_ENABLE_WARN_DEPRECATED is not set
+>  # CONFIG_ENABLE_MUST_CHECK is not set
+>  # CONFIG_ARM_UNWIND is not set
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
