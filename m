@@ -1,10 +1,11 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 15 Nov 2013 14:16:21 -0700
-Subject: [PATCH 08/31] pci: tegra: use reset framework
-In-Reply-To: <1384548866-13141-9-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 15 Nov 2013 14:17:12 -0700
+Subject: [PATCH 10/31] ARM: tegra: pass reset to
+ tegra_powergate_sequence_power_up()
+In-Reply-To: <1384548866-13141-11-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-9-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAErSpo7ZP-1qkBYjdNYRPz3Z3rHL_tUOY3fNi4nvTfFmcdEEOQ@mail.gmail.com>
+ <1384548866-13141-11-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAErSpo7i_rGBNvjCb002VeXuL9xpkZ+Nx3APFA1OYH1PyMQ3yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,24 +16,18 @@ On Fri, Nov 15, 2013 at 1:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > reset API (include/linux/reset.h). Use this instead of the old Tegra-
 > specific API; that will soon be removed.
 >
-> The old Tegra-specific API used a struct clock to represent the module
-> to reset. Some of the clocks retrieved during probe() were only used for
-> reset purposes, and indeed aren't even true clocks. So, there's no need
-> to get() them any more.
->
 > Cc: treding at nvidia.com
 > Cc: pdeschrijver at nvidia.com
 > Cc: linux-tegra at vger.kernel.org
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: Bjorn Helgaas <bhelgaas@google.com>
 > Cc: linux-pci at vger.kernel.org
+> Cc: Terje Bergstr?m <tbergstrom@nvidia.com>
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: dri-devel at lists.freedesktop.org
 > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
 Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-
-Feel free to merge this through whatever tree is appropriate.  If I
-were applying this, I would be looking for an ack from Thierry in
-addition to mine.
 
 > ---
 > This patch is part of a series with strong internal depdendencies. I'm
@@ -40,128 +35,107 @@ addition to mine.
 > and arm-soc trees. The series will be part of a stable branch that can be
 > merged into other subsystems if needed to avoid/resolve dependencies.
 > ---
->  drivers/pci/host/pci-tegra.c | 49 ++++++++++++++++++++++++++++++++------------
->  1 file changed, 36 insertions(+), 13 deletions(-)
+>  arch/arm/mach-tegra/powergate.c | 8 +++++---
+>  drivers/gpu/drm/tegra/gr3d.c    | 6 ++++--
+>  drivers/pci/host/pci-tegra.c    | 3 ++-
+>  include/linux/tegra-powergate.h | 4 +++-
+>  4 files changed, 14 insertions(+), 7 deletions(-)
 >
-> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-> index 0afbbbc55c81..174a5bc2d993 100644
-> --- a/drivers/pci/host/pci-tegra.c
-> +++ b/drivers/pci/host/pci-tegra.c
-> @@ -39,6 +39,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/pci.h>
->  #include <linux/platform_device.h>
+> diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
+> index 85d28e756bb7..f6f5b54ff95e 100644
+> --- a/arch/arm/mach-tegra/powergate.c
+> +++ b/arch/arm/mach-tegra/powergate.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/export.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
 > +#include <linux/reset.h>
->  #include <linux/sizes.h>
->  #include <linux/slab.h>
->  #include <linux/tegra-cpuidle.h>
-> @@ -259,10 +260,13 @@ struct tegra_pcie {
->
->         struct clk *pex_clk;
->         struct clk *afi_clk;
-> -       struct clk *pcie_xclk;
->         struct clk *pll_e;
->         struct clk *cml_clk;
->
-> +       struct reset_control *pex_rst;
-> +       struct reset_control *afi_rst;
-> +       struct reset_control *pcie_xrst;
-> +
->         struct tegra_msi msi;
->
->         struct list_head ports;
-> @@ -858,7 +862,7 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
->         pads_writel(pcie, value, PADS_CTL);
->
->         /* take the PCIe interface module out of reset */
-> -       tegra_periph_reset_deassert(pcie->pcie_xclk);
-> +       reset_control_deassert(pcie->pcie_xrst);
->
->         /* finally enable PCIe */
->         value = afi_readl(pcie, AFI_CONFIGURATION);
-> @@ -891,9 +895,9 @@ static void tegra_pcie_power_off(struct tegra_pcie *pcie)
->
->         /* TODO: disable and unprepare clocks? */
->
-> -       tegra_periph_reset_assert(pcie->pcie_xclk);
-> -       tegra_periph_reset_assert(pcie->afi_clk);
-> -       tegra_periph_reset_assert(pcie->pex_clk);
-> +       reset_control_assert(pcie->pcie_xrst);
-> +       reset_control_assert(pcie->afi_rst);
-> +       reset_control_assert(pcie->pex_rst);
->
->         tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
->
-> @@ -921,9 +925,9 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
->         const struct tegra_pcie_soc_data *soc = pcie->soc_data;
->         int err;
->
-> -       tegra_periph_reset_assert(pcie->pcie_xclk);
-> -       tegra_periph_reset_assert(pcie->afi_clk);
-> -       tegra_periph_reset_assert(pcie->pex_clk);
-> +       reset_control_assert(pcie->pcie_xrst);
-> +       reset_control_assert(pcie->afi_rst);
-> +       reset_control_assert(pcie->pex_rst);
->
->         tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
->
-> @@ -958,7 +962,7 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
->                 return err;
->         }
->
-> -       tegra_periph_reset_deassert(pcie->afi_clk);
-> +       reset_control_deassert(pcie->afi_rst);
->
->         err = clk_prepare_enable(pcie->afi_clk);
->         if (err < 0) {
-> @@ -996,10 +1000,6 @@ static int tegra_pcie_clocks_get(struct tegra_pcie *pcie)
->         if (IS_ERR(pcie->afi_clk))
->                 return PTR_ERR(pcie->afi_clk);
->
-> -       pcie->pcie_xclk = devm_clk_get(pcie->dev, "pcie_xclk");
-> -       if (IS_ERR(pcie->pcie_xclk))
-> -               return PTR_ERR(pcie->pcie_xclk);
-> -
->         pcie->pll_e = devm_clk_get(pcie->dev, "pll_e");
->         if (IS_ERR(pcie->pll_e))
->                 return PTR_ERR(pcie->pll_e);
-> @@ -1013,6 +1013,23 @@ static int tegra_pcie_clocks_get(struct tegra_pcie *pcie)
->         return 0;
+>  #include <linux/seq_file.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/clk/tegra.h>
+> @@ -144,11 +145,12 @@ int tegra_powergate_remove_clamping(int id)
 >  }
 >
-> +static int tegra_pcie_resets_get(struct tegra_pcie *pcie)
-> +{
-> +       pcie->pex_rst = devm_reset_control_get(pcie->dev, "pex");
-> +       if (IS_ERR(pcie->pex_rst))
-> +               return PTR_ERR(pcie->pex_rst);
-> +
-> +       pcie->afi_rst = devm_reset_control_get(pcie->dev, "afi");
-> +       if (IS_ERR(pcie->afi_rst))
-> +               return PTR_ERR(pcie->afi_rst);
-> +
-> +       pcie->pcie_xrst = devm_reset_control_get(pcie->dev, "pcie_x");
-> +       if (IS_ERR(pcie->pcie_xrst))
-> +               return PTR_ERR(pcie->pcie_xrst);
-> +
-> +       return 0;
-> +}
-> +
->  static int tegra_pcie_get_resources(struct tegra_pcie *pcie)
+>  /* Must be called with clk disabled, and returns with clk enabled */
+> -int tegra_powergate_sequence_power_up(int id, struct clk *clk)
+> +int tegra_powergate_sequence_power_up(int id, struct clk *clk,
+> +                                       struct reset_control *rst)
 >  {
->         struct platform_device *pdev = to_platform_device(pcie->dev);
-> @@ -1025,6 +1042,12 @@ static int tegra_pcie_get_resources(struct tegra_pcie *pcie)
->                 return err;
+>         int ret;
+>
+> -       tegra_periph_reset_assert(clk);
+> +       reset_control_assert(rst);
+>
+>         ret = tegra_powergate_power_on(id);
+>         if (ret)
+> @@ -165,7 +167,7 @@ int tegra_powergate_sequence_power_up(int id, struct clk *clk)
+>                 goto err_clamp;
+>
+>         udelay(10);
+> -       tegra_periph_reset_deassert(clk);
+> +       reset_control_deassert(rst);
+>
+>         return 0;
+>
+> diff --git a/drivers/gpu/drm/tegra/gr3d.c b/drivers/gpu/drm/tegra/gr3d.c
+> index f629e38b00e4..0cbb24b1ae04 100644
+> --- a/drivers/gpu/drm/tegra/gr3d.c
+> +++ b/drivers/gpu/drm/tegra/gr3d.c
+> @@ -279,7 +279,8 @@ static int gr3d_probe(struct platform_device *pdev)
+>                 }
 >         }
 >
-> +       err = tegra_pcie_resets_get(pcie);
-> +       if (err) {
-> +               dev_err(&pdev->dev, "failed to get resets: %d\n", err);
-> +               return err;
-> +       }
-> +
->         err = tegra_pcie_power_on(pcie);
+> -       err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D, gr3d->clk);
+> +       err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D, gr3d->clk,
+> +                                               gr3d->rst);
+>         if (err < 0) {
+>                 dev_err(&pdev->dev, "failed to power up 3D unit\n");
+>                 return err;
+> @@ -287,7 +288,8 @@ static int gr3d_probe(struct platform_device *pdev)
+>
+>         if (gr3d->clk_secondary) {
+>                 err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D1,
+> -                                                       gr3d->clk_secondary);
+> +                                                       gr3d->clk_secondary,
+> +                                                       gr3d->rst_secondary);
+>                 if (err < 0) {
+>                         dev_err(&pdev->dev,
+>                                 "failed to power up secondary 3D unit\n");
+> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+> index 174a5bc2d993..aace19edc469 100644
+> --- a/drivers/pci/host/pci-tegra.c
+> +++ b/drivers/pci/host/pci-tegra.c
+> @@ -956,7 +956,8 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
+>         }
+>
+>         err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_PCIE,
+> -                                               pcie->pex_clk);
+> +                                               pcie->pex_clk,
+> +                                               pcie->pex_rst);
 >         if (err) {
->                 dev_err(&pdev->dev, "failed to power up: %d\n", err);
+>                 dev_err(pcie->dev, "powerup sequence failed: %d\n", err);
+>                 return err;
+> diff --git a/include/linux/tegra-powergate.h b/include/linux/tegra-powergate.h
+> index c98cfa406952..b5ad64aca071 100644
+> --- a/include/linux/tegra-powergate.h
+> +++ b/include/linux/tegra-powergate.h
+> @@ -19,6 +19,7 @@
+>  #define _MACH_TEGRA_POWERGATE_H_
+>
+>  struct clk;
+> +struct reset_control;
+>
+>  #define TEGRA_POWERGATE_CPU    0
+>  #define TEGRA_POWERGATE_3D     1
+> @@ -51,6 +52,7 @@ int tegra_powergate_power_off(int id);
+>  int tegra_powergate_remove_clamping(int id);
+>
+>  /* Must be called with clk disabled, and returns with clk enabled */
+> -int tegra_powergate_sequence_power_up(int id, struct clk *clk);
+> +int tegra_powergate_sequence_power_up(int id, struct clk *clk,
+> +                                       struct reset_control *rst);
+>
+>  #endif /* _MACH_TEGRA_POWERGATE_H_ */
 > --
 > 1.8.1.5
 >
