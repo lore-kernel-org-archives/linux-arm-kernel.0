@@ -1,43 +1,34 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Nov 2013 10:21:42 -0500
+Date: Fri, 15 Nov 2013 10:23:36 -0500
 Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
-In-Reply-To: <20131115121215.901EFC40885@trevor.secretlab.ca>
+In-Reply-To: <20131114192629.GE16735@n2100.arm.linux.org.uk>
 References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <20131115121215.901EFC40885@trevor.secretlab.ca>
-Message-ID: <20131115152142.GC10335@titan.lakedaemon.net>
+ <52814AFB.3070600@wwwdotorg.org>
+ <CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com>
+ <528275B7.6050209@wwwdotorg.org>
+ <20131112193012.GR10335@titan.lakedaemon.net>
+ <52828C77.20001@wwwdotorg.org>
+ <20131114162859.GX10335@titan.lakedaemon.net>
+ <20131114192629.GE16735@n2100.arm.linux.org.uk>
+Message-ID: <20131115152336.GD10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 09:12:15PM +0900, Grant Likely wrote:
-> On Mon, 11 Nov 2013 20:29:20 +0000, Jason Cooper <jason@lakedaemon.net> wrote:
-> > Consumers of the Linux kernel's build products are beginning to hardcode
-> > the filenames of the dtbs generated.  Since the dtb filenames are
-> > currently the dts filename s/dts/dtb/, this prevents the kernel
-> > community from renaming dts files as needed.
-> > 
-> > Let's provide a consistent naming structure for consumers to script
-> > against.  Or at least, as consistent as the dts properties themselves.
-> > 
-> > With this patch, adding the '-L' option to the dtc commandline will
-> > cause dtc to create a symlink to the generated dtb, using the board
-> > compatible string as the filename, eg:
-> > 
-> >   globalscale,mirabox.dtb -> armada-370-mirabox.dtb
+On Thu, Nov 14, 2013 at 07:26:29PM +0000, Russell King - ARM Linux wrote:
+> We have ways and means to deal with the installation of kernel images
+> and modules.  There's well defined makefile targets for this, and
+> make variables which control where and how these get put.  For the
+> kernel image, you can specify the script to be run (which is called
+> with the location of the *Image file) for copying.  Pulling it manually
+> out of arch/arm/boot is really a failure of the distro packaging people
+> to get their process right.
 > 
-> This whole thread is just crazy. The filename is not an ABI. Anything
-> digging into the kernel build tree is a) wrong, and b) userspace tooling
-> consuming the kernel build products which is /not/ ABI and can be changed
+> The same goes for the DT files: if we don't provide a method for the
+> kernel build system to install these in a sane way, then that's our
+> failing.  However, distros should be asking for this, and not picking
+> the files out of arch/arm/boot/dts.
 
-whew.  I still think there is a need for an install target.  The fact
-that our changing filenames might break things is an indicator of that.
-
-> If we want to have a tool or script for creating a well formed directory
-> full of .dtb files because it would be helpful to U-Boot or something
-> else, then that is fine. Make it part of the "make install" path.
-
-I'm currently reworking the patch(es) to implement 'make dtbs-install'.
-I'll hopefully have them ready this weekend or sooner.  I'm taking the
-same tack as install.sh (/sbin/installdtbs takes precedence).
+Exactly.  V2 hopefully this weekend implementing 'make dtbs-install'
 
 thx,
 
