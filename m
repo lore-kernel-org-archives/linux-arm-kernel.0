@@ -1,73 +1,37 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 15 Nov 2013 15:22:31 +0100
-Subject: [PATCH 0/3] Orion irqchip and Kirkwood SDIO
-Message-ID: <1384525354-901-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 15 Nov 2013 14:25:29 +0000
+Subject: [PATCH 4/6] arm64: mm: Drop the lowmem watermark check from
+ virt_addr_valid()
+In-Reply-To: <20131115133948.GB1217@darko.cambridge.arm.com>
+References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
+ <1384457866-16135-5-git-send-email-santosh.shilimkar@ti.com>
+ <20131115133948.GB1217@darko.cambridge.arm.com>
+Message-ID: <52862ED9.1050708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set tries to deal with a minor irq issue seen on Marvell
-Kirkwood SoCs with irqchip/irq-orion and mvsdio drivers. In contrast
-to non-DT irq handling, irqchip driver does handle irqs a little bit
-different. First of all, it reads irq cause register once and works
-through all bits set while non-DT irq handling read irq cause and
-handled only one irq. Second, irqchip reverses irq priorities by
-using ffs() instead of fls().
+On 15/11/13 13:39, Catalin Marinas wrote:
+> On Thu, Nov 14, 2013 at 07:37:44PM +0000, Santosh Shilimkar wrote:
+>> Slab allocator can allocate memory beyond the lowmem watermark
+>> which can lead to false failure of virt_addr_valid().
+>>
+>> So drop the check. The issue was seen with percpu_alloc()
+>> in KVM code which was allocating memory beyond lowmem watermark.
+>>
+>> Am not completly sure whether this is the right fix and if it could
+>> impact any other user of virt_addr_valid(). Without this fix as
+>> pointed out the KVM init was failing in my testing.
+> 
+> Do you have a problem on arm64? There is no lowmem watermark here.
 
-This now, seems to trigger a minor ip design issue in sdio peripheral
-where sdio irq can occur upstream while sdio interrupts are all
-disabled in the ip registers. This extra, unexpected irq does neither
-harm correct function of HW nor SW driver but triggers a warning in
-mvsdio irq handler.
+I don't think that change is relevant for arm64. Actually, the more I
+look at it, I don't think virt_addr_valid() should be touched at all.
 
-I have tried to debug this and can say that the sequence of irq
-related events is:
-(a) sdio irq is set in upstream irq
-(b) generic-chip handler masks sdio irq
-(c) sdio irq handler deals with it,
-    acks and disables all peripheral irq registers
-(d) sdio irq cause is cleared
-(e) generic-chip handler unmasks sdio irq
-(f) sdio irq is set in upstream irq and cleared little later
-(g) sdio irq handler is upset about being called with no irq to handle
+The real issue is the use of virt_to_phys()/virt_addr_valid() on a
+percpu pointer, which is wrong and only worked by chance so far.
 
-This patch set is actually three independent patches in one as mvsdio
-irq workaround just motivates irqchip handling changes. The third just
-silences a noisy mvsdio dev_notice down to dev_dbg. I have chosen to
-keep them together anyway. Below is a more detailed description of the
-individual patches.
+I'm working on a patch to solve this.
 
-First patch reverses irq handling priority for irqchip driver to what
-non-DT irq did before by using fls() instead of ffs(). The "read cause
-once, work through all irqs" handling is maintained.
-
-Second patch works around the spurious irq issue by bailing out of the
-irq handler early, if peripheral irq registers indicate that none should
-have been fired.
-
-Third patch silences a card detect mechanism related dev_notice to
-dev_dbg to not bother users with that.
-
-All patches are based on v3.12. I suggest to take irqchip patch though
-mvebu branch, while mmc related patches should go though mmc tree.
-
-Sebastian Hesselbarth (3):
-  irqchip: orion: reverse irq handling priority
-  mmc: mvsdio: workaround for spurious irqs
-  mmc: mvsdio: silence card detect notice
-
- drivers/irqchip/irq-orion.c |    4 ++--
- drivers/mmc/host/mvsdio.c   |   20 +++++++++++++++++---
- 2 files changed, 19 insertions(+), 5 deletions(-)
-
----
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+	M.
 -- 
-1.7.2.5
+Jazz is not dead. It just smells funny...
