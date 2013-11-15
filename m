@@ -1,37 +1,14 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 15:22:18 -0800
-Subject: [PATCH 1/4] wl1251: split wl251 platform data to a separate
- structure
-In-Reply-To: <20131114230330.GB6383@earth.universe>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-2-git-send-email-sre@debian.org>
- <20131114185132.GQ10317@atomide.com>
- <20131114230330.GB6383@earth.universe>
-Message-ID: <20131114232217.GV10317@atomide.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 14 Nov 2013 16:01:13 -0800
+Subject: UEFI Clock
+Message-ID: <CAPw-ZTnPecp+VYfn5yukrpFNk5sCr5LVDNFty0sLhY=NNhNkXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@debian.org> [131114 15:04]:
-> On Thu, Nov 14, 2013 at 10:51:33AM -0800, Tony Lindgren wrote:
-> > [...]
-> >
-> > If this is not going into v3.13, these will cause conflicts
-> > with the mach-omap2/board-*.c files for v3.14.
-> > 
-> > So it might be best to do a minimal header patch first that
-> > can be merged in by both linux-omap and wireless trees.
-> 
-> I guess this patch is pretty minimal. It also seems to be acked by
-> the involved Maintainers, so maybe just merge Patch 1 without the
-> other patches?
-> 
-> This does not solve the problem with the struct modification from
-> the second patch, but I guess it's the more intrusive patch.
+Hi Mike,
 
-Once at least the first two patches are ready, how about I queue
-them after -rc1 and set up an immutable branch that can be merged
-in by linux-omap tree and the wireless tree?
+I will be looking into covering the clock driver to support UEFI.
+Before I do this, can someone explain to me how x86 system handle each
+IP clock as I don't see such thing?
 
-Regards,
-
-Tony
+-Loc
