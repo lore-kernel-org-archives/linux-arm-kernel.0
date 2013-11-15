@@ -1,50 +1,106 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Fri, 15 Nov 2013 18:02:13 +0200
-Subject: [PATCH v2] ARM: OMAP4460: cpuidle: Extend
- PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD on cpuidle
-In-Reply-To: <20131115153608.GX10317@atomide.com>
-References: <1382467484-16957-1-git-send-email-grygorii.strashko@ti.com>
- <5266CCE3.1090801@ti.com> <20131114183535.GL10317@atomide.com>
- <20131115153608.GX10317@atomide.com>
-Message-ID: <52864585.6030206@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 15 Nov 2013 10:08:14 -0600
+Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
+In-Reply-To: <CAHCPf3tBOvoeK+ibrA4Hc6iUpVBte+B9BL=-3p8rWz9RmHOfcQ@mail.gmail.com>
+References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
+ <CAHCPf3tBOvoeK+ibrA4Hc6iUpVBte+B9BL=-3p8rWz9RmHOfcQ@mail.gmail.com>
+Message-ID: <528646EE.5000109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2013 05:36 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [131114 10:36]:
->> * Grygorii Strashko <grygorii.strashko@ti.com> [131022 12:09]:
->>> The same workaround as ff999b8a0983ee15668394ed49e38d3568fc6859
->>> "ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC ..."
->>> need to be applied not only when system is booting, but when MPUSS hits
->>> OSWR state through CPUIdle too. Without this WA the same issue is
->>> reproduced now on boards PandaES and Tablet/Blaze with SOM OMAP4460
->>> when CONFIG_CPU_IDLE is enabled.
->>> After MPUSS has enterred OSWR and waken up:
->>> - GIC distributor became disabled forever
->>> - scheduling is not performed any more
->>>
->>> Cc: Kevin Hilman <khilman@linaro.org>
->>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> Applying into omap-for-v3.13/fixes thanks.
+On 11/14/2013 02:33 PM, Matt Sealey wrote:
+> On Sun, Nov 3, 2013 at 2:50 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Hmm looks like this breaks the build with randconfigs at least
-> with the attached .config, so dropping for now.
+> Snip.. I actually reviewed what you're doing since I was
+> understandably curious as to what the "plan" is for removing
+> machine_desc and how you'd potentially avoid end up stashing global
+> variables all over the place for early init code..
+> 
+>> --- a/arch/arm/kernel/devtree.c
+>> +++ b/arch/arm/kernel/devtree.c
+>> @@ -199,7 +199,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>>         const struct machine_desc *mdesc, *mdesc_best = NULL;
+>>
+>>  #ifdef CONFIG_ARCH_MULTIPLATFORM
+>> -       DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+>> +       DT_MACHINE_START(GENERIC_DT)
+>>         MACHINE_END
+> 
+> This machine doesn't have a .dt_compat so...
+> 
+>> +               early_print("%08x\t%s\n", p->nr, p->name ? p->name : *p->dt_compat);
+> 
+> In your case here, isn't this going to print "calxeda,highbank" for
+> you right now, with a broken tree, since it's the first in your
+> dt_compat list?
+> 
+> In the generic case, as noted above, the compatibility list usually comes out as
+> 
+>                          ID (hex)       NAME
+>                          :
+>                          0xffffffff        Highbank
+>                          0xffffffff        Generic DT based system
+> 
+> But you've made it say:
+> 
+>                          ID (hex)        NAME
+>                          :
+>                          0xffffffff         calxeda,highbank
+>                          0xffffffff
+> 
+> You didn't fix your customer issue there, at least, if they're messing
+> with their DT and break it ;)
 
-Hi Tony
-Have you forgot to attach .config?
+This is not the issue I'm trying to fix as this is a debug early print.
+It is what /proc/cpuinfo displays.
 
-> arch/arm/mach-omap2/built-in.o: In function `omap_enter_idle_coupled':
-> :(.text+0xb48c): undefined reference to `pm44xx_errata'
+I don't think your example is even possible. If we have the default
+descriptor enabled (i.e. all multi-platform builds), then we will always
+match a machine descriptor and try to continue to boot never reaching
+this code path.
 
-I assume that .config doesn't have CONFIG_SMP enabled while
-pm44xx_errata is defined in omap-smp.c.
-I think it should be a separate patch to move pm44xx_errata somewhere
-else, so this patch will remain the same.
+>> @@ -859,7 +859,7 @@ void __init setup_arch(char **cmdline_p)
+>>         if (!mdesc)
+>>                 mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+>>         machine_desc = mdesc;
+>> -       machine_name = mdesc->name;
+>> +       machine_name = mdesc->name ? mdesc->name : of_flat_dt_get_machine_name();
+> 
+> Also you missed around line 242 of kernel/devtree.c which prints
+> mdesc_best->name;
 
-Btw, do we need omap_enter_idle_coupled() in UP?
+You are looking at the wrong version. See the DT clean-up that I did
+which is in mainline now. This patch is dependent on that.
 
--- 
-Taras Kondratiuk
+> 
+>         model = of_get_flat_dt_prop(dt_root, "model", NULL);
+>         if (!model)
+>                 model = of_get_flat_dt_prop(dt_root, "compatible", NULL);
+>         if (!model)
+>                 model = "<unknown>";
+>         pr_info("Machine: %s, model: %s\n", mdesc_best->name, model);
+> 
+> Which is now going to say "Machine: , model: Calxeda Foo Board", isn't it?
+> 
+> Should just use machine_name, if mdesc_best->name isn't set, shouldn't it?
+> 
+> I think there's a bunch of weirdness here.. I just checked the PAPR
+> and ePAPR specs, and the original IEEE1275 and ARM bindings and
+> finding board information like you want from the DT is an unholy
+> crapshoot.
+
+Maybe in the past, but we require a root compatible string. If there is
+no model property, then the compatible string is the machine name.
+
+> In this case I think we need more information, and to only print it
+> once per boot if that's the goal here. Why not make machine_name an
+> argument to setup_machine_fdt (or just don't have it be static in
+> setup.c) and have that function fill in the right thing rather than
+> having a DT parsing function in setup_arch where before it was totally
+> boot-method agnostic?
+
+Well, that's an implementation detail. First we have to agree on which
+string gets used and where.
+
+Rob
