@@ -1,37 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 15 Nov 2013 15:00:58 +0100
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-Message-ID: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Nov 2013 14:19:12 +0000
+Subject: [PATCH] arm: check stack pointer in get_wchan
+In-Reply-To: <20131115121907.4707.82671.stgit@buzz>
+References: <20131115121907.4707.82671.stgit@buzz>
+Message-ID: <20131115141912.GE19468@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-arch/arm/mach-at91/include/mach/hardware.h. This file is included
-implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
+On Fri, Nov 15, 2013 at 12:19:07PM +0000, Konstantin Khlebnikov wrote:
+> get_wchan() is lockless. Task may wakeup at any time and change its own stack,
+> thus each next stack frame may be overwritten and filled with random stuff.
+> 
+> /proc/$pid/stack interface had been disabled for non-current tasks, see [1]
+> But 'wchan' still allows to trigger stack frame unwinding on volatile stack.
+> 
+> This patch fixes oops in unwind_frame() by adding stack pointer validation on
+> each step (as x86 code do), unwind_frame() already checks frame pointer.
+> 
+> Also I've found another report of this oops on stackoverflow (irony).
 
-So better include it explicitly not only because the last link will go
-away soon.
+For that comment alone:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/rtc/rtc-at91sam9.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 309b8b3..5963743 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -24,7 +24,7 @@
- 
- #include <mach/at91_rtt.h>
- #include <mach/cpu.h>
--
-+#include <mach/hardware.h>
- 
- /*
-  * This driver uses two configurable hardware resources that live in the
--- 
-1.8.4.2
+[also, the patch looks sane to me].
+
+Will
+
+> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+> Cc: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+> Link: http://www.spinics.net/lists/arm-kernel/msg110589.html [1]
+> Link: http://stackoverflow.com/questions/18479894/unwind-frame-cause-a-kernel-paging-error
+> ---
+>  arch/arm/kernel/process.c |    7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 94f6b05..92f7b15 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -404,6 +404,7 @@ EXPORT_SYMBOL(dump_fpu);
+>  unsigned long get_wchan(struct task_struct *p)
+>  {
+>  	struct stackframe frame;
+> +	unsigned long stack_page;
+>  	int count = 0;
+>  	if (!p || p == current || p->state == TASK_RUNNING)
+>  		return 0;
+> @@ -412,9 +413,11 @@ unsigned long get_wchan(struct task_struct *p)
+>  	frame.sp = thread_saved_sp(p);
+>  	frame.lr = 0;			/* recovered from the stack */
+>  	frame.pc = thread_saved_pc(p);
+> +	stack_page = (unsigned long)task_stack_page(p);
+>  	do {
+> -		int ret = unwind_frame(&frame);
+> -		if (ret < 0)
+> +		if (frame.sp < stack_page ||
+> +		    frame.sp >= stack_page + THREAD_SIZE ||
+> +		    unwind_frame(&frame) < 0)
+>  			return 0;
+>  		if (!in_sched_functions(frame.pc))
+>  			return frame.pc;
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
