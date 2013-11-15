@@ -1,34 +1,50 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Nov 2013 13:54:11 -0700
-Subject: [PATCH 16/31] ASoC: tegra: use reset framework
+Date: Fri, 15 Nov 2013 13:54:06 -0700
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
 In-Reply-To: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1384548866-13141-17-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Tegra's clock driver now provides an implementation of the common
-reset API (include/linux/reset.h). Use this instead of the old Tegra-
-specific API; that will soon be removed.
+dma_request_slave_channel() simply returns NULL whenever DMA channel
+lookup fails. Lookup could fail for two distinct reasons:
 
-This change also renames "clock"/"clk" to "modules"/"mod" in symbols
-related to entries in configlink_clocks[], since:
-- We don't care about clock handles any more, but rather reset handles,
-  so the old name isn't applicable.
-- It really is a list of modules on the bus, about which we currently
-  only care about reset handles.
-If we start caring about any other aspect of the modules in the future,
-we won't have to rename all these symbols again.
+a) No DMA specification exists for the channel name.
+   This includes situations where no DMA specifications exist at all, or
+   other general lookup problems.
+
+b) A DMA specification does exist, yet the driver for that channel is not
+   yet registered.
+
+Case (b) should trigger deferred probe in client drivers. However, since
+they have no way to differentiate the two situations, it cannot.
+
+Implement new function dma_request_slave_channel_or_err(), which performs
+identically to dma_request_slave_channel(), except that it returns an
+error-pointer rather than NULL, which allows callers to detect when
+deferred probe should occur.
+
+Eventually, all drivers should be converted to this new API, the old API
+removed, and the new API renamed to the more desirable name. This patch
+doesn't convert the existing API and all drivers in one go, since some
+drivers call dma_request_slave_channel() then dma_request_channel() if
+that fails. That would require modifying dma_request_channel() in the
+same way, which would then require modifying close to 100 drivers at once,
+rather than just the 15-20 or so that use dma_request_slave_channel(),
+which might be tenable in a single patch.
+
+acpi_dma_request_slave_chan_by_index() doesn't actually implement
+deferred probe. Perhaps it should?
 
 Cc: treding at nvidia.com
 Cc: pdeschrijver at nvidia.com
 Cc: linux-tegra at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: alsa-devel at alsa-project.org
+Cc: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
 This patch is part of a series with strong internal depdendencies. I'm
@@ -36,159 +52,242 @@ looking for an ack so that I can take the entire series through the Tegra
 and arm-soc trees. The series will be part of a stable branch that can be
 merged into other subsystems if needed to avoid/resolve dependencies.
 ---
- sound/soc/tegra/Kconfig        |  2 ++
- sound/soc/tegra/tegra30_ahub.c | 70 +++++++++++++++++++++++-------------------
- sound/soc/tegra/tegra30_ahub.h |  2 +-
- 3 files changed, 41 insertions(+), 33 deletions(-)
+ drivers/dma/acpi-dma.c    | 12 ++++++------
+ drivers/dma/dmaengine.c   | 44 ++++++++++++++++++++++++++++++++++++++++----
+ drivers/dma/of-dma.c      | 12 +++++++-----
+ include/linux/dmaengine.h |  7 +++++++
+ include/linux/of_dma.h    |  9 ++++++---
+ 5 files changed, 66 insertions(+), 18 deletions(-)
 
-diff --git a/sound/soc/tegra/Kconfig b/sound/soc/tegra/Kconfig
-index 8fc653ca3ab4..896292bb853f 100644
---- a/sound/soc/tegra/Kconfig
-+++ b/sound/soc/tegra/Kconfig
-@@ -1,6 +1,8 @@
- config SND_SOC_TEGRA
- 	tristate "SoC Audio for the Tegra System-on-Chip"
- 	depends on (ARCH_TEGRA && TEGRA20_APB_DMA) || COMPILE_TEST
-+	depends on COMMON_CLK
-+	depends on RESET_CONTROLLER
- 	select REGMAP_MMIO
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	help
-diff --git a/sound/soc/tegra/tegra30_ahub.c b/sound/soc/tegra/tegra30_ahub.c
-index 31154338c1eb..5ce00dc48c44 100644
---- a/sound/soc/tegra/tegra30_ahub.c
-+++ b/sound/soc/tegra/tegra30_ahub.c
-@@ -24,6 +24,7 @@
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
-+#include <linux/reset.h>
- #include <linux/slab.h>
- #include <linux/clk/tegra.h>
- #include <sound/soc.h>
-@@ -301,27 +302,27 @@ int tegra30_ahub_unset_rx_cif_source(enum tegra30_ahub_rxcif rxcif)
+diff --git a/drivers/dma/acpi-dma.c b/drivers/dma/acpi-dma.c
+index e69b03c0fa50..c83d40f14467 100644
+--- a/drivers/dma/acpi-dma.c
++++ b/drivers/dma/acpi-dma.c
+@@ -334,7 +334,7 @@ static int acpi_dma_parse_fixed_dma(struct acpi_resource *res, void *data)
+  * @dev:	struct device to get DMA request from
+  * @index:	index of FixedDMA descriptor for @dev
+  *
+- * Returns pointer to appropriate dma channel on success or NULL on error.
++ * Returns pointer to appropriate dma channel on success or an error pointer.
+  */
+ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+ 		size_t index)
+@@ -349,10 +349,10 @@ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+ 
+ 	/* Check if the device was enumerated by ACPI */
+ 	if (!dev || !ACPI_HANDLE(dev))
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 
+ 	if (acpi_bus_get_device(ACPI_HANDLE(dev), &adev))
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 
+ 	memset(&pdata, 0, sizeof(pdata));
+ 	pdata.index = index;
+@@ -367,7 +367,7 @@ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+ 	acpi_dev_free_resource_list(&resource_list);
+ 
+ 	if (dma_spec->slave_id < 0 || dma_spec->chan_id < 0)
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 
+ 	mutex_lock(&acpi_dma_lock);
+ 
+@@ -403,7 +403,7 @@ EXPORT_SYMBOL_GPL(acpi_dma_request_slave_chan_by_index);
+  * translate the names "tx" and "rx" here based on the most common case where
+  * the first FixedDMA descriptor is TX and second is RX.
+  *
+- * Returns pointer to appropriate dma channel on success or NULL on error.
++ * Returns pointer to appropriate dma channel on success or an error pointer.
+  */
+ struct dma_chan *acpi_dma_request_slave_chan_by_name(struct device *dev,
+ 		const char *name)
+@@ -415,7 +415,7 @@ struct dma_chan *acpi_dma_request_slave_chan_by_name(struct device *dev,
+ 	else if (!strcmp(name, "rx"))
+ 		index = 1;
+ 	else
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 
+ 	return acpi_dma_request_slave_chan_by_index(dev, index);
  }
- EXPORT_SYMBOL_GPL(tegra30_ahub_unset_rx_cif_source);
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index ea806bdc12ef..5e7f8af2f0ec 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -540,6 +540,8 @@ EXPORT_SYMBOL_GPL(dma_get_slave_channel);
+  * @mask: capabilities that the channel must satisfy
+  * @fn: optional callback to disposition available channels
+  * @fn_param: opaque parameter to pass to dma_filter_fn
++ *
++ * Returns pointer to appropriate dma channel on success or NULL.
+  */
+ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+ 				       dma_filter_fn fn, void *fn_param)
+@@ -588,24 +590,58 @@ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+ EXPORT_SYMBOL_GPL(__dma_request_channel);
  
--#define CLK_LIST_MASK_TEGRA30	BIT(0)
--#define CLK_LIST_MASK_TEGRA114	BIT(1)
-+#define MOD_LIST_MASK_TEGRA30	BIT(0)
-+#define MOD_LIST_MASK_TEGRA114	BIT(1)
- 
--#define CLK_LIST_MASK_TEGRA30_OR_LATER \
--		(CLK_LIST_MASK_TEGRA30 | CLK_LIST_MASK_TEGRA114)
-+#define MOD_LIST_MASK_TEGRA30_OR_LATER \
-+		(MOD_LIST_MASK_TEGRA30 | MOD_LIST_MASK_TEGRA114)
- 
- static const struct {
--	const char *clk_name;
--	u32 clk_list_mask;
--} configlink_clocks[] = {
--	{ "i2s0", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "i2s1", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "i2s2", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "i2s3", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "i2s4", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "dam0", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "dam1", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "dam2", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "spdif_in", CLK_LIST_MASK_TEGRA30_OR_LATER },
--	{ "amx", CLK_LIST_MASK_TEGRA114 },
--	{ "adx", CLK_LIST_MASK_TEGRA114 },
-+	const char *rst_name;
-+	u32 mod_list_mask;
-+} configlink_mods[] = {
-+	{ "i2s0", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "i2s1", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "i2s2", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "i2s3", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "i2s4", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "dam0", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "dam1", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "dam2", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "spdif", MOD_LIST_MASK_TEGRA30_OR_LATER },
-+	{ "amx", MOD_LIST_MASK_TEGRA114 },
-+	{ "adx", MOD_LIST_MASK_TEGRA114 },
- };
- 
- #define LAST_REG(name) \
-@@ -450,17 +451,17 @@ static const struct regmap_config tegra30_ahub_ahub_regmap_config = {
- };
- 
- static struct tegra30_ahub_soc_data soc_data_tegra30 = {
--	.clk_list_mask = CLK_LIST_MASK_TEGRA30,
-+	.mod_list_mask = MOD_LIST_MASK_TEGRA30,
- 	.set_audio_cif = tegra30_ahub_set_cif,
- };
- 
- static struct tegra30_ahub_soc_data soc_data_tegra114 = {
--	.clk_list_mask = CLK_LIST_MASK_TEGRA114,
-+	.mod_list_mask = MOD_LIST_MASK_TEGRA114,
- 	.set_audio_cif = tegra30_ahub_set_cif,
- };
- 
- static struct tegra30_ahub_soc_data soc_data_tegra124 = {
--	.clk_list_mask = CLK_LIST_MASK_TEGRA114,
-+	.mod_list_mask = MOD_LIST_MASK_TEGRA114,
- 	.set_audio_cif = tegra124_ahub_set_cif,
- };
- 
-@@ -475,7 +476,7 @@ static int tegra30_ahub_probe(struct platform_device *pdev)
+ /**
+- * dma_request_slave_channel - try to allocate an exclusive slave channel
++ * __dma_request_slave_channel - try to allocate an exclusive slave
++ *   channel
+  * @dev:	pointer to client device structure
+  * @name:	slave channel name
++ *
++ * Returns pointer to appropriate dma channel on success or an error pointer.
+  */
+-struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name)
++static struct dma_chan *__dma_request_slave_channel(struct device *dev,
++					const char *name, bool defer)
  {
- 	const struct of_device_id *match;
- 	const struct tegra30_ahub_soc_data *soc_data;
--	struct clk *clk;
-+	struct reset_control *rst;
- 	int i;
- 	struct resource *res0, *res1, *region;
- 	u32 of_dma[2];
-@@ -495,19 +496,24 @@ static int tegra30_ahub_probe(struct platform_device *pdev)
- 	 * operate correctly, all devices on this bus must be out of reset.
- 	 * Ensure that here.
- 	 */
--	for (i = 0; i < ARRAY_SIZE(configlink_clocks); i++) {
--		if (!(configlink_clocks[i].clk_list_mask &
--					soc_data->clk_list_mask))
-+	for (i = 0; i < ARRAY_SIZE(configlink_mods); i++) {
-+		if (!(configlink_mods[i].mod_list_mask &
-+					soc_data->mod_list_mask))
- 			continue;
--		clk = clk_get(&pdev->dev, configlink_clocks[i].clk_name);
--		if (IS_ERR(clk)) {
--			dev_err(&pdev->dev, "Can't get clock %s\n",
--				configlink_clocks[i].clk_name);
--			ret = PTR_ERR(clk);
+ 	/* If device-tree is present get slave info from here */
+ 	if (dev->of_node)
+-		return of_dma_request_slave_channel(dev->of_node, name);
++		return of_dma_request_slave_channel(dev->of_node, name, defer);
+ 
+ 	/* If device was enumerated by ACPI get slave info from here */
+ 	if (ACPI_HANDLE(dev))
+ 		return acpi_dma_request_slave_chan_by_name(dev, name);
+ 
+-	return NULL;
++	return ERR_PTR(-ENODEV);
++}
 +
-+		rst = reset_control_get(&pdev->dev,
-+					configlink_mods[i].rst_name);
-+		if (IS_ERR(rst)) {
-+			dev_err(&pdev->dev, "Can't get reset %s\n",
-+				configlink_mods[i].rst_name);
-+			ret = PTR_ERR(rst);
- 			goto err;
- 		}
--		tegra_periph_reset_deassert(clk);
--		clk_put(clk);
++/**
++ * dma_request_slave_channel - try to allocate an exclusive slave channel
++ * @dev:	pointer to client device structure
++ * @name:	slave channel name
++ *
++ * Returns pointer to appropriate dma channel on success or NULL.
++ */
++struct dma_chan *dma_request_slave_channel(struct device *dev,
++					   const char *name)
++{
++	struct dma_chan *ch = __dma_request_slave_channel(dev, name, false);
++	if (IS_ERR(ch))
++		return NULL;
++	return ch;
+ }
+ EXPORT_SYMBOL_GPL(dma_request_slave_channel);
+ 
++/**
++ * dma_request_slave_channel_or_err - try to allocate an exclusive slave channel
++ * @dev:	pointer to client device structure
++ * @name:	slave channel name
++ *
++ * Returns pointer to appropriate dma channel on success or an error pointer.
++ */
++struct dma_chan *dma_request_slave_channel_or_err(struct device *dev,
++						  const char *name)
++{
++	return __dma_request_slave_channel(dev, name, true);
++}
++EXPORT_SYMBOL_GPL(dma_request_slave_channel_or_err);
 +
-+		ret = reset_control_deassert(rst);
-+		reset_control_put(rst);
-+		if (ret)
-+			goto err;
+ void dma_release_channel(struct dma_chan *chan)
+ {
+ 	mutex_lock(&dma_list_mutex);
+diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+index 0b88dd3d05f4..928141f6f21b 100644
+--- a/drivers/dma/of-dma.c
++++ b/drivers/dma/of-dma.c
+@@ -143,10 +143,10 @@ static int of_dma_match_channel(struct device_node *np, const char *name,
+  * @np:		device node to get DMA request from
+  * @name:	name of desired channel
+  *
+- * Returns pointer to appropriate dma channel on success or NULL on error.
++ * Returns pointer to appropriate dma channel on success or an error pointer.
+  */
+ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+-					      const char *name)
++					      const char *name, bool defer)
+ {
+ 	struct of_phandle_args	dma_spec;
+ 	struct of_dma		*ofdma;
+@@ -155,14 +155,14 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 
+ 	if (!np || !name) {
+ 		pr_err("%s: not enough information provided\n", __func__);
+-		return NULL;
++		return ERR_PTR(-ENODEV);
  	}
  
- 	ahub = devm_kzalloc(&pdev->dev, sizeof(struct tegra30_ahub),
-diff --git a/sound/soc/tegra/tegra30_ahub.h b/sound/soc/tegra/tegra30_ahub.h
-index d67321d90faa..1383f8cd3572 100644
---- a/sound/soc/tegra/tegra30_ahub.h
-+++ b/sound/soc/tegra/tegra30_ahub.h
-@@ -502,7 +502,7 @@ void tegra124_ahub_set_cif(struct regmap *regmap, unsigned int reg,
- 			   struct tegra30_ahub_cif_conf *conf);
+ 	count = of_property_count_strings(np, "dma-names");
+ 	if (count < 0) {
+ 		pr_err("%s: dma-names property of node '%s' missing or empty\n",
+ 			__func__, np->full_name);
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 	}
  
- struct tegra30_ahub_soc_data {
--	u32 clk_list_mask;
-+	u32 mod_list_mask;
- 	void (*set_audio_cif)(struct regmap *regmap,
- 			      unsigned int reg,
- 			      struct tegra30_ahub_cif_conf *conf);
+ 	for (i = 0; i < count; i++) {
+@@ -181,11 +181,13 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 
+ 		of_node_put(dma_spec.np);
+ 
++		if (!ofdma && defer)
++			return ERR_PTR(-EPROBE_DEFER);
+ 		if (chan)
+ 			return chan;
+ 	}
+ 
+-	return NULL;
++	return ERR_PTR(-ENODEV);
+ }
+ 
+ /**
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 41cf0c399288..b908b0fda72b 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -1041,6 +1041,8 @@ void dma_issue_pending_all(void);
+ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+ 					dma_filter_fn fn, void *fn_param);
+ struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name);
++struct dma_chan *dma_request_slave_channel_or_err(struct device *dev,
++						  const char *name);
+ void dma_release_channel(struct dma_chan *chan);
+ #else
+ static inline struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type)
+@@ -1068,6 +1070,11 @@ static inline struct dma_chan *dma_request_slave_channel(struct device *dev,
+ {
+ 	return NULL;
+ }
++static inline struct dma_chan *dma_request_slave_channel_or_err(
++					struct device *dev, const char *name)
++{
++	return ERR_PTR(-ENODEV);
++}
+ static inline void dma_release_channel(struct dma_chan *chan)
+ {
+ }
+diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+index ae36298ba076..0504461574c6 100644
+--- a/include/linux/of_dma.h
++++ b/include/linux/of_dma.h
+@@ -38,7 +38,8 @@ extern int of_dma_controller_register(struct device_node *np,
+ 		void *data);
+ extern void of_dma_controller_free(struct device_node *np);
+ extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+-						     const char *name);
++						     const char *name,
++						     bool defer);
+ extern struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+ 		struct of_dma *ofdma);
+ #else
+@@ -54,8 +55,10 @@ static inline void of_dma_controller_free(struct device_node *np)
+ {
+ }
+ 
+-static inline struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+-						     const char *name)
++static inline struct dma_chan *of_dma_request_slave_channel(
++					struct device_node *np,
++					const char *name,
++					bool defer)
+ {
+ 	return NULL;
+ }
 -- 
 1.8.1.5
