@@ -1,35 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Nov 2013 13:35:09 +0100
-Subject: [PATCH 1/3] Documentation: Add APM X-Gene SoC 6.0Gbps SATA PHY
- driver binding documentation
-In-Reply-To: <1384457519-21335-2-git-send-email-lho@apm.com>
-References: <1384457519-21335-1-git-send-email-lho@apm.com>
- <1384457519-21335-2-git-send-email-lho@apm.com>
-Message-ID: <201311151335.09577.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Nov 2013 12:45:22 +0000
+Subject: [PATCH 2/2] ARM: pxa: delete the custom GPIO header
+In-Reply-To: <1380183077-27407-1-git-send-email-linus.walleij@linaro.org>
+References: <1380183077-27407-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131115124522.GA1913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 November 2013, Loc Ho wrote:
-> +- id                   : PHY ID (0 = first, 1 = second, 2 = third)
-> +- #phy-cells           : Shall be 0
+On Thu, Sep 26, 2013 at 10:11:17AM +0200, Linus Walleij wrote:
+> The PXA sub-architecture appears to have a custom <mach/gpio.h>
+> for no reason whatsoever. The file became completely empty
+> after Haojian removed the remaining content in
+> commit 157d2644cb0c1e71a18baaffca56d2b1d0ebf10f
+> "ARM: pxa: change gpio to platform device".
+> 
+> That commit added these two lines:
+> 
+> However it seems like deleting the file has no effect
+> whatsoever on the kernel compilation.
 
-Hmm, it seems like this would make more sense if you have #phy-cells=<1>
-and have the PHY ID in user node as the argument.
-
-> +- CTLE0                        : PHY override parameters for channel 0 register REG1
-> +                         field CTLE_EQ. First value for Gen1, second value
-> +                         for Gen2, and third value for Gen3. Default is 0x2.
-> +- CTLE1                        : PHY override parameters for channel 1 register REG1
-> +                         field CTLE_EQ. First value for Gen1, second value
-> +                         for Gen2, and third value for Gen3. Default is 0x2.
-> +- PQ0                  : PHY override parameters for channel 0 register REG125
-> +                         field PQ_REG. First value for Gen1, second value
-> +                         for Gen2, and third value for Gen3. Default is 0xA.
-> +- PQ1                  : PHY override parameters for channel 1 register REG125
-> +                         field PQ_REG. First value for Gen1, second value
-> +                         for Gen2, and third value for Gen3. Default is 0xA.
-
-As mentioned before, I don't think putting register-level information into the binding
-is the right approach here.
-
-	Arnd
+This has broken pxa25x_udc - it seems that it was using this path to get
+hold of mach/hardware.h, and now that it doesn't have that, it gets lots
+of build errors.
