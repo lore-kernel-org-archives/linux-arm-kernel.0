@@ -1,60 +1,26 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 15 Nov 2013 12:29:26 +0200
-Subject: [PATCHv4 1/7] ARM: tegra: Create a DT header defining SWGROUP ID
-In-Reply-To: <5282B036.9090604@wwwdotorg.org>
-References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
- <1384158718-4756-2-git-send-email-hdoyu@nvidia.com>
- <5282B036.9090604@wwwdotorg.org>
-Message-ID: <20131115122926.9166a6693bb9378a7f2c1526@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 15 Nov 2013 10:34:43 +0000
+Subject: [PATCH] spi: s3c64xx: fix reference leak to master in
+ s3c64xx_spi_remove()
+In-Reply-To: <CAPgLHd_-cpipSk5+SVPwZ0_Jzx2P5tJVFaj8Rxkbb_+yFVqvEg@mail.gmail.com>
+References: <CAPgLHd_-cpipSk5+SVPwZ0_Jzx2P5tJVFaj8Rxkbb_+yFVqvEg@mail.gmail.com>
+Message-ID: <20131115103443.GC26614@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Nov 2013 23:48:22 +0100
-Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Fri, Nov 15, 2013 at 03:54:16PM +0800, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Once a spi_master_get() call succeeds, we need an additional
+> spi_master_put() call to free the memory, otherwise we will
+> leak a reference to master. Fix by removing the unnecessary
+> spi_master_get() call.
 
-> On 11/11/2013 01:31 AM, Hiroshi Doyu wrote:
-> > Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-> > binding. "swgroup" is a group of H/W clients which a Tegra SoC
-> > supports. This unique ID can be used to calculate MC_SMMU_<swgroup
-> > name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
-> > register bit. This will allow the same header to be used by both
-> > device tree files, and drivers implementing this binding, which
-> > guarantees that the two stay in sync. This also makes device trees
-> > more readable by using names instead of magic numbers. For HOTRESET
-> > bit shifting we need another conversion table, which will come later.
-> 
-> > diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
-> 
-> > +#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
-> > +
-> > +#define TEGRA_SWGROUP_MAX	64
-> > +
-> > +#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-> 
-> If I put the following into a DT and compile it:
-> 
-> #define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
-> #define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-> / {
-> 	test-prop = <(TEGRA_SWGROUP_BIT(PPCS2))>;
-> };
-> 
-> I get:
-> 
-> Error: arch/arm/boot/dts/tegra20.dtsi:11.28-29 integer value out of
-> range 0000000000000020 (32 bits)
-> FATAL ERROR: Syntax error parsing input tree
-> 
-> Is TEGRA_SWGROUP_BIT() not meant to be used in DT files? If it is, the
-> definition is broken. If it is not, it should be defined in the driver
-> not the header, since DT files have no use for it.
-
-I'd like to use the macro in DT but what I want is 2 cells from 64 bit.
-For the above example, I want the following 2 cell to be generated but I
-haven't found any ways yet.
-
-#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
-#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-/ {
- 	test-prop = <0x00000000 0x00000001>;
-};
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131115/1b398e42/attachment-0001.sig>
