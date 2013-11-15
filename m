@@ -1,56 +1,64 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Nov 2013 15:50:01 +0100
-Subject: [PATCH 06/11] ARM: at91: switch RSI EWS board to DT
+Date: Fri, 15 Nov 2013 15:50:06 +0100
+Subject: [PATCH 11/11] ARM: at91: switch Calao QIL-A9260 board to DT
 In-Reply-To: <1384527006-9040-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20131115143855.GR28304@ns203013.ovh.net>
  <1384527006-9040-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1384527006-9040-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1384527006-9040-11-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/at91-rsi-ews.dts | 175 ++++++++++++++++++++++++++++
- arch/arm/mach-at91/Kconfig.non_dt  |   6 -
- arch/arm/mach-at91/Makefile        |   1 -
- arch/arm/mach-at91/board-rsi-ews.c | 231 -------------------------------------
- 5 files changed, 176 insertions(+), 238 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-rsi-ews.dts
- delete mode 100644 arch/arm/mach-at91/board-rsi-ews.c
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/at91-qil_a9260.dts        | 185 +++++++++++++++++++
+ arch/arm/configs/at91sam9260_9g20_defconfig |   1 -
+ arch/arm/mach-at91/Kconfig.non_dt           |   6 -
+ arch/arm/mach-at91/Makefile                 |   1 -
+ arch/arm/mach-at91/board-qil-a9260.c        | 266 ----------------------------
+ 6 files changed, 186 insertions(+), 274 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-qil_a9260.dts
+ delete mode 100644 arch/arm/mach-at91/board-qil-a9260.c
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a66de6d..cdba9ce 100644
+index d042c68..1de1ba2 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -7,6 +7,7 @@ dtb-$(CONFIG_ARCH_AT91) += at91-1arm.dtb
- dtb-$(CONFIG_ARCH_AT91) += at91-carmeva.dtb
- dtb-$(CONFIG_ARCH_AT91) += at91-flexibity.dtb
- dtb-$(CONFIG_ARCH_AT91) += at91-kafa.dtb
-+dtb-$(CONFIG_ARCH_AT91) += at91-rsi-ews.dtb
+@@ -15,6 +15,7 @@ dtb-$(CONFIG_ARCH_AT91) += at91-rsi-ews.dtb
  dtb-$(CONFIG_ARCH_AT91) += mpa1600.dtb
  # sam9260
  dtb-$(CONFIG_ARCH_AT91) += animeo_ip.dtb
-diff --git a/arch/arm/boot/dts/at91-rsi-ews.dts b/arch/arm/boot/dts/at91-rsi-ews.dts
++dtb-$(CONFIG_ARCH_AT91) += at91-qil_a9260.dtb
+ dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb
+ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
+ dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
+diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
 new file mode 100644
-index 0000000..2ae5af8
+index 0000000..d3d52dd
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91-rsi-ews.dts
-@@ -0,0 +1,175 @@
++++ b/arch/arm/boot/dts/at91-qil_a9260.dts
+@@ -0,0 +1,185 @@
 +/*
-+ * at91-rsi-ews.dts - Device Tree file for RSI EWS board
++ * at91-qil_a9260.dts - Device Tree file for Caloa QIL A9260 board
 + *
-+ * Copyright (C) 2013 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ * Copyright (C) 2011-2013 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 + *
-+ * Licensed under GPLv2 only
++ * Licensed under GPLv2.
 + */
 +/dts-v1/;
-+#include "at91rm9200.dtsi"
-+
++#include "at91sam9260.dtsi"
 +/ {
-+	model = "RSI EWS board";
-+	compatible = "rsi,ews", "atmel,at91rm9200";
++	model = "Calao QIL A9260";
++	compatible = "calao,qil-a9260", "atmel,at91sam9260", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock5 rw rootfstype=ubifs";
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
 +
 +	clocks {
 +		#address-cells = <1>;
@@ -59,43 +67,72 @@ index 0000000..2ae5af8
 +
 +		main_clock: clock at 0 {
 +			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <18432000>;
++			clock-frequency = <12000000>;
 +		};
 +	};
 +
 +	ahb {
 +		apb {
++			shdwc at fffffd10 {
++				atmel,wakeup-counter = <10>;
++				atmel,wakeup-rtt-timer;
++			};
++
 +			dbgu: serial at fffff200 {
 +				status = "okay";
 +			};
 +
-+			usart1: serial at fffc4000 {
++			usart0: serial at fffb0000 {
 +				pinctrl-0 =
-+						<&pinctrl_uart1
-+						 &pinctrl_uart1_rts
-+						 &pinctrl_uart1_cts
-+						 &pinctrl_uart1_dtr_dsr
-+						 &pinctrl_uart1_dcd
-+						 &pinctrl_uart1_ri>;
++					<&pinctrl_usart0
++					 &pinctrl_usart0_rts
++					 &pinctrl_usart0_cts
++					 &pinctrl_usart0_dtr_dsr
++					 &pinctrl_usart0_dcd
++					 &pinctrl_usart0_ri>;
 +				status = "okay";
 +			};
 +
-+			usart3: serial at fffcc000 {
++			usart1: serial at fffb4000 {
 +				pinctrl-0 =
-+						<&pinctrl_uart3
-+						 &pinctrl_uart3_rts>;
++					<&pinctrl_usart1
++					 &pinctrl_usart1_rts
++					 &pinctrl_usart1_cts>;
 +				status = "okay";
 +			};
 +
-+			macb0: ethernet at fffbc000 {
++			usart2: serial at fffb8000 {
++				pinctrl-0 =
++					<&pinctrl_usart2
++					 &pinctrl_usart2_rts
++					 &pinctrl_usart2_cts>;
++				status = "okay";
++			};
++
++			macb0: ethernet at fffc4000 {
 +				phy-mode = "rmii";
 +				status = "okay";
-+				/* phy irq on PC4 */
 +			};
 +
-+			mmc0: mmc at fffb4000 {
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
++				status = "okay";
++			};
++
++			spi0: spi at fffc8000 {
++				status = "okay";
++				cs-gpios = <&pioA 3 GPIO_ACTIVE_HIGH>;
++
++				m41t94 at 0 {
++					compatible = "st,m41t94";
++					reg = <0>;
++					spi-max-frequency = <1000000>;
++				};
++
++			};
++
++			mmc0: mmc at fffa8000 {
 +				pinctrl-0 = <
-+					&pinctrl_board_mmc0
 +					&pinctrl_mmc0_clk
 +					&pinctrl_mmc0_slot0_cmd_dat0
 +					&pinctrl_mmc0_slot0_dat1_3>;
@@ -103,168 +140,169 @@ index 0000000..2ae5af8
 +				slot at 0 {
 +					reg = <0>;
 +					bus-width = <4>;
-+					cd-gpios = <&pioB 27 GPIO_ACTIVE_HIGH>;
-+					wp-gpios = <&pioB 29 GPIO_ACTIVE_HIGH>;
-+				};
-+			};
-+
-+			pinctrl at fffff400 {
-+				mmc0 {
-+					pinctrl_board_mmc0: mmc0-board {
-+						atmel,pins =
-+							<AT91_PIOB 27 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH
-+							 AT91_PIOC 29 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
-+					};
-+				};
-+			};
-+
-+			spi0: spi at fffe0000 {
-+				status = "okay";
-+				cs-gpios = <&pioA 3 GPIO_ACTIVE_HIGH>, <&pioA 4 GPIO_ACTIVE_HIGH>, <0>, <0>;
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <15000000>;
-+					reg = <0>;
-+				};
-+
-+				mtd_dataflash at 1 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <15000000>;
-+					reg = <1>;
 +				};
 +			};
 +		};
 +
-+		usb0: ohci at 00300000 {
-+			num-ports = <1>;
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
 +			status = "okay";
++
++			at91bootstrap at 0 {
++				label = "at91bootstrap";
++				reg = <0x0 0x20000>;
++			};
++
++			barebox at 20000 {
++				label = "barebox";
++				reg = <0x20000 0x40000>;
++			};
++
++			bareboxenv at 60000 {
++				label = "bareboxenv";
++				reg = <0x60000 0x20000>;
++			};
++
++			bareboxenv2 at 80000 {
++				label = "bareboxenv2";
++				reg = <0x80000 0x20000>;
++			};
++
++			oftree at 80000 {
++				label = "oftree";
++				reg = <0xa0000 0x20000>;
++			};
++
++			kernel at a0000 {
++				label = "kernel";
++				reg = <0xc0000 0x400000>;
++			};
++
++			rootfs at 4a0000 {
++				label = "rootfs";
++				reg = <0x4c0000 0x7800000>;
++			};
++
++			data at 7ca0000 {
++				label = "data";
++				reg = <0x7cc0000 0x8340000>;
++			};
 +		};
 +
-+		nor_flash at 10000000 {
-+			compatible = "cfi-flash";
-+			reg = <0x10000000 0x1000000>;
-+			linux,mtd-name = "physmap-flash.0";
-+			bank-width = <2>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			boot at 0 {
-+				label = "boot";
-+				reg = <0x00000 0x60000>;
-+			};
-+
-+			kernel at 60000 {
-+				label = "kernel";
-+				reg = <0x60000 0x1a0000>;
-+			};
-+
-+			root at 200000 {
-+				label = "kernel";
-+				reg = <0x200000 0x800000>;
-+			};
-+
-+			kernelupd at A00000  {
-+				label = "kernelupd";
-+				reg = <0xA00000 0x180000>;
-+			};
-+
-+			rootupd at B80000  {
-+				label = "rootupd";
-+				reg = <0xB80000 0x480000>;
-+			};
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
 +		};
 +	};
 +
 +	leds {
 +		compatible = "gpio-leds";
 +
-+		led0 {
-+			label = "led0";
-+			gpios = <&pioB 6 GPIO_ACTIVE_HIGH>;
++		user_led {
++			label = "user_led";
++			gpios = <&pioB 21 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
 +		};
++	};
 +
-+		led1 {
-+			label = "led1";
-+			gpios = <&pioB 7 GPIO_ACTIVE_HIGH>;
-+		};
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+		led2 {
-+			label = "led2";
-+			gpios = <&pioB 8 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led3 {
-+			label = "led3";
-+			gpios = <&pioB 9 GPIO_ACTIVE_HIGH>;
++		user_pb {
++			label = "user_pb";
++			gpios = <&pioB 10 GPIO_ACTIVE_LOW>;
++			linux,code = <28>;
++			gpio-key,wakeup;
 +		};
 +	};
 +
 +	i2c at 0 {
 +		status = "okay";
-+
-+		ds1337 at 68 {
-+			compatible = "dallas,ds1337";
-+			reg = <0x68>;
-+		};
-+
-+		24c01 at 50 {
-+			compatible = "at24,24c01";
-+			reg = <0x50>;
-+		};
 +	};
 +};
+diff --git a/arch/arm/configs/at91sam9260_9g20_defconfig b/arch/arm/configs/at91sam9260_9g20_defconfig
+index ab66867..64700c31 100644
+--- a/arch/arm/configs/at91sam9260_9g20_defconfig
++++ b/arch/arm/configs/at91sam9260_9g20_defconfig
+@@ -15,7 +15,6 @@ CONFIG_MACH_AT91SAM9260EK=y
+ CONFIG_MACH_CAM60=y
+ CONFIG_MACH_SAM9_L9260=y
+ CONFIG_MACH_AFEB9260=y
+-CONFIG_MACH_QIL_A9260=y
+ CONFIG_MACH_CPU9260=y
+ CONFIG_MACH_AT91SAM9G20EK=y
+ CONFIG_MACH_AT91SAM9G20EK_2MMC=y
 diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
-index 694e959..af27414 100644
+index c193a13..d16075a 100644
 --- a/arch/arm/mach-at91/Kconfig.non_dt
 +++ b/arch/arm/mach-at91/Kconfig.non_dt
-@@ -115,12 +115,6 @@ config MACH_ECO920
- 	bool "eco920"
- 	help
- 	  Select this if you are using the eco920 board
--
--config MACH_RSI_EWS
--	bool "RSI Embedded Webserver"
--	depends on ARCH_AT91RM9200
--	help
--	  Select this if you are using RSIs EWS board.
- endif
+@@ -128,12 +128,6 @@ config MACH_AFEB9260
+ 	  <svn://194.85.238.22/home/users/george/svn/arm9eb>
+ 	  <http://groups.google.com/group/arm9fpga-evolution-board>
  
- # ----------------------------------------------------------
+-config MACH_QIL_A9260
+-	bool "CALAO QIL-A9260 board"
+-	help
+-	  Select this if you are using a Calao Systems QIL-A9260 Board.
+-	  <http://www.calao-systems.com>
+-
+ config MACH_CPU9260
+ 	bool "Eukrea CPU9260 board"
+ 	help
 diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 70e2b22..d0b2518 100644
+index 8eda4b0..fb9ecd4 100644
 --- a/arch/arm/mach-at91/Makefile
 +++ b/arch/arm/mach-at91/Makefile
-@@ -43,7 +43,6 @@ obj-$(CONFIG_MACH_ECBAT91)	+= board-ecbat91.o
- obj-$(CONFIG_MACH_YL9200)	+= board-yl-9200.o
- obj-$(CONFIG_MACH_CPUAT91)	+= board-cpuat91.o
- obj-$(CONFIG_MACH_ECO920)	+= board-eco920.o
--obj-$(CONFIG_MACH_RSI_EWS)	+= board-rsi-ews.o
- 
- # AT91SAM9260 board-specific support
+@@ -44,7 +44,6 @@ obj-$(CONFIG_MACH_ECO920)	+= board-eco920.o
  obj-$(CONFIG_MACH_AT91SAM9260EK) += board-sam9260ek.o
-diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
+ obj-$(CONFIG_MACH_CAM60)	+= board-cam60.o
+ obj-$(CONFIG_MACH_SAM9_L9260)	+= board-sam9-l9260.o
+-obj-$(CONFIG_MACH_QIL_A9260)	+= board-qil-a9260.o
+ obj-$(CONFIG_MACH_AFEB9260)	+= board-afeb-9260v1.o
+ obj-$(CONFIG_MACH_CPU9260)	+= board-cpu9krea.o
+ 
+diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
 deleted file mode 100644
-index f6d7f19..0000000
---- a/arch/arm/mach-at91/board-rsi-ews.c
+index aa3bc9b..0000000
+--- a/arch/arm/mach-at91/board-qil-a9260.c
 +++ /dev/null
-@@ -1,231 +0,0 @@
+@@ -1,266 +0,0 @@
 -/*
-- * board-rsi-ews.c
+- * linux/arch/arm/mach-at91/board-qil-a9260.c
 - *
-- *  Copyright (C)
-- *  2005 SAN People,
-- *  2008-2011 R-S-I Elektrotechnik GmbH & Co. KG
+- *  Copyright (C) 2005 SAN People
+- *  Copyright (C) 2006 Atmel
+- *  Copyright (C) 2007 Calao-systems
 - *
-- * Licensed under GPLv2 or later.
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
 -#include <linux/types.h>
+-#include <linux/gpio.h>
 -#include <linux/init.h>
 -#include <linux/mm.h>
 -#include <linux/module.h>
 -#include <linux/platform_device.h>
 -#include <linux/spi/spi.h>
--#include <linux/mtd/physmap.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/input.h>
+-#include <linux/clk.h>
 -
 -#include <asm/setup.h>
 -#include <asm/mach-types.h>
@@ -275,209 +313,229 @@ index f6d7f19..0000000
 -#include <asm/mach/irq.h>
 -
 -#include <mach/hardware.h>
--
--#include <linux/gpio.h>
+-#include <mach/at91sam9_smc.h>
 -
 -#include "at91_aic.h"
+-#include "at91_shdwc.h"
 -#include "board.h"
+-#include "sam9_smc.h"
 -#include "generic.h"
 -
--static void __init rsi_ews_init_early(void)
+-
+-static void __init ek_init_early(void)
 -{
--	/* Initialize processor: 18.432 MHz crystal */
--	at91_initialize(18432000);
+-	/* Initialize processor: 12.000 MHz crystal */
+-	at91_initialize(12000000);
 -}
 -
 -/*
-- * Ethernet
+- * USB Host port
 - */
--static struct macb_platform_data rsi_ews_eth_data __initdata = {
--	.phy_irq_pin	= AT91_PIN_PC4,
--	.is_rmii	= 1,
--};
--
--/*
-- * USB Host
-- */
--static struct at91_usbh_data rsi_ews_usbh_data __initdata = {
--	.ports		= 1,
+-static struct at91_usbh_data __initdata ek_usbh_data = {
+-	.ports		= 2,
 -	.vbus_pin	= {-EINVAL, -EINVAL},
 -	.overcurrent_pin= {-EINVAL, -EINVAL},
 -};
 -
 -/*
-- * SD/MC
+- * USB Device port
 - */
--static struct mci_platform_data __initdata rsi_ews_mci0_data = {
+-static struct at91_udc_data __initdata ek_udc_data = {
+-	.vbus_pin	= AT91_PIN_PC5,
+-	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+-};
+-
+-/*
+- * SPI devices.
+- */
+-static struct spi_board_info ek_spi_devices[] = {
+-#if defined(CONFIG_RTC_DRV_M41T94)
+-	{	/* M41T94 RTC */
+-		.modalias	= "m41t94",
+-		.chip_select	= 0,
+-		.max_speed_hz	= 1 * 1000 * 1000,
+-		.bus_num	= 0,
+-	}
+-#endif
+-};
+-
+-/*
+- * MACB Ethernet device
+- */
+-static struct macb_platform_data __initdata ek_macb_data = {
+-	.phy_irq_pin	= AT91_PIN_PA31,
+-	.is_rmii	= 1,
+-};
+-
+-/*
+- * NAND flash
+- */
+-static struct mtd_partition __initdata ek_nand_partition[] = {
+-	{
+-		.name	= "Uboot & Kernel",
+-		.offset	= 0,
+-		.size	= SZ_16M,
+-	},
+-	{
+-		.name	= "Root FS",
+-		.offset	= MTDPART_OFS_NXTBLK,
+-		.size	= 120 * SZ_1M,
+-	},
+-	{
+-		.name	= "FS",
+-		.offset	= MTDPART_OFS_NXTBLK,
+-		.size	= 120 * SZ_1M,
+-	},
+-};
+-
+-static struct atmel_nand_data __initdata ek_nand_data = {
+-	.ale		= 21,
+-	.cle		= 22,
+-	.det_pin	= -EINVAL,
+-	.rdy_pin	= AT91_PIN_PC13,
+-	.enable_pin	= AT91_PIN_PC14,
+-	.ecc_mode	= NAND_ECC_SOFT,
+-	.on_flash_bbt	= 1,
+-	.parts		= ek_nand_partition,
+-	.num_parts	= ARRAY_SIZE(ek_nand_partition),
+-};
+-
+-static struct sam9_smc_config __initdata ek_nand_smc_config = {
+-	.ncs_read_setup		= 0,
+-	.nrd_setup		= 1,
+-	.ncs_write_setup	= 0,
+-	.nwe_setup		= 1,
+-
+-	.ncs_read_pulse		= 3,
+-	.nrd_pulse		= 3,
+-	.ncs_write_pulse	= 3,
+-	.nwe_pulse		= 3,
+-
+-	.read_cycle		= 5,
+-	.write_cycle		= 5,
+-
+-	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8,
+-	.tdf_cycles		= 2,
+-};
+-
+-static void __init ek_add_device_nand(void)
+-{
+-	/* configure chip-select 3 (NAND) */
+-	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+-
+-	at91_add_device_nand(&ek_nand_data);
+-}
+-
+-/*
+- * MCI (SD/MMC)
+- */
+-static struct mci_platform_data __initdata ek_mci0_data = {
 -	.slot[0] = {
 -		.bus_width	= 4,
--		.detect_pin	= AT91_PIN_PB27,
--		.wp_pin		= AT91_PIN_PB29,
+-		.detect_pin	= -EINVAL,
+-		.wp_pin		= -EINVAL,
 -	},
 -};
 -
 -/*
-- * I2C
+- * GPIO Buttons
 - */
--static struct i2c_board_info rsi_ews_i2c_devices[] __initdata = {
--	{
--		I2C_BOARD_INFO("ds1337", 0x68),
--	},
--	{
--		I2C_BOARD_INFO("24c01", 0x50),
+-#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+-static struct gpio_keys_button ek_buttons[] = {
+-	{	/* USER PUSH BUTTON */
+-		.code		= KEY_ENTER,
+-		.gpio		= AT91_PIN_PB10,
+-		.active_low	= 1,
+-		.desc		= "user_pb",
+-		.wakeup		= 1,
 -	}
 -};
+-
+-static struct gpio_keys_platform_data ek_button_data = {
+-	.buttons	= ek_buttons,
+-	.nbuttons	= ARRAY_SIZE(ek_buttons),
+-};
+-
+-static struct platform_device ek_button_device = {
+-	.name		= "gpio-keys",
+-	.id		= -1,
+-	.num_resources	= 0,
+-	.dev		= {
+-		.platform_data	= &ek_button_data,
+-	}
+-};
+-
+-static void __init ek_add_device_buttons(void)
+-{
+-	at91_set_GPIO_periph(AT91_PIN_PB10, 1);	/* user push button, pull up enabled */
+-	at91_set_deglitch(AT91_PIN_PB10, 1);
+-
+-	platform_device_register(&ek_button_device);
+-}
+-#else
+-static void __init ek_add_device_buttons(void) {}
+-#endif
 -
 -/*
 - * LEDs
 - */
--static struct gpio_led rsi_ews_leds[] = {
--	{
--		.name			= "led0",
--		.gpio			= AT91_PIN_PB6,
+-static struct gpio_led ek_leds[] = {
+-	{	/* user_led (green) */
+-		.name			= "user_led",
+-		.gpio			= AT91_PIN_PB21,
 -		.active_low		= 0,
--	},
--	{
--		.name			= "led1",
--		.gpio			= AT91_PIN_PB7,
--		.active_low		= 0,
--	},
--	{
--		.name			= "led2",
--		.gpio			= AT91_PIN_PB8,
--		.active_low		= 0,
--	},
--	{
--		.name			= "led3",
--		.gpio			= AT91_PIN_PB9,
--		.active_low		= 0,
--	},
--};
--
--/*
-- * DataFlash
-- */
--static struct spi_board_info rsi_ews_spi_devices[] = {
--	{	/* DataFlash chip 1*/
--		.modalias	= "mtd_dataflash",
--		.chip_select	= 0,
--		.max_speed_hz	= 5 * 1000 * 1000,
--	},
--	{	/* DataFlash chip 2*/
--		.modalias	= "mtd_dataflash",
--		.chip_select	= 1,
--		.max_speed_hz	= 5 * 1000 * 1000,
--	},
--};
--
--/*
-- * NOR flash
-- */
--static struct mtd_partition rsiews_nor_partitions[] = {
--	{
--		.name		= "boot",
--		.offset		= 0,
--		.size		= 3 * SZ_128K,
--		.mask_flags	= MTD_WRITEABLE
--	},
--	{
--		.name		= "kernel",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= SZ_2M - (3 * SZ_128K)
--	},
--	{
--		.name		= "root",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= SZ_8M
--	},
--	{
--		.name		= "kernelupd",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= 3 * SZ_512K,
--		.mask_flags	= MTD_WRITEABLE
--	},
--	{
--		.name		= "rootupd",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= 9 * SZ_512K,
--		.mask_flags	= MTD_WRITEABLE
--	},
--};
--
--static struct physmap_flash_data rsiews_nor_data = {
--	.width		= 2,
--	.parts		= rsiews_nor_partitions,
--	.nr_parts	= ARRAY_SIZE(rsiews_nor_partitions),
--};
--
--#define NOR_BASE	AT91_CHIPSELECT_0
--#define NOR_SIZE	SZ_16M
--
--static struct resource nor_flash_resources[] = {
--	{
--		.start	= NOR_BASE,
--		.end	= NOR_BASE + NOR_SIZE - 1,
--		.flags	= IORESOURCE_MEM,
+-		.default_trigger	= "heartbeat",
 -	}
 -};
 -
--static struct platform_device rsiews_nor_flash = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev		= {
--				.platform_data	= &rsiews_nor_data,
--	},
--	.resource	= nor_flash_resources,
--	.num_resources	= ARRAY_SIZE(nor_flash_resources),
--};
--
--/*
-- * Init Func
-- */
--static void __init rsi_ews_board_init(void)
+-static void __init ek_board_init(void)
 -{
 -	/* Serial */
 -	/* DBGU on ttyS0. (Rx & Tx only) */
--	/* This one is for debugging */
 -	at91_register_uart(0, 0, 0);
 -
--	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	/* Dialin/-out modem interface */
--	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
+-	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
+-	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
 -			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
 -			   | ATMEL_UART_RI);
 -
--	/* USART3 on ttyS4. (Rx, Tx, RTS) */
--	/* RS485 communication */
--	at91_register_uart(AT91RM9200_ID_US3, 4, ATMEL_UART_RTS);
+-	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
+-	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
+-
+-	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
+-	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
 -	at91_add_device_serial();
--	at91_set_gpio_output(AT91_PIN_PA21, 0);
--	/* Ethernet */
--	at91_add_device_eth(&rsi_ews_eth_data);
 -	/* USB Host */
--	at91_add_device_usbh(&rsi_ews_usbh_data);
--	/* I2C */
--	at91_add_device_i2c(rsi_ews_i2c_devices,
--			ARRAY_SIZE(rsi_ews_i2c_devices));
+-	at91_add_device_usbh(&ek_usbh_data);
+-	/* USB Device */
+-	at91_add_device_udc(&ek_udc_data);
 -	/* SPI */
--	at91_add_device_spi(rsi_ews_spi_devices,
--			ARRAY_SIZE(rsi_ews_spi_devices));
+-	at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
+-	/* NAND */
+-	ek_add_device_nand();
+-	/* I2C */
+-	at91_add_device_i2c(NULL, 0);
+-	/* Ethernet */
+-	at91_add_device_eth(&ek_macb_data);
 -	/* MMC */
--	at91_add_device_mci(0, &rsi_ews_mci0_data);
--	/* NOR Flash */
--	platform_device_register(&rsiews_nor_flash);
+-	at91_add_device_mci(0, &ek_mci0_data);
+-	/* Push Buttons */
+-	ek_add_device_buttons();
 -	/* LEDs */
--	at91_gpio_leds(rsi_ews_leds, ARRAY_SIZE(rsi_ews_leds));
+-	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
+-	/* shutdown controller, wakeup button (5 msec low) */
+-	at91_shdwc_write(AT91_SHDW_MR, AT91_SHDW_CPTWK0_(10) | AT91_SHDW_WKMODE0_LOW
+-				| AT91_SHDW_RTTWKEN);
 -}
 -
--MACHINE_START(RSI_EWS, "RSI EWS")
--	/* Maintainer: Josef Holzmayr <holzmayr@rsi-elektrotechnik.de> */
--	.init_time	= at91rm9200_timer_init,
+-MACHINE_START(QIL_A9260, "CALAO QIL_A9260")
+-	/* Maintainer: calao-systems */
+-	.init_time	= at91sam926x_pit_init,
 -	.map_io		= at91_map_io,
 -	.handle_irq	= at91_aic_handle_irq,
--	.init_early	= rsi_ews_init_early,
+-	.init_early	= ek_init_early,
 -	.init_irq	= at91_init_irq_default,
--	.init_machine	= rsi_ews_board_init,
+-	.init_machine	= ek_board_init,
 -MACHINE_END
 -- 
 1.8.4.rc3
