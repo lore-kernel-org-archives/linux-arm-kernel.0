@@ -1,44 +1,58 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Nov 2013 15:26:12 -0800
-Subject: [PATCH 04/17] ARM: imx: Switch to sched_clock_register()
-In-Reply-To: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
-References: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1384557985-9414-5-git-send-email-sboyd@codeaurora.org>
+Date: Fri, 15 Nov 2013 15:26:08 -0800
+Subject: [PATCH 00/17] Convert ARM sched_clock users to sched_clock_register()
+Message-ID: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32 bit sched_clock interface now supports 64 bits. Upgrade to
-the 64 bit function to allow us to remove the 32 bit registration
-interface.
+Olof,
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-imx/time.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Please consider picking up these simple conversion patches. They
+were sent a few months back[1] but I didn't keep pushing them due
+to the complex path to mainline that the core patches took. I've
+picked up the acks and resent. Now that the core kernel changes have
+landed in Linus' tree it's much easier to pull these changes in.
 
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index 9b6638a..1a3a5f6 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -111,7 +111,7 @@ static void gpt_irq_acknowledge(void)
- 
- static void __iomem *sched_clock_reg;
- 
--static u32 notrace mxc_read_sched_clock(void)
-+static u64 notrace mxc_read_sched_clock(void)
- {
- 	return sched_clock_reg ? __raw_readl(sched_clock_reg) : 0;
- }
-@@ -123,7 +123,7 @@ static int __init mxc_clocksource_init(struct clk *timer_clk)
- 
- 	sched_clock_reg = reg;
- 
--	setup_sched_clock(mxc_read_sched_clock, 32, c);
-+	sched_clock_register(mxc_read_sched_clock, 32, c);
- 	return clocksource_mmio_init(reg, "mxc_timer1", c, 200, 32,
- 			clocksource_mmio_readl_up);
- }
+Stephen Boyd (17):
+  ARM: timer-sp: Switch to sched_clock_register()
+  ARM: clps711x: Switch to sched_clock_register()
+  ARM: davinci: Switch to sched_clock_register()
+  ARM: imx: Switch to sched_clock_register()
+  ARM: integrator: Switch to sched_clock_register()
+  ARM: IXP4xx: Switch to sched_clock_register()
+  ARM: mmp: Switch to sched_clock_register()
+  ARM: msm: Switch to sched_clock_register()
+  ARM: OMAP1: Switch to sched_clock_register()
+  ARM: OMAP2+: Switch to sched_clock_register()
+  ARM: pxa: Switch to sched_clock_register()
+  ARM: sa1100: Switch to sched_clock_register()
+  ARM: u300: Switch to sched_clock_register()
+  ARM: iop: Switch to sched_clock_register()
+  ARM: OMAP: Switch to sched_clock_register()
+  ARM: orion: Switch to sched_clock_register()
+  ARM: versatile: Switch to sched_clock_register()
+
+ arch/arm/common/timer-sp.c               | 4 ++--
+ arch/arm/mach-clps711x/common.c          | 4 ++--
+ arch/arm/mach-davinci/time.c             | 4 ++--
+ arch/arm/mach-imx/time.c                 | 4 ++--
+ arch/arm/mach-integrator/integrator_ap.c | 4 ++--
+ arch/arm/mach-ixp4xx/common.c            | 4 ++--
+ arch/arm/mach-mmp/time.c                 | 4 ++--
+ arch/arm/mach-msm/timer.c                | 4 ++--
+ arch/arm/mach-omap1/time.c               | 4 ++--
+ arch/arm/mach-omap2/timer.c              | 4 ++--
+ arch/arm/mach-pxa/time.c                 | 4 ++--
+ arch/arm/mach-sa1100/time.c              | 4 ++--
+ arch/arm/mach-u300/timer.c               | 4 ++--
+ arch/arm/plat-iop/time.c                 | 4 ++--
+ arch/arm/plat-omap/counter_32k.c         | 4 ++--
+ arch/arm/plat-orion/time.c               | 4 ++--
+ arch/arm/plat-versatile/sched-clock.c    | 4 ++--
+ 17 files changed, 34 insertions(+), 34 deletions(-)
+
+[1] https://lkml.org/lkml/2013/7/31/631
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
