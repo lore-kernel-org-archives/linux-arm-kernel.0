@@ -1,85 +1,86 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 16:09:50 -0800
-Subject: [PATCH 03/11] ARM: OMAP2+: Add support for board specific auxdata
- quirks
+Date: Thu, 14 Nov 2013 16:09:52 -0800
+Subject: [PATCH 05/11] ARM: OMAP2+: Make n8x0 behave better with device tree
+ based booting
 In-Reply-To: <1384474198-20756-1-git-send-email-tony@atomide.com>
 References: <1384474198-20756-1-git-send-email-tony@atomide.com>
-Message-ID: <1384474198-20756-4-git-send-email-tony@atomide.com>
+Message-ID: <1384474198-20756-6-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like some boards need to fill in the auxdata before
-we call of_platform_populate(). Let's add support for
-auxdata quirks like we already have for pdata quirks for
-legacy drivers.
+Initialize some devices using a late_initcall and test for
+the device tree based booting for some devices.
 
+This way we can keep things working for legacy platform
+devices when booted with device tree.
+
+Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c | 32 +++++++++++++++++++++++++-------
- 1 file changed, 25 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/board-n8x0.c | 30 ++++++++++++++++++++++--------
+ 1 file changed, 22 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 10c7145..cb2863d 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -125,7 +125,18 @@ void omap_pcs_legacy_init(int irq, void (*rearm)(void))
- 	pcs_pdata.rearm = rearm;
- }
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index d61a00d..c9eef2b 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -32,7 +32,7 @@
  
-+/*
-+ * Few boards still need auxdata populated before we populate
-+ * the dev entries in of_platform_populate().
-+ */
-+static struct pdata_init auxdata_quirks[] __initdata = {
-+	{ /* sentinel */ },
-+};
-+
- struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
-+#ifdef CONFIG_MACH_NOKIA_N8X0
-+	OF_DEV_AUXDATA("ti,omap2420-mmc", 0x4809c000, "mmci-omap.0", NULL),
-+#endif
- #ifdef CONFIG_ARCH_OMAP3
- 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002030, "48002030.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
-@@ -137,6 +148,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	{ /* sentinel */ },
- };
- 
-+/*
-+ * Few boards still need to initialize some legacy devices with
-+ * platform data until the drivers support device tree.
-+ */
- static struct pdata_init pdata_quirks[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP3
- 	{ "nokia,omap3-n9", hsmmc2_internal_input_clk, },
-@@ -155,14 +170,8 @@ static struct pdata_init pdata_quirks[] __initdata = {
- 	{ /* sentinel */ },
- };
- 
--void __init pdata_quirks_init(struct of_device_id *omap_dt_match_table)
-+static void pdata_quirks_check(struct pdata_init *quirks)
- {
--	struct pdata_init *quirks = pdata_quirks;
+ #include "common.h"
+ #include "mmc.h"
 -
--	omap_sdrc_init(NULL, NULL);
--	of_platform_populate(NULL, omap_dt_match_table,
--			     omap_auxdata_lookup, NULL);
--
- 	while (quirks->compatible) {
- 		if (of_machine_is_compatible(quirks->compatible)) {
- 			if (quirks->fn)
-@@ -172,3 +181,12 @@ void __init pdata_quirks_init(struct of_device_id *omap_dt_match_table)
- 		quirks++;
++#include "soc.h"
+ #include "mux.h"
+ #include "gpmc-onenand.h"
+ 
+@@ -597,7 +597,8 @@ static void __init n8x0_mmc_init(void)
  	}
+ 
+ 	mmc_data[0] = &mmc1_data;
+-	omap242x_init_mmc(mmc_data);
++	if (!of_have_populated_dt())
++		omap242x_init_mmc(mmc_data);
  }
-+
-+void __init pdata_quirks_init(struct of_device_id *omap_dt_match_table)
+ #else
+ 
+@@ -730,6 +731,21 @@ static inline void board_serial_init(void)
+ 
+ #endif
+ 
++static int __init n8x0_late_initcall(void)
 +{
-+	omap_sdrc_init(NULL, NULL);
-+	pdata_quirks_check(auxdata_quirks);
-+	of_platform_populate(NULL, omap_dt_match_table,
-+			     omap_auxdata_lookup, NULL);
-+	pdata_quirks_check(pdata_quirks);
++	if (!board_caps)
++		return -ENODEV;
++
++	gpmc_onenand_init(board_onenand_data);
++	n8x0_mmc_init();
++	n8x0_usb_init();
++	if (!of_have_populated_dt())
++		n8x0_cbus_init();
++
++	return 0;
 +}
++omap_late_initcall(n8x0_late_initcall);
++
+ static void __init n8x0_init_machine(void)
+ {
+ 	board_check_revision();
+@@ -743,12 +759,10 @@ static void __init n8x0_init_machine(void)
+ 	if (board_is_n810())
+ 		i2c_register_board_info(2, n810_i2c_board_info_2,
+ 					ARRAY_SIZE(n810_i2c_board_info_2));
+-	board_serial_init();
+-	omap_sdrc_init(NULL, NULL);
+-	gpmc_onenand_init(board_onenand_data);
+-	n8x0_mmc_init();
+-	n8x0_usb_init();
+-	n8x0_cbus_init();
++	if (!of_have_populated_dt()) {
++		board_serial_init();
++		omap_sdrc_init(NULL, NULL);
++	}
+ }
+ 
+ MACHINE_START(NOKIA_N800, "Nokia N800")
 -- 
 1.8.1.1
