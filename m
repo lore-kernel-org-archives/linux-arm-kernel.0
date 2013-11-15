@@ -1,59 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Nov 2013 08:07:34 +0000 (UTC)
-Subject: [PATCH V3] ARM: OMAP2+: omap_device: maintain sane runtime pm
- status around suspend/resume
-In-Reply-To: <1384448716-3186-1-git-send-email-nm@ti.com>
-References: <1384297710-29694-1-git-send-email-nm@ti.com>
- <1384448716-3186-1-git-send-email-nm@ti.com>
-Message-ID: <alpine.DEB.2.02.1311150806220.15980@utopia.booyaka.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 15 Nov 2013 12:47:53 +0400
+Subject: [PATCH 2/9] ARM: locomo: don't clobber chip data for chained irq
+In-Reply-To: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1384505280-25389-3-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Nov 2013, Nishanth Menon wrote:
+Currently locomo uses chip data to pass private data to chained irq
+handler. Thus it clobbers the private data of the corresponding chip
+(sa1100 or pxa). Make locomo use handler data for this purpose.
 
-> OMAP device hooks around suspend|resume_noirq ensures that hwmod
-> devices are forced to idle using omap_device_idle/enable as part of
-> the last stage of suspend activity.
-> 
-> For a device such as i2c who uses autosuspend, it is possible to enter
-> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
-> 
-> As part of the suspend flow, the generic runtime logic would increment
-> it's dev->power.disable_depth to 1. This should prevent further
-> pm_runtime_get_sync from succeeding once the runtime_status has been
-> set to RPM_SUSPENDED.
-> 
-> Now, as part of the suspend_noirq handler in omap_device, we force the
-> following: if the device status is !suspended, we force the device
-> to idle using omap_device_idle (clocks are cut etc..). This ensures
-> that from a hardware perspective, the device is "suspended". However,
-> runtime_status is left to be active.
-> 
-> *if* an operation is attempted after this point to
-> pm_runtime_get_sync, runtime framework depends on runtime_status to
-> indicate accurately the device status, and since it sees it to be
-> ACTIVE, it assumes the module is functional and returns a non-error
-> value. As a result the user will see pm_runtime_get succeed, however a
-> register access will crash due to the lack of clocks.
-> 
-> To prevent this from happening, we should ensure that runtime_status
-> exactly indicates the device status. As a result of this change
-> any further calls to pm_runtime_get* would return -EACCES (since
-> disable_depth is 1). On resume, we restore the clocks and runtime
-> status exactly as we suspended with. These operations are not expected
-> to fail as we update the states after the core runtime framework has
-> suspended itself and restore before the core runtime framework has
-> resumed.
-> 
-> Reported-by: J Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Acked-by: Rajendra Nayak <rnayak@ti.com>
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/common/locomo.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Looks reasonable to me.  Looks like this should be considered for -stable 
-- Nishanth, what do you think?
-
-Tony or Kevin, do you want to take this one, or want me to?
-
-
-- Paul
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index b55c362..f26bd50 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -140,7 +140,7 @@ static struct locomo_dev_info locomo_devices[] = {
+ 
+ static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct locomo *lchip = irq_get_chip_data(irq);
++	struct locomo *lchip = irq_get_handler_data(irq);
+ 	int req, i;
+ 
+ 	/* Acknowledge the parent IRQ */
+@@ -198,7 +198,7 @@ static void locomo_setup_irq(struct locomo *lchip)
+ 	 * Install handler for IRQ_LOCOMO_HW.
+ 	 */
+ 	irq_set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
+-	irq_set_chip_data(lchip->irq, lchip);
++	irq_set_handler_data(lchip->irq, lchip);
+ 	irq_set_chained_handler(lchip->irq, locomo_handler);
+ 
+ 	/* Install handlers for IRQ_LOCOMO_* */
+-- 
+1.8.4.2
