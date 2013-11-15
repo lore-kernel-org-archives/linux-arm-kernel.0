@@ -1,143 +1,77 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Nov 2013 19:33:57 +0100
-Subject: [PATCH 02/11] ARM: at91: switch 1arm to DT
-In-Reply-To: <5286677A.8020104@overkiz.com>
-References: <20131115143855.GR28304@ns203013.ovh.net>
- <1384527006-9040-1-git-send-email-plagnioj@jcrosoft.com>
- <1384527006-9040-2-git-send-email-plagnioj@jcrosoft.com>
- <5286477E.8060606@overkiz.com>
- <20131115174134.GA14627@ns203013.ovh.net>
- <5286677A.8020104@overkiz.com>
-Message-ID: <20131115183357.GB14627@ns203013.ovh.net>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Fri, 15 Nov 2013 18:33:20 +0000
+Subject: [PATCH v2] ARM: kexec: Use the right ISA for relocate_new_kernel
+In-Reply-To: <528663DF.1010008@linaro.org>
+References: <1383913444-9153-1-git-send-email-Dave.Martin@arm.com>
+ <20131108133426.GE17461@mudshark.cambridge.arm.com>
+ <20131108184625.GE2602@localhost.localdomain>
+ <5282818B.9030903@linaro.org> <52860555.7010307@linaro.org>
+ <20131115173113.GB4028@e103592.cambridge.arm.com>
+ <528663DF.1010008@linaro.org>
+Message-ID: <20131115183320.GM2290@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:27 Fri 15 Nov     , boris brezillon wrote:
-> On 15/11/2013 18:41, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >On 17:10 Fri 15 Nov     , boris brezillon wrote:
-> >>On 15/11/2013 15:49, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>>Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>>---
-> >>>  arch/arm/boot/dts/Makefile            |  1 +
-> >>>  arch/arm/boot/dts/at91-1arm.dts       | 70 +++++++++++++++++++++++++
-> >>>  arch/arm/configs/at91rm9200_defconfig |  1 -
-> >>>  arch/arm/mach-at91/Kconfig.non_dt     |  6 ---
-> >>>  arch/arm/mach-at91/Makefile           |  1 -
-> >>>  arch/arm/mach-at91/board-1arm.c       | 99 -----------------------------------
-> >>>  6 files changed, 71 insertions(+), 107 deletions(-)
-> >>>  create mode 100644 arch/arm/boot/dts/at91-1arm.dts
-> >>>  delete mode 100644 arch/arm/mach-at91/board-1arm.c
-> >>>
-> >>>diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >>>index 802720e..f1fb6d7 100644
-> >>>--- a/arch/arm/boot/dts/Makefile
-> >>>+++ b/arch/arm/boot/dts/Makefile
-> >>>@@ -3,6 +3,7 @@ ifeq ($(CONFIG_OF),y)
-> >>>  # Keep at91 dtb files sorted alphabetically for each SoC
-> >>>  # rm9200
-> >>>  dtb-$(CONFIG_ARCH_AT91) += at91rm9200ek.dtb
-> >>>+dtb-$(CONFIG_ARCH_AT91) += at91-1arm.dtb
-> >>>  dtb-$(CONFIG_ARCH_AT91) += mpa1600.dtb
-> >>>  # sam9260
-> >>>  dtb-$(CONFIG_ARCH_AT91) += animeo_ip.dtb
-> >>>diff --git a/arch/arm/boot/dts/at91-1arm.dts b/arch/arm/boot/dts/at91-1arm.dts
-> >>>new file mode 100644
-> >>>index 0000000..39b0c56
-> >>>--- /dev/null
-> >>>+++ b/arch/arm/boot/dts/at91-1arm.dts
-> >>>@@ -0,0 +1,70 @@
-> >>>+/*
-> >>>+ * at91-1arm.dts - Device Tree file for Ajeco 1ARM single board computer
-> >>>+ *
-> >>>+ * Copyright (C) 2013 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>>+ *
-> >>>+ * Licensed under GPLv2 only
-> >>>+ */
-> >>>+/dts-v1/;
-> >>>+#include "at91rm9200_pqfp.dtsi"
-> >>>+
-> >>>+/ {
-> >>>+	model = "Ajeco 1ARM single board computer";
-> >>>+	compatible = "ajeco,1arm", "atmel,at91rm9200-pqfp", "atmel,at91rm9200";
-> >>>+
-> >>>+	clocks {
-> >>>+		#address-cells = <1>;
-> >>>+		#size-cells = <1>;
-> >>>+		ranges;
-> >>>+
-> >>>+		main_clock: clock at 0 {
-> >>>+			compatible = "atmel,osc", "fixed-clock";
-> >>>+			clock-frequency = <18432000>;
-> >>>+		};
-> >>>+	};
-> >>>+
-> >>>+	ahb {
-> >>>+		apb {
-> >>>+			dbgu: serial at fffff200 {
-> >>>+				status = "okay";
-> >>>+			};
-> >>>+
-> >>>+			usart0: serial at fffc0000 {
-> >>>+				pinctrl-0 =
-> >>>+						<&pinctrl_uart0
-> >>>+						 &pinctrl_uart0_rts
-> >>>+						 &pinctrl_uart0_cts>;
-> >>>+
-> >>>+				status = "okay";
-> >>>+			};
-> >>>+
-> >>>+			usart1: serial at fffc4000 {
-> >>>+				pinctrl-0 =
-> >>>+						<&pinctrl_uart1
-> >>>+						 &pinctrl_uart1_rts
-> >>>+						 &pinctrl_uart1_cts
-> >>>+						 &pinctrl_uart1_dtr_dsr
-> >>>+						 &pinctrl_uart1_dcd
-> >>>+						 &pinctrl_uart1_ri>;
-> >>>+				status = "okay";
-> >>>+			};
-> >>>+
-> >>>+			macb0: ethernet at fffbc000 {
-> >>>+				phy-mode = "rmii";
-> >>>+				/* phy irq PC4 */
-> >>>+				status = "okay";
-> >>>+			};
+On Fri, Nov 15, 2013 at 06:11:43PM +0000, Taras Kondratiuk wrote:
+> On 11/15/2013 07:38 PM, Dave Martin wrote:
+> > On Fri, Nov 15, 2013 at 01:28:21PM +0200, Taras Kondratiuk wrote:
+> >> And the issue I'm frequently facing in reloaded kernel (Thumb from ARM)
+> >> is random crashes caused by undefined instructions.
 > >>
-> >>Could you add a phy node in macb0 node (see
-> >>https://lkml.org/lkml/2013/8/28/183) ?
-> >>In this node you can describe phy irq and even phy id (if it is hardcoded).
-> >>
-> >>The same goes for all rm9200 boards except rm9200ek (I already
-> >>posted a series for this one).
-> >I did not do this as this code was never tested on those board as the driver
-> >was not supporting it so as I can not test it I do not want to do it
+> >> My observation summary:
+> >> - Before starting a second kernel I'm dumping loaded zImage and then
+> >>   unpacked Image at final location and they are correct, so no issue
+> >>   with loading.
+> >> - I observe two types of crash:
+> >>   1) Undefined instruction in the middle of kernel code. After a crash
+> >>      I check failing address and there is always a *valid* Thumb
+> >>      instruction (CPU is in Thumb mode).
+> >>   2) Jump to a wrong address which consequently causes undefined
+> >>      instruction exception. A trace of one example of a wrong jump is
+> >>      captured in [1]. Instead of jumping to 0xC049097C code gets
+> >>      executed at 0xED85E008. BTW the wrong address suspiciously looks
+> >>      like an ARM instruction.
+> > 
+> > That jump to 0xED85E008 certainly looks strange ... I wonder whether
+> > there could be some instructions missing from the trace.
+> > 
+> > 
+> > How early do these crashes happen?
 > 
-> How could this be a valid argument ?
-> I'm not telling that this should be mainlined without any tests, but
-> IMHO dropping
-> new features because we don't have time to test it is not a good approach.
-
-execpt here the board code was never tested as when the board was merged the
-cadence driver did NOT support phy IRQ so I can garanti it will work
-
-so I do not prodive the DT support if the board maintainer care about its
-board it will fix it
-
-
+> At very early stages starting from setup_arch() up to early initcalls.
 > 
-> Moreover, the non-dt versions of these boards provide phy irq
-> functionality and I think
-> we should at least provide the same level of functionality when
-> migrating to dt.
+> > Is this happening on SMP, and if so, what is the state of secondary
+> > CPUs across kexec?
 > 
-> I implemented the phy dt definition support for macb (and implicitely for
-> at91_ether) ethernet drivers, and I think this should be used for
-> all new dt boards.
+> I have disabled CONFIG_SMP. Second CPU is busy-looping in ROM code and
+> shouldn't cause any issues.
 
-If you want to use it and work on the HW
+OK, that sounds reasonable.
 
-here I'm note sure so I play safe
+> > If secondary CPUs are not safely parked, or their caches are not drained
+> > before the kexec occurs, this can cause corruption of the new kernel
+> > or unpredictable behaviour of the secondary CPUs.
+> > 
+> >> - If second kernel is placed at different address (like in kdump case),
+> >>   then it boots fine and I don't observe any crashes.
+> >> - If I check failing address in the first kernel (ARM) the code there
+> >>   is really undefined instruction if executed as Thumb.
+> >> - Looks like pieces of old ARM kernel gets executed instead of new
+> >>   Thumb kernel. But as I've mentioned I'm reading physical memory via
+> >>   JTAG before starting second kernel and memory is matching a compiled
+> >>   Thumb 'Image'. Icache also gets cleaned...
+> >> - Once when stopped on breakpoint I've seen a piece of ARM code in
+> >>   Thumb kernel. Interesting that I was looking at the same memory
+> > 
+> > Thumb kernels do contain a small amount of ARM code, in the vectors
+> > page for example.  But it's possible you were also looking at stale
+> > data.
+> 
+> Right, but I mean there was an ARM code in place where definitely a
+> Thumb code should be.
 
-Best Regards,
-J.
+Sure.  Well, I guess this remains unexplained for now, but keep me
+posted.
+
+Cheers
+---Dave
