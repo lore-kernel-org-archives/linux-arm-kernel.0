@@ -1,32 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Nov 2013 14:28:24 +0100
-Subject: [PATCH v3 2/4] Documentation: Add documentation for APM X-Gene
- SATA controllor DTS binding
-In-Reply-To: <1384465153-29902-3-git-send-email-lho@apm.com>
-References: <1384465153-29902-1-git-send-email-lho@apm.com>
- <1384465153-29902-2-git-send-email-lho@apm.com>
- <1384465153-29902-3-git-send-email-lho@apm.com>
-Message-ID: <201311151428.25204.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 15 Nov 2013 07:30:13 -0600
+Subject: [PATCH V3] ARM: OMAP2+: omap_device: maintain sane runtime pm
+ status around suspend/resume
+In-Reply-To: <alpine.DEB.2.02.1311150806220.15980@utopia.booyaka.com>
+References: <1384297710-29694-1-git-send-email-nm@ti.com>
+ <1384448716-3186-1-git-send-email-nm@ti.com>
+ <alpine.DEB.2.02.1311150806220.15980@utopia.booyaka.com>
+Message-ID: <528621E5.4030201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 November 2013, Loc Ho wrote:
-> +Required properties:
-> +- compatible           : Shall be "apm,xgene-ahci"
-> +- reg                  : First memory resource shall be the AHCI memory
-> +                         resource.
-> +                         Second memory resource shall be the host controller
-> +                         memory resource.
-> +- id                   : Controller ID (0 = first, 1 = second, 2 = third)
+On 11/15/2013 02:07 AM, Paul Walmsley wrote:
+> On Thu, 14 Nov 2013, Nishanth Menon wrote:
+> 
+>> OMAP device hooks around suspend|resume_noirq ensures that hwmod
+>> devices are forced to idle using omap_device_idle/enable as part of
+>> the last stage of suspend activity.
+>>
+>> For a device such as i2c who uses autosuspend, it is possible to enter
+>> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
+>>
+>> As part of the suspend flow, the generic runtime logic would increment
+>> it's dev->power.disable_depth to 1. This should prevent further
+>> pm_runtime_get_sync from succeeding once the runtime_status has been
+>> set to RPM_SUSPENDED.
+>>
+>> Now, as part of the suspend_noirq handler in omap_device, we force the
+>> following: if the device status is !suspended, we force the device
+>> to idle using omap_device_idle (clocks are cut etc..). This ensures
+>> that from a hardware perspective, the device is "suspended". However,
+>> runtime_status is left to be active.
+>>
+>> *if* an operation is attempted after this point to
+>> pm_runtime_get_sync, runtime framework depends on runtime_status to
+>> indicate accurately the device status, and since it sees it to be
+>> ACTIVE, it assumes the module is functional and returns a non-error
+>> value. As a result the user will see pm_runtime_get succeed, however a
+>> register access will crash due to the lack of clocks.
+>>
+>> To prevent this from happening, we should ensure that runtime_status
+>> exactly indicates the device status. As a result of this change
+>> any further calls to pm_runtime_get* would return -EACCES (since
+>> disable_depth is 1). On resume, we restore the clocks and runtime
+>> status exactly as we suspended with. These operations are not expected
+>> to fail as we update the states after the core runtime framework has
+>> suspended itself and restore before the core runtime framework has
+>> resumed.
+>>
+>> Reported-by: J Keerthy <j-keerthy@ti.com>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> Acked-by: Rajendra Nayak <rnayak@ti.com>
+>> Acked-by: Kevin Hilman <khilman@linaro.org>
+> 
+> Looks reasonable to me.  Looks like this should be considered for -stable 
+> - Nishanth, what do you think?
 
-As in the PHY patch, it's probably best to drop the "id" property here and
-describe the actual differences between the instances directly, either by
-having distinct "compatible" properties for each model, or by adding binary
-flags to tell about a capability that only some instances have.
+Every product kernel since 3.4 needed to be hacked (we have hacked in
+different ways so far) to work around this (since we never spend time
+digging deeper :( ), So, I do agree with your view that a -stable tag
+will be most beneficial.
 
-Also, I think you should have a separate file for the sata binding, especially
-since the PHY binding is not actually specific to SATA at all.
+> 
+> Tony or Kevin, do you want to take this one, or want me to?
+> 
+> 
+> - Paul
+> 
 
-Aside from these, the binding looks good to me now.
 
-	Arnd
+-- 
+Regards,
+Nishanth Menon
