@@ -1,18 +1,30 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Fri, 15 Nov 2013 09:22:40 +0000
-Subject: [PATCH] ARM: orion5x: Fix typo in device_type property of phy node
-In-Reply-To: <20131114153650.GK21691@lunn.ch>
-References: <1384440788-3529-1-git-send-email-srinivas.kandagatla@st.com>
- <20131114153650.GK21691@lunn.ch>
-Message-ID: <5285E7E0.20609@st.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 15 Nov 2013 17:42:30 +0800
+Subject: [PATCH -next] iommu/arm-smmu: fix error return code in
+ arm_smmu_device_dt_probe()
+Message-ID: <CAPgLHd8siM4ZpmaqHWa9JXFmcGBvvb6J=Vo2DvP5=zMQE0d0fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/13 15:36, Andrew Lunn wrote:
-> Please CC: the Marvell maintainers for patches like this.
-> I added them in CC:
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-Thanks for the ack and adding Marvell maintainers in CC.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
---srini
+Fix to return -ENODEV instead of 0 when context interrupt number
+does no match in arm_smmu_device_dt_probe().
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/iommu/arm-smmu.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 2349d62..2bc977b 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1858,6 +1858,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		dev_err(dev,
+ 			"found only %d context interrupt(s) but %d required\n",
+ 			smmu->num_context_irqs, smmu->num_context_banks);
++		err = -ENODEV;
+ 		goto out_put_parent;
+ 	}
+ 
