@@ -1,71 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Nov 2013 10:33:15 -0500
-Subject: [PATCH 1/6] arm64: mm: Add __virt_to_idmap() to keep kvm build
- happy
-In-Reply-To: <20131115153116.GD11347@arm.com>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-2-git-send-email-santosh.shilimkar@ti.com>
- <5286384A.5050105@arm.com> <52863CE5.3070906@ti.com>
- <52863DF0.9070200@arm.com> <20131115153116.GD11347@arm.com>
-Message-ID: <52863EBB.7050804@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Nov 2013 07:36:08 -0800
+Subject: [PATCH v2] ARM: OMAP4460: cpuidle: Extend
+ PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD on cpuidle
+In-Reply-To: <20131114183535.GL10317@atomide.com>
+References: <1382467484-16957-1-git-send-email-grygorii.strashko@ti.com>
+ <5266CCE3.1090801@ti.com> <20131114183535.GL10317@atomide.com>
+Message-ID: <20131115153608.GX10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013 10:31 AM, Catalin Marinas wrote:
-> On Fri, Nov 15, 2013 at 03:29:52PM +0000, Marc Zyngier wrote:
->> On 15/11/13 15:25, Santosh Shilimkar wrote:
->>> On Friday 15 November 2013 10:05 AM, Marc Zyngier wrote:
->>>> On 14/11/13 19:37, Santosh Shilimkar wrote:
->>>>> ARM kvm code will make use of __virt_to_idmap() on arm32
->>>>> machines as hardware interconnect supported alias of physical
->>>>> memory for idmap purposes. The same code is shared with arm64
->>>>> bit and hence will break the builds. So we add __virt_to_idmap()
->>>>> which is just __virt_to_phys() on arm64 bit to keep build happy.
->>>>>
->>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>
->>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>> ---
->>>>>  arch/arm64/include/asm/memory.h |    8 ++++++++
->>>>>  1 file changed, 8 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
->>>>> index 3776217..d9341ee 100644
->>>>> --- a/arch/arm64/include/asm/memory.h
->>>>> +++ b/arch/arm64/include/asm/memory.h
->>>>> @@ -75,6 +75,14 @@
->>>>>  #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
->>>>>  
->>>>>  /*
->>>>> + * Added to keep arm64 kvm build working which shares code with
->>>>> + * 32bit port. ARM kvm code makes use of __virt_to_idmap() on arm32
->>>>> + * machines as hardware interconnect supported alias of physical
->>>>> + * memory for idmap purposes.
->>>>> + */
->>>>> +#define virt_to_idmap(x)	__virt_to_phys(x)
->>>>> +
->>>>> +/*
->>>>>   * Convert a physical address to a Page Frame Number and back
->>>>>   */
->>>>>  #define	__phys_to_pfn(paddr)	((unsigned long)((paddr) >> PAGE_SHIFT))
->>>>>
->>>>
->>>> I'd rather have a kvm_virt_to_phys() in kvm_mmu.h. That's how we've
->>>> dealt with that kind of difference so far.
->>>>
->>> Are you suggesting something like below ?
->>
->> Yes, I like it a lot more.
->>
->> Catalin, what do you think?
+* Tony Lindgren <tony@atomide.com> [131114 10:36]:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [131022 12:09]:
+> > The same workaround as ff999b8a0983ee15668394ed49e38d3568fc6859
+> > "ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC ..."
+> > need to be applied not only when system is booting, but when MPUSS hits
+> > OSWR state through CPUIdle too. Without this WA the same issue is
+> > reproduced now on boards PandaES and Tablet/Blaze with SOM OMAP4460
+> > when CONFIG_CPU_IDLE is enabled.
+> > After MPUSS has enterred OSWR and waken up:
+> > - GIC distributor became disabled forever
+> > - scheduling is not performed any more
+> > 
+> > Cc: Kevin Hilman <khilman@linaro.org>
+> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 > 
-> It looks better ;)
-> 
-OK then. I will use this approach in my refreshed version. Still need
-to get around other lingering issue with guest userspace corruption.
+> Applying into omap-for-v3.13/fixes thanks.
 
-Regards,
-Santosh
+Hmm looks like this breaks the build with randconfigs at least
+with the attached .config, so dropping for now.
+
+arch/arm/mach-omap2/built-in.o: In function `omap_enter_idle_coupled':
+:(.text+0xb48c): undefined reference to `pm44xx_errata'
+
+Can you please check and repost?
+
+Thanks,
+
+Tony
