@@ -1,38 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Nov 2013 14:20:14 +0000
-Subject: [PATCH 3/6] ARM: mm: Drop the lowmem watermark check from
- virt_addr_valid()
-In-Reply-To: <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131115142014.GN16735@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 15 Nov 2013 15:20:25 +0100
+Subject: [PATCH 2/2] ARM: kirkwood: mark guruplug sdio as non-removable
+In-Reply-To: <1384525225-591-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384525225-591-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384525225-591-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:37:43PM -0500, Santosh Shilimkar wrote:
-> Slab allocator can allocate memory beyond the lowmem watermark
-> which can lead to false failure of virt_addr_valid().
+Globalscale Guruplug has AW-GH381 WiFi/BT on sdio which is always
+present and cannot be detected in any way. Therefore, mark the node
+as non-removable instead of broken-cd. While at it, also put a note
+about connected WiFi/BT chip above.
 
-This is definitely going to cause problems.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: devicetree at vger.kernel.org 
+Cc: linux-arm-kernel at lists.infradead.org 
+Cc: linux-kernel at vger.kernel.org 
+---
+ .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> So drop the check. The issue was seen with percpu_alloc()
-> in KVM code which was allocating memory beyond lowmem watermark.
-> 
-> Am not completly sure whether this is the right fix and if it could
-> impact any other user of virt_addr_valid(). Without this fix as
-> pointed out the KVM init was failing in my testing.
-
-virt_addr_valid() gets used in some places to check whether the virtual
-address is part of the lowmem mapping and explicitly not part of vmalloc()
-or DMA coherent space:
-
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-drivers/net/wireless/ath/ath6kl/sdio.c
-
-It opens up the checks in include/linux/scatterlist.h to start accepting
-non-streaming DMA capable buffers as well.
-
-It also bypasses a check in the slab code to ensure that it's a potentially
-valid pointer that was handed out by slab.
-
-.. etc ..
+diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+index 6548b9d..4ebe720 100644
+--- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
++++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+@@ -65,10 +65,10 @@
+ 			nr-ports = <1>;
+ 		};
+ 
++		/* AzureWave AW-GH381 WiFi/BT */
+ 		mvsdio at 90000 {
+ 			status = "okay";
+-			/* No CD or WP GPIOs */
+-			broken-cd;
++			non-removable;
+ 		};
+ 	};
+ 
+-- 
+1.7.2.5
