@@ -1,106 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 15 Nov 2013 10:08:14 -0600
-Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <CAHCPf3tBOvoeK+ibrA4Hc6iUpVBte+B9BL=-3p8rWz9RmHOfcQ@mail.gmail.com>
-References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
- <CAHCPf3tBOvoeK+ibrA4Hc6iUpVBte+B9BL=-3p8rWz9RmHOfcQ@mail.gmail.com>
-Message-ID: <528646EE.5000109@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Nov 2013 08:10:04 -0800
+Subject: [PATCH] arm/arm64: KVM: introduce new mapping API for percpu
+ mappings
+In-Reply-To: <1384530008-18181-1-git-send-email-marc.zyngier@arm.com>
+References: <1384530008-18181-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20131115161004.GA25051@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2013 02:33 PM, Matt Sealey wrote:
-> On Sun, Nov 3, 2013 at 2:50 PM, Rob Herring <robherring2@gmail.com> wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On Fri, Nov 15, 2013 at 03:40:08PM +0000, Marc Zyngier wrote:
+> Using virt_to_phys on percpu mappings is horribly wrong (my own bad).
+> Thankfully, the kernel offers a way to obtain the physical address
+> of such a mapping.
 > 
-> Snip.. I actually reviewed what you're doing since I was
-> understandably curious as to what the "plan" is for removing
-> machine_desc and how you'd potentially avoid end up stashing global
-> variables all over the place for early init code..
+> Add a new create_hyp_percpu_mappings function to deal with those.
 > 
->> --- a/arch/arm/kernel/devtree.c
->> +++ b/arch/arm/kernel/devtree.c
->> @@ -199,7 +199,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->>         const struct machine_desc *mdesc, *mdesc_best = NULL;
->>
->>  #ifdef CONFIG_ARCH_MULTIPLATFORM
->> -       DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
->> +       DT_MACHINE_START(GENERIC_DT)
->>         MACHINE_END
-> 
-> This machine doesn't have a .dt_compat so...
-> 
->> +               early_print("%08x\t%s\n", p->nr, p->name ? p->name : *p->dt_compat);
-> 
-> In your case here, isn't this going to print "calxeda,highbank" for
-> you right now, with a broken tree, since it's the first in your
-> dt_compat list?
-> 
-> In the generic case, as noted above, the compatibility list usually comes out as
-> 
->                          ID (hex)       NAME
->                          :
->                          0xffffffff        Highbank
->                          0xffffffff        Generic DT based system
-> 
-> But you've made it say:
-> 
->                          ID (hex)        NAME
->                          :
->                          0xffffffff         calxeda,highbank
->                          0xffffffff
-> 
-> You didn't fix your customer issue there, at least, if they're messing
-> with their DT and break it ;)
+> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
-This is not the issue I'm trying to fix as this is a debug early print.
-It is what /proc/cpuinfo displays.
 
-I don't think your example is even possible. If we have the default
-descriptor enabled (i.e. all multi-platform builds), then we will always
-match a machine descriptor and try to continue to boot never reaching
-this code path.
+So, I find this nicer, somehow, what do you think:
 
->> @@ -859,7 +859,7 @@ void __init setup_arch(char **cmdline_p)
->>         if (!mdesc)
->>                 mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
->>         machine_desc = mdesc;
->> -       machine_name = mdesc->name;
->> +       machine_name = mdesc->name ? mdesc->name : of_flat_dt_get_machine_name();
-> 
-> Also you missed around line 242 of kernel/devtree.c which prints
-> mdesc_best->name;
 
-You are looking at the wrong version. See the DT clean-up that I did
-which is in mainline now. This patch is dependent on that.
-
-> 
->         model = of_get_flat_dt_prop(dt_root, "model", NULL);
->         if (!model)
->                 model = of_get_flat_dt_prop(dt_root, "compatible", NULL);
->         if (!model)
->                 model = "<unknown>";
->         pr_info("Machine: %s, model: %s\n", mdesc_best->name, model);
-> 
-> Which is now going to say "Machine: , model: Calxeda Foo Board", isn't it?
-> 
-> Should just use machine_name, if mdesc_best->name isn't set, shouldn't it?
-> 
-> I think there's a bunch of weirdness here.. I just checked the PAPR
-> and ePAPR specs, and the original IEEE1275 and ARM bindings and
-> finding board information like you want from the DT is an unholy
-> crapshoot.
-
-Maybe in the past, but we require a root compatible string. If there is
-no model property, then the compatible string is the machine name.
-
-> In this case I think we need more information, and to only print it
-> once per boot if that's the goal here. Why not make machine_name an
-> argument to setup_machine_fdt (or just don't have it be static in
-> setup.c) and have that function fill in the right thing rather than
-> having a DT parsing function in setup_arch where before it was totally
-> boot-method agnostic?
-
-Well, that's an implementation detail. First we have to agree on which
-string gets used and where.
-
-Rob
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 3719583..dd531ba 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -334,6 +334,15 @@ out:
+ 	return err;
+ }
+ 
++static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
++{
++	if (!is_vmalloc_addr(kaddr))
++		return __pa(kaddr);
++	else
++		return page_to_phys(vmalloc_to_page(kaddr)) +
++		       offset_in_page(kaddr);
++}
++
+ /**
+  * create_hyp_mappings - duplicate a kernel virtual address range in Hyp mode
+  * @from:	The virtual kernel start address of the range
+@@ -345,16 +354,24 @@ out:
+  */
+ int create_hyp_mappings(void *from, void *to)
+ {
+-	unsigned long phys_addr = virt_to_phys(from);
++	phys_addr_t phys_addr;
++	unsigned long virt_addr;
+ 	unsigned long start = KERN_TO_HYP((unsigned long)from);
+ 	unsigned long end = KERN_TO_HYP((unsigned long)to);
+ 
+-	/* Check for a valid kernel memory mapping */
+-	if (!virt_addr_valid(from) || !virt_addr_valid(to - 1))
+-		return -EINVAL;
++	for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE) {
++		int err;
+ 
+-	return __create_hyp_mappings(hyp_pgd, start, end,
+-				     __phys_to_pfn(phys_addr), PAGE_HYP);
++		phys_addr = kvm_kaddr_to_phys(from + virt_addr - start);
++		err = __create_hyp_mappings(hyp_pgd, virt_addr,
++					    virt_addr + PAGE_SIZE,
++					    __phys_to_pfn(phys_addr),
++					    PAGE_HYP);
++		if (err)
++			return err;
++	}
++
++	return 0;
+ }
+ 
+ /**
