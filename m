@@ -1,42 +1,116 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 15 Nov 2013 12:47:53 +0400
-Subject: [PATCH 2/9] ARM: locomo: don't clobber chip data for chained irq
+Date: Fri, 15 Nov 2013 12:47:52 +0400
+Subject: [PATCH 1/9] ARM: sa1100 collie: use gpio-charger instead of pda-power
 In-Reply-To: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
 References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1384505280-25389-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1384505280-25389-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently locomo uses chip data to pass private data to chained irq
-handler. Thus it clobbers the private data of the corresponding chip
-(sa1100 or pxa). Make locomo use handler data for this purpose.
+Use gpio-charger driver instead of pda-power: it automatically cares
+about used gpio and since collie does not differentiate between usb and
+ac chargers, pda-power is an overkill for it.
+
+As a bonus this allows us to remove gpio_to_irq calls from machine init
+call - it is fragile. These gpio_to_irq calls will fail if gpios are
+registered later, via device driver mechanisms.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/common/locomo.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-sa1100/collie.c | 55 ++++++-------------------------------------
+ 1 file changed, 7 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
-index b55c362..f26bd50 100644
---- a/arch/arm/common/locomo.c
-+++ b/arch/arm/common/locomo.c
-@@ -140,7 +140,7 @@ static struct locomo_dev_info locomo_devices[] = {
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 7fb96eb..f902b8e 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -28,7 +28,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/timer.h>
+ #include <linux/gpio.h>
+-#include <linux/pda_power.h>
++#include <linux/power/gpio-charger.h>
  
- static void locomo_handler(unsigned int irq, struct irq_desc *desc)
- {
--	struct locomo *lchip = irq_get_chip_data(irq);
-+	struct locomo *lchip = irq_get_handler_data(irq);
- 	int req, i;
+ #include <video/sa1100fb.h>
  
- 	/* Acknowledge the parent IRQ */
-@@ -198,7 +198,7 @@ static void locomo_setup_irq(struct locomo *lchip)
- 	 * Install handler for IRQ_LOCOMO_HW.
- 	 */
- 	irq_set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
--	irq_set_chip_data(lchip->irq, lchip);
-+	irq_set_handler_data(lchip->irq, lchip);
- 	irq_set_chained_handler(lchip->irq, locomo_handler);
+@@ -97,62 +97,24 @@ static struct mcp_plat_data collie_mcp_data = {
+ /*
+  * Collie AC IN
+  */
+-static int collie_power_init(struct device *dev)
+-{
+-	int ret = gpio_request(COLLIE_GPIO_AC_IN, "ac in");
+-	if (ret)
+-		goto err_gpio_req;
+-
+-	ret = gpio_direction_input(COLLIE_GPIO_AC_IN);
+-	if (ret)
+-		goto err_gpio_in;
+-
+-	return 0;
+-
+-err_gpio_in:
+-	gpio_free(COLLIE_GPIO_AC_IN);
+-err_gpio_req:
+-	return ret;
+-}
+-
+-static void collie_power_exit(struct device *dev)
+-{
+-	gpio_free(COLLIE_GPIO_AC_IN);
+-}
+-
+-static int collie_power_ac_online(void)
+-{
+-	return gpio_get_value(COLLIE_GPIO_AC_IN) == 2;
+-}
+-
+ static char *collie_ac_supplied_to[] = {
+ 	"main-battery",
+ 	"backup-battery",
+ };
  
- 	/* Install handlers for IRQ_LOCOMO_* */
+-static struct pda_power_pdata collie_power_data = {
+-	.init			= collie_power_init,
+-	.is_ac_online		= collie_power_ac_online,
+-	.exit			= collie_power_exit,
++
++static struct gpio_charger_platform_data collie_power_data = {
++	.name			= "charger",
++	.type			= POWER_SUPPLY_TYPE_MAINS,
++	.gpio			= COLLIE_GPIO_AC_IN,
+ 	.supplied_to		= collie_ac_supplied_to,
+ 	.num_supplicants	= ARRAY_SIZE(collie_ac_supplied_to),
+ };
+ 
+-static struct resource collie_power_resource[] = {
+-	{
+-		.name		= "ac",
+-		.flags		= IORESOURCE_IRQ |
+-				  IORESOURCE_IRQ_HIGHEDGE |
+-				  IORESOURCE_IRQ_LOWEDGE,
+-	},
+-};
+-
+ static struct platform_device collie_power_device = {
+-	.name			= "pda-power",
++	.name			= "gpio-charger",
+ 	.id			= -1,
+ 	.dev.platform_data	= &collie_power_data,
+-	.resource		= collie_power_resource,
+-	.num_resources		= ARRAY_SIZE(collie_power_resource),
+ };
+ 
+ #ifdef CONFIG_SHARP_LOCOMO
+@@ -348,9 +310,6 @@ static void __init collie_init(void)
+ 
+ 	GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
+ 
+-	collie_power_resource[0].start = gpio_to_irq(COLLIE_GPIO_AC_IN);
+-	collie_power_resource[0].end = gpio_to_irq(COLLIE_GPIO_AC_IN);
+-
+ 	sa11x0_ppc_configure_mcp();
+ 
+ 
 -- 
 1.8.4.2
