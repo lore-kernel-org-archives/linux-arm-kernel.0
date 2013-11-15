@@ -1,29 +1,23 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 15 Nov 2013 23:20:44 +0100
-Subject: [PATCH 20/31] i2c: tegra: use reset framework
-In-Reply-To: <1384548866-13141-21-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-21-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131115222044.GA2672@katana>
+Date: Fri, 15 Nov 2013 23:26:33 +0100
+Subject: [PATCH 9/8] i2c: Fix device tree binding for i2c-cbus-gpio
+In-Reply-To: <20131114230842.GU10317@atomide.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <20131114230842.GU10317@atomide.com>
+Message-ID: <20131115222632.GB2672@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:54:15PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Thu, Nov 14, 2013 at 03:08:42PM -0800, Tony Lindgren wrote:
+> Looks like we're missing two lines needed to make it
+> work properly with device tree.
 > 
-> Tegra's clock driver now provides an implementation of the common
-> reset API (include/linux/reset.h). Use this instead of the old Tegra-
-> specific API; that will soon be removed.
-> 
-> Cc: treding at nvidia.com
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Wolfram Sang <wsa@the-dreams.de>
 > Cc: linux-i2c at vger.kernel.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
+Applied to for-next, thanks!
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -31,4 +25,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131115/b7548525/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131115/44668d17/attachment-0001.sig>
