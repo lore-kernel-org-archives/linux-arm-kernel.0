@@ -1,54 +1,62 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Nov 2013 00:27:39 +0000
-Subject: [PATCH 6/6] ARM: kvm: TMP: Commit the hyp page tables to main
- memory
-In-Reply-To: <528567B0.1020308@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Nov 2013 19:31:36 -0500
+Subject: [PATCH 3/6] ARM: mm: Drop the lowmem watermark check from
+ virt_addr_valid()
+In-Reply-To: <20131115002232.GE20516@lvm>
 References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-7-git-send-email-santosh.shilimkar@ti.com>
- <20131115001115.GC20516@lvm> <528567B0.1020308@ti.com>
-Message-ID: <20131115002739.GF20516@lvm>
+ <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
+ <20131115002232.GE20516@lvm>
+Message-ID: <52856B68.4040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 07:15:44PM -0500, Santosh Shilimkar wrote:
-> On Thursday 14 November 2013 07:11 PM, Christoffer Dall wrote:
-> > On Thu, Nov 14, 2013 at 02:37:46PM -0500, Santosh Shilimkar wrote:
-> >> This is a temporary hack which I have to use to avoid a weired crash while
-> >> starting the guest OS on Keystsone. They are random crashesh while the
-> >> guest os userspace starts. Additional data point is, it seen only with first
-> >> guest OS lanch. Subsequest guest OS starts normal.
-> >>     
-> > 
-> > what crashes?  The guest?  Where, how?
-> >
-> When guest userspace starts. The crashes are random but always after the
-> guest init process have started.
->  
-
-So you get a guest kernel crash when guest userspace starts?
-
-Are the crashes completely random or is it always some pointer
-dereference that goes wrong, is it init crashing and causing the kernel
-to crash (from killed init), or is it always the same kernel thread, or
-anything coherent at all?
-
-It could be anything, really.  You could try a really brute force
-debugging option of adding a complete cache flush at the end of
-user_mem_abort in arch/arm/kvm/mmu.c to see if this is cache related at
-all...
-
-Are you running with huge pages enabled?
-
-> > 
-> >> I still don't know why this is needed but it helps to get around the issue
-> >> and hence including the patch in the series for the discussion
-> > 
-> > It may not be needed but is just hiding the issue.  I'm afraid you're
-> > going to have to dig a little more into this.
-> > 
-> I replied already on this. Further testing, I found the issue
-> even with this patch applied. I need to dig bit more as you said.
-
-Yeah, sorry I missed your reply before replying to the patch.
-
--Christoffer
+On Thursday 14 November 2013 07:22 PM, Christoffer Dall wrote:
+> On Thu, Nov 14, 2013 at 02:37:43PM -0500, Santosh Shilimkar wrote:
+>> Slab allocator can allocate memory beyond the lowmem watermark
+>> which can lead to false failure of virt_addr_valid().
+>>
+>> So drop the check. The issue was seen with percpu_alloc()
+>> in KVM code which was allocating memory beyond lowmem watermark.
+>>
+>> Am not completly sure whether this is the right fix and if it could
+>> impact any other user of virt_addr_valid(). Without this fix as
+>> pointed out the KVM init was failing in my testing.
+>>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  arch/arm/include/asm/memory.h |    3 +--
+>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+>> index 4dd2145..412da47 100644
+>> --- a/arch/arm/include/asm/memory.h
+>> +++ b/arch/arm/include/asm/memory.h
+>> @@ -343,8 +343,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+>>  #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
+>>  
+>>  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+>> -#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+>> -
+>> +#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET)
+>>  #endif
+>>  
+>>  #include <asm-generic/memory_model.h>
+>> -- 
+>> 1.7.9.5
+>>
+> 
+> This looks wrong to me.  Check Documentation/arm/memory.txt, this would
+> return true for the VMALLOC region, which would cause virt_to_phys to
+> give you something invalid, which would be bad.
+>
+I also thought it might not be right fix and hence added a disclaimer
+in the commit message ;-)
+ 
+Regards,
+Santosh
