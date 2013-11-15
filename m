@@ -1,108 +1,83 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 15 Nov 2013 15:35:40 -0300
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-In-Reply-To: <CAN8TOE88uoitm+8J6fXAnAWf1Rb4favyVqCvjCU+WHdBZ9m8cA@mail.gmail.com>
-References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131114230436.GV9468@ld-irv-0074.broadcom.com>
- <20131114230540.GW9468@ld-irv-0074.broadcom.com>
- <20131114231528.GA9793@localhost> <5285D44C.7080501@gmail.com>
- <20131115130711.GA2496@localhost> <528625EA.8060406@gmail.com>
- <20131115142659.GB2496@localhost> <52862FED.20501@gmail.com>
- <CAN8TOE88uoitm+8J6fXAnAWf1Rb4favyVqCvjCU+WHdBZ9m8cA@mail.gmail.com>
-Message-ID: <20131115183539.GB9252@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 15 Nov 2013 10:42:15 -0800
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131115180832.GR16735@n2100.arm.linux.org.uk>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131115175241.GB27174@quad.lixom.net>
+ <20131115180832.GR16735@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMg+xCDVS6Frp8hjxxsHyC=vczwkDJLoHcn9bndSjOnWKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 10:05:35AM -0800, Brian Norris wrote:
-> On Fri, Nov 15, 2013 at 6:30 AM, Daniel Mack <zonque@gmail.com> wrote:
-> > On 11/15/2013 03:27 PM, Ezequiel Garcia wrote:
-> >> On Fri, Nov 15, 2013 at 02:47:22PM +0100, Daniel Mack wrote:
-> >>> On 11/15/2013 02:07 PM, Ezequiel Garcia wrote:
-> >>>> On Fri, Nov 15, 2013 at 08:59:08AM +0100, Daniel Mack wrote:
-> >>>>> On 11/15/2013 12:15 AM, Ezequiel Garcia wrote:
-> >>>>>> On Thu, Nov 14, 2013 at 03:05:40PM -0800, Brian Norris wrote:
-> >>>>>>> + Daniel (missed the CC)
-> >>>>>>>
-> >>>>>>> On Thu, Nov 14, 2013 at 03:04:36PM -0800, Brian Norris wrote:
-> >>>>>>>> On Thu, Nov 14, 2013 at 06:25:25PM -0300, Ezequiel Garcia wrote:
-> >>>>>>>>> * Changes from v4
-> >>>>>>>>>
-> >>>>>>>>>   * Rebased on top of l2-mtd.git origin/next branch
-> >>>>>>>>>
-> >>>>>>>>>   * Fixed is_ready flag reset, renamed by a more descriptive
-> >>>>>>>>>     and readble "need_wait".
-> >>>>>>>>>
-> >>>>>>>>
-> >>>>>>>> ...
-> >>>>>>>>
-> >>>>>>>> I think this series is now good as-is. Pushing to l2-mtd.git/next.
-> >>>>>>>> Thanks for the efforts! I can submit my extra diff from patch 12 as a
-> >>>>>>>> separate patch for review.
-> >>>>>>>>
-> >>>>>>>> Do you have any available regression tests? Or was there somebody else
-> >>>>>>>> we could run this by for some Tested-by's? Daniel Mack, perhaps?
-> >>>>>>>
-> >>>>>>> Brian
-> >>>>>>
-> >>>>>> Yes, if Daniel (or anybody else) can push a Tested-by, that's better because
-> >>>>>> he's a "third-party" tester.
-> >>>>>
-> >>>>> Yes. Sorry, I could only partially follow all the discussions around
-> >>>>> these patch sets, but I can certainly do a quick regression test on my
-> >>>>> pxa3xx platform.
-> >>>>>
-> >>>>> Ezequiel, could you maybe point me to a repository where I can pull
-> >>>>> everything from you want me to have a look at?
-> >>>>>
-> >>>>
-> >>>> Latest work is at the next branch in l2-mtd.git:
-> >>>>
-> >>>> http://git.infradead.org/l2-mtd.git/shortlog/refs/heads/next
-> >>>>
-> >>>> You could try that, with Brian's latest patch:
-> >>>>
-> >>>> http://patchwork.ozlabs.org/patch/291408/
-> >>>
-> >>> Thanks Ezequiel! Tested with and without DMA on my PXA3xx platform and
-> >>> it seems to work just well. Awesome work :)
-> >>>
-> >>> [    2.675715] NAND device: Manufacturer ID: 0x20, Chip ID: 0xa1 (ST
-> >>> Micro NAND01GR3B2CZA6)
-> >>> [    2.683965] NAND device: 128MiB, SLC, page size: 2048, OOB size: 64
-> >>> [    2.690867] Scanning device for bad blocks
-> >>> [    2.977987] Bad eraseblock 528 at 0x000004200000
-> >>> [    2.983394] Bad eraseblock 529 at 0x000004220000
-> >>> [    3.251150] 4 ofpart partitions found on MTD device pxa3xx_nand-0
-> >>> [    3.257313] Creating 4 MTD partitions on "pxa3xx_nand-0":
-> >>> [    3.263051] 0x000000000000-0x0000000a0000 : "Bootloader"
-> >>> [    3.278845] 0x0000000a0000-0x0000000c0000 : "BootloaderEnvironment"
-> >>> [    3.296388] 0x0000000c0000-0x000000120000 : "BootloaderSplashScreen"
-> >>> [    3.314704] 0x000000120000-0x000008000000 : "UBI"
-> >>>
-> >>
-> >> Good news! Have you tried with Brian's patch [1]?
-> >
-> > Yes. l2-mtd 'next' branch + Brian's patch.
-> >
-> >> In that case, is this a Tested-by?
-> >>
-> >> [1] http://patchwork.ozlabs.org/patch/291408/
-> >
-> >   Tested-by: Daniel Mack <zonque@gmail.com>
-> 
-> Well, that last patch wouldn't be relevant to the PXA platform,
+On Fri, Nov 15, 2013 at 10:08 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 15, 2013 at 09:52:41AM -0800, Olof Johansson wrote:
+>> If we knew exactly what we wanted, it'd be a different story. _We
+>> don't_. We're into year FOUR of the device tree conversion and we're just
+>> now reaching a point where we think we know what a good solution looks
+>> like. The first two years were easy -- they were the trivial devices we're
+>> now talking about on ACPI. After that it got harder. Going through all
+>> of that again with ACPI? No. No way. Microsoft gets to do it and while
+>> they're busy sorting it out, we'll boot with device tree.
+>
+> However, there's a very big danger here.  I disagree with the stance
+> you're taking.
+>
+> It seems that under ACPI and DT, we refer to properties by string names.
+> That's good, but do we really want to have different string names for the
+> same property.
+>
+> Or worse still, the same hardware property described in two completely
+> different ways between ACPI and DT?
+>
+> If you think Microsoft will come along, look at what we've done for DT,
+> and implement something in ACPI which is somehow compatible with that,
+> I'd have to ask where you've been for the last 30 years.  That's not
+> how Microsoft operates.
+>
+> Microsoft will instead design something different (whether it's
+> intentionally different or not depends on your point of view) but it
+> will be designed how they want and not how we'd like it to be.  From
+> their point of view, if it's completely different and very difficult
+> to convert to device tree, that's a win for them because it means
+> they're pushing back on Linux being used in markets they wish to be
+> successful.
 
-Ah, right. Forgot about that.
+Main reply at the bottom but on this: I don't know if this is already
+happening. Given that APM is asking us how to do clock bindings, I'm
+guessing they're not working with Microsoft on ACPI yet. So I have no
+idea if there's a complete impedance mismatch between what we're tying
+to do, and what they will later require, or not. They might chose to
+discard any ACPI implementation that's been written just to Linux, and
+have their own set of criteria. We just don't know at this time since
+I get the impression we're working on our own right now.
 
-> but I'll add your Tested-by to the whole series. Thanks!
-> 
-> Ezequiel, is that an "acked-by" for my last patch?
-> 
+> We have a possibility here to define how we'd like ACPI to look: we
+> have the chance to have ACPI properties using the same naming that we
+> already have for DT.  What this means is that _if_ we wanted one day
+> to have first class support for ACPI (which we may wish to for the
+> AML) then we wouldn't have to rewrite all the drivers we've already
+> converted.  Yes, we'd have a some churn, but most of that would be
+> along the lines of converting the of_* calls to being firmware_*
+> calls, taking a generic firmware handle.
+>
+> Who knows, we may decide in the future that we want to move everything
+> over to ACPI rather than using DT, and having things as I mention above
+> would make it much easier to convert from DT to ACPI.
+>
+> I believe that we're only going to regret shutting the door on this
+> in the future.  It's not like the kernel doesn't already have native
+> support for ACPI.
 
-No, I want to give it a try on the boards. I just haven't found
-time to work on it.
+Yeah, I should have been clearer on that: It still makes much sense to
+make sure that we have Linux representation in the UEFI/ACPI standards
+committees, and it's my impression that Linaro is providing that --
+that's a good initiative and should continue. It is particularly true
+once we move off the path of the simple initial stuff and start to
+enter corner cases of where things don't fit the standard model (like
+we're at with DT now), since we'd need to come up with common
+solutions.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+
+-Olof
