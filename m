@@ -1,66 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Nov 2013 11:36:40 -0800
-Subject: [GIT PULL] omap fixes for v3.13 merge window
-Message-ID: <pull-1384544200-51160>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Nov 2013 20:54:10 +0100
+Subject: [PATCH 1/3] Documentation: Add APM X-Gene SoC 6.0Gbps SATA PHY
+ driver binding documentation
+In-Reply-To: <CAPw-ZTnyknFs2S5uZOH7RyAqcQrk7z=Ms0QfRGd-kQfYsw4+wQ@mail.gmail.com>
+References: <1384457519-21335-1-git-send-email-lho@apm.com>
+ <201311152026.07433.arnd@arndb.de>
+ <CAPw-ZTnyknFs2S5uZOH7RyAqcQrk7z=Ms0QfRGd-kQfYsw4+wQ@mail.gmail.com>
+Message-ID: <201311152054.10859.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 10d0c9705e80bbd3d587c5fad24599aabaca6688:
+On Friday 15 November 2013, Loc Ho wrote:
+> It may be possible from ACPI point of view (hasn't tried yet). But for
+> DTS, there is no such firmware.
 
-  Merge tag 'devicetree-for-3.13' of git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux (2013-11-12 16:52:17 +0900)
+Why not? Doesn't any boot loader have to initialize the hardware in order
+to load a kernel from disk?
 
-are available in the git repository at:
+> I will make the entry more friendly
+> for DTS. For ACPI, I am thinking that the BIOS/Firmware will just
+> initialize it. As long as the clock isn't reset, the value will be
+> there. Let's agree on these:
+> 
+> 1. DTS - use more friendly name
+> 2. ACPI - handled by the BIOS/Firmware
 
+Make sense.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/fixes-for-merge-window-take2
-
-for you to fetch changes up to 26273e02a0cf18eb72416559310d3294390a9024:
-
-  ARM: OMAP2+: Fix build for dra7xx without omap4 and 5 (2013-11-15 08:27:29 -0800)
-
-----------------------------------------------------------------
-Few clock fixes, a runtime PM fix, and pinctrl-single fix along
-with few other fixes that popped up during the merge window.
-
-----------------------------------------------------------------
-Eric Witcher (1):
-      ARM: OMAP: devicetree: fix SPI node compatible property syntax items
-
-Joel Fernandes (1):
-      doc: devicetree: Add bindings documentation for omap-des driver
-
-Lokesh Vutla (1):
-      ARM: dts: doc: Document missing compatible property for omap-sham driver
-
-Nishanth Menon (1):
-      ARM: OMAP2+: omap_device: maintain sane runtime pm status around suspend/resume
-
-Roger Quadros (1):
-      pinctrl: single: call pcs_soc->rearm() whenever IRQ mask is changed
-
-Tomi Valkeinen (3):
-      ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
-      ARM: OMAP3: use CLK_SET_RATE_PARENT for dss clocks
-      ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
-
-Tony Lindgren (2):
-      Merge tag 'for-v3.13/clock-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into xxx-dt
-      ARM: OMAP2+: Fix build for dra7xx without omap4 and 5
-
-Wei Yongjun (2):
-      ARM: OMAP2+: smsc911x: fix return value check in gpmc_smsc911x_init()
-      ARM: OMAP3: Beagle: fix return value check in beagle_opp_init()
-
- .../devicetree/bindings/crypto/omap-des.txt        | 30 +++++++++++
- .../devicetree/bindings/crypto/omap-sham.txt       |  2 +-
- Documentation/devicetree/bindings/spi/omap-spi.txt |  4 +-
- arch/arm/mach-omap2/Makefile                       |  2 +-
- arch/arm/mach-omap2/board-omap3beagle.c            |  2 +-
- arch/arm/mach-omap2/cclock3xxx_data.c              | 58 ++++++++++++++++++----
- arch/arm/mach-omap2/cclock44xx_data.c              |  3 +-
- arch/arm/mach-omap2/gpmc-smsc911x.c                |  2 +-
- arch/arm/mach-omap2/omap_device.c                  | 13 ++++-
- arch/arm/mach-omap2/prm44xx_54xx.h                 |  3 +-
- drivers/pinctrl/pinctrl-single.c                   | 10 ++--
- 11 files changed, 103 insertions(+), 26 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/crypto/omap-des.txt
+	Arnd
