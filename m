@@ -1,90 +1,70 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Nov 2013 15:38:55 +0100
-Subject: [PATCH 00/11] ARM: at91: DT: switch C board to DT
-Message-ID: <20131115143855.GR28304@ns203013.ovh.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Nov 2013 06:37:37 -0800
+Subject: [PATCH V3] ARM: OMAP2+: omap_device: maintain sane runtime pm
+ status around suspend/resume
+In-Reply-To: <528621E5.4030201@ti.com>
+References: <1384297710-29694-1-git-send-email-nm@ti.com>
+ <1384448716-3186-1-git-send-email-nm@ti.com>
+ <alpine.DEB.2.02.1311150806220.15980@utopia.booyaka.com>
+ <528621E5.4030201@ti.com>
+Message-ID: <20131115143736.GW10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Nishanth Menon <nm@ti.com> [131115 05:30]:
+> On 11/15/2013 02:07 AM, Paul Walmsley wrote:
+> > On Thu, 14 Nov 2013, Nishanth Menon wrote:
+> > 
+> >> OMAP device hooks around suspend|resume_noirq ensures that hwmod
+> >> devices are forced to idle using omap_device_idle/enable as part of
+> >> the last stage of suspend activity.
+> >>
+> >> For a device such as i2c who uses autosuspend, it is possible to enter
+> >> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
+> >>
+> >> As part of the suspend flow, the generic runtime logic would increment
+> >> it's dev->power.disable_depth to 1. This should prevent further
+> >> pm_runtime_get_sync from succeeding once the runtime_status has been
+> >> set to RPM_SUSPENDED.
+> >>
+> >> Now, as part of the suspend_noirq handler in omap_device, we force the
+> >> following: if the device status is !suspended, we force the device
+> >> to idle using omap_device_idle (clocks are cut etc..). This ensures
+> >> that from a hardware perspective, the device is "suspended". However,
+> >> runtime_status is left to be active.
+> >>
+> >> *if* an operation is attempted after this point to
+> >> pm_runtime_get_sync, runtime framework depends on runtime_status to
+> >> indicate accurately the device status, and since it sees it to be
+> >> ACTIVE, it assumes the module is functional and returns a non-error
+> >> value. As a result the user will see pm_runtime_get succeed, however a
+> >> register access will crash due to the lack of clocks.
+> >>
+> >> To prevent this from happening, we should ensure that runtime_status
+> >> exactly indicates the device status. As a result of this change
+> >> any further calls to pm_runtime_get* would return -EACCES (since
+> >> disable_depth is 1). On resume, we restore the clocks and runtime
+> >> status exactly as we suspended with. These operations are not expected
+> >> to fail as we update the states after the core runtime framework has
+> >> suspended itself and restore before the core runtime framework has
+> >> resumed.
+> >>
+> >> Reported-by: J Keerthy <j-keerthy@ti.com>
+> >> Signed-off-by: Nishanth Menon <nm@ti.com>
+> >> Acked-by: Rajendra Nayak <rnayak@ti.com>
+> >> Acked-by: Kevin Hilman <khilman@linaro.org>
+> > 
+> > Looks reasonable to me.  Looks like this should be considered for -stable 
+> > - Nishanth, what do you think?
+> 
+> Every product kernel since 3.4 needed to be hacked (we have hacked in
+> different ways so far) to work around this (since we never spend time
+> digging deeper :( ), So, I do agree with your view that a -stable tag
+> will be most beneficial.
+> 
+> > 
+> > Tony or Kevin, do you want to take this one, or want me to?
 
-	As we have now enough DT support we can start to drop C board support
-	for some boards
+I can take it unless you have other fixes pending right now.
 
-	Here is the first batch of boards (10) droping.
-
-The following changes since commit 5e01dc7b26d9f24f39abace5da98ccbd6a5ceb52:
-
-  Linux 3.12 (2013-11-03 15:41:51 -0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git j/for-3.14-dt-switch
-
-for you to fetch changes up to 10dd7da058bcb77db271d0ed023fe5dc5be0f75d:
-
-  ARM: at91: switch Calao QIL-A9260 board to DT (2013-11-15 05:06:39 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (11):
-      ARM: at91: dt: at91rm9200ek: add emac and nor flash support
-      ARM: at91: switch 1arm to DT
-      ARM: at91: switch carmeva to DT
-      ARM: at91: switch kafa board to DT
-      ARM: at91: switch flexibity to DT
-      ARM: at91: switch RSI EWS board to DT
-      ARM: at91: switch Picotux 200 board to DT
-      ARM: at91: switch ecbat91 board to DT
-      ARM: at91: switch kb9202 board to DT
-      ARM: at91: switch csb637 board to DT
-      ARM: at91: switch Calao QIL-A9260 board to DT
-
- arch/arm/boot/dts/Makefile                  |  10 +++++++
- arch/arm/boot/dts/at91-1arm.dts             |  70 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-carmeva.dts          | 150 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-csb637.dts           |  83 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-ecbat91.dts          | 135 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-flexibity.dts        | 144 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-kafa.dts             |  79 +++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-kb9202.dts           | 135 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-picotux-200.dts      |  93 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-qil_a9260.dts        | 185 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-rsi-ews.dts          | 175 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91rm9200ek.dts          |  34 +++++++++++++++++++++
- arch/arm/configs/at91rm9200_defconfig       |   7 -----
- arch/arm/configs/at91sam9260_9g20_defconfig |   2 --
- arch/arm/mach-at91/Kconfig.non_dt           |  60 -------------------------------------
- arch/arm/mach-at91/Makefile                 |  10 -------
- arch/arm/mach-at91/board-1arm.c             |  99 --------------------------------------------------------------
- arch/arm/mach-at91/board-carmeva.c          | 166 -------------------------------------------------------------------------------------------------------
- arch/arm/mach-at91/board-csb637.c           | 141 ---------------------------------------------------------------------------------------
- arch/arm/mach-at91/board-ecbat91.c          | 190 ----------------------------------------------------------------------------------------------------------------------
- arch/arm/mach-at91/board-flexibity.c        | 168 --------------------------------------------------------------------------------------------------------
- arch/arm/mach-at91/board-kafa.c             | 112 ----------------------------------------------------------------------
- arch/arm/mach-at91/board-kb9202.c           | 158 --------------------------------------------------------------------------------------------------
- arch/arm/mach-at91/board-picotux200.c       | 128 -------------------------------------------------------------------------------
- arch/arm/mach-at91/board-qil-a9260.c        | 266 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
- arch/arm/mach-at91/board-rsi-ews.c          | 231 -----------------------------------------------------------------------------------------------------------------------------------------------
- 26 files changed, 1293 insertions(+), 1738 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-1arm.dts
- create mode 100644 arch/arm/boot/dts/at91-carmeva.dts
- create mode 100644 arch/arm/boot/dts/at91-csb637.dts
- create mode 100644 arch/arm/boot/dts/at91-ecbat91.dts
- create mode 100644 arch/arm/boot/dts/at91-flexibity.dts
- create mode 100644 arch/arm/boot/dts/at91-kafa.dts
- create mode 100644 arch/arm/boot/dts/at91-kb9202.dts
- create mode 100644 arch/arm/boot/dts/at91-picotux-200.dts
- create mode 100644 arch/arm/boot/dts/at91-qil_a9260.dts
- create mode 100644 arch/arm/boot/dts/at91-rsi-ews.dts
- delete mode 100644 arch/arm/mach-at91/board-1arm.c
- delete mode 100644 arch/arm/mach-at91/board-carmeva.c
- delete mode 100644 arch/arm/mach-at91/board-csb637.c
- delete mode 100644 arch/arm/mach-at91/board-ecbat91.c
- delete mode 100644 arch/arm/mach-at91/board-flexibity.c
- delete mode 100644 arch/arm/mach-at91/board-kafa.c
- delete mode 100644 arch/arm/mach-at91/board-kb9202.c
- delete mode 100644 arch/arm/mach-at91/board-picotux200.c
- delete mode 100644 arch/arm/mach-at91/board-qil-a9260.c
- delete mode 100644 arch/arm/mach-at91/board-rsi-ews.c
-
-Best Regards,
-J.
+Tony
