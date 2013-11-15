@@ -1,176 +1,146 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 15 Nov 2013 12:10:45 +0100
-Subject: [PATCH v3 2/3] ARM: at91: fix hanged boot due to early
- rtt-interrupt
-In-Reply-To: <1381917376-21107-3-git-send-email-jhovold@gmail.com>
-References: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
- <1381917376-21107-1-git-send-email-jhovold@gmail.com>
- <1381917376-21107-3-git-send-email-jhovold@gmail.com>
-Message-ID: <52860135.3030409@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Nov 2013 11:23:29 +0000
+Subject: [PATCH V4 1/4] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
+ routable irqs
+In-Reply-To: <5284FE6C.9040901@ti.com>
+References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
+ <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
+ <20131114140103.GA28328@e106331-lin.cambridge.arm.com>
+ <5284FE6C.9040901@ti.com>
+Message-ID: <20131115112329.GE1709@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/2013 11:56, Johan Hovold :
-> Make sure the RTT-interrupts are masked at boot by adding a new helper
-> function to be used at SOC-init.
->
-> This fixes hanged boot on all AT91 SOCs with an RTT, for example, if an
-> RTT-alarm goes off after a non-clean shutdown (e.g. when using RTC
-> wakeup).
->
-> The RTC and RTT-peripherals are powered by backup power (VDDBU) (on all
-> AT91 SOCs but RM9200) and are not reset on wake-up, user, watchdog or
-> software reset. This means that their interrupts may be enabled during
-> early boot if, for example, they where not disabled during a previous
-> shutdown (e.g. due to a buggy driver or a non-clean shutdown such as a
-> user reset). Furthermore, an RTC or RTT-alarm may also be active.
->
-> The RTC and RTT-interrupts use the shared system-interrupt line, which
-> is also used by the PIT, and if an interrupt occurs before a handler
-> (e.g. RTC-driver) has been installed this leads to the system interrupt
-> being disabled and prevents the system from booting.
->
-> Note that when boot hangs due to an early RTC or RTT-interrupt, the only
-> way to get the system to start again is to remove the backup power (e.g.
-> battery) or to disable the interrupt manually from the bootloader. In
-> particular, a user reset is not sufficient.
->
-> Signed-off-by: Johan Hovold <jhovold@gmail.com>
+On Thu, Nov 14, 2013 at 04:46:36PM +0000, Sricharan R wrote:
+> Hi Mark,
+> 
+> On Thursday 14 November 2013 07:31 PM, Mark Rutland wrote:
+> > On Thu, Nov 14, 2013 at 12:18:47PM +0000, Sricharan R wrote:
+> >> In some socs the gic can be preceded by a crossbar IP which
+> >> routes the peripheral interrupts to the gic inputs. The peripheral
+> >> interrupts are associated with a fixed crossbar input line and the
+> >> crossbar routes that to one of the free gic input line.
+> >>
+> >> The DT entries for peripherals provides the fixed crossbar input line
+> >> as its interrupt number and the mapping code should associate this with
+> >> a free gic input line. This patch adds the support inside the gic irqchip
+> >> to handle such routable irqs. The routable irqs are registered in a linear
+> >> domain. The registered routable domain's callback should be implemented
+> >> to get a free irq and to configure the IP to route it.
+> >>
+> >> Cc: Thomas Gleixner <tglx@linutronix.de>
+> >> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Tony Lindgren <tony@atomide.com>
+> >> Cc: Rajendra Nayak <rnayak@ti.com>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> Cc: Grant Likely <grant.likely@linaro.org>
+> >> Cc: Rob Herring <rob.herring@calxeda.com>
+> >> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> >> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> ---
+> >>  [V2] Added default routable-irqs functions to avoid
+> >>       unnecessary if checks as per Thomas Gleixner comments
+> >>       and renamed routable-irq binding as per
+> >>       Kumar Gala <galak@codeaurora.org> comments.
+> >>
+> >>  [V3] Addressed unnecessary warn-on and updated default
+> >>       xlate function as per Thomas Gleixner comments
+> >>
+> >>  Documentation/devicetree/bindings/arm/gic.txt |    6 ++
+> >>  drivers/irqchip/irq-gic.c                     |   81 ++++++++++++++++++++++---
+> >>  include/linux/irqchip/arm-gic.h               |    7 ++-
+> >>  3 files changed, 83 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> >> index 3dfb0c0..5357745 100644
+> >> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> >> @@ -49,6 +49,11 @@ Optional
+> >>    regions, used when the GIC doesn't have banked registers. The offset is
+> >>    cpu-offset * cpu-nr.
+> >>  
+> >> +- arm,routable-irqs : Total number of gic irq inputs which are not directly
+> >> +		  connected from the peripherals, but are routed dynamically
+> >> +		  by a crossbar/multiplexer preceding the GIC. The GIC irq
+> >> +		  input line is assigned dynamically when the corresponding
+> >> +		  peripheral's crossbar line is mapped.
+> > I'm not keen on the design of the arm,routable-irqs property. The set of
+> > IRQs which the crossbar IP can use is a property of which IRQ lines it
+> > has routed to the GIC. I don't see why that should be considered a
+> > property of the GIC; it's a property of the crossbar IP's attachment to
+> > the GIC.
+> >
+> > Given we already have a mechanism for describing the attachment (i.e.
+> > the interrupts property) where the property appears on the node for the
+> > device generating/propagating the interrupt, I don't see why we should
+> > do differently here.
+>  We did try using interrupts=<> property for all peripherals and
+>  mapping them as crossbar's parent. But that approach of representing
+>  crossbar as a interrupt parent was not accepted, since the crossbar
+>  was just routing the interrupts from peripherals to GIC and nothing more.
+>  Also  mapping all the interrupts using interrupt-map like property by a fixed way
+>  in DTS itself was considered hacky
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I'm not suggesting you should interrupt-map. I agree that that
+interrupt-map is not suitable for a dynamically configurable device like
+the crossbar.
 
-and added to the at91-3.13-fixes-non-critical branch with the "stable" tag:
-Cc: stable at vger.kernel.org # 3.11.x
+When you say that the crossbar is just routing the interrupts, at what
+level is it doing so? Does it accept a logical interrupt and output
+another logical interrupt, or does it just connect the two lines
+electrically?
 
-Thanks for your patience, bye,
+We don't necessarily have to use the interrupts property, but I still
+think that the set of GIC input IRQ lines that the crossbar is wired to
+should be described on the crossbar node.
 
-> ---
->   arch/arm/mach-at91/at91sam9260.c |  2 ++
->   arch/arm/mach-at91/at91sam9261.c |  2 ++
->   arch/arm/mach-at91/at91sam9263.c |  3 +++
->   arch/arm/mach-at91/at91sam9g45.c |  1 +
->   arch/arm/mach-at91/at91sam9rl.c  |  1 +
->   arch/arm/mach-at91/generic.h     |  1 +
->   arch/arm/mach-at91/sysirq_mask.c | 24 ++++++++++++++++++++++++
->   7 files changed, 34 insertions(+)
->
-> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index 5de6074..ae10d14 100644
-> --- a/arch/arm/mach-at91/at91sam9260.c
-> +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -349,6 +349,8 @@ static void __init at91sam9260_initialize(void)
->   	arm_pm_idle = at91sam9_idle;
->   	arm_pm_restart = at91sam9_alt_restart;
->
-> +	at91_sysirq_mask_rtt(AT91SAM9260_BASE_RTT);
-> +
->   	/* Register GPIO subsystem */
->   	at91_gpio_init(at91sam9260_gpio, 3);
->   }
-> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-> index 0e07932..e761e74 100644
-> --- a/arch/arm/mach-at91/at91sam9261.c
-> +++ b/arch/arm/mach-at91/at91sam9261.c
-> @@ -291,6 +291,8 @@ static void __init at91sam9261_initialize(void)
->   	arm_pm_idle = at91sam9_idle;
->   	arm_pm_restart = at91sam9_alt_restart;
->
-> +	at91_sysirq_mask_rtt(AT91SAM9261_BASE_RTT);
-> +
->   	/* Register GPIO subsystem */
->   	at91_gpio_init(at91sam9261_gpio, 3);
->   }
-> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-> index 962768b..ad02281 100644
-> --- a/arch/arm/mach-at91/at91sam9263.c
-> +++ b/arch/arm/mach-at91/at91sam9263.c
-> @@ -330,6 +330,9 @@ static void __init at91sam9263_initialize(void)
->   	arm_pm_idle = at91sam9_idle;
->   	arm_pm_restart = at91sam9_alt_restart;
->
-> +	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT0);
-> +	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT1);
-> +
->   	/* Register GPIO subsystem */
->   	at91_gpio_init(at91sam9263_gpio, 5);
->   }
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index 8d4da6d..88e6f7b 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -380,6 +380,7 @@ static void __init at91sam9g45_initialize(void)
->   	arm_pm_restart = at91sam9g45_restart;
->
->   	at91_sysirq_mask_rtc(AT91SAM9G45_BASE_RTC);
-> +	at91_sysirq_mask_rtt(AT91SAM9G45_BASE_RTT);
->
->   	/* Register GPIO subsystem */
->   	at91_gpio_init(at91sam9g45_gpio, 5);
-> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-> index b5a8c9d..301e172 100644
-> --- a/arch/arm/mach-at91/at91sam9rl.c
-> +++ b/arch/arm/mach-at91/at91sam9rl.c
-> @@ -295,6 +295,7 @@ static void __init at91sam9rl_initialize(void)
->   	arm_pm_restart = at91sam9_alt_restart;
->
->   	at91_sysirq_mask_rtc(AT91SAM9RL_BASE_RTC);
-> +	at91_sysirq_mask_rtt(AT91SAM9RL_BASE_RTT);
->
->   	/* Register GPIO subsystem */
->   	at91_gpio_init(at91sam9rl_gpio, 4);
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index 80269bd..26dee3c 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -35,6 +35,7 @@ extern int  __init at91_aic_of_init(struct device_node *node,
->   extern int  __init at91_aic5_of_init(struct device_node *node,
->   				    struct device_node *parent);
->   extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
-> +extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
->
->
->    /* Timer */
-> diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-at91/sysirq_mask.c
-> index ee3e22c..2ba694f 100644
-> --- a/arch/arm/mach-at91/sysirq_mask.c
-> +++ b/arch/arm/mach-at91/sysirq_mask.c
-> @@ -21,6 +21,7 @@
->    */
->
->   #include <linux/io.h>
-> +#include <mach/at91_rtt.h>
->
->   #include "generic.h"
->
-> @@ -45,3 +46,26 @@ void __init at91_sysirq_mask_rtc(u32 rtc_base)
->
->   	iounmap(base);
->   }
-> +
-> +void __init at91_sysirq_mask_rtt(u32 rtt_base)
-> +{
-> +	void __iomem *base;
-> +	void __iomem *reg;
-> +	u32 mode;
-> +
-> +	base = ioremap(rtt_base, 16);
-> +	if (!base)
-> +		return;
-> +
-> +	reg = base + AT91_RTT_MR;
-> +
-> +	mode = readl_relaxed(reg);
-> +	if (mode & (AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN)) {
-> +		pr_info("AT91: Disabling rtt irq\n");
-> +		mode &= ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN);
-> +		writel_relaxed(mode, reg);
-> +		(void)readl_relaxed(reg);			/* flush */
-> +	}
-> +
-> +	iounmap(base);
-> +}
->
+> > Listing 160 interrupts in the crossbar node is clearly something we
+> > don't want to have to do.  If we had a property that we could use to
+> > define a range (or multiple ranges) of interrupts, then the crossbar
+> > driver could go and request those ranges from its interrupt-parent (the
+> > GIC) and the GIC driver could reserve/allocate the irqdomain at that
+> > time.
+> Again, this kind of approach of crossbar requesting irqs from GIC
+> was tried earlier and it did not go anywhere. Subsequently after lot of
+> discussions this design was considered the best one.
+> 
+> http://www.spinics.net/lists/linux-omap/msg97085.html
 
+As far as I can see, the comment there was to use irqdomains, which I am
+not arguing against. I am arguing that the linkage of the GIC and the
+crossbar is being described the wrong way around. The GIC input lines
+that the crossbar is wired to should be described on the crossbar node,
+and the crossbar driver should request the appropriate domain from the
+GIC.
 
--- 
-Nicolas Ferre
+> > This feels like a point-hack, counter in style to the vast majority of
+> > provider/consumer bindings. It only allows for one multiplexer before
+> > the GIC. What if we had multiple multiplexers feeding into the GIC?
+> > Describing the attachment on the multiplexer allows that to be handled,
+> > describing that on the GIC does not.
+>  This is case where the interrupts to GIC is not coming from full irqchip,
+>  but just a router and support added in the GIC helps to handle
+>  such cases. In the case of more than one multiplexer, the crossbar
+>  driver should really take care of handling the downward muxes and
+>  crossbar like driver can be expanded to handle if such a scenario happens.
+
+That still feels like a hack. If there are multiple instances, I see no
+reason why they should have to know about each other. It's fundamentally
+at odds to the generic composable model we have now.
+
+> > Describing the attachement on the multiplexer would also prevent the
+> > duplication of information (i.e. the max-irqs property in the crossbar
+> > binding).
+> >
+> > Thanks,
+> > Mark.
+> Here max-irqs is the total number of output lines of the crossbar itself and
+> its property.
+
+This would be implicit if the set of IRQ inputs on the GIC that these
+lines fed out to were described.
+
+Thanks,
+Mark.
