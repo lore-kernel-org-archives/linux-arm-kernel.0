@@ -1,129 +1,176 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 15 Nov 2013 10:45:59 -0500
-Subject: [PATCH v2 11/13] ARM: Finish renaming ARM kprobes APIs for sharing
- with uprobes
-In-Reply-To: <1384363014.3392.44.camel@linaro1.home>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-12-git-send-email-dave.long@linaro.org>
- <1384363014.3392.44.camel@linaro1.home>
-Message-ID: <528641B7.2080409@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Nov 2013 07:46:46 -0800
+Subject: [PATCH 3/6] ARM: mm: Drop the lowmem watermark check from
+ virt_addr_valid()
+In-Reply-To: <528638DD.3060300@arm.com>
+References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
+ <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
+ <20131115002232.GE20516@lvm> <528608E9.1060407@arm.com>
+ <528635D4.4090605@ti.com> <528638DD.3060300@arm.com>
+Message-ID: <20131115154646.GJ20516@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/13 12:16, Jon Medhurst (Tixy) wrote:
-> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Use the prefix "probes_" for APIs and definitions to be shared between
->> kprobes and uprobes. Pass additional information into the lower-level decoding
->> functions to avoid having to duplicate architecture-specfific data structures.
->> Make susbsystem-specific APIs static (non-global) again.  Make a couple of utility
->> functions (probes_simulate_nop and probes_emulate_none) sharable and in a common
->> file. Keep the current "action" tables specific to kprobes, as this is where
->> uprobes functionality will be connected up to the instruction interpreter.
->
-> That's a rather long list of things this patch is reorganising and makes
-> it very difficult to review. For those class of changes which are
-> independent of each other, can you do them as separate patches?
->
-> Particularly, the change from using the function arguments
->
->      struct kprobe *p
->
-> to
->      probes_opcode_t opcode, probes_opcode_t *addr, struct arch_specific_insn *asi
->
-> should be in it's own separate patch as that is spread out across multiple files
-> and functions.
+On Fri, Nov 15, 2013 at 03:08:13PM +0000, Marc Zyngier wrote:
+> On 15/11/13 14:55, Santosh Shilimkar wrote:
+> > On Friday 15 November 2013 06:43 AM, Marc Zyngier wrote:
+> >> On 15/11/13 00:22, Christoffer Dall wrote:
+> >>>> On Thu, Nov 14, 2013 at 02:37:43PM -0500, Santosh Shilimkar wrote:
+> >>>>>> Slab allocator can allocate memory beyond the lowmem watermark
+> >>>>>> which can lead to false failure of virt_addr_valid().
+> >>>>>>
+> >>>>>> So drop the check. The issue was seen with percpu_alloc()
+> >>>>>> in KVM code which was allocating memory beyond lowmem watermark.
+> >>>>>>
+> >>>>>> Am not completly sure whether this is the right fix and if it could
+> >>>>>> impact any other user of virt_addr_valid(). Without this fix as
+> >>>>>> pointed out the KVM init was failing in my testing.
+> >>>>>>
+> >>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>>>>> Cc: Russell King <linux@arm.linux.org.uk>
+> >>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>>>>> Cc: Will Deacon <will.deacon@arm.com>
+> >>>>>>
+> >>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>>>> ---
+> >>>>>>  arch/arm/include/asm/memory.h |    3 +--
+> >>>>>>  1 file changed, 1 insertion(+), 2 deletions(-)
+> >>>>>>
+> >>>>>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> >>>>>> index 4dd2145..412da47 100644
+> >>>>>> --- a/arch/arm/include/asm/memory.h
+> >>>>>> +++ b/arch/arm/include/asm/memory.h
+> >>>>>> @@ -343,8 +343,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+> >>>>>>  #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
+> >>>>>>  
+> >>>>>>  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+> >>>>>> -#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+> >>>>>> -
+> >>>>>> +#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET)
+> >>>>>>  #endif
+> >>>>>>  
+> >>>>>>  #include <asm-generic/memory_model.h>
+> >>>>>> -- 
+> >>>>>> 1.7.9.5
+> >>>>>>
+> >>>>
+> >>>> This looks wrong to me.  Check Documentation/arm/memory.txt, this would
+> >>>> return true for the VMALLOC region, which would cause virt_to_phys to
+> >>>> give you something invalid, which would be bad.
+> >>>>
+> >>>> We use the check in create_hyp_mappings to be sure that the physical
+> >>>> address returned by virt_to_phys is valid and that if we're mapping more
+> >>>> than one page that those pages are physically contiguous.
+> >>>>
+> >>>> So if you want to get rid of this check, you need to change the mapping
+> >>>> functionality to obtain the physical address by walking the page table
+> >>>> mappings for each page that you are mapping instead.  Or limit each call
+> >>>> to a single page in size and take the physical address as input and use
+> >>>> per_cpu_ptr_to_phys at the caller side instead.
+> >>>>
+> >>>> Alternatively, we need to get rid of alloc_percpu and use regular
+> >>>> kmallocs instead, unless anyone else knows of an even better way.
+> >> alloc_percpu has nice properties (cache locality, mostly).
+> >>
+> >> One way out of it would be to give percpu stuff a special treatment. Can
+> >> you try the attach patch as a first approximation? It needs more
+> >> refinements (allocations straddling two pages?), but I think that's the
+> >> right sort of things.
+> >>
+> >> Let me know how it works for you.
+> >>
+> > Host boots bug guest fails. Patch needs small update as mentioned
+> > with inline patch.
+> > 
+> >> From 01bc1c8eaebdd70b1ea044050144b9bfb3375f82 Mon Sep 17 00:00:00 2001
+> >> From: Marc Zyngier <marc.zyngier@arm.com>
+> >> Date: Fri, 15 Nov 2013 11:36:36 +0000
+> >> Subject: [PATCH] arm/arm64: KVM: introduce new mapping API for percpu mappings
+> >>
+> >> Using virt_to_phys on percpu mappings is horribly wrong (my own bad).
+> >> Thankfully, the kernel offers a way to obtain the phisical address
+> >> of such a mapping.
+> >>
+> >> Add a new "create_hyp_percpu_mappings" to deal with those.
+> >>
+> >> *Fully untested, don't merge*
+> >>
+> >> Not-Even-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/include/asm/kvm_mmu.h   |  1 +
+> >>  arch/arm/kvm/arm.c               |  2 +-
+> >>  arch/arm/kvm/mmu.c               | 20 ++++++++++++++++++++
+> >>  arch/arm64/include/asm/kvm_mmu.h |  1 +
+> >>  4 files changed, 23 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> >> index 9b28c41..6dcb9ff 100644
+> >> --- a/arch/arm/include/asm/kvm_mmu.h
+> >> +++ b/arch/arm/include/asm/kvm_mmu.h
+> >> @@ -43,6 +43,7 @@
+> >>  #include <asm/pgalloc.h>
+> >>  
+> >>  int create_hyp_mappings(void *from, void *to);
+> >> +int create_hyp_percpu_mappings(void *from, void *to);
+> >>  int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+> >>  void free_boot_hyp_pgd(void);
+> >>  void free_hyp_pgds(void);
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index 9c697db..6191960 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -911,7 +911,7 @@ static int init_hyp_mode(void)
+> >>  		kvm_cpu_context_t *cpu_ctxt;
+> >>  
+> >>  		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
+> >> -		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1);
+> >> +		err = create_hyp_percpu_mappings(cpu_ctxt, cpu_ctxt + 1);
+> >>  
+> >>  		if (err) {
+> >>  			kvm_err("Cannot map host CPU state: %d\n", err);
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index b0de86b..e509718 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -331,6 +331,26 @@ int create_hyp_mappings(void *from, void *to)
+> >>  }
+> >>  
+> >>  /**
+> >> + * create_hyp_percpu_mappings - duplicate a percpu kernel virtual address
+> >> + *				range in Hyp mode
+> >> + * @from:	The virtual kernel start address of the range
+> >> + * @to:		The virtual kernel end address of the range (exclusive)
+> >> + *
+> >> + * The same virtual address as the kernel virtual address is also used
+> >> + * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
+> >> + * physical pages. It *has* to be a percpu pointer.
+> >> + */
+> >> +int create_hyp_percpu_mappings(void *from, void *to)
+> >> +{
+> >> +	unsigned long phys_addr = per_cpu_ptr_to_phys(from);
+> > phys_addr_t phys_addr = per_cpu_ptr_to_phys(from);
+> 
+> Yeah, of course... ;-)
+> 
+> > With this change things work as expected without $subject patch.
+> > Thanks for the patch.
+> 
+> Good. I'll respin another version with support for allocations
+> straddling multiple pages and post it ASAP.
+> 
+Marc, hold on, can't we just make the create_hyp_mappings more generic?
 
-OK, I will break this down further into separate patches.
+I think it would be much cleaner to, either:
 
-> I have a few general comments on this patch...
->
-> 1. I don't think we actually need to pass 'probes_opcode_t *addr' to the
-> simulation functions, this will be the same as regs->ARM_pc (except that
-> for thumb code 'addr' has bit0 set, which we don't actually care about).
-> So drop the new 'addr' argument, and we can also delete the definition of
-> thumb_probe_pc() and replace its use with 'regs->ARM_pc + 4'
+1) use the existing function, but take a physical address and let the
+caller figure that part out, and limit mappings to a single page
 
-I had some trouble getting that to work before, but I'll try again.
+2) make create_hyp_mappings handle the full thing, check if the addr can
+be translated with virt_to_phys and otherwise do
+page_to_phys(vmalloc_tp_page(addr)), and handle cross-page mappings.
+Basically it's what the tail end of per_cpu_ptr_to_phys does, only more
+generically for any allocation.
 
-> 2. Now we pass 'probes_opcode_t opcode' to simulation functions a lot of
-> them end up doing the redundant...
->
->     kprobe_opcode_t insn = opcode
->
-> I would suggest deleting all of these assignments and either rename all
-> use of 'insn' to 'opcode' or just changing the function argument name to
-> 'insn'.
 
-OK, I'll have a go at that.
-
-> 3. I've a comment about the change to probes_decode_insn, I've snipped
-> the rest of the patch...
->
-> [...]
->>   int __kprobes
->> -kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->> +probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
->>   				const union decode_item *table, bool thumb,
->> -				const union decode_item *actions)
->> +				bool usermode, const union decode_item *actions)
->>   {
->
-> The new argument 'usermode' is named for the use you are using it for,
-> i.e. uprobes, I think the code is more intuitive if it was called
-> something like 'no_emulate', because what the argument does is force all
-> emulate operations to become 'custom'.
->
-> Perhaps to avoid double negatives like !no_emulate, the logic of the
-> argument could be inverted and it called 'use_emulation' or something.
-
-Or maybe just "emulate".
-
->> -	const struct decode_header *h = (struct decode_header *)table;
->> -	const struct decode_header *next;
->> +	struct decode_header *h = (struct decode_header *)table;
->> +	struct decode_header *next;
->>   	bool matched = false;
->>
->> -	insn = prepare_emulated_insn(insn, asi, thumb);
->> +	if (!usermode)
->> +		insn = prepare_emulated_insn(insn, asi, thumb);
->>
->>   	for (;; h = next) {
->>   		enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
->> @@ -401,7 +412,7 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->>   		if (!matched && (insn & h->mask.bits) != h->value.bits)
->>   			continue;
->>
->> -		if (!decode_regs(&insn, regs))
->> +		if (!decode_regs(&insn, regs, !usermode))
->>   			return INSN_REJECTED;
->>
->>   		switch (type) {
->> @@ -414,7 +425,8 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->>
->>   		case DECODE_TYPE_CUSTOM: {
->>   			struct decode_custom *d = (struct decode_custom *)h;
->> -			return actions[d->decoder.bits].decoder(insn, asi, h);
->> +			return actions[d->decoder.bits].decoder(insn,
->> +					asi, h);
->>   		}
->>
->>   		case DECODE_TYPE_SIMULATE: {
->> @@ -425,6 +437,11 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->>
->>   		case DECODE_TYPE_EMULATE: {
->>   			struct decode_emulate *d = (struct decode_emulate *)h;
->> +
->> +			if (usermode)
->> +				return actions[d->handler.bits].decoder(insn,
->> +								asi, h);
->> +
->>   			asi->insn_handler = actions[d->handler.bits].handler;
->>   			set_emulated_insn(insn, asi, thumb);
->>   			return INSN_GOOD;
->
-> [...]
->
+-Christoffer
