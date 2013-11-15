@@ -1,50 +1,59 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 15 Nov 2013 08:59:08 +0100
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-In-Reply-To: <20131114231528.GA9793@localhost>
-References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131114230436.GV9468@ld-irv-0074.broadcom.com>
- <20131114230540.GW9468@ld-irv-0074.broadcom.com>
- <20131114231528.GA9793@localhost>
-Message-ID: <5285D44C.7080501@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 15 Nov 2013 08:07:34 +0000 (UTC)
+Subject: [PATCH V3] ARM: OMAP2+: omap_device: maintain sane runtime pm
+ status around suspend/resume
+In-Reply-To: <1384448716-3186-1-git-send-email-nm@ti.com>
+References: <1384297710-29694-1-git-send-email-nm@ti.com>
+ <1384448716-3186-1-git-send-email-nm@ti.com>
+Message-ID: <alpine.DEB.2.02.1311150806220.15980@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2013 12:15 AM, Ezequiel Garcia wrote:
-> On Thu, Nov 14, 2013 at 03:05:40PM -0800, Brian Norris wrote:
->> + Daniel (missed the CC)
->>
->> On Thu, Nov 14, 2013 at 03:04:36PM -0800, Brian Norris wrote:
->>> On Thu, Nov 14, 2013 at 06:25:25PM -0300, Ezequiel Garcia wrote:
->>>> * Changes from v4
->>>>
->>>>   * Rebased on top of l2-mtd.git origin/next branch
->>>>
->>>>   * Fixed is_ready flag reset, renamed by a more descriptive
->>>>     and readble "need_wait".
->>>>
->>>
->>> ...
->>>
->>> I think this series is now good as-is. Pushing to l2-mtd.git/next.
->>> Thanks for the efforts! I can submit my extra diff from patch 12 as a
->>> separate patch for review.
->>>
->>> Do you have any available regression tests? Or was there somebody else
->>> we could run this by for some Tested-by's? Daniel Mack, perhaps?
->>
->> Brian
+On Thu, 14 Nov 2013, Nishanth Menon wrote:
+
+> OMAP device hooks around suspend|resume_noirq ensures that hwmod
+> devices are forced to idle using omap_device_idle/enable as part of
+> the last stage of suspend activity.
 > 
-> Yes, if Daniel (or anybody else) can push a Tested-by, that's better because
-> he's a "third-party" tester.
+> For a device such as i2c who uses autosuspend, it is possible to enter
+> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
+> 
+> As part of the suspend flow, the generic runtime logic would increment
+> it's dev->power.disable_depth to 1. This should prevent further
+> pm_runtime_get_sync from succeeding once the runtime_status has been
+> set to RPM_SUSPENDED.
+> 
+> Now, as part of the suspend_noirq handler in omap_device, we force the
+> following: if the device status is !suspended, we force the device
+> to idle using omap_device_idle (clocks are cut etc..). This ensures
+> that from a hardware perspective, the device is "suspended". However,
+> runtime_status is left to be active.
+> 
+> *if* an operation is attempted after this point to
+> pm_runtime_get_sync, runtime framework depends on runtime_status to
+> indicate accurately the device status, and since it sees it to be
+> ACTIVE, it assumes the module is functional and returns a non-error
+> value. As a result the user will see pm_runtime_get succeed, however a
+> register access will crash due to the lack of clocks.
+> 
+> To prevent this from happening, we should ensure that runtime_status
+> exactly indicates the device status. As a result of this change
+> any further calls to pm_runtime_get* would return -EACCES (since
+> disable_depth is 1). On resume, we restore the clocks and runtime
+> status exactly as we suspended with. These operations are not expected
+> to fail as we update the states after the core runtime framework has
+> suspended itself and restore before the core runtime framework has
+> resumed.
+> 
+> Reported-by: J Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Acked-by: Rajendra Nayak <rnayak@ti.com>
+> Acked-by: Kevin Hilman <khilman@linaro.org>
 
-Yes. Sorry, I could only partially follow all the discussions around
-these patch sets, but I can certainly do a quick regression test on my
-pxa3xx platform.
+Looks reasonable to me.  Looks like this should be considered for -stable 
+- Nishanth, what do you think?
 
-Ezequiel, could you maybe point me to a repository where I can pull
-everything from you want me to have a look at?
+Tony or Kevin, do you want to take this one, or want me to?
 
 
-Thanks,
-Daniel
+- Paul
