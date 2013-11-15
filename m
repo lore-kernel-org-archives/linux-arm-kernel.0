@@ -1,153 +1,145 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 16:09:51 -0800
-Subject: [PATCH 04/11] ARM: OMAP2+: Add device tree compatible revision checks
- for n8x0
+Date: Thu, 14 Nov 2013 16:09:49 -0800
+Subject: [PATCH 02/11] ARM: dts: Add basic Nokia N8X0 support
 In-Reply-To: <1384474198-20756-1-git-send-email-tony@atomide.com>
 References: <1384474198-20756-1-git-send-email-tony@atomide.com>
-Message-ID: <1384474198-20756-5-git-send-email-tony@atomide.com>
+Message-ID: <1384474198-20756-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows us to initialize the legacy devices when booted
-with device tree.
+Add minimal device tree support for n8x0 boards so we
+can make omap2 device tree only. Note that we still need
+to initialize various platform data quirks to keep
+things working until n8x0 drivers support device tree.
 
+Here's a rough todo list for the people using n8x0:
+
+1. Update menelaus for device tree and set up
+   regulators at least for the MMC driver
+
+2. Remove the MMC regulator platform data callback
+   by using the Menlaus regulators directly in the
+   driver passed from the .dts file
+
+3. Update GPMC connected devices for onenand and
+   tusb6010 for device tree
+
+We're planning to remove all legacy platform data
+for mach-omap2 over next few merge cycles, so if
+people are still using n8x0, please fix the issues
+above.
+
+Cc: devicetree at vger.kernel.org
 Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-n8x0.c | 51 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 42 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/Makefile                  |  3 +++
+ arch/arm/boot/dts/omap2420-n800.dts         |  8 +++++++
+ arch/arm/boot/dts/omap2420-n810-wimax.dts   |  8 +++++++
+ arch/arm/boot/dts/omap2420-n810.dts         |  8 +++++++
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi | 34 +++++++++++++++++++++++++++++
+ 5 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap2420-n800.dts
+ create mode 100644 arch/arm/boot/dts/omap2420-n810-wimax.dts
+ create mode 100644 arch/arm/boot/dts/omap2420-n810.dts
+ create mode 100644 arch/arm/boot/dts/omap2420-n8x0-common.dtsi
 
-diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-index 827d1500..d61a00d 100644
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -42,6 +42,38 @@
- #define TUSB6010_GPIO_ENABLE	0
- #define TUSB6010_DMACHAN	0x3f
- 
-+#define NOKIA_N810_WIMAX	(1 << 2)
-+#define NOKIA_N810		(1 << 1)
-+#define NOKIA_N800		(1 << 0)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 73022b1..de37094 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -174,6 +174,9 @@ dtb-$(CONFIG_ARCH_NSPIRE) += nspire-cx.dtb \
+ 	nspire-clp.dtb
+ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap2430-sdp.dtb \
++	omap2420-n800.dtb \
++	omap2420-n810.dtb \
++	omap2420-n810-wimax.dtb \
+ 	omap3430-sdp.dtb \
+ 	omap3-beagle.dtb \
+ 	omap3-devkit8000.dtb \
+diff --git a/arch/arm/boot/dts/omap2420-n800.dts b/arch/arm/boot/dts/omap2420-n800.dts
+new file mode 100644
+index 0000000..d8c1b42
+--- /dev/null
++++ b/arch/arm/boot/dts/omap2420-n800.dts
+@@ -0,0 +1,8 @@
++/dts-v1/;
 +
-+static u32 board_caps;
++#include "omap2420-n8x0-common.dtsi"
 +
-+#define board_is_n800()		(board_caps & NOKIA_N800)
-+#define board_is_n810()		(board_caps & NOKIA_N810)
-+#define board_is_n810_wimax()	(board_caps & NOKIA_N810_WIMAX)
++/ {
++	model = "Nokia N800";
++	compatible = "nokia,n800", "nokia,n8x0", "ti,omap2420", "ti,omap2";
++};
+diff --git a/arch/arm/boot/dts/omap2420-n810-wimax.dts b/arch/arm/boot/dts/omap2420-n810-wimax.dts
+new file mode 100644
+index 0000000..6b25b03
+--- /dev/null
++++ b/arch/arm/boot/dts/omap2420-n810-wimax.dts
+@@ -0,0 +1,8 @@
++/dts-v1/;
 +
-+static void board_check_revision(void)
-+{
-+	if (of_have_populated_dt()) {
-+		if (of_machine_is_compatible("nokia,n800"))
-+			board_caps = NOKIA_N800;
-+		else if (of_machine_is_compatible("nokia,n810"))
-+			board_caps = NOKIA_N810;
-+		else if (of_machine_is_compatible("nokia,n810-wimax"))
-+			board_caps = NOKIA_N810_WIMAX;
-+	} else {
-+		if (machine_is_nokia_n800())
-+			board_caps = NOKIA_N800;
-+		else if (machine_is_nokia_n810())
-+			board_caps = NOKIA_N810;
-+		else if (machine_is_nokia_n810_wimax())
-+			board_caps = NOKIA_N810_WIMAX;
-+	}
++#include "omap2420-n8x0-common.dtsi"
 +
-+	if (!board_caps)
-+		pr_err("Unknown board\n");
-+}
++/ {
++	model = "Nokia N810 WiMax";
++	compatible = "nokia,n810-wimax", "nokia,n8x0", "ti,omap2420", "ti,omap2";
++};
+diff --git a/arch/arm/boot/dts/omap2420-n810.dts b/arch/arm/boot/dts/omap2420-n810.dts
+new file mode 100644
+index 0000000..21baec1
+--- /dev/null
++++ b/arch/arm/boot/dts/omap2420-n810.dts
+@@ -0,0 +1,8 @@
++/dts-v1/;
 +
- #if defined(CONFIG_I2C_CBUS_GPIO) || defined(CONFIG_I2C_CBUS_GPIO_MODULE)
- static struct i2c_cbus_platform_data n8x0_cbus_data = {
- 	.clk_gpio = 66,
-@@ -342,7 +374,7 @@ static void n810_set_power_emmc(struct device *dev,
- static int n8x0_mmc_set_power(struct device *dev, int slot, int power_on,
- 			      int vdd)
- {
--	if (machine_is_nokia_n800() || slot == 0)
-+	if (board_is_n800() || slot == 0)
- 		return n8x0_mmc_set_power_menelaus(dev, slot, power_on, vdd);
- 
- 	n810_set_power_emmc(dev, power_on);
-@@ -388,7 +420,7 @@ static void n8x0_mmc_callback(void *data, u8 card_mask)
- {
- 	int bit, *openp, index;
- 
--	if (machine_is_nokia_n800()) {
-+	if (board_is_n800()) {
- 		bit = 1 << 1;
- 		openp = &slot2_cover_open;
- 		index = 1;
-@@ -421,7 +453,7 @@ static int n8x0_mmc_late_init(struct device *dev)
- 	if (r < 0)
- 		return r;
- 
--	if (machine_is_nokia_n800())
-+	if (board_is_n800())
- 		vs2sel = 0;
- 	else
- 		vs2sel = 2;
-@@ -444,7 +476,7 @@ static int n8x0_mmc_late_init(struct device *dev)
- 	if (r < 0)
- 		return r;
- 
--	if (machine_is_nokia_n800()) {
-+	if (board_is_n800()) {
- 		bit = 1 << 1;
- 		openp = &slot2_cover_open;
- 	} else {
-@@ -471,7 +503,7 @@ static void n8x0_mmc_shutdown(struct device *dev)
- {
- 	int vs2sel;
- 
--	if (machine_is_nokia_n800())
-+	if (board_is_n800())
- 		vs2sel = 0;
- 	else
- 		vs2sel = 2;
-@@ -486,7 +518,7 @@ static void n8x0_mmc_cleanup(struct device *dev)
- 
- 	gpio_free(N8X0_SLOT_SWITCH_GPIO);
- 
--	if (machine_is_nokia_n810()) {
-+	if (board_is_n810()) {
- 		gpio_free(N810_EMMC_VSD_GPIO);
- 		gpio_free(N810_EMMC_VIO_GPIO);
- 	}
-@@ -537,7 +569,7 @@ static void __init n8x0_mmc_init(void)
- {
- 	int err;
- 
--	if (machine_is_nokia_n810()) {
-+	if (board_is_n810()) {
- 		mmc1_data.slots[0].name = "external";
- 
- 		/*
-@@ -555,7 +587,7 @@ static void __init n8x0_mmc_init(void)
- 	if (err)
- 		return;
- 
--	if (machine_is_nokia_n810()) {
-+	if (board_is_n810()) {
- 		err = gpio_request_array(n810_emmc_gpios,
- 					 ARRAY_SIZE(n810_emmc_gpios));
- 		if (err) {
-@@ -700,6 +732,7 @@ static inline void board_serial_init(void)
- 
- static void __init n8x0_init_machine(void)
- {
-+	board_check_revision();
- 	omap2420_mux_init(board_mux, OMAP_PACKAGE_ZAC);
- 	/* FIXME: add n810 spi devices */
- 	spi_register_board_info(n800_spi_board_info,
-@@ -707,7 +740,7 @@ static void __init n8x0_init_machine(void)
- 	omap_register_i2c_bus(1, 400, n8x0_i2c_board_info_1,
- 			      ARRAY_SIZE(n8x0_i2c_board_info_1));
- 	omap_register_i2c_bus(2, 400, NULL, 0);
--	if (machine_is_nokia_n810())
-+	if (board_is_n810())
- 		i2c_register_board_info(2, n810_i2c_board_info_2,
- 					ARRAY_SIZE(n810_i2c_board_info_2));
- 	board_serial_init();
++#include "omap2420-n8x0-common.dtsi"
++
++/ {
++	model = "Nokia N810";
++	compatible = "nokia,n810", "nokia,n8x0", "ti,omap2420", "ti,omap2";
++};
+diff --git a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+new file mode 100644
+index 0000000..c539693
+--- /dev/null
++++ b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+@@ -0,0 +1,34 @@
++#include "omap2420.dtsi"
++
++/ {
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x8000000>; /* 128 MB */
++	};
++
++	ocp {
++		i2c at 0 {
++			compatible = "i2c-cbus-gpio";
++			gpios = <&gpio3 2 0 /* gpio66 clk */
++				 &gpio3 1 0 /* gpio65 dat */
++				 &gpio3 0 0 /* gpio64 sel */
++				>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			retu_mfd: retu at 1 {
++				compatible = "retu-mfd";
++				interrupt-parent = <&gpio4>;
++				interrupts = <12 IRQ_TYPE_EDGE_RISING>;
++				reg = <0x1>;
++			};
++		};
++	};
++};
++
++&i2c1 {
++	clock-frequency = <400000>;
++};
++
++&i2c2 {
++	clock-frequency = <400000>;
++};
 -- 
 1.8.1.1
