@@ -1,466 +1,91 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 15 Nov 2013 17:53:27 +0800
-Subject: [PATCH v7 1/2] PWM: atmel-pwm: add PWM controller driver
-Message-ID: <1384509208-10762-1-git-send-email-voice.shen@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Nov 2013 09:57:17 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+Message-ID: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Atmel PWM controller driver based on PWM framework.
+On Fri, Nov 15, 2013 at 01:44:10AM +0000, Olof Johansson wrote:
+> The more I start to see early UEFI/ACPI code, the more I am certain
+> that we want none of that crap in the kernel. It's making things
+> considerably messier, while we're already very busy trying to convert
+> everything over and enable DT -- we'll be preempting that effort just
+> to add even more boilerplate everywhere and total progress will be
+> hurt.
 
-This is the basic function implementation of Atmel PWM controller.
-It can work with PWM based led and backlight.
+We are certainly under a lot of pressure with the device tree migration,
+and I agree that adding another information source is going to be a
+source of pain. However, I'd argue that we're going to encounter pain
+regardless of which approach we take.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Changes in v7:
-  - fix issue for none device tree issues.
+I'm of the opinion that the only way we should support ACPI is as a
+first-class citizen. We don't need to modify every driver and subsystem
+to support ACPI, only those necessary to support the minimal set of
+platforms using ACPI. ACPI is new in the arm space, and we can enforce
+quality standards on ACPI _now_ above what we're allowing for DT, and
+avoid future problems.
 
-Changes in v6:
-  - using relaxed version for writel and readl
-  - add none device tree support
-  - change some define from lower case to upper case
-  - split device tree binding document as a separate patch
+There may even be things which we don't have to deal with at all on ACPI
+systems as used in servers (e.g. clock management), but perhaps we will
+if people see value in those elements.
 
-Changes in v5:
-  - call clk_disable directly, if so, it won't cause more than one channel
-    enabled, the clock can not be disabled.
+> The server guys really want UEFI for their boot protocols,
+> installation managers, etc, etc. That's fine, let them do that, but
+> that doesn't mean we need to bring the same APIs all the way into the
+> kernel.
+> 
+> So, I'm strongly urging that whatever the server guys try to do, it
+> will in the end result in the ACPI data being translated into DT
+> equivalents, such that the kernel _only_ needs to handle data via DT.
 
-Changes in v4:
-  - check the return value of clk_prepare()
-  - change channel register size as constant
+I'm not sure that translating ACPI tables to dt makes any sense. If AML
+is used (even sparingly), I do not believe that we can do any sensible
+conversion to device tree. My understanding is that AML includes
+functionality for modifying ACPI tables, and I don't see how we can
+possibly support that without having to add a lot of boilerplate to all
+the code handling AML to add a device tree backend...
 
-Changes in v3:
-  - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
-  - Add PWM led example in binding documentation
-  - Using micro replace hard code
+> Just like PowerPC scrapes the OpenFirmware client interface to build a
+> flat device tree, we should add a pre-boot stage that scrapes
+> ACPI/UEFI data and constructs an appropriate device-tree. We can still
+> bring over ACPI methods and represent those in the DT, but we should
+> _not_ have two native interfaces.
 
-Changes in v2:
-  - Address the comments from Thierry Reding
+I'm not sure the two cases are comparable. The format of the FDT was
+designed to encode the data structure used by OpenFirmware, and thus the
+two map to each other pretty well. I do not believe that mapping from
+ACPI tables to an FDT blob is anywhere near as simple, and as I mention
+above I do not believe that we can just copy over the ACPI methods in
+isolation.
 
- drivers/pwm/Kconfig     |    9 ++
- drivers/pwm/Makefile    |    1 +
- drivers/pwm/pwm-atmel.c |  380 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 390 insertions(+)
- create mode 100644 drivers/pwm/pwm-atmel.c
+> It might be done via having a skeleton/framework DT for the vendor
+> platform that is updated via UEFI/ACPI data, or it might be
+> constructed entirely out of tables coming from firmware. I don't care
+> about the methods for how it is done, but I do feel strongly that we
+> should _not_ introduce a second API for everything. I can't think of a
+> single good reason to do it.
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index eece329..5043572 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -41,6 +41,15 @@ config PWM_AB8500
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-ab8500.
- 
-+config PWM_ATMEL
-+	tristate "Atmel PWM support"
-+	depends on ARCH_AT91
-+	help
-+	  Generic PWM framework driver for Atmel SoC.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-atmel.
-+
- config PWM_ATMEL_TCB
- 	tristate "Atmel TC Block PWM support"
- 	depends on ATMEL_TCLIB && OF
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 8b754e4..1b99cfb 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
- obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
-+obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
- obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_EP93XX)	+= pwm-ep93xx.o
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-new file mode 100644
-index 0000000..d012538
---- /dev/null
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -0,0 +1,380 @@
-+/*
-+ * Driver for Atmel Pulse Width Modulation Controller
-+ *
-+ * Copyright (C) 2013 Atmel Corporation
-+ *		 Bo Shen <voice.shen@atmel.com>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
-+
-+/* The following is global registers for PWM controller */
-+#define PWM_ENA			0x04
-+#define PWM_DIS			0x08
-+#define PWM_SR			0x0C
-+/* Bit field in SR */
-+#define PWM_SR_ALL_CH_ON	0x0F
-+
-+/* The following register is PWM channel related registers */
-+#define PWM_CH_REG_OFFSET	0x200
-+#define PWM_CH_REG_SIZE		0x20
-+
-+#define PWM_CMR			0x0
-+/* Bit field in CMR */
-+#define PWM_CMR_CPOL		(1 << 9)
-+#define PWM_CMR_UPD_CDTY	(1 << 10)
-+
-+/* The following registers for PWM v1 */
-+#define PWMV1_CDTY		0x04
-+#define PWMV1_CPRD		0x08
-+#define PWMV1_CUPD		0x10
-+
-+/* The following registers for PWM v2 */
-+#define PWMV2_CDTY		0x04
-+#define PWMV2_CDTYUPD		0x08
-+#define PWMV2_CPRD		0x0C
-+#define PWMV2_CPRDUPD		0x10
-+
-+/* Max value for duty and period
-+ *
-+ * Although the duty and period register is 32 bit,
-+ * however only the LSB 16 bits are significant.
-+ */
-+#define PWM_MAX_DTY		0xFFFF
-+#define PWM_MAX_PRD		0xFFFF
-+#define PRD_MAX_PRES		10
-+
-+struct atmel_pwm_chip {
-+	struct pwm_chip chip;
-+	struct clk *clk;
-+	void __iomem *base;
-+
-+	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-+		       int dty, int prd);
-+};
-+
-+static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct atmel_pwm_chip, chip);
-+}
-+
-+static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
-+				  unsigned long offset)
-+{
-+	return readl_relaxed(chip->base + offset);
-+}
-+
-+static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
-+				    unsigned long offset, unsigned long val)
-+{
-+	writel_relaxed(val, chip->base + offset);
-+}
-+
-+static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
-+				     unsigned int ch, unsigned long offset)
-+{
-+	return readl_relaxed(chip->base + PWM_CH_REG_OFFSET +
-+			ch * PWM_CH_REG_SIZE + offset);
-+}
-+
-+static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
-+				       unsigned int ch, unsigned long offset,
-+				       unsigned long val)
-+{
-+	writel_relaxed(val, chip->base + PWM_CH_REG_OFFSET +
-+			ch * PWM_CH_REG_SIZE + offset);
-+}
-+
-+static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+		int duty_ns, int period_ns)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	unsigned long clk_rate, prd, dty;
-+	unsigned long long div;
-+	int ret, pres = 0;
-+
-+	clk_rate = clk_get_rate(atmel_pwm->clk);
-+	div = clk_rate;
-+
-+	/* Calculate the period cycles */
-+	while (div > PWM_MAX_PRD) {
-+		div = clk_rate / (1 << pres);
-+		div = div * period_ns;
-+		/* 1/Hz = 100000000 ns */
-+		do_div(div, 1000000000);
-+
-+		if (pres++ > PRD_MAX_PRES) {
-+			pr_err("PRES is bigger than maximum pre-scaler\n");
-+			return -EINVAL;
-+		}
-+	}
-+
-+	/* Calculate the duty cycles */
-+	prd = div;
-+	div *= duty_ns;
-+	do_div(div, period_ns);
-+	dty = div;
-+
-+	ret = clk_enable(atmel_pwm->clk);
-+	if (ret) {
-+		pr_err("Failed to enable pwm clock\n");
-+		return ret;
-+	}
-+
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, pres);
-+	atmel_pwm->config(chip, pwm, dty, prd);
-+
-+	clk_disable(atmel_pwm->clk);
-+
-+	return 0;
-+}
-+
-+static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
-+				int dty, int prd)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	unsigned int val;
-+
-+	/*
-+	 * If the PWM channel is disabled, write value to duty and period
-+	 * registers directly.
-+	 * If the PWM channel is enabled, using the update register, it needs
-+	 * to set bit 10 of CMR to 0
-+	 */
-+	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
-+
-+		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-+		val &= ~PWM_CMR_UPD_CDTY;
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-+	} else {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
-+	}
-+}
-+
-+static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
-+				int dty, int prd)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+
-+	/*
-+	 * If the PWM channel is disabled, write value to duty and period
-+	 * registers directly.
-+	 * If the PWM channel is enabled, using the duty update register to
-+	 * update the value.
-+	 */
-+	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, dty);
-+	} else {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, dty);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, prd);
-+	}
-+}
-+
-+static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+		enum pwm_polarity polarity)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	u32 val = 0;
-+	int ret;
-+
-+	if (polarity == PWM_POLARITY_NORMAL)
-+		val &= ~PWM_CMR_CPOL;
-+	else
-+		val |= PWM_CMR_CPOL;
-+
-+	ret = clk_enable(atmel_pwm->clk);
-+	if (ret) {
-+		pr_err("failed to enable pwm clock\n");
-+		return ret;
-+	}
-+
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-+
-+	clk_disable(atmel_pwm->clk);
-+
-+	return 0;
-+}
-+
-+static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	int ret;
-+
-+	ret = clk_enable(atmel_pwm->clk);
-+	if (ret) {
-+		pr_err("failed to enable pwm clock\n");
-+		return ret;
-+	}
-+
-+	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
-+
-+	return 0;
-+}
-+
-+static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+
-+	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
-+
-+	clk_disable(atmel_pwm->clk);
-+}
-+
-+static const struct pwm_ops atmel_pwm_ops = {
-+	.config = atmel_pwm_config,
-+	.set_polarity = atmel_pwm_set_polarity,
-+	.enable = atmel_pwm_enable,
-+	.disable = atmel_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+struct atmel_pwm_data {
-+	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-+		       int dty, int prd);
-+};
-+
-+static const struct atmel_pwm_data atmel_pwm_data_v1 = {
-+	.config = atmel_pwm_config_v1,
-+};
-+
-+static const struct atmel_pwm_data atmel_pwm_data_v2 = {
-+	.config = atmel_pwm_config_v2,
-+};
-+
-+static const struct platform_device_id atmel_pwm_devtypes[] = {
-+	{
-+		.name = "at91sam9rl-pwm",
-+		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v1,
-+	}, {
-+		.name = "sama5d3-pwm",
-+		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v2,
-+	}, {
-+		/* sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(platform, atmel_pwm_devtypes);
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id atmel_pwm_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91sam9rl-pwm",
-+		.data = &atmel_pwm_data_v1,
-+	}, {
-+		.compatible = "atmel,sama5d3-pwm",
-+		.data = &atmel_pwm_data_v2,
-+	}, {
-+		/* sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
-+#endif
-+
-+static inline const struct atmel_pwm_data * __init
-+	atmel_pwm_get_driver_data(struct platform_device *pdev)
-+{
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_device(atmel_pwm_dt_ids, &pdev->dev);
-+		if (match == NULL)
-+			return NULL;
-+		return match->data;
-+	}
-+
-+	return (struct atmel_pwm_data *)
-+		platform_get_device_id(pdev)->driver_data;
-+}
-+
-+static int atmel_pwm_probe(struct platform_device *pdev)
-+{
-+	const struct atmel_pwm_data *data;
-+	struct atmel_pwm_chip *atmel_pwm;
-+	struct resource *res;
-+	int ret;
-+
-+	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
-+	if (!atmel_pwm)
-+		return -ENOMEM;
-+
-+	data = atmel_pwm_get_driver_data(pdev);
-+	if (!data)
-+		return -ENODEV;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+
-+	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(atmel_pwm->base))
-+		return PTR_ERR(atmel_pwm->base);
-+
-+	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(atmel_pwm->clk))
-+		return PTR_ERR(atmel_pwm->clk);
-+
-+	ret = clk_prepare(atmel_pwm->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to prepare pwm clock\n");
-+		return ret;
-+	}
-+
-+	atmel_pwm->chip.dev = &pdev->dev;
-+	atmel_pwm->chip.ops = &atmel_pwm_ops;
-+	if (pdev->dev.of_node) {
-+		atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-+		atmel_pwm->chip.of_pwm_n_cells = 3;
-+		atmel_pwm->chip.base = -1;
-+	} else {
-+		atmel_pwm->chip.base = pdev->id;
-+	}
-+	atmel_pwm->chip.npwm = 4;
-+
-+	atmel_pwm->config = data->config;
-+
-+	ret = pwmchip_add(&atmel_pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
-+		goto unprepare_clk;
-+	}
-+
-+	platform_set_drvdata(pdev, atmel_pwm);
-+
-+unprepare_clk:
-+	clk_unprepare(atmel_pwm->clk);
-+	return ret;
-+}
-+
-+static int atmel_pwm_remove(struct platform_device *pdev)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
-+
-+	clk_unprepare(atmel_pwm->clk);
-+
-+	return pwmchip_remove(&atmel_pwm->chip);
-+}
-+
-+static struct platform_driver atmel_pwm_driver = {
-+	.driver = {
-+		.name = "atmel-pwm",
-+		.of_match_table = of_match_ptr(atmel_pwm_dt_ids),
-+	},
-+	.id_table = atmel_pwm_devtypes,
-+	.probe = atmel_pwm_probe,
-+	.remove = atmel_pwm_remove,
-+};
-+module_platform_driver(atmel_pwm_driver);
-+
-+MODULE_ALIAS("platform:atmel-pwm");
-+MODULE_AUTHOR("Bo Shen <voice.shen@atmel.com>");
-+MODULE_DESCRIPTION("Atmel PWM driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+Where does this skeleton/framework come from? Within the kernel? That
+sounds like an arcane board file equivalent, and is counter to the
+entire reason for using UEFI and ACPI -- having a well-defined
+(excluding particular driver bindings, and I'm not arguing well-defined
+means nice) stable standard that allows the kernel to boot on an
+arbitrary platform without requiring arbitrary platform-specific code
+everywhere in the boot path.
+
+It might not be pretty, and it will certainly require a lot of work, but
+I'd prefer it at least for a semblance of uniformity.
+
+I think that trying to shoe-horn ACPI-derived information into device
+tree is fundamentally the wrong approach. I don't think it encourages
+best practices, and I don't think it's beneficial to the long term
+health of Linux or the ecosystem as a whole.
+
+> [There, commence centithread]
+
+[centithread commenced]
+
+Thanks,
+Mark.
