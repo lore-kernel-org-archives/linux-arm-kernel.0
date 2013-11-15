@@ -1,19 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Nov 2013 09:18:38 -0600
-Subject: [PATCH] ARM: OMAP4+: pm_debug: provide more visibility into
- suspend failure
-In-Reply-To: <1384528302-31730-1-git-send-email-nm@ti.com>
-References: <1384528302-31730-1-git-send-email-nm@ti.com>
-Message-ID: <52863B4E.1040501@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 15 Nov 2013 10:21:42 -0500
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <20131115121215.901EFC40885@trevor.secretlab.ca>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <20131115121215.901EFC40885@trevor.secretlab.ca>
+Message-ID: <20131115152142.GC10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apologies - $subject should have been an RFC PATCH.
+On Fri, Nov 15, 2013 at 09:12:15PM +0900, Grant Likely wrote:
+> On Mon, 11 Nov 2013 20:29:20 +0000, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Consumers of the Linux kernel's build products are beginning to hardcode
+> > the filenames of the dtbs generated.  Since the dtb filenames are
+> > currently the dts filename s/dts/dtb/, this prevents the kernel
+> > community from renaming dts files as needed.
+> > 
+> > Let's provide a consistent naming structure for consumers to script
+> > against.  Or at least, as consistent as the dts properties themselves.
+> > 
+> > With this patch, adding the '-L' option to the dtc commandline will
+> > cause dtc to create a symlink to the generated dtb, using the board
+> > compatible string as the filename, eg:
+> > 
+> >   globalscale,mirabox.dtb -> armada-370-mirabox.dtb
+> 
+> This whole thread is just crazy. The filename is not an ABI. Anything
+> digging into the kernel build tree is a) wrong, and b) userspace tooling
+> consuming the kernel build products which is /not/ ABI and can be changed
 
-On 11/15/2013 09:11 AM, Nishanth Menon wrote:
+whew.  I still think there is a need for an install target.  The fact
+that our changing filenames might break things is an indicator of that.
 
-[...]
+> If we want to have a tool or script for creating a well formed directory
+> full of .dtb files because it would be helpful to U-Boot or something
+> else, then that is fine. Make it part of the "make install" path.
 
--- 
-Regards,
-Nishanth Menon
+I'm currently reworking the patch(es) to implement 'make dtbs-install'.
+I'll hopefully have them ready this weekend or sooner.  I'm taking the
+same tack as install.sh (/sbin/installdtbs takes precedence).
+
+thx,
+
+Jason.
