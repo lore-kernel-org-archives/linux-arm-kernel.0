@@ -1,42 +1,47 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 15 Nov 2013 19:54:58 +0100
-Subject: [PATCH v2 0/3] arm: [U]EFI runtime services support
-In-Reply-To: <CAOesGMh+2Qs_cVMtdkpyXR44NJkQscs0eP_=pxwKXHkopaAKog@mail.gmail.com>
-References: <1380799481-5470-1-git-send-email-leif.lindholm@linaro.org>
- <CAOesGMh+2Qs_cVMtdkpyXR44NJkQscs0eP_=pxwKXHkopaAKog@mail.gmail.com>
-Message-ID: <20131115185458.GA30374@rocoto.smurfnet.nu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Nov 2013 19:57:35 +0100
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131115182826.GB14920@obsidianresearch.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131115182826.GB14920@obsidianresearch.com>
+Message-ID: <201311151957.36133.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Friday 15 November 2013, Jason Gunthorpe wrote:
+> 
+> On Fri, Nov 15, 2013 at 09:57:17AM +0000, Mark Rutland wrote:
+> 
+> > first-class citizen. We don't need to modify every driver and subsystem
+> > to support ACPI, only those necessary to support the minimal set of
+> > platforms using ACPI. ACPI is new in the arm space, and we can enforce
+> > quality standards on ACPI now above what we're allowing for DT, and
+> > avoid future problems.
+> 
+> I think to replicate the kind of 'success' ACPI sees in x86-land you
+> really need to push back on the HW folks and limit what drivers will
+> be supported on ACPI systems.
+> 
+> ACPI should be coupled with a standard basic HW environment -
+> analogous to the stable APIC, PCI and HPET standards we have in
+> x86. (ARMv8 only?)
 
-Many thanks for having a look.
+timers and interrupts are pretty much standardized in ARMv8 and in
+SMP-capable ARMv7 systems now, it's really the PCI argument that
+matters here. Even on Intel's embedded SoCs, the integrated 
+peripherals tend to be shown to software as standalone PCI devices
+that don't need to talk to another internal device to set up
+DMA, clocks, pinmux etc.
 
-On Fri, Nov 15, 2013 at 10:04:22AM -0800, Olof Johansson wrote:
-> This series is generally looking sane to me without looking at the
-> code in very close detail.
+> Other essential devices (ethernet, graphics, etc) should fit within
+> the PCI framework. Again, mostly like x86.
+> 
+> If you don't fit in that model then use DT.
+> 
+> If you need the kernel to control clk, pinctrl, regulator, etc then
+> you should be using DT.
 
-In the interest of full disclosure, I would like to point out that I
-will be posting another version next week, based on the output of the
-discussions around the DT bindings and documentation.
- 
-This set needs to be tested in combination with Roy's UEFI stub patches
-is recommended, as this is the intended boot mechanism on UEFI
-platforms. https://wiki.linaro.org/LEG/Engineering/Kernel/UEFI/EFIstub
+Exactly.
 
-> Do you have a test setup that you've been using for this that you
-> could give a pointer to?
-
-Well, I have been using vexpress ca9 and ca15_a7 (TC2), or the ARM
-commercial software models (RTSM) of the same. I have also tested on
-Arndale, but I don't know if that is fully supported by mainline yet.
-
-Prebuilt UEFI images are available from
-http://releases.linaro.org/13.09/components/kernel/uefi-linaro
-
-efibootmgr is probably the best utility to test the runtime services,
-if scanning the /sys entries are not sufficient. It builds for armhf
-without modification.
-
-/
-    Leif
+	Arnd
