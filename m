@@ -1,53 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Nov 2013 23:21:09 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <201311152056.47846.arnd@arndb.de>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115175241.GB27174@quad.lixom.net>
- <20131115180832.GR16735@n2100.arm.linux.org.uk>
- <201311152056.47846.arnd@arndb.de>
-Message-ID: <20131115232109.GT16735@n2100.arm.linux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Nov 2013 15:24:40 -0800
+Subject: [PATCH] arm/arm64: KVM: Fix hyp mappings of vmalloc regions
+Message-ID: <1384557880-14107-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 08:56:47PM +0100, Arnd Bergmann wrote:
-> On Friday 15 November 2013, Russell King - ARM Linux wrote:
-> > On Fri, Nov 15, 2013 at 09:52:41AM -0800, Olof Johansson wrote:
-> > > If we knew exactly what we wanted, it'd be a different story. _We
-> > > don't_. We're into year FOUR of the device tree conversion and we're just
-> > > now reaching a point where we think we know what a good solution looks
-> > > like. The first two years were easy -- they were the trivial devices we're
-> > > now talking about on ACPI. After that it got harder. Going through all
-> > > of that again with ACPI? No. No way. Microsoft gets to do it and while
-> > > they're busy sorting it out, we'll boot with device tree.
-> > 
-> > However, there's a very big danger here.  I disagree with the stance
-> > you're taking.
-> > 
-> > It seems that under ACPI and DT, we refer to properties by string names.
-> > That's good, but do we really want to have different string names for the
-> > same property.
-> 
-> For all I know, doing this in ACPI is something that is only now being
-> discussed as Intel wants to be able to reuse the existing features from
-> DT enabled drivers in the kernel and share the implementation between
-> embedded x86 SoCs and embedded ARM/PowerPC/MIPS/... SoCs. That part actually
-> isn't as crazy.
-> 
-> The existing ACPI usage however is basically all binary and cannot be
-> shared with DT, in particular it won't help for the orthogonal problem of
-> using ACPI to get "enterprise server" features on ARM64.
+Using virt_to_phys on percpu mappings is horribly wrong as it may be
+backed by vmalloc.  Introduce kvm_kaddr_to_phys which translates both
+types of valid kernel addresses to the corresponding physical address.
 
-That's strange, because the patches I've seen from people who want to
-add ACPI support to AMBA are all based around very similar strings to
-those in DT to lookup the same data in ACPI.
+At the same time resolves a typing issue where we were storing the
+physical address as a 32 bit unsigned long (on arm), truncating the
+physical address for addresses above the 4GB limit.  This caused
+breakage on Keystone.
 
-What's been done there is the function which reads from DT has been
-duplicated, and instead of reading the information from DT, it reads it
-from ACPI instead using string names without the vendor prefix.
+Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
 
-That tells me that what I've stated in my previous email to which you
-replied is _definitely_ possible to do.  That means it's certainly
-possible to do this without reinventing the wheel, and without having
-to rewrite lots of parsing code, precisely along the lines I set out
-in my original email.
+This patch is loosely based on Marc's previous patch from today but
+instead of introducing another Hyp mapping function, it fixes the
+existing one to deal with both kinds of kernel addresses.
+
+ arch/arm/kvm/mmu.c |   34 ++++++++++++++++++++++++++++------
+ 1 file changed, 28 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 3719583..5809069 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -334,6 +334,17 @@ out:
+ 	return err;
+ }
+ 
++static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
++{
++	if (!is_vmalloc_addr(kaddr)) {
++		BUG_ON(!virt_addr_valid(kaddr));
++		return __pa(kaddr);
++	} else {
++		return page_to_phys(vmalloc_to_page(kaddr)) +
++		       offset_in_page(kaddr);
++	}
++}
++
+ /**
+  * create_hyp_mappings - duplicate a kernel virtual address range in Hyp mode
+  * @from:	The virtual kernel start address of the range
+@@ -345,16 +356,27 @@ out:
+  */
+ int create_hyp_mappings(void *from, void *to)
+ {
+-	unsigned long phys_addr = virt_to_phys(from);
++	phys_addr_t phys_addr;
++	unsigned long virt_addr;
+ 	unsigned long start = KERN_TO_HYP((unsigned long)from);
+ 	unsigned long end = KERN_TO_HYP((unsigned long)to);
+ 
+-	/* Check for a valid kernel memory mapping */
+-	if (!virt_addr_valid(from) || !virt_addr_valid(to - 1))
+-		return -EINVAL;
++	start = start & PAGE_MASK;
++	end = PAGE_ALIGN(end);
+ 
+-	return __create_hyp_mappings(hyp_pgd, start, end,
+-				     __phys_to_pfn(phys_addr), PAGE_HYP);
++	for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE) {
++		int err;
++
++		phys_addr = kvm_kaddr_to_phys(from + virt_addr - start);
++		err = __create_hyp_mappings(hyp_pgd, virt_addr,
++					    virt_addr + PAGE_SIZE,
++					    __phys_to_pfn(phys_addr),
++					    PAGE_HYP);
++		if (err)
++			return err;
++	}
++
++	return 0;
+ }
+ 
+ /**
+-- 
+1.7.10.4
