@@ -1,50 +1,129 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 15 Nov 2013 15:44:17 +0000
-Subject: [PATCH v4] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <5286401E.5090400@gmail.com>
-References: <1379625868-5395-1-git-send-email-robherring2@gmail.com>
- <alpine.DEB.2.02.1311151447590.4714@kaball.uk.xensource.com>
- <5286401E.5090400@gmail.com>
-Message-ID: <alpine.DEB.2.02.1311151540550.4714@kaball.uk.xensource.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 15 Nov 2013 10:45:59 -0500
+Subject: [PATCH v2 11/13] ARM: Finish renaming ARM kprobes APIs for sharing
+ with uprobes
+In-Reply-To: <1384363014.3392.44.camel@linaro1.home>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-12-git-send-email-dave.long@linaro.org>
+ <1384363014.3392.44.camel@linaro1.home>
+Message-ID: <528641B7.2080409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Nov 2013, Rob Herring wrote:
-> On 11/15/2013 08:48 AM, Stefano Stabellini wrote:
-> > On Thu, 19 Sep 2013, Rob Herring wrote:
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> The PSCI spec from ARM has been updated to 0.2 version. Update the
-> >> binding document to reflect the spec changes. For the binding, the
-> >> major changes are the addition of psci_version, affinity_info,
-> >> migrate_info_type, migrate_info_up_cpu, system_reset and system_off
-> >> functions. The recommended function ID numbering has also changed.
-> >>
-> >> This update also defines 32 and 64 bit calling conventions. The calling
-> >> convention is defined on a per function ID basis.
-> >>
-> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >> Cc: Dave Martin <Dave.Martin@arm.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Ian Campbell <Ian.Campbell@citrix.com>
-> >> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>,
-> >> Cc: Charles Garcia-Tobin <Charles.Garcia-Tobin@arm.com>
-> >> Cc: Matt Sealey <neko@bakuhatsu.net>
-> >> Cc: devicetree at vger.kernel.org
-> > 
-> > Rob,
-> > I noticed that this patch hasn't gone upstream yet. Is the interface
-> > still under discussion?
-> > I am thinking of implementing the Xen side of it.
-> 
-> Since we can't seem to agree on how to extend the binding, I plan to go
-> back to something more simple which is simply adding 2 optional
-> properties to the existing "arm,psci" binding. This would be enough to
-> meet the needs of KVM, Xen, and highbank. A future binding can deal with
-> the whole 32 and 64-bit calling convention issue.
+On 11/13/13 12:16, Jon Medhurst (Tixy) wrote:
+> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Use the prefix "probes_" for APIs and definitions to be shared between
+>> kprobes and uprobes. Pass additional information into the lower-level decoding
+>> functions to avoid having to duplicate architecture-specfific data structures.
+>> Make susbsystem-specific APIs static (non-global) again.  Make a couple of utility
+>> functions (probes_simulate_nop and probes_emulate_none) sharable and in a common
+>> file. Keep the current "action" tables specific to kprobes, as this is where
+>> uprobes functionality will be connected up to the instruction interpreter.
+>
+> That's a rather long list of things this patch is reorganising and makes
+> it very difficult to review. For those class of changes which are
+> independent of each other, can you do them as separate patches?
+>
+> Particularly, the change from using the function arguments
+>
+>      struct kprobe *p
+>
+> to
+>      probes_opcode_t opcode, probes_opcode_t *addr, struct arch_specific_insn *asi
+>
+> should be in it's own separate patch as that is spread out across multiple files
+> and functions.
 
-OK. TBH Xen doesn't need anything more than what is already specified in
-"arm,psci".
-However it would have been nice to fully implement the latest PSCI spec.
+OK, I will break this down further into separate patches.
+
+> I have a few general comments on this patch...
+>
+> 1. I don't think we actually need to pass 'probes_opcode_t *addr' to the
+> simulation functions, this will be the same as regs->ARM_pc (except that
+> for thumb code 'addr' has bit0 set, which we don't actually care about).
+> So drop the new 'addr' argument, and we can also delete the definition of
+> thumb_probe_pc() and replace its use with 'regs->ARM_pc + 4'
+
+I had some trouble getting that to work before, but I'll try again.
+
+> 2. Now we pass 'probes_opcode_t opcode' to simulation functions a lot of
+> them end up doing the redundant...
+>
+>     kprobe_opcode_t insn = opcode
+>
+> I would suggest deleting all of these assignments and either rename all
+> use of 'insn' to 'opcode' or just changing the function argument name to
+> 'insn'.
+
+OK, I'll have a go at that.
+
+> 3. I've a comment about the change to probes_decode_insn, I've snipped
+> the rest of the patch...
+>
+> [...]
+>>   int __kprobes
+>> -kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>> +probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>>   				const union decode_item *table, bool thumb,
+>> -				const union decode_item *actions)
+>> +				bool usermode, const union decode_item *actions)
+>>   {
+>
+> The new argument 'usermode' is named for the use you are using it for,
+> i.e. uprobes, I think the code is more intuitive if it was called
+> something like 'no_emulate', because what the argument does is force all
+> emulate operations to become 'custom'.
+>
+> Perhaps to avoid double negatives like !no_emulate, the logic of the
+> argument could be inverted and it called 'use_emulation' or something.
+
+Or maybe just "emulate".
+
+>> -	const struct decode_header *h = (struct decode_header *)table;
+>> -	const struct decode_header *next;
+>> +	struct decode_header *h = (struct decode_header *)table;
+>> +	struct decode_header *next;
+>>   	bool matched = false;
+>>
+>> -	insn = prepare_emulated_insn(insn, asi, thumb);
+>> +	if (!usermode)
+>> +		insn = prepare_emulated_insn(insn, asi, thumb);
+>>
+>>   	for (;; h = next) {
+>>   		enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
+>> @@ -401,7 +412,7 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>>   		if (!matched && (insn & h->mask.bits) != h->value.bits)
+>>   			continue;
+>>
+>> -		if (!decode_regs(&insn, regs))
+>> +		if (!decode_regs(&insn, regs, !usermode))
+>>   			return INSN_REJECTED;
+>>
+>>   		switch (type) {
+>> @@ -414,7 +425,8 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>>
+>>   		case DECODE_TYPE_CUSTOM: {
+>>   			struct decode_custom *d = (struct decode_custom *)h;
+>> -			return actions[d->decoder.bits].decoder(insn, asi, h);
+>> +			return actions[d->decoder.bits].decoder(insn,
+>> +					asi, h);
+>>   		}
+>>
+>>   		case DECODE_TYPE_SIMULATE: {
+>> @@ -425,6 +437,11 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>>
+>>   		case DECODE_TYPE_EMULATE: {
+>>   			struct decode_emulate *d = (struct decode_emulate *)h;
+>> +
+>> +			if (usermode)
+>> +				return actions[d->handler.bits].decoder(insn,
+>> +								asi, h);
+>> +
+>>   			asi->insn_handler = actions[d->handler.bits].handler;
+>>   			set_emulated_insn(insn, asi, thumb);
+>>   			return INSN_GOOD;
+>
+> [...]
+>
