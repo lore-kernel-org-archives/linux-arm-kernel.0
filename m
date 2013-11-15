@@ -1,86 +1,47 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 15 Nov 2013 19:03:30 +0000
-Subject: [PATCH v2] ARM: signal: fix armv7-m build issue in
- sigreturn_codes.S
-In-Reply-To: <1384325867-5140-1-git-send-email-victor.kamensky@linaro.org>
-References: <1384325867-5140-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20131115190330.GD4028@e103592.cambridge.arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 15 Nov 2013 16:14:30 +0000
+Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
+In-Reply-To: <528542AC.4080405@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net> <
+ 52814AFB.3070600@wwwdotorg.org> <
+ CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com> <
+ 528275B7.6050209@wwwdotorg.org> <20131112193012.GR10335@titan.lakedaemon.
+ net> <52828C77.20001@wwwdotorg.org> <20131114162859.GX10335@titan.
+ lakedaemon.net> <52851DC8.203@wwwdotorg.org> <20131114191622.GC21549@
+ obsidianresearch.com> <528542AC.4080405@wwwdotorg.org>
+Message-ID: <20131115161430.E5938C408A5@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 10:57:46PM -0800, Victor Kamensky wrote:
-> Hi,
+On Thu, 14 Nov 2013 14:37:48 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/14/2013 12:16 PM, Jason Gunthorpe wrote:
+> > On Thu, Nov 14, 2013 at 12:00:24PM -0700, Stephen Warren wrote:
+> > 
+> >> I don't think a distro should need to know the DTB filename at all.
+> >> Rather, the/a bootloader should know which platform it's running on, and
+> >> provide a variable/... to the boot script/... that defines the DTB
+> >> filename. That would completely remove all the knowledge of DTB
+> >> filenames from distros.
+> > 
+> > At some point the distro has to install a dtb into some cannonical
+> > place so the bootloader can find it..
+> > 
+> > Are you thinking that distros will have to ship a /boot/dtbs/*.dtb
+> > with every dtb from the kernel build?
 > 
-> Here is version 2 of fix to armv7-m build failure in sigreturn_codes.S.
-> It is based on Dave's suggestion on [1]. Basically it set
-> arch to arm4t explicitly if CONFIG_CPU_THUMBONLY is set.
-> That enables both arm and thumb opcodes and code merged with
-> the rest of image.
+> Yes. How else would the distro support booting the install on arbitrary
+> boards?
 > 
-> Version 1 [2] used conditional compilation.
+> > What happens when you install two different versions of the kernel?
 > 
-> Fix was tested
->    linux-next with efm32_defconfig build (along with few other fixes)
->    rmk-next BE/LE arndale build/boot and LTP rt_sigaction0? tests run
+> /boot/zImage-$version
+> /boot/dtbs-$version/*.dtb
 > 
-> Dave, I've added your name with Suggested-by tag, please
-> let me know if it is not OK with you, I'll remove it then.
+> > What about boot schemes that can load a kernel version dependent dtb?
 > 
-> Uwe, is it possible for you to test that this fix runs on 
-> efm32? Sorry, for multiple requests.
-> 
-> To address concern about fragility of proposed solution
-> I looked binutils bfd/elf32-arm.c
-> 
->   https://sourceware.org/git/?p=binutils.git;a=blob;f=bfd/elf32-arm.c;h=5af1643bf506870e741ee4da7bd645083619e16d;hb=HEAD
-> 
-> Attributes merge deals with couple things:
-> 
-> Tag_CPU_arch: tag_cpu_arch_combine function deals with it
-> and from its tables it seems that v4t is compatible with
-> any latter version and resulting value will come from 
-> latter version. I.e v4t and v7 (v7m) would merge fine.
-> 
-> Tag_CPU_arch_profile: since in case of '.arch armv4t' 
-> profile attribute is not generated it is merged fine
-> with any other profile. Unlike in case of 
-> '.arch armv7a' and '.arch armv7m' profile values would
-> be 'Application' and 'Microcontroller' and those 
-> conflict.
-> 
-> Above logic seems to be universal, so other linkers
-> may follow it too. So it seems it is good to use 
-> '.arch armv4t' with armv7m code.
+> I think that's solved by installing the DTB files in a
+> kernel-version-specific directory.
 
-[Apologies if you already saw a reply to this.  I was writing one
-previously, but I think I never finished it.  Anyway, here it is...]
+That's certainly the way I would solve it.
 
-After thinking about this, I'm not sure that this logic is really sound.
-
-By allowing v7M objects to be linked together with ARM objects, ld
-creates objects with nonsensical attributes:
-
-File Attributes
-  Tag_CPU_name: "7-M"
-  Tag_CPU_arch: v7
-  Tag_CPU_arch_profile: Microcontroller
-  Tag_ARM_ISA_use: Yes
-  Tag_THUMB_ISA_use: Thumb-2
-
-i.e., a object cannot really be compatible with the microcontroller
-profile and also contain ARM instructions.  v7-M is absolutely not a
-superset of v4T.
-
-
-So, I think we are getting lucky here, and there's no real reason why
-a different linker (or future versions of GNU ld) should allow this.
-
-The alternative is to use #ifdefs, and replace the ARM instructions and
-associates directives with suitable .space directives or nops in the ARM
-case.
-
-This brings us back closer to your original suggestion, I guess.
-
-
-Cheers
----Dave
+g.
