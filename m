@@ -1,50 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Nov 2013 11:02:56 -0800
-Subject: [PATCH 00/11] Make omap24xx booting device tree based for
- v3.14 merge window
-In-Reply-To: <20131115184744.GA10997@blackmetal.musicnaut.iki.fi>
-References: <1384474198-20756-1-git-send-email-tony@atomide.com>
- <20131115184744.GA10997@blackmetal.musicnaut.iki.fi>
-Message-ID: <20131115190255.GB10317@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 15 Nov 2013 19:03:30 +0000
+Subject: [PATCH v2] ARM: signal: fix armv7-m build issue in
+ sigreturn_codes.S
+In-Reply-To: <1384325867-5140-1-git-send-email-victor.kamensky@linaro.org>
+References: <1384325867-5140-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131115190330.GD4028@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [131115 10:48]:
+On Tue, Nov 12, 2013 at 10:57:46PM -0800, Victor Kamensky wrote:
 > Hi,
 > 
-> On Thu, Nov 14, 2013 at 04:09:47PM -0800, Tony Lindgren wrote:
-> > Here are some early patches for the v3.14 merge window to make
-> > omap2 booting device tree based before we make omap3 device
-> > tree only. Otherwise we cannot remove the shared platform data
-> > between omap2 and 3 for things like some hwmod entries.
-> > 
-> > I've added minimal support for 2430sdp to boot it to serial
-> > console with ethernet working, and kept n8x0 support using
-> > the legacy init for the drivers. Then the old H4 I have not
-> > updated as I'm not using it.
-> > 
-> > Hopefully if there are still people using n8x0 they can
-> > pick up the work from here on removing the rest of the legacy
-> > platform data init as we're planning to drop those things
-> > completely over next few merge cycles.
+> Here is version 2 of fix to armv7-m build failure in sigreturn_codes.S.
+> It is based on Dave's suggestion on [1]. Basically it set
+> arch to arm4t explicitly if CONFIG_CPU_THUMBONLY is set.
+> That enables both arm and thumb opcodes and code merged with
+> the rest of image.
 > 
-> Thanks for the effort, I'll try to continue this work. You can add my
-> Tested-by for N8x0 bits.
+> Version 1 [2] used conditional compilation.
 > 
-> > Note that these patches are against mainline commit 10d0c9705
-> > as there are few device tree related fixes to stuff the resources.   
-> > These also depend on the recently posted fixes series
-> > "[PATCH 0/8] Various omap device tree usability fixes for v3.13
-> > merge window"
+> Fix was tested
+>    linux-next with efm32_defconfig build (along with few other fixes)
+>    rmk-next BE/LE arndale build/boot and LTP rt_sigaction0? tests run
 > 
-> I noticed one bug. If you disable MACH_NOKIA_N8X0 from .config, there
-> is a compilation failure:
+> Dave, I've added your name with Suggested-by tag, please
+> let me know if it is not OK with you, I'll remove it then.
 > 
-> arch/arm/mach-omap2/built-in.o: In function `omap2420_n8x0_legacy_init':
-> /home/aaro/git/linux/arch/arm/mach-omap2/pdata-quirks.c:76: undefined reference to `n8x0_legacy_init'
+> Uwe, is it possible for you to test that this fix runs on 
+> efm32? Sorry, for multiple requests.
+> 
+> To address concern about fragility of proposed solution
+> I looked binutils bfd/elf32-arm.c
+> 
+>   https://sourceware.org/git/?p=binutils.git;a=blob;f=bfd/elf32-arm.c;h=5af1643bf506870e741ee4da7bd645083619e16d;hb=HEAD
+> 
+> Attributes merge deals with couple things:
+> 
+> Tag_CPU_arch: tag_cpu_arch_combine function deals with it
+> and from its tables it seems that v4t is compatible with
+> any latter version and resulting value will come from 
+> latter version. I.e v4t and v7 (v7m) would merge fine.
+> 
+> Tag_CPU_arch_profile: since in case of '.arch armv4t' 
+> profile attribute is not generated it is merged fine
+> with any other profile. Unlike in case of 
+> '.arch armv7a' and '.arch armv7m' profile values would
+> be 'Application' and 'Microcontroller' and those 
+> conflict.
+> 
+> Above logic seems to be universal, so other linkers
+> may follow it too. So it seems it is good to use 
+> '.arch armv4t' with armv7m code.
 
-OK thanks for testing, I'll fix that.
+[Apologies if you already saw a reply to this.  I was writing one
+previously, but I think I never finished it.  Anyway, here it is...]
 
-Regards,
+After thinking about this, I'm not sure that this logic is really sound.
 
-Tony
+By allowing v7M objects to be linked together with ARM objects, ld
+creates objects with nonsensical attributes:
+
+File Attributes
+  Tag_CPU_name: "7-M"
+  Tag_CPU_arch: v7
+  Tag_CPU_arch_profile: Microcontroller
+  Tag_ARM_ISA_use: Yes
+  Tag_THUMB_ISA_use: Thumb-2
+
+i.e., a object cannot really be compatible with the microcontroller
+profile and also contain ARM instructions.  v7-M is absolutely not a
+superset of v4T.
+
+
+So, I think we are getting lucky here, and there's no real reason why
+a different linker (or future versions of GNU ld) should allow this.
+
+The alternative is to use #ifdefs, and replace the ARM instructions and
+associates directives with suitable .space directives or nops in the ARM
+case.
+
+This brings us back closer to your original suggestion, I guess.
+
+
+Cheers
+---Dave
