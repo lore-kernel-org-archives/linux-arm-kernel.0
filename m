@@ -1,124 +1,134 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Nov 2013 14:48:15 +0100
-Subject: [PATCH v3 3/4] ata: Add APM X-Gene SoC SATA host controller driver
-In-Reply-To: <1384465153-29902-4-git-send-email-lho@apm.com>
-References: <1384465153-29902-1-git-send-email-lho@apm.com>
- <1384465153-29902-3-git-send-email-lho@apm.com>
- <1384465153-29902-4-git-send-email-lho@apm.com>
-Message-ID: <201311151448.16279.arnd@arndb.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 15 Nov 2013 14:52:56 +0100
+Subject: [RFC PATCH v2] ARM: at91: add support for Cosino board series by
+ HCE Engineering
+In-Reply-To: <20131114185002.GM10964@enneenne.com>
+References: <1383754767-5398-1-git-send-email-giometti@linux.it>
+ <1384364070-32306-1-git-send-email-nicolas.ferre@atmel.com>
+ <20131114162810.GJ28304@ns203013.ovh.net>
+ <20131114185002.GM10964@enneenne.com>
+Message-ID: <20131115135256.GP28304@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 November 2013, Loc Ho wrote:
->  
-> +config SATA_XGENE
-> +	tristate "APM X-Gene 6.0Gbps SATA host controller support"
-> +	depends on SATA_AHCI_PLATFORM
-> +	default y if ARM64
-> +	select SATA_XGENE_PHY
+On 19:50 Thu 14 Nov     , Rodolfo Giometti wrote:
+> On Thu, Nov 14, 2013 at 05:28:10PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 18:34 Wed 13 Nov     , Nicolas Ferre wrote:
+> > > From: Rodolfo Giometti <giometti@linux.it>
+> > > 
+> > > This patch adds the Cosino at91sam9g35 based CPU module and the
+> > > Cosino Mega 2560 extension board.
+> > > 
+> > > Web site: http://www.cosino.it
+> > > 
+> > > Signed-off-by: Rodolfo Giometti <giometti@linux.it>
+> > > [nicolas.ferre at atmel.com: adapted to newer kernel, modified commit message]
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > ---
+> > > Rodolfo,
+> > > 
+> > > Can you please review this adaptation of your previous patch to newer kernel.
+> > > I hope to integrate your board in upcoming 3.14.
+> > > 
+> > > You will see that I addressed the remarks by Jean-Christophe and Russell (about
+> > > commit message). Please tell me if it is good on your side.
+> > > 
+> > > Ciao,
+> > > 
+> > > 
+> > >  arch/arm/boot/dts/Makefile                 |   1 +
+> > >  arch/arm/boot/dts/at91-cosino.dtsi         | 122 +++++++++++++++++++++++++++++
+> > >  arch/arm/boot/dts/at91-cosino_mega2560.dts |  85 ++++++++++++++++++++
+> > >  3 files changed, 208 insertions(+)
+> > >  create mode 100644 arch/arm/boot/dts/at91-cosino.dtsi
+> > >  create mode 100644 arch/arm/boot/dts/at91-cosino_mega2560.dts
+> > > 
+> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > > index d57c1a6..772a30e 100644
+> > > --- a/arch/arm/boot/dts/Makefile
+> > > +++ b/arch/arm/boot/dts/Makefile
+> > > @@ -30,6 +30,7 @@ dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
+> > >  dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
+> > >  # sam9x5
+> > >  dtb-$(CONFIG_ARCH_AT91) += at91-ariag25.dtb
+> > > +dtb-$(CONFIG_ARCH_AT91) += at91-cosino_mega2560.dtb
+> > >  dtb-$(CONFIG_ARCH_AT91) += at91sam9g15ek.dtb
+> > >  dtb-$(CONFIG_ARCH_AT91) += at91sam9g25ek.dtb
+> > >  dtb-$(CONFIG_ARCH_AT91) += at91sam9g35ek.dtb
+> > > diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
+> > > new file mode 100644
+> > > index 0000000..53f2b01
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/at91-cosino.dtsi
+> > > @@ -0,0 +1,122 @@
+> > > +/*
+> > > + * at91-cosino.dtsi - Device Tree file for Cosino core module
+> > > + *
+> > > + * Copyright (C) 2013 - Rodolfo Giometti <giometti@linux.it>
+> > > + *			HCE Engineering
+> > > + *
+> > > + * Derived from at91sam9x5ek.dtsi by:
+> > > + *	Copyright (C) 2012 Atmel,
+> > > + *	2012 Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > + *
+> > > + * Licensed under GPLv2 or later.
+> > > + */
+> > > +
+> > > +#include "at91sam9g35.dtsi"
+> > > +
+> > > +/ {
+> > > +	model = "HCE Cosino core module";
+> > > +	compatible = "hce,cosino", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+> > is this really sam9xek compatible?
+> 
+> Well, the board is derived from ATMEL dev board... maybe I can remove
+> these lines... :-/
 
-I don't think the "default y" is appropriate here, since there are going to
-be lots of ARM64 platforms in the long run that don't have this. Also,
-there is a trend towards using CONFIG_COMPILE_TEST to limit the
-visibility.
-
-I'd suggest something like
-
-config SATA_XGENE
-	tristate "APM X-Gene 6.0Gbps SATA host controller support"
-	depends on ARM64 || COMPILE_TEST
-	...
-
-> +/* Enable for dumping CSR read/write access */
-> +#undef XGENE_DBG_CSR
-
-This should be removed now as well, along with the debug macro you already removed.
-
+compatible means you board is an extension and that the kernel + dtb will run
+on both without modification
+> 
+> > > +
+> > > +	chosen {
+> > > +		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait";
+> > > +	};
+> > > +
+> > ...
+> > > +/ {
+> > > +	model = "HCE Cosino Mega 2560";
+> > > +	compatible = "hce,cosino_mega2560", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+...
 > +
-> +/* Temporary function until the PHY parameter API */
-> +extern void xgene_ahci_phy_set_pq(struct phy *phy, int chan, int data);
-> +extern void xgene_ahci_phy_set_spd(struct phy *phy, int chan, int gen);
-
-Ah, that should have been mentioned in the changeset text. Do you think you
-can remove these for the final version?
-
-> +static void xgene_rd(void *addr, u32 *val)
-> +{
-> +	*val = readl(addr);
-> +#if defined(XGENE_DBG_CSR)
-> +	printk(KERN_DEBUG "SATAPHY CSR RD: 0x%p value: 0x%08x\n", addr, *val);
-> +#endif
-> +}
-
-The interface you are looking for is pr_debug() or dev_dbg(), which get
-built-in only if the DEBUG macro is set.
-
-In a lot of cases, it's actually best to remove debug output like this from
-the driver once you have it working  -- whoever is debugging problems in 
-the driver next might need completely different debugging information or
-can add them back easily if needed.
-
-It's your choice if you want to use pr_debug() or remove that output
-entirely. If you remove it, best remove the helper functions entirely
-and use readl/writel directly.
-
-> +/* Flush the IOB to ensure all SATA controller writes completed before
-> +   servicing the completed command. */
-> +static int xgene_ahci_iob_flush(struct xgene_ahci_context *ctx)
-> +{
-> +	if (ctx->ahbc_io_base == NULL) {
-> +		void *ahbc_base;
-> +		u32 val;
+> +	ahb {
+> +		apb {
+> +			mmc0: mmc at f0008000 {
+> +				pinctrl-0 = <
+> +					&pinctrl_board_mmc0
+> +					&pinctrl_mmc0_slot0_clk_cmd_dat0
+> +					&pinctrl_mmc0_slot0_dat1_3>;
+> +				status = "okay";
+> +				slot at 0 {
+> +					reg = <0>;
+> +					bus-width = <4>;
+> +					cd-gpios = <&pioD 15 GPIO_ACTIVE_HIGH>;
+> +				};
+> +			};
 > +
-> +		/* The AHBC address is fixed in X-Gene */
-> +		ahbc_base = devm_ioremap(ctx->dev, 0x1F2A0000, 0x80000);
-> +		if (!ahbc_base) {
-> +			dev_err(ctx->dev, "can't map AHBC resource\n");
-> +			return -ENODEV;
-> +		}
-
-I had an important comment about the misuse of hardcoded I/O addresses
-here. Please never just post a new version with the same issue. In general,
-your options are:
-
-* rewrite the code in a more appropriate way
-* reply to the comment, arguing why you think your code is correct
-* ask for clarification if you don't know how to improve the code
-* mark the code as TODO and mention in the patch description why you
-  are still working on this and that the current version should not
-  be seen as final.
-
-If you don't do any of these, reviewers will get annoyed because you
-are wasting their time.
+...
 > +
-> +static int xgene_ahci_get_u32_param(struct platform_device *pdev,
-> +				    const char *of_name, char *acpi_name,
-> +				    u32 *param)
-> +{
-> +#ifdef CONFIG_ACPI
-> +	if (efi_enabled(EFI_BOOT)) {
-> +		unsigned long long value;
-> +		acpi_status status;
-> +		if (acpi_name == NULL)
-> +			return -ENODEV;
-> +		status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
-> +					       acpi_name, NULL, &value);
-> +		if (ACPI_FAILURE(status))
-> +			return -ENODEV;
-> +		*param = value;
-> +		return 0;
-> +	}
-> +#endif
-
-There are more previous comments that you have not addressed yet.
-
-> diff --git a/drivers/ata/sata_xgene.h b/drivers/ata/sata_xgene.h
-> new file mode 100644
-> index 0000000..51e73f6
-> --- /dev/null
-> +++ b/drivers/ata/sata_xgene.h
-
-This file should probably just be folded into the driver, since it contains no
-interfaces between  modules, just internal definitions.
-
-	Arnd
+> +			mmc1: mmc at f000c000 {
+> +				pinctrl-0 = <
+> +					&pinctrl_board_mmc0
+this will failled you can not have the same pux on 2 device
+> +					&pinctrl_mmc1_slot0_clk_cmd_dat0
+> +					&pinctrl_mmc1_slot0_dat1_3>;
+> +				status = "okay";
+> +				slot at 0 {
+> +					reg = <0>;
+> +					bus-width = <4>;
+> +					non-removable;
+> +				};
+> +			};
+> +		};
+> +
+Best Regards,
+J.
