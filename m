@@ -1,216 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Nov 2013 19:19:04 +0100
-Subject: [PATCH v4 1/4] reset: Add Allwinner SoCs Reset Controller Driver
-In-Reply-To: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1384539547-29463-2-git-send-email-maxime.ripard@free-electrons.com>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 15 Nov 2013 10:20:24 -0800
+Subject: [PATCHv5] dmaengine: Add support for BCM2835
+In-Reply-To: <20131115174337.GP16735@n2100.arm.linux.org.uk>
+References: <52864BBC.7000506@koalo.de> <1384535016.18739.23.camel@joe-AO722>
+ <20131115174337.GP16735@n2100.arm.linux.org.uk>
+Message-ID: <1384539624.18739.27.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31 and most of the other Allwinner SoCs have an IP
-maintaining a few other IPs in the SoC in reset by default. Among these
-IPs are the A31's High Speed Timers, hence why we can't use the regular
-driver construct in every cases, and need to call the registering
-function directly during machine initialisation.
+On Fri, 2013-11-15 at 17:43 +0000, Russell King - ARM Linux wrote:
+> On Fri, Nov 15, 2013 at 09:03:36AM -0800, Joe Perches wrote:
+> > On Fri, 2013-11-15 at 17:28 +0100, Florian Meier wrote:
+> > > +static size_t bcm2835_dma_desc_size_pos(struct bcm2835_desc *d, dma_addr_t addr)
+> > > +{
+> > > +	unsigned i;
+> > > +	size_t size;
+> > 
+> > Please set size to 0 here and not in the for loop
+> > > +
+> > > +	for (size = i = 0; i < d->frames; i++) {
+> 
+> I disagree with that comment; I think the above is not only cleaner, but
+> also more obvious that _this_ loop is calculating _this_ size.
 
-Apart from this, the implementation is fairly straightforward, and could
-easily be moved to a generic MMIO-based reset controller driver if the
-need ever arise.
+I think that using
+	size_t size = 0;
+is not only _much_ more commonly used
+throughout the kernel but makes it
+clearer that the initialization of the
+return value is done before the loop.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/reset/Makefile      |   1 +
- drivers/reset/reset-sunxi.c | 175 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 176 insertions(+)
- create mode 100644 drivers/reset/reset-sunxi.c
+Reasonable minds can differ and there
+is no style guide that prefers one over
+the other.
 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 1e2d83f2b995..cc29832c9638 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_RESET_CONTROLLER) += core.o
-+obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
-diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-new file mode 100644
-index 000000000000..695bd3496eba
---- /dev/null
-+++ b/drivers/reset/reset-sunxi.c
-@@ -0,0 +1,175 @@
-+/*
-+ * Allwinner SoCs Reset Controller driver
-+ *
-+ * Copyright 2013 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/types.h>
-+
-+struct sunxi_reset_data {
-+	spinlock_t			lock;
-+	void __iomem			*membase;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+static int sunxi_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct sunxi_reset_data *data = container_of(rcdev,
-+						     struct sunxi_reset_data,
-+						     rcdev);
-+	int bank = id / BITS_PER_LONG;
-+	int offset = id % BITS_PER_LONG;
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	reg = readl(data->membase + (bank * 4));
-+	writel(reg & ~BIT(offset), data->membase + (bank * 4));
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sunxi_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct sunxi_reset_data *data = container_of(rcdev,
-+						     struct sunxi_reset_data,
-+						     rcdev);
-+	int bank = id / BITS_PER_LONG;
-+	int offset = id % BITS_PER_LONG;
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	reg = readl(data->membase + (bank * 4));
-+	writel(reg | BIT(offset), data->membase + (bank * 4));
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static struct reset_control_ops sunxi_reset_ops = {
-+	.assert		= sunxi_reset_assert,
-+	.deassert	= sunxi_reset_deassert,
-+};
-+
-+static int sunxi_reset_init(struct device_node *np)
-+{
-+	struct sunxi_reset_data *data;
-+	struct resource res;
-+	resource_size_t size;
-+	int ret;
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	ret = of_address_to_resource(np, 0, &res);
-+	if (ret)
-+		goto err_alloc;
-+
-+	size = resource_size(&res);
-+	if (!request_mem_region(res.start, size, np->name)) {
-+		ret = -EBUSY;
-+		goto err_alloc;
-+	}
-+
-+	data->membase = ioremap(res.start, size);
-+	if (!data->membase) {
-+		ret = -ENOMEM;
-+		goto err_alloc;
-+	}
-+
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = size * 32;
-+	data->rcdev.ops = &sunxi_reset_ops;
-+	data->rcdev.of_node = np;
-+	reset_controller_register(&data->rcdev);
-+
-+	return 0;
-+
-+err_alloc:
-+	kfree(data);
-+	return ret;
-+};
-+
-+/*
-+ * These are the reset controller we need to initialize early on in
-+ * our system, before we can even think of using a regular device
-+ * driver for it.
-+ */
-+static const struct of_device_id sunxi_early_reset_dt_ids[] __initdata = {
-+	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
-+	{ /* sentinel */ },
-+};
-+
-+void __init sun6i_reset_init(void)
-+{
-+	struct device_node *np;
-+
-+	for_each_matching_node(np, sunxi_early_reset_dt_ids)
-+		sunxi_reset_init(np);
-+}
-+
-+/*
-+ * And these are the controllers we can register through the regular
-+ * device model.
-+ */
-+static const struct of_device_id sunxi_reset_dt_ids[] = {
-+	 { .compatible = "allwinner,sun6i-a31-clock-reset", },
-+	 { /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, sunxi_reset_dt_ids);
-+
-+static int sunxi_reset_probe(struct platform_device *pdev)
-+{
-+	return sunxi_reset_init(pdev->dev.of_node);
-+}
-+
-+static int sunxi_reset_remove(struct platform_device *pdev)
-+{
-+	struct sunxi_reset_data *data = platform_get_drvdata(pdev);
-+
-+	reset_controller_unregister(&data->rcdev);
-+	iounmap(data->membase);
-+	kfree(data);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sunxi_reset_driver = {
-+	.probe	= sunxi_reset_probe,
-+	.remove	= sunxi_reset_remove,
-+	.driver = {
-+		.name		= "sunxi-reset",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= sunxi_reset_dt_ids,
-+	},
-+};
-+module_platform_driver(sunxi_reset_driver);
-+
-+MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
-+MODULE_DESCRIPTION("Allwinner SoCs Reset Controller Driver");
-+MODULE_LICENSE("GPL");
--- 
-1.8.4.2
+No matter really to me.
+As I said, it's trivial.
+
+cheers, Joe
