@@ -1,44 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Nov 2013 19:19:06 +0100
-Subject: [PATCH v4 3/4] ARM: sunxi: Register the A31 reset IP in init_time
-In-Reply-To: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1384539547-29463-4-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 15 Nov 2013 19:19:03 +0100
+Subject: [PATCH v4 0/4] Add support for the Allwinner A31 Reset Controllers
+Message-ID: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has a reset IP that maintains a few other IPs in reset by
-default. Among these IPs are the UARTs, and most notably the timers. We
-thus need to register the reset driver before initializing the timers so
-that the reset timer can use the reset framework.
+Hi everyone,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-sunxi/sunxi.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+This patchset adds support for the reset controllers found in the Allwinner A31
+SoCs. Since these controllers are pretty simple, basically just a few MMIO
+registers, with a single bit controlling the reset state of the other devices
+it asserts in reset, the driver is quite simple as well.
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index f184f6c2fa33..2e79736abe95 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -142,9 +142,17 @@ static const char * const sun6i_board_dt_compat[] = {
- 	NULL,
- };
- 
-+extern void __init sun6i_reset_init(void);
-+static void __init sun6i_timer_init(void)
-+{
-+	sunxi_init_clocks();
-+	sun6i_reset_init();
-+	clocksource_of_init();
-+}
-+
- DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
- 	.init_machine	= sunxi_dt_init,
--	.init_time	= sunxi_timer_init,
-+	.init_time	= sun6i_timer_init,
- 	.dt_compat	= sun6i_board_dt_compat,
- 	.restart	= sun6i_restart,
- MACHINE_END
+However, one of the IPs asserted in reset by these controllers are the timers,
+the only thing standing out is that it requires to be registered before the
+timers are initialized.
+
+Thanks,
+Maxime
+
+Changes from v3:
+  - Added some locking
+  - Added back the sun6i compatible and the request_mem_region
+
+Changes from v2:
+  - Changed the commit logs to be a bit more generic
+  - Fixed a stupid breakage in the Makefile
+
+Changes from v1:
+  - Don't call request_mem_region, since some of these controllers will share
+    registers with clock drivers
+  - Switched to a more generic allwinner,sun4i-clock-reset compatible, since a
+    lot of these controllers are found in other SoCs than the A31
+  - Switched to a "real" driver using the device model for all these reset
+    controllers but the one that needs to be initialised early.
+  - Fixed a typo in one of the DT bindings that was leading to a compilation
+    breakage
+
+Maxime Ripard (4):
+  reset: Add Allwinner SoCs Reset Controller Driver
+  ARM: sunxi: Select ARCH_HAS_RESET_CONTROLLER
+  ARM: sunxi: Register the A31 reset IP in init_time
+  ARM: sun6i: Add the reset controller to the DTSI
+
+ arch/arm/boot/dts/sun6i-a31.dtsi |  24 ++++++
+ arch/arm/mach-sunxi/Kconfig      |   1 +
+ arch/arm/mach-sunxi/sunxi.c      |  10 ++-
+ drivers/reset/Makefile           |   1 +
+ drivers/reset/reset-sunxi.c      | 175 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 210 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/reset/reset-sunxi.c
+
 -- 
 1.8.4.2
