@@ -1,101 +1,92 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Nov 2013 10:01:03 -0500
-Subject: [PATCH V4 1/4] DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable
- irqs
-In-Reply-To: <20131115112329.GE1709@e106331-lin.cambridge.arm.com>
-References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
- <1384431530-2166-2-git-send-email-r.sricharan@ti.com>
- <20131114140103.GA28328@e106331-lin.cambridge.arm.com>
- <5284FE6C.9040901@ti.com>
- <20131115112329.GE1709@e106331-lin.cambridge.arm.com>
-Message-ID: <5286372F.3000302@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 15 Nov 2013 16:06:27 +0900
+Subject: Report from 2013 ARM kernel summit
+In-Reply-To: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
+References: <CACxGe6stYhZOc=MfGj8BgtG8zp6eh=jRFGUbFn1SSYRtw+zryA@mail.gmail.
+ com> <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
+Message-ID: <20131115070627.6CF65C4079B@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013 06:23 AM, Mark Rutland wrote:
-> On Thu, Nov 14, 2013 at 04:46:36PM +0000, Sricharan R wrote:
->> Hi Mark,
->>
->> On Thursday 14 November 2013 07:31 PM, Mark Rutland wrote:
->>> On Thu, Nov 14, 2013 at 12:18:47PM +0000, Sricharan R wrote:
->>>> In some socs the gic can be preceded by a crossbar IP which
->>>> routes the peripheral interrupts to the gic inputs. The peripheral
->>>> interrupts are associated with a fixed crossbar input line and the
->>>> crossbar routes that to one of the free gic input line.
->>>>
->>>> The DT entries for peripherals provides the fixed crossbar input line
->>>> as its interrupt number and the mapping code should associate this with
->>>> a free gic input line. This patch adds the support inside the gic irqchip
->>>> to handle such routable irqs. The routable irqs are registered in a linear
->>>> domain. The registered routable domain's callback should be implemented
->>>> to get a free irq and to configure the IP to route it.
->>>>
->>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Cc: Rajendra Nayak <rnayak@ti.com>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Grant Likely <grant.likely@linaro.org>
->>>> Cc: Rob Herring <rob.herring@calxeda.com>
->>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> ---
->>>>  [V2] Added default routable-irqs functions to avoid
->>>>       unnecessary if checks as per Thomas Gleixner comments
->>>>       and renamed routable-irq binding as per
->>>>       Kumar Gala <galak@codeaurora.org> comments.
->>>>
->>>>  [V3] Addressed unnecessary warn-on and updated default
->>>>       xlate function as per Thomas Gleixner comments
->>>>
->>>>  Documentation/devicetree/bindings/arm/gic.txt |    6 ++
->>>>  drivers/irqchip/irq-gic.c                     |   81 ++++++++++++++++++++++---
->>>>  include/linux/irqchip/arm-gic.h               |    7 ++-
->>>>  3 files changed, 83 insertions(+), 11 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
->>>> index 3dfb0c0..5357745 100644
->>>> --- a/Documentation/devicetree/bindings/arm/gic.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
->>>> @@ -49,6 +49,11 @@ Optional
->>>>    regions, used when the GIC doesn't have banked registers. The offset is
->>>>    cpu-offset * cpu-nr.
->>>>  
->>>> +- arm,routable-irqs : Total number of gic irq inputs which are not directly
->>>> +		  connected from the peripherals, but are routed dynamically
->>>> +		  by a crossbar/multiplexer preceding the GIC. The GIC irq
->>>> +		  input line is assigned dynamically when the corresponding
->>>> +		  peripheral's crossbar line is mapped.
->>> I'm not keen on the design of the arm,routable-irqs property. The set of
->>> IRQs which the crossbar IP can use is a property of which IRQ lines it
->>> has routed to the GIC. I don't see why that should be considered a
->>> property of the GIC; it's a property of the crossbar IP's attachment to
->>> the GIC.
->>>
->>> Given we already have a mechanism for describing the attachment (i.e.
->>> the interrupts property) where the property appears on the node for the
->>> device generating/propagating the interrupt, I don't see why we should
->>> do differently here.
->>  We did try using interrupts=<> property for all peripherals and
->>  mapping them as crossbar's parent. But that approach of representing
->>  crossbar as a interrupt parent was not accepted, since the crossbar
->>  was just routing the interrupts from peripherals to GIC and nothing more.
->>  Also  mapping all the interrupts using interrupt-map like property by a fixed way
->>  in DTS itself was considered hacky
+On Mon, 11 Nov 2013 10:47:23 +0100, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> Missed some MLs. Resending....
 > 
-> I'm not suggesting you should interrupt-map. I agree that that
-> interrupt-map is not suitable for a dynamically configurable device like
-> the crossbar.
+> Grant Likely <grant.likely@secretlab.ca> wrote @ Fri, 8 Nov 2013 14:20:46 +0100:
 > 
-> When you say that the crossbar is just routing the interrupts, at what
-> level is it doing so? Does it accept a logical interrupt and output
-> another logical interrupt, or does it just connect the two lines
-> electrically?
+> > Early Init, Deferred Probe and Init Order
+> ...
+> > The big problem with deferring to initcalls is that the kernel doesn?t
+> > have any information about dependencies between devices and so doesn?t
+> > know what order to call modules in. Right now driver probe order is
+> > roughly determined by kernel link order first, and registration order
+> > second for devices populated during or after initcalls. Olof commented
+> > that the current driver model is based on the assumption that devices
+> > live in a single hierarchy. There is no easy way to add in dependency
+> > data with the current structure, and in most cases dependencies aren?t
+> > specifically on other devices, but rather on the service provided by
+> > another device (ie, a GPIO line).
 > 
-Its just makes electrical connection between input and output line and
-thats it.
+> I think that an IOMMU device is also the service provider for other
+> devices, where an single IOMMU device resides in the bus to provide
+> the address translation to the bus children.
+> 
+> > Kumar is concerned that deferred probe won?t work in all situations. For
+> > instance, what about a device that has an optional dependency? Does it
+> > fail to probe in the hope that the dependency will show up later? It was
+> 
+> Other devices don't know if the system has IOMMU or not. IOMMU'able
+> devices' population can be deferred till IOMMU device is populated,
+> but they don't know if there's really IOMMU device exists or not at
+> their population time.
 
-Regards,
-Santosh
+Deferring the population might complicate the common code by changing
+the time that devices get created. Right now the code is oriented around
+doing it all at once.
+
+However, it would be possible to cause a probe deferal on devices that
+requires an IOMMU in a way that it would be triggered by the bus instead
+of by the individual device drivers.
+
+I don't really know the details well enough to comment intelliently.
+Craft up the patches and see what it looks like.
+
+> > The suggestion was made that it would be a really nice to have the core
+> > kernel sort out probe order rather than using deferred probe. Grant
+> > replied that deferred probe was designed as the simplest possible
+> > solution to the problem, and by no means is he attached to it if someone
+> > can come up with a better approach. He did consider other options that
+> > put dependency resolution into the core, but it ended up pulling all
+> > kinds of GPIO, IRQ, Clock and DMA details into the core which made it
+> > quite complex.
+> 
+> I have a problem to control the poplution order for IOMMU in Tegra
+> SoC, and currently I haven't found any framework so that I inserted an
+> IOMMU hook in the driver core[1] since I discussed with Stephen Warren
+> and we thought that the number of those subsystem which requires this
+> kind of control isn't so many. This patch depends on a certain DT
+> bindings("#stream-id-cells") if a device has an dependency on IOMMU or
+> not. But at least this doesn't require anything for a client driver
+> side at all. The exsiting driver can be used as they are. The current
+> design is:
+> 
+> 1, When a device is populated, it checks if that device is IOMMU'able
+>    or not. This is identified by "#stream-id-cells" in DT. If
+>    a device is normal(non IOMMU), a device is populated. If a device
+>    is IOMMU'able, it continues to be checked.
+> 
+> 2, When an IOMMU device has been already populated,
+>    "dev->bus->iommu_ops" is set. If so a device(client) is registered
+>    as IOMMU'able, and the rest of population process continues. If not
+>    set yet, a device population would be deferred til
+>    "dev->bus->iommu_ops" is set.
+> 
+> 3, After an IOMMU device has been already populated, deferred
+>    population will be continued.
+> 
+> I'm not so sure if this dependecy on "#stream-id-cells" is acceptable
+> or not, but I haven't any better idea right now.
+
+It seems a little fragile to me too. I'd rather the IOMMU requirement be
+described more explicitly.
+
+g.
