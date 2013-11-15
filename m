@@ -1,165 +1,313 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Nov 2013 15:08:13 +0000
-Subject: [PATCH 3/6] ARM: mm: Drop the lowmem watermark check from
- virt_addr_valid()
-In-Reply-To: <528635D4.4090605@ti.com>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
- <20131115002232.GE20516@lvm> <528608E9.1060407@arm.com>
- <528635D4.4090605@ti.com>
-Message-ID: <528638DD.3060300@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 15 Nov 2013 09:11:42 -0600
+Subject: [PATCH] ARM: OMAP4+: pm_debug: provide more visibility into suspend
+ failure
+Message-ID: <1384528302-31730-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/13 14:55, Santosh Shilimkar wrote:
-> On Friday 15 November 2013 06:43 AM, Marc Zyngier wrote:
->> On 15/11/13 00:22, Christoffer Dall wrote:
->>>> On Thu, Nov 14, 2013 at 02:37:43PM -0500, Santosh Shilimkar wrote:
->>>>>> Slab allocator can allocate memory beyond the lowmem watermark
->>>>>> which can lead to false failure of virt_addr_valid().
->>>>>>
->>>>>> So drop the check. The issue was seen with percpu_alloc()
->>>>>> in KVM code which was allocating memory beyond lowmem watermark.
->>>>>>
->>>>>> Am not completly sure whether this is the right fix and if it could
->>>>>> impact any other user of virt_addr_valid(). Without this fix as
->>>>>> pointed out the KVM init was failing in my testing.
->>>>>>
->>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>>>
->>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>> ---
->>>>>>  arch/arm/include/asm/memory.h |    3 +--
->>>>>>  1 file changed, 1 insertion(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
->>>>>> index 4dd2145..412da47 100644
->>>>>> --- a/arch/arm/include/asm/memory.h
->>>>>> +++ b/arch/arm/include/asm/memory.h
->>>>>> @@ -343,8 +343,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
->>>>>>  #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
->>>>>>  
->>>>>>  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
->>>>>> -#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
->>>>>> -
->>>>>> +#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET)
->>>>>>  #endif
->>>>>>  
->>>>>>  #include <asm-generic/memory_model.h>
->>>>>> -- 
->>>>>> 1.7.9.5
->>>>>>
->>>>
->>>> This looks wrong to me.  Check Documentation/arm/memory.txt, this would
->>>> return true for the VMALLOC region, which would cause virt_to_phys to
->>>> give you something invalid, which would be bad.
->>>>
->>>> We use the check in create_hyp_mappings to be sure that the physical
->>>> address returned by virt_to_phys is valid and that if we're mapping more
->>>> than one page that those pages are physically contiguous.
->>>>
->>>> So if you want to get rid of this check, you need to change the mapping
->>>> functionality to obtain the physical address by walking the page table
->>>> mappings for each page that you are mapping instead.  Or limit each call
->>>> to a single page in size and take the physical address as input and use
->>>> per_cpu_ptr_to_phys at the caller side instead.
->>>>
->>>> Alternatively, we need to get rid of alloc_percpu and use regular
->>>> kmallocs instead, unless anyone else knows of an even better way.
->> alloc_percpu has nice properties (cache locality, mostly).
->>
->> One way out of it would be to give percpu stuff a special treatment. Can
->> you try the attach patch as a first approximation? It needs more
->> refinements (allocations straddling two pages?), but I think that's the
->> right sort of things.
->>
->> Let me know how it works for you.
->>
-> Host boots bug guest fails. Patch needs small update as mentioned
-> with inline patch.
-> 
->> From 01bc1c8eaebdd70b1ea044050144b9bfb3375f82 Mon Sep 17 00:00:00 2001
->> From: Marc Zyngier <marc.zyngier@arm.com>
->> Date: Fri, 15 Nov 2013 11:36:36 +0000
->> Subject: [PATCH] arm/arm64: KVM: introduce new mapping API for percpu mappings
->>
->> Using virt_to_phys on percpu mappings is horribly wrong (my own bad).
->> Thankfully, the kernel offers a way to obtain the phisical address
->> of such a mapping.
->>
->> Add a new "create_hyp_percpu_mappings" to deal with those.
->>
->> *Fully untested, don't merge*
->>
->> Not-Even-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/kvm_mmu.h   |  1 +
->>  arch/arm/kvm/arm.c               |  2 +-
->>  arch/arm/kvm/mmu.c               | 20 ++++++++++++++++++++
->>  arch/arm64/include/asm/kvm_mmu.h |  1 +
->>  4 files changed, 23 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index 9b28c41..6dcb9ff 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -43,6 +43,7 @@
->>  #include <asm/pgalloc.h>
->>  
->>  int create_hyp_mappings(void *from, void *to);
->> +int create_hyp_percpu_mappings(void *from, void *to);
->>  int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
->>  void free_boot_hyp_pgd(void);
->>  void free_hyp_pgds(void);
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 9c697db..6191960 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -911,7 +911,7 @@ static int init_hyp_mode(void)
->>  		kvm_cpu_context_t *cpu_ctxt;
->>  
->>  		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
->> -		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1);
->> +		err = create_hyp_percpu_mappings(cpu_ctxt, cpu_ctxt + 1);
->>  
->>  		if (err) {
->>  			kvm_err("Cannot map host CPU state: %d\n", err);
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index b0de86b..e509718 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -331,6 +331,26 @@ int create_hyp_mappings(void *from, void *to)
->>  }
->>  
->>  /**
->> + * create_hyp_percpu_mappings - duplicate a percpu kernel virtual address
->> + *				range in Hyp mode
->> + * @from:	The virtual kernel start address of the range
->> + * @to:		The virtual kernel end address of the range (exclusive)
->> + *
->> + * The same virtual address as the kernel virtual address is also used
->> + * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
->> + * physical pages. It *has* to be a percpu pointer.
->> + */
->> +int create_hyp_percpu_mappings(void *from, void *to)
->> +{
->> +	unsigned long phys_addr = per_cpu_ptr_to_phys(from);
-> phys_addr_t phys_addr = per_cpu_ptr_to_phys(from);
+Traditionally on OMAP4+ systems, with complete data properly populated,
+we should be able to track down which device prevented the power domain
+from transitioning to low power state. This is rather trivial is the
+powerdomain to clockdomain to list of clock status registers were easily
+accessible. However, it is not. we have linkage from clk->clkdm, and
+hwmod to clkdm, however going from clkdm to clk status involves a search
+for matches :(.
 
-Yeah, of course... ;-)
+Previously, we just get:
+Powerdomain (XYZ) didn't enter target state 1
 
-> With this change things work as expected without $subject patch.
-> Thanks for the patch.
+Now, we get:
+Powerdomain (XYZ) didn't enter target state 1
+	XYZ: s/w flags(HWSUP_SWSUP HWSUP_ENABLED(int) ) h/w control(enable_auto )
+		module-X: functional
 
-Good. I'll respin another version with support for allocations
-straddling multiple pages and post it ASAP.
+This simplifies our debug when hwmod is properly populated with every
+device in the SoC and when status bits are properly identified. However,
+the alternative to doing this is to replicate actual h/w data in some
+other form which duplicates existing infrastructure for the same.
 
-Thanks for testing!
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-	M.
+Traditionally, we have add solutions in production kernel that
+duplicated data such as:
+3.0: https://android.googlesource.com/kernel/omap.git/+/android-omap-tuna-3.0-jb-mr2/arch/arm/mach-omap2/prcm-debug.c
+3.4: http://git.omapzoom.org/?p=kernel/omap.git;a=blob;f=arch/arm/mach-omap2/prcm-54xx-debug_data.c;h=26d9b1e74368ec387db86fde6208e37ffeb95d5c;hb=p-linux-omap-3.4
+
+Which for obvious reasons dont make sense in an upstream kernel - the
+rationale for duplicated data was the in-development state of pm code
+which needed cross verification as well.
+
+The code is a bit dirty, but then, this is just an RFC to see if folks
+are interested in this feature. If folks think this actually adds
+value, then we can split this up properly and control the prints with
+some debugfs control flag (instead of spamming every single time).
+we could discuss even on how to make this prettier, do checkpatch,
+split into a proper series etc.. just *if* folks think it is worth the
+work..
+
+Sample logs (using TI vendor kernel):
+DRA7-evm: http://pastebin.mozilla.org/3606008
+OMAP5-uEVM: http://pastebin.mozilla.org/3606015
+
+Obviously, could be extended for more TI platforms as well since it
+uses the mach-omap2 frameworks - but we could instead decide not to
+develop this further till we cleanup hwmod instead of adding new usage
+of the same and make that transition harder.. over to folks for comments..
+
+Applies on kernel tag v3.12
+
+ arch/arm/mach-omap2/clockdomain.c |   23 ++++++++++
+ arch/arm/mach-omap2/clockdomain.h |    5 +++
+ arch/arm/mach-omap2/cminst44xx.c  |   40 +++++++++++++++++
+ arch/arm/mach-omap2/pm-debug.c    |   85 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm.h          |    6 +++
+ arch/arm/mach-omap2/pm44xx.c      |    1 +
+ arch/arm/mach-omap2/powerdomain.c |    3 +-
+ 7 files changed, 162 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index 2da3b5e..6de3860 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -1295,3 +1295,26 @@ int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh)
+ 	return 0;
+ }
+ 
++int clkdm_control_status(struct clockdomain *clkdm, bool *disable_auto, bool *force_sleep, bool *force_wakeup, bool *enable_auto)
++{
++	/* The clkdm attribute does not exist yet prior OMAP4 */
++	if (cpu_is_omap24xx() || cpu_is_omap34xx())
++		return 0;
++
++	if (!clkdm || !arch_clkdm || !arch_clkdm->clkdm_control_status || !disable_auto || !force_sleep || !force_wakeup || !enable_auto)
++		return -EINVAL;
++
++	return arch_clkdm->clkdm_control_status(clkdm, disable_auto, force_sleep, force_wakeup, enable_auto);
++}
++
++int clkdm_current_status(struct clockdomain *clkdm, struct omap_hwmod *oh, bool *functional, bool *in_transition, bool *if_idle, bool *disabled)
++{
++	/* The clkdm attribute does not exist yet prior OMAP4 */
++	if (cpu_is_omap24xx() || cpu_is_omap34xx())
++		return 0;
++
++	if (!clkdm || !oh || !arch_clkdm || !arch_clkdm->clkdm_current_status || !functional || !in_transition || !if_idle || !disabled)
++		return -EINVAL;
++
++	return arch_clkdm->clkdm_current_status(clkdm, oh, functional, in_transition, if_idle, disabled);
++}
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index 4b03394..1048baa 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -172,8 +172,13 @@ struct clkdm_ops {
+ 	void	(*clkdm_deny_idle)(struct clockdomain *clkdm);
+ 	int	(*clkdm_clk_enable)(struct clockdomain *clkdm);
+ 	int	(*clkdm_clk_disable)(struct clockdomain *clkdm);
++	int	(*clkdm_control_status)(struct clockdomain *clkdm, bool *disable_auto, bool *force_sleep, bool *force_wakeup, bool *enable_auto);
++	int	(*clkdm_current_status)(struct clockdomain *clkdm, struct omap_hwmod *oh, bool *functional, bool *intransition, bool *if_idle, bool *disabled);
+ };
+ 
++int clkdm_control_status(struct clockdomain *clkdm, bool *disable_auto, bool *force_sleep, bool *force_wakeup, bool *enable_auto);
++int clkdm_current_status(struct clockdomain *clkdm, struct omap_hwmod *oh, bool *functional, bool *intransition, bool *if_idle, bool *disabled);
++
+ int clkdm_register_platform_funcs(struct clkdm_ops *co);
+ int clkdm_register_autodeps(struct clkdm_autodep *ia);
+ int clkdm_register_clkdms(struct clockdomain **c);
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index f0290f5..07f61e1 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -467,6 +467,44 @@ static int omap4_clkdm_clk_disable(struct clockdomain *clkdm)
+ 	return 0;
+ }
+ 
++static int omap4_clkdm_control_status(struct clockdomain *clkdm, bool *disable_auto, bool *force_sleep, bool *force_wakeup, bool *enable_auto)
++{
++	u32 v;
++
++	if (!clkdm->prcm_partition)
++		return -EINVAL;
++	v = omap4_cminst_read_inst_reg(clkdm->prcm_partition, clkdm->cm_inst, clkdm->clkdm_offs + OMAP4_CM_CLKSTCTRL);
++	v &= OMAP4430_CLKTRCTRL_MASK;
++	v >>= OMAP4430_CLKTRCTRL_SHIFT;
++
++	*enable_auto = (v  == OMAP34XX_CLKSTCTRL_ENABLE_AUTO) ? true : false;
++	*force_wakeup = (v  == OMAP34XX_CLKSTCTRL_FORCE_WAKEUP) ? true : false;
++	*force_sleep = (v  == OMAP34XX_CLKSTCTRL_FORCE_SLEEP) ? true : false;
++	*disable_auto = (v  == OMAP34XX_CLKSTCTRL_DISABLE_AUTO) ? true : false;
++
++	return 0;
++}
++
++static int omap4_clkdm_current_status(struct clockdomain *clkdm, struct omap_hwmod *oh, bool *functional, bool *intransition, bool *if_idle, bool *disabled)
++{
++	u32 idlest = 0;
++	u16 clkctrl_offs = oh->prcm.omap4.clkctrl_offs;
++
++	if (!clkdm->prcm_partition || !clkctrl_offs)
++		return -EINVAL;
++
++	idlest = _clkctrl_idlest(clkdm->prcm_partition, clkdm->cm_inst, clkdm->clkdm_offs, clkctrl_offs);
++	if (idlest  == CLKCTRL_IDLEST_FUNCTIONAL)
++		*functional = true;
++	else if (idlest  == CLKCTRL_IDLEST_INTRANSITION)
++		*intransition = true;
++	else if (idlest  == CLKCTRL_IDLEST_INTERFACE_IDLE)
++		*if_idle = true;
++	else if (idlest  == CLKCTRL_IDLEST_DISABLED)
++		*disabled = true;
++	return 0;
++}
++
+ struct clkdm_ops omap4_clkdm_operations = {
+ 	.clkdm_add_wkdep	= omap4_clkdm_add_wkup_sleep_dep,
+ 	.clkdm_del_wkdep	= omap4_clkdm_del_wkup_sleep_dep,
+@@ -482,4 +520,6 @@ struct clkdm_ops omap4_clkdm_operations = {
+ 	.clkdm_deny_idle	= omap4_clkdm_deny_idle,
+ 	.clkdm_clk_enable	= omap4_clkdm_clk_enable,
+ 	.clkdm_clk_disable	= omap4_clkdm_clk_disable,
++	.clkdm_control_status	= omap4_clkdm_control_status,
++	.clkdm_current_status	= omap4_clkdm_current_status,
+ };
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 0b33986..0ae6437 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -39,6 +39,91 @@
+ 
+ u32 enable_off_mode;
+ 
++static int _check_hwmod(struct omap_hwmod *oh, void *data)
++{
++	struct clockdomain *clkdm = data;
++	bool functional = false;
++	bool in_transition = false;
++	bool if_idle = false;
++	bool disabled = false;
++	char *state = "unknown";
++	bool print = true;
++
++	/* Skip if we dont have clkdm match */
++	if (clkdm != oh->clkdm)
++		return 0;
++
++	if (!clkdm_current_status(clkdm, oh, &functional, &in_transition, &if_idle, &disabled)) {
++		if (disabled) {
++			print = false;
++			state = "disabled";
++		} else {
++			if (functional)
++				state = "functional";
++			else if (in_transition)
++				state = "stuck in transition";
++			else if (if_idle)
++				state = "i/f clk idled - if iclk = fclk for this module, consider as disabled";
++		}
++	}
++
++	if (print)
++		pr_err("\t\t%s: %s\n", oh->name, state);
++
++	return 0;
++}
++
++static int _check_clkdm_state(struct powerdomain *pwrdm, struct clockdomain *clkdm)
++{
++	char sflags[255] = {0};
++	char hflags[255] = {0};
++	bool disable_auto = false;
++	bool force_sleep = false;
++	bool force_wakeup = false;
++	bool enable_auto = false;
++
++
++	if (clkdm->flags & CLKDM_CAN_HWSUP_SWSUP)
++		strncat(sflags, "HWSUP_SWSUP ", sizeof(sflags));
++
++	else if (clkdm->flags & CLKDM_CAN_HWSUP)
++		strncat(sflags, "HWSUP ", sizeof(sflags));
++	else if (clkdm->flags & CLKDM_CAN_SWSUP)
++		strncat(sflags, "SWSUP ", sizeof(sflags));
++	if (clkdm->flags & CLKDM_NO_AUTODEPS)
++		strncat(sflags, "NO_AUTODEPS ", sizeof(sflags));
++	if (clkdm->flags & CLKDM_ACTIVE_WITH_MPU)
++		strncat(sflags, "ACTIVE_WITH_MPU ", sizeof(sflags));
++	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING)
++		strncat(sflags, "MISSING_IDLE_REPORTING ", sizeof(sflags));
++	if (clkdm->_flags & _CLKDM_FLAG_HWSUP_ENABLED)
++		strncat(sflags, "HWSUP_ENABLED(int) ", sizeof(sflags));
++
++	if (!clkdm_control_status(clkdm, &disable_auto, &force_sleep, &force_wakeup, &enable_auto) ){
++		if (disable_auto)
++			strncat(hflags, "disable_auto ", sizeof(hflags));
++		if (enable_auto)
++			strncat(hflags, "enable_auto ", sizeof(hflags));
++		if (force_sleep)
++			strncat(hflags, "force_sleep ", sizeof(hflags));
++		if (force_wakeup)
++			strncat(hflags, "force_wakeup ", sizeof(hflags));
++	}
++
++	pr_info("\t %s: s/w flags(%s) h/w control(%s)\n",
++		clkdm->name, sflags, hflags);
++	/* Need to check per hwmod for match */
++	omap_hwmod_for_each(_check_hwmod, clkdm);
++
++
++	return 0;
++}
++
++void pm_debug_check_pwrdm(struct powerdomain *pwrdm)
++{
++	pwrdm_for_each_clkdm(pwrdm,_check_clkdm_state);
++}
++
+ #ifdef CONFIG_DEBUG_FS
+ #include <linux/debugfs.h>
+ #include <linux/seq_file.h>
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 7bdd22a..6349bb1 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -147,4 +147,10 @@ static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { *tstart = *
+ static inline void omap_pm_setup_sr_i2c_pcb_length(u32 mm) { }
+ #endif
+ 
++#ifdef CONFIG_PM_DEBUG
++void pm_debug_check_pwrdm(struct powerdomain *pwrdm);
++#else
++static inline void pm_debug_check_pwrdm(struct powerdomain *pwrdm) { };
++#endif
++
+ #endif
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 82f06989..f3ee79d 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -72,6 +72,7 @@ static int omap4_pm_suspend(void)
+ 		if (state > pwrst->next_state) {
+ 			pr_info("Powerdomain (%s) didn't enter target state %d\n",
+ 				pwrst->pwrdm->name, pwrst->next_state);
++			pm_debug_check_pwrdm(pwrst->pwrdm);
+ 			ret = -1;
+ 		}
+ 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index e233dfc..73b0be3 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -544,7 +544,8 @@ int pwrdm_for_each_clkdm(struct powerdomain *pwrdm,
+ 		return -EINVAL;
+ 
+ 	for (i = 0; i < PWRDM_MAX_CLKDMS && !ret; i++)
+-		ret = (*fn)(pwrdm, pwrdm->pwrdm_clkdms[i]);
++		if (pwrdm->pwrdm_clkdms[i])
++			ret = (*fn)(pwrdm, pwrdm->pwrdm_clkdms[i]);
+ 
+ 	return ret;
+ }
 -- 
-Jazz is not dead. It just smells funny...
+1.7.9.5
