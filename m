@@ -1,211 +1,79 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Nov 2013 14:46:46 +0100
-Subject: [PATCH v7 1/2] PWM: atmel-pwm: add PWM controller driver
-In-Reply-To: <1384509208-10762-1-git-send-email-voice.shen@atmel.com>
-References: <1384509208-10762-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20131115134646.GO28304@ns203013.ovh.net>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 15 Nov 2013 14:47:22 +0100
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <20131115130711.GA2496@localhost>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131114230436.GV9468@ld-irv-0074.broadcom.com>
+ <20131114230540.GW9468@ld-irv-0074.broadcom.com>
+ <20131114231528.GA9793@localhost> <5285D44C.7080501@gmail.com>
+ <20131115130711.GA2496@localhost>
+Message-ID: <528625EA.8060406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:53 Fri 15 Nov     , Bo Shen wrote:
-> Add Atmel PWM controller driver based on PWM framework.
+On 11/15/2013 02:07 PM, Ezequiel Garcia wrote:
+> On Fri, Nov 15, 2013 at 08:59:08AM +0100, Daniel Mack wrote:
+>> On 11/15/2013 12:15 AM, Ezequiel Garcia wrote:
+>>> On Thu, Nov 14, 2013 at 03:05:40PM -0800, Brian Norris wrote:
+>>>> + Daniel (missed the CC)
+>>>>
+>>>> On Thu, Nov 14, 2013 at 03:04:36PM -0800, Brian Norris wrote:
+>>>>> On Thu, Nov 14, 2013 at 06:25:25PM -0300, Ezequiel Garcia wrote:
+>>>>>> * Changes from v4
+>>>>>>
+>>>>>>   * Rebased on top of l2-mtd.git origin/next branch
+>>>>>>
+>>>>>>   * Fixed is_ready flag reset, renamed by a more descriptive
+>>>>>>     and readble "need_wait".
+>>>>>>
+>>>>>
+>>>>> ...
+>>>>>
+>>>>> I think this series is now good as-is. Pushing to l2-mtd.git/next.
+>>>>> Thanks for the efforts! I can submit my extra diff from patch 12 as a
+>>>>> separate patch for review.
+>>>>>
+>>>>> Do you have any available regression tests? Or was there somebody else
+>>>>> we could run this by for some Tested-by's? Daniel Mack, perhaps?
+>>>>
+>>>> Brian
+>>>
+>>> Yes, if Daniel (or anybody else) can push a Tested-by, that's better because
+>>> he's a "third-party" tester.
+>>
+>> Yes. Sorry, I could only partially follow all the discussions around
+>> these patch sets, but I can certainly do a quick regression test on my
+>> pxa3xx platform.
+>>
+>> Ezequiel, could you maybe point me to a repository where I can pull
+>> everything from you want me to have a look at?
+>>
 > 
-> This is the basic function implementation of Atmel PWM controller.
-> It can work with PWM based led and backlight.
+> Latest work is at the next branch in l2-mtd.git:
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Changes in v7:
->   - fix issue for none device tree issues.
+> http://git.infradead.org/l2-mtd.git/shortlog/refs/heads/next
 > 
-> Changes in v6:
->   - using relaxed version for writel and readl
->   - add none device tree support
->   - change some define from lower case to upper case
->   - split device tree binding document as a separate patch
+> You could try that, with Brian's latest patch:
 > 
-> Changes in v5:
->   - call clk_disable directly, if so, it won't cause more than one channel
->     enabled, the clock can not be disabled.
-> 
-> Changes in v4:
->   - check the return value of clk_prepare()
->   - change channel register size as constant
-> 
-> Changes in v3:
->   - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
->   - Add PWM led example in binding documentation
->   - Using micro replace hard code
-> 
-> Changes in v2:
->   - Address the comments from Thierry Reding
-> 
->  drivers/pwm/Kconfig     |    9 ++
->  drivers/pwm/Makefile    |    1 +
->  drivers/pwm/pwm-atmel.c |  380 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 390 insertions(+)
->  create mode 100644 drivers/pwm/pwm-atmel.c
-> 
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index eece329..5043572 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -41,6 +41,15 @@ config PWM_AB8500
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-ab8500.
->  
-> +config PWM_ATMEL
-> +	tristate "Atmel PWM support"
-> +	depends on ARCH_AT91
-> +	help
-> +	  Generic PWM framework driver for Atmel SoC.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-atmel.
-> +
->  config PWM_ATMEL_TCB
->  	tristate "Atmel TC Block PWM support"
->  	depends on ATMEL_TCLIB && OF
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index 8b754e4..1b99cfb 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -1,6 +1,7 @@
->  obj-$(CONFIG_PWM)		+= core.o
->  obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
->  obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
-> +obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
->  obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
->  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
->  obj-$(CONFIG_PWM_EP93XX)	+= pwm-ep93xx.o
-> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> new file mode 100644
-> index 0000000..d012538
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-atmel.c
-> @@ -0,0 +1,380 @@
-> +/*
-> + * Driver for Atmel Pulse Width Modulation Controller
-> + *
-> + * Copyright (C) 2013 Atmel Corporation
-> + *		 Bo Shen <voice.shen@atmel.com>
-> + *
-> + * Licensed under GPLv2.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pwm.h>
-> +#include <linux/slab.h>
-> +
-> +/* The following is global registers for PWM controller */
-> +#define PWM_ENA			0x04
-> +#define PWM_DIS			0x08
-> +#define PWM_SR			0x0C
-> +/* Bit field in SR */
-> +#define PWM_SR_ALL_CH_ON	0x0F
-> +
-> +/* The following register is PWM channel related registers */
-> +#define PWM_CH_REG_OFFSET	0x200
-> +#define PWM_CH_REG_SIZE		0x20
-> +
-> +#define PWM_CMR			0x0
-> +/* Bit field in CMR */
-> +#define PWM_CMR_CPOL		(1 << 9)
-> +#define PWM_CMR_UPD_CDTY	(1 << 10)
-> +
-> +/* The following registers for PWM v1 */
-> +#define PWMV1_CDTY		0x04
-> +#define PWMV1_CPRD		0x08
-> +#define PWMV1_CUPD		0x10
-> +
-> +/* The following registers for PWM v2 */
-> +#define PWMV2_CDTY		0x04
-> +#define PWMV2_CDTYUPD		0x08
-> +#define PWMV2_CPRD		0x0C
-> +#define PWMV2_CPRDUPD		0x10
-> +
-> +/* Max value for duty and period
-> + *
-> + * Although the duty and period register is 32 bit,
-> + * however only the LSB 16 bits are significant.
-> + */
-> +#define PWM_MAX_DTY		0xFFFF
-> +#define PWM_MAX_PRD		0xFFFF
-> +#define PRD_MAX_PRES		10
-> +
-> +struct atmel_pwm_chip {
-> +	struct pwm_chip chip;
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +
-> +	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		       int dty, int prd);
-> +};
-> +
-> +static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
-> +{
-> +	return container_of(chip, struct atmel_pwm_chip, chip);
-> +}
-> +
-> +static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
-> +				  unsigned long offset)
-> +{
-> +	return readl_relaxed(chip->base + offset);
-> +}
-> +
-> +static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
-> +				    unsigned long offset, unsigned long val)
-> +{
-> +	writel_relaxed(val, chip->base + offset);
-> +}
-> +
-> +static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
-> +				     unsigned int ch, unsigned long offset)
-> +{
-> +	return readl_relaxed(chip->base + PWM_CH_REG_OFFSET +
-> +			ch * PWM_CH_REG_SIZE + offset);
-> +}
-> +
-> +static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
-> +				       unsigned int ch, unsigned long offset,
-> +				       unsigned long val)
-> +{
-> +	writel_relaxed(val, chip->base + PWM_CH_REG_OFFSET +
-> +			ch * PWM_CH_REG_SIZE + offset);
-> +}
-> +
-> +static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		int duty_ns, int period_ns)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	unsigned long clk_rate, prd, dty;
-> +	unsigned long long div;
-> +	int ret, pres = 0;
-> +
-> +	clk_rate = clk_get_rate(atmel_pwm->clk);
-> +	div = clk_rate;
-> +
-> +	/* Calculate the period cycles */
-> +	while (div > PWM_MAX_PRD) {
-> +		div = clk_rate / (1 << pres);
-> +		div = div * period_ns;
-> +		/* 1/Hz = 100000000 ns */
-> +		do_div(div, 1000000000);
-> +
-> +		if (pres++ > PRD_MAX_PRES) {
-> +			pr_err("PRES is bigger than maximum pre-scaler\n");
-if we have more than 1 pwm with pr_err we can known which is it use dev_xxx
-instead of all pr_xx
+> http://patchwork.ozlabs.org/patch/291408/
+
+Thanks Ezequiel! Tested with and without DMA on my PXA3xx platform and
+it seems to work just well. Awesome work :)
+
+[    2.675715] NAND device: Manufacturer ID: 0x20, Chip ID: 0xa1 (ST
+Micro NAND01GR3B2CZA6)
+[    2.683965] NAND device: 128MiB, SLC, page size: 2048, OOB size: 64
+[    2.690867] Scanning device for bad blocks
+[    2.977987] Bad eraseblock 528 at 0x000004200000
+[    2.983394] Bad eraseblock 529 at 0x000004220000
+[    3.251150] 4 ofpart partitions found on MTD device pxa3xx_nand-0
+[    3.257313] Creating 4 MTD partitions on "pxa3xx_nand-0":
+[    3.263051] 0x000000000000-0x0000000a0000 : "Bootloader"
+[    3.278845] 0x0000000a0000-0x0000000c0000 : "BootloaderEnvironment"
+[    3.296388] 0x0000000c0000-0x000000120000 : "BootloaderSplashScreen"
+[    3.314704] 0x000000120000-0x000008000000 : "UBI"
 
 
-with this Ack
 
-Best Regards,
-J.
+Best regards,
+Daniel
