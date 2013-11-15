@@ -1,59 +1,72 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 15 Nov 2013 12:24:25 +0100
-Subject: [GIT PULL] at91: non-critical fixes for 3.13 #1
-Message-ID: <1384514665-32174-1-git-send-email-nicolas.ferre@atmel.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Fri, 15 Nov 2013 13:28:21 +0200
+Subject: [PATCH v2] ARM: kexec: Use the right ISA for relocate_new_kernel
+In-Reply-To: <5282818B.9030903@linaro.org>
+References: <1383913444-9153-1-git-send-email-Dave.Martin@arm.com>
+ <20131108133426.GE17461@mudshark.cambridge.arm.com>
+ <20131108184625.GE2602@localhost.localdomain> <5282818B.9030903@linaro.org>
+Message-ID: <52860555.7010307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 11/12/2013 09:29 PM, Taras Kondratiuk wrote:
+> Hi Dave
+> 
+> Yes. I've tested it on Pandaboard and results are quite weird.
+> ARM->ARM, Thumb->Thumb and Thumb->ARM kernel transition works fine
+> for both kexec and kdump ways. But ARM->Thumb works for only kdump
+> via kernel panic. In case of "kexec -e" the second Thumb kernel
+> doesn't come up.
+> 
+> I don't have JTAG now. I will check this tomorrow morning.
 
-This is a pull-request for AT91 about non-critical fixes for 3.13. This means
-that you can certainly plan it for early 3.14.
-It is not a 3.13 regression as this issue has been present for ages. I have
-tagged the patch for "-stable" down to 3.11.y as they need modification to
-apply on older kernels.
+Hi Dave, Will
 
-Thanks, best regards,
+The issue I observed is not caused by this patch.
+I was able to reproduce it with my initial simple patch.
 
-The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+So for this one:
+Reported-and-Tested-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
 
-  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+And the issue I'm frequently facing in reloaded kernel (Thumb from ARM)
+is random crashes caused by undefined instructions.
 
-are available in the git repository at:
+My observation summary:
+- Before starting a second kernel I'm dumping loaded zImage and then
+  unpacked Image at final location and they are correct, so no issue
+  with loading.
+- I observe two types of crash:
+  1) Undefined instruction in the middle of kernel code. After a crash
+     I check failing address and there is always a *valid* Thumb
+     instruction (CPU is in Thumb mode).
+  2) Jump to a wrong address which consequently causes undefined
+     instruction exception. A trace of one example of a wrong jump is
+     captured in [1]. Instead of jumping to 0xC049097C code gets
+     executed at 0xED85E008. BTW the wrong address suspiciously looks
+     like an ARM instruction.
+- If second kernel is placed at different address (like in kdump case),
+  then it boots fine and I don't observe any crashes.
+- If I check failing address in the first kernel (ARM) the code there
+  is really undefined instruction if executed as Thumb.
+- Looks like pieces of old ARM kernel gets executed instead of new
+  Thumb kernel. But as I've mentioned I'm reading physical memory via
+  JTAG before starting second kernel and memory is matching a compiled
+  Thumb 'Image'. Icache also gets cleaned...
+- Once when stopped on breakpoint I've seen a piece of ARM code in
+  Thumb kernel. Interesting that I was looking at the same memory
+  location via physical and virtual addresses simultaneously and only
+  virtual address showed an old code. After a few memory browsing
+  operations, data at both addresses got synced to correct Thumb code.
+  Sure it could be a debugger lag, but it fits nicely with other
+  observations.
 
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes-non-critical
+Do you have some ideas what could cause such behavior?
 
-for you to fetch changes up to 94c4c79f2f1acca6e69a50bff5a7d9027509c16b:
+Unfortunately I don't have more time now to debug it further,
+but I will try to return to this later.
 
-  ARM: at91: fix hanged boot due to early rtt-interrupt (2013-11-15 12:13:33 +0100)
-
-----------------------------------------------------------------
-Fixes for RTT & RTC interrupts that can fire early
-during boot process and kill the system.
-This fix has been discussed for months and it is time
-for it to reach mainline.
-
-----------------------------------------------------------------
-Johan Hovold (2):
-      ARM: at91: fix hanged boot due to early rtc-interrupt
-      ARM: at91: fix hanged boot due to early rtt-interrupt
-
- arch/arm/mach-at91/Makefile                   |  2 +-
- arch/arm/mach-at91/at91sam9260.c              |  2 +
- arch/arm/mach-at91/at91sam9261.c              |  2 +
- arch/arm/mach-at91/at91sam9263.c              |  3 ++
- arch/arm/mach-at91/at91sam9g45.c              |  3 ++
- arch/arm/mach-at91/at91sam9n12.c              |  6 +++
- arch/arm/mach-at91/at91sam9rl.c               |  3 ++
- arch/arm/mach-at91/at91sam9x5.c               |  6 +++
- arch/arm/mach-at91/generic.h                  |  2 +
- arch/arm/mach-at91/include/mach/at91sam9n12.h |  5 ++
- arch/arm/mach-at91/include/mach/at91sam9x5.h  |  5 ++
- arch/arm/mach-at91/include/mach/sama5d3.h     |  5 ++
- arch/arm/mach-at91/sama5d3.c                  |  6 +++
- arch/arm/mach-at91/sysirq_mask.c              | 71 +++++++++++++++++++++++++++
- 14 files changed, 120 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-at91/sysirq_mask.c
+[1]
+https://drive.google.com/file/d/0ByfnRzd5ZYtdQWJKc1k0VmxrZlE/edit?usp=sharing
 
 -- 
-Nicolas Ferre
+Taras Kondratiuk
