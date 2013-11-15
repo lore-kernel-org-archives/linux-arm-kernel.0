@@ -1,86 +1,45 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Nov 2013 15:24:40 -0800
-Subject: [PATCH] arm/arm64: KVM: Fix hyp mappings of vmalloc regions
-Message-ID: <1384557880-14107-1-git-send-email-christoffer.dall@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 15 Nov 2013 15:26:09 -0800
+Subject: [PATCH 01/17] ARM: timer-sp: Switch to sched_clock_register()
+In-Reply-To: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
+References: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1384557985-9414-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using virt_to_phys on percpu mappings is horribly wrong as it may be
-backed by vmalloc.  Introduce kvm_kaddr_to_phys which translates both
-types of valid kernel addresses to the corresponding physical address.
+The 32 bit sched_clock interface now supports 64 bits. Upgrade to
+the 64 bit function to allow us to remove the 32 bit registration
+interface. Also mark the read function notrace since we're here
+and failure to do so would cause ftrace to break.
 
-At the same time resolves a typing issue where we were storing the
-physical address as a 32 bit unsigned long (on arm), truncating the
-physical address for addresses above the 4GB limit.  This caused
-breakage on Keystone.
-
-Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ arch/arm/common/timer-sp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This patch is loosely based on Marc's previous patch from today but
-instead of introducing another Hyp mapping function, it fixes the
-existing one to deal with both kinds of kernel addresses.
-
- arch/arm/kvm/mmu.c |   34 ++++++++++++++++++++++++++++------
- 1 file changed, 28 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 3719583..5809069 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -334,6 +334,17 @@ out:
- 	return err;
- }
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index ce922d0..53c6a26 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -66,7 +66,7 @@ static long __init sp804_get_clock_rate(struct clk *clk)
  
-+static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
-+{
-+	if (!is_vmalloc_addr(kaddr)) {
-+		BUG_ON(!virt_addr_valid(kaddr));
-+		return __pa(kaddr);
-+	} else {
-+		return page_to_phys(vmalloc_to_page(kaddr)) +
-+		       offset_in_page(kaddr);
-+	}
-+}
-+
- /**
-  * create_hyp_mappings - duplicate a kernel virtual address range in Hyp mode
-  * @from:	The virtual kernel start address of the range
-@@ -345,16 +356,27 @@ out:
-  */
- int create_hyp_mappings(void *from, void *to)
+ static void __iomem *sched_clock_base;
+ 
+-static u32 sp804_read(void)
++static u64 notrace sp804_read(void)
  {
--	unsigned long phys_addr = virt_to_phys(from);
-+	phys_addr_t phys_addr;
-+	unsigned long virt_addr;
- 	unsigned long start = KERN_TO_HYP((unsigned long)from);
- 	unsigned long end = KERN_TO_HYP((unsigned long)to);
+ 	return ~readl_relaxed(sched_clock_base + TIMER_VALUE);
+ }
+@@ -104,7 +104,7 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
  
--	/* Check for a valid kernel memory mapping */
--	if (!virt_addr_valid(from) || !virt_addr_valid(to - 1))
--		return -EINVAL;
-+	start = start & PAGE_MASK;
-+	end = PAGE_ALIGN(end);
- 
--	return __create_hyp_mappings(hyp_pgd, start, end,
--				     __phys_to_pfn(phys_addr), PAGE_HYP);
-+	for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE) {
-+		int err;
-+
-+		phys_addr = kvm_kaddr_to_phys(from + virt_addr - start);
-+		err = __create_hyp_mappings(hyp_pgd, virt_addr,
-+					    virt_addr + PAGE_SIZE,
-+					    __phys_to_pfn(phys_addr),
-+					    PAGE_HYP);
-+		if (err)
-+			return err;
-+	}
-+
-+	return 0;
+ 	if (use_sched_clock) {
+ 		sched_clock_base = base;
+-		setup_sched_clock(sp804_read, 32, rate);
++		sched_clock_register(sp804_read, 32, rate);
+ 	}
  }
  
- /**
 -- 
-1.7.10.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
