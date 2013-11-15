@@ -1,24 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Nov 2013 11:36:12 +0000
-Subject: [PATCH] ARM: nommu: Include asm/procinfo.h to fix build warning
-In-Reply-To: <CAOesGMjh-bj=YsTQb=K0Hy4j_Wdc6rbueQ6+5oek9amwtE9UHA@mail.gmail.com>
-References: <1384486680.11140.1.camel@phoenix>
- <CAOesGMjh-bj=YsTQb=K0Hy4j_Wdc6rbueQ6+5oek9amwtE9UHA@mail.gmail.com>
-Message-ID: <20131115113612.GI16735@n2100.arm.linux.org.uk>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 15 Nov 2013 17:11:27 +0530
+Subject: [RFC v2 0/4] Add basic support for ASV
+Message-ID: <1384515691-26299-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 11:14:11PM -0800, Olof Johansson wrote:
-> On Thu, Nov 14, 2013 at 7:38 PM, Axel Lin <axel.lin@ingics.com> wrote:
-> > Include asm/procinfo.h to fix below build warning:
-> >   CC      arch/arm/mm/nommu.o
-> > arch/arm/mm/nommu.c:303:17: warning: 'struct proc_info_list' declared inside parameter list [enabled by default]
-> > arch/arm/mm/nommu.c:303:17: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-> >
-> > Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> 
-> This is identical to the patch I posted a day earlier, that I just
-> sent to Russell's patch tracker. :)
+Original cover letter from Yadwinder:
+This series is to add basic common infrastructure for ASV.
+ Basically ASV is a technique used on samsung SoCs, which provides the
+recommended supply voltage for dvfs of arm, mif etc. For a given operating
+frequency, the voltage is recommended based on SoC's ASV group.
+ASV group gets fussed on SoCs during process of mass production.
 
-And I probably have a near identical patch which I committed yesterday
-morning.
+This series includes:
+ - basic common infrastructue for ASV. It provides common APIs for user drivers
+like cpufreq & devfreq and and an interface for SoC specific drivers to
+register ASV members(instances)
+ - a common platform driver to register ASV members for exynos SoCs
+ - an example providing minimal support (only for ARM ASV) for exynos5250 chips
+
+Its just basic skelton which I wanted to get it reviewed or discussed in
+early stage, before going ahead on further development based on it.
+ Presently example is based on static ASV table provided in SoC specific file,
+which I expects to go into DT. But exactly how and where needs to be discussed,
+may be in next revisions once we get through the basic skelton.
+ Also the location of driver in kernel may also seem odd to someone and
+many more things :).
+
+Looking for your valuable reviews and suggestions.
+
+Changes since v1:
+* Rebased onto the latest linux-next
+* Used devm* and *opp APIs
+* Code cleanup and some fixes
+* Updated kernel doc and Kconfig text
+
+Yadwinder Singh Brar (4):
+  power: asv: Add common ASV support for Samsung SoCs
+  power: asv: Add a common ASV driver for Exynos SoCs.
+  power: asv: Add support for Exynos5250
+  ARM: SAMSUNG: Register static platform device for ASV for Exynos5
+
+ arch/arm/mach-exynos/mach-exynos5-dt.c |    2 +
+ drivers/power/Kconfig                  |    1 +
+ drivers/power/Makefile                 |    1 +
+ drivers/power/asv/Kconfig              |   23 +++++
+ drivers/power/asv/Makefile             |    2 +
+ drivers/power/asv/asv.c                |  176 ++++++++++++++++++++++++++++++++
+ drivers/power/asv/exynos-asv.c         |   78 ++++++++++++++
+ drivers/power/asv/exynos-asv.h         |   22 ++++
+ drivers/power/asv/exynos5250-asv.c     |  139 +++++++++++++++++++++++++
+ include/linux/power/asv-driver.h       |   62 +++++++++++
+ include/linux/power/asv.h              |   37 +++++++
+ 11 files changed, 543 insertions(+)
+ create mode 100644 drivers/power/asv/Kconfig
+ create mode 100644 drivers/power/asv/Makefile
+ create mode 100644 drivers/power/asv/asv.c
+ create mode 100644 drivers/power/asv/exynos-asv.c
+ create mode 100644 drivers/power/asv/exynos-asv.h
+ create mode 100644 drivers/power/asv/exynos5250-asv.c
+ create mode 100644 include/linux/power/asv-driver.h
+ create mode 100644 include/linux/power/asv.h
+
+-- 
+1.7.9.5
