@@ -1,41 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Nov 2013 09:57:30 -0500
-Subject: [PATCH 4/6] arm64: mm: Drop the lowmem watermark check from
- virt_addr_valid()
-In-Reply-To: <52862ED9.1050708@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Nov 2013 14:58:44 +0000
+Subject: [PATCH 1/6] arm64: mm: Add __virt_to_idmap() to keep kvm build
+ happy
+In-Reply-To: <528635F6.6030207@ti.com>
 References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-5-git-send-email-santosh.shilimkar@ti.com>
- <20131115133948.GB1217@darko.cambridge.arm.com> <52862ED9.1050708@arm.com>
-Message-ID: <5286365A.5080504@ti.com>
+ <1384457866-16135-2-git-send-email-santosh.shilimkar@ti.com>
+ <20131115133428.GA1217@darko.cambridge.arm.com>
+ <528635F6.6030207@ti.com>
+Message-ID: <20131115145844.GC11347@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013 09:25 AM, Marc Zyngier wrote:
-> On 15/11/13 13:39, Catalin Marinas wrote:
->> On Thu, Nov 14, 2013 at 07:37:44PM +0000, Santosh Shilimkar wrote:
->>> Slab allocator can allocate memory beyond the lowmem watermark
->>> which can lead to false failure of virt_addr_valid().
->>>
->>> So drop the check. The issue was seen with percpu_alloc()
->>> in KVM code which was allocating memory beyond lowmem watermark.
->>>
->>> Am not completly sure whether this is the right fix and if it could
->>> impact any other user of virt_addr_valid(). Without this fix as
->>> pointed out the KVM init was failing in my testing.
->>
->> Do you have a problem on arm64? There is no lowmem watermark here.
-> 
-> I don't think that change is relevant for arm64. Actually, the more I
-> look at it, I don't think virt_addr_valid() should be touched at all.
-> 
-> The real issue is the use of virt_to_phys()/virt_addr_valid() on a
-> percpu pointer, which is wrong and only worked by chance so far.
-> 
-> I'm working on a patch to solve this.
-> 
-Yep. I tried Marc's other approach and that does solve the issue.
-The $subject patch was any way more for getting attention to figure
-out right solution ;-) which I guess we have now.
+On Fri, Nov 15, 2013 at 02:55:50PM +0000, Santosh Shilimkar wrote:
+> On Friday 15 November 2013 08:34 AM, Catalin Marinas wrote:
+> > On Thu, Nov 14, 2013 at 07:37:41PM +0000, Santosh Shilimkar wrote:
+> >>  /*
+> >> + * Added to keep arm64 kvm build working which shares code with
+> >> + * 32bit port. ARM kvm code makes use of __virt_to_idmap() on arm32
+> >> + * machines as hardware interconnect supported alias of physical
+> >> + * memory for idmap purposes.
+> >> + */
+> >> +#define virt_to_idmap(x)	__virt_to_phys(x)
+> > 
+> > There are consistency issues with the use of underscores before
+> > __virt_to_idmap. And I think you can simply say something like "Required
+> > by ARM KVM code". The explanation on why really belongs to the 32-bit
+> > arm code.
+> > 
+> Will update the comment as you suggested. Do you want me to rename the
+> macros as well. I need to do update some more code for that.
 
-Regards,
-Santosh
+The macro name should be whatever is in arch/arm/ but the comment and
+the macro disagree here.
+
+-- 
+Catalin
