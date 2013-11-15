@@ -1,23 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Nov 2013 12:04:17 +0000
-Subject: [PATCH 3/8] ARM: dts: imx: imx6sl/qdl-pingrp: reorganize
- USDHCx pad groups
-In-Reply-To: <1384462934-17390-4-git-send-email-troy.kisky@boundarydevices.com>
-References: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1384462934-17390-4-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20131115120417.GJ16735@n2100.arm.linux.org.uk>
+From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
+Date: Fri, 15 Nov 2013 16:19:07 +0400
+Subject: [PATCH] arm: check stack pointer in get_wchan
+Message-ID: <20131115121907.4707.82671.stgit@buzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:02:09PM -0700, Troy Kisky wrote:
-> +#define MX6QDL_USDHC1_D4(pad, pad_clk) \
-> +	MX6QDL_PAD_SD1_CMD__SD1_CMD			pad \
-> +	MX6QDL_PAD_SD1_CLK__SD1_CLK			pad_clk \
-> +	MX6QDL_PAD_SD1_DAT0__SD1_DATA0			pad \
-> +	MX6QDL_PAD_SD1_DAT1__SD1_DATA1			pad \
-> +	MX6QDL_PAD_SD1_DAT2__SD1_DATA2			pad \
-> +	MX6QDL_PAD_SD1_DAT3__SD1_DATA3			pad
+get_wchan() is lockless. Task may wakeup at any time and change its own stack,
+thus each next stack frame may be overwritten and filled with random stuff.
 
-DATA3 should be specified separately as you may want that to have a
-different pull direction due to the workarounds in the driver interfering
-with the card present detection.
+/proc/$pid/stack interface had been disabled for non-current tasks, see [1]
+But 'wchan' still allows to trigger stack frame unwinding on volatile stack.
+
+This patch fixes oops in unwind_frame() by adding stack pointer validation on
+each step (as x86 code do), unwind_frame() already checks frame pointer.
+
+Also I've found another report of this oops on stackoverflow (irony).
+
+Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+Cc: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+Link: http://www.spinics.net/lists/arm-kernel/msg110589.html [1]
+Link: http://stackoverflow.com/questions/18479894/unwind-frame-cause-a-kernel-paging-error
+---
+ arch/arm/kernel/process.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 94f6b05..92f7b15 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -404,6 +404,7 @@ EXPORT_SYMBOL(dump_fpu);
+ unsigned long get_wchan(struct task_struct *p)
+ {
+ 	struct stackframe frame;
++	unsigned long stack_page;
+ 	int count = 0;
+ 	if (!p || p == current || p->state == TASK_RUNNING)
+ 		return 0;
+@@ -412,9 +413,11 @@ unsigned long get_wchan(struct task_struct *p)
+ 	frame.sp = thread_saved_sp(p);
+ 	frame.lr = 0;			/* recovered from the stack */
+ 	frame.pc = thread_saved_pc(p);
++	stack_page = (unsigned long)task_stack_page(p);
+ 	do {
+-		int ret = unwind_frame(&frame);
+-		if (ret < 0)
++		if (frame.sp < stack_page ||
++		    frame.sp >= stack_page + THREAD_SIZE ||
++		    unwind_frame(&frame) < 0)
+ 			return 0;
+ 		if (!in_sched_functions(frame.pc))
+ 			return frame.pc;
