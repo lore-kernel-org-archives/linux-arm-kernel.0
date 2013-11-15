@@ -1,70 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Nov 2013 14:19:12 +0000
-Subject: [PATCH] arm: check stack pointer in get_wchan
-In-Reply-To: <20131115121907.4707.82671.stgit@buzz>
-References: <20131115121907.4707.82671.stgit@buzz>
-Message-ID: <20131115141912.GE19468@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Nov 2013 14:20:14 +0000
+Subject: [PATCH 3/6] ARM: mm: Drop the lowmem watermark check from
+ virt_addr_valid()
+In-Reply-To: <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
+References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
+ <1384457866-16135-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131115142014.GN16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 12:19:07PM +0000, Konstantin Khlebnikov wrote:
-> get_wchan() is lockless. Task may wakeup at any time and change its own stack,
-> thus each next stack frame may be overwritten and filled with random stuff.
-> 
-> /proc/$pid/stack interface had been disabled for non-current tasks, see [1]
-> But 'wchan' still allows to trigger stack frame unwinding on volatile stack.
-> 
-> This patch fixes oops in unwind_frame() by adding stack pointer validation on
-> each step (as x86 code do), unwind_frame() already checks frame pointer.
-> 
-> Also I've found another report of this oops on stackoverflow (irony).
+On Thu, Nov 14, 2013 at 02:37:43PM -0500, Santosh Shilimkar wrote:
+> Slab allocator can allocate memory beyond the lowmem watermark
+> which can lead to false failure of virt_addr_valid().
 
-For that comment alone:
+This is definitely going to cause problems.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+> So drop the check. The issue was seen with percpu_alloc()
+> in KVM code which was allocating memory beyond lowmem watermark.
+> 
+> Am not completly sure whether this is the right fix and if it could
+> impact any other user of virt_addr_valid(). Without this fix as
+> pointed out the KVM init was failing in my testing.
 
-[also, the patch looks sane to me].
+virt_addr_valid() gets used in some places to check whether the virtual
+address is part of the lowmem mapping and explicitly not part of vmalloc()
+or DMA coherent space:
 
-Will
+drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+drivers/net/wireless/ath/ath6kl/sdio.c
 
-> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-> Cc: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> Link: http://www.spinics.net/lists/arm-kernel/msg110589.html [1]
-> Link: http://stackoverflow.com/questions/18479894/unwind-frame-cause-a-kernel-paging-error
-> ---
->  arch/arm/kernel/process.c |    7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 94f6b05..92f7b15 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -404,6 +404,7 @@ EXPORT_SYMBOL(dump_fpu);
->  unsigned long get_wchan(struct task_struct *p)
->  {
->  	struct stackframe frame;
-> +	unsigned long stack_page;
->  	int count = 0;
->  	if (!p || p == current || p->state == TASK_RUNNING)
->  		return 0;
-> @@ -412,9 +413,11 @@ unsigned long get_wchan(struct task_struct *p)
->  	frame.sp = thread_saved_sp(p);
->  	frame.lr = 0;			/* recovered from the stack */
->  	frame.pc = thread_saved_pc(p);
-> +	stack_page = (unsigned long)task_stack_page(p);
->  	do {
-> -		int ret = unwind_frame(&frame);
-> -		if (ret < 0)
-> +		if (frame.sp < stack_page ||
-> +		    frame.sp >= stack_page + THREAD_SIZE ||
-> +		    unwind_frame(&frame) < 0)
->  			return 0;
->  		if (!in_sched_functions(frame.pc))
->  			return frame.pc;
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+It opens up the checks in include/linux/scatterlist.h to start accepting
+non-streaming DMA capable buffers as well.
+
+It also bypasses a check in the slab code to ensure that it's a potentially
+valid pointer that was handed out by slab.
+
+.. etc ..
