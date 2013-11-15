@@ -1,10 +1,9 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Nov 2013 13:54:05 -0700
-Subject: [PATCH 10/31] ARM: tegra: pass reset to
- tegra_powergate_sequence_power_up()
+Date: Fri, 15 Nov 2013 13:54:07 -0700
+Subject: [PATCH 12/31] dma: tegra: use reset framework
 In-Reply-To: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1384548866-13141-11-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1384548866-13141-13-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,11 +17,7 @@ Cc: treding at nvidia.com
 Cc: pdeschrijver at nvidia.com
 Cc: linux-tegra at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: linux-pci at vger.kernel.org
-Cc: Terje Bergstr?m <tbergstrom@nvidia.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
+Cc: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
 This patch is part of a series with strong internal depdendencies. I'm
@@ -30,106 +25,55 @@ looking for an ack so that I can take the entire series through the Tegra
 and arm-soc trees. The series will be part of a stable branch that can be
 merged into other subsystems if needed to avoid/resolve dependencies.
 ---
- arch/arm/mach-tegra/powergate.c | 8 +++++---
- drivers/gpu/drm/tegra/gr3d.c    | 6 ++++--
- drivers/pci/host/pci-tegra.c    | 3 ++-
- include/linux/tegra-powergate.h | 4 +++-
- 4 files changed, 14 insertions(+), 7 deletions(-)
+ drivers/dma/tegra20-apb-dma.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
-index 85d28e756bb7..f6f5b54ff95e 100644
---- a/arch/arm/mach-tegra/powergate.c
-+++ b/arch/arm/mach-tegra/powergate.c
-@@ -25,6 +25,7 @@
- #include <linux/export.h>
- #include <linux/init.h>
- #include <linux/io.h>
+diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+index 73654e33f13b..afa5844c9346 100644
+--- a/drivers/dma/tegra20-apb-dma.c
++++ b/drivers/dma/tegra20-apb-dma.c
+@@ -32,8 +32,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm.h>
+ #include <linux/pm_runtime.h>
 +#include <linux/reset.h>
- #include <linux/seq_file.h>
- #include <linux/spinlock.h>
- #include <linux/clk/tegra.h>
-@@ -144,11 +145,12 @@ int tegra_powergate_remove_clamping(int id)
- }
+ #include <linux/slab.h>
+-#include <linux/clk/tegra.h>
  
- /* Must be called with clk disabled, and returns with clk enabled */
--int tegra_powergate_sequence_power_up(int id, struct clk *clk)
-+int tegra_powergate_sequence_power_up(int id, struct clk *clk,
-+					struct reset_control *rst)
- {
- 	int ret;
+ #include "dmaengine.h"
  
--	tegra_periph_reset_assert(clk);
-+	reset_control_assert(rst);
- 
- 	ret = tegra_powergate_power_on(id);
- 	if (ret)
-@@ -165,7 +167,7 @@ int tegra_powergate_sequence_power_up(int id, struct clk *clk)
- 		goto err_clamp;
- 
- 	udelay(10);
--	tegra_periph_reset_deassert(clk);
-+	reset_control_deassert(rst);
- 
- 	return 0;
- 
-diff --git a/drivers/gpu/drm/tegra/gr3d.c b/drivers/gpu/drm/tegra/gr3d.c
-index f629e38b00e4..0cbb24b1ae04 100644
---- a/drivers/gpu/drm/tegra/gr3d.c
-+++ b/drivers/gpu/drm/tegra/gr3d.c
-@@ -279,7 +279,8 @@ static int gr3d_probe(struct platform_device *pdev)
- 		}
+@@ -208,6 +208,7 @@ struct tegra_dma {
+ 	struct dma_device		dma_dev;
+ 	struct device			*dev;
+ 	struct clk			*dma_clk;
++	struct reset_control		*rst;
+ 	spinlock_t			global_lock;
+ 	void __iomem			*base_addr;
+ 	const struct tegra_dma_chip_data *chip_data;
+@@ -1282,6 +1283,12 @@ static int tegra_dma_probe(struct platform_device *pdev)
+ 		return PTR_ERR(tdma->dma_clk);
  	}
  
--	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D, gr3d->clk);
-+	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D, gr3d->clk,
-+						gr3d->rst);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed to power up 3D unit\n");
- 		return err;
-@@ -287,7 +288,8 @@ static int gr3d_probe(struct platform_device *pdev)
++	tdma->rst = devm_reset_control_get(&pdev->dev, "dma");
++	if (IS_ERR(tdma->rst)) {
++		dev_err(&pdev->dev, "Error: Missing reset\n");
++		return PTR_ERR(tdma->rst);
++	}
++
+ 	spin_lock_init(&tdma->global_lock);
  
- 	if (gr3d->clk_secondary) {
- 		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D1,
--							gr3d->clk_secondary);
-+							gr3d->clk_secondary,
-+							gr3d->rst_secondary);
- 		if (err < 0) {
- 			dev_err(&pdev->dev,
- 				"failed to power up secondary 3D unit\n");
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 174a5bc2d993..aace19edc469 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -956,7 +956,8 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
+ 	pm_runtime_enable(&pdev->dev);
+@@ -1302,9 +1309,9 @@ static int tegra_dma_probe(struct platform_device *pdev)
  	}
  
- 	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_PCIE,
--						pcie->pex_clk);
-+						pcie->pex_clk,
-+						pcie->pex_rst);
- 	if (err) {
- 		dev_err(pcie->dev, "powerup sequence failed: %d\n", err);
- 		return err;
-diff --git a/include/linux/tegra-powergate.h b/include/linux/tegra-powergate.h
-index c98cfa406952..b5ad64aca071 100644
---- a/include/linux/tegra-powergate.h
-+++ b/include/linux/tegra-powergate.h
-@@ -19,6 +19,7 @@
- #define _MACH_TEGRA_POWERGATE_H_
+ 	/* Reset DMA controller */
+-	tegra_periph_reset_assert(tdma->dma_clk);
++	reset_control_assert(tdma->rst);
+ 	udelay(2);
+-	tegra_periph_reset_deassert(tdma->dma_clk);
++	reset_control_deassert(tdma->rst);
  
- struct clk;
-+struct reset_control;
- 
- #define TEGRA_POWERGATE_CPU	0
- #define TEGRA_POWERGATE_3D	1
-@@ -51,6 +52,7 @@ int tegra_powergate_power_off(int id);
- int tegra_powergate_remove_clamping(int id);
- 
- /* Must be called with clk disabled, and returns with clk enabled */
--int tegra_powergate_sequence_power_up(int id, struct clk *clk);
-+int tegra_powergate_sequence_power_up(int id, struct clk *clk,
-+					struct reset_control *rst);
- 
- #endif /* _MACH_TEGRA_POWERGATE_H_ */
+ 	/* Enable global DMA registers */
+ 	tdma_write(tdma, TEGRA_APBDMA_GENERAL, TEGRA_APBDMA_GENERAL_ENABLE);
 -- 
 1.8.1.5
