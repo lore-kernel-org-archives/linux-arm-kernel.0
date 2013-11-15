@@ -1,24 +1,22 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Nov 2013 13:54:17 -0700
-Subject: [PATCH 22/31] spi: tegra: use reset framework
+Date: Fri, 15 Nov 2013 13:54:25 -0700
+Subject: [PATCH 30/31] clk: tegra: remove legacy reset APIs
 In-Reply-To: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1384548866-13141-23-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1384548866-13141-31-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Tegra's clock driver now provides an implementation of the common
-reset API (include/linux/reset.h). Use this instead of the old Tegra-
-specific API; that will soon be removed.
+Now that no code uses the custom Tegra module reset API, we can remove
+its implementation.
 
 Cc: treding at nvidia.com
 Cc: pdeschrijver at nvidia.com
 Cc: linux-tegra at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Mark Brown <broonie@kernel.org>
-Cc: linux-spi at vger.kernel.org
+Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
 This patch is part of a series with strong internal depdendencies. I'm
@@ -26,225 +24,132 @@ looking for an ack so that I can take the entire series through the Tegra
 and arm-soc trees. The series will be part of a stable branch that can be
 merged into other subsystems if needed to avoid/resolve dependencies.
 ---
- drivers/spi/Kconfig              |  3 +++
- drivers/spi/spi-tegra114.c       | 18 +++++++++++++-----
- drivers/spi/spi-tegra20-sflash.c | 18 +++++++++++++-----
- drivers/spi/spi-tegra20-slink.c  | 18 +++++++++++++-----
- 4 files changed, 42 insertions(+), 15 deletions(-)
+ drivers/clk/tegra/clk-periph-gate.c | 22 --------------------
+ drivers/clk/tegra/clk-periph.c      | 40 -------------------------------------
+ drivers/clk/tegra/clk.h             |  1 -
+ include/linux/clk/tegra.h           |  7 -------
+ 4 files changed, 70 deletions(-)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index eb1f1ef5fa2e..9fc66e83c1a7 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -448,6 +448,7 @@ config SPI_MXS
- config SPI_TEGRA114
- 	tristate "NVIDIA Tegra114 SPI Controller"
- 	depends on (ARCH_TEGRA && TEGRA20_APB_DMA) || COMPILE_TEST
-+	depends on RESET_CONTROLLER
- 	help
- 	  SPI driver for NVIDIA Tegra114 SPI Controller interface. This controller
- 	  is different than the older SoCs SPI controller and also register interface
-@@ -456,6 +457,7 @@ config SPI_TEGRA114
- config SPI_TEGRA20_SFLASH
- 	tristate "Nvidia Tegra20 Serial flash Controller"
- 	depends on ARCH_TEGRA || COMPILE_TEST
-+	depends on RESET_CONTROLLER
- 	help
- 	  SPI driver for Nvidia Tegra20 Serial flash Controller interface.
- 	  The main usecase of this controller is to use spi flash as boot
-@@ -464,6 +466,7 @@ config SPI_TEGRA20_SFLASH
- config SPI_TEGRA20_SLINK
- 	tristate "Nvidia Tegra20/Tegra30 SLINK Controller"
- 	depends on (ARCH_TEGRA && TEGRA20_APB_DMA) || COMPILE_TEST
-+	depends on RESET_CONTROLLER
- 	help
- 	  SPI driver for Nvidia Tegra20/Tegra30 SLINK Controller interface.
+diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
+index f38f33e3c65d..507015314827 100644
+--- a/drivers/clk/tegra/clk-periph-gate.c
++++ b/drivers/clk/tegra/clk-periph-gate.c
+@@ -36,8 +36,6 @@ static DEFINE_SPINLOCK(periph_ref_lock);
  
-diff --git a/drivers/spi/spi-tegra114.c b/drivers/spi/spi-tegra114.c
-index aaecfb3ebf58..f62e6e5e90e3 100644
---- a/drivers/spi/spi-tegra114.c
-+++ b/drivers/spi/spi-tegra114.c
-@@ -17,7 +17,6 @@
-  */
+ #define read_rst(gate) \
+ 	readl_relaxed(gate->clk_base + (gate->regs->rst_reg))
+-#define write_rst_set(val, gate) \
+-	writel_relaxed(val, gate->clk_base + (gate->regs->rst_set_reg))
+ #define write_rst_clr(val, gate) \
+ 	writel_relaxed(val, gate->clk_base + (gate->regs->rst_clr_reg))
  
- #include <linux/clk.h>
--#include <linux/clk/tegra.h>
- #include <linux/completion.h>
- #include <linux/delay.h>
- #include <linux/dmaengine.h>
-@@ -34,6 +33,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/reset.h>
- #include <linux/spi/spi.h>
+@@ -123,26 +121,6 @@ static void clk_periph_disable(struct clk_hw *hw)
+ 	spin_unlock_irqrestore(&periph_ref_lock, flags);
+ }
  
- #define SPI_COMMAND1				0x000
-@@ -174,6 +174,7 @@ struct tegra_spi_data {
- 	spinlock_t				lock;
+-void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert)
+-{
+-	if (gate->flags & TEGRA_PERIPH_NO_RESET)
+-		return;
+-
+-	if (assert) {
+-		/*
+-		 * If peripheral is in the APB bus then read the APB bus to
+-		 * flush the write operation in apb bus. This will avoid the
+-		 * peripheral access after disabling clock
+-		 */
+-		if (gate->flags & TEGRA_PERIPH_ON_APB)
+-			tegra_read_chipid();
+-
+-		write_rst_set(periph_clk_to_bit(gate), gate);
+-	} else {
+-		write_rst_clr(periph_clk_to_bit(gate), gate);
+-	}
+-}
+-
+ const struct clk_ops tegra_clk_periph_gate_ops = {
+ 	.is_enabled = clk_periph_is_enabled,
+ 	.enable = clk_periph_enable,
+diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
+index b5feccca2f1e..d8ed9f79708b 100644
+--- a/drivers/clk/tegra/clk-periph.c
++++ b/drivers/clk/tegra/clk-periph.c
+@@ -111,46 +111,6 @@ static void clk_periph_disable(struct clk_hw *hw)
+ 	gate_ops->disable(gate_hw);
+ }
  
- 	struct clk				*clk;
-+	struct reset_control			*rst;
- 	void __iomem				*base;
- 	phys_addr_t				phys;
- 	unsigned				irq;
-@@ -918,9 +919,9 @@ static irqreturn_t handle_cpu_based_xfer(struct tegra_spi_data *tspi)
- 			tspi->status_reg);
- 		dev_err(tspi->dev, "CpuXfer 0x%08x:0x%08x\n",
- 			tspi->command1_reg, tspi->dma_control_reg);
--		tegra_periph_reset_assert(tspi->clk);
-+		reset_control_assert(tspi->rst);
- 		udelay(2);
--		tegra_periph_reset_deassert(tspi->clk);
-+		reset_control_deassert(tspi->rst);
- 		complete(&tspi->xfer_completion);
- 		goto exit;
- 	}
-@@ -990,9 +991,9 @@ static irqreturn_t handle_dma_based_xfer(struct tegra_spi_data *tspi)
- 			tspi->status_reg);
- 		dev_err(tspi->dev, "DmaXfer 0x%08x:0x%08x\n",
- 			tspi->command1_reg, tspi->dma_control_reg);
--		tegra_periph_reset_assert(tspi->clk);
-+		reset_control_assert(tspi->rst);
- 		udelay(2);
--		tegra_periph_reset_deassert(tspi->clk);
-+		reset_control_deassert(tspi->rst);
- 		complete(&tspi->xfer_completion);
- 		spin_unlock_irqrestore(&tspi->lock, flags);
- 		return IRQ_HANDLED;
-@@ -1127,6 +1128,13 @@ static int tegra_spi_probe(struct platform_device *pdev)
- 		goto exit_free_irq;
- 	}
+-void tegra_periph_reset_deassert(struct clk *c)
+-{
+-	struct clk_hw *hw = __clk_get_hw(c);
+-	struct tegra_clk_periph *periph = to_clk_periph(hw);
+-	struct tegra_clk_periph_gate *gate;
+-
+-	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
+-		gate = to_clk_periph_gate(hw);
+-		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
+-			WARN_ON(1);
+-			return;
+-		}
+-	} else {
+-		gate = &periph->gate;
+-	}
+-
+-	tegra_periph_reset(gate, 0);
+-}
+-EXPORT_SYMBOL(tegra_periph_reset_deassert);
+-
+-void tegra_periph_reset_assert(struct clk *c)
+-{
+-	struct clk_hw *hw = __clk_get_hw(c);
+-	struct tegra_clk_periph *periph = to_clk_periph(hw);
+-	struct tegra_clk_periph_gate *gate;
+-
+-	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
+-		gate = to_clk_periph_gate(hw);
+-		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
+-			WARN_ON(1);
+-			return;
+-		}
+-	} else {
+-		gate = &periph->gate;
+-	}
+-
+-	tegra_periph_reset(gate, 1);
+-}
+-EXPORT_SYMBOL(tegra_periph_reset_assert);
+-
+ const struct clk_ops tegra_clk_periph_ops = {
+ 	.get_parent = clk_periph_get_parent,
+ 	.set_parent = clk_periph_set_parent,
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 39f24959daf7..57bd0d3090e3 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -392,7 +392,6 @@ struct tegra_clk_periph_gate {
+ #define TEGRA_PERIPH_WAR_1005168 BIT(3)
+ #define TEGRA_PERIPH_NO_DIV BIT(4)
  
-+	tspi->rst = devm_reset_control_get(&pdev->dev, "spi");
-+	if (IS_ERR(tspi->rst)) {
-+		dev_err(&pdev->dev, "can not get reset\n");
-+		ret = PTR_ERR(tspi->rst);
-+		goto exit_free_irq;
-+	}
-+
- 	tspi->max_buf_size = SPI_FIFO_DEPTH << 2;
- 	tspi->dma_buf_size = DEFAULT_SPI_DMA_BUF_LEN;
+-void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert);
+ extern const struct clk_ops tegra_clk_periph_gate_ops;
+ struct clk *tegra_clk_register_periph_gate(const char *name,
+ 		const char *parent_name, u8 gate_flags, void __iomem *clk_base,
+diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
+index 23a0ceee831f..3ca9fca827a2 100644
+--- a/include/linux/clk/tegra.h
++++ b/include/linux/clk/tegra.h
+@@ -120,13 +120,6 @@ static inline void tegra_cpu_clock_resume(void)
+ }
+ #endif
  
-diff --git a/drivers/spi/spi-tegra20-sflash.c b/drivers/spi/spi-tegra20-sflash.c
-index 4dc8e8129459..e6f382b33818 100644
---- a/drivers/spi/spi-tegra20-sflash.c
-+++ b/drivers/spi/spi-tegra20-sflash.c
-@@ -32,8 +32,8 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/reset.h>
- #include <linux/spi/spi.h>
--#include <linux/clk/tegra.h>
+-#ifdef CONFIG_ARCH_TEGRA
+-void tegra_periph_reset_deassert(struct clk *c);
+-void tegra_periph_reset_assert(struct clk *c);
+-#else
+-static inline void tegra_periph_reset_deassert(struct clk *c) {}
+-static inline void tegra_periph_reset_assert(struct clk *c) {}
+-#endif
+ void tegra_clocks_apply_init_table(void);
  
- #define SPI_COMMAND				0x000
- #define SPI_GO					BIT(30)
-@@ -118,6 +118,7 @@ struct tegra_sflash_data {
- 	spinlock_t				lock;
- 
- 	struct clk				*clk;
-+	struct reset_control			*rst;
- 	void __iomem				*base;
- 	unsigned				irq;
- 	u32					spi_max_frequency;
-@@ -389,9 +390,9 @@ static irqreturn_t handle_cpu_based_xfer(struct tegra_sflash_data *tsd)
- 		dev_err(tsd->dev,
- 			"CpuXfer 0x%08x:0x%08x\n", tsd->command_reg,
- 				tsd->dma_control_reg);
--		tegra_periph_reset_assert(tsd->clk);
-+		reset_control_assert(tsd->rst);
- 		udelay(2);
--		tegra_periph_reset_deassert(tsd->clk);
-+		reset_control_deassert(tsd->rst);
- 		complete(&tsd->xfer_completion);
- 		goto exit;
- 	}
-@@ -505,6 +506,13 @@ static int tegra_sflash_probe(struct platform_device *pdev)
- 		goto exit_free_irq;
- 	}
- 
-+	tsd->rst = devm_reset_control_get(&pdev->dev, "spi");
-+	if (IS_ERR(tsd->rst)) {
-+		dev_err(&pdev->dev, "can not get reset\n");
-+		ret = PTR_ERR(tsd->rst);
-+		goto exit_free_irq;
-+	}
-+
- 	init_completion(&tsd->xfer_completion);
- 	pm_runtime_enable(&pdev->dev);
- 	if (!pm_runtime_enabled(&pdev->dev)) {
-@@ -520,9 +528,9 @@ static int tegra_sflash_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Reset controller */
--	tegra_periph_reset_assert(tsd->clk);
-+	reset_control_assert(tsd->rst);
- 	udelay(2);
--	tegra_periph_reset_deassert(tsd->clk);
-+	reset_control_deassert(tsd->rst);
- 
- 	tsd->def_command_reg  = SPI_M_S | SPI_CS_SW;
- 	tegra_sflash_writel(tsd, tsd->def_command_reg, SPI_COMMAND);
-diff --git a/drivers/spi/spi-tegra20-slink.c b/drivers/spi/spi-tegra20-slink.c
-index e66715ba37ed..1305b8f933ba 100644
---- a/drivers/spi/spi-tegra20-slink.c
-+++ b/drivers/spi/spi-tegra20-slink.c
-@@ -33,8 +33,8 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/reset.h>
- #include <linux/spi/spi.h>
--#include <linux/clk/tegra.h>
- 
- #define SLINK_COMMAND			0x000
- #define SLINK_BIT_LENGTH(x)		(((x) & 0x1f) << 0)
-@@ -167,6 +167,7 @@ struct tegra_slink_data {
- 	spinlock_t				lock;
- 
- 	struct clk				*clk;
-+	struct reset_control			*rst;
- 	void __iomem				*base;
- 	phys_addr_t				phys;
- 	unsigned				irq;
-@@ -884,9 +885,9 @@ static irqreturn_t handle_cpu_based_xfer(struct tegra_slink_data *tspi)
- 		dev_err(tspi->dev,
- 			"CpuXfer 0x%08x:0x%08x:0x%08x\n", tspi->command_reg,
- 				tspi->command2_reg, tspi->dma_control_reg);
--		tegra_periph_reset_assert(tspi->clk);
-+		reset_control_assert(tspi->rst);
- 		udelay(2);
--		tegra_periph_reset_deassert(tspi->clk);
-+		reset_control_deassert(tspi->rst);
- 		complete(&tspi->xfer_completion);
- 		goto exit;
- 	}
-@@ -957,9 +958,9 @@ static irqreturn_t handle_dma_based_xfer(struct tegra_slink_data *tspi)
- 		dev_err(tspi->dev,
- 			"DmaXfer 0x%08x:0x%08x:0x%08x\n", tspi->command_reg,
- 				tspi->command2_reg, tspi->dma_control_reg);
--		tegra_periph_reset_assert(tspi->clk);
-+		reset_control_assert(tspi->rst);
- 		udelay(2);
--		tegra_periph_reset_deassert(tspi->clk);
-+		reset_control_assert(tspi->rst);
- 		complete(&tspi->xfer_completion);
- 		spin_unlock_irqrestore(&tspi->lock, flags);
- 		return IRQ_HANDLED;
-@@ -1118,6 +1119,13 @@ static int tegra_slink_probe(struct platform_device *pdev)
- 		goto exit_free_irq;
- 	}
- 
-+	tspi->rst = devm_reset_control_get(&pdev->dev, "spi");
-+	if (IS_ERR(tspi->rst)) {
-+		dev_err(&pdev->dev, "can not get reset\n");
-+		ret = PTR_ERR(tspi->rst);
-+		goto exit_free_irq;
-+	}
-+
- 	tspi->max_buf_size = SLINK_FIFO_DEPTH << 2;
- 	tspi->dma_buf_size = DEFAULT_SPI_DMA_BUF_LEN;
- 
+ #endif /* __LINUX_CLK_TEGRA_H_ */
 -- 
 1.8.1.5
