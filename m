@@ -1,47 +1,35 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 15 Nov 2013 16:14:30 +0000
-Subject: [RFC DTC PATCH] dtc: add symlink (-L) output to dtbs
-In-Reply-To: <528542AC.4080405@wwwdotorg.org>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net> <
- 52814AFB.3070600@wwwdotorg.org> <
- CAL_Jsq+mAoN2Lbg+uqfLMTZBvgz28E-EioiaU4BUSL_7rS5JjA@mail.gmail.com> <
- 528275B7.6050209@wwwdotorg.org> <20131112193012.GR10335@titan.lakedaemon.
- net> <52828C77.20001@wwwdotorg.org> <20131114162859.GX10335@titan.
- lakedaemon.net> <52851DC8.203@wwwdotorg.org> <20131114191622.GC21549@
- obsidianresearch.com> <528542AC.4080405@wwwdotorg.org>
-Message-ID: <20131115161430.E5938C408A5@trevor.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Nov 2013 19:13:59 +0000
+Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
+In-Reply-To: <5284E236.1000606@gmail.com>
+References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
+ <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
+ <5283DB34.9050301@gmail.com> <201311141332.58498.arnd@arndb.de>
+ <CACxGe6uMWjfmB4WDKs+vu05224jqpbDZBHT_ZXnqxw17JzUqvw@mail.gmail.com>
+ <5284E236.1000606@gmail.com>
+Message-ID: <20131115191359.GS16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Nov 2013 14:37:48 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/14/2013 12:16 PM, Jason Gunthorpe wrote:
-> > On Thu, Nov 14, 2013 at 12:00:24PM -0700, Stephen Warren wrote:
-> > 
-> >> I don't think a distro should need to know the DTB filename at all.
-> >> Rather, the/a bootloader should know which platform it's running on, and
-> >> provide a variable/... to the boot script/... that defines the DTB
-> >> filename. That would completely remove all the knowledge of DTB
-> >> filenames from distros.
-> > 
-> > At some point the distro has to install a dtb into some cannonical
-> > place so the bootloader can find it..
-> > 
-> > Are you thinking that distros will have to ship a /boot/dtbs/*.dtb
-> > with every dtb from the kernel build?
-> 
-> Yes. How else would the distro support booting the install on arbitrary
-> boards?
-> 
-> > What happens when you install two different versions of the kernel?
-> 
-> /boot/zImage-$version
-> /boot/dtbs-$version/*.dtb
-> 
-> > What about boot schemes that can load a kernel version dependent dtb?
-> 
-> I think that's solved by installing the DTB files in a
-> kernel-version-specific directory.
+On Thu, Nov 14, 2013 at 08:46:14AM -0600, Rob Herring wrote:
+> We probably have at least a dozen machine_desc's we are close to being
+> able to remove (sunxi, picoxcell, highbank, dove, rockchip, virt,
+> several sh-mobile). There's also more that probably can be combined
+> together which will change the string in /proc/cpuinfo.
 
-That's certainly the way I would solve it.
+I hope not (for dove) because it's one of the few ARM platforms I have
+here which run a "modern" distribution.  That's rather important,
+because I seem to find things that no one else finds, not even Olof's
+wonderful build system when running against distro stuff.
 
-g.
+It also means that work on sorting out the componentising of DRM stuff
+loses a test platform.
+
+Yes, I boot non-DT kernels on the Cubox because its the only way to get
+full support there.  Yes, I maintain a separate kernel tree for doing
+this but removing non-DT support for Dove will cripple my efforts to
+keep that up to date, and continue pushing forward on getting the various
+drivers into shape.
+
+However, maybe the whole point _is_ to keep all the fun stuff on these
+platforms out of the kernel tree...
