@@ -1,73 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Nov 2013 07:30:13 -0600
-Subject: [PATCH V3] ARM: OMAP2+: omap_device: maintain sane runtime pm
- status around suspend/resume
-In-Reply-To: <alpine.DEB.2.02.1311150806220.15980@utopia.booyaka.com>
-References: <1384297710-29694-1-git-send-email-nm@ti.com>
- <1384448716-3186-1-git-send-email-nm@ti.com>
- <alpine.DEB.2.02.1311150806220.15980@utopia.booyaka.com>
-Message-ID: <528621E5.4030201@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Nov 2013 13:34:28 +0000
+Subject: [PATCH 1/6] arm64: mm: Add __virt_to_idmap() to keep kvm build
+ happy
+In-Reply-To: <1384457866-16135-2-git-send-email-santosh.shilimkar@ti.com>
+References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
+ <1384457866-16135-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131115133428.GA1217@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2013 02:07 AM, Paul Walmsley wrote:
-> On Thu, 14 Nov 2013, Nishanth Menon wrote:
+On Thu, Nov 14, 2013 at 07:37:41PM +0000, Santosh Shilimkar wrote:
+> ARM kvm code will make use of __virt_to_idmap() on arm32
+> machines as hardware interconnect supported alias of physical
+> memory for idmap purposes. The same code is shared with arm64
+> bit and hence will break the builds. So we add __virt_to_idmap()
+> which is just __virt_to_phys() on arm64 bit to keep build happy.
 > 
->> OMAP device hooks around suspend|resume_noirq ensures that hwmod
->> devices are forced to idle using omap_device_idle/enable as part of
->> the last stage of suspend activity.
->>
->> For a device such as i2c who uses autosuspend, it is possible to enter
->> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
->>
->> As part of the suspend flow, the generic runtime logic would increment
->> it's dev->power.disable_depth to 1. This should prevent further
->> pm_runtime_get_sync from succeeding once the runtime_status has been
->> set to RPM_SUSPENDED.
->>
->> Now, as part of the suspend_noirq handler in omap_device, we force the
->> following: if the device status is !suspended, we force the device
->> to idle using omap_device_idle (clocks are cut etc..). This ensures
->> that from a hardware perspective, the device is "suspended". However,
->> runtime_status is left to be active.
->>
->> *if* an operation is attempted after this point to
->> pm_runtime_get_sync, runtime framework depends on runtime_status to
->> indicate accurately the device status, and since it sees it to be
->> ACTIVE, it assumes the module is functional and returns a non-error
->> value. As a result the user will see pm_runtime_get succeed, however a
->> register access will crash due to the lack of clocks.
->>
->> To prevent this from happening, we should ensure that runtime_status
->> exactly indicates the device status. As a result of this change
->> any further calls to pm_runtime_get* would return -EACCES (since
->> disable_depth is 1). On resume, we restore the clocks and runtime
->> status exactly as we suspended with. These operations are not expected
->> to fail as we update the states after the core runtime framework has
->> suspended itself and restore before the core runtime framework has
->> resumed.
->>
->> Reported-by: J Keerthy <j-keerthy@ti.com>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Acked-by: Rajendra Nayak <rnayak@ti.com>
->> Acked-by: Kevin Hilman <khilman@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> Looks reasonable to me.  Looks like this should be considered for -stable 
-> - Nishanth, what do you think?
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Every product kernel since 3.4 needed to be hacked (we have hacked in
-different ways so far) to work around this (since we never spend time
-digging deeper :( ), So, I do agree with your view that a -stable tag
-will be most beneficial.
+BTW, there is normally no space between the Cc and Signed-off-by lines.
 
+> ---
+>  arch/arm64/include/asm/memory.h |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> Tony or Kevin, do you want to take this one, or want me to?
-> 
-> 
-> - Paul
-> 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 3776217..d9341ee 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -75,6 +75,14 @@
+>  #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
+>  
+>  /*
+> + * Added to keep arm64 kvm build working which shares code with
+> + * 32bit port. ARM kvm code makes use of __virt_to_idmap() on arm32
+> + * machines as hardware interconnect supported alias of physical
+> + * memory for idmap purposes.
+> + */
+> +#define virt_to_idmap(x)	__virt_to_phys(x)
 
+There are consistency issues with the use of underscores before
+__virt_to_idmap. And I think you can simply say something like "Required
+by ARM KVM code". The explanation on why really belongs to the 32-bit
+arm code.
 
 -- 
-Regards,
-Nishanth Menon
+Catalin
