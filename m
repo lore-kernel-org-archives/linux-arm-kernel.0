@@ -1,79 +1,124 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 15 Nov 2013 14:47:22 +0100
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-In-Reply-To: <20131115130711.GA2496@localhost>
-References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131114230436.GV9468@ld-irv-0074.broadcom.com>
- <20131114230540.GW9468@ld-irv-0074.broadcom.com>
- <20131114231528.GA9793@localhost> <5285D44C.7080501@gmail.com>
- <20131115130711.GA2496@localhost>
-Message-ID: <528625EA.8060406@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Nov 2013 14:48:15 +0100
+Subject: [PATCH v3 3/4] ata: Add APM X-Gene SoC SATA host controller driver
+In-Reply-To: <1384465153-29902-4-git-send-email-lho@apm.com>
+References: <1384465153-29902-1-git-send-email-lho@apm.com>
+ <1384465153-29902-3-git-send-email-lho@apm.com>
+ <1384465153-29902-4-git-send-email-lho@apm.com>
+Message-ID: <201311151448.16279.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2013 02:07 PM, Ezequiel Garcia wrote:
-> On Fri, Nov 15, 2013 at 08:59:08AM +0100, Daniel Mack wrote:
->> On 11/15/2013 12:15 AM, Ezequiel Garcia wrote:
->>> On Thu, Nov 14, 2013 at 03:05:40PM -0800, Brian Norris wrote:
->>>> + Daniel (missed the CC)
->>>>
->>>> On Thu, Nov 14, 2013 at 03:04:36PM -0800, Brian Norris wrote:
->>>>> On Thu, Nov 14, 2013 at 06:25:25PM -0300, Ezequiel Garcia wrote:
->>>>>> * Changes from v4
->>>>>>
->>>>>>   * Rebased on top of l2-mtd.git origin/next branch
->>>>>>
->>>>>>   * Fixed is_ready flag reset, renamed by a more descriptive
->>>>>>     and readble "need_wait".
->>>>>>
->>>>>
->>>>> ...
->>>>>
->>>>> I think this series is now good as-is. Pushing to l2-mtd.git/next.
->>>>> Thanks for the efforts! I can submit my extra diff from patch 12 as a
->>>>> separate patch for review.
->>>>>
->>>>> Do you have any available regression tests? Or was there somebody else
->>>>> we could run this by for some Tested-by's? Daniel Mack, perhaps?
->>>>
->>>> Brian
->>>
->>> Yes, if Daniel (or anybody else) can push a Tested-by, that's better because
->>> he's a "third-party" tester.
->>
->> Yes. Sorry, I could only partially follow all the discussions around
->> these patch sets, but I can certainly do a quick regression test on my
->> pxa3xx platform.
->>
->> Ezequiel, could you maybe point me to a repository where I can pull
->> everything from you want me to have a look at?
->>
-> 
-> Latest work is at the next branch in l2-mtd.git:
-> 
-> http://git.infradead.org/l2-mtd.git/shortlog/refs/heads/next
-> 
-> You could try that, with Brian's latest patch:
-> 
-> http://patchwork.ozlabs.org/patch/291408/
+On Thursday 14 November 2013, Loc Ho wrote:
+>  
+> +config SATA_XGENE
+> +	tristate "APM X-Gene 6.0Gbps SATA host controller support"
+> +	depends on SATA_AHCI_PLATFORM
+> +	default y if ARM64
+> +	select SATA_XGENE_PHY
 
-Thanks Ezequiel! Tested with and without DMA on my PXA3xx platform and
-it seems to work just well. Awesome work :)
+I don't think the "default y" is appropriate here, since there are going to
+be lots of ARM64 platforms in the long run that don't have this. Also,
+there is a trend towards using CONFIG_COMPILE_TEST to limit the
+visibility.
 
-[    2.675715] NAND device: Manufacturer ID: 0x20, Chip ID: 0xa1 (ST
-Micro NAND01GR3B2CZA6)
-[    2.683965] NAND device: 128MiB, SLC, page size: 2048, OOB size: 64
-[    2.690867] Scanning device for bad blocks
-[    2.977987] Bad eraseblock 528 at 0x000004200000
-[    2.983394] Bad eraseblock 529 at 0x000004220000
-[    3.251150] 4 ofpart partitions found on MTD device pxa3xx_nand-0
-[    3.257313] Creating 4 MTD partitions on "pxa3xx_nand-0":
-[    3.263051] 0x000000000000-0x0000000a0000 : "Bootloader"
-[    3.278845] 0x0000000a0000-0x0000000c0000 : "BootloaderEnvironment"
-[    3.296388] 0x0000000c0000-0x000000120000 : "BootloaderSplashScreen"
-[    3.314704] 0x000000120000-0x000008000000 : "UBI"
+I'd suggest something like
 
+config SATA_XGENE
+	tristate "APM X-Gene 6.0Gbps SATA host controller support"
+	depends on ARM64 || COMPILE_TEST
+	...
 
+> +/* Enable for dumping CSR read/write access */
+> +#undef XGENE_DBG_CSR
 
-Best regards,
-Daniel
+This should be removed now as well, along with the debug macro you already removed.
+
+> +
+> +/* Temporary function until the PHY parameter API */
+> +extern void xgene_ahci_phy_set_pq(struct phy *phy, int chan, int data);
+> +extern void xgene_ahci_phy_set_spd(struct phy *phy, int chan, int gen);
+
+Ah, that should have been mentioned in the changeset text. Do you think you
+can remove these for the final version?
+
+> +static void xgene_rd(void *addr, u32 *val)
+> +{
+> +	*val = readl(addr);
+> +#if defined(XGENE_DBG_CSR)
+> +	printk(KERN_DEBUG "SATAPHY CSR RD: 0x%p value: 0x%08x\n", addr, *val);
+> +#endif
+> +}
+
+The interface you are looking for is pr_debug() or dev_dbg(), which get
+built-in only if the DEBUG macro is set.
+
+In a lot of cases, it's actually best to remove debug output like this from
+the driver once you have it working  -- whoever is debugging problems in 
+the driver next might need completely different debugging information or
+can add them back easily if needed.
+
+It's your choice if you want to use pr_debug() or remove that output
+entirely. If you remove it, best remove the helper functions entirely
+and use readl/writel directly.
+
+> +/* Flush the IOB to ensure all SATA controller writes completed before
+> +   servicing the completed command. */
+> +static int xgene_ahci_iob_flush(struct xgene_ahci_context *ctx)
+> +{
+> +	if (ctx->ahbc_io_base == NULL) {
+> +		void *ahbc_base;
+> +		u32 val;
+> +
+> +		/* The AHBC address is fixed in X-Gene */
+> +		ahbc_base = devm_ioremap(ctx->dev, 0x1F2A0000, 0x80000);
+> +		if (!ahbc_base) {
+> +			dev_err(ctx->dev, "can't map AHBC resource\n");
+> +			return -ENODEV;
+> +		}
+
+I had an important comment about the misuse of hardcoded I/O addresses
+here. Please never just post a new version with the same issue. In general,
+your options are:
+
+* rewrite the code in a more appropriate way
+* reply to the comment, arguing why you think your code is correct
+* ask for clarification if you don't know how to improve the code
+* mark the code as TODO and mention in the patch description why you
+  are still working on this and that the current version should not
+  be seen as final.
+
+If you don't do any of these, reviewers will get annoyed because you
+are wasting their time.
+> +
+> +static int xgene_ahci_get_u32_param(struct platform_device *pdev,
+> +				    const char *of_name, char *acpi_name,
+> +				    u32 *param)
+> +{
+> +#ifdef CONFIG_ACPI
+> +	if (efi_enabled(EFI_BOOT)) {
+> +		unsigned long long value;
+> +		acpi_status status;
+> +		if (acpi_name == NULL)
+> +			return -ENODEV;
+> +		status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
+> +					       acpi_name, NULL, &value);
+> +		if (ACPI_FAILURE(status))
+> +			return -ENODEV;
+> +		*param = value;
+> +		return 0;
+> +	}
+> +#endif
+
+There are more previous comments that you have not addressed yet.
+
+> diff --git a/drivers/ata/sata_xgene.h b/drivers/ata/sata_xgene.h
+> new file mode 100644
+> index 0000000..51e73f6
+> --- /dev/null
+> +++ b/drivers/ata/sata_xgene.h
+
+This file should probably just be folded into the driver, since it contains no
+interfaces between  modules, just internal definitions.
+
+	Arnd
