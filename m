@@ -1,38 +1,26 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Nov 2013 14:41:30 +0100
-Subject: [PATCH] ARM: at91/dt: binding: add precision to AIC documentation
-In-Reply-To: <1384510173-15901-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1384510173-15901-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20131115134130.GM28304@ns203013.ovh.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Nov 2013 13:39:49 +0000
+Subject: [PATCH 4/6] arm64: mm: Drop the lowmem watermark check from
+ virt_addr_valid()
+In-Reply-To: <1384457866-16135-5-git-send-email-santosh.shilimkar@ti.com>
+References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
+ <1384457866-16135-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131115133948.GB1217@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:09 Fri 15 Nov     , Nicolas Ferre wrote:
-> In response to the "undocumented compatible strings" message, here is a
-> patch which is adding the precision of two "chips" that should be used for
-> the "atmel,<chip>-aic" compatibility string.
+On Thu, Nov 14, 2013 at 07:37:44PM +0000, Santosh Shilimkar wrote:
+> Slab allocator can allocate memory beyond the lowmem watermark
+> which can lead to false failure of virt_addr_valid().
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> So drop the check. The issue was seen with percpu_alloc()
+> in KVM code which was allocating memory beyond lowmem watermark.
+> 
+> Am not completly sure whether this is the right fix and if it could
+> impact any other user of virt_addr_valid(). Without this fix as
+> pointed out the KVM init was failing in my testing.
 
-Best Regards,
-J.
-> ---
->  Documentation/devicetree/bindings/arm/atmel-aic.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-> index ad031211..2742e9c 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-> @@ -2,6 +2,7 @@
->  
->  Required properties:
->  - compatible: Should be "atmel,<chip>-aic"
-> +  <chip> can be "at91rm9200" or "sama5d3"
->  - interrupt-controller: Identifies the node as an interrupt controller.
->  - interrupt-parent: For single AIC system, it is an empty property.
->  - #interrupt-cells: The number of cells to define the interrupts. It should be 3.
-> -- 
-> 1.8.2.2
-> 
+Do you have a problem on arm64? There is no lowmem watermark here.
+
+-- 
+Catalin
