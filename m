@@ -1,53 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 Nov 2013 13:34:28 +0000
-Subject: [PATCH 1/6] arm64: mm: Add __virt_to_idmap() to keep kvm build
- happy
-In-Reply-To: <1384457866-16135-2-git-send-email-santosh.shilimkar@ti.com>
-References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131115133428.GA1217@darko.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 15 Nov 2013 14:41:14 +0100
+Subject: [PATCH] ARM: at91/dt: binding: add missing compatibility string
+ in SDRAM/DDR documentation
+In-Reply-To: <1384510235-16083-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1384510235-16083-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20131115134114.GL28304@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 07:37:41PM +0000, Santosh Shilimkar wrote:
-> ARM kvm code will make use of __virt_to_idmap() on arm32
-> machines as hardware interconnect supported alias of physical
-> memory for idmap purposes. The same code is shared with arm64
-> bit and hence will break the builds. So we add __virt_to_idmap()
-> which is just __virt_to_phys() on arm64 bit to keep build happy.
+On 11:10 Fri 15 Nov     , Nicolas Ferre wrote:
+> The "atmel,at91rm9200-sdramc" was missing from binding documentation.
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-BTW, there is normally no space between the Cc and Signed-off-by lines.
-
+Best Regards,
+J.
 > ---
->  arch/arm64/include/asm/memory.h |    8 ++++++++
->  1 file changed, 8 insertions(+)
+>  Documentation/devicetree/bindings/arm/atmel-at91.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 3776217..d9341ee 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -75,6 +75,14 @@
->  #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 1196290..d2170e7 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -50,7 +50,8 @@ Example:
+>  	};
 >  
->  /*
-> + * Added to keep arm64 kvm build working which shares code with
-> + * 32bit port. ARM kvm code makes use of __virt_to_idmap() on arm32
-> + * machines as hardware interconnect supported alias of physical
-> + * memory for idmap purposes.
-> + */
-> +#define virt_to_idmap(x)	__virt_to_phys(x)
-
-There are consistency issues with the use of underscores before
-__virt_to_idmap. And I think you can simply say something like "Required
-by ARM KVM code". The explanation on why really belongs to the 32-bit
-arm code.
-
--- 
-Catalin
+>  RAMC SDRAM/DDR Controller required properties:
+> -- compatible: Should be "atmel,at91sam9260-sdramc",
+> +- compatible: Should be "atmel,at91rm9200-sdramc",
+> +			"atmel,at91sam9260-sdramc",
+>  			"atmel,at91sam9g45-ddramc",
+>  - reg: Should contain registers location and length
+>    For at91sam9263 and at91sam9g45 you must specify 2 entries.
+> -- 
+> 1.8.2.2
+> 
