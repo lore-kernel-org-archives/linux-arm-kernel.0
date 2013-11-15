@@ -1,16 +1,18 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Nov 2013 13:54:25 -0700
-Subject: [PATCH 30/31] clk: tegra: remove legacy reset APIs
+Date: Fri, 15 Nov 2013 13:54:26 -0700
+Subject: [PATCH 31/31] clk: tegra: remove bogus PCIE_XCLK
 In-Reply-To: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1384548866-13141-31-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1384548866-13141-32-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Now that no code uses the custom Tegra module reset API, we can remove
-its implementation.
+The "pcie_xclk" clock is not actually a clock at all, but rather a reset
+domain. Now that the custom Tegra module reset API has been removed, we
+can remove the definition of any "clocks" that existed solely to support
+it.
 
 Cc: treding at nvidia.com
 Cc: pdeschrijver at nvidia.com
@@ -24,132 +26,93 @@ looking for an ack so that I can take the entire series through the Tegra
 and arm-soc trees. The series will be part of a stable branch that can be
 merged into other subsystems if needed to avoid/resolve dependencies.
 ---
- drivers/clk/tegra/clk-periph-gate.c | 22 --------------------
- drivers/clk/tegra/clk-periph.c      | 40 -------------------------------------
- drivers/clk/tegra/clk.h             |  1 -
- include/linux/clk/tegra.h           |  7 -------
- 4 files changed, 70 deletions(-)
+ drivers/clk/tegra/clk-tegra20.c         | 6 ------
+ drivers/clk/tegra/clk-tegra30.c         | 7 -------
+ include/dt-bindings/clock/tegra20-car.h | 2 +-
+ include/dt-bindings/clock/tegra30-car.h | 2 +-
+ 4 files changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
-index f38f33e3c65d..507015314827 100644
---- a/drivers/clk/tegra/clk-periph-gate.c
-+++ b/drivers/clk/tegra/clk-periph-gate.c
-@@ -36,8 +36,6 @@ static DEFINE_SPINLOCK(periph_ref_lock);
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index eeffff6c6778..69c44ccc2ab2 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -473,7 +473,6 @@ static struct tegra_devclk devclks[] __initdata = {
+ 	{ .con_id = "isp", .dev_id = "tegra_camera", .dt_id = TEGRA20_CLK_ISP },
+ 	{ .con_id = "pex", .dt_id = TEGRA20_CLK_PEX },
+ 	{ .con_id = "afi", .dt_id = TEGRA20_CLK_AFI },
+-	{ .con_id = "pcie_xclk", .dt_id = TEGRA20_CLK_PCIE_XCLK },
+ 	{ .con_id = "cdev1", .dt_id = TEGRA20_CLK_CDEV1 },
+ 	{ .con_id = "cdev2", .dt_id = TEGRA20_CLK_CDEV2 },
+ 	{ .con_id = "clk_32k", .dt_id = TEGRA20_CLK_CLK_32K },
+@@ -839,11 +838,6 @@ static void __init tegra20_periph_clk_init(void)
+ 				    periph_clk_enb_refcnt);
+ 	clks[TEGRA20_CLK_PEX] = clk;
  
- #define read_rst(gate) \
- 	readl_relaxed(gate->clk_base + (gate->regs->rst_reg))
--#define write_rst_set(val, gate) \
--	writel_relaxed(val, gate->clk_base + (gate->regs->rst_set_reg))
- #define write_rst_clr(val, gate) \
- 	writel_relaxed(val, gate->clk_base + (gate->regs->rst_clr_reg))
+-	/* pcie_xclk */
+-	clk = tegra_clk_register_periph_gate("pcie_xclk", "clk_m", 0, clk_base,
+-				    0, 74, periph_clk_enb_refcnt);
+-	clks[TEGRA20_CLK_PCIE_XCLK] = clk;
+-
+ 	/* cdev1 */
+ 	clk = clk_register_fixed_rate(NULL, "cdev1_fixed", NULL, CLK_IS_ROOT,
+ 				      26000000);
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index e9b6a305be92..a0c9cc4dc6a3 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -658,7 +658,6 @@ static struct tegra_devclk devclks[] __initdata = {
+ 	{ .con_id = "isp", .dev_id = "tegra_camera", .dt_id = TEGRA30_CLK_ISP },
+ 	{ .con_id = "pcie", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIE },
+ 	{ .con_id = "afi", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_AFI },
+-	{ .con_id = "pciex", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIEX },
+ 	{ .con_id = "fuse", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE },
+ 	{ .con_id = "fuse_burn", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE_BURN },
+ 	{ .con_id = "apbif", .dev_id = "tegra30-ahub", .dt_id = TEGRA30_CLK_APBIF },
+@@ -1159,11 +1158,6 @@ static void __init tegra30_periph_clk_init(void)
+ 				    periph_clk_enb_refcnt);
+ 	clks[TEGRA30_CLK_AFI] = clk;
  
-@@ -123,26 +121,6 @@ static void clk_periph_disable(struct clk_hw *hw)
- 	spin_unlock_irqrestore(&periph_ref_lock, flags);
- }
- 
--void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert)
--{
--	if (gate->flags & TEGRA_PERIPH_NO_RESET)
--		return;
+-	/* pciex */
+-	clk = tegra_clk_register_periph_gate("pciex", "pll_e", 0, clk_base, 0,
+-				    74, periph_clk_enb_refcnt);
+-	clks[TEGRA30_CLK_PCIEX] = clk;
 -
--	if (assert) {
--		/*
--		 * If peripheral is in the APB bus then read the APB bus to
--		 * flush the write operation in apb bus. This will avoid the
--		 * peripheral access after disabling clock
--		 */
--		if (gate->flags & TEGRA_PERIPH_ON_APB)
--			tegra_read_chipid();
--
--		write_rst_set(periph_clk_to_bit(gate), gate);
--	} else {
--		write_rst_clr(periph_clk_to_bit(gate), gate);
--	}
--}
--
- const struct clk_ops tegra_clk_periph_gate_ops = {
- 	.is_enabled = clk_periph_is_enabled,
- 	.enable = clk_periph_enable,
-diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
-index b5feccca2f1e..d8ed9f79708b 100644
---- a/drivers/clk/tegra/clk-periph.c
-+++ b/drivers/clk/tegra/clk-periph.c
-@@ -111,46 +111,6 @@ static void clk_periph_disable(struct clk_hw *hw)
- 	gate_ops->disable(gate_hw);
- }
- 
--void tegra_periph_reset_deassert(struct clk *c)
--{
--	struct clk_hw *hw = __clk_get_hw(c);
--	struct tegra_clk_periph *periph = to_clk_periph(hw);
--	struct tegra_clk_periph_gate *gate;
--
--	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
--		gate = to_clk_periph_gate(hw);
--		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
--			WARN_ON(1);
--			return;
--		}
--	} else {
--		gate = &periph->gate;
--	}
--
--	tegra_periph_reset(gate, 0);
--}
--EXPORT_SYMBOL(tegra_periph_reset_deassert);
--
--void tegra_periph_reset_assert(struct clk *c)
--{
--	struct clk_hw *hw = __clk_get_hw(c);
--	struct tegra_clk_periph *periph = to_clk_periph(hw);
--	struct tegra_clk_periph_gate *gate;
--
--	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
--		gate = to_clk_periph_gate(hw);
--		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
--			WARN_ON(1);
--			return;
--		}
--	} else {
--		gate = &periph->gate;
--	}
--
--	tegra_periph_reset(gate, 1);
--}
--EXPORT_SYMBOL(tegra_periph_reset_assert);
--
- const struct clk_ops tegra_clk_periph_ops = {
- 	.get_parent = clk_periph_get_parent,
- 	.set_parent = clk_periph_set_parent,
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index 39f24959daf7..57bd0d3090e3 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -392,7 +392,6 @@ struct tegra_clk_periph_gate {
- #define TEGRA_PERIPH_WAR_1005168 BIT(3)
- #define TEGRA_PERIPH_NO_DIV BIT(4)
- 
--void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert);
- extern const struct clk_ops tegra_clk_periph_gate_ops;
- struct clk *tegra_clk_register_periph_gate(const char *name,
- 		const char *parent_name, u8 gate_flags, void __iomem *clk_base,
-diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
-index 23a0ceee831f..3ca9fca827a2 100644
---- a/include/linux/clk/tegra.h
-+++ b/include/linux/clk/tegra.h
-@@ -120,13 +120,6 @@ static inline void tegra_cpu_clock_resume(void)
- }
- #endif
- 
--#ifdef CONFIG_ARCH_TEGRA
--void tegra_periph_reset_deassert(struct clk *c);
--void tegra_periph_reset_assert(struct clk *c);
--#else
--static inline void tegra_periph_reset_deassert(struct clk *c) {}
--static inline void tegra_periph_reset_assert(struct clk *c) {}
--#endif
- void tegra_clocks_apply_init_table(void);
- 
- #endif /* __LINUX_CLK_TEGRA_H_ */
+ 	/* emc */
+ 	clk = clk_register_mux(NULL, "emc_mux", mux_pllmcp_clkm,
+ 			       ARRAY_SIZE(mux_pllmcp_clkm),
+@@ -1404,7 +1398,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
+ 	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_BSEA, "nvavp", "bsea"),
+ 	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CML1, "tegra_sata_cml", NULL),
+ 	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CML0, "tegra_pcie", "cml"),
+-	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_PCIEX, "tegra_pcie", "pciex"),
+ 	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_VCP, "nvavp", "vcp"),
+ 	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CLK_MAX, NULL, NULL), /* MUST be the last entry */
+ };
+diff --git a/include/dt-bindings/clock/tegra20-car.h b/include/dt-bindings/clock/tegra20-car.h
+index a1ae9a8fdd6c..9406207cfac8 100644
+--- a/include/dt-bindings/clock/tegra20-car.h
++++ b/include/dt-bindings/clock/tegra20-car.h
+@@ -92,7 +92,7 @@
+ #define TEGRA20_CLK_OWR 71
+ #define TEGRA20_CLK_AFI 72
+ #define TEGRA20_CLK_CSITE 73
+-#define TEGRA20_CLK_PCIE_XCLK 74
++/* 74 */
+ #define TEGRA20_CLK_AVPUCQ 75
+ #define TEGRA20_CLK_LA 76
+ /* 77 */
+diff --git a/include/dt-bindings/clock/tegra30-car.h b/include/dt-bindings/clock/tegra30-car.h
+index 22445820a929..889e49ba0aa3 100644
+--- a/include/dt-bindings/clock/tegra30-car.h
++++ b/include/dt-bindings/clock/tegra30-car.h
+@@ -92,7 +92,7 @@
+ #define TEGRA30_CLK_OWR 71
+ #define TEGRA30_CLK_AFI 72
+ #define TEGRA30_CLK_CSITE 73
+-#define TEGRA30_CLK_PCIEX 74
++/* 74 */
+ #define TEGRA30_CLK_AVPUCQ 75
+ #define TEGRA30_CLK_LA 76
+ /* 77 */
 -- 
 1.8.1.5
