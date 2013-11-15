@@ -1,36 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Nov 2013 12:48:55 +0000
-Subject: [PATCH -next] iommu/arm-smmu: fix error return code in
- arm_smmu_device_dt_probe()
-In-Reply-To: <CAPgLHd8siM4ZpmaqHWa9JXFmcGBvvb6J=Vo2DvP5=zMQE0d0fA@mail.gmail.com>
-References: <CAPgLHd8siM4ZpmaqHWa9JXFmcGBvvb6J=Vo2DvP5=zMQE0d0fA@mail.gmail.com>
-Message-ID: <20131115124855.GC19468@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Nov 2013 13:52:33 +0100
+Subject: [PATCH 1/3] Documentation: Add APM X-Gene SoC 6.0Gbps SATA PHY
+ driver binding documentation
+In-Reply-To: <201311151335.09577.arnd@arndb.de>
+References: <1384457519-21335-1-git-send-email-lho@apm.com>
+ <1384457519-21335-2-git-send-email-lho@apm.com>
+ <201311151335.09577.arnd@arndb.de>
+Message-ID: <201311151352.33803.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 09:42:30AM +0000, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Friday 15 November 2013, Arnd Bergmann wrote:
+> On Thursday 14 November 2013, Loc Ho wrote:
+> > +- id                   : PHY ID (0 = first, 1 = second, 2 = third)
+> > +- #phy-cells           : Shall be 0
 > 
-> Fix to return -ENODEV instead of 0 when context interrupt number
-> does no match in arm_smmu_device_dt_probe().
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  drivers/iommu/arm-smmu.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 2349d62..2bc977b 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1858,6 +1858,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->  		dev_err(dev,
->  			"found only %d context interrupt(s) but %d required\n",
->  			smmu->num_context_irqs, smmu->num_context_banks);
-> +		err = -ENODEV;
->  		goto out_put_parent;
->  	}
+> Hmm, it seems like this would make more sense if you have #phy-cells=<1>
+> and have the PHY ID in user node as the argument.
 
-Applied to my devel branch. Thanks!
+Ignore this comment. After reading patch 2, I concluded that your choice of
+#phy-cells=0 is probably more appropriate here.
 
-Will
+	Arnd
