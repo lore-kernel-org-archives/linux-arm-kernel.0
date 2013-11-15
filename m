@@ -1,51 +1,41 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Fri, 15 Nov 2013 14:55:56 +0000
-Subject: [PATCH 1/4] wl1251: split wl251 platform data to a separate
- structure
-In-Reply-To: <20131115143254.GA7079@tuxdriver.com>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-2-git-send-email-sre@debian.org>
- <20131114185132.GQ10317@atomide.com>
- <20131114230330.GB6383@earth.universe>
- <20131114232217.GV10317@atomide.com>
- <20131115143254.GA7079@tuxdriver.com>
-Message-ID: <20131115145555.GA23351@earth.universe>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 15 Nov 2013 09:57:30 -0500
+Subject: [PATCH 4/6] arm64: mm: Drop the lowmem watermark check from
+ virt_addr_valid()
+In-Reply-To: <52862ED9.1050708@arm.com>
+References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
+ <1384457866-16135-5-git-send-email-santosh.shilimkar@ti.com>
+ <20131115133948.GB1217@darko.cambridge.arm.com> <52862ED9.1050708@arm.com>
+Message-ID: <5286365A.5080504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 09:32:55AM -0500, John W. Linville wrote:
-> On Thu, Nov 14, 2013 at 03:22:18PM -0800, Tony Lindgren wrote:
-> > * Sebastian Reichel <sre@debian.org> [131114 15:04]:
-> > > On Thu, Nov 14, 2013 at 10:51:33AM -0800, Tony Lindgren wrote:
-> > > > [...]
-> > > >
-> > > > If this is not going into v3.13, these will cause conflicts
-> > > > with the mach-omap2/board-*.c files for v3.14.
-> > > > 
-> > > > So it might be best to do a minimal header patch first that
-> > > > can be merged in by both linux-omap and wireless trees.
-> > > 
-> > > I guess this patch is pretty minimal. It also seems to be acked by
-> > > the involved Maintainers, so maybe just merge Patch 1 without the
-> > > other patches?
-> > > 
-> > > This does not solve the problem with the struct modification from
-> > > the second patch, but I guess it's the more intrusive patch.
-> > 
-> > Once at least the first two patches are ready, how about I queue
-> > them after -rc1 and set up an immutable branch that can be merged
-> > in by linux-omap tree and the wireless tree?
+On Friday 15 November 2013 09:25 AM, Marc Zyngier wrote:
+> On 15/11/13 13:39, Catalin Marinas wrote:
+>> On Thu, Nov 14, 2013 at 07:37:44PM +0000, Santosh Shilimkar wrote:
+>>> Slab allocator can allocate memory beyond the lowmem watermark
+>>> which can lead to false failure of virt_addr_valid().
+>>>
+>>> So drop the check. The issue was seen with percpu_alloc()
+>>> in KVM code which was allocating memory beyond lowmem watermark.
+>>>
+>>> Am not completly sure whether this is the right fix and if it could
+>>> impact any other user of virt_addr_valid(). Without this fix as
+>>> pointed out the KVM init was failing in my testing.
+>>
+>> Do you have a problem on arm64? There is no lowmem watermark here.
 > 
-> That sounds reasonable to me.
+> I don't think that change is relevant for arm64. Actually, the more I
+> look at it, I don't think virt_addr_valid() should be touched at all.
+> 
+> The real issue is the use of virt_to_phys()/virt_addr_valid() on a
+> percpu pointer, which is wrong and only worked by chance so far.
+> 
+> I'm working on a patch to solve this.
+> 
+Yep. I tried Marc's other approach and that does solve the issue.
+The $subject patch was any way more for getting attention to figure
+out right solution ;-) which I guess we have now.
 
-So what changes do you request for those patches? I will try to
-update them as soon as possible.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131115/26782d7a/attachment.sig>
+Regards,
+Santosh
