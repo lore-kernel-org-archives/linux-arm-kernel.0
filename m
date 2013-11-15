@@ -1,65 +1,85 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Nov 2013 11:12:59 -0500
-Subject: [PATCH v2] ARM: OMAP4460: cpuidle: Extend
- PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD on cpuidle
-In-Reply-To: <20131115161137.GY10317@atomide.com>
-References: <1382467484-16957-1-git-send-email-grygorii.strashko@ti.com>
- <5266CCE3.1090801@ti.com> <20131114183535.GL10317@atomide.com>
- <20131115153608.GX10317@atomide.com> <52864585.6030206@linaro.org>
- <20131115161137.GY10317@atomide.com>
-Message-ID: <5286480B.3060801@ti.com>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 15 Nov 2013 08:14:26 -0800
+Subject: [PATCH 2/3] ata: Add APM X-Gene SoC 6.0Gbps SATA PHY driver
+In-Reply-To: <201311151346.17231.arnd@arndb.de>
+References: <1384457519-21335-1-git-send-email-lho@apm.com>
+ <1384457519-21335-2-git-send-email-lho@apm.com>
+ <1384457519-21335-3-git-send-email-lho@apm.com>
+ <201311151346.17231.arnd@arndb.de>
+Message-ID: <CAPw-ZT=77Fc4Nyc0au74EusoQe=n8fGrJLpavLOmTcswp+8SwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013 11:11 AM, Tony Lindgren wrote:
-> * Taras Kondratiuk <taras.kondratiuk@linaro.org> [131115 08:03]:
->> On 11/15/2013 05:36 PM, Tony Lindgren wrote:
->>> * Tony Lindgren <tony@atomide.com> [131114 10:36]:
->>>> * Grygorii Strashko <grygorii.strashko@ti.com> [131022 12:09]:
->>>>> The same workaround as ff999b8a0983ee15668394ed49e38d3568fc6859
->>>>> "ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC ..."
->>>>> need to be applied not only when system is booting, but when MPUSS hits
->>>>> OSWR state through CPUIdle too. Without this WA the same issue is
->>>>> reproduced now on boards PandaES and Tablet/Blaze with SOM OMAP4460
->>>>> when CONFIG_CPU_IDLE is enabled.
->>>>> After MPUSS has enterred OSWR and waken up:
->>>>> - GIC distributor became disabled forever
->>>>> - scheduling is not performed any more
->>>>>
->>>>> Cc: Kevin Hilman <khilman@linaro.org>
->>>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>> Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
->>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>>
->>>> Applying into omap-for-v3.13/fixes thanks.
->>>
->>> Hmm looks like this breaks the build with randconfigs at least
->>> with the attached .config, so dropping for now.
->>
->> Hi Tony
->> Have you forgot to attach .config?
-> 
-> Oops, sorry looks like I removed it already as I rebuilt the tree
-> and started a new set of randconfig build tests.
->  
->>> arch/arm/mach-omap2/built-in.o: In function `omap_enter_idle_coupled':
->>> :(.text+0xb48c): undefined reference to `pm44xx_errata'
->>
->> I assume that .config doesn't have CONFIG_SMP enabled while
->> pm44xx_errata is defined in omap-smp.c.
->> I think it should be a separate patch to move pm44xx_errata somewhere
->> else, so this patch will remain the same.
-> 
-> Yes something like that probably. Sounds like that should be then
-> patches before this fix.
->  
->> Btw, do we need omap_enter_idle_coupled() in UP?
-> 
-> That should be checked, am43xx may need it.
-> 
-Nope. omap_enter_idle_coupled() is needed only for SMP
-systems. UP don't need couple idle functionality as
-such.
+Hi,
 
-Regards,
-Santosh
+>> +
+>> +/* SATA port 4 - 5 force power down VCO */
+>> +static void xgene_phy_sata45_macro_pdwn_force_vco(struct xgene_ahci_phy_ctx
+>> +                                                  *ctx)
+>> +{
+>> +     sds_pcie_toggle1to0(ctx->pcie_base, KC_CLKMACRO_CMU_REGS_CMU_REG0_ADDR,
+>> +                         CMU_REG0_PDOWN_MASK);
+>> +     sds_pcie_toggle1to0(ctx->pcie_base,
+>> +                         KC_CLKMACRO_CMU_REGS_CMU_REG32_ADDR,
+>> +                         CMU_REG32_FORCE_VCOCAL_START_MASK);
+>> +}
+>
+> I think it's bad to have knowledge of specific port numbers in the driver.
+> Can you change this so that the driver treats all PHYs the same way but
+> gets the differences between sata/eth/pcie mode from DT properties?
+[Loc Ho]
+Okay... I will get rip of the "sata45" and call this function if an
+base address is available.
+
+>
+>
+>> +void xgene_ahci_serdes_reset_rxa_rxd(struct xgene_ahci_phy_ctx *ctx, int chan)
+>
+> All functions in the driver should be 'static'. You are not calling these
+> directly from the SATA driver, are you?
+[Loc Ho]
+Okay... Not anymore.
+
+>
+>> +     /* Select SATA mux for SATA port 0 - 3 which shared with SGMII ETH */
+>> +     if (ctx->id < 2) {
+>> +             if (xgene_phy_host_sata_select(ctx) != 0) {
+>> +                     dev_err(ctx->dev, "SATA%d can not select SATA MUX\n",
+>> +                             ctx->id);
+>> +                     return -1;
+>> +             }
+>> +     }
+>
+> I think all checks for the "id" field are to find out what kind of PHY you
+> are talking to, the driver itself does not need to know the id, and the
+> field can be removed if you find that out in a different way.
+[Loc Ho]
+This is mainly used for debugging and detection of the 2nd resource. I
+will use another compatible type.
+
+>
+>> +     if (ctx->id == 2) {
+>> +             /* For 3rd controller, we must also program another resource */
+>> +             res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>> +             if (!res) {
+>> +                     dev_err(&pdev->dev,
+>> +                             "no SATA/PCIE PHY resource address\n");
+>> +                     goto error;
+>> +             }
+>> +             ctx->pcie_base = devm_ioremap(&pdev->dev, res->start,
+>> +                                           resource_size(res));
+>> +             if (!ctx->pcie_base) {
+>> +                     dev_err(&pdev->dev,
+>> +                             "can't map SATA/PCIe PHY resource\n");
+>> +                     rc = -ENOMEM;
+>> +                     goto error;
+>> +             }
+>> +     }
+>
+> If you need a second memory resource, I take that as a hint that
+> the device is actually different from the others, so using a separate
+> "compatible" string in DT might be more appropriate.
+[Loc Ho]
+Okay..
+
+-Loc
