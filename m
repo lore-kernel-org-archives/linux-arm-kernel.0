@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Nov 2013 15:26:23 -0800
-Subject: [PATCH 15/17] ARM: OMAP: Switch to sched_clock_register()
+Date: Fri, 15 Nov 2013 15:26:24 -0800
+Subject: [PATCH 16/17] ARM: orion: Switch to sched_clock_register()
 In-Reply-To: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
 References: <1384557985-9414-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1384557985-9414-16-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1384557985-9414-17-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +11,35 @@ The 32 bit sched_clock interface now supports 64 bits. Upgrade to
 the 64 bit function to allow us to remove the 32 bit registration
 interface.
 
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/plat-omap/counter_32k.c | 4 ++--
+ arch/arm/plat-orion/time.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index d9bc98e..384a776d 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -38,7 +38,7 @@
+diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
+index 9d2b2ac..dade292 100644
+--- a/arch/arm/plat-orion/time.c
++++ b/arch/arm/plat-orion/time.c
+@@ -60,7 +60,7 @@ static u32 ticks_per_jiffy;
+  * at least 7.5ns (133MHz TCLK).
   */
- static void __iomem *sync32k_cnt_reg;
  
--static u32 notrace omap_32k_read_sched_clock(void)
-+static u64 notrace omap_32k_read_sched_clock(void)
+-static u32 notrace orion_read_sched_clock(void)
++static u64 notrace orion_read_sched_clock(void)
  {
- 	return sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
+ 	return ~readl(timer_base + TIMER0_VAL_OFF);
  }
-@@ -115,7 +115,7 @@ int __init omap_init_clocksource_32k(void __iomem *vbase)
- 		return ret;
- 	}
+@@ -201,7 +201,7 @@ orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
+ 	/*
+ 	 * Set scale and timer for sched_clock.
+ 	 */
+-	setup_sched_clock(orion_read_sched_clock, 32, tclk);
++	sched_clock_register(orion_read_sched_clock, 32, tclk);
  
--	setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
-+	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
- 	register_persistent_clock(NULL, omap_read_persistent_clock);
- 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
- 
+ 	/*
+ 	 * Setup free-running clocksource timer (interrupts
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
