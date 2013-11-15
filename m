@@ -1,24 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Nov 2013 13:52:33 +0100
-Subject: [PATCH 1/3] Documentation: Add APM X-Gene SoC 6.0Gbps SATA PHY
- driver binding documentation
-In-Reply-To: <201311151335.09577.arnd@arndb.de>
-References: <1384457519-21335-1-git-send-email-lho@apm.com>
- <1384457519-21335-2-git-send-email-lho@apm.com>
- <201311151335.09577.arnd@arndb.de>
-Message-ID: <201311151352.33803.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Nov 2013 12:53:16 +0000
+Subject: [PATCH -next] iommu/arm-smmu: fix potential NULL pointer
+ dereference in arm_smmu_map()
+In-Reply-To: <CAPgLHd8f7mj2fMXt5_HeCyEhqDP_twFoHH0SNpeBdQXhhqVYxA@mail.gmail.com>
+References: <CAPgLHd8f7mj2fMXt5_HeCyEhqDP_twFoHH0SNpeBdQXhhqVYxA@mail.gmail.com>
+Message-ID: <20131115125315.GD19468@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013, Arnd Bergmann wrote:
-> On Thursday 14 November 2013, Loc Ho wrote:
-> > +- id                   : PHY ID (0 = first, 1 = second, 2 = third)
-> > +- #phy-cells           : Shall be 0
+On Fri, Nov 15, 2013 at 09:45:03AM +0000, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> Hmm, it seems like this would make more sense if you have #phy-cells=<1>
-> and have the PHY ID in user node as the argument.
+> The dereference should be moved below the NULL test.
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  drivers/iommu/arm-smmu.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 2349d62..a0cc0a5 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1420,9 +1420,8 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+>  			phys_addr_t paddr, size_t size, int flags)
+>  {
+>  	struct arm_smmu_domain *smmu_domain = domain->priv;
+> -	struct arm_smmu_device *smmu = smmu_domain->leaf_smmu;
+>  
+> -	if (!smmu_domain || !smmu)
+> +	if (!smmu_domain || !smmu_domain->leaf_smmu)
+>  		return -ENODEV;
+>  
+>  	/* Check for silent address truncation up the SMMU chain. */
 
-Ignore this comment. After reading patch 2, I concluded that your choice of
-#phy-cells=0 is probably more appropriate here.
+I already have a patch for this, but actually, we can remove that check
+altogether. I'll fix it in my tree.
 
-	Arnd
+Will
