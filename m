@@ -1,88 +1,153 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Nov 2013 16:09:47 -0800
-Subject: [PATCH 00/11] Make omap24xx booting device tree based for v3.14 merge
- window
-Message-ID: <1384474198-20756-1-git-send-email-tony@atomide.com>
+Date: Thu, 14 Nov 2013 16:09:51 -0800
+Subject: [PATCH 04/11] ARM: OMAP2+: Add device tree compatible revision checks
+ for n8x0
+In-Reply-To: <1384474198-20756-1-git-send-email-tony@atomide.com>
+References: <1384474198-20756-1-git-send-email-tony@atomide.com>
+Message-ID: <1384474198-20756-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This allows us to initialize the legacy devices when booted
+with device tree.
 
-Here are some early patches for the v3.14 merge window to make
-omap2 booting device tree based before we make omap3 device
-tree only. Otherwise we cannot remove the shared platform data
-between omap2 and 3 for things like some hwmod entries.
+Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/board-n8x0.c | 51 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 42 insertions(+), 9 deletions(-)
 
-I've added minimal support for 2430sdp to boot it to serial
-console with ethernet working, and kept n8x0 support using
-the legacy init for the drivers. Then the old H4 I have not
-updated as I'm not using it.
-
-Hopefully if there are still people using n8x0 they can
-pick up the work from here on removing the rest of the legacy
-platform data init as we're planning to drop those things
-completely over next few merge cycles.
-
-Note that these patches are against mainline commit 10d0c9705
-as there are few device tree related fixes to stuff the resources.   
-These also depend on the recently posted fixes series
-"[PATCH 0/8] Various omap device tree usability fixes for v3.13
-merge window"
-
-Cheers,
-
-Tony
-
-
-Tony Lindgren (11):
-  ARM: dts: Add basic device tree support for omap2430 sdp
-  ARM: dts: Add basic Nokia N8X0 support
-  ARM: OMAP2+: Add support for board specific auxdata quirks
-  ARM: OMAP2+: Add device tree compatible revision checks for n8x0
-  ARM: OMAP2+: Make n8x0 behave better with device tree based booting
-  ARM: OMAP2+: Add quirks support for n8x0
-  ARM: OMAP2+: Remove legacy booting support for n8x0
-  ARM: OMAP2+: Remove board file for H4
-  ARM: OMAP2+: Remove legacy board file for 2430sdp
-  ARM: OMAP2+: Remove legacy mux code for omap2
-  ARM: OMAP2+: Remove legacy hwmod entries for omap2
-
- arch/arm/boot/dts/Makefile                         |   4 +
- arch/arm/boot/dts/omap2420-n800.dts                |   8 +
- arch/arm/boot/dts/omap2420-n810-wimax.dts          |   8 +
- arch/arm/boot/dts/omap2420-n810.dts                |   8 +
- arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  34 +
- arch/arm/boot/dts/omap2430-sdp.dts                 |  49 ++
- arch/arm/mach-omap2/Kconfig                        |  13 -
- arch/arm/mach-omap2/Makefile                       |   4 -
- arch/arm/mach-omap2/board-2430sdp.c                | 273 -------
- arch/arm/mach-omap2/board-h4.c                     | 365 ----------
- arch/arm/mach-omap2/board-n8x0.c                   | 190 ++---
- arch/arm/mach-omap2/common-board-devices.h         |   1 +
- arch/arm/mach-omap2/msdi.c                         |  69 --
- arch/arm/mach-omap2/mux.h                          |   2 -
- arch/arm/mach-omap2/mux2420.c                      | 690 ------------------
- arch/arm/mach-omap2/mux2420.h                      | 282 --------
- arch/arm/mach-omap2/mux2430.c                      | 793 ---------------------
- arch/arm/mach-omap2/mux2430.h                      | 370 ----------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         | 137 ----
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         | 266 -------
- .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c | 155 ----
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  68 --
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   5 -
- arch/arm/mach-omap2/pdata-quirks.c                 |  46 +-
- 24 files changed, 200 insertions(+), 3640 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap2420-n800.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n810-wimax.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n810.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n8x0-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap2430-sdp.dts
- delete mode 100644 arch/arm/mach-omap2/board-2430sdp.c
- delete mode 100644 arch/arm/mach-omap2/board-h4.c
- delete mode 100644 arch/arm/mach-omap2/mux2420.c
- delete mode 100644 arch/arm/mach-omap2/mux2420.h
- delete mode 100644 arch/arm/mach-omap2/mux2430.c
- delete mode 100644 arch/arm/mach-omap2/mux2430.h
-
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index 827d1500..d61a00d 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -42,6 +42,38 @@
+ #define TUSB6010_GPIO_ENABLE	0
+ #define TUSB6010_DMACHAN	0x3f
+ 
++#define NOKIA_N810_WIMAX	(1 << 2)
++#define NOKIA_N810		(1 << 1)
++#define NOKIA_N800		(1 << 0)
++
++static u32 board_caps;
++
++#define board_is_n800()		(board_caps & NOKIA_N800)
++#define board_is_n810()		(board_caps & NOKIA_N810)
++#define board_is_n810_wimax()	(board_caps & NOKIA_N810_WIMAX)
++
++static void board_check_revision(void)
++{
++	if (of_have_populated_dt()) {
++		if (of_machine_is_compatible("nokia,n800"))
++			board_caps = NOKIA_N800;
++		else if (of_machine_is_compatible("nokia,n810"))
++			board_caps = NOKIA_N810;
++		else if (of_machine_is_compatible("nokia,n810-wimax"))
++			board_caps = NOKIA_N810_WIMAX;
++	} else {
++		if (machine_is_nokia_n800())
++			board_caps = NOKIA_N800;
++		else if (machine_is_nokia_n810())
++			board_caps = NOKIA_N810;
++		else if (machine_is_nokia_n810_wimax())
++			board_caps = NOKIA_N810_WIMAX;
++	}
++
++	if (!board_caps)
++		pr_err("Unknown board\n");
++}
++
+ #if defined(CONFIG_I2C_CBUS_GPIO) || defined(CONFIG_I2C_CBUS_GPIO_MODULE)
+ static struct i2c_cbus_platform_data n8x0_cbus_data = {
+ 	.clk_gpio = 66,
+@@ -342,7 +374,7 @@ static void n810_set_power_emmc(struct device *dev,
+ static int n8x0_mmc_set_power(struct device *dev, int slot, int power_on,
+ 			      int vdd)
+ {
+-	if (machine_is_nokia_n800() || slot == 0)
++	if (board_is_n800() || slot == 0)
+ 		return n8x0_mmc_set_power_menelaus(dev, slot, power_on, vdd);
+ 
+ 	n810_set_power_emmc(dev, power_on);
+@@ -388,7 +420,7 @@ static void n8x0_mmc_callback(void *data, u8 card_mask)
+ {
+ 	int bit, *openp, index;
+ 
+-	if (machine_is_nokia_n800()) {
++	if (board_is_n800()) {
+ 		bit = 1 << 1;
+ 		openp = &slot2_cover_open;
+ 		index = 1;
+@@ -421,7 +453,7 @@ static int n8x0_mmc_late_init(struct device *dev)
+ 	if (r < 0)
+ 		return r;
+ 
+-	if (machine_is_nokia_n800())
++	if (board_is_n800())
+ 		vs2sel = 0;
+ 	else
+ 		vs2sel = 2;
+@@ -444,7 +476,7 @@ static int n8x0_mmc_late_init(struct device *dev)
+ 	if (r < 0)
+ 		return r;
+ 
+-	if (machine_is_nokia_n800()) {
++	if (board_is_n800()) {
+ 		bit = 1 << 1;
+ 		openp = &slot2_cover_open;
+ 	} else {
+@@ -471,7 +503,7 @@ static void n8x0_mmc_shutdown(struct device *dev)
+ {
+ 	int vs2sel;
+ 
+-	if (machine_is_nokia_n800())
++	if (board_is_n800())
+ 		vs2sel = 0;
+ 	else
+ 		vs2sel = 2;
+@@ -486,7 +518,7 @@ static void n8x0_mmc_cleanup(struct device *dev)
+ 
+ 	gpio_free(N8X0_SLOT_SWITCH_GPIO);
+ 
+-	if (machine_is_nokia_n810()) {
++	if (board_is_n810()) {
+ 		gpio_free(N810_EMMC_VSD_GPIO);
+ 		gpio_free(N810_EMMC_VIO_GPIO);
+ 	}
+@@ -537,7 +569,7 @@ static void __init n8x0_mmc_init(void)
+ {
+ 	int err;
+ 
+-	if (machine_is_nokia_n810()) {
++	if (board_is_n810()) {
+ 		mmc1_data.slots[0].name = "external";
+ 
+ 		/*
+@@ -555,7 +587,7 @@ static void __init n8x0_mmc_init(void)
+ 	if (err)
+ 		return;
+ 
+-	if (machine_is_nokia_n810()) {
++	if (board_is_n810()) {
+ 		err = gpio_request_array(n810_emmc_gpios,
+ 					 ARRAY_SIZE(n810_emmc_gpios));
+ 		if (err) {
+@@ -700,6 +732,7 @@ static inline void board_serial_init(void)
+ 
+ static void __init n8x0_init_machine(void)
+ {
++	board_check_revision();
+ 	omap2420_mux_init(board_mux, OMAP_PACKAGE_ZAC);
+ 	/* FIXME: add n810 spi devices */
+ 	spi_register_board_info(n800_spi_board_info,
+@@ -707,7 +740,7 @@ static void __init n8x0_init_machine(void)
+ 	omap_register_i2c_bus(1, 400, n8x0_i2c_board_info_1,
+ 			      ARRAY_SIZE(n8x0_i2c_board_info_1));
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+-	if (machine_is_nokia_n810())
++	if (board_is_n810())
+ 		i2c_register_board_info(2, n810_i2c_board_info_2,
+ 					ARRAY_SIZE(n810_i2c_board_info_2));
+ 	board_serial_init();
 -- 
 1.8.1.1
