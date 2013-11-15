@@ -1,36 +1,51 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 15 Nov 2013 15:55:54 +0100
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <20131115142327.GQ28304@ns203013.ovh.net>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131115142327.GQ28304@ns203013.ovh.net>
-Message-ID: <20131115145554.GC19318@pengutronix.de>
+From: sre@debian.org (Sebastian Reichel)
+Date: Fri, 15 Nov 2013 14:55:56 +0000
+Subject: [PATCH 1/4] wl1251: split wl251 platform data to a separate
+ structure
+In-Reply-To: <20131115143254.GA7079@tuxdriver.com>
+References: <1382890469-25286-1-git-send-email-sre@debian.org>
+ <1382890469-25286-2-git-send-email-sre@debian.org>
+ <20131114185132.GQ10317@atomide.com>
+ <20131114230330.GB6383@earth.universe>
+ <20131114232217.GV10317@atomide.com>
+ <20131115143254.GA7079@tuxdriver.com>
+Message-ID: <20131115145555.GA23351@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Nov 15, 2013 at 03:23:27PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:00 Fri 15 Nov     , Uwe Kleine-K??nig wrote:
-> > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> > arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
+On Fri, Nov 15, 2013 at 09:32:55AM -0500, John W. Linville wrote:
+> On Thu, Nov 14, 2013 at 03:22:18PM -0800, Tony Lindgren wrote:
+> > * Sebastian Reichel <sre@debian.org> [131114 15:04]:
+> > > On Thu, Nov 14, 2013 at 10:51:33AM -0800, Tony Lindgren wrote:
+> > > > [...]
+> > > >
+> > > > If this is not going into v3.13, these will cause conflicts
+> > > > with the mach-omap2/board-*.c files for v3.14.
+> > > > 
+> > > > So it might be best to do a minimal header patch first that
+> > > > can be merged in by both linux-omap and wireless trees.
+> > > 
+> > > I guess this patch is pretty minimal. It also seems to be acked by
+> > > the involved Maintainers, so maybe just merge Patch 1 without the
+> > > other patches?
+> > > 
+> > > This does not solve the problem with the struct modification from
+> > > the second patch, but I guess it's the more intrusive patch.
 > > 
-> > So better include it explicitly not only because the last link will go
-> > away soon.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Once at least the first two patches are ready, how about I queue
+> > them after -rc1 and set up an immutable branch that can be merged
+> > in by linux-omap tree and the wireless tree?
 > 
-> we should never use this symbol you need to request the clock clk32k
-IMHO this should be addressed in another patch. My intent is to get rid
-of <mach/timex.h>. So I let someone else take this patch opportunity.
+> That sounds reasonable to me.
 
-Best regards
-Uwe
+So what changes do you request for those patches? I will try to
+update them as soon as possible.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131115/26782d7a/attachment.sig>
