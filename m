@@ -1,60 +1,50 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Nov 2013 10:57:18 -0500
-Subject: [PATCH] arm/arm64: KVM: introduce new mapping API for percpu
- mappings
-In-Reply-To: <1384530008-18181-1-git-send-email-marc.zyngier@arm.com>
-References: <1384530008-18181-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5286445E.2090300@ti.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Fri, 15 Nov 2013 18:02:13 +0200
+Subject: [PATCH v2] ARM: OMAP4460: cpuidle: Extend
+ PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD on cpuidle
+In-Reply-To: <20131115153608.GX10317@atomide.com>
+References: <1382467484-16957-1-git-send-email-grygorii.strashko@ti.com>
+ <5266CCE3.1090801@ti.com> <20131114183535.GL10317@atomide.com>
+ <20131115153608.GX10317@atomide.com>
+Message-ID: <52864585.6030206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013 10:40 AM, Marc Zyngier wrote:
-> Using virt_to_phys on percpu mappings is horribly wrong (my own bad).
-> Thankfully, the kernel offers a way to obtain the physical address
-> of such a mapping.
+On 11/15/2013 05:36 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [131114 10:36]:
+>> * Grygorii Strashko <grygorii.strashko@ti.com> [131022 12:09]:
+>>> The same workaround as ff999b8a0983ee15668394ed49e38d3568fc6859
+>>> "ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC ..."
+>>> need to be applied not only when system is booting, but when MPUSS hits
+>>> OSWR state through CPUIdle too. Without this WA the same issue is
+>>> reproduced now on boards PandaES and Tablet/Blaze with SOM OMAP4460
+>>> when CONFIG_CPU_IDLE is enabled.
+>>> After MPUSS has enterred OSWR and waken up:
+>>> - GIC distributor became disabled forever
+>>> - scheduling is not performed any more
+>>>
+>>> Cc: Kevin Hilman <khilman@linaro.org>
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>
+>> Applying into omap-for-v3.13/fixes thanks.
 > 
-> Add a new create_hyp_percpu_mappings function to deal with those.
-> 
-> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> Santosh, can you please give this new patch a spin on your HW?
-> 
-Works except to make guest boot on my machine, phys_addr_t
-update is needed as discussed ;-)
+> Hmm looks like this breaks the build with randconfigs at least
+> with the attached .config, so dropping for now.
 
+Hi Tony
+Have you forgot to attach .config?
 
-> 
->  arch/arm/include/asm/kvm_mmu.h   |  1 +
->  arch/arm/kvm/arm.c               |  2 +-
->  arch/arm/kvm/mmu.c               | 32 ++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/kvm_mmu.h |  1 +
->  4 files changed, 35 insertions(+), 1 deletion(-)
-> 
-[..]
+> arch/arm/mach-omap2/built-in.o: In function `omap_enter_idle_coupled':
+> :(.text+0xb48c): undefined reference to `pm44xx_errata'
 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index b0de86b..f2a552b 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -331,6 +331,38 @@ int create_hyp_mappings(void *from, void *to)
->  }
->  
->  /**
-> + * create_hyp_percpu_mappings - duplicate a percpu kernel virtual address
-> + *				range in Hyp mode
-> + * @from:	The virtual kernel start address of the range
-> + * @to:		The virtual kernel end address of the range (exclusive)
-> + *
-> + * The same virtual address as the kernel virtual address is also used
-> + * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
-> + * physical pages. It *has* to be a percpu region.
-> + */
-> +int create_hyp_percpu_mappings(void *from, void *to)
-> +{
-> +	unsigned long phys_addr;
-s/unsigned long/phys_addr_t
+I assume that .config doesn't have CONFIG_SMP enabled while
+pm44xx_errata is defined in omap-smp.c.
+I think it should be a separate patch to move pm44xx_errata somewhere
+else, so this patch will remain the same.
 
-regards,
-Santosh
+Btw, do we need omap_enter_idle_coupled() in UP?
+
+-- 
+Taras Kondratiuk
