@@ -1,47 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Nov 2013 19:57:35 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131115182826.GB14920@obsidianresearch.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131115182826.GB14920@obsidianresearch.com>
-Message-ID: <201311151957.36133.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Nov 2013 11:02:56 -0800
+Subject: [PATCH 00/11] Make omap24xx booting device tree based for
+ v3.14 merge window
+In-Reply-To: <20131115184744.GA10997@blackmetal.musicnaut.iki.fi>
+References: <1384474198-20756-1-git-send-email-tony@atomide.com>
+ <20131115184744.GA10997@blackmetal.musicnaut.iki.fi>
+Message-ID: <20131115190255.GB10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013, Jason Gunthorpe wrote:
+* Aaro Koskinen <aaro.koskinen@iki.fi> [131115 10:48]:
+> Hi,
 > 
-> On Fri, Nov 15, 2013 at 09:57:17AM +0000, Mark Rutland wrote:
+> On Thu, Nov 14, 2013 at 04:09:47PM -0800, Tony Lindgren wrote:
+> > Here are some early patches for the v3.14 merge window to make
+> > omap2 booting device tree based before we make omap3 device
+> > tree only. Otherwise we cannot remove the shared platform data
+> > between omap2 and 3 for things like some hwmod entries.
+> > 
+> > I've added minimal support for 2430sdp to boot it to serial
+> > console with ethernet working, and kept n8x0 support using
+> > the legacy init for the drivers. Then the old H4 I have not
+> > updated as I'm not using it.
+> > 
+> > Hopefully if there are still people using n8x0 they can
+> > pick up the work from here on removing the rest of the legacy
+> > platform data init as we're planning to drop those things
+> > completely over next few merge cycles.
 > 
-> > first-class citizen. We don't need to modify every driver and subsystem
-> > to support ACPI, only those necessary to support the minimal set of
-> > platforms using ACPI. ACPI is new in the arm space, and we can enforce
-> > quality standards on ACPI now above what we're allowing for DT, and
-> > avoid future problems.
+> Thanks for the effort, I'll try to continue this work. You can add my
+> Tested-by for N8x0 bits.
 > 
-> I think to replicate the kind of 'success' ACPI sees in x86-land you
-> really need to push back on the HW folks and limit what drivers will
-> be supported on ACPI systems.
+> > Note that these patches are against mainline commit 10d0c9705
+> > as there are few device tree related fixes to stuff the resources.   
+> > These also depend on the recently posted fixes series
+> > "[PATCH 0/8] Various omap device tree usability fixes for v3.13
+> > merge window"
 > 
-> ACPI should be coupled with a standard basic HW environment -
-> analogous to the stable APIC, PCI and HPET standards we have in
-> x86. (ARMv8 only?)
+> I noticed one bug. If you disable MACH_NOKIA_N8X0 from .config, there
+> is a compilation failure:
+> 
+> arch/arm/mach-omap2/built-in.o: In function `omap2420_n8x0_legacy_init':
+> /home/aaro/git/linux/arch/arm/mach-omap2/pdata-quirks.c:76: undefined reference to `n8x0_legacy_init'
 
-timers and interrupts are pretty much standardized in ARMv8 and in
-SMP-capable ARMv7 systems now, it's really the PCI argument that
-matters here. Even on Intel's embedded SoCs, the integrated 
-peripherals tend to be shown to software as standalone PCI devices
-that don't need to talk to another internal device to set up
-DMA, clocks, pinmux etc.
+OK thanks for testing, I'll fix that.
 
-> Other essential devices (ethernet, graphics, etc) should fit within
-> the PCI framework. Again, mostly like x86.
-> 
-> If you don't fit in that model then use DT.
-> 
-> If you need the kernel to control clk, pinctrl, regulator, etc then
-> you should be using DT.
+Regards,
 
-Exactly.
-
-	Arnd
+Tony
