@@ -1,58 +1,37 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Nov 2013 00:12:42 +0000
-Subject: [PATCH 2/6] ARM: kvm: Use virt_to_idmap instead of virt_to_phys
- for idmap mappings
-In-Reply-To: <1384457866-16135-3-git-send-email-santosh.shilimkar@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Nov 2013 19:15:44 -0500
+Subject: [PATCH 6/6] ARM: kvm: TMP: Commit the hyp page tables to main
+ memory
+In-Reply-To: <20131115001115.GC20516@lvm>
 References: <y> <1384457866-16135-1-git-send-email-santosh.shilimkar@ti.com>
- <1384457866-16135-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131115001242.GD20516@lvm>
+ <1384457866-16135-7-git-send-email-santosh.shilimkar@ti.com>
+ <20131115001115.GC20516@lvm>
+Message-ID: <528567B0.1020308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:37:42PM -0500, Santosh Shilimkar wrote:
-> KVM initialisation fails on architectures implementing virt_to_idmap() because
-> virt_to_phys() on such architectures won't fetch you the correct idmap page.
+On Thursday 14 November 2013 07:11 PM, Christoffer Dall wrote:
+> On Thu, Nov 14, 2013 at 02:37:46PM -0500, Santosh Shilimkar wrote:
+>> This is a temporary hack which I have to use to avoid a weired crash while
+>> starting the guest OS on Keystsone. They are random crashesh while the
+>> guest os userspace starts. Additional data point is, it seen only with first
+>> guest OS lanch. Subsequest guest OS starts normal.
+>>     
 > 
-> So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
+> what crashes?  The guest?  Where, how?
+>
+When guest userspace starts. The crashes are random but always after the
+guest init process have started.
+ 
 > 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> I still don't know why this is needed but it helps to get around the issue
+>> and hence including the patch in the series for the discussion
 > 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/kvm/mmu.c |    9 ++++-----
->  1 file changed, 4 insertions(+), 5 deletions(-)
+> It may not be needed but is just hiding the issue.  I'm afraid you're
+> going to have to dig a little more into this.
 > 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index b0de86b..3bd652f 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -747,9 +747,9 @@ int kvm_mmu_init(void)
->  {
->  	int err;
->  
-> -	hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
-> -	hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
-> -	hyp_idmap_vector = virt_to_phys(__kvm_hyp_init);
-> +	hyp_idmap_start = virt_to_idmap(__hyp_idmap_text_start);
-> +	hyp_idmap_end = virt_to_idmap(__hyp_idmap_text_end);
-> +	hyp_idmap_vector = virt_to_idmap(__kvm_hyp_init);
->  
->  	if ((hyp_idmap_start ^ hyp_idmap_end) & PAGE_MASK) {
->  		/*
-> @@ -775,8 +775,7 @@ int kvm_mmu_init(void)
->  		 * caches off at that point.
->  		 */
->  		kvm_flush_dcache_to_poc(init_bounce_page, len);
-> -
-> -		phys_base = virt_to_phys(init_bounce_page);
-> +		phys_base = virt_to_idmap(init_bounce_page);
->  		hyp_idmap_vector += phys_base - hyp_idmap_start;
->  		hyp_idmap_start = phys_base;
->  		hyp_idmap_end = phys_base + len;
-> -- 
-> 1.7.9.5
-> 
-Looks good to me.
+I replied already on this. Further testing, I found the issue
+even with this patch applied. I need to dig bit more as you said.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Regards,
+Santosh
