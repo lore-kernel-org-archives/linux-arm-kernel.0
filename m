@@ -1,43 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 16 Nov 2013 22:36:25 +0800
-Subject: [PATCH] ARM: imx: rename IMX6SL_CLK_CLK_END to IMX6SL_CLK_END
-Message-ID: <1384612585-7602-1-git-send-email-shawn.guo@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 16 Nov 2013 06:40:34 -0800
+Subject: [PATCH 4/5] ARM: dts: Add basic support for omap3 LDP zoom1
+ labrador
+In-Reply-To: <20131116080408.GA15300@earth.universe>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-5-git-send-email-tony@atomide.com>
+ <20131116080408.GA15300@earth.universe>
+Message-ID: <20131116144033.GG10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macro name IMX6SL_CLK_CLK_END is a little insane.  Rename it to
-IMX6SL_CLK_END.
+* Sebastian Reichel <sre@ring0.de> [131116 00:05]:
+> On Fri, Nov 15, 2013 at 04:36:06PM -0800, Tony Lindgren wrote:
+> > Basic things like serial, Ethernet, MMC, NAND, DSS, touchscreen
+> > and GPIO keys work.
+> > 
+> > For twl4030-keypad we're still missing the binding, but
+> > support for that should be trivial to add once the driver
+> > has been updated.
+> 
+> DT bindings for twl4030-keypad are being worked on:
+> 
+> https://lkml.org/lkml/2013/11/8/463
+> 
+> > MUSB I'm pretty sure I got got to enumerate once, but I
+> > suspect the battery charging somehow disrupts it and it's
+> > not enumerating in general for some reason.
+> 
+> Try to add this:
+> 
+> &usb_otg_hs {
+> 	phys = <&usb2_phy>;
+> 	phy-names = "usb2-phy";
+> };
+> 
+> Those were introduced by the new generic PHY framework, see
+> for example: https://lkml.org/lkml/2013/9/27/37
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/clk-imx6sl.c           |    2 +-
- include/dt-bindings/clock/imx6sl-clock.h |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Thanks yeah those should be added. No luck with those either
+though, I do have MUSB working fine on the 37xx-evm with the
+same image.
 
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index c0c4ef5..a747a7d 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -63,7 +63,7 @@ static struct clk_div_table video_div_table[] = {
- 	{ }
- };
- 
--static struct clk *clks[IMX6SL_CLK_CLK_END];
-+static struct clk *clks[IMX6SL_CLK_END];
- static struct clk_onecell_data clk_data;
- 
- static void __init imx6sl_clocks_init(struct device_node *ccm_node)
-diff --git a/include/dt-bindings/clock/imx6sl-clock.h b/include/dt-bindings/clock/imx6sl-clock.h
-index 7fcdf90..46f7495 100644
---- a/include/dt-bindings/clock/imx6sl-clock.h
-+++ b/include/dt-bindings/clock/imx6sl-clock.h
-@@ -143,6 +143,6 @@
- #define IMX6SL_CLK_USDHC2		130
- #define IMX6SL_CLK_USDHC3		131
- #define IMX6SL_CLK_USDHC4		132
--#define IMX6SL_CLK_CLK_END		133
-+#define IMX6SL_CLK_END			133
- 
- #endif /* __DT_BINDINGS_CLOCK_IMX6SL_H */
--- 
-1.7.9.5
+I seem to get twl4030_usb interrupts on cable insert and remove,
+then enabling debugging I see the following:
+
+connect
+HW_CONDITIONS 0xe0/224; link 3
+
+disconnect
+HW_CONDITIONS 0x60/96; link 4
+
+Regards,
+
+Tony
