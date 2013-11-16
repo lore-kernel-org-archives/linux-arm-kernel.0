@@ -1,13 +1,45 @@
-From: marcio@netopen.com.br (Marcio Lima)
-Date: Sat, 16 Nov 2013 14:10:37 -0200
-Subject: OV5642 device driver for linux 2.6.39 and Atmel ISI
-Message-ID: <F5BE1D3F-AE8A-42D5-85B0-F4C4DF159B63@netopen.com.br>
+From: jwboyer@fedoraproject.org (Josh Boyer)
+Date: Sat, 16 Nov 2013 11:36:25 -0500
+Subject: xen drivers fail to link on ARM with v3.12-9888-gf63c482
+In-Reply-To: <CA+5PVA7YMMRmFE=T7MOdGNeUiv_4Eu_u2-SrDfSTE052MpAnag@mail.gmail.com>
+References: <CA+5PVA7YMMRmFE=T7MOdGNeUiv_4Eu_u2-SrDfSTE052MpAnag@mail.gmail.com>
+Message-ID: <CA+5PVA63LyUB7o0+Z-YS91AUUwvRokHeYq_GJ1i6VE3bj2qQLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-Can anybody  send me an OV5642 Omnivision device driver for kernel 2.6.39 which has been tested with the AT91SAM9M10 ISI interface?
+On Sat, Nov 16, 2013 at 9:56 AM, Josh Boyer <jwboyer@fedoraproject.org> wrote:
+> Hi All,
+>
+> The xen-gntalloc, xen-netfront, xen-blkfront, and xen-netback drivers
+> fail to link on ARM today with the following error:
+>
+> ERROR: "phys_to_mach" [drivers/xen/xen-gntalloc.ko] undefined!
+> ERROR: "phys_to_mach" [drivers/net/xen-netfront.ko] undefined!
+> ERROR: "phys_to_mach" [drivers/net/xen-netback/xen-netback.ko] undefined!
+> ERROR: "phys_to_mach" [drivers/block/xen-blkfront.ko] undefined!
+>
+> This is with Linus' tree as of this morning.
+>
+> I'm guessing this is because the mfn_to_pfn and pfn_to_mfn functions
+> are inlined and reference phys_to_mach directly, and that isn't
+> exported to modules.  Thoughts?
 
-Thanks
+The patch below seems to fix this, but I'm not sure it's the desired
+approach.  I added the export for mach_to_phys just in case.
 
-Enviado via iPhone
+josh
+
+diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+index 23732cd..7772fa8 100644
+--- a/arch/arm/xen/p2m.c
++++ b/arch/arm/xen/p2m.c
+@@ -27,7 +27,9 @@ struct xen_p2m_entry {
+
+ rwlock_t p2m_lock;
+ struct rb_root phys_to_mach = RB_ROOT;
++EXPORT_SYMBOL_GPL(phys_to_mach);
+ static struct rb_root mach_to_phys = RB_ROOT;
++EXPORT_SYMBOL_GPL(mach_to_phys);
+
+ static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
+ {
