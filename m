@@ -1,53 +1,47 @@
-From: miloody@gmail.com (loody)
-Date: Sat, 16 Nov 2013 15:23:34 +0800
-Subject: Some question about GIC v1 setting
-In-Reply-To: <20131115165939.GO16735@n2100.arm.linux.org.uk>
-References: <CANudz+sg6MiUZaTELF4G=NMfwj--K9j10JrYh1cm2VAjfvq6MA@mail.gmail.com>
- <20131115165939.GO16735@n2100.arm.linux.org.uk>
-Message-ID: <CANudz+uO7s=GdFz64oxFEQefAB=EguUo1NP17AT+3Ft+wK8nNQ@mail.gmail.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Sat, 16 Nov 2013 08:04:09 +0000
+Subject: [PATCH 4/5] ARM: dts: Add basic support for omap3 LDP zoom1
+ labrador
+In-Reply-To: <1384562167-14725-5-git-send-email-tony@atomide.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-5-git-send-email-tony@atomide.com>
+Message-ID: <20131116080408.GA15300@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Russel:
+On Fri, Nov 15, 2013 at 04:36:06PM -0800, Tony Lindgren wrote:
+> Basic things like serial, Ethernet, MMC, NAND, DSS, touchscreen
+> and GPIO keys work.
+> 
+> For twl4030-keypad we're still missing the binding, but
+> support for that should be trivial to add once the driver
+> has been updated.
 
-2013/11/16 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sat, Nov 16, 2013 at 12:55:11AM +0800, loody wrote:
->> hi all:
->> I use arm cortex A9 smp with GIC v1 system.
->> And my kernel is 3.8.13.
->>
->> I have some questions:
->> 1.  From GIc v1 spec, we can modify irq priority.
->>      (ICDIPRn, Interrupt Priority Rigisters)
->>      how could we do that in kernel? Did kernel provide any API of Irq
->> to reach that goal?
->
-> No.  It's pointless.  The kernel doesn't support interrupting one IRQ
-> while another is already in progress.
-in so far kernel, there are impossible
-1. dynamically  change irq priority setting in GIC through kernel API
-2. get higher interrupt priority when first time register requtest_irq
+DT bindings for twl4030-keypad are being worked on:
 
->
->> 2. From Gic V1 spec, we can assign 1 irq to multi-core.
->>      (ICDIPTRn, Interrupt Processor Targets Registers)
->>      Is there similar API in kernel to let 1 irq possibility to be
->> handled by multi-cores?
->
-> No.  All that does is lead to cores being woken up and racing on locks,
-> and then causing IRQs to be spuriously marked as false (because there's
-> nothing for the handlers to do on the cores which lost out).
-In Gic spec, if 1 core service the irq, other cores will read invalid
-#1023 if accidentally they are waken up by GIC.
+https://lkml.org/lkml/2013/11/8/463
 
-Why that will let cores racing on locks?
+> MUSB I'm pretty sure I got got to enumerate once, but I
+> suspect the battery charging somehow disrupts it and it's
+> not enumerating in general for some reason.
 
-if accidentally waken up by GIC, and cores read #1023, cores can
-return back immediately.
+Try to add this:
 
->
-> If you want to redirect IRQs to different cores, run the userspace
-> irqbalance daemon.
+&usb_otg_hs {
+	phys = <&usb2_phy>;
+	phy-names = "usb2-phy";
+};
 
+Those were introduced by the new generic PHY framework, see
+for example: https://lkml.org/lkml/2013/9/27/37
 
-Appreciate your help,
+> [...]
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131116/c6bc0b72/attachment.sig>
