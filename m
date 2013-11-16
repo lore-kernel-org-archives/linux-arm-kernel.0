@@ -1,85 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 16 Nov 2013 22:17:34 +0800
-Subject: [PATCH] pinctrl: imx: drop redundant OF dependency
-Message-ID: <1384611454-24381-1-git-send-email-shawn.guo@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 16 Nov 2013 06:16:23 -0800
+Subject: [PATCH 00/11]: add remaining support for IGEP boards
+In-Reply-To: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20131116141622.GE10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IMX/MXC selects USE_OF at architecture level, so the OF dependency
-at individual SoC pinctrl driver level can just be dropped.
+* Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
+> In order to make mach-omap2 Device Tree only the board file for
+> IGEP boards was removed even when support for wifi and display
+> was still not supported by its DTS.
+> 
+> This patch-set adds support for these remaining peripherals and
+> also adds support for USB, HDMI and user LED for the am33xx SoC
+> based IGEP Aquila board.
+> 
+> The patch-set is composed of the following patches:
+> 
+> Enric Balletbo i Serra (7):
+>       ARM: dts: omap3-igep: Fix bus-width for mmc1.
+>       ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
+>       ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
+>       ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
+>       ARM: dts: AM33XX BASE0033: add pinmux and user led support.
+>       ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
+>       ARM: dts: AM33XX IGEP0033: add USB support.
+> 
+> Javier Martinez Canillas (4):
+>       ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
+>       ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
+>       ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
+>       OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is not found
+> 
+> Tony,
+> 
+> Most of these patches are just DTS changes so they have to be picked
+> by Benoit although there are patches that should go to different trees.
+> 
+> [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
+> 
+> have to go through your tree and
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/pinctrl/Kconfig |    8 --------
- 1 file changed, 8 deletions(-)
+OK
+ 
+> [PATCH 11/11] OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is not found
+> 
+> should be picked by Tomi Valkeinen.
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 33f9dc1..e216a46 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -116,7 +116,6 @@ config PINCTRL_IMX1_CORE
+That may not be needed as it can be set in the .dts file, I'll comment
+on that patch.
  
- config PINCTRL_IMX27
- 	bool "IMX27 pinctrl driver"
--	depends on OF
- 	depends on SOC_IMX27
- 	select PINCTRL_IMX1_CORE
- 	help
-@@ -124,7 +123,6 @@ config PINCTRL_IMX27
- 
- config PINCTRL_IMX35
- 	bool "IMX35 pinctrl driver"
--	depends on OF
- 	depends on SOC_IMX35
- 	select PINCTRL_IMX
- 	help
-@@ -132,7 +130,6 @@ config PINCTRL_IMX35
- 
- config PINCTRL_IMX50
- 	bool "IMX50 pinctrl driver"
--	depends on OF
- 	depends on SOC_IMX50
- 	select PINCTRL_IMX
- 	help
-@@ -140,7 +137,6 @@ config PINCTRL_IMX50
- 
- config PINCTRL_IMX51
- 	bool "IMX51 pinctrl driver"
--	depends on OF
- 	depends on SOC_IMX51
- 	select PINCTRL_IMX
- 	help
-@@ -148,7 +144,6 @@ config PINCTRL_IMX51
- 
- config PINCTRL_IMX53
- 	bool "IMX53 pinctrl driver"
--	depends on OF
- 	depends on SOC_IMX53
- 	select PINCTRL_IMX
- 	help
-@@ -156,7 +151,6 @@ config PINCTRL_IMX53
- 
- config PINCTRL_IMX6Q
- 	bool "IMX6Q/DL pinctrl driver"
--	depends on OF
- 	depends on SOC_IMX6Q
- 	select PINCTRL_IMX
- 	help
-@@ -164,7 +158,6 @@ config PINCTRL_IMX6Q
- 
- config PINCTRL_IMX6SL
- 	bool "IMX6SL pinctrl driver"
--	depends on OF
- 	depends on SOC_IMX6SL
- 	select PINCTRL_IMX
- 	help
-@@ -172,7 +165,6 @@ config PINCTRL_IMX6SL
- 
- config PINCTRL_VF610
- 	bool "Freescale Vybrid VF610 pinctrl driver"
--	depends on OF
- 	depends on SOC_VF610
- 	select PINCTRL_IMX
- 	help
--- 
-1.7.9.5
+> Since we have removed the board file for IGEP boards I think these
+> can be considered as regression fixes for 3.13 although I don't mind
+> if you prefer to wait for 3.14.
+
+Yes I agree, let's try to fix these issues during the -rc cycle
+so the earlier functionality is maintained.
+
+Regards,
+
+Tony
