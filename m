@@ -1,286 +1,65 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Nov 2013 16:36:06 -0800
-Subject: [PATCH 4/5] ARM: dts: Add basic support for omap3 LDP zoom1 labrador
+Date: Fri, 15 Nov 2013 16:36:03 -0800
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the device
+ tree case
 In-Reply-To: <1384562167-14725-1-git-send-email-tony@atomide.com>
 References: <1384562167-14725-1-git-send-email-tony@atomide.com>
-Message-ID: <1384562167-14725-5-git-send-email-tony@atomide.com>
+Message-ID: <1384562167-14725-2-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic things like serial, Ethernet, MMC, NAND, DSS, touchscreen
-and GPIO keys work.
+Since we still need to rely on a mix of device tree initialized
+drivers and legacy platform data initialize drivers, let's fix
+the passing of platform data to twl4030-gpio.
 
-For twl4030-keypad we're still missing the binding, but
-support for that should be trivial to add once the driver
-has been updated.
+As the twl4030 GPIO is initialized by twl-core.c, we need to register
+the auxdata for twl4030 GPIO in twl-core.c.
 
-MUSB I'm pretty sure I got got to enumerate once, but I
-suspect the battery charging somehow disrupts it and it's
-not enumerating in general for some reason.
-
-Patches are welcome to improve things if people are
-still using this board.
-
-For reference, here's some more info on this old board:
-http://www.openomap.org/wiki/tiki-index.php?page=HardwareInfo
-
-Cc: devicetree at vger.kernel.org
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/Makefile      |   1 +
- arch/arm/boot/dts/omap3-ldp.dts | 231 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 232 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-ldp.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index de37094..fc37bca 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -183,6 +183,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-beagle-xm.dtb \
- 	omap3-evm.dtb \
- 	omap3-evm-37xx.dtb \
-+	omap3-ldp.dtb \
- 	omap3-n900.dtb \
- 	omap3-n9.dtb \
- 	omap3-n950.dtb \
-diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
-new file mode 100644
-index 0000000..ddce0d8
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-ldp.dts
-@@ -0,0 +1,231 @@
-+/*
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+#include "omap34xx.dtsi"
-+#include "omap-gpmc-smsc911x.dtsi"
-+
-+/ {
-+	model = "TI OMAP3430 LDP (Zoom1 Labrador)";
-+	compatible = "ti,omap3-ldp", "ti,omap3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x8000000>; /* 128 MB */
-+	};
-+
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vcc>;
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gpio_key_pins>;
-+
-+		key_enter {
-+			label = "enter";
-+			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* gpio101 */
-+			linux,code = <0x0107001c>; /* KEY_ENTER */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_f1 {
-+			label = "f1";
-+			gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* gpio102 */
-+			linux,code = <0x0303003b>; /* KEY_F1 */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_f2 {
-+			label = "f2";
-+			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>; /* gpio103 */
-+			linux,code = <0x0403003c>; /* KEY_F2 */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_f3 {
-+			label = "f3";
-+			gpios = <&gpio4 8 GPIO_ACTIVE_LOW>; /* gpio104 */
-+			linux,code = <0x0503003d>; /* KEY_F3 */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_f4 {
-+			label = "f4";
-+			gpios = <&gpio4 9 GPIO_ACTIVE_LOW>; /* gpio105 */
-+			linux,code = <0x0704003e>; /* KEY_F4 */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_left {
-+			label = "left";
-+			gpios = <&gpio4 10 GPIO_ACTIVE_LOW>; /* gpio106 */
-+			linux,code = <0x04070069>; /* KEY_LEFT */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_right {
-+			label = "right";
-+			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>; /* gpio107 */
-+			linux,code = <0x0507006a>; /* KEY_RIGHT */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_up {
-+			label = "up";
-+			gpios = <&gpio4 12 GPIO_ACTIVE_LOW>; /* gpio108 */
-+			linux,code = <0x06070067>; /* KEY_UP */
-+			gpio-key,wakeup;
-+		};
-+
-+		key_down {
-+			label = "down";
-+			gpios = <&gpio4 13 GPIO_ACTIVE_LOW>; /* gpio109 */
-+			linux,code = <0x0707006c>; /* KEY_DOWN */
-+			gpio-key,wakeup;
-+		};
-+	};
+Samuel & Lee, I'd like to merge this fix via arm-soc tree if this looks
+OK to you as I have other patches that depend on this.
+
+---
+ drivers/mfd/twl-core.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+index 29473c2..d5b3dd8 100644
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -1133,6 +1133,11 @@ static int twl_remove(struct i2c_client *client)
+ 	return 0;
+ }
+ 
++static struct of_dev_auxdata twl_auxdata_lookup[] = {
++	OF_DEV_AUXDATA("ti,twl4030-gpio", 0, "twl4030-gpio", NULL),
++	{ /* sentinel */ },
 +};
 +
-+&gpmc {
-+	ranges = <0 0 0x00000000 0x01000000>,
-+		 <1 0 0x08000000 0x01000000>;
-+
-+	nand at 0,0 {
-+		linux,mtd-name= "micron,nand";
-+		reg = <0 0 0>;
-+		nand-bus-width = <16>;
-+		ti,nand-ecc-opt = "bch8";
-+
-+		gpmc,sync-clk-ps = <0>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <44>;
-+		gpmc,cs-wr-off-ns = <44>;
-+		gpmc,adv-on-ns = <6>;
-+		gpmc,adv-rd-off-ns = <34>;
-+		gpmc,adv-wr-off-ns = <44>;
-+		gpmc,we-off-ns = <40>;
-+		gpmc,oe-off-ns = <54>;
-+		gpmc,access-ns = <64>;
-+		gpmc,rd-cycle-ns = <82>;
-+		gpmc,wr-cycle-ns = <82>;
-+		gpmc,wr-access-ns = <40>;
-+		gpmc,wr-data-mux-bus-ns = <0>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "X-Loader";
-+			reg = <0 0x80000>;
-+		};
-+		partition at 80000 {
-+			label = "U-Boot";
-+			reg = <0x80000 0x140000>;
-+		};
-+		partition at 1c0000 {
-+			label = "Environment";
-+			reg = <0x1c0000 0x40000>;
-+		};
-+		partition at 200000 {
-+			label = "Kernel";
-+			reg = <0x200000 0x1e00000>;
-+		};
-+		partition at 2000000 {
-+			label = "Filesystem";
-+			reg = <0x2000000 0xe000000>;
-+		};
-+	};
-+
-+	ethernet at gpmc {
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
-+		reg = <1 0 0xff>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
-+
-+#include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c3 {
-+	clock-frequency = <400000>;
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	bus-width = <4>;
-+};
-+
-+&omap3_pmx_core {
-+	gpio_key_pins: pinmux_gpio_key_pins {
-+		pinctrl-single,pins = <
-+			0xea (PIN_INPUT | MUX_MODE4)	/* cam_d2.gpio_101 */
-+			0xec (PIN_INPUT | MUX_MODE4)	/* cam_d3.gpio_102 */
-+			0xee (PIN_INPUT | MUX_MODE4)	/* cam_d4.gpio_103 */
-+			0xf0 (PIN_INPUT | MUX_MODE4)	/* cam_d5.gpio_104 */
-+			0xf2 (PIN_INPUT | MUX_MODE4)	/* cam_d6.gpio_105 */
-+			0xf4 (PIN_INPUT | MUX_MODE4)	/* cam_d7.gpio_106 */
-+			0xf6 (PIN_INPUT | MUX_MODE4)	/* cam_d8.gpio_107 */
-+			0xf8 (PIN_INPUT | MUX_MODE4)	/* cam_d9.gpio_108 */
-+			0xfa (PIN_INPUT | MUX_MODE4)	/* cam_d10.gpio_109 */
-+		>;
-+	};
-+
-+	musb_pins: pinmux_musb_pins {
-+		pinctrl-single,pins = <
-+			0x172 (PIN_INPUT | MUX_MODE0)	/* hsusb0_clk.hsusb0_clk */
-+			0x17a (PIN_INPUT | MUX_MODE0)	/* hsusb0_data0.hsusb0_data0 */
-+			0x17c (PIN_INPUT | MUX_MODE0)	/* hsusb0_data1.hsusb0_data1 */
-+			0x17e (PIN_INPUT | MUX_MODE0)	/* hsusb0_data2.hsusb0_data2 */
-+			0x180 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data3.hsusb0_data3 */
-+			0x182 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data4.hsusb0_data4 */
-+			0x184 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data5.hsusb0_data5 */
-+			0x186 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data6.hsusb0_data6 */
-+			0x188 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data7.hsusb0_data7 */
-+			0x176 (PIN_INPUT | MUX_MODE0)	/* hsusb0_dir.hsusb0_dir */
-+			0x178 (PIN_INPUT | MUX_MODE0)	/* hsusb0_nxt.hsusb0_nxt */
-+			0x174 (PIN_OUTPUT | MUX_MODE0)	/* hsusb0_stp.hsusb0_stp */
-+		>;
-+	};
-+};
-+
-+&usb_otg_hs {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&musb_pins>;
-+	interface-type = <0>;
-+	usb-phy = <&usb2_phy>;
-+	mode = <3>;
-+	power = <50>;
-+};
-+
-+&vaux1 {
-+	/* Needed for ads7846 */
-+        regulator-name = "vcc";
-+};
-+
-+&vpll2 {
-+       /* Needed for DSS */
-+       regulator-name = "vdds_dsi";
-+};
+ /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
+ static int
+ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+@@ -1271,10 +1276,14 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+ 	}
+ 
+-	if (node)
+-		status = of_platform_populate(node, NULL, NULL, &client->dev);
+-	else
++	if (node) {
++		if (pdata)
++			twl_auxdata_lookup[0].platform_data = pdata->gpio;
++		status = of_platform_populate(node, NULL, twl_auxdata_lookup,
++					      &client->dev);
++	} else {
+ 		status = add_children(pdata, irq_base, id->driver_data);
++	}
+ 
+ fail:
+ 	if (status < 0)
 -- 
 1.8.1.1
