@@ -1,32 +1,111 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 15 Nov 2013 15:30:06 -0800
-Subject: [PATCH v2 0/5] Add-Broadcom-Kona-I2C-Support
-In-Reply-To: <20131115225234.GC2672@katana>
-References: <1384462936-7906-1-git-send-email-tim.kryger@linaro.org>
- <20131115225234.GC2672@katana>
-Message-ID: <CAAYSxhrk6qgfy3TUdme3ge98d8Db7e=aW3LG8VfsJgjfuHAS3A@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 16 Nov 2013 04:32:42 +0300
+Subject: [PATCH v2 2/3] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <1583497.MMBMuSKFMR@avalon>
+References: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
+ <2664891.LKK7X6OLFJ@avalon> <52869200.3080303@cogentembedded.com>
+ <1583497.MMBMuSKFMR@avalon>
+Message-ID: <5286CB3A.9080305@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 2:52 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+On 11/16/2013 02:03 AM, Laurent Pinchart wrote:
 
-> Fixed Kconfig sorting, squashed broken out patches 1-3 into one and
-> applied to for-next, thanks! Let me know if I should take patches 4-5
-> also, but usually they go via arm-soc. Also, please provide a "Changes
-> since V1" log which will speed up reviewing.
+>>>> Register Ether platform device and pin data on  the  Koelsch board.
+>>>> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager
+>>>> board.
 
-Thanks.  It appears that when I updated the dependencies, I
-accidentally removed the change list I had planned to send.  This is
-what should have appeared in my cover letter:
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Changes in v2:
-  - Binding documentation is in its own patch
-  - Minor cosmetic changes
-  - Fixed bug related to improper signedness
-  - Removed superflous mutex
-  - Simplified probe function
+>>>> ---
+>>>> Changes in version 2:
+>>>> - added *if* (IS_ENABLED(CONFIG_PHYLIB)) around
+>>>> phy_register_fixup_for_id()
+>>>>     call;
 
-I think it would be best for the DTS changes (patches 4 and 5) to go
-through Christian's tree.
+>>>> - changed Ether device name to "r8a779x-ether".
 
--Tim
+>>>>    arch/arm/mach-shmobile/board-koelsch.c |   63 ++++++++++++++++++++++++-
+>>>>    1 file changed, 62 insertions(+), 1 deletion(-)
+
+>>>> Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
+>>>> ===================================================================
+>>>> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
+>>>> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
+
+>> [...]
+
+>>>> @@ -84,6 +119,32 @@ static void __init koelsch_add_standard_
+>>>>    				      sizeof(koelsch_keys_pdata));
+>>>>    }
+>>>>
+>>>> +/*
+>>>> + * Ether LEDs on the Koelsch board are named LINK and ACTIVE which
+>>>> corresponds
+>>>> + * to non-default 01 setting of the Micrel KSZ8041 PHY control register
+>>>> 1 bits
+>>>> + * 14-15. We have to set them back to 01 from the default 00 value each
+>>>> time
+>>>> + * the PHY is reset. It's also important because the PHY's LED0 signal
+>>>> is
+>>>> + * connected to SoC's ETH_LINK signal and in the PHY's default mode it
+>>>> will
+>>>> + * bounce on and off after each packet, which we apparently want to
+>>>> avoid.
+>>>> + */
+>>>> +static int koelsch_ksz8041_fixup(struct phy_device *phydev)
+>>>> +{
+>>>> +	u16 phyctrl1 = phy_read(phydev, 0x1e);
+>>>> +
+>>>> +	phyctrl1 &= ~0xc000;
+>>>> +	phyctrl1 |= 0x4000;
+>>>> +	return phy_write(phydev, 0x1e, phyctrl1);
+>>>> +}
+>>>> +
+>>>> +static void __init koelsch_init(void)
+>>>> +{
+>>>> +	koelsch_add_standard_devices();
+>>>> +
+>>>> +	if (IS_ENABLED(CONFIG_PHYLIB))
+>>>> +		phy_register_fixup_for_id("r8a779x-ether-ff:01",
+>>>> +					  koelsch_ksz8041_fixup);
+
+>>> This is fine with board code, but will break when we'll switch to DT.
+>>> Would it be difficult to replace board code by using the existing micrel
+>>> phy driver (drivers/net/phy/micrel.c) which should support the ksz8041
+>>> already and
+
+>> The first issue here is KSZ8041 on the BOCK-W/Lager/Koelsch boards uses
+>> undocumented PHY ID for some reason, so the current driver doesn't really
+>> support it. :-)
+
+> Right. Let's teach the KSZ8041 driver about that then :-)
+
+    Well, this seems at least easy. :-)
+
+>>> extending it with support for register 0x1e which doesn't seem to be
+>>> handled ?
+
+>> You probably didn't quite understand the purpose of the platform PHY fixup.
+>> It's designed to do the board-specific changes, not the driver-specific
+>> changes. In this case, the setting of the bits 14-15 of the PHY control
+>> register 1 (w/address 0x1E) purely depends on the board schematics and
+>> simply can't be selected by the PHY driver.
+
+>> It could have been set by the PHY driver iff we would find a way to pass the
+>> platform data to the PHY device (on the automatically probed MDIO bus).
+
+> That seems to me like the real issue we need to solve. The PHY clearly needs
+> platform (or DT) data, so we need a way to pass it to the driver. Once we get
+> that it shouldn't be difficult to add LED configuration information to the
+> platform data.
+
+    Well, with the PHY driver being DT-enabled somehow, it wouldn't be 
+difficult (though how to make phylib's automatic probing coexist with DT 
+probing is not clear to me ATM). More difficult is to link the platform data 
+to an automatically probed device; there were attempts on linux-usb to link 
+the platform data to an USB device but that went nowhere IIRC... anyway, with 
+the PHY platform fixups already in place we need to care only about the DT 
+case really...
+
+WBR, Sergei
