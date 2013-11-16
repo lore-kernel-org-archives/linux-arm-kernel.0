@@ -1,66 +1,145 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 16 Nov 2013 08:08:35 +0000
-Subject: Some question about GIC v1 setting
-In-Reply-To: <CANudz+uO7s=GdFz64oxFEQefAB=EguUo1NP17AT+3Ft+wK8nNQ@mail.gmail.com>
-References: <CANudz+sg6MiUZaTELF4G=NMfwj--K9j10JrYh1cm2VAjfvq6MA@mail.gmail.com>
- <20131115165939.GO16735@n2100.arm.linux.org.uk>
- <CANudz+uO7s=GdFz64oxFEQefAB=EguUo1NP17AT+3Ft+wK8nNQ@mail.gmail.com>
-Message-ID: <9ab50cfbe03ffd667566808166b04573@www.loen.fr>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 16 Nov 2013 00:18:30 -0800
+Subject: [GIT PULL] ARM: SoC fixes for 3.13 merge window
+Message-ID: <20131116081830.GA22051@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-16 07:23, loody wrote:
-> hi Russel:
->
-> 2013/11/16 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> On Sat, Nov 16, 2013 at 12:55:11AM +0800, loody wrote:
->>> hi all:
->>> I use arm cortex A9 smp with GIC v1 system.
->>> And my kernel is 3.8.13.
->>>
->>> I have some questions:
->>> 1.  From GIc v1 spec, we can modify irq priority.
->>>      (ICDIPRn, Interrupt Priority Rigisters)
->>>      how could we do that in kernel? Did kernel provide any API of 
->>> Irq
->>> to reach that goal?
->>
->> No.  It's pointless.  The kernel doesn't support interrupting one 
->> IRQ
->> while another is already in progress.
-> in so far kernel, there are impossible
-> 1. dynamically  change irq priority setting in GIC through kernel API
-> 2. get higher interrupt priority when first time register 
-> requtest_irq
+Hi Linus,
 
-As Russell said, this is because Linux only models a single interrupt 
-priority.
-The net result is that all interrupts must have the same priority.
 
->>
->>> 2. From Gic V1 spec, we can assign 1 irq to multi-core.
->>>      (ICDIPTRn, Interrupt Processor Targets Registers)
->>>      Is there similar API in kernel to let 1 irq possibility to be
->>> handled by multi-cores?
->>
->> No.  All that does is lead to cores being woken up and racing on 
->> locks,
->> and then causing IRQs to be spuriously marked as false (because 
->> there's
->> nothing for the handlers to do on the cores which lost out).
-> In Gic spec, if 1 core service the irq, other cores will read invalid
-> #1023 if accidentally they are waken up by GIC.
->
-> Why that will let cores racing on locks?
->
-> if accidentally waken up by GIC, and cores read #1023, cores can
-> return back immediately.
+The following changes since commit 10d0c9705e80bbd3d587c5fad24599aabaca6688:
 
-Hence wasting a lot of time and energy on all the other cores.
-The question is: why do you want to do that?
+  Merge tag 'devicetree-for-3.13' of git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux (2013-11-12 16:52:17 +0900)
 
-Cheers,
+are available in the git repository at:
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 6886059f2ef5d62c73e87a905e84fa4f87d56074:
+
+  Merge tag 'omap-for-v3.13/fixes-for-merge-window-take2' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2013-11-15 15:17:59 -0800)
+
+----------------------------------------------------------------
+
+ARM: SoC fixes for 3.13 merge window
+
+A first set of batches of fixes for 3.13. The diffstat is large mostly
+because we're adding a defconfig for a family that's been lacking it, and
+there's some missing clock information added for i.MX and OMAP.
+
+The at91 new code is around dealing with RTC/RTT reset at boot to fix possible
+hangs due to pending wakeup interrupts coming in during early boot.
+
+----------------------------------------------------------------
+Alexander Shiyan (1):
+      ARM: dts: i.MX51: Fix OTG PHY clock
+
+Alexandre Courbot (1):
+      ARM: tegra: init fuse before setting reset handler
+
+Eric Witcher (1):
+      ARM: OMAP: devicetree: fix SPI node compatible property syntax items
+
+Jiada Wang (1):
+      ARM: i.MX6q: fix the wrong parent of can_root clock
+
+Joel Fernandes (1):
+      doc: devicetree: Add bindings documentation for omap-des driver
+
+Johan Hovold (2):
+      ARM: at91: fix hanged boot due to early rtc-interrupt
+      ARM: at91: fix hanged boot due to early rtt-interrupt
+
+Jonathan Austin (1):
+      ARM: integrator_cp: Set LCD{0,1} enable lines when turning on CLCD
+
+Linus Walleij (1):
+      MAINTAINERS: drop discontinued mailing list
+
+Lokesh Vutla (1):
+      ARM: dts: doc: Document missing compatible property for omap-sham driver
+
+Lothar Wa?mann (1):
+      ARM: imx6q: add missing sentinel to divider table
+
+Nishanth Menon (1):
+      ARM: OMAP2+: omap_device: maintain sane runtime pm status around suspend/resume
+
+Olof Johansson (7):
+      Merge tag 'imx-fixes-3.13' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      ARM: vt8500: add defconfig for v6/v7 chips
+      ARM: sti: only select errata 764369 if SMP
+      ARM: highbank: only select errata 764369 if SMP
+      video: exynos_mipi_dsim: Remove unused variable
+      Merge tag 'at91-fixes-non-critical' of git://github.com/at91linux/linux-at91 into fixes
+      Merge tag 'omap-for-v3.13/fixes-for-merge-window-take2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+Roger Quadros (1):
+      pinctrl: single: call pcs_soc->rearm() whenever IRQ mask is changed
+
+Shawn Guo (6):
+      ARM: imx: remove imx_src_prepare_restart() call
+      ARM: imx: improve mxc_restart() on the SRC bit writes
+      ARM: imx: v7_cpu_resume() is needed by imx6sl build
+      ARM: imx: add sleep for pllv3 relock
+      ARM: imx: pllv3 needs relock in .set_rate() call
+      ARM: imx: set up pllv3 POWER and BYPASS sequentially
+
+Tomi Valkeinen (3):
+      ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
+      ARM: OMAP3: use CLK_SET_RATE_PARENT for dss clocks
+      ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
+
+Tony Lindgren (2):
+      Merge tag 'for-v3.13/clock-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into xxx-dt
+      ARM: OMAP2+: Fix build for dra7xx without omap4 and 5
+
+Wei Yongjun (2):
+      ARM: OMAP2+: smsc911x: fix return value check in gpmc_smsc911x_init()
+      ARM: OMAP3: Beagle: fix return value check in beagle_opp_init()
+
+ .../devicetree/bindings/crypto/omap-des.txt        | 30 ++++++++
+ .../devicetree/bindings/crypto/omap-sham.txt       |  2 +-
+ Documentation/devicetree/bindings/spi/omap-spi.txt |  4 +-
+ MAINTAINERS                                        |  1 -
+ arch/arm/boot/dts/imx51.dtsi                       |  2 +-
+ arch/arm/configs/vt8500_v6_v7_defconfig            | 90 ++++++++++++++++++++++
+ arch/arm/mach-at91/Makefile                        |  2 +-
+ arch/arm/mach-at91/at91sam9260.c                   |  2 +
+ arch/arm/mach-at91/at91sam9261.c                   |  2 +
+ arch/arm/mach-at91/at91sam9263.c                   |  3 +
+ arch/arm/mach-at91/at91sam9g45.c                   |  3 +
+ arch/arm/mach-at91/at91sam9n12.c                   |  6 ++
+ arch/arm/mach-at91/at91sam9rl.c                    |  3 +
+ arch/arm/mach-at91/at91sam9x5.c                    |  6 ++
+ arch/arm/mach-at91/generic.h                       |  2 +
+ arch/arm/mach-at91/include/mach/at91sam9n12.h      |  5 ++
+ arch/arm/mach-at91/include/mach/at91sam9x5.h       |  5 ++
+ arch/arm/mach-at91/include/mach/sama5d3.h          |  5 ++
+ arch/arm/mach-at91/sama5d3.c                       |  6 ++
+ arch/arm/mach-at91/sysirq_mask.c                   | 71 +++++++++++++++++
+ arch/arm/mach-highbank/Kconfig                     |  2 +-
+ arch/arm/mach-imx/Makefile                         |  4 +-
+ arch/arm/mach-imx/clk-imx6q.c                      |  7 +-
+ arch/arm/mach-imx/clk-pllv3.c                      | 51 ++++++++----
+ arch/arm/mach-imx/common.h                         |  5 --
+ arch/arm/mach-imx/src.c                            | 15 ----
+ arch/arm/mach-imx/system.c                         | 12 ++-
+ arch/arm/mach-integrator/integrator_cp.c           |  3 +-
+ arch/arm/mach-omap2/Makefile                       |  2 +-
+ arch/arm/mach-omap2/board-omap3beagle.c            |  2 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c              | 58 +++++++++++---
+ arch/arm/mach-omap2/cclock44xx_data.c              |  3 +-
+ arch/arm/mach-omap2/gpmc-smsc911x.c                |  2 +-
+ arch/arm/mach-omap2/omap_device.c                  | 13 +++-
+ arch/arm/mach-omap2/prm44xx_54xx.h                 |  3 +-
+ arch/arm/mach-sti/Kconfig                          |  2 +-
+ arch/arm/mach-tegra/tegra.c                        |  2 +-
+ drivers/pinctrl/pinctrl-single.c                   | 10 +--
+ drivers/video/exynos/exynos_mipi_dsi.c             |  1 -
+ 39 files changed, 367 insertions(+), 80 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-des.txt
+ create mode 100644 arch/arm/configs/vt8500_v6_v7_defconfig
+ create mode 100644 arch/arm/mach-at91/sysirq_mask.c
