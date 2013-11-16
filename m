@@ -1,28 +1,118 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 17 Nov 2013 02:07:25 +0400
-Subject: [PATCH v2 0/5]
-Message-ID: <1384639650-3919-1-git-send-email-dbaryshkov@gmail.com>
+Date: Sun, 17 Nov 2013 02:07:27 +0400
+Subject: [PATCH v2 2/5] fbdev: sa1100fb: make use of device clock
+In-Reply-To: <1384639650-3919-1-git-send-email-dbaryshkov@gmail.com>
+References: <1384639650-3919-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1384639650-3919-3-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please apply the following patches that fix the sa1100 framebuffer and PCMCIA
-timings calculation if CPU frequency driver is not available.
+Use per-device clock (instead of calling cpufreq_get(0), which can
+return 0 if no cpu frequency driver is selected) to program timings.
 
-Changes since V1:
-* Corrected patch adding sa1111 pcmcia device - offset was wrong.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/video/sa1100fb.c | 24 +++++++++++++++++-------
+ drivers/video/sa1100fb.h |  1 +
+ 2 files changed, 18 insertions(+), 7 deletions(-)
 
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (5):
-      arm: sa1100: add cpu clock
-      fbdev: sa1100fb: make use of device clock
-      pcmcia: sa1100: make use of device clock
-      arm: sa1100: add a clock alias for sa1111 pcmcia device
-      pcmcia: sa1111: make use of device clock
-
- arch/arm/mach-sa1100/clock.c    | 36 ++++++++++++++++++++++++++++++++++++
- drivers/pcmcia/sa1100_generic.c |  1 +
- drivers/pcmcia/sa1111_generic.c |  4 ++++
- drivers/pcmcia/sa11xx_base.c    | 14 ++++++++++++--
- drivers/video/sa1100fb.c        | 24 +++++++++++++++++-------
- drivers/video/sa1100fb.h        |  1 +
- 6 files changed, 71 insertions(+), 9 deletions(-)
+diff --git a/drivers/video/sa1100fb.c b/drivers/video/sa1100fb.c
+index de76da0..05d1b37 100644
+--- a/drivers/video/sa1100fb.c
++++ b/drivers/video/sa1100fb.c
+@@ -178,6 +178,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/mutex.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
+ 
+ #include <video/sa1100fb.h>
+ 
+@@ -413,9 +414,9 @@ sa1100fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+ 		var->transp.offset);
+ 
+ #ifdef CONFIG_CPU_FREQ
+-	dev_dbg(fbi->dev, "dma period = %d ps, clock = %d kHz\n",
++	dev_dbg(fbi->dev, "dma period = %d ps, clock = %ld kHz\n",
+ 		sa1100fb_display_dma_period(var),
+-		cpufreq_get(smp_processor_id()));
++		clk_get_rate(fbi->clk) / 1000);
+ #endif
+ 
+ 	return 0;
+@@ -586,9 +587,10 @@ static struct fb_ops sa1100fb_ops = {
+  * Calculate the PCD value from the clock rate (in picoseconds).
+  * We take account of the PPCR clock setting.
+  */
+-static inline unsigned int get_pcd(unsigned int pixclock, unsigned int cpuclock)
++static inline unsigned int get_pcd(struct sa1100fb_info *fbi,
++		unsigned int pixclock)
+ {
+-	unsigned int pcd = cpuclock / 100;
++	unsigned int pcd = clk_get_rate(fbi->clk) / 100 / 1000;
+ 
+ 	pcd *= pixclock;
+ 	pcd /= 10000000;
+@@ -667,7 +669,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
+ 		LCCR2_BegFrmDel(var->upper_margin) +
+ 		LCCR2_EndFrmDel(var->lower_margin);
+ 
+-	pcd = get_pcd(var->pixclock, cpufreq_get(0));
++	pcd = get_pcd(fbi, var->pixclock);
+ 	new_regs.lccr3 = LCCR3_PixClkDiv(pcd) | fbi->inf->lccr3 |
+ 		(var->sync & FB_SYNC_HOR_HIGH_ACT ? LCCR3_HorSnchH : LCCR3_HorSnchL) |
+ 		(var->sync & FB_SYNC_VERT_HIGH_ACT ? LCCR3_VrtSnchH : LCCR3_VrtSnchL);
+@@ -1003,7 +1005,6 @@ sa1100fb_freq_transition(struct notifier_block *nb, unsigned long val,
+ 			 void *data)
+ {
+ 	struct sa1100fb_info *fbi = TO_INF(nb, freq_transition);
+-	struct cpufreq_freqs *f = data;
+ 	u_int pcd;
+ 
+ 	switch (val) {
+@@ -1012,7 +1013,7 @@ sa1100fb_freq_transition(struct notifier_block *nb, unsigned long val,
+ 		break;
+ 
+ 	case CPUFREQ_POSTCHANGE:
+-		pcd = get_pcd(fbi->fb.var.pixclock, f->new);
++		pcd = get_pcd(fbi, fbi->fb.var.pixclock);
+ 		fbi->reg_lccr3 = (fbi->reg_lccr3 & ~0xff) | LCCR3_PixClkDiv(pcd);
+ 		set_ctrlr_state(fbi, C_ENABLE_CLKCHANGE);
+ 		break;
+@@ -1219,6 +1220,13 @@ static int sa1100fb_probe(struct platform_device *pdev)
+ 	if (!fbi)
+ 		goto failed;
+ 
++	fbi->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(fbi->clk)) {
++		ret = PTR_ERR(fbi->clk);
++		fbi->clk = NULL;
++		goto failed;
++	}
++
+ 	fbi->base = ioremap(res->start, resource_size(res));
+ 	if (!fbi->base)
+ 		goto failed;
+@@ -1271,6 +1279,8 @@ static int sa1100fb_probe(struct platform_device *pdev)
+  failed:
+ 	if (fbi)
+ 		iounmap(fbi->base);
++	if (fbi->clk)
++		clk_put(fbi->clk);
+ 	kfree(fbi);
+ 	release_mem_region(res->start, resource_size(res));
+ 	return ret;
+diff --git a/drivers/video/sa1100fb.h b/drivers/video/sa1100fb.h
+index fc5d429..0139d13 100644
+--- a/drivers/video/sa1100fb.h
++++ b/drivers/video/sa1100fb.h
+@@ -68,6 +68,7 @@ struct sa1100fb_info {
+ #endif
+ 
+ 	const struct sa1100fb_mach_info *inf;
++	struct clk *clk;
+ };
+ 
+ #define TO_INF(ptr,member)	container_of(ptr,struct sa1100fb_info,member)
+-- 
+1.8.4.2
