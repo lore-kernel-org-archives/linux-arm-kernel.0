@@ -1,126 +1,61 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 16:19:43 +0100
-Subject: [PATCH 03/11] ARM: dts: omap3-igep: Update to use the TI AM/DM37x
- processor.
-In-Reply-To: <20131116144412.GH10317@atomide.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 16 Nov 2013 07:22:40 -0800
+Subject: [PATCH 03/11] ARM: dts: omap3-igep: Update to use the TI
+ AM/DM37x processor.
+In-Reply-To: <52878D0F.7040204@collabora.co.uk>
 References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
  <1384608224-9452-4-git-send-email-javier.martinez@collabora.co.uk>
  <20131116144412.GH10317@atomide.com>
-Message-ID: <52878D0F.7040204@collabora.co.uk>
+ <52878D0F.7040204@collabora.co.uk>
+Message-ID: <20131116152239.GK10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2013 03:44 PM, Tony Lindgren wrote:
-> * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
->> From: Enric Balletbo i Serra <eballetbo@gmail.com>
->> 
->> Most of the boards are using the TI AM/DM37x processor, there is only a small
->> quantity of IGEP Processor Boards based on TI OMAP3530. So it's better use the
->> omap36xx.dtsi include instead of omap34xx.dtsi include.
->> 
->> To avoid confusion we have added to the model the (TI AM/DM37x) comment.
+* Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 07:21]:
+> On 11/16/2013 03:44 PM, Tony Lindgren wrote:
+> > * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
+> >> From: Enric Balletbo i Serra <eballetbo@gmail.com>
+> >> 
+> >> Most of the boards are using the TI AM/DM37x processor, there is only a small
+> >> quantity of IGEP Processor Boards based on TI OMAP3530. So it's better use the
+> >> omap36xx.dtsi include instead of omap34xx.dtsi include.
+> >> 
+> >> To avoid confusion we have added to the model the (TI AM/DM37x) comment.
+> > 
+> > You could have omap3-igep-common.dtsi that contains most configurations
+> > and then files including that where only the SoC type and name is set.
+> > 
+> > Regards,
+> > 
+> > Tony
+> >  
 > 
-> You could have omap3-igep-common.dtsi that contains most configurations
-> and then files including that where only the SoC type and name is set.
+> Hi Tony,
 > 
-> Regards,
+> We do have a common DTSI file for IGEP boards which is
+> arch/arm/boot/dts/omap3-igep.dtsi. Maybe it should be renamed to -common to make
+> it more clear?
+
+No that's fine.
+ 
+> Anyways, there are two models OMAP3 based IGEP boards that include this common
+> DTSI: IGEPv2 (omap3-igep0020.dts) and IGEP COM Module (omap3-igep0030.dts).
 > 
-> Tony
->  
-
-Hi Tony,
-
-We do have a common DTSI file for IGEP boards which is
-arch/arm/boot/dts/omap3-igep.dtsi. Maybe it should be renamed to -common to make
-it more clear?
-
-Anyways, there are two models OMAP3 based IGEP boards that include this common
-DTSI: IGEPv2 (omap3-igep0020.dts) and IGEP COM Module (omap3-igep0030.dts).
-
-However there are different revisions for each model with variations of the SoC
-version used (AM/DM37x or OMAP3530), with wifi or not wifi, flash memory
-technology (NAND or OneNAND) and different flash memory sizes.
-
-So, we don't plan to support every single variation on mainline since this will
-unnecessary increase the complexity of DTS adding not much benefit.
-
-We just prefer to support the latter and most popular revision for each model
-which is AM/DM37x SoC, wifi, 512 MB NAND flash.
-
-Users that have a less popular revision can modify the reference DTS in mainline
-to reflect their board.
-
->> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
->> ---
->>  arch/arm/boot/dts/omap3-igep.dtsi    | 4 ++--
->>  arch/arm/boot/dts/omap3-igep0020.dts | 4 ++--
->>  arch/arm/boot/dts/omap3-igep0030.dts | 4 ++--
->>  3 files changed, 6 insertions(+), 6 deletions(-)
->> 
->> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
->> index b3517b2..e4c8769 100644
->> --- a/arch/arm/boot/dts/omap3-igep.dtsi
->> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
->> @@ -1,5 +1,5 @@
->>  /*
->> - * Device Tree Source for IGEP Technology devices
->> + * Common device tree for IGEP boards based on AM/DM37x
->>   *
->>   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
->>   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
->> @@ -10,7 +10,7 @@
->>   */
->>  /dts-v1/;
->>  
->> -#include "omap34xx.dtsi"
->> +#include "omap36xx.dtsi"
->>  
->>  / {
->>  	memory {
->> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
->> index d5cc792..33ce123 100644
->> --- a/arch/arm/boot/dts/omap3-igep0020.dts
->> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
->> @@ -1,5 +1,5 @@
->>  /*
->> - * Device Tree Source for IGEPv2 board
->> + * Device Tree Source for IGEPv2 Rev. (TI OMAP AM/DM37x)
->>   *
->>   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
->>   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
->> @@ -13,7 +13,7 @@
->>  #include "omap-gpmc-smsc911x.dtsi"
->>  
->>  / {
->> -	model = "IGEPv2";
->> +	model = "IGEPv2 (TI OMAP AM/DM37x)";
->>  	compatible = "isee,omap3-igep0020", "ti,omap3";
->>  
->>  	leds {
->> diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
->> index 525e6d9..02a23f8 100644
->> --- a/arch/arm/boot/dts/omap3-igep0030.dts
->> +++ b/arch/arm/boot/dts/omap3-igep0030.dts
->> @@ -1,5 +1,5 @@
->>  /*
->> - * Device Tree Source for IGEP COM Module
->> + * Device Tree Source for IGEP COM MODULE (TI OMAP AM/DM37x)
->>   *
->>   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
->>   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
->> @@ -12,7 +12,7 @@
->>  #include "omap3-igep.dtsi"
->>  
->>  / {
->> -	model = "IGEP COM Module";
->> +	model = "IGEP COM MODULE (TI OMAP AM/DM37x)";
->>  	compatible = "isee,omap3-igep0030", "ti,omap3";
->>  
->>  	leds {
->> -- 
->> 1.8.4.2
->> 
+> However there are different revisions for each model with variations of the SoC
+> version used (AM/DM37x or OMAP3530), with wifi or not wifi, flash memory
+> technology (NAND or OneNAND) and different flash memory sizes.
 > 
+> So, we don't plan to support every single variation on mainline since this will
+> unnecessary increase the complexity of DTS adding not much benefit.
+> 
+> We just prefer to support the latter and most popular revision for each model
+> which is AM/DM37x SoC, wifi, 512 MB NAND flash.
+> 
+> Users that have a less popular revision can modify the reference DTS in mainline
+> to reflect their board.
 
-Best regards,
-Javier
+OK sounds fine to me and can be revisited if needed naturally.
+
+Regards,
+
+Tony
