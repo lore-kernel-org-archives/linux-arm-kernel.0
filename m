@@ -1,153 +1,286 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Nov 2013 16:36:05 -0800
-Subject: [PATCH 3/5] ARM: OMAP2+: Add DT init code for DPI displays and make
- omap3 LDP to use it
+Date: Fri, 15 Nov 2013 16:36:06 -0800
+Subject: [PATCH 4/5] ARM: dts: Add basic support for omap3 LDP zoom1 labrador
 In-Reply-To: <1384562167-14725-1-git-send-email-tony@atomide.com>
 References: <1384562167-14725-1-git-send-email-tony@atomide.com>
-Message-ID: <1384562167-14725-4-git-send-email-tony@atomide.com>
+Message-ID: <1384562167-14725-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make the remaining omap3 boards usable with device
-tree, we need to initialize the DPI based displays using pdata
-until we have the DSS bindings in place.
+Basic things like serial, Ethernet, MMC, NAND, DSS, touchscreen
+and GPIO keys work.
 
-At least board-am3517evm.c, board-cm-t35.c, board-devkit8000.c,
-board-ldp.c and board-overo.c all use fairly similar DPI setup,
-so let's add generic code for it. And let's make omap3 LDP to
-use it and also initialize the ads7846 until we have a binding
-for it.
+For twl4030-keypad we're still missing the binding, but
+support for that should be trivial to add once the driver
+has been updated.
 
-Note that at least LDP needs the TWL bug fix posted as
-"gpio: twl4030: Fix regression for twl gpio output" for the
-LCD backlight to power.
+MUSB I'm pretty sure I got got to enumerate once, but I
+suspect the battery charging somehow disrupts it and it's
+not enumerating in general for some reason.
 
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Patches are welcome to improve things if people are
+still using this board.
+
+For reference, here's some more info on this old board:
+http://www.openomap.org/wiki/tiki-index.php?page=HardwareInfo
+
+Cc: devicetree at vger.kernel.org
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/dss-common.c   | 67 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/dss-common.h   |  1 +
- arch/arm/mach-omap2/pdata-quirks.c | 15 +++++++++
- 3 files changed, 83 insertions(+)
+ arch/arm/boot/dts/Makefile      |   1 +
+ arch/arm/boot/dts/omap3-ldp.dts | 231 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 232 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-ldp.dts
 
-diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
-index 365bfd3..86e98c5 100644
---- a/arch/arm/mach-omap2/dss-common.c
-+++ b/arch/arm/mach-omap2/dss-common.c
-@@ -257,3 +257,70 @@ void __init omap3_igep2_display_init_of(void)
- 	platform_device_register(&omap3_igep2_tfp410_device);
- 	platform_device_register(&omap3_igep2_dvi_connector_device);
- }
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index de37094..fc37bca 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -183,6 +183,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-beagle-xm.dtb \
+ 	omap3-evm.dtb \
+ 	omap3-evm-37xx.dtb \
++	omap3-ldp.dtb \
+ 	omap3-n900.dtb \
+ 	omap3-n9.dtb \
+ 	omap3-n950.dtb \
+diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
+new file mode 100644
+index 0000000..ddce0d8
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-ldp.dts
+@@ -0,0 +1,231 @@
++/*
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
 +
-+/* Systems with DPI LCD */
++#include "omap34xx.dtsi"
++#include "omap-gpmc-smsc911x.dtsi"
 +
-+static struct panel_dpi_platform_data dpi_lcd = {
-+	.name                   = "lcd",
-+	.source                 = "dpi.0",
-+	.enable_gpio		= -1,
-+	.backlight_gpio		= -1,
-+};
++/ {
++	model = "TI OMAP3430 LDP (Zoom1 Labrador)";
++	compatible = "ti,omap3-ldp", "ti,omap3";
 +
-+static struct platform_device dpi_lcd_device = {
-+	.name                   = "panel-dpi",
-+	.id                     = 0,
-+	.dev.platform_data      = &dpi_lcd,
-+};
-+
-+static struct omap_dss_board_info dpi_dss_data = {
-+	.default_display_name = "lcd",
-+};
-+
-+static void dpi_display_init(void)
-+{
-+	platform_device_register(&dpi_lcd_device);
-+	omap_display_init(&dpi_dss_data);
-+}
-+
-+/* DPI on omap3 LDP */
-+
-+static const struct display_timing ldp_lcd_videomode = {
-+	.pixelclock	= { 0, 5400000, 0 },
-+
-+	.hactive = { 0, 240, 0 },
-+	.hfront_porch = { 0, 3, 0 },
-+	.hback_porch = { 0, 39, 0 },
-+	.hsync_len = { 0, 3, 0 },
-+
-+	.vactive = { 0, 320, 0 },
-+	.vfront_porch = { 0, 2, 0 },
-+	.vback_porch = { 0, 7, 0 },
-+	.vsync_len = { 0, 1, 0 },
-+
-+	.flags = DISPLAY_FLAGS_HSYNC_LOW | DISPLAY_FLAGS_VSYNC_LOW |
-+		DISPLAY_FLAGS_DE_HIGH | DISPLAY_FLAGS_PIXDATA_POSEDGE,
-+};
-+
-+void __init omap3_ldp_display_init_of(int gpio_bl, int gpio_en)
-+{
-+	int r;
-+
-+	static struct gpio gpios[] = {
-+		{ 55, GPIOF_OUT_INIT_HIGH, "LCD RESET" },
-+		{ 56, GPIOF_OUT_INIT_HIGH, "LCD QVGA" },
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x8000000>; /* 128 MB */
 +	};
 +
-+	r = gpio_request_array(gpios, ARRAY_SIZE(gpios));
-+	if (r) {
-+		pr_err("Cannot request LCD GPIOs, error %d\n", r);
-+		return;
-+	}
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vcc>;
++		};
++	};
 +
-+	dpi_lcd.data_lines = 18;
-+	dpi_lcd.display_timing = &ldp_lcd_videomode;
-+	dpi_lcd.enable_gpio = gpio_en;
-+	dpi_lcd.backlight_gpio = gpio_bl;
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_key_pins>;
 +
-+	dpi_display_init();
-+}
-diff --git a/arch/arm/mach-omap2/dss-common.h b/arch/arm/mach-omap2/dss-common.h
-index a9becf0..bc9921c 100644
---- a/arch/arm/mach-omap2/dss-common.h
-+++ b/arch/arm/mach-omap2/dss-common.h
-@@ -9,5 +9,6 @@
- void __init omap4_panda_display_init_of(void);
- void __init omap_4430sdp_display_init_of(void);
- void __init omap3_igep2_display_init_of(void);
-+void omap3_ldp_display_init_of(int gpio_bl, int gpio_en);
- 
- #endif
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index f2fc072..97f200f 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -100,6 +100,20 @@ static void __init omap3_evm_legacy_init(void)
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 149);
- }
- 
-+/* Pass enable and backlight GPIO to DSS code */
-+int __init ldp_twl_gpio_setup(struct device *dev, unsigned gpio, unsigned ngpio)
-+{
-+	omap3_ldp_display_init_of(gpio + 7, gpio + 15);
-+	omap_ads7846_init(1, 54, 310, NULL);
++		key_enter {
++			label = "enter";
++			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* gpio101 */
++			linux,code = <0x0107001c>; /* KEY_ENTER */
++			gpio-key,wakeup;
++		};
 +
-+	return 0;
-+}
++		key_f1 {
++			label = "f1";
++			gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* gpio102 */
++			linux,code = <0x0303003b>; /* KEY_F1 */
++			gpio-key,wakeup;
++		};
 +
-+static void __init omap3_ldp_legacy_init(void)
-+{
-+	twl_gpio_auxdata.setup = ldp_twl_gpio_setup;
-+}
++		key_f2 {
++			label = "f2";
++			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>; /* gpio103 */
++			linux,code = <0x0403003c>; /* KEY_F2 */
++			gpio-key,wakeup;
++		};
 +
- static void __init omap3_zoom_legacy_init(void)
- {
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_26, 0, 162);
-@@ -190,6 +204,7 @@ static struct pdata_init pdata_quirks[] __initdata = {
- 	{ "nokia,omap3-n950", hsmmc2_internal_input_clk, },
- 	{ "isee,omap3-igep0020", omap3_igep0020_legacy_init, },
- 	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
-+	{ "ti,omap3-ldp", omap3_ldp_legacy_init, },
- 	{ "ti,omap3-zoom3", omap3_zoom_legacy_init, },
- #endif
- #ifdef CONFIG_ARCH_OMAP4
++		key_f3 {
++			label = "f3";
++			gpios = <&gpio4 8 GPIO_ACTIVE_LOW>; /* gpio104 */
++			linux,code = <0x0503003d>; /* KEY_F3 */
++			gpio-key,wakeup;
++		};
++
++		key_f4 {
++			label = "f4";
++			gpios = <&gpio4 9 GPIO_ACTIVE_LOW>; /* gpio105 */
++			linux,code = <0x0704003e>; /* KEY_F4 */
++			gpio-key,wakeup;
++		};
++
++		key_left {
++			label = "left";
++			gpios = <&gpio4 10 GPIO_ACTIVE_LOW>; /* gpio106 */
++			linux,code = <0x04070069>; /* KEY_LEFT */
++			gpio-key,wakeup;
++		};
++
++		key_right {
++			label = "right";
++			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>; /* gpio107 */
++			linux,code = <0x0507006a>; /* KEY_RIGHT */
++			gpio-key,wakeup;
++		};
++
++		key_up {
++			label = "up";
++			gpios = <&gpio4 12 GPIO_ACTIVE_LOW>; /* gpio108 */
++			linux,code = <0x06070067>; /* KEY_UP */
++			gpio-key,wakeup;
++		};
++
++		key_down {
++			label = "down";
++			gpios = <&gpio4 13 GPIO_ACTIVE_LOW>; /* gpio109 */
++			linux,code = <0x0707006c>; /* KEY_DOWN */
++			gpio-key,wakeup;
++		};
++	};
++};
++
++&gpmc {
++	ranges = <0 0 0x00000000 0x01000000>,
++		 <1 0 0x08000000 0x01000000>;
++
++	nand at 0,0 {
++		linux,mtd-name= "micron,nand";
++		reg = <0 0 0>;
++		nand-bus-width = <16>;
++		ti,nand-ecc-opt = "bch8";
++
++		gpmc,sync-clk-ps = <0>;
++		gpmc,cs-on-ns = <0>;
++		gpmc,cs-rd-off-ns = <44>;
++		gpmc,cs-wr-off-ns = <44>;
++		gpmc,adv-on-ns = <6>;
++		gpmc,adv-rd-off-ns = <34>;
++		gpmc,adv-wr-off-ns = <44>;
++		gpmc,we-off-ns = <40>;
++		gpmc,oe-off-ns = <54>;
++		gpmc,access-ns = <64>;
++		gpmc,rd-cycle-ns = <82>;
++		gpmc,wr-cycle-ns = <82>;
++		gpmc,wr-access-ns = <40>;
++		gpmc,wr-data-mux-bus-ns = <0>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "X-Loader";
++			reg = <0 0x80000>;
++		};
++		partition at 80000 {
++			label = "U-Boot";
++			reg = <0x80000 0x140000>;
++		};
++		partition at 1c0000 {
++			label = "Environment";
++			reg = <0x1c0000 0x40000>;
++		};
++		partition at 200000 {
++			label = "Kernel";
++			reg = <0x200000 0x1e00000>;
++		};
++		partition at 2000000 {
++			label = "Filesystem";
++			reg = <0x2000000 0xe000000>;
++		};
++	};
++
++	ethernet at gpmc {
++		interrupt-parent = <&gpio5>;
++		interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
++		reg = <1 0 0xff>;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <2600000>;
++
++	twl: twl at 48 {
++		reg = <0x48>;
++		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
++		interrupt-parent = <&intc>;
++	};
++};
++
++#include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
++
++&i2c2 {
++	clock-frequency = <400000>;
++};
++
++&i2c3 {
++	clock-frequency = <400000>;
++};
++
++&mmc1 {
++	vmmc-supply = <&vmmc1>;
++	bus-width = <4>;
++};
++
++&omap3_pmx_core {
++	gpio_key_pins: pinmux_gpio_key_pins {
++		pinctrl-single,pins = <
++			0xea (PIN_INPUT | MUX_MODE4)	/* cam_d2.gpio_101 */
++			0xec (PIN_INPUT | MUX_MODE4)	/* cam_d3.gpio_102 */
++			0xee (PIN_INPUT | MUX_MODE4)	/* cam_d4.gpio_103 */
++			0xf0 (PIN_INPUT | MUX_MODE4)	/* cam_d5.gpio_104 */
++			0xf2 (PIN_INPUT | MUX_MODE4)	/* cam_d6.gpio_105 */
++			0xf4 (PIN_INPUT | MUX_MODE4)	/* cam_d7.gpio_106 */
++			0xf6 (PIN_INPUT | MUX_MODE4)	/* cam_d8.gpio_107 */
++			0xf8 (PIN_INPUT | MUX_MODE4)	/* cam_d9.gpio_108 */
++			0xfa (PIN_INPUT | MUX_MODE4)	/* cam_d10.gpio_109 */
++		>;
++	};
++
++	musb_pins: pinmux_musb_pins {
++		pinctrl-single,pins = <
++			0x172 (PIN_INPUT | MUX_MODE0)	/* hsusb0_clk.hsusb0_clk */
++			0x17a (PIN_INPUT | MUX_MODE0)	/* hsusb0_data0.hsusb0_data0 */
++			0x17c (PIN_INPUT | MUX_MODE0)	/* hsusb0_data1.hsusb0_data1 */
++			0x17e (PIN_INPUT | MUX_MODE0)	/* hsusb0_data2.hsusb0_data2 */
++			0x180 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data3.hsusb0_data3 */
++			0x182 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data4.hsusb0_data4 */
++			0x184 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data5.hsusb0_data5 */
++			0x186 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data6.hsusb0_data6 */
++			0x188 (PIN_INPUT | MUX_MODE0)	/* hsusb0_data7.hsusb0_data7 */
++			0x176 (PIN_INPUT | MUX_MODE0)	/* hsusb0_dir.hsusb0_dir */
++			0x178 (PIN_INPUT | MUX_MODE0)	/* hsusb0_nxt.hsusb0_nxt */
++			0x174 (PIN_OUTPUT | MUX_MODE0)	/* hsusb0_stp.hsusb0_stp */
++		>;
++	};
++};
++
++&usb_otg_hs {
++	pinctrl-names = "default";
++	pinctrl-0 = <&musb_pins>;
++	interface-type = <0>;
++	usb-phy = <&usb2_phy>;
++	mode = <3>;
++	power = <50>;
++};
++
++&vaux1 {
++	/* Needed for ads7846 */
++        regulator-name = "vcc";
++};
++
++&vpll2 {
++       /* Needed for DSS */
++       regulator-name = "vdds_dsi";
++};
 -- 
 1.8.1.1
