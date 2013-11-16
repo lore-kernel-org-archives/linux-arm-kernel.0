@@ -1,41 +1,87 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 16 Nov 2013 18:30:31 -0500
-Subject: [PATCH] arm/arm64: KVM: Fix hyp mappings of vmalloc regions
-In-Reply-To: <20131116171524.GK20516@lvm>
-References: <1384557880-14107-1-git-send-email-christoffer.dall@linaro.org>
- <87846f3195cadcae32824120f78e3c9d@www.loen.fr> <20131116171524.GK20516@lvm>
-Message-ID: <52880017.8060006@ti.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Sun, 17 Nov 2013 00:37:08 +0100
+Subject: [PATCH v2] ARM: sunxi: dt: add EMAC aliases
+In-Reply-To: <1384625849-29849-1-git-send-email-emilio@elopez.com.ar>
+References: <1384546600-14384-1-git-send-email-emilio@elopez.com.ar>
+ <1384625849-29849-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <CAOMqctTb0-B4y0DD6CWEi8Z7Bpd+pP-dWvvn5GiAkCeRD2v43g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 November 2013 12:15 PM, Christoffer Dall wrote:
-> On Sat, Nov 16, 2013 at 10:01:01AM +0000, Marc Zyngier wrote:
->> On 2013-11-15 23:24, Christoffer Dall wrote:
->>> Using virt_to_phys on percpu mappings is horribly wrong as it may be
->>> backed by vmalloc.  Introduce kvm_kaddr_to_phys which translates both
->>> types of valid kernel addresses to the corresponding physical
->>> address.
->>>
->>> At the same time resolves a typing issue where we were storing the
->>> physical address as a 32 bit unsigned long (on arm), truncating the
->>> physical address for addresses above the 4GB limit.  This caused
->>> breakage on Keystone.
->>>
->>> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>
->>> This patch is loosely based on Marc's previous patch from today but
->>> instead of introducing another Hyp mapping function, it fixes the
->>> existing one to deal with both kinds of kernel addresses.
->>
->> Looks good to me! This should probably be merged quickly (after
->> testing by Santosh), and possibly Cc-ed to stable.
->>
-> Agreed, Santhos, can you give this a quick spin?
-> 
-Works as expected.
+Unfortunately,
 
-Regards,
-Santosh
+a20 has two Ethernets so you can't alias both to ethernet0.
+
+This has to be done on a per-board basis.
+
+Thanks
+
+Michal
+
+On 16 November 2013 19:17, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> U-Boot uses the ethernet0 alias to locate the right node to fill in
+> the MAC address of the first ethernet interface. This patch adds the
+> alias on all the sunxi SoCs with EMAC. In this way, people using
+> ethernet in U-Boot (eg, for tftp) can keep a consistent address on both
+> U-Boot and Linux with no additional effort.
+>
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+>
+> v1->v2:
+>    add to dtsi instead of dts as suggested by Maxime; it's easier to
+>    maintain on the long run.
+>
+>  arch/arm/boot/dts/sun4i-a10.dtsi  | 4 ++++
+>  arch/arm/boot/dts/sun5i-a10s.dtsi | 4 ++++
+>  arch/arm/boot/dts/sun7i-a20.dtsi  | 4 ++++
+>  3 files changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 09e7b43..23374da 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -15,6 +15,10 @@
+>  / {
+>         interrupt-parent = <&intc>;
+>
+> +       aliases {
+> +               ethernet0 = &emac;
+> +       };
+> +
+>         cpus {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 9326b64..e95ab43 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -16,6 +16,10 @@
+>  / {
+>         interrupt-parent = <&intc>;
+>
+> +       aliases {
+> +               ethernet0 = &emac;
+> +       };
+> +
+>         cpus {
+>                 cpu at 0 {
+>                         compatible = "arm,cortex-a8";
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index c645a0f..6bea2b84 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -16,6 +16,10 @@
+>  / {
+>         interrupt-parent = <&gic>;
+>
+> +       aliases {
+> +               ethernet0 = &emac;
+> +       };
+> +
+>         cpus {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> --
+> 1.8.4.2
+>
