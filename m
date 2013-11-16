@@ -1,45 +1,87 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 14:23:34 +0100
-Subject: [PATCH 01/11] ARM: dts: omap3-igep: Fix bus-width for mmc1.
+Date: Sat, 16 Nov 2013 14:23:36 +0100
+Subject: [PATCH 03/11] ARM: dts: omap3-igep: Update to use the TI AM/DM37x
+ processor.
 In-Reply-To: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1384608224-9452-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1384608224-9452-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Enric Balletbo i Serra <eballetbo@gmail.com>
 
-Both, IGEPv2 and IGEP COM MODULE have a bus-width of 4 not 8, so fix this and
-do not mux data pins from mmc1_data4 to mmc1_data7.
+Most of the boards are using the TI AM/DM37x processor, there is only a small
+quantity of IGEP Processor Boards based on TI OMAP3530. So it's better use the
+omap36xx.dtsi include instead of omap34xx.dtsi include.
+
+To avoid confusion we have added to the model the (TI AM/DM37x) comment.
 
 Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
 ---
- arch/arm/boot/dts/omap3-igep.dtsi | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/boot/dts/omap3-igep.dtsi    | 4 ++--
+ arch/arm/boot/dts/omap3-igep0020.dts | 4 ++--
+ arch/arm/boot/dts/omap3-igep0030.dts | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index ba1e58b..d4fecce 100644
+index b3517b2..e4c8769 100644
 --- a/arch/arm/boot/dts/omap3-igep.dtsi
 +++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -65,10 +65,6 @@
- 			0x11a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat1.sdmmc1_dat1 */
- 			0x11c (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat2.sdmmc1_dat2 */
- 			0x11e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat3.sdmmc1_dat3 */
--			0x120 (PIN_INPUT | MUX_MODE0)		/* sdmmc1_dat4.sdmmc1_dat4 */
--			0x122 (PIN_INPUT | MUX_MODE0)		/* sdmmc1_dat5.sdmmc1_dat5 */
--			0x124 (PIN_INPUT | MUX_MODE0)		/* sdmmc1_dat6.sdmmc1_dat6 */
--			0x126 (PIN_INPUT | MUX_MODE0)		/* sdmmc1_dat7.sdmmc1_dat7 */
- 		>;
- 	};
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for IGEP Technology devices
++ * Common device tree for IGEP boards based on AM/DM37x
+  *
+  * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
+  * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+@@ -10,7 +10,7 @@
+  */
+ /dts-v1/;
  
-@@ -114,7 +110,7 @@
-       pinctrl-0 = <&mmc1_pins>;
-       vmmc-supply = <&vmmc1>;
-       vmmc_aux-supply = <&vsim>;
--      bus-width = <8>;
-+      bus-width = <4>;
- };
+-#include "omap34xx.dtsi"
++#include "omap36xx.dtsi"
  
- &mmc2 {
+ / {
+ 	memory {
+diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+index d5cc792..33ce123 100644
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for IGEPv2 board
++ * Device Tree Source for IGEPv2 Rev. (TI OMAP AM/DM37x)
+  *
+  * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
+  * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+@@ -13,7 +13,7 @@
+ #include "omap-gpmc-smsc911x.dtsi"
+ 
+ / {
+-	model = "IGEPv2";
++	model = "IGEPv2 (TI OMAP AM/DM37x)";
+ 	compatible = "isee,omap3-igep0020", "ti,omap3";
+ 
+ 	leds {
+diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
+index 525e6d9..02a23f8 100644
+--- a/arch/arm/boot/dts/omap3-igep0030.dts
++++ b/arch/arm/boot/dts/omap3-igep0030.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for IGEP COM Module
++ * Device Tree Source for IGEP COM MODULE (TI OMAP AM/DM37x)
+  *
+  * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
+  * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+@@ -12,7 +12,7 @@
+ #include "omap3-igep.dtsi"
+ 
+ / {
+-	model = "IGEP COM Module";
++	model = "IGEP COM MODULE (TI OMAP AM/DM37x)";
+ 	compatible = "isee,omap3-igep0030", "ti,omap3";
+ 
+ 	leds {
 -- 
 1.8.4.2
