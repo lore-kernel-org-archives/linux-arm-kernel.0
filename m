@@ -1,51 +1,74 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 14:23:33 +0100
-Subject: [PATCH 00/11]: add remaining support for IGEP boards
-Message-ID: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Sat, 16 Nov 2013 14:23:37 +0100
+Subject: [PATCH 04/11] ARM: dts: omap3-igep0020: Add pinmux setup for i2c
+ devices
+In-Reply-To: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1384608224-9452-5-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make mach-omap2 Device Tree only the board file for
-IGEP boards was removed even when support for wifi and display
-was still not supported by its DTS.
+Add pin muxing support for IGEP boards i2c controllers.
 
-This patch-set adds support for these remaining peripherals and
-also adds support for USB, HDMI and user LED for the am33xx SoC
-based IGEP Aquila board.
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/boot/dts/omap3-igep.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-The patch-set is composed of the following patches:
-
-Enric Balletbo i Serra (7):
-      ARM: dts: omap3-igep: Fix bus-width for mmc1.
-      ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
-      ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
-      ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
-      ARM: dts: AM33XX BASE0033: add pinmux and user led support.
-      ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
-      ARM: dts: AM33XX IGEP0033: add USB support.
-
-Javier Martinez Canillas (4):
-      ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
-      ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
-      ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
-      OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is not found
-
-Tony,
-
-Most of these patches are just DTS changes so they have to be picked
-by Benoit although there are patches that should go to different trees.
-
-[PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
-
-have to go through your tree and
-
-[PATCH 11/11] OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is not found
-
-should be picked by Tomi Valkeinen.
-
-Since we have removed the board file for IGEP boards I think these
-can be considered as regression fixes for 3.13 although I don't mind
-if you prefer to wait for 3.14.
-
-Thanks a lot and best regards,
-Javier
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index e4c8769..165aaf7 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -113,10 +113,33 @@
+ 		>;
+ 	};
+ 
++	i2c1_pins: pinmux_i2c1_pins {
++		pinctrl-single,pins = <
++			0x18a (PIN_INPUT | MUX_MODE0)   /* i2c1_scl.i2c1_scl */
++			0x18c (PIN_INPUT | MUX_MODE0)   /* i2c1_sda.i2c1_sda */
++		>;
++	};
++
++	i2c2_pins: pinmux_i2c2_pins {
++		pinctrl-single,pins = <
++			0x18e (PIN_INPUT | MUX_MODE0)   /* i2c2_scl.i2c2_scl */
++			0x190 (PIN_INPUT | MUX_MODE0)   /* i2c2_sda.i2c2_sda */
++		>;
++	};
++
++	i2c3_pins: pinmux_i2c3_pins {
++		pinctrl-single,pins = <
++			0x192 (PIN_INPUT | MUX_MODE0)   /* i2c3_scl.i2c3_scl */
++			0x194 (PIN_INPUT | MUX_MODE0)   /* i2c3_sda.i2c3_sda */
++		>;
++	};
++
+ 	leds_pins: pinmux_leds_pins { };
+ };
+ 
+ &i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
+ 	clock-frequency = <2600000>;
+ 
+ 	twl: twl at 48 {
+@@ -136,9 +159,16 @@
+ #include "twl4030_omap3.dtsi"
+ 
+ &i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins>;
+ 	clock-frequency = <400000>;
+ };
+ 
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++};
++
+ &mcbsp2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mcbsp2_pins>;
+-- 
+1.8.4.2
