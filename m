@@ -1,64 +1,41 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 16 Nov 2013 23:52:08 +0100
-Subject: Warning masked by BUG() when CONFIG_BUG is enabled
-Message-ID: <87a9h4559j.fsf@natisbad.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 16 Nov 2013 18:30:31 -0500
+Subject: [PATCH] arm/arm64: KVM: Fix hyp mappings of vmalloc regions
+In-Reply-To: <20131116171524.GK20516@lvm>
+References: <1384557880-14107-1-git-send-email-christoffer.dall@linaro.org>
+ <87846f3195cadcae32824120f78e3c9d@www.loen.fr> <20131116171524.GK20516@lvm>
+Message-ID: <52880017.8060006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Saturday 16 November 2013 12:15 PM, Christoffer Dall wrote:
+> On Sat, Nov 16, 2013 at 10:01:01AM +0000, Marc Zyngier wrote:
+>> On 2013-11-15 23:24, Christoffer Dall wrote:
+>>> Using virt_to_phys on percpu mappings is horribly wrong as it may be
+>>> backed by vmalloc.  Introduce kvm_kaddr_to_phys which translates both
+>>> types of valid kernel addresses to the corresponding physical
+>>> address.
+>>>
+>>> At the same time resolves a typing issue where we were storing the
+>>> physical address as a 32 bit unsigned long (on arm), truncating the
+>>> physical address for addresses above the 4GB limit.  This caused
+>>> breakage on Keystone.
+>>>
+>>> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>>
+>>> This patch is loosely based on Marc's previous patch from today but
+>>> instead of introducing another Hyp mapping function, it fixes the
+>>> existing one to deal with both kinds of kernel addresses.
+>>
+>> Looks good to me! This should probably be merged quickly (after
+>> testing by Santosh), and possibly Cc-ed to stable.
+>>
+> Agreed, Santhos, can you give this a quick spin?
+> 
+Works as expected.
 
-While compiling a kernel, I got the following warnings which are due to
-missing returns in the following functions:
-
-  CC      fs/xattr.o
-  CC      crypto/cryptd.o
-  CC      lib/irq_regs.o
-  CC      lib/is_single_threaded.o
-  CC      lib/klist.o
-drivers/gpio/gpio-mvebu.c: In function ?mvebu_gpioreg_edge_mask?:
-drivers/gpio/gpio-mvebu.c:148:1: warning: control reaches end of non-void function [-Wreturn-type]
-drivers/gpio/gpio-mvebu.c: In function ?mvebu_gpioreg_edge_cause?:
-drivers/gpio/gpio-mvebu.c:130:1: warning: control reaches end of non-void function [-Wreturn-type]
-drivers/gpio/gpio-mvebu.c: In function ?mvebu_gpioreg_level_mask?:
-drivers/gpio/gpio-mvebu.c:166:1: warning: control reaches end of non-void function [-Wreturn-type]
-  CC      lib/kobject.o
-  CC      lib/kobject_uevent.o
-  CC      lib/md5.o
-  CC      lib/percpu-refcount.o
-
-I was kind of curious not to have noticed it during kernel builds for
-armada 370/xp targets. The reason is the following: on my Armada 370/XP
-builds, I had CONFIG_BUG=y which makes BUG() call panic() (which never
-returns). Otherwise, BUG() is a nop and the 'default' branch below is no
-more a catch-all barrier in previous functions. For the discussion,
-those have the same structure:
-
-static inline void __iomem *mvebu_gpioreg_edge_cause(...)
-{
-	int cpu;
-
-	switch (mvchip->soc_variant) {
-	case MVEBU_GPIO_SOC_VARIANT_ORION:
-	case MVEBU_GPIO_SOC_VARIANT_MV78200:
-		return sth;
-	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
-		return sth;
-	default:
-		BUG();
-	}
-}
-
-*Out of curiosity*, are there no generic solutions to handle such a case?
-In the end, if BUG() has been put here on purpose (i.e. this is the only
-solution, which it kinds of looks like here) wouldn't it be more logical
-to call panic() here directly?
-
-As a side note, I noticed quite some instances of that pattern (switch
-statement w/ a 'default' calling BUG()) while more carefully looking at
-compilation output. I may get slapped for this, but just in case this
-is indeed something which deserves to be fixed and can be fixed
-automagically via some semantic patch, I have CC'ed Coccinelle people.
-
-Cheers,
-
-a+
+Regards,
+Santosh
