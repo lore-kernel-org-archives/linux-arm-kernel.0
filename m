@@ -1,74 +1,100 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 14:23:37 +0100
-Subject: [PATCH 04/11] ARM: dts: omap3-igep0020: Add pinmux setup for i2c
- devices
+Date: Sat, 16 Nov 2013 14:23:35 +0100
+Subject: [PATCH 02/11] ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi
+ connected to SDIO.
 In-Reply-To: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1384608224-9452-5-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1384608224-9452-3-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pin muxing support for IGEP boards i2c controllers.
+From: Enric Balletbo i Serra <eballetbo@gmail.com>
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+The LBEE1USJYC is a WiFi/BT combo module used on OMAP3-based IGEP boards. In
+both cases, IGEPv2 Rev. C and IGEP COM MODULE, the module is connected using
+the same MMC interface and uses the same GPIOs.
+
+Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
 ---
- arch/arm/boot/dts/omap3-igep.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/omap3-igep.dtsi | 45 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 44 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index e4c8769..165aaf7 100644
+index d4fecce..b3517b2 100644
 --- a/arch/arm/boot/dts/omap3-igep.dtsi
 +++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -113,10 +113,33 @@
+@@ -24,6 +24,25 @@
+ 		ti,mcbsp = <&mcbsp2>;
+ 		ti,codec = <&twl_audio>;
+ 	};
++
++	vdd33: regulator-vdd33 {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd33";
++		regulator-always-on;
++	};
++
++	lbee1usjyc_vmmc: lbee1usjyc_vmmc {
++		pinctrl-names = "default";
++		pinctrl-0 = <&lbee1usjyc_pins>;
++		compatible = "regulator-fixed";
++		regulator-name = "regulator-lbee1usjyc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio5 10 GPIO_ACTIVE_HIGH>;	/* gpio_138 WIFI_PDN */
++		startup-delay-us = <10000>;
++		enable-active-high;
++		vin-supply = <&vdd33>;
++	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -48,6 +67,15 @@
  		>;
  	};
  
-+	i2c1_pins: pinmux_i2c1_pins {
++	/* WiFi/BT combo */
++	lbee1usjyc_pins: pinmux_lbee1usjyc_pins {
 +		pinctrl-single,pins = <
-+			0x18a (PIN_INPUT | MUX_MODE0)   /* i2c1_scl.i2c1_scl */
-+			0x18c (PIN_INPUT | MUX_MODE0)   /* i2c1_sda.i2c1_sda */
++			0x136 (PIN_OUTPUT | MUX_MODE4)	/* sdmmc2_dat5.gpio_137 */
++			0x138 (PIN_OUTPUT | MUX_MODE4)	/* sdmmc2_dat6.gpio_138 */
++			0x13a (PIN_OUTPUT | MUX_MODE4)	/* sdmmc2_dat7.gpio_139 */
 +		>;
 +	};
 +
-+	i2c2_pins: pinmux_i2c2_pins {
+ 	mcbsp2_pins: pinmux_mcbsp2_pins {
+ 		pinctrl-single,pins = <
+ 			0x10c (PIN_INPUT | MUX_MODE0)		/* mcbsp2_fsx.mcbsp2_fsx */
+@@ -68,6 +96,17 @@
+ 		>;
+ 	};
+ 
++	mmc2_pins: pinmux_mmc2_pins {
 +		pinctrl-single,pins = <
-+			0x18e (PIN_INPUT | MUX_MODE0)   /* i2c2_scl.i2c2_scl */
-+			0x190 (PIN_INPUT | MUX_MODE0)   /* i2c2_sda.i2c2_sda */
++			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
++			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
++			0x12c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc2_dat0.sdmmc2_dat0 */
++			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
++			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
++			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
 +		>;
 +	};
 +
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			0x192 (PIN_INPUT | MUX_MODE0)   /* i2c3_scl.i2c3_scl */
-+			0x194 (PIN_INPUT | MUX_MODE0)   /* i2c3_sda.i2c3_sda */
-+		>;
-+	};
-+
- 	leds_pins: pinmux_leds_pins { };
+ 	smsc911x_pins: pinmux_smsc911x_pins {
+ 		pinctrl-single,pins = <
+ 			0x1a2 (PIN_INPUT | MUX_MODE4)		/* mcspi1_cs2.gpio_176 */
+@@ -114,7 +153,11 @@
  };
  
- &i2c1 {
+ &mmc2 {
+-	status = "disabled";
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
- 	clock-frequency = <2600000>;
- 
- 	twl: twl at 48 {
-@@ -136,9 +159,16 @@
- #include "twl4030_omap3.dtsi"
- 
- &i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
- 	clock-frequency = <400000>;
++	pinctrl-0 = <&mmc2_pins>;
++	vmmc-supply = <&lbee1usjyc_vmmc>;
++	bus-width = <4>;
++	non-removable;
  };
  
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
-+};
-+
- &mcbsp2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mcbsp2_pins>;
+ &mmc3 {
 -- 
 1.8.4.2
