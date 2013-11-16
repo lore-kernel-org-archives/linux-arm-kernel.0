@@ -1,118 +1,106 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 16 Nov 2013 15:11:23 +0100
-Subject: [PATCH v2 2/3] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <5286CB3A.9080305@cogentembedded.com>
-References: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
- <1583497.MMBMuSKFMR@avalon> <5286CB3A.9080305@cogentembedded.com>
-Message-ID: <3215184.4Bsszdk70M@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 16 Nov 2013 06:12:26 -0800
+Subject: N900 board code in 3.14
+In-Reply-To: <20131116120508.GA22335@earth.universe>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <20131116120508.GA22335@earth.universe>
+Message-ID: <20131116141226.GD10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Saturday 16 November 2013 04:32:42 Sergei Shtylyov wrote:
-> On 11/16/2013 02:03 AM, Laurent Pinchart wrote:
-> >>>> Register Ether platform device and pin data on  the  Koelsch board.
-> >>>> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager
-> >>>> board.
-> >>>> 
-> >>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>> 
-> >>>> ---
-> >>>> Changes in version 2:
-> >>>> - added *if* (IS_ENABLED(CONFIG_PHYLIB)) around
-> >>>> phy_register_fixup_for_id() call;
-> >>>> 
-> >>>> - changed Ether device name to "r8a779x-ether".
-> >>>> 
-> >>>>    arch/arm/mach-shmobile/board-koelsch.c |   63 +++++++++++++++++++++-
-> >>>>    1 file changed, 62 insertions(+), 1 deletion(-)
-> >>>> 
-> >>>> Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
-> >>>> ===================================================================
-> >>>> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
-> >>>> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
-> >> 
-> >> [...]
-> >> 
-> >>>> @@ -84,6 +119,32 @@ static void __init koelsch_add_standard_
-> >>>>    				      sizeof(koelsch_keys_pdata));
-> >>>>    }
-> >>>> 
-> >>>> +/*
-> >>>> + * Ether LEDs on the Koelsch board are named LINK and ACTIVE which
-> >>>> corresponds
-> >>>> + * to non-default 01 setting of the Micrel KSZ8041 PHY control
-> >>>> register 1 bits
-> >>>> + * 14-15. We have to set them back to 01 from the default 00 value
-> >>>> each time
-> >>>> + * the PHY is reset. It's also important because the PHY's LED0 signal
-> >>>> is
-> >>>> + * connected to SoC's ETH_LINK signal and in the PHY's default mode it
-> >>>> will
-> >>>> + * bounce on and off after each packet, which we apparently want to
-> >>>> avoid.
-> >>>> + */
-> >>>> +static int koelsch_ksz8041_fixup(struct phy_device *phydev)
-> >>>> +{
-> >>>> +	u16 phyctrl1 = phy_read(phydev, 0x1e);
-> >>>> +
-> >>>> +	phyctrl1 &= ~0xc000;
-> >>>> +	phyctrl1 |= 0x4000;
-> >>>> +	return phy_write(phydev, 0x1e, phyctrl1);
-> >>>> +}
-> >>>> +
-> >>>> +static void __init koelsch_init(void)
-> >>>> +{
-> >>>> +	koelsch_add_standard_devices();
-> >>>> +
-> >>>> +	if (IS_ENABLED(CONFIG_PHYLIB))
-> >>>> +		phy_register_fixup_for_id("r8a779x-ether-ff:01",
-> >>>> +					  koelsch_ksz8041_fixup);
-> >>> 
-> >>> This is fine with board code, but will break when we'll switch to DT.
-> >>> Would it be difficult to replace board code by using the existing micrel
-> >>> phy driver (drivers/net/phy/micrel.c) which should support the ksz8041
-> >>> already and
-> >> 
-> >> The first issue here is KSZ8041 on the BOCK-W/Lager/Koelsch boards uses
-> >> undocumented PHY ID for some reason, so the current driver doesn't really
-> >> support it. :-)
-> > 
-> > Right. Let's teach the KSZ8041 driver about that then :-)
+* Sebastian Reichel <sre@debian.org> [131116 04:06]:
+> Hi Tony,
 > 
-> Well, this seems at least easy. :-)
+> On Fri, Nov 15, 2013 at 04:36:02PM -0800, Tony Lindgren wrote:
+> > Here are few patches to deal with the mix of legacy platform data
+> > and device tree that we still need to do at least until DSS has
+> > device tree bindings. These patches should allow the remaining
+> > omap3 boards to be made device tree only so we can remove the
+> > board-*.c files.
 > 
-> >>> extending it with support for register 0x1e which doesn't seem to be
-> >>> handled ?
-> >> 
-> >> You probably didn't quite understand the purpose of the platform PHY
-> >> fixup. It's designed to do the board-specific changes, not the driver-
-> >> specific changes. In this case, the setting of the bits 14-15 of the PHY
-> >> control register 1 (w/address 0x1E) purely depends on the board
-> >> schematics and simply can't be selected by the PHY driver.
-> >> 
-> >> It could have been set by the PHY driver iff we would find a way to pass
-> >> the platform data to the PHY device (on the automatically probed MDIO
-> >> bus).
-> > 
-> > That seems to me like the real issue we need to solve. The PHY clearly
-> > needs platform (or DT) data, so we need a way to pass it to the driver.
-> > Once we get that it shouldn't be difficult to add LED configuration
-> > information to the platform data.
+> Do you plan to remove the Nokia N900 board code in 3.14, too?
+
+Probably not completely, we should still keep the pieces that are
+needed to initialize things in legacy mode. Then those can be dealt
+with using the auxdata hooks in pdata-quirks.c.
+
+But we do want to boot everything in in DT mode for mach-omap2 for
+v3.14 as that leaves out huge amounts of old duplicate code.
+ 
+> I see two big issues with that:
+>  a) Using DT boot the display is currently not working.
+
+OK
+
+>  b) I could not get the 32GB eMMC working. For me the chip is not found
+>     and I don't know how to debug it.
+
+OK the eMMC issue might be related to the control module PBIAS
+register support missing. If so, that should be fixable with the
+auxdata until we have a minimal control module device driver to
+deal with the PBIAS and expose those features as regulators to
+the omap-hsmmc driver.
+ 
+> There are two reasons for broken display:
 > 
-> Well, with the PHY driver being DT-enabled somehow, it wouldn't be difficult
-> (though how to make phylib's automatic probing coexist with DT probing is
-> not clear to me ATM). More difficult is to link the platform data to an
-> automatically probed device; there were attempts on linux-usb to link the
-> platform data to an USB device but that went nowhere IIRC... anyway, with
-> the PHY platform fixups already in place we need to care only about the DT
-> case really...
+> 1. omap_mux_init_gpio(RX51_LCD_RESET_GPIO, OMAP_PIN_OUTPUT) fails.
+>    This can be fixed by simply not calling it in DT mode. DT data
+>    contains pinmux information for this from 3.13 onwards [0].
 
-I agree, let's focus on the DT case, board code can use platform fixups for 
-now.
+OK yeah makes sense. The pins should be set up using pinctrl-single
+for DT.
 
--- 
+> 2. The spi panel driver is not probed.
+> 
+> I have a local hack to probe the panel driver via DT. I changed the
+> display node to look as follows:
+> 
+> &mcspi1 {
+>     /* ... tsc2005 ... */
+> 
+>     mipid at 2 {
+>         compatible = "sony,acx565akm";
+>         spi-max-frequency = <6000000>;
+>         reg = <2>;
+>         vdds_sdi-supply = <&vaux1>;
+>         label = "lcd";
+>         reset-gpio = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
+>         ti,sdi-datapairs = <2>;
+>         ti,dss-source = "sdi.0";
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&display_pins>;
+>     };
+> };
+> 
+> Then I changed the acx565akm panel driver to get data from DT
+> and the DSS to get SDI regulator from the panel. This is
+> obviously not the way to got, so I wonder how to proceed.
+> omapdss DT seems not to be ready for the next kernel releases.
+> 
+> My suggestion would be:
+>  1. Find a better workaround for omapdss to acquire the SDI
+>     regulator. My current hack is obviously not acceptable.
+>  2. Load the panel driver via DT as seen above and reference
+>     the omapdss interface with something like the above
+>     "ti,dss-source".
+
+To me it seems that we should be able to add minimal panel entries to DT
+if we stick to existing standard bindings. Then the timings etc can be
+set up based on the compatible flag. So I would leave out the properties
+for ti,sdi-datapairs and ti,dss-source for now, and just set those in
+the driver based on the sony,acx565akm compatible flag. Or maybe it should
+be sony,acx565akm-n900 if there's some board specific configuration info.
+ 
+> This is obviously not a stable DT interface, but that's also the case if
+> everything is done via platform quirks: An old DT file without any display
+> stuff in it would not work with a newer kernel without the quirks.
+
+Right, naturally we cannot support missing properties in the old DT files.
+But the standard properties are stable, so those should be OK to use.
+But let's see what Tomi says, he may have some good ideas :)
+
 Regards,
 
-Laurent Pinchart
+Tony
+ 
+> [0] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d1e6f51646f2bed16826fd8e4fc1b5f4188d086e
