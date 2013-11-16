@@ -1,131 +1,106 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 16 Nov 2013 16:47:50 +0400
-Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
-Message-ID: <20131116124750.GA26318@anuminas.rup.mentorg.com>
+From: carlo.caione@gmail.com (Carlo Caione)
+Date: Sat, 16 Nov 2013 13:58:35 +0100
+Subject: [PATCH v3 1/2] ARM: sun4i/sun7i: RTC driver
+In-Reply-To: <20131116085140.GJ3538@lukather>
+References: <1383172738-8206-1-git-send-email-carlo.caione@gmail.com>
+ <20131106141357.GQ26440@lukather>
+ <CAOQ7t2a=KdNb-4_E_PRP53yYPiNmKzRN69Urg8EZ=4JE-6-Mig@mail.gmail.com>
+ <20131116085140.GJ3538@lukather>
+Message-ID: <CAOQ7t2Zsb0Kstd-tvnSLdyNxAvNUdYL4r5twVBvtnYFL1DRCMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When converting from tosa-keyboard driver to matrix keyboard, tosa keys
-received extra 1 column shift. Replace that with correct values to make
-keyboard work again.
+On Sat, Nov 16, 2013 at 9:51 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Carlo,
+>
+> On Fri, Nov 15, 2013 at 11:50:56PM +0100, Carlo Caione wrote:
+>> >> +static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
+>> >> +{
+>> >> +     struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
+>> >> +     u32 date = 0;
+>> >> +     u32 time = 0;
+>> >> +     int year;
+>> >> +     int t;
+>> >> +
+>> >> +     year = rtc_tm->tm_year + 1900;
+>> >
+>> > So, that means that the A10 RTC starts a year 1900, and the A20 at
+>> > year 2010? Why not just put those in your year_offset fieldd directly?
+>>
+>> 1900 is the offset of the parameter tm_year with respect to the current year.
+>> year_offset is used to make tm_year fit inside the limited range of
+>> the year field of the SUNXI_RTC_YMD register.
+>
+> Ok, so 1900 is the RTC's epoch, and tm_year is relative to that
+> epoch. What I still don't get is why you're not defining it as such
+> and use it directly the field your year_offset as such.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-pxa/tosa.c | 102 +++++++++++++++++++++++------------------------
- 1 file changed, 51 insertions(+), 51 deletions(-)
+Because for A10 the year field is only 6 bit wide and it can hold only
+64 years so I cannot use year_offset directly.
+We have the RTC framework where everything is based on 1900 and the
+date register that is only 6 bit wide. Without year_offset I would
+cover only 64 years from 1900 to 1963.
+I need year_offset to shift the base year from 1900 to 2010 such that
+I can use those 6 bit to track years from 2010 to 2073.
 
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 0206b91..ef5557b 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -425,57 +425,57 @@ static struct platform_device tosa_power_device = {
-  * Tosa Keyboard
-  */
- static const uint32_t tosakbd_keymap[] = {
--	KEY(0, 2, KEY_W),
--	KEY(0, 6, KEY_K),
--	KEY(0, 7, KEY_BACKSPACE),
--	KEY(0, 8, KEY_P),
--	KEY(1, 1, KEY_Q),
--	KEY(1, 2, KEY_E),
--	KEY(1, 3, KEY_T),
--	KEY(1, 4, KEY_Y),
--	KEY(1, 6, KEY_O),
--	KEY(1, 7, KEY_I),
--	KEY(1, 8, KEY_COMMA),
--	KEY(2, 1, KEY_A),
--	KEY(2, 2, KEY_D),
--	KEY(2, 3, KEY_G),
--	KEY(2, 4, KEY_U),
--	KEY(2, 6, KEY_L),
--	KEY(2, 7, KEY_ENTER),
--	KEY(2, 8, KEY_DOT),
--	KEY(3, 1, KEY_Z),
--	KEY(3, 2, KEY_C),
--	KEY(3, 3, KEY_V),
--	KEY(3, 4, KEY_J),
--	KEY(3, 5, TOSA_KEY_ADDRESSBOOK),
--	KEY(3, 6, TOSA_KEY_CANCEL),
--	KEY(3, 7, TOSA_KEY_CENTER),
--	KEY(3, 8, TOSA_KEY_OK),
--	KEY(3, 9, KEY_LEFTSHIFT),
--	KEY(4, 1, KEY_S),
--	KEY(4, 2, KEY_R),
--	KEY(4, 3, KEY_B),
--	KEY(4, 4, KEY_N),
--	KEY(4, 5, TOSA_KEY_CALENDAR),
--	KEY(4, 6, TOSA_KEY_HOMEPAGE),
--	KEY(4, 7, KEY_LEFTCTRL),
--	KEY(4, 8, TOSA_KEY_LIGHT),
--	KEY(4, 10, KEY_RIGHTSHIFT),
--	KEY(5, 1, KEY_TAB),
--	KEY(5, 2, KEY_SLASH),
--	KEY(5, 3, KEY_H),
--	KEY(5, 4, KEY_M),
--	KEY(5, 5, TOSA_KEY_MENU),
--	KEY(5, 7, KEY_UP),
--	KEY(5, 11, TOSA_KEY_FN),
--	KEY(6, 1, KEY_X),
--	KEY(6, 2, KEY_F),
--	KEY(6, 3, KEY_SPACE),
--	KEY(6, 4, KEY_APOSTROPHE),
--	KEY(6, 5, TOSA_KEY_MAIL),
--	KEY(6, 6, KEY_LEFT),
--	KEY(6, 7, KEY_DOWN),
--	KEY(6, 8, KEY_RIGHT),
-+	KEY(0, 1, KEY_W),
-+	KEY(0, 5, KEY_K),
-+	KEY(0, 6, KEY_BACKSPACE),
-+	KEY(0, 7, KEY_P),
-+	KEY(1, 0, KEY_Q),
-+	KEY(1, 1, KEY_E),
-+	KEY(1, 2, KEY_T),
-+	KEY(1, 3, KEY_Y),
-+	KEY(1, 5, KEY_O),
-+	KEY(1, 6, KEY_I),
-+	KEY(1, 7, KEY_COMMA),
-+	KEY(2, 0, KEY_A),
-+	KEY(2, 1, KEY_D),
-+	KEY(2, 2, KEY_G),
-+	KEY(2, 3, KEY_U),
-+	KEY(2, 5, KEY_L),
-+	KEY(2, 6, KEY_ENTER),
-+	KEY(2, 7, KEY_DOT),
-+	KEY(3, 0, KEY_Z),
-+	KEY(3, 1, KEY_C),
-+	KEY(3, 2, KEY_V),
-+	KEY(3, 3, KEY_J),
-+	KEY(3, 4, TOSA_KEY_ADDRESSBOOK),
-+	KEY(3, 5, TOSA_KEY_CANCEL),
-+	KEY(3, 6, TOSA_KEY_CENTER),
-+	KEY(3, 7, TOSA_KEY_OK),
-+	KEY(3, 8, KEY_LEFTSHIFT),
-+	KEY(4, 0, KEY_S),
-+	KEY(4, 1, KEY_R),
-+	KEY(4, 2, KEY_B),
-+	KEY(4, 3, KEY_N),
-+	KEY(4, 4, TOSA_KEY_CALENDAR),
-+	KEY(4, 5, TOSA_KEY_HOMEPAGE),
-+	KEY(4, 6, KEY_LEFTCTRL),
-+	KEY(4, 7, TOSA_KEY_LIGHT),
-+	KEY(4, 9, KEY_RIGHTSHIFT),
-+	KEY(5, 0, KEY_TAB),
-+	KEY(5, 1, KEY_SLASH),
-+	KEY(5, 2, KEY_H),
-+	KEY(5, 3, KEY_M),
-+	KEY(5, 4, TOSA_KEY_MENU),
-+	KEY(5, 6, KEY_UP),
-+	KEY(5, 10, TOSA_KEY_FN),
-+	KEY(6, 0, KEY_X),
-+	KEY(6, 1, KEY_F),
-+	KEY(6, 2, KEY_SPACE),
-+	KEY(6, 3, KEY_APOSTROPHE),
-+	KEY(6, 4, TOSA_KEY_MAIL),
-+	KEY(6, 5, KEY_LEFT),
-+	KEY(6, 6, KEY_DOWN),
-+	KEY(6, 7, KEY_RIGHT),
- };
- 
- static struct matrix_keymap_data tosakbd_keymap_data = {
--- 
-1.8.4.rc3
+> Moreover, you have some max values that imply that the RTC can't count
+> over either 2100 or 2073, which is kind of weird, since, respectively,
+> it starts at 1900 and 2010, and the year field is documented to be 8
+> bits wide, I'd expect it to go up to 2155 and 2265.
+
+For A10 the date register is documented to be 6 bit. For A20 it is 8
+bit wide (here the "mask" field in the sunxi_rtc_data_year).
+In the v4 I'm going to expand to 255 the year range for A20 and modify
+the min year to make it starts also at 1900 (it as actually wrong
+having a the min field set to 1970).
+(BTW I just noticed that the indexes for sunxi_rtc_data_year are
+swapped, one more fix in v4).
+
+>> >> +
+>> >> +     /*
+>> >> +      * wait about 70us to make sure the the time is really written into
+>> >> +      * target
+>> >> +      */
+>> >> +     usleep_range(70, 100);
+>> >
+>> > Isn't the write operation supposed to be done already?
+>>
+>> Yes, it is supposed to be, but this waiting was already present in the
+>> original version of the driver by aw so I'll leave it in v4.
+>
+> I feel like we argue over this again and again.
+>
+> I'm sorry, but saying "allwinner did it that way so we should keep it"
+> is a bad argument. Otherwise we would be using fex, and every other
+> driver Allwinner reimplemented.
+>
+> That being said, either that sleep is needed, and then it should be
+> needed everytime you write to the RTC, which is not the case iirc, and
+> have a comment saying "I have no idea why, but this come from
+> Allwinner and this is actually required", or you don't need it, and
+> then you can just remove it.
+>
+> But having it some-times-but-not-some-other seems pretty weak to me.
+
+Maxime, as you know documentation for AW's SoC is really weak. I can
+only extrapolate information from the old drivers and the badly
+written comments to the code.
+In those drivers (in all the versions I have) this waiting is always
+present with the same comment I have left in the driver. What I
+imagined is that it is needed not always, but only when I write
+SUNXI_LOSC_CTRL_RTC_HMS_ACC or SUNXI_LOSC_CTRL_RTC_YMD_ACC (again,
+this is just a guess but in the comment there is an explicit reference
+to "time").
+I actually have no idea why and removing it in my tests doesn't affect
+the RTC. So I had two possibilities: 1) leave it in the code because
+somehow it seems important even though I don't know exactly why it is
+(only) there or 2) leave it out knowing that it doesn't affect my
+tests but it could in some particular case or configuration.
+That said, I'm going to do some more tests without the usleep to see
+if there is any problem otherwise I'll delete it in v4.
+
+Thank you,
+
+--
+Carlo Caione
