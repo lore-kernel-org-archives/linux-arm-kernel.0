@@ -1,107 +1,64 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Sat, 16 Nov 2013 23:33:29 +0100
-Subject: [PATCH 21/31] staging: nvec: use reset framework
-In-Reply-To: <1384548866-13141-22-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-22-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <6324985.OW3IJOJeSb@ax5200p>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 16 Nov 2013 23:52:08 +0100
+Subject: Warning masked by BUG() when CONFIG_BUG is enabled
+Message-ID: <87a9h4559j.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 November 2013 13:54:16 Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Tegra's clock driver now provides an implementation of the common
-> reset API (include/linux/reset.h). Use this instead of the old Tegra-
-> specific API; that will soon be removed.
-> 
-> Cc: treding at nvidia.com
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Julian Andres Klode <jak@jak-linux.org>
-> Cc: Marc Dietrich <marvin24@gmx.de>
-> Cc: ac100 at lists.launchpad.net
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: devel at driverdev.osuosl.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Hi,
 
-Acked-by: Marc Dietrich <marvin24@gmx.de>
+While compiling a kernel, I got the following warnings which are due to
+missing returns in the following functions:
 
-> ---
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
-> ---
->  drivers/staging/nvec/nvec.c | 11 ++++++++---
->  drivers/staging/nvec/nvec.h |  5 ++++-
->  2 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
-> index 3066ee2e753b..9de4cd13d9ab 100644
-> --- a/drivers/staging/nvec/nvec.c
-> +++ b/drivers/staging/nvec/nvec.c
-> @@ -36,7 +36,6 @@
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
->  #include <linux/workqueue.h>
-> -#include <linux/clk/tegra.h>
-> 
->  #include "nvec.h"
-> 
-> @@ -733,9 +732,9 @@ static void tegra_init_i2c_slave(struct nvec_chip *nvec)
-> 
->  	clk_prepare_enable(nvec->i2c_clk);
-> 
-> -	tegra_periph_reset_assert(nvec->i2c_clk);
-> +	reset_control_assert(nvec->rst);
->  	udelay(2);
-> -	tegra_periph_reset_deassert(nvec->i2c_clk);
-> +	reset_control_deassert(nvec->rst);
-> 
->  	val = I2C_CNFG_NEW_MASTER_SFM | I2C_CNFG_PACKET_MODE_EN |
->  	    (0x2 << I2C_CNFG_DEBOUNCE_CNT_SHIFT);
-> @@ -836,6 +835,12 @@ static int tegra_nvec_probe(struct platform_device
-> *pdev) return -ENODEV;
->  	}
-> 
-> +	nvec->rst = devm_reset_control_get(&pdev->dev, "i2c");
-> +	if (IS_ERR(nvec->rst)) {
-> +		dev_err(nvec->dev, "failed to get controller reset\n");
-> +		return PTR_ERR(nvec->rst);
-> +	}
-> +
->  	nvec->base = base;
->  	nvec->irq = res->start;
->  	nvec->i2c_clk = i2c_clk;
-> diff --git a/drivers/staging/nvec/nvec.h b/drivers/staging/nvec/nvec.h
-> index e880518935fb..e271375053fa 100644
-> --- a/drivers/staging/nvec/nvec.h
-> +++ b/drivers/staging/nvec/nvec.h
-> @@ -23,6 +23,7 @@
->  #include <linux/list.h>
->  #include <linux/mutex.h>
->  #include <linux/notifier.h>
-> +#include <linux/reset.h>
->  #include <linux/spinlock.h>
->  #include <linux/workqueue.h>
-> 
-> @@ -109,7 +110,8 @@ struct nvec_msg {
->   * @irq: The IRQ of the I2C device
->   * @i2c_addr: The address of the I2C slave
->   * @base: The base of the memory mapped region of the I2C device
-> - * @clk: The clock of the I2C device
-> + * @i2c_clk: The clock of the I2C device
-> + * @rst: The reset of the I2C device
->   * @notifier_list: Notifiers to be called on received messages, see
->   *                 nvec_register_notifier()
->   * @rx_data: Received messages that have to be processed
-> @@ -139,6 +141,7 @@ struct nvec_chip {
->  	int i2c_addr;
->  	void __iomem *base;
->  	struct clk *i2c_clk;
-> +	struct reset_control *rst;
->  	struct atomic_notifier_head notifier_list;
->  	struct list_head rx_data, tx_data;
->  	struct notifier_block nvec_status_notifier;
+  CC      fs/xattr.o
+  CC      crypto/cryptd.o
+  CC      lib/irq_regs.o
+  CC      lib/is_single_threaded.o
+  CC      lib/klist.o
+drivers/gpio/gpio-mvebu.c: In function ?mvebu_gpioreg_edge_mask?:
+drivers/gpio/gpio-mvebu.c:148:1: warning: control reaches end of non-void function [-Wreturn-type]
+drivers/gpio/gpio-mvebu.c: In function ?mvebu_gpioreg_edge_cause?:
+drivers/gpio/gpio-mvebu.c:130:1: warning: control reaches end of non-void function [-Wreturn-type]
+drivers/gpio/gpio-mvebu.c: In function ?mvebu_gpioreg_level_mask?:
+drivers/gpio/gpio-mvebu.c:166:1: warning: control reaches end of non-void function [-Wreturn-type]
+  CC      lib/kobject.o
+  CC      lib/kobject_uevent.o
+  CC      lib/md5.o
+  CC      lib/percpu-refcount.o
+
+I was kind of curious not to have noticed it during kernel builds for
+armada 370/xp targets. The reason is the following: on my Armada 370/XP
+builds, I had CONFIG_BUG=y which makes BUG() call panic() (which never
+returns). Otherwise, BUG() is a nop and the 'default' branch below is no
+more a catch-all barrier in previous functions. For the discussion,
+those have the same structure:
+
+static inline void __iomem *mvebu_gpioreg_edge_cause(...)
+{
+	int cpu;
+
+	switch (mvchip->soc_variant) {
+	case MVEBU_GPIO_SOC_VARIANT_ORION:
+	case MVEBU_GPIO_SOC_VARIANT_MV78200:
+		return sth;
+	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
+		return sth;
+	default:
+		BUG();
+	}
+}
+
+*Out of curiosity*, are there no generic solutions to handle such a case?
+In the end, if BUG() has been put here on purpose (i.e. this is the only
+solution, which it kinds of looks like here) wouldn't it be more logical
+to call panic() here directly?
+
+As a side note, I noticed quite some instances of that pattern (switch
+statement w/ a 'default' calling BUG()) while more carefully looking at
+compilation output. I may get slapped for this, but just in case this
+is indeed something which deserves to be fixed and can be fixed
+automagically via some semantic patch, I have CC'ed Coccinelle people.
+
+Cheers,
+
+a+
