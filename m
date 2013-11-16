@@ -1,68 +1,96 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 16 Nov 2013 06:18:53 -0800
-Subject: [PATCH 11/11] OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is
- not found
-In-Reply-To: <1384608224-9452-12-git-send-email-javier.martinez@collabora.co.uk>
-References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
- <1384608224-9452-12-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20131116141853.GF10317@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 16 Nov 2013 22:28:12 +0800
+Subject: [PATCH] ARM: imx: select PINCTRL at sub-architecure level
+Message-ID: <1384612093-28691-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
-> On Device Tree boot the VDDS_DSI regulator is not linked to
-> the DPI device so omapfb driver probing fails with:
-> 
-> [    3.186035] OMAPFB: omapfb_probe
-> [    3.190704] omapdss DPI error: can't get VDDS_DSI regulator
-> [    3.196594] omapfb omapfb: failed to connect default display
-> [    3.202667] omapfb omapfb: failed to init overlay connections
-> [    3.208892] OMAPFB: free_resources
-> [    3.212493] OMAPFB: free all fbmem
-> [    3.216735] omapfb omapfb: failed to setup omapfb
-> 
-> As a workaround try to use the VPLL2 regulator from twl4030 in
-> dpi_init_regulator() if getting the VDDS_DSI regulator fails.
+Instead of selecting PINCTRL on individual SoC, let's select it at IMX
+sub-architecure level.
 
-Probably makes sens to fix this in the dpi.c, but this can also be set
-in the .dts file. I just set up the following in the omap3-ldp.dts file:
+While at it, it also adds the missing PINCTRL_IMX50 selection for
+SOC_IMX50.
 
-&vaux1 {
-	/* Needed for ads7846 */
-	regulator-name = "vcc";
-};
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/Kconfig |    9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-&vpll2 {
-	/* Needed for DSS */
-	regulator-name = "vdds_dsi";
-};
-
-Regards,
-
-Tony
-
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index f35da31..d511e054 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -11,6 +11,7 @@ config ARCH_MXC
+ 	select GENERIC_IRQ_CHIP
+ 	select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+ 	select MULTI_IRQ_HANDLER
++	select PINCTRL
+ 	select SOC_BUS
+ 	select SPARSE_IRQ
+ 	select USE_OF
+@@ -99,7 +100,6 @@ config SOC_IMX25
+ 	select ARCH_MXC_IOMUX_V3
+ 	select CPU_ARM926T
+ 	select MXC_AVIC
+-	select PINCTRL
+ 	select PINCTRL_IMX25
  
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/video/omap2/dss/dpi.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/video/omap2/dss/dpi.c b/drivers/video/omap2/dss/dpi.c
-> index bd48cde..e328f0b 100644
-> --- a/drivers/video/omap2/dss/dpi.c
-> +++ b/drivers/video/omap2/dss/dpi.c
-> @@ -550,6 +550,11 @@ static int dpi_init_regulator(void)
->  		return 0;
->  
->  	vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "vdds_dsi");
-> +
-> +        /* DT HACK: try VPLL2 to make omapdss work for OMAP3 IGEPv2 */
-> +        if (IS_ERR(vdds_dsi))
-> +                vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "VPLL2");
-> +
->  	if (IS_ERR(vdds_dsi)) {
->  		DSSERR("can't get VDDS_DSI regulator\n");
->  		return PTR_ERR(vdds_dsi);
-> -- 
-> 1.8.4.2
-> 
+ config SOC_IMX27
+@@ -110,7 +110,6 @@ config SOC_IMX27
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MACH_MX27
+ 	select MXC_AVIC
+-	select PINCTRL
+ 	select PINCTRL_IMX27
+ 
+ config SOC_IMX31
+@@ -139,7 +138,6 @@ config SOC_IMX5
+ config	SOC_IMX51
+ 	bool
+ 	select HAVE_IMX_SRC
+-	select PINCTRL
+ 	select PINCTRL_IMX51
+ 	select SOC_IMX5
+ 
+@@ -763,6 +761,7 @@ comment "Device tree only"
+ config	SOC_IMX50
+ 	bool "i.MX50 support"
+ 	select HAVE_IMX_SRC
++	select PINCTRL_IMX50
+ 	select SOC_IMX5
+ 
+ 	help
+@@ -772,7 +771,6 @@ config	SOC_IMX53
+ 	bool "i.MX53 support"
+ 	select HAVE_IMX_SRC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select PINCTRL
+ 	select PINCTRL_IMX53
+ 	select SOC_IMX5
+ 
+@@ -798,7 +796,6 @@ config SOC_IMX6Q
+ 	select MFD_SYSCON
+ 	select MIGHT_HAVE_PCI
+ 	select PCI_DOMAINS if PCI
+-	select PINCTRL
+ 	select PINCTRL_IMX6Q
+ 	select PL310_ERRATA_588369 if CACHE_PL310
+ 	select PL310_ERRATA_727915 if CACHE_PL310
+@@ -819,7 +816,6 @@ config SOC_IMX6SL
+ 	select HAVE_IMX_MMDC
+ 	select HAVE_IMX_SRC
+ 	select MFD_SYSCON
+-	select PINCTRL
+ 	select PINCTRL_IMX6SL
+ 	select PL310_ERRATA_588369 if CACHE_PL310
+ 	select PL310_ERRATA_727915 if CACHE_PL310
+@@ -833,7 +829,6 @@ config SOC_VF610
+ 	select CPU_V7
+ 	select ARM_GIC
+ 	select CLKSRC_OF
+-	select PINCTRL
+ 	select PINCTRL_VF610
+ 	select VF_PIT_TIMER
+ 	select PL310_ERRATA_588369 if CACHE_PL310
+-- 
+1.7.9.5
