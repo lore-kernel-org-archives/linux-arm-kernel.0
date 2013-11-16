@@ -1,45 +1,37 @@
-From: jwboyer@fedoraproject.org (Josh Boyer)
-Date: Sat, 16 Nov 2013 11:36:25 -0500
-Subject: xen drivers fail to link on ARM with v3.12-9888-gf63c482
-In-Reply-To: <CA+5PVA7YMMRmFE=T7MOdGNeUiv_4Eu_u2-SrDfSTE052MpAnag@mail.gmail.com>
-References: <CA+5PVA7YMMRmFE=T7MOdGNeUiv_4Eu_u2-SrDfSTE052MpAnag@mail.gmail.com>
-Message-ID: <CA+5PVA63LyUB7o0+Z-YS91AUUwvRokHeYq_GJ1i6VE3bj2qQLA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 16 Nov 2013 09:15:24 -0800
+Subject: [PATCH] arm/arm64: KVM: Fix hyp mappings of vmalloc regions
+In-Reply-To: <87846f3195cadcae32824120f78e3c9d@www.loen.fr>
+References: <1384557880-14107-1-git-send-email-christoffer.dall@linaro.org>
+ <87846f3195cadcae32824120f78e3c9d@www.loen.fr>
+Message-ID: <20131116171524.GK20516@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 16, 2013 at 9:56 AM, Josh Boyer <jwboyer@fedoraproject.org> wrote:
-> Hi All,
->
-> The xen-gntalloc, xen-netfront, xen-blkfront, and xen-netback drivers
-> fail to link on ARM today with the following error:
->
-> ERROR: "phys_to_mach" [drivers/xen/xen-gntalloc.ko] undefined!
-> ERROR: "phys_to_mach" [drivers/net/xen-netfront.ko] undefined!
-> ERROR: "phys_to_mach" [drivers/net/xen-netback/xen-netback.ko] undefined!
-> ERROR: "phys_to_mach" [drivers/block/xen-blkfront.ko] undefined!
->
-> This is with Linus' tree as of this morning.
->
-> I'm guessing this is because the mfn_to_pfn and pfn_to_mfn functions
-> are inlined and reference phys_to_mach directly, and that isn't
-> exported to modules.  Thoughts?
+On Sat, Nov 16, 2013 at 10:01:01AM +0000, Marc Zyngier wrote:
+> On 2013-11-15 23:24, Christoffer Dall wrote:
+> >Using virt_to_phys on percpu mappings is horribly wrong as it may be
+> >backed by vmalloc.  Introduce kvm_kaddr_to_phys which translates both
+> >types of valid kernel addresses to the corresponding physical
+> >address.
+> >
+> >At the same time resolves a typing issue where we were storing the
+> >physical address as a 32 bit unsigned long (on arm), truncating the
+> >physical address for addresses above the 4GB limit.  This caused
+> >breakage on Keystone.
+> >
+> >Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >---
+> >
+> >This patch is loosely based on Marc's previous patch from today but
+> >instead of introducing another Hyp mapping function, it fixes the
+> >existing one to deal with both kinds of kernel addresses.
+> 
+> Looks good to me! This should probably be merged quickly (after
+> testing by Santosh), and possibly Cc-ed to stable.
+> 
+Agreed, Santhos, can you give this a quick spin?
 
-The patch below seems to fix this, but I'm not sure it's the desired
-approach.  I added the export for mach_to_phys just in case.
-
-josh
-
-diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-index 23732cd..7772fa8 100644
---- a/arch/arm/xen/p2m.c
-+++ b/arch/arm/xen/p2m.c
-@@ -27,7 +27,9 @@ struct xen_p2m_entry {
-
- rwlock_t p2m_lock;
- struct rb_root phys_to_mach = RB_ROOT;
-+EXPORT_SYMBOL_GPL(phys_to_mach);
- static struct rb_root mach_to_phys = RB_ROOT;
-+EXPORT_SYMBOL_GPL(mach_to_phys);
-
- static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
- {
+-Christoffer
