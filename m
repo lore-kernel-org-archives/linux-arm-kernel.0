@@ -1,74 +1,31 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sat, 16 Nov 2013 15:17:29 -0300
-Subject: [PATCH v2] ARM: sunxi: dt: add EMAC aliases
-In-Reply-To: <1384546600-14384-1-git-send-email-emilio@elopez.com.ar>
-References: <1384546600-14384-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1384625849-29849-1-git-send-email-emilio@elopez.com.ar>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 16 Nov 2013 13:12:59 -0500 (EST)
+Subject: [PATCH 27/31] USB: EHCI: tegra: use reset framework
+In-Reply-To: <1384548866-13141-28-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <Pine.LNX.4.44L0.1311161312380.8119-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-U-Boot uses the ethernet0 alias to locate the right node to fill in
-the MAC address of the first ethernet interface. This patch adds the
-alias on all the sunxi SoCs with EMAC. In this way, people using
-ethernet in U-Boot (eg, for tftp) can keep a consistent address on both
-U-Boot and Linux with no additional effort.
+On Fri, 15 Nov 2013, Stephen Warren wrote:
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Tegra's clock driver now provides an implementation of the common
+> reset API (include/linux/reset.h). Use this instead of the old Tegra-
+> specific API; that will soon be removed.
+> 
+> Cc: treding at nvidia.com
+> Cc: pdeschrijver at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: linux-usb at vger.kernel.org
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
 
-v1->v2:
-   add to dtsi instead of dts as suggested by Maxime; it's easier to 
-   maintain on the long run.
-
- arch/arm/boot/dts/sun4i-a10.dtsi  | 4 ++++
- arch/arm/boot/dts/sun5i-a10s.dtsi | 4 ++++
- arch/arm/boot/dts/sun7i-a20.dtsi  | 4 ++++
- 3 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 09e7b43..23374da 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -15,6 +15,10 @@
- / {
- 	interrupt-parent = <&intc>;
- 
-+	aliases {
-+		ethernet0 = &emac;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 9326b64..e95ab43 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -16,6 +16,10 @@
- / {
- 	interrupt-parent = <&intc>;
- 
-+	aliases {
-+		ethernet0 = &emac;
-+	};
-+
- 	cpus {
- 		cpu at 0 {
- 			compatible = "arm,cortex-a8";
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index c645a0f..6bea2b84 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -16,6 +16,10 @@
- / {
- 	interrupt-parent = <&gic>;
- 
-+	aliases {
-+		ethernet0 = &emac;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--- 
-1.8.4.2
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
