@@ -1,145 +1,79 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 16 Nov 2013 00:18:30 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.13 merge window
-Message-ID: <20131116081830.GA22051@quad.lixom.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 16 Nov 2013 09:51:40 +0100
+Subject: [PATCH v3 1/2] ARM: sun4i/sun7i: RTC driver
+In-Reply-To: <CAOQ7t2a=KdNb-4_E_PRP53yYPiNmKzRN69Urg8EZ=4JE-6-Mig@mail.gmail.com>
+References: <1383172738-8206-1-git-send-email-carlo.caione@gmail.com>
+ <20131106141357.GQ26440@lukather>
+ <CAOQ7t2a=KdNb-4_E_PRP53yYPiNmKzRN69Urg8EZ=4JE-6-Mig@mail.gmail.com>
+Message-ID: <20131116085140.GJ3538@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Carlo,
 
+On Fri, Nov 15, 2013 at 11:50:56PM +0100, Carlo Caione wrote:
+> >> +static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
+> >> +{
+> >> +     struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
+> >> +     u32 date = 0;
+> >> +     u32 time = 0;
+> >> +     int year;
+> >> +     int t;
+> >> +
+> >> +     year = rtc_tm->tm_year + 1900;
+> >
+> > So, that means that the A10 RTC starts a year 1900, and the A20 at
+> > year 2010? Why not just put those in your year_offset field directly?
+> 
+> 1900 is the offset of the parameter tm_year with respect to the current year.
+> year_offset is used to make tm_year fit inside the limited range of
+> the year field of the SUNXI_RTC_YMD register.
 
-The following changes since commit 10d0c9705e80bbd3d587c5fad24599aabaca6688:
+Ok, so 1900 is the RTC's epoch, and tm_year is relative to that
+epoch. What I still don't get is why you're not defining it as such
+and use it directly the field your year_offset as such.
 
-  Merge tag 'devicetree-for-3.13' of git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux (2013-11-12 16:52:17 +0900)
+Moreover, you have some max values that imply that the RTC can't count
+over either 2100 or 2073, which is kind of weird, since, respectively,
+it starts at 1900 and 2010, and the year field is documented to be 8
+bits wide, I'd expect it to go up to 2155 and 2265.
 
-are available in the git repository at:
+> >> +
+> >> +     /*
+> >> +      * wait about 70us to make sure the the time is really written into
+> >> +      * target
+> >> +      */
+> >> +     usleep_range(70, 100);
+> >
+> > Isn't the write operation supposed to be done already?
+> 
+> Yes, it is supposed to be, but this waiting was already present in the
+> original version of the driver by aw so I'll leave it in v4.
 
+I feel like we argue over this again and again.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+I'm sorry, but saying "allwinner did it that way so we should keep it"
+is a bad argument. Otherwise we would be using fex, and every other
+driver Allwinner reimplemented.
 
-for you to fetch changes up to 6886059f2ef5d62c73e87a905e84fa4f87d56074:
+That being said, either that sleep is needed, and then it should be
+needed everytime you write to the RTC, which is not the case iirc, and
+have a comment saying "I have no idea why, but this come from
+Allwinner and this is actually required", or you don't need it, and
+then you can just remove it.
 
-  Merge tag 'omap-for-v3.13/fixes-for-merge-window-take2' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2013-11-15 15:17:59 -0800)
+But having it some-times-but-not-some-other seems pretty weak to me.
 
-----------------------------------------------------------------
+Maxime
 
-ARM: SoC fixes for 3.13 merge window
-
-A first set of batches of fixes for 3.13. The diffstat is large mostly
-because we're adding a defconfig for a family that's been lacking it, and
-there's some missing clock information added for i.MX and OMAP.
-
-The at91 new code is around dealing with RTC/RTT reset at boot to fix possible
-hangs due to pending wakeup interrupts coming in during early boot.
-
-----------------------------------------------------------------
-Alexander Shiyan (1):
-      ARM: dts: i.MX51: Fix OTG PHY clock
-
-Alexandre Courbot (1):
-      ARM: tegra: init fuse before setting reset handler
-
-Eric Witcher (1):
-      ARM: OMAP: devicetree: fix SPI node compatible property syntax items
-
-Jiada Wang (1):
-      ARM: i.MX6q: fix the wrong parent of can_root clock
-
-Joel Fernandes (1):
-      doc: devicetree: Add bindings documentation for omap-des driver
-
-Johan Hovold (2):
-      ARM: at91: fix hanged boot due to early rtc-interrupt
-      ARM: at91: fix hanged boot due to early rtt-interrupt
-
-Jonathan Austin (1):
-      ARM: integrator_cp: Set LCD{0,1} enable lines when turning on CLCD
-
-Linus Walleij (1):
-      MAINTAINERS: drop discontinued mailing list
-
-Lokesh Vutla (1):
-      ARM: dts: doc: Document missing compatible property for omap-sham driver
-
-Lothar Wa?mann (1):
-      ARM: imx6q: add missing sentinel to divider table
-
-Nishanth Menon (1):
-      ARM: OMAP2+: omap_device: maintain sane runtime pm status around suspend/resume
-
-Olof Johansson (7):
-      Merge tag 'imx-fixes-3.13' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      ARM: vt8500: add defconfig for v6/v7 chips
-      ARM: sti: only select errata 764369 if SMP
-      ARM: highbank: only select errata 764369 if SMP
-      video: exynos_mipi_dsim: Remove unused variable
-      Merge tag 'at91-fixes-non-critical' of git://github.com/at91linux/linux-at91 into fixes
-      Merge tag 'omap-for-v3.13/fixes-for-merge-window-take2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Roger Quadros (1):
-      pinctrl: single: call pcs_soc->rearm() whenever IRQ mask is changed
-
-Shawn Guo (6):
-      ARM: imx: remove imx_src_prepare_restart() call
-      ARM: imx: improve mxc_restart() on the SRC bit writes
-      ARM: imx: v7_cpu_resume() is needed by imx6sl build
-      ARM: imx: add sleep for pllv3 relock
-      ARM: imx: pllv3 needs relock in .set_rate() call
-      ARM: imx: set up pllv3 POWER and BYPASS sequentially
-
-Tomi Valkeinen (3):
-      ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
-      ARM: OMAP3: use CLK_SET_RATE_PARENT for dss clocks
-      ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
-
-Tony Lindgren (2):
-      Merge tag 'for-v3.13/clock-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into xxx-dt
-      ARM: OMAP2+: Fix build for dra7xx without omap4 and 5
-
-Wei Yongjun (2):
-      ARM: OMAP2+: smsc911x: fix return value check in gpmc_smsc911x_init()
-      ARM: OMAP3: Beagle: fix return value check in beagle_opp_init()
-
- .../devicetree/bindings/crypto/omap-des.txt        | 30 ++++++++
- .../devicetree/bindings/crypto/omap-sham.txt       |  2 +-
- Documentation/devicetree/bindings/spi/omap-spi.txt |  4 +-
- MAINTAINERS                                        |  1 -
- arch/arm/boot/dts/imx51.dtsi                       |  2 +-
- arch/arm/configs/vt8500_v6_v7_defconfig            | 90 ++++++++++++++++++++++
- arch/arm/mach-at91/Makefile                        |  2 +-
- arch/arm/mach-at91/at91sam9260.c                   |  2 +
- arch/arm/mach-at91/at91sam9261.c                   |  2 +
- arch/arm/mach-at91/at91sam9263.c                   |  3 +
- arch/arm/mach-at91/at91sam9g45.c                   |  3 +
- arch/arm/mach-at91/at91sam9n12.c                   |  6 ++
- arch/arm/mach-at91/at91sam9rl.c                    |  3 +
- arch/arm/mach-at91/at91sam9x5.c                    |  6 ++
- arch/arm/mach-at91/generic.h                       |  2 +
- arch/arm/mach-at91/include/mach/at91sam9n12.h      |  5 ++
- arch/arm/mach-at91/include/mach/at91sam9x5.h       |  5 ++
- arch/arm/mach-at91/include/mach/sama5d3.h          |  5 ++
- arch/arm/mach-at91/sama5d3.c                       |  6 ++
- arch/arm/mach-at91/sysirq_mask.c                   | 71 +++++++++++++++++
- arch/arm/mach-highbank/Kconfig                     |  2 +-
- arch/arm/mach-imx/Makefile                         |  4 +-
- arch/arm/mach-imx/clk-imx6q.c                      |  7 +-
- arch/arm/mach-imx/clk-pllv3.c                      | 51 ++++++++----
- arch/arm/mach-imx/common.h                         |  5 --
- arch/arm/mach-imx/src.c                            | 15 ----
- arch/arm/mach-imx/system.c                         | 12 ++-
- arch/arm/mach-integrator/integrator_cp.c           |  3 +-
- arch/arm/mach-omap2/Makefile                       |  2 +-
- arch/arm/mach-omap2/board-omap3beagle.c            |  2 +-
- arch/arm/mach-omap2/cclock3xxx_data.c              | 58 +++++++++++---
- arch/arm/mach-omap2/cclock44xx_data.c              |  3 +-
- arch/arm/mach-omap2/gpmc-smsc911x.c                |  2 +-
- arch/arm/mach-omap2/omap_device.c                  | 13 +++-
- arch/arm/mach-omap2/prm44xx_54xx.h                 |  3 +-
- arch/arm/mach-sti/Kconfig                          |  2 +-
- arch/arm/mach-tegra/tegra.c                        |  2 +-
- drivers/pinctrl/pinctrl-single.c                   | 10 +--
- drivers/video/exynos/exynos_mipi_dsi.c             |  1 -
- 39 files changed, 367 insertions(+), 80 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/crypto/omap-des.txt
- create mode 100644 arch/arm/configs/vt8500_v6_v7_defconfig
- create mode 100644 arch/arm/mach-at91/sysirq_mask.c
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131116/6468848d/attachment.sig>
