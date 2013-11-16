@@ -1,97 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 16 Nov 2013 06:44:12 -0800
-Subject: [PATCH 03/11] ARM: dts: omap3-igep: Update to use the TI
- AM/DM37x processor.
-In-Reply-To: <1384608224-9452-4-git-send-email-javier.martinez@collabora.co.uk>
-References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
- <1384608224-9452-4-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20131116144412.GH10317@atomide.com>
+From: jwboyer@fedoraproject.org (Josh Boyer)
+Date: Sat, 16 Nov 2013 09:56:24 -0500
+Subject: xen drivers fail to link on ARM with v3.12-9888-gf63c482
+Message-ID: <CA+5PVA7YMMRmFE=T7MOdGNeUiv_4Eu_u2-SrDfSTE052MpAnag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
-> From: Enric Balletbo i Serra <eballetbo@gmail.com>
-> 
-> Most of the boards are using the TI AM/DM37x processor, there is only a small
-> quantity of IGEP Processor Boards based on TI OMAP3530. So it's better use the
-> omap36xx.dtsi include instead of omap34xx.dtsi include.
-> 
-> To avoid confusion we have added to the model the (TI AM/DM37x) comment.
+Hi All,
 
-You could have omap3-igep-common.dtsi that contains most configurations
-and then files including that where only the SoC type and name is set.
+The xen-gntalloc, xen-netfront, xen-blkfront, and xen-netback drivers
+fail to link on ARM today with the following error:
 
-Regards,
+ERROR: "phys_to_mach" [drivers/xen/xen-gntalloc.ko] undefined!
+ERROR: "phys_to_mach" [drivers/net/xen-netfront.ko] undefined!
+ERROR: "phys_to_mach" [drivers/net/xen-netback/xen-netback.ko] undefined!
+ERROR: "phys_to_mach" [drivers/block/xen-blkfront.ko] undefined!
 
-Tony
- 
-> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
-> ---
->  arch/arm/boot/dts/omap3-igep.dtsi    | 4 ++--
->  arch/arm/boot/dts/omap3-igep0020.dts | 4 ++--
->  arch/arm/boot/dts/omap3-igep0030.dts | 4 ++--
->  3 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-> index b3517b2..e4c8769 100644
-> --- a/arch/arm/boot/dts/omap3-igep.dtsi
-> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
-> @@ -1,5 +1,5 @@
->  /*
-> - * Device Tree Source for IGEP Technology devices
-> + * Common device tree for IGEP boards based on AM/DM37x
->   *
->   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
->   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
-> @@ -10,7 +10,7 @@
->   */
->  /dts-v1/;
->  
-> -#include "omap34xx.dtsi"
-> +#include "omap36xx.dtsi"
->  
->  / {
->  	memory {
-> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-> index d5cc792..33ce123 100644
-> --- a/arch/arm/boot/dts/omap3-igep0020.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
-> @@ -1,5 +1,5 @@
->  /*
-> - * Device Tree Source for IGEPv2 board
-> + * Device Tree Source for IGEPv2 Rev. (TI OMAP AM/DM37x)
->   *
->   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
->   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
-> @@ -13,7 +13,7 @@
->  #include "omap-gpmc-smsc911x.dtsi"
->  
->  / {
-> -	model = "IGEPv2";
-> +	model = "IGEPv2 (TI OMAP AM/DM37x)";
->  	compatible = "isee,omap3-igep0020", "ti,omap3";
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-> index 525e6d9..02a23f8 100644
-> --- a/arch/arm/boot/dts/omap3-igep0030.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0030.dts
-> @@ -1,5 +1,5 @@
->  /*
-> - * Device Tree Source for IGEP COM Module
-> + * Device Tree Source for IGEP COM MODULE (TI OMAP AM/DM37x)
->   *
->   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
->   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
-> @@ -12,7 +12,7 @@
->  #include "omap3-igep.dtsi"
->  
->  / {
-> -	model = "IGEP COM Module";
-> +	model = "IGEP COM MODULE (TI OMAP AM/DM37x)";
->  	compatible = "isee,omap3-igep0030", "ti,omap3";
->  
->  	leds {
-> -- 
-> 1.8.4.2
-> 
+This is with Linus' tree as of this morning.
+
+I'm guessing this is because the mfn_to_pfn and pfn_to_mfn functions
+are inlined and reference phys_to_mach directly, and that isn't
+exported to modules.  Thoughts?
+
+josh
