@@ -1,79 +1,47 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 14:23:39 +0100
-Subject: [PATCH 06/11] ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to
- enable display
+Date: Sat, 16 Nov 2013 14:23:44 +0100
+Subject: [PATCH 11/11] OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is not
+ found
 In-Reply-To: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1384608224-9452-7-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1384608224-9452-12-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Enric Balletbo i Serra <eballetbo@gmail.com>
+On Device Tree boot the VDDS_DSI regulator is not linked to
+the DPI device so omapfb driver probing fails with:
 
-Enable the hdmi output and the LCD Controller on IGEP AQUILA. Also
-configure the correct pinmux for output of video data from the SoC
-to the HDMI encoder.
+[    3.186035] OMAPFB: omapfb_probe
+[    3.190704] omapdss DPI error: can't get VDDS_DSI regulator
+[    3.196594] omapfb omapfb: failed to connect default display
+[    3.202667] omapfb omapfb: failed to init overlay connections
+[    3.208892] OMAPFB: free_resources
+[    3.212493] OMAPFB: free all fbmem
+[    3.216735] omapfb omapfb: failed to setup omapfb
 
-Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+As a workaround try to use the VPLL2 regulator from twl4030 in
+dpi_init_regulator() if getting the VDDS_DSI regulator fails.
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/am335x-base0033.dts | 47 +++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+ drivers/video/omap2/dss/dpi.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-base0033.dts b/arch/arm/boot/dts/am335x-base0033.dts
-index b4f95c2..3a97613 100644
---- a/arch/arm/boot/dts/am335x-base0033.dts
-+++ b/arch/arm/boot/dts/am335x-base0033.dts
-@@ -13,4 +13,51 @@
- / {
- 	model = "IGEP COM AM335x on AQUILA Expansion";
- 	compatible = "isee,am335x-base0033", "isee,am335x-igep0033", "ti,am33xx";
+diff --git a/drivers/video/omap2/dss/dpi.c b/drivers/video/omap2/dss/dpi.c
+index bd48cde..e328f0b 100644
+--- a/drivers/video/omap2/dss/dpi.c
++++ b/drivers/video/omap2/dss/dpi.c
+@@ -550,6 +550,11 @@ static int dpi_init_regulator(void)
+ 		return 0;
+ 
+ 	vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "vdds_dsi");
 +
-+	hdmi {
-+		compatible = "ti,tilcdc,slave";
-+		i2c = <&i2c0>;
-+		pinctrl-names = "default", "off";
-+		pinctrl-0 = <&nxp_hdmi_pins>;
-+		pinctrl-1 = <&nxp_hdmi_off_pins>;
-+		status = "okay";
-+	};
-+};
++        /* DT HACK: try VPLL2 to make omapdss work for OMAP3 IGEPv2 */
++        if (IS_ERR(vdds_dsi))
++                vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "VPLL2");
 +
-+&am33xx_pinmux {
-+	nxp_hdmi_pins: pinmux_nxp_hdmi_pins {
-+		pinctrl-single,pins = <
-+			0x1b0 (PIN_OUTPUT | MUX_MODE3)	/* xdma_event_intr0.clkout1 */
-+			0xa0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data0 */
-+			0xa4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data1 */
-+			0xa8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data2 */
-+			0xac (PIN_OUTPUT | MUX_MODE0)	/* lcd_data3 */
-+			0xb0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data4 */
-+			0xb4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data5 */
-+			0xb8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data6 */
-+			0xbc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data7 */
-+			0xc0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data8 */
-+			0xc4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data9 */
-+			0xc8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data10 */
-+			0xcc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data11 */
-+			0xd0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data12 */
-+			0xd4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data13 */
-+			0xd8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data14 */
-+			0xdc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data15 */
-+			0xe0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_vsync */
-+			0xe4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_hsync */
-+			0xe8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_pclk */
-+			0xec (PIN_OUTPUT | MUX_MODE0)	/* lcd_ac_bias_en */
-+		>;
-+	};
-+	nxp_hdmi_off_pins: pinmux_nxp_hdmi_off_pins {
-+		pinctrl-single,pins = <
-+			0x1b0 (PIN_OUTPUT | MUX_MODE3)	/* xdma_event_intr0.clkout1 */
-+		>;
-+	};
- };
-+
-+&lcdc {
-+	status = "okay";
-+};
-+
+ 	if (IS_ERR(vdds_dsi)) {
+ 		DSSERR("can't get VDDS_DSI regulator\n");
+ 		return PTR_ERR(vdds_dsi);
 -- 
 1.8.4.2
