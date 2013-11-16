@@ -1,80 +1,97 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 15:41:09 +0100
-Subject: [PATCH 00/11]: add remaining support for IGEP boards
-In-Reply-To: <20131116141622.GE10317@atomide.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 16 Nov 2013 06:44:12 -0800
+Subject: [PATCH 03/11] ARM: dts: omap3-igep: Update to use the TI
+ AM/DM37x processor.
+In-Reply-To: <1384608224-9452-4-git-send-email-javier.martinez@collabora.co.uk>
 References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
- <20131116141622.GE10317@atomide.com>
-Message-ID: <52878405.6000109@collabora.co.uk>
+ <1384608224-9452-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20131116144412.GH10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2013 03:16 PM, Tony Lindgren wrote:
-> * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
->> In order to make mach-omap2 Device Tree only the board file for
->> IGEP boards was removed even when support for wifi and display
->> was still not supported by its DTS.
->> 
->> This patch-set adds support for these remaining peripherals and
->> also adds support for USB, HDMI and user LED for the am33xx SoC
->> based IGEP Aquila board.
->> 
->> The patch-set is composed of the following patches:
->> 
->> Enric Balletbo i Serra (7):
->>       ARM: dts: omap3-igep: Fix bus-width for mmc1.
->>       ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
->>       ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
->>       ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
->>       ARM: dts: AM33XX BASE0033: add pinmux and user led support.
->>       ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
->>       ARM: dts: AM33XX IGEP0033: add USB support.
->> 
->> Javier Martinez Canillas (4):
->>       ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
->>       ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
->>       ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
->>       OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is not found
->> 
->> Tony,
->> 
->> Most of these patches are just DTS changes so they have to be picked
->> by Benoit although there are patches that should go to different trees.
->> 
->> [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
->> 
->> have to go through your tree and
+* Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
+> From: Enric Balletbo i Serra <eballetbo@gmail.com>
 > 
-> OK
+> Most of the boards are using the TI AM/DM37x processor, there is only a small
+> quantity of IGEP Processor Boards based on TI OMAP3530. So it's better use the
+> omap36xx.dtsi include instead of omap34xx.dtsi include.
+> 
+> To avoid confusion we have added to the model the (TI AM/DM37x) comment.
+
+You could have omap3-igep-common.dtsi that contains most configurations
+and then files including that where only the SoC type and name is set.
+
+Regards,
+
+Tony
+ 
+> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+> ---
+>  arch/arm/boot/dts/omap3-igep.dtsi    | 4 ++--
+>  arch/arm/boot/dts/omap3-igep0020.dts | 4 ++--
+>  arch/arm/boot/dts/omap3-igep0030.dts | 4 ++--
+>  3 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+> index b3517b2..e4c8769 100644
+> --- a/arch/arm/boot/dts/omap3-igep.dtsi
+> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Device Tree Source for IGEP Technology devices
+> + * Common device tree for IGEP boards based on AM/DM37x
+>   *
+>   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
+>   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+> @@ -10,7 +10,7 @@
+>   */
+>  /dts-v1/;
 >  
->> [PATCH 11/11] OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is not found
->> 
->> should be picked by Tomi Valkeinen.
-> 
-> That may not be needed as it can be set in the .dts file, I'll comment
-> on that patch.
+> -#include "omap34xx.dtsi"
+> +#include "omap36xx.dtsi"
 >  
-
-A similar hack is made for OMAP4 on dsi_regulator_init() to use the twl6030
-VCXIO regulator if vdds_dsi is not found so I thought it makes sense to do
-something similar for DPI and OMAP3.
-
-But if you prefer I can add a regulator-name = "vdds_dsi" property to vpll2 like
-you did for omap3-ldp.dts
-
->> Since we have removed the board file for IGEP boards I think these
->> can be considered as regression fixes for 3.13 although I don't mind
->> if you prefer to wait for 3.14.
+>  / {
+>  	memory {
+> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+> index d5cc792..33ce123 100644
+> --- a/arch/arm/boot/dts/omap3-igep0020.dts
+> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Device Tree Source for IGEPv2 board
+> + * Device Tree Source for IGEPv2 Rev. (TI OMAP AM/DM37x)
+>   *
+>   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
+>   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+> @@ -13,7 +13,7 @@
+>  #include "omap-gpmc-smsc911x.dtsi"
+>  
+>  / {
+> -	model = "IGEPv2";
+> +	model = "IGEPv2 (TI OMAP AM/DM37x)";
+>  	compatible = "isee,omap3-igep0020", "ti,omap3";
+>  
+>  	leds {
+> diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
+> index 525e6d9..02a23f8 100644
+> --- a/arch/arm/boot/dts/omap3-igep0030.dts
+> +++ b/arch/arm/boot/dts/omap3-igep0030.dts
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Device Tree Source for IGEP COM Module
+> + * Device Tree Source for IGEP COM MODULE (TI OMAP AM/DM37x)
+>   *
+>   * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
+>   * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+> @@ -12,7 +12,7 @@
+>  #include "omap3-igep.dtsi"
+>  
+>  / {
+> -	model = "IGEP COM Module";
+> +	model = "IGEP COM MODULE (TI OMAP AM/DM37x)";
+>  	compatible = "isee,omap3-igep0030", "ti,omap3";
+>  
+>  	leds {
+> -- 
+> 1.8.4.2
 > 
-> Yes I agree, let's try to fix these issues during the -rc cycle
-> so the earlier functionality is maintained.
-> 
-> Regards,
-> 
-> Tony
-> 
-
-Great, so you can drop [PATCH 11/11] and I'll send a follow up patch doing the
-required regulator change in omap3-igep0020.dts.
-
-Thanks a lot and best regards,
-Javier
