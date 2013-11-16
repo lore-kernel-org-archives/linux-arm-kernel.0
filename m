@@ -1,25 +1,82 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 16 Nov 2013 23:28:35 +0800
-Subject: [PATCH] ARM: dts: imx6qdl: disable spdif "rxtx5" clock option
-In-Reply-To: <20131116151331.GW16735@n2100.arm.linux.org.uk>
-References: <1384614847-22905-1-git-send-email-shawn.guo@linaro.org>
- <20131116151331.GW16735@n2100.arm.linux.org.uk>
-Message-ID: <20131116152834.GK11014@S2101-09.ap.freescale.net>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 16 Nov 2013 16:34:36 +0100
+Subject: [PATCH 11/11] OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is
+ not found
+In-Reply-To: <20131116141853.GF10317@atomide.com>
+References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1384608224-9452-12-git-send-email-javier.martinez@collabora.co.uk>
+ <20131116141853.GF10317@atomide.com>
+Message-ID: <5287908C.3040602@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 16, 2013 at 03:13:31PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Nov 16, 2013 at 11:14:07PM +0800, Shawn Guo wrote:
-> > The spdif "rxtx5" clock option is being set to ipg clk (62) by mistake.
-> > This causes an incorrect time keeping when spdif driver is running,
-> > because ipg is ancestor clock for clocksource while spdif driver will
-> > change the rate of this clock in certain circumstance.  Before the
-> > correct clock for "rxtx5" option can be supplied, let's disable this
-> > option for now by filling a dummy clock for it.
+Hi Tony,
+
+On 11/16/2013 03:18 PM, Tony Lindgren wrote:
+> * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [131116 05:25]:
+>> On Device Tree boot the VDDS_DSI regulator is not linked to
+>> the DPI device so omapfb driver probing fails with:
+>> 
+>> [    3.186035] OMAPFB: omapfb_probe
+>> [    3.190704] omapdss DPI error: can't get VDDS_DSI regulator
+>> [    3.196594] omapfb omapfb: failed to connect default display
+>> [    3.202667] omapfb omapfb: failed to init overlay connections
+>> [    3.208892] OMAPFB: free_resources
+>> [    3.212493] OMAPFB: free all fbmem
+>> [    3.216735] omapfb omapfb: failed to setup omapfb
+>> 
+>> As a workaround try to use the VPLL2 regulator from twl4030 in
+>> dpi_init_regulator() if getting the VDDS_DSI regulator fails.
 > 
-> Strangely, this looks exactly like the change I made here :)
+> Probably makes sens to fix this in the dpi.c, but this can also be set
+> in the .dts file. I just set up the following in the omap3-ldp.dts file:
+> 
 
-Yeah, I tried very hard to find a different quick fix from the one in
-your bug report, but failed :)  I should mention it's your change.
+Sorry is not clear to me if you agree that makes sense to do this fix on dpi.c
+or if you think this is a bad idea and prefer to do it in the DTS instead?
 
-Shawn
+I'm asking to know if I have to send a follow up patch or not :)
+
+> &vaux1 {
+> 	/* Needed for ads7846 */
+> 	regulator-name = "vcc";
+> };
+> 
+> &vpll2 {
+> 	/* Needed for DSS */
+> 	regulator-name = "vdds_dsi";
+> };
+> 
+> Regards,
+> 
+> Tony
+> 
+>  
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>  drivers/video/omap2/dss/dpi.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>> 
+>> diff --git a/drivers/video/omap2/dss/dpi.c b/drivers/video/omap2/dss/dpi.c
+>> index bd48cde..e328f0b 100644
+>> --- a/drivers/video/omap2/dss/dpi.c
+>> +++ b/drivers/video/omap2/dss/dpi.c
+>> @@ -550,6 +550,11 @@ static int dpi_init_regulator(void)
+>>  		return 0;
+>>  
+>>  	vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "vdds_dsi");
+>> +
+>> +        /* DT HACK: try VPLL2 to make omapdss work for OMAP3 IGEPv2 */
+>> +        if (IS_ERR(vdds_dsi))
+>> +                vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "VPLL2");
+>> +
+>>  	if (IS_ERR(vdds_dsi)) {
+>>  		DSSERR("can't get VDDS_DSI regulator\n");
+>>  		return PTR_ERR(vdds_dsi);
+>> -- 
+>> 1.8.4.2
+>> 
+> 
+
+Best regards,
+Javier
