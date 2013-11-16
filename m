@@ -1,44 +1,20 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 16 Nov 2013 15:12:42 +0000
-Subject: [PATCH] ARM: fix /proc/$PID/stack to work on SMP
-In-Reply-To: <CAP+bzvWtq9PrcAmyVMxjGu9OCaiH9mPwo-WjQJBz9LyXDSER+w@mail.gmail.com>
-References: <CAP+bzvWtq9PrcAmyVMxjGu9OCaiH9mPwo-WjQJBz9LyXDSER+w@mail.gmail.com>
-Message-ID: <20131116151242.GV16735@n2100.arm.linux.org.uk>
+Date: Sat, 16 Nov 2013 15:13:31 +0000
+Subject: [PATCH] ARM: dts: imx6qdl: disable spdif "rxtx5" clock option
+In-Reply-To: <1384614847-22905-1-git-send-email-shawn.guo@linaro.org>
+References: <1384614847-22905-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20131116151331.GW16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 16, 2013 at 10:58:44PM +0800, ivan lam wrote:
-> In arm, we can't get stack info of the other tasks via
-> /proc/$PID/stack file. for example:
-> 
-> # sleep 1000 &
-> # ps -ef | grep sleep
->   536 0          0:00 sleep 1000
->   538 0          0:00 grep sleep
-> # cat /proc/536/stack
-> [<ffffffff>] 0xffffffff
-> 
-> If a thread was scheduled out, this proc should provide
-> useful backtrace for debug. Try to unwind the stack based
-> on the previous scheduled out register file whatever a
-> thread is in Running state or not.
-> 
-> After this fix, result as:
-> 
-> # cat /proc/536/stack
-> [<8003f018>] hrtimer_nanosleep+0x8c/0x108
-> [<8003f134>] SyS_nanosleep+0xa0/0xb0
-> [<8000e220>] ret_fast_syscall+0x0/0x30
-> [<ffffffff>] 0xffffffff
-> 
-> If a thread is Running on the oher CPUs, the result is not accurate,
-> but this is acceptable. This behaviors are same as x86 and arm64 arch.
+On Sat, Nov 16, 2013 at 11:14:07PM +0800, Shawn Guo wrote:
+> The spdif "rxtx5" clock option is being set to ipg clk (62) by mistake.
+> This causes an incorrect time keeping when spdif driver is running,
+> because ipg is ancestor clock for clocksource while spdif driver will
+> change the rate of this clock in certain circumstance.  Before the
+> correct clock for "rxtx5" option can be supplied, let's disable this
+> option for now by filling a dummy clock for it.
 
-As we have people running around trying to add additional checks to
-the unwinder to stop it going wrong, I've no plans to apply any patch
-like this until we're more sure that it won't open up the possibility
-for any user process to crash the kernel.  That in itself is a massive
-security issue because its an effective DoS attack.
+Strangely, this looks exactly like the change I made here :)
 
-Moreover, your emailer has totally screwed the patch, so it's impossible
-to apply.
+Thanks Shawn.
