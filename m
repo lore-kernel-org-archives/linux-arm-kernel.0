@@ -1,81 +1,80 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 14:23:38 +0100
-Subject: [PATCH 05/11] ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
-In-Reply-To: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1384608224-9452-6-git-send-email-javier.martinez@collabora.co.uk>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Sat, 16 Nov 2013 13:35:04 +0000
+Subject: [PATCH 2/2] usb: chipidea: usbmisc: Add support for i.MX51 CPU
+In-Reply-To: <CAHCPf3tOxKESwbooR0sz0w=A8n6uEDOmaawDxick0+AMBRAQfA@mail.gmail.com>
+References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+ <1384067901-9377-2-git-send-email-shc_work@mail.ru>
+ <CAHCPf3tOxKESwbooR0sz0w=A8n6uEDOmaawDxick0+AMBRAQfA@mail.gmail.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411A0C0@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IGEPv2 has a TFP410 DPI-to-DVI encoder attached to OMAP's
-Display SubSystem (DSS).
-
-Add mux setup for DSS pins and also for the GPIO 170 pin that
-is used to ensure that the DVI-D is powered down on power up.
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/omap3-igep0020.dts | 41 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index 33ce123..b9a9e17 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -67,6 +67,8 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
- 		&hsusbb1_pins
-+		&tfp410_pins
-+		&dss_pins
- 	>;
  
- 	hsusbb1_pins: pinmux_hsusbb1_pins {
-@@ -85,6 +87,45 @@
- 			0x5ba (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d7.hsusb1_data3 */
- 		>;
- 	};
-+
-+	tfp410_pins: tfp410_dvi_pins {
-+		pinctrl-single,pins = <
-+			0x196 (PIN_OUTPUT | MUX_MODE4)   /* hdq_sio.gpio_170 */
-+		>;
-+	};
-+
-+	dss_pins: pinmux_dss_dvi_pins {
-+		pinctrl-single,pins = <
-+			0x0a4 (PIN_OUTPUT | MUX_MODE0)   /* dss_pclk.dss_pclk */
-+			0x0a6 (PIN_OUTPUT | MUX_MODE0)   /* dss_hsync.dss_hsync */
-+			0x0a8 (PIN_OUTPUT | MUX_MODE0)   /* dss_vsync.dss_vsync */
-+			0x0aa (PIN_OUTPUT | MUX_MODE0)   /* dss_acbias.dss_acbias */
-+			0x0ac (PIN_OUTPUT | MUX_MODE0)   /* dss_data0.dss_data0 */
-+			0x0ae (PIN_OUTPUT | MUX_MODE0)   /* dss_data1.dss_data1 */
-+			0x0b0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data2.dss_data2 */
-+			0x0b2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data3.dss_data3 */
-+			0x0b4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data4.dss_data4 */
-+			0x0b6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data5.dss_data5 */
-+			0x0b8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data6.dss_data6 */
-+			0x0ba (PIN_OUTPUT | MUX_MODE0)   /* dss_data7.dss_data7 */
-+			0x0bc (PIN_OUTPUT | MUX_MODE0)   /* dss_data8.dss_data8 */
-+			0x0be (PIN_OUTPUT | MUX_MODE0)   /* dss_data9.dss_data9 */
-+			0x0c0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data10.dss_data10 */
-+			0x0c2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data11.dss_data11 */
-+			0x0c4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data12.dss_data12 */
-+			0x0c6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data13.dss_data13 */
-+			0x0c8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data14.dss_data14 */
-+			0x0ca (PIN_OUTPUT | MUX_MODE0)   /* dss_data15.dss_data15 */
-+			0x0cc (PIN_OUTPUT | MUX_MODE0)   /* dss_data16.dss_data16 */
-+			0x0ce (PIN_OUTPUT | MUX_MODE0)   /* dss_data17.dss_data17 */
-+			0x0d0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data18.dss_data18 */
-+			0x0d2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data19.dss_data19 */
-+			0x0d4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data20.dss_data20 */
-+			0x0d6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data21.dss_data21 */
-+			0x0d8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data22.dss_data22 */
-+			0x0da (PIN_OUTPUT | MUX_MODE0)   /* dss_data23.dss_data23 */
-+		>;
-+	};
- };
+> >
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  drivers/usb/chipidea/usbmisc_imx.c | 40 +++++++++++++++++++++---------
+> --------
+> >  1 file changed, 22 insertions(+), 18 deletions(-)
+> >
+> >
+> > -static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
+> > +static int usbmisc_imx5_init(struct imx_usbmisc_data *data)
+> 
+> Can we keep usbmisc_imx53_init named this?
+> 
+> There is more to do here on i.MX5 for cases where the bootloader did
+> not already try to set up USB (or did it badly) such as the
+> transceiver reference clock rate and also setting the USB sysclk clock
+> source (internal DPLL or from external transceiver in the external
+> ULPI case) and so on, which is related and needs doing on both, but is
+> different on i.MX51 than i.MX53. This is information sort of best
+> passed in the PHY node that goes along with this, but it's set within
+> the usbmisc block of the chips so the usbmisc driver will have a
+> responsibility to go see if it's an external PHY that is feeding it's
+> clock back into the USB block in this way.
+> 
+> I am not sure we (Peter etc.) discussed how best to do this, the code
+> to pull the correct information out always seems kind of misplaced no
+> matter where it goes, but the responsibility for tweaking those
+> registers is most certainly this driver.
+> 
+> Essentially the layout of usbmisc->base + 0x10 register (USB_CTRL_1)
+> is different when doing the above, and dependent on a board-specific
+> option for the input clock to the transceiver. We could reduce a
+> little churn, later, when usbmisc_imx could be given related usbphy
+> information and actually do the right thing. I have a patch kinda
+> sitting in the wings to do this.. and two *real* pieces of consumer
+> hardware that need it, and some other kicking, to make USB work in the
+> never-touched-before-Linux case.
+> 
+> > -static const struct usbmisc_ops imx53_usbmisc_ops = {
+> > -       .init = usbmisc_imx53_init,
+> > +static const struct usbmisc_ops imx5_usbmisc_ops = {
+> > +       .init = usbmisc_imx5_init,
+> >  };
+> 
+> And keep imx53_usbmisc_ops named this?
+> 
+> >  static const struct usbmisc_ops imx6q_usbmisc_ops = {
+> > @@ -204,8 +204,12 @@ static const struct of_device_id
+> usbmisc_imx_dt_ids[] = {
+> >                 .data = &imx27_usbmisc_ops,
+> >         },
+> >         {
+> > +               .compatible = "fsl,imx51-usbmisc",
+> > +               .data = &imx5_usbmisc_ops,
+> 
+> And then just use &imx53_usbmisc_ops?
+> 
+> This gives us some breathing room later to actually do the right thing
+> without additionally performing renames all over the place to make
+> imx5 -> imx53 (again)/imx51 (new).
  
- &leds_pins {
--- 
-1.8.4.2
+Hi Alexander,
+
+You may take matt's suggestion, it can reduce the code change now and in future.
+We can only add device_id for imx51 in this patch, split imx53 and imx51's ops
+when their differences are added in future.
+
+Peter
