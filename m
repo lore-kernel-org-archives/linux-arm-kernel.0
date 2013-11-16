@@ -1,111 +1,107 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 16 Nov 2013 04:32:42 +0300
-Subject: [PATCH v2 2/3] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <1583497.MMBMuSKFMR@avalon>
-References: <201311150217.23563.sergei.shtylyov@cogentembedded.com>
- <2664891.LKK7X6OLFJ@avalon> <52869200.3080303@cogentembedded.com>
- <1583497.MMBMuSKFMR@avalon>
-Message-ID: <5286CB3A.9080305@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Nov 2013 16:36:04 -0800
+Subject: [PATCH 2/5] ARM: OMAP2+: Add support for legacy auxdata for twl
+In-Reply-To: <1384562167-14725-1-git-send-email-tony@atomide.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+Message-ID: <1384562167-14725-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2013 02:03 AM, Laurent Pinchart wrote:
+As we currently need to support a mix of legacy platform data and
+device tree intialized data, let's make sure things keep working
+for the TWL GPIOs.
 
->>>> Register Ether platform device and pin data on  the  Koelsch board.
->>>> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager
->>>> board.
+Mostly the issue is caused by the fact that DSS does not yet have
+device tree bindings, so we need to rely on the TWL GPIO callback
+for setting up things like LCD backlight for some boards.
 
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+As of_platform_populate() for the TWL GPIO is called by twl-core
+after the I2C bus has been initialized, we cannot pass the auxdata
+table from the board init code to twl-core like we used to with
+just legacy platform data.
 
->>>> ---
->>>> Changes in version 2:
->>>> - added *if* (IS_ENABLED(CONFIG_PHYLIB)) around
->>>> phy_register_fixup_for_id()
->>>>     call;
+So let's use the omap_device bus hook to patch in the platform
+data for TWL GPIO until we have sorted out the issues with the
+TWL GPIOs and device tree bindings.
 
->>>> - changed Ether device name to "r8a779x-ether".
+The other option was be to initialize twl core using legacy
+platform data, which seems like a step backwards as we're moving
+to device tree only initialization.  And we really don't want to
+add custom configuration functions to the TWL GPIO driver either
+for this.
 
->>>>    arch/arm/mach-shmobile/board-koelsch.c |   63 ++++++++++++++++++++++++-
->>>>    1 file changed, 62 insertions(+), 1 deletion(-)
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/common.h       |  1 +
+ arch/arm/mach-omap2/omap_device.c  |  2 ++
+ arch/arm/mach-omap2/pdata-quirks.c | 16 ++++++++++++++++
+ 3 files changed, 19 insertions(+)
 
->>>> Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
->>>> ===================================================================
->>>> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
->>>> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
-
->> [...]
-
->>>> @@ -84,6 +119,32 @@ static void __init koelsch_add_standard_
->>>>    				      sizeof(koelsch_keys_pdata));
->>>>    }
->>>>
->>>> +/*
->>>> + * Ether LEDs on the Koelsch board are named LINK and ACTIVE which
->>>> corresponds
->>>> + * to non-default 01 setting of the Micrel KSZ8041 PHY control register
->>>> 1 bits
->>>> + * 14-15. We have to set them back to 01 from the default 00 value each
->>>> time
->>>> + * the PHY is reset. It's also important because the PHY's LED0 signal
->>>> is
->>>> + * connected to SoC's ETH_LINK signal and in the PHY's default mode it
->>>> will
->>>> + * bounce on and off after each packet, which we apparently want to
->>>> avoid.
->>>> + */
->>>> +static int koelsch_ksz8041_fixup(struct phy_device *phydev)
->>>> +{
->>>> +	u16 phyctrl1 = phy_read(phydev, 0x1e);
->>>> +
->>>> +	phyctrl1 &= ~0xc000;
->>>> +	phyctrl1 |= 0x4000;
->>>> +	return phy_write(phydev, 0x1e, phyctrl1);
->>>> +}
->>>> +
->>>> +static void __init koelsch_init(void)
->>>> +{
->>>> +	koelsch_add_standard_devices();
->>>> +
->>>> +	if (IS_ENABLED(CONFIG_PHYLIB))
->>>> +		phy_register_fixup_for_id("r8a779x-ether-ff:01",
->>>> +					  koelsch_ksz8041_fixup);
-
->>> This is fine with board code, but will break when we'll switch to DT.
->>> Would it be difficult to replace board code by using the existing micrel
->>> phy driver (drivers/net/phy/micrel.c) which should support the ksz8041
->>> already and
-
->> The first issue here is KSZ8041 on the BOCK-W/Lager/Koelsch boards uses
->> undocumented PHY ID for some reason, so the current driver doesn't really
->> support it. :-)
-
-> Right. Let's teach the KSZ8041 driver about that then :-)
-
-    Well, this seems at least easy. :-)
-
->>> extending it with support for register 0x1e which doesn't seem to be
->>> handled ?
-
->> You probably didn't quite understand the purpose of the platform PHY fixup.
->> It's designed to do the board-specific changes, not the driver-specific
->> changes. In this case, the setting of the bits 14-15 of the PHY control
->> register 1 (w/address 0x1E) purely depends on the board schematics and
->> simply can't be selected by the PHY driver.
-
->> It could have been set by the PHY driver iff we would find a way to pass the
->> platform data to the PHY device (on the automatically probed MDIO bus).
-
-> That seems to me like the real issue we need to solve. The PHY clearly needs
-> platform (or DT) data, so we need a way to pass it to the driver. Once we get
-> that it shouldn't be difficult to add LED configuration information to the
-> platform data.
-
-    Well, with the PHY driver being DT-enabled somehow, it wouldn't be 
-difficult (though how to make phylib's automatic probing coexist with DT 
-probing is not clear to me ATM). More difficult is to link the platform data 
-to an automatically probed device; there were attempts on linux-usb to link 
-the platform data to an USB device but that went nowhere IIRC... anyway, with 
-the PHY platform fixups already in place we need to care only about the DT 
-case really...
-
-WBR, Sergei
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index f7644fe..d0f3308 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -293,6 +293,7 @@ static inline void omap4_cpu_resume(void)
+ #endif
+ 
+ void pdata_quirks_init(struct of_device_id *);
++void omap_auxdata_legacy_init(struct device *dev);
+ void omap_pcs_legacy_init(int irq, void (*rearm)(void));
+ 
+ struct omap_sdrc_params;
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 53f0735..828f538 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -36,6 +36,7 @@
+ #include <linux/of.h>
+ #include <linux/notifier.h>
+ 
++#include "common.h"
+ #include "soc.h"
+ #include "omap_device.h"
+ #include "omap_hwmod.h"
+@@ -200,6 +201,7 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (pdev->dev.of_node)
+ 			omap_device_build_from_dt(pdev);
++		omap_auxdata_legacy_init(dev);
+ 		/* fall through */
+ 	default:
+ 		od = to_omap_device(pdev);
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index e7e9984..f2fc072 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -27,6 +27,7 @@ struct pdata_init {
+ };
+ 
+ struct of_dev_auxdata omap_auxdata_lookup[];
++static struct twl4030_gpio_platform_data twl_gpio_auxdata;
+ 
+ /*
+  * Create alias for USB host PHY clock.
+@@ -137,6 +138,21 @@ void omap_pcs_legacy_init(int irq, void (*rearm)(void))
+ }
+ 
+ /*
++ * GPIOs for TWL are initialized by the I2C bus and need custom
++ * handing until DSS has device tree bindings.
++ */
++void omap_auxdata_legacy_init(struct device *dev)
++{
++	if (dev->platform_data)
++		return;
++
++	if (strcmp("twl4030-gpio", dev_name(dev)))
++		return;
++
++	dev->platform_data = &twl_gpio_auxdata;
++}
++
++/*
+  * Few boards still need auxdata populated before we populate
+  * the dev entries in of_platform_populate().
+  */
+-- 
+1.8.1.1
