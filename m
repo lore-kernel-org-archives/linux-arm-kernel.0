@@ -1,45 +1,131 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 16 Nov 2013 12:22:44 +0000
-Subject: [PATCHv5] dmaengine: Add support for BCM2835
-In-Reply-To: <20131116114134.GU16735@n2100.arm.linux.org.uk>
-References: <52864BBC.7000506@koalo.de> <1384537403.14845.131.camel@smile>
- <20131115175155.GQ16735@n2100.arm.linux.org.uk>
- <CAHp75Vf3CJNgSiSjoZ6dYjRRHWN4bTpMxRTLG37+wwtEsQbq4g@mail.gmail.com>
- <20131116112754.GT15393@sirena.org.uk>
- <20131116114134.GU16735@n2100.arm.linux.org.uk>
-Message-ID: <20131116122244.GV15393@sirena.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sat, 16 Nov 2013 16:47:50 +0400
+Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
+Message-ID: <20131116124750.GA26318@anuminas.rup.mentorg.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 16, 2013 at 11:41:34AM +0000, Russell King - ARM Linux wrote:
-> On Sat, Nov 16, 2013 at 11:27:54AM +0000, Mark Brown wrote:
+When converting from tosa-keyboard driver to matrix keyboard, tosa keys
+received extra 1 column shift. Replace that with correct values to make
+keyboard work again.
 
-> > We should in general be moving in that direction however it does need a
-> > bit of care to make sure that there aren't any dependencies which do
-> > things like discard error codes, fail to check errors or treat errors as
-> > hard failures.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-pxa/tosa.c | 102 +++++++++++++++++++++++------------------------
+ 1 file changed, 51 insertions(+), 51 deletions(-)
 
-> I don't agree: on platforms which have done this, it's very difficult to
-> tell from reading the kernel message log whether things came up correctly
-> because there's soo much spew from deferred probing it's virtually
-> impossible to tell whether component X initialised or whether that error
-> about resource Y missing was ever resolved.
-
-I do agree that deferred programming is far too chatty - there's a
-usability issue there.  This bites me a lot on some of my systems too, I
-tend to read my logs with grep a lot which isn't awesome.
-
-> If we want kernel boot logs to be useful, we really need to shut up *all*
-> the drivers and subsystems whinging about being deferred probing, and only
-> have the driver model core reporting this status - maybe only allow
-> output about why at debug level or similar.
-
-Yes, some sort of standardisation of how this stuff gets reported would
-give us much better control of these things.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131116/77ea498d/attachment.sig>
+diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+index 0206b91..ef5557b 100644
+--- a/arch/arm/mach-pxa/tosa.c
++++ b/arch/arm/mach-pxa/tosa.c
+@@ -425,57 +425,57 @@ static struct platform_device tosa_power_device = {
+  * Tosa Keyboard
+  */
+ static const uint32_t tosakbd_keymap[] = {
+-	KEY(0, 2, KEY_W),
+-	KEY(0, 6, KEY_K),
+-	KEY(0, 7, KEY_BACKSPACE),
+-	KEY(0, 8, KEY_P),
+-	KEY(1, 1, KEY_Q),
+-	KEY(1, 2, KEY_E),
+-	KEY(1, 3, KEY_T),
+-	KEY(1, 4, KEY_Y),
+-	KEY(1, 6, KEY_O),
+-	KEY(1, 7, KEY_I),
+-	KEY(1, 8, KEY_COMMA),
+-	KEY(2, 1, KEY_A),
+-	KEY(2, 2, KEY_D),
+-	KEY(2, 3, KEY_G),
+-	KEY(2, 4, KEY_U),
+-	KEY(2, 6, KEY_L),
+-	KEY(2, 7, KEY_ENTER),
+-	KEY(2, 8, KEY_DOT),
+-	KEY(3, 1, KEY_Z),
+-	KEY(3, 2, KEY_C),
+-	KEY(3, 3, KEY_V),
+-	KEY(3, 4, KEY_J),
+-	KEY(3, 5, TOSA_KEY_ADDRESSBOOK),
+-	KEY(3, 6, TOSA_KEY_CANCEL),
+-	KEY(3, 7, TOSA_KEY_CENTER),
+-	KEY(3, 8, TOSA_KEY_OK),
+-	KEY(3, 9, KEY_LEFTSHIFT),
+-	KEY(4, 1, KEY_S),
+-	KEY(4, 2, KEY_R),
+-	KEY(4, 3, KEY_B),
+-	KEY(4, 4, KEY_N),
+-	KEY(4, 5, TOSA_KEY_CALENDAR),
+-	KEY(4, 6, TOSA_KEY_HOMEPAGE),
+-	KEY(4, 7, KEY_LEFTCTRL),
+-	KEY(4, 8, TOSA_KEY_LIGHT),
+-	KEY(4, 10, KEY_RIGHTSHIFT),
+-	KEY(5, 1, KEY_TAB),
+-	KEY(5, 2, KEY_SLASH),
+-	KEY(5, 3, KEY_H),
+-	KEY(5, 4, KEY_M),
+-	KEY(5, 5, TOSA_KEY_MENU),
+-	KEY(5, 7, KEY_UP),
+-	KEY(5, 11, TOSA_KEY_FN),
+-	KEY(6, 1, KEY_X),
+-	KEY(6, 2, KEY_F),
+-	KEY(6, 3, KEY_SPACE),
+-	KEY(6, 4, KEY_APOSTROPHE),
+-	KEY(6, 5, TOSA_KEY_MAIL),
+-	KEY(6, 6, KEY_LEFT),
+-	KEY(6, 7, KEY_DOWN),
+-	KEY(6, 8, KEY_RIGHT),
++	KEY(0, 1, KEY_W),
++	KEY(0, 5, KEY_K),
++	KEY(0, 6, KEY_BACKSPACE),
++	KEY(0, 7, KEY_P),
++	KEY(1, 0, KEY_Q),
++	KEY(1, 1, KEY_E),
++	KEY(1, 2, KEY_T),
++	KEY(1, 3, KEY_Y),
++	KEY(1, 5, KEY_O),
++	KEY(1, 6, KEY_I),
++	KEY(1, 7, KEY_COMMA),
++	KEY(2, 0, KEY_A),
++	KEY(2, 1, KEY_D),
++	KEY(2, 2, KEY_G),
++	KEY(2, 3, KEY_U),
++	KEY(2, 5, KEY_L),
++	KEY(2, 6, KEY_ENTER),
++	KEY(2, 7, KEY_DOT),
++	KEY(3, 0, KEY_Z),
++	KEY(3, 1, KEY_C),
++	KEY(3, 2, KEY_V),
++	KEY(3, 3, KEY_J),
++	KEY(3, 4, TOSA_KEY_ADDRESSBOOK),
++	KEY(3, 5, TOSA_KEY_CANCEL),
++	KEY(3, 6, TOSA_KEY_CENTER),
++	KEY(3, 7, TOSA_KEY_OK),
++	KEY(3, 8, KEY_LEFTSHIFT),
++	KEY(4, 0, KEY_S),
++	KEY(4, 1, KEY_R),
++	KEY(4, 2, KEY_B),
++	KEY(4, 3, KEY_N),
++	KEY(4, 4, TOSA_KEY_CALENDAR),
++	KEY(4, 5, TOSA_KEY_HOMEPAGE),
++	KEY(4, 6, KEY_LEFTCTRL),
++	KEY(4, 7, TOSA_KEY_LIGHT),
++	KEY(4, 9, KEY_RIGHTSHIFT),
++	KEY(5, 0, KEY_TAB),
++	KEY(5, 1, KEY_SLASH),
++	KEY(5, 2, KEY_H),
++	KEY(5, 3, KEY_M),
++	KEY(5, 4, TOSA_KEY_MENU),
++	KEY(5, 6, KEY_UP),
++	KEY(5, 10, TOSA_KEY_FN),
++	KEY(6, 0, KEY_X),
++	KEY(6, 1, KEY_F),
++	KEY(6, 2, KEY_SPACE),
++	KEY(6, 3, KEY_APOSTROPHE),
++	KEY(6, 4, TOSA_KEY_MAIL),
++	KEY(6, 5, KEY_LEFT),
++	KEY(6, 6, KEY_DOWN),
++	KEY(6, 7, KEY_RIGHT),
+ };
+ 
+ static struct matrix_keymap_data tosakbd_keymap_data = {
+-- 
+1.8.4.rc3
