@@ -1,39 +1,35 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 16 Nov 2013 14:23:43 +0100
-Subject: [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
+Date: Sat, 16 Nov 2013 14:23:41 +0100
+Subject: [PATCH 08/11] ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
 In-Reply-To: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1384608224-9452-11-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1384608224-9452-9-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IGEP's DVI connector's DDC pins are connected to OMAP's third i2c bus.
+From: Enric Balletbo i Serra <eballetbo@iseebcn.com>
 
-When booting with Device Trees the requested bus number is set to -1
-which means that the bus number should be dynamically assigned. So the
-third i2c bus has 2 has a bus number.
+The IGEP AQUILA EXPANSION has a 32KBit EEPROM for user data storage.
 
-Since now only DT booting is supported for IGEP boards after commit
-06ff74fd ("ARM: OMAP2+: remove legacy support for IGEP boards"), the
-i2c bus number has to be changed.
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Enric Balletbo i Serra <eballetbo@iseebcn.com>
 ---
- arch/arm/mach-omap2/dss-common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/am335x-base0033.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
-index 365bfd3..dadccc9 100644
---- a/arch/arm/mach-omap2/dss-common.c
-+++ b/arch/arm/mach-omap2/dss-common.c
-@@ -223,7 +223,7 @@ void __init omap_4430sdp_display_init_of(void)
- static struct connector_dvi_platform_data omap3_igep2_dvi_connector_pdata = {
- 	.name                   = "dvi",
- 	.source                 = "tfp410.0",
--	.i2c_bus_num            = 3,
-+	.i2c_bus_num            = 2,
+diff --git a/arch/arm/boot/dts/am335x-base0033.dts b/arch/arm/boot/dts/am335x-base0033.dts
+index 2878024..a76ea11 100644
+--- a/arch/arm/boot/dts/am335x-base0033.dts
++++ b/arch/arm/boot/dts/am335x-base0033.dts
+@@ -87,3 +87,10 @@
+ 	status = "okay";
  };
  
- static struct platform_device omap3_igep2_dvi_connector_device = {
++&i2c0 {
++	eeprom: eeprom at 50 {
++		compatible = "at,24c256";
++		reg = <0x50>;
++	};
++};
++
 -- 
 1.8.4.2
