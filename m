@@ -1,96 +1,43 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 16 Nov 2013 22:28:12 +0800
-Subject: [PATCH] ARM: imx: select PINCTRL at sub-architecure level
-Message-ID: <1384612093-28691-1-git-send-email-shawn.guo@linaro.org>
+Date: Sat, 16 Nov 2013 22:36:25 +0800
+Subject: [PATCH] ARM: imx: rename IMX6SL_CLK_CLK_END to IMX6SL_CLK_END
+Message-ID: <1384612585-7602-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of selecting PINCTRL on individual SoC, let's select it at IMX
-sub-architecure level.
-
-While at it, it also adds the missing PINCTRL_IMX50 selection for
-SOC_IMX50.
+The macro name IMX6SL_CLK_CLK_END is a little insane.  Rename it to
+IMX6SL_CLK_END.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/Kconfig |    9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ arch/arm/mach-imx/clk-imx6sl.c           |    2 +-
+ include/dt-bindings/clock/imx6sl-clock.h |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index f35da31..d511e054 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_MXC
- 	select GENERIC_IRQ_CHIP
- 	select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
- 	select MULTI_IRQ_HANDLER
-+	select PINCTRL
- 	select SOC_BUS
- 	select SPARSE_IRQ
- 	select USE_OF
-@@ -99,7 +100,6 @@ config SOC_IMX25
- 	select ARCH_MXC_IOMUX_V3
- 	select CPU_ARM926T
- 	select MXC_AVIC
--	select PINCTRL
- 	select PINCTRL_IMX25
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index c0c4ef5..a747a7d 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -63,7 +63,7 @@ static struct clk_div_table video_div_table[] = {
+ 	{ }
+ };
  
- config SOC_IMX27
-@@ -110,7 +110,6 @@ config SOC_IMX27
- 	select IMX_HAVE_IOMUX_V1
- 	select MACH_MX27
- 	select MXC_AVIC
--	select PINCTRL
- 	select PINCTRL_IMX27
+-static struct clk *clks[IMX6SL_CLK_CLK_END];
++static struct clk *clks[IMX6SL_CLK_END];
+ static struct clk_onecell_data clk_data;
  
- config SOC_IMX31
-@@ -139,7 +138,6 @@ config SOC_IMX5
- config	SOC_IMX51
- 	bool
- 	select HAVE_IMX_SRC
--	select PINCTRL
- 	select PINCTRL_IMX51
- 	select SOC_IMX5
+ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+diff --git a/include/dt-bindings/clock/imx6sl-clock.h b/include/dt-bindings/clock/imx6sl-clock.h
+index 7fcdf90..46f7495 100644
+--- a/include/dt-bindings/clock/imx6sl-clock.h
++++ b/include/dt-bindings/clock/imx6sl-clock.h
+@@ -143,6 +143,6 @@
+ #define IMX6SL_CLK_USDHC2		130
+ #define IMX6SL_CLK_USDHC3		131
+ #define IMX6SL_CLK_USDHC4		132
+-#define IMX6SL_CLK_CLK_END		133
++#define IMX6SL_CLK_END			133
  
-@@ -763,6 +761,7 @@ comment "Device tree only"
- config	SOC_IMX50
- 	bool "i.MX50 support"
- 	select HAVE_IMX_SRC
-+	select PINCTRL_IMX50
- 	select SOC_IMX5
- 
- 	help
-@@ -772,7 +771,6 @@ config	SOC_IMX53
- 	bool "i.MX53 support"
- 	select HAVE_IMX_SRC
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
--	select PINCTRL
- 	select PINCTRL_IMX53
- 	select SOC_IMX5
- 
-@@ -798,7 +796,6 @@ config SOC_IMX6Q
- 	select MFD_SYSCON
- 	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
--	select PINCTRL
- 	select PINCTRL_IMX6Q
- 	select PL310_ERRATA_588369 if CACHE_PL310
- 	select PL310_ERRATA_727915 if CACHE_PL310
-@@ -819,7 +816,6 @@ config SOC_IMX6SL
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
- 	select MFD_SYSCON
--	select PINCTRL
- 	select PINCTRL_IMX6SL
- 	select PL310_ERRATA_588369 if CACHE_PL310
- 	select PL310_ERRATA_727915 if CACHE_PL310
-@@ -833,7 +829,6 @@ config SOC_VF610
- 	select CPU_V7
- 	select ARM_GIC
- 	select CLKSRC_OF
--	select PINCTRL
- 	select PINCTRL_VF610
- 	select VF_PIT_TIMER
- 	select PL310_ERRATA_588369 if CACHE_PL310
+ #endif /* __DT_BINDINGS_CLOCK_IMX6SL_H */
 -- 
 1.7.9.5
