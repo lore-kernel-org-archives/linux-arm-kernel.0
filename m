@@ -1,53 +1,36 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Sun, 17 Nov 2013 16:18:29 +0000
-Subject: xen drivers fail to link on ARM with v3.12-9888-gf63c482
-In-Reply-To: <CA+5PVA63LyUB7o0+Z-YS91AUUwvRokHeYq_GJ1i6VE3bj2qQLA@mail.gmail.com>
-References: <CA+5PVA7YMMRmFE=T7MOdGNeUiv_4Eu_u2-SrDfSTE052MpAnag@mail.gmail.com>
- <CA+5PVA63LyUB7o0+Z-YS91AUUwvRokHeYq_GJ1i6VE3bj2qQLA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1311171616470.4714@kaball.uk.xensource.com>
+Date: Sun, 17 Nov 2013 16:31:34 +0000
+Subject: [PATCH] xen/arm: p2m_init and p2m_lock should be static
+Message-ID: <1384705894-8285-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 16 Nov 2013, Josh Boyer wrote:
-> On Sat, Nov 16, 2013 at 9:56 AM, Josh Boyer <jwboyer@fedoraproject.org> wrote:
-> > Hi All,
-> >
-> > The xen-gntalloc, xen-netfront, xen-blkfront, and xen-netback drivers
-> > fail to link on ARM today with the following error:
-> >
-> > ERROR: "phys_to_mach" [drivers/xen/xen-gntalloc.ko] undefined!
-> > ERROR: "phys_to_mach" [drivers/net/xen-netfront.ko] undefined!
-> > ERROR: "phys_to_mach" [drivers/net/xen-netback/xen-netback.ko] undefined!
-> > ERROR: "phys_to_mach" [drivers/block/xen-blkfront.ko] undefined!
-> >
-> > This is with Linus' tree as of this morning.
-> >
-> > I'm guessing this is because the mfn_to_pfn and pfn_to_mfn functions
-> > are inlined and reference phys_to_mach directly, and that isn't
-> > exported to modules.  Thoughts?
-> 
-> The patch below seems to fix this, but I'm not sure it's the desired
-> approach.  I added the export for mach_to_phys just in case.
-> 
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/p2m.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Thank you for letting me know of the problem and thank you for the
-patch!
-
-
-> diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-> index 23732cd..7772fa8 100644
-> --- a/arch/arm/xen/p2m.c
-> +++ b/arch/arm/xen/p2m.c
-> @@ -27,7 +27,9 @@ struct xen_p2m_entry {
-> 
->  rwlock_t p2m_lock;
->  struct rb_root phys_to_mach = RB_ROOT;
-> +EXPORT_SYMBOL_GPL(phys_to_mach);
->  static struct rb_root mach_to_phys = RB_ROOT;
-> +EXPORT_SYMBOL_GPL(mach_to_phys);
-> 
-
-The approach is OK but mach_to_phys should not be exported.
-Can you please resent the patch only exporting phys_to_mach and with
-your signed-off-by line so that I can send it to Linus as soon as
-possible?
+diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+index 0f842e8..b31ee1b2 100644
+--- a/arch/arm/xen/p2m.c
++++ b/arch/arm/xen/p2m.c
+@@ -25,7 +25,7 @@ struct xen_p2m_entry {
+ 	struct rb_node rbnode_phys;
+ };
+ 
+-rwlock_t p2m_lock;
++static rwlock_t p2m_lock;
+ struct rb_root phys_to_mach = RB_ROOT;
+ EXPORT_SYMBOL_GPL(phys_to_mach);
+ static struct rb_root mach_to_phys = RB_ROOT;
+@@ -201,7 +201,7 @@ bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ }
+ EXPORT_SYMBOL_GPL(__set_phys_to_machine);
+ 
+-int p2m_init(void)
++static int p2m_init(void)
+ {
+ 	rwlock_init(&p2m_lock);
+ 	return 0;
+-- 
+1.7.2.5
