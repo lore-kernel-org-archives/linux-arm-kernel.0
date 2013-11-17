@@ -1,83 +1,57 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Sun, 17 Nov 2013 17:37:53 +0100
-Subject: [PATCHv7] dmaengine: Add support for BCM2835
-In-Reply-To: <1384704123.2727.8.camel@joe-AO722>
-References: <5288E327.8050809@koalo.de> <1384704123.2727.8.camel@joe-AO722>
-Message-ID: <5288F0E1.3020101@koalo.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sun, 17 Nov 2013 17:18:03 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <CAOesGMhkCn2zeJj_ZZAZu_wJya-4evWEqNHpVJEpjxzWHVWY3A@mail.gmail.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <201311152158.32644.arnd@arndb.de>
+ <CAOesGMhkCn2zeJj_ZZAZu_wJya-4evWEqNHpVJEpjxzWHVWY3A@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1311171705130.4714@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2013 17:02, Joe Perches wrote:
-> On Sun, 2013-11-17 at 16:39 +0100, Florian Meier wrote:
->> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
->> Currently it only supports cyclic DMA.
-> []
->> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> []
->> +static int bcm2835_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->> +	unsigned long arg)
->> +{
->> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
->> +	int ret;
->> +
->> +	switch (cmd) {
->> +	case DMA_SLAVE_CONFIG:
->> +		return bcm2835_dma_slave_config(c,
->> +				(struct dma_slave_config *)arg);
->> +
->> +	case DMA_TERMINATE_ALL:
->> +		bcm2835_dma_terminate_all(c);
->> +		break;
->> +
->> +	default:
->> +		ret = -ENXIO;
->> +		break;
->> +	}
->> +
->> +	return ret;
->> +}
+On Fri, 15 Nov 2013, Olof Johansson wrote:
+> On Fri, Nov 15, 2013 at 12:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 15 November 2013, Olof Johansson wrote:
+> >> So, I'm strongly urging that whatever the server guys try to do, it
+> >> will in the end result in the ACPI data being translated into DT
+> >> equivalents, such that the kernel only needs to handle data via DT.
+> >
+> > I don't think that a translation layer is the answer, I see the problem
+> > more in things that cannot be translated automatically. The parts that
+> > are similar enough to allow translation could also just be handled by
+> > a thin abstraction layer in the kernel, which I think we will see
+> > on embedded x86 with DT-in-ACPI-syntax.
 > 
-> case DMA_TERMINATE_ALL returns an uninitialized ret;
+> I'm not so sure that converting everything yet again to another
+> abstraction layer is a good solution. We've got one level of
+> abstraction today -- DT. And we've got the un-abstracted layer of
+> platform devices. Churning all drivers yet again seems like the wrong
+> way to do this. For things that we can pre-populate instead of adding
+> runtime abstraction, we should.
 
-Oh yes - stupid mistake. Thank you!
+Simply using DT would help avoiding the awkward situation where a driver
+of a device only works with one of the two description formats and not
+the other.
 
-> []
+
+> > I think we can still treat ACPI on ARM64 as a beginner's mistake and
+> > provide hand-written DT blobs for the few systems that start shipping
+> > with that.
 > 
->> +static struct dma_chan *bcm2835_dma_xlate(struct of_phandle_args *spec,
->> +					   struct of_dma *ofdma)
->> +{
->> +	struct bcm2835_dmadev *d = ofdma->of_dma_data;
->> +	struct dma_chan *chan, *candidate;
->> +
->> +retry:
->> +	candidate = NULL;
->> +
->> +	/* Walk the list of channels registered with the current instance and
->> +	 * find one that is currently unused */
->> +	list_for_each_entry(chan, &d->ddev.channels, device_node)
->> +		if (chan->client_count == 0) {
->> +			candidate = chan;
->> +			break;
->> +		}
->> +
->> +	if (!candidate)
->> +		return NULL;
->> +
->> +	/* dma_get_slave_channel will return NULL if we lost a race between
->> +	 * the lookup and the reservation */
->> +	chan = dma_get_slave_channel(candidate);
-> 
-> Can that race happen consistently?
-> Does this avoid being a tight loop?
+> I think we can do better -- we can ask those vendors to not ship ACPI
+> at all, and ship DT themselves (together with us for review, etc).
 
-I would say this can not happen.
-If I get everything right, the conflicting process will not
-get NULL (because it has won the race). In the worst case,
-a new process enters the race, but this will only continue until all
-channels are used. In that case no candidate exists and the loop will
-exit.
+They can ship with ACPI if they want to, what is important is that they
+ship with device tree too.
+Encouraging them to do that is definitely the right thing to do today,
+regardless of the medium to long term ACPI strategy for the Linux
+kernel.
 
-At least, the code is directly taken from mmp_pdma.c ;-)
 
-Greetings,
-Florian
+> Especially since doing a broken ACPI implementation today _just for
+> us_ will just distract them. If they need one for RT, fine. As I
+> mentioned elsewhere, shipping a flashed DTB is no different from
+> shipping ACPI from a future-proof point of view; we'll end up
+> overriding either at some point once we figure out things better.
+
+Well said.
