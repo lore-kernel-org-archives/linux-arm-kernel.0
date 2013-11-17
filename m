@@ -1,135 +1,51 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 17 Nov 2013 12:04:02 +0100
-Subject: [PATCH 13/21] ARM: ux500: move GPIO key configuration to device tree
+Date: Sun, 17 Nov 2013 12:04:03 +0100
+Subject: [PATCH 14/21] ARM: ux500: move the WLAN GPIO pin setup to the device
+ tree
 In-Reply-To: <1384686250-10542-1-git-send-email-linus.walleij@linaro.org>
 References: <1384686250-10542-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1384686250-10542-14-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1384686250-10542-15-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves over the configuration of the GPIO keys (used for
-proximity sensor and Hall effect sensor) from the static pin
-configuration file to the device tree. As part of the exercise,
-implement the GPIO keys properly in a per-UIB file as this
-setup actually differs with each UIB.
+This moves some of the pin setup related to the CW1200 WLAN
+module over to the device tree. As the driver is not yet
+activated for the CW1200 WLAN we do not assign this pinctrl
+state to any device node yet.
+
+Get rid of the cmdline argument passing of a certain U9500
+platform variant, as this is not supported by the kernel or
+any device tree.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-href-stuib.dtsi      | 41 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 38 +++++++++++++++++++++++++++
- arch/arm/boot/dts/ste-href.dtsi            | 11 --------
- arch/arm/boot/dts/ste-hrefv60plus.dtsi     |  6 -----
- arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi |  5 ++++
- arch/arm/mach-ux500/board-mop500-pins.c    |  8 ------
- 6 files changed, 84 insertions(+), 25 deletions(-)
+ arch/arm/boot/dts/ste-href-family-pinctrl.dtsi | 19 +++++++
+ arch/arm/mach-ux500/board-mop500-pins.c        | 75 --------------------------
+ 2 files changed, 19 insertions(+), 75 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-href-stuib.dtsi b/arch/arm/boot/dts/ste-href-stuib.dtsi
-index 76704ec0ffcc..1c3574435ea8 100644
---- a/arch/arm/boot/dts/ste-href-stuib.dtsi
-+++ b/arch/arm/boot/dts/ste-href-stuib.dtsi
-@@ -12,6 +12,28 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		vdd-supply = <&ab8500_ldo_aux1_reg>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&prox_stuib_mode>, <&hall_stuib_mode>;
-+
-+		button at 139 {
-+			/* Proximity sensor */
-+			gpios = <&gpio6 25 0x4>;
-+			linux,code = <11>; /* SW_FRONT_PROXIMITY */
-+			label = "SFH7741 Proximity Sensor";
-+		};
-+		button at 145 {
-+			/* Hall sensor */
-+			gpios = <&gpio4 17 0x4>;
-+			linux,code = <0>; /* SW_LID */
-+			label = "HED54XXU11 Hall Effect Sensor";
-+		};
-+	};
-+
- 	soc {
- 		i2c at 80004000 {
- 			stmpe1601: stmpe1601 at 40 {
-@@ -74,5 +96,24 @@
- 				rohm,flip-y;
- 			};
- 		};
-+
-+		pinctrl {
-+			prox {
-+				prox_stuib_mode: prox_stuib {
-+					stuib_cfg {
-+						ste,pins = "GPIO217_AH12";
-+						ste,config = <&gpio_in_pu>;
-+					};
-+				};
-+			};
-+			hall {
-+				hall_stuib_mode: stuib_tvk {
-+					stuib_cfg {
-+						ste,pins = "GPIO145_C13";
-+						ste,config = <&gpio_in_pu>;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-index 3f31f9206fb3..c40565320978 100644
---- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-+++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-@@ -14,6 +14,28 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		vdd-supply = <&ab8500_ldo_aux1_reg>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&prox_tvk_mode>, <&hall_tvk_mode>;
-+
-+		button at 139 {
-+			/* Proximity sensor */
-+			gpios = <&gpio6 25 0x4>;
-+			linux,code = <11>; /* SW_FRONT_PROXIMITY */
-+			label = "SFH7741 Proximity Sensor";
-+		};
-+		button at 145 {
-+			/* Hall sensor */
-+			gpios = <&gpio4 17 0x4>;
-+			linux,code = <0>; /* SW_LID */
-+			label = "HED54XXU11 Hall Effect Sensor";
-+		};
-+	};
-+
- 	soc {
- 		/* Add Synaptics touch screen, TC35893 keypad etc here */
- 		i2c at 80004000 {
-@@ -76,6 +98,22 @@
+diff --git a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
+index 854a4a6e521e..addfcc7c2750 100644
+--- a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
++++ b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
+@@ -721,6 +721,25 @@
  					};
  				};
  			};
-+			prox {
-+				prox_tvk_mode: prox_tvk {
-+					tvk_cfg {
-+						ste,pins = "GPIO217_AH12";
-+						ste,config = <&gpio_in_pu>;
++
++			wlan {
++				wlan_default_mode: wlan_default {
++					/*
++					 * Activate this mode with the WLAN chip.
++					 * These are plain GPIO pins used by WLAN
++					 */
++					default_cfg1 {
++						ste,pins =
++						"GPIO226_AF8", /* WLAN_PMU_EN */
++						"GPIO85_D5"; /* WLAN_ENA */
++						ste,config = <&gpio_out_lo>;
 +					};
-+				};
-+			};
-+			hall {
-+				hall_tvk_mode: hall_tvk {
-+					tvk_cfg {
-+						ste,pins = "GPIO145_C13";
++					default_cfg2 {
++						ste,pins = "GPIO4_AH6"; /* WLAN_IRQ on UART1 */
 +						ste,config = <&gpio_in_pu>;
 +					};
 +				};
@@ -137,79 +53,140 @@ index 3f31f9206fb3..c40565320978 100644
  		};
  	};
  };
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 56772c3ebb28..e28242173d18 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -18,17 +18,6 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
- 
--	gpio_keys {
--		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		button at 1 {
--			linux,code = <11>;
--			label = "SFH7741 Proximity Sensor";
--		};
--	};
--
- 	soc {
- 		usb_per5 at a03e0000 {
- 			pinctrl-names = "default", "sleep";
-diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-index 452f00c4f7c0..6e0105d2f461 100644
---- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-@@ -16,12 +16,6 @@
- 	model = "ST-Ericsson HREF (v60+) platform with Device Tree";
- 	compatible = "st-ericsson,hrefv60+", "st-ericsson,u8500";
- 
--	gpio_keys {
--		button at 1 {
--			gpios = <&gpio5 25 0x4>;
--		};
--	};
--
- 	soc {
- 		// External Micro SD slot
- 		sdi0_per1 at 80126000 {
-diff --git a/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi b/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
-index ee143b0a5baa..e6f22b266420 100644
---- a/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
-@@ -36,6 +36,11 @@
- 		ste,input = <INPUT_PULLUP>;
- 	};
- 
-+	gpio_in_pd: gpio_input_pull_down {
-+		ste,gpio = <GPIOMODE_ENABLED>;
-+		ste,input = <INPUT_PULLDOWN>;
-+	};
-+
- 	gpio_out_lo: gpio_output_low {
- 		ste,gpio = <GPIOMODE_ENABLED>;
- 		ste,output = <OUTPUT_LOW>;
 diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 257c97a214a5..4535702a8e3f 100644
+index 4535702a8e3f..d0d527a3d205 100644
 --- a/arch/arm/mach-ux500/board-mop500-pins.c
 +++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -382,14 +382,6 @@ static struct pinctrl_map __initdata hrefv60_pinmap[] = {
- 	/* Accelerometer interrupt lines */
- 	DB8500_PIN_HOG("GPIO82_C1", gpio_in_pu), /* ACC_INT1 */
+@@ -16,19 +16,11 @@
+ 
+ #include "board-mop500.h"
+ 
+-enum custom_pin_cfg_t {
+-	PINS_FOR_DEFAULT,
+-	PINS_FOR_U9500,
+-};
+-
+-static enum custom_pin_cfg_t pinsfor;
+-
+ /* These simply sets bias for pins */
+ #define BIAS(a,b) static unsigned long a[] = { b }
+ 
+ BIAS(pd, PIN_PULL_DOWN);
+ BIAS(in_pu, PIN_INPUT_PULLUP);
+-BIAS(in_pd, PIN_INPUT_PULLDOWN);
+ BIAS(out_lo, PIN_OUTPUT_LOW);
+ 
+ BIAS(abx500_out_lo, PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0));
+@@ -38,8 +30,6 @@ BIAS(abx500_in_nopull, PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN, 0));
+ /* These also force them into GPIO mode */
+ BIAS(gpio_in_pu, PIN_INPUT_PULLUP|PIN_GPIOMODE_ENABLED);
+ BIAS(gpio_in_pd, PIN_INPUT_PULLDOWN|PIN_GPIOMODE_ENABLED);
+-BIAS(gpio_in_pu_slpm_gpio_nopull, PIN_INPUT_PULLUP|PIN_GPIOMODE_ENABLED|PIN_SLPM_GPIO|PIN_SLPM_INPUT_NOPULL);
+-BIAS(gpio_in_pd_slpm_gpio_nopull, PIN_INPUT_PULLDOWN|PIN_GPIOMODE_ENABLED|PIN_SLPM_GPIO|PIN_SLPM_INPUT_NOPULL);
+ BIAS(gpio_out_hi, PIN_OUTPUT_HIGH|PIN_GPIOMODE_ENABLED);
+ BIAS(gpio_out_lo, PIN_OUTPUT_LOW|PIN_GPIOMODE_ENABLED);
+ 
+@@ -317,8 +307,6 @@ static struct pinctrl_map __initdata ab8505_pinmap[] = {
+  * and SSP1 ports (previously connected to the AB8500) as generic GPIO lines.
+  */
+ static struct pinctrl_map __initdata hrefv60_pinmap[] = {
+-	/* Drive WLAN_ENA low */
+-	DB8500_PIN_HOG("GPIO85_D5", gpio_out_lo), /* WLAN_ENA */
+ 	/*
+ 	 * XENON Flashgun on image processor GPIO (controlled from image
+ 	 * processor firmware), mux in these image processor GPIO lines 0
+@@ -384,27 +372,6 @@ static struct pinctrl_map __initdata hrefv60_pinmap[] = {
  	DB8500_PIN_HOG("GPIO83_D3", gpio_in_pu), /* ACC_INT2 */
--	/*
--	 * Runtime stuff
--	 * Pull up/down of some sensor GPIO pins, for proximity, HAL sensor
--	 * etc.
--	 */
--	DB8500_PIN("GPIO217_AH12", gpio_in_pu_slpm_gpio_nopull, "gpio-keys.0"),
--	DB8500_PIN("GPIO145_C13", gpio_in_pd_slpm_gpio_nopull, "gpio-keys.0"),
--	DB8500_PIN("GPIO139_C9", gpio_in_pu_slpm_gpio_nopull, "gpio-keys.0"),
  };
  
- static struct pinctrl_map __initdata u9500_pinmap[] = {
+-static struct pinctrl_map __initdata u9500_pinmap[] = {
+-	/* WLAN_IRQ line */
+-	DB8500_PIN_HOG("GPIO144_B13", gpio_in_pu),
+-	/* HSI */
+-	DB8500_MUX_HOG("hsir_a_1", "hsi"),
+-	DB8500_MUX_HOG("hsit_a_2", "hsi"),
+-	DB8500_PIN_HOG("GPIO219_AG10", in_pd), /* RX FLA0 */
+-	DB8500_PIN_HOG("GPIO220_AH10", in_pd), /* RX DAT0 */
+-	DB8500_PIN_HOG("GPIO221_AJ11", out_lo), /* RX RDY0 */
+-	DB8500_PIN_HOG("GPIO222_AJ9", out_lo), /* TX FLA0 */
+-	DB8500_PIN_HOG("GPIO223_AH9", out_lo), /* TX DAT0 */
+-	DB8500_PIN_HOG("GPIO224_AG9", in_pd), /* TX RDY0 */
+-	DB8500_PIN_HOG("GPIO225_AG8", in_pd), /* CAWAKE0 */
+-	DB8500_PIN_HOG("GPIO226_AF8", gpio_out_hi), /* ACWAKE0 */
+-};
+-
+-static struct pinctrl_map __initdata u8500_pinmap[] = {
+-	DB8500_PIN_HOG("GPIO226_AF8", gpio_out_lo), /* WLAN_PMU_EN */
+-	DB8500_PIN_HOG("GPIO4_AH6", gpio_in_pu), /* WLAN_IRQ */
+-};
+-
+ static struct pinctrl_map __initdata snowball_pinmap[] = {
+ 	/* Mux in SSP0 connected to AB8500, pull down RXD pin */
+ 	DB8500_MUX_HOG("ssp0_a_1", "ssp0"),
+@@ -426,47 +393,8 @@ static struct pinctrl_map __initdata snowball_pinmap[] = {
+ 	DB8500_PIN_HOG("GPIO216_AG12", gpio_in_pu), /* WLAN_IRQ */
+ };
+ 
+-/*
+- * passing "pinsfor=" in kernel cmdline allows for custom
+- * configuration of GPIOs on u8500 derived boards.
+- */
+-static int __init early_pinsfor(char *p)
+-{
+-	pinsfor = PINS_FOR_DEFAULT;
+-
+-	if (strcmp(p, "u9500-21") == 0)
+-		pinsfor = PINS_FOR_U9500;
+-
+-	return 0;
+-}
+-early_param("pinsfor", early_pinsfor);
+-
+-int pins_for_u9500(void)
+-{
+-	if (pinsfor == PINS_FOR_U9500)
+-		return 1;
+-
+-	return 0;
+-}
+-
+-static void __init mop500_href_family_pinmaps_init(void)
+-{
+-	switch (pinsfor) {
+-	case PINS_FOR_U9500:
+-		pinctrl_register_mappings(u9500_pinmap,
+-					  ARRAY_SIZE(u9500_pinmap));
+-		break;
+-	case PINS_FOR_DEFAULT:
+-		pinctrl_register_mappings(u8500_pinmap,
+-					  ARRAY_SIZE(u8500_pinmap));
+-	default:
+-		break;
+-	}
+-}
+-
+ void __init mop500_pinmaps_init(void)
+ {
+-	mop500_href_family_pinmaps_init();
+ 	if (machine_is_u8520())
+ 		pinctrl_register_mappings(ab8505_pinmap,
+ 					  ARRAY_SIZE(ab8505_pinmap));
+@@ -479,8 +407,6 @@ void __init snowball_pinmaps_init(void)
+ {
+ 	pinctrl_register_mappings(snowball_pinmap,
+ 				  ARRAY_SIZE(snowball_pinmap));
+-	pinctrl_register_mappings(u8500_pinmap,
+-				  ARRAY_SIZE(u8500_pinmap));
+ 	pinctrl_register_mappings(ab8500_pinmap,
+ 				  ARRAY_SIZE(ab8500_pinmap));
+ }
+@@ -489,7 +415,6 @@ void __init hrefv60_pinmaps_init(void)
+ {
+ 	pinctrl_register_mappings(hrefv60_pinmap,
+ 				  ARRAY_SIZE(hrefv60_pinmap));
+-	mop500_href_family_pinmaps_init();
+ 	pinctrl_register_mappings(ab8500_pinmap,
+ 				  ARRAY_SIZE(ab8500_pinmap));
+ }
 -- 
 1.8.3.1
