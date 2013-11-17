@@ -1,57 +1,42 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Sun, 17 Nov 2013 19:52:40 -0300
-Subject: [GIT PULL] Allwinner sunXi clock patches for 3.13
-In-Reply-To: <20131110105309.GA16835@lukather>
-References: <20131110105309.GA16835@lukather>
-Message-ID: <528948B8.2060503@elopez.com.ar>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 17 Nov 2013 23:56:21 +0100
+Subject: [PATCH 4/5] ARM: dts: imx53: Add AHCI SATA binding
+In-Reply-To: <1384728982-19834-1-git-send-email-marex@denx.de>
+References: <1384728982-19834-1-git-send-email-marex@denx.de>
+Message-ID: <1384728982-19834-4-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+The AHCI-IMX driver now supports i.MX53 as well. Add DT binding.
 
-El 10/11/13 07:53, Maxime Ripard escribi?:
-> Hi Mike,
->
-> Emilio doesn't have time to send the pull request for this release
-> cycle, so I'm doing the pull request for this merge window. The
-> current plan is that he'll do the next ones.
->
-> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
->
->    Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
->
-> are available in the git repository at:
->
->    https://github.com/mripard/linux.git tags/sunxi-clk-for-3.13
->
-> for you to fetch changes up to e71c69fc3362b88b09194d486dda6d721a8004f6:
->
->    drivers: clk: sunxi: Fix memory leakage in clk-sunxi.c (2013-11-10 11:40:51 +0100)
->
-> ----------------------------------------------------------------
-> Allwinner sunXi SoCs clock changes
->
-> Those are mostly random fixes, except for one patch to the composite
-> clock that adds support for automatic reparenting.
->
-> ----------------------------------------------------------------
-> Emilio L?pez (4):
->        clk: composite: .determine_rate support
->        clk: sunxi: factors: fix off-by-one masks
->        clk: sunxi: factors: clear variables before using them
->        clk: sunxi: protect core clocks from accidental shutdown
->
-> Victor N. Ramos Mello (1):
->        drivers: clk: sunxi: Fix memory leakage in clk-sunxi.c
->
->   drivers/clk/clk-composite.c     | 28 +++++++++++++++++++++
->   drivers/clk/sunxi/clk-factors.c |  4 +--
->   drivers/clk/sunxi/clk-sunxi.c   | 56 +++++++++++++++++++++++++++++++++--------
->   3 files changed, 75 insertions(+), 13 deletions(-)
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Richard Zhu <r65037@freescale.com>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Linux-IDE <linux-ide@vger.kernel.org>
+---
+ arch/arm/boot/dts/imx53.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Do you intend to pull these patches for 3.13? I see that you sent your 
-pull request to Linus on November 11th, so I wondered what your plans were.
-
-Cheers,
-
-Emilio
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cffdda2..0e92af0 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -85,6 +85,15 @@
+ 		interrupt-parent = <&tzic>;
+ 		ranges;
+ 
++		sata: sata at 10000000 {
++			compatible = "fsl,imx53-ahci";
++			reg = <0x10000000 0x1000>;
++			interrupts = <28>;
++			clocks =  <&clks 173>, <&clks 188>, <&clks 5>;
++			clock-names = "sata_gate", "sata_phy", "ahb";
++			status = "disabled";
++		};
++
+ 		ipu: ipu at 18000000 {
+ 			#crtc-cells = <1>;
+ 			compatible = "fsl,imx53-ipu";
+-- 
+1.8.4.2
