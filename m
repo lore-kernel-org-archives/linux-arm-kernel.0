@@ -1,110 +1,183 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 18 Nov 2013 00:06:17 +0100
-Subject: [PATCH v5 17/17] clk: mpc512x: remove migration support workarounds
+Date: Mon, 18 Nov 2013 00:06:15 +0100
+Subject: [PATCH v5 15/17] net: can: mscan: remove non-CCF code for MPC512x
 In-Reply-To: <1384729577-7336-1-git-send-email-gsi@denx.de>
 References: <1384729577-7336-1-git-send-email-gsi@denx.de>
-Message-ID: <1384729577-7336-18-git-send-email-gsi@denx.de>
+Message-ID: <1384729577-7336-16-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this change removes workarounds which have become obsolete after
-migration to common clock support has completed
-- remove clkdev registration calls (compatibility clock item aliases)
-  after all peripheral drivers were adjusted for device tree based
-  clock lookup
-- remove pre-enable workarounds after all peripheral drivers were
-  adjusted to acquire their respective clock items
+transition to the common clock framework has completed and the PPC_CLOCK
+is no longer available for the MPC512x platform, remove the now obsolete
+code path of the mpc5xxx mscan driver which accessed clock control module
+registers directly
 
-workarounds for these clock items get removed:  FEC (ethernet), I2C,
-PSC (UART, SPI), PSC FIFO, USB, NFC (NAND flash), VIU (video capture),
-BDLC (CAN), CAN MCLK, DIU (video output)
-
-these clkdev registered names won't be provided any longer by the
-MPC512x platform's clock driver:  "psc%d_mclk", "mscan%d_mclk",
-"usb%d_clk", "nfc_clk", "viu_clk", "sys_clk", "ref_clk"
-
-the pre-enable workaround for PCI remains, but depends on the presence
-of PCI related device tree nodes (disables the PCI clock in the absence
-of PCI nodes, keeps the PCI clock enabled in the presence of nodes) --
-moving clock acquisition into the peripheral driver isn't possible for
-PCI because its initialization takes place before the platform clock
-driver gets initialized, thus the clock provider isn't available then
-
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Anatolij Gustschin <agust@denx.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Wolfgang Grandegger <wg@grandegger.com>
+Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+Cc: linux-can at vger.kernel.org
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/platforms/512x/clock-commonclk.c |   50 ++++++++-----------------
- 1 file changed, 16 insertions(+), 34 deletions(-)
+ drivers/net/can/mscan/mpc5xxx_can.c |  141 -----------------------------------
+ 1 file changed, 141 deletions(-)
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index c1faf3a9ea1f..b1fbdcbc68b7 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -695,46 +695,28 @@ static void mpc5121_clk_register_of_provider(struct device_node *np)
-  */
- static void mpc5121_clk_provide_migration_support(void)
+diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+index f48f1297ff30..6b0c9958d824 100644
+--- a/drivers/net/can/mscan/mpc5xxx_can.c
++++ b/drivers/net/can/mscan/mpc5xxx_can.c
+@@ -109,9 +109,6 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+ #endif /* CONFIG_PPC_MPC52xx */
+ 
+ #ifdef CONFIG_PPC_MPC512x
+-
+-#if IS_ENABLED(CONFIG_COMMON_CLK)
+-
+ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 				 const char *clock_source, int *mscan_clksrc)
  {
--	int idx;
--	char name[32];
+@@ -277,144 +274,6 @@ static void mpc512x_can_put_clock(struct platform_device *ofdev)
+ 	if (priv->clk_ipg)
+ 		clk_disable_unprepare(priv->clk_ipg);
+ }
+-
+-#else	/* COMMON_CLK */
+-
+-struct mpc512x_clockctl {
+-	u32 spmr;		/* System PLL Mode Reg */
+-	u32 sccr[2];		/* System Clk Ctrl Reg 1 & 2 */
+-	u32 scfr1;		/* System Clk Freq Reg 1 */
+-	u32 scfr2;		/* System Clk Freq Reg 2 */
+-	u32 reserved;
+-	u32 bcr;		/* Bread Crumb Reg */
+-	u32 pccr[12];		/* PSC Clk Ctrl Reg 0-11 */
+-	u32 spccr;		/* SPDIF Clk Ctrl Reg */
+-	u32 cccr;		/* CFM Clk Ctrl Reg */
+-	u32 dccr;		/* DIU Clk Cnfg Reg */
+-	u32 mccr[4];		/* MSCAN Clk Ctrl Reg 1-3 */
+-};
+-
+-static struct of_device_id mpc512x_clock_ids[] = {
+-	{ .compatible = "fsl,mpc5121-clock", },
+-	{}
+-};
+-
+-static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+-				 const char *clock_name, int *mscan_clksrc)
+-{
+-	struct mpc512x_clockctl __iomem *clockctl;
+-	struct device_node *np_clock;
+-	struct clk *sys_clk, *ref_clk;
+-	int plen, clockidx, clocksrc = -1;
+-	u32 sys_freq, val, clockdiv = 1, freq = 0;
+-	const u32 *pval;
+-
+-	np_clock = of_find_matching_node(NULL, mpc512x_clock_ids);
+-	if (!np_clock) {
+-		dev_err(&ofdev->dev, "couldn't find clock node\n");
+-		return 0;
+-	}
+-	clockctl = of_iomap(np_clock, 0);
+-	if (!clockctl) {
+-		dev_err(&ofdev->dev, "couldn't map clock registers\n");
+-		goto exit_put;
+-	}
+-
+-	/* Determine the MSCAN device index from the peripheral's
+-	 * physical address. Register address offsets against the
+-	 * IMMR base are:  0x1300, 0x1380, 0x2300, 0x2380
+-	 */
+-	pval = of_get_property(ofdev->dev.of_node, "reg", &plen);
+-	BUG_ON(!pval || plen < sizeof(*pval));
+-	clockidx = (*pval & 0x80) ? 1 : 0;
+-	if (*pval & 0x2000)
+-		clockidx += 2;
 -
 -	/*
--	 * provide "pre-CCF" alias clock names for peripheral drivers
--	 * which have not yet been adjusted to do OF based clock lookups
+-	 * Clock source and divider selection: 3 different clock sources
+-	 * can be selected: "ip", "ref" or "sys". For the latter two, a
+-	 * clock divider can be defined as well. If the clock source is
+-	 * not specified by the device tree, we first try to find an
+-	 * optimal CAN source clock based on the system clock. If that
+-	 * is not posslible, the reference clock will be used.
 -	 */
--	clk_register_clkdev(clks[MPC512x_CLK_REF], "ref_clk", NULL);
--	clk_register_clkdev(clks[MPC512x_CLK_SYS], "sys_clk", NULL);
--	clk_register_clkdev(clks[MPC512x_CLK_VIU], "viu_clk", NULL);
--	clk_register_clkdev(clks[MPC512x_CLK_NFC], "nfc_clk", NULL);
--	clk_register_clkdev(clks[MPC512x_CLK_USB1], "usb1_clk", NULL);
--	clk_register_clkdev(clks[MPC512x_CLK_USB2], "usb2_clk", NULL);
--	for (idx = 0; idx < NR_PSCS; idx++) {
--		snprintf(name, sizeof(name), "psc%d_mclk", idx);
--		clk_register_clkdev(clks[MPC512x_CLK_PSC0_MCLK + idx],
--				    name, NULL);
+-	if (clock_name && !strcmp(clock_name, "ip")) {
+-		*mscan_clksrc = MSCAN_CLKSRC_IPS;
+-		freq = mpc5xxx_get_bus_frequency(ofdev->dev.of_node);
+-	} else {
+-		*mscan_clksrc = MSCAN_CLKSRC_BUS;
+-
+-		pval = of_get_property(ofdev->dev.of_node,
+-				       "fsl,mscan-clock-divider", &plen);
+-		if (pval && plen == sizeof(*pval))
+-			clockdiv = *pval;
+-		if (!clockdiv)
+-			clockdiv = 1;
+-
+-		if (!clock_name || !strcmp(clock_name, "sys")) {
+-			sys_clk = devm_clk_get(&ofdev->dev, "sys_clk");
+-			if (IS_ERR(sys_clk)) {
+-				dev_err(&ofdev->dev, "couldn't get sys_clk\n");
+-				goto exit_unmap;
+-			}
+-			/* Get and round up/down sys clock rate */
+-			sys_freq = 1000000 *
+-				((clk_get_rate(sys_clk) + 499999) / 1000000);
+-
+-			if (!clock_name) {
+-				/* A multiple of 16 MHz would be optimal */
+-				if ((sys_freq % 16000000) == 0) {
+-					clocksrc = 0;
+-					clockdiv = sys_freq / 16000000;
+-					freq = sys_freq / clockdiv;
+-				}
+-			} else {
+-				clocksrc = 0;
+-				freq = sys_freq / clockdiv;
+-			}
+-		}
+-
+-		if (clocksrc < 0) {
+-			ref_clk = devm_clk_get(&ofdev->dev, "ref_clk");
+-			if (IS_ERR(ref_clk)) {
+-				dev_err(&ofdev->dev, "couldn't get ref_clk\n");
+-				goto exit_unmap;
+-			}
+-			clocksrc = 1;
+-			freq = clk_get_rate(ref_clk) / clockdiv;
+-		}
 -	}
--	for (idx = 0; idx < NR_MSCANS; idx++) {
--		snprintf(name, sizeof(name), "mscan%d_mclk", idx);
--		clk_register_clkdev(clks[MPC512x_CLK_MSCAN0_MCLK + idx],
--				    name, NULL);
+-
+-	/* Disable clock */
+-	out_be32(&clockctl->mccr[clockidx], 0x0);
+-	if (clocksrc >= 0) {
+-		/* Set source and divider */
+-		val = (clocksrc << 14) | ((clockdiv - 1) << 17);
+-		out_be32(&clockctl->mccr[clockidx], val);
+-		/* Enable clock */
+-		out_be32(&clockctl->mccr[clockidx], val | 0x10000);
 -	}
--	clk_register_clkdev(clks[MPC512x_CLK_SPDIF_MCLK], "spdif_mclk", NULL);
- 
- 	/*
- 	 * pre-enable those clock items which are not yet appropriately
- 	 * acquired by their peripheral driver
-+	 *
-+	 * the PCI clock cannot get acquired by its peripheral driver,
-+	 * because for this platform the driver won't probe(), instead
-+	 * initialization is done from within the .setup_arch() routine
-+	 *@a point in time where the clock provider has not been
-+	 * setup yet and thus isn't available yet
-+	 *
-+	 * so we "pre-enable" the clock here, to not have the clock
-+	 * subsystem automatically disable this item in a late init call
-+	 *
-+	 * this PCI clock pre-enable workaround only applies when there
-+	 * are device tree nodes for PCI and thus the peripheral driver
-+	 * has attached to bridges, otherwise the PCI clock remains
-+	 * unused and so it gets disabled
- 	 */
--	clk_prepare_enable(clks[MPC512x_CLK_PSC_FIFO]);
- 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
--	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
--	clk_prepare_enable(clks[MPC512x_CLK_DIU]);	/* display */
--	clk_prepare_enable(clks[MPC512x_CLK_I2C]);	/* I2C */
--	for (idx = 0; idx < NR_PSCS; idx++)		/* PSC ipg */
--		clk_prepare_enable(clks[MPC512x_CLK_PSC0 + idx]);
--	clk_prepare_enable(clks[MPC512x_CLK_BDLC]);	/* MSCAN ipg */
--	for (idx = 0; idx < NR_MSCANS; idx++)		/* MSCAN mclk */
--		clk_prepare_enable(clks[MPC512x_CLK_MSCAN0_MCLK + idx]);
--	clk_prepare_enable(clks[MPC512x_CLK_PCI]);	/* PCI */
-+	if (of_find_compatible_node(NULL, "pci", "fsl,mpc5121-pci"))
-+		clk_prepare_enable(clks[MPC512x_CLK_PCI]);
- }
- 
- /*
+-
+-	/* Enable MSCAN clock domain */
+-	val = in_be32(&clockctl->sccr[1]);
+-	if (!(val & (1 << 25)))
+-		out_be32(&clockctl->sccr[1], val | (1 << 25));
+-
+-	dev_dbg(&ofdev->dev, "using '%s' with frequency divider %d\n",
+-		*mscan_clksrc == MSCAN_CLKSRC_IPS ? "ips_clk" :
+-		clocksrc == 1 ? "ref_clk" : "sys_clk", clockdiv);
+-
+-exit_unmap:
+-	iounmap(clockctl);
+-exit_put:
+-	of_node_put(np_clock);
+-	return freq;
+-}
+-
+-#define mpc512x_can_put_clock NULL
+-
+-#endif	/* COMMON_CLK */
+-
+ #else /* !CONFIG_PPC_MPC512x */
+ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 				 const char *clock_name, int *mscan_clksrc)
 -- 
 1.7.10.4
