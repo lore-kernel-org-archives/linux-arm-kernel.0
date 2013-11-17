@@ -1,60 +1,39 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 17 Nov 2013 02:19:40 +0100
-Subject: [PATCH 2/3] ARM: dts: imx53: Fix backlight for M53EVK
+Date: Sun, 17 Nov 2013 02:19:41 +0100
+Subject: [PATCH 3/3] ARM: imx_v6_v7_defconfig: Enable STMPE touchscreen
 In-Reply-To: <1384651181-5504-1-git-send-email-marex@denx.de>
 References: <1384651181-5504-1-git-send-email-marex@denx.de>
-Message-ID: <1384651181-5504-2-git-send-email-marex@denx.de>
+Message-ID: <1384651181-5504-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the PWM backlight pin from the hog pins list, so it doesn't
-collide with the PWM pin group. Moreover, add dummy regulator for
-the backlight so that the backlight driver probes correctly.
+Enable STMPE touchscreen support as this is used on M53EVK.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx53-m53evk.dts | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 4bc4a83..658d32a 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -51,6 +51,7 @@
- 		pwms = <&pwm1 0 3000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		power-supply = <&reg_backlight>;
- 	};
- 
- 	leds {
-@@ -84,6 +85,17 @@
- 			regulator-max-microvolt = <3200000>;
- 			regulator-always-on;
- 		};
-+
-+
-+		reg_backlight: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "lcd-supply";
-+			regulator-min-microvolt = <3200000>;
-+			regulator-max-microvolt = <3200000>;
-+			regulator-always-on;
-+		};
-+
- 	};
- 
- 	sound {
-@@ -210,8 +222,6 @@
- 				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x80000000
- 				MX53_PAD_EIM_EB3__GPIO2_31		0x80000000
- 				MX53_PAD_PATA_DA_0__GPIO7_6		0x80000000
--				MX53_PAD_DISP0_DAT8__PWM1_PWMO		0x5
--
- 			>;
- 		};
- 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index f1c9bfa..f338fd6 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -131,6 +131,7 @@ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_EGALAX=y
+ CONFIG_TOUCHSCREEN_MC13783=y
+ CONFIG_TOUCHSCREEN_TSC2007=y
++CONFIG_TOUCHSCREEN_STMPE=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MMA8450=y
+ CONFIG_SERIO_SERPORT=m
+@@ -158,6 +159,7 @@ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_MFD_MC13XXX_I2C=y
++CONFIG_MFD_STMPE=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_ANATOP=y
 -- 
 1.8.4.2
