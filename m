@@ -1,259 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 17 Nov 2013 11:29:15 +0100
-Subject: [PATCH] ARM: Kirkwood: DT board setup for LaPlug
-In-Reply-To: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
-References: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
-Message-ID: <20131117102915.GJ9713@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 17 Nov 2013 12:03:49 +0100
+Subject: [PATCH 00/21] ARM: ux500: pin control device tree migration
+Message-ID: <1384686250-10542-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime
+This patch series migrated all the pin control information
+for the Nomadik pin controller as used on the various Ux500
+boards from the board file and into the device tree.
 
-Overall, this looks good.
+After this only the ABx500 pin configuration remains in the
+board file. (Will be addressed separately.)
 
-I have a few minor comments though:
+This uses the existing device tree bindings. No new bindings
+are added.
 
-Please ensure the Marvell Maintainers get a copy of patches like this.
-I added them to this reply.
+Linus Walleij (21):
+  ARM: ux500: move UART pin control to the device tree
+  ARM: ux500: move I2C pin control to the device tree
+  ARM: ux500: move MMC/SD/SDIO pin control to the device tree
+  ARM: ux500: move MSP pin control to the device tree
+  ARM: ux500: move GPIO217/218 config to device tree
+  ARM: ux500: move MUSB pin config to device tree
+  ARM: ux500: move SPI pin config to device tree
+  ARM: ux500: create MCDE node to collect resources
+  ARM: ux500: move MCDE pin config to device tree
+  ARM: ux500: move SKE pin config to device tree
+  ARM: ux500: drop STM pinmap settings
+  ARM: ux500: move old HREF ipgpio to the device tree
+  ARM: ux500: move GPIO key configuration to device tree
+  ARM: ux500: move the WLAN GPIO pin setup to the device tree
+  ARM: ux500: move the HREFv60plus IPGPIO pins to device tree
+  ARM: ux500: move final HREFv60 LCD pins to device tree
+  ARM: ux500: move HREFv60plus pin configs to device tree
+  ARM: ux500: move snowball ethernet config to device tree
+  ARM: ux500: convert Snowball SPI pin reference
+  ARM: ux500: move snowball LED pin control to device tree
+  ARM: ux500: move snowball pin configs to device tree
 
-> Chipset list:
-> - CPU MARVELL 88FR131 800Mhz
-> - SDRAM memory: 128MB DDR2-800 400Mhz
-> - 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
-> - 1 Mini PCI-Express port
-> - 1 NAND 512 MB
-> - 1 push button
-> - 2 LEDs (red and blue)
-> - 4 USB Ports
-> 
-> Signed-off-by: Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/kirkwood-nsplug.dts | 178 ++++++++++++++++++++++++++++++++++
->  2 files changed, 179 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-nsplug.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d57c1a6..38b0604 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -96,6 +96,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
->  	kirkwood-ns2mini.dtb \
->  	kirkwood-nsa310.dtb \
->  	kirkwood-nsa310a.dtb \
-> +	kirkwood-nsplug.dtb \
->  	kirkwood-openblocks_a6.dtb \
->  	kirkwood-openblocks_a7.dtb \
->  	kirkwood-sheevaplug.dtb \
-> diff --git a/arch/arm/boot/dts/kirkwood-nsplug.dts b/arch/arm/boot/dts/kirkwood-nsplug.dts
-> new file mode 100644
-> index 0000000..45ab517
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-nsplug.dts
-> @@ -0,0 +1,178 @@
-> +/*
-> + * Copyright (C) 2013 Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "kirkwood.dtsi"
-> +#include "kirkwood-6281.dtsi"
-> +
-> +/ {
-> +  model = "LaCie LaPlug";
-> +  compatible = "lacie,nsplug", "marvell,kirkwood-88f6192", "marvell,kirkwood";
-> +
-> +  memory {
-> +    device_type = "memory";
-> +    reg = <0x00000000 0x8000000>; /* 128 MB */
-> +  };
+ arch/arm/boot/dts/ste-dbx5x0.dtsi              |  17 +
+ arch/arm/boot/dts/ste-href-family-pinctrl.dtsi | 745 +++++++++++++++++++++++
+ arch/arm/boot/dts/ste-href-stuib.dtsi          |  41 ++
+ arch/arm/boot/dts/ste-href-tvk1281618.dtsi     |  51 ++
+ arch/arm/boot/dts/ste-href.dtsi                |  78 ++-
+ arch/arm/boot/dts/ste-hrefprev60.dtsi          |  65 ++
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi         | 217 ++++++-
+ arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi     |  80 +++
+ arch/arm/boot/dts/ste-snowball.dts             | 225 +++++++
+ arch/arm/mach-ux500/board-mop500-pins.c        | 781 -------------------------
+ 10 files changed, 1503 insertions(+), 797 deletions(-)
+ create mode 100644 arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
 
-I'm not aware of an indentation standard for DT files. However, for
-kirkwood, we use tabs. 
-
-> +
-> +  chosen {
-> +    bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +  };
-> +
-> +  mbus {
-> +    ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>;
-> +    pcie-controller {
-> +      status = "okay";
-> +      pcie at 1,0 {
-> +        status = "okay";
-> +      };
-> +    };
-> +  };
-> +
-> +  ocp at f1000000 {
-> +
-> +    serial at 12000 {
-> +      pinctrl-0 = <&pmx_uart0>;
-> +      pinctrl-names = "default";
-> +      status = "okay";
-> +    };
-> +
-> +    i2c at 11000 {
-> +      pinctrl-0 = <&pmx_twsi0>;
-> +      pinctrl-names = "default";
-> +      status = "okay";
-> +
-> +      eeprom at 50 {
-> +        compatible = "at,24c04";
-> +        pagesize = <16>;
-> +        reg = <0x50>;
-> +      };
-> +    };
-> +
-> +    pinctrl: pinctrl at 10000 {
-> +      pmx_usb_power_enable: pmx-usb-power-enable {
-> +        marvell,pins = "mpp14";
-> +        marvell,function = "gpio";
-> +      };
-> +    };
-> +
-> +    nand at 3000000 {
-> +      /* Total size : 512MB */
-> +      status = "okay";
-> +
-> +      partition at 0 {
-> +        label = "u-boot";
-> +        reg = <0x0 0x100000>; /* 1MB */
-> +        read-only;
-> +      };
-> +
-> +      partition at 100000 {
-> +        label = "uImage";
-> +        reg = <0x100000 0x1000000>; /* 16MB */
-> +      };
-> +
-> +      partition at 1100000 {
-> +        label = "rootfs";
-> +        reg = <0x1100000 0x1EF00000>; /* 495MB */
-> +      };
-> +    };
-> +  };
-> +
-> +  gpio_keys {
-> +    compatible = "gpio-keys";
-> +    #address-cells = <1>;
-> +    #size-cells = <0>;
-> +
-> +    button at 1{
-> +      label = "Power push button";
-> +      linux,code = <116>;
-
-You could use <dt-bindings/input/input.h> and symbolic names instead
-of 116.
-
-> +      gpios = <&gpio1 0 0>;
-
-And here you can use <dt-bindings/gpio/gpio.h> and use
-GPIO_ACTIVE_HIGH.
-
-None of the kirkwood .dtb files actually use these yet, but it is
-something we want to change to. 
-
-Thanks
-	Andrew
-
-
-
-> +    };
-> +  };
-> +
-> +  gpio-leds {
-> +    compatible = "gpio-leds";
-> +
-> +    red-fail {
-> +      label = "ns_plug_v2:red:power";
-> +      gpios = <&gpio0 12 0>;
-> +    };
-> +    blue-power {
-> +      label = "ns_plug_v2:blue:power";
-> +      gpios = <&gpio0 29 0>;
-> +      linux,default-trigger = "default-on";
-> +    };
-> +  };
-> +
-> +  gpio_poweroff {
-> +    compatible = "gpio-poweroff";
-> +    gpios = <&gpio0 31 0>;
-> +  };
-> +
-> +  regulators {
-> +    compatible = "simple-bus";
-> +    #address-cells = <1>;
-> +    #size-cells = <0>;
-> +    pinctrl-0 = <&pmx_usb_power_enable>;
-> +    pinctrl-names = "default";
-> +
-> +    usb_power_back1: regulator at 1 {
-> +      compatible = "regulator-fixed";
-> +      reg = <1>;
-> +      regulator-name = "USB Power Back 1";
-> +      regulator-min-microvolt = <5000000>;
-> +      regulator-max-microvolt = <5000000>;
-> +      enable-active-high;
-> +      regulator-always-on;
-> +      regulator-boot-on;
-> +      gpio = <&gpio0 15 0>;
-> +    };
-> +
-> +    usb_power_back2: regulator at 2 {
-> +      compatible = "regulator-fixed";
-> +      reg = <2>;
-> +      regulator-name = "USB Power Back 2";
-> +      regulator-min-microvolt = <5000000>;
-> +      regulator-max-microvolt = <5000000>;
-> +      enable-active-high;
-> +      regulator-always-on;
-> +      regulator-boot-on;
-> +      gpio = <&gpio0 28 0>;
-> +    };
-> +
-> +    usb_power_front: regulator at 3 {
-> +      compatible = "regulator-fixed";
-> +      reg = <3>;
-> +      regulator-name = "USB Power Front";
-> +      regulator-min-microvolt = <5000000>;
-> +      regulator-max-microvolt = <5000000>;
-> +      enable-active-high;
-> +      regulator-always-on;
-> +      regulator-boot-on;
-> +      gpio = <&gpio1 3 0>;
-> +    };
-> +  };
-> +
-> +};
-> +
-> +&mdio {
-> +  status = "okay";
-> +
-> +  ethphy0: ethernet-phy at 0 {
-> +    device_type = "ethernet-phy";
-> +    reg = <0>;
-> +  };
-> +};
-> +
-> +&eth0 {
-> +  status = "okay";
-> +  ethernet0-port at 0 {
-> +    phy-handle = <&ethphy0>;
-> +  };
-> +};
-> +
-> -- 
-> 1.8.4.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+1.8.3.1
