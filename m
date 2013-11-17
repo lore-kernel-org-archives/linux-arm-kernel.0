@@ -1,123 +1,210 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 17 Nov 2013 12:03:54 +0100
-Subject: [PATCH 05/21] ARM: ux500: move GPIO217/218 config to device tree
+Date: Sun, 17 Nov 2013 12:03:55 +0100
+Subject: [PATCH 06/21] ARM: ux500: move MUSB pin config to device tree
 In-Reply-To: <1384686250-10542-1-git-send-email-linus.walleij@linaro.org>
 References: <1384686250-10542-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1384686250-10542-6-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1384686250-10542-7-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the input-pulled-up setting for GPIO217 as used
-on the HREFs prior to v60 from the boardfile to the device
-tree. GPIO218 is only used with the TVK UIB so move it to
-that .dtsi file.
+This moves the MUSB pin control table out of the board file
+and into the device tree. Tie the config to the on-chip MUSB
+device rather than the ab8500-usb device which is off-chip.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/ste-hrefprev60.dtsi      | 10 ++++++++++
- arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi |  5 +++++
- arch/arm/mach-ux500/board-mop500-pins.c    |  7 -------
- 4 files changed, 28 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/ste-href-family-pinctrl.dtsi | 55 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/ste-href.dtsi                |  6 +++
+ arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi     | 13 ++++++
+ arch/arm/boot/dts/ste-snowball.dts             |  5 +++
+ arch/arm/mach-ux500/board-mop500-pins.c        | 25 ------------
+ 5 files changed, 79 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-index 61b180ea92ca..3f31f9206fb3 100644
---- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-+++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-@@ -22,6 +22,8 @@
- 				reg = <0x44>;
- 				interrupt-parent = <&gpio6>;
- 				interrupts = <26 IRQ_TYPE_EDGE_RISING>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&tc35893_tvk_mode>;
- 
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
-@@ -64,5 +66,16 @@
+diff --git a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
+index 7408d3a898a5..6868fec95d64 100644
+--- a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
++++ b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
+@@ -488,6 +488,61 @@
+ 					};
  				};
  			};
- 		};
-+		pinctrl {
-+			/* Pull up this GPIO pin */
-+			tc35893 {
-+				tc35893_tvk_mode: tc35893_tvk {
-+					tvk_cfg {
-+						ste,pins = "GPIO218_AH11";
-+						ste,config = <&gpio_in_pu>;
++
++
++			musb {
++				musb_default_mode: musb_default {
++					default_mux {
++						ste,function = "usb";
++						ste,pins = "usb_a_1";
++					};
++					default_cfg1 {
++						ste,pins =
++						"GPIO256_AF28", /* NXT */
++						"GPIO258_AD29", /* XCLK */
++						"GPIO259_AC29", /* DIR */
++						"GPIO260_AD28", /* DAT7 */
++						"GPIO261_AD26", /* DAT6 */
++						"GPIO262_AE26", /* DAT5 */
++						"GPIO263_AG29", /* DAT4 */
++						"GPIO264_AE27", /* DAT3 */
++						"GPIO265_AD27", /* DAT2 */
++						"GPIO266_AC28", /* DAT1 */
++						"GPIO267_AC27"; /* DAT0 */
++						ste,config = <&in_nopull>;
++					};
++					default_cfg2 {
++						ste,pins = "GPIO257_AE29"; /* STP */
++						ste,config = <&out_hi>;
++					};
++				};
++
++				musb_sleep_mode: musb_sleep {
++					sleep_cfg1 {
++						ste,pins =
++						"GPIO256_AF28", /* NXT */
++						"GPIO258_AD29", /* XCLK */
++						"GPIO259_AC29"; /* DIR */
++						ste,config = <&slpm_wkup_pdis_en>;
++					};
++					sleep_cfg2 {
++						ste,pins = "GPIO257_AE29"; /* STP */
++						ste,config = <&slpm_out_hi_wkup_pdis>;
++					};
++					sleep_cfg3 {
++						ste,pins =
++						"GPIO260_AD28", /* DAT7 */
++						"GPIO261_AD26", /* DAT6 */
++						"GPIO262_AE26", /* DAT5 */
++						"GPIO263_AG29", /* DAT4 */
++						"GPIO264_AE27", /* DAT3 */
++						"GPIO265_AD27", /* DAT2 */
++						"GPIO266_AC28", /* DAT1 */
++						"GPIO267_AC27"; /* DAT0 */
++						ste,config = <&slpm_in_wkup_pdis_en>;
 +					};
 +				};
 +			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
+index 85260846deae..4fda2d933488 100644
+--- a/arch/arm/boot/dts/ste-href.dtsi
++++ b/arch/arm/boot/dts/ste-href.dtsi
+@@ -30,6 +30,12 @@
+ 	};
+ 
+ 	soc {
++		usb_per5 at a03e0000 {
++			pinctrl-names = "default", "sleep";
++			pinctrl-0 = <&musb_default_mode>;
++			pinctrl-1 = <&musb_sleep_mode>;
 +		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index cfd7ef306d49..6fc94ea65ab9 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -33,6 +33,8 @@
- 				reg = <0x42>;
- 				interrupt-parent = <&gpio6>;
- 				interrupts = <25 IRQ_TYPE_EDGE_RISING>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&tc35892_hrefprev60_mode>;
- 
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
-@@ -71,6 +73,14 @@
- 
- 				};
- 			};
-+			tc35892 {
-+				tc35892_hrefprev60_mode: tc35892_hrefprev60 {
-+					hrefprev60_cfg {
-+						ste,pins = "GPIO217_AH12";
-+						ste,config = <&gpio_in_pu>;
-+					};
-+				};
-+			};
- 		};
- 	};
- };
++
+ 		uart at 80120000 {
+ 			pinctrl-names = "default", "sleep";
+ 			pinctrl-0 = <&uart0_default_mode>;
 diff --git a/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi b/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
-index f213222cf220..9aea983e78b5 100644
+index 9aea983e78b5..9f3e87573f86 100644
 --- a/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
 +++ b/arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
-@@ -31,6 +31,11 @@
+@@ -41,6 +41,12 @@
  		ste,output = <OUTPUT_LOW>;
  	};
  
-+	gpio_in_pu: gpio_input_pull_up {
-+		ste,gpio = <GPIOMODE_ENABLED>;
-+		ste,input = <INPUT_PULLUP>;
++	slpm_wkup_pdis_en: slpm_wkup_pdis_en {
++		ste,sleep = <SLPM_ENABLED>;
++		ste,sleep-wakeup = <SLPM_WAKEUP_ENABLE>;
++		ste,sleep-pull-disable = <SLPM_PDIS_ENABLED>;
 +	};
 +
- 	gpio_out_lo: gpio_output_low {
- 		ste,gpio = <GPIOMODE_ENABLED>;
- 		ste,output = <OUTPUT_LOW>;
+ 	slpm_in_pu: slpm_in_pu {
+ 		ste,sleep = <SLPM_ENABLED>;
+ 		ste,sleep-input = <SLPM_INPUT_PULLUP>;
+@@ -54,6 +60,13 @@
+ 		ste,sleep-pull-disable = <SLPM_PDIS_DISABLED>;
+ 	};
+ 
++	slpm_in_wkup_pdis_en: slpm_in_wkup_pdis_en {
++		ste,sleep = <SLPM_ENABLED>;
++		ste,sleep-input = <SLPM_DIR_INPUT>;
++		ste,sleep-wakeup = <SLPM_WAKEUP_ENABLE>;
++		ste,sleep-pull-disable = <SLPM_PDIS_ENABLED>;
++	};
++
+ 	slpm_out_lo: slpm_out_lo {
+ 		ste,sleep = <SLPM_ENABLED>;
+ 		ste,sleep-output = <SLPM_OUTPUT_LOW>;
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index 65180b2bc409..4763b805e754 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -85,6 +85,11 @@
+ 	};
+ 
+ 	soc {
++		usb_per5 at a03e0000 {
++			pinctrl-names = "default", "sleep";
++			pinctrl-0 = <&musb_default_mode>;
++			pinctrl-1 = <&musb_sleep_mode>;
++		};
+ 
+ 		sound {
+ 			compatible = "stericsson,snd-soc-mop500";
 diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index f7034cbdc630..c032392294a0 100644
+index c032392294a0..a6d431bd0659 100644
 --- a/arch/arm/mach-ux500/board-mop500-pins.c
 +++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -340,11 +340,6 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	DB8500_MUX_HOG("lcdvsi0_a_1", "lcd"),
- 	DB8500_PIN_HOG("GPIO68_E1", in_pu),
- 	DB8500_PIN_HOG("GPIO84_C2", gpio_in_pu),
--	/*
--	 * STMPE1601/tc35893 keypad IRQ GPIO 218
--	 * TODO: set for snowball and HREF really??
--	 */
--	DB8500_PIN_HOG("GPIO218_AH11", gpio_in_pu),
- 	/* Mux in LCD data lines 8 thru 11 and LCDA CLK for MCDE TVOUT */
- 	DB8500_MUX("lcd_d8_d11_a_1", "lcd", "mcde-tvout"),
- 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
-@@ -625,8 +620,6 @@ static struct pinctrl_map __initdata mop500_pinmap[] = {
- 	DB8500_MUX_HOG("ipgpio1_c_1", "ipgpio"),
- 	DB8500_PIN_HOG("GPIO6_AF6", in_pu),
- 	DB8500_PIN_HOG("GPIO7_AG5", in_pu),
--	/* TC35892 IRQ, pull up the line, let the driver mux in the pin */
--	DB8500_PIN_HOG("GPIO217_AH12", gpio_in_pu),
- 	/*
- 	 * Runtime stuff: make it possible to mux in the SKE keypad
- 	 * and bias the pins
+@@ -30,7 +30,6 @@ BIAS(pd, PIN_PULL_DOWN);
+ BIAS(in_nopull, PIN_INPUT_NOPULL);
+ BIAS(in_pu, PIN_INPUT_PULLUP);
+ BIAS(in_pd, PIN_INPUT_PULLDOWN);
+-BIAS(out_hi, PIN_OUTPUT_HIGH);
+ BIAS(out_lo, PIN_OUTPUT_LOW);
+ 
+ BIAS(abx500_out_lo, PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0));
+@@ -47,18 +46,12 @@ BIAS(gpio_out_lo, PIN_OUTPUT_LOW|PIN_GPIOMODE_ENABLED);
+ /* Sleep modes */
+ BIAS(slpm_in_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+-BIAS(slpm_in_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|
+-	PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
+ BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+-BIAS(slpm_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|
+-	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
+ BIAS(slpm_out_lo_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+-BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_HIGH|
+-	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_in_pu_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|PIN_SLPM_INPUT_PULLUP|
+ 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
+ 
+@@ -349,24 +342,6 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	/* LCD VSI1 sleep state */
+ 	DB8500_PIN_SLEEP("GPIO69_E2", slpm_in_wkup_pdis, "0-0070"),
+ 
+-	/* Mux in USB pins, drive STP high */
+-	/* USB default state */
+-	DB8500_MUX("usb_a_1", "usb", "ab8500-usb.0"),
+-	DB8500_PIN("GPIO257_AE29", out_hi, "ab8500-usb.0"), /* STP */
+-	/* USB sleep state */
+-	DB8500_PIN_SLEEP("GPIO256_AF28", slpm_wkup_pdis_en, "ab8500-usb.0"), /* NXT */
+-	DB8500_PIN_SLEEP("GPIO257_AE29", slpm_out_hi_wkup_pdis, "ab8500-usb.0"), /* STP */
+-	DB8500_PIN_SLEEP("GPIO258_AD29", slpm_wkup_pdis_en, "ab8500-usb.0"), /* XCLK */
+-	DB8500_PIN_SLEEP("GPIO259_AC29", slpm_wkup_pdis_en, "ab8500-usb.0"), /* DIR */
+-	DB8500_PIN_SLEEP("GPIO260_AD28", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT7 */
+-	DB8500_PIN_SLEEP("GPIO261_AD26", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT6 */
+-	DB8500_PIN_SLEEP("GPIO262_AE26", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT5 */
+-	DB8500_PIN_SLEEP("GPIO263_AG29", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT4 */
+-	DB8500_PIN_SLEEP("GPIO264_AE27", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT3 */
+-	DB8500_PIN_SLEEP("GPIO265_AD27", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT2 */
+-	DB8500_PIN_SLEEP("GPIO266_AC28", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT1 */
+-	DB8500_PIN_SLEEP("GPIO267_AC27", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT0 */
+-
+ 	/* Mux in SPI2 pins on the "other C1" altfunction */
+ 	DB8500_MUX("spi2_oc1_2", "spi2", "spi2"),
+ 	DB8500_PIN("GPIO216_AG12", gpio_out_hi, "spi2"), /* FRM */
 -- 
 1.8.3.1
