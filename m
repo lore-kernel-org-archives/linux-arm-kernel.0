@@ -1,245 +1,73 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sun, 17 Nov 2013 15:06:39 +0100
-Subject: [PATCH] ARM: Kirkwood: DT board setup for LaPlug
-In-Reply-To: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
-References: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
-Message-ID: <20131117140639.GH16823@kw.sim.vm.gnt>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sun, 17 Nov 2013 15:19:40 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <20131113072257.GB10591@1wt.eu>
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> <87y54u59zq.fsf@natisbad.org>
+ <20131112083633.GB10318@1wt.eu> <87a9hagex1.fsf@natisbad.org>
+ <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
+ <20131113072257.GB10591@1wt.eu>
+Message-ID: <20131117141940.GA18569@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 16, 2013 at 11:08:28PM +0100, Maxime Hadjinlian wrote:
-> This patch adds DT board setup for the LaCie NAS LaPlug.
+Hi Arnaud,
+
+[CCing Thomas and removing stable@]
+
+On Wed, Nov 13, 2013 at 08:22:57AM +0100, Willy Tarreau wrote:
+> On Tue, Nov 12, 2013 at 04:34:24PM +0100, Arnaud Ebalard wrote:
+> > Can you give a pre-3.11.7 kernel a try if you find the time? I started
+> > working on RN102 during 3.10-rc cycle but do not remember if I did the
+> > first preformance tests on 3.10 or 3.11. And if you find more time,
+> > 3.11.7 would be nice too ;-)
 > 
-> Chipset list:
-> - CPU MARVELL 88FR131 800Mhz
-> - SDRAM memory: 128MB DDR2-800 400Mhz
-> - 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
-> - 1 Mini PCI-Express port
-> - 1 NAND 512 MB
-> - 1 push button
-> - 2 LEDs (red and blue)
-> - 4 USB Ports
+> Still have not found time for this but I observed something intriguing
+> which might possibly match your experience : if I use large enough send
+> buffers on the mirabox and receive buffers on the client, then the
+> traffic drops for objects larger than 1 MB. I have quickly checked what's
+> happening and it's just that there are pauses of up to 8 ms between some
+> packets when the TCP send window grows larger than about 200 kB. And
+> since there are no drops, there is no reason for the window to shrink.
+> I suspect it's exactly related to the issue explained by Eric about the
+> timer used to recycle the Tx descriptors. However last time I checked,
+> these ones were also processed in the Rx path, which means that the
+> ACKs that flow back should have had the same effect as a Tx IRQ (unless
+> I'd use asymmetric routing, which was not the case). So there might be
+> another issue. Ah, and it only happens with GSO.
 
-Hi Maxime,
+I just had a quick look at the driver and I can confirm that Eric is right
+about the fact that we use up to two descriptors per GSO segment. Thus, we
+can saturate the Tx queue at 532/2 = 266 Tx segments = 388360 bytes (for
+1460 MSS). I thought I had seen a tx flush from the rx poll function but I
+can't find it so it seems I was wrong, or that I possibly misunderstood
+mvneta_poll() the first time I read it. Thus the observed behaviour is
+perfectly normal.
 
-Thanks for this patch.
+With GSO enabled, as soon as the window grows large enough, we can fill
+all the Tx descriptors with few segments, then need to wait for 10ms (12
+if running at 250 Hz as I am) to flush them, which explains the low speed
+I was observing with large windows. When disabling GSO, as much as twice
+the number of descriptors can be used, which is enough to fill the wire
+in the same time frame. Additionally it's likely that more descriptors
+get the time to be sent during that period and that each call to mvneta_tx()
+causing a call to mvneta_txq_done() releases some of the previously sent
+descriptors, allowing to sustain wire rate.
 
-> 
-> Signed-off-by: Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/kirkwood-nsplug.dts | 178 ++++++++++++++++++++++++++++++++++
->  2 files changed, 179 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-nsplug.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d57c1a6..38b0604 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -96,6 +96,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
->  	kirkwood-ns2mini.dtb \
->  	kirkwood-nsa310.dtb \
->  	kirkwood-nsa310a.dtb \
-> +	kirkwood-nsplug.dtb \
->  	kirkwood-openblocks_a6.dtb \
->  	kirkwood-openblocks_a7.dtb \
->  	kirkwood-sheevaplug.dtb \
-> diff --git a/arch/arm/boot/dts/kirkwood-nsplug.dts b/arch/arm/boot/dts/kirkwood-nsplug.dts
-> new file mode 100644
-> index 0000000..45ab517
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-nsplug.dts
-> @@ -0,0 +1,178 @@
-> +/*
-> + * Copyright (C) 2013 Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "kirkwood.dtsi"
-> +#include "kirkwood-6281.dtsi"
-> +
-> +/ {
-> +  model = "LaCie LaPlug";
-> +  compatible = "lacie,nsplug", "marvell,kirkwood-88f6192", "marvell,kirkwood";
+I wonder if we can call mvneta_txq_done() from the IRQ handler, which would
+cause some recycling of the Tx descriptors when receiving the corresponding
+ACKs.
 
-I think you should use "lacie,laplug" as a primary compatible string and
-also fix the LED device names accordingly.
+Ideally we should enable the Tx IRQ, but I still have no access to this
+chip's datasheet despite having asked Marvell several times in one year
+(Thomas has it though).
 
-Simon
+So it is fairly possible that in your case you can't fill the link if you
+consume too many descriptors. For example, if your server uses TCP_NODELAY
+and sends incomplete segments (which is quite common), it's very easy to
+run out of descriptors before the link is full.
 
-> +
-> +  memory {
-> +    device_type = "memory";
-> +    reg = <0x00000000 0x8000000>; /* 128 MB */
-> +  };
-> +
-> +  chosen {
-> +    bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +  };
-> +
-> +  mbus {
-> +    ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>;
-> +    pcie-controller {
-> +      status = "okay";
-> +      pcie at 1,0 {
-> +        status = "okay";
-> +      };
-> +    };
-> +  };
-> +
-> +  ocp at f1000000 {
-> +
-> +    serial at 12000 {
-> +      pinctrl-0 = <&pmx_uart0>;
-> +      pinctrl-names = "default";
-> +      status = "okay";
-> +    };
-> +
-> +    i2c at 11000 {
-> +      pinctrl-0 = <&pmx_twsi0>;
-> +      pinctrl-names = "default";
-> +      status = "okay";
-> +
-> +      eeprom at 50 {
-> +        compatible = "at,24c04";
-> +        pagesize = <16>;
-> +        reg = <0x50>;
-> +      };
-> +    };
-> +
-> +    pinctrl: pinctrl at 10000 {
-> +      pmx_usb_power_enable: pmx-usb-power-enable {
-> +        marvell,pins = "mpp14";
-> +        marvell,function = "gpio";
-> +      };
-> +    };
-> +
-> +    nand at 3000000 {
-> +      /* Total size : 512MB */
-> +      status = "okay";
-> +
-> +      partition at 0 {
-> +        label = "u-boot";
-> +        reg = <0x0 0x100000>; /* 1MB */
-> +        read-only;
-> +      };
-> +
-> +      partition at 100000 {
-> +        label = "uImage";
-> +        reg = <0x100000 0x1000000>; /* 16MB */
-> +      };
-> +
-> +      partition at 1100000 {
-> +        label = "rootfs";
-> +        reg = <0x1100000 0x1EF00000>; /* 495MB */
-> +      };
-> +    };
-> +  };
-> +
-> +  gpio_keys {
-> +    compatible = "gpio-keys";
-> +    #address-cells = <1>;
-> +    #size-cells = <0>;
-> +
-> +    button at 1{
-> +      label = "Power push button";
-> +      linux,code = <116>;
-> +      gpios = <&gpio1 0 0>;
-> +    };
-> +  };
-> +
-> +  gpio-leds {
-> +    compatible = "gpio-leds";
-> +
-> +    red-fail {
-> +      label = "ns_plug_v2:red:power";
-> +      gpios = <&gpio0 12 0>;
-> +    };
-> +    blue-power {
-> +      label = "ns_plug_v2:blue:power";
-> +      gpios = <&gpio0 29 0>;
-> +      linux,default-trigger = "default-on";
-> +    };
-> +  };
-> +
-> +  gpio_poweroff {
-> +    compatible = "gpio-poweroff";
-> +    gpios = <&gpio0 31 0>;
-> +  };
-> +
-> +  regulators {
-> +    compatible = "simple-bus";
-> +    #address-cells = <1>;
-> +    #size-cells = <0>;
-> +    pinctrl-0 = <&pmx_usb_power_enable>;
-> +    pinctrl-names = "default";
-> +
-> +    usb_power_back1: regulator at 1 {
-> +      compatible = "regulator-fixed";
-> +      reg = <1>;
-> +      regulator-name = "USB Power Back 1";
-> +      regulator-min-microvolt = <5000000>;
-> +      regulator-max-microvolt = <5000000>;
-> +      enable-active-high;
-> +      regulator-always-on;
-> +      regulator-boot-on;
-> +      gpio = <&gpio0 15 0>;
-> +    };
-> +
-> +    usb_power_back2: regulator at 2 {
-> +      compatible = "regulator-fixed";
-> +      reg = <2>;
-> +      regulator-name = "USB Power Back 2";
-> +      regulator-min-microvolt = <5000000>;
-> +      regulator-max-microvolt = <5000000>;
-> +      enable-active-high;
-> +      regulator-always-on;
-> +      regulator-boot-on;
-> +      gpio = <&gpio0 28 0>;
-> +    };
-> +
-> +    usb_power_front: regulator at 3 {
-> +      compatible = "regulator-fixed";
-> +      reg = <3>;
-> +      regulator-name = "USB Power Front";
-> +      regulator-min-microvolt = <5000000>;
-> +      regulator-max-microvolt = <5000000>;
-> +      enable-active-high;
-> +      regulator-always-on;
-> +      regulator-boot-on;
-> +      gpio = <&gpio1 3 0>;
-> +    };
-> +  };
-> +
-> +};
-> +
-> +&mdio {
-> +  status = "okay";
-> +
-> +  ethphy0: ethernet-phy at 0 {
-> +    device_type = "ethernet-phy";
-> +    reg = <0>;
-> +  };
-> +};
-> +
-> +&eth0 {
-> +  status = "okay";
-> +  ethernet0-port at 0 {
-> +    phy-handle = <&ethphy0>;
-> +  };
-> +};
-> +
-> -- 
-> 1.8.4.2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131117/bcc13457/attachment.sig>
+I still did not have time to run a new kernel on this device however :-(
+
+Best regards,
+Willy
