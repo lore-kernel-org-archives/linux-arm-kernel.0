@@ -1,128 +1,36 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 18 Nov 2013 00:06:10 +0100
-Subject: [PATCH v5 10/17] serial: mpc512x: setup the PSC FIFO clock as well
+Date: Mon, 18 Nov 2013 00:06:12 +0100
+Subject: [PATCH v5 12/17] mtd: mpc5121_nfc: adjust for OF based clock lookup
 In-Reply-To: <1384729577-7336-1-git-send-email-gsi@denx.de>
 References: <1384729577-7336-1-git-send-email-gsi@denx.de>
-Message-ID: <1384729577-7336-11-git-send-email-gsi@denx.de>
+Message-ID: <1384729577-7336-13-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-prepare and enable the FIFO clock upon PSC FIFO initialization,
-check for and propagage errors when enabling the PSC FIFO clock,
-disable and unprepare the FIFO clock upon PSC FIFO uninitialization
+after device tree based clock lookup became available, the NAND
+flash driver need no longer use the previous global "nfc_clk" name,
+but should use the "ipg" clock name specific to the OF node
 
-devm_{get,put}_clk() doesn't apply here, as the SoC provides a
-single FIFO component which is shared among several PSC components,
-thus the FIFO isn't associated with a device (while the PSCs are)
-
-provide a fallback clock lookup approach in case the OF based clock
-lookup for the PSC FIFO fails, this allows for successful operation in
-the presence of an outdated device tree which lacks clock specs
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: linux-serial at vger.kernel.org
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org> # for v4
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Cc: linux-mtd at lists.infradead.org
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
-Greg, the addition since v4 is the clk_get_sys() call for the 'ipg'
-clock item (backwards compat for device trees w/o clock specs)
+ drivers/mtd/nand/mpc5121_nfc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
----
- drivers/tty/serial/mpc52xx_uart.c |   50 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 44 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
-index 1d1dbe9d5af2..78c8cbadc776 100644
---- a/drivers/tty/serial/mpc52xx_uart.c
-+++ b/drivers/tty/serial/mpc52xx_uart.c
-@@ -421,6 +421,7 @@ struct psc_fifoc {
+diff --git a/drivers/mtd/nand/mpc5121_nfc.c b/drivers/mtd/nand/mpc5121_nfc.c
+index 3c60a000b426..35a51a5aa537 100644
+--- a/drivers/mtd/nand/mpc5121_nfc.c
++++ b/drivers/mtd/nand/mpc5121_nfc.c
+@@ -729,7 +729,7 @@ static int mpc5121_nfc_probe(struct platform_device *op)
+ 	of_node_put(rootnode);
  
- static struct psc_fifoc __iomem *psc_fifoc;
- static unsigned int psc_fifoc_irq;
-+static struct clk *psc_fifoc_clk;
- 
- static void mpc512x_psc_fifo_init(struct uart_port *port)
- {
-@@ -568,36 +569,73 @@ static unsigned int mpc512x_psc_set_baudrate(struct uart_port *port,
- /* Init PSC FIFO Controller */
- static int __init mpc512x_psc_fifoc_init(void)
- {
-+	int err;
- 	struct device_node *np;
-+	struct clk *clk;
-+
-+	/* default error code, potentially overwritten by clock calls */
-+	err = -ENODEV;
- 
- 	np = of_find_compatible_node(NULL, NULL,
- 				     "fsl,mpc5121-psc-fifo");
- 	if (!np) {
- 		pr_err("%s: Can't find FIFOC node\n", __func__);
--		return -ENODEV;
-+		goto out_err;
-+	}
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		/* backwards compat with device trees that lack clock specs */
-+		clk = clk_get_sys(np->name, "ipg");
-+	}
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: Can't lookup FIFO clock\n", __func__);
-+		err = PTR_ERR(clk);
-+		goto out_ofnode_put;
-+	}
-+	if (clk_prepare_enable(clk)) {
-+		pr_err("%s: Can't enable FIFO clock\n", __func__);
-+		clk_put(clk);
-+		goto out_ofnode_put;
- 	}
-+	psc_fifoc_clk = clk;
- 
- 	psc_fifoc = of_iomap(np, 0);
- 	if (!psc_fifoc) {
- 		pr_err("%s: Can't map FIFOC\n", __func__);
--		of_node_put(np);
--		return -ENODEV;
-+		goto out_clk_disable;
- 	}
- 
- 	psc_fifoc_irq = irq_of_parse_and_map(np, 0);
--	of_node_put(np);
- 	if (psc_fifoc_irq == 0) {
- 		pr_err("%s: Can't get FIFOC irq\n", __func__);
--		iounmap(psc_fifoc);
--		return -ENODEV;
-+		goto out_unmap;
- 	}
- 
-+	of_node_put(np);
- 	return 0;
-+
-+out_unmap:
-+	iounmap(psc_fifoc);
-+out_clk_disable:
-+	clk_disable_unprepare(psc_fifoc_clk);
-+	clk_put(psc_fifoc_clk);
-+out_ofnode_put:
-+	of_node_put(np);
-+out_err:
-+	return err;
- }
- 
- static void __exit mpc512x_psc_fifoc_uninit(void)
- {
- 	iounmap(psc_fifoc);
-+
-+	/* disable the clock, errors are not fatal */
-+	if (psc_fifoc_clk) {
-+		clk_disable_unprepare(psc_fifoc_clk);
-+		clk_put(psc_fifoc_clk);
-+		psc_fifoc_clk = NULL;
-+	}
- }
- 
- /* 512x specific interrupt handler. The caller holds the port lock */
+ 	/* Enable NFC clock */
+-	clk = devm_clk_get(dev, "nfc_clk");
++	clk = devm_clk_get(dev, "ipg");
+ 	if (IS_ERR(clk)) {
+ 		dev_err(dev, "Unable to acquire NFC clock!\n");
+ 		retval = PTR_ERR(clk);
 -- 
 1.7.10.4
