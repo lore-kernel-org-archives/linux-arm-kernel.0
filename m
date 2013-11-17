@@ -1,41 +1,60 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 17 Nov 2013 02:19:39 +0100
-Subject: [PATCH 1/3] ARM: dts: imx53: Fix display pinmux for M53EVK
-Message-ID: <1384651181-5504-1-git-send-email-marex@denx.de>
+Date: Sun, 17 Nov 2013 02:19:40 +0100
+Subject: [PATCH 2/3] ARM: dts: imx53: Fix backlight for M53EVK
+In-Reply-To: <1384651181-5504-1-git-send-email-marex@denx.de>
+References: <1384651181-5504-1-git-send-email-marex@denx.de>
+Message-ID: <1384651181-5504-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the DISP1 pinmux on M53EVK for the LCD, not the LVDS.
+Remove the PWM backlight pin from the hog pins list, so it doesn't
+collide with the PWM pin group. Moreover, add dummy regulator for
+the backlight so that the backlight driver probes correctly.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx53-m53evk.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx53-m53evk.dts | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 7583449..4bc4a83 100644
+index 4bc4a83..658d32a 100644
 --- a/arch/arm/boot/dts/imx53-m53evk.dts
 +++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -26,7 +26,7 @@
- 			crtcs = <&ipu 1>;
- 			interface-pix-fmt = "bgr666";
- 			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_ipu_disp2>;
-+			pinctrl-0 = <&pinctrl_ipu_disp1>;
+@@ -51,6 +51,7 @@
+ 		pwms = <&pwm1 0 3000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&reg_backlight>;
+ 	};
  
- 			display-timings {
- 				800x480p60 {
-@@ -254,8 +254,8 @@
- 			fsl,pins = <MX53_I2C3_PINGRP1>;
+ 	leds {
+@@ -84,6 +85,17 @@
+ 			regulator-max-microvolt = <3200000>;
+ 			regulator-always-on;
+ 		};
++
++
++		reg_backlight: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "lcd-supply";
++			regulator-min-microvolt = <3200000>;
++			regulator-max-microvolt = <3200000>;
++			regulator-always-on;
++		};
++
+ 	};
+ 
+ 	sound {
+@@ -210,8 +222,6 @@
+ 				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x80000000
+ 				MX53_PAD_EIM_EB3__GPIO2_31		0x80000000
+ 				MX53_PAD_PATA_DA_0__GPIO7_6		0x80000000
+-				MX53_PAD_DISP0_DAT8__PWM1_PWMO		0x5
+-
+ 			>;
  		};
  
--		pinctrl_ipu_disp2: ipudisp2grp {
--			fsl,pins = <MX53_IPU_DISP2_PINGRP1>;
-+		pinctrl_ipu_disp1: ipudisp1grp {
-+			fsl,pins = <MX53_IPU_DISP1_PINGRP1>;
- 		};
- 
- 		pinctrl_nand: nandgrp {
 -- 
 1.8.4.2
