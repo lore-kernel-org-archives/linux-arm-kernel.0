@@ -1,108 +1,47 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 18 Nov 2013 00:06:09 +0100
-Subject: [PATCH v5 09/17] serial: mpc512x: adjust for OF based clock lookup
+Date: Mon, 18 Nov 2013 00:06:11 +0100
+Subject: [PATCH v5 11/17] USB: fsl-mph-dr-of: adjust for OF based clock lookup
 In-Reply-To: <1384729577-7336-1-git-send-email-gsi@denx.de>
 References: <1384729577-7336-1-git-send-email-gsi@denx.de>
-Message-ID: <1384729577-7336-10-git-send-email-gsi@denx.de>
+Message-ID: <1384729577-7336-12-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 after device tree based clock lookup became available, the peripheral
-driver need no longer construct clock names which include the PSC index,
-remove the "psc%d_mclk" template and unconditionally use 'mclk'
-
-acquire and release the "ipg" clock item for register access as well
+driver need no longer construct clock names which include the component
+index -- remove the "usb%d_clk" template, always use "ipg" instead
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: linux-serial at vger.kernel.org
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org> # for v4
+Cc: linux-usb at vger.kernel.org
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
-Greg, the difference between v4 and v5 of this patch is that v4
-took the 'mclk' and 'ipg' clock items in reverse order, and thus
-potentially obfuscated the adjusted name for 'mclk' -- v5 of the
-patch is identical in content but cleaner diff-wise
+ drivers/usb/host/fsl-mph-dr-of.c |   13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
----
- drivers/tty/serial/mpc52xx_uart.c |   40 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 35 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
-index 5be1df39f9f5..1d1dbe9d5af2 100644
---- a/drivers/tty/serial/mpc52xx_uart.c
-+++ b/drivers/tty/serial/mpc52xx_uart.c
-@@ -619,29 +619,55 @@ static irqreturn_t mpc512x_psc_handle_irq(struct uart_port *port)
- }
- 
- static struct clk *psc_mclk_clk[MPC52xx_PSC_MAXNUM];
-+static struct clk *psc_ipg_clk[MPC52xx_PSC_MAXNUM];
- 
- /* called from within the .request_port() callback (allocation) */
- static int mpc512x_psc_alloc_clock(struct uart_port *port)
- {
- 	int psc_num;
--	char clk_name[16];
+diff --git a/drivers/usb/host/fsl-mph-dr-of.c b/drivers/usb/host/fsl-mph-dr-of.c
+index abd5050a4899..9162d1b6c0a3 100644
+--- a/drivers/usb/host/fsl-mph-dr-of.c
++++ b/drivers/usb/host/fsl-mph-dr-of.c
+@@ -261,19 +261,8 @@ int fsl_usb2_mpc5121_init(struct platform_device *pdev)
+ 	struct fsl_usb2_platform_data *pdata = dev_get_platdata(&pdev->dev);
  	struct clk *clk;
  	int err;
+-	char clk_name[10];
+-	int base, clk_num;
+-
+-	base = pdev->resource->start & 0xf000;
+-	if (base == 0x3000)
+-		clk_num = 1;
+-	else if (base == 0x4000)
+-		clk_num = 2;
+-	else
+-		return -ENODEV;
  
- 	psc_num = (port->mapbase & 0xf00) >> 8;
--	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
--	clk = devm_clk_get(port->dev, clk_name);
-+
-+	clk = devm_clk_get(port->dev, "mclk");
+-	snprintf(clk_name, sizeof(clk_name), "usb%d_clk", clk_num);
+-	clk = devm_clk_get(pdev->dev.parent, clk_name);
++	clk = devm_clk_get(pdev->dev.parent, "ipg");
  	if (IS_ERR(clk)) {
- 		dev_err(port->dev, "Failed to get MCLK!\n");
--		return PTR_ERR(clk);
-+		err = PTR_ERR(clk);
-+		goto out_err;
- 	}
- 	err = clk_prepare_enable(clk);
- 	if (err) {
- 		dev_err(port->dev, "Failed to enable MCLK!\n");
--		return err;
-+		goto out_err;
- 	}
- 	psc_mclk_clk[psc_num] = clk;
-+
-+	clk = devm_clk_get(port->dev, "ipg");
-+	if (IS_ERR(clk)) {
-+		dev_err(port->dev, "Failed to get IPG clock!\n");
-+		err = PTR_ERR(clk);
-+		goto out_err;
-+	}
-+	err = clk_prepare_enable(clk);
-+	if (err) {
-+		dev_err(port->dev, "Failed to enable IPG clock!\n");
-+		goto out_err;
-+	}
-+	psc_ipg_clk[psc_num] = clk;
-+
- 	return 0;
-+
-+out_err:
-+	if (psc_mclk_clk[psc_num]) {
-+		clk_disable_unprepare(psc_mclk_clk[psc_num]);
-+		psc_mclk_clk[psc_num] = NULL;
-+	}
-+	if (psc_ipg_clk[psc_num]) {
-+		clk_disable_unprepare(psc_ipg_clk[psc_num]);
-+		psc_ipg_clk[psc_num] = NULL;
-+	}
-+	return err;
- }
- 
- /* called from within the .release_port() callback (release) */
-@@ -656,6 +682,10 @@ static void mpc512x_psc_relse_clock(struct uart_port *port)
- 		clk_disable_unprepare(clk);
- 		psc_mclk_clk[psc_num] = NULL;
- 	}
-+	if (psc_ipg_clk[psc_num]) {
-+		clk_disable_unprepare(psc_ipg_clk[psc_num]);
-+		psc_ipg_clk[psc_num] = NULL;
-+	}
- }
- 
- /* implementation of the .clock() callback (enable/disable) */
+ 		dev_err(&pdev->dev, "failed to get clk\n");
+ 		return PTR_ERR(clk);
 -- 
 1.7.10.4
