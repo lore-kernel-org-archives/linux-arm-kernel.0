@@ -1,59 +1,95 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Sun, 17 Nov 2013 09:41:38 -0800
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <20131117141940.GA18569@1wt.eu>
-References: <8761s0cqhh.fsf@natisbad.org>
- <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
- <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
- <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
- <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
- <20131117141940.GA18569@1wt.eu>
-Message-ID: <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 17 Nov 2013 19:10:51 +0100
+Subject: ACPI vs DT at runtime
+In-Reply-To: <alpine.DEB.2.02.1311171705130.4714@kaball.uk.xensource.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <CAOesGMhkCn2zeJj_ZZAZu_wJya-4evWEqNHpVJEpjxzWHVWY3A@mail.gmail.com>
+ <alpine.DEB.2.02.1311171705130.4714@kaball.uk.xensource.com>
+Message-ID: <3371903.8j54vrCjEN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2013-11-17 at 15:19 +0100, Willy Tarreau wrote:
+On Sunday 17 November 2013 17:18:03 Stefano Stabellini wrote:
+> On Fri, 15 Nov 2013, Olof Johansson wrote:
+> > On Fri, Nov 15, 2013 at 12:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Friday 15 November 2013, Olof Johansson wrote:
+> > >> So, I'm strongly urging that whatever the server guys try to do, it
+> > >> will in the end result in the ACPI data being translated into DT
+> > >> equivalents, such that the kernel only needs to handle data via DT.
+> > >
+> > > I don't think that a translation layer is the answer, I see the problem
+> > > more in things that cannot be translated automatically. The parts that
+> > > are similar enough to allow translation could also just be handled by
+> > > a thin abstraction layer in the kernel, which I think we will see
+> > > on embedded x86 with DT-in-ACPI-syntax.
+> > 
+> > I'm not so sure that converting everything yet again to another
+> > abstraction layer is a good solution. We've got one level of
+> > abstraction today -- DT. And we've got the un-abstracted layer of
+> > platform devices. Churning all drivers yet again seems like the wrong
+> > way to do this. For things that we can pre-populate instead of adding
+> > runtime abstraction, we should.
 
+My point was not that everything would be good if we change the kernel
+this way, it clearly wouldn't. I think the problem is more the parts
+for which neither an automated translation nor a unified driver level
+interface would work well.
+
+> Simply using DT would help avoiding the awkward situation where a driver
+> of a device only works with one of the two description formats and not
+> the other.
+
+Yes, but remember that Intel still have the problem on their embedded
+systems, and will want to solve them.
+
+For ARM Linux I agree that we're better off not having to change all
+the drivers again for this, but we will have a growing number of
+drivers that are shared with ACPI based x86 SoCs. At least there are
+only one or two vendors of those chips ;-)
+
+> > > I think we can still treat ACPI on ARM64 as a beginner's mistake and
+> > > provide hand-written DT blobs for the few systems that start shipping
+> > > with that.
+> > 
+> > I think we can do better -- we can ask those vendors to not ship ACPI
+> > at all, and ship DT themselves (together with us for review, etc).
 > 
-> So it is fairly possible that in your case you can't fill the link if you
-> consume too many descriptors. For example, if your server uses TCP_NODELAY
-> and sends incomplete segments (which is quite common), it's very easy to
-> run out of descriptors before the link is full.
+> They can ship with ACPI if they want to, what is important is that they
+> ship with device tree too.
+> Encouraging them to do that is definitely the right thing to do today,
+> regardless of the medium to long term ACPI strategy for the Linux
+> kernel.
 
-BTW I have a very simple patch for TCP stack that could help this exact
-situation...
+I'm skeptical about getting people to ship both, except if they
+want to support multiple operating systems. For those vendors
+we are talking to, we are possibly able to convince them to drop
+ACPI for Linux based servers. The bigger problem is system vendors
+we don't talk to. They are going to to do any number of crazy things
+in their private kernels:
 
-Idea is to use TCP Small Queue so that we dont fill qdisc/TX ring with
-very small frames, and let tcp_sendmsg() have more chance to fill
-complete packets.
+* Board files
+* Hardcoded platform devices with no multiplatform support
+* Custom hypervisor (EL2 or EL3) interfaces for probing
+* FEX
+* ACPI
+* Some other firmware ported over from their MIPS products
+* Incompatible Open Firmware
+* Incompatible DT extensions
+* ...
 
-Again, for this to work very well, you need that NIC performs TX
-completion in reasonable amount of time...
+The only thing we really have a handle on is stuff that gets submitted
+for inclusion into Linux. One would hope that this would include
+any server platform, but I think the people trying get into that
+market are still learning about how to do these things.
 
-diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
-index 3dc0c6c..10456cf 100644
---- a/net/ipv4/tcp.c
-+++ b/net/ipv4/tcp.c
-@@ -624,13 +624,19 @@ static inline void tcp_push(struct sock *sk, int flags, int mss_now,
- {
- 	if (tcp_send_head(sk)) {
- 		struct tcp_sock *tp = tcp_sk(sk);
-+		struct sk_buff *skb = tcp_write_queue_tail(sk);
- 
- 		if (!(flags & MSG_MORE) || forced_push(tp))
--			tcp_mark_push(tp, tcp_write_queue_tail(sk));
-+			tcp_mark_push(tp, skb);
- 
- 		tcp_mark_urg(tp, flags);
--		__tcp_push_pending_frames(sk, mss_now,
--					  (flags & MSG_MORE) ? TCP_NAGLE_CORK : nonagle);
-+		if (flags & MSG_MORE)
-+			nonagle = TCP_NAGLE_CORK;
-+		if (atomic_read(&sk->sk_wmem_alloc) > 2048) {
-+			set_bit(TSQ_THROTTLED, &tp->tsq_flags);
-+			nonagle = TCP_NAGLE_CORK;
-+		}
-+		__tcp_push_pending_frames(sk, mss_now, nonagle);
- 	}
- }
- 
+> > Especially since doing a broken ACPI implementation today _just for
+> > us_ will just distract them. If they need one for RT, fine. As I
+> > mentioned elsewhere, shipping a flashed DTB is no different from
+> > shipping ACPI from a future-proof point of view; we'll end up
+> > overriding either at some point once we figure out things better.
+> 
+> Well said.
+
++1
+
+	Arnd
