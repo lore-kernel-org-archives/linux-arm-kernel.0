@@ -1,121 +1,103 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 18 Nov 2013 00:06:01 +0100
-Subject: [PATCH v5 01/17] powerpc/fsl-pci: improve clock API use
+Date: Mon, 18 Nov 2013 00:06:02 +0100
+Subject: [PATCH v5 02/17] dts: mpc512x: introduce dt-bindings/clock/ header
 In-Reply-To: <1384729577-7336-1-git-send-email-gsi@denx.de>
 References: <1384729577-7336-1-git-send-email-gsi@denx.de>
-Message-ID: <1384729577-7336-2-git-send-email-gsi@denx.de>
+Message-ID: <1384729577-7336-3-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make the Freescale PCI driver get, prepare and enable the PCI clock
-during probe(); the clock gets put upon device shutdown by the devm
-approach
+introduce a dt-bindings/ header file for MPC512x clocks,
+providing symbolic identifiers for those SoC clocks which
+clients will reference from their device tree nodes
 
-clock lookup is non-fatal as not all platforms may provide clock specs
-in their device tree or implement a device tree based clock provider,
-but failure to enable clocks after successful lookup is fatal
-
-the driver appears to not have a remove() routine, so no reference to
-the clock is kept during use, and the clock isn't released (the devm
-approach will put the clock, but it won't get disabled or unprepared)
-
-the 85xx/86xx platforms go through the probe() routine, where clock
-lookup occurs and the clock gets acquired if one was specified; the
-512x/83xx platforms don't pass through probe() but instead directly call
-the add_bridge() routine at a point in time where the clock provider has
-not been setup yet even if the platform implements one -- add comments
-to the code paths as a reminder for the potential need of a workaround
-in the platform's clock driver, and to keep awareness if code should get
-re-arranged or moved
-
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Kumar Gala <galak@kernel.crashing.org>
-Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: devicetree at vger.kernel.org
+Reviewed-by: Mike Turquette <mturquette@linaro.org>	# for v3: w/o bdlc, PSC ipg
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/sysdev/fsl_pci.c |   52 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ include/dt-bindings/clock/mpc512x-clock.h |   69 +++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
+ create mode 100644 include/dt-bindings/clock/mpc512x-clock.h
 
-diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
-index ccfb50ddfe38..efa0916f61b6 100644
---- a/arch/powerpc/sysdev/fsl_pci.c
-+++ b/arch/powerpc/sysdev/fsl_pci.c
-@@ -17,6 +17,8 @@
-  * Free Software Foundation;  either version 2 of the  License, or (at your
-  * option) any later version.
-  */
+diff --git a/include/dt-bindings/clock/mpc512x-clock.h b/include/dt-bindings/clock/mpc512x-clock.h
+new file mode 100644
+index 000000000000..9e81b3b99a32
+--- /dev/null
++++ b/include/dt-bindings/clock/mpc512x-clock.h
+@@ -0,0 +1,69 @@
++/*
++ * This header provides constants for MPC512x clock specs in DT bindings.
++ */
 +
-+#include <linux/clk.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/delay.h>
-@@ -755,6 +757,32 @@ int __init mpc83xx_add_bridge(struct device_node *dev)
- 	const int *bus_range;
- 	int primary;
- 
-+	/*
-+	 * 85xx/86xx platforms take the path through the probe() routine
-+	 * as one would expect, PCI related clocks get acquired there if
-+	 * specified
-+	 *
-+	 * 83xx/512x _don't_ pass through probe(), this add_bridge()
-+	 * routine instead is called from within .setup_arch() at a
-+	 * point in time where clock providers haven't been setup yet;
-+	 * so clocks cannot get acquired here -- lookup would always
-+	 * fail even on those platforms which implement the provider
-+	 *
-+	 * there is no counterpart for add_bridge() just like there is
-+	 * no remove() counterpart for probe(), so in either case the
-+	 * PCI related clock won't get released, and all of the
-+	 * 512x/83xx/85xx/86xx platforms behave in identical ways
-+	 *
-+	 * this comment is here to "keep the balance" against the
-+	 * probe() routine, and as a reminder to acquire clocks if the
-+	 * add_bridge() call should move to some later point in time
-+	 *
-+	 * until then clock providers are expected to work around the
-+	 * peripheral driver's not acquiring the PCI clock on those
-+	 * platforms where clock providers exist, while nothing needs to
-+	 * be done for those platforms without a clock provider
-+	 */
++#ifndef _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
++#define _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
 +
- 	is_mpc83xx_pci = 1;
- 
- 	if (!of_device_is_available(dev)) {
-@@ -1086,9 +1114,33 @@ void fsl_pci_assign_primary(void)
- 
- static int fsl_pci_probe(struct platform_device *pdev)
- {
-+	struct clk *clk;
- 	int ret;
- 	struct device_node *node;
- 
-+	/*
-+	 * clock lookup is non-fatal since the driver is shared among
-+	 * platforms and not all of them provide clocks specs in their
-+	 * device tree, but failure to enable a specified clock is
-+	 * considered fatal
-+	 *
-+	 * note that only the 85xx and 86xx platforms pass through this
-+	 * probe() routine, while 83xx and 512x directly invoke the
-+	 * mpc83xx_add_bridge() routine from within .setup_arch() code
-+	 */
-+	clk = devm_clk_get(&pdev->dev, "ipg");
-+	if (!IS_ERR(clk)) {
-+		ret = clk_prepare_enable(clk);
-+		if (ret) {
-+			dev_err(&pdev->dev, "Could not enable PCI clock\n");
-+			return ret;
-+		}
-+		/*
-+		 * TODO where to store the 'clk' reference?  there appears
-+		 * to be no remove() routine which undoes what probe() does
-+		 */
-+	}
++#define MPC512x_CLK_DUMMY		0
++#define MPC512x_CLK_REF			1
++#define MPC512x_CLK_SYS			2
++#define MPC512x_CLK_DIU			3
++#define MPC512x_CLK_VIU			4
++#define MPC512x_CLK_CSB			5
++#define MPC512x_CLK_E300		6
++#define MPC512x_CLK_IPS			7
++#define MPC512x_CLK_FEC			8
++#define MPC512x_CLK_SATA		9
++#define MPC512x_CLK_PATA		10
++#define MPC512x_CLK_NFC			11
++#define MPC512x_CLK_LPC			12
++#define MPC512x_CLK_MBX_BUS		13
++#define MPC512x_CLK_MBX			14
++#define MPC512x_CLK_MBX_3D		15
++#define MPC512x_CLK_AXE			16
++#define MPC512x_CLK_USB1		17
++#define MPC512x_CLK_USB2		18
++#define MPC512x_CLK_I2C			19
++#define MPC512x_CLK_MSCAN0_MCLK		20
++#define MPC512x_CLK_MSCAN1_MCLK		21
++#define MPC512x_CLK_MSCAN2_MCLK		22
++#define MPC512x_CLK_MSCAN3_MCLK		23
++#define MPC512x_CLK_BDLC		24
++#define MPC512x_CLK_SDHC		25
++#define MPC512x_CLK_PCI			26
++#define MPC512x_CLK_PSC_MCLK_IN		27
++#define MPC512x_CLK_SPDIF_TX		28
++#define MPC512x_CLK_SPDIF_RX		29
++#define MPC512x_CLK_SPDIF_MCLK		30
++#define MPC512x_CLK_SPDIF		31
++#define MPC512x_CLK_AC97		32
++#define MPC512x_CLK_PSC0_MCLK		33
++#define MPC512x_CLK_PSC1_MCLK		34
++#define MPC512x_CLK_PSC2_MCLK		35
++#define MPC512x_CLK_PSC3_MCLK		36
++#define MPC512x_CLK_PSC4_MCLK		37
++#define MPC512x_CLK_PSC5_MCLK		38
++#define MPC512x_CLK_PSC6_MCLK		39
++#define MPC512x_CLK_PSC7_MCLK		40
++#define MPC512x_CLK_PSC8_MCLK		41
++#define MPC512x_CLK_PSC9_MCLK		42
++#define MPC512x_CLK_PSC10_MCLK		43
++#define MPC512x_CLK_PSC11_MCLK		44
++#define MPC512x_CLK_PSC_FIFO		45
++#define MPC512x_CLK_PSC0		46
++#define MPC512x_CLK_PSC1		47
++#define MPC512x_CLK_PSC2		48
++#define MPC512x_CLK_PSC3		49
++#define MPC512x_CLK_PSC4		50
++#define MPC512x_CLK_PSC5		51
++#define MPC512x_CLK_PSC6		52
++#define MPC512x_CLK_PSC7		53
++#define MPC512x_CLK_PSC8		54
++#define MPC512x_CLK_PSC9		55
++#define MPC512x_CLK_PSC10		56
++#define MPC512x_CLK_PSC11		57
 +
- 	node = pdev->dev.of_node;
- 	ret = fsl_add_bridge(pdev, fsl_pci_primary == node);
- 
++#define MPC512x_CLK_LAST_PUBLIC		57
++
++#endif
 -- 
 1.7.10.4
