@@ -1,86 +1,48 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Sun, 17 Nov 2013 09:15:58 +0100
-Subject: [PATCH 1/5] ahci: imx: Pull out the clock enable/disable calls
-In-Reply-To: <1384651251-5548-1-git-send-email-marex@denx.de>
-References: <1384651251-5548-1-git-send-email-marex@denx.de>
-Message-ID: <20131117091558.556a46bd@ipc1.ka-ro>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 17 Nov 2013 09:38:29 +0100
+Subject: [PATCH v2] ARM: sunxi: dt: add EMAC aliases
+In-Reply-To: <52880460.9050700@elopez.com.ar>
+References: <1384546600-14384-1-git-send-email-emilio@elopez.com.ar>
+ <1384625849-29849-1-git-send-email-emilio@elopez.com.ar>
+ <CAOMqctTb0-B4y0DD6CWEi8Z7Bpd+pP-dWvvn5GiAkCeRD2v43g@mail.gmail.com>
+ <52880460.9050700@elopez.com.ar>
+Message-ID: <20131117083829.GK3538@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Marek Vasut wrote:
-> The same code for enabling and disabling SATA clock was found in multiple
-> places in the driver. Implement functions that enable/disable the SATA clock
-> and use them in such places instead of duplicating the code.
+On Sat, Nov 16, 2013 at 08:48:48PM -0300, Emilio L?pez wrote:
+> Hi,
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: Linux-IDE <linux-ide@vger.kernel.org>
-> ---
->  drivers/ata/ahci_imx.c | 133 ++++++++++++++++++++++++++++---------------------
->  1 file changed, 75 insertions(+), 58 deletions(-)
+> El 16/11/13 20:37, Michal Suchanek escribi?:
+> >Unfortunately,
+> >
+> >a20 has two Ethernets so you can't alias both to ethernet0.
+> >
+> >This has to be done on a per-board basis.
+> >
 > 
-> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-> index ae2d73f..c7ee505 100644
-> --- a/drivers/ata/ahci_imx.c
-> +++ b/drivers/ata/ahci_imx.c
-> @@ -47,6 +47,73 @@ static int ahci_imx_hotplug;
->  module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
->  MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support)");
->  
-> +static int imx_sata_clock_enable(struct device *dev, bool config)
-> +{
-> +	struct imx_ahci_priv *imxpriv = dev_get_drvdata(dev->parent);
-> +	int ret;
-> +
-> +	imxpriv->gpr =
-> +		syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> +	if (IS_ERR(imxpriv->gpr)) {
-> +		dev_err(dev, "failed to find fsl,imx6q-iomux-gpr regmap\n");
-> +		return PTR_ERR(imxpriv->gpr);
-> +	}
-> +
-> +	ret = clk_prepare_enable(imxpriv->sata_ref_clk);
-> +	if (ret < 0) {
-> +		dev_err(dev, "prepare-enable sata_ref clock err:%d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	/*
-> +	 * set PHY Paremeters, two steps to configure the GPR13,
-> +	 * one write for rest of parameters, mask of first write
-> +	 * is 0x07fffffd, and the other one write for setting
-> +	 * the mpll_clk_en.
-> +	 */
-> +	if (config) {
-> +		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
-> +				IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
-> +				| IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK
-> +				| IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK
-> +				| IMX6Q_GPR13_SATA_SPD_MODE_MASK
-> +				| IMX6Q_GPR13_SATA_MPLL_SS_EN
-> +				| IMX6Q_GPR13_SATA_TX_ATTEN_MASK
-> +				| IMX6Q_GPR13_SATA_TX_BOOST_MASK
-> +				| IMX6Q_GPR13_SATA_TX_LVL_MASK
-> +				| IMX6Q_GPR13_SATA_TX_EDGE_RATE
-> +				, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
->
-I would prefer the comma to be at the end of the line where one usually
-looks for it. Also '#define'ing constants for these bitmasks would make
-the code more readable.
+> That was my first thought, and partly why I did it per-board on v1
+> (the other part being that some boards do not have a phy, so having
+> an ethernet0 alias felt "wrong"). But after some quick testing, it
+> appears that aliases are overridable, so we could just add ethernet0
+> = &gmac; on qualifying boards when the gmac support is ready.
 
+Or we will just add it as ethernet1. U-boot is able to put the
+mac-address in the DT for every ethernet* nodes for as much ethernet
+nodes as you need.
 
-Lothar Wa?mann
+Maxime
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131117/ffd0ff45/attachment.sig>
