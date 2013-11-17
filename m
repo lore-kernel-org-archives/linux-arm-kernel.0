@@ -1,41 +1,87 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 17 Nov 2013 01:36:52 +0100
-Subject: Warning masked by BUG() when CONFIG_BUG is enabled
-In-Reply-To: <20131117002651.GX16735@n2100.arm.linux.org.uk> (Russell King's
- message of "Sun, 17 Nov 2013 00:26:51 +0000")
-References: <87a9h4559j.fsf@natisbad.org>
- <20131117002651.GX16735@n2100.arm.linux.org.uk>
-Message-ID: <8738mvx3rv.fsf@natisbad.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sun, 17 Nov 2013 02:06:27 +0100
+Subject: [PATCH 11/11] OMAPDSS: DPI: use VPLL2 regulator if VDDS_DSI is
+ not found
+In-Reply-To: <20131117002600.GA14253@earth.universe>
+References: <1384608224-9452-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1384608224-9452-12-git-send-email-javier.martinez@collabora.co.uk>
+ <20131116141853.GF10317@atomide.com> <5287908C.3040602@collabora.co.uk>
+ <20131116154507.GL10317@atomide.com> <20131116160234.GB5104@earth.universe>
+ <5287AB20.9070407@collabora.co.uk> <20131117002600.GA14253@earth.universe>
+Message-ID: <52881693.7090600@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Sebastian,
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On 11/17/2013 01:26 AM, Sebastian Reichel wrote:
+> Hi Javier,
+> 
+> On Sat, Nov 16, 2013 at 06:28:00PM +0100, Javier Martinez Canillas wrote:
+>> > The hack, as being sent by Javier, will result in the wrong
+>> > regulator being used on the Nokia N900, which is using vaux1.
+>> > It must depend on the machine.
+>> 
+>> I see, so this hack is not generic enough to be usable for all OMAP3 boards so I
+>> think is better to just add the hack on the DTS.
+>>
+>> I was more found about adding a hack on dpi.c since the DTB is an stable ABI
+>> while the dpi.c implementation is not.
+> 
+> I agree with this. My suggestion would be to get the vdds_dsi regulator name
+> from platform data. This way each board can setup its own quirk until omapdss
+> supports DT.
+> 
+>> But I guess is not that bad to change the DTS later once DSS DT
+>> bindings are added to mainline.
+> 
+> As far as I know DT bindings are supposed to be as stable as
+> possible.
+> 
 
-> On Sat, Nov 16, 2013 at 11:52:08PM +0100, Arnaud Ebalard wrote:
->> I was kind of curious not to have noticed it during kernel builds for
->> armada 370/xp targets. The reason is the following: on my Armada 370/XP
->> builds, I had CONFIG_BUG=y which makes BUG() call panic() (which never
->> returns).
+Indeed, although as far as I understood on the latest ARM kernel summit it was
+decided that DT bindings (and DTS) can be changed in incompatible ways if it can
+be reasonably argued that nobody will be affected by the change.
+
+IMHO this is the case for IGEP boards since the vendor (ISEE) is still shipping
+the boards using an old 2.6.37 forked kernel that uses board files.
+
+So I think is reasonable to remove this DT hack later once we have omapdss + CDF
+bindings in mainline since current users that choose to use the mainline kernel
+instead of the vendor one have to be able to replace the stock kernel +
+bootloader that comes with the boards anyways.
+
+>> > At the same time the N900 device tree file uses V28 as
+>> > regulator-name for vaux1 (which is the same one as legacy boot
+>> > used). Nothing depends on this, but I don't think it's a
+>> > good idea to use this property. Apparently it does not work
+>> > if multiple drivers need the same regulator under different
+>> > names.
+>> > 
+>> > -- Sebastian
+>> > 
+>> 
+>> So, what do you think about the following patch instead?
+>> 
+>> [PATCH]
+> 
+> For Nokia N900 vaux1 is also used for si4713 radio chip, lis3lv02d
+> accelerometer and battery cover sensor, so I don't like this hack.
 >
-> You're not the first to spot this, and you won't be the last.
+> If vppl2 is only used for omapdss.dsi on IGEP boards it might be
+> sensible to label it, though? So it might be ok there.
 >
-> Some very experienced kernel hackers have tried to get this fixed and
-> failed.  It seems people actually want the CPU to fall through the
-> BUG() sites when people disable CONFIG_BUG - which I think is idiotic.
->
-> Arnd (and myself) have worked on this problem, and we came up with a
-> very nice solution which didn't increase the size of the kernel and
-> didn't make things unsafe.  However, it went nowhere.
->
-> It's pointless trying to get this fixed - it's just a complete waste of
-> time because of politics.  Find something else to attack.  Just ensure
-> you always have CONFIG_BUG enabled if you want a system which will
-> produce some kind of report when one of these sites gets hit.
 
-Understood. Thanks for the explanation.
+Yes, you can't use this hack for the N900 since other devices already use the
+vaux1 regulator named as "V28" so you can't just rename it to "vdds_dsi".
 
-Cheers,
+But for IGEP boards vpll2 is only used for omapdss DPI so we don't have that issue.
 
-a+
+Let's see what Tomi says that is the best way to handle this to have DVI working
+with DT until the propers bindings land in mainline.
+
+> -- Sebastian
+> 
+
+Thanks a lot for your feedback and best regards,
+Javier
