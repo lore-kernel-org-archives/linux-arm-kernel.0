@@ -1,136 +1,97 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 17 Nov 2013 12:03:58 +0100
-Subject: [PATCH 09/21] ARM: ux500: move MCDE pin config to device tree
+Date: Sun, 17 Nov 2013 12:04:01 +0100
+Subject: [PATCH 12/21] ARM: ux500: move old HREF ipgpio to the device tree
 In-Reply-To: <1384686250-10542-1-git-send-email-linus.walleij@linaro.org>
 References: <1384686250-10542-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1384686250-10542-10-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1384686250-10542-13-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the MCDE pin control table out of the board file
-and into the device tree. Some pins and configs have been
-marked as used by sub-devices or slaves to the MCDE, such
-as I2C device 0-070 which is the HDMI interface circuit
-AV8100, but the pins rather belong to the MCDE SOC block
-as they come out of the main ASIC. The touch screen GPIO
-is not related to MCDE so this gets deleted and need to
-be tied to the respective touch screen (I2C) device
-once that device is added instead.
+The old HREFs (MOP500) were controlling an image-processor
+GPIO (IPGPIO) by using hogs. Do the same thing with device tree
+and get rid of the mop500_pins setting.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-href-family-pinctrl.dtsi | 27 ++++++++++++++++++++++++++
- arch/arm/boot/dts/ste-href.dtsi                |  6 ++++++
- arch/arm/boot/dts/ste-snowball.dts             |  6 ++++++
- arch/arm/mach-ux500/board-mop500-pins.c        | 19 ------------------
- 4 files changed, 39 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/ste-hrefprev60.dtsi   | 16 ++++++++++++++++
+ arch/arm/mach-ux500/board-mop500-pins.c | 24 ------------------------
+ 2 files changed, 16 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-index ec990d8e1029..779829a1e143 100644
---- a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-@@ -604,6 +604,33 @@
+diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
+index 32295e396ff8..b0f5def8e2a8 100644
+--- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
++++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
+@@ -68,6 +68,10 @@
+ 		};
+ 
+ 		pinctrl {
++			/* Set this up using hogs */
++			pinctrl-names = "default";
++			pinctrl-0 = <&ipgpio_hrefprev60_mode>;
++
+ 			ssp0 {
+ 				ssp0_hrefprev60_mode: ssp0_hrefprev60_default {
+ 					hrefprev60_mux {
+@@ -103,6 +107,18 @@
  					};
  				};
  			};
-+
-+			mcde {
-+				lcd_default_mode: lcd_default {
-+					default_mux {
-+						/* Mux in VSI0 and all the data lines */
-+						ste,function = "lcd";
-+						ste,pins =
-+						"lcdvsi0_a_1", /* VSI0 for LCD */
-+						"lcd_d0_d7_a_1", /* Data lines */
-+						"lcd_d8_d11_a_1", /* TV-out */
-+						"lcdaclk_b_1", /* Clock line for TV-out */
-+						"lcdvsi1_a_1"; /* VSI1 for HDMI */
++			ipgpio {
++				 ipgpio_hrefprev60_mode: ipgpio_hrefprev60 {
++					hrefprev60_mux {
++						ste,function = "ipgpio";
++						ste,pins = "ipgpio0_c_1", "ipgpio1_c_1";
 +					};
-+					default_cfg1 {
-+						ste,pins =
-+						"GPIO68_E1", /* VSI0 */
-+						"GPIO69_E2"; /* VSI1 */
++					hrefprev60_cfg1 {
++						ste,pins = "GPIO6_AF6", "GPIO7_AG5";
 +						ste,config = <&in_pu>;
 +					};
-+				};
-+				lcd_sleep_mode: lcd_sleep {
-+					sleep_cfg1 {
-+						ste,pins = "GPIO69_E2"; /* VSI1 */
-+						ste,config = <&slpm_in_wkup_pdis>;
-+					};
-+				};
++				 };
 +			};
  		};
  	};
  };
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 4fda2d933488..56772c3ebb28 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -261,5 +261,11 @@
- 				};
- 			};
- 		};
-+
-+		mcde at a0350000 {
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&lcd_default_mode>;
-+			pinctrl-1 = <&lcd_sleep_mode>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index 4763b805e754..53febe58a1cb 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -362,5 +362,11 @@
- 				};
- 			};
- 		};
-+
-+		mcde at a0350000 {
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&lcd_default_mode>;
-+			pinctrl-1 = <&lcd_sleep_mode>;
-+		};
- 	};
- };
 diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 8fba58c98da2..4cc4cb151474 100644
+index c311d11d6c3d..257c97a214a5 100644
 --- a/arch/arm/mach-ux500/board-mop500-pins.c
 +++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -46,8 +46,6 @@ BIAS(gpio_out_lo, PIN_OUTPUT_LOW|PIN_GPIOMODE_ENABLED);
- /* Sleep modes */
- BIAS(slpm_in_wkup_pdis, PIN_SLEEPMODE_ENABLED|
- 	PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
--BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|
--	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(slpm_out_lo_pdis, PIN_SLEEPMODE_ENABLED|
- 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|
-@@ -325,23 +323,6 @@ static struct pinctrl_map __initdata ab8505_pinmap[] = {
+@@ -312,28 +312,6 @@ static struct pinctrl_map __initdata ab8505_pinmap[] = {
+ };
  
- /* Pin control settings */
- static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ /*
+- * These are specifically for the MOP500 and HREFP (pre-v60) version of the
+- * board, which utilized a TC35892 GPIO expander instead of using a lot of
+- * on-chip pins as the HREFv60 and later does.
+- */
+-static struct pinctrl_map __initdata mop500_pinmap[] = {
 -	/*
--	 * LCD, set TE0 (using LCD VSI0) and D14 (touch screen interrupt) to
--	 * pull-up
--	 * TODO: is this really correct? Snowball doesn't have a LCD.
+-	 * XENON Flashgun on image processor GPIO (controlled from image
+-	 * processor firmware), mux in these image processor GPIO lines 0
+-	 * (XENON_FLASH_ID) and 1 (XENON_READY) on altfunction C and pull up
+-	 * the pins.
 -	 */
--	DB8500_MUX_HOG("lcdvsi0_a_1", "lcd"),
--	DB8500_PIN_HOG("GPIO68_E1", in_pu),
--	DB8500_PIN_HOG("GPIO84_C2", gpio_in_pu),
--	/* Mux in LCD data lines 8 thru 11 and LCDA CLK for MCDE TVOUT */
--	DB8500_MUX("lcd_d8_d11_a_1", "lcd", "mcde-tvout"),
--	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
--	/* Mux in LCD VSI1 and pull it up for MCDE HDMI output */
--	DB8500_MUX("lcdvsi1_a_1", "lcd", "0-0070"),
--	DB8500_PIN("GPIO69_E2", in_pu, "0-0070"),
--	/* LCD VSI1 sleep state */
--	DB8500_PIN_SLEEP("GPIO69_E2", slpm_in_wkup_pdis, "0-0070"),
+-	DB8500_MUX_HOG("ipgpio0_c_1", "ipgpio"),
+-	DB8500_MUX_HOG("ipgpio1_c_1", "ipgpio"),
+-	DB8500_PIN_HOG("GPIO6_AF6", in_pu),
+-	DB8500_PIN_HOG("GPIO7_AG5", in_pu),
+-	/*
+-	 * Runtime stuff: make it possible to mux in the SKE keypad
+-	 * and bias the pins
+-	 */
+-};
 -
- 	/* ske default state */
- 	DB8500_MUX("kp_a_2", "kp", "nmk-ske-keypad"),
- 	DB8500_PIN("GPIO153_B17", in_pd, "nmk-ske-keypad"), /* I7 */
+-/*
+  * The HREFv60 series of platforms is using available pins on the DB8500
+  * insteaf of the Toshiba I2C GPIO expander, reusing some pins like the SSP0
+  * and SSP1 ports (previously connected to the AB8500) as generic GPIO lines.
+@@ -496,8 +474,6 @@ static void __init mop500_href_family_pinmaps_init(void)
+ 
+ void __init mop500_pinmaps_init(void)
+ {
+-	pinctrl_register_mappings(mop500_pinmap,
+-				  ARRAY_SIZE(mop500_pinmap));
+ 	mop500_href_family_pinmaps_init();
+ 	if (machine_is_u8520())
+ 		pinctrl_register_mappings(ab8505_pinmap,
 -- 
 1.8.3.1
