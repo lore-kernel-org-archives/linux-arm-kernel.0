@@ -1,81 +1,86 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 17 Nov 2013 01:52:53 -0300
-Subject: [PATCH v2 1/4] clk: mvebu: Add Core Divider clock
-In-Reply-To: <20131022095317.11944.60429@quantum>
-References: <1380224130-11868-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380224130-11868-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131002174332.GQ31178@titan.lakedaemon.net>
- <20131002180944.GC2365@localhost> <20131008195933.GA2473@localhost>
- <20131016110819.GC2518@localhost> <20131017191852.GA8832@localhost>
- <20131017192545.GJ22434@titan.lakedaemon.net>
- <20131022095317.11944.60429@quantum>
-Message-ID: <20131117045252.GA2677@localhost>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Sun, 17 Nov 2013 09:15:58 +0100
+Subject: [PATCH 1/5] ahci: imx: Pull out the clock enable/disable calls
+In-Reply-To: <1384651251-5548-1-git-send-email-marex@denx.de>
+References: <1384651251-5548-1-git-send-email-marex@denx.de>
+Message-ID: <20131117091558.556a46bd@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi,
 
-On Tue, Oct 22, 2013 at 02:53:17AM -0700, Mike Turquette wrote:
-> Quoting Jason Cooper (2013-10-17 12:25:45)
-> > On Thu, Oct 17, 2013 at 04:18:53PM -0300, Ezequiel Garcia wrote:
-> > > On Wed, Oct 16, 2013 at 08:08:19AM -0300, Ezequiel Garcia wrote:
-> > > > On Tue, Oct 08, 2013 at 04:59:33PM -0300, Ezequiel Garcia wrote:
-> > > > > On Wed, Oct 02, 2013 at 03:09:44PM -0300, Ezequiel Garcia wrote:
-> > > > > > On Wed, Oct 02, 2013 at 01:43:32PM -0400, Jason Cooper wrote:
-> > > > > > > On Thu, Sep 26, 2013 at 04:35:27PM -0300, Ezequiel Garcia wrote:
-> > > > > > > > This commit introduces a new group of clocks present in Armada 370/XP
-> > > > > > > > SoCs (called "Core Divider" clocks) and add a provider for them.
-> > > > > > > > The only clock supported for now is the NAND clock (ndclk), but the
-> > > > > > > > infrastructure to add the rest is already set.
-> > > > > > > > 
-> > > > > > > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > > > > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > > > > > ---
-> > > > > > > >  drivers/clk/mvebu/Kconfig       |   5 +
-> > > > > > > >  drivers/clk/mvebu/Makefile      |   1 +
-> > > > > > > >  drivers/clk/mvebu/clk-corediv.c | 223 ++++++++++++++++++++++++++++++++++++++++
-> > > > > > > >  3 files changed, 229 insertions(+)
-> > > > > > > >  create mode 100644 drivers/clk/mvebu/clk-corediv.c
-> > > > > > > 
-> > > > > > > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > > > > > > 
-> > > > > > 
-> > > > > > Mike: any comments on this?
-> > > > > 
-> > > > > ping?
-> > > > > 
-> > > > > I'd like to move along with the NAND driver for this controller and
-> > > > > -although these are not a hard requirement- it would be nice
-> > > > > to have them merged.
-> > > > > 
-> > > > 
-> > > > Mike? Any chance you pick these soon? It's been almost three-weeks since
-> > > > these patchset has been sent and I'm starting to forget the details of it ;)
-> > > 
-> > > Jason: It seems Mike went on 'stealth mode' so I'm wondering if you would
-> > > consider taking this patchset through you (given it's for our SoCs).
-> > 
-> > I considered it, and it didn't sit well with me.  I don't mind taking a
-> > bugfix, everyone wants to see those moved along.  However, this is an
-> > entirely new driver.  Yes, it's scope of use is limited, but I'd prefer
-> > to let the maintainer review the driver before agreeing to maintain it.
-> > Otherwise, I'd be forcing him to maintain something he hasn't even
-> > looked at.  :(
-> > 
-> > I know it sucks, but we're going to wait for Mike.
+Marek Vasut wrote:
+> The same code for enabling and disabling SATA clock was found in multiple
+> places in the driver. Implement functions that enable/disable the SATA clock
+> and use them in such places instead of duplicating the code.
 > 
-> Sorry for the delay. This driver looks fine and I've taken it into
-> clk-next.
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Linux-IDE <linux-ide@vger.kernel.org>
+> ---
+>  drivers/ata/ahci_imx.c | 133 ++++++++++++++++++++++++++++---------------------
+>  1 file changed, 75 insertions(+), 58 deletions(-)
 > 
+> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+> index ae2d73f..c7ee505 100644
+> --- a/drivers/ata/ahci_imx.c
+> +++ b/drivers/ata/ahci_imx.c
+> @@ -47,6 +47,73 @@ static int ahci_imx_hotplug;
+>  module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
+>  MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support)");
+>  
+> +static int imx_sata_clock_enable(struct device *dev, bool config)
+> +{
+> +	struct imx_ahci_priv *imxpriv = dev_get_drvdata(dev->parent);
+> +	int ret;
+> +
+> +	imxpriv->gpr =
+> +		syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +	if (IS_ERR(imxpriv->gpr)) {
+> +		dev_err(dev, "failed to find fsl,imx6q-iomux-gpr regmap\n");
+> +		return PTR_ERR(imxpriv->gpr);
+> +	}
+> +
+> +	ret = clk_prepare_enable(imxpriv->sata_ref_clk);
+> +	if (ret < 0) {
+> +		dev_err(dev, "prepare-enable sata_ref clock err:%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	/*
+> +	 * set PHY Paremeters, two steps to configure the GPR13,
+> +	 * one write for rest of parameters, mask of first write
+> +	 * is 0x07fffffd, and the other one write for setting
+> +	 * the mpll_clk_en.
+> +	 */
+> +	if (config) {
+> +		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+> +				IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
+> +				| IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK
+> +				| IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK
+> +				| IMX6Q_GPR13_SATA_SPD_MODE_MASK
+> +				| IMX6Q_GPR13_SATA_MPLL_SS_EN
+> +				| IMX6Q_GPR13_SATA_TX_ATTEN_MASK
+> +				| IMX6Q_GPR13_SATA_TX_BOOST_MASK
+> +				| IMX6Q_GPR13_SATA_TX_LVL_MASK
+> +				| IMX6Q_GPR13_SATA_TX_EDGE_RATE
+> +				, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
+>
+I would prefer the comma to be at the end of the line where one usually
+looks for it. Also '#define'ing constants for these bitmasks would make
+the code more readable.
 
-This commit doesn't seem to be in clk-next (or in any other place),
-nearly two months after I submitted it, and after a month I was told
-it was accepted.
 
-What's going on?
-
-I really hope I'm missing something or I'm looking at the wrong tree.
+Lothar Wa?mann
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
