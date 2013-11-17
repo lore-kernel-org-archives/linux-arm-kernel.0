@@ -1,63 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 17 Nov 2013 04:04:50 +0100
-Subject: [PATCH] ARM: dts: imx53: Add USB support for M53EVK
-Message-ID: <1384657490-5925-1-git-send-email-marex@denx.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 16 Nov 2013 19:12:04 -0800
+Subject: [PATCH 0/2 v3] arm/arm64: KVM: arch_timer save/restore
+Message-ID: <1384657926-28194-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB support for M53EVK. The configuration is such that USB Host1
-port is used as Host and the USB OTG port is used as Peripheral thus
-far. Once OTG is properly fixed, the OTG will be further adjusted.
+We never got around to merging any of this.  I'm sending a v2 of my
+patch with Marc Zyngier's comments addressed and resending Andre's v3 of
+the core timer save/restore patch.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx53-m53evk.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+There shouldn't be any outstanding issues here and the current patches
+have been tested with the full save/restore code and works.
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 47b3c89..8658e06 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -100,6 +100,15 @@
- 			regulator-always-on;
- 		};
- 
-+		reg_usbh1_vbus: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 2 0>;
-+			enable-active-low;
-+		};
- 	};
- 
- 	sound {
-@@ -228,6 +237,8 @@
- 				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x80000000
- 				MX53_PAD_EIM_EB3__GPIO2_31		0x80000000
- 				MX53_PAD_PATA_DA_0__GPIO7_6		0x80000000
-+				MX53_PAD_GPIO_2__GPIO1_2		0x80000000
-+				MX53_PAD_GPIO_3__USBOH3_USBH1_OC	0x80000000
- 			>;
- 		};
- 
-@@ -332,3 +343,14 @@
- 	pinctrl-0 = <&pinctrl_uart3>;
- 	status = "okay";
- };
-+
-+&usbotg {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usbh1_vbus>;
-+	phy_type = "utmi";
-+	status = "okay";
-+};
+Andre Przywara (1):
+  ARM/KVM: save and restore generic timer registers
+
+Christoffer Dall (1):
+  arm/arm64: KVM: arch_timer: Initialize cntvoff at kvm_init
+
+ arch/arm/include/asm/kvm_host.h   |    3 ++
+ arch/arm/include/uapi/asm/kvm.h   |   16 +++++++
+ arch/arm/kvm/arm.c                |    2 +
+ arch/arm/kvm/guest.c              |   92 ++++++++++++++++++++++++++++++++++++-
+ arch/arm64/include/uapi/asm/kvm.h |   25 ++++++++++
+ virt/kvm/arm/arch_timer.c         |   34 ++++++++++++++
+ virt/kvm/arm/vgic.c               |    1 -
+ 7 files changed, 171 insertions(+), 2 deletions(-)
+
 -- 
-1.8.4.2
+1.7.10.4
