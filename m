@@ -1,44 +1,20 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 16 Nov 2013 17:26:45 -0800
-Subject: [PATCH] arm/arm64: KVM: Fix hyp mappings of vmalloc regions
-In-Reply-To: <52880017.8060006@ti.com>
-References: <1384557880-14107-1-git-send-email-christoffer.dall@linaro.org>
- <87846f3195cadcae32824120f78e3c9d@www.loen.fr>
- <20131116171524.GK20516@lvm> <52880017.8060006@ti.com>
-Message-ID: <CAMJs5B-4ABJ1PBhBaJOiqhF_CekBPQ3QwpZ_yyQsEkSO_tPcXg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 16 Nov 2013 18:19:15 -0800
+Subject: Fwd: [PATCH 2/8] watchdog: davinci: use davinci_wdt_device
+ structure to hold device data
+In-Reply-To: <527A2888.5030604@ti.com>
+References: <1383680783-12114-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <527A2888.5030604@ti.com>
+Message-ID: <528827A3.6050108@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2013 15:30, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> On Saturday 16 November 2013 12:15 PM, Christoffer Dall wrote:
->> On Sat, Nov 16, 2013 at 10:01:01AM +0000, Marc Zyngier wrote:
->>> On 2013-11-15 23:24, Christoffer Dall wrote:
->>>> Using virt_to_phys on percpu mappings is horribly wrong as it may be
->>>> backed by vmalloc.  Introduce kvm_kaddr_to_phys which translates both
->>>> types of valid kernel addresses to the corresponding physical
->>>> address.
->>>>
->>>> At the same time resolves a typing issue where we were storing the
->>>> physical address as a 32 bit unsigned long (on arm), truncating the
->>>> physical address for addresses above the 4GB limit.  This caused
->>>> breakage on Keystone.
->>>>
->>>> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>> ---
->>>>
->>>> This patch is loosely based on Marc's previous patch from today but
->>>> instead of introducing another Hyp mapping function, it fixes the
->>>> existing one to deal with both kinds of kernel addresses.
->>>
->>> Looks good to me! This should probably be merged quickly (after
->>> testing by Santosh), and possibly Cc-ed to stable.
->>>
->> Agreed, Santhos, can you give this a quick spin?
->>
-> Works as expected.
+On 11/06/2013 03:31 AM, ivan.khoronzhuk wrote:
+> Some SoCs, like Keystone 2, can support more than one WDT and each
+> watchdog device has to use it's own base address, clock source,
+> wdd device, so add new davinci_wdt_device structure to hold device
+> data.
 >
-great, I'll merge the patch.  Thanks for testing it.
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 
--Christoffer
+Reviewed-by: Guenter roeck <linux@roeck-us.net>
