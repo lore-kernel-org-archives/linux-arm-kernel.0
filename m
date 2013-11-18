@@ -1,47 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Nov 2013 10:30:35 -0700
-Subject: [PATCH 23/31] spi: tegra: convert to standard DMA DT bindings
-In-Reply-To: <20131116101422.GK15393@sirena.org.uk>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-24-git-send-email-swarren@wwwdotorg.org>
- <20131116101422.GK15393@sirena.org.uk>
-Message-ID: <528A4EBB.2090800@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Nov 2013 17:30:47 +0000
+Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
+In-Reply-To: <528A4869.2020701@wwwdotorg.org>
+References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
+ <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
+ <52898417.80601@nvidia.com> <20131118115842.GE4050@arm.com>
+ <528A4869.2020701@wwwdotorg.org>
+Message-ID: <20131118173047.GF9838@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2013 03:14 AM, Mark Brown wrote:
-> On Fri, Nov 15, 2013 at 01:54:18PM -0700, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> By using dma_request_slave_channel_or_err(), the DMA slave ID can be
+On Mon, Nov 18, 2013 at 05:03:37PM +0000, Stephen Warren wrote:
+> On 11/18/2013 04:58 AM, Catalin Marinas wrote:
+> ...
+> > Of course, trusted foundations interface could be plugged into cpu_ops
+> > on arm64 but I will NAK it on the grounds of not using the PSCI API, nor
+> > the SMC calling convention (and it's easy to fix when porting to ARMv8).
+> > If a supported standard API is used, then there is no need for
+> > additional code in the kernel.
 > 
-> Acked-by: Mark Brown <broonie@linaro.org>
-> 
-> Is this function introduced earlier in the series?
+> What happens when someone takes an existing working secure-mode SW stack
+> and simply re-uses it on some new ARMv8 SoC. Are you going to force
+> people working on upstream to re-write the secure mode firmware in
+> shipped hardware before allowing upstream kernel support?
 
-Yes, patch 11/31 introduced this.
+Don't confuse the secure stack with the secure monitor running at EL3.
+If you want AArch64 support for lower levels (EL2, EL1, EL0), your
+monitor _must_ be AArch64. You can't run legacy AArch32 code at EL3 and
+have lower levels in AArch64 mode (architectural constraint). You can
+still keep the secure services at S-EL1 in AArch32, only that the SMCs
+are handled by EL3 (and that's another aspect the SMC calling convention
+spec is trying to address, mixed register-width secure/non-secure OSes).
 
-> One of the things
-> I'm looking at is trying to factor out some DMA code in the SPI
-> framework so perhaps using this straight off would be good.  But perhaps
-> the channel request stuff will all be in the drivers and it'll just pass
-> a handle to the framework code so there'll be no issue.
-
-I think I can make a "core changes" branch that contains:
-
-[PATCH 11/31] dma: add channel request API that supports deferred probe
-
-[PATCH 14/31] ASoC: dmaengine: support deferred probe for DMA channels
-
-[PATCH 15/31] ASoC: dmaengine: add custom DMA config to
-snd_dmaengine_pcm_config
-
-That could be merged into relevant subsystems alone, if they only depend
-on the core changes and not any of the Tegra driver changes.
-
-However, I suspect that the Tegra driver changes may need to be merged
-into any subsystem that's doing much other work on the Tegra drivers,
-especially any significant refactoring, so the subsystem would probably
-have to pick up the whole series anyway. Still, I'll make sure I
-re-order the branch to put the core changes first so we have as much
-flexibility as possible.
+-- 
+Catalin
