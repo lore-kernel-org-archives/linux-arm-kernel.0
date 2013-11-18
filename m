@@ -1,25 +1,52 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Nov 2013 15:07:18 +0100
-Subject: [PATCH 4/5] ARM: dts: imx53: Add AHCI SATA binding
-In-Reply-To: <20131118024150.GQ11014@S2101-09.ap.freescale.net>
-References: <1384651251-5548-1-git-send-email-marex@denx.de>
- <1384651251-5548-4-git-send-email-marex@denx.de>
- <20131118024150.GQ11014@S2101-09.ap.freescale.net>
-Message-ID: <201311181507.18592.marex@denx.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 18 Nov 2013 09:08:13 -0500
+Subject: [PATCH 10/12] mtd: nand: davinci: don't set timings if AEMIF
+ is used
+In-Reply-To: <5289FB9C.6060204@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-11-git-send-email-ivan.khoronzhuk@ti.com>
+ <4F5844B3A985794BA902E12C070812375F8D53@DNCE04.ent.ti.com>
+ <528253B7.2060408@ti.com> <5289FB9C.6060204@ti.com>
+Message-ID: <528A1F4D.6050404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Sun, Nov 17, 2013 at 02:20:50AM +0100, Marek Vasut wrote:
-> > The AHCI-IMX driver now supports i.MX53 as well. Add DT binding.
+On Monday 18 November 2013 06:35 AM, Grygorii Strashko wrote:
+> On 11/12/2013 06:13 PM, Santosh Shilimkar wrote:
+>> On Monday 11 November 2013 12:10 PM, Khoronzhuk, Ivan wrote:
+>>> If Davinci AEMIF is used we don't need to set timings and bus width.
+>>> It is done by AEMIF driver (drivers/memory/davinci-aemfi.c).
+>>>
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> ---
+>>>   drivers/mtd/nand/davinci_nand.c |   22 +++++++++++++++-------
+>>>   1 file changed, 15 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+>>> index 4705214..879e915 100644
+>>> --- a/drivers/mtd/nand/davinci_nand.c
+>>> +++ b/drivers/mtd/nand/davinci_nand.c
+>>> @@ -742,27 +742,35 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
+>>>                  goto err_clk_enable;
+>>>          }
+>>>
+>>> +#if !IS_ENABLED(CONFIG_TI_DAVINCI_AEMIF)
+>>>
+>> Instead above #if, just use a variable.
+>>     bool aemif = IS_ENABLED(CONFIG_TI_DAVINCI_AEMIF) and then skip
+>> the below code. #if block in the middle of the code looks ugly.
 > 
-> I think this patch can be merged independently without the driver
-> changes in place.  Also, I understand that the term 'binding' is
-> referred as binding doc, while what you're patching here is device tree
-> source.
+> Yes, this is the hack.
+> The problem is that this part of code contains the call of Davinci platform function davinci_aemif_setup_timing() which is not accessible if Kernel is built for Keystone only.
+> That's why "#if" has been used.
+> 
+> This part of code has to be removed together with Davinci aemif platform code (aemif.c), once Davinci will be converted to DT and use
+> new driver.
+> 
+> The corresponding comment can be added here. Is it ok?
+> 
+Thats more or less what I proposed in another reply. Lets clearly
+document it on why such a check was added.
 
-Ah right, shall I change it?
-
-Best regards,
-Marek Vasut
+Regards,
+Santosh
