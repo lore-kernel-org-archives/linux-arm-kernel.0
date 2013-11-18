@@ -1,36 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 14:45:12 +0000
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <20131118142447.GJ13640@lee--X1>
-References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
- <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
- <20131118093229.GB13640@lee--X1>
- <20131118133940.GC14306@sirena.org.uk>
- <20131118142447.GJ13640@lee--X1>
-Message-ID: <20131118144512.GB24408@sirena.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 18 Nov 2013 12:49:27 -0200
+Subject: mx6qsabresd: Adding eMMC suport
+Message-ID: <CAOMZO5DvYQRBWmJwXBA_kDG_rt0rpreLzshx+dY_UEttQMSE-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 02:24:47PM +0000, Lee Jones wrote:
+Hi,
 
-> For example, we have thought about inserting a layer which handles the
-> type of communication that'll be utilised i.e. true SPI, or our
-> bespoke FSM implementation for instance. This would enable us to issue
-> serial_flash_write(), serial_flash_write_then_read(), ... in the m25p80
-> driver and not care which protocol is used. However, in reality this
-> won't really save a great deal of code - not in our case at least.
+When I add support to esdhc4 port, which is connected to a eMMC on mx6qsabresd:
 
-Right, that's what I'm suggesting.  It's not so much for the code saving
-as for the data saving, allowing device trees that just say "flash chip
-X is connected" rather than requiring either the flash chip information
-in multiple places in the kernel or (worse) have the commands added to
-the DTs of individual boards using the flash chip.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/f8f71139/attachment.sig>
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -229,6 +229,10 @@
+                pinctrl_usdhc3: usdhc3grp {
+                        fsl,pins = <MX6QDL_USDHC3_PINGRP1>;
+                };
++
++               pinctrl_usdhc4: usdhc4grp {
++                       fsl,pins = <MX6QDL_USDHC4_PINGRP1>;
++               };
+        };
+ };
+
+@@ -304,3 +308,11 @@
+        wp-gpios = <&gpio2 1 0>;
+        status = "okay";
+ };
++
++&usdhc4 {
++       pinctrl-names = "default";
++       pinctrl-0 = <&pinctrl_usdhc4>;
++       bus-width = <8>;
++       non-removable;
++       status = "okay";
++};
+
+I get the following:
+
+mmc2: Timeout waiting for hardware interrupt.
+ mmcblk1boot1: unknown partition table
+mmc2: Timeout waiting for hardware interrupt.
+ mmcblk1boot0: unknown partition table
+
+The boots proceeds until the end, but there is a big delay due to the
+above messages.
+
+Does anything special need to be done in order to support eMMC?
+
+Regards,
+
+Fabio Estevam
