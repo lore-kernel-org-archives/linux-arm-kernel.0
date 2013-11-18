@@ -1,162 +1,50 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Mon, 18 Nov 2013 18:52:29 +0530
-Subject: [PATCH V3 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1384780949-10922-1-git-send-email-vkale@apm.com>
-References: <1384780949-10922-1-git-send-email-vkale@apm.com>
-Message-ID: <1384780949-10922-3-git-send-email-vkale@apm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 18 Nov 2013 15:29:54 +0200
+Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
+In-Reply-To: <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
+ <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
+ <5280E617.3000004@ti.com>
+ <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
+Message-ID: <528A1652.4000806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for irq registration when pmu interrupt is percpu.
+On 2013-11-11 16:30, Dr. H. Nikolaus Schaller wrote:
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
----
- arch/arm64/kernel/perf_event.c |  102 +++++++++++++++++++++++++++++-----------
- 1 file changed, 74 insertions(+), 28 deletions(-)
+> Maybe it looks as if it is an unsolvable problem. The OPA works only if acbias
+> and bypass are enabled, but is not allowed to tell that it is there.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index cea1594..23475f6 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/bitmap.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/perf_event.h>
-@@ -363,22 +364,51 @@ validate_group(struct perf_event *event)
- }
- 
- static void
-+armpmu_disable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-+	disable_percpu_irq(irq);
-+}
-+
-+static void
- armpmu_release_hardware(struct arm_pmu *armpmu)
- {
- 	int i, irq, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
- 
--	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+	irq = platform_get_irq(pmu_device, 0);
- 
--	for (i = 0; i < irqs; ++i) {
--		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
--			continue;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, armpmu);
-+	if (irq_to_desc(irq) && irq_is_percpu(irq)) {
-+		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
-+		free_percpu_irq(irq, &cpu_hw_events);
-+	} else {
-+		irqs = min(pmu_device->num_resources, num_possible_cpus());
-+
-+		for (i = 0; i < irqs; ++i) {
-+			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-+				continue;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq >= 0)
-+				free_irq(irq, armpmu);
-+		}
- 	}
- }
- 
-+static void
-+armpmu_enable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	enable_percpu_irq(irq, 0);
-+	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-+}
-+
- static int
- armpmu_reserve_hardware(struct arm_pmu *armpmu)
- {
-@@ -396,34 +426,50 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 		return -ENODEV;
- 	}
- 
--	for (i = 0; i < irqs; ++i) {
--		err = 0;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq < 0)
--			continue;
-+	irq = platform_get_irq(pmu_device, 0);
- 
--		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
--		 */
--		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
--			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				    irq, i);
--			continue;
--		}
-+	if (irq_to_desc(irq) && irq_is_percpu(irq)) {
-+		err = request_percpu_irq(irq, armpmu->handle_irq,
-+				"arm-pmu", &cpu_hw_events);
- 
--		err = request_irq(irq, armpmu->handle_irq,
--				  IRQF_NOBALANCING,
--				  "arm-pmu", armpmu);
- 		if (err) {
--			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
-+			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
-+					irq);
- 			armpmu_release_hardware(armpmu);
- 			return err;
- 		}
- 
--		cpumask_set_cpu(i, &armpmu->active_irqs);
-+		on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			err = 0;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq < 0)
-+				continue;
-+
-+			/*
-+			 * If we have a single PMU interrupt that we can't shift,
-+			 * assume that we're running on a uniprocessor machine and
-+			 * continue. Otherwise, continue without this interrupt.
-+			 */
-+			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-+				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+						irq, i);
-+				continue;
-+			}
-+
-+			err = request_irq(irq, armpmu->handle_irq,
-+					IRQF_NOBALANCING,
-+					"arm-pmu", armpmu);
-+			if (err) {
-+				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+						irq);
-+				armpmu_release_hardware(armpmu);
-+				return err;
-+			}
-+
-+			cpumask_set_cpu(i, &armpmu->active_irqs);
-+		}
- 	}
- 
- 	return 0;
--- 
-1.7.9.5
+That's why the board file or dts file is there, to have "glue" data to
+make different pieces work together.
+
+The perfect (?) solution would be a CDF like data. The idea would be
+that in the board file, you would describe configuration options for
+VENC and for OPA. In this particular case, you'd tell VENC that it needs
+to enable acbias and bypass when OPA is to be connected to VENC. Then
+there could be more entries for VENC, saying disable acbias and bypass
+when BAR is to be connected to VENC.
+
+However, we don't have such support (yet).
+
+For now, I hope it's enough if we handle VENC in a "single
+configuration" manner, i.e. you'll tell VENC to enable acbias and bypass
+when VENC is enabled. This means you can't have board setups where you'd
+change the VENC->OPA connection to some other analog tv output at
+runtime. I hope that's the case (i.e. OPA is always in use on that board).
+
+If so, then I think you can just pass the acbias and bypass
+configuration values via omapdss platform data. And VENC driver will use
+them to configure those. OPA doesn't know anything about this at all.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/0cbad3b4/attachment.sig>
