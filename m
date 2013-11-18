@@ -1,49 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Nov 2013 12:01:02 -0700
-Subject: [RFC PATCH V2 1/2] dtc: add 'compat' output option, prints board
- string
-In-Reply-To: <728deb9bbeab491a728da077aa5e47c0e01bccf8.1384798508.git.jason@lakedaemon.net>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <cover.1384798508.git.jason@lakedaemon.net>
- <728deb9bbeab491a728da077aa5e47c0e01bccf8.1384798508.git.jason@lakedaemon.net>
-Message-ID: <528A63EE.8050401@wwwdotorg.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Nov 2013 20:10:31 +0100
+Subject: [PATCH] RFC: framebuffer: provide generic get_fb_unmapped_area
+In-Reply-To: <20131118185959.GE19318@pengutronix.de>
+References: <1384772231-20993-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAMuHMdWtrSnTHNN-7GtMWAG9gZ0HJ3ZgVZt6Cfc=q=e-5Sr-Qw@mail.gmail.com>
+ <20131118185959.GE19318@pengutronix.de>
+Message-ID: <20131118191031.GF19318@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 11:38 AM, Jason Cooper wrote:
-> Consumers of the Linux kernel's build products are beginning to hardcode
-> the filenames of the dtbs generated.  Since the dtb filenames are
-> currently the dts filename s/dts/dtb/, this prevents the kernel
-> community from renaming dts files as needed.
-> 
-> Let's provide a consistent naming structure for consumers to script
-> against.  Or at least, as consistent as the dts properties themselves.
-> 
-> With this patch, adding the '-O compat' option to the dtc commandline
-> will cause dtc to parse the provided file, and print out the board
-> compatible string to stdout.
-> 
-> This will facilitate an 'installdtbs.sh' script in the kernel for naming
-> dtb files by their compatible string, eg:
-> 
-> $ dtc -I dtb -O compat arch/arm/boot/dts/armada-370-mirabox.dtb
-> globalscale,mirabox
-> 
-> This change will also simplify distribution install scripts that need to
-> search through many dtbs to find the right one for a target board.
-> 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> changes since v1:
->  - made patch against in-tree dtc code to facilitate testing
+Hello again,
 
-I assume this patch would first get applied to the upstream dtc, then
-back-ported into the kernel though?
+On Mon, Nov 18, 2013 at 07:59:59PM +0100, Uwe Kleine-K?nig wrote:
+> 	if (pgoff > screen_size || pgoff + len > screen_size)
+This must be:
 
-I wonder if dtc is the correct place to put this feature at all though.
-It seems like a tiny standalone utility using libfdt would be better.
-Actually, perhaps the existing fdtget utility (which seems to be
-scripts/dtc/fdtget.c in the kernel although I don't know if it's built
-by the kernel yet) can be used rather than creating a new one? Using
-fdtget seems like it'd allow more flexibility later, if the naming rules
-change, via scripting rather than having to edit the dtc source code.
+	if (pgoff > screen_size || len > screen_size - pgoff)
+
+to do what I intended.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
