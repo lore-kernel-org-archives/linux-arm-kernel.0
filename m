@@ -1,36 +1,74 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 18 Nov 2013 21:38:05 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <201311181610.33105.arnd@arndb.de>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <3371903.8j54vrCjEN@wuerfel> <20131118150455.GD24408@sirena.org.uk> <
- 201311181610.33105.arnd@arndb.de>
-Message-ID: <20131118213805.D4158C401C6@trevor.secretlab.ca>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 18 Nov 2013 13:42:35 -0800
+Subject: [PATCH 1/2] sched/nohz: add debugfs control over
+ sched_tick_max_deferment
+In-Reply-To: <1379371429-22214-1-git-send-email-khilman@linaro.org>
+References: <1379371429-22214-1-git-send-email-khilman@linaro.org>
+Message-ID: <CAGa+x86tj59F6n6cU=Anru2d8RHLuByHXqsrMFkUrNwhLbWXnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013 16:10:32 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 18 November 2013, Mark Brown wrote:
-> > On Sun, Nov 17, 2013 at 07:10:51PM +0100, Arnd Bergmann wrote:
-> > > On Sunday 17 November 2013 17:18:03 Stefano Stabellini wrote:
-> > 
-> > > > Simply using DT would help avoiding the awkward situation where a driver
-> > > > of a device only works with one of the two description formats and not
-> > > > the other.
-> > 
-> > > Yes, but remember that Intel still have the problem on their embedded
-> > > systems, and will want to solve them.
-> > 
-> > Has it been confirmed that Intel are going with ACPI for their embedded
-> > devices rather than SFI?  That would be nice given how awful SFI is and
-> > I have heard that before but I'm not sure I've seen anything official.
-> 
-> Possibly not all of Intel agrees to that, but I think that's what I've 
-> heard from Darrent Hart and David Woodhouse. I doubt you can get an
-> "official" confirmation about it. I also don't know if there is a follow-up
-> for the Intel CE4100 that started using DT[1].
+Frederic,
 
-Darren is using it to enable Minnowboard, and there is active work on
-the GPIO, SPI and other subsystems to bring in ACPI support.
+On Mon, Sep 16, 2013 at 3:43 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> Allow debugfs override of sched_tick_max_deferment in order to ease
+> finding/fixing the remaining issues with full nohz.
+>
+> The value to be written is in jiffies, and -1 means the max deferment
+> is disabled (scheduler_tick_max_deferment() returns KTIME_MAX.)
+>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 
-g.
+Any objections to this series for ease of debugging and tracking down
+issues with the residual tick?
+
+Kevin
+
+> ---
+>  kernel/sched/core.c | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+>
+> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+> index 5ac63c9..4b1fe3e 100644
+> --- a/kernel/sched/core.c
+> +++ b/kernel/sched/core.c
+> @@ -2175,6 +2175,8 @@ void scheduler_tick(void)
+>  }
+>
+>  #ifdef CONFIG_NO_HZ_FULL
+> +static u32 sched_tick_max_deferment = HZ;
+> +
+>  /**
+>   * scheduler_tick_max_deferment
+>   *
+> @@ -2193,13 +2195,25 @@ u64 scheduler_tick_max_deferment(void)
+>         struct rq *rq = this_rq();
+>         unsigned long next, now = ACCESS_ONCE(jiffies);
+>
+> -       next = rq->last_sched_tick + HZ;
+> +       if (sched_tick_max_deferment == -1)
+> +               return KTIME_MAX;
+> +
+> +       next = rq->last_sched_tick + sched_tick_max_deferment;
+>
+>         if (time_before_eq(next, now))
+>                 return 0;
+>
+>         return jiffies_to_usecs(next - now) * NSEC_PER_USEC;
+>  }
+> +
+> +static __init int sched_nohz_full_init_debug(void)
+> +{
+> +       debugfs_create_u32("sched_tick_max_deferment", 0644, NULL,
+> +                          &sched_tick_max_deferment);
+> +
+> +       return 0;
+> +}
+> +late_initcall(sched_nohz_full_init_debug);
+>  #endif
+>
+>  notrace unsigned long get_parent_ip(unsigned long addr)
+> --
+> 1.8.3
+>
