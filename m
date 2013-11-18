@@ -1,223 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Nov 2013 14:41:55 +0000
-Subject: [PATCHv7] dmaengine: Add support for BCM2835
-In-Reply-To: <5288E327.8050809@koalo.de>
-References: <5288E327.8050809@koalo.de>
-Message-ID: <20131118144155.GJ30853@e106331-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 18 Nov 2013 14:45:12 +0000
+Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
+ bit logic defines
+In-Reply-To: <20131118142447.GJ13640@lee--X1>
+References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
+ <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
+ <20131118093229.GB13640@lee--X1>
+ <20131118133940.GC14306@sirena.org.uk>
+ <20131118142447.GJ13640@lee--X1>
+Message-ID: <20131118144512.GB24408@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 17, 2013 at 03:39:19PM +0000, Florian Meier wrote:
-> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
-> Currently it only supports cyclic DMA.
-> 
-> Signed-off-by: Florian Meier <florian.meier@koalo.de>
-> ---
-> 
-> This version includes some more style improvements
-> suggested in the previous thread.
-> 
->  .../devicetree/bindings/dma/bcm2835-dma.txt        |   56 ++
->  drivers/dma/Kconfig                                |    6 +
->  drivers/dma/Makefile                               |    1 +
->  drivers/dma/bcm2835-dma.c                          |  736 ++++++++++++++++++++
->  4 files changed, 799 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/bcm2835-dma.txt
->  create mode 100644 drivers/dma/bcm2835-dma.c
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
-> new file mode 100644
-> index 0000000..7d91019
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/bcm2835-dma.txt
-> @@ -0,0 +1,56 @@
-> +* BCM2835 DMA controller
-> +
-> +Required properties:
-> +- compatible: Should be "brcm,bcm2835-dma".
-> +- reg: Should contain DMA registers location and length.
-> +- interrupts: Should contain the DMA interrupts associated
-> +               to the DMA channels in ascending order.
-> +               First cell is the IRQ bank.
-> +               Second cell is the IRQ number.
+On Mon, Nov 18, 2013 at 02:24:47PM +0000, Lee Jones wrote:
 
-The format of the cells is a property of the interrupt parent, not of
-the DMA controller. It shouldn't be described here.
+> For example, we have thought about inserting a layer which handles the
+> type of communication that'll be utilised i.e. true SPI, or our
+> bespoke FSM implementation for instance. This would enable us to issue
+> serial_flash_write(), serial_flash_write_then_read(), ... in the m25p80
+> driver and not care which protocol is used. However, in reality this
+> won't really save a great deal of code - not in our case at least.
 
-> +- #dma-cells: Must be <1>, used to represent the number of integer cells in
-> +               the dmas property of client devices.
-
-A brief description of the set of sane values of the dma-specifier cell
-would be better.
-
-How many channels does the DMA controller have?
-
-> +- brcm,dma-channel-mask: Bit mask representing the channels
-> +                        not used by the firmware.
-
-Which bits correspond to which channels?
-
-How many channels are likely to be reserved out of how many in total?
-
-Are they likely to be an arbitrary set, or some contiguous range?
-
-> +
-> +Example:
-> +
-> +dma: dma at 7e007000 {
-> +       compatible = "brcm,bcm2835-dma";
-> +       reg = <0x7e007000 0xf00>;
-> +       interrupts = <1 16
-> +                     1 17
-> +                     1 18
-> +                     1 19
-> +                     1 20
-> +                     1 21
-> +                     1 22
-> +                     1 23
-> +                     1 24
-> +                     1 25
-> +                     1 26
-> +                     1 27
-> +                     1 28>;
-
-Please bracket these individually.
-
-> +
-> +       #dma-cells = <1>;
-> +       brcm,dma-channel-mask = <0x7f35>;
-> +};
-> +
-> +DMA clients connected to the BCM2835 DMA controller must use the format
-> +described in the dma.txt file, using a two-cell specifier for each channel:
-> +a phandle plus one integer cells.
-> +The two cells in order are:
-> +
-> +1. A phandle pointing to the DMA controller.
-> +2. The DREQ number.
-
-This description is unnecessary, and technically wrong (the phandle
-isn't part of the specifier, as the specifier goes with the phandle).
-
-> +
-> +Example:
-> +
-> +bcm2835_i2s: i2s at 7e203000 {
-> +       compatible = "brcm,bcm2835-i2s";
-> +       reg = < 0x7e203000 0x20
-> +               0x7e101098 0x02>;
-> +
-> +       dmas = <&dma 2
-> +               &dma 3>;
-
-Brackets please.
-
-[...]
-
-> +struct bcm2835_dma_cb {
-> +       uint32_t info;
-> +       uint32_t src;
-> +       uint32_t dst;
-> +       uint32_t length;
-> +       uint32_t stride;
-> +       uint32_t next;
-> +       uint32_t pad[2];
-
-s/uint32_t/u32/ here and elsewhere.
-
-[...]
-
-> +static void bcm2835_dma_start_desc(struct bcm2835_chan *c)
-> +{
-> +       struct virt_dma_desc *vd = vchan_next_desc(&c->vc);
-> +       struct bcm2835_desc *d;
-> +
-> +       if (!vd) {
-> +               c->desc = NULL;
-> +               return;
-> +       }
-> +
-> +       list_del(&vd->node);
-> +
-> +       c->desc = d = to_bcm2835_dma_desc(&vd->tx);
-> +
-> +       dsb();  /* ARM data synchronization (push) operation */
-
-We all know what a dsb is. What you should explain is _why_ the dsb is
-here. As this is sat under drivers, it would be nicer to use an
-architecture generic barrier rather than dsb() directly.
-
-> +
-> +       writel(d->control_block_base_phys, c->chan_base + BCM2835_DMA_ADDR);
-> +       writel(BCM2835_DMA_ACTIVE, c->chan_base + BCM2835_DMA_CS);
-> +}
-> +
-> +static irqreturn_t bcm2835_dma_callback(int irq, void *data)
-> +{
-> +       struct bcm2835_chan *c = data;
-> +       struct bcm2835_desc *d;
-> +       unsigned long flags;
-> +
-> +       spin_lock_irqsave(&c->vc.lock, flags);
-> +
-> +       /* Acknowledge interrupt */
-> +       writel(BCM2835_DMA_INT, c->chan_base + BCM2835_DMA_CS);
-> +
-> +       d = c->desc;
-> +
-> +       if (d) {
-> +               /* TODO Only works for cyclic DMA */
-> +               vchan_cyclic_callback(&d->vd);
-> +       }
-> +
-> +       /* Keep the DMA engine running */
-> +       dsb(); /* ARM synchronization barrier */
-
-Better explanation please.
-
-> +       writel(BCM2835_DMA_ACTIVE, c->chan_base + BCM2835_DMA_CS);
-> +
-> +       spin_unlock_irqrestore(&c->vc.lock, flags);
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +       struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-> +
-> +       dev_dbg(c->vc.chan.device->dev,
-> +                       "Allocating DMA channel %i\n", c->ch);
-
-Why not %d? It's far more common...
-
-
-[...]
-
-> +       if (pdev->dev.of_node) {
-> +               /* Request DMA channel mask from device tree */
-> +               if (of_property_read_u32(pdev->dev.of_node,
-> +                               "brcm,dma-channel-mask",
-> +                               &chans_available)) {
-> +                       dev_err(&pdev->dev, "Failed to get channel mask\n");
-> +                       bcm2835_dma_free(od);
-> +                       return -EINVAL;
-> +               }
-
-As of_property_read_u32 has an implicit check on np, you don't need to
-first check pdev->dev.of_node.
-
-> +       } else {
-> +               dev_err(&pdev->dev, "Failed to get channel mask. No device tree.\n");
-> +               bcm2835_dma_free(od);
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* Do not use the FIQ and BULK channels */
-> +       chans_available &= ~0xD;
-
-A couple of #defines would be nice, along with an explanation as to
-why...
-
-Thanks,
-Mark.
+Right, that's what I'm suggesting.  It's not so much for the code saving
+as for the data saving, allowing device trees that just say "flash chip
+X is connected" rather than requiring either the flash chip information
+in multiple places in the kernel or (worse) have the commands added to
+the DTs of individual boards using the flash chip.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/f8f71139/attachment.sig>
