@@ -1,43 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Nov 2013 14:14:44 +0100
-Subject: [PATCH v2] ARM: sunxi: dt: add EMAC aliases
-In-Reply-To: <CAOMqctQc7K4OwOiCu1UuRpQLmU-Gh43HE_y2tYVnokk84ignJw@mail.gmail.com>
-References: <1384546600-14384-1-git-send-email-emilio@elopez.com.ar>
- <1384625849-29849-1-git-send-email-emilio@elopez.com.ar>
- <CAOMqctTb0-B4y0DD6CWEi8Z7Bpd+pP-dWvvn5GiAkCeRD2v43g@mail.gmail.com>
- <52880460.9050700@elopez.com.ar> <20131117083829.GK3538@lukather>
- <CAOMqctQc7K4OwOiCu1UuRpQLmU-Gh43HE_y2tYVnokk84ignJw@mail.gmail.com>
-Message-ID: <20131118131444.GC5325@lukather>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 18 Nov 2013 14:20:17 +0100
+Subject: [RFC PATCH RESEND 1/2] clk: add clk accuracy retrieval support
+In-Reply-To: <20131116015946.19193.29895@quantum>
+References: <1381684631-10835-1-git-send-email-b.brezillon@overkiz.com>
+ <1381684631-10835-2-git-send-email-b.brezillon@overkiz.com>
+ <20131116015946.19193.29895@quantum>
+Message-ID: <528A1411.6000905@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 02:07:07PM +0100, Michal Suchanek wrote:
-> >> That was my first thought, and partly why I did it per-board on v1
-> >> (the other part being that some boards do not have a phy, so having
-> >> an ethernet0 alias felt "wrong"). But after some quick testing, it
-> >> appears that aliases are overridable, so we could just add ethernet0
-> >> = &gmac; on qualifying boards when the gmac support is ready.
-> >
-> > Or we will just add it as ethernet1. U-boot is able to put the
-> > mac-address in the DT for every ethernet* nodes for as much ethernet
-> > nodes as you need.
-> 
-> I guess that would be fine for CT and CB2 which can have only one
-> physical ethernet (unless there are pins for adding another PHY) but
-> if there is ever board with two ethernets you want only one of them to
->  get the mac address from u-boot.
+Hi Mike,
 
-I'm not sure to get why. ethernet0 would get ethaddr, ethernet1 would
-get eth1addr. How is that an issue?
+Nothing related to this thread, but if you have some time, could you 
+take a look at
+the last version (v5) of the at91 CCF port ?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/6e37df2d/attachment.sig>
+I know Nicolas was planning to add this for 3.14, and we'd like to have 
+your feedback
+on the new dt bindings.
+
+Best Regards,
+
+Boris
+
+On 16/11/2013 02:59, Mike Turquette wrote:
+> Quoting Boris BREZILLON (2013-10-13 10:17:10)
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 73bdb69..942811d 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+> ...
+>> @@ -194,6 +204,7 @@ struct clk_hw {
+>>   struct clk_fixed_rate {
+>>          struct          clk_hw hw;
+>>          unsigned long   fixed_rate;
+>> +       unsigned long   fixed_accuracy;
+> This change belongs in patch #2. Please also update the kerneldoc above
+> this struct definition.
+>
+> Regards,
+> Mike
+>
+>>          u8              flags;
+>>   };
+>>   
+>> diff --git a/include/linux/clk.h b/include/linux/clk.h
+>> index 9a6d045..2fe3b54 100644
+>> --- a/include/linux/clk.h
+>> +++ b/include/linux/clk.h
+>> @@ -85,6 +85,23 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
+>>   #endif
+>>   
+>>   /**
+>> + * clk_get_accuracy - obtain the clock accuracy in ppb (parts per billion)
+>> + *                   for a clock source.
+>> + * @clk: clock source
+>> + *
+>> + * This gets the clock source accuracy expressed in ppb.
+>> + * A perfect clock returns 0.
+>> + */
+>> +#ifdef CONFIG_HAVE_CLK_GET_ACCURACY
+>> +unsigned long clk_get_accuracy(struct clk *clk);
+>> +#else
+>> +static inline unsigned long clk_get_accuracy(struct clk *clk)
+>> +{
+>> +       return 0;
+>> +}
+>> +#endif
+>> +
+>> +/**
+>>    * clk_prepare - prepare a clock source
+>>    * @clk: clock source
+>>    *
+>> -- 
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
