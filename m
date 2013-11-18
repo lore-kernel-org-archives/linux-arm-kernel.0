@@ -1,60 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Nov 2013 14:21:21 -0500
-Subject: [RFC PATCH V2 1/2] dtc: add 'compat' output option, prints
- board string
-In-Reply-To: <528A63EE.8050401@wwwdotorg.org>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <cover.1384798508.git.jason@lakedaemon.net>
- <728deb9bbeab491a728da077aa5e47c0e01bccf8.1384798508.git.jason@lakedaemon.net>
- <528A63EE.8050401@wwwdotorg.org>
-Message-ID: <20131118192121.GH10335@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Nov 2013 11:22:56 -0800
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
+ device tree case
+In-Reply-To: <20131118190921.GT13640@lee--X1>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-2-git-send-email-tony@atomide.com>
+ <20131118102907.GC13640@lee--X1>
+ <20131118172510.GI16038@saruman.home>
+ <20131118174638.GQ13640@lee--X1>
+ <20131118181110.GM10317@atomide.com>
+ <20131118190921.GT13640@lee--X1>
+Message-ID: <20131118192256.GU10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 12:01:02PM -0700, Stephen Warren wrote:
-> On 11/18/2013 11:38 AM, Jason Cooper wrote:
-> > Consumers of the Linux kernel's build products are beginning to hardcode
-> > the filenames of the dtbs generated.  Since the dtb filenames are
-> > currently the dts filename s/dts/dtb/, this prevents the kernel
-> > community from renaming dts files as needed.
+* Lee Jones <lee.jones@linaro.org> [131118 11:10]:
+> > > Are you Acking this patch by the way?
 > > 
-> > Let's provide a consistent naming structure for consumers to script
-> > against.  Or at least, as consistent as the dts properties themselves.
-> > 
-> > With this patch, adding the '-O compat' option to the dtc commandline
-> > will cause dtc to parse the provided file, and print out the board
-> > compatible string to stdout.
-> > 
-> > This will facilitate an 'installdtbs.sh' script in the kernel for naming
-> > dtb files by their compatible string, eg:
-> > 
-> > $ dtc -I dtb -O compat arch/arm/boot/dts/armada-370-mirabox.dtb
-> > globalscale,mirabox
-> > 
-> > This change will also simplify distribution install scripts that need to
-> > search through many dtbs to find the right one for a target board.
-> > 
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > ---
-> > changes since v1:
-> >  - made patch against in-tree dtc code to facilitate testing
+> > If this looks acceptable to you guys, I'd like to merge this via my fixes
+> > branch this week with your acks if that works for you. That way I can base
+> > my omap legacy platform data removal patches on my fixes branch while keep
+> > things working for the drivers. Alternatively I can naturally base my
+> > legacy data removal on -rc2 too if this gets merged to mainline by then 
+> > via the MFD tree.
 > 
-> I assume this patch would first get applied to the upstream dtc, then
-> back-ported into the kernel though?
+> I can either send it up for the -rcs, or I can create an immutable
+> branch for you to pull from. That way the patch can do in via ARM-SoC
+> and MFD and we can let Git sort it out.
 
-Yes.
+OK great, I'd prefer an immutable branch that I can merge in too. Then
+you can bundle it with other MFD fixes for the -rc series and send it
+in when it suits you :)
 
-> I wonder if dtc is the correct place to put this feature at all though.
-> It seems like a tiny standalone utility using libfdt would be better.
-> Actually, perhaps the existing fdtget utility (which seems to be
-> scripts/dtc/fdtget.c in the kernel although I don't know if it's built
-> by the kernel yet) can be used rather than creating a new one? Using
-> fdtget seems like it'd allow more flexibility later, if the naming rules
-> change, via scripting rather than having to edit the dtc source code.
+Regards,
 
-Ah, neat.  I missed fdtget.c.  I'll take a look at that, it sounds
-promising.
-
-thx,
-
-Jason.
+Tony
