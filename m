@@ -1,52 +1,127 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 18 Nov 2013 09:08:13 -0500
-Subject: [PATCH 10/12] mtd: nand: davinci: don't set timings if AEMIF
- is used
-In-Reply-To: <5289FB9C.6060204@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-11-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D53@DNCE04.ent.ti.com>
- <528253B7.2060408@ti.com> <5289FB9C.6060204@ti.com>
-Message-ID: <528A1F4D.6050404@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Nov 2013 14:16:37 +0000
+Subject: [PATCHv3] ASoC: Add support for BCM2835
+In-Reply-To: <5289F9DF.8060406@koalo.de>
+References: <5289F9DF.8060406@koalo.de>
+Message-ID: <20131118141637.GI30853@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 November 2013 06:35 AM, Grygorii Strashko wrote:
-> On 11/12/2013 06:13 PM, Santosh Shilimkar wrote:
->> On Monday 11 November 2013 12:10 PM, Khoronzhuk, Ivan wrote:
->>> If Davinci AEMIF is used we don't need to set timings and bus width.
->>> It is done by AEMIF driver (drivers/memory/davinci-aemfi.c).
->>>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>>   drivers/mtd/nand/davinci_nand.c |   22 +++++++++++++++-------
->>>   1 file changed, 15 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
->>> index 4705214..879e915 100644
->>> --- a/drivers/mtd/nand/davinci_nand.c
->>> +++ b/drivers/mtd/nand/davinci_nand.c
->>> @@ -742,27 +742,35 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
->>>                  goto err_clk_enable;
->>>          }
->>>
->>> +#if !IS_ENABLED(CONFIG_TI_DAVINCI_AEMIF)
->>>
->> Instead above #if, just use a variable.
->>     bool aemif = IS_ENABLED(CONFIG_TI_DAVINCI_AEMIF) and then skip
->> the below code. #if block in the middle of the code looks ugly.
+On Mon, Nov 18, 2013 at 11:28:31AM +0000, Florian Meier wrote:
+> This driver adds support for digital audio (I2S)
+> for the BCM2835 SoC that is used by the
+> Raspberry Pi. External audio codecs can be
+> connected to the Raspberry Pi via P5 header.
 > 
-> Yes, this is the hack.
-> The problem is that this part of code contains the call of Davinci platform function davinci_aemif_setup_timing() which is not accessible if Kernel is built for Keystone only.
-> That's why "#if" has been used.
+> It relies on cyclic DMA engine support for BCM2835.
 > 
-> This part of code has to be removed together with Davinci aemif platform code (aemif.c), once Davinci will be converted to DT and use
-> new driver.
+> Signed-off-by: Florian Meier <florian.meier@koalo.de>
+> ---
 > 
-> The corresponding comment can be added here. Is it ok?
+> This successor of RFCv2 is no longer dependent on the dmaengine
+> patch (of course you need it for running it). Therefore, it
+> should cleanly apply.
 > 
-Thats more or less what I proposed in another reply. Lets clearly
-document it on why such a check was added.
+> Furthermore, some minor enhancements were applied. For example
+> - Removal of bcm2835-pcm.c and .h
+> - Adding bindings documentation
+> - Adding possibility for setting bclk_ratio
+> 
+>  .../devicetree/bindings/sound/bcm2835-i2s.txt      |   22 +
+>  sound/soc/Kconfig                                  |    1 +
+>  sound/soc/Makefile                                 |    1 +
+>  sound/soc/bcm/Kconfig                              |   10 +
+>  sound/soc/bcm/Makefile                             |    5 +
+>  sound/soc/bcm/bcm2835-i2s.c                        |  904 ++++++++++++++++++++
+>  6 files changed, 943 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/bcm2835-i2s.txt
+>  create mode 100644 sound/soc/bcm/Kconfig
+>  create mode 100644 sound/soc/bcm/Makefile
+>  create mode 100644 sound/soc/bcm/bcm2835-i2s.c
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/bcm2835-i2s.txt
+> new file mode 100644
+> index 0000000..7bf1d04
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/bcm2835-i2s.txt
+> @@ -0,0 +1,22 @@
+> +* Broadcom BCM2835 SoC I2S/PCM module
+> +
+> +Required properties:
+> +- compatible: "brcm,bcm2835-i2s"
+> +- reg: Register location and size
+> +       <PCM base address, size
+> +        PCM clock base address, size>;
 
-Regards,
-Santosh
+I'd prefer something like:
+
+- reg: A list of base address and size entries:
+  * The first entry should cover the PCM registers
+  * The second entry should cover the PCM clock registers
+
+Are the clocks actually a sub-block, or are they actually a separate
+unit that just happens to feed this one?
+
+> +- dmas: List of DMA controller phandle and DMA request line ordered pairs.
+> +- dma-names: Identifier string for each DMA request line in the dmas property.
+> +  These strings correspond 1:1 with the ordered pairs in dmas.
+
+It should be pointed out that "tx" and "rx" are expected.
+
+> +
+> +Example:
+> +
+> +bcm2835_i2s: i2s at 7e203000 {
+> +       compatible = "brcm,bcm2835-i2s";
+> +       reg = < 0x7e203000 0x20
+> +               0x7e101098 0x02>;
+
+Please bracket entries individually:
+
+reg = <0x7e203000 0x20>,
+      <0x7e101098 0x02>;
+
+> +
+> +       dmas = <&dma 2
+> +               &dma 3>;
+
+Similarly:
+
+dmas = <&dma 2>,
+       <&dma 3>;
+
+[...]
+
+> +static void bcm2835_i2s_stop_clock(struct bcm2835_i2s_dev *dev)
+> +{
+> +       uint32_t clkreg;
+
+s/uint32_t/u32/ (and elsewhere...)
+
+[...]
+
+> +       target_frequency = sampling_rate*bclk_ratio;
+
+It would be nicer if there were space around binary operators here and
+elsewhere.
+
+> +       clk_src = BCM2835_CLK_SRC_OSC;
+> +       mash = BCM2835_CLK_MASH_0;
+> +
+> +       if (bcm2835_clk_freq[clk_src] % target_frequency == 0
+> +                       && bit_master && frame_master) {
+> +               divi = bcm2835_clk_freq[clk_src]/target_frequency;
+> +               divf = 0;
+> +       } else {
+> +               uint64_t dividend;
+
+s/uint64_t/u64/
+
+[...]
+
+> +       ch2pos = bclk_ratio/2+data_delay;
+
+Spacing would make this far nicer...
+
+Thanks,
+Mark.
