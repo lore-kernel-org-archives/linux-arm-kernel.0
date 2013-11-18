@@ -1,34 +1,182 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 18 Nov 2013 13:40:22 +0000
-Subject: ARM topic: Is DT on ARM the solution,
- or is there something better?
-In-Reply-To: <20131118122644.GA26046@ulmo.nvidia.com>
-References: <52644A9E.3060007@wwwdotorg.org> <20131118122644.GA26046@ulmo.
- nvidia.com>
-Message-ID: <20131118134022.26EE7C409EC@trevor.secretlab.ca>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 18 Nov 2013 07:42:20 -0600
+Subject: [PATCH v5 5/7] gpio: davinci: add OF support
+In-Reply-To: <1383905510-31760-6-git-send-email-prabhakar.csengg@gmail.com>
+References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1383905510-31760-6-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <CAL_Jsq+0KmAjEWgbmfS5jxtYz4nvtgeE0eFzrPv8Q0WOuFhU4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013 13:26:46 +0100, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
-> [...]
-> > In general, the kernel still needs a complete driver to every last
-> > device on every strange board, and needs to support every strange way
-> > some random board hooks all the devices together.
-> [...]
-> 
-> This may only be slightly related and it doesn't address all the points
-> you brought up here, but for lack of a better place, here goes.
-> 
-> I've had an interesting discussion with a friend over the weekend which
-> eventually turned to a similar topic. With all the recent discussions
-> about how to push board-specific details out into firmware, perhaps a
-> more drastic measure would be to push for standardization of hardware
-> interfaces.
+On Fri, Nov 8, 2013 at 4:11 AM, Prabhakar Lad
+<prabhakar.csengg@gmail.com> wrote:
+> From: KV Sujith <sujithkv@ti.com>
+>
+> This patch adds OF parser support for davinci gpio
+> driver and also appropriate documentation in gpio-davinci.txt
+> located at Documentation/devicetree/bindings/gpio/.
+>
+> Signed-off-by: KV Sujith <sujithkv@ti.com>
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> [prabhakar.csengg at gmail.com: simplified the OF code, removed
+>                 unnecessary DT property and also simplified
+>                 the commit message]
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Some hardware does that. That's what OHCI, EHCI, UHCI, XHCI, SDHCI, and
-similar are all about. It always helps when well understood hardware
-follows a register interface. It doesn't work for everything, but I
-agree it would be good to have preferred hw interfaces for SPI & I2C.
+You should add the interrupt-controller and #interrupt-cells
+properties to the example. Otherwise:
 
-g.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+> ---
+>  .../devicetree/bindings/gpio/gpio-davinci.txt      |   39 ++++++++++++++
+>  drivers/gpio/gpio-davinci.c                        |   54 ++++++++++++++++++--
+>  2 files changed, 90 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> new file mode 100644
+> index 0000000..d677bbe
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> @@ -0,0 +1,39 @@
+> +Davinci GPIO controller bindings
+> +
+> +Required Properties:
+> +- compatible: should be "ti,dm6441-gpio"
+> +
+> +- reg: Physical base address of the controller and the size of memory mapped
+> +       registers.
+> +
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +
+> +- interrupt-parent: phandle of the parent interrupt controller.
+> +
+> +- interrupts: Array of GPIO interrupt number. Only banked or unbanked IRQs are
+> +             supported at a time.
+> +
+> +- ti,ngpio: The number of GPIO pins supported.
+> +
+> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt
+> +                            line to processor.
+> +
+> +The GPIO controller also acts as an interrupt controller. It uses the default
+> +two cells specifier as described in Documentation/devicetree/bindings/
+> +interrupt-controller/interrupts.txt.
+> +
+> +Example:
+> +
+> +gpio: gpio at 1e26000 {
+> +       compatible = "ti,dm6441-gpio";
+> +       gpio-controller;
+> +       reg = <0x226000 0x1000>;
+> +       interrupt-parent = <&intc>;
+> +       interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
+> +               44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
+> +               46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
+> +               48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
+> +               50 IRQ_TYPE_EDGE_BOTH>;
+> +       ti,ngpio = <144>;
+> +       ti,davinci-gpio-unbanked = <0>;
+> +};
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index b149239..ed04835 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -17,6 +17,9 @@
+>  #include <linux/io.h>
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/platform_data/gpio-davinci.h>
+>
+> @@ -134,6 +137,40 @@ davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>         writel((1 << offset), value ? &g->set_data : &g->clr_data);
+>  }
+>
+> +static struct davinci_gpio_platform_data *
+> +davinci_gpio_get_pdata(struct platform_device *pdev)
+> +{
+> +       struct device_node *dn = pdev->dev.of_node;
+> +       struct davinci_gpio_platform_data *pdata;
+> +       int ret;
+> +       u32 val;
+> +
+> +       if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
+> +               return pdev->dev.platform_data;
+> +
+> +       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +       if (!pdata)
+> +               return NULL;
+> +
+> +       ret = of_property_read_u32(dn, "ti,ngpio", &val);
+> +       if (ret)
+> +               goto of_err;
+> +
+> +       pdata->ngpio = val;
+> +
+> +       ret = of_property_read_u32(dn, "ti,davinci-gpio-unbanked", &val);
+> +       if (ret)
+> +               goto of_err;
+> +
+> +       pdata->gpio_unbanked = val;
+> +
+> +       return pdata;
+> +
+> +of_err:
+> +       dev_err(&pdev->dev, "Populating pdata from DT failed: err %d\n", ret);
+> +       return NULL;
+> +}
+> +
+>  static int davinci_gpio_probe(struct platform_device *pdev)
+>  {
+>         int i, base;
+> @@ -144,12 +181,14 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+>         struct device *dev = &pdev->dev;
+>         struct resource *res;
+>
+> -       pdata = dev->platform_data;
+> +       pdata = davinci_gpio_get_pdata(pdev);
+>         if (!pdata) {
+>                 dev_err(dev, "No platform data found\n");
+>                 return -EINVAL;
+>         }
+>
+> +       dev->platform_data = pdata;
+> +
+>         /*
+>          * The gpio banks conceptually expose a segmented bitmap,
+>          * and "ngpio" is one more than the largest zero-based
+> @@ -496,11 +535,20 @@ done:
+>         return 0;
+>  }
+>
+> +#if IS_ENABLED(CONFIG_OF)
+> +static const struct of_device_id davinci_gpio_ids[] = {
+> +       { .compatible = "ti,dm6441-gpio", },
+> +       { /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
+> +#endif
+> +
+>  static struct platform_driver davinci_gpio_driver = {
+>         .probe          = davinci_gpio_probe,
+>         .driver         = {
+> -               .name   = "davinci_gpio",
+> -               .owner  = THIS_MODULE,
+> +               .name           = "davinci_gpio",
+> +               .owner          = THIS_MODULE,
+> +               .of_match_table = of_match_ptr(davinci_gpio_ids),
+>         },
+>  };
+>
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
