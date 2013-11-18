@@ -1,67 +1,132 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Nov 2013 21:23:00 +0100
-Subject: [PATCH 1/5] ahci: imx: Pull out the clock enable/disable calls
-In-Reply-To: <528A60BB.4010802@boundarydevices.com>
-References: <1384651251-5548-1-git-send-email-marex@denx.de>
- <528A60BB.4010802@boundarydevices.com>
-Message-ID: <201311182123.00169.marex@denx.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 18 Nov 2013 13:50:08 -0800
+Subject: ACPI vs DT at runtime
+In-Reply-To: <528A7EA0.9050101@jonmasters.org>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <5289A356.4060004@jonmasters.org>
+ <20131118190929.GA5886@quad.lixom.net>
+ <528A7EA0.9050101@jonmasters.org>
+Message-ID: <20131118215008.GA10332@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi,
 
-> Hi Marek,
+On Mon, Nov 18, 2013 at 03:54:56PM -0500, Jon Masters wrote:
+> Hi Olof,
 > 
-> On 11/16/2013 06:20 PM, Marek Vasut wrote:
-> > The same code for enabling and disabling SATA clock was found in multiple
-> > places in the driver. Implement functions that enable/disable the SATA
-> > clock and use them in such places instead of duplicating the code.
+> On 11/18/2013 02:09 PM, Olof Johansson wrote:
+> > Jon,
 > > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Richard Zhu <r65037@freescale.com>
-> > Cc: Tejun Heo <tj@kernel.org>
-> > Cc: Linux-IDE <linux-ide@vger.kernel.org>
-> > ---
+> > On Mon, Nov 18, 2013 at 12:19:18AM -0500, Jon Masters wrote:
+> >> Olof, thanks for starting this thread. Mark, thanks for the followup.
 > > 
-> >   drivers/ata/ahci_imx.c | 133
-> >   ++++++++++++++++++++++++++++--------------------- 1 file changed, 75
-> >   insertions(+), 58 deletions(-)
-> > 
-> > diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-> > index ae2d73f..c7ee505 100644
-> > --- a/drivers/ata/ahci_imx.c
-> > +++ b/drivers/ata/ahci_imx.c
-> > @@ -47,6 +47,73 @@ static int ahci_imx_hotplug;
-> > 
-> >   module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
-> >   MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support,
-> >   1=support)");
-> > 
-> > <snip>
+> > Your mailer is dropping all ccs to your emails, so I didn't get a copy of this
+> > in my inbox. You might want to check the configuration at your end.
 > 
-> I haven't traced through all of this, but if you're copying from
-> the Freescale 3.0.35 kernel, note that there's a bug in it, and
-> the 0x7FFFFFFD really wanted to be an 0x7FFFFFFF.
-
-I'm not taking this from FSL 3.0.35, no, but thanks for pointing this out!
-
-> The way I read this comment, the writes need to happen in two
-> steps:
-> 	- write everything with the PHY disabled
-> 	- enable the PHY
+> I need to shoot Thunderbird for all kinds of reasons unrelated to this.
+> I actually am having to alternate with another laptop right now to do
+> email because this Thunderbird build I am running is just so sluggish
+> and nasty (and the other laptop setup is what is broken). But anyway,
+> that's something I need to fix, thanks for fixing the CCs.
 > 
-> We had reports of stalls waiting for SATA drives to be enumerated
-> that were solved with this commit...
+> > I've added back the cc recipients.
+> > 
+> >> Comments on both inline, below. But before I reply to the specific
+> >> points, let me add that this is clearly an emotional topic for many.
+> > 
+> > I'm sorry that it's so emotional. Let's keep to technical arguments.
 > 
-> 	https://github.com/boundarydevices/linux-
-imx6/commit/0186ea224ce6bd1cb4757
-> a0f83b0090e26a021f4
+> I agree with you. I got worried on Friday when I saw a discussion
+> effectively leading with (what I read as) "let's ban all ACPI", which
+> really got me concerned. But then again, I've been in bed most of the
+> weekend sick, so I probably miss-read your intention. I apologize.
 
-[...]
+My stance is the same as last week: ACPI is the wrong tool for the job
+at this time on ARM. The job in question is kernel and device runtime
+configuration.
 
-> > +	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
-> > +			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
-> > +			IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+In the future, it might be more suitable, but likely not for at least
+a couple of years, maybe more. Making strict statements about its use in
+the future seems counterproductive at this time since there's no guarantee
+that it'll reach that point in a given timeframe. Maybe it will for some
+firmware vendors and platform vendors, while for others it won't, etc.
 
-Isn't this snippet doing exactly what your patch does ?
+> >> There are a great many companies involved in ARMv8 on servers, and a
+> >> great many have yet to say anything in public. I am trying to strike a
+> >> balance constantly by being fair to those who have announced and those
+> >> who have yet to do so. But regardless, we have one chance here to make a
+> >> good server platform that can challenge the incumbent architectures. If
+> >> I weren't utterly convinced of that, and of the need for such standards
+> >> as UEFI and ACPI, then I wouldn't be so vocal about it. Given who is
+> >> involved in this space, regardless of a decision to adopt ACPI now or
+> >> later, it is coming. It can be done right now, or not.
+> > 
+> > And what I am saying here is that "not right now" is the right answer
+> > for the linux kernel. For technical reasons.
+> 
+> I believe we can skip a lot of other conversation if I can summarize
+> something from this thread. Is it the case that you believe there is
+> room for both codepaths to exist in the upstream kernel, and for ACPI to
+> mature over time as it becomes "more ready"?
+
+As my original email said, I don't think there's a reason to pick up
+and pollute the whole kernel with double code paths at this time, while
+the vendors using ACPI is still trying to figure out what to do and how
+to do it. It's better to keep it out of the kernel, especially since it
+will require either re-abstracting all drivers and subsystems, or adding
+dual code paths to them for platform support that is likely to change.
+
+Until then, if someone wants to boot with ACPI, then the best path would
+be to translate as much of the simple data over to device tree and boot
+with that as the in-kernel abstraction layer. That can be done at boot
+or by crafting static device trees. Likely the first few generations of
+hardware will not have elaborate complex AML-based ACPI workarounds for
+stuff in the first place, so chances are this will not be a big issue.
+
+If, down the road, ACPI seems to have their act together, have worked out
+their kinks and reached a usable stable platform, then we can consider
+bringing in the parts of it that doesn't make the kernel explode in
+complexity and messiness. When this will be is impossible to predict
+today, but I expect it to take a couple of years and some generations
+of hardware.
+
+> If the above is the case, then I don't think we disagree at all! I don't
+> want to kill DeviceTree, I just know (or think I do) that ACPI is going
+> to be the dominant force on v8 server systems. It worries me if there's
+> no way to let ACPI code be merged upstream until it's completely figured
+> out. I hope I am reading the rest of the thread correctly and understand
+> instead that you're saying there can be a path for both, and perhaps
+> those of us who require ACPI can simply state that up front and work
+> with partners to ensure support for those ACPI platforms is available -
+> and binding fixes to the standard made - while those same server
+> platforms might also be supported by a DeviceTree at the same time for a
+> period of whatever transition is required. That seems totally
+> acceptable. I don't see any reason why the same binary kernel image
+> can't boot with either a DTB or an ACPI table and indeed that would be
+> my preference. Some of us can require it be ACPI by policy, but others
+> can build kernels that use DTB on v8 servers if that's what they need
+> while the whole thing shakes itself out.
+
+Again, merging a substantial amount of ACPI enablement is premature for
+the reasons already stated in the thread; it adds complexity and is likely
+to churn several times as vendors figure out just how to work with it. The
+two examples at hand (APM SATA and Exynos AHCI) both indicate that.
+
+While vendors are free to implement it in their firmware, we are much
+better off not relying on it right now. ACPI was messy on x86 in the
+beginning too. Luckily we have an alternative that will get the work
+done while the rest is being worked out.
+
+So, if we're not going to merge the ACPI-enabling code yet,
+mandating ACPI for booting isn't going to work if you expect to rely
+on native-all-the-way-through-the-kernel ACPI implementation. It will
+however work to some extent for the ACPI-to-DT approach, given that
+the platforms are kept reasonably simplistic. And if it doesn't, we can
+fall back to static DT and native implementation of whatever stuff ACPI
+would have abstracted for us (clock drivers, reset drivers) if we really
+have to.
+
+
+-Olof
