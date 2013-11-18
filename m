@@ -1,58 +1,31 @@
-From: david.goodenough@btconnect.com (David Goodenough)
-Date: Mon, 18 Nov 2013 22:47:03 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131118213256.8EC15C401C6@trevor.secretlab.ca>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <20131118190929.GA5886@quad.lixom.net>
- <20131118213256.8EC15C401C6@trevor.secretlab.ca>
-Message-ID: <201311182247.03540.david.goodenough@btconnect.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Nov 2013 15:54:26 -0700
+Subject: [RFC PATCH V3 1/2] scripts: dtc: build fdtget for extracting
+ properties from dtbs
+In-Reply-To: <55bef0830d336fc1df24e4cbf96822acc70c8f7e.1384809305.git.jason@lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <cover.1384809305.git.jason@lakedaemon.net>
+ <55bef0830d336fc1df24e4cbf96822acc70c8f7e.1384809305.git.jason@lakedaemon.net>
+Message-ID: <528A9AA2.30303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 Nov 2013, Grant Likely wrote:
-> On Mon, 18 Nov 2013 11:09:29 -0800, Olof Johansson <olof@lixom.net> wrote:
-> > On Mon, Nov 18, 2013 at 12:19:18AM -0500, Jon Masters wrote:
-> > 
-> > I'm looking at the quality of the initial submissions (very poor and
-> > confused), the readiness of the kernel in general (none so far),
-> > the way the involved parties are doing development (away from the
-> > community and in their own little world). I also look at some of the
-> > bottlenecks we've had with device tree (reviewer bandwidth, slow-moving
-> > consensus/standards-driven approval process) and how it compares to the
-> > ACPI counterparts (standards forum).
-> > 
-> > The conclusion is that we're about to embark onto something that isn't
-> > going to be done right in the short to medium term. It just isn't. The
-> > sooner we own up to that, the sooner we can course-correct and get back
-> > to something that's likely to work.
-> > 
-> > The alternative is signing onto a setup that _will_ stumble right out
-> > of the door, which in turn will mean that the high-end ARM play will be
-> > off to a rough start instead of running as smoothly as possible.
-> 
-> I completely agree here. The DT conversion was hard and it took a lot of
-> years. There was a lot of getting the code into shape and a lot of
-> people trying to get their heads around it. ACPI is exactly the same
-> problem. We don't know what we're doing and we don't know how to do it
-> yet.
-> 
-> I fully support getting ACPI up on ARM and the current work is good.
-> However, it cannot short-circuit the kernel development process.
-> Absolutely, push back hard on the ACPI and UEFI patches where the code
-> is not ready.
-> 
-> g.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 11/18/2013 02:21 PM, Jason Cooper wrote:
+> In order for 'make dtbs_install' to be maintainable, we need a reliable
+> way to determine the board compatible string for a given dtb.  fdtget
+> does that easily as written, but currently isn't built by the kernel.
 
-Would it not be possible to have ACPI read the hardware configuration
-from the DT, and provide whatever services it wants, while also allowing
-the kernel to retain the DT for its hardware config?  I suppose the only
-thing that would be needed would be some way to mark paricular bits of
-hardware (I am largely thinking of the things lmsensors deals with) as
-being used by ACPI and being off limits to the kernel.
+> diff --git a/scripts/dtc/Makefile b/scripts/dtc/Makefile
 
-David
+> +include $(src)/libfdt/Makefile.libfdt
+> +
+> +fdtget-objs	:= fdtget.o util.o $(patsubst %, libfdt/%, $(LIBFDT_OBJS))
+
+I observe that there's a scripts/dtc/Makefile.dtc that /isn't/ used by
+scripts/dtc/Makefile. Hence, having scripts/dtc/Makefile use
+scripts/dtc/libfdt/Makefile.libfdt seems slightly inconsistent. That
+said, it's probably a good idea to use Makefile.libfdt, so perhaps the
+answer here is to update Makefile to use Makefile.dtc sometime, rather
+than not use Makefile.libfdt in this patch?
+
+Otherwise, this patch seems to make sense.
