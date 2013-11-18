@@ -1,143 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Nov 2013 09:45:52 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <3371903.8j54vrCjEN@wuerfel>
- <CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com>
-Message-ID: <201311180945.52764.arnd@arndb.de>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Mon, 18 Nov 2013 14:21:04 +0530
+Subject: [PATCH RFC 2/6] arm64: Kprobes with single stepping
+ support
+In-Reply-To: <CA+b37P14G=j-y_dCzOC7nbiBwu-oK_dUA-8qXHKr7dZQqnqkMQ@mail.gmail.com>
+References: <CA+b37P3U=cAbUvs=2B9wA4F7S9o49vh7d-KamjPsHcz-b9ZYLA@mail.gmail.com>
+ <52808D53.7080904@hitachi.com> <5280B6C8.7050807@hitachi.com>
+ <20131111105812.GC28302@mudshark.cambridge.arm.com>
+ <528114C4.5000506@hitachi.com>
+ <CA+b37P08cLAvBYAXSkozLPzrpuXn=N0SUetwL6N8JL+10AtYjQ@mail.gmail.com>
+ <5281D848.7000502@hitachi.com>
+ <CA+b37P1sNsEXrJFfVL51sZ-SeGNCBiwXnOwCiFY8CBwSXPw+mQ@mail.gmail.com>
+ <20131113143110.GF28881@mudshark.cambridge.arm.com>
+ <CA+b37P1-DPtSu5vB+_4HamUtDNSFn0qNbPWk9A6+vUAp4tu6_w@mail.gmail.com>
+ <20131115163936.GI19468@mudshark.cambridge.arm.com>
+ <CA+b37P14G=j-y_dCzOC7nbiBwu-oK_dUA-8qXHKr7dZQqnqkMQ@mail.gmail.com>
+Message-ID: <CA+b37P3w1kkjkoiHtX6Dua0D65X9VybZiu01-UCZCRh9rVDw2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 17 November 2013, Olof Johansson wrote:
-> On Sun, Nov 17, 2013 at 10:10 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Sunday 17 November 2013 17:18:03 Stefano Stabellini wrote:
-> >
-> > My point was not that everything would be good if we change the kernel
-> > this way, it clearly wouldn't. I think the problem is more the parts
-> > for which neither an automated translation nor a unified driver level
-> > interface would work well.
-> 
-> Do you have predictions for what those areas would be? Chances are
-> that at least the initial ones can be handled with the methods we
-> already have today such as quirks and the like.
+On 18 November 2013 12:25, Sandeepa Prabhu <sandeepa.prabhu@linaro.org> wrote:
+>>> This is generic test module (samples/hw_breakpoint/data_breakpoint.ko)
+>>> which places watchpoint for bothe read/write.
+>>> Atleast watchpt should have triggered for Read right? I also tried
+>>> with othe functions like do_fork, vfs_read etc but no hit.
+>>
+>> You'd need to place something for exec if you want to see anything on the
+>> instruction side. A read by the instruction fetcher does not trigger a read
+>> watchpoint on ARM.
+> Hmm, then watchpoint cannot not be placed on text address (instruction
+> fetch path) right?
+> (Sorry I did not check debug spec fully for watchpoint/hw breakpoints,
+> I should do that)
+>
+>>
+>>> >> 2.  Placing text breakpoint (modified sample module with attr.bp_type
+>>> >> = HW_BREAKPOINT_X) upon vfs_symlink, and run "ln -s /dev/null
+>>> >> /tmp/foo".  This time, breakpoint hit but exception is re-cursing
+>>> >> infinitely!
+>>> >
+>>> > The problem here is that we expect the overflow handler to deal with the
+>>> > stepping (like GDB does via ptrace). If you don't register a handler, the
+>>> > kernel will do the step (like you would get if you used perf stat -e
+>>> > mem:0xNNNN:x).
+>>> [This test was done on upstream branch, without kprobes patches.]
+>>> Hmm, then this is expected with test breakpoint right? is this
+>>> handling to be done by perf and ptrace?
+>>
+>> perf stat doesn't register an overflow handler, so the hw_breakpoint
+>> backend will handle the step. ptrace registers a handler which sends a
+>> SIGTRAP to the debugger (e.g. gdb), which handles the step manually
+>> (probably using a PTRACE_SINGLESTEP request).
+>>
+>>> I did not see arm64 support in linux/tools/perf/,  there are multiple
+>>> patches in mailing list though. Are you aware of any version of perf
+>>> that work with arm64?
+>>
+>> The perf tool should work fine on arm64 using mainline. Are you seeing
+>> problems?
+> Hmm basically perf is working and I can run tests now.
+Hi Will,
+Okay. I can see what you meant with respect to D-flag unmasking, on
+original patchset(v2). :)
 
-I think all DT references that take the form of <&phandle arg1 ...>
-are problematic because in ACPI the same things tend to expressed
-by a single number (irq, dma, gpio, ...) or just a reference with
-no arguments (don't have an example here).
+a. Placed a kprobe on vfs_read - works fine independently.
+b. Placed hw_breakpoint on vfs_read using perf (perf record -e
+mem:0xffffffc000134ba4:x -a -- sleep 10) and it works fine
+independently.
 
-Another difference is things that are numbered on one side but
-named on the other. In DT we  have an inconsistent mix of the two,
-e.g. DMA requests must be named (per device) while IRQs must be
-numbered (per device) and may additionally be named. 
+c. Now, a+b, first placed kprobe on vfs_read and then ran perf record
+event on vfs_read (hw breakpoint). Now, seeing that kprobe single step
+is never complete/never disabled!, so debug exception would generate
+forever! (Continuously printing "Unexpected kernel single-step
+exception at EL1")
 
-Finally, anything that needs run-time interpretation of AML is
-fundamentally hard because the AML would refer to objects that
-don't exist when you don't boot from ACPI. This gets worse if you
-need to pass ACPI identifiers into EL3 firmware. Because of this,
-anything related to runtime PM scares me at the moment, because
-there are two conflicting ways to do it: As we discussed before,
-the correct way to do this in ACPI is to hide it all from the OS
-in AML bytecode and EL2/EL3 firmware calls, but this may not be
-possible on all systems and it prevents us from translating into
-a format that the drivers can use to call our
-regulator/clk/pmdomain interfaces.
-Intel's embedded systems will likely get around this by defining
-ACPI representations of our existing DT bindings for these
-subsystems, which would be possible to translate automatically,
-but it seems very silly to use those on servers.
+ kprobe pre_handler: p->addr = 0xffffffc000134ba4
+ reenter_dbg: test API invoked
+ kprobe post_handler: p->addr = 0xffffffc000134ba4
+ fmp/fo^[[5Dreenter_dbg: test API invoked
+ kprobe pre_handler: p->addr = 0xffffffc000134ba4
+ Unexpected kernel single-step exception at EL1
+ Unexpected kernel single-step exception at EL1
+....
 
-> Once we've seen enough of them, we'll have more knowledge of what a
-> new solution really needs to cover. Speculating prematurely will
-> likely give us the wrong abstractions (and/or at too high a level,
-> causing extra work and churn for everybody). I think we agree that
-> holding off is the right answer, just maybe not (yet) what the actual
-> solution might be when we start to need it. :)
+Once I change the location of D-flag manipulation (your suggestion)
+and run enough tests, I would come back with more details and inputs.
 
-Yes. Especially for the runtime-pm stuff, someone should probably try
-both methods on a couple of systems and then decide which one of them
-everybody should use. Unfortunately that alone is going to bind
-reviewer resources and take a significant amount of time.
+Thanks,
+Sandeepa
 
-> >> Simply using DT would help avoiding the awkward situation where a driver
-> >> of a device only works with one of the two description formats and not
-> >> the other.
-> >
-> > Yes, but remember that Intel still have the problem on their embedded
-> > systems, and will want to solve them.
-> >
-> > For ARM Linux I agree that we're better off not having to change all
-> > the drivers again for this, but we will have a growing number of
-> > drivers that are shared with ACPI based x86 SoCs. At least there are
-> > only one or two vendors of those chips ;-)
-> 
-> Well, you menion DT-in-ACPI above. If they're really exploring that
-> path then a lot will sort itself out from there. Making a decision to
-> hold off with ACPI for ARM will help get everybody on the same page if
-> they're already considering a solution along those lines.
-
-Possibly, but x86 extending into deeply embedded may also have different
-requirements to ARM extending into servers, even if both want to use
-ACPI to get there. Some parts will overlap, others won't, and I suspect
-that there is more in the second category than people are hoping for.
-
-> >> > > I think we can still treat ACPI on ARM64 as a beginner's mistake and
-> >> > > provide hand-written DT blobs for the few systems that start shipping
-> >> > > with that.
-> >> >
-> >> > I think we can do better -- we can ask those vendors to not ship ACPI
-> >> > at all, and ship DT themselves (together with us for review, etc).
-> 
-> Yep, and together for review is a critical part. I'm not saying that
-> the ideal solution is a flashed DTB, but it's better than ACPI. A
-> flashed DTB that's _easy to update_ as part of an OS install would
-> probably be one of the best solutions we could ask for though.
-
-Right: the assumption on the DT boot interfaces is that board designers
-make mistakes and are working on moving targets, so we need ways to update
-the DTB. By contrast, the assumption on ACPI is that server firmware
-authors know what they are doing and you shouldn't let anyone else mess
-with the ACPI bits because doing so might damage your hardware. We're
-in trouble if the second assumption turns out wrong.
-
-> > The bigger problem is system vendors
-> > we don't talk to. They are going to to do any number of crazy things
-> > in their private kernels:
-> >
-> > * Board files
-> > * Hardcoded platform devices with no multiplatform support
-> > * Custom hypervisor (EL2 or EL3) interfaces for probing
-> > * FEX
-> > * ACPI
-> > * Some other firmware ported over from their MIPS products
-> > * Incompatible Open Firmware
-> > * Incompatible DT extensions
-> > * ...
-> 
-> Given that we have a documented boot protocol today, it shouldn't
-> matter much if someone ports over some MIPS firmware (we did add OF
-> client interface to CFE at PA Semi, and that worked well for us :-).
-> Most of the others listed above can hopefully be avoided by us having
-> appropriate solutions in-kernel today that they can reuse. I.e. FEX
-> happened because DT didn't exist at the time.
-> 
-> ACPI is a big problem here in that sense: Vendors have been told to
-> use it, but there's no infrastructure, and even if it would be there
-> it would be immature and we don't really know what we want from it.
-> 
-> Board files and hardcoded devices are things we've dealt with already
-> and know what to do with, so I'm less worried about that. And finally,
-> custom firmware interfaces should hopefully be rare given the
-> reference PSCI implementation from ARM, but we can deal with it if we
-> have to.
-
-Yes, the only real worry is if someone does their own firmware interfaces
-the way that Sony did on the PS3, which definitely requires custom
-APIs in the kernel. All others can be handled in some way by ignoring
-the provided interfaces and replacing them with DT. We might need some
-boot wrapper for cases where someone ignored the documented boot
-interfaces, but that would only be likely for systems designed for
-another OS.
- 
-	Arnd
+>>
+>> Will
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
