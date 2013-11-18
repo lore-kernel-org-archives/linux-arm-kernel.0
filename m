@@ -1,46 +1,33 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 18:35:02 +0000
-Subject: ARM topic: Is DT on ARM the solution, or is there something
- better?
-In-Reply-To: <20131118160626.GN26046@ulmo.nvidia.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131118122644.GA26046@ulmo.nvidia.com>
- <20131118134022.26EE7C409EC@trevor.secretlab.ca>
- <20131118135727.GD14306@sirena.org.uk>
- <20131118152920.GL26046@ulmo.nvidia.com>
- <20131118155022.GB28334@sirena.org.uk>
- <20131118160626.GN26046@ulmo.nvidia.com>
-Message-ID: <20131118183502.GP2674@sirena.org.uk>
+Date: Mon, 18 Nov 2013 18:35:55 +0000
+Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
+ bit logic defines
+In-Reply-To: <20131118173201.GP13640@lee--X1>
+References: <20131118133940.GC14306@sirena.org.uk>
+ <20131118142447.GJ13640@lee--X1>
+ <20131118144512.GB24408@sirena.org.uk>
+ <20131118145614.GM13640@lee--X1>
+ <20131118151651.GE24408@sirena.org.uk>
+ <20131118153110.GN13640@lee--X1>
+ <20131118154137.GA28334@sirena.org.uk>
+ <20131118160226.GO13640@lee--X1>
+ <20131118172243.GO2674@sirena.org.uk>
+ <20131118173201.GP13640@lee--X1>
+Message-ID: <20131118183555.GQ2674@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 05:06:28PM +0100, Thierry Reding wrote:
+On Mon, Nov 18, 2013 at 05:32:01PM +0000, Lee Jones wrote:
 
-> Part of my point was that you could possibly still use the same IP with
-> only a modified (standard) register interface. That way no licensing of
-> third party IP would be needed. You'd only need to rewrite parts of the
-> IP to make it look (and behave) like the standard one.
+> I can get a patch out tomorrow if the MTD guys agree. Where are they
+> by the way? I haven't seen hide nor hair of them since sending out the
+> patch set.
 
-> That's exactly how 16550-compatible UARTs work, isn't it? Or even the
-> way that USB (EHCI, ...) work. There's a standardize register interface,
-> possibly with a way for vendor-specific extensions, but the interface
-> itself doesn't need to be licensed, so there are no additional costs to
-> supporting the standard interface. There are only the advantages of
-> being able to reuse a well-tested body of code.
-
-My (potentially flawed) understanding here is that the register
-interfaces for this sort of thing tend to be very thin - perhaps more
-true for SPI which is extremely simple electrically.  Adding a new
-interface therefore ends up being more invasive than it could appear
-since assumptions in the design and validation tend to appear in the
-registers and so changing the register map propagates through.
-
-I do agree that it'd be nice to get some standardisation at some level,
-I just fear that it's a bit late.
+They tend to do big batches of things intermittently AFAICT.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/84293f9c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/4f0e1779/attachment-0001.sig>
