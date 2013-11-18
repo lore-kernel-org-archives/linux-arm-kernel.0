@@ -1,34 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Nov 2013 13:54:39 +0000
-Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <CACxGe6sgRwiakJLUCtaaQ2NF51PpkoNZvZr6EoE-BPeZiDsDFQ@mail.gmail.com>
-References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
- <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
- <5283DB34.9050301@gmail.com> <201311141332.58498.arnd@arndb.de>
- <CACxGe6uMWjfmB4WDKs+vu05224jqpbDZBHT_ZXnqxw17JzUqvw@mail.gmail.com>
- <5284E236.1000606@gmail.com>
- <CACxGe6sgRwiakJLUCtaaQ2NF51PpkoNZvZr6EoE-BPeZiDsDFQ@mail.gmail.com>
-Message-ID: <20131118135439.GC16735@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 18 Nov 2013 13:55:43 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <5289A356.4060004@jonmasters.org>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <5289A356.4060004@jonmasters.org>
+Message-ID: <alpine.DEB.2.02.1311181251490.4714@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 02:16:29AM +0900, Grant Likely wrote:
-> On Thu, Nov 14, 2013 at 11:46 PM, Rob Herring <robherring2@gmail.com> wrote:
-> > If this is a required feature then we should make machine_desc common
-> > (or at least part of it) with the other arches that have copied arm and
-> > then add it to arm64 as well. Then I could do further consolidation of
-> > the FDT machine matching code. Otherwise this is all just pointless
-> > architecture variation that really has nothing to do with the architecture.
+On Mon, 18 Nov 2013, Jon Masters wrote:
+> > We don't need to modify every driver and subsystem
+> > to support ACPI, only those necessary to support the minimal set of
+> > platforms using ACPI. ACPI is new in the arm space, and we can enforce
+> > quality standards on ACPI _now_ above what we're allowing for DT, and
+> > avoid future problems.
 > 
-> I think you are missing my point. go ahead, take it out of
-> /proc/cpuinfo. That's not the issue.
+> This is key. It's not going to be ACPI everywhere. It's going to be ACPI
+> on server class systems. And later, maybe some client systems. But the
+> big push is from the server crowd. We need to build systems that in 5-10
+> years time can still boot an older kernel. This can't be done without a
+> standardized/versioned enumeration/discovery mechanism like ACPI that
+> has an API enshrined in stone as far as compatibility. Device Tree is
+> wonderful, anyone can make a binding and use it. Or change the binding
+> in the next kernel release. Or...this doesn't work in the server space.
+> Server platforms aren't vertically welded shut like in the embedded
+> space, where DeviceTree has brought all kinds of benefits for those
+> building with a single kernel for many different targets, but has also
+> seen a huge amount of churn from one kernel to the next. If I counted
+> the number of times I've been told "just update your dtb"...then I would
+> be shivering in the corner a sadden wreck. You can't "just update your
+> dtb" on a server class system. You shouldn't.
 
-You do realise this is a user API issue, right?
+Isn't this a matter of ensuring backward compatibility for device
+tree support in the kernel? This topic has already been discussed and
+agreed upon at the minisummit.
 
-http://fossies.org/dox/glibc-2.18/ports_2sysdeps_2unix_2sysv_2linux_2arm_2ioperm_8c_source.html
+Also I think that most of the churn was due to the fact that device tree
+was new in linux-arm. My guess is that something similar could easily
+happen to acpi support for linux-arm too during the first couple of
+years of development.
 
-Right, it only has four strings which it matches against, but this is
-evidence that /proc/cpuinfo is a user API, and the strings therein are
-used by userspace in ways you don't expect.
 
-We can't just go around removing things.
+> But anyway, emotional plea aside, a very large number of ACPI systems
+> are coming. Yes, I've been pushing to get existing players to switch,
+> but that's because I know what is coming. And if you want certain other
+> players to appear in this space, you'll need to have ACPI for them, too.
+
+What systems? You haven't named any.
+Your basic argument is: "I know things you don't know, trust me".
+I don't think that is good enough.
+
+
+> AML includes code that is runtime interpreted, for things like power
+> button emulation and the like. You can't just translate this. This comes
+> up every few years - it's impractical. You'll end up having to ship both
+> DTB and ACPI tables for a system. Which means two tables for a platform
+> vendor to get right. You know what will happen - only one table with be
+> correct. 
+
+No. Most likely they are going to be both wrong, except that DTB can
+be fixed.
+In my x86 years I have seen many broken ACPI tables that only work on
+Windows, because that's the only OS they were tested with.
+
+
+> Perhaps it seems that it will be the DTB that is more correct,
+> and this might be true this week, but by 2016 I *guarantee* you that the
+> ACPI table will be the one winning.
+
+I would be careful making statements like that: many high profile people
+risked similar predictions in the past about the success of a technology
+or the other and they failed spectacularly.
