@@ -1,64 +1,45 @@
-From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
-Date: Mon, 18 Nov 2013 15:00:20 +0100
-Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
-In-Reply-To: <528A1652.4000806@ti.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
- <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
- <5280E617.3000004@ti.com>
- <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
- <528A1652.4000806@ti.com>
-Message-ID: <3C198737-CAE0-40B4-803F-31C132911265@goldelico.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 18 Nov 2013 14:02:52 +0000
+Subject: [PATCH] arm/xen: Export phys_to_mach to fix Xen module link errors
+In-Reply-To: <20131118134806.GA1908@hansolo.jdub.homelinux.org>
+References: <20131118134806.GA1908@hansolo.jdub.homelinux.org>
+Message-ID: <alpine.DEB.2.02.1311181402160.4714@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
-
-Am 18.11.2013 um 14:29 schrieb Tomi Valkeinen:
-
-> On 2013-11-11 16:30, Dr. H. Nikolaus Schaller wrote:
+On Mon, 18 Nov 2013, Josh Boyer wrote:
+> Various xen drivers fail to link when built as modules with the following
+> error:
 > 
->> Maybe it looks as if it is an unsolvable problem. The OPA works only if acbias
->> and bypass are enabled, but is not allowed to tell that it is there.
+> ERROR: "phys_to_mach" [drivers/xen/xen-gntalloc.ko] undefined!
+> ERROR: "phys_to_mach" [drivers/net/xen-netfront.ko] undefined!
+> ERROR: "phys_to_mach" [drivers/net/xen-netback/xen-netback.ko] undefined!
+> ERROR: "phys_to_mach" [drivers/block/xen-blkfront.ko] undefined!
 > 
-> That's why the board file or dts file is there, to have "glue" data to
-> make different pieces work together.
-
-Our implementation idea was that this makes the board file developer to specify knowlegde that the
-drivers already could have and to reduce the risk of misconfiguration.
-
-So we tried to model the invert property of the connector which is also backpropagated
-to VENC.
-
-But of course there are different ways of doing it and different priorities of contradicting
-requirements.
-
+> The mfn_to_pfn and pfn_to_mfn functions get inlined in these modules and
+> those functions require phys_to_mach.  Export the symbol to fix the link
+> errors.
 > 
-> The perfect (?) solution would be a CDF like data. The idea would be
-> that in the board file, you would describe configuration options for
-> VENC and for OPA. In this particular case, you'd tell VENC that it needs
-> to enable acbias and bypass when OPA is to be connected to VENC. Then
-> there could be more entries for VENC, saying disable acbias and bypass
-> when BAR is to be connected to VENC.
+> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
+
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+>  arch/arm/xen/p2m.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> However, we don't have such support (yet).
+> diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+> index 23732cd..0f842e8 100644
+> --- a/arch/arm/xen/p2m.c
+> +++ b/arch/arm/xen/p2m.c
+> @@ -27,6 +27,7 @@ struct xen_p2m_entry {
+>  
+>  rwlock_t p2m_lock;
+>  struct rb_root phys_to_mach = RB_ROOT;
+> +EXPORT_SYMBOL_GPL(phys_to_mach);
+>  static struct rb_root mach_to_phys = RB_ROOT;
+>  
+>  static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
+> -- 
+> 1.8.3.1
 > 
-> For now, I hope it's enough if we handle VENC in a "single
-> configuration" manner, i.e. you'll tell VENC to enable acbias and bypass
-> when VENC is enabled. This means you can't have board setups where you'd
-> change the VENC->OPA connection to some other analog tv output at
-> runtime. I hope that's the case (i.e. OPA is always in use on that board).
-
-I also don't think that there is a need for runtime modifications, so your proposal
-looks ok.
-
-> If so, then I think you can just pass the acbias and bypass
-> configuration values via omapdss platform data. And VENC driver will use
-> them to configure those. OPA doesn't know anything about this at all.
-
-We will change it that way.
-
-Do you see a chance to get it into the merge window of 3.13?
-
-BR,
-Nikolaus
