@@ -1,53 +1,149 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 18 Nov 2013 11:36:51 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOmNscHM3MTF4OkVuYWJsZSBBUk1fUEFUQ0hfUEhZ?=
- =?UTF-8?B?U19WSVJUIGJ5IGRlZmF1bHQ=?=
-In-Reply-To: <1384758970-20099-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-References: <1384758970-20099-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-Message-ID: <1384760211.959851268@f258.i.mail.ru>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Nov 2013 16:54:33 +0900
+Subject: [PATCH] sh_eth: add R8A7791 support
+In-Reply-To: <201311150211.36049.sergei.shtylyov@cogentembedded.com>
+References: <201311150211.36049.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20131118075433.GA1506@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> ARM_PATCH_PHYS_VIRT is enabled by default for clps711x systems
+On Fri, Nov 15, 2013 at 02:11:35AM +0300, Sergei Shtylyov wrote:
+> Add support for yet another ARM member of the R-Car family, R-Car M2, also known
+> as R8A7791 -- it will share the code and data with previously added R8A7790.
+> Since  the Ether devices in these SoCs are indistinguishable at least from the
+> driver's point of view,  do not introduce  a new platform device ID but modify
+> device name "r8a7790-ether" to "r8a779x-ether" throughout the files (and also
+> 'r8a7790_data' to 'r8a779x_data' in the driver), just like the names used for
+> R8A7778/9 SoCs.
+
+I realise that this is the approach that has been taken previously by this
+driver for some other SoCs but it is inconsistent with the approach that
+has (recently) emerged for drivers for Renesas IP.
+
+The problem with this approach is that although the hardware may appear to
+be the same in the absence of some kind of version number for the IP we
+can't be certain it is the same.  Some difference may come to light later
+and then this system breaks down.
+
+Sure, at that point we can create a more fine-grained compatibility string.
+But the approach that has emerged is that in the absence of a clearly
+documented version number for the hardware the SoC name is used as the
+version number.
+
+I am also not entirely happy with the approach taken by this patch for
+two other reasons:
+
+1) It removes rather than deprecating an existing compatibility string.
+   Albeit one that may not actually be used in the wild.
+
+2) It changes both drivers/net/ and arch/arm/mach-shmobile/ code.
+   This kind of cross-subsystem change can lead to conflicts which
+   make Linus grumpy: this has occurred recently with shmobile code
+   though not in this driver.
+
+That said, I did successfully test this patch in conjunction with
+companion patches for the r8A7791 SoC and Koelsch board.
+
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Introduction of this config as default will enable phy-to-virt and
-> virt-to-phy translation function at boot and module loading time
-> and enforce dynamic reallocation of memory.
-> 
-> This config is mutually exclusive to XIP_KERNEL, which is used in
-> systems with NOR flash devices
-> 
-> Requesting platform maintainers to evaluate  the changes on the
-> board and comment on the changes, as I dont have the board for
-> testing.
-> 
-> Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
-> Cc: Linus Walleij <linux.walleij@linaro.org>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: linux-arm-kernel at lists.infradead.org
 > ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
+> This patch is atop of 'renesas-devel-v3.12-20131112' tag of Simon Horman's
+> 'renesas.git' repo and I intend to push it thru this tree in order to satisfy
+> runtime dependencies of the R8A7791/Koelsch Ether support patches to follow.
+> Not posting this to netdev at vger.kernel.org since Dave has closed 'net-next.git'
+> for now; Dave, I hope you'll ACK this patch...
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 1ad6fb6..dff1c81 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -372,6 +372,7 @@ config ARCH_CLPS711X
->  	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
->  	select ARCH_REQUIRE_GPIOLIB
->  	select AUTO_ZRELADDR
-> +	select ARM_PATCH_PHYS_VIRT
->  	select CLKDEV_LOOKUP
->  	select CLKSRC_MMIO
->  	select COMMON_CLK
-> -- 
-
-Should we keep sorting of symbols here?
-Anyway, since this symbol in my config by default,
-
-Tested-by: Alexander Shiyan <shc_work@mail.ru>
-
----
+>  arch/arm/mach-shmobile/board-lager.c   |   12 ++++++------
+>  arch/arm/mach-shmobile/clock-r8a7790.c |    2 +-
+>  drivers/net/ethernet/renesas/Kconfig   |    2 +-
+>  drivers/net/ethernet/renesas/sh_eth.c  |    6 +++---
+>  4 files changed, 11 insertions(+), 11 deletions(-)
+> 
+> Index: renesas/arch/arm/mach-shmobile/board-lager.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/board-lager.c
+> +++ renesas/arch/arm/mach-shmobile/board-lager.c
+> @@ -186,13 +186,13 @@ static const struct pinctrl_map lager_pi
+>  	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.1", "pfc-r8a7790",
+>  				  "mmc1_ctrl", "mmc1"),
+>  	/* Ether */
+> -	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
+> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
+>  				  "eth_link", "eth"),
+> -	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
+> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
+>  				  "eth_mdio", "eth"),
+> -	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
+> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
+>  				  "eth_rmii", "eth"),
+> -	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
+> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a779x-ether", "pfc-r8a7790",
+>  				  "intc_irq0", "intc"),
+>  };
+>  
+> @@ -217,7 +217,7 @@ static void __init lager_add_standard_de
+>  					  mmcif1_resources, ARRAY_SIZE(mmcif1_resources),
+>  					  &mmcif1_pdata, sizeof(mmcif1_pdata));
+>  
+> -	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
+> +	platform_device_register_resndata(&platform_bus, "r8a779x-ether", -1,
+>  					  ether_resources,
+>  					  ARRAY_SIZE(ether_resources),
+>  					  &ether_pdata, sizeof(ether_pdata));
+> @@ -246,7 +246,7 @@ static void __init lager_init(void)
+>  {
+>  	lager_add_standard_devices();
+>  
+> -	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
+> +	phy_register_fixup_for_id("r8a779x-ether-ff:01", lager_ksz8041_fixup);
+>  }
+>  
+>  static const char * const lager_boards_compat_dt[] __initconst = {
+> Index: renesas/arch/arm/mach-shmobile/clock-r8a7790.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/clock-r8a7790.c
+> +++ renesas/arch/arm/mach-shmobile/clock-r8a7790.c
+> @@ -285,7 +285,7 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_DEV_ID("e6518000.i2c", &mstp_clks[MSTP930]),
+>  	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP929]),
+>  	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
+> -	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
+> +	CLKDEV_DEV_ID("r8a779x-ether", &mstp_clks[MSTP813]),
+>  	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+>  	CLKDEV_DEV_ID("ee200000.mmc", &mstp_clks[MSTP315]),
+>  	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
+> Index: renesas/drivers/net/ethernet/renesas/Kconfig
+> ===================================================================
+> --- renesas.orig/drivers/net/ethernet/renesas/Kconfig
+> +++ renesas/drivers/net/ethernet/renesas/Kconfig
+> @@ -13,4 +13,4 @@ config SH_ETH
+>  	  Renesas SuperH Ethernet device driver.
+>  	  This driver supporting CPUs are:
+>  		- SH7619, SH7710, SH7712, SH7724, SH7734, SH7763, SH7757,
+> -		  R8A7740, R8A777x and R8A7790.
+> +		  R8A7740, R8A777x and R8A779x.
+> Index: renesas/drivers/net/ethernet/renesas/sh_eth.c
+> ===================================================================
+> --- renesas.orig/drivers/net/ethernet/renesas/sh_eth.c
+> +++ renesas/drivers/net/ethernet/renesas/sh_eth.c
+> @@ -395,8 +395,8 @@ static struct sh_eth_cpu_data r8a777x_da
+>  	.hw_swap	= 1,
+>  };
+>  
+> -/* R8A7790 */
+> -static struct sh_eth_cpu_data r8a7790_data = {
+> +/* R8A7790/1 */
+> +static struct sh_eth_cpu_data r8a779x_data = {
+>  	.set_duplex	= sh_eth_set_duplex,
+>  	.set_rate	= sh_eth_set_rate_r8a777x,
+>  
+> @@ -2807,7 +2807,7 @@ static struct platform_device_id sh_eth_
+>  	{ "sh7763-gether", (kernel_ulong_t)&sh7763_data },
+>  	{ "r8a7740-gether", (kernel_ulong_t)&r8a7740_data },
+>  	{ "r8a777x-ether", (kernel_ulong_t)&r8a777x_data },
+> -	{ "r8a7790-ether", (kernel_ulong_t)&r8a7790_data },
+> +	{ "r8a779x-ether", (kernel_ulong_t)&r8a779x_data },
+>  	{ }
+>  };
+>  MODULE_DEVICE_TABLE(platform, sh_eth_id_table);
+> 
