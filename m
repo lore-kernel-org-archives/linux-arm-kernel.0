@@ -1,46 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Nov 2013 19:28:32 +0000
-Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
- device tree case
-In-Reply-To: <20131118192256.GU10317@atomide.com>
-References: <1384562167-14725-1-git-send-email-tony@atomide.com>
- <1384562167-14725-2-git-send-email-tony@atomide.com>
- <20131118102907.GC13640@lee--X1>
- <20131118172510.GI16038@saruman.home>
- <20131118174638.GQ13640@lee--X1>
- <20131118181110.GM10317@atomide.com>
- <20131118190921.GT13640@lee--X1>
- <20131118192256.GU10317@atomide.com>
-Message-ID: <20131118192832.GU13640@lee--X1>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 18 Nov 2013 14:28:52 -0500
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <528A6944.3070303@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <cover.1384798508.git.jason@lakedaemon.net>
+ <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
+ <528A65DF.8060000@wwwdotorg.org>
+ <20131118191955.GG10335@titan.lakedaemon.net>
+ <528A6944.3070303@wwwdotorg.org>
+Message-ID: <20131118192852.GI10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013, Tony Lindgren wrote:
-
-> * Lee Jones <lee.jones@linaro.org> [131118 11:10]:
-> > > > Are you Acking this patch by the way?
-> > > 
-> > > If this looks acceptable to you guys, I'd like to merge this via my fixes
-> > > branch this week with your acks if that works for you. That way I can base
-> > > my omap legacy platform data removal patches on my fixes branch while keep
-> > > things working for the drivers. Alternatively I can naturally base my
-> > > legacy data removal on -rc2 too if this gets merged to mainline by then 
-> > > via the MFD tree.
+On Mon, Nov 18, 2013 at 12:23:48PM -0700, Stephen Warren wrote:
+> On 11/18/2013 12:19 PM, Jason Cooper wrote:
+> > On Mon, Nov 18, 2013 at 12:09:19PM -0700, Stephen Warren wrote:
+> >> On 11/18/2013 11:38 AM, Jason Cooper wrote:
+> >>> Unlike other build products in the Linux kernel, the devicetree blobs
+> >>> are simply the name of their source file, s/dts/dtb/.  There is also no
+> >>> 'make *install' mechanism to put them in a standard place with a
+> >>> standard naming structure.
+> >>>
+> >>> Unfortunately, users have begun scripting pulling the needed dtbs from
+> >>> within the kernel tree, thus hardcoding the dtbs names.  In turn, this
+> >>> means any changes to the dts filenames breaks these scripts.
+> >>>
+> >>> This patch is an attempt to fix this problem.  Akin to 'make install',
+> >>> this creates a new make target, dtbs_install.  The script that gets
+> >>> called defers to a vendor or distribution supplied installdtbs binary,
+> >>> if found in the system.  Otherwise, the default action is to install a
+> >>> given dtb into
+> ...
+> >> This only appears to create ${compat}.dtb, and not ${dtb} too. 
 > > 
-> > I can either send it up for the -rcs, or I can create an immutable
-> > branch for you to pull from. That way the patch can do in via ARM-SoC
-> > and MFD and we can let Git sort it out.
+> > See my comment, above.
+> > 
+> >> So, it doesn't seem to address part of the cover letter, "In addition,
+> >> some vendors have done a diligent job naming their devicetree source
+> >> files appropriately and we don't want to break their setups." Was that
+> >> deliberate? If so, I guess I need to send some patches to U-Boot.
+> > 
+> > I assume you are still pulling from arch/arm/boot/dts/*.dtb, right?
+> > Those build products don't go away with this patch, so you should be
+> > fine.  Unless I'm mis-understanding your workflow...
 > 
-> OK great, I'd prefer an immutable branch that I can merge in too. Then
-> you can bundle it with other MFD fixes for the -rc series and send it
-> in when it suits you :)
+> Yes, but I thought the whole point of this was that everyone would/could
+> switch to running "make dtbs_install", then pulling out the files from
+> the install tree, instead of any use-case requiring obtaining files
+> directly from the source/build tree?
 
-That's fine. It's 19:30 here now and I still have a shed load of
-debugging to do, so I'll deal with this tomorrow if it's all the same
-to you?
+Yes, in the script, it checks for the existence of /sbin/installdtbs.
+If it's there, it will override the default behavior and execute that
+script.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+So yours can be:
+
+#!/bin/sh
+
+[ -d "/boot/dtbs/$1" ] && rm -rf "/boot/dtbs/$1"
+
+mkdir -p "/boot/dtbs/$1"
+
+for dtb in `find "$3" -name "*.dtb"`; do
+	cp "$dtb" "/boot/dtbs/$1/${dtb##*/}"
+done
