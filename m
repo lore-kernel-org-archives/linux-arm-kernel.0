@@ -1,83 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Nov 2013 11:58:42 +0000
-Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
-In-Reply-To: <52898417.80601@nvidia.com>
-References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
- <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
- <52898417.80601@nvidia.com>
-Message-ID: <20131118115842.GE4050@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 18 Nov 2013 12:59:40 +0100
+Subject: [PATCH] RFC: framebuffer: provide generic get_fb_unmapped_area
+In-Reply-To: <1384772231-20993-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384772231-20993-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAMuHMdWtrSnTHNN-7GtMWAG9gZ0HJ3ZgVZt6Cfc=q=e-5Sr-Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 03:05:59AM +0000, Alex Courbot wrote:
-> On 11/18/2013 12:59 AM, Catalin Marinas wrote:
-> > On 17 November 2013 08:49, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> >> The ARM tree includes a firmware_ops interface that is designed to
-> >> implement support for simple, TrustZone-based firmwares but could
-> >> also cover other use-cases. It has been suggested that this
-> >> interface might be useful to other architectures (e.g. arm64) and
-> >> that it should be moved out of arch/arm.
-> >
-> > NAK. I'm for code sharing with arm via common locations but this API
-> > goes against the ARMv8 firmware standardisation efforts like PSCI,
-> > encouraging each platform to define there own non-standard interface.
-> 
-> I have to say, I pretty much agree with your NAK.
-> 
-> The reason for this patch is that the suggestion to move firmware_ops 
-> out of arch/arm is the last (I hope) thing that prevents my Trusted 
-> Foundation support series from being merged.
+On Mon, Nov 18, 2013 at 11:57 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> This patch makes mmapping the simple-framebuffer device work on a no-MMU
+> ARM target. The code is mostly taken from
+> arch/blackfin/kernel/sys_bfin.c.
+>
+> Note this is only tested on this no-MMU machine and I don't know enough
+> about framebuffers and mm to decide if this patch is sane. Also I'm
+> unsure about the size check because it triggers if userspace page aligns
+> the len parameter. (I don't know how usual it is to do, I'd say it's
+> wrong, but my test program (fbtest by Geert Uytterhoeven) does it.)
 
-Moving it into drivers shouldn't be a workaround. Nice try ;).
+It's quite common: the granularity of mmap() is PAGE_SIZE, i.e. if you
+try to map a partial page, you'll get access to the full page anyway
+(with MMU; without MMU, you can access everything anyway).
+Fbtest always mmap()s the full (page aligned) smem_len.
 
-> Now if we can all agree:
-> 
-> * that ARMv8 will only use PSCI
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/video/fbmem.c | 22 +++++++++++++++++++---
+>  1 file changed, 19 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/video/fbmem.c b/drivers/video/fbmem.c
+> index dacaf74..70b328c 100644
+> --- a/drivers/video/fbmem.c
+> +++ b/drivers/video/fbmem.c
+> @@ -1483,6 +1483,24 @@ __releases(&info->lock)
+>         return 0;
+>  }
+>
+> +#ifdef HAVE_ARCH_FB_UNMAPPED_AREA
+> +#define fb_get_unmapped_area get_fb_unmapped_area
+> +#else
+> +unsigned long fb_get_unmapped_area(struct file *filp, unsigned long orig_addr,
+> +               unsigned long len, unsigned long pgoff, unsigned long flags)
+> +{
+> +       struct fb_info * const info = filp->private_data;
+> +       unsigned long screen_size = info->screen_size ?: info->fix.smem_len;
 
-Or spin-table (which does not require secure calls). Otherwise, if
-secure firmware is present, SoCs should use PSCI (as the only firmware
-standard currently supported in the arm64 kernel).
+Why restrict this to screen_size? Fbtest will map the whole frame buffer memory.
 
-However, things evolve and we may have other needs in the future or PSCI
-may not be sufficient or we get newer PSCI revisions. This can be
-extended but my requirement is to decouple booting standard from SoC
-support (together with the aim of having no SoC-specific code under
-arch/arm64). I really don't see why SoCs can't agree on one (or very
-few) standard booting protocol (and legacy argument doesn't work since
-the ARMv8 firmware needs to be converted to AArch64 anyway).
+Typically screen_size is not a multiple of PAGE_SIZE, so this is another
+reason why your size check fails.
 
-> * that there is no use-case of this interface outside of arch/arm as of 
-> today (and none foreseen in the near future)
+> +       if (len > screen_size) {
+> +               pr_info("%lu > %lu (%lu, %lu)\n", len, screen_size, info->screen_size, info->fix.smem_len);
+> +               return -EINVAL;
+> +       }
+> +
+> +       return (unsigned long)info->screen_base;
 
-The firmware_ops are only used under arch/arm so far, I don't see any
-drivers doing anything with it. Also, l2x0_init is ARMv7 only.
+Shouldn't you take into account pgoff?
 
-On arm64, support for PSCI is handled via cpu_operations in the latest
-kernel. That's an arm64 abstraction and is extensible (but we want to
-keep tight control of this, hence no register_cpu_ops function).
+> +}
+> +#endif
 
-> * that the firmware_ops interface is quite ARMv7-specific anyway,
+Gr{oetje,eeting}s,
 
-This was introduced to allow SoC code to enable hooks for SoC-specific
-firmware calls like cpu_idle, l2x0_init. By standardising the interface
-and decoupling it from SoC code on arm64, we don't need per-SoC
-firmware_ops.
+                        Geert
 
-Of course, trusted foundations interface could be plugged into cpu_ops
-on arm64 but I will NAK it on the grounds of not using the PSCI API, nor
-the SMC calling convention (and it's easy to fix when porting to ARMv8).
-If a supported standard API is used, then there is no need for
-additional code in the kernel.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-BTW, is legacy code the reason for not converting the SMC # to PSCI?
-It's already supported on ARMv7, so you may not have much code left to
-merge in the kernel ;).
-
-> * that should a need to move it (for whatever reason) occur later, it 
-> will be easy to do (as this patch hopefully demonstrates).
-
-I agree, it's not hard to unify this but so far I haven't seen a good
-reason.
-
--- 
-Catalin
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
