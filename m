@@ -1,93 +1,59 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Nov 2013 14:19:55 -0500
-Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
-In-Reply-To: <528A65DF.8060000@wwwdotorg.org>
+Date: Mon, 18 Nov 2013 14:21:21 -0500
+Subject: [RFC PATCH V2 1/2] dtc: add 'compat' output option, prints
+ board string
+In-Reply-To: <528A63EE.8050401@wwwdotorg.org>
 References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
  <cover.1384798508.git.jason@lakedaemon.net>
- <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
- <528A65DF.8060000@wwwdotorg.org>
-Message-ID: <20131118191955.GG10335@titan.lakedaemon.net>
+ <728deb9bbeab491a728da077aa5e47c0e01bccf8.1384798508.git.jason@lakedaemon.net>
+ <528A63EE.8050401@wwwdotorg.org>
+Message-ID: <20131118192121.GH10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 12:09:19PM -0700, Stephen Warren wrote:
+On Mon, Nov 18, 2013 at 12:01:02PM -0700, Stephen Warren wrote:
 > On 11/18/2013 11:38 AM, Jason Cooper wrote:
-> > Unlike other build products in the Linux kernel, the devicetree blobs
-> > are simply the name of their source file, s/dts/dtb/.  There is also no
-> > 'make *install' mechanism to put them in a standard place with a
-> > standard naming structure.
+> > Consumers of the Linux kernel's build products are beginning to hardcode
+> > the filenames of the dtbs generated.  Since the dtb filenames are
+> > currently the dts filename s/dts/dtb/, this prevents the kernel
+> > community from renaming dts files as needed.
 > > 
-> > Unfortunately, users have begun scripting pulling the needed dtbs from
-> > within the kernel tree, thus hardcoding the dtbs names.  In turn, this
-> > means any changes to the dts filenames breaks these scripts.
+> > Let's provide a consistent naming structure for consumers to script
+> > against.  Or at least, as consistent as the dts properties themselves.
 > > 
-> > This patch is an attempt to fix this problem.  Akin to 'make install',
-> > this creates a new make target, dtbs_install.  The script that gets
-> > called defers to a vendor or distribution supplied installdtbs binary,
-> > if found in the system.  Otherwise, the default action is to install a
-> > given dtb into
+> > With this patch, adding the '-O compat' option to the dtc commandline
+> > will cause dtc to parse the provided file, and print out the board
+> > compatible string to stdout.
 > > 
-> >   /lib/modules/${kernel_version}/devicetree/${board_compat}.dtb
+> > This will facilitate an 'installdtbs.sh' script in the kernel for naming
+> > dtb files by their compatible string, eg:
+> > 
+> > $ dtc -I dtb -O compat arch/arm/boot/dts/armada-370-mirabox.dtb
+> > globalscale,mirabox
+> > 
+> > This change will also simplify distribution install scripts that need to
+> > search through many dtbs to find the right one for a target board.
+> > 
+> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> > ---
+> > changes since v1:
+> >  - made patch against in-tree dtc code to facilitate testing
 > 
-> Is co-mingling the DTs in the same (top-level) directory as modules a
-> good idea. I guess there is an explicit devicetree/ sub-directory so
-> they're easy to pull out of the source tree, but even so, they're
-> certainly not modules. I would assume that distros would put them into
-> e.g. /boot/dtbs/${kernelversion} or something more like that. Would it
-> make sense for the install target to use a path more like that, or
-> perhaps at least /dtbs/${kernelversion} to keep it separate from modules?
+> I assume this patch would first get applied to the upstream dtc, then
+> back-ported into the kernel though?
 
-I thought about the proposed /boot/dtbs/${kernelversion} and it didn't
-sit well with me.  /boot is for the files needed to boot the machine,
-not all the files you *might* need to boot the machine.  I'm speaking
-generally, I understand your situation is different.
+Yes.
 
-I tried to follow the analogy of the kernel modules, All of them are
-installed in /lib/modules/$kernelversion}, then, the initramfs builder
-selects a few modules needed to find the rootfs, etc and packs just
-those into the initramfs.
+> I wonder if dtc is the correct place to put this feature at all though.
+> It seems like a tiny standalone utility using libfdt would be better.
+> Actually, perhaps the existing fdtget utility (which seems to be
+> scripts/dtc/fdtget.c in the kernel although I don't know if it's built
+> by the kernel yet) can be used rather than creating a new one? Using
+> fdtget seems like it'd allow more flexibility later, if the naming rules
+> change, via scripting rather than having to edit the dtc source code.
 
-> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> 
-> > +dtbs_install: dtbs
-
-This answers below ^^^^
-
-> > +	$(CONFIG_SHELL) $(srctree)/$(boot)/installdtbs.sh $(KERNELRELEASE) \
-> > +	"$(MODLIB)/devicetree" "$(srctree)/$(boot)/dts"
-> 
-> Architectures besides ARM use device trees. Shouldn't "make
-> dtbs_install" work for them too?
-
-Yes, once the idea is hammered out, I'll add powerpc/mips/etc.
-
-> > diff --git a/arch/arm/boot/installdtbs.sh b/arch/arm/boot/installdtbs.sh
-> 
-> > +for dtb in `find "$3" -name "*.dtb"`; do
-> > +	# we use dtc to parse the dtb, get the board compatible string,
-> > +	# and then copy the dtb to $2/${board_compatible}.dtb
-> > +	compat="`$DTC -I dtb -O compat "$dtb"`"
-> > +
-> > +	if [ -e "$2/${compat}.dtb" ]; then
-> > +		echo "Install $dtb: $2/${compat}.dtb already exists!" 1>&2
-> > +		exit 1
-> > +	else
-> > +		cp "$dtb" "$2/${compat}.dtb"
-> > +	fi
-> > +done
-> 
-> This only appears to create ${compat}.dtb, and not ${dtb} too. 
-
-See my comment, above.
-
-> So, it doesn't seem to address part of the cover letter, "In addition,
-> some vendors have done a diligent job naming their devicetree source
-> files appropriately and we don't want to break their setups." Was that
-> deliberate? If so, I guess I need to send some patches to U-Boot.
-
-I assume you are still pulling from arch/arm/boot/dts/*.dtb, right?
-Those build products don't go away with this patch, so you should be
-fine.  Unless I'm mis-understanding your workflow...
+Ah, neat.  I missed fdtget.c.  I'll take a look at that, it sounds
+promising.
 
 thx,
 
