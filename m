@@ -1,59 +1,107 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Nov 2013 11:45:17 -0700
-Subject: [PATCH 15/31] ASoC: dmaengine: add custom DMA config to
- snd_dmaengine_pcm_config
-In-Reply-To: <20131116094412.GD15393@sirena.org.uk>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-16-git-send-email-swarren@wwwdotorg.org>
- <20131116094412.GD15393@sirena.org.uk>
-Message-ID: <528A603D.2000307@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Nov 2013 10:47:24 -0800
+Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
+ device id
+In-Reply-To: <1384396537-3486-3-git-send-email-tony@atomide.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-3-git-send-email-tony@atomide.com>
+Message-ID: <20131118184723.GR10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2013 02:44 AM, Mark Brown wrote:
-> On Fri, Nov 15, 2013 at 01:54:10PM -0700, Stephen Warren wrote:
+* Tony Lindgren <tony@atomide.com> [131113 18:36]:
+> We are wrongly relying on device id for the DMA configuration
+> which can lead to wrong DMA channel being selected.
 > 
->> - DMA device
+> Fix the issue by using the standard resources like we should.
 > 
->> This allows requesting DMA channels for a device other than the 
->> device which is registering the "PCM" driver. This is quite 
->> unusual, but is currently useful on Tegra. In much HW, and in 
->> Tegra20, each DAI HW
-...
-> I'm a bit concerned about anything actually using dma_dev since it
->  indicates that something is being worked around, it'd be a bit 
-> nicer to print a warning when doing this to give people a hint
-> that they might not be doing the right thing if they use it
-> (unless someone comes up with a system that has a clear use case
-> for it).
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+> 
+> If this looks OK, I'd like to merge this as a fix via arm-soc tree
+> along with the other patches in this series as my later patches
+> depend on patches in this series.
 
-What if I squash the following into that patch:
+Looks like we need sig initialized in this patch to avoid some
+uninitialized warnings.
 
-> diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
-> index 1160d1cba133..0e2645dee96a 100644
-> --- a/sound/soc/soc-generic-dmaengine-pcm.c
-> +++ b/sound/soc/soc-generic-dmaengine-pcm.c
-> @@ -296,8 +296,17 @@ static int dmaengine_pcm_request_chan_of(struct dmaengine_pcm *pcm,
->  	    !dev->of_node)
->  		return 0;
->  
-> -	if (config->dma_dev)
-> +	if (config->dma_dev) {
-> +		/*
-> +		 * If this warning is seen, it probably means that your Linux
-> +		 * device structure does not match your HW device structure.
-> +		 * It would be best to refactor the Linux device structure to
-> +		 * correctly match the HW structure.
-> +		 */
-> +		dev_warn(dev, "DMA channels sourced from device %s",
-> +			 dev_name(config->dma_dev));
->  		dev = config->dma_dev;
-> +	}
->  
->  	for (i = SNDRV_PCM_STREAM_PLAYBACK; i <= SNDRV_PCM_STREAM_CAPTURE;
->  	     i++) {
+Regards,
 
-(a few patches later) That yields the following warning on Tegra, for
-example:
+Tony
 
-> [    2.629623] tegra30-i2s 70080400.i2s: DMA channels sourced from device 70080000.ahub
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 14 Nov 2013 15:25:06 -0800
+Subject: [PATCH] mmc: omap: Fix DMA configuration to not rely on device id
+
+We are wrongly relying on device id for the DMA configuration
+which can lead to wrong DMA channel being selected.
+
+Fix the issue by using the standard resources like we should.
+
+Cc: Chris Ball <cjb@laptop.org>
+Cc: linux-mmc at vger.kernel.org
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/mmc/host/omap.c
++++ b/drivers/mmc/host/omap.c
+@@ -90,17 +90,6 @@
+ #define OMAP_MMC_CMDTYPE_AC	2
+ #define OMAP_MMC_CMDTYPE_ADTC	3
+ 
+-#define OMAP_DMA_MMC_TX		21
+-#define OMAP_DMA_MMC_RX		22
+-#define OMAP_DMA_MMC2_TX	54
+-#define OMAP_DMA_MMC2_RX	55
+-
+-#define OMAP24XX_DMA_MMC2_TX	47
+-#define OMAP24XX_DMA_MMC2_RX	48
+-#define OMAP24XX_DMA_MMC1_TX	61
+-#define OMAP24XX_DMA_MMC1_RX	62
+-
+-
+ #define DRIVER_NAME "mmci-omap"
+ 
+ /* Specifies how often in millisecs to poll for card status changes
+@@ -1331,7 +1320,7 @@ static int mmc_omap_probe(struct platform_device *pdev)
+ 	struct mmc_omap_host *host = NULL;
+ 	struct resource *res;
+ 	dma_cap_mask_t mask;
+-	unsigned sig;
++	unsigned sig = 0;
+ 	int i, ret = 0;
+ 	int irq;
+ 
+@@ -1408,19 +1397,20 @@ static int mmc_omap_probe(struct platform_device *pdev)
+ 	host->dma_tx_burst = -1;
+ 	host->dma_rx_burst = -1;
+ 
+-	if (mmc_omap2())
+-		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX : OMAP24XX_DMA_MMC2_TX;
+-	else
+-		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
+-	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
++	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
++	if (res)
++		sig = res->start;
++	host->dma_tx = dma_request_slave_channel_compat(mask,
++				omap_dma_filter_fn, &sig, &pdev->dev, "tx");
+ 	if (!host->dma_tx)
+ 		dev_warn(host->dev, "unable to obtain TX DMA engine channel %u\n",
+ 			sig);
+-	if (mmc_omap2())
+-		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_RX : OMAP24XX_DMA_MMC2_RX;
+-	else
+-		sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
+-	host->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
++	if (res)
++		sig = res->start;
++	host->dma_rx = dma_request_slave_channel_compat(mask,
++				omap_dma_filter_fn, &sig, &pdev->dev, "rx");
+ 	if (!host->dma_rx)
+ 		dev_warn(host->dev, "unable to obtain RX DMA engine channel %u\n",
+ 			sig);
