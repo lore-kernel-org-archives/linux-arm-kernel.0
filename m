@@ -1,47 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Nov 2013 10:52:36 -0700
-Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
-In-Reply-To: <20131118173047.GF9838@arm.com>
-References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
- <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
- <52898417.80601@nvidia.com> <20131118115842.GE4050@arm.com>
- <528A4869.2020701@wwwdotorg.org> <20131118173047.GF9838@arm.com>
-Message-ID: <528A53E4.90401@wwwdotorg.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 18 Nov 2013 09:58:38 -0800
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <20131118105150.GA26398@1wt.eu>
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
+ <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
+ <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
+ <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu> <20131118112601.65feb708@skate>
+ <20131118105150.GA26398@1wt.eu>
+Message-ID: <CAGVrzca=L1XxrFXJH03iYOjY3LttQ_dvYgOHdavz_8W+iL6iWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 10:30 AM, Catalin Marinas wrote:
-> On Mon, Nov 18, 2013 at 05:03:37PM +0000, Stephen Warren wrote:
->> On 11/18/2013 04:58 AM, Catalin Marinas wrote:
->> ...
->>> Of course, trusted foundations interface could be plugged into cpu_ops
->>> on arm64 but I will NAK it on the grounds of not using the PSCI API, nor
->>> the SMC calling convention (and it's easy to fix when porting to ARMv8).
->>> If a supported standard API is used, then there is no need for
->>> additional code in the kernel.
->>
->> What happens when someone takes an existing working secure-mode SW stack
->> and simply re-uses it on some new ARMv8 SoC. Are you going to force
->> people working on upstream to re-write the secure mode firmware in
->> shipped hardware before allowing upstream kernel support?
-> 
-> Don't confuse the secure stack with the secure monitor running at EL3.
-> If you want AArch64 support for lower levels (EL2, EL1, EL0), your
-> monitor _must_ be AArch64. You can't run legacy AArch32 code at EL3 and
-> have lower levels in AArch64 mode (architectural constraint).
+Hello Willy, Thomas,
 
-I was assuming that vendors would take the existing source code and
-simply rebuild it to create the AArch64 secure world. As such, the same
-SMC IDs, same structures, etc. would be used. The only source difference
-would be to perhaps change some 32-bit registers/struct-fields up to
-64-bit. Naively that sounds like the lowest-effort way to get an AArch64
-secure world, so I'm purely guessing that that's what vendors will do.
+2013/11/18 Willy Tarreau <w@1wt.eu>:
+> Hi Thomas,
+>
+> On Mon, Nov 18, 2013 at 11:26:01AM +0100, Thomas Petazzoni wrote:
+>> I haven't read the entire discussion yet, but do you guys have
+>> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/mvebu?id=1022c75f5abd3a3b25e679bc8793d21bedd009b4
+>> applied? It got merged recently, and it fixes a number of networking
+>> problems on Armada 370.
+>
+> No, because my version was even older than the code which introduced this
+> issue :-)
+>
+> The main issue is related to something we discussed once ago which surprized
+> both of us, the use of a Tx timer to release the Tx descriptors. I remember
+> I considered that it was not a big issue because the flush was also done in
+> the Rx path (thus on ACKs) but I can't find trace of this code so my analysis
+> was wrong. Thus we can hit some situations where we fill the descriptors
+> before filling the link.
 
-> You can
-> still keep the secure services at S-EL1 in AArch32, only that the SMCs
-> are handled by EL3 (and that's another aspect the SMC calling convention
-> spec is trying to address, mixed register-width secure/non-secure OSes).
+So long as you are using TCP this works because the ACKs will somehow
+create an artificial "forced" completion of your transmitted SKBs, how
+about an UDP streamer use case? In that case you will quickly fill up
+all of your descriptors and have to wait for the descriptors to be
+freed by the 10ms timer. I do not think this is desirable at all, and
+this will requite very large UDP sender socket buffers. I remember
+asking Thomas what was the reason for not using the TX completion IRQ
+during the first incarnation of the driver, but I do not quite
+remember what was the answer.
 
-I'm not sure of the implications of that statement. Since you mention
-SMCs being handled by EL3, I think the quick-and-dirty conversion I
-mention above is still likely to be used.
+If the original mvneta driver authors fears where that TX completion
+could generate too many IRQs, they should use netif_stop_queue() /
+netif_wake_queue() and mask off/on interrupts appropriately to slow
+down the pace of TX interrupts.
+
+>
+> Ideally we should have a Tx IRQ. At the very least we should call the tx
+> refill function in mvneta_poll() I believe. I can try to do it but I'd
+> rather have the Tx IRQ working instead.
+
+Right, actually you should do both, free transmitted SKBs from your
+NAPI poll callback and from the TX completion IRQ to ensure SKBs are
+freed up in time no matter what workload/use case is being used.
+-- 
+Florian
