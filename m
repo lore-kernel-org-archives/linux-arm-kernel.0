@@ -1,78 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Nov 2013 10:27:24 -0800
-Subject: [PATCH 6/8] gpio: twl4030: Fix passing of pdata in the device
- tree case
-In-Reply-To: <1384396537-3486-7-git-send-email-tony@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-7-git-send-email-tony@atomide.com>
-Message-ID: <20131118182724.GO10317@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 18 Nov 2013 15:33:26 -0300
+Subject: [PATCH v3 22/28] mtd: nand: pxa3xx: Introduce multiple page I/O
+ support
+In-Reply-To: <20131118181009.GZ9468@ld-irv-0074.broadcom.com>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-23-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131105190432.GQ20061@ld-irv-0074.broadcom.com>
+ <20131106011351.GH11759@localhost>
+ <CAN8TOE_ZmcsvShKY273KQCaopJEXgtXVR1XY9pP5EKkUK+bUbA@mail.gmail.com>
+ <20131106113210.GB2616@localhost>
+ <20131118181009.GZ9468@ld-irv-0074.broadcom.com>
+Message-ID: <20131118183325.GC21975@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131113 18:37]:
-> We still have some legacy code needing the callback functions
-> that won't work properly without platform data. To use platform
-> data for twl4030-gpio, we need to not trash the possible data.
+On Mon, Nov 18, 2013 at 10:10:09AM -0800, Brian Norris wrote:
+> Hi Ezequiel,
 > 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-gpio at vger.kernel.org
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
+> There's one question of yours that I think hasn't been addressed:
 > 
-> If this looks OK, I'd like to merge this as a fix via arm-soc tree
-> along with the other patches in this series as my later patches
-> depend on patches in this series.
+> On Wed, Nov 06, 2013 at 08:32:11AM -0300, Ezequiel Garcia wrote:
+> > Having followed (part) of the OMAP DT ECC discussion, I'm thinking:
+> > wouldn't it be good to have an 'nand-ecc-strength' property in the DT?
+> > 
+> > It would match the ecc_strength_ds field. This way, the ECC mode
+> > selection is left to the driver and not to the user.
+> > On the other side, this can cause some severe incompatibilities
+> > unless such driver *always* make the *same* selection.
+> 
+> I'm not quite so sure about the whole question of ECC in device tree.
+> There seems to be 2 subtly different properties we might want to
+> capture:
+> 
+> 1) What is the minimum ECC required for the flash?
+> 
+> 2) What is the exact ECC layout/strength/type used for this flash?
+>    (i.e., what is the bootloader using?)
+> 
+> The first is quite generic: the property consists of a stength and step
+> size. (But this is also duplicated in ONFI, and our full-ID device
+> table.)
+> 
+> Still, I think a property for #1 could be useful, for those chips that
+> are not discoverable. And if we (you?) add it, it should be done at the
+> nand_base level, I think, so its binding is shared by all drivers.
+> 
+> I'm not quite sure how we identify the appropriate struct device_node
+> for nand_base to use, though. Maybe we should force drivers to
+> initialize a new mtd_info.of_node field? And then maybe this could also
+> be integrated into the 'ofpart' parser, which currently requires drivers
+> to pass a device_node via the mtd_part_parser_data struct?
+> 
+> Property #2 is very driver/hardware specific, and it may not be easy to
+> capture this information properly using the same set of properties for
+> all NAND drivers. For example, "BCH-8" is not the same on all systems;
+> and even on the same system a software BCH-X could potentially be very
+> different than (and incompatible with) a BCH-X as provided by hardware.
+> And different hardware provides wildly different choices regarding ECC,
+> so I'm not convinced that we could create a good generic binding for
+> describing #2.
+> 
+> But I think a property like #2 is necessary for many platforms that need
+> to eliminate the problem that you mention, where drivers must always
+> make the same selection. Essentially, we're assuming bootloader/driver
+> co-design, rather than properly communicating this information via a
+> shared data structure like device tree.
+> 
+> Now, it's another question as to whether we need a property for both #1
+> and #2. The latter would probably just override the former, but that
+> doesn't mean that the former is unnecessary...
+> 
 
-Here's this one with a fix from Fengguang Wu to use struct assignment
-instead of memcpy folded in.
+I completely agree with all of the above, but I'm still a bit uncertain
+about how useful implementing #1 would be.
 
-Regards,
+As you say, encoding the specific (per-driver) ECC information in the
+devicetree seems the safest way of dealing with that.
 
-Tony
+On the other side, I fail to clearly see a valid use case for reporting
+the "minimum" ECC required strength in the devicetree.
 
+If I'm not missing anything, then I'd say just implement #2, for each driver
+that needs it. I know that pxa3xx-nand should have it to avoid future issues.
+This item is on top of my NAND TODO list.
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 14 Nov 2013 15:25:08 -0800
-Subject: [PATCH] gpio: twl4030: Fix passing of pdata in the device tree case
-
-We still have some legacy code needing the callback functions
-that won't work properly without platform data. To use platform
-data for twl4030-gpio, we need to not trash the possible data.
-
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-gpio at vger.kernel.org
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
-[tony at atomide.com: folded in fix from Fengguang to use struct assignment]
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/gpio/gpio-twl4030.c
-+++ b/drivers/gpio/gpio-twl4030.c
-@@ -436,7 +436,8 @@ static int gpio_twl4030_debounce(u32 debounce, u8 mmc_cd)
- 
- static int gpio_twl4030_remove(struct platform_device *pdev);
- 
--static struct twl4030_gpio_platform_data *of_gpio_twl4030(struct device *dev)
-+static struct twl4030_gpio_platform_data *of_gpio_twl4030(struct device *dev,
-+				struct twl4030_gpio_platform_data *pdata)
- {
- 	struct twl4030_gpio_platform_data *omap_twl_info;
- 
-@@ -444,6 +445,9 @@ static struct twl4030_gpio_platform_data *of_gpio_twl4030(struct device *dev)
- 	if (!omap_twl_info)
- 		return NULL;
- 
-+	if (pdata)
-+		*omap_twl_info = *pdata;
-+
- 	omap_twl_info->use_leds = of_property_read_bool(dev->of_node,
- 			"ti,use-leds");
- 
-@@ -501,7 +505,7 @@ no_irqs:
- 	mutex_init(&priv->mutex);
- 
- 	if (node)
--		pdata = of_gpio_twl4030(&pdev->dev);
-+		pdata = of_gpio_twl4030(&pdev->dev, pdata);
- 
- 	if (pdata == NULL) {
- 		dev_err(&pdev->dev, "Platform data is missing\n");
+Thanks for following the discussion!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
