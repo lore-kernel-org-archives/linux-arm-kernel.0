@@ -1,82 +1,47 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 18 Nov 2013 14:20:17 +0100
-Subject: [RFC PATCH RESEND 1/2] clk: add clk accuracy retrieval support
-In-Reply-To: <20131116015946.19193.29895@quantum>
-References: <1381684631-10835-1-git-send-email-b.brezillon@overkiz.com>
- <1381684631-10835-2-git-send-email-b.brezillon@overkiz.com>
- <20131116015946.19193.29895@quantum>
-Message-ID: <528A1411.6000905@overkiz.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Nov 2013 14:22:09 +0100
+Subject: PINCTRL:We May need mutex protect in pinctrl API
+In-Reply-To: <201311071748050629542@gmail.com>
+References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
+ <1383732348-18576-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZekui-CoPdwtyATQyAv07CZp3B9L=qU6xAk8J43=Bb6w@mail.gmail.com>
+ <201311071253281097419@gmail.com>
+ <CACRpkdYUKKLvMWcSxb24ZvYUq1QMzs9cw-h5CpZ1Q5S2s3RVBQ@mail.gmail.com>
+ <201311071748050629542@gmail.com>
+Message-ID: <CACRpkdZg9H+efyZMPAAQX475zcyRx-wzd53jcSe40eASy0Dirw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, Nov 7, 2013 at 10:48 AM, xulinuxkernel at gmail.com
+<xulinuxkernel@gmail.com> wrote:
 
-Nothing related to this thread, but if you have some time, could you 
-take a look at
-the last version (v5) of the at91 CCF port ?
+> sorry,our code is not upstream.
+> But if two threads come in pinctrl_select_state()  at the same time,
+> Is that okay?
 
-I know Nicolas was planning to add this for 3.14, and we'd like to have 
-your feedback
-on the new dt bindings.
+Why would two threads come in there at the same time?
 
-Best Regards,
+We have exactly one pinctrl* handle per device, and we
+select the state on it. This is like for example the device
+driver would have one thread telling it to go to "default"
+state and another thread telling it to go to "idle" or "sleep"
+state for example.
 
-Boris
+If we really have a device driver doing such things
+for a good reason, then we need to protect it, but I
+want to see that device driver first.
 
-On 16/11/2013 02:59, Mike Turquette wrote:
-> Quoting Boris BREZILLON (2013-10-13 10:17:10)
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index 73bdb69..942811d 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
-> ...
->> @@ -194,6 +204,7 @@ struct clk_hw {
->>   struct clk_fixed_rate {
->>          struct          clk_hw hw;
->>          unsigned long   fixed_rate;
->> +       unsigned long   fixed_accuracy;
-> This change belongs in patch #2. Please also update the kerneldoc above
-> this struct definition.
->
-> Regards,
-> Mike
->
->>          u8              flags;
->>   };
->>   
->> diff --git a/include/linux/clk.h b/include/linux/clk.h
->> index 9a6d045..2fe3b54 100644
->> --- a/include/linux/clk.h
->> +++ b/include/linux/clk.h
->> @@ -85,6 +85,23 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
->>   #endif
->>   
->>   /**
->> + * clk_get_accuracy - obtain the clock accuracy in ppb (parts per billion)
->> + *                   for a clock source.
->> + * @clk: clock source
->> + *
->> + * This gets the clock source accuracy expressed in ppb.
->> + * A perfect clock returns 0.
->> + */
->> +#ifdef CONFIG_HAVE_CLK_GET_ACCURACY
->> +unsigned long clk_get_accuracy(struct clk *clk);
->> +#else
->> +static inline unsigned long clk_get_accuracy(struct clk *clk)
->> +{
->> +       return 0;
->> +}
->> +#endif
->> +
->> +/**
->>    * clk_prepare - prepare a clock source
->>    * @clk: clock source
->>    *
->> -- 
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I am quite sure that it's safe to say that the upstream
+kernel does not contain a device that will ask the hardware
+to move around between different states like this from
+different threads, such calls will be serialized by the
+nature of sequencing in e.g. runtime PM.
+
+I need to see the device driver and the use case so I
+can understand why this would be needed.
+
+I think the need from this arise from an abuse of the
+pin controller states.
+
+Yours,
+Linus Walleij
