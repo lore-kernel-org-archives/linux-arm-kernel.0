@@ -1,87 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 18 Nov 2013 11:25:10 -0600
-Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
- device tree case
-In-Reply-To: <20131118102907.GC13640@lee--X1>
-References: <1384562167-14725-1-git-send-email-tony@atomide.com>
- <1384562167-14725-2-git-send-email-tony@atomide.com>
- <20131118102907.GC13640@lee--X1>
-Message-ID: <20131118172510.GI16038@saruman.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Nov 2013 10:25:46 -0700
+Subject: [PATCH 17/31] ASoC: tegra: call pm_runtime APIs around register
+ accesses
+In-Reply-To: <20131116100205.GG15393@sirena.org.uk>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-18-git-send-email-swarren@wwwdotorg.org>
+ <20131116100205.GG15393@sirena.org.uk>
+Message-ID: <528A4D9A.10809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Nov 18, 2013 at 10:29:07AM +0000, Lee Jones wrote:
-> > Since we still need to rely on a mix of device tree initialized
-> > drivers and legacy platform data initialize drivers, let's fix
-> > the passing of platform data to twl4030-gpio.
-> > 
-> > As the twl4030 GPIO is initialized by twl-core.c, we need to register
-> > the auxdata for twl4030 GPIO in twl-core.c.
-> > 
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> > 
-> > Samuel & Lee, I'd like to merge this fix via arm-soc tree if this looks
-> > OK to you as I have other patches that depend on this.
-> > 
-> > ---
-> >  drivers/mfd/twl-core.c | 15 ++++++++++++---
-> >  1 file changed, 12 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> > index 29473c2..d5b3dd8 100644
-> > --- a/drivers/mfd/twl-core.c
-> > +++ b/drivers/mfd/twl-core.c
-> > @@ -1133,6 +1133,11 @@ static int twl_remove(struct i2c_client *client)
-> >  	return 0;
-> >  }
-> >  
-> > +static struct of_dev_auxdata twl_auxdata_lookup[] = {
-> > +	OF_DEV_AUXDATA("ti,twl4030-gpio", 0, "twl4030-gpio", NULL),
-> > +	{ /* sentinel */ },
-> > +};
-> > +
-> >  /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
-> >  static int
-> >  twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
-> > @@ -1271,10 +1276,14 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
-> >  		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
-> >  	}
-> >  
-> > -	if (node)
-> > -		status = of_platform_populate(node, NULL, NULL, &client->dev);
-> > -	else
-> > +	if (node) {
-> > +		if (pdata)
-> > +			twl_auxdata_lookup[0].platform_data = pdata->gpio;
-> > +		status = of_platform_populate(node, NULL, twl_auxdata_lookup,
-> > +					      &client->dev);
-> > +	} else {
-> >  		status = add_children(pdata, irq_base, id->driver_data);
+On 11/16/2013 03:02 AM, Mark Brown wrote:
+> On Fri, Nov 15, 2013 at 01:54:12PM -0700, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Call pm_runtime_get_sync() before all register accesses; the HW requires
+>> clocks to be running when accessing registers.
+>>
+>> This hasn't been needed to date, since all register IO was performed
+>> while playback was active, and hence the ASoC core had already called
+>> pm_runtime_get(). However, an imminent future commit will allocate and
+>> set up the FIFOs and routing during probe(), when that "protection"
+>> won't be in place.
 > 
-> Why doesn't the TWL driver use the MFD framework for this stuff?
+> Acked-by: Mark Brown <broonie@linaro.org>
+> 
+> However should we fix this at the regmap level in the same way that we
+> do for clocks?  That would need to be using _put_autosuspend() to avoid
+> being horrific.
 
-that's reminiscent from years ago and, surely, needs to be fixed. Should
-we gate $subject for that, though ? This has been in tree for quite a
-few years already and Tony's patch is still a step forward, since most
-omap3 platforms would break on DT-only without it.
+I did wonder about that, but it seemed like rather a lot of overhead?
 
-There are quite a few folks who could volunteer to fixing that after
-Tony's patch is in (me included, although there could be better choices
-hehe).
+> Or alternatively should the driver be making the device
+> cache only when runtime PM is disabled?
 
-cheers
+The regmap is already cache-only when runtime-suspended. However the
+registers don't get flushed during resume. I suppose that would require
+only adding one extra call to the PM resume function?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/c09d0cfa/attachment.sig>
+For some reason, my gut prefers this current solution, but I could be
+persuaded.
