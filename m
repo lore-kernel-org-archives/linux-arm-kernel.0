@@ -1,105 +1,61 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Mon, 18 Nov 2013 12:05:59 +0900
-Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
-In-Reply-To: <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
-References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
- <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
-Message-ID: <52898417.80601@nvidia.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 18 Nov 2013 09:37:49 +0530
+Subject: [RFC v2 0/4] Add basic support for ASV
+In-Reply-To: <CAJ0PZbS8FxRA_sPTOnWbZcNfUMp=k5Jf_tZHLg1fh6gsAGJ=Gw@mail.gmail.com>
+References: <1384515691-26299-1-git-send-email-sachin.kamat@linaro.org>
+ <CAJ0PZbS8FxRA_sPTOnWbZcNfUMp=k5Jf_tZHLg1fh6gsAGJ=Gw@mail.gmail.com>
+Message-ID: <CAK9yfHzUAnBMB2Bp+eKzR3NH1iRguJn4K45gss5psWzG4Lc7tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 12:59 AM, Catalin Marinas wrote:
-> On 17 November 2013 08:49, Alexandre Courbot <acourbot@nvidia.com> wrote:
->> The ARM tree includes a firmware_ops interface that is designed to
->> implement support for simple, TrustZone-based firmwares but could
->> also cover other use-cases. It has been suggested that this
->> interface might be useful to other architectures (e.g. arm64) and
->> that it should be moved out of arch/arm.
->
-> NAK. I'm for code sharing with arm via common locations but this API
-> goes against the ARMv8 firmware standardisation efforts like PSCI,
-> encouraging each platform to define there own non-standard interface.
+Hi MyungJoo,
 
-I have to say, I pretty much agree with your NAK.
+On 18 November 2013 08:07, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
+>
+> 2013. 11. 15. ?? 8:44? "Sachin Kamat" <sachin.kamat@linaro.org>?? ??:
+>
+>
+>>
+>> Original cover letter from Yadwinder:
+>> This series is to add basic common infrastructure for ASV.
+>>  Basically ASV is a technique used on samsung SoCs, which provides the
+>> recommended supply voltage for dvfs of arm, mif etc. For a given operating
+>> frequency, the voltage is recommended based on SoC's ASV group.
+>> ASV group gets fussed on SoCs during process of mass production.
+>>
+>> This series includes:
+>>  - basic common infrastructue for ASV. It provides common APIs for user
+>> drivers
+>> like cpufreq & devfreq and and an interface for SoC specific drivers to
+>> register ASV members(instances)
+>>  - a common platform driver to register ASV members for exynos SoCs
+>>  - an example providing minimal support (only for ARM ASV) for exynos5250
+>> chips
+>>
+>> Its just basic skelton which I wanted to get it reviewed or discussed in
+>> early stage, before going ahead on further development based on it.
+>>  Presently example is based on static ASV table provided in SoC specific
+>> file,
+>> which I expects to go into DT. But exactly how and where needs to be
+>> discussed,
+>> may be in next revisions once we get through the basic skelton.
+>>  Also the location of driver in kernel may also seem odd to someone and
+>> many more things :).
+>>
+>> Looking for your valuable reviews and suggestions.
+>
+> Hi,
+>
+> As I have commented on the previous thread of Yadwinder, please share the
+> directory woth AVS, which is conceptually a superset of ASV.
+>
+> Ultimately, it would be best if you can supply an infra that can be shared
+> with the current AVS, which does not have any currently.
+>
 
-The reason for this patch is that the suggestion to move firmware_ops 
-out of arch/arm is the last (I hope) thing that prevents my Trusted 
-Foundation support series from being merged. Now if we can all agree:
+Yadwinder has already replied to your suggestion about his concerns. Please
+share your comments.
 
-* that ARMv8 will only use PSCI
-* that there is no use-case of this interface outside of arch/arm as of 
-today (and none foreseen in the near future)
-* that the firmware_ops interface is quite ARMv7-specific anyway,
-* that should a need to move it (for whatever reason) occur later, it 
-will be easy to do (as this patch hopefully demonstrates).
-
-... then this has indeed no reason to be. And maybe I can finally get 
-Russell's blessing on my series.
-
->
->> --- /dev/null
->> +++ b/include/linux/platform_firmware.h
->> @@ -0,0 +1,69 @@
->> +/*
->> + * Copyright (C) 2012 Samsung Electronics.
->> + * Kyungmin Park <kyungmin.park@samsung.com>
->> + * Tomasz Figa <t.figa@samsung.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef _PLATFORM_FIRMWARE_H
->> +#define _PLATFORM_FIRMWARE_H
->> +
->> +#include <linux/bug.h>
->> +
->> +/*
->> + * struct platform_firmware_ops
->> + *
->> + * A structure to specify available firmware operations.
->> + *
->> + * A filled up structure can be registered with
->> + * register_platform_firmware_ops().
->> + */
->> +struct platform_firmware_ops {
->> +       /*
->> +        * Enters CPU idle mode
->> +        */
->> +       int (*do_idle)(void);
->
-> Covered by PSCI already.
->
->> +       /*
->> +        * Sets boot address of specified physical CPU
->> +        */
->> +       int (*set_cpu_boot_addr)(int cpu, unsigned long boot_addr);
->
-> Covered either by PSCI or spin-table release method (PSCI if firmware
-> call is required).
->
->> +       /*
->> +        * Boots specified physical CPU
->> +        */
->> +       int (*cpu_boot)(int cpu);
->
-> PSCI.
->
->> +       /*
->> +        * Initializes L2 cache
->> +        */
->> +       int (*l2x0_init)(void);
->
-> No L2x0 (L210, L220, PL310) cache on ARMv8. And here I strongly
-> recommend the hardware people to make proper external caches which can
-> be flushed by standard CPU instructions, not MMIO. Any such caches
-> must be enabled by firmware before Linux starts.
->
-> The above firmware API is 32-bit ARM only. Form 64-bit ARM, you have
-> the choice of PSCI so far but as I said in a long thread to Nico, I'm
-> open to other standard interfaces if there are good reasons PSCI
-> cannot be used. Note the _standard_ part, I don't want every SoC with
-> their own firmware API for standard things like secondary CPU
-> booting/hotplug/idle.
->
+-- 
+With warm regards,
+Sachin
