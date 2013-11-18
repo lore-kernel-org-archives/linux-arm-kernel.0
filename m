@@ -1,38 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Nov 2013 16:46:18 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131118151900.GF16735@n2100.arm.linux.org.uk>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <201311181605.37300.arnd@arndb.de>
- <20131118151900.GF16735@n2100.arm.linux.org.uk>
-Message-ID: <201311181646.19070.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 18 Nov 2013 15:50:22 +0000
+Subject: ARM topic: Is DT on ARM the solution, or is there something
+ better?
+In-Reply-To: <20131118152920.GL26046@ulmo.nvidia.com>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131118122644.GA26046@ulmo.nvidia.com>
+ <20131118134022.26EE7C409EC@trevor.secretlab.ca>
+ <20131118135727.GD14306@sirena.org.uk>
+ <20131118152920.GL26046@ulmo.nvidia.com>
+Message-ID: <20131118155022.GB28334@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 November 2013, Russell King - ARM Linux wrote:
-> > Can you point to specific patches?
-> 
-> No, because they weren't publically posted, so I don't feel that I can
-> say all that much; they were from quite a large company though.
+On Mon, Nov 18, 2013 at 04:29:21PM +0100, Thierry Reding wrote:
+> On Mon, Nov 18, 2013 at 01:57:27PM +0000, Mark Brown wrote:
 
-I see.
+> > You'd need something class based like USB, there's such massive
+> > variation in what the hardware is trying to do and the tradeoffs.  A big
+> > issue is that especially with I2C many of the devices are primarily
+> > analogue devices implemnted in larger processes where the cost of adding
+> > additional digital logic can have a noticeable effect on the area and
+> > hence cost of the silicon.
 
-> > I can't say I'm an expert on this, but everything I've seen with ACPI
-> > is tables of binary data with four-letter identifiers that are defined
-> > by the ACPI group, but not using strings in a similar manner to DT.
-> 
-> They are using strings which are the same as the DT properties, but
-> without the vendor prefix - but yes, to only retrieve things like
-> booleans, u32s and such like.  They also have support for fixed-rate
-> clocks via the clk API too...
-> 
-> I'd like them to post the patches publically so a more open discussion
-> could occur.
+> My comments were mostly regarding the interface controllers. Those which
+> generate the same bus transactions but need different drivers on every
+> SoC. I suspect that the same costs don't apply (or at least not to the
+> same extent) to SoCs.
 
-I'd definitely like that too, especially since managing clocks etc.
-is (as multiple people have pointed out in this thread) a very
-un-ACPI-like thing to do and it would be important for them to have
-the debate whether that has a chance of getting accepted in the kernel
-(or the ACPI spec, for that matter) or not.
-
-	Arnd
+Oh, right.  In that space I suspect you'd face apathy on the part of
+vendors for switching away from their existing validated and deployed
+IPs - probably the best shot would be a freely licensed reference
+implementation that people could pick up if they wanted.  It's plausible
+that some of the vendors might do so for SPI where there are a bunch of
+chips that don't have DMA/FIFOs yet and so could possibly benefit from
+performance and feature gains but without that sort of benefit it's hard
+to see what would be persuasive for the vendors.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/82c19a4f/attachment.sig>
