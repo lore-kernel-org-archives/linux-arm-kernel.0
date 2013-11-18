@@ -1,36 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Nov 2013 17:30:47 +0000
-Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
-In-Reply-To: <528A4869.2020701@wwwdotorg.org>
-References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
- <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
- <52898417.80601@nvidia.com> <20131118115842.GE4050@arm.com>
- <528A4869.2020701@wwwdotorg.org>
-Message-ID: <20131118173047.GF9838@arm.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Mon, 18 Nov 2013 12:33:19 -0500
+Subject: ACPI vs DT at runtime
+In-Reply-To: <201311180945.52764.arnd@arndb.de>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <3371903.8j54vrCjEN@wuerfel>
+ <CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com>
+ <201311180945.52764.arnd@arndb.de>
+Message-ID: <528A4F5F.7080104@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 05:03:37PM +0000, Stephen Warren wrote:
-> On 11/18/2013 04:58 AM, Catalin Marinas wrote:
-> ...
-> > Of course, trusted foundations interface could be plugged into cpu_ops
-> > on arm64 but I will NAK it on the grounds of not using the PSCI API, nor
-> > the SMC calling convention (and it's easy to fix when porting to ARMv8).
-> > If a supported standard API is used, then there is no need for
-> > additional code in the kernel.
+On 11/18/2013 03:45 AM, Arnd Bergmann wrote:
+> On Sunday 17 November 2013, Olof Johansson wrote:
+
+>> Yep, and together for review is a critical part. I'm not saying that
+>> the ideal solution is a flashed DTB, but it's better than ACPI. A
+>> flashed DTB that's _easy to update_ as part of an OS install would
+>> probably be one of the best solutions we could ask for though.
 > 
-> What happens when someone takes an existing working secure-mode SW stack
-> and simply re-uses it on some new ARMv8 SoC. Are you going to force
-> people working on upstream to re-write the secure mode firmware in
-> shipped hardware before allowing upstream kernel support?
+> Right: the assumption on the DT boot interfaces is that board designers
+> make mistakes and are working on moving targets, so we need ways to update
+> the DTB. By contrast, the assumption on ACPI is that server firmware
+> authors know what they are doing and you shouldn't let anyone else mess
+> with the ACPI bits because doing so might damage your hardware. We're
+> in trouble if the second assumption turns out wrong.
 
-Don't confuse the secure stack with the secure monitor running at EL3.
-If you want AArch64 support for lower levels (EL2, EL1, EL0), your
-monitor _must_ be AArch64. You can't run legacy AArch32 code at EL3 and
-have lower levels in AArch64 mode (architectural constraint). You can
-still keep the secure services at S-EL1 in AArch32, only that the SMCs
-are handled by EL3 (and that's another aspect the SMC calling convention
-spec is trying to address, mixed register-width secure/non-secure OSes).
+In the server space we *never* ship updated ACPI tables in Red Hat
+products, and we never would ship updated tables as part of the OS.
+Platform data is platform data. It belongs to the vendor shipping the
+system, never to the OS. Yes, there are workarounds for bugs but on the
+whole you do in fact count on server vendors not to screw it up, and if
+they do then it is up to them to ship a BIOS update for their hardware.
 
--- 
-Catalin
+In the Fedora space, even on 32-bit, we tried to not get in the business
+of shipping DeviceTree blobs (way back when) that should be shipped by
+the platform, but alas many systems don't have flash to store the DTB.
+Coupled with the moving target we're dealing with there...things have
+been ugly. In the v8 server space, there will be no shipping of platform
+data. It will be ACPI tables passed in via UEFI, never updated by the
+OS, and owned wholly by the platform vendor.
+
+Jon.
