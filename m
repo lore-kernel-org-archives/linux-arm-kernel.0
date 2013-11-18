@@ -1,34 +1,63 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Mon, 18 Nov 2013 16:56:33 +0100
-Subject: [PATCHv3] ASoC: Add support for BCM2835
-In-Reply-To: <1384776479.14845.208.camel@smile>
-References: <5289F9DF.8060406@koalo.de> <1384776479.14845.208.camel@smile>
-Message-ID: <528A38B1.5010107@koalo.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 18 Nov 2013 16:54:36 +0100
+Subject: [RESEND PATCH v3 2/4] usb: musb: Bugfix of_node assignment
+In-Reply-To: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
+References: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1384790078-15366-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
->> +				 struct snd_pcm_hw_params *params,
->> +				 struct snd_soc_dai *dai)
->> +{
->> +	struct bcm2835_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
->> +
->> +	unsigned int sampling_rate = params_rate(params);
->> +	unsigned int data_length, data_delay, bclk_ratio;
->> +	unsigned int ch1pos, ch2pos, mode, format;
->> +	unsigned int mash = BCM2835_CLK_MASH_1;
->> +	unsigned int divi, divf, target_frequency;
->> +	int clk_src = -1;
->> +	unsigned int master = dev->fmt & SND_SOC_DAIFMT_MASTER_MASK;
->> +	uint32_t bit_master =	(master == SND_SOC_DAIFMT_CBS_CFS
->> +					|| master == SND_SOC_DAIFMT_CBS_CFM);
->> +
->> +	uint32_t frame_master =	(master == SND_SOC_DAIFMT_CBS_CFS
-> 
-> So, if master == SND_SOC_DAIFMT_CBS_CFS both bit_master and frame_master
-> will be true. Is it correct?
+It is not safe to assign the of_node to a device without driver. The
+device is matched against a list of drivers and the of_node could lead
+to a DT match with the parent driver.
 
-Yes. That is exactly what CBS_CFS expresses:
-Codec Bit Slave and Codec Frame Slave
-So the interface is bit master as well as frame master.
-Did I miss anything?
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/usb/musb/musb_core.c | 12 +++++++++++-
+ drivers/usb/musb/musb_dsps.c |  1 -
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index 8b7d903..d5ad9db 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -1966,6 +1966,7 @@ static int musb_probe(struct platform_device *pdev)
+ 	int		irq = platform_get_irq_byname(pdev, "mc");
+ 	struct resource	*iomem;
+ 	void __iomem	*base;
++	int ret;
+ 
+ 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!iomem || irq <= 0)
+@@ -1975,7 +1976,16 @@ static int musb_probe(struct platform_device *pdev)
+ 	if (IS_ERR(base))
+ 		return PTR_ERR(base);
+ 
+-	return musb_init_controller(dev, irq, base);
++	if (dev->parent)
++		dev->of_node = dev->parent->of_node;
++
++	ret = musb_init_controller(dev, irq, base);
++	if (ret) {
++		dev->of_node = NULL;
++		return ret;
++	}
++
++	return 0;
+ }
+ 
+ static int musb_remove(struct platform_device *pdev)
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index 82e1da0..7b36d32 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -485,7 +485,6 @@ static int dsps_create_musb_pdev(struct dsps_glue *glue,
+ 	musb->dev.parent		= dev;
+ 	musb->dev.dma_mask		= &musb_dmamask;
+ 	musb->dev.coherent_dma_mask	= musb_dmamask;
+-	musb->dev.of_node		= of_node_get(dn);
+ 
+ 	glue->musb = musb;
+ 
+-- 
+1.8.4.2
