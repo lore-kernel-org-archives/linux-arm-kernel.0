@@ -1,133 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Nov 2013 11:14:51 +0000
-Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E852409CE@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
- <20131114104620.GB16396@e106331-lin.cambridge.arm.com>
- <B56CDBE15CE27145A4B77D2D24263E852409CE@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <20131118111451.GA30853@e106331-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 18 Nov 2013 12:18:43 +0100
+Subject: [PATCH 0/7] ARM: shmobile: Use interrupt macros in DT files
+In-Reply-To: <20131118084204.GD1506@verge.net.au>
+References: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131118084204.GD1506@verge.net.au>
+Message-ID: <1950158.tI28CZ2mbU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 07:43:04AM +0000, Jingchang Lu wrote:
+Hi Simon,
+
+On Monday 18 November 2013 17:42:04 Simon Horman wrote:
+> On Sat, Nov 09, 2013 at 01:23:52PM +0100, Laurent Pinchart wrote:
+> > Hello,
+> > 
+> > This patch series replaces all numerical IRQ types by the corresponding
+> > IRQ_TYPE_* macros in device tree sources. It starts by switching from
+> > /include/ to #include (1/7), replacing numerical types by macros in SoC DT
+> > files (2/7) and board DT files (3/7), and fixing several boards that use a
+> > defined IRQ type instead of IRQ_TYPE_NONE.
+> > 
+> > The changes have been tested on the armadillo and marzen boards.
 > 
+> Hi Laurent,
 > 
-> > -----Original Message-----
-> > From: Mark Rutland [mailto:mark.rutland at arm.com]
-> > Sent: Thursday, November 14, 2013 6:46 PM
-> > To: Lu Jingchang-B35083
-> > Cc: vinod.koul at intel.com; devicetree at vger.kernel.org; Wang Huan-B18965;
-> > linux-kernel at vger.kernel.org; shawn.guo at linaro.org; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-> > 
-> > On Wed, Sep 18, 2013 at 10:57:59AM +0100, Jingchang Lu wrote:
-> > > Add Freescale enhanced direct memory(eDMA) controller support.
-> > > The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
-> > > to eDMA channels.
-> > > This module can be found on Vybrid and LS-1 SoCs.
-> > >
-> > > Signed-off-by: Alison Wang <b18965@freescale.com>
-> > > Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> [...] 
-> > > +* DMAMUX
-> > > +Required properties:
-> > 
-> > No compatible?
-> > 
-> > Where are DMAMUX nodes expected to live?
-> > 
-> > How to they relate to the eDMA controller in HW? Are they a
-> > subcomponent, or a logically separate unit that happens to be connected?
-> [Lu Jingchang-b35083] 
-> DMAMUX is a multiplexer between dma controller channels and peripheral deivces,
-> each DMAMUX provides 16 independently selectable DMA channel routers, and each 
-> channel router can be assigned to one of the possible peripheral DMA slots.
-> So it's not a standalone device, it's just required by the DMA controller to
-> connect the channels and slaves, So it's got by DMA controller's "fsl,dma-mux" property.
-> Thanks!
+> could you let me know what the status of these patches is.
 
-Ok.
+Given the lack of review comments I assume the patches are perfect :-) I'd 
+like to get them applied. Would you like me to split 2/7 and/or 3/7 ? The 
+changes are pretty small, I don't think not splitting them would make 
+backporting much more difficult.
 
-I'm not so sure on the way this is described, from the point of view of
-the device, its DMA channel is wired to the MUX, not to the DMA engine
-directly:
+> > Laurent Pinchart (7):
+> >   ARM: shmobile: Use #include in device tree sources
+> >   ARM: shmobile: Use interrupt macros in SoC DT files
+> >   ARM: shmobile: Use interrupt macros in board DT files
+> >   ARM: shmobile: marzen-reference: Use falling edge IRQ for LAN9221
+> >   ARM: shmobile: bockw-reference: Use falling edge IRQ for LAN9221
+> >   ARM: shmobile: kzm9g-reference: Use falling edge IRQ for LAN9221
+> >   ARM: shmobile: armadillo-reference: Use low level IRQ for ST1231
+> >  
+> >  arch/arm/boot/dts/r7s72100-genmai.dts              |   2 +-
+> >  arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    |   2 +-
+> >  arch/arm/boot/dts/r8a73a4-ape6evm.dts              |   5 +-
+> >  arch/arm/boot/dts/r8a73a4.dtsi                     | 108 +++++++++++-----
+> >  .../boot/dts/r8a7740-armadillo800eva-reference.dts |   5 +-
+> >  arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |   2 +-
+> >  arch/arm/boot/dts/r8a7740.dtsi                     | 106   ++++++--------
+> >  arch/arm/boot/dts/r8a7778-bockw-reference.dts      |   5 +-
+> >  arch/arm/boot/dts/r8a7778-bockw.dts                |   2 +-
+> >  arch/arm/boot/dts/r8a7778.dtsi                     |  44 +++----
+> >  arch/arm/boot/dts/r8a7779-marzen-reference.dts     |   5 +-
+> >  arch/arm/boot/dts/r8a7779-marzen.dts               |   2 +-
+> >  arch/arm/boot/dts/r8a7779.dtsi                     |  42 +++----
+> >  arch/arm/boot/dts/r8a7790-lager-reference.dts      |   2 +-
+> >  arch/arm/boot/dts/r8a7790-lager.dts                |   2 +-
+> >  arch/arm/boot/dts/r8a7790.dtsi                     |  58 +++++-----
+> >  arch/arm/boot/dts/r8a7791-koelsch-reference.dts    |   2 +-
+> >  arch/arm/boot/dts/r8a7791-koelsch.dts              |   2 +-
+> >  arch/arm/boot/dts/r8a7791.dtsi                     |  49 ++++----
+> >  arch/arm/boot/dts/sh7372-mackerel.dts              |   2 +-
+> >  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   5 +-
+> >  arch/arm/boot/dts/sh73a0-kzm9g.dts                 |   2 +-
+> >  arch/arm/boot/dts/sh73a0.dtsi                      | 128  ++++++++-------
+> >  23 files changed, 325 insertions(+), 257 deletions(-)
+-- 
+Regards,
 
-                       +-------+
-             /---------|DEVICE0|
-             |         +-------+
-+-----+   +------+
-| DMA |===|DMAMUX|
-+-----+   +------+
-             |         +-------+
-             \---------|DEVICE1|
-                       +-------+
-
-If that's the case, I'd expect the DMAMUX to have a #dma-cells and
-describe each device as being wired to the mux, and then the mux as
-being wired to the DMA. If the MUXes are sub-blocks of the DMA, then I'm
-not sure why they need to be described at all.
-
-Currently, the DMA code is handling information that's specific to the
-MUX (i.e. the channel ID that's specific to the MUX), and that feels odd
-unless the MUX is a component of the DMA (which if true I'd expect it to
-be described differently).
-
-> > 
-> > > +- reg : Should contain DMAMUX registers location and length
-> > > +- fsl,dmamux-id : DMAMUX ID. DMAMUX IDs are unique in each eDMA
-> > controller.
-> > > +  inside one eDMA controller, specific request source can only be
-> > routed by
-> > > +  one of its DMAMUXs.
-> > > +  However Specific request source may be routed to different eDMA
-> > controller,
-> > > +  thus all the DMAMUXs sharing a the same request sources have the
-> > same ID.
-> > > +- clocks : Phandle of the clock used by the DMAMUX
-> > > +- clock-names : The clock names
-> > 
-> > _which_ clock names do you expect? From the looks of the example, you
-> > expect "dmamux".
-> > 
-> > From the view of the DMAMUX, what is its clock input called? "dmamux"
-> > doesn't look like what I'd expect for a clock name, but if the
-> > documentation for the eDMA doesn't provide a name for it, "dmamux" is
-> > fine.
-> > 
-> > If you're not using clock-names, it's useless. You _must_ define the set
-> > of names you expect or it's unusable. If you do define a set of names,
-> > then you should request clocks by name in the driver.
-> > 
-> [Lu Jingchang-b35083] [Lu Jingchang-b35083] 
-> The clock here is from the platform bus clock, I will remove this property for
-> compatible between SoCs. Thanks!
-> > > +
-
-Ok, if it's already on and you don't need it for now, nto describing it
-is fine.
-
-[...]
-
-> > > +               fsl_edmamux->clk = of_clk_get(phandle, 0);
-> > > +               if (IS_ERR(fsl_edmamux->clk)) {
-> > > +                       dev_err(&pdev->dev, "Missing DMAMUX clock.\n");
-> > > +                       return PTR_ERR(fsl_edmamux->clk);
-> > > +               }
-> > 
-> > Please acquire the clock by name:
-> [Lu Jingchang-b35083] 
-> I will remove the node name property for reuse the driver between SoCs,
-> for they may have different clock names. Thanks!
-
-The clock-names property describes the clock from the view of the
-_device_, not the _system_. The set of possible clock-names should not
-vary from system to system, but it may vary from generation to
-generation of the device.
-
-See the last portion of
-http://www.spinics.net/lists/devicetree/msg08993.html for a description
-of clock-names.
-
-Thanks,
-Mark.
+Laurent Pinchart
