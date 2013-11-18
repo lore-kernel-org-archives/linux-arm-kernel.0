@@ -1,85 +1,108 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Mon, 18 Nov 2013 11:47:23 -0700
-Subject: [PATCH 1/5] ahci: imx: Pull out the clock enable/disable calls
-In-Reply-To: <1384651251-5548-1-git-send-email-marex@denx.de>
-References: <1384651251-5548-1-git-send-email-marex@denx.de>
-Message-ID: <528A60BB.4010802@boundarydevices.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 18 Nov 2013 10:50:59 -0800
+Subject: [PATCH v3 22/28] mtd: nand: pxa3xx: Introduce multiple page
+ I/O support
+In-Reply-To: <20131118183325.GC21975@localhost>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-23-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131105190432.GQ20061@ld-irv-0074.broadcom.com>
+ <20131106011351.GH11759@localhost>
+ <CAN8TOE_ZmcsvShKY273KQCaopJEXgtXVR1XY9pP5EKkUK+bUbA@mail.gmail.com>
+ <20131106113210.GB2616@localhost>
+ <20131118181009.GZ9468@ld-irv-0074.broadcom.com>
+ <20131118183325.GC21975@localhost>
+Message-ID: <20131118185059.GB9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Ezequiel,
 
-On 11/16/2013 06:20 PM, Marek Vasut wrote:
-> The same code for enabling and disabling SATA clock was found in multiple
-> places in the driver. Implement functions that enable/disable the SATA clock
-> and use them in such places instead of duplicating the code.
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: Linux-IDE <linux-ide@vger.kernel.org>
-> ---
->   drivers/ata/ahci_imx.c | 133 ++++++++++++++++++++++++++++---------------------
->   1 file changed, 75 insertions(+), 58 deletions(-)
->
-> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-> index ae2d73f..c7ee505 100644
-> --- a/drivers/ata/ahci_imx.c
-> +++ b/drivers/ata/ahci_imx.c
-> @@ -47,6 +47,73 @@ static int ahci_imx_hotplug;
->   module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
->   MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support)");
->
-> <snip>
- >
+On Mon, Nov 18, 2013 at 03:33:26PM -0300, Ezequiel Garcia wrote:
+> On Mon, Nov 18, 2013 at 10:10:09AM -0800, Brian Norris wrote:
+> > There's one question of yours that I think hasn't been addressed:
+> > 
+> > On Wed, Nov 06, 2013 at 08:32:11AM -0300, Ezequiel Garcia wrote:
+> > > Having followed (part) of the OMAP DT ECC discussion, I'm thinking:
+> > > wouldn't it be good to have an 'nand-ecc-strength' property in the DT?
+> > > 
+> > > It would match the ecc_strength_ds field. This way, the ECC mode
+> > > selection is left to the driver and not to the user.
+> > > On the other side, this can cause some severe incompatibilities
+> > > unless such driver *always* make the *same* selection.
+> > 
+> > I'm not quite so sure about the whole question of ECC in device tree.
+> > There seems to be 2 subtly different properties we might want to
+> > capture:
+> > 
+> > 1) What is the minimum ECC required for the flash?
+> > 
+> > 2) What is the exact ECC layout/strength/type used for this flash?
+> >    (i.e., what is the bootloader using?)
+> > 
+> > The first is quite generic: the property consists of a stength and step
+> > size. (But this is also duplicated in ONFI, and our full-ID device
+> > table.)
+> > 
+> > Still, I think a property for #1 could be useful, for those chips that
+> > are not discoverable. And if we (you?) add it, it should be done at the
+> > nand_base level, I think, so its binding is shared by all drivers.
+> > 
+> > I'm not quite sure how we identify the appropriate struct device_node
+> > for nand_base to use, though. Maybe we should force drivers to
+> > initialize a new mtd_info.of_node field? And then maybe this could also
+> > be integrated into the 'ofpart' parser, which currently requires drivers
+> > to pass a device_node via the mtd_part_parser_data struct?
+> > 
+> > Property #2 is very driver/hardware specific, and it may not be easy to
+> > capture this information properly using the same set of properties for
+> > all NAND drivers. For example, "BCH-8" is not the same on all systems;
+> > and even on the same system a software BCH-X could potentially be very
+> > different than (and incompatible with) a BCH-X as provided by hardware.
+> > And different hardware provides wildly different choices regarding ECC,
+> > so I'm not convinced that we could create a good generic binding for
+> > describing #2.
+> > 
+> > But I think a property like #2 is necessary for many platforms that need
+> > to eliminate the problem that you mention, where drivers must always
+> > make the same selection. Essentially, we're assuming bootloader/driver
+> > co-design, rather than properly communicating this information via a
+> > shared data structure like device tree.
+> > 
+> > Now, it's another question as to whether we need a property for both #1
+> > and #2. The latter would probably just override the former, but that
+> > doesn't mean that the former is unnecessary...
+> > 
+> 
+> I completely agree with all of the above, but I'm still a bit uncertain
+> about how useful implementing #1 would be.
+> 
+> As you say, encoding the specific (per-driver) ECC information in the
+> devicetree seems the safest way of dealing with that.
+> 
+> On the other side, I fail to clearly see a valid use case for reporting
+> the "minimum" ECC required strength in the devicetree.
+> 
+> If I'm not missing anything, then I'd say just implement #2, for each driver
+> that needs it. I know that pxa3xx-nand should have it to avoid future issues.
+> This item is on top of my NAND TODO list.
 
-I haven't traced through all of this, but if you're copying from
-the Freescale 3.0.35 kernel, note that there's a bug in it, and
-the 0x7FFFFFFD really wanted to be an 0x7FFFFFFF.
+Well, Huang kinda dodged #2 for now in GPMI NAND, by hacking in a
+'fsl,use-minimum-ecc' property. That potentially yields less work for
+the bootloader; it just defers the "minimum ECC" choice to Linux. This
+is certainly less specific, and it leaves the door open just a bit for
+Linux to inadvertently make incompatible changes...
 
-The way I read this comment, the writes need to happen in two
-steps:
-	- write everything with the PHY disabled
-	- enable the PHY
+But the more I think about it, the more I think that #2 is really the
+right way. And yes, I think pxa3xx-nand should do #2.
 
-We had reports of stalls waiting for SATA drives to be enumerated
-that were solved with this commit...
+Huang,
 
-	https://github.com/boundarydevices/linux-imx6/commit/0186ea224ce6bd1cb4757a0f83b0090e26a021f4
+Do you have a good reason why you needed GPMI NAND to choose the ECC
+configuration (a la "miminum ECC") instead of fully specifying your ECC
+selection in device tree? I recall most of your arguments were about
+using an ECC strength that leaves room for user data in OOB (e.g., with
+JFFS2). But you could have done the same thing by creating a proper DT
+property to describe the desidered ECC strength, with no real
+disadvantage, right?
 
-> +	/*
-> +	 * set PHY Paremeters, two steps to configure the GPR13,
-> +	 * one write for rest of parameters, mask of first write
-> +	 * is 0x07fffffd, and the other one write for setting
-> +	 * the mpll_clk_en.
-> +	 */
-> +	if (config) {
-> +		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
-> +				IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
-> +				| IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK
-> +				| IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK
-> +				| IMX6Q_GPR13_SATA_SPD_MODE_MASK
-> +				| IMX6Q_GPR13_SATA_MPLL_SS_EN
-> +				| IMX6Q_GPR13_SATA_TX_ATTEN_MASK
-> +				| IMX6Q_GPR13_SATA_TX_BOOST_MASK
-> +				| IMX6Q_GPR13_SATA_TX_LVL_MASK
-> +				| IMX6Q_GPR13_SATA_TX_EDGE_RATE
-> +				, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
-> +				| IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M
-> +				| IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F
-> +				| IMX6Q_GPR13_SATA_SPD_MODE_3P0G
-> +				| IMX6Q_GPR13_SATA_MPLL_SS_EN
-> +				| IMX6Q_GPR13_SATA_TX_ATTEN_9_16
-> +				| IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB
-> +				| IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
-> +	}
-> +	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
-> +			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
-> +			IMX6Q_GPR13_SATA_MPLL_CLK_EN);
-> +
-
-Regards,
-
-
-Eric
+Brian
