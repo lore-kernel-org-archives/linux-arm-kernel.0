@@ -1,56 +1,154 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 18 Nov 2013 17:26:06 +0200
-Subject: Fwd: [PATCH 7/8] watchdog: davinci: add "clocks" property
-In-Reply-To: <528829DB.7020003@roeck-us.net>
-References: <1383680783-12114-8-git-send-email-ivan.khoronzhuk@ti.com>
- <527A28E8.4010204@ti.com> <528829DB.7020003@roeck-us.net>
-Message-ID: <528A318E.1090209@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 18 Nov 2013 09:28:47 -0600
+Subject: ACPI vs DT at runtime
+In-Reply-To: <5289A356.4060004@jonmasters.org>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <5289A356.4060004@jonmasters.org>
+Message-ID: <CAL_Jsq+QUXj5CX3aV9gAnb0HOU3eJwFLjeeC3wMBSH6qwLmq+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2013 04:28 AM, Guenter Roeck wrote:
-> On 11/06/2013 03:32 AM, ivan.khoronzhuk wrote:
->> The Keystone arch is using clocks in DT and source clock for watchdog
->> has to be specified, so add this to binding.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> ---
->>   .../devicetree/bindings/watchdog/davinci-wdt.txt   |    5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git
->> a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
->> b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
->> index fddced9..4db4d0e 100644
->> --- a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
->> +++ b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
->> @@ -7,6 +7,10 @@ Required properties:
->>
->>   - reg : Should contain WDT registers location and length
->>
->> +- clocks: phandle reference to the controller clock.
->> +      Required only for Keystone arch.
->> +      See clock-bindings.txt
->> +
+On Sun, Nov 17, 2013 at 11:19 PM, Jon Masters <jonathan@jonmasters.org> wrote:
+> Olof, thanks for starting this thread. Mark, thanks for the followup.
 >
-> Yet another form of formatting. Also, wonder if it makes sense to merge
-> this with the patch adding keystone support.
+> Comments on both inline, below. But before I reply to the specific
+> points, let me add that this is clearly an emotional topic for many.
+> There are a great many companies involved in ARMv8 on servers, and a
+> great many have yet to say anything in public. I am trying to strike a
+> balance constantly by being fair to those who have announced and those
+> who have yet to do so. But regardless, we have one chance here to make a
+> good server platform that can challenge the incumbent architectures. If
+> I weren't utterly convinced of that, and of the need for such standards
+> as UEFI and ACPI, then I wouldn't be so vocal about it. Given who is
+> involved in this space, regardless of a decision to adopt ACPI now or
+> later, it is coming. It can be done right now, or not.
 >
-
-Ok, I'll squash them.
-
->>   Optional properties:
->>
->>   - timeout-sec:        Contains the watchdog timeout in seconds
->> @@ -21,4 +25,5 @@ wdt: wdt at 2320000 {
->>       compatible = "ti,davinci-wdt";
->>       reg = <0x02320000 0x80>;
->>       timeout-sec = <30>;
->> +    clocks = <&clkwdtimer0>;
->>   };
->>
+> I (and others) pushed 3 years ago for the adoption of ACPI. Dong, and
+> others instigated the legal processes that resulted in the movement of
+> ACPI under UEFI Forum recently, to become a fully open standard that can
+> be shaped - both by the Linux community, and by others. ACPI.next will
+> benefit from the same development process that has shaped UEFI standards
+> over the past few years, and most people here can easily get involved in
+> shaping that standard - as they can on x86 as well now.
 >
+> I am pushing for a few other things to become public that will help to
+> explain why ACPI is being adopted and provide a standardized description
+> of the ways in which it will be used/consumed.
+>
+> On 11/15/2013 04:57 AM, Mark Rutland wrote:
+>> On Fri, Nov 15, 2013 at 01:44:10AM +0000, Olof Johansson wrote:
+>>> The more I start to see early UEFI/ACPI code, the more I am certain
+>>> that we want none of that crap in the kernel. It's making things
+>>> considerably messier, while we're already very busy trying to convert
+>>> everything over and enable DT -- we'll be preempting that effort just
+>>> to add even more boilerplate everywhere and total progress will be
+>>> hurt.
+>
+> Firstly, I would note that I don't expect DeviceTree to go away. Only on
+> server class systems. I expect all server class ARMv8 systems in the
+> Enterprise/Cloud environment to boot using UEFI and ACPI. This is
+> certainly the case of most future design starts already underway. These
+> can either be supported properly, or not, but ignoring the impending
+> ACPI systems isn't practical. Translation won't work reliably either.
+>
+> For the record, I did suggest to Applied that the first posting of that
+> SATA driver not have the ACPI bits in (since we know it needs cleaning
+> up to use the key/value approaches already discussed, and so on), but
+> after chatting with Loc about it, it seemed reasonable to use the
+> opportunity to start a discussion - which seems to be on cue here.
 
--- 
-Regards,
-Ivan Khoronzhuk
+That and the Exynos SATA support are great examples of how ACPI won't
+help solve anything. Both are "standard AHCI" yet require lots of code
+at runtime that ACPI is simply not going abstract away. Even we had to
+do modifications for highbank due to an errata. What's to keep the
+next gen chips from changing because they will. New process technology
+will mean new phy which will no doubt have different programming or
+quirks.
+
+
+>> I'm of the opinion that the only way we should support ACPI is as a
+>> first-class citizen.
+>
+> There really isn't another way to do it in my opinion.
+>
+>> We don't need to modify every driver and subsystem
+>> to support ACPI, only those necessary to support the minimal set of
+>> platforms using ACPI. ACPI is new in the arm space, and we can enforce
+>> quality standards on ACPI _now_ above what we're allowing for DT, and
+>> avoid future problems.
+>
+> This is key. It's not going to be ACPI everywhere. It's going to be ACPI
+> on server class systems. And later, maybe some client systems. But the
+> big push is from the server crowd. We need to build systems that in 5-10
+> years time can still boot an older kernel. This can't be done without a
+> standardized/versioned enumeration/discovery mechanism like ACPI that
+> has an API enshrined in stone as far as compatibility. Device Tree is
+> wonderful, anyone can make a binding and use it. Or change the binding
+> in the next kernel release. Or...this doesn't work in the server space.
+> Server platforms aren't vertically welded shut like in the embedded
+> space, where DeviceTree has brought all kinds of benefits for those
+> building with a single kernel for many different targets, but has also
+> seen a huge amount of churn from one kernel to the next. If I counted
+> the number of times I've been told "just update your dtb"...then I would
+> be shivering in the corner a sadden wreck. You can't "just update your
+> dtb" on a server class system. You shouldn't.
+
+I think people are being misled that ACPI somehow solves the problem
+of new systems just work. It doesn't. It is having a single platform,
+tons of legacy h/w or emulation of the h/w, and the ability to trap
+into the firmware. That all takes upfront design and verification
+requirements to achieve. This is not how the ARM world works. Yes, we
+have secret documents attempting to standardize things, but they are
+hardly sufficient. Using AHCI for SATA is specified, but the above
+example shows why this is insufficient. Granted, those chips were not
+designed to target any standardization doc, but I doubt anyone reads
+the doc and believes they are not already compliant. When it comes
+down to changing the kernel or spinning the Si, vendors are going to
+do the former.
+
+> But anyway, emotional plea aside, a very large number of ACPI systems
+> are coming. Yes, I've been pushing to get existing players to switch,
+> but that's because I know what is coming. And if you want certain other
+> players to appear in this space, you'll need to have ACPI for them, too.
+
+Well, first a large number of DT systems are coming because ACPI is
+simply not ready. Yes, some of the core ACPI support is getting in
+place, but until how to deal with it in drivers is worked out drivers
+are going to use DT. As this thread shows, there is currently nothing
+more than ideas thrown around of how to deal with both.
+
+>> There may even be things which we don't have to deal with at all on ACPI
+>> systems as used in servers (e.g. clock management), but perhaps we will
+>> if people see value in those elements.
+>>
+>>> The server guys really want UEFI for their boot protocols,
+>>> installation managers, etc, etc. That's fine, let them do that, but
+>>> that doesn't mean we need to bring the same APIs all the way into the
+>>> kernel.
+>>>
+>>> So, I'm strongly urging that whatever the server guys try to do, it
+>>> will in the end result in the ACPI data being translated into DT
+>>> equivalents, such that the kernel _only_ needs to handle data via DT.
+>>
+>> I'm not sure that translating ACPI tables to dt makes any sense. If AML
+>> is used (even sparingly), I do not believe that we can do any sensible
+>> conversion to device tree. My understanding is that AML includes
+>> functionality for modifying ACPI tables, and I don't see how we can
+>> possibly support that without having to add a lot of boilerplate to all
+>> the code handling AML to add a device tree backend...
+>
+> AML includes code that is runtime interpreted, for things like power
+> button emulation and the like. You can't just translate this. This comes
+> up every few years - it's impractical. You'll end up having to ship both
+> DTB and ACPI tables for a system. Which means two tables for a platform
+> vendor to get right. You know what will happen - only one table with be
+> correct. Perhaps it seems that it will be the DTB that is more correct,
+> and this might be true this week, but by 2016 I *guarantee* you that the
+> ACPI table will be the one winning.
+
+Perhaps we spend so much pointless effort on ACPI conversion rather
+than areas that really benefit end users that we win the battle and
+lose the war.
+
+Rob
