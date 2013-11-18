@@ -1,48 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Nov 2013 12:23:48 -0700
-Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
-In-Reply-To: <20131118191955.GG10335@titan.lakedaemon.net>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <cover.1384798508.git.jason@lakedaemon.net>
- <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
- <528A65DF.8060000@wwwdotorg.org>
- <20131118191955.GG10335@titan.lakedaemon.net>
-Message-ID: <528A6944.3070303@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 18 Nov 2013 11:25:52 -0800
+Subject: ACPI vs DT at runtime
+In-Reply-To: <5289A4F3.5040203@jonmasters.org>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <5289A356.4060004@jonmasters.org> <5289A4F3.5040203@jonmasters.org>
+Message-ID: <20131118192552.GD5886@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 12:19 PM, Jason Cooper wrote:
-> On Mon, Nov 18, 2013 at 12:09:19PM -0700, Stephen Warren wrote:
->> On 11/18/2013 11:38 AM, Jason Cooper wrote:
->>> Unlike other build products in the Linux kernel, the devicetree blobs
->>> are simply the name of their source file, s/dts/dtb/.  There is also no
->>> 'make *install' mechanism to put them in a standard place with a
->>> standard naming structure.
->>>
->>> Unfortunately, users have begun scripting pulling the needed dtbs from
->>> within the kernel tree, thus hardcoding the dtbs names.  In turn, this
->>> means any changes to the dts filenames breaks these scripts.
->>>
->>> This patch is an attempt to fix this problem.  Akin to 'make install',
->>> this creates a new make target, dtbs_install.  The script that gets
->>> called defers to a vendor or distribution supplied installdtbs binary,
->>> if found in the system.  Otherwise, the default action is to install a
->>> given dtb into
-...
->> This only appears to create ${compat}.dtb, and not ${dtb} too. 
+On Mon, Nov 18, 2013 at 12:26:11AM -0500, Jon Masters wrote:
+> On 11/18/2013 12:19 AM, Jon Masters wrote:
 > 
-> See my comment, above.
+> > It's going to be a messy thing to even attempt. Look, I wish we had a
+> > time machine and could have done this whole thing years ago, but I'm not
+> > sure it would have gone differently. ACPI is something a lot of people
+> > emotionally hate. In the Enterprise space myself and others *need* it
+> > (along with UEFI) to have a scalable solution that doesn't result in an
+> > onslaught of customer support calls, which a non-standards body backed
+> > moving target of DTB will do. And besides all of the big boys are going
+> > to be using ACPI whether it's liked much or not.
 > 
->> So, it doesn't seem to address part of the cover letter, "In addition,
->> some vendors have done a diligent job naming their devicetree source
->> files appropriately and we don't want to break their setups." Was that
->> deliberate? If so, I guess I need to send some patches to U-Boot.
-> 
-> I assume you are still pulling from arch/arm/boot/dts/*.dtb, right?
-> Those build products don't go away with this patch, so you should be
-> fine.  Unless I'm mis-understanding your workflow...
+> A while ago I mentioned producing a series of requirements that
+> articulates what Red Hat thinks an ARMv8 server looks like. Suffice it
+> to say that such requirements do in fact exist, and will be made
+> available in the not too distant future as part of another doc.
 
-Yes, but I thought the whole point of this was that everyone would/could
-switch to running "make dtbs_install", then pulling out the files from
-the install tree, instead of any use-case requiring obtaining files
-directly from the source/build tree?
+It's nice that there's an unpublished document with a RedHat logo on it
+somewhere that mandates what we, the kernel project, is going to do.
+
+I thought both RedHat and you personally knew that we don't do things
+that way in the kernel, Jon. Published or not.
+
+
+-Olof
