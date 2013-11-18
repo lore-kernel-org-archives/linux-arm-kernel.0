@@ -1,30 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Nov 2013 17:38:24 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <528A4F5F.7080104@jonmasters.org>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <3371903.8j54vrCjEN@wuerfel>
- <CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com>
- <201311180945.52764.arnd@arndb.de> <528A4F5F.7080104@jonmasters.org>
-Message-ID: <20131118173823.GJ16735@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Nov 2013 17:32:01 +0000
+Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
+ bit logic defines
+In-Reply-To: <20131118172243.GO2674@sirena.org.uk>
+References: <20131118093229.GB13640@lee--X1>
+ <20131118133940.GC14306@sirena.org.uk>
+ <20131118142447.GJ13640@lee--X1>
+ <20131118144512.GB24408@sirena.org.uk>
+ <20131118145614.GM13640@lee--X1>
+ <20131118151651.GE24408@sirena.org.uk>
+ <20131118153110.GN13640@lee--X1>
+ <20131118154137.GA28334@sirena.org.uk>
+ <20131118160226.GO13640@lee--X1>
+ <20131118172243.GO2674@sirena.org.uk>
+Message-ID: <20131118173201.GP13640@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 12:33:19PM -0500, Jon Masters wrote:
-> In the server space we *never* ship updated ACPI tables in Red Hat
-> products, and we never would ship updated tables as part of the OS.
-> Platform data is platform data. It belongs to the vendor shipping the
-> system, never to the OS. Yes, there are workarounds for bugs but on the
-> whole you do in fact count on server vendors not to screw it up, and if
-> they do then it is up to them to ship a BIOS update for their hardware.
+On Mon, 18 Nov 2013, Mark Brown wrote:
 
-... which is why my nightly autoboot tests regularly fail if I undock
-and redock the laptop, and forget to manually rebind the serial port...
-because the vendor supplied ACPI tables seem to be broken, and there's
-zero interest from the vendor to fix such an issue.
+> On Mon, Nov 18, 2013 at 04:02:26PM +0000, Lee Jones wrote:
+> > On Mon, 18 Nov 2013, Mark Brown wrote:
+> 
+> > > Like I say I'm suggesting that the bit of the code that understands the
+> > > flash chip is separate to the bit of code that knows the mechanics of
+> > > sending commands and data to the chip.
+> 
+> > The issue is that almost the entire driver is controller side. The
+> > only bits that are the same (and not in all cases) are the OPCODEs,
+> > but they are one liners (21 lines out of 1153). Most of the
+> > controllers which use this stuff could reuse quite a bit of the m25p80
+> > driver as they just write the message containing the OPCODE as the
+> > m25p80 driver sets it up, but that's simply not the case with our
+> > controller. We would have to pull the OPCODE out and based on which
+> > one it is, we'd have to build our own message.
+> 
+> OK, so then perhaps the abstraction here is simply to export the table
+> with the opcodes from the m25p80 driver so that when someone comes along
+> and adds a new chip they can just add it there and other drivers will
+> get the update too.
 
-They're certainly not going to fix it based on one report from an
-end user using an obscure operating system which seems not to have
-any support in mainline for such oeprations in any case.
+We could do that, although I'd have to insist on extending the current
+framework to add a configuration call-back, as it's the neatest way to
+configure chip specific attributes.
 
-Linux sucks sometimes - it's not all roses.
+I can get a patch out tomorrow if the MTD guys agree. Where are they
+by the way? I haven't seen hide nor hair of them since sending out the
+patch set.
+
+> > Put it this way, if we tried to use the m25p80 our controller driver
+> > would most likely be twice as large and twice as complex as it is
+> > currently, which is exactly the inverse of what we're trying to
+> > achieve here.
+> 
+> If we're having to add new flashes to multiple drivers I'd not say we're
+> winning.
+
+I agree.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
