@@ -1,28 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 15:00:52 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <5289A356.4060004@jonmasters.org>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <5289A356.4060004@jonmasters.org>
-Message-ID: <20131118150052.GC24408@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Nov 2013 15:04:28 +0000
+Subject: [PATCHv7] dmaengine: Add support for BCM2835
+In-Reply-To: <20131118145400.GE16735@n2100.arm.linux.org.uk>
+References: <5288E327.8050809@koalo.de> <1384768816.14845.186.camel@smile>
+ <528A051A.7000703@koalo.de> <1384785017.14845.214.camel@smile>
+ <20131118145400.GE16735@n2100.arm.linux.org.uk>
+Message-ID: <20131118150428.GK30853@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 12:19:18AM -0500, Jon Masters wrote:
+On Mon, Nov 18, 2013 at 02:54:00PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 18, 2013 at 04:30:17PM +0200, Andy Shevchenko wrote:
+> > On Mon, 2013-11-18 at 13:16 +0100, Florian Meier wrote:
+> > > >> +	uint32_t chans_available;
+> > > > 
+> > > > Why uint32_t?
+> > > 
+> > > Because it is a bit mask of fixed length that directly comes from the
+> > > firmware.
+> > 
+> > Like one already told you in your i2s patch, please, change that to
+> > corresponding u* value, namely u32.
+> 
+> There's no problem with uint32_t vs u32 - either will do.  u32 is the
+> pre-stdint.h Linux definition of a 32-bit unsigned integer.  There's
+> no reason why uint32_t isn't perfectly acceptable.  It's a matter of
+> author taste which gets used.  (Except where modifications are to an
+> existing chunk of code using one or the other - where consistency then
+> matters more.)
 
-> has an API enshrined in stone as far as compatibility. Device Tree is
-> wonderful, anyone can make a binding and use it. Or change the binding
-> in the next kernel release. Or...this doesn't work in the server space.
+Sorry for being a source of confusion here. I won't push this point in
+future.
 
-This isn't really a property of DT, it's a property of the way people
-have been using the DT - people have been running with baked in DTs on
-PowerPC and SPARC systems for quite some time now.  It's not obvious how
-writing the data out in one format rather than another addresses this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/feb59cb5/attachment.sig>
+Thanks,
+Mark.
