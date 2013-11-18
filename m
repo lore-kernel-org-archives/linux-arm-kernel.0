@@ -1,54 +1,69 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 18 Nov 2013 09:39:23 +0100
-Subject: [PATCH 2/9] ARM: at91/dt: add ethernet phy to at91rm9200ek board
-In-Reply-To: <1377687819-10653-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377687819-10653-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <5289D23B.6090101@overkiz.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Nov 2013 17:42:04 +0900
+Subject: [PATCH 0/7] ARM: shmobile: Use interrupt macros in DT files
+In-Reply-To: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131118084204.GD1506@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/2013 13:03, Boris BREZILLON wrote:
-> Add ethernet phy node in at91rm9200ek.dts.
-> The reg register is not specified, as it may differ depending on the init
-> process of the board:
-> ADDR0/1 phy pins are connected to PA13/14 rm9200 pins. Which means the phy
-> will take its address from these pins during the reset process.
->
-> The macb driver will launch a full scan on the mdio bus to discover the phy
-> address.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   arch/arm/boot/dts/at91rm9200ek.dts |    5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-> index d2d72c3..37b0880 100644
-> --- a/arch/arm/boot/dts/at91rm9200ek.dts
-> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
-> @@ -47,6 +47,11 @@
->   			macb0: ethernet at fffbc000 {
->   				phy-mode = "rmii";
->   				status = "okay";
-> +
-> +				phy0: ethernet-phy {
-> +					interrupt-parent = <&pioC>;
-> +					interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+On Sat, Nov 09, 2013 at 01:23:52PM +0100, Laurent Pinchart wrote:
+> Hello,
+> 
+> This patch series replaces all numerical IRQ types by the corresponding
+> IRQ_TYPE_* macros in device tree sources. It starts by switching from
+> /include/ to #include (1/7), replacing numerical types by macros in SoC DT
+> files (2/7) and board DT files (3/7), and fixing several boards that use a
+> defined IRQ type instead of IRQ_TYPE_NONE.
+> 
+> The changes have been tested on the armadillo and marzen boards.
 
-rm9200 pio controller does not support specific edge detection.
-The line above should be replaced with:
-				interrupts = <4 IRQ_TYPE_EDGE_BOTH>;
-or
-				interrupts = <4 0>;
+Hi Laurent,
 
-Nicolas, I know you were planning to push this patch for 3.14.
-If you haven't done it yet (or if you changed your mind), I can send a 
-new version including this fix.
+could you let me know what the status of these patches is.
 
-
-> +				};
->   			};
->
->   			usb1: gadget at fffb0000 {
->
+> 
+> Laurent Pinchart (7):
+>   ARM: shmobile: Use #include in device tree sources
+>   ARM: shmobile: Use interrupt macros in SoC DT files
+>   ARM: shmobile: Use interrupt macros in board DT files
+>   ARM: shmobile: marzen-reference: Use falling edge IRQ for LAN9221
+>   ARM: shmobile: bockw-reference: Use falling edge IRQ for LAN9221
+>   ARM: shmobile: kzm9g-reference: Use falling edge IRQ for LAN9221
+>   ARM: shmobile: armadillo-reference: Use low level IRQ for ST1231
+> 
+>  arch/arm/boot/dts/r7s72100-genmai.dts              |   2 +-
+>  arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    |   2 +-
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts              |   5 +-
+>  arch/arm/boot/dts/r8a73a4.dtsi                     | 108 ++++++++++++-----
+>  .../boot/dts/r8a7740-armadillo800eva-reference.dts |   5 +-
+>  arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |   2 +-
+>  arch/arm/boot/dts/r8a7740.dtsi                     | 106 ++++++++---------
+>  arch/arm/boot/dts/r8a7778-bockw-reference.dts      |   5 +-
+>  arch/arm/boot/dts/r8a7778-bockw.dts                |   2 +-
+>  arch/arm/boot/dts/r8a7778.dtsi                     |  44 +++----
+>  arch/arm/boot/dts/r8a7779-marzen-reference.dts     |   5 +-
+>  arch/arm/boot/dts/r8a7779-marzen.dts               |   2 +-
+>  arch/arm/boot/dts/r8a7779.dtsi                     |  42 +++----
+>  arch/arm/boot/dts/r8a7790-lager-reference.dts      |   2 +-
+>  arch/arm/boot/dts/r8a7790-lager.dts                |   2 +-
+>  arch/arm/boot/dts/r8a7790.dtsi                     |  58 +++++-----
+>  arch/arm/boot/dts/r8a7791-koelsch-reference.dts    |   2 +-
+>  arch/arm/boot/dts/r8a7791-koelsch.dts              |   2 +-
+>  arch/arm/boot/dts/r8a7791.dtsi                     |  49 ++++----
+>  arch/arm/boot/dts/sh7372-mackerel.dts              |   2 +-
+>  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   5 +-
+>  arch/arm/boot/dts/sh73a0-kzm9g.dts                 |   2 +-
+>  arch/arm/boot/dts/sh73a0.dtsi                      | 128 +++++++++++----------
+>  23 files changed, 325 insertions(+), 257 deletions(-)
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
