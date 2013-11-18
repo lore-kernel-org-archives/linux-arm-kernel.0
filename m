@@ -1,104 +1,185 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 18 Nov 2013 13:44:04 +0000
-Subject: [PATCH v2] ARM: signal: fix armv7-m build issue in
- sigreturn_codes.S
-In-Reply-To: <CAA3XUr0D=6Vo--HojBSw_R9ROWH6LqXs3SUSkyu0DszNr-Ev5g@mail.gmail.com>
-References: <1384325867-5140-1-git-send-email-victor.kamensky@linaro.org>
- <20131115190330.GD4028@e103592.cambridge.arm.com>
- <CAA3XUr0D=6Vo--HojBSw_R9ROWH6LqXs3SUSkyu0DszNr-Ev5g@mail.gmail.com>
-Message-ID: <20131118134404.GB2308@e103592.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 Nov 2013 13:46:09 +0000
+Subject: [PATCH V3 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1384780949-10922-3-git-send-email-vkale@apm.com>
+References: <1384780949-10922-1-git-send-email-vkale@apm.com>
+ <1384780949-10922-3-git-send-email-vkale@apm.com>
+Message-ID: <3545e6650079200b6b364df14ef14a4f@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 11:24:17AM -0800, Victor Kamensky wrote:
-> Hi Dave,
-> 
-> Thank you for looking into this.
-> 
-> On 15 November 2013 11:03, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Tue, Nov 12, 2013 at 10:57:46PM -0800, Victor Kamensky wrote:
-> >> Hi,
-> >>
-> >> Here is version 2 of fix to armv7-m build failure in sigreturn_codes.S.
-> >> It is based on Dave's suggestion on [1]. Basically it set
-> >> arch to arm4t explicitly if CONFIG_CPU_THUMBONLY is set.
-> >> That enables both arm and thumb opcodes and code merged with
-> >> the rest of image.
-> >>
-> >> Version 1 [2] used conditional compilation.
-> >>
-> >> Fix was tested
-> >>    linux-next with efm32_defconfig build (along with few other fixes)
-> >>    rmk-next BE/LE arndale build/boot and LTP rt_sigaction0? tests run
-> >>
-> >> Dave, I've added your name with Suggested-by tag, please
-> >> let me know if it is not OK with you, I'll remove it then.
-> >>
-> >> Uwe, is it possible for you to test that this fix runs on
-> >> efm32? Sorry, for multiple requests.
-> >>
-> >> To address concern about fragility of proposed solution
-> >> I looked binutils bfd/elf32-arm.c
-> >>
-> >>   https://sourceware.org/git/?p=binutils.git;a=blob;f=bfd/elf32-arm.c;h=5af1643bf506870e741ee4da7bd645083619e16d;hb=HEAD
-> >>
-> >> Attributes merge deals with couple things:
-> >>
-> >> Tag_CPU_arch: tag_cpu_arch_combine function deals with it
-> >> and from its tables it seems that v4t is compatible with
-> >> any latter version and resulting value will come from
-> >> latter version. I.e v4t and v7 (v7m) would merge fine.
-> >>
-> >> Tag_CPU_arch_profile: since in case of '.arch armv4t'
-> >> profile attribute is not generated it is merged fine
-> >> with any other profile. Unlike in case of
-> >> '.arch armv7a' and '.arch armv7m' profile values would
-> >> be 'Application' and 'Microcontroller' and those
-> >> conflict.
-> >>
-> >> Above logic seems to be universal, so other linkers
-> >> may follow it too. So it seems it is good to use
-> >> '.arch armv4t' with armv7m code.
-> >
-> > [Apologies if you already saw a reply to this.  I was writing one
-> > previously, but I think I never finished it.  Anyway, here it is...]
-> >
-> > After thinking about this, I'm not sure that this logic is really sound.
-> >
-> > By allowing v7M objects to be linked together with ARM objects, ld
-> > creates objects with nonsensical attributes:
-> >
-> > File Attributes
-> >   Tag_CPU_name: "7-M"
-> >   Tag_CPU_arch: v7
-> >   Tag_CPU_arch_profile: Microcontroller
-> >   Tag_ARM_ISA_use: Yes
-> >   Tag_THUMB_ISA_use: Thumb-2
-> >
-> > i.e., a object cannot really be compatible with the microcontroller
-> > profile and also contain ARM instructions.  v7-M is absolutely not a
-> > superset of v4T.
-> >
-> >
-> > So, I think we are getting lucky here, and there's no real reason why
-> > a different linker (or future versions of GNU ld) should allow this.
-> >
-> > The alternative is to use #ifdefs, and replace the ARM instructions and
-> > associates directives with suitable .space directives or nops in the ARM
-> > case.
-> >
-> > This brings us back closer to your original suggestion, I guess.
-> 
-> I am OK with this. What are the next steps then?
-> 
-> Should we continue review of [1]? If you could take a look at would
-> be great. Or should I resubmit the same patches as V3?
-> [1] was already tested on armv7m by Uwe.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210393.html
+Vinayak,
 
-It looks like we'll probably need to go back to something like that.
-I've commented on that thread again with a few new thoughts.
+On 2013-11-18 13:22, Vinayak Kale wrote:
+> Add support for irq registration when pmu interrupt is percpu.
+>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c |  102
+> +++++++++++++++++++++++++++++-----------
+>  1 file changed, 74 insertions(+), 28 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/perf_event.c 
+> b/arch/arm64/kernel/perf_event.c
+> index cea1594..23475f6 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -22,6 +22,7 @@
+>
+>  #include <linux/bitmap.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/export.h>
+>  #include <linux/perf_event.h>
+> @@ -363,22 +364,51 @@ validate_group(struct perf_event *event)
+>  }
+>
+>  static void
+> +armpmu_disable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = data;
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	cpumask_test_and_clear_cpu(smp_processor_id(), 
+> &armpmu->active_irqs);
+> +	disable_percpu_irq(irq);
+> +}
+> +
+> +static void
+>  armpmu_release_hardware(struct arm_pmu *armpmu)
+>  {
+>  	int i, irq, irqs;
+>  	struct platform_device *pmu_device = armpmu->plat_device;
+>
+> -	irqs = min(pmu_device->num_resources, num_possible_cpus());
+> +	irq = platform_get_irq(pmu_device, 0);
+>
+> -	for (i = 0; i < irqs; ++i) {
+> -		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+> -			continue;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq >= 0)
+> -			free_irq(irq, armpmu);
+> +	if (irq_to_desc(irq) && irq_is_percpu(irq)) {
 
-Cheers
----Dave
+Why do you need to check the irq_desc here? It really looks like a 
+misuse of the API.
+Instead, you should check the value of irq itself (it should be 
+strictly positive).
+
+> +		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
+> +		free_percpu_irq(irq, &cpu_hw_events);
+> +	} else {
+> +		irqs = min(pmu_device->num_resources, num_possible_cpus());
+> +
+> +		for (i = 0; i < irqs; ++i) {
+> +			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+> +				continue;
+> +			irq = platform_get_irq(pmu_device, i);
+> +			if (irq >= 0)
+
+irq == 0 means "no-irq". You should handle it as an error case.
+
+> +				free_irq(irq, armpmu);
+> +		}
+>  	}
+>  }
+>
+> +static void
+> +armpmu_enable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = data;
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	enable_percpu_irq(irq, 0);
+> +	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +}
+> +
+>  static int
+>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  {
+> @@ -396,34 +426,50 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  		return -ENODEV;
+>  	}
+>
+> -	for (i = 0; i < irqs; ++i) {
+> -		err = 0;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq < 0)
+> -			continue;
+> +	irq = platform_get_irq(pmu_device, 0);
+>
+> -		/*
+> -		 * If we have a single PMU interrupt that we can't shift,
+> -		 * assume that we're running on a uniprocessor machine and
+> -		 * continue. Otherwise, continue without this interrupt.
+> -		 */
+> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> -				    irq, i);
+> -			continue;
+> -		}
+> +	if (irq_to_desc(irq) && irq_is_percpu(irq)) {
+
+Same comment about irq_to_desc.
+
+> +		err = request_percpu_irq(irq, armpmu->handle_irq,
+> +				"arm-pmu", &cpu_hw_events);
+>
+> -		err = request_irq(irq, armpmu->handle_irq,
+> -				  IRQF_NOBALANCING,
+> -				  "arm-pmu", armpmu);
+>  		if (err) {
+> -			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+> -				irq);
+> +			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
+> +					irq);
+>  			armpmu_release_hardware(armpmu);
+>  			return err;
+>  		}
+>
+> -		cpumask_set_cpu(i, &armpmu->active_irqs);
+> +		on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
+> +	} else {
+> +		for (i = 0; i < irqs; ++i) {
+> +			err = 0;
+> +			irq = platform_get_irq(pmu_device, i);
+> +			if (irq < 0)
+
+Same comment about irq == 0.
+
+> +				continue;
+> +
+> +			/*
+> +			 * If we have a single PMU interrupt that we can't shift,
+> +			 * assume that we're running on a uniprocessor machine and
+> +			 * continue. Otherwise, continue without this interrupt.
+> +			 */
+> +			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> +				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> +						irq, i);
+> +				continue;
+> +			}
+> +
+> +			err = request_irq(irq, armpmu->handle_irq,
+> +					IRQF_NOBALANCING,
+> +					"arm-pmu", armpmu);
+> +			if (err) {
+> +				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+> +						irq);
+> +				armpmu_release_hardware(armpmu);
+> +				return err;
+> +			}
+> +
+> +			cpumask_set_cpu(i, &armpmu->active_irqs);
+> +		}
+>  	}
+>
+>  	return 0;
+
+-- 
+Fast, cheap, reliable. Pick two.
