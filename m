@@ -1,75 +1,43 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 18 Nov 2013 12:59:45 +0000
-Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <52855A23.3050009@gmail.com>
-References: <1383511801-31682-1-git-send-email-robherring2@gmail.com> <
- CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com> <
- 5283DB34.9050301@gmail.com> <201311141332.58498.arnd@arndb.de> <
- CACxGe6uMWjfmB4WDKs+vu05224jqpbDZBHT_ZXnqxw17JzUqvw@mail.gmail.com> <
- 5284E236.1000606@gmail.com> <
- CACxGe6sgRwiakJLUCtaaQ2NF51PpkoNZvZr6EoE-BPeZiDsDFQ@mail.gmail.com> <
- 52855A23.3050009@gmail.com>
-Message-ID: <20131118125945.0F50AC409E3@trevor.secretlab.ca>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 18 Nov 2013 15:06:20 +0200
+Subject: [PATCH 3/5] ARM: OMAP2+: Add DT init code for DPI displays and
+ make omap3 LDP to use it
+In-Reply-To: <1384562167-14725-4-git-send-email-tony@atomide.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-4-git-send-email-tony@atomide.com>
+Message-ID: <528A10CC.7070908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Nov 2013 17:17:55 -0600, Rob Herring <robherring2@gmail.com> wrote:
-> On 11/14/2013 11:16 AM, Grant Likely wrote:
-> > On Thu, Nov 14, 2013 at 11:46 PM, Rob Herring <robherring2@gmail.com> wrote:
-> >> On 11/14/2013 07:33 AM, Grant Likely wrote:
-> >>> On Thu, Nov 14, 2013 at 9:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >>>> On Wednesday 13 November 2013, Rob Herring wrote:
-> >>>>> I'm not inclined to expand cpuinfo and prior attempts to add more info
-> >>>>> to cpuinfo like SoC name have failed. The differences between x86 and
-> >>>>> arm cpuinfo already cause issues for arm. lscpu does not really work on arm.
-> >>>>
-> >>>> Well, they turned into drivers/base/soc.c, which adds the information in
-> >>>> a structured way in sysfs, but is only used on a couple of platforms.
-> >>>>
-> >>>>> I'd actually prefer If you really want more system info, then go read
-> >>>>> /proc/device-tree.
-> >>>
-> >>> I really don't mind pulling that information out of /proc/cpuinfo. My
-> >>> point is merely that it is incredibly useful to be able to easily find
-> >>> out exactly which machine_desc got chosen on any given platform. I
-> >>> don't think I should have to grep the source tree to figure that out.
-> >>>
-> >>> The kernel log is useful, but it is also helpful to have it in a /proc
-> >>> or /sysfs file for when the kernel log overflows. /proc/device-tree
-> >>> doesn't give that information.
-> >>
-> >> Either we want to shrink/remove machine_desc or we don't. If we do, then
-> >> the name has to go at some point. So what is the reason to remove it
-> >> later rather than sooner? Later means we will have "Generic DT based
-> >> system" in cpuinfo as platforms transition. Perhaps that is useful to
-> >> know in the short term, but once all platforms print the same thing the
-> >> information becomes useless. Then we either remove Hardware field from
-> >> cpuinfo or change to use DT info. That's changing the string twice
-> >> rather than once.
-> >>
-> >> We probably have at least a dozen machine_desc's we are close to being
-> >> able to remove (sunxi, picoxcell, highbank, dove, rockchip, virt,
-> >> several sh-mobile). There's also more that probably can be combined
-> >> together which will change the string in /proc/cpuinfo.
-> >>
-> >> If this is a required feature then we should make machine_desc common
-> >> (or at least part of it) with the other arches that have copied arm and
-> >> then add it to arm64 as well. Then I could do further consolidation of
-> >> the FDT machine matching code. Otherwise this is all just pointless
-> >> architecture variation that really has nothing to do with the architecture.
-> > 
-> > I think you are missing my point. go ahead, take it out of
-> > /proc/cpuinfo. That's not the issue.
+On 2013-11-16 02:36, Tony Lindgren wrote:
+> In order to make the remaining omap3 boards usable with device
+> tree, we need to initialize the DPI based displays using pdata
+> until we have the DSS bindings in place.
 > 
-> I understand what you want. I just don't see a solution that satisfies
-> you, Olof, and me. I don't see an easy way to add both strings in a way
-> that is not an ABI, but yet is persistently available. I'm not sure I
-> understand a scenario where you boot successfully enough to read
-> /proc/cpuinfo, /sys or something, but cannot get the kernel log.
+> At least board-am3517evm.c, board-cm-t35.c, board-devkit8000.c,
+> board-ldp.c and board-overo.c all use fairly similar DPI setup,
+> so let's add generic code for it. And let's make omap3 LDP to
+> use it and also initialize the ads7846 until we have a binding
+> for it.
+> 
+> Note that at least LDP needs the TWL bug fix posted as
+> "gpio: twl4030: Fix regression for twl gpio output" for the
+> LCD backlight to power.
 
-Okay, I'm being selfish. When the kernel output overflows the log buf
-then I don't get the machine_desc structure. I won't make a big fuss
-about this if it causes a lot of pain. As long as it shows up in the
-boot log then I'm happy.
+Looks fine to me.
 
-g.
+Is it possible to keep this, and other similar DSS patches, in a
+separate branch, that could be dropped if needed? I'm kind of hoping I
+would get the DSS DT finished for the next merge window (but I've said
+that before, so...).
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/c02ffb77/attachment.sig>
