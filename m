@@ -1,75 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 18 Nov 2013 12:59:40 +0100
-Subject: [PATCH] RFC: framebuffer: provide generic get_fb_unmapped_area
-In-Reply-To: <1384772231-20993-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384772231-20993-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAMuHMdWtrSnTHNN-7GtMWAG9gZ0HJ3ZgVZt6Cfc=q=e-5Sr-Qw@mail.gmail.com>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Mon, 18 Nov 2013 17:36:56 +0530
+Subject: [RFC v2 PATCH 0/1] ARM64: KGDB: Add FPSIMD debug support
+Message-ID: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 11:57 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> This patch makes mmapping the simple-framebuffer device work on a no-MMU
-> ARM target. The code is mostly taken from
-> arch/blackfin/kernel/sys_bfin.c.
->
-> Note this is only tested on this no-MMU machine and I don't know enough
-> about framebuffers and mm to decide if this patch is sane. Also I'm
-> unsure about the size check because it triggers if userspace page aligns
-> the len parameter. (I don't know how usual it is to do, I'd say it's
-> wrong, but my test program (fbtest by Geert Uytterhoeven) does it.)
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-It's quite common: the granularity of mmap() is PAGE_SIZE, i.e. if you
-try to map a partial page, you'll get access to the full page anyway
-(with MMU; without MMU, you can access everything anyway).
-Fbtest always mmap()s the full (page aligned) smem_len.
+Based on ARM64 KGDB support patches, KGDB support for
+FPSIMD is added. Only debugging of FPSIMD kernel context
+is supported.
 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/video/fbmem.c | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/video/fbmem.c b/drivers/video/fbmem.c
-> index dacaf74..70b328c 100644
-> --- a/drivers/video/fbmem.c
-> +++ b/drivers/video/fbmem.c
-> @@ -1483,6 +1483,24 @@ __releases(&info->lock)
->         return 0;
->  }
->
-> +#ifdef HAVE_ARCH_FB_UNMAPPED_AREA
-> +#define fb_get_unmapped_area get_fb_unmapped_area
-> +#else
-> +unsigned long fb_get_unmapped_area(struct file *filp, unsigned long orig_addr,
-> +               unsigned long len, unsigned long pgoff, unsigned long flags)
-> +{
-> +       struct fb_info * const info = filp->private_data;
-> +       unsigned long screen_size = info->screen_size ?: info->fix.smem_len;
+This patch requires Ard's patches where in kernel support and
+below patch for holding thread's fpsimd state.
 
-Why restrict this to screen_size? Fbtest will map the whole frame buffer memory.
+http://permalink.gmane.org/gmane.linux.ports.arm.kernel/277228
 
-Typically screen_size is not a multiple of PAGE_SIZE, so this is another
-reason why your size check fails.
+So CONFIG_KERNEL_MODE_NEON should  be enabled.
+with this, FPSIMD registers can be viewed or set from gdb tool.
 
-> +       if (len > screen_size) {
-> +               pr_info("%lu > %lu (%lu, %lu)\n", len, screen_size, info->screen_size, info->fix.smem_len);
-> +               return -EINVAL;
-> +       }
-> +
-> +       return (unsigned long)info->screen_base;
+Unlike CPU registers, the FPSIMD registers are not saved on
+exception entry. With the known restriction that FPSIMD  should not be
+touched in interrupt/exception context, in this patch the FPSIMD
+registers are directly read/written on gdb tool request
 
-Shouldn't you take into account pgoff?
+Here, the FPSIMD registers are read and restored for every FPSIMD
+register read and write by GDB tool. So this has impact on
+gdb tool response which is neglible. Other architectures like
+mips are also implemented similarly
 
-> +}
-> +#endif
+v2 changes:
+  - Added API to know thread fpsimd state by checking
+    TIF_FOREIGN_FPSTATE flag. This is based on below patch
 
-Gr{oetje,eeting}s,
+    http://permalink.gmane.org/gmane.linux.ports.arm.kernel/277228
 
-                        Geert
+  - Allow FPSIMD registers access only when FPSIMD is under use
+    by current thread 
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+v1 changes: 
+  - Initial patch
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Tested on ARM64 simulator
+
+Vijaya Kumar K (1):
+  ARM64: KGDB: Add FP/SIMD debug support
+
+ arch/arm64/include/asm/fpsimd.h |    1 +
+ arch/arm64/kernel/fpsimd.c      |    5 ++
+ arch/arm64/kernel/kgdb.c        |  105 +++++++++++++++++++++++++--------------
+ 3 files changed, 73 insertions(+), 38 deletions(-)
+
+-- 
+1.7.9.5
