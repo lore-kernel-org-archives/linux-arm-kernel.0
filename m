@@ -1,107 +1,85 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Nov 2013 10:47:24 -0800
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
- device id
-In-Reply-To: <1384396537-3486-3-git-send-email-tony@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-3-git-send-email-tony@atomide.com>
-Message-ID: <20131118184723.GR10317@atomide.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Mon, 18 Nov 2013 11:47:23 -0700
+Subject: [PATCH 1/5] ahci: imx: Pull out the clock enable/disable calls
+In-Reply-To: <1384651251-5548-1-git-send-email-marex@denx.de>
+References: <1384651251-5548-1-git-send-email-marex@denx.de>
+Message-ID: <528A60BB.4010802@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131113 18:36]:
-> We are wrongly relying on device id for the DMA configuration
-> which can lead to wrong DMA channel being selected.
-> 
-> Fix the issue by using the standard resources like we should.
-> 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
-> 
-> If this looks OK, I'd like to merge this as a fix via arm-soc tree
-> along with the other patches in this series as my later patches
-> depend on patches in this series.
+Hi Marek,
 
-Looks like we need sig initialized in this patch to avoid some
-uninitialized warnings.
+On 11/16/2013 06:20 PM, Marek Vasut wrote:
+> The same code for enabling and disabling SATA clock was found in multiple
+> places in the driver. Implement functions that enable/disable the SATA clock
+> and use them in such places instead of duplicating the code.
+>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Linux-IDE <linux-ide@vger.kernel.org>
+> ---
+>   drivers/ata/ahci_imx.c | 133 ++++++++++++++++++++++++++++---------------------
+>   1 file changed, 75 insertions(+), 58 deletions(-)
+>
+> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+> index ae2d73f..c7ee505 100644
+> --- a/drivers/ata/ahci_imx.c
+> +++ b/drivers/ata/ahci_imx.c
+> @@ -47,6 +47,73 @@ static int ahci_imx_hotplug;
+>   module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
+>   MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support)");
+>
+> <snip>
+ >
+
+I haven't traced through all of this, but if you're copying from
+the Freescale 3.0.35 kernel, note that there's a bug in it, and
+the 0x7FFFFFFD really wanted to be an 0x7FFFFFFF.
+
+The way I read this comment, the writes need to happen in two
+steps:
+	- write everything with the PHY disabled
+	- enable the PHY
+
+We had reports of stalls waiting for SATA drives to be enumerated
+that were solved with this commit...
+
+	https://github.com/boundarydevices/linux-imx6/commit/0186ea224ce6bd1cb4757a0f83b0090e26a021f4
+
+> +	/*
+> +	 * set PHY Paremeters, two steps to configure the GPR13,
+> +	 * one write for rest of parameters, mask of first write
+> +	 * is 0x07fffffd, and the other one write for setting
+> +	 * the mpll_clk_en.
+> +	 */
+> +	if (config) {
+> +		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+> +				IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
+> +				| IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK
+> +				| IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK
+> +				| IMX6Q_GPR13_SATA_SPD_MODE_MASK
+> +				| IMX6Q_GPR13_SATA_MPLL_SS_EN
+> +				| IMX6Q_GPR13_SATA_TX_ATTEN_MASK
+> +				| IMX6Q_GPR13_SATA_TX_BOOST_MASK
+> +				| IMX6Q_GPR13_SATA_TX_LVL_MASK
+> +				| IMX6Q_GPR13_SATA_TX_EDGE_RATE
+> +				, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
+> +				| IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M
+> +				| IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F
+> +				| IMX6Q_GPR13_SATA_SPD_MODE_3P0G
+> +				| IMX6Q_GPR13_SATA_MPLL_SS_EN
+> +				| IMX6Q_GPR13_SATA_TX_ATTEN_9_16
+> +				| IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB
+> +				| IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
+> +	}
+> +	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+> +			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+> +			IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+> +
 
 Regards,
 
-Tony
 
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 14 Nov 2013 15:25:06 -0800
-Subject: [PATCH] mmc: omap: Fix DMA configuration to not rely on device id
-
-We are wrongly relying on device id for the DMA configuration
-which can lead to wrong DMA channel being selected.
-
-Fix the issue by using the standard resources like we should.
-
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/mmc/host/omap.c
-+++ b/drivers/mmc/host/omap.c
-@@ -90,17 +90,6 @@
- #define OMAP_MMC_CMDTYPE_AC	2
- #define OMAP_MMC_CMDTYPE_ADTC	3
- 
--#define OMAP_DMA_MMC_TX		21
--#define OMAP_DMA_MMC_RX		22
--#define OMAP_DMA_MMC2_TX	54
--#define OMAP_DMA_MMC2_RX	55
--
--#define OMAP24XX_DMA_MMC2_TX	47
--#define OMAP24XX_DMA_MMC2_RX	48
--#define OMAP24XX_DMA_MMC1_TX	61
--#define OMAP24XX_DMA_MMC1_RX	62
--
--
- #define DRIVER_NAME "mmci-omap"
- 
- /* Specifies how often in millisecs to poll for card status changes
-@@ -1331,7 +1320,7 @@ static int mmc_omap_probe(struct platform_device *pdev)
- 	struct mmc_omap_host *host = NULL;
- 	struct resource *res;
- 	dma_cap_mask_t mask;
--	unsigned sig;
-+	unsigned sig = 0;
- 	int i, ret = 0;
- 	int irq;
- 
-@@ -1408,19 +1397,20 @@ static int mmc_omap_probe(struct platform_device *pdev)
- 	host->dma_tx_burst = -1;
- 	host->dma_rx_burst = -1;
- 
--	if (mmc_omap2())
--		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX : OMAP24XX_DMA_MMC2_TX;
--	else
--		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
--	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
-+	if (res)
-+		sig = res->start;
-+	host->dma_tx = dma_request_slave_channel_compat(mask,
-+				omap_dma_filter_fn, &sig, &pdev->dev, "tx");
- 	if (!host->dma_tx)
- 		dev_warn(host->dev, "unable to obtain TX DMA engine channel %u\n",
- 			sig);
--	if (mmc_omap2())
--		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_RX : OMAP24XX_DMA_MMC2_RX;
--	else
--		sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
--	host->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
-+	if (res)
-+		sig = res->start;
-+	host->dma_rx = dma_request_slave_channel_compat(mask,
-+				omap_dma_filter_fn, &sig, &pdev->dev, "rx");
- 	if (!host->dma_rx)
- 		dev_warn(host->dev, "unable to obtain RX DMA engine channel %u\n",
- 			sig);
+Eric
