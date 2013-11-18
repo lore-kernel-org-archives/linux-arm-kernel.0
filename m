@@ -1,54 +1,73 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 18 Nov 2013 11:26:01 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <20131117141940.GA18569@1wt.eu>
-References: <8761s0cqhh.fsf@natisbad.org>
- <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
- <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
- <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
- <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
- <20131117141940.GA18569@1wt.eu>
-Message-ID: <20131118112601.65feb708@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Nov 2013 10:29:07 +0000
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
+ device tree case
+In-Reply-To: <1384562167-14725-2-git-send-email-tony@atomide.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-2-git-send-email-tony@atomide.com>
+Message-ID: <20131118102907.GC13640@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Willy, All,
+> Since we still need to rely on a mix of device tree initialized
+> drivers and legacy platform data initialize drivers, let's fix
+> the passing of platform data to twl4030-gpio.
+> 
+> As the twl4030 GPIO is initialized by twl-core.c, we need to register
+> the auxdata for twl4030 GPIO in twl-core.c.
+> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+> 
+> Samuel & Lee, I'd like to merge this fix via arm-soc tree if this looks
+> OK to you as I have other patches that depend on this.
+> 
+> ---
+>  drivers/mfd/twl-core.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index 29473c2..d5b3dd8 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -1133,6 +1133,11 @@ static int twl_remove(struct i2c_client *client)
+>  	return 0;
+>  }
+>  
+> +static struct of_dev_auxdata twl_auxdata_lookup[] = {
+> +	OF_DEV_AUXDATA("ti,twl4030-gpio", 0, "twl4030-gpio", NULL),
+> +	{ /* sentinel */ },
+> +};
+> +
+>  /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
+>  static int
+>  twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> @@ -1271,10 +1276,14 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+>  	}
+>  
+> -	if (node)
+> -		status = of_platform_populate(node, NULL, NULL, &client->dev);
+> -	else
+> +	if (node) {
+> +		if (pdata)
+> +			twl_auxdata_lookup[0].platform_data = pdata->gpio;
+> +		status = of_platform_populate(node, NULL, twl_auxdata_lookup,
+> +					      &client->dev);
+> +	} else {
+>  		status = add_children(pdata, irq_base, id->driver_data);
 
-On Sun, 17 Nov 2013 15:19:40 +0100, Willy Tarreau wrote:
+Why doesn't the TWL driver use the MFD framework for this stuff?
 
-> On Wed, Nov 13, 2013 at 08:22:57AM +0100, Willy Tarreau wrote:
-> > On Tue, Nov 12, 2013 at 04:34:24PM +0100, Arnaud Ebalard wrote:
-> > > Can you give a pre-3.11.7 kernel a try if you find the time? I
-> > > started working on RN102 during 3.10-rc cycle but do not remember
-> > > if I did the first preformance tests on 3.10 or 3.11. And if you
-> > > find more time, 3.11.7 would be nice too ;-)
-> > 
-> > Still have not found time for this but I observed something
-> > intriguing which might possibly match your experience : if I use
-> > large enough send buffers on the mirabox and receive buffers on the
-> > client, then the traffic drops for objects larger than 1 MB. I have
-> > quickly checked what's happening and it's just that there are
-> > pauses of up to 8 ms between some packets when the TCP send window
-> > grows larger than about 200 kB. And since there are no drops, there
-> > is no reason for the window to shrink. I suspect it's exactly
-> > related to the issue explained by Eric about the timer used to
-> > recycle the Tx descriptors. However last time I checked, these ones
-> > were also processed in the Rx path, which means that the ACKs that
-> > flow back should have had the same effect as a Tx IRQ (unless I'd
-> > use asymmetric routing, which was not the case). So there might be
-> > another issue. Ah, and it only happens with GSO.
+> +	}
+>  
+>  fail:
+>  	if (status < 0)
 
-I haven't read the entire discussion yet, but do you guys have
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/mvebu?id=1022c75f5abd3a3b25e679bc8793d21bedd009b4
-applied? It got merged recently, and it fixes a number of networking
-problems on Armada 370.
-
-I've added Simon Guinot in Cc, who is the author of this patch.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
