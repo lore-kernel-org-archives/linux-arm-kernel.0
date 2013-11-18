@@ -1,37 +1,28 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Nov 2013 15:30:43 +0100
-Subject: [PATCH V2 5/5] ARM: dts: imx53: Enable AHCI SATA for M53EVK
-In-Reply-To: <1384785043-5027-1-git-send-email-marex@denx.de>
-References: <1384785043-5027-1-git-send-email-marex@denx.de>
-Message-ID: <1384785043-5027-5-git-send-email-marex@denx.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 18 Nov 2013 06:31:58 -0800
+Subject: Fwd: [PATCH 1/8] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <5289FE60.2040207@ti.com>
+References: <1383680783-12114-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <527A287C.2090401@ti.com> <5287D5A7.7060702@roeck-us.net>
+ <5289FE60.2040207@ti.com>
+Message-ID: <528A24DE.1010507@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Linux-IDE <linux-ide@vger.kernel.org>
----
- arch/arm/boot/dts/imx53-m53evk.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+On 11/18/2013 03:47 AM, ivan.khoronzhuk wrote:
 
-V2: Reference sata like other devices.
+>>>    MODULE_LICENSE("GPL");
+>>> -MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+>>>    MODULE_ALIAS("platform:watchdog");
+>>>
+>> You might want to rename the platform driver to something like
+>> davinci-wdt and change the MODULE_ALIAS
+>> accordingly.
+>>
+>
+> Yes, it could be changed but not in this patch.
+>
+Seems to me this would be the perfect time to change it, as you switch to use
+the watchdog core which permits more than one active watchdog in the system.
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 7a006cb..c623774 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -315,6 +315,10 @@
- 	status = "okay";
- };
- 
-+&sata {
-+	status = "okay";
-+};
-+
- &ssi2 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
--- 
-1.8.4.2
+Guenter
