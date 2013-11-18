@@ -1,47 +1,63 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 18 Nov 2013 12:06:18 -0800
-Subject: [PATCH] Documentation/Changes: update binutils version requirement
- for ARMv7 builds
-In-Reply-To: <1384714221.1974.276@driftwood>
-References: <1384714221.1974.276@driftwood>
-Message-ID: <528A733A.6040304@nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 18 Nov 2013 15:24:33 -0500
+Subject: [RFC PATCH V2 1/2] dtc: add 'compat' output option, prints
+ board string
+In-Reply-To: <528A63EE.8050401@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <cover.1384798508.git.jason@lakedaemon.net>
+ <728deb9bbeab491a728da077aa5e47c0e01bccf8.1384798508.git.jason@lakedaemon.net>
+ <528A63EE.8050401@wwwdotorg.org>
+Message-ID: <20131118202433.GK10335@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, Nov 18, 2013 at 12:01:02PM -0700, Stephen Warren wrote:
+> On 11/18/2013 11:38 AM, Jason Cooper wrote:
+> > Consumers of the Linux kernel's build products are beginning to hardcode
+> > the filenames of the dtbs generated.  Since the dtb filenames are
+> > currently the dts filename s/dts/dtb/, this prevents the kernel
+> > community from renaming dts files as needed.
+> > 
+> > Let's provide a consistent naming structure for consumers to script
+> > against.  Or at least, as consistent as the dts properties themselves.
+> > 
+> > With this patch, adding the '-O compat' option to the dtc commandline
+> > will cause dtc to parse the provided file, and print out the board
+> > compatible string to stdout.
+> > 
+> > This will facilitate an 'installdtbs.sh' script in the kernel for naming
+> > dtb files by their compatible string, eg:
+> > 
+> > $ dtc -I dtb -O compat arch/arm/boot/dts/armada-370-mirabox.dtb
+> > globalscale,mirabox
+> > 
+> > This change will also simplify distribution install scripts that need to
+> > search through many dtbs to find the right one for a target board.
+> > 
+> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> > ---
+> > changes since v1:
+> >  - made patch against in-tree dtc code to facilitate testing
+> 
+> I assume this patch would first get applied to the upstream dtc, then
+> back-ported into the kernel though?
+> 
+> I wonder if dtc is the correct place to put this feature at all though.
+> It seems like a tiny standalone utility using libfdt would be better.
+> Actually, perhaps the existing fdtget utility (which seems to be
+> scripts/dtc/fdtget.c in the kernel although I don't know if it's built
+> by the kernel yet) can be used rather than creating a new one? Using
+> fdtget seems like it'd allow more flexibility later, if the naming rules
+> change, via scripting rather than having to edit the dtc source code.
 
-On 11/17/2013 10:50 AM, Rob Landley wrote:
-> On 10/30/2013 11:27:07 AM, Paul Walmsley wrote:
->> ARMv7 builds now make use of the pldw opcode and the ".arch_extension
->> mp"
->> pragma.  These aren't supported in binutils prior to 2.21.  So, update
->> Documentation/Changes accordingly.
-> Annotating the global Documentation/Changes with every per-arch
-> requirement... not sure that's the right place for it.
+yep, just tested it.  It was easier to build fdtget in the dtc source
+tree, but the result was suitable:
 
-It doesn't matter to me where it's documented in the kernel 
-documentation, but we should document it.
+$ ./fdtget ../linux/arch/arm/boot/dts/armada-370-mirabox.dtb / compatible
+globalscale,mirabox marvell,armada370 marvell,armada-370-xp
 
-And we should expect folks who post patches with new toolchain 
-constraints to also send patches for that documentation...
+Thanks for the pointer.
 
-> Noting armv7 requirements in
-> an arm-specific file makes sense. Annotating the top level one raises
-> the question of why not to do that for arc, unicore, openrisc, tile...
+thx,
 
-Yes - it's the following x86-specific text in Documentation/Changes that 
-inspired the patch:
-
------
-Linux on IA-32 has recently switched from using as86 to using gas for
-assembling the 16-bit boot code, removing the need for as86 to compile
-your kernel.  This change does, however, mean that you need a recent
-release of binutils.
------
-
-But we can move that to Documentation/x86/ also.
-
-
-regards,
-
-- Paul
+Jason.
