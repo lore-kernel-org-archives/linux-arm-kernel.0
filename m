@@ -1,84 +1,60 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 18 Nov 2013 18:28:05 +0200
-Subject: Fwd: [PATCH 4/8] watchdog: davinci: add GET_STATUS option support
-In-Reply-To: <20131118162426.GA15610@roeck-us.net>
-References: <1383680783-12114-5-git-send-email-ivan.khoronzhuk@ti.com>
- <527A28CE.2070802@ti.com> <528828E7.6060404@roeck-us.net>
- <528A2252.7040605@ti.com> <20131118162426.GA15610@roeck-us.net>
-Message-ID: <528A4015.5040405@ti.com>
+From: stephen@networkplumber.org (Stephen Hemminger)
+Date: Mon, 18 Nov 2013 08:54:07 -0800
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <20131118104448.GI16823@kw.sim.vm.gnt>
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
+ <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
+ <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
+ <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu> <20131118112601.65feb708@skate>
+ <20131118104448.GI16823@kw.sim.vm.gnt>
+Message-ID: <20131118085407.25dadcaf@samsung-9>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 06:24 PM, Guenter Roeck wrote:
-> On Mon, Nov 18, 2013 at 04:21:06PM +0200, ivan.khoronzhuk wrote:
->> On 11/17/2013 04:24 AM, Guenter Roeck wrote:
->>> On 11/06/2013 03:32 AM, ivan.khoronzhuk wrote:
->>>> When watchdog timer is expired we can know about it thought
->>>
->>> thought -> through or with
->>>
->>
->> Ok
->>
->>>> GET_STATUS ioctl option.
->>>>
->>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>> ---
->>>>    drivers/watchdog/davinci_wdt.c |   13 +++++++++++++
->>>>    1 file changed, 13 insertions(+)
->>>>
->>>> diff --git a/drivers/watchdog/davinci_wdt.c
->>>> b/drivers/watchdog/davinci_wdt.c
->>>> index 6cbf2e1..a371b2d 100644
->>>> --- a/drivers/watchdog/davinci_wdt.c
->>>> +++ b/drivers/watchdog/davinci_wdt.c
->>>> @@ -144,6 +144,18 @@ static unsigned int
->>>> davinci_wdt_get_timeleft(struct watchdog_device *wdd)
->>>>        return wdd->timeout - timer_counter;
->>>>    }
->>>>
->>>> +static unsigned int davinci_wdt_status(struct watchdog_device *wdd)
->>>> +{
->>>> +    u32 val;
->>>> +    struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
->>>> +
->>>> +    val = ioread32(davinci_wdt->base + WDTCR);
->>>> +    if (val & WDFLAG)
->>>> +        return WDIOF_CARDRESET;
->>>> +
->>>       "Card previously reset the CPU"
->>>
->>> Is this really accurate / correct ?
->>>
->>> My understanding is that the status is supposed to return the reason for
->>> a previous reset/reboot,
->>> not the curent condition.
->>>
->>
->> Actually it is not so good correlate with the purpose, but I grasped
->> several examples like watchdog/pcwd.c; watchdog/w83977f_wdt.c;
->> watchdog/of_xilinx_wdt.c and saw that I can use it in meaning "the card initiated reset.
->> After the WDT is overflowed it sets WDFLAG, so I can use it.
->> It is more useful while debugging and if it is doubtful I can drop it.
->>
-> The usual reaction to a watchdog timer event is a reset, so I am somewhat
-> doubtful if this is of any use in practice, other than maybe to show that it
-> isn't working.
->
-> Anyway, I always dislike it when people point out other wrong usages of an API
-> (or anything, really) as argument to do the same. Speeding isn't legal either,
-> no matter how many people do it. FWIW, the wrong usages you pointed out should
-> in my opinion be removed, and if Wim agrees I'll be happy to submit patches to
-> do it.
->
-> If you need debugging information, there is always debugfs. There should be
-> no need to hijack an API which is supposed to be used for something else.
->
-> Guenter
->
+On Mon, 18 Nov 2013 11:44:48 +0100
+Simon Guinot <simon.guinot@sequanux.org> wrote:
 
-I'll drop it
+> On Mon, Nov 18, 2013 at 11:26:01AM +0100, Thomas Petazzoni wrote:
+> > Willy, All,
+> > 
+> > On Sun, 17 Nov 2013 15:19:40 +0100, Willy Tarreau wrote:
+> > 
+> > > On Wed, Nov 13, 2013 at 08:22:57AM +0100, Willy Tarreau wrote:
+> > > > On Tue, Nov 12, 2013 at 04:34:24PM +0100, Arnaud Ebalard wrote:
+> > > > > Can you give a pre-3.11.7 kernel a try if you find the time? I
+> > > > > started working on RN102 during 3.10-rc cycle but do not remember
+> > > > > if I did the first preformance tests on 3.10 or 3.11. And if you
+> > > > > find more time, 3.11.7 would be nice too ;-)
+> > > > 
+> > > > Still have not found time for this but I observed something
+> > > > intriguing which might possibly match your experience : if I use
+> > > > large enough send buffers on the mirabox and receive buffers on the
+> > > > client, then the traffic drops for objects larger than 1 MB. I have
+> > > > quickly checked what's happening and it's just that there are
+> > > > pauses of up to 8 ms between some packets when the TCP send window
+> > > > grows larger than about 200 kB. And since there are no drops, there
+> > > > is no reason for the window to shrink. I suspect it's exactly
+> > > > related to the issue explained by Eric about the timer used to
+> > > > recycle the Tx descriptors. However last time I checked, these ones
+> > > > were also processed in the Rx path, which means that the ACKs that
+> > > > flow back should have had the same effect as a Tx IRQ (unless I'd
+> > > > use asymmetric routing, which was not the case). So there might be
+> > > > another issue. Ah, and it only happens with GSO.
+> > 
+> > I haven't read the entire discussion yet, but do you guys have
+> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/mvebu?id=1022c75f5abd3a3b25e679bc8793d21bedd009b4
+> > applied? It got merged recently, and it fixes a number of networking
+> > problems on Armada 370.
+> > 
+> > I've added Simon Guinot in Cc, who is the author of this patch.
+> 
+> I don't think it is related. We also have noticed a huge performance
+> regression. Reverting the following patch restores the rate:
+> 
+> c9eeec26 tcp: TSQ can use a dynamic limit
+> 
 
--- 
-Regards,
-Ivan Khoronzhuk
+But without that patch there was a performance regression for high speed
+interfaces whihc was caused by TSQ. 10G performance dropped to 8G
