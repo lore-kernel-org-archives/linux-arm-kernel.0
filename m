@@ -1,34 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 18:37:16 +0000
-Subject: [PATCH 16/31] ASoC: tegra: use reset framework
-In-Reply-To: <528A4C8C.3030200@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-17-git-send-email-swarren@wwwdotorg.org>
- <20131116095529.GF15393@sirena.org.uk>
- <528A4C8C.3030200@wwwdotorg.org>
-Message-ID: <20131118183716.GR2674@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 18 Nov 2013 18:38:13 +0000
+Subject: [RFC PATCH V2 0/2] Add 'make dtbs_install'
+In-Reply-To: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <cover.1384798508.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 10:21:16AM -0700, Stephen Warren wrote:
+Detailed changelog can be found in each patch.
 
-> It's fixing a dependency that should already be there, in the
-> COMPILE_TEST case. In the (ARCH_TEGRA && TEGRA20_APB_DMA) case,
-> COMMON_CLOCK is always selected.
+The kernel community never created a 'dtbs_install' make target for properly
+handling the build output of the kernel's devicetree files.  Currently, the dtb
+files are simply their source file, s/dts/dtb/.  Users have recently begun
+retrieving these files from inside the kernel tree.  Any change to the dts
+filenames breaks the scripts of those users.
 
-> Do you want me to split this out into a separate patch? If so, I'd
-> prefer not to apply that separate patch immediately to 3.13 as a fix,
-> since then it'd delay applying this series until after -rc2 is out,
-> unless you can get the fix into -rc1 quickly...
+Before this gets too far along, we'd like to create a standardized method of
+installing the dtb files for users to find and use.  In addition, some vendors
+have done a diligent job naming their devicetree source files appropriately and
+we don't want to break their setups.
 
-I don't really care, it was just that I was looking for something to do
-with clocks in the patch and couldn't find anything.  Perhaps a note in
-the changelog if you need to respin so I don't forget and say the same
-thing again.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/7ea8100b/attachment.sig>
+This patch series solves both problems by creating a dtbs_install make target
+which calls arch/arm/boot/installdtbs.sh.  If /sbin/installdtbs or
+~/bin/installdtbs is present, they will be run instead of the default behavior.
+
+The default action is to install a given dtb to
+
+  /lib/modules/${kernel_version}/devicetree/${board_compatible}.dtb
+
+Ideally, the devicetree file should be independent of the kernel version,
+however, we aren't there yet.  So, while the devicetree files live in the
+kernel source tree, we'll install them as above.  Once they are in their own
+repository, this install target can be removed, and users can adjust their
+workflow to getting the dtbs from a new location.
+
+Jason Cooper (2):
+  dtc: add 'compat' output option, prints board string
+  kbuild: dtbs_install: new make target
+
+ Makefile                     |  3 ++-
+ arch/arm/Makefile            |  4 ++++
+ arch/arm/boot/installdtbs.sh | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ scripts/dtc/dtc.c            |  3 +++
+ scripts/dtc/dtc.h            |  1 +
+ scripts/dtc/flattree.c       |  9 +++++++++
+ 6 files changed, 63 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/installdtbs.sh
+
+-- 
+1.8.4.3
