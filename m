@@ -1,23 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Nov 2013 10:48:45 +0000
-Subject: [PATCH 1/3] arm: delete __cpuinit/__CPUINIT usage from all ARM
- users
-In-Reply-To: <1384771703-25741-2-git-send-email-francesco.virlinzi@st.com>
-References: <1384771703-25741-1-git-send-email-francesco.virlinzi@st.com>
- <1384771703-25741-2-git-send-email-francesco.virlinzi@st.com>
-Message-ID: <20131118104845.GY16735@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Nov 2013 11:49:37 +0100
+Subject: [PATCH] MAINTAINERS: Add maintainer for the ARM Ux500 clock driver
+In-Reply-To: <1384252872-5717-1-git-send-email-ulf.hansson@linaro.org>
+References: <1384252872-5717-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdbQ5tCih0C01yKZ1N7KnJYE0EG-szFH-2JOF21uGom98Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 11:48:21AM +0100, Francesco VIRLINZI wrote:
->  arch/arm/common/mcpm_platsmp.c       |   84 +++++++++
->  arch/arm/include/asm/arch_timer.h    |  105 +++++++++++
+On Tue, Nov 12, 2013 at 11:41 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  MAINTAINERS |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-I hope this isn't an indication of the quality of the ST Linux tree -
-where patches are badly backported to some previous kernel version
-without understanding what a delete/modify conflict actually is.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Several of the "new files" you introduce here are irrelevant to this
-change, because they didn't exist when the change was made.  If they
-don't exist, then they don't need to be patched, and so they shouldn't
-be created by the patch!
+Mike: I assume you will take this patch?
+
+Yours,
+Linus Walleij
