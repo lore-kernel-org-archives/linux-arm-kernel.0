@@ -1,34 +1,32 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 18 Nov 2013 10:09:53 -0000
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <20131117141940.GA18569@1wt.eu>
-References: <8761s0cqhh.fsf@natisbad.org>
- <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> <87y54u59zq.fsf@natisbad.org>
- <20131112083633.GB10318@1wt.eu> <87a9hagex1.fsf@natisbad.org>
- <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
- <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B742A@saturn3.aculab.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Nov 2013 11:23:42 +0100
+Subject: [PATCH 2/2] ARM: pxa: delete the custom GPIO header
+In-Reply-To: <20131115124522.GA1913@n2100.arm.linux.org.uk>
+References: <1380183077-27407-1-git-send-email-linus.walleij@linaro.org>
+ <20131115124522.GA1913@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkda72DWkRctD2cBEZWdewpoz3DnXPeA=znNcswJVCcJTpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I wonder if we can call mvneta_txq_done() from the IRQ handler, which would
-> cause some recycling of the Tx descriptors when receiving the corresponding
-> ACKs.
-> 
-> Ideally we should enable the Tx IRQ, but I still have no access to this
-> chip's datasheet despite having asked Marvell several times in one year
-> (Thomas has it though).
-> 
-> So it is fairly possible that in your case you can't fill the link if you
-> consume too many descriptors. For example, if your server uses TCP_NODELAY
-> and sends incomplete segments (which is quite common), it's very easy to
-> run out of descriptors before the link is full.
+On Fri, Nov 15, 2013 at 1:45 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Sep 26, 2013 at 10:11:17AM +0200, Linus Walleij wrote:
+>> The PXA sub-architecture appears to have a custom <mach/gpio.h>
+>> for no reason whatsoever. The file became completely empty
+>> after Haojian removed the remaining content in
+>> commit 157d2644cb0c1e71a18baaffca56d2b1d0ebf10f
+>> "ARM: pxa: change gpio to platform device".
+>>
+>> That commit added these two lines:
+>>
+>> However it seems like deleting the file has no effect
+>> whatsoever on the kernel compilation.
+>
+> This has broken pxa25x_udc - it seems that it was using this path to get
+> hold of mach/hardware.h, and now that it doesn't have that, it gets lots
+> of build errors.
 
-Or you have a significant number of active tcp connections.
+OK I'm onto it.
 
-Even if there were no requirement to free the skb quickly you still
-need to take a 'tx done' interrupt when the link is transmit rate limited.
-There are scenarios when there is no receive traffic - eg asymmetric
-routing, but testable with netperf UDP transmits.
-
-	David
+Yours,
+Linus Walleij
