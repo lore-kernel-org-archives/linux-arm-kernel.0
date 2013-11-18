@@ -1,39 +1,45 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Mon, 18 Nov 2013 13:07:12 -0500
-Subject: [PATCHv2 3/8] ARM: dts: Enables SAI ALSA SoC DAI device for
- Vybrid VF610 TOWER board.
-In-Reply-To: <1383289495-24523-4-git-send-email-Li.Xiubo@freescale.com> (Xiubo
- Li's message of "Fri, 1 Nov 2013 15:04:50 +0800")
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-4-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <87bo1hk2i7.fsf@nbsps.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Nov 2013 10:19:34 -0800
+Subject: [PATCH 3/5] ARM: OMAP2+: Add DT init code for DPI displays and
+ make omap3 LDP to use it
+In-Reply-To: <528A10CC.7070908@ti.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-4-git-send-email-tony@atomide.com>
+ <528A10CC.7070908@ti.com>
+Message-ID: <20131118181934.GN10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On  1 Nov 2013, Li.Xiubo at freescale.com wrote:
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [131118 05:07]:
+> On 2013-11-16 02:36, Tony Lindgren wrote:
+> > In order to make the remaining omap3 boards usable with device
+> > tree, we need to initialize the DPI based displays using pdata
+> > until we have the DSS bindings in place.
+> > 
+> > At least board-am3517evm.c, board-cm-t35.c, board-devkit8000.c,
+> > board-ldp.c and board-overo.c all use fairly similar DPI setup,
+> > so let's add generic code for it. And let's make omap3 LDP to
+> > use it and also initialize the ads7846 until we have a binding
+> > for it.
+> > 
+> > Note that at least LDP needs the TWL bug fix posted as
+> > "gpio: twl4030: Fix regression for twl gpio output" for the
+> > LCD backlight to power.
+> 
+> Looks fine to me.
+> 
+> Is it possible to keep this, and other similar DSS patches, in a
+> separate branch, that could be dropped if needed? I'm kind of hoping I
+> would get the DSS DT finished for the next merge window (but I've said
+> that before, so...).
 
-> This patch add and enable SAI device.
->
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
-> arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
-> 1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index 1a58678..e4106dd 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
->>> -57,6 +57,12 @@
-> 	status = "okay";
-> };
+OK let's keep the DSS pdata quirks separate for now. How about we set
+-rc3 as a deadline for deciding which way to go for the DSS DT bindings
+for v3.14?
 
-Should we put a comment here that a TWR-AUDIO-SGTL board is needed?  Or
-is this better in a menuconfig?  I guess TWR-AUDIO-SGTL is needed as
-this codec is not on the VF610-TWR main board?
+BTW, Russell posted some interesting comments on LAKML this weekend
+on binding together driver components if that helps.
 
-> +&sai2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_sai2_1>;
-> +	status = "okay";
-> +};
-> +
+Regards,
+
+Tony
