@@ -1,105 +1,133 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 18 Nov 2013 11:55:43 +0100
-Subject: [PATCH 1/3] arm: delete __cpuinit/__CPUINIT usage from all ARM
- users
-In-Reply-To: <1384771703-25741-2-git-send-email-francesco.virlinzi@st.com>
-References: <1384771703-25741-1-git-send-email-francesco.virlinzi@st.com>
- <1384771703-25741-2-git-send-email-francesco.virlinzi@st.com>
-Message-ID: <5289F22F.2010007@monstr.eu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Nov 2013 11:14:51 +0000
+Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E852409CE@039-SN1MPN1-003.039d.mgd.msft.net>
+References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
+ <20131114104620.GB16396@e106331-lin.cambridge.arm.com>
+ <B56CDBE15CE27145A4B77D2D24263E852409CE@039-SN1MPN1-003.039d.mgd.msft.net>
+Message-ID: <20131118111451.GA30853@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 11:48 AM, Francesco VIRLINZI wrote:
-> From: Paul Gortmaker <paul.gortmaker@windriver.com>
+On Fri, Nov 15, 2013 at 07:43:04AM +0000, Jingchang Lu wrote:
 > 
-> The __cpuinit type of throwaway sections might have made sense
-> some time ago when RAM was more constrained, but now the savings
-> do not offset the cost and complications.  For example, the fix in
-> commit 5e427ec2d0 ("x86: Fix bit corruption at CPU resume time")
-> is a good example of the nasty type of bugs that can be created
-> with improper use of the various __init prefixes.
 > 
-> After a discussion on LKML[1] it was decided that cpuinit should go
-> the way of devinit and be phased out.  Once all the users are gone,
-> we can then finally remove the macros themselves from linux/init.h.
-> 
-> Note that some harmless section mismatch warnings may result, since
-> notify_cpu_starting() and cpu_up() are arch independent (kernel/cpu.c)
-> and are flagged as __cpuinit  -- so if we remove the __cpuinit from
-> the arch specific callers, we will also get section mismatch warnings.
-> As an intermediate step, we intend to turn the linux/init.h cpuinit
-> related content into no-ops as early as possible, since that will get
-> rid of these warnings.  In any case, they are temporary and harmless.
-> 
-> This removes all the ARM uses of the __cpuinit macros from C code,
-> and all __CPUINIT from assembly code.  It also had two ".previous"
-> section statements that were paired off against __CPUINIT
-> (aka .section ".cpuinit.text") that also get removed here.
-> 
-> [1] https://lkml.org/lkml/2013/5/20/589
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> 
-> Conflicts:
-> 
-> 	arch/arm/common/mcpm_platsmp.c
-> 	arch/arm/include/asm/arch_timer.h
-> 	arch/arm/kernel/head-common.S
-> 	arch/arm/kernel/head-nommu.S
-> 	arch/arm/kernel/perf_event_cpu.c
-> 	arch/arm/kernel/psci_smp.c
-> 	arch/arm/kernel/smp.c
-> 	arch/arm/lib/delay.c
-> 	arch/arm/mach-exynos/platsmp.c
-> 	arch/arm/mach-highbank/platsmp.c
-> 	arch/arm/mach-imx/platsmp.c
-> 	arch/arm/mach-keystone/platsmp.c
-> 	arch/arm/mach-msm/platsmp.c
-> 	arch/arm/mach-mvebu/coherency.c
-> 	arch/arm/mach-mvebu/headsmp.S
-> 	arch/arm/mach-mvebu/platsmp.c
-> 	arch/arm/mach-omap2/omap-headsmp.S
-> 	arch/arm/mach-omap2/omap-smp.c
-> 	arch/arm/mach-prima2/headsmp.S
-> 	arch/arm/mach-prima2/platsmp.c
-> 	arch/arm/mach-shmobile/headsmp-scu.S
-> 	arch/arm/mach-shmobile/headsmp.S
-> 	arch/arm/mach-shmobile/smp-emev2.c
-> 	arch/arm/mach-shmobile/smp-r8a7779.c
-> 	arch/arm/mach-shmobile/smp-sh73a0.c
-> 	arch/arm/mach-socfpga/headsmp.S
-> 	arch/arm/mach-socfpga/platsmp.c
-> 	arch/arm/mach-spear/generic.h
-> 	arch/arm/mach-spear/platsmp.c
-> 	arch/arm/mach-sti/platsmp.c
-> 	arch/arm/mach-tegra/platsmp.c
-> 	arch/arm/mach-tegra/pm.c
-> 	arch/arm/mach-ux500/platsmp.c
-> 	arch/arm/mach-zynq/common.h
-> 	arch/arm/mach-zynq/headsmp.S
-> 	arch/arm/mach-zynq/platsmp.c
+> > -----Original Message-----
+> > From: Mark Rutland [mailto:mark.rutland at arm.com]
+> > Sent: Thursday, November 14, 2013 6:46 PM
+> > To: Lu Jingchang-B35083
+> > Cc: vinod.koul at intel.com; devicetree at vger.kernel.org; Wang Huan-B18965;
+> > linux-kernel at vger.kernel.org; shawn.guo at linaro.org; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+> > 
+> > On Wed, Sep 18, 2013 at 10:57:59AM +0100, Jingchang Lu wrote:
+> > > Add Freescale enhanced direct memory(eDMA) controller support.
+> > > The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
+> > > to eDMA channels.
+> > > This module can be found on Vybrid and LS-1 SoCs.
+> > >
+> > > Signed-off-by: Alison Wang <b18965@freescale.com>
+> > > Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> [...] 
+> > > +* DMAMUX
+> > > +Required properties:
+> > 
+> > No compatible?
+> > 
+> > Where are DMAMUX nodes expected to live?
+> > 
+> > How to they relate to the eDMA controller in HW? Are they a
+> > subcomponent, or a logically separate unit that happens to be connected?
+> [Lu Jingchang-b35083] 
+> DMAMUX is a multiplexer between dma controller channels and peripheral deivces,
+> each DMAMUX provides 16 independently selectable DMA channel routers, and each 
+> channel router can be assigned to one of the possible peripheral DMA slots.
+> So it's not a standalone device, it's just required by the DMA controller to
+> connect the channels and slaves, So it's got by DMA controller's "fsl,dma-mux" property.
+> Thanks!
 
-What's this?
-Probably incorrect setup of git send-email.
+Ok.
 
-Michal
+I'm not so sure on the way this is described, from the point of view of
+the device, its DMA channel is wired to the MUX, not to the DMA engine
+directly:
 
+                       +-------+
+             /---------|DEVICE0|
+             |         +-------+
++-----+   +------+
+| DMA |===|DMAMUX|
++-----+   +------+
+             |         +-------+
+             \---------|DEVICE1|
+                       +-------+
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+If that's the case, I'd expect the DMAMUX to have a #dma-cells and
+describe each device as being wired to the mux, and then the mux as
+being wired to the DMA. If the MUXes are sub-blocks of the DMA, then I'm
+not sure why they need to be described at all.
 
+Currently, the DMA code is handling information that's specific to the
+MUX (i.e. the channel ID that's specific to the MUX), and that feels odd
+unless the MUX is a component of the DMA (which if true I'd expect it to
+be described differently).
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/428e84b0/attachment.sig>
+> > 
+> > > +- reg : Should contain DMAMUX registers location and length
+> > > +- fsl,dmamux-id : DMAMUX ID. DMAMUX IDs are unique in each eDMA
+> > controller.
+> > > +  inside one eDMA controller, specific request source can only be
+> > routed by
+> > > +  one of its DMAMUXs.
+> > > +  However Specific request source may be routed to different eDMA
+> > controller,
+> > > +  thus all the DMAMUXs sharing a the same request sources have the
+> > same ID.
+> > > +- clocks : Phandle of the clock used by the DMAMUX
+> > > +- clock-names : The clock names
+> > 
+> > _which_ clock names do you expect? From the looks of the example, you
+> > expect "dmamux".
+> > 
+> > From the view of the DMAMUX, what is its clock input called? "dmamux"
+> > doesn't look like what I'd expect for a clock name, but if the
+> > documentation for the eDMA doesn't provide a name for it, "dmamux" is
+> > fine.
+> > 
+> > If you're not using clock-names, it's useless. You _must_ define the set
+> > of names you expect or it's unusable. If you do define a set of names,
+> > then you should request clocks by name in the driver.
+> > 
+> [Lu Jingchang-b35083] [Lu Jingchang-b35083] 
+> The clock here is from the platform bus clock, I will remove this property for
+> compatible between SoCs. Thanks!
+> > > +
+
+Ok, if it's already on and you don't need it for now, nto describing it
+is fine.
+
+[...]
+
+> > > +               fsl_edmamux->clk = of_clk_get(phandle, 0);
+> > > +               if (IS_ERR(fsl_edmamux->clk)) {
+> > > +                       dev_err(&pdev->dev, "Missing DMAMUX clock.\n");
+> > > +                       return PTR_ERR(fsl_edmamux->clk);
+> > > +               }
+> > 
+> > Please acquire the clock by name:
+> [Lu Jingchang-b35083] 
+> I will remove the node name property for reuse the driver between SoCs,
+> for they may have different clock names. Thanks!
+
+The clock-names property describes the clock from the view of the
+_device_, not the _system_. The set of possible clock-names should not
+vary from system to system, but it may vary from generation to
+generation of the device.
+
+See the last portion of
+http://www.spinics.net/lists/devicetree/msg08993.html for a description
+of clock-names.
+
+Thanks,
+Mark.
