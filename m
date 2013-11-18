@@ -1,336 +1,83 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 18 Nov 2013 13:47:44 +0200
-Subject: Fwd: [PATCH 1/8] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <5287D5A7.7060702@roeck-us.net>
-References: <1383680783-12114-2-git-send-email-ivan.khoronzhuk@ti.com>
- <527A287C.2090401@ti.com> <5287D5A7.7060702@roeck-us.net>
-Message-ID: <5289FE60.2040207@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Nov 2013 11:58:42 +0000
+Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
+In-Reply-To: <52898417.80601@nvidia.com>
+References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
+ <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
+ <52898417.80601@nvidia.com>
+Message-ID: <20131118115842.GE4050@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2013 10:29 PM, Guenter Roeck wrote:
-> On 11/06/2013 03:31 AM, ivan.khoronzhuk wrote:
->> To reduce code duplicate and increase code readability use WDT core
->> code to handle WDT interface.
->>
->> Remove io_lock as the WDT core uses mutex to lock each wdt device.
->> Remove wdt_state as the WDT core track state with its own variable.
->>
->> The watchdog_init_timeout() can read timeout value from timeout-sec
->> property if the passed value is out of bounds. So set initial
->> heartbeat value more than max value in order to initialize heartbeat
->> in next way. If heartbeat is not set thought module parameter, try
->> to read it's value from WDT node timeout-sec property. If node has
->> no one, use default value.
->>
->> The heartbeat is hold in wdd->timeout by WDT core, so use it in
->> order to set timeout period.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> ---
->>   drivers/watchdog/Kconfig       |    1 +
->>   drivers/watchdog/davinci_wdt.c |  150 
->> ++++++++++------------------------------
->>   2 files changed, 38 insertions(+), 113 deletions(-)
->>
->> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->> index d1d53f3..2c954b5 100644
->> --- a/drivers/watchdog/Kconfig
->> +++ b/drivers/watchdog/Kconfig
->> @@ -271,6 +271,7 @@ config IOP_WATCHDOG
->>   config DAVINCI_WATCHDOG
->>       tristate "DaVinci watchdog"
->>       depends on ARCH_DAVINCI
->> +    select WATCHDOG_CORE
->>       help
->>         Say Y here if to include support for the watchdog timer
->>         in the DaVinci DM644x/DM646x processors.
->> diff --git a/drivers/watchdog/davinci_wdt.c 
->> b/drivers/watchdog/davinci_wdt.c
->> index bead774..a6eef71 100644
->> --- a/drivers/watchdog/davinci_wdt.c
->> +++ b/drivers/watchdog/davinci_wdt.c
->> @@ -3,7 +3,7 @@
->>    *
->>    * Watchdog driver for DaVinci DM644x/DM646x processors
->>    *
->> - * Copyright (C) 2006 Texas Instruments.
->> + * Copyright (C) 2013 Texas Instruments.
+On Mon, Nov 18, 2013 at 03:05:59AM +0000, Alex Courbot wrote:
+> On 11/18/2013 12:59 AM, Catalin Marinas wrote:
+> > On 17 November 2013 08:49, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> >> The ARM tree includes a firmware_ops interface that is designed to
+> >> implement support for simple, TrustZone-based firmwares but could
+> >> also cover other use-cases. It has been suggested that this
+> >> interface might be useful to other architectures (e.g. arm64) and
+> >> that it should be moved out of arch/arm.
+> >
+> > NAK. I'm for code sharing with arm via common locations but this API
+> > goes against the ARMv8 firmware standardisation efforts like PSCI,
+> > encouraging each platform to define there own non-standard interface.
 > 
-> 2006-2013
->
-
-Ok
-
->>    *
->>    * 2007 (c) MontaVista Software, Inc. This file is licensed under
->>    * the terms of the GNU General Public License version 2. This program
->> @@ -15,18 +15,12 @@
->>   #include <linux/moduleparam.h>
->>   #include <linux/types.h>
->>   #include <linux/kernel.h>
->> -#include <linux/fs.h>
->> -#include <linux/miscdevice.h>
->>   #include <linux/watchdog.h>
->>   #include <linux/init.h>
->> -#include <linux/bitops.h>
->>   #include <linux/platform_device.h>
->> -#include <linux/spinlock.h>
->> -#include <linux/uaccess.h>
->>   #include <linux/io.h>
->>   #include <linux/device.h>
->>   #include <linux/clk.h>
->> -#include <linux/slab.h>
->>   #include <linux/err.h>
->>
->>   #define MODULE_NAME "DAVINCI-WDT: "
->> @@ -61,31 +55,13 @@
->>   #define WDKEY_SEQ0        (0xa5c6 << 16)
->>   #define WDKEY_SEQ1        (0xda7e << 16)
->>
->> -static int heartbeat = DEFAULT_HEARTBEAT;
->> -
->> -static DEFINE_SPINLOCK(io_lock);
->> -static unsigned long wdt_status;
->> -#define WDT_IN_USE        0
->> -#define WDT_OK_TO_CLOSE   1
->> -#define WDT_REGION_INITED 2
->> -#define WDT_DEVICE_INITED 3
->> -
->> +static int heartbeat = MAX_HEARTBEAT + 1;
+> I have to say, I pretty much agree with your NAK.
 > 
-> Initializing it with 0 (ie not at all) would be just as good. Also see 
-> below.
->
+> The reason for this patch is that the suggestion to move firmware_ops 
+> out of arch/arm is the last (I hope) thing that prevents my Trusted 
+> Foundation support series from being merged.
 
-Ok
+Moving it into drivers shouldn't be a workaround. Nice try ;).
 
->>   static void __iomem    *wdt_base;
->>   struct clk        *wdt_clk;
->> +static struct watchdog_device    wdt_wdd;
->>
->> -static void wdt_service(void)
->> -{
->> -    spin_lock(&io_lock);
->> -
->> -    /* put watchdog in service state */
->> -    iowrite32(WDKEY_SEQ0, wdt_base + WDTCR);
->> -    /* put watchdog in active state */
->> -    iowrite32(WDKEY_SEQ1, wdt_base + WDTCR);
->> -
->> -    spin_unlock(&io_lock);
->> -}
->> -
->> -static void wdt_enable(void)
->> +/* davinci_wdt_start - enable watchdog */
+> Now if we can all agree:
 > 
-> That comment doesn't really provide much value.
-> 
->> +static int davinci_wdt_start(struct watchdog_device *wdd)
->>   {
->>       u32 tgcr;
->>       u32 timer_margin;
->> @@ -93,8 +69,6 @@ static void wdt_enable(void)
->>
->>       wdt_freq = clk_get_rate(wdt_clk);
->>
->> -    spin_lock(&io_lock);
->> -
->>       /* disable, internal clock source */
->>       iowrite32(0, wdt_base + TCR);
->>       /* reset timer, set mode to 64-bit watchdog, and unreset */
->> @@ -105,9 +79,9 @@ static void wdt_enable(void)
->>       iowrite32(0, wdt_base + TIM12);
->>       iowrite32(0, wdt_base + TIM34);
->>       /* set timeout period */
->> -    timer_margin = (((u64)heartbeat * wdt_freq) & 0xffffffff);
->> +    timer_margin = (((u64)wdd->timeout * wdt_freq) & 0xffffffff);
->>       iowrite32(timer_margin, wdt_base + PRD12);
->> -    timer_margin = (((u64)heartbeat * wdt_freq) >> 32);
->> +    timer_margin = (((u64)wdd->timeout * wdt_freq) >> 32);
->>       iowrite32(timer_margin, wdt_base + PRD34);
->>       /* enable run continuously */
->>       iowrite32(ENAMODE12_PERIODIC, wdt_base + TCR);
->> @@ -119,84 +93,28 @@ static void wdt_enable(void)
->>       iowrite32(WDKEY_SEQ0 | WDEN, wdt_base + WDTCR);
->>       /* put watchdog in active state */
->>       iowrite32(WDKEY_SEQ1 | WDEN, wdt_base + WDTCR);
->> -
->> -    spin_unlock(&io_lock);
->> -}
->> -
->> -static int davinci_wdt_open(struct inode *inode, struct file *file)
->> -{
->> -    if (test_and_set_bit(WDT_IN_USE, &wdt_status))
->> -        return -EBUSY;
->> -
->> -    wdt_enable();
->> -
->> -    return nonseekable_open(inode, file);
->> +    return 0;
->>   }
->>
->> -static ssize_t
->> -davinci_wdt_write(struct file *file, const char *data, size_t len,
->> -          loff_t *ppos)
->> +static int davinci_wdt_ping(struct watchdog_device *wdd)
->>   {
->> -    if (len)
->> -        wdt_service();
->> -
->> -    return len;
->> +    /* put watchdog in service state */
->> +    iowrite32(WDKEY_SEQ0, wdt_base + WDTCR);
->> +    /* put watchdog in active state */
->> +    iowrite32(WDKEY_SEQ1, wdt_base + WDTCR);
->> +    return 0;
->>   }
->>
->> -static const struct watchdog_info ident = {
->> +static const struct watchdog_info davinci_wdt_info = {
->>       .options = WDIOF_KEEPALIVEPING,
->>       .identity = "DaVinci Watchdog",
->>   };
->>
->> -static long davinci_wdt_ioctl(struct file *file,
->> -                    unsigned int cmd, unsigned long arg)
->> -{
->> -    int ret = -ENOTTY;
->> -
->> -    switch (cmd) {
->> -    case WDIOC_GETSUPPORT:
->> -        ret = copy_to_user((struct watchdog_info *)arg, &ident,
->> -                   sizeof(ident)) ? -EFAULT : 0;
->> -        break;
->> -
->> -    case WDIOC_GETSTATUS:
->> -    case WDIOC_GETBOOTSTATUS:
->> -        ret = put_user(0, (int *)arg);
->> -        break;
->> -
->> -    case WDIOC_KEEPALIVE:
->> -        wdt_service();
->> -        ret = 0;
->> -        break;
->> -
->> -    case WDIOC_GETTIMEOUT:
->> -        ret = put_user(heartbeat, (int *)arg);
->> -        break;
->> -    }
->> -    return ret;
->> -}
->> -
->> -static int davinci_wdt_release(struct inode *inode, struct file *file)
->> -{
->> -    wdt_service();
->> -    clear_bit(WDT_IN_USE, &wdt_status);
->> -
->> -    return 0;
->> -}
->> -
->> -static const struct file_operations davinci_wdt_fops = {
->> -    .owner = THIS_MODULE,
->> -    .llseek = no_llseek,
->> -    .write = davinci_wdt_write,
->> -    .unlocked_ioctl = davinci_wdt_ioctl,
->> -    .open = davinci_wdt_open,
->> -    .release = davinci_wdt_release,
->> -};
->> -
->> -static struct miscdevice davinci_wdt_miscdev = {
->> -    .minor = WATCHDOG_MINOR,
->> -    .name = "watchdog",
->> -    .fops = &davinci_wdt_fops,
->> +static const struct watchdog_ops davinci_wdt_ops = {
->> +    .owner        = THIS_MODULE,
->> +    .start        = davinci_wdt_start,
->> +    .stop        = davinci_wdt_ping,
->> +    .ping        = davinci_wdt_ping,
->>   };
->>
->>   static int davinci_wdt_probe(struct platform_device *pdev)
->> @@ -204,6 +122,7 @@ static int davinci_wdt_probe(struct 
->> platform_device *pdev)
->>       int ret = 0;
->>       struct device *dev = &pdev->dev;
->>       struct resource  *wdt_mem;
->> +    struct watchdog_device *wdd;
->>
->>       wdt_clk = devm_clk_get(dev, NULL);
->>       if (WARN_ON(IS_ERR(wdt_clk)))
->> @@ -211,29 +130,35 @@ static int davinci_wdt_probe(struct 
->> platform_device *pdev)
->>
->>       clk_prepare_enable(wdt_clk);
->>
->> -    if (heartbeat < 1 || heartbeat > MAX_HEARTBEAT)
->> -        heartbeat = DEFAULT_HEARTBEAT;
->> +    wdd            = &wdt_wdd;
->> +    wdd->info        = &davinci_wdt_info;
->> +    wdd->ops        = &davinci_wdt_ops;
->> +    wdd->min_timeout     = 1;
->> +    wdd->max_timeout     = MAX_HEARTBEAT;
->> +    wdd->timeout        = DEFAULT_HEARTBEAT;
->> +
->> +    if (heartbeat)
->> +        watchdog_init_timeout(wdd, heartbeat, dev);
->> +
-> The if statement here is unnecessary. Actually, you always want to call 
-> watchdog_init_timeout()
-> to ensure that it gets the configuration from fdt if available.
->
+> * that ARMv8 will only use PSCI
 
-Ok
+Or spin-table (which does not require secure calls). Otherwise, if
+secure firmware is present, SoCs should use PSCI (as the only firmware
+standard currently supported in the arm64 kernel).
 
->> +    dev_info(dev, "heartbeat %d sec\n", wdd->timeout);
->>
->> -    dev_info(dev, "heartbeat %d sec\n", heartbeat);
->> +    watchdog_set_nowayout(wdd, WATCHDOG_NOWAYOUT);
->>
->>       wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>       wdt_base = devm_ioremap_resource(dev, wdt_mem);
->>       if (IS_ERR(wdt_base))
->>           return PTR_ERR(wdt_base);
->>
->> -    ret = misc_register(&davinci_wdt_miscdev);
->> -    if (ret < 0) {
->> -        dev_err(dev, "cannot register misc device\n");
->> -    } else {
->> -        set_bit(WDT_DEVICE_INITED, &wdt_status);
->> -    }
->> +    ret = watchdog_register_device(wdd);
->> +    if (ret < 0)
->> +        dev_err(dev, "cannot register watchdog device\n");
->>
->>       return ret;
->>   }
->>
->>   static int davinci_wdt_remove(struct platform_device *pdev)
->>   {
->> -    misc_deregister(&davinci_wdt_miscdev);
->> +    watchdog_unregister_device(&wdt_wdd);
->>       clk_disable_unprepare(wdt_clk);
->>
->>       return 0;
->> @@ -267,5 +192,4 @@ MODULE_PARM_DESC(heartbeat,
->>            __MODULE_STRING(DEFAULT_HEARTBEAT));
->>
->>   MODULE_LICENSE("GPL");
->> -MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
->>   MODULE_ALIAS("platform:watchdog");
->>
-> You might want to rename the platform driver to something like 
-> davinci-wdt and change the MODULE_ALIAS
-> accordingly.
->
+However, things evolve and we may have other needs in the future or PSCI
+may not be sufficient or we get newer PSCI revisions. This can be
+extended but my requirement is to decouple booting standard from SoC
+support (together with the aim of having no SoC-specific code under
+arch/arm64). I really don't see why SoCs can't agree on one (or very
+few) standard booting protocol (and legacy argument doesn't work since
+the ARMv8 firmware needs to be converted to AArch64 anyway).
 
-Yes, it could be changed but not in this patch.
+> * that there is no use-case of this interface outside of arch/arm as of 
+> today (and none foreseen in the near future)
 
-> Guenter
-> 
-> 
+The firmware_ops are only used under arch/arm so far, I don't see any
+drivers doing anything with it. Also, l2x0_init is ARMv7 only.
 
+On arm64, support for PSCI is handled via cpu_operations in the latest
+kernel. That's an arm64 abstraction and is extensible (but we want to
+keep tight control of this, hence no register_cpu_ops function).
+
+> * that the firmware_ops interface is quite ARMv7-specific anyway,
+
+This was introduced to allow SoC code to enable hooks for SoC-specific
+firmware calls like cpu_idle, l2x0_init. By standardising the interface
+and decoupling it from SoC code on arm64, we don't need per-SoC
+firmware_ops.
+
+Of course, trusted foundations interface could be plugged into cpu_ops
+on arm64 but I will NAK it on the grounds of not using the PSCI API, nor
+the SMC calling convention (and it's easy to fix when porting to ARMv8).
+If a supported standard API is used, then there is no need for
+additional code in the kernel.
+
+BTW, is legacy code the reason for not converting the SMC # to PSCI?
+It's already supported on ARMv7, so you may not have much code left to
+merge in the kernel ;).
+
+> * that should a need to move it (for whatever reason) occur later, it 
+> will be easy to do (as this patch hopefully demonstrates).
+
+I agree, it's not hard to unify this but so far I haven't seen a good
+reason.
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Catalin
