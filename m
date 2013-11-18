@@ -1,43 +1,56 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Mon, 18 Nov 2013 12:33:19 -0500
-Subject: ACPI vs DT at runtime
-In-Reply-To: <201311180945.52764.arnd@arndb.de>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <3371903.8j54vrCjEN@wuerfel>
- <CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com>
- <201311180945.52764.arnd@arndb.de>
-Message-ID: <528A4F5F.7080104@jonmasters.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Nov 2013 10:36:19 -0700
+Subject: [PATCH 01/31] ARM: tegra: add missing clock documentation to
+ DT bindings
+In-Reply-To: <9892703.gTmEHyqaYb@ax5200p>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-2-git-send-email-swarren@wwwdotorg.org>
+ <9892703.gTmEHyqaYb@ax5200p>
+Message-ID: <528A5013.3060006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 03:45 AM, Arnd Bergmann wrote:
-> On Sunday 17 November 2013, Olof Johansson wrote:
-
->> Yep, and together for review is a critical part. I'm not saying that
->> the ideal solution is a flashed DTB, but it's better than ACPI. A
->> flashed DTB that's _easy to update_ as part of an OS install would
->> probably be one of the best solutions we could ask for though.
+On 11/16/2013 03:00 PM, Marc Dietrich wrote:
+> Hi Stephen,
 > 
-> Right: the assumption on the DT boot interfaces is that board designers
-> make mistakes and are working on moving targets, so we need ways to update
-> the DTB. By contrast, the assumption on ACPI is that server firmware
-> authors know what they are doing and you shouldn't let anyone else mess
-> with the ACPI bits because doing so might damage your hardware. We're
-> in trouble if the second assumption turns out wrong.
+> On Friday 15 November 2013 13:53:56 Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Many of the Tegra DT binding documents say nothing about the clocks or
+>> clock-names properties, yet those are present and required in DT files.
+>> This patch simply updates the documentation file to match the implicit
+>> definition of the binding, based on real-world DT content.
+>>
+>> All Tegra bindings that mention clocks are updated to have consistent
+>> wording and formatting of the clock-related properties.
 
-In the server space we *never* ship updated ACPI tables in Red Hat
-products, and we never would ship updated tables as part of the OS.
-Platform data is platform data. It belongs to the vendor shipping the
-system, never to the OS. Yes, there are workarounds for bugs but on the
-whole you do in fact count on server vendors not to screw it up, and if
-they do then it is up to them to ship a BIOS update for their hardware.
+>> diff --git a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
 
-In the Fedora space, even on 32-bit, we tried to not get in the business
-of shipping DeviceTree blobs (way back when) that should be shipped by
-the platform, but alas many systems don't have flash to store the DTB.
-Coupled with the moving target we're dealing with there...things have
-been ugly. In the v8 server space, there will be no shipping of platform
-data. It will be ACPI tables passed in via UEFI, never updated by the
-OS, and owned wholly by the platform vendor.
+(Thanks for pointing out the duplicate entries; I'll fix those.)
 
-Jon.
+>> +  - clocks : Must contain an entry for each entry in clock-names.
+>> +    See ../clocks/clock-bindings.txt for details.
+>> +  - clock-names : Must include the following entries:
+>> +    (This property may be omitted if the only clock in the list is "3d")
+>> +    - 3d
+>> +      This MUST be the first entry.
+> 
+> why? isn't the purpose of names that the order is irrelevant?
+
+If we used names from the start, then the order would be irrelevant.
+
+However, this binding didn't use names from the start, and hence the
+order of appearance in "clocks" is part of the original binding.
+"clock-names" only became part of the binding when the second clock was
+introduced.
+
+We can either: (a) document the existing requirements as I have done, or
+(b) go through all the bindings and drivers and make potentially
+incompatible changes so that all ordering is purely defined by
+"clock-names". I was tempted to do (b) for cleanliness, but didn't want
+to push my luck on too many ABI-incompatible changes. (b) /might/ also
+affect more drivers than this series already does, thus bloating it even
+more:-(
+
+P.S. only quoting the parts of the patch you're replying to makes it a
+lot easier and quicker to find your replies.
