@@ -1,33 +1,40 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Mon, 18 Nov 2013 10:54:56 -0800
-Subject: [PATCH 0/5] Add Broadcom Kona PWM Support
-Message-ID: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
+Date: Mon, 18 Nov 2013 10:55:01 -0800
+Subject: [PATCH 5/5] ARM: bcm_defconfig: Enable PWM and Backlight
+In-Reply-To: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
+References: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1384800901-21711-6-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces the driver for the Kona PWM controller found in
-Broadcom mobile SoCs like bcm281xx and updates the device tree and the
-defconfig to enable use of this hardware on the bcm28155 AP board.
+Enable PWM drivers and the PWM-based baclight driver.
 
-It depends on:  https://lkml.org/lkml/2013/11/14/521
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Alex Elder <elder@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+---
+ arch/arm/configs/bcm_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Tim Kryger (5):
-  Documentation: dt: Add kona-pwm binding
-  pwm: kona: Introduce Kona PWM controller support
-  ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
-  ARM: dts: Enable the PWM for bcm28155 AP board
-  ARM: bcm_defconfig: Enable PWM and Backlight
-
- .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |  24 +++
- arch/arm/boot/dts/bcm11351.dtsi                    |   8 +
- arch/arm/boot/dts/bcm28155-ap.dts                  |   4 +
- arch/arm/configs/bcm_defconfig                     |   2 +
- drivers/pwm/Kconfig                                |  10 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-bcm-kona.c                         | 226 +++++++++++++++++++++
- 7 files changed, 275 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
- create mode 100644 drivers/pwm/pwm-bcm-kona.c
-
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index fcea348..04a58f34 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -85,6 +85,7 @@ CONFIG_FB=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_PWM=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+ CONFIG_MMC_UNSAFE_RESUME=y
+@@ -98,6 +99,7 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_PWM=y
+ CONFIG_EXT4_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_EXT4_FS_SECURITY=y
 -- 
 1.8.0.1
