@@ -1,33 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 15:16:51 +0000
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <20131118145614.GM13640@lee--X1>
-References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
- <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
- <20131118093229.GB13640@lee--X1>
- <20131118133940.GC14306@sirena.org.uk>
- <20131118142447.GJ13640@lee--X1>
- <20131118144512.GB24408@sirena.org.uk>
- <20131118145614.GM13640@lee--X1>
-Message-ID: <20131118151651.GE24408@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Nov 2013 15:19:01 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <201311181605.37300.arnd@arndb.de>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <201311152056.47846.arnd@arndb.de>
+ <20131115232109.GT16735@n2100.arm.linux.org.uk>
+ <201311181605.37300.arnd@arndb.de>
+Message-ID: <20131118151900.GF16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 02:56:14PM +0000, Lee Jones wrote:
+On Mon, Nov 18, 2013 at 04:05:37PM +0100, Arnd Bergmann wrote:
+> On Saturday 16 November 2013, Russell King - ARM Linux wrote:
+> > On Fri, Nov 15, 2013 at 08:56:47PM +0100, Arnd Bergmann wrote:
+> > > 
+> > > For all I know, doing this in ACPI is something that is only now being
+> > > discussed as Intel wants to be able to reuse the existing features from
+> > > DT enabled drivers in the kernel and share the implementation between
+> > > embedded x86 SoCs and embedded ARM/PowerPC/MIPS/... SoCs. That part actually
+> > > isn't as crazy.
+> > > 
+> > > The existing ACPI usage however is basically all binary and cannot be
+> > > shared with DT, in particular it won't help for the orthogonal problem of
+> > > using ACPI to get "enterprise server" features on ARM64.
+> > 
+> > That's strange, because the patches I've seen from people who want to
+> > add ACPI support to AMBA are all based around very similar strings to
+> > those in DT to lookup the same data in ACPI.
+> 
+> Can you point to specific patches?
 
-> I think it's a good idea for people using the m25p80, but still
-> doesn't effect us. All of our chips are dynamically probable. We are
+No, because they weren't publically posted, so I don't feel that I can
+say all that much; they were from quite a large company though.
 
-This doesn't seem realistic, you're assuming that system integrators
-won't go and use chips you've not heard of and at least in the case of
-things like quad read my understanding is that the commands aren't
-standardised so the host just has to know what to write.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/e8fe7650/attachment.sig>
+> I can't say I'm an expert on this, but everything I've seen with ACPI
+> is tables of binary data with four-letter identifiers that are defined
+> by the ACPI group, but not using strings in a similar manner to DT.
+
+They are using strings which are the same as the DT properties, but
+without the vendor prefix - but yes, to only retrieve things like
+booleans, u32s and such like.  They also have support for fixed-rate
+clocks via the clk API too...
+
+I'd like them to post the patches publically so a more open discussion
+could occur.
