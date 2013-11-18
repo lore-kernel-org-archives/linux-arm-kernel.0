@@ -1,45 +1,25 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 18 Nov 2013 14:02:52 +0000
-Subject: [PATCH] arm/xen: Export phys_to_mach to fix Xen module link errors
-In-Reply-To: <20131118134806.GA1908@hansolo.jdub.homelinux.org>
-References: <20131118134806.GA1908@hansolo.jdub.homelinux.org>
-Message-ID: <alpine.DEB.2.02.1311181402160.4714@kaball.uk.xensource.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Nov 2013 15:07:18 +0100
+Subject: [PATCH 4/5] ARM: dts: imx53: Add AHCI SATA binding
+In-Reply-To: <20131118024150.GQ11014@S2101-09.ap.freescale.net>
+References: <1384651251-5548-1-git-send-email-marex@denx.de>
+ <1384651251-5548-4-git-send-email-marex@denx.de>
+ <20131118024150.GQ11014@S2101-09.ap.freescale.net>
+Message-ID: <201311181507.18592.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013, Josh Boyer wrote:
-> Various xen drivers fail to link when built as modules with the following
-> error:
-> 
-> ERROR: "phys_to_mach" [drivers/xen/xen-gntalloc.ko] undefined!
-> ERROR: "phys_to_mach" [drivers/net/xen-netfront.ko] undefined!
-> ERROR: "phys_to_mach" [drivers/net/xen-netback/xen-netback.ko] undefined!
-> ERROR: "phys_to_mach" [drivers/block/xen-blkfront.ko] undefined!
-> 
-> The mfn_to_pfn and pfn_to_mfn functions get inlined in these modules and
-> those functions require phys_to_mach.  Export the symbol to fix the link
-> errors.
-> 
-> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
+Dear Shawn Guo,
 
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
->  arch/arm/xen/p2m.c | 1 +
->  1 file changed, 1 insertion(+)
+> On Sun, Nov 17, 2013 at 02:20:50AM +0100, Marek Vasut wrote:
+> > The AHCI-IMX driver now supports i.MX53 as well. Add DT binding.
 > 
-> diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-> index 23732cd..0f842e8 100644
-> --- a/arch/arm/xen/p2m.c
-> +++ b/arch/arm/xen/p2m.c
-> @@ -27,6 +27,7 @@ struct xen_p2m_entry {
->  
->  rwlock_t p2m_lock;
->  struct rb_root phys_to_mach = RB_ROOT;
-> +EXPORT_SYMBOL_GPL(phys_to_mach);
->  static struct rb_root mach_to_phys = RB_ROOT;
->  
->  static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
-> -- 
-> 1.8.3.1
-> 
+> I think this patch can be merged independently without the driver
+> changes in place.  Also, I understand that the term 'binding' is
+> referred as binding doc, while what you're patching here is device tree
+> source.
+
+Ah right, shall I change it?
+
+Best regards,
+Marek Vasut
