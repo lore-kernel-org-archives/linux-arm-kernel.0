@@ -1,99 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Nov 2013 18:38:14 +0000
-Subject: [RFC PATCH V2 1/2] dtc: add 'compat' output option,
- prints board string
-In-Reply-To: <cover.1384798508.git.jason@lakedaemon.net>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <cover.1384798508.git.jason@lakedaemon.net>
-Message-ID: <728deb9bbeab491a728da077aa5e47c0e01bccf8.1384798508.git.jason@lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 18 Nov 2013 18:39:47 +0000
+Subject: [PATCH 17/31] ASoC: tegra: call pm_runtime APIs around register
+ accesses
+In-Reply-To: <528A4D9A.10809@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-18-git-send-email-swarren@wwwdotorg.org>
+ <20131116100205.GG15393@sirena.org.uk>
+ <528A4D9A.10809@wwwdotorg.org>
+Message-ID: <20131118183947.GS2674@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consumers of the Linux kernel's build products are beginning to hardcode
-the filenames of the dtbs generated.  Since the dtb filenames are
-currently the dts filename s/dts/dtb/, this prevents the kernel
-community from renaming dts files as needed.
+On Mon, Nov 18, 2013 at 10:25:46AM -0700, Stephen Warren wrote:
+> On 11/16/2013 03:02 AM, Mark Brown wrote:
 
-Let's provide a consistent naming structure for consumers to script
-against.  Or at least, as consistent as the dts properties themselves.
+> > Or alternatively should the driver be making the device
+> > cache only when runtime PM is disabled?
 
-With this patch, adding the '-O compat' option to the dtc commandline
-will cause dtc to parse the provided file, and print out the board
-compatible string to stdout.
+> The regmap is already cache-only when runtime-suspended. However the
+> registers don't get flushed during resume. I suppose that would require
+> only adding one extra call to the PM resume function?
 
-This will facilitate an 'installdtbs.sh' script in the kernel for naming
-dtb files by their compatible string, eg:
+Yup, should probably do that anyway since that's going to bite someone
+otherwise.  We probably want a single operation to flush and enable
+writes now I think about it, it's the common case.
 
-$ dtc -I dtb -O compat arch/arm/boot/dts/armada-370-mirabox.dtb
-globalscale,mirabox
+> For some reason, my gut prefers this current solution, but I could be
+> persuaded.
 
-This change will also simplify distribution install scripts that need to
-search through many dtbs to find the right one for a target board.
-
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
-changes since v1:
- - made patch against in-tree dtc code to facilitate testing
- - dtc prints compatible string to stdout now, instead of creating symlink
-    - should be more flexible for end-users
-
- scripts/dtc/dtc.c      | 3 +++
- scripts/dtc/dtc.h      | 1 +
- scripts/dtc/flattree.c | 9 +++++++++
- 3 files changed, 13 insertions(+)
-
-diff --git a/scripts/dtc/dtc.c b/scripts/dtc/dtc.c
-index a375683c1534..89264bb0a3dd 100644
---- a/scripts/dtc/dtc.c
-+++ b/scripts/dtc/dtc.c
-@@ -68,6 +68,7 @@ static void  __attribute__ ((noreturn)) usage(void)
- 	fprintf(stderr, "\t\tOutput formats are:\n");
- 	fprintf(stderr, "\t\t\tdts - device tree source text\n");
- 	fprintf(stderr, "\t\t\tdtb - device tree blob\n");
-+	fprintf(stderr, "\t\t\tcompat - print board compatible string\n");
- 	fprintf(stderr, "\t\t\tasm - assembler source\n");
- 	fprintf(stderr, "\t-V <output version>\n");
- 	fprintf(stderr, "\t\tBlob version to produce, defaults to %d (relevant for dtb\n\t\tand asm output only)\n", DEFAULT_FDT_VERSION);
-@@ -250,6 +251,8 @@ int main(int argc, char *argv[])
- 		dt_to_blob(outf, bi, outversion);
- 	} else if (streq(outform, "asm")) {
- 		dt_to_asm(outf, bi, outversion);
-+	} else if (streq(outform, "compat")) {
-+		dt_to_compat(bi);
- 	} else if (streq(outform, "null")) {
- 		/* do nothing */
- 	} else {
-diff --git a/scripts/dtc/dtc.h b/scripts/dtc/dtc.h
-index 3e42a071070e..d4e47c697c2f 100644
---- a/scripts/dtc/dtc.h
-+++ b/scripts/dtc/dtc.h
-@@ -255,6 +255,7 @@ void process_checks(int force, struct boot_info *bi);
- 
- void dt_to_blob(FILE *f, struct boot_info *bi, int version);
- void dt_to_asm(FILE *f, struct boot_info *bi, int version);
-+void dt_to_compat(struct boot_info *bi);
- 
- struct boot_info *dt_from_blob(const char *fname);
- 
-diff --git a/scripts/dtc/flattree.c b/scripts/dtc/flattree.c
-index 665dad7bb465..bdbd3d7e8964 100644
---- a/scripts/dtc/flattree.c
-+++ b/scripts/dtc/flattree.c
-@@ -577,6 +577,15 @@ void dt_to_asm(FILE *f, struct boot_info *bi, int version)
- 	data_free(strbuf);
- }
- 
-+void dt_to_compat(struct boot_info *bi)
-+{
-+	struct property *prop;
-+
-+	prop = get_property(bi->dt, "compatible");
-+
-+	printf("%s\n", prop->val.val);
-+}
-+
- struct inbuf {
- 	char *base, *limit, *ptr;
- };
--- 
-1.8.4.3
+I'm not dead set against doing it this way, it's just that it feels like
+if it's required something's not working as well as it should.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/30ac4b2c/attachment.sig>
