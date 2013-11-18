@@ -1,61 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Nov 2013 16:02:26 +0000
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <20131118154137.GA28334@sirena.org.uk>
-References: <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
- <20131118093229.GB13640@lee--X1>
- <20131118133940.GC14306@sirena.org.uk>
- <20131118142447.GJ13640@lee--X1>
- <20131118144512.GB24408@sirena.org.uk>
- <20131118145614.GM13640@lee--X1>
- <20131118151651.GE24408@sirena.org.uk>
- <20131118153110.GN13640@lee--X1>
- <20131118154137.GA28334@sirena.org.uk>
-Message-ID: <20131118160226.GO13640@lee--X1>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 18 Nov 2013 17:06:28 +0100
+Subject: ARM topic: Is DT on ARM the solution, or is there something
+ better?
+In-Reply-To: <20131118155022.GB28334@sirena.org.uk>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131118122644.GA26046@ulmo.nvidia.com>
+ <20131118134022.26EE7C409EC@trevor.secretlab.ca>
+ <20131118135727.GD14306@sirena.org.uk>
+ <20131118152920.GL26046@ulmo.nvidia.com>
+ <20131118155022.GB28334@sirena.org.uk>
+Message-ID: <20131118160626.GN26046@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013, Mark Brown wrote:
+On Mon, Nov 18, 2013 at 03:50:22PM +0000, Mark Brown wrote:
+> On Mon, Nov 18, 2013 at 04:29:21PM +0100, Thierry Reding wrote:
+> > On Mon, Nov 18, 2013 at 01:57:27PM +0000, Mark Brown wrote:
+> 
+> > > You'd need something class based like USB, there's such massive
+> > > variation in what the hardware is trying to do and the tradeoffs.  A big
+> > > issue is that especially with I2C many of the devices are primarily
+> > > analogue devices implemnted in larger processes where the cost of adding
+> > > additional digital logic can have a noticeable effect on the area and
+> > > hence cost of the silicon.
+> 
+> > My comments were mostly regarding the interface controllers. Those which
+> > generate the same bus transactions but need different drivers on every
+> > SoC. I suspect that the same costs don't apply (or at least not to the
+> > same extent) to SoCs.
+> 
+> Oh, right.  In that space I suspect you'd face apathy on the part of
+> vendors for switching away from their existing validated and deployed
+> IPs - probably the best shot would be a freely licensed reference
+> implementation that people could pick up if they wanted.  It's plausible
+> that some of the vendors might do so for SPI where there are a bunch of
+> chips that don't have DMA/FIFOs yet and so could possibly benefit from
+> performance and feature gains but without that sort of benefit it's hard
+> to see what would be persuasive for the vendors.
 
-> On Mon, Nov 18, 2013 at 03:31:10PM +0000, Lee Jones wrote:
-> > On Mon, 18 Nov 2013, Mark Brown wrote:
-> 
-> > > This doesn't seem realistic, you're assuming that system integrators
-> > > won't go and use chips you've not heard of and at least in the case of
-> > > things like quad read my understanding is that the commands aren't
-> > > standardised so the host just has to know what to write.
-> 
-> > I'm not following? What are you suggesting?
-> 
-> Like I say I'm suggesting that the bit of the code that understands the
-> flash chip is separate to the bit of code that knows the mechanics of
-> sending commands and data to the chip.
-> 
-> > After some analysis we have come to the conclusion that using m25p80
-> > is not feasible. It makes more sense for this to be an
-> > orthogonal/stand-alone driver.
-> 
-> That seems plausible for the controller side but it seems surprising for
-> the flash chip side.
+Part of my point was that you could possibly still use the same IP with
+only a modified (standard) register interface. That way no licensing of
+third party IP would be needed. You'd only need to rewrite parts of the
+IP to make it look (and behave) like the standard one.
 
-The issue is that almost the entire driver is controller side. The
-only bits that are the same (and not in all cases) are the OPCODEs,
-but they are one liners (21 lines out of 1153). Most of the
-controllers which use this stuff could reuse quite a bit of the m25p80
-driver as they just write the message containing the OPCODE as the
-m25p80 driver sets it up, but that's simply not the case with our
-controller. We would have to pull the OPCODE out and based on which
-one it is, we'd have to build our own message.
+That's exactly how 16550-compatible UARTs work, isn't it? Or even the
+way that USB (EHCI, ...) work. There's a standardize register interface,
+possibly with a way for vendor-specific extensions, but the interface
+itself doesn't need to be licensed, so there are no additional costs to
+supporting the standard interface. There are only the advantages of
+being able to reuse a well-tested body of code.
 
-Put it this way, if we tried to use the m25p80 our controller driver
-would most likely be twice as large and twice as complex as it is
-currently, which is exactly the inverse of what we're trying to
-achieve here.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/212df139/attachment.sig>
