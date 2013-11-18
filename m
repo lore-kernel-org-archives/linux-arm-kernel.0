@@ -1,41 +1,196 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Nov 2013 15:31:10 +0000
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <20131118151651.GE24408@sirena.org.uk>
-References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
- <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
- <20131118093229.GB13640@lee--X1>
- <20131118133940.GC14306@sirena.org.uk>
- <20131118142447.GJ13640@lee--X1>
- <20131118144512.GB24408@sirena.org.uk>
- <20131118145614.GM13640@lee--X1>
- <20131118151651.GE24408@sirena.org.uk>
-Message-ID: <20131118153110.GN13640@lee--X1>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 18 Nov 2013 16:37:51 +0100
+Subject: ARM topic: Is DT on ARM the solution, or is there something
+ better?
+In-Reply-To: <20131118124518.GA16735@n2100.arm.linux.org.uk>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020231134.GR25034@n2100.arm.linux.org.uk>
+ <20131021083242.GB30088@pengutronix.de>
+ <20131021084854.GV25034@n2100.arm.linux.org.uk>
+ <20131021092730.GF30088@pengutronix.de>
+ <CAF6AEGtt_2sStiZCNBp9btxevWghSwLZZBdN6ir8eUpX1FXrCQ@mail.gmail.com>
+ <20131024072811.GS30088@pengutronix.de>
+ <CAF6AEGuEho9Ms7ifTE-EmBoQ-=_AXgvGcJxi5qEC0vsZ+H9C+A@mail.gmail.com>
+ <20131118124518.GA16735@n2100.arm.linux.org.uk>
+Message-ID: <20131118153750.GM26046@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013, Mark Brown wrote:
-
-> On Mon, Nov 18, 2013 at 02:56:14PM +0000, Lee Jones wrote:
+On Mon, Nov 18, 2013 at 12:45:19PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Oct 24, 2013 at 05:21:54PM -0400, Rob Clark wrote:
+> > ahh, ok.  Yeah, we do need some way to make this easier, as it is a
+> > too-common pattern.  I do think we do need a way to know if something
+> > is missing because it isn't there vs it hasn't been probed yet.  Ie.
+> > late_initcall() is not the awesome solution.
 > 
-> > I think it's a good idea for people using the m25p80, but still
-> > doesn't effect us. All of our chips are dynamically probable. We are
+> On this topic, I now have a solution to this which is not DRM specific,
+> nor is it DT specific.
 > 
-> This doesn't seem realistic, you're assuming that system integrators
-> won't go and use chips you've not heard of and at least in the case of
-> things like quad read my understanding is that the commands aren't
-> standardised so the host just has to know what to write.
+> It's a core piece of code which gathers up the struct device pointers,
+> and a callback for the master device to assemble the components and
+> indicate when the master is complete.
+> 
+> Here's an example:
+> 
+>         imx-drm {
+>                 compatible = "fsl,drm";
+>                 /* Both CRTCs (can't specify which here) */
+>                 crtcs = <&ipu1>, <&ipu1>;
+>                 connectors = <&hdmi>;
+>         };
+> 
+> &hdmi {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_carrier1_hdmi>;
+>         ddc = <&i2c2>;
+>         status = "okay";
+>         crtcs = <&ipu1 0>;
+> };
+> 
+> The HDMI driver's probe and remove functions look like this:
+> 
+> static int imx_hdmi_platform_probe(struct platform_device *pdev)
+> {
+>         return component_add(&pdev->dev, &hdmi_ops);
+> }
+> 
+> static int imx_hdmi_platform_remove(struct platform_device *pdev)
+> {
+>         component_del(&pdev->dev, &hdmi_ops);
+>         return 0;
+> }
+> 
+> These register the device into the component layer, with a set of
+> operations for binding and unbinding the device.
+> 
+> The master device (imx-drm) does this:
+> 
+> static const struct component_master_ops imx_drm_ops = {
+>         .add_components = imx_drm_add_components,
+>         .bind = imx_drm_bind,
+>         .unbind = imx_drm_unbind,
+> };
+> 
+> static int imx_drm_platform_probe(struct platform_device *pdev)
+> {
+>         return component_master_add(&pdev->dev, &imx_drm_ops);
+> }
+> 
+> static int imx_drm_platform_remove(struct platform_device *pdev)
+> {
+>         component_master_del(&pdev->dev, &imx_drm_ops);
+>         return 0;
+> }
+> 
+> so registering the master device.  imx_drm_add_components() gets called
+> whenever something gets added, and this function is responsible for
+> assembling the registered components and indicating when the master is
+> complete:
+> 
+> static int imx_drm_add_components(struct device *master, struct master *m)
+> {
+>         struct device_node *np = master->of_node;
+>         unsigned i;
+>         int ret;
+> 
+>         for (i = 0; ; i++) {
+>                 struct device_node *node;
+> 
+>                 node = of_parse_phandle(np, "crtcs", i);
+>                 if (!node)
+>                         break;
+> 
+>                 ret = component_master_add_child(m, compare_parent_of, node);
+>                 of_node_put(node);
+> 
+>                 if (ret)
+>                         return ret;
+>         }
+> 
+>         for (i = 0; ; i++) {
+>                 struct device_node *node;
+> 
+>                 node = of_parse_phandle(np, "connectors", i);
+>                 if (!node)
+>                         break;
+> 
+>                 ret = component_master_add_child(m, compare_of, node);
+>                 of_node_put(node);
+> 
+>                 if (ret)
+>                         return ret;
+>         }
+>         return 0;
+> }
+> 
+> When it is complete (iow, this function returns zero), the master is
+> bound:
+> 
+> static int imx_drm_bind(struct device *dev)
+> {
+>         return drm_platform_init(&imx_drm_driver, to_platform_device(dev));
+> }
+> 
+> This causes DRM to start the construction of a drm_device, and call the
+> load callback.  In the load callback:
+> 
+>         /* Now try and bind all our sub-components */
+>         ret = component_bind_all(drm->dev, drm);
+>         if (ret)
+>                 goto err;
+> 
+> which binds the previously assembled components, with the drm_device
+> structure as their data - that's drm above:
+> 
+> static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
+> {
+>         struct platform_device *pdev = to_platform_device(dev);
+>         const struct of_device_id *of_id =
+>                                 of_match_device(imx_hdmi_dt_ids, dev);
+>         struct drm_device *drm = data;
+> ...
+> }
+> 
+> This allows the HDMI driver to register with DRM using the passed
+> struct drm_device pointer.  Other connectors do the same at this moment,
+> CRTCs also use this same mechanism, but with a higher priority, so CRTCs
+> get registered before connectors.
+> 
+> Teardown is similar to the above, but it happens in reverse order: when
+> any bound component or the master goes away, the master DRM device is
+> unbound, which triggers DRM to call the unload callback.
+> 
+> The unload callback unbinds the components, which triggers an unbind
+> call to each component in reverse order.
+> 
+> As I say, nothing in the above is specific to DRM; this can be re-used
+> by any subsystem.  It can also be re-used by non-DT setups as well via
+> appropriate .add_components callback and appropriate component matching
+> functions.
+> 
+> This addresses the componentised device problem in a completely generic
+> way.
 
-I'm not following? What are you suggesting?
+Very nice. This is in fact very similar to a skeleton I started to
+implement locally. The names vary to some degree, but the general
+approach is the same.
 
-After some analysis we have come to the conclusion that using m25p80
-is not feasible. It makes more sense for this to be an
-orthogonal/stand-alone driver.
+This also happens to be very similar to what Tegra DRM does, just as a
+set of helpers rather than a bus type. I like it a lot.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+In particular this gives every driver a good amount of flexibility to
+implement the matching in a way that's appropriate. On hardware where
+the relationships are hierarchical, a driver can use that to its
+advantage. Whenever that's not possible it can be done using phandles
+or any other meta data that fits the particular use-case.
+
+Do you have a branch somewhere that I could use to test this with?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/b2d274c7/attachment.sig>
