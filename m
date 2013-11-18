@@ -1,136 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 Nov 2013 00:06:02 +0100
-Subject: [PATCH v5 3/7] gpio: davinci: use irqdomain
-In-Reply-To: <528A2565.4000802@ti.com>
-References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
- <1383905510-31760-4-git-send-email-prabhakar.csengg@gmail.com>
- <CACRpkdaJg4wqtD5xhPVrHJHxFoVwau6jidbOuQ9xFSK_6drxPQ@mail.gmail.com>
- <528A2565.4000802@ti.com>
-Message-ID: <CACRpkda7h4hsMYv_2gdrY+JB80kHu3BkS5OOGyGhEZFc_UkCig@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 18 Nov 2013 18:11:08 -0500
+Subject: [PATCH] ARM: OMAP2+: Fix undefined reference to set_cntfreq
+In-Reply-To: <20131118215855.GW10317@atomide.com>
+References: <20131118215855.GW10317@atomide.com>
+Message-ID: <528A9E8C.9040903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 3:34 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> On 11/18/2013 03:11 PM, Linus Walleij wrote:
-
->> I think we recently established that map creating cannot be done
->> in gpio_to_irq* functions as that will not work properly if you request
->> an IRQ from device tree without first obtaining the IRQ from the GPIO
->> number with this function.
+On Monday 18 November 2013 04:58 PM, Tony Lindgren wrote:
+> If CONFIG_SOC_HAS_REALTIME_COUNTER is not selected for omap5
+> or dra7xx, we can get the following error:
+> 
+> arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_init':
+> :(.text+0x7ab0): undefined reference to `set_cntfreq'
+> 
+> Fix the issue by not trying to initalize the realtime counter
+> unles CONFIG_SOC_HAS_REALTIME_COUNTER is selected.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 >
-> Why? Could you point on corresponding thread, pls?
+How about a dummy inline function of set_cntfreq() ?
+Having #ifdef in middle of the code looks pretty ugly.
 
-All that contain this:
-"gpio: interrupt consistency check for OF GPIO IRQs"
-http://marc.info/?l=linux-kernel&w=2&r=1&s=interrupt+consistency&q=b
-
-> Current call tree is:
-> irq_create_of_mapping()
-> |-hwirq = omain->ops->xlate()
-> |-irq_create_mapping(domain, hwirq)
-
-OK that works for the pure device-tree scenario so mostly
-this is OK.
-
-The problem that appear is if someone is using platform data-provided
-IRQs off the irq_chip without calling gpio_to_irq() on the GPIO line
-first. This has been determined to be legal to do, so preferably
-create the map when registering the lines.
-
->> Also: please write a patch that marks the IRQ lines.
->> Call gpio_lock_as_irq(*gpio_chip, offset); in the
->> irqchip startup/shutdown functions. (Can be a separate
->> patch.)
->
-> It seems, some misunderstanding is here. So I'd like to clarify few points
-> and would be very appreciate for your comments:
-> 1) This patch itself will work unless we switch to DT (as in the following
-> patch)
-
-Sure.... but this does not seem to have much to do
-with my request to use gpio_lock_as_irq().
-
-> 2) After this patch the following object structure will be created during
-> Davinci GPIO driver initialization (DA850 has 144 IRQ lines):
-> - gpio_chip0(0..31)
->   |- irq_domain1
-> - gpio_chip1(32..63)
->   |- irq_domain2
-> - gpio_chip2(64..95)
->   |- irq_domain3
-> - gpio_chip3(96..127)
->   |- irq_domain4
-> - gpio_chip4(128..143)
->   |- irq_domain5
-
-OK that's nice.
-
-> 3) But in case of DT only one GPIO controller node will be created
-> Example:
-> gpio: gpio at 1e26000 {
->         compatible = "ti,dm6441-gpio";
->         gpio-controller;
->         reg = <0x226000 0x1000>;
->         interrupt-parent = <&intc>;
->         interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
->                 44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
->                 46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
->                 48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
->                 50 IRQ_TYPE_EDGE_BOTH>;
->         interrupt-controller;
->         #interrupt-cells = <2>;
->         ti,ngpio = <144>;
->         ti,davinci-gpio-unbanked = <0>;
-> }
-
-Yep...
-
-> 4) As result, to make GPIO bindings/mappings work - we'll need to implement
-> .of_xlate() callback per GPIO chip, which will provide us with valid valid
-> gpio_chip and offset of gpio inside chip
-> (It was discussed before and supposed to be done as next step).
-
-Yeah.. this is usually a bit tricky.
-
-> For example, gpio_chip3 and offset=15 should be selected:
-> devA {
->    gpios = <&gpio 111 GPIO_ACTIVE_HIGH>;
-> }
->
-> 5) What should be done to make GPIO IRQ bindings/mappings work?
->
-> Example:
-> devB {
->    interrupt-parent = <&gpio>;
->    interrupts = <111 IRQ_TYPE_EDGE_BOTH>;
-> }
->
-> Should we implement one IRQ domain per all GPIO chips (per GPIO controller)?
-
-I don't know, I cannot really see where the problem is.
-
-The IRQ domain is for translationg hardware numbers such as bit offsets
-into Linux IRQ numbers and nothing else, so I'd suggest that as long as
-the thing you are translating/mapping is something simple like a bit
-index you're doing the right thing.
-
-If it becomes something complex where that index is not just a bit
-but an index into an array of registers at various locations it is
-abusing the irqdomain.
-
-So I think you should create one irqdomain per GPIO instance
-or bank or whatever you want to call it: like if there is this one
-register with 32 bits, then it gets its own IRQdomain.
-
-I think you should try to keep the 5 irqdomains, but whatever
-gives the simplest code is usually the right answer, and
-divide-and-conquer (split down the problem) is usually a good
-idea.
-
-How the GPIO block(s) are represented in the device tree is
-another totally separate issue about hardware description,
-do not let the device tree model your driver structure.
-
-Yours,
-Linus Walleij
+> --- a/arch/arm/mach-omap2/omap-smp.c
+> +++ b/arch/arm/mach-omap2/omap-smp.c
+> @@ -65,12 +65,14 @@ static void omap4_secondary_init(unsigned int cpu)
+>  		omap_secure_dispatcher(OMAP4_PPA_CPU_ACTRL_SMP_INDEX,
+>  							4, 0, 0, 0, 0, 0);
+>  
+> +#ifdef CONFIG_SOC_HAS_REALTIME_COUNTER
+>  	/*
+>  	 * Configure the CNTFRQ register for the secondary cpu's which
+>  	 * indicates the frequency of the cpu local timers.
+>  	 */
+>  	if (soc_is_omap54xx() || soc_is_dra7xx())
+>  		set_cntfreq();
+> +#endif
+>  
+>  	/*
+>  	 * Synchronise with the boot thread.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
