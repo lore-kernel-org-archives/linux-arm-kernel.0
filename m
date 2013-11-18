@@ -1,76 +1,62 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 18 Nov 2013 21:35:22 +0200
-Subject: [PATCH 10/12] mtd: nand: davinci: don't set timings if AEMIF
- is used
-In-Reply-To: <5284DFE7.70308@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-11-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D53@DNCE04.ent.ti.com>
- <528307F0.6000805@ti.com> <52838941.4060207@ti.com> <5284ABB9.70608@ti.com>
- <5284DFE7.70308@ti.com>
-Message-ID: <528A6BFA.3030007@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Nov 2013 12:38:11 -0700
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <20131118192852.GI10335@titan.lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <cover.1384798508.git.jason@lakedaemon.net>
+ <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
+ <528A65DF.8060000@wwwdotorg.org>
+ <20131118191955.GG10335@titan.lakedaemon.net>
+ <528A6944.3070303@wwwdotorg.org>
+ <20131118192852.GI10335@titan.lakedaemon.net>
+Message-ID: <528A6CA3.9030904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2013 04:36 PM, Santosh Shilimkar wrote:
-> On Thursday 14 November 2013 05:53 AM, Nori, Sekhar wrote:
->> On Wednesday 13 November 2013 07:44 PM, Santosh Shilimkar wrote:
->>> On Wednesday 13 November 2013 12:02 AM, Sekhar Nori wrote:
->>>> On Monday 11 November 2013 10:40 PM, Khoronzhuk, Ivan wrote:
->>>>> If Davinci AEMIF is used we don't need to set timings and bus width.
->>>>> It is done by AEMIF driver (drivers/memory/davinci-aemfi.c).
+On 11/18/2013 12:28 PM, Jason Cooper wrote:
+> On Mon, Nov 18, 2013 at 12:23:48PM -0700, Stephen Warren wrote:
+>> On 11/18/2013 12:19 PM, Jason Cooper wrote:
+>>> On Mon, Nov 18, 2013 at 12:09:19PM -0700, Stephen Warren wrote:
+>>>> On 11/18/2013 11:38 AM, Jason Cooper wrote:
+>>>>> Unlike other build products in the Linux kernel, the devicetree blobs
+>>>>> are simply the name of their source file, s/dts/dtb/.  There is also no
+>>>>> 'make *install' mechanism to put them in a standard place with a
+>>>>> standard naming structure.
 >>>>>
->>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>>> ---
->>>>>   drivers/mtd/nand/davinci_nand.c |   22 +++++++++++++++-------
->>>>>   1 file changed, 15 insertions(+), 7 deletions(-)
+>>>>> Unfortunately, users have begun scripting pulling the needed dtbs from
+>>>>> within the kernel tree, thus hardcoding the dtbs names.  In turn, this
+>>>>> means any changes to the dts filenames breaks these scripts.
 >>>>>
->>>>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
->>>>> index 4705214..879e915 100644
->>>>> --- a/drivers/mtd/nand/davinci_nand.c
->>>>> +++ b/drivers/mtd/nand/davinci_nand.c
->>>>> @@ -742,27 +742,35 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
->>>>>                  goto err_clk_enable;
->>>>>          }
->>>>>
->>>>> +#if !IS_ENABLED(CONFIG_TI_DAVINCI_AEMIF)
->>>>
->>>> This is a hack! Just because AEMIF driver is enabled, it does not
->>>> guarantee that the timings have been setup by it. Instead of configuring
->>>> timings in two drivers, why not just convert everyone over to use the
->>>> new driver. Dont worry about breaking old platforms, I will help test
->>>> and ack them.
->>>>
->>> How about you take a stab at and convert the DaVinci code over to make
->>> use of new driver. We are trying to re-use as much as possible from the
->>> common drivers and also making an option so that the DaVinci arch can
->>> move over to these drivers if they want to.
+>>>>> This patch is an attempt to fix this problem.  Akin to 'make install',
+>>>>> this creates a new make target, dtbs_install.  The script that gets
+>>>>> called defers to a vendor or distribution supplied installdtbs binary,
+>>>>> if found in the system.  Otherwise, the default action is to install a
+>>>>> given dtb into
+>> ...
+>>>> This only appears to create ${compat}.dtb, and not ${dtb} too. 
+>>>
+>>> See my comment, above.
+>>>
+>>>> So, it doesn't seem to address part of the cover letter, "In addition,
+>>>> some vendors have done a diligent job naming their devicetree source
+>>>> files appropriately and we don't want to break their setups." Was that
+>>>> deliberate? If so, I guess I need to send some patches to U-Boot.
+>>>
+>>> I assume you are still pulling from arch/arm/boot/dts/*.dtb, right?
+>>> Those build products don't go away with this patch, so you should be
+>>> fine.  Unless I'm mis-understanding your workflow...
 >>
->> Sure I could.
->>
-> Thanks
->
->> Ivan,
->>
->> The AEMIF driver does not use platfrom_data currently. Is that something
->> you can add or you want me to take a stab at that as well?
->>
-> The AEMIF new driver is device tree only and thats the direction. So the
-> better thing would be to convert Davinci to DT and then make use of this
-> new driver. Thats how most of the new drivers used on arm socs are
-> moving. Adding platform data to new driver is a step in backward
-> direction so I would want to avoid that.
->
-> Once you start using new driver the $subject patch code skipping
-> is trivial. Till then I would like to proceed with current approach
-> which allows Nand support for Keystone.
->
-> Regards,
-> Santosh
->
+>> Yes, but I thought the whole point of this was that everyone would/could
+>> switch to running "make dtbs_install", then pulling out the files from
+>> the install tree, instead of any use-case requiring obtaining files
+>> directly from the source/build tree?
+> 
+> Yes, in the script, it checks for the existence of /sbin/installdtbs.
+> If it's there, it will override the default behavior and execute that
+> script.
 
-Agree with Santosh
-
--- 
-Regards,
-Ivan Khoronzhuk
+But that means everyone (a lot of people, and all distros) has to write,
+or at least download and install, such a script. Equally, that script
+would incorrectly affect the naming of non-Tegra DTBs that follow the
+new convention. The naming of the Tegra DTBs is based more on the fact
+that they're the Tegra DTBs than the fact that I'm using them.
