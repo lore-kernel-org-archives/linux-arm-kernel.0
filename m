@@ -1,157 +1,63 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 18 Nov 2013 16:34:13 +0200
-Subject: [PATCH v5 3/7] gpio: davinci: use irqdomain
-In-Reply-To: <CACRpkdaJg4wqtD5xhPVrHJHxFoVwau6jidbOuQ9xFSK_6drxPQ@mail.gmail.com>
-References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>	<1383905510-31760-4-git-send-email-prabhakar.csengg@gmail.com>
- <CACRpkdaJg4wqtD5xhPVrHJHxFoVwau6jidbOuQ9xFSK_6drxPQ@mail.gmail.com>
-Message-ID: <528A2565.4000802@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Nov 2013 15:37:52 +0100
+Subject: [PATCH] ARM: mxs: cfa10049: Add NAU7802 ADCs to the device tree
+Message-ID: <1384785472-16544-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-On 11/18/2013 03:11 PM, Linus Walleij wrote:
-> On Fri, Nov 8, 2013 at 11:11 AM, Prabhakar Lad
-> <prabhakar.csengg@gmail.com> wrote:
->
->> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>
->> This patch converts the davinci gpio driver to use irqdomain
->> support.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->
-> (...)
->> @@ -282,8 +283,7 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->>          desc->irq_data.chip->irq_ack(&desc->irq_data);
->>          while (1) {
->>                  u32             status;
->> -               int             n;
->> -               int             res;
->> +               int             bit;
->
-> Why is this an int? I think u8 would suffice.
->
->>                  /* now demux them to the right lowlevel handler */
->> -               n = d->irq_base;
->> -               if (irq & 1) {
->> -                       n += 16;
->> -                       status >>= 16;
->> -               }
->> -
->>                  while (status) {
->> -                       res = ffs(status);
->> -                       n += res;
->> -                       generic_handle_irq(n - 1);
->> -                       status >>= res;
->> +                       bit = __ffs(status);
->> +                       status &= ~(1 << bit);
->> +                       generic_handle_irq(irq_find_mapping(d->irq_domain,
->> +                                                           bit));
->
-> This is a nice hunk of the patch.
->
-> I would use <linux/bitops.h> and do:
-> status &= ~BIT(bit);
->
->
->> @@ -313,10 +307,7 @@ static int gpio_to_irq_banked(struct gpio_chip *chip, unsigned offset)
->>   {
->>          struct davinci_gpio_controller *d = chip2controller(chip);
->>
->> -       if (d->irq_base >= 0)
->> -               return d->irq_base + offset;
->> -       else
->> -               return -ENODEV;
->> +       return irq_create_mapping(d->irq_domain, offset);
->>   }
->
-> I think we recently established that map creating cannot be done
-> in gpio_to_irq* functions as that will not work properly if you request
-> an IRQ from device tree without first obtaining the IRQ from the GPIO
-> number with this function.
+The Crystalfontz CFA-10049 has 3 Nuvoton NAU7802 ADCs, plugged behing a
+GPIO-controlled I2C muxer because these ADCs don't have a configurable
+address.
 
-Why? Could you point on corresponding thread, pls?
-Current call tree is:
-irq_create_of_mapping()
-|-hwirq = omain->ops->xlate()
-|-irq_create_mapping(domain, hwirq)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10049.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
->
-> Instead call irq_create_mapping() on *all* used IRQ lines in the
-> probe function and use irq_find_mapping() here too.
->
->> +       for (gpio = 0, bank = 0; gpio < ngpio; bank++, bank_irq++, gpio += 16) {
->>                  /* disabled by default, enabled only as needed */
->>                  g = gpio2regs(gpio);
->>                  writel(~0, &g->clr_falling);
->> @@ -467,14 +483,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->>                   */
->>                  irq_set_handler_data(bank_irq, &chips[gpio / 32]);
->
-> So for example here you could call iurq_create_mapping();
->
-> Also: please write a patch that marks the IRQ lines.
-> Call gpio_lock_as_irq(*gpio_chip, offset); in the
-> irqchip startup/shutdown functions. (Can be a separate
-> patch.)
-
-It seems, some misunderstanding is here. So I'd like to clarify few 
-points and would be very appreciate for your comments:
-1) This patch itself will work unless we switch to DT (as in the 
-following patch)
-
-2) After this patch the following object structure will be created 
-during Davinci GPIO driver initialization (DA850 has 144 IRQ lines):
-- gpio_chip0(0..31)
-   |- irq_domain1
-- gpio_chip1(32..63)
-   |- irq_domain2
-- gpio_chip2(64..95)
-   |- irq_domain3
-- gpio_chip3(96..127)
-   |- irq_domain4
-- gpio_chip4(128..143)
-   |- irq_domain5
-
-3) But in case of DT only one GPIO controller node will be created
-Example:
-gpio: gpio at 1e26000 {
-	compatible = "ti,dm6441-gpio";
-	gpio-controller;
-	reg = <0x226000 0x1000>;
-	interrupt-parent = <&intc>;
-	interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
-		44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
-		46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
-		48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
-		50 IRQ_TYPE_EDGE_BOTH>;
-	interrupt-controller;
-	#interrupt-cells = <2>;
-	ti,ngpio = <144>;
-	ti,davinci-gpio-unbanked = <0>;
-}
-
-4) As result, to make GPIO bindings/mappings work - we'll need to 
-implement .of_xlate() callback per GPIO chip, which will provide us with 
-valid valid gpio_chip and offset of gpio inside chip
-(It was discussed before and supposed to be done as next step).
-
-For example, gpio_chip3 and offset=15 should be selected:
-devA {
-    gpios = <&gpio 111 GPIO_ACTIVE_HIGH>;
-}
-
-5) What should be done to make GPIO IRQ bindings/mappings work?
-
-Example:
-devB {
-    interrupt-parent = <&gpio>;
-    interrupts = <111 IRQ_TYPE_EDGE_BOTH>;
-}
-
-Should we implement one IRQ domain per all GPIO chips (per GPIO controller)?
-
-Thanks.
-
-Regards,
--Grygorii
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index 06e4cfaf7dd2..9a0e913e92aa 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -229,15 +229,39 @@
+ 				i2c-parent = <&i2c1>;
+ 
+ 				i2c at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <0>;
++
++					adc0: nau7802 at 2a {
++						compatible = "nuvoton,nau7802";
++						reg = <0x2a>;
++						nuvoton,vldo = <3000>;
++					};
+ 				};
+ 
+ 				i2c at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <1>;
++
++					adc1: nau7802 at 2a {
++						compatible = "nuvoton,nau7802";
++						reg = <0x2a>;
++						nuvoton,vldo = <3000>;
++					};
+ 				};
+ 
+ 				i2c at 2 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <2>;
++
++					adc2: nau7802 at 2a {
++						compatible = "nuvoton,nau7802";
++						reg = <0x2a>;
++						nuvoton,vldo = <3000>;
++					};
+ 				};
+ 
+ 				i2c at 3 {
+-- 
+1.8.4.2
