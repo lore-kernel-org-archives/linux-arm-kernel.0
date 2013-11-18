@@ -1,50 +1,39 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 18 Nov 2013 15:29:54 +0200
-Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
-In-Reply-To: <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
- <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
- <5280E617.3000004@ti.com>
- <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
-Message-ID: <528A1652.4000806@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 18 Nov 2013 13:39:40 +0000
+Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
+ bit logic defines
+In-Reply-To: <20131118093229.GB13640@lee--X1>
+References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
+ <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
+ <20131118093229.GB13640@lee--X1>
+Message-ID: <20131118133940.GC14306@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-11 16:30, Dr. H. Nikolaus Schaller wrote:
+On Mon, Nov 18, 2013 at 09:32:29AM +0000, Lee Jones wrote:
 
-> Maybe it looks as if it is an unsolvable problem. The OPA works only if acbias
-> and bypass are enabled, but is not allowed to tell that it is there.
+> I've actually travelled down the route of separating the SPI
+> Controller parts to drivers/spi. It's possible to do that and perhaps
+> we could then use the generic m25p80 Serial Flash driver as the
+> back-end, but it would be incredibly complicated and would mean we'd
+> need to duplicate almost all of the m25p80 driver into the SPI
+> Controller. The Falcon SPI driver tried to do something similar, but
+> now looks broken due to some incompatible changes in m25p80. We also
+> want to avoid putting ourselves in that position of fragility.
 
-That's why the board file or dts file is there, to have "glue" data to
-make different pieces work together.
-
-The perfect (?) solution would be a CDF like data. The idea would be
-that in the board file, you would describe configuration options for
-VENC and for OPA. In this particular case, you'd tell VENC that it needs
-to enable acbias and bypass when OPA is to be connected to VENC. Then
-there could be more entries for VENC, saying disable acbias and bypass
-when BAR is to be connected to VENC.
-
-However, we don't have such support (yet).
-
-For now, I hope it's enough if we handle VENC in a "single
-configuration" manner, i.e. you'll tell VENC to enable acbias and bypass
-when VENC is enabled. This means you can't have board setups where you'd
-change the VENC->OPA connection to some other analog tv output at
-runtime. I hope that's the case (i.e. OPA is always in use on that board).
-
-If so, then I think you can just pass the acbias and bypass
-configuration values via omapdss platform data. And VENC driver will use
-them to configure those. OPA doesn't know anything about this at all.
-
- Tomi
-
-
+What I've said to people doing similar drivers before is that it seems
+like there should be an abstraction added in the MTD framework for SPI
+flash controllers like this is that if there is genunie flash-specific
+stuff going on then the mp25p80 driver ought to be split so that the
+code that understands what commands to send to the flash chip is split
+out from the code that actually sends those commands to the chip.  The
+existing SPI support would then be a function driver for this.  This
+would mean we don't need to support the flash chips multiple times.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/0cbad3b4/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/d3234a26/attachment.sig>
