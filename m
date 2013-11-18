@@ -1,28 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Nov 2013 14:54:00 +0000
-Subject: [PATCHv7] dmaengine: Add support for BCM2835
-In-Reply-To: <1384785017.14845.214.camel@smile>
-References: <5288E327.8050809@koalo.de> <1384768816.14845.186.camel@smile>
- <528A051A.7000703@koalo.de> <1384785017.14845.214.camel@smile>
-Message-ID: <20131118145400.GE16735@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Nov 2013 15:52:02 +0100
+Subject: [PATCH] ARM: cfa10036: Add dr_mode and phy_type properties to the DT
+Message-ID: <1384786322-17168-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 04:30:17PM +0200, Andy Shevchenko wrote:
-> On Mon, 2013-11-18 at 13:16 +0100, Florian Meier wrote:
-> > >> +	uint32_t chans_available;
-> > > 
-> > > Why uint32_t?
-> > 
-> > Because it is a bit mask of fixed length that directly comes from the
-> > firmware.
-> 
-> Like one already told you in your i2s patch, please, change that to
-> corresponding u* value, namely u32.
+This USB port is only used as peripheral. Set it accordingly in its DT
+node.
 
-There's no problem with uint32_t vs u32 - either will do.  u32 is the
-pre-stdint.h Linux definition of a 32-bit unsigned integer.  There's
-no reason why uint32_t isn't perfectly acceptable.  It's a matter of
-author taste which gets used.  (Except where modifications are to an
-existing chunk of code using one or the other - where consistency then
-matters more.)
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10036.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index 1ec8c94bbac9..94e73e2cd4f8 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -101,6 +101,8 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&usb0_otg_cfa10036>;
+ 			status = "okay";
++			dr_mode = "peripheral";
++			phy_type = "utmi";
+ 		};
+ 	};
+ 
+-- 
+1.8.4.2
