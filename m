@@ -1,77 +1,324 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Nov 2013 09:32:29 +0000
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
-References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
- <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
-Message-ID: <20131118093229.GB13640@lee--X1>
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Mon, 18 Nov 2013 10:00:39 +0000
+Subject: [PATCHv7] dmaengine: Add support for BCM2835
+In-Reply-To: <5288E327.8050809@koalo.de>
+References: <5288E327.8050809@koalo.de>
+Message-ID: <1384768816.14845.186.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013, Linus Walleij wrote:
+On Sun, 2013-11-17 at 16:39 +0100, Florian Meier wrote:
+> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
+> Currently it only supports cyclic DMA.
 
-> On Thu, Nov 14, 2013 at 3:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > Here we provide the FSM's register addresses, register bit names/offsets
-> > and some commands which will prove useful as we start bulk the FMS's
-> > driver out with functionality.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> OK...
-> 
-> > +/*
-> > + * FSM SPI Controller Registers
-> > + */
-> > +#define SPI_CLOCKDIV                   0x0010
-> > +#define SPI_MODESELECT                 0x0018
-> > +#define SPI_CONFIGDATA                 0x0020
-> (...)
-> 
-> So what we want to know here is whether this is a general-purpose
-> SPI block, or if it's a special-purpose SPI block that can only be
-> used for accessing flashes.
-> 
-> If it's the former that part should be broken out into drivers/spi
-> of course...
-> 
-> But the register map seems a bit special-purpose so it could
-> very well be that this is for flash control only. So maybe you can
-> spill some beans from a datasheet here?
-> 
-> A clock divider at offset 0x10 already tells us that this is probably
-> a PL022 derivate, just that we don't know how much it has
-> been hacked with... does this thing contain AMBA identifiers
-> at the end of the IO-region, usually at 0x0fe0 thru 0x0fff?
+Few comments below.
 
-You've just opened a massive can of worms. Let me try to catch and put
-them all back as quickly as possible.
+> +++ b/drivers/dma/bcm2835-dma.c
+> @@ -0,0 +1,736 @@
 
-The FSM Controller is a derivative of an SPI controller, but it's so
-highly specialised that it can't do anything else but talk to Serial
-Flash devices.
+> +static int bcm2835_dma_abort(void __iomem *chan_base)
+> +{
+> +	unsigned long int cs;
+> +	long int timeout = 10000;
+> +
+> +	cs = readl(chan_base + BCM2835_DMA_CS);
+> +	if (!(cs & BCM2835_DMA_ACTIVE))
+> +		return 0;
+> +
+> +	/* Write 0 to the active bit - Pause the DMA */
+> +	writel(0, chan_base + BCM2835_DMA_CS);
+> +
+> +	/* Wait for any current AXI transfer to complete */
+> +	while ((cs & BCM2835_DMA_ISPAUSED) && --timeout >= 0)
+> +		cs = readl(chan_base + BCM2835_DMA_CS);
 
-I've actually travelled down the route of separating the SPI
-Controller parts to drivers/spi. It's possible to do that and perhaps
-we could then use the generic m25p80 Serial Flash driver as the
-back-end, but it would be incredibly complicated and would mean we'd
-need to duplicate almost all of the m25p80 driver into the SPI
-Controller. The Falcon SPI driver tried to do something similar, but
-now looks broken due to some incompatible changes in m25p80. We also
-want to avoid putting ourselves in that position of fragility.
+I actually don't see timeout here. timeout means counter in your case.
+Might be better to have something like
 
-There are a list of other reasons why this wouldn't work well. I have
-asked the original author of this driver (whom I've spent quite a few
-hours in face-to-face meetings with over the past couple of weeks) to 
-jot them all down so I can reply to these kinds of requests, but I
-just don't have it yet.
+while (readl(...) & BCM2835_DMA_ISPAUSED && --timeout)
+cpu_relax();
 
-Take my word for it for now and I'll get back to you when I can.
+?
+
+> +	/* We'll un-pause when we set of our next DMA */
+> +	if (cs & BCM2835_DMA_ISPAUSED)
+
+if (!timeout)
+
+> +		return -ETIMEDOUT;
+
+
+> +
+> +	if (!(cs & BCM2835_DMA_ACTIVE))
+> +		return 0;
+
+Duplicate code. Perhaps
+static inline bool is_chan_not_active(unsigned long cs)
+{
+return !(cs & BCM2835_DMA_ACTIVE);
+}
+
+[]
+
+> +static irqreturn_t bcm2835_dma_callback(int irq, void *data)
+> +{
+
+[]
+
+> +	writel(BCM2835_DMA_ACTIVE, c->chan_base + BCM2835_DMA_CS);
+
+Since it's duplicate code, perhaps
+
+static inline void set_chan_active(void __iomem *base)
+{
+writel(BCM2835_DMA_ACTIVE, base + BCM2835_DMA_CS);
+}
+
+[]
+
+> +static size_t bcm2835_dma_desc_size_pos(struct bcm2835_desc *d, dma_addr_t addr)
+> +{
+> +	unsigned i;
+
+In some cases you use 'unsigned long int' for 'unsigned long', for
+example, but here 'unsigned' instead of 'unsigned int'. Please, align
+style with certain choice.
+
+[]
+
+> +static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
+> +	dma_cookie_t cookie, struct dma_tx_state *txstate)
+> +{
+
+[]
+
+> +	} else {
+> +		txstate->residue = 0;
+
+Useless assignment since dmaengine will do this for you in
+dma_cookie_status.
+
+[]
+
+> +static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
+> +	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+> +	size_t period_len, enum dma_transfer_direction direction,
+> +	unsigned long flags, void *context)
+> +{
+
+[]
+
+> +	/* Grab configuration */
+> +	if (direction == DMA_DEV_TO_MEM) {
+> +		dev_addr = c->cfg.src_addr;
+> +		dev_width = c->cfg.src_addr_width;
+> +		sync_type = BCM2835_DMA_S_DREQ;
+> +	} else if (direction == DMA_MEM_TO_DEV) {
+> +		dev_addr = c->cfg.dst_addr;
+> +		dev_width = c->cfg.dst_addr_width;
+> +		sync_type = BCM2835_DMA_D_DREQ;
+> +	} else {
+> +		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
+> +		return NULL;
+> +	}
+
+You might use following as well
+
+if (!is_slave_direction) {
+ dev_err(...);
+ return NULL;
+}
+
+if (direction == DMA_DEV_TO_MEM)
+{
+...
+} else {
+...
+}
+
+?
+
+At least it will be aligned with what you have further in this function.
+
+> +	/* Bus width translates to the element size (ES) */
+> +	switch (dev_width) {
+> +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> +		es = BCM2835_DMA_DATA_TYPE_S32;
+> +		break;
+> +	default:
+> +		return NULL;
+> +	}
+
+So, you use switch-case on hope to extend it later, correct?
+
+[]
+
+> +static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
+> +{
+> +	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(c->vc.chan.device);
+> +	unsigned long flags;
+> +	int timeout = 1000;
+> +	LIST_HEAD(head);
+
+[]
+
+> +	if (c->desc) {
+> +		c->desc = NULL;
+> +		bcm2835_dma_abort(c->chan_base);
+> +
+> +		/* Wait for stopping */
+> +		while (timeout > 0) {
+> +			timeout--;
+
+while (--timeout)
+
+> +			if (!(readl(c->chan_base + BCM2835_DMA_CS) &
+> +						BCM2835_DMA_ACTIVE))
+> +				break;
+> +
+> +			cpu_relax();
+> +		}
+> +
+> +		if (timeout <= 0)
+
+if (!timeout)
+
+[]
+
+> +static struct dma_chan *bcm2835_dma_xlate(struct of_phandle_args *spec,
+> +					   struct of_dma *ofdma)
+> +{
+> +	struct bcm2835_dmadev *d = ofdma->of_dma_data;
+> +	struct dma_chan *chan, *candidate;
+> +
+> +retry:
+> +	candidate = NULL;
+> +
+> +	/* Walk the list of channels registered with the current instance and
+> +	 * find one that is currently unused */
+> +	list_for_each_entry(chan, &d->ddev.channels, device_node)
+> +		if (chan->client_count == 0) {
+> +			candidate = chan;
+> +			break;
+> +		}
+> +
+> +	if (!candidate)
+> +		return NULL;
+> +
+> +	/* dma_get_slave_channel will return NULL if we lost a race between
+> +	 * the lookup and the reservation */
+> +	chan = dma_get_slave_channel(candidate);
+> +
+> +	if (chan) {
+
+Perhaps
+
+if (!chan)
+goto retry;
+
+
+> +		struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+> +
+> +		/* Set DREQ from param */
+> +		c->dreq = spec->args[0];
+> +
+> +		return chan;
+> +	}
+> +
+> +	goto retry;
+> +}
+
+> +static int bcm2835_dma_probe(struct platform_device *pdev)
+> +{
+> +	struct bcm2835_dmadev *od;
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	int rc;
+> +	int i;
+> +	int irq;
+> +	uint32_t chans_available;
+
+Why uint32_t?
+
+[]
+
+> +	if (pdev->dev.of_node) {
+
+Perhaps
+
+if (!...of_node) {
+ ...
+ return -EINVAL;
+}
+
+> +		/* Request DMA channel mask from device tree */
+> +		if (of_property_read_u32(pdev->dev.of_node,
+> +				"brcm,dma-channel-mask",
+> +				&chans_available)) {
+> +			dev_err(&pdev->dev, "Failed to get channel mask\n");
+> +			bcm2835_dma_free(od);
+> +			return -EINVAL;
+> +		}
+> +	} else {
+> +		dev_err(&pdev->dev, "Failed to get channel mask. No device tree.\n");
+> +		bcm2835_dma_free(od);
+> +		return -EINVAL;
+> +	}
+
+> +	dev_dbg(&pdev->dev, "Initialized %i DMA channels\n", i);
+> +
+> +	if (pdev->dev.of_node) {
+
+Does it make sense?
+
+> +		/* Device-tree DMA controller registration */
+> +		rc = of_dma_controller_register(pdev->dev.of_node,
+> +				bcm2835_dma_xlate, od);
+> +		if (rc) {
+> +			dev_err(&pdev->dev, "Failed to register DMA controller\n");
+> +			bcm2835_dma_free(od);
+> +			return rc;
+
+goto err_no_dma;
+
+> +		}
+> +	}
+> +
+> +	rc = dma_async_device_register(&od->ddev);
+> +	if (rc) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to register slave DMA engine device: %d\n", rc);
+> +		bcm2835_dma_free(od);
+> +		return rc;
+
+goto err_no_dma;
+
+> +	}
+> +
+> +	dev_dbg(&pdev->dev, "Load BCM2835 DMA engine driver\n");
+
+
+> +	return rc;
+
+return 0;
+
+err_no_dma:
+bcm2835_dma_free(od);
+return rc;
+
+?
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
