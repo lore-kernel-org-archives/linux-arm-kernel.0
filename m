@@ -1,63 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Nov 2013 15:37:52 +0100
-Subject: [PATCH] ARM: mxs: cfa10049: Add NAU7802 ADCs to the device tree
-Message-ID: <1384785472-16544-1-git-send-email-maxime.ripard@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 Nov 2013 14:40:32 +0000
+Subject: [PATCH V3 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <CAPrCYkf0KH0zKFrFwG6XK1Kz2dsKUZC1wL5ONhNGvY3BLM8QGQ@mail.gmail.com>
+References: <1384780949-10922-1-git-send-email-vkale@apm.com>
+ <1384780949-10922-3-git-send-email-vkale@apm.com>
+ <3545e6650079200b6b364df14ef14a4f@www.loen.fr>
+ <CAPrCYkf0KH0zKFrFwG6XK1Kz2dsKUZC1wL5ONhNGvY3BLM8QGQ@mail.gmail.com>
+Message-ID: <4103ca6ab0e769ce07a327fcb5ade0d1@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Crystalfontz CFA-10049 has 3 Nuvoton NAU7802 ADCs, plugged behing a
-GPIO-controlled I2C muxer because these ADCs don't have a configurable
-address.
+On 2013-11-18 14:18, Vinayak Kale wrote:
+> On Mon, Nov 18, 2013 at 7:16 PM, Marc Zyngier <marc.zyngier@arm.com> 
+> wrote:
+>> Vinayak,
+>>
+>>
+>> On 2013-11-18 13:22, Vinayak Kale wrote:
+>>>
+>>> Add support for irq registration when pmu interrupt is percpu.
+>>>
+>>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>>> Signed-off-by: Tuan Phan <tphan@apm.com>
+>>> ---
+>>>  arch/arm64/kernel/perf_event.c |  102
+>>> +++++++++++++++++++++++++++++-----------
+>>>  1 file changed, 74 insertions(+), 28 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/perf_event.c
+>>> b/arch/arm64/kernel/perf_event.c
+>>> index cea1594..23475f6 100644
+>>> --- a/arch/arm64/kernel/perf_event.c
+>>> +++ b/arch/arm64/kernel/perf_event.c
+>>> @@ -22,6 +22,7 @@
+>>>
+>>>  #include <linux/bitmap.h>
+>>>  #include <linux/interrupt.h>
+>>> +#include <linux/irq.h>
+>>>  #include <linux/kernel.h>
+>>>  #include <linux/export.h>
+>>>  #include <linux/perf_event.h>
+>>> @@ -363,22 +364,51 @@ validate_group(struct perf_event *event)
+>>>  }
+>>>
+>>>  static void
+>>> +armpmu_disable_percpu_irq(void *data)
+>>> +{
+>>> +       struct arm_pmu *armpmu = data;
+>>> +       struct platform_device *pmu_device = armpmu->plat_device;
+>>> +       int irq = platform_get_irq(pmu_device, 0);
+>>> +
+>>> +       cpumask_test_and_clear_cpu(smp_processor_id(),
+>>> &armpmu->active_irqs);
+>>> +       disable_percpu_irq(irq);
+>>> +}
+>>> +
+>>> +static void
+>>>  armpmu_release_hardware(struct arm_pmu *armpmu)
+>>>  {
+>>>         int i, irq, irqs;
+>>>         struct platform_device *pmu_device = armpmu->plat_device;
+>>>
+>>> -       irqs = min(pmu_device->num_resources, num_possible_cpus());
+>>> +       irq = platform_get_irq(pmu_device, 0);
+>>>
+>>> -       for (i = 0; i < irqs; ++i) {
+>>> -               if (!cpumask_test_and_clear_cpu(i, 
+>>> &armpmu->active_irqs))
+>>> -                       continue;
+>>> -               irq = platform_get_irq(pmu_device, i);
+>>> -               if (irq >= 0)
+>>> -                       free_irq(irq, armpmu);
+>>> +       if (irq_to_desc(irq) && irq_is_percpu(irq)) {
+>>
+>>
+>> Why do you need to check the irq_desc here? It really looks like a 
+>> misuse of
+>> the API.
+> I don't think it's being misused. In case of invalid irq number, the
+> API would return null.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+And feeding an error code to irq_to_desc() doesn't disturb you?
+Do you call that a normal use of the API? Humfff....
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 06e4cfaf7dd2..9a0e913e92aa 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -229,15 +229,39 @@
- 				i2c-parent = <&i2c1>;
- 
- 				i2c at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <0>;
-+
-+					adc0: nau7802 at 2a {
-+						compatible = "nuvoton,nau7802";
-+						reg = <0x2a>;
-+						nuvoton,vldo = <3000>;
-+					};
- 				};
- 
- 				i2c at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <1>;
-+
-+					adc1: nau7802 at 2a {
-+						compatible = "nuvoton,nau7802";
-+						reg = <0x2a>;
-+						nuvoton,vldo = <3000>;
-+					};
- 				};
- 
- 				i2c at 2 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <2>;
-+
-+					adc2: nau7802 at 2a {
-+						compatible = "nuvoton,nau7802";
-+						reg = <0x2a>;
-+						nuvoton,vldo = <3000>;
-+					};
- 				};
- 
- 				i2c at 3 {
+         M.
 -- 
-1.8.4.2
+Fast, cheap, reliable. Pick two.
