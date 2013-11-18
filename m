@@ -1,36 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 18 Nov 2013 11:25:52 -0800
-Subject: ACPI vs DT at runtime
-In-Reply-To: <5289A4F3.5040203@jonmasters.org>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <5289A356.4060004@jonmasters.org> <5289A4F3.5040203@jonmasters.org>
-Message-ID: <20131118192552.GD5886@quad.lixom.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Nov 2013 19:28:32 +0000
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
+ device tree case
+In-Reply-To: <20131118192256.GU10317@atomide.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-2-git-send-email-tony@atomide.com>
+ <20131118102907.GC13640@lee--X1>
+ <20131118172510.GI16038@saruman.home>
+ <20131118174638.GQ13640@lee--X1>
+ <20131118181110.GM10317@atomide.com>
+ <20131118190921.GT13640@lee--X1>
+ <20131118192256.GU10317@atomide.com>
+Message-ID: <20131118192832.GU13640@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 12:26:11AM -0500, Jon Masters wrote:
-> On 11/18/2013 12:19 AM, Jon Masters wrote:
+On Mon, 18 Nov 2013, Tony Lindgren wrote:
+
+> * Lee Jones <lee.jones@linaro.org> [131118 11:10]:
+> > > > Are you Acking this patch by the way?
+> > > 
+> > > If this looks acceptable to you guys, I'd like to merge this via my fixes
+> > > branch this week with your acks if that works for you. That way I can base
+> > > my omap legacy platform data removal patches on my fixes branch while keep
+> > > things working for the drivers. Alternatively I can naturally base my
+> > > legacy data removal on -rc2 too if this gets merged to mainline by then 
+> > > via the MFD tree.
+> > 
+> > I can either send it up for the -rcs, or I can create an immutable
+> > branch for you to pull from. That way the patch can do in via ARM-SoC
+> > and MFD and we can let Git sort it out.
 > 
-> > It's going to be a messy thing to even attempt. Look, I wish we had a
-> > time machine and could have done this whole thing years ago, but I'm not
-> > sure it would have gone differently. ACPI is something a lot of people
-> > emotionally hate. In the Enterprise space myself and others *need* it
-> > (along with UEFI) to have a scalable solution that doesn't result in an
-> > onslaught of customer support calls, which a non-standards body backed
-> > moving target of DTB will do. And besides all of the big boys are going
-> > to be using ACPI whether it's liked much or not.
-> 
-> A while ago I mentioned producing a series of requirements that
-> articulates what Red Hat thinks an ARMv8 server looks like. Suffice it
-> to say that such requirements do in fact exist, and will be made
-> available in the not too distant future as part of another doc.
+> OK great, I'd prefer an immutable branch that I can merge in too. Then
+> you can bundle it with other MFD fixes for the -rc series and send it
+> in when it suits you :)
 
-It's nice that there's an unpublished document with a RedHat logo on it
-somewhere that mandates what we, the kernel project, is going to do.
+That's fine. It's 19:30 here now and I still have a shed load of
+debugging to do, so I'll deal with this tomorrow if it's all the same
+to you?
 
-I thought both RedHat and you personally knew that we don't do things
-that way in the kernel, Jon. Published or not.
-
-
--Olof
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
