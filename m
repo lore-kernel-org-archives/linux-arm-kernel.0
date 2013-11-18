@@ -1,222 +1,81 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Mon, 18 Nov 2013 19:48:31 +0530
-Subject: [PATCH V3 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <3545e6650079200b6b364df14ef14a4f@www.loen.fr>
-References: <1384780949-10922-1-git-send-email-vkale@apm.com>
- <1384780949-10922-3-git-send-email-vkale@apm.com>
- <3545e6650079200b6b364df14ef14a4f@www.loen.fr>
-Message-ID: <CAPrCYkf0KH0zKFrFwG6XK1Kz2dsKUZC1wL5ONhNGvY3BLM8QGQ@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Mon, 18 Nov 2013 16:21:06 +0200
+Subject: Fwd: [PATCH 4/8] watchdog: davinci: add GET_STATUS option support
+In-Reply-To: <528828E7.6060404@roeck-us.net>
+References: <1383680783-12114-5-git-send-email-ivan.khoronzhuk@ti.com>
+ <527A28CE.2070802@ti.com> <528828E7.6060404@roeck-us.net>
+Message-ID: <528A2252.7040605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 7:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Vinayak,
->
->
-> On 2013-11-18 13:22, Vinayak Kale wrote:
+On 11/17/2013 04:24 AM, Guenter Roeck wrote:
+> On 11/06/2013 03:32 AM, ivan.khoronzhuk wrote:
+>> When watchdog timer is expired we can know about it thought
+> 
+> thought -> through or with
+> 
+
+Ok
+
+>> GET_STATUS ioctl option.
 >>
->> Add support for irq registration when pmu interrupt is percpu.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 >> ---
->>  arch/arm64/kernel/perf_event.c |  102
->> +++++++++++++++++++++++++++++-----------
->>  1 file changed, 74 insertions(+), 28 deletions(-)
+>>   drivers/watchdog/davinci_wdt.c |   13 +++++++++++++
+>>   1 file changed, 13 insertions(+)
 >>
->> diff --git a/arch/arm64/kernel/perf_event.c
->> b/arch/arm64/kernel/perf_event.c
->> index cea1594..23475f6 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -22,6 +22,7 @@
+>> diff --git a/drivers/watchdog/davinci_wdt.c 
+>> b/drivers/watchdog/davinci_wdt.c
+>> index 6cbf2e1..a371b2d 100644
+>> --- a/drivers/watchdog/davinci_wdt.c
+>> +++ b/drivers/watchdog/davinci_wdt.c
+>> @@ -144,6 +144,18 @@ static unsigned int 
+>> davinci_wdt_get_timeleft(struct watchdog_device *wdd)
+>>       return wdd->timeout - timer_counter;
+>>   }
 >>
->>  #include <linux/bitmap.h>
->>  #include <linux/interrupt.h>
->> +#include <linux/irq.h>
->>  #include <linux/kernel.h>
->>  #include <linux/export.h>
->>  #include <linux/perf_event.h>
->> @@ -363,22 +364,51 @@ validate_group(struct perf_event *event)
->>  }
->>
->>  static void
->> +armpmu_disable_percpu_irq(void *data)
+>> +static unsigned int davinci_wdt_status(struct watchdog_device *wdd)
 >> +{
->> +       struct arm_pmu *armpmu = data;
->> +       struct platform_device *pmu_device = armpmu->plat_device;
->> +       int irq = platform_get_irq(pmu_device, 0);
+>> +    u32 val;
+>> +    struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
 >> +
->> +       cpumask_test_and_clear_cpu(smp_processor_id(),
->> &armpmu->active_irqs);
->> +       disable_percpu_irq(irq);
+>> +    val = ioread32(davinci_wdt->base + WDTCR);
+>> +    if (val & WDFLAG)
+>> +        return WDIOF_CARDRESET;
+>> +
+>      "Card previously reset the CPU"
+> 
+> Is this really accurate / correct ?
+> 
+> My understanding is that the status is supposed to return the reason for 
+> a previous reset/reboot,
+> not the curent condition.
+> 
+
+Actually it is not so good correlate with the purpose, but I grasped
+several examples like watchdog/pcwd.c; watchdog/w83977f_wdt.c;
+watchdog/of_xilinx_wdt.c and saw that I can use it in meaning "the card initiated reset.
+After the WDT is overflowed it sets WDFLAG, so I can use it.
+It is more useful while debugging and if it is doubtful I can drop it.
+
+>> +    return 0;
 >> +}
 >> +
->> +static void
->>  armpmu_release_hardware(struct arm_pmu *armpmu)
->>  {
->>         int i, irq, irqs;
->>         struct platform_device *pmu_device = armpmu->plat_device;
+>>   static const struct watchdog_info davinci_wdt_info = {
+>>       .options = WDIOF_KEEPALIVEPING,
+>>       .identity = "DaVinci Watchdog",
+>> @@ -155,6 +167,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
+>>       .stop        = davinci_wdt_ping,
+>>       .ping        = davinci_wdt_ping,
+>>       .get_timeleft    = davinci_wdt_get_timeleft,
+>> +    .status        = davinci_wdt_status,
+>>   };
 >>
->> -       irqs = min(pmu_device->num_resources, num_possible_cpus());
->> +       irq = platform_get_irq(pmu_device, 0);
+>>   static int davinci_wdt_probe(struct platform_device *pdev)
 >>
->> -       for (i = 0; i < irqs; ++i) {
->> -               if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> -                       continue;
->> -               irq = platform_get_irq(pmu_device, i);
->> -               if (irq >= 0)
->> -                       free_irq(irq, armpmu);
->> +       if (irq_to_desc(irq) && irq_is_percpu(irq)) {
->
->
-> Why do you need to check the irq_desc here? It really looks like a misuse of
-> the API.
-I don't think it's being misused. In case of invalid irq number, the
-API would return null.
-> Instead, you should check the value of irq itself (it should be strictly
-> positive).
->
->
->> +               on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
->> +               free_percpu_irq(irq, &cpu_hw_events);
->> +       } else {
->> +               irqs = min(pmu_device->num_resources,
->> num_possible_cpus());
->> +
->> +               for (i = 0; i < irqs; ++i) {
->> +                       if (!cpumask_test_and_clear_cpu(i,
->> &armpmu->active_irqs))
->> +                               continue;
->> +                       irq = platform_get_irq(pmu_device, i);
->> +                       if (irq >= 0)
->
->
-> irq == 0 means "no-irq". You should handle it as an error case.
-This part of the code (for non-percpu irq) was already present in driver as is.
-Will was Okay with it as per his review on V1 here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210102.html
->
->
->> +                               free_irq(irq, armpmu);
->> +               }
->>         }
->>  }
->>
->> +static void
->> +armpmu_enable_percpu_irq(void *data)
->> +{
->> +       struct arm_pmu *armpmu = data;
->> +       struct platform_device *pmu_device = armpmu->plat_device;
->> +       int irq = platform_get_irq(pmu_device, 0);
->> +
->> +       enable_percpu_irq(irq, 0);
->> +       cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
->> +}
->> +
->>  static int
->>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>  {
->> @@ -396,34 +426,50 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>                 return -ENODEV;
->>         }
->>
->> -       for (i = 0; i < irqs; ++i) {
->> -               err = 0;
->> -               irq = platform_get_irq(pmu_device, i);
->> -               if (irq < 0)
->> -                       continue;
->> +       irq = platform_get_irq(pmu_device, 0);
->>
->> -               /*
->> -                * If we have a single PMU interrupt that we can't shift,
->> -                * assume that we're running on a uniprocessor machine and
->> -                * continue. Otherwise, continue without this interrupt.
->> -                */
->> -               if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
->> -                       pr_warning("unable to set irq affinity (irq=%d,
->> cpu=%u)\n",
->> -                                   irq, i);
->> -                       continue;
->> -               }
->> +       if (irq_to_desc(irq) && irq_is_percpu(irq)) {
->
->
-> Same comment about irq_to_desc.
->
->
->> +               err = request_percpu_irq(irq, armpmu->handle_irq,
->> +                               "arm-pmu", &cpu_hw_events);
->>
->> -               err = request_irq(irq, armpmu->handle_irq,
->> -                                 IRQF_NOBALANCING,
->> -                                 "arm-pmu", armpmu);
->>                 if (err) {
->> -                       pr_err("unable to request IRQ%d for ARM PMU
->> counters\n",
->> -                               irq);
->> +                       pr_err("unable to request percpu IRQ%d for ARM PMU
->> counters\n",
->> +                                       irq);
->>                         armpmu_release_hardware(armpmu);
->>                         return err;
->>                 }
->>
->> -               cpumask_set_cpu(i, &armpmu->active_irqs);
->> +               on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
->> +       } else {
->> +               for (i = 0; i < irqs; ++i) {
->> +                       err = 0;
->> +                       irq = platform_get_irq(pmu_device, i);
->> +                       if (irq < 0)
->
->
-> Same comment about irq == 0.
-This part of the code (for non-percpu irq) was already present in driver as is.
-Will was Okay with it as per his review on V1 here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210102.html
->
->
->> +                               continue;
->> +
->> +                       /*
->> +                        * If we have a single PMU interrupt that we can't
->> shift,
->> +                        * assume that we're running on a uniprocessor
->> machine and
->> +                        * continue. Otherwise, continue without this
->> interrupt.
->> +                        */
->> +                       if (irq_set_affinity(irq, cpumask_of(i)) && irqs >
->> 1) {
->> +                               pr_warning("unable to set irq affinity
->> (irq=%d, cpu=%u)\n",
->> +                                               irq, i);
->> +                               continue;
->> +                       }
->> +
->> +                       err = request_irq(irq, armpmu->handle_irq,
->> +                                       IRQF_NOBALANCING,
->> +                                       "arm-pmu", armpmu);
->> +                       if (err) {
->> +                               pr_err("unable to request IRQ%d for ARM
->> PMU counters\n",
->> +                                               irq);
->> +                               armpmu_release_hardware(armpmu);
->> +                               return err;
->> +                       }
->> +
->> +                       cpumask_set_cpu(i, &armpmu->active_irqs);
->> +               }
->>         }
->>
->>         return 0;
->
->
-> --
-> Fast, cheap, reliable. Pick two.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+
+-- 
+Regards,
+Ivan Khoronzhuk
