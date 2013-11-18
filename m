@@ -1,43 +1,45 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 18 Nov 2013 15:06:20 +0200
-Subject: [PATCH 3/5] ARM: OMAP2+: Add DT init code for DPI displays and
- make omap3 LDP to use it
-In-Reply-To: <1384562167-14725-4-git-send-email-tony@atomide.com>
-References: <1384562167-14725-1-git-send-email-tony@atomide.com>
- <1384562167-14725-4-git-send-email-tony@atomide.com>
-Message-ID: <528A10CC.7070908@ti.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Mon, 18 Nov 2013 14:07:07 +0100
+Subject: [PATCH v2] ARM: sunxi: dt: add EMAC aliases
+In-Reply-To: <20131117083829.GK3538@lukather>
+References: <1384546600-14384-1-git-send-email-emilio@elopez.com.ar>
+ <1384625849-29849-1-git-send-email-emilio@elopez.com.ar>
+ <CAOMqctTb0-B4y0DD6CWEi8Z7Bpd+pP-dWvvn5GiAkCeRD2v43g@mail.gmail.com>
+ <52880460.9050700@elopez.com.ar> <20131117083829.GK3538@lukather>
+Message-ID: <CAOMqctQc7K4OwOiCu1UuRpQLmU-Gh43HE_y2tYVnokk84ignJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-16 02:36, Tony Lindgren wrote:
-> In order to make the remaining omap3 boards usable with device
-> tree, we need to initialize the DPI based displays using pdata
-> until we have the DSS bindings in place.
-> 
-> At least board-am3517evm.c, board-cm-t35.c, board-devkit8000.c,
-> board-ldp.c and board-overo.c all use fairly similar DPI setup,
-> so let's add generic code for it. And let's make omap3 LDP to
-> use it and also initialize the ads7846 until we have a binding
-> for it.
-> 
-> Note that at least LDP needs the TWL bug fix posted as
-> "gpio: twl4030: Fix regression for twl gpio output" for the
-> LCD backlight to power.
+On 17 November 2013 09:38, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Sat, Nov 16, 2013 at 08:48:48PM -0300, Emilio L?pez wrote:
+>> Hi,
+>>
+>> El 16/11/13 20:37, Michal Suchanek escribi?:
+>> >Unfortunately,
+>> >
+>> >a20 has two Ethernets so you can't alias both to ethernet0.
+>> >
+>> >This has to be done on a per-board basis.
+>> >
+>>
+>> That was my first thought, and partly why I did it per-board on v1
+>> (the other part being that some boards do not have a phy, so having
+>> an ethernet0 alias felt "wrong"). But after some quick testing, it
+>> appears that aliases are overridable, so we could just add ethernet0
+>> = &gmac; on qualifying boards when the gmac support is ready.
+>
+> Or we will just add it as ethernet1. U-boot is able to put the
+> mac-address in the DT for every ethernet* nodes for as much ethernet
+> nodes as you need.
 
-Looks fine to me.
+I guess that would be fine for CT and CB2 which can have only one
+physical ethernet (unless there are pins for adding another PHY) but
+if there is ever board with two ethernets you want only one of them to
+ get the mac address from u-boot.
 
-Is it possible to keep this, and other similar DSS patches, in a
-separate branch, that could be dropped if needed? I'm kind of hoping I
-would get the DSS DT finished for the next merge window (but I've said
-that before, so...).
+Thanks
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/c02ffb77/attachment.sig>
+Michal
