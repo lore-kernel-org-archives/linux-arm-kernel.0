@@ -1,69 +1,32 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 19 Nov 2013 09:12:42 +1100
-Subject: [GIT PULL] ep93xx-devel for 3.12
-In-Reply-To: <522FD8B1.4080206@gmail.com>
-References: <522FB619.90603@gmail.com>
- <CAOesGMg8utb11JQpbJGAMNmvdGtz2+DbUfCmbXBNj0Gpw+2vAA@mail.gmail.com>
- <522FD8B1.4080206@gmail.com>
-Message-ID: <528A90DA.7020803@gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 18 Nov 2013 14:18:48 -0800
+Subject: [PATCHv7] dmaengine: Add support for BCM2835
+In-Reply-To: <20131118145400.GE16735@n2100.arm.linux.org.uk>
+References: <5288E327.8050809@koalo.de> <1384768816.14845.186.camel@smile>
+ <528A051A.7000703@koalo.de> <1384785017.14845.214.camel@smile>
+ <20131118145400.GE16735@n2100.arm.linux.org.uk>
+Message-ID: <1384813128.17783.3.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/13 12:42, Ryan Mallon wrote:
-> On 11/09/13 12:22, Olof Johansson wrote:
->> Hi Ryan,
->>
->> On Tue, Sep 10, 2013 at 5:15 PM, Ryan Mallon <rmallon@gmail.com> wrote:
->>> Hi Arnd, Olof,
->>>
->>> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
->>>
->>>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-devel-for-3.12
->>>
->>> for you to fetch changes up to 0e98a32f8773993da65ab4759b0c5ba362119ebb:
->>>
->>>   arm: ep93xx: use soc bus (2013-07-19 10:08:15 +1000)
->>
->>
->> Unfortunately the merge window is already in progress, and we're not
->> taking new code into arm-soc for 3.12. We ask that platform
->> maintainers send us the code they want into the next release by -rc6
->> or -rc7 the latest, so we have some time to merge it and sort it out
->> if needed, and so that it has time to sit in linux-next to discover
->> any problems.
+On Mon, 2013-11-18 at 14:54 +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 18, 2013 at 04:30:17PM +0200, Andy Shevchenko wrote:
+> > On Mon, 2013-11-18 at 13:16 +0100, Florian Meier wrote:
+> > > >> +	uint32_t chans_available;
+> > > > 
+> > > > Why uint32_t?
+> > > 
+> > > Because it is a bit mask of fixed length that directly comes from the
+> > > firmware.
+> > 
+> > Like one already told you in your i2s patch, please, change that to
+> > corresponding u* value, namely u32.
 > 
-> Ugh, my fault sorry. I'm slack on keeping up with the merge windows.
-> 
->> So, please resend this pull request once 3.12-rc1 is out, and we'll be
->> happy to queue it up for 3.13 inclusion!
+> There's no problem with uint32_t vs u32 - either will do.  u32 is the
+> pre-stdint.h Linux definition of a 32-bit unsigned integer.  There's
+> no reason why uint32_t isn't perfectly acceptable.  It's a matter of
+> author taste which gets used.  (Except where modifications are to an
+> existing chunk of code using one or the other - where consistency then
+> matters more.)
 
-Hi Olof,
-
-Is it possible to get this pulled now for 3.13? I haven't modified the
-branch at all, and there is still just the one commit there. I can't
-fast-forward the tree, and don't want to rebase it, but it should merge
-cleanly as-is I think.
-
-I also have an ep93xx-fixes branch with one commit on it for 3.13.
-Unfortunately I've neglected the branch and so it's history looks like:
-
-  337f9c21 ARM: ep93xx: remove deprecated IRQF_DISABLED
-  cc3874fe ARM: ep93xx: Don't use modem interface on the second UART
-  ad81f054 Linux 3.11-rc1
-
-The cc3874fe commit was already merged for 3.12, and the branch won't
-let me fast-forward on to, say v3.12-rc7. Should I rebase the 337fc21
-commit onto the latest mainline tag, or do I just do a pull request with
-cc3874fe as the base tag?
-
-Sorry for the annoyance. I get so few patches via this tree, and I don't
-even have hardware ep93xx set up at the moment. I don't keep up with the
-merge window status very well, and its unfair to the people who's
-patches I am carrying. Is there an arm-soc-misc tree future patches
-could go via, or Hartley might be interested in taking over the tree?
-
-~Ryan
+https://lkml.org/lkml/2006/5/2/258
