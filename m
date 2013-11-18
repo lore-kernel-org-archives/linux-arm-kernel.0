@@ -1,46 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 15:41:37 +0000
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <20131118153110.GN13640@lee--X1>
-References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
- <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
- <20131118093229.GB13640@lee--X1>
- <20131118133940.GC14306@sirena.org.uk>
- <20131118142447.GJ13640@lee--X1>
- <20131118144512.GB24408@sirena.org.uk>
- <20131118145614.GM13640@lee--X1>
- <20131118151651.GE24408@sirena.org.uk>
- <20131118153110.GN13640@lee--X1>
-Message-ID: <20131118154137.GA28334@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Nov 2013 16:46:18 +0100
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131118151900.GF16735@n2100.arm.linux.org.uk>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <201311181605.37300.arnd@arndb.de>
+ <20131118151900.GF16735@n2100.arm.linux.org.uk>
+Message-ID: <201311181646.19070.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 03:31:10PM +0000, Lee Jones wrote:
-> On Mon, 18 Nov 2013, Mark Brown wrote:
+On Monday 18 November 2013, Russell King - ARM Linux wrote:
+> > Can you point to specific patches?
+> 
+> No, because they weren't publically posted, so I don't feel that I can
+> say all that much; they were from quite a large company though.
 
-> > This doesn't seem realistic, you're assuming that system integrators
-> > won't go and use chips you've not heard of and at least in the case of
-> > things like quad read my understanding is that the commands aren't
-> > standardised so the host just has to know what to write.
+I see.
 
-> I'm not following? What are you suggesting?
+> > I can't say I'm an expert on this, but everything I've seen with ACPI
+> > is tables of binary data with four-letter identifiers that are defined
+> > by the ACPI group, but not using strings in a similar manner to DT.
+> 
+> They are using strings which are the same as the DT properties, but
+> without the vendor prefix - but yes, to only retrieve things like
+> booleans, u32s and such like.  They also have support for fixed-rate
+> clocks via the clk API too...
+> 
+> I'd like them to post the patches publically so a more open discussion
+> could occur.
 
-Like I say I'm suggesting that the bit of the code that understands the
-flash chip is separate to the bit of code that knows the mechanics of
-sending commands and data to the chip.
+I'd definitely like that too, especially since managing clocks etc.
+is (as multiple people have pointed out in this thread) a very
+un-ACPI-like thing to do and it would be important for them to have
+the debate whether that has a chance of getting accepted in the kernel
+(or the ACPI spec, for that matter) or not.
 
-> After some analysis we have come to the conclusion that using m25p80
-> is not feasible. It makes more sense for this to be an
-> orthogonal/stand-alone driver.
-
-That seems plausible for the controller side but it seems surprising for
-the flash chip side.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/d4aaa61c/attachment-0001.sig>
+	Arnd
