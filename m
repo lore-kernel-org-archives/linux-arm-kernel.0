@@ -1,45 +1,90 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Mon, 18 Nov 2013 14:07:07 +0100
-Subject: [PATCH v2] ARM: sunxi: dt: add EMAC aliases
-In-Reply-To: <20131117083829.GK3538@lukather>
-References: <1384546600-14384-1-git-send-email-emilio@elopez.com.ar>
- <1384625849-29849-1-git-send-email-emilio@elopez.com.ar>
- <CAOMqctTb0-B4y0DD6CWEi8Z7Bpd+pP-dWvvn5GiAkCeRD2v43g@mail.gmail.com>
- <52880460.9050700@elopez.com.ar> <20131117083829.GK3538@lukather>
-Message-ID: <CAOMqctQc7K4OwOiCu1UuRpQLmU-Gh43HE_y2tYVnokk84ignJw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Nov 2013 14:11:32 +0100
+Subject: [PATCH v5 3/7] gpio: davinci: use irqdomain
+In-Reply-To: <1383905510-31760-4-git-send-email-prabhakar.csengg@gmail.com>
+References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1383905510-31760-4-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <CACRpkdaJg4wqtD5xhPVrHJHxFoVwau6jidbOuQ9xFSK_6drxPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 November 2013 09:38, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+On Fri, Nov 8, 2013 at 11:11 AM, Prabhakar Lad
+<prabhakar.csengg@gmail.com> wrote:
+
+> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 >
-> On Sat, Nov 16, 2013 at 08:48:48PM -0300, Emilio L?pez wrote:
->> Hi,
->>
->> El 16/11/13 20:37, Michal Suchanek escribi?:
->> >Unfortunately,
->> >
->> >a20 has two Ethernets so you can't alias both to ethernet0.
->> >
->> >This has to be done on a per-board basis.
->> >
->>
->> That was my first thought, and partly why I did it per-board on v1
->> (the other part being that some boards do not have a phy, so having
->> an ethernet0 alias felt "wrong"). But after some quick testing, it
->> appears that aliases are overridable, so we could just add ethernet0
->> = &gmac; on qualifying boards when the gmac support is ready.
+> This patch converts the davinci gpio driver to use irqdomain
+> support.
 >
-> Or we will just add it as ethernet1. U-boot is able to put the
-> mac-address in the DT for every ethernet* nodes for as much ethernet
-> nodes as you need.
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-I guess that would be fine for CT and CB2 which can have only one
-physical ethernet (unless there are pins for adding another PHY) but
-if there is ever board with two ethernets you want only one of them to
- get the mac address from u-boot.
+(...)
+> @@ -282,8 +283,7 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+>         desc->irq_data.chip->irq_ack(&desc->irq_data);
+>         while (1) {
+>                 u32             status;
+> -               int             n;
+> -               int             res;
+> +               int             bit;
 
-Thanks
+Why is this an int? I think u8 would suffice.
 
-Michal
+>                 /* now demux them to the right lowlevel handler */
+> -               n = d->irq_base;
+> -               if (irq & 1) {
+> -                       n += 16;
+> -                       status >>= 16;
+> -               }
+> -
+>                 while (status) {
+> -                       res = ffs(status);
+> -                       n += res;
+> -                       generic_handle_irq(n - 1);
+> -                       status >>= res;
+> +                       bit = __ffs(status);
+> +                       status &= ~(1 << bit);
+> +                       generic_handle_irq(irq_find_mapping(d->irq_domain,
+> +                                                           bit));
+
+This is a nice hunk of the patch.
+
+I would use <linux/bitops.h> and do:
+status &= ~BIT(bit);
+
+
+> @@ -313,10 +307,7 @@ static int gpio_to_irq_banked(struct gpio_chip *chip, unsigned offset)
+>  {
+>         struct davinci_gpio_controller *d = chip2controller(chip);
+>
+> -       if (d->irq_base >= 0)
+> -               return d->irq_base + offset;
+> -       else
+> -               return -ENODEV;
+> +       return irq_create_mapping(d->irq_domain, offset);
+>  }
+
+I think we recently established that map creating cannot be done
+in gpio_to_irq* functions as that will not work properly if you request
+an IRQ from device tree without first obtaining the IRQ from the GPIO
+number with this function.
+
+Instead call irq_create_mapping() on *all* used IRQ lines in the
+probe function and use irq_find_mapping() here too.
+
+> +       for (gpio = 0, bank = 0; gpio < ngpio; bank++, bank_irq++, gpio += 16) {
+>                 /* disabled by default, enabled only as needed */
+>                 g = gpio2regs(gpio);
+>                 writel(~0, &g->clr_falling);
+> @@ -467,14 +483,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>                  */
+>                 irq_set_handler_data(bank_irq, &chips[gpio / 32]);
+
+So for example here you could call iurq_create_mapping();
+
+Also: please write a patch that marks the IRQ lines.
+Call gpio_lock_as_irq(*gpio_chip, offset); in the
+irqchip startup/shutdown functions. (Can be a separate
+patch.)
+
+Yours,
+Linus Walleij
