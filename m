@@ -1,75 +1,76 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 18 Nov 2013 10:10:09 -0800
-Subject: [PATCH v3 22/28] mtd: nand: pxa3xx: Introduce multiple page
- I/O support
-In-Reply-To: <20131106113210.GB2616@localhost>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-23-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105190432.GQ20061@ld-irv-0074.broadcom.com>
- <20131106011351.GH11759@localhost>
- <CAN8TOE_ZmcsvShKY273KQCaopJEXgtXVR1XY9pP5EKkUK+bUbA@mail.gmail.com>
- <20131106113210.GB2616@localhost>
-Message-ID: <20131118181009.GZ9468@ld-irv-0074.broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Nov 2013 10:11:10 -0800
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
+ device tree case
+In-Reply-To: <20131118174638.GQ13640@lee--X1>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-2-git-send-email-tony@atomide.com>
+ <20131118102907.GC13640@lee--X1>
+ <20131118172510.GI16038@saruman.home>
+ <20131118174638.GQ13640@lee--X1>
+Message-ID: <20131118181110.GM10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
-
-There's one question of yours that I think hasn't been addressed:
-
-On Wed, Nov 06, 2013 at 08:32:11AM -0300, Ezequiel Garcia wrote:
-> Having followed (part) of the OMAP DT ECC discussion, I'm thinking:
-> wouldn't it be good to have an 'nand-ecc-strength' property in the DT?
+* Lee Jones <lee.jones@linaro.org> [131118 09:47]:
+> > > > +static struct of_dev_auxdata twl_auxdata_lookup[] = {
+> > > > +	OF_DEV_AUXDATA("ti,twl4030-gpio", 0, "twl4030-gpio", NULL),
+> > > > +	{ /* sentinel */ },
+> > > > +};
+> > > > +
+> > > >  /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
+> > > >  static int
+> > > >  twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> > > > @@ -1271,10 +1276,14 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> > > >  		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+> > > >  	}
+> > > >  
+> > > > -	if (node)
+> > > > -		status = of_platform_populate(node, NULL, NULL, &client->dev);
+> > > > -	else
+> > > > +	if (node) {
+> > > > +		if (pdata)
+> > > > +			twl_auxdata_lookup[0].platform_data = pdata->gpio;
+> > > > +		status = of_platform_populate(node, NULL, twl_auxdata_lookup,
+> > > > +					      &client->dev);
+> > > > +	} else {
+> > > >  		status = add_children(pdata, irq_base, id->driver_data);
+> > > 
+> > > Why doesn't the TWL driver use the MFD framework for this stuff?
+> > 
+> > that's reminiscent from years ago and, surely, needs to be fixed. Should
+> > we gate $subject for that, though ? This has been in tree for quite a
+> > few years already and Tony's patch is still a step forward, since most
+> > omap3 platforms would break on DT-only without it.
 > 
-> It would match the ecc_strength_ds field. This way, the ECC mode
-> selection is left to the driver and not to the user.
-> On the other side, this can cause some severe incompatibilities
-> unless such driver *always* make the *same* selection.
+> I didn't say that I would reject the patch. I was just surprised to
+> see so much hand-rolling, as the MFD core code does much of it
+> automatically. This is the first time I've taken a look at this and it
+> seems to be quite the relic.
 
-I'm not quite so sure about the whole question of ECC in device tree.
-There seems to be 2 subtly different properties we might want to
-capture:
+Yeah it seems something from the early days of MFD code. Then grepping for
+add_children shows that drivers/mfd/dm355evm_msp.c is doing it too, which
+should also be fixed while at it.
+ 
+> > There are quite a few folks who could volunteer to fixing that after
+> > Tony's patch is in (me included, although there could be better choices
+> > hehe).
+> 
+> Well it's not doing any harm. I'll make a note to fix it myself if a)
+> no one has done so already and b) I manage to find some spare
+> time. The latter issue is less likely to be resolved. :)
 
-1) What is the minimum ECC required for the flash?
+Sounds like Felipe has already picked it up for future work :)
+ 
+> Are you Acking this patch by the way?
 
-2) What is the exact ECC layout/strength/type used for this flash?
-   (i.e., what is the bootloader using?)
+If this looks acceptable to you guys, I'd like to merge this via my fixes
+branch this week with your acks if that works for you. That way I can base
+my omap legacy platform data removal patches on my fixes branch while keep
+things working for the drivers. Alternatively I can naturally base my
+legacy data removal on -rc2 too if this gets merged to mainline by then 
+via the MFD tree.
 
-The first is quite generic: the property consists of a stength and step
-size. (But this is also duplicated in ONFI, and our full-ID device
-table.)
+Regards,
 
-Still, I think a property for #1 could be useful, for those chips that
-are not discoverable. And if we (you?) add it, it should be done at the
-nand_base level, I think, so its binding is shared by all drivers.
-
-I'm not quite sure how we identify the appropriate struct device_node
-for nand_base to use, though. Maybe we should force drivers to
-initialize a new mtd_info.of_node field? And then maybe this could also
-be integrated into the 'ofpart' parser, which currently requires drivers
-to pass a device_node via the mtd_part_parser_data struct?
-
-Property #2 is very driver/hardware specific, and it may not be easy to
-capture this information properly using the same set of properties for
-all NAND drivers. For example, "BCH-8" is not the same on all systems;
-and even on the same system a software BCH-X could potentially be very
-different than (and incompatible with) a BCH-X as provided by hardware.
-And different hardware provides wildly different choices regarding ECC,
-so I'm not convinced that we could create a good generic binding for
-describing #2.
-
-But I think a property like #2 is necessary for many platforms that need
-to eliminate the problem that you mention, where drivers must always
-make the same selection. Essentially, we're assuming bootloader/driver
-co-design, rather than properly communicating this information via a
-shared data structure like device tree.
-
-Now, it's another question as to whether we need a property for both #1
-and #2. The latter would probably just override the former, but that
-doesn't mean that the former is unnecessary...
-
-Anyway, I'll stop having a conversation with myself now. If you think
-something should be done, I'm willing to listen and help integrate a
-solution.
-
-Brian
+Tony
