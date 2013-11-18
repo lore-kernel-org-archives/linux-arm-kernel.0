@@ -1,32 +1,34 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 18 Nov 2013 14:18:48 -0800
-Subject: [PATCHv7] dmaengine: Add support for BCM2835
-In-Reply-To: <20131118145400.GE16735@n2100.arm.linux.org.uk>
-References: <5288E327.8050809@koalo.de> <1384768816.14845.186.camel@smile>
- <528A051A.7000703@koalo.de> <1384785017.14845.214.camel@smile>
- <20131118145400.GE16735@n2100.arm.linux.org.uk>
-Message-ID: <1384813128.17783.3.camel@joe-AO722>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 18 Nov 2013 14:37:40 -0800
+Subject: [PATCH] rtc: rtc-at91rm9200: Corrected alarm over day/month wrap:
+In-Reply-To: <1384795254-11996-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1384795254-11996-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20131118143740.cdb5c0ee72b3d68e443afd66@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-11-18 at 14:54 +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 18, 2013 at 04:30:17PM +0200, Andy Shevchenko wrote:
-> > On Mon, 2013-11-18 at 13:16 +0100, Florian Meier wrote:
-> > > >> +	uint32_t chans_available;
-> > > > 
-> > > > Why uint32_t?
-> > > 
-> > > Because it is a bit mask of fixed length that directly comes from the
-> > > firmware.
-> > 
-> > Like one already told you in your i2s patch, please, change that to
-> > corresponding u* value, namely u32.
-> 
-> There's no problem with uint32_t vs u32 - either will do.  u32 is the
-> pre-stdint.h Linux definition of a 32-bit unsigned integer.  There's
-> no reason why uint32_t isn't perfectly acceptable.  It's a matter of
-> author taste which gets used.  (Except where modifications are to an
-> existing chunk of code using one or the other - where consistency then
-> matters more.)
+On Mon, 18 Nov 2013 18:20:54 +0100 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-https://lkml.org/lkml/2006/5/2/258
+> From: Linus Pizunski <linus@narrativeteam.com>
+> 
+> Update month and day of month to the alarm month/day instead
+> of current day/month when setting the RTC alarm mask.
+> 
+> Signed-off-by: Linus Pizunski <linus@narrativeteam.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I changed this to signed-off-by, as you were on the patch delivery path.
+
+> --- a/drivers/rtc/rtc-at91rm9200.c
+> +++ b/drivers/rtc/rtc-at91rm9200.c
+> @@ -220,6 +220,8 @@ static int at91_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
+>  
+>  	at91_alarm_year = tm.tm_year;
+>  
+> +	tm.tm_mon = alrm->time.tm_mon;
+> +	tm.tm_mday = alrm->time.tm_mday;
+>  	tm.tm_hour = alrm->time.tm_hour;
+>  	tm.tm_min = alrm->time.tm_min;
+>  	tm.tm_sec = alrm->time.tm_sec;
+
+I queued this for 3.13.  Do we think it warrants a -stable backport?
