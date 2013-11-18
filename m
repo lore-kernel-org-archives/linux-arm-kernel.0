@@ -1,53 +1,53 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 18 Nov 2013 16:30:17 +0200
-Subject: [PATCHv7] dmaengine: Add support for BCM2835
-In-Reply-To: <528A051A.7000703@koalo.de>
-References: <5288E327.8050809@koalo.de> <1384768816.14845.186.camel@smile>
- <528A051A.7000703@koalo.de>
-Message-ID: <1384785017.14845.214.camel@smile>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Nov 2013 15:30:41 +0100
+Subject: [PATCH V2 3/5] ARM: imx: imx53: Add SATA PHY clock
+In-Reply-To: <1384785043-5027-1-git-send-email-marex@denx.de>
+References: <1384785043-5027-1-git-send-email-marex@denx.de>
+Message-ID: <1384785043-5027-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-11-18 at 13:16 +0100, Florian Meier wrote:
-> Thank you! Few comments below.
+Add SATA PHY clock which are derived from the USB PHY1 clock. Note that this
+patch derives the SATA PHY clock from USB PHY1 clock gate so that the SATA
+driver can ungate both the SATA PHY clock and USB PHY1 clock for the SATA to
+work correctly.
 
-See my answers below.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Richard Zhu <r65037@freescale.com>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Linux-IDE <linux-ide@vger.kernel.org>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c    | 1 +
+ include/dt-bindings/clock/imx5-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-> >> +static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
-> >> +	dma_cookie_t cookie, struct dma_tx_state *txstate)
-> >> +{
-> > 
-> > []
-> > 
-> >> +	} else {
-> >> +		txstate->residue = 0;
-> > 
-> > Useless assignment since dmaengine will do this for you in
-> > dma_cookie_status.
-> 
-> I agree that it is useless, but I think otherwise it might be concealed
-> that there is a third case left that uses a residue of 0. Do you think a
-> comment is better? E.g.:
-> 
-> +	} else {
-> +		/* residue = 0 per default */
+V2: Use the clock ID macros
 
-I think like in many other DMA drivers either you have separate function
-to get residue, which returns 0, or just not include this case.
-
-> >> +static int bcm2835_dma_probe(struct platform_device *pdev)
-> >> +{
-
-> >> +	uint32_t chans_available;
-> > 
-> > Why uint32_t?
-> 
-> Because it is a bit mask of fixed length that directly comes from the
-> firmware.
-
-Like one already told you in your i2s patch, please, change that to
-corresponding u* value, namely u32.
-
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 07d275f..c128ec6 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -244,6 +244,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk[IMX5_CLK_SPDIF0_GATE]	= imx_clk_gate2("spdif0_gate", "spdif0_com_sel", MXC_CCM_CCGR5, 26);
+ 	clk[IMX5_CLK_SPDIF_IPG_GATE]	= imx_clk_gate2("spdif_ipg_gate", "ipg", MXC_CCM_CCGR5, 30);
+ 	clk[IMX5_CLK_SAHARA_IPG_GATE]	= imx_clk_gate2("sahara_ipg_gate", "ipg", MXC_CCM_CCGR4, 14);
++	clk[IMX5_CLK_SATA_PHY]		= imx_clk_fixed_factor("sata_phy", "usb_phy1_gate", 1, 1);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clk); i++)
+ 		if (IS_ERR(clk[i]))
+diff --git a/include/dt-bindings/clock/imx5-clock.h b/include/dt-bindings/clock/imx5-clock.h
+index 5c2f634..a719c04 100644
+--- a/include/dt-bindings/clock/imx5-clock.h
++++ b/include/dt-bindings/clock/imx5-clock.h
+@@ -197,6 +197,7 @@
+ #define IMX5_CLK_SPDIF_IPG_GATE		185
+ #define IMX5_CLK_OCRAM			186
+ #define IMX5_CLK_SAHARA_IPG_GATE	187
+-#define IMX5_CLK_END			188
++#define IMX5_CLK_SATA_PHY		188
++#define IMX5_CLK_END			189
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX5_H */
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+1.8.4.2
