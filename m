@@ -1,31 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Nov 2013 10:21:16 -0700
-Subject: [PATCH 16/31] ASoC: tegra: use reset framework
-In-Reply-To: <20131116095529.GF15393@sirena.org.uk>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-17-git-send-email-swarren@wwwdotorg.org>
- <20131116095529.GF15393@sirena.org.uk>
-Message-ID: <528A4C8C.3030200@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 18 Nov 2013 17:22:43 +0000
+Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
+ bit logic defines
+In-Reply-To: <20131118160226.GO13640@lee--X1>
+References: <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
+ <20131118093229.GB13640@lee--X1>
+ <20131118133940.GC14306@sirena.org.uk>
+ <20131118142447.GJ13640@lee--X1>
+ <20131118144512.GB24408@sirena.org.uk>
+ <20131118145614.GM13640@lee--X1>
+ <20131118151651.GE24408@sirena.org.uk>
+ <20131118153110.GN13640@lee--X1>
+ <20131118154137.GA28334@sirena.org.uk>
+ <20131118160226.GO13640@lee--X1>
+Message-ID: <20131118172243.GO2674@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2013 02:55 AM, Mark Brown wrote:
-> On Fri, Nov 15, 2013 at 01:54:11PM -0700, Stephen Warren wrote:
-> 
->> @@ -1,6 +1,8 @@ config SND_SOC_TEGRA tristate "SoC Audio for the
->> Tegra System-on-Chip" depends on (ARCH_TEGRA && TEGRA20_APB_DMA)
->> || COMPILE_TEST +	depends on COMMON_CLK +	depends on
->> RESET_CONTROLLER
-> 
-> Do you depend on COMMON_CLK here?  I only noticed reset controller
-> API dependencies here but perhaps I missed this (or it's fixing a
-> dependency that should be there already).
+On Mon, Nov 18, 2013 at 04:02:26PM +0000, Lee Jones wrote:
+> On Mon, 18 Nov 2013, Mark Brown wrote:
 
-It's fixing a dependency that should already be there, in the
-COMPILE_TEST case. In the (ARCH_TEGRA && TEGRA20_APB_DMA) case,
-COMMON_CLOCK is always selected.
+> > Like I say I'm suggesting that the bit of the code that understands the
+> > flash chip is separate to the bit of code that knows the mechanics of
+> > sending commands and data to the chip.
 
-Do you want me to split this out into a separate patch? If so, I'd
-prefer not to apply that separate patch immediately to 3.13 as a fix,
-since then it'd delay applying this series until after -rc2 is out,
-unless you can get the fix into -rc1 quickly...
+> The issue is that almost the entire driver is controller side. The
+> only bits that are the same (and not in all cases) are the OPCODEs,
+> but they are one liners (21 lines out of 1153). Most of the
+> controllers which use this stuff could reuse quite a bit of the m25p80
+> driver as they just write the message containing the OPCODE as the
+> m25p80 driver sets it up, but that's simply not the case with our
+> controller. We would have to pull the OPCODE out and based on which
+> one it is, we'd have to build our own message.
+
+OK, so then perhaps the abstraction here is simply to export the table
+with the opcodes from the m25p80 driver so that when someone comes along
+and adds a new chip they can just add it there and other drivers will
+get the update too.
+
+> Put it this way, if we tried to use the m25p80 our controller driver
+> would most likely be twice as large and twice as complex as it is
+> currently, which is exactly the inverse of what we're trying to
+> achieve here.
+
+If we're having to add new flashes to multiple drivers I'd not say we're
+winning.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/36fe5722/attachment.sig>
