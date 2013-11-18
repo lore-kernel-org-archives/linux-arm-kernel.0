@@ -1,34 +1,34 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Nov 2013 09:25:12 +0800
-Subject: [PATCH 0/8] imx6 dts cleanup series
-In-Reply-To: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1384462934-17390-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20131118012510.GL11014@S2101-09.ap.freescale.net>
+Date: Mon, 18 Nov 2013 09:38:49 +0800
+Subject: [RFC 4/9] ASoC: fsl-ssi: Add imx50-ssi and of_device_id matching
+In-Reply-To: <1384530584-31273-5-git-send-email-mpa@pengutronix.de>
+References: <1384530584-31273-1-git-send-email-mpa@pengutronix.de>
+ <1384530584-31273-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131118013848.GM11014@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:02:06PM -0700, Troy Kisky wrote:
-> This is a cleanup series. Only patch 8 adds new functionality,
-> dualLite support for the sabrelite board.
-> 
-> patches 1-6 can be applied in any order
-> patch 7 depends on patches 4,5
-> patch 8 depends on patch 3
-> 
-> 
-> Troy Kisky (8):
->   ARM: dts: imx: pinfunc: add MX6QDL_PAD_SD1_CLK__OSC32K_32K_OUT
->   ARM: dts: imx: imx6qdl.dtsi: add mipi_csi tag
->   ARM: dts: imx: imx6sl/qdl-pingrp: reorganize USDHCx pad groups
+On Fri, Nov 15, 2013 at 04:49:39PM +0100, Markus Pargmann wrote:
+> @@ -190,6 +190,20 @@ struct fsl_ssi_private {
+>  	char name[1];
+>  };
+>  
+> +enum fsl_ssi_type {
+> +	FSL_SSI_MCP8610,
+> +	FSL_SSI_MX21,
+> +	FSL_SSI_MX50,
+> +};
+> +
+> +static const struct of_device_id fsl_ssi_ids[] = {
+> +	{ .compatible = "fsl,mpc8610-ssi", .data = (void *) FSL_SSI_MCP8610},
+> +	{ .compatible = "fsl,imx21-ssi", .data = (void *) FSL_SSI_MX21},
+> +	{ .compatible = "fsl,imx50-ssi", .data = (void *) FSL_SSI_MX50},
 
-Except this one ...
-
->   ARM: dts: imx: imx6q.dtsi: use IRQ_TYPE_LEVEL_HIGH
->   ARM: dts: imx: imx6dl.dtsi: use IRQ_TYPE_LEVEL_HIGH
->   ARM: dts: imx: imx6sl.dtsi: use IRQ_TYPE_LEVEL_HIGH
->   ARM: dts: imx: imx6qdl.dtsi: use IRQ_TYPE_LEVEL_HIGH
->   ARM: dts: imx: sabrelite: add dualLite support
-
-... and this one, applied all other 6 patches.
+As a good practice, please sort it from the specific to the generic.
+That said, "fsl,imx50-ssi" should be put before "fsl,imx21-ssi".
 
 Shawn
+
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
