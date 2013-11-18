@@ -1,44 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 15:50:22 +0000
-Subject: ARM topic: Is DT on ARM the solution, or is there something
- better?
-In-Reply-To: <20131118152920.GL26046@ulmo.nvidia.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131118122644.GA26046@ulmo.nvidia.com>
- <20131118134022.26EE7C409EC@trevor.secretlab.ca>
- <20131118135727.GD14306@sirena.org.uk>
- <20131118152920.GL26046@ulmo.nvidia.com>
-Message-ID: <20131118155022.GB28334@sirena.org.uk>
+From: florian.meier@koalo.de (Florian Meier)
+Date: Mon, 18 Nov 2013 16:56:33 +0100
+Subject: [PATCHv3] ASoC: Add support for BCM2835
+In-Reply-To: <1384776479.14845.208.camel@smile>
+References: <5289F9DF.8060406@koalo.de> <1384776479.14845.208.camel@smile>
+Message-ID: <528A38B1.5010107@koalo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 04:29:21PM +0100, Thierry Reding wrote:
-> On Mon, Nov 18, 2013 at 01:57:27PM +0000, Mark Brown wrote:
+>> +static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
+>> +				 struct snd_pcm_hw_params *params,
+>> +				 struct snd_soc_dai *dai)
+>> +{
+>> +	struct bcm2835_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
+>> +
+>> +	unsigned int sampling_rate = params_rate(params);
+>> +	unsigned int data_length, data_delay, bclk_ratio;
+>> +	unsigned int ch1pos, ch2pos, mode, format;
+>> +	unsigned int mash = BCM2835_CLK_MASH_1;
+>> +	unsigned int divi, divf, target_frequency;
+>> +	int clk_src = -1;
+>> +	unsigned int master = dev->fmt & SND_SOC_DAIFMT_MASTER_MASK;
+>> +	uint32_t bit_master =	(master == SND_SOC_DAIFMT_CBS_CFS
+>> +					|| master == SND_SOC_DAIFMT_CBS_CFM);
+>> +
+>> +	uint32_t frame_master =	(master == SND_SOC_DAIFMT_CBS_CFS
+> 
+> So, if master == SND_SOC_DAIFMT_CBS_CFS both bit_master and frame_master
+> will be true. Is it correct?
 
-> > You'd need something class based like USB, there's such massive
-> > variation in what the hardware is trying to do and the tradeoffs.  A big
-> > issue is that especially with I2C many of the devices are primarily
-> > analogue devices implemnted in larger processes where the cost of adding
-> > additional digital logic can have a noticeable effect on the area and
-> > hence cost of the silicon.
-
-> My comments were mostly regarding the interface controllers. Those which
-> generate the same bus transactions but need different drivers on every
-> SoC. I suspect that the same costs don't apply (or at least not to the
-> same extent) to SoCs.
-
-Oh, right.  In that space I suspect you'd face apathy on the part of
-vendors for switching away from their existing validated and deployed
-IPs - probably the best shot would be a freely licensed reference
-implementation that people could pick up if they wanted.  It's plausible
-that some of the vendors might do so for SPI where there are a bunch of
-chips that don't have DMA/FIFOs yet and so could possibly benefit from
-performance and feature gains but without that sort of benefit it's hard
-to see what would be persuasive for the vendors.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/82c19a4f/attachment.sig>
+Yes. That is exactly what CBS_CFS expresses:
+Codec Bit Slave and Codec Frame Slave
+So the interface is bit master as well as frame master.
+Did I miss anything?
