@@ -1,39 +1,159 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 13:39:40 +0000
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <20131118093229.GB13640@lee--X1>
-References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
- <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
- <20131118093229.GB13640@lee--X1>
-Message-ID: <20131118133940.GC14306@sirena.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 18 Nov 2013 13:39:48 +0000
+Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
+In-Reply-To: <1384157427-31613-2-git-send-email-victor.kamensky@linaro.org>
+References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
+ <1384157427-31613-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131118132844.GA2308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 09:32:29AM +0000, Lee Jones wrote:
+On Mon, Nov 11, 2013 at 12:10:27AM -0800, Victor Kamensky wrote:
+> In case of armv7-m architecture arm instructions are not allowed.
+> For this architecture CONFIG_CPU_THUMBONLY is set. Use this macro
+> to emit conditionally arm instructions or nops in thumb mode.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm/kernel/sigreturn_codes.S | 25 ++++++++++++++++++-------
+>  1 file changed, 18 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
+> index 3c5d0f2..899fb86 100644
+> --- a/arch/arm/kernel/sigreturn_codes.S
+> +++ b/arch/arm/kernel/sigreturn_codes.S
+> @@ -41,17 +41,29 @@
+>  	.arch armv4t
+>  #endif
+>  
+> +/*
+> + * In CPU_THUMBONLY kernel case arm opcodes are not allowed
+> + */
+> +#ifndef CONFIG_CPU_THUMBONLY
+> +#define ARM_INSTR(code...) .arm ; \
+> +			   code
+> +#else
+> +#define ARM_INSTR(code...) .thumb ; \
+> +			   nop ;    \
+> +			   nop ;
+> +#endif
+> +
 
-> I've actually travelled down the route of separating the SPI
-> Controller parts to drivers/spi. It's possible to do that and perhaps
-> we could then use the generic m25p80 Serial Flash driver as the
-> back-end, but it would be incredibly complicated and would mean we'd
-> need to duplicate almost all of the m25p80 driver into the SPI
-> Controller. The Falcon SPI driver tried to do something similar, but
-> now looks broken due to some incompatible changes in m25p80. We also
-> want to avoid putting ourselves in that position of fragility.
+Maybe use .org to force the layout, instead of nop-padding,
+and don't emit the ARM instructions at all in the THUMBONLY
+case.
 
-What I've said to people doing similar drivers before is that it seems
-like there should be an abstraction added in the MTD framework for SPI
-flash controllers like this is that if there is genunie flash-specific
-stuff going on then the mp25p80 driver ought to be split so that the
-code that understands what commands to send to the flash chip is split
-out from the code that actually sends those commands to the chip.  The
-existing SPI support would then be a function driver for this.  This
-would mean we don't need to support the flash chips multiple times.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/d3234a26/attachment.sig>
+So, this becomes something like:
+
+sigreturn_codes:
+
+#ifndef CONFIG_CPU_THUMBONLY
+	.arm
+	mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+	swi	#(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+#endif
+	.org	sigreturn_codes + 8 + 12 * 0
+	.thumb
+        movs	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+        swi	#0
+
+#ifndef CONFIG_CPU_THUMBONLY
+	.arm
+	mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+	swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+#endif
+	.org	sigreturn_codes + 8 + 12 * 1
+	.thumb
+	movs	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+	swi	#0
+
+...etc.
+
+This will just leave gaps in the right places without needing
+to worry about what to fill them with (which shouldn't matter).
+
+Ideally the ifdefs can be hidden with macros to make things
+look a bit less ugly.  You could keep ARM_INSTR() unmodified,
+and define separate macros that spit out the .org and related
+stuff, like:
+
+.macro arm_slot n
+		.org	sigreturn_codes + 12 * (\n)
+ ARM_INSTR(	.arm	)
+.endm
+
+.macro thumb_slot n
+		.org	sigreturn_codes + 12 * (\n) + 8
+		.thumb
+.endm
+
+
+Then you get
+
+sigreturn_codes:
+
+arm_slot 0
+ ARM_INSTR(	mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)	)
+ ARM_INSTR(	mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)	)
+thumb_slot 0
+	        movs	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+	        swi	#0
+
+arm_slot 1
+ ARM_INSTR(	mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)	)
+ ARM_INSTR(	swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)	)
+thumb_slot 1
+		movs	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+		swi	#0
+
+Still not ideal, but it might work.
+
+Cheers
+---Dave
+
+>  	.section .rodata
+>  	.global sigreturn_codes
+>  	.type	sigreturn_codes, #object
+>  
+> -	.arm
+> +	.align
+>  
+>  sigreturn_codes:
+>  
+>  	/* ARM sigreturn syscall code snippet */
+> -	mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+> -	swi	#(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+> +ARM_INSTR(mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE))
+> +ARM_INSTR(swi	#(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
+>  
+>  	/* Thumb sigreturn syscall code snippet */
+>  	.thumb
+> @@ -59,9 +71,8 @@ sigreturn_codes:
+>  	swi	#0
+>  
+>  	/* ARM sigreturn_rt syscall code snippet */
+> -	.arm
+> -	mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+> -	swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+> +ARM_INSTR(mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE))
+> +ARM_INSTR(swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
+>  
+>  	/* Thumb sigreturn_rt syscall code snippet */
+>  	.thumb
+> @@ -74,7 +85,7 @@ sigreturn_codes:
+>  	 * it is thumb case or not, so we need additional
+>  	 * word after real last entry.
+>  	 */
+> -	.arm
+> +	.align
+>  	.space	4
+>  
+>  	.size	sigreturn_codes, . - sigreturn_codes
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
