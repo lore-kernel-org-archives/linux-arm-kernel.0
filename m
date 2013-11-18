@@ -1,32 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Nov 2013 13:57:27 +0000
-Subject: ARM topic: Is DT on ARM the solution, or is there something
- better?
-In-Reply-To: <20131118134022.26EE7C409EC@trevor.secretlab.ca>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131118122644.GA26046@ulmo.nvidia.com>
- <20131118134022.26EE7C409EC@trevor.secretlab.ca>
-Message-ID: <20131118135727.GD14306@sirena.org.uk>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Mon, 18 Nov 2013 15:00:20 +0100
+Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
+In-Reply-To: <528A1652.4000806@ti.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
+ <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
+ <5280E617.3000004@ti.com>
+ <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
+ <528A1652.4000806@ti.com>
+Message-ID: <3C198737-CAE0-40B4-803F-31C132911265@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 01:40:22PM +0000, Grant Likely wrote:
+Hi Tomi,
 
-> Some hardware does that. That's what OHCI, EHCI, UHCI, XHCI, SDHCI, and
-> similar are all about. It always helps when well understood hardware
-> follows a register interface. It doesn't work for everything, but I
-> agree it would be good to have preferred hw interfaces for SPI & I2C.
+Am 18.11.2013 um 14:29 schrieb Tomi Valkeinen:
 
-You'd need something class based like USB, there's such massive
-variation in what the hardware is trying to do and the tradeoffs.  A big
-issue is that especially with I2C many of the devices are primarily
-analogue devices implemnted in larger processes where the cost of adding
-additional digital logic can have a noticeable effect on the area and
-hence cost of the silicon.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131118/adb8ad80/attachment.sig>
+> On 2013-11-11 16:30, Dr. H. Nikolaus Schaller wrote:
+> 
+>> Maybe it looks as if it is an unsolvable problem. The OPA works only if acbias
+>> and bypass are enabled, but is not allowed to tell that it is there.
+> 
+> That's why the board file or dts file is there, to have "glue" data to
+> make different pieces work together.
+
+Our implementation idea was that this makes the board file developer to specify knowlegde that the
+drivers already could have and to reduce the risk of misconfiguration.
+
+So we tried to model the invert property of the connector which is also backpropagated
+to VENC.
+
+But of course there are different ways of doing it and different priorities of contradicting
+requirements.
+
+> 
+> The perfect (?) solution would be a CDF like data. The idea would be
+> that in the board file, you would describe configuration options for
+> VENC and for OPA. In this particular case, you'd tell VENC that it needs
+> to enable acbias and bypass when OPA is to be connected to VENC. Then
+> there could be more entries for VENC, saying disable acbias and bypass
+> when BAR is to be connected to VENC.
+> 
+> However, we don't have such support (yet).
+> 
+> For now, I hope it's enough if we handle VENC in a "single
+> configuration" manner, i.e. you'll tell VENC to enable acbias and bypass
+> when VENC is enabled. This means you can't have board setups where you'd
+> change the VENC->OPA connection to some other analog tv output at
+> runtime. I hope that's the case (i.e. OPA is always in use on that board).
+
+I also don't think that there is a need for runtime modifications, so your proposal
+looks ok.
+
+> If so, then I think you can just pass the acbias and bypass
+> configuration values via omapdss platform data. And VENC driver will use
+> them to configure those. OPA doesn't know anything about this at all.
+
+We will change it that way.
+
+Do you see a chance to get it into the merge window of 3.13?
+
+BR,
+Nikolaus
