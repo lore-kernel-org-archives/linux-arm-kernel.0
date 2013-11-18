@@ -1,48 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Nov 2013 11:03:23 -0800
-Subject: [PATCH] ARM: OMAP2+: More randconfig fixes for reconfigure_io_chain
-Message-ID: <20131118190322.GT10317@atomide.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 18 Nov 2013 14:04:50 -0500
+Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
+In-Reply-To: <20131118173047.GF9838@arm.com>
+References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
+ <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
+ <52898417.80601@nvidia.com> <20131118115842.GE4050@arm.com>
+ <528A4869.2020701@wwwdotorg.org> <20131118173047.GF9838@arm.com>
+Message-ID: <528A64D2.4020107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 26273e02a0cf (ARM: OMAP2+: Fix build for dra7xx without
-omap4 and 5) attempted to fix randconfig found errors for
-redefinition of omap44xx_prm_reconfigure_io_chain, but was
-not enough.
+Hi Catalin,
 
-We need to check for AM43XX without any omap4 or 5 related
-SoCs as well. And looks like we have prm44xx.o built always
-anyways with omap-4-5-prcm-common because of the calls to
-omap4_prm_vp_clear_txdone, so we can remove the duplicate
-entries in the Makefile.
+On 11/18/2013 12:30 PM, Catalin Marinas wrote:
+[...]
+> You can't run legacy AArch32 code at EL3 and have lower levels in AArch64
+> mode (architectural constraint).
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+What prevents AArch32 code from running at EL3 and then requesting a reset to
+AArch64 by writing to the Reset Management Register before sliding down to
+lower exception levels?
 
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -19,11 +19,11 @@ secure-common				= omap-smc.o omap-secure.o
- 
- obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
- obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
--obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common)
-+obj-$(CONFIG_ARCH_OMAP4) += $(hwmod-common) $(secure-common)
- obj-$(CONFIG_SOC_AM33XX) += irq.o $(hwmod-common)
--obj-$(CONFIG_SOC_OMAP5)	 += prm44xx.o $(hwmod-common) $(secure-common)
-+obj-$(CONFIG_SOC_OMAP5)	 += $(hwmod-common) $(secure-common)
- obj-$(CONFIG_SOC_AM43XX) += $(hwmod-common) $(secure-common)
--obj-$(CONFIG_SOC_DRA7XX) += prm44xx.o $(hwmod-common) $(secure-common)
-+obj-$(CONFIG_SOC_DRA7XX) += $(hwmod-common) $(secure-common)
- 
- ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
- obj-y += mcbsp.o
---- a/arch/arm/mach-omap2/prm44xx_54xx.h
-+++ b/arch/arm/mach-omap2/prm44xx_54xx.h
-@@ -43,7 +43,7 @@ extern void omap4_prm_vcvp_write(u32 val, u8 offset);
- extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
- 
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
--	defined(CONFIG_SOC_DRA7XX)
-+	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
- void omap44xx_prm_reconfigure_io_chain(void);
- #else
- static inline void omap44xx_prm_reconfigure_io_chain(void)
+Thanks,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
