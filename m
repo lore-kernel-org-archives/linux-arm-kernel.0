@@ -1,52 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 18 Nov 2013 12:49:27 -0200
-Subject: mx6qsabresd: Adding eMMC suport
-Message-ID: <CAOMZO5DvYQRBWmJwXBA_kDG_rt0rpreLzshx+dY_UEttQMSE-g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Nov 2013 14:54:00 +0000
+Subject: [PATCHv7] dmaengine: Add support for BCM2835
+In-Reply-To: <1384785017.14845.214.camel@smile>
+References: <5288E327.8050809@koalo.de> <1384768816.14845.186.camel@smile>
+ <528A051A.7000703@koalo.de> <1384785017.14845.214.camel@smile>
+Message-ID: <20131118145400.GE16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Nov 18, 2013 at 04:30:17PM +0200, Andy Shevchenko wrote:
+> On Mon, 2013-11-18 at 13:16 +0100, Florian Meier wrote:
+> > >> +	uint32_t chans_available;
+> > > 
+> > > Why uint32_t?
+> > 
+> > Because it is a bit mask of fixed length that directly comes from the
+> > firmware.
+> 
+> Like one already told you in your i2s patch, please, change that to
+> corresponding u* value, namely u32.
 
-When I add support to esdhc4 port, which is connected to a eMMC on mx6qsabresd:
-
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -229,6 +229,10 @@
-                pinctrl_usdhc3: usdhc3grp {
-                        fsl,pins = <MX6QDL_USDHC3_PINGRP1>;
-                };
-+
-+               pinctrl_usdhc4: usdhc4grp {
-+                       fsl,pins = <MX6QDL_USDHC4_PINGRP1>;
-+               };
-        };
- };
-
-@@ -304,3 +308,11 @@
-        wp-gpios = <&gpio2 1 0>;
-        status = "okay";
- };
-+
-+&usdhc4 {
-+       pinctrl-names = "default";
-+       pinctrl-0 = <&pinctrl_usdhc4>;
-+       bus-width = <8>;
-+       non-removable;
-+       status = "okay";
-+};
-
-I get the following:
-
-mmc2: Timeout waiting for hardware interrupt.
- mmcblk1boot1: unknown partition table
-mmc2: Timeout waiting for hardware interrupt.
- mmcblk1boot0: unknown partition table
-
-The boots proceeds until the end, but there is a big delay due to the
-above messages.
-
-Does anything special need to be done in order to support eMMC?
-
-Regards,
-
-Fabio Estevam
+There's no problem with uint32_t vs u32 - either will do.  u32 is the
+pre-stdint.h Linux definition of a 32-bit unsigned integer.  There's
+no reason why uint32_t isn't perfectly acceptable.  It's a matter of
+author taste which gets used.  (Except where modifications are to an
+existing chunk of code using one or the other - where consistency then
+matters more.)
