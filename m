@@ -1,94 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 18 Nov 2013 19:59:59 +0100
-Subject: [PATCH] RFC: framebuffer: provide generic get_fb_unmapped_area
-In-Reply-To: <CAMuHMdWtrSnTHNN-7GtMWAG9gZ0HJ3ZgVZt6Cfc=q=e-5Sr-Qw@mail.gmail.com>
-References: <1384772231-20993-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAMuHMdWtrSnTHNN-7GtMWAG9gZ0HJ3ZgVZt6Cfc=q=e-5Sr-Qw@mail.gmail.com>
-Message-ID: <20131118185959.GE19318@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Nov 2013 11:03:23 -0800
+Subject: [PATCH] ARM: OMAP2+: More randconfig fixes for reconfigure_io_chain
+Message-ID: <20131118190322.GT10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+Commit 26273e02a0cf (ARM: OMAP2+: Fix build for dra7xx without
+omap4 and 5) attempted to fix randconfig found errors for
+redefinition of omap44xx_prm_reconfigure_io_chain, but was
+not enough.
 
-On Mon, Nov 18, 2013 at 12:59:40PM +0100, Geert Uytterhoeven wrote:
-> On Mon, Nov 18, 2013 at 11:57 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > This patch makes mmapping the simple-framebuffer device work on a no-MMU
-> > ARM target. The code is mostly taken from
-> > arch/blackfin/kernel/sys_bfin.c.
-> >
-> > Note this is only tested on this no-MMU machine and I don't know enough
-> > about framebuffers and mm to decide if this patch is sane. Also I'm
-> > unsure about the size check because it triggers if userspace page aligns
-> > the len parameter. (I don't know how usual it is to do, I'd say it's
-> > wrong, but my test program (fbtest by Geert Uytterhoeven) does it.)
-> 
-> It's quite common: the granularity of mmap() is PAGE_SIZE, i.e. if you
-> try to map a partial page, you'll get access to the full page anyway
-> (with MMU; without MMU, you can access everything anyway).
-> Fbtest always mmap()s the full (page aligned) smem_len.
-> 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  drivers/video/fbmem.c | 22 +++++++++++++++++++---
-> >  1 file changed, 19 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/video/fbmem.c b/drivers/video/fbmem.c
-> > index dacaf74..70b328c 100644
-> > --- a/drivers/video/fbmem.c
-> > +++ b/drivers/video/fbmem.c
-> > @@ -1483,6 +1483,24 @@ __releases(&info->lock)
-> >         return 0;
-> >  }
-> >
-> > +#ifdef HAVE_ARCH_FB_UNMAPPED_AREA
-> > +#define fb_get_unmapped_area get_fb_unmapped_area
-> > +#else
-> > +unsigned long fb_get_unmapped_area(struct file *filp, unsigned long orig_addr,
-> > +               unsigned long len, unsigned long pgoff, unsigned long flags)
-> > +{
-> > +       struct fb_info * const info = filp->private_data;
-> > +       unsigned long screen_size = info->screen_size ?: info->fix.smem_len;
-> 
-> Why restrict this to screen_size? Fbtest will map the whole frame buffer memory.
-For me screen_size is zero. The logic to determine the size is copied
-from fb_read. In the meantine I'm using
+We need to check for AM43XX without any omap4 or 5 related
+SoCs as well. And looks like we have prm44xx.o built always
+anyways with omap-4-5-prcm-common because of the calls to
+omap4_prm_vp_clear_txdone, so we can remove the duplicate
+entries in the Makefile.
 
-	if (len > PAGE_ALIGN(screen_size))
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-because even if userspace passes an unaligned size it gets aligned
-somewhere on the path to fb_get_unmapped_area.
-
-> Typically screen_size is not a multiple of PAGE_SIZE, so this is another
-> reason why your size check fails.
-> 
-> > +       if (len > screen_size) {
-> > +               pr_info("%lu > %lu (%lu, %lu)\n", len, screen_size, info->screen_size, info->fix.smem_len);
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       return (unsigned long)info->screen_base;
-> 
-> Shouldn't you take into account pgoff?
-Sounds sensible. Then the same applies to blackfin's
-get_fb_unmapped_area.
-
-So is it:
-
-	unsigned long screen_size = info->screen_size ?: info->fix.smem_len;
-
-	screen_size = PAGE_ALIGN(screen_size);
-
-	if (pgoff > screen_size || pgoff + len > screen_size)
-		return -EINVAL;
-
-	return (unsigned long)info->screen_base + pgoff;
-
-? Or should I drop the size check?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -19,11 +19,11 @@ secure-common				= omap-smc.o omap-secure.o
+ 
+ obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
+ obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
+-obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common)
++obj-$(CONFIG_ARCH_OMAP4) += $(hwmod-common) $(secure-common)
+ obj-$(CONFIG_SOC_AM33XX) += irq.o $(hwmod-common)
+-obj-$(CONFIG_SOC_OMAP5)	 += prm44xx.o $(hwmod-common) $(secure-common)
++obj-$(CONFIG_SOC_OMAP5)	 += $(hwmod-common) $(secure-common)
+ obj-$(CONFIG_SOC_AM43XX) += $(hwmod-common) $(secure-common)
+-obj-$(CONFIG_SOC_DRA7XX) += prm44xx.o $(hwmod-common) $(secure-common)
++obj-$(CONFIG_SOC_DRA7XX) += $(hwmod-common) $(secure-common)
+ 
+ ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
+ obj-y += mcbsp.o
+--- a/arch/arm/mach-omap2/prm44xx_54xx.h
++++ b/arch/arm/mach-omap2/prm44xx_54xx.h
+@@ -43,7 +43,7 @@ extern void omap4_prm_vcvp_write(u32 val, u8 offset);
+ extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+ 
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+-	defined(CONFIG_SOC_DRA7XX)
++	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+ void omap44xx_prm_reconfigure_io_chain(void);
+ #else
+ static inline void omap44xx_prm_reconfigure_io_chain(void)
