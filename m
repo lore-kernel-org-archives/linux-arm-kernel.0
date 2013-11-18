@@ -1,47 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 18 Nov 2013 10:15:36 +0100
-Subject: [PATCH 02/10] mtd: st_spi_fsm: Supply all register address and
- bit logic defines
-In-Reply-To: <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
-References: <1384438956-31153-1-git-send-email-lee.jones@linaro.org>
- <1384438956-31153-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaccxcTfKc-y7rPEH1H3yua3ubLvuvTzWnMs1rOwjiVNw@mail.gmail.com>
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Mon, 18 Nov 2013 09:18:19 +0000
+Subject: [PATCH 11/31] dma: add channel request API that supports
+ deferred probe
+In-Reply-To: <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
+ <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+Message-ID: <1384766276.14845.155.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 3:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Fri, 2013-11-15 at 13:01 -0800, Dan Williams wrote:
+> On Fri, Nov 15, 2013 at 12:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-> Here we provide the FSM's register addresses, register bit names/offsets
-> and some commands which will prove useful as we start bulk the FMS's
-> driver out with functionality.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > Eventually, all drivers should be converted to this new API, the old API
+> > removed, and the new API renamed to the more desirable name. 
 
-OK...
+I really would like to see more sensible and shorter names for the API
+functions.
 
-> +/*
-> + * FSM SPI Controller Registers
-> + */
-> +#define SPI_CLOCKDIV                   0x0010
-> +#define SPI_MODESELECT                 0x0018
-> +#define SPI_CONFIGDATA                 0x0020
-(...)
+[]
 
-So what we want to know here is whether this is a general-purpose
-SPI block, or if it's a special-purpose SPI block that can only be
-used for accessing flashes.
+> > acpi_dma_request_slave_chan_by_index() doesn't actually implement
+> > deferred probe. Perhaps it should?
 
-If it's the former that part should be broken out into drivers/spi
-of course...
+Yes it should, though I propose we will add this a bit later since we
+will survive w/o it.
 
-But the register map seems a bit special-purpose so it could
-very well be that this is for flash control only. So maybe you can
-spill some beans from a datasheet here?
+My comments regarding acpi-dma.c below.
 
-A clock divider at offset 0x10 already tells us that this is probably
-a PL022 derivate, just that we don't know how much it has
-been hacked with... does this thing contain AMBA identifiers
-at the end of the IO-region, usually at 0x0fe0 thru 0x0fff?
+[]
 
-Yours,
-Linus Walleij
+> > --- a/drivers/dma/acpi-dma.c
+> > +++ b/drivers/dma/acpi-dma.c
+> > @@ -334,7 +334,7 @@ static int acpi_dma_parse_fixed_dma(struct acpi_resource *res, void *data)
+> >   * @dev:       struct device to get DMA request from
+> >   * @index:     index of FixedDMA descriptor for @dev
+> >   *
+> > - * Returns pointer to appropriate dma channel on success or NULL on error.
+> > + * Returns pointer to appropriate dma channel on success or an error pointer.
+> >   */
+> >  struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+> >                 size_t index)
+> > @@ -349,10 +349,10 @@ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+
+We use default value of chan if it's not found. Perhaps you have to
+change it as well to something like ERR_PTR(-ENOENT).
+
+[]
+
+> > @@ -367,7 +367,7 @@ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
+> >         acpi_dev_free_resource_list(&resource_list);
+> >
+> >         if (dma_spec->slave_id < 0 || dma_spec->chan_id < 0)
+> > -               return NULL;
+> > +               return ERR_PTR(-ENODEV);
+
+In this case I would rather use -ENODATA, since it means we have no
+FixedDMA descriptor for the device under question.
+
+[]
+
+> >  struct dma_chan *acpi_dma_request_slave_chan_by_name(struct device *dev,
+> >                 const char *name)
+> > @@ -415,7 +415,7 @@ struct dma_chan *acpi_dma_request_slave_chan_by_name(struct device *dev,
+> >         else if (!strcmp(name, "rx"))
+> >                 index = 1;
+> >         else
+> > -               return NULL;
+> > +               return ERR_PTR(-ENODEV);
+
+Perhaps -EINVAL, since it means the input parameter kinda wrong.
+
+
+-- 
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
