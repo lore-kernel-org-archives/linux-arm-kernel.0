@@ -1,54 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Nov 2013 10:42:08 -0700
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <1384766276.14845.155.camel@smile>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>	
- <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>	
- <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
- <1384766276.14845.155.camel@smile>
-Message-ID: <528A5170.3090809@wwwdotorg.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Nov 2013 17:46:38 +0000
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
+ device tree case
+In-Reply-To: <20131118172510.GI16038@saruman.home>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-2-git-send-email-tony@atomide.com>
+ <20131118102907.GC13640@lee--X1>
+ <20131118172510.GI16038@saruman.home>
+Message-ID: <20131118174638.GQ13640@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 02:18 AM, Shevchenko, Andriy wrote:
-> On Fri, 2013-11-15 at 13:01 -0800, Dan Williams wrote:
->> On Fri, Nov 15, 2013 at 12:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > > +static struct of_dev_auxdata twl_auxdata_lookup[] = {
+> > > +	OF_DEV_AUXDATA("ti,twl4030-gpio", 0, "twl4030-gpio", NULL),
+> > > +	{ /* sentinel */ },
+> > > +};
+> > > +
+> > >  /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
+> > >  static int
+> > >  twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> > > @@ -1271,10 +1276,14 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> > >  		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+> > >  	}
+> > >  
+> > > -	if (node)
+> > > -		status = of_platform_populate(node, NULL, NULL, &client->dev);
+> > > -	else
+> > > +	if (node) {
+> > > +		if (pdata)
+> > > +			twl_auxdata_lookup[0].platform_data = pdata->gpio;
+> > > +		status = of_platform_populate(node, NULL, twl_auxdata_lookup,
+> > > +					      &client->dev);
+> > > +	} else {
+> > >  		status = add_children(pdata, irq_base, id->driver_data);
+> > 
+> > Why doesn't the TWL driver use the MFD framework for this stuff?
 > 
->>> Eventually, all drivers should be converted to this new API, the old API
->>> removed, and the new API renamed to the more desirable name. 
-> 
-> I really would like to see more sensible and shorter names for the API
-> functions.
+> that's reminiscent from years ago and, surely, needs to be fixed. Should
+> we gate $subject for that, though ? This has been in tree for quite a
+> few years already and Tony's patch is still a step forward, since most
+> omap3 platforms would break on DT-only without it.
 
-I'm not sure if you're suggesting that you:
+I didn't say that I would reject the patch. I was just surprised to
+see so much hand-rolling, as the MFD core code does much of it
+automatically. This is the first time I've taken a look at this and it
+seems to be quite the relic.
 
-a) Really want to API renaming I mention above to happen at some time.
+> There are quite a few folks who could volunteer to fixing that after
+> Tony's patch is in (me included, although there could be better choices
+> hehe).
 
-b) We need to pick a better name now, for the new API this patch
-introduces. If so, do you have any better suggestion?
+Well it's not doing any harm. I'll make a note to fix it myself if a)
+no one has done so already and b) I manage to find some spare
+time. The latter issue is less likely to be resolved. :)
 
->>> --- a/drivers/dma/acpi-dma.c
->>> +++ b/drivers/dma/acpi-dma.c
->>> @@ -334,7 +334,7 @@ static int acpi_dma_parse_fixed_dma(struct acpi_resource *res, void *data)
->>>   * @dev:       struct device to get DMA request from
->>>   * @index:     index of FixedDMA descriptor for @dev
->>>   *
->>> - * Returns pointer to appropriate dma channel on success or NULL on error.
->>> + * Returns pointer to appropriate dma channel on success or an error pointer.
->>>   */
->>>  struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
->>>                 size_t index)
->>> @@ -349,10 +349,10 @@ struct dma_chan *acpi_dma_request_slave_chan_by_index(struct device *dev,
-> 
-> We use default value of chan if it's not found. Perhaps you have to
-> change it as well to something like ERR_PTR(-ENOENT).
+Are you Acking this patch by the way?
 
-Ah yes. I think I'll keep the default value of chan = NULL, and just
-change the return statement to something like:
-
-return chan ? chan : ERR_PTR(-ENOENT);
-
-That way, the fact that adma->acpi_dma_xlate() returns
-NULL-or-valid-pointer and the check of chan against NULL inside the
-list_for_each_entry() won't have to change.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
