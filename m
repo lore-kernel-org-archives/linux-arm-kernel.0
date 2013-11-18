@@ -1,58 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 18 Nov 2013 11:21:07 -0800
-Subject: ACPI vs DT at runtime
-In-Reply-To: <528A4F5F.7080104@jonmasters.org>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <3371903.8j54vrCjEN@wuerfel>
- <CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com>
- <201311180945.52764.arnd@arndb.de>
- <528A4F5F.7080104@jonmasters.org>
-Message-ID: <20131118192107.GC5886@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Nov 2013 12:23:48 -0700
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <20131118191955.GG10335@titan.lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <cover.1384798508.git.jason@lakedaemon.net>
+ <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
+ <528A65DF.8060000@wwwdotorg.org>
+ <20131118191955.GG10335@titan.lakedaemon.net>
+Message-ID: <528A6944.3070303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 12:33:19PM -0500, Jon Masters wrote:
-> On 11/18/2013 03:45 AM, Arnd Bergmann wrote:
-> > On Sunday 17 November 2013, Olof Johansson wrote:
+On 11/18/2013 12:19 PM, Jason Cooper wrote:
+> On Mon, Nov 18, 2013 at 12:09:19PM -0700, Stephen Warren wrote:
+>> On 11/18/2013 11:38 AM, Jason Cooper wrote:
+>>> Unlike other build products in the Linux kernel, the devicetree blobs
+>>> are simply the name of their source file, s/dts/dtb/.  There is also no
+>>> 'make *install' mechanism to put them in a standard place with a
+>>> standard naming structure.
+>>>
+>>> Unfortunately, users have begun scripting pulling the needed dtbs from
+>>> within the kernel tree, thus hardcoding the dtbs names.  In turn, this
+>>> means any changes to the dts filenames breaks these scripts.
+>>>
+>>> This patch is an attempt to fix this problem.  Akin to 'make install',
+>>> this creates a new make target, dtbs_install.  The script that gets
+>>> called defers to a vendor or distribution supplied installdtbs binary,
+>>> if found in the system.  Otherwise, the default action is to install a
+>>> given dtb into
+...
+>> This only appears to create ${compat}.dtb, and not ${dtb} too. 
 > 
-> >> Yep, and together for review is a critical part. I'm not saying that
-> >> the ideal solution is a flashed DTB, but it's better than ACPI. A
-> >> flashed DTB that's _easy to update_ as part of an OS install would
-> >> probably be one of the best solutions we could ask for though.
-> > 
-> > Right: the assumption on the DT boot interfaces is that board designers
-> > make mistakes and are working on moving targets, so we need ways to update
-> > the DTB. By contrast, the assumption on ACPI is that server firmware
-> > authors know what they are doing and you shouldn't let anyone else mess
-> > with the ACPI bits because doing so might damage your hardware. We're
-> > in trouble if the second assumption turns out wrong.
+> See my comment, above.
 > 
-> In the server space we *never* ship updated ACPI tables in Red Hat
-> products, and we never would ship updated tables as part of the OS.
-> Platform data is platform data. It belongs to the vendor shipping the
-> system, never to the OS. Yes, there are workarounds for bugs but on the
-> whole you do in fact count on server vendors not to screw it up, and if
-> they do then it is up to them to ship a BIOS update for their hardware.
+>> So, it doesn't seem to address part of the cover letter, "In addition,
+>> some vendors have done a diligent job naming their devicetree source
+>> files appropriately and we don't want to break their setups." Was that
+>> deliberate? If so, I guess I need to send some patches to U-Boot.
+> 
+> I assume you are still pulling from arch/arm/boot/dts/*.dtb, right?
+> Those build products don't go away with this patch, so you should be
+> fine.  Unless I'm mis-understanding your workflow...
 
-And in x86 land these days, they mostly don't screw it up because they've been
-doing this for years and years. On ARM we've got a dozen new vendors who have
-never done any of this before (and neither have we), and we're all going to
-screw it up. Denying that buys us nothing, planning for it in a manner that we
-can recover from the worst screwups without paying for it forever is the best
-way forward.
-
-> In the Fedora space, even on 32-bit, we tried to not get in the business
-> of shipping DeviceTree blobs (way back when) that should be shipped by
-> the platform, but alas many systems don't have flash to store the DTB.
-
-Well, duh, that was what we, as the kernel community, had mandated at
-the time.
-
-> Coupled with the moving target we're dealing with there...things have
-> been ugly. In the v8 server space, there will be no shipping of platform
-> data. It will be ACPI tables passed in via UEFI, never updated by the
-> OS, and owned wholly by the platform vendor.
-
-Everything is a moving target on ARMv8 today. ACPI isn't going to change that.
-
--Olof
+Yes, but I thought the whole point of this was that everyone would/could
+switch to running "make dtbs_install", then pulling out the files from
+the install tree, instead of any use-case requiring obtaining files
+directly from the source/build tree?
