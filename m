@@ -1,62 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Nov 2013 15:21:47 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix undefined reference to set_cntfreq
-In-Reply-To: <528A9E8C.9040903@ti.com>
-References: <20131118215855.GW10317@atomide.com>
- <528A9E8C.9040903@ti.com>
-Message-ID: <20131118232145.GX10317@atomide.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 19 Nov 2013 10:22:11 +1100
+Subject: [PATCH] ARM: ep93xx: remove deprecated IRQF_DISABLED
+Message-ID: <1384816931-3680-1-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [131118 15:11]:
-> On Monday 18 November 2013 04:58 PM, Tony Lindgren wrote:
-> > If CONFIG_SOC_HAS_REALTIME_COUNTER is not selected for omap5
-> > or dra7xx, we can get the following error:
-> > 
-> > arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_init':
-> > :(.text+0x7ab0): undefined reference to `set_cntfreq'
-> > 
-> > Fix the issue by not trying to initalize the realtime counter
-> > unles CONFIG_SOC_HAS_REALTIME_COUNTER is selected.
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> >
-> How about a dummy inline function of set_cntfreq() ?
-> Having #ifdef in middle of the code looks pretty ugly.
+From: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 
-Sure, here's an updated version.
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
-Tony
+It's a NOOP since 2.6.35 and it will be removed one day.
 
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+---
+ arch/arm/mach-ep93xx/core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 18 Nov 2013 13:56:48 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix undefined reference to set_cntfreq
-
-If CONFIG_SOC_HAS_REALTIME_COUNTER is not selected for omap5
-or dra7xx, we can get the following error:
-
-arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_init':
-:(.text+0x7ab0): undefined reference to `set_cntfreq'
-
-Fix the issue by not trying to initalize the realtime counter
-unles CONFIG_SOC_HAS_REALTIME_COUNTER is selected.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -76,6 +76,13 @@ static inline void omap_barrier_reserve_memblock(void)
- { }
- #endif
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 3f12b88..fcc965f 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -136,7 +136,7 @@ static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
  
-+#ifdef CONFIG_SOC_HAS_REALTIME_COUNTER
- void set_cntfreq(void);
-+#else
-+static inline void set_cntfreq(void)
-+{
-+}
-+#endif
-+
- #endif /* __ASSEMBLER__ */
- #endif /* OMAP_ARCH_OMAP_SECURE_H */
+ static struct irqaction ep93xx_timer_irq = {
+ 	.name		= "ep93xx timer",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= ep93xx_timer_interrupt,
+ };
+ 
+-- 
+1.7.9.7
