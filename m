@@ -1,43 +1,29 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Mon, 18 Nov 2013 17:07:52 +0000
-Subject: [PATCH 4/4] ARM: ep93xx: stop using mach/timex.h
-In-Reply-To: <1384292466-31725-5-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1384292466-31725-5-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DF7679@P3PWEX4MB008.ex4.secureserver.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Nov 2013 17:10:23 +0000
+Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
+In-Reply-To: <528A4869.2020701@wwwdotorg.org>
+References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
+ <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
+ <52898417.80601@nvidia.com> <20131118115842.GE4050@arm.com>
+ <528A4869.2020701@wwwdotorg.org>
+Message-ID: <20131118171023.GH16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 12, 2013 2:41 PM, Uwe Kleine-K?nig wrote:
-> mach/timex.h is the last remaining header that is unused for multiarch
-> builds but necessary for singlearch builds. To allow to get rid of it
-> for singlearch builds, too, drop its usage in ep93xx arch code by
-> substituting CLOCK_TICK_RATE by a local cpp symbol.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-ep93xx/core.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 157ba88..615244b 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -116,8 +116,9 @@ void __init ep93xx_map_io(void)
->  #define EP93XX_TIMER123_CLOCK		508469
->  #define EP93XX_TIMER4_CLOCK		983040
->  
-> +#define EP93XX_CLOCK_FREQ		983040
+On Mon, Nov 18, 2013 at 10:03:37AM -0700, Stephen Warren wrote:
+> On 11/18/2013 04:58 AM, Catalin Marinas wrote:
+> ...
+> > Of course, trusted foundations interface could be plugged into cpu_ops
+> > on arm64 but I will NAK it on the grounds of not using the PSCI API, nor
+> > the SMC calling convention (and it's easy to fix when porting to ARMv8).
+> > If a supported standard API is used, then there is no need for
+> > additional code in the kernel.
+> 
+> What happens when someone takes an existing working secure-mode SW stack
+> and simply re-uses it on some new ARMv8 SoC. Are you going to force
+> people working on upstream to re-write the secure mode firmware in
+> shipped hardware before allowing upstream kernel support?
 
-I would prefer that the already defined symbol EP93XX_TIMER4_CLOCK be used
-instead of adding a new one.
-
->  #define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
-> -#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
-> +#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(EP93XX_CLOCK_FREQ, HZ)
->
->  static unsigned int last_jiffy_time;
-
-Other than that comment, I have no issues with this.
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+I'll tell you what will happen.  They'll say "screw mainline, we're doing
+our own thing".  Vendors have been doing that for years, this will be no
+different and require no additional effort from them.
