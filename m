@@ -1,37 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 19 Nov 2013 10:48:27 -0800
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131119091216.GA4412@netboy>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <5289A356.4060004@jonmasters.org>
- <20131118150052.GC24408@sirena.org.uk>
- <20131118191336.GB5886@quad.lixom.net>
- <20131119091216.GA4412@netboy>
-Message-ID: <20131119184827.GD20967@quad.lixom.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Nov 2013 18:51:06 +0000
+Subject: [PATCH 07/10] ASoC: ux500: Store DMA data in the DAI differently
+ in the pdata and DT case
+In-Reply-To: <1384859269-19801-8-git-send-email-lee.jones@linaro.org>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+ <1384859269-19801-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131119185106.GI2674@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Grant]
+On Tue, Nov 19, 2013 at 11:07:46AM +0000, Lee Jones wrote:
+> In this patch we do two things. Firstly, instead of open coding the
+> store of DMA data in to the DAI for later use, we use the API provided.
+> Secondly we create and store similar DMA data for the DT case, only
+> this time we use 'struct snd_dmaengine_dai_dma_data' which is provided
+> by the core for this very reason.
 
-On Tue, Nov 19, 2013 at 10:12:17AM +0100, Richard Cochran wrote:
-> On Mon, Nov 18, 2013 at 11:13:36AM -0800, Olof Johansson wrote:
-> > 
-> > I know people have been frustrated that they need to keep the DT in sync with
-> > the kernel. But we've always been upfront with the requirement, and why we've
-> > been having it. We're now changing this requirement, which should help sort out
-> > practically all of the concerns at hand.
-> 
-> Sorry, but this really gets my goat. When have you been upfront about
-> the unstable DT idea?
-
-As I said, from the very beginning. It's why we decided to have the DTS hosted
-in the kernel tree as well. The approach has always been "we'll move it out
-eventually when things settle down", but that's always been pushed off so far.
-
-This is just a tangent and a distraction anyway: You should know by
-now that we've decided to keep backwards compatibility going forward,
-so any argument about why we did it differently before is leading nowhere.
-
-
--Olof
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/9c20a3eb/attachment-0001.sig>
