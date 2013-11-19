@@ -1,40 +1,33 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Tue, 19 Nov 2013 10:29:07 +0200
-Subject: [GIT PULL] Fix vmalloc allocations for KVM/ARM
-In-Reply-To: <1384809194-9301-1-git-send-email-christoffer.dall@linaro.org>
-References: <1384809194-9301-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20131119082907.GW2008@redhat.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 19 Nov 2013 12:33:21 +0400
+Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
+In-Reply-To: <20131116124750.GA26318@anuminas.rup.mentorg.com>
+References: <20131116124750.GA26318@anuminas.rup.mentorg.com>
+Message-ID: <CALT56yOcUChApUP6rOyXqWuK55ZR0Ooj457XVP2b7bVR9yk-8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 01:13:13PM -0800, Christoffer Dall wrote:
-> Hi Gleb and Paolo,
-> 
-Pulled, thanks.
+Hello,
 
-> Please pull this into kvm/master:
-> 
-> The following changes since commit 5e01dc7b26d9f24f39abace5da98ccbd6a5ceb52:
-> 
->   Linux 3.12 (2013-11-03 15:41:51 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-fixes-3.13-1
-> 
-> for you to fetch changes up to 40c2729bab48e2832b17c1fa8af9db60e776131b:
-> 
->   arm/arm64: KVM: Fix hyp mappings of vmalloc regions (2013-11-16 18:54:45 -0800)
-> 
-> ----------------------------------------------------------------
-> Fix percpu vmalloc allocations
-> 
-> ----------------------------------------------------------------
-> Christoffer Dall (1):
->       arm/arm64: KVM: Fix hyp mappings of vmalloc regions
-> 
->  arch/arm/kvm/mmu.c |   34 ++++++++++++++++++++++++++++------
->  1 file changed, 28 insertions(+), 6 deletions(-)
+On Sat, Nov 16, 2013 at 4:47 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> When converting from tosa-keyboard driver to matrix keyboard, tosa keys
+> received extra 1 column shift. Replace that with correct values to make
+> keyboard work again.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  arch/arm/mach-pxa/tosa.c | 102 +++++++++++++++++++++++------------------------
+>  1 file changed, 51 insertions(+), 51 deletions(-)
 
---
-			Gleb.
+As nobody seems to object, I would like to use my tosa maintainer
+powers and push
+this patch for inclusion.
+
+Both Eric and Haojian seem to be unresponsive now.
+Russell, can I push it to your patch system? Or should I push it to
+arm-soc guys?
+
+-- 
+With best wishes
+Dmitry
