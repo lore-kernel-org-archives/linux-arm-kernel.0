@@ -1,51 +1,16 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Nov 2013 11:48:26 -0800
-Subject: [GIT PULL] few more omap fixes for v3.13 merge window
-Message-ID: <pull-1384890506-765990>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Tue, 19 Nov 2013 14:45:41 -0500
+Subject: at91: ubi: UBIFS error (pid 1): ubifs_iget: failed to read inode 1,
+ error -2
+Message-ID: <91586D499ADFD74FBCFB8425266A5DE40153BB2BE545@pluto.melinkcorp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 26273e02a0cf18eb72416559310d3294390a9024:
+I am using an Atmel AT91SAM9G25 board with Micron's MT29F2G08ABAEAWP NAND flash.  I am on Atmel's variant of the 3.6.9 kernel.  Specifically, I'm using https://github.com/linux4sam/linux-at91/tree/linux-3.6.9-at91 commit 5fe012d4aee98ef82df66e6763882c735902ed0f.   I have several boards in which I see the error message shown in the message subject when the device is reset due to a power cycle and the device fails to continue to load the filesystem.  On one board I erased and re-wrote the filesystem and the device is working just fine through multiple power cycles.  My questions are:
 
-  ARM: OMAP2+: Fix build for dra7xx without omap4 and 5 (2013-11-15 08:27:29 -0800)
+1. Is this a known issue with the version of the kernel that I am using?  I've searched this mailing list and the latest mainline kernel commits, and I didn't see anything directly related to this issue.
+2. If so, is there a fix in a later kernel version?
+3. If not, what would be helpful in figuring out what is going on?  I still have a bad device that I haven't touched the flash on.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/more-fixes-for-merge-window-take2
-
-for you to fetch changes up to b2ff4790612bbfa3433cc92e56445c2a40098e2c:
-
-  ARM: OMAP2+: Remove legacy omap4_twl6030_hsmmc_init (2013-11-18 16:24:58 -0800)
-
-----------------------------------------------------------------
-Few more fixes for issues found booting older omaps using device tree.
-Also few randconfig build fixes and removal of some dead code for omap4
-as it no longer has legacy platform data based booting support.
-
-----------------------------------------------------------------
-Tony Lindgren (9):
-      i2c: omap: Fix missing device tree flags for omap2
-      ARM: OMAP2+: Fix GPMC and simplify bootloader timings for 8250 and smc91x
-      ARM: dts: Fix omap2 specific dtsi files by adding the missing entries
-      ARM: OMAP2+: More randconfig fixes for reconfigure_io_chain
-      gpio: twl4030: Fix regression for twl gpio output
-      gpio: twl4030: Fix passing of pdata in the device tree case
-      ARM: OMAP2+: Fix undefined reference to set_cntfreq
-      ARM: OMAP2+: Remove legacy mux code for display.c
-      ARM: OMAP2+: Remove legacy omap4_twl6030_hsmmc_init
-
- Documentation/devicetree/bindings/i2c/i2c-omap.txt |  3 +-
- arch/arm/boot/dts/omap-zoom-common.dtsi            |  2 +-
- arch/arm/boot/dts/omap2.dtsi                       | 96 ++++++++++++++++++++++
- arch/arm/boot/dts/omap2420.dtsi                    | 23 ++++++
- arch/arm/boot/dts/omap2430.dtsi                    | 49 +++++++++++
- arch/arm/mach-omap2/Makefile                       |  6 +-
- arch/arm/mach-omap2/common.h                       |  1 -
- arch/arm/mach-omap2/display.c                      | 78 ------------------
- arch/arm/mach-omap2/gpmc.c                         | 58 +++++--------
- arch/arm/mach-omap2/omap-secure.h                  |  7 ++
- arch/arm/mach-omap2/omap4-common.c                 | 57 -------------
- arch/arm/mach-omap2/prm44xx_54xx.h                 |  2 +-
- drivers/gpio/gpio-twl4030.c                        | 13 ++-
- drivers/i2c/busses/i2c-omap.c                      | 22 +++++
- 14 files changed, 232 insertions(+), 185 deletions(-)
+Thanks,
+Bryan
