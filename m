@@ -1,47 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 19 Nov 2013 11:56:29 +0900
-Subject: [PATCH 7/7] ARM: shmobile: armadillo-reference: Use low level
- IRQ for ST1231
-In-Reply-To: <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131119025629.GA14794@verge.net.au>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 19 Nov 2013 11:03:00 +0800
+Subject: a bug on NO_HZ_FULL_ALL
+In-Reply-To: <CANHzE=0yshUSnxRRhQ_hBjo8ze4pSzuWQq+SAWdosq+wdP8hFg@mail.gmail.com>
+References: <CANHzE=2EOJmjFqLUDSfxTvgQhrUogOxH8Qux9hBFTGf8HiWWEw@mail.gmail.com>	<52843855.5060509@linaro.org>	<52847FBE.9070501@linaro.org>	<CAKfTPtD7fo08mjQoLXMMDpyxQuyoCZLS33qBnnUcQEmzYai2VQ@mail.gmail.com>	<52848547.9080604@linaro.org>
+ <CANHzE=0yshUSnxRRhQ_hBjo8ze4pSzuWQq+SAWdosq+wdP8hFg@mail.gmail.com>
+Message-ID: <528AD4E4.9010103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 09, 2013 at 01:23:59PM +0100, Laurent Pinchart wrote:
-> The device is configured to generate an active-low interrupt signal that
-> needs to be acknowledged by the host. Configure the IRQ to trigger on
-> low level.
+On 11/14/2013 05:54 PM, Shaojie Sun wrote:
+> No, I think it is a bug.
 > 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Because I tested the option with NO_HZ_FULL and without
+> NO_HZ_FULL_ALL. It had only little interruptes on CPU0 twd.
+> With same code, I added NO_HZ_FULL_ALL option. It had too many
+> interruptes on CPU0 twd.
 > 
-> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> index aef425f..04e9d49 100644
-> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> @@ -95,7 +95,7 @@
->  		compatible = "sitronix,st1232";
->  		reg = <0x55>;
->  		interrupt-parent = <&irqpin1>;
-> -		interrupts = <2 IRQ_TYPE_NONE>; /* IRQ10: hwirq 2 on irqpin1 */
-> +		interrupts = <2 IRQ_TYPE_LOW_LEVEL>;
+> So the sumbitter just didn't test twd interrupts, when he expanded
+> NO_HZ_FULL option to all cpu.
+> 
+> On Thu, Nov 14, 2013 at 4:09 PM, viresh kumar <viresh.kumar@linaro.org> wrote:
+>> On Thursday 14 November 2013 01:35 PM, Vincent Guittot wrote:
+>>> AFAICT, It's a none issue. In full nohz, a timer fires periodically
+>>> (around 4sec period on ARM IIRC) on one cpu (cpu0).
+>>
+>> Timer should always be running on CPU0, its out of nohz-full domain. Its
+>> cpu 1, where it will fire after long delays..
+>>
+>>
+>> https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/AdaptiveTickless
 
-I believe this should be IRQ_TYPE_LEVEL_LOW.
 
-I have dequeued this patch for now.
+Shaojie,
+which kernel version has this bug?
+I just find only the v3.13 kernel has opened the NO_HZ_FULL for 32 bit
+kernel. and my testing base it.
 
->  		pinctrl-0 = <&st1232_pins>;
->  		pinctrl-names = "default";
->  		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
-> -- 
-> 1.8.1.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+but for lsk, it is 3.10 kernel, so unless you are using 64bit kernel to
+do testing, is it right?
+
+-- 
+Thanks
+    Alex
