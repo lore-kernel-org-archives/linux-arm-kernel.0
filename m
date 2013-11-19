@@ -1,108 +1,50 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 19 Nov 2013 13:42:38 -0800
-Subject: [PATCH 1/1] irq-gic: add capability to set bypass flag in GIC
-Message-ID: <1384897358-22940-1-git-send-email-fkan@apm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Nov 2013 22:44:28 +0100
+Subject: [PATCH] ARM: ux500: delete remnant pin config macros
+Message-ID: <1384897468-21723-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC-400 implementation allows for FIQ and IRQ bypass. In the
-X-Gene implementation, the FIQ bypass must be enabled at all time.
-Otherwise, some PPI will appear as FIQ and cause kernel problem.
+This deletes a few final pin configuration macros from the
+ux500.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/irqchip/irq-gic.c       |   15 +++++++++++----
- include/linux/irqchip/arm-gic.h |    4 ++--
- 2 files changed, 13 insertions(+), 6 deletions(-)
+ arch/arm/mach-ux500/board-mop500-pins.c | 22 ----------------------
+ 1 file changed, 22 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index d0e9480..aa7342e 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -65,6 +65,7 @@ struct gic_chip_data {
- #endif
- 	struct irq_domain *domain;
- 	unsigned int gic_irqs;
-+	unsigned int bypass_flag;
- #ifdef CONFIG_GIC_NON_BANKED
- 	void __iomem *(*get_base)(union gic_base *);
- #endif
-@@ -450,7 +451,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index ff532ba30610..c98004beeccd 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -23,28 +23,6 @@ BIAS(abx500_out_lo, PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0));
+ BIAS(abx500_in_pd, PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN, 1));
+ BIAS(abx500_in_nopull, PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN, 0));
  
- 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, base + GIC_CPU_CTRL);
-+	writel_relaxed(gic->bypass_flag | 1, base + GIC_CPU_CTRL);
- }
- 
- void gic_cpu_if_down(void)
-@@ -591,7 +592,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
- 
- 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-+	writel_relaxed(gic_data[gic_nr].bypass_flag | 1, cpu_base + GIC_CPU_CTRL);
- }
- 
- static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-@@ -733,7 +734,8 @@ const struct irq_domain_ops gic_irq_domain_ops = {
- 
- void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 			   void __iomem *dist_base, void __iomem *cpu_base,
--			   u32 percpu_offset, struct device_node *node)
-+			   u32 percpu_offset, u32 bypass_val,
-+			   struct device_node *node)
- {
- 	irq_hw_number_t hwirq_base;
- 	struct gic_chip_data *gic;
-@@ -821,6 +823,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 
- 	set_handle_irq(gic_handle_irq);
- 
-+	gic->bypass_flag = (bypass_val & 0xf) << 4;
- 	gic_chip.flags |= gic_arch_extn.flags;
- 	gic_dist_init(gic);
- 	gic_cpu_init(gic);
-@@ -835,6 +838,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
- 	void __iomem *cpu_base;
- 	void __iomem *dist_base;
- 	u32 percpu_offset;
-+	u32 bypass_val;
- 	int irq;
- 
- 	if (WARN_ON(!node))
-@@ -849,7 +853,10 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
- 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
- 		percpu_offset = 0;
- 
--	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
-+	if (of_property_read_u32(node, "bypass-flags", &bypass_val))
-+		bypass_val = 0;
-+
-+	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, bypass_val, node);
- 
- 	if (parent) {
- 		irq = irq_of_parse_and_map(node, 0);
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 0e5d9ec..999515b 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -64,14 +64,14 @@ struct device_node;
- extern struct irq_chip gic_arch_extn;
- 
- void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
--		    u32 offset, struct device_node *);
-+		    u32 offset, u32 bypass_val, struct device_node *);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_cpu_if_down(void);
- 
- static inline void gic_init(unsigned int nr, int start,
- 			    void __iomem *dist , void __iomem *cpu)
- {
--	gic_init_bases(nr, start, dist, cpu, 0, NULL);
-+	gic_init_bases(nr, start, dist, cpu, 0, 0, NULL);
- }
- 
- #endif /* __ASSEMBLY */
+-/* We use these to define hog settings that are always done on boot */
+-#define DB8500_MUX_HOG(group,func) \
+-	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-db8500", group, func)
+-#define DB8500_PIN_HOG(pin,conf) \
+-	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-db8500", pin, conf)
+-
+-/* These are default states associated with device and changed runtime */
+-#define DB8500_MUX(group,func,dev) \
+-	PIN_MAP_MUX_GROUP_DEFAULT(dev, "pinctrl-db8500", group, func)
+-#define DB8500_PIN(pin,conf,dev) \
+-	PIN_MAP_CONFIGS_PIN_DEFAULT(dev, "pinctrl-db8500", pin, conf)
+-#define DB8500_PIN_IDLE(pin, conf, dev) \
+-	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_IDLE, "pinctrl-db8500",	\
+-			    pin, conf)
+-#define DB8500_PIN_SLEEP(pin, conf, dev) \
+-	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_SLEEP, "pinctrl-db8500",	\
+-			    pin, conf)
+-#define DB8500_MUX_STATE(group, func, dev, state) \
+-	PIN_MAP_MUX_GROUP(dev, state, "pinctrl-db8500", group, func)
+-#define DB8500_PIN_STATE(pin, conf, dev, state) \
+-	PIN_MAP_CONFIGS_PIN(dev, state, "pinctrl-db8500", pin, conf)
+-
+ #define AB8500_MUX_HOG(group, func) \
+ 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-ab8500.0", group, func)
+ #define AB8500_PIN_HOG(pin, conf) \
 -- 
-1.7.6.1
+1.8.3.1
