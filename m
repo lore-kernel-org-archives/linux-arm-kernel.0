@@ -1,37 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Nov 2013 11:57:44 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131115175241.GB27174@quad.lixom.net>
- <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
-Message-ID: <20131119115744.GK16735@n2100.arm.linux.org.uk>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 19 Nov 2013 14:00:21 +0200
+Subject: [PATCH 11/31] dma: add channel request API that supports
+ deferred probe
+In-Reply-To: <528A5170.3090809@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
+ <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+ <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
+Message-ID: <1384862421.14845.222.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 11:30:15AM +0000, Mark Rutland wrote:
-> I'm not sure it's entirely reasonable to assume that Microsoft will
-> swoop in and develop standards that are useful to us or even applicable
-> to the vast majority of the systems that are likely to exist.
+On Mon, 2013-11-18 at 10:42 -0700, Stephen Warren wrote:
+> On 11/18/2013 02:18 AM, Shevchenko, Andriy wrote:
+> > On Fri, 2013-11-15 at 13:01 -0800, Dan Williams wrote:
+> >> On Fri, Nov 15, 2013 at 12:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > 
+> >>> Eventually, all drivers should be converted to this new API, the old API
+> >>> removed, and the new API renamed to the more desirable name. 
+> > 
+> > I really would like to see more sensible and shorter names for the API
+> > functions.
+> 
+> I'm not sure if you're suggesting that you:
+> 
+> a) Really want to API renaming I mention above to happen at some time.
+> 
+> b) We need to pick a better name now, for the new API this patch
+> introduces. If so, do you have any better suggestion?
 
-It's not in their interest to do this, so it won't happen.
+Sooner better, I think. 
 
-> Outside of the ARM Linux community there is work ongoing to change ACPI
-> to better suit the level of variation we seem in the ARM space (see
-> Darren Hart's presentation from ELCE [1]). We need to be involved now in
-> order to make sure that this is actually generally applicable.
+Now only what I can propose is to change
+dma_slave_request_channel_or_err() to dma_slave_request_chan().
 
-It may have been interesting to have attended some of these talks, but
-because the LF botched up and never told the KSummit invitees that they
-had free access to ELCE until after ELCE had finished...
+In any way the dma_slave_request_* API is quite new and we, as far as I
+understood, will come when the main request function will always return
+channel or error.
 
-> I think that we need to be involved in ACPI from today if we have any
-> hope of having something sane in future.
-
-I fully agree with that.  If we're not involved now, we're going to end
-up with something that's already designed and implemented on systems
-which we'll then _have_ no option but to accept or just not be able to
-run mainline kernels on such systems.
-
-To ignore ACPI now would be extremely n?ieve.
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
