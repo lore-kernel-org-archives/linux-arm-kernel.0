@@ -1,156 +1,133 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Nov 2013 11:07:49 +0000
-Subject: [PATCH 10/10] ASoC: ux500: Dynamically fill DAI driver data on probe
-In-Reply-To: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
-References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1384859269-19801-11-git-send-email-lee.jones@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 Nov 2013 12:28:27 +0100
+Subject: [PATCH v3 1/2] ARM: sun4i/sun7i: RTC driver
+In-Reply-To: <CAOQ7t2Zsb0Kstd-tvnSLdyNxAvNUdYL4r5twVBvtnYFL1DRCMA@mail.gmail.com>
+References: <1383172738-8206-1-git-send-email-carlo.caione@gmail.com>
+ <20131106141357.GQ26440@lukather>
+ <CAOQ7t2a=KdNb-4_E_PRP53yYPiNmKzRN69Urg8EZ=4JE-6-Mig@mail.gmail.com>
+ <20131116085140.GJ3538@lukather>
+ <CAOQ7t2Zsb0Kstd-tvnSLdyNxAvNUdYL4r5twVBvtnYFL1DRCMA@mail.gmail.com>
+Message-ID: <20131119112827.GJ5325@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer have a means to differentiate MSP devices at probe time,
-mainline because we don't really have to. So rather than have an over-
-sized static data structure in place, where the only difference between
-devices is the ID and name (which are unused), we'll create them only
-when required and omit the unnecessary information.
+On Sat, Nov 16, 2013 at 01:58:35PM +0100, Carlo Caione wrote:
+> On Sat, Nov 16, 2013 at 9:51 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Carlo,
+> >
+> > On Fri, Nov 15, 2013 at 11:50:56PM +0100, Carlo Caione wrote:
+> >> >> +static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
+> >> >> +{
+> >> >> +     struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
+> >> >> +     u32 date = 0;
+> >> >> +     u32 time = 0;
+> >> >> +     int year;
+> >> >> +     int t;
+> >> >> +
+> >> >> +     year = rtc_tm->tm_year + 1900;
+> >> >
+> >> > So, that means that the A10 RTC starts a year 1900, and the A20 at
+> >> > year 2010? Why not just put those in your year_offset fieldd directly?
+> >>
+> >> 1900 is the offset of the parameter tm_year with respect to the current year.
+> >> year_offset is used to make tm_year fit inside the limited range of
+> >> the year field of the SUNXI_RTC_YMD register.
+> >
+> > Ok, so 1900 is the RTC's epoch, and tm_year is relative to that
+> > epoch. What I still don't get is why you're not defining it as such
+> > and use it directly the field your year_offset as such.
+> 
+> Because for A10 the year field is only 6 bit wide and it can hold only
+> 64 years so I cannot use year_offset directly.
+> We have the RTC framework where everything is based on 1900 and the
+> date register that is only 6 bit wide. Without year_offset I would
+> cover only 64 years from 1900 to 1963.
+> I need year_offset to shift the base year from 1900 to 2010 such that
+> I can use those 6 bit to track years from 2010 to 2073.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- sound/soc/ux500/ux500_msp_dai.c | 108 ++++++++++------------------------------
- 1 file changed, 26 insertions(+), 82 deletions(-)
+I'm sorry, but this is not at all what you have in your driver.
 
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index 8d1b01f..153fb3f 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -718,87 +718,20 @@ static struct snd_soc_dai_ops ux500_msp_dai_ops[] = {
- 	}
- };
- 
--static struct snd_soc_dai_driver ux500_msp_dai_drv[UX500_NBR_OF_DAI] = {
--	{
--		.name = "ux500-msp-i2s.0",
--		.probe = ux500_msp_dai_probe,
--		.id = 0,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.1",
--		.probe = ux500_msp_dai_probe,
--		.id = 1,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.2",
--		.id = 2,
--		.probe = ux500_msp_dai_probe,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.3",
--		.probe = ux500_msp_dai_probe,
--		.id = 3,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
-+void ux500_msp_populate_dai_drv(struct snd_soc_dai_driver *ux500_msp_dai_drv)
-+{
-+	ux500_msp_dai_drv->probe                 = ux500_msp_dai_probe;
-+	ux500_msp_dai_drv->suspend               = NULL;
-+	ux500_msp_dai_drv->resume                = NULL;
-+	ux500_msp_dai_drv->playback.channels_min = UX500_MSP_MIN_CHANNELS;
-+	ux500_msp_dai_drv->playback.channels_max = UX500_MSP_MAX_CHANNELS;
-+	ux500_msp_dai_drv->playback.rates        = UX500_I2S_RATES;
-+	ux500_msp_dai_drv->playback.formats      = UX500_I2S_FORMATS;
-+	ux500_msp_dai_drv->capture.channels_min  = UX500_MSP_MIN_CHANNELS;
-+	ux500_msp_dai_drv->capture.channels_max  = UX500_MSP_MAX_CHANNELS;
-+	ux500_msp_dai_drv->capture.rates         = UX500_I2S_RATES;
-+	ux500_msp_dai_drv->capture.formats       = UX500_I2S_FORMATS;
-+	ux500_msp_dai_drv->ops                   = ux500_msp_dai_ops;
- };
- 
- static const struct snd_soc_component_driver ux500_msp_component = {
-@@ -809,6 +742,7 @@ static const struct snd_soc_component_driver ux500_msp_component = {
- static int ux500_msp_drv_probe(struct platform_device *pdev)
- {
- 	struct ux500_msp_i2s_drvdata *drvdata;
-+	struct snd_soc_dai_driver *ux500_msp_dai_drv;
- 	int ret = 0;
- 
- 	dev_dbg(&pdev->dev, "%s: Enter (pdev->name = %s).\n", __func__,
-@@ -863,8 +797,18 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
- 	}
- 	dev_set_drvdata(&pdev->dev, drvdata);
- 
-+	ux500_msp_dai_drv = devm_kzalloc(&pdev->dev,
-+					 sizeof(*ux500_msp_dai_drv),
-+					 GFP_KERNEL);
-+	if (!ux500_msp_dai_drv) {
-+		ret = -ENOMEM;
-+		goto err_init_msp;
-+	}
-+
-+	ux500_msp_populate_dai_drv(ux500_msp_dai_drv);
-+
- 	ret = snd_soc_register_component(&pdev->dev, &ux500_msp_component,
--					 &ux500_msp_dai_drv[drvdata->msp->id], 1);
-+					 ux500_msp_dai_drv, 1);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Error: %s: Failed to register MSP%d!\n",
- 			__func__, drvdata->msp->id);
+the 6 bit width and the start-at-2010 is set for the A20, not the A10.
+
+> > Moreover, you have some max values that imply that the RTC can't count
+> > over either 2100 or 2073, which is kind of weird, since, respectively,
+> > it starts at 1900 and 2010, and the year field is documented to be 8
+> > bits wide, I'd expect it to go up to 2155 and 2265.
+> 
+> For A10 the date register is documented to be 6 bit. For A20 it is 8
+> bit wide (here the "mask" field in the sunxi_rtc_data_year).
+> In the v4 I'm going to expand to 255 the year range for A20 and modify
+> the min year to make it starts also at 1900 (it as actually wrong
+> having a the min field set to 1970).
+> (BTW I just noticed that the indexes for sunxi_rtc_data_year are
+> swapped, one more fix in v4).
+
+Ah, yes, I guess you found out already.
+
+Sorry for the confusion.
+
+> >> >> +
+> >> >> +     /*
+> >> >> +      * wait about 70us to make sure the the time is really written into
+> >> >> +      * target
+> >> >> +      */
+> >> >> +     usleep_range(70, 100);
+> >> >
+> >> > Isn't the write operation supposed to be done already?
+> >>
+> >> Yes, it is supposed to be, but this waiting was already present in the
+> >> original version of the driver by aw so I'll leave it in v4.
+> >
+> > I feel like we argue over this again and again.
+> >
+> > I'm sorry, but saying "allwinner did it that way so we should keep it"
+> > is a bad argument. Otherwise we would be using fex, and every other
+> > driver Allwinner reimplemented.
+> >
+> > That being said, either that sleep is needed, and then it should be
+> > needed everytime you write to the RTC, which is not the case iirc, and
+> > have a comment saying "I have no idea why, but this come from
+> > Allwinner and this is actually required", or you don't need it, and
+> > then you can just remove it.
+> >
+> > But having it some-times-but-not-some-other seems pretty weak to me.
+> 
+> Maxime, as you know documentation for AW's SoC is really weak. I can
+> only extrapolate information from the old drivers and the badly
+> written comments to the code.
+> In those drivers (in all the versions I have) this waiting is always
+> present with the same comment I have left in the driver. What I
+> imagined is that it is needed not always, but only when I write
+> SUNXI_LOSC_CTRL_RTC_HMS_ACC or SUNXI_LOSC_CTRL_RTC_YMD_ACC (again,
+> this is just a guess but in the comment there is an explicit reference
+> to "time").
+
+My point is that you're not even using that for every access to DHMS.
+
+Let me see what I can find out about this.
+
+> I actually have no idea why and removing it in my tests doesn't affect
+> the RTC. So I had two possibilities: 1) leave it in the code because
+> somehow it seems important even though I don't know exactly why it is
+> (only) there or 2) leave it out knowing that it doesn't affect my
+> tests but it could in some particular case or configuration.
+> That said, I'm going to do some more tests without the usleep to see
+> if there is any problem otherwise I'll delete it in v4.
+
+Ok.
+
+Thanks!
+Maxime
+
 -- 
-1.8.1.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/d0566852/attachment.sig>
