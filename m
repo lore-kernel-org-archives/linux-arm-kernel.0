@@ -1,68 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 19 Nov 2013 15:29:53 +0000
-Subject: [PATCH] arm: mm: refactor v7 cache cleaning ops to use way/index
- sequence
-Message-ID: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 Nov 2013 16:53:47 +0100
+Subject: [PATCH v4 0/4] Add support for the Allwinner A31 Reset Controllers
+In-Reply-To: <1384871415.6790.30.camel@pizza.hi.pengutronix.de>
+References: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1384798284.4348.33.camel@pizza.hi.pengutronix.de>
+ <20131119074929.GE5325@lukather>
+ <1384871415.6790.30.camel@pizza.hi.pengutronix.de>
+Message-ID: <20131119155347.GA1029@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set-associative caches on all v7 implementations map the index bits
-to physical addresses LSBs and tag bits to MSBs. On most systems with
-sane DRAM controller configurations, this means that the current v7
-cache flush routine using set/way operations triggers a DRAM memory
-controller precharge/activate for every cache line writeback since the
-cache routine cleans lines by first fixing the index and then looping
-through ways.
+Hi Philipp,
 
-Given the random content of cache tags, swapping the order between
-indexes and ways loops do not prevent DRAM pages precharge and
-activate cycles but at least, on average, improves the chances that
-either multiple lines hit the same page or multiple lines belong to
-different DRAM banks, improving throughput significantly.
+On Tue, Nov 19, 2013 at 03:30:15PM +0100, Philipp Zabel wrote:
+> > Do you want to merge this through your tree?
+> 
+> since 0d74578b7de73c4b7f25daaacff8d5091fa83bd4 "ARM: sunxi:
+> remove .init_time hooks", patch 3/4 doesn't apply against soc/for-next
+> anymore.
+> I could take the first patch now, and you merge the other three through
+> your tree afterwards?
 
-This patch swaps the inner loops in the v7 cache flushing routine to
-carry out the clean operations first on all sets belonging to a given
-way (looping through sets) and then decrementing the way.
+Hmmm, patch 1, 2 and 3 can't be merged independently.
 
-Benchmarks showed that by swapping the ordering in which sets and ways
-are decremented in the v7 cache flushing routine, that uses set/way
-operations, time required to flush caches is reduced significantly,
-owing to improved writebacks throughput to the DRAM controller.
+I guess the easiest will be for me to merge it with your Acked-by.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/mm/cache-v7.S | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Thanks!
+Maxime
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index b5c467a..778bcf8 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -146,18 +146,18 @@ flush_levels:
- 	ldr	r7, =0x7fff
- 	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
- loop1:
--	mov	r9, r4				@ create working copy of max way size
-+	mov	r9, r7				@ create working copy of max index
- loop2:
-- ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
-- THUMB(	lsl	r6, r9, r5		)
-+ ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
-+ THUMB(	lsl	r6, r4, r5		)
-  THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
-- ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
-- THUMB(	lsl	r6, r7, r2		)
-+ ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
-+ THUMB(	lsl	r6, r9, r2		)
-  THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
- 	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
--	subs	r9, r9, #1			@ decrement the way
-+	subs	r9, r9, #1			@ decrement the index
- 	bge	loop2
--	subs	r7, r7, #1			@ decrement the index
-+	subs	r4, r4, #1			@ decrement the way
- 	bge	loop1
- skip:
- 	add	r10, r10, #2			@ increment cache number
 -- 
-1.8.2.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/1c6f95f0/attachment.sig>
