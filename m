@@ -1,80 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Nov 2013 13:58:09 -0500
-Subject: [PATCH v2] arm/arm64: kvm: Use virt_to_idmap instead of virt_to_phys
- for idmap mappings
-Message-ID: <1384887489-15290-1-git-send-email-santosh.shilimkar@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 19 Nov 2013 10:59:39 -0800
+Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
+ pinfunc.
+In-Reply-To: <528BB1F2.4080107@wwwdotorg.org>
+References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
+ <528BB1F2.4080107@wwwdotorg.org>
+Message-ID: <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM initialisation fails on architectures implementing virt_to_idmap()
-because virt_to_phys() on such architectures won't fetch you the correct
-idmap page.
+On Tue, Nov 19, 2013 at 10:46 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/19/2013 10:15 AM, Tomasz Figa wrote:
+>> This patch extends the range of settings configurable via pinfunc API
+>> to cover pin value as well. This allows configuration of default values
+>> of pins.
+>
+> Shouldn't there be a driver that acquires the GPIO that's output to the
+> pin, and configures the output value? IIRC there have been previous
+> discussions re: having a list of e.g. initial GPIO output values in DT,
+> and that was rejected, and this patch seems to be doing almost the exact
+> same thing, just at the pinctrl level rather than GPIO level.
+>
+> That all said, I admit this could be a useful feature...
 
-So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
-Since the KVM code is shared between arm and arm64, we create
-kvm_virt_to_phys() and handle the redirection in respective headers.
+I haven't followed all of the previous discussions, but I know I've
+run into scenarios where something like this would be useful.  The one
+that comes to mind is:
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-Update the earlier version as per Marc's suggestion
+* We've got GPIOs that default at bootup to a pulled up input since
+the default state of the pin should be "high".
 
- arch/arm/include/asm/kvm_mmu.h   |    1 +
- arch/arm/kvm/mmu.c               |    8 ++++----
- arch/arm64/include/asm/kvm_mmu.h |    1 +
- 3 files changed, 6 insertions(+), 4 deletions(-)
+* These pins are really intended to be outputs, like an "enable",
+"reset", or "power down" line for a peripheral.  The pullup is strong
+enough to give us a good default state but we really want outputs.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 77de4a4..2d122ad 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -140,6 +140,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
- }
- 
- #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-+#define kvm_virt_to_phys(x)		virt_to_idmap((unsigned long)(x))
- 
- #endif	/* !__ASSEMBLY__ */
- 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 5809069..659db0e 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -916,9 +916,9 @@ int kvm_mmu_init(void)
- {
- 	int err;
- 
--	hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
--	hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
--	hyp_idmap_vector = virt_to_phys(__kvm_hyp_init);
-+	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
-+	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
-+	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
- 
- 	if ((hyp_idmap_start ^ hyp_idmap_end) & PAGE_MASK) {
- 		/*
-@@ -945,7 +945,7 @@ int kvm_mmu_init(void)
- 		 */
- 		kvm_flush_dcache_to_poc(init_bounce_page, len);
- 
--		phys_base = virt_to_phys(init_bounce_page);
-+		phys_base = kvm_virt_to_phys(init_bounce_page);
- 		hyp_idmap_vector += phys_base - hyp_idmap_start;
- 		hyp_idmap_start = phys_base;
- 		hyp_idmap_end = phys_base + len;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 680f74e..7f1f940 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -136,6 +136,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
- }
- 
- #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-+#define kvm_virt_to_phys(x)		__virt_to_phys((unsigned long)(x))
- 
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
--- 
-1.7.9.5
+* We'd like to provide this GPIO to a peripheral through device tree.
+...and we'd like all the pinmux to be setup automatically so we use
+pinctrl-names = "default".
+
+* If we set the pinmux up as "output" then there's a chance that the
+line will glitch at bootup since the pinmux happens (changing the pin
+to output) before the driver has a chance to run.
+
+
+Does that sound like the same scenario you're trying to solve Tomasz?
