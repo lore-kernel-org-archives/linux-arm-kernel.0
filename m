@@ -1,88 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 20 Nov 2013 00:33:09 +0100
-Subject: [PATCH 1/2] ARM: ux500: decomission the non-DT MTU init sequence
-In-Reply-To: <CACRpkdab=1xJtcAg-_oUBr_jC5DgDre-f9jxuzDnZmXGFShvLw@mail.gmail.com>
-References: <1384896471-9384-1-git-send-email-linus.walleij@linaro.org>	<528BE8F2.3030507@linaro.org>
- <CACRpkdab=1xJtcAg-_oUBr_jC5DgDre-f9jxuzDnZmXGFShvLw@mail.gmail.com>
-Message-ID: <528BF535.1030504@linaro.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 19 Nov 2013 15:37:36 -0800
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <528B9CAE.3040600@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
+ <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+ <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
+ <1384862421.14845.222.camel@smile> <528B9CAE.3040600@wwwdotorg.org>
+Message-ID: <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 11:55 PM, Linus Walleij wrote:
-> On Tue, Nov 19, 2013 at 11:40 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 11/19/2013 10:27 PM, Linus Walleij wrote:
->
->>> -       if (!of_have_populated_dt())
->>> -               nmdk_timer_init(mtu_timer_base, IRQ_MTU0);
+On Tue, Nov 19, 2013 at 9:15 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/19/2013 05:00 AM, Andy Shevchenko wrote:
+>> On Mon, 2013-11-18 at 10:42 -0700, Stephen Warren wrote:
+>>> On 11/18/2013 02:18 AM, Shevchenko, Andriy wrote:
+>>>> On Fri, 2013-11-15 at 13:01 -0800, Dan Williams wrote:
+>>>>> On Fri, Nov 15, 2013 at 12:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>
+>>>>>> Eventually, all drivers should be converted to this new API, the old API
+>>>>>> removed, and the new API renamed to the more desirable name.
+>>>>
+>>>> I really would like to see more sensible and shorter names for the API
+>>>> functions.
+>>>
+>>> I'm not sure if you're suggesting that you:
+>>>
+>>> a) Really want to API renaming I mention above to happen at some time.
+>>>
+>>> b) We need to pick a better name now, for the new API this patch
+>>> introduces. If so, do you have any better suggestion?
 >>
->> If no timer have been defined in the dt [or wrongly defined], is there a
->> message to tell the user what is wrong ?
+>> Sooner better, I think.
+>>
+>> Now only what I can propose is to change
+>> dma_slave_request_channel_or_err() to dma_slave_request_chan().
 >
-> Isn't that a question to be asked about a whole lot of such
-> clocksource drivers and ARM platforms?
+> The one downside I see with the name dma_slave_request_chan() is that
+> it's very similar to the existing dma_request_slave_channel(); driver
+> authors may well be confused which is which, and end up using the wrong
+> one. That's why I added an explicit "_or_err" to the function name.
+> Still, I can go for dma_slave_request_chan() if the dmaengine
+> maintainers think it's the right choice; just let me know.
 
-Yes, I did the comment based on your patch but I agree it must be 
-addressed in a global manner.
-
-> Most DT-only ARM platforms rely on
-> arch/arm/kernel/time.c to call clocksource_of_init() if the
-> machine_desc->init_time() hook is not set and has zero
-> code to handle any such situation.
->
-> So I guess what you're asking is whether we should patch
-> clocksource_of_init() to warn if it cannot find any
-> matching clock sources, like this:
->
->  From e55cf038b238d96b28d9fb01b5b6cdf345990d53 Mon Sep 17 00:00:00 2001
-> From: Linus Walleij <linus.walleij@linaro.org>
-> Date: Tue, 19 Nov 2013 23:52:56 +0100
-> Subject: [PATCH] clksrc-of: warn if no clock sources are found
->
-> Many platforms rely on clocksource_of_init() being implicitly
-> called for registering clock sources and will get zero warnings
-> if no working clock source is available. Let's print a critical
-> error message if no clock source is found.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yes, it sounds right to do this.
-
-Thanks !
-
-   -- Daniel
-
-> ---
->   drivers/clocksource/clksrc-of.c | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
-> index 35639cf4e5a2..a30b42c3ac3b 100644
-> --- a/drivers/clocksource/clksrc-of.c
-> +++ b/drivers/clocksource/clksrc-of.c
-> @@ -28,6 +28,7 @@ void __init clocksource_of_init(void)
->       struct device_node *np;
->       const struct of_device_id *match;
->       clocksource_of_init_fn init_func;
-> +    unsigned clocksources = 0;
->
->       for_each_matching_node_and_match(np, __clksrc_of_table, &match) {
->           if (!of_device_is_available(np))
-> @@ -36,5 +37,8 @@ void __init clocksource_of_init(void)
->           init_func = match->data;
->           init_func(np);
->           of_node_put(np);
-> +        clocksources++;
->       }
-> +    if (!clocksources)
-> +        pr_crit("%s: no matching clocksources found\n", __func__);
->   }
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I think the problem with dma_slave_request_channel_or_err() is that it
+does not tell you what the function does or how it's different from
+the existing one.  I think dma_slave_request_channel_defer() with a
+comment about what error value callers should be expecting to
+delineate a permanent error vs "try again later".
