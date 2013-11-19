@@ -1,56 +1,55 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 19 Nov 2013 14:33:18 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <5289A356.4060004@jonmasters.org>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com> <5289A356.
- 4060004@jonmasters.org>
-Message-ID: <20131119143318.0FDB7C4079D@trevor.secretlab.ca>
+From: bgamari.foss@gmail.com (Ben Gamari)
+Date: Tue, 19 Nov 2013 09:37:22 -0500
+Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
+In-Reply-To: <528AE58B.5030209@ti.com>
+References: <87hab9agjr.fsf@gmail.com> <528AE58B.5030209@ti.com>
+Message-ID: <87mwl0o3tp.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013 00:19:18 -0500, Jon Masters <jonathan@jonmasters.org> wrote:
-> > I think that trying to shoe-horn ACPI-derived information into device
-> > tree is fundamentally the wrong approach. I don't think it encourages
-> > best practices, and I don't think it's beneficial to the long term
-> > health of Linux or the ecosystem as a whole.
+Lokesh Vutla <lokeshvutla@ti.com> writes:
+
+> Hi Ben,
+> On Monday 18 November 2013 08:44 PM, Ben Gamari wrote:
+>> I'm having difficulty getting a PandaBoard ES rev. B1 to boot v3.12 and
+>> linux-next (30121118). I'm booting with a brand new u-boot
+>> (c2e5e802ecb7ab668ce9911b210ed68c804b349f).
+>> 
+>> In both cases the device appears to hang shortly before one would expect
+>> init to start as seen in the boot output below. I'm booting with the
+>> omap4-panda-es devicetree. As far as I can tell, the machine is
+>> completely dead and will not respond to even sysrq. I have a PandaBoard
+>> A4 which apparently has no trouble with the same kernel image.
 > 
-> It's going to be a messy thing to even attempt. Look, I wish we had a
-> time machine and could have done this whole thing years ago, but I'm not
-> sure it would have gone differently. ACPI is something a lot of people
-> emotionally hate. In the Enterprise space myself and others *need* it
-> (along with UEFI) to have a scalable solution that doesn't result in an
-> onslaught of customer support calls, which a non-standards body backed
-> moving target of DTB will do.
+> Which defconfig are you using ?
+>
+I derived the config from RobertCNelson's Debian Wheezy image. It did
+require some modification, however.
 
-I think that sells our entire community short. The Linux kernel itself is
-nowhere near standards body backed, and the userspace ABI is absolutely
-stable. It's stable because we've made stability a priority. Linus and
-others have been vocal about it, and maintainers have enforced it.
-Suggesting the lack of a standards body means we're left with a moving
-target is clearly not true.
+> Can you see if CPU_IDLE is enabled in your defconfig?
+>
+Yes, CPU_IDLE is enabled.
 
-As much as we hoped ARM ACPI support would be complete by now and merged
-into the kernel, it isn't. I really can't fault (or expect) any hardware
-vendor to ship only ACPI when support for it isn't in mainline.
+> I saw a similar failure on my panda es when CPU_IDLE is enabled.
+> If this is the case for you please apply this[1] patch and give a try.
+>
 
-As for DT, we discussed DT stability at length in Edinburgh. We've made
-the commitment to support shipped hardware. If hardware ships with a DT
-that boots on mainline, then we will not break it.
+Indeed that did the trick. Thanks for the reference!
 
-> And besides all of the big boys are going
-> to be using ACPI whether it's liked much or not.
+I do however now see periodic messages of the form,
 
-I have to call that statement out as over the line. It comes across as
-attempting to shame maintainers into accepting ACPI, and further implies
-that non-ACPI users are not "big boys" and therefore just playing
-around. That is not okay.
+    [   42.143005] gic_timer_retrigger: lost localtimer interrupt
 
-The ACPI support patches must satisfy maintainers before they will be
-accepted. This is normal and we've done this before. The current patches
-raise serious concerns, but they're also generating constructive
-feedback. If ACPI isn't there in time then we can support the hardware
-with DT, whether it is provided by the firmware (preferred), or shipped
-with the kernel.
+Any idea what this might be due to?
 
-g.
+Cheers,
+
+- Ben
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/b18d28cb/attachment.sig>
