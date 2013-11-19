@@ -1,35 +1,135 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 19 Nov 2013 17:27:41 +0100
-Subject: [PATCH v4 0/4] Add support for the Allwinner A31 Reset Controllers
-In-Reply-To: <20131119155347.GA1029@lukather>
-References: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
- <1384798284.4348.33.camel@pizza.hi.pengutronix.de>
- <20131119074929.GE5325@lukather>
- <1384871415.6790.30.camel@pizza.hi.pengutronix.de>
- <20131119155347.GA1029@lukather>
-Message-ID: <1384878461.6790.36.camel@pizza.hi.pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 19 Nov 2013 16:28:02 +0000
+Subject: [PATCH v3] ARM: signal: fix armv7-m build issue in
+ sigreturn_codes.S
+In-Reply-To: <1384843790-14394-2-git-send-email-victor.kamensky@linaro.org>
+References: <1384843790-14394-1-git-send-email-victor.kamensky@linaro.org>
+ <1384843790-14394-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131119162756.GA2566@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-Am Dienstag, den 19.11.2013, 16:53 +0100 schrieb Maxime Ripard:
-> Hi Philipp,
+On Mon, Nov 18, 2013 at 10:49:50PM -0800, Victor Kamensky wrote:
+> After "ARM: signal: sigreturn_codes should be endian neutral to
+> work in BE8" commit, thumb only platforms, like armv7m, fails to
+> compile sigreturn_codes.S. The reason is that for such arch
+> values '.arm' directive and arm opcodes are not allowed.
 > 
-> On Tue, Nov 19, 2013 at 03:30:15PM +0100, Philipp Zabel wrote:
-> > > Do you want to merge this through your tree?
-> > 
-> > since 0d74578b7de73c4b7f25daaacff8d5091fa83bd4 "ARM: sunxi:
-> > remove .init_time hooks", patch 3/4 doesn't apply against soc/for-next
-> > anymore.
-> > I could take the first patch now, and you merge the other three through
-> > your tree afterwards?
+> Fix conditionally enables arm opcodes only if no CONFIG_CPU_THUMBONLY
+> defined and it uses .org instructions to keep sigreturn_codes
+> layout.
 > 
-> Hmmm, patch 1, 2 and 3 can't be merged independently.
+> Suggested-by: Dave Martin <Dave.Martin@arm.com>
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm/kernel/sigreturn_codes.S | 40 ++++++++++++++++++++++++++++++---------
+>  1 file changed, 31 insertions(+), 9 deletions(-)
 > 
-> I guess the easiest will be for me to merge it with your Acked-by.
+> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
+> index 3c5d0f2..9d48fe9 100644
+> --- a/arch/arm/kernel/sigreturn_codes.S
+> +++ b/arch/arm/kernel/sigreturn_codes.S
+> @@ -30,6 +30,27 @@
+>   * snippets.
+>   */
+>  
+> +/*
+> + * In CPU_THUMBONLY case kernel arm opcodes are not allowed.
+> + * Note in this case codes skips those instructions but it uses .org
+> + * directive to keep correct layout of sigreturn_codes array.
+> + */
+> +#ifndef CONFIG_CPU_THUMBONLY
+> +#define ARM_INSTR(code...) 	code
 
-please do.
+Minor nit, but you have a space before the tab before code, where the
+'X' is, below:
 
-regards
-Philipp
+#define ARM_INSTR(code...)X	code
+
+
+Another minor one:
+
+Since this is a local macro, it would make the code a bit tidier if you
+reduced the length of the name to 7 chars or less so that we can fit the
+macro name into the left margin without messing up the indenting.
+
+Perhaps HAS_ARM or ARM_OK are good names:
+
+	insn1	arg1, arg2
+ ARM_OK(insn2	args		)
+
+Some people seem to tab out all the right )s to the same column at
+beyond the right-hand edge of all the neighbouring instructions,
+but that's purely cosmetic.  It helps to separate out the visual
+noise of the macros from the instructions themselves when reading.
+
+> +#else
+> +#define ARM_INSTR(code...)
+> +#endif
+> +
+> +.macro arm_slot n
+> +		.org	sigreturn_codes + 12 * (\n)
+> +ARM_INSTR(	.arm	)
+> +.endm
+> +
+> +.macro thumb_slot n
+> +		.org	sigreturn_codes + 12 * (\n) + 8
+> +		.thumb
+> +.endm
+> +
+>  #if __LINUX_ARM_ARCH__ <= 4
+>  	/*
+>  	 * Note we manually set minimally required arch that supports
+> @@ -45,26 +66,27 @@
+>  	.global sigreturn_codes
+>  	.type	sigreturn_codes, #object
+>  
+> -	.arm
+> +	.align
+>  
+>  sigreturn_codes:
+>  
+>  	/* ARM sigreturn syscall code snippet */
+> -	mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+> -	swi	#(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+> +arm_slot 0
+> +ARM_INSTR(mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE))
+> +ARM_INSTR(swi	#(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
+>  
+>  	/* Thumb sigreturn syscall code snippet */
+> -	.thumb
+> +thumb_slot 0
+>  	movs	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+>  	swi	#0
+>  
+>  	/* ARM sigreturn_rt syscall code snippet */
+> -	.arm
+> -	mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+> -	swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+> +arm_slot 1
+> +ARM_INSTR(mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE))
+> +ARM_INSTR(swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
+>  
+>  	/* Thumb sigreturn_rt syscall code snippet */
+> -	.thumb
+> +thumb_slot 1
+>  	movs	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+>  	swi	#0
+>  
+> @@ -74,7 +96,7 @@ sigreturn_codes:
+>  	 * it is thumb case or not, so we need additional
+>  	 * word after real last entry.
+>  	 */
+> -	.arm
+> +arm_slot 2
+>  	.space	4
+>  
+>  	.size	sigreturn_codes, . - sigreturn_codes
+
+Otherwise, this looks OK to me.
+
+It seems to work at least back to binutils 2.18, so the chance of this
+spoiling anyone's day seems minimal.
+
+Cheers
+---Dave
