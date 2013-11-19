@@ -1,43 +1,43 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 19 Nov 2013 14:00:21 +0200
-Subject: [PATCH 11/31] dma: add channel request API that supports
- deferred probe
-In-Reply-To: <528A5170.3090809@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
- <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
- <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
-Message-ID: <1384862421.14845.222.camel@smile>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Nov 2013 12:01:25 +0000
+Subject: [GIT PULL] prefetch support for 3.13
+In-Reply-To: <20131119092741.GC28642@pengutronix.de>
+References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
+ <20131111090810.GI14892@pengutronix.de>
+ <20131111112554.GE28302@mudshark.cambridge.arm.com>
+ <20131119092741.GC28642@pengutronix.de>
+Message-ID: <20131119120125.GE11778@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-11-18 at 10:42 -0700, Stephen Warren wrote:
-> On 11/18/2013 02:18 AM, Shevchenko, Andriy wrote:
-> > On Fri, 2013-11-15 at 13:01 -0800, Dan Williams wrote:
-> >> On Fri, Nov 15, 2013 at 12:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Tue, Nov 19, 2013 at 09:27:41AM +0000, Uwe Kleine-K?nig wrote:
+> On Mon, Nov 11, 2013 at 11:25:54AM +0000, Will Deacon wrote:
+> > I see gas is being as helpful as ever. Something like the (untested) patch
+> > below should fix the issue.
 > > 
-> >>> Eventually, all drivers should be converted to this new API, the old API
-> >>> removed, and the new API renamed to the more desirable name. 
+> > Will
 > > 
-> > I really would like to see more sensible and shorter names for the API
-> > functions.
-> 
-> I'm not sure if you're suggesting that you:
-> 
-> a) Really want to API renaming I mention above to happen at some time.
-> 
-> b) We need to pick a better name now, for the new API this patch
-> introduces. If so, do you have any better suggestion?
+> > --->8
+> > 
+> > diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+> > index e0c68d5bb7dc..52886b89706c 100644
+> > --- a/arch/arm/lib/bitops.h
+> > +++ b/arch/arm/lib/bitops.h
+> > @@ -10,7 +10,7 @@ UNWIND(       .fnstart        )
+> >         and     r3, r0, #31             @ Get bit offset
+> >         mov     r0, r0, lsr #5
+> >         add     r1, r1, r0, lsl #2      @ Get word offset
+> > -#if __LINUX_ARM_ARCH__ >= 7
+> > +#if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
+> >         .arch_extension mp
+> >         ALT_SMP(W(pldw) [r1])
+> >         ALT_UP(W(nop))
+> > 
+> It does fix compilation and I booted successfully on my efm32-tree +
+> next-20131119 + this patch + the patch for the be signal stuff.
 
-Sooner better, I think. 
+Ok, great. Mind if I add your tested-by before I put it in the patch system?
 
-Now only what I can propose is to change
-dma_slave_request_channel_or_err() to dma_slave_request_chan().
+Cheers,
 
-In any way the dma_slave_request_* API is quite new and we, as far as I
-understood, will come when the main request function will always return
-channel or error.
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Will
