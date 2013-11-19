@@ -1,89 +1,66 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 19 Nov 2013 17:35:02 +0000
-Subject: [PATCH] arm: mm: refactor v7 cache cleaning ops to use way/index
- sequence
-In-Reply-To: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20131119173502.GB2566@e103592.cambridge.arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 19 Nov 2013 17:35:27 +0000
+Subject: [PATCH 1/3] ARM: mm: Rewire LPAE set_huge_pte_at
+In-Reply-To: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
+References: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1384882529-28104-2-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 03:29:53PM +0000, Lorenzo Pieralisi wrote:
-> Set-associative caches on all v7 implementations map the index bits
-> to physical addresses LSBs and tag bits to MSBs. On most systems with
-> sane DRAM controller configurations, this means that the current v7
-> cache flush routine using set/way operations triggers a DRAM memory
-> controller precharge/activate for every cache line writeback since the
-> cache routine cleans lines by first fixing the index and then looping
-> through ways.
-> 
-> Given the random content of cache tags, swapping the order between
-> indexes and ways loops do not prevent DRAM pages precharge and
-> activate cycles but at least, on average, improves the chances that
-> either multiple lines hit the same page or multiple lines belong to
-> different DRAM banks, improving throughput significantly.
-> 
-> This patch swaps the inner loops in the v7 cache flushing routine to
-> carry out the clean operations first on all sets belonging to a given
-> way (looping through sets) and then decrementing the way.
-> 
-> Benchmarks showed that by swapping the ordering in which sets and ways
-> are decremented in the v7 cache flushing routine, that uses set/way
-> operations, time required to flush caches is reduced significantly,
-> owing to improved writebacks throughput to the DRAM controller.
+For LPAE, set_huge_pte_at calls set_pte_at which then calls
+set_pte_ext, which in turn is wired up to call cpu_v7_set_pte_ext,
+which is defined in proc-v7-3level.S.
 
-For the correctness of this patch:
+For huge pages, given newprot a pgprot_t value for a shared writable
+VMA, and ptep a pointer to a pte belonging to this VMA; the following
+behaviour is assumed by core code:
+   hugetlb_change_protection(vma, address, end, newprot);
+   ...
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+   huge_pte_write(huge_ptep_get(ptep)); /* should be true! */
 
-My understanding of the performance implications is more limited, so
-I'm happy to defer to others on that.
+Unfortunately, cpu_v7_set_pte_ext will change the bit layout of the
+resultant pte, and will set the read only bit if the dirty bit is not
+also enabled.
 
-Cheers
----Dave
+If one were to allocate a read only shared huge page, then fault it in,
+and then mprotect it to be writeable. A subsequent write to that huge
+page will result in a spurious call to hugetlb_cow, which causes
+corruption. This call is optimised away prior to:
+ 37a2140 mm, hugetlb: do not use a page in page cache for cow
+         optimization
 
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/mm/cache-v7.S | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index b5c467a..778bcf8 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -146,18 +146,18 @@ flush_levels:
->  	ldr	r7, =0x7fff
->  	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
->  loop1:
-> -	mov	r9, r4				@ create working copy of max way size
-> +	mov	r9, r7				@ create working copy of max index
->  loop2:
-> - ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
-> - THUMB(	lsl	r6, r9, r5		)
-> + ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
-> + THUMB(	lsl	r6, r4, r5		)
->   THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
-> - ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
-> - THUMB(	lsl	r6, r7, r2		)
-> + ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
-> + THUMB(	lsl	r6, r9, r2		)
->   THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
->  	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
-> -	subs	r9, r9, #1			@ decrement the way
-> +	subs	r9, r9, #1			@ decrement the index
->  	bge	loop2
-> -	subs	r7, r7, #1			@ decrement the index
-> +	subs	r4, r4, #1			@ decrement the way
->  	bge	loop1
->  skip:
->  	add	r10, r10, #2			@ increment cache number
-> -- 
-> 1.8.2.2
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+If one runs the libhugetlbfs test suite on v3.12-rc1 upwards, then the
+mprotect test will cause the afformentioned corruption and before the
+set of tests completes, the system will be left in an unresponsive
+state. (calls to fork fail with -ENOMEM).
+
+This patch re-implements set_huge_pte_at to dereference the pte value
+explicitly. hugetlb_cow is no longer called spuriously, and the unit
+tests complete succesfully.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/include/asm/hugetlb-3level.h | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/hugetlb-3level.h b/arch/arm/include/asm/hugetlb-3level.h
+index d4014fb..211e9a8 100644
+--- a/arch/arm/include/asm/hugetlb-3level.h
++++ b/arch/arm/include/asm/hugetlb-3level.h
+@@ -40,7 +40,12 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
+ static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 				   pte_t *ptep, pte_t pte)
+ {
+-	set_pte_at(mm, addr, ptep, pte);
++	VM_BUG_ON(addr >= TASK_SIZE);
++
++	if (pte_present_user(pte))
++		__sync_icache_dcache(pte);
++
++	*ptep = pte;
+ }
+ 
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+-- 
+1.8.1.4
