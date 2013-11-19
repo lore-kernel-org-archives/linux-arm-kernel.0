@@ -1,76 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 Nov 2013 23:55:28 +0100
-Subject: [PATCH 1/2] ARM: ux500: decomission the non-DT MTU init sequence
-In-Reply-To: <528BE8F2.3030507@linaro.org>
-References: <1384896471-9384-1-git-send-email-linus.walleij@linaro.org>
- <528BE8F2.3030507@linaro.org>
-Message-ID: <CACRpkdab=1xJtcAg-_oUBr_jC5DgDre-f9jxuzDnZmXGFShvLw@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 19 Nov 2013 15:23:35 -0800
+Subject: [PATCH 21/31] staging: nvec: use reset framework
+In-Reply-To: <1384548866-13141-22-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-22-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131119232335.GA24947@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 11:40 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 11/19/2013 10:27 PM, Linus Walleij wrote:
+On Fri, Nov 15, 2013 at 01:54:16PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Tegra's clock driver now provides an implementation of the common
+> reset API (include/linux/reset.h). Use this instead of the old Tegra-
+> specific API; that will soon be removed.
+> 
+> Cc: treding at nvidia.com
+> Cc: pdeschrijver at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Julian Andres Klode <jak@jak-linux.org>
+> Cc: Marc Dietrich <marvin24@gmx.de>
+> Cc: ac100 at lists.launchpad.net
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: devel at driverdev.osuosl.org
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
 
->> -       if (!of_have_populated_dt())
->> -               nmdk_timer_init(mtu_timer_base, IRQ_MTU0);
->
-> If no timer have been defined in the dt [or wrongly defined], is there a
-> message to tell the user what is wrong ?
-
-Isn't that a question to be asked about a whole lot of such
-clocksource drivers and ARM platforms?
-
-Most DT-only ARM platforms rely on
-arch/arm/kernel/time.c to call clocksource_of_init() if the
-machine_desc->init_time() hook is not set and has zero
-code to handle any such situation.
-
-So I guess what you're asking is whether we should patch
-clocksource_of_init() to warn if it cannot find any
-matching clock sources, like this:
-
->From e55cf038b238d96b28d9fb01b5b6cdf345990d53 Mon Sep 17 00:00:00 2001
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Tue, 19 Nov 2013 23:52:56 +0100
-Subject: [PATCH] clksrc-of: warn if no clock sources are found
-
-Many platforms rely on clocksource_of_init() being implicitly
-called for registering clock sources and will get zero warnings
-if no working clock source is available. Let's print a critical
-error message if no clock source is found.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clocksource/clksrc-of.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
-index 35639cf4e5a2..a30b42c3ac3b 100644
---- a/drivers/clocksource/clksrc-of.c
-+++ b/drivers/clocksource/clksrc-of.c
-@@ -28,6 +28,7 @@ void __init clocksource_of_init(void)
-     struct device_node *np;
-     const struct of_device_id *match;
-     clocksource_of_init_fn init_func;
-+    unsigned clocksources = 0;
-
-     for_each_matching_node_and_match(np, __clksrc_of_table, &match) {
-         if (!of_device_is_available(np))
-@@ -36,5 +37,8 @@ void __init clocksource_of_init(void)
-         init_func = match->data;
-         init_func(np);
-         of_node_put(np);
-+        clocksources++;
-     }
-+    if (!clocksources)
-+        pr_crit("%s: no matching clocksources found\n", __func__);
- }
--- 
-1.8.3.1
-
-You can apply this by itself to get the desired warning.
-Tell me if you want me to send the patch separately.
-
-Yours,
-Linus Walleij
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
