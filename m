@@ -1,36 +1,69 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 19 Nov 2013 13:13:05 -0500
-Subject: [PATCH 1/4] clk: keystone: use clkod register bits for postdiv
-Message-ID: <1384884788-29137-1-git-send-email-m-karicheri2@ti.com>
+Date: Tue, 19 Nov 2013 13:13:06 -0500
+Subject: [PATCH 2/4] keystone: dts: add/modify clock nodes
+In-Reply-To: <1384884788-29137-1-git-send-email-m-karicheri2@ti.com>
+References: <1384884788-29137-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1384884788-29137-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DDR3A/B, ARM and PA PLL controllers have clkod register bits for
-configuring postdiv values. So use it instead of using fixed
-post dividers for these pll controllers. Assume that if fixed-postdiv
-attribute is not present, use clkod register value for pistdiv.
-
-Also update the Documentation of bindings to reflect the same.
+K2 SoC has separate ref clock inputs for various clocks. This patch
+adds following changes:-
+ - Add separate ref clock nodes for ARM, DDR3A, DDR3B and PA PLL input
+   clocks
+ - While at it, rename  refclkmain to refclksys based on device User
+   Guide naming convention
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- .../devicetree/bindings/clock/keystone-pll.txt     |    8 +++----
- drivers/clk/keystone/pll.c                         |   25 ++++++++++++++++----
- 2 files changed, 25 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/keystone-clocks.dtsi |   48 ++++++++++++++++++++++++--------
+ 1 file changed, 36 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
-index 12bd726..225990f 100644
---- a/Documentation/devicetree/bindings/clock/keystone-pll.txt
-+++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
-@@ -17,13 +17,14 @@ Required properties:
- - reg - pll control0 and pll multipler registers
- - reg-names : control and multiplier. The multiplier is applicable only for
- 		main pll clock
--- fixed-postdiv : fixed post divider value
-+- fixed-postdiv : fixed post divider value. If absent, use clkod register bits
-+		for postdiv
+diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
+index d6713b1..3f1cf28 100644
+--- a/arch/arm/boot/dts/keystone-clocks.dtsi
++++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+@@ -13,17 +13,45 @@ clocks {
+ 	#size-cells = <1>;
+ 	ranges;
  
- Example:
+-	refclkmain: refclkmain {
++	refclksys: refclksys {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <122880000>;
+-		clock-output-names = "refclk-main";
++		clock-output-names = "refclk-sys";
++	};
++
++	refclkpass: refclkpass {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <122880000>;
++		clock-output-names = "refclk-pass";
++	};
++
++	refclkarm: refclkarm {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <125000000>;
++		clock-output-names = "refclk-arm";
++	};
++
++	refclkddr3a: refclkddr3a {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <100000000>;
++		clock-output-names = "refclk-ddr3a";
++	};
++
++	refclkddr3b: refclkddr3b {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <100000000>;
++		clock-output-names = "refclk-ddr3b";
+ 	};
+ 
  	mainpllclk: mainpllclk at 2310110 {
  		#clock-cells = <0>;
  		compatible = "ti,keystone,main-pll-clock";
@@ -39,7 +72,7 @@ index 12bd726..225990f 100644
  		reg = <0x02620350 4>, <0x02310110 4>;
  		reg-names = "control", "multiplier";
  		fixed-postdiv = <2>;
-@@ -32,11 +33,10 @@ Example:
+@@ -32,47 +60,43 @@ clocks {
  	papllclk: papllclk at 2620358 {
  		#clock-cells = <0>;
  		compatible = "ti,keystone,pll-clock";
@@ -51,73 +84,46 @@ index 12bd726..225990f 100644
 -		fixed-postdiv = <6>;
  	};
  
- Required properties:
-diff --git a/drivers/clk/keystone/pll.c b/drivers/clk/keystone/pll.c
-index 47a1bd9..f59d5db 100644
---- a/drivers/clk/keystone/pll.c
-+++ b/drivers/clk/keystone/pll.c
-@@ -24,6 +24,8 @@
- #define MAIN_PLLM_HIGH_MASK	0x7f000
- #define PLLM_HIGH_SHIFT		6
- #define PLLD_MASK		0x3f
-+#define CLKOD_MASK		0x780000
-+#define CLKOD_SHIFT		19
+ 	ddr3allclk: ddr3apllclk at 2620360 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,pll-clock";
+-		clocks = <&refclkmain>;
++		clocks = <&refclkddr3a>;
+ 		clock-output-names = "ddr-3a-pll-clk";
+ 		reg = <0x02620360 4>;
+ 		reg-names = "control";
+-		fixed-postdiv = <6>;
+ 	};
  
- /**
-  * struct clk_pll_data - pll data structure
-@@ -41,7 +43,10 @@
-  * @pllm_upper_mask: multiplier upper mask
-  * @pllm_upper_shift: multiplier upper shift
-  * @plld_mask: divider mask
-- * @postdiv: Post divider
-+ * @clkod_mask: output divider mask
-+ * @clkod_shift: output divider shift
-+ * @plld_mask: divider mask
-+ * @postdiv: Fixed post divider
-  */
- struct clk_pll_data {
- 	bool has_pllctrl;
-@@ -53,6 +58,8 @@ struct clk_pll_data {
- 	u32 pllm_upper_mask;
- 	u32 pllm_upper_shift;
- 	u32 plld_mask;
-+	u32 clkod_mask;
-+	u32 clkod_shift;
- 	u32 postdiv;
- };
+ 	ddr3bllclk: ddr3bpllclk at 2620368 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,pll-clock";
+-		clocks = <&refclkmain>;
++		clocks = <&refclkddr3b>;
+ 		clock-output-names = "ddr-3b-pll-clk";
+ 		reg = <0x02620368 4>;
+ 		reg-names = "control";
+-		fixed-postdiv = <6>;
+ 	};
  
-@@ -87,10 +94,17 @@ static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
+ 	armpllclk: armpllclk at 2620370 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,pll-clock";
+-		clocks = <&refclkmain>;
++		clocks = <&refclkarm>;
+ 		clock-output-names = "arm-pll-clk";
+ 		reg = <0x02620370 4>;
+ 		reg-names = "control";
+-		fixed-postdiv = <6>;
+ 	};
  
- 	/* bit6-12 of PLLM is in Main PLL control register */
- 	val = readl(pll_data->pll_ctl0);
-+
- 	mult |= ((val & pll_data->pllm_upper_mask)
- 			>> pll_data->pllm_upper_shift);
- 	prediv = (val & pll_data->plld_mask);
--	postdiv = pll_data->postdiv;
-+
-+	if (!pll_data->has_pllctrl)
-+		/* read post divider from od bits*/
-+		postdiv = ((val & pll_data->clkod_mask) >>
-+				 pll_data->clkod_shift) + 1;
-+	else
-+		postdiv = pll_data->postdiv;
- 
- 	rate /= (prediv + 1);
- 	rate = (rate * (mult + 1));
-@@ -155,8 +169,11 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
- 	}
- 
- 	parent_name = of_clk_get_parent_name(node, 0);
--	if (of_property_read_u32(node, "fixed-postdiv",	&pll_data->postdiv))
--		goto out;
-+	if (of_property_read_u32(node, "fixed-postdiv",	&pll_data->postdiv)) {
-+		/* assume the PLL has output divider register bits */
-+		pll_data->clkod_mask = CLKOD_MASK;
-+		pll_data->clkod_shift = CLKOD_SHIFT;
-+	}
- 
- 	i = of_property_match_string(node, "reg-names", "control");
- 	pll_data->pll_ctl0 = of_iomap(node, i);
+ 	mainmuxclk: mainmuxclk at 2310108 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,pll-mux-clock";
+-		clocks = <&mainpllclk>, <&refclkmain>;
++		clocks = <&mainpllclk>, <&refclksys>;
+ 		reg = <0x02310108 4>;
+ 		bit-shift = <23>;
+ 		bit-mask = <1>;
 -- 
 1.7.9.5
