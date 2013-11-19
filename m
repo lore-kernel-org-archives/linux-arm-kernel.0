@@ -1,48 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Nov 2013 19:33:41 +0000
-Subject: [PATCH 08/10] ASoC: ux500_pcm: Differentiate between pdata and
- DT initialisation
-In-Reply-To: <20131119184829.GF2674@sirena.org.uk>
-References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
- <1384859269-19801-9-git-send-email-lee.jones@linaro.org>
- <20131119184829.GF2674@sirena.org.uk>
-Message-ID: <20131119193341.GC19953@lee--X1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Nov 2013 11:48:26 -0800
+Subject: [GIT PULL] few more omap fixes for v3.13 merge window
+Message-ID: <pull-1384890506-765990>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Nov 2013, Mark Brown wrote:
+The following changes since commit 26273e02a0cf18eb72416559310d3294390a9024:
 
-> On Tue, Nov 19, 2013 at 11:07:47AM +0000, Lee Jones wrote:
-> 
-> > require slightly different flags to inform the core that we 'are'
-> > booting with DT.
-> 
-> Is there some situation when we would want to say we're booting from DT
-> when we aren't?  Just wondering about the quotes.
+  ARM: OMAP2+: Fix build for dra7xx without omap4 and 5 (2013-11-15 08:27:29 -0800)
 
-The quotes do 'not' mean anything special. :)
+are available in the git repository at:
 
-> > +static const struct snd_dmaengine_pcm_config ux500_dmaengine_of_pcm_config = {
-> > +	.pcm_hardware = &ux500_pcm_hw,
-> > +	.prealloc_buffer_size = 128 * 1024,
-> 
-> You shouldn't need to set this explicitly, the generic code should be
-> able to pick a number for you - if you do need this number please
-> explain why the number was chosen in the comments (or fix the core to
-> guess better).  At the minute the core just makes up a number too but at
-> least then it's a consistent random number between platforms.
-> 
-> Can you also get away without the pcm_hardware - the core should also
-> have support for discovering this by querying the DMA controller?
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/more-fixes-for-merge-window-take2
 
-Despite the '+'s, I'm not actually adding these parameters, I'm
-duplicating the pdata version and removing the stuff I 'know' that's
-not required. I don't know what happens when/if these two parameters
-are removed. I can add this to my TODO when I rip out platform data
-support, which will happen when this stuff lands.
+for you to fetch changes up to b2ff4790612bbfa3433cc92e56445c2a40098e2c:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+  ARM: OMAP2+: Remove legacy omap4_twl6030_hsmmc_init (2013-11-18 16:24:58 -0800)
+
+----------------------------------------------------------------
+Few more fixes for issues found booting older omaps using device tree.
+Also few randconfig build fixes and removal of some dead code for omap4
+as it no longer has legacy platform data based booting support.
+
+----------------------------------------------------------------
+Tony Lindgren (9):
+      i2c: omap: Fix missing device tree flags for omap2
+      ARM: OMAP2+: Fix GPMC and simplify bootloader timings for 8250 and smc91x
+      ARM: dts: Fix omap2 specific dtsi files by adding the missing entries
+      ARM: OMAP2+: More randconfig fixes for reconfigure_io_chain
+      gpio: twl4030: Fix regression for twl gpio output
+      gpio: twl4030: Fix passing of pdata in the device tree case
+      ARM: OMAP2+: Fix undefined reference to set_cntfreq
+      ARM: OMAP2+: Remove legacy mux code for display.c
+      ARM: OMAP2+: Remove legacy omap4_twl6030_hsmmc_init
+
+ Documentation/devicetree/bindings/i2c/i2c-omap.txt |  3 +-
+ arch/arm/boot/dts/omap-zoom-common.dtsi            |  2 +-
+ arch/arm/boot/dts/omap2.dtsi                       | 96 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap2420.dtsi                    | 23 ++++++
+ arch/arm/boot/dts/omap2430.dtsi                    | 49 +++++++++++
+ arch/arm/mach-omap2/Makefile                       |  6 +-
+ arch/arm/mach-omap2/common.h                       |  1 -
+ arch/arm/mach-omap2/display.c                      | 78 ------------------
+ arch/arm/mach-omap2/gpmc.c                         | 58 +++++--------
+ arch/arm/mach-omap2/omap-secure.h                  |  7 ++
+ arch/arm/mach-omap2/omap4-common.c                 | 57 -------------
+ arch/arm/mach-omap2/prm44xx_54xx.h                 |  2 +-
+ drivers/gpio/gpio-twl4030.c                        | 13 ++-
+ drivers/i2c/busses/i2c-omap.c                      | 22 +++++
+ 14 files changed, 232 insertions(+), 185 deletions(-)
