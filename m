@@ -1,159 +1,32 @@
-From: pmeerw@pmeerw.net (Peter Meerwald)
-Date: Tue, 19 Nov 2013 11:51:56 +0100 (CET)
-Subject: [PATCH] iio: mxs-lradc: compute temperature from channel 8 and 9
-In-Reply-To: <1384857392-2199-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1384857392-2199-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <alpine.DEB.2.01.1311191149130.18664@pmeerw.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 19 Nov 2013 10:58:17 +0000
+Subject: [PATCH 1/2] ASoC: ab8500: Revert "ASoC: ab8500: Explicitly set I/O up"
+Message-ID: <1384858698-19027-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This reverts commit 2245e3c31c15c2d2a26926c4b734f4d3a37ae252, as it
+is one of two patches which stop audio from working on Snowball.
 
-> The mxs LRADC is able to read an internal die temperature sensor. The
-> temperature has to be calculated from the value read on channel 8 and channel 9.
-> To be able to expose the result to hwmon, implement iio channel 8 as
-> (channel 9 - channel 8). Then, implement IIO_CHAN_INFO_SCALE and
-> IIO_CHAN_INFO_OFFSET so that it can be processed by hwmon through the in kernel
-> provider/consumer mechanism.
+Cc: alsa-devel at alsa-project.org
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ sound/soc/codecs/ab8500-codec.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-wouldn't IIO_CHAN_INFO_PROCESSED be more suitable than IIO_CHAN_INFO_RAW?
-
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
-> ---
->  drivers/staging/iio/adc/mxs-lradc.c | 91 +++++++++++++++++++++++++++++++------
->  1 file changed, 78 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> index a08c1736458b..fec76090dae5 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -231,20 +231,11 @@ struct mxs_lradc {
->  /*
->   * Raw I/O operations
->   */
-> -static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
-> -			const struct iio_chan_spec *chan,
-> -			int *val, int *val2, long m)
-> +static int mxs_lradc_read_single(struct iio_dev *iio_dev, int chan, int *val)
->  {
->  	struct mxs_lradc *lradc = iio_priv(iio_dev);
->  	int ret;
->  
-> -	if (m != IIO_CHAN_INFO_RAW)
-> -		return -EINVAL;
-> -
-> -	/* Check for invalid channel */
-> -	if (chan->channel > LRADC_MAX_TOTAL_CHANS)
-> -		return -EINVAL;
-> -
->  	/*
->  	 * See if there is no buffered operation in progess. If there is, simply
->  	 * bail out. This can be improved to support both buffered and raw IO at
-> @@ -269,7 +260,7 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
->  	/* Clean the slot's previous content, then set new one. */
->  	writel(LRADC_CTRL4_LRADCSELECT_MASK(0),
->  		lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_CLR);
-> -	writel(chan->channel, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
-> +	writel(chan, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
->  
->  	writel(0, lradc->base + LRADC_CH(0));
->  
-> @@ -298,6 +289,71 @@ err:
->  	return ret;
->  }
->  
-> +static int mxs_lradc_read_temp(struct iio_dev *iio_dev, int *val)
-> +{
-> +	int ret, min, max;
-> +
-> +	ret = mxs_lradc_read_single(iio_dev, 8, &min);
-> +	if (ret != IIO_VAL_INT)
-> +		return ret;
-> +
-> +	ret = mxs_lradc_read_single(iio_dev, 9, &max);
-> +	if (ret != IIO_VAL_INT)
-> +		return ret;
-> +
-> +	*val = max - min;
-> +
-> +	return IIO_VAL_INT;
-> +}
-> +
-> +static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
-> +			const struct iio_chan_spec *chan,
-> +			int *val, int *val2, long m)
-> +{
-> +	/* Check for invalid channel */
-> +	if (chan->channel > LRADC_MAX_TOTAL_CHANS)
-> +		return -EINVAL;
-> +
-> +	switch (m) {
-> +	case IIO_CHAN_INFO_RAW:
-> +		if (chan->type == IIO_TEMP)
-> +			return mxs_lradc_read_temp(iio_dev, val);
-> +
-> +		return mxs_lradc_read_single(iio_dev, chan->channel, val);
-> +
-> +	case IIO_CHAN_INFO_SCALE:
-> +		if (chan->type == IIO_TEMP) {
-> +			/* From the datasheet, we have to multiply by 1.012 and
-> +			 * divide by 4
-> +			 */
-> +			*val = 0;
-> +			*val2 = 253000;
-> +			return IIO_VAL_INT_PLUS_MICRO;
-> +		}
-> +
-> +		return -EINVAL;
-> +
-> +	case IIO_CHAN_INFO_OFFSET:
-> +		if (chan->type == IIO_TEMP) {
-> +			/* The calculated value from the ADC is in Kelvin, we
-> +			 * want Celsius for hwmon so the offset is
-> +			 * -272.15 * scale
-> +			 */
-> +			*val = -1075;
-> +			*val2 = 691699;
-> +
-> +			return IIO_VAL_INT_PLUS_MICRO;
-> +		}
-> +
-> +		return -EINVAL;
-> +
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
->  static const struct iio_info mxs_lradc_iio_info = {
->  	.driver_module		= THIS_MODULE,
->  	.read_raw		= mxs_lradc_read_raw,
-> @@ -835,8 +891,17 @@ static const struct iio_chan_spec mxs_lradc_chan_spec[] = {
->  	MXS_ADC_CHAN(5, IIO_VOLTAGE),
->  	MXS_ADC_CHAN(6, IIO_VOLTAGE),
->  	MXS_ADC_CHAN(7, IIO_VOLTAGE),	/* VBATT */
-> -	MXS_ADC_CHAN(8, IIO_TEMP),	/* Temp sense 0 */
-> -	MXS_ADC_CHAN(9, IIO_TEMP),	/* Temp sense 1 */
-> +	/* Combined Temperature sensors */
-> +	{
-> +		.type = IIO_TEMP,
-> +		.indexed = 1,
-> +		.scan_index = 8,
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-> +				      BIT(IIO_CHAN_INFO_OFFSET) |
-> +				      BIT(IIO_CHAN_INFO_SCALE),
-> +		.channel = 8,
-> +		.scan_type = {.sign = 'u', .realbits = 18, .storagebits = 32,},
-> +	},
->  	MXS_ADC_CHAN(10, IIO_VOLTAGE),	/* VDDIO */
->  	MXS_ADC_CHAN(11, IIO_VOLTAGE),	/* VTH */
->  	MXS_ADC_CHAN(12, IIO_VOLTAGE),	/* VDDA */
-> 
-
+diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+index a0394a8..ca500fd 100644
+--- a/sound/soc/codecs/ab8500-codec.c
++++ b/sound/soc/codecs/ab8500-codec.c
+@@ -2473,8 +2473,6 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+ 
+ 	dev_dbg(dev, "%s: Enter.\n", __func__);
+ 
+-	snd_soc_codec_set_cache_io(codec, 0, 0, SND_SOC_REGMAP);
+-
+ 	/* Setup AB8500 according to board-settings */
+ 	pdata = dev_get_platdata(dev->parent);
+ 
 -- 
-
-Peter Meerwald
-+43-664-2444418 (mobile)
+1.8.1.2
