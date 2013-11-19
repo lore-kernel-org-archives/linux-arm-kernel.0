@@ -1,55 +1,162 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 19 Nov 2013 15:47:26 +0400
-Subject: [PATCH 1/2] ARM: dts: i.MX51: Move usbphy0 node from AIPS1
-Message-ID: <1384861647-28567-1-git-send-email-shc_work@mail.ru>
+Date: Tue, 19 Nov 2013 15:47:27 +0400
+Subject: [PATCH 2/2] ARM: dts: i.MX51 boards: Switch to use standard GPIO
+ flags definitions
+In-Reply-To: <1384861647-28567-1-git-send-email-shc_work@mail.ru>
+References: <1384861647-28567-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1384861647-28567-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-usbphy0 is not a part of AIPS1, so move this node under root.
-Additionally this patch removes useless "status" property.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx51.dtsi | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/imx51-apf51.dts                      |  2 +-
+ arch/arm/boot/dts/imx51-apf51dev.dts                   | 12 +++++++-----
+ arch/arm/boot/dts/imx51-babbage.dts                    | 11 ++++++-----
+ arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts |  4 ++--
+ arch/arm/boot/dts/imx51.dtsi                           |  1 +
+ 5 files changed, 17 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index ee35090..29fda13 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -83,6 +83,19 @@
+diff --git a/arch/arm/boot/dts/imx51-apf51.dts b/arch/arm/boot/dts/imx51-apf51.dts
+index 783618d..80840da 100644
+--- a/arch/arm/boot/dts/imx51-apf51.dts
++++ b/arch/arm/boot/dts/imx51-apf51.dts
+@@ -36,7 +36,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "mii";
+-	phy-reset-gpios = <&gpio3 0 0>;
++	phy-reset-gpios = <&gpio3 0 GPIO_ACTIVE_HIGH>;
+ 	phy-reset-duration = <1>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index 5342a48..f36a3aa 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -48,7 +48,7 @@
+ 
+ 		user-key {
+ 			label = "user";
+-			gpios = <&gpio1 3 0>;
++			gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+ 			linux,code = <256>; /* BTN_0 */
  		};
  	};
+@@ -58,7 +58,7 @@
  
-+	usbphy {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "simple-bus";
-+
-+		usbphy0: usbphy at 0 {
-+			compatible = "usb-nop-xceiv";
-+			reg = <0>;
-+			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
-+			clock-names = "main_clk";
-+		};
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -204,13 +217,6 @@
- 				};
- 			};
+ 		user {
+ 			label = "Heartbeat";
+-			gpios = <&gpio1 2 0>;
++			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
+@@ -68,7 +68,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi1>;
+ 	fsl,spi-num-chipselects = <2>;
+-	cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
++	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>,
++		   <&gpio4 25 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
  
--			usbphy0: usbphy at 0 {
--				compatible = "usb-nop-xceiv";
--				clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
--				clock-names = "main_clk";
--				status = "okay";
--			};
--
- 			usbotg: usb at 73f80000 {
- 				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
- 				reg = <0x73f80000 0x0200>;
+@@ -76,14 +77,15 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi2>;
+ 	fsl,spi-num-chipselects = <2>;
+-	cs-gpios = <&gpio3 28 1>, <&gpio3 27 1>;
++	cs-gpios = <&gpio3 28 GPIO_ACTIVE_LOW>,
++		   <&gpio3 27 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+-	cd-gpios = <&gpio2 29 0>;
++	cd-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
+ 	bus-width = <4>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 5a77d33..bbe899f 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -75,7 +75,7 @@
+ 
+ 		power {
+ 			label = "Power Button";
+-			gpios = <&gpio2 21 0>;
++			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
+ 			linux,code = <116>; /* KEY_POWER */
+ 			gpio-key,wakeup;
+ 		};
+@@ -105,7 +105,7 @@
+ 			reg=<0>;
+ 			#clock-cells = <0>;
+ 			clock-frequency = <26000000>;
+-			gpios = <&gpio4 26 1>;
++			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ };
+@@ -121,8 +121,8 @@
+ &esdhc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc2>;
+-	cd-gpios = <&gpio1 6 0>;
+-	wp-gpios = <&gpio1 5 0>;
++	cd-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
++	wp-gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
+ 
+@@ -137,7 +137,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi1>;
+ 	fsl,spi-num-chipselects = <2>;
+-	cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
++	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>,
++		   <&gpio4 25 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ 
+ 	pmic: mc13892 at 0 {
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+index d44a85d..cf2e0d8 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -30,7 +30,7 @@
+ 
+ 		button-1 {
+ 			label = "BP1";
+-			gpios = <&gpio3 31 1>;
++			gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
+ 			linux,code = <256>;
+ 			gpio-key,wakeup;
+ 			linux,input-type = <1>;
+@@ -44,7 +44,7 @@
+ 
+ 		led1 {
+ 			label = "led1";
+-			gpios = <&gpio3 30 1>;
++			gpios = <&gpio3 30 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 29fda13..db828ab 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -15,6 +15,7 @@
+ #include "imx51-pingrp.h"
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/clock/imx5-clock.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	aliases {
 -- 
 1.8.1.5
