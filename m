@@ -1,19 +1,89 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 20 Nov 2013 08:24:21 -0600
-Subject: [PATCH V2 2/2] ARM: dts: doc: Document missing binding for
- ti-sdma controller
-In-Reply-To: <1384185976-17822-2-git-send-email-r.sricharan@ti.com>
-References: <1384185976-17822-1-git-send-email-r.sricharan@ti.com>
- <1384185976-17822-2-git-send-email-r.sricharan@ti.com>
-Message-ID: <CAL_Jsq+vbonbLga3idXS_NKBq1OXLqwJXpin97Y4dEag7vYBUg@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 19 Nov 2013 13:17:21 -0800
+Subject: [PATCH 26/31] Input: tegra-kbc - use reset framework
+In-Reply-To: <1384548866-13141-27-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-27-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131119211721.GB14888@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 10:06 AM, Sricharan R <r.sricharan@ti.com> wrote:
-> The binding and support for system DMA module present in OMAP2+ Socs
-> and DRA7 with dma-engine is already present. So adding the missing
-> documentation for the same.
->
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+On Fri, Nov 15, 2013 at 01:54:21PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Tegra's clock driver now provides an implementation of the common
+> reset API (include/linux/reset.h). Use this instead of the old Tegra-
+> specific API; that will soon be removed.
+> 
+> Cc: treding at nvidia.com
+> Cc: pdeschrijver at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Dmitry Torokhov <dtor@mail.ru>
+> Cc: linux-input at vger.kernel.org
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+> ---
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
+> ---
+>  drivers/input/keyboard/tegra-kbc.c | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
+> index 8508879f6faf..9757a58bc897 100644
+> --- a/drivers/input/keyboard/tegra-kbc.c
+> +++ b/drivers/input/keyboard/tegra-kbc.c
+> @@ -31,7 +31,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/slab.h>
+>  #include <linux/input/matrix_keypad.h>
+> -#include <linux/clk/tegra.h>
+> +#include <linux/reset.h>
+>  #include <linux/err.h>
+>  
+>  #define KBC_MAX_KPENT	8
+> @@ -116,6 +116,7 @@ struct tegra_kbc {
+>  	u32 wakeup_key;
+>  	struct timer_list timer;
+>  	struct clk *clk;
+> +	struct reset_control *rst;
+>  	const struct tegra_kbc_hw_support *hw_support;
+>  	int max_keys;
+>  	int num_rows_and_columns;
+> @@ -373,9 +374,9 @@ static int tegra_kbc_start(struct tegra_kbc *kbc)
+>  	clk_prepare_enable(kbc->clk);
+>  
+>  	/* Reset the KBC controller to clear all previous status.*/
+> -	tegra_periph_reset_assert(kbc->clk);
+> +	reset_control_assert(kbc->rst);
+>  	udelay(100);
+> -	tegra_periph_reset_deassert(kbc->clk);
+> +	reset_control_assert(kbc->rst);
+>  	udelay(100);
+>  
+>  	tegra_kbc_config_pins(kbc);
+> @@ -663,6 +664,12 @@ static int tegra_kbc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(kbc->clk);
+>  	}
+>  
+> +	kbc->rst = devm_reset_control_get(&pdev->dev, "kbc");
+> +	if (IS_ERR(kbc->rst)) {
+> +		dev_err(&pdev->dev, "failed to get keyboard reset\n");
+> +		return PTR_ERR(kbc->rst);
+> +	}
+> +
+>  	/*
+>  	 * The time delay between two consecutive reads of the FIFO is
+>  	 * the sum of the repeat time and the time taken for scanning
+> -- 
+> 1.8.1.5
+> 
+
+-- 
+Dmitry
