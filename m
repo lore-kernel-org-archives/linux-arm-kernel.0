@@ -1,41 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Nov 2013 16:53:47 +0100
-Subject: [PATCH v4 0/4] Add support for the Allwinner A31 Reset Controllers
-In-Reply-To: <1384871415.6790.30.camel@pizza.hi.pengutronix.de>
-References: <1384539547-29463-1-git-send-email-maxime.ripard@free-electrons.com>
- <1384798284.4348.33.camel@pizza.hi.pengutronix.de>
- <20131119074929.GE5325@lukather>
- <1384871415.6790.30.camel@pizza.hi.pengutronix.de>
-Message-ID: <20131119155347.GA1029@lukather>
+Date: Tue, 19 Nov 2013 16:50:30 +0100
+Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and gyroscopes
+Message-ID: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi everyone,
 
-On Tue, Nov 19, 2013 at 03:30:15PM +0100, Philipp Zabel wrote:
-> > Do you want to merge this through your tree?
-> 
-> since 0d74578b7de73c4b7f25daaacff8d5091fa83bd4 "ARM: sunxi:
-> remove .init_time hooks", patch 3/4 doesn't apply against soc/for-next
-> anymore.
-> I could take the first patch now, and you merge the other three through
-> your tree afterwards?
+This is an attempt at adding the DT probing to the st_sensors
+accelerometers and gyroscopes.
 
-Hmmm, patch 1, 2 and 3 can't be merged independently.
+It's somewhat hackish, because the core actively checks for the value
+of the device at probe time, and DT probing generates a quite
+different name.
 
-I guess the easiest will be for me to merge it with your Acked-by.
+I first tried to turn the function st_sensors_check_device_support the
+other way around, with the "leaf" providing the sensor structure, and
+the function checking that it's consistent with the WAI stored in the
+sensor. However, it turned to be a quite intrusive change, so I'm
+sending the easiest one, to try to get some feedback :)
 
 Thanks!
 Maxime
 
+Maxime Ripard (3):
+  iio: accel: Add device tree probing for STMicro accelerometers
+  iio: accel: Add device tree probing for STMicro gyroscopes
+  ARM: cfa10057: Add the accelerometer and gyroscope to the device tree
+
+ .../devicetree/bindings/iio/accel/st_accel_i2c.txt | 22 +++++++++++++++
+ .../devicetree/bindings/iio/gyro/st_gyro_i2c.txt   | 20 +++++++++++++
+ arch/arm/boot/dts/imx28-cfa10057.dts               | 13 +++++++++
+ drivers/iio/accel/st_accel_i2c.c                   | 33 ++++++++++++++++++++++
+ drivers/iio/gyro/st_gyro_i2c.c                     | 31 ++++++++++++++++++++
+ 5 files changed, 119 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
+ create mode 100644 Documentation/devicetree/bindings/iio/gyro/st_gyro_i2c.txt
+
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/1c6f95f0/attachment.sig>
+1.8.4.2
