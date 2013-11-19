@@ -1,34 +1,77 @@
 From: jsarha@ti.com (Jyri Sarha)
-Date: Tue, 19 Nov 2013 14:12:28 +0200
-Subject: [PATCH RFC 8/9] ARM: OMAP2+: omap2plus_defconfig: Enable tilcdc and
- TDA998X HDMI support
+Date: Tue, 19 Nov 2013 14:12:24 +0200
+Subject: [PATCH RFC 4/9] ASoC: hdmi-codec: Add devicetree binding with
+ documentation
 In-Reply-To: <cover.1384862950.git.jsarha@ti.com>
 References: <cover.1384862950.git.jsarha@ti.com>
-Message-ID: <3e8730e3b30d80925bbc4a45c5eaf0155787a9a4.1384862950.git.jsarha@ti.com>
+Message-ID: <829968f1a6b34176de8a04dd4ad473b2b37be783.1384862950.git.jsarha@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables HDMI video support on Beaglebone-Black.
-
 Signed-off-by: Jyri Sarha <jsarha@ti.com>
-cc: tony at atomide.com
 ---
- arch/arm/configs/omap2plus_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+ Documentation/devicetree/bindings/sound/hdmi.txt |   17 +++++++++++++++++
+ sound/soc/codecs/hdmi.c                          |   10 ++++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/hdmi.txt
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 254cf05..52b0d92 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -176,6 +176,9 @@ CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
- CONFIG_REGULATOR_TPS65217=y
- CONFIG_REGULATOR_TPS65910=y
-+CONFIG_DRM=m
-+CONFIG_DRM_I2C_NXP_TDA998X=m
-+CONFIG_DRM_TILCDC=m
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
+diff --git a/Documentation/devicetree/bindings/sound/hdmi.txt b/Documentation/devicetree/bindings/sound/hdmi.txt
+new file mode 100644
+index 0000000..31af7bc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/hdmi.txt
+@@ -0,0 +1,17 @@
++Device-Tree bindings for dummy HDMI codec
++
++Required properties:
++	- compatible: should be "linux,hdmi-audio".
++
++CODEC output pins:
++  * TX
++
++CODEC input pins:
++  * RX
++
++Example node:
++
++	hdmi_audio: hdmi_audio at 0 {
++		compatible = "linux,hdmi-audio";
++		status = "okay";
++	};
+diff --git a/sound/soc/codecs/hdmi.c b/sound/soc/codecs/hdmi.c
+index 68342b1..6d2fcf1 100644
+--- a/sound/soc/codecs/hdmi.c
++++ b/sound/soc/codecs/hdmi.c
+@@ -20,6 +20,7 @@
+  */
+ #include <linux/module.h>
+ #include <sound/soc.h>
++#include <linux/of_device.h>
+ 
+ #define DRV_NAME "hdmi-audio-codec"
+ 
+@@ -60,6 +61,14 @@ static struct snd_soc_dai_driver hdmi_codec_dai = {
+ 
+ };
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id hdmi_audio_codec_ids[] = {
++	{ .compatible = "linux,hdmi-audio", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, hdmi_audio_codec_ids);
++#endif
++
+ static struct snd_soc_codec_driver hdmi_codec = {
+ 	.dapm_widgets = hdmi_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(hdmi_widgets),
+@@ -83,6 +92,7 @@ static struct platform_driver hdmi_codec_driver = {
+ 	.driver		= {
+ 		.name	= DRV_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(hdmi_audio_codec_ids),
+ 	},
+ 
+ 	.probe		= hdmi_codec_probe,
 -- 
 1.7.9.5
