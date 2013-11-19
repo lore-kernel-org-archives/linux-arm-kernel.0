@@ -1,49 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Nov 2013 17:16:06 +0000
-Subject: [PATCH] arm: mm: refactor v7 cache cleaning ops to use
- way/index sequence
-In-Reply-To: <alpine.LFD.2.10.1311191155080.9667@knanqh.ubzr>
-References: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.10.1311191155080.9667@knanqh.ubzr>
-Message-ID: <20131119171606.GB32337@arm.com>
+From: bgamari.foss@gmail.com (Ben Gamari)
+Date: Tue, 19 Nov 2013 12:18:14 -0500
+Subject: cpufreq on PandaBoard
+In-Reply-To: <528B7D61.5020206@ti.com>
+References: <87eh6ca150.fsf@gmail.com> <528B7D61.5020206@ti.com>
+Message-ID: <87hab8nwdl.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 04:58:58PM +0000, Nicolas Pitre wrote:
-> On Tue, 19 Nov 2013, Lorenzo Pieralisi wrote:
+Nishanth Menon <nm@ti.com> writes:
+
+> On 11/19/2013 08:59 AM, Ben Gamari wrote:
+>> 
+>> Booting a PandaBoard with a recent kernel and devicetree appears to be a
+>> rather messy process. There are dozens of devicetree-related warnings
+>> spewed on boot (many pertaining to missing regulators). At the moment,
+>> however, I'm most interested in this,
+>> 
+>>     cpufreq-cpu0 cpufreq-cpu0.0: no of_node; not parsing pinctrl DT
+>>     cpu cpu0: dummy supplies not allowed
+>>     cpufreq_cpu0: failed to get cpu0 regulator: -19
+>>     cpufreq_cpu0: failed to get cpu0 clock: -2
+>>     cpufreq-cpu0: probe of cpufreq-cpu0.0 failed with error -2
+>> 
+>> What is the status of cpufreq on the PandaBoard? Is this expected to
+>> work?
+>> 
+>> More generally, if one wants a fairly recent kernel supporting the
+>> PandaBoard's hardware what kernel tree should be used? Is mainline not
+>> yet appropriate? Is linux-next preferred? Perhaps a ti-maintained tree?
 > 
-> > Set-associative caches on all v7 implementations map the index bits
-> > to physical addresses LSBs and tag bits to MSBs. On most systems with
-> > sane DRAM controller configurations, this means that the current v7
-> > cache flush routine using set/way operations triggers a DRAM memory
-> > controller precharge/activate for every cache line writeback since the
-> > cache routine cleans lines by first fixing the index and then looping
-> > through ways.
-> > 
-> > Given the random content of cache tags, swapping the order between
-> > indexes and ways loops do not prevent DRAM pages precharge and
-> > activate cycles but at least, on average, improves the chances that
-> > either multiple lines hit the same page or multiple lines belong to
-> > different DRAM banks, improving throughput significantly.
-> > 
-> > This patch swaps the inner loops in the v7 cache flushing routine to
-> > carry out the clean operations first on all sets belonging to a given
-> > way (looping through sets) and then decrementing the way.
-> > 
-> > Benchmarks showed that by swapping the ordering in which sets and ways
-> > are decremented in the v7 cache flushing routine, that uses set/way
-> > operations, time required to flush caches is reduced significantly,
-> > owing to improved writebacks throughput to the DRAM controller.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> Could you include some benchmark results so we have an idea of the 
-> expected improvement scale?
+> for upstream: Wait for the clock nodes to get merged.. we are at v9 of
+> discussion thread here[1].
+>
+I take it that the clock node work does not itself fix cpufreq? I've
+built the 3.12-dt-clks-v10-dev branch. On the bright side, it boots and
+appears to run just fine. Unfortunately, there isn't even a mention of
+cpufreq in the boot log.
 
-Lorenzo should have some numbers.
+I've seen your Google+ post[1] from May enumerating the steps to having
+working DVFS. It would be useful to post an update showing what has been
+merged, what is waiting for merge, and what is still in progress.
 
-It was initially raised by the hardware people and the ARM ARM was
-changed in this respect between revB and revC.
+> for ti-maintained tree, you need to talk to TI support folks for
+> appropriate kernel for your product line.
+>
+I wasn't asking for official support, just wondering where work is
+currently happening.
 
--- 
-Catalin
+Thanks for your help.
+
+Cheers,
+
+- Ben
+
+
+[1] https://plus.google.com/112464029509057661457/posts/gvyZQcNieoq
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/7e86274a/attachment.sig>
