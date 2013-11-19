@@ -1,27 +1,58 @@
-From: trini@ti.com (Tom Rini)
-Date: Tue, 19 Nov 2013 14:06:04 -0500
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131119152157.GO5914@e106331-lin.cambridge.arm.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115175241.GB27174@quad.lixom.net>
- <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
- <201311191505.33636.arnd@arndb.de>
- <20131119152157.GO5914@e106331-lin.cambridge.arm.com>
-Message-ID: <20131119190604.GH420@bill-the-cat>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Tue, 19 Nov 2013 11:07:52 -0800
+Subject: [PATCH v4 0/2] watchdog: bcm281xx: Watchdog Driver
+Message-ID: <1384888074-19696-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 03:21:57PM +0000, Mark Rutland wrote:
-[snip]
-> I think that with ACPI systems the data we would have to convert is
-> going to be larger and more varied than that. Given we already have code
-> in the kernel for handling ACPI, I believe it would be more valuable to
-> leverage that and support ACPI directly in those places which require it
+This is version 4 of the watchdog driver for the BCM281xx family of mobile
+SoCs.
 
-I'll bite.  How realistic a proprosition is that?  When I've talked with
-a few folks here and there they say, roughly, that "the ARM bit" being
-set means it's a whole new ball game, and no, they don't expect to be
-able to re-use a lot of the existing code.
+Changes since version 3:
+- Removed #include <linux/miscdevice.h>
+- Added Reviewed-by:/Acked-by: Guenter Roeck
+
+Changes since version 2:
+
+- BCM_KONA_WDT_NAME: "bcm-kona-wdt" -> "bcm_kona_wdt"
+- Don't initialize static variable
+- Removed '{'/'}' from single-line statements
+- busy_count retains the maximum loop count of the longest loop rather
+  than an over-all maximum
+- Use seq_puts() in lieu of seq_printf() in 2 locations
+- Removed error message after devm_kzalloc()
+- Added MODULE_ALIAS
+
+Changes since version 1:
+
+- Added module name to "help" section in Kconfig A few cosmetic code
+- simplifications and fixes Removed most dev_info() calls and changed the
+- remaining ones to dev_dbg() Renamed SECWDOG_WD_LOAD_FLAG_MASK to
+- SECWDOG_WD_LOAD_FLAG Added some comments to secure_register_read() and
+- struct bcm_kona_wdt Added delay to secure_register_read() Reduced maximum
+- retry loop from 10000 to 1000 Introduced "busy_count" variable to count
+- how often secure_register_read() gets stalled; this is available through
+- debugfs Simplified secure_register_read() to return -ETIMEDOUT rather than
+- using a variable parameter to indicate a timeout error Got rid of all uses
+- of -EAGAIN Fixed return value check for debugfs_create_dir() Simplified
+- bcm_kona_wdt_debugfs_init() by getting rid of goto Created new generic
+- function bcm_kona_wdt_ctrl_reg_modify() The following functions now use
+- bcm_kona_wdt_ctrl_reg_modify():
+    - bcm_kona_wdt_set_resolution_reg() bcm_kona_wdt_set_timeout_reg()
+    - bcm_kona_wdt_stop()
+- Made bcm_kona_wdt_set_timeout_reg() more generic, so bcm_kona_wdt_start()
+  can use it Removed MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR)
+
+Markus Mayer (2):
+  watchdog: bcm281xx: Watchdog Driver
+  ARM: bcm281xx: watchdog configuration
+
+ arch/arm/configs/bcm_defconfig  |    3 +
+ drivers/watchdog/Kconfig        |   22 +++
+ drivers/watchdog/Makefile       |    1 +
+ drivers/watchdog/bcm_kona_wdt.c |  365 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 391 insertions(+)
+ create mode 100644 drivers/watchdog/bcm_kona_wdt.c
 
 -- 
-Tom
+1.7.9.5
