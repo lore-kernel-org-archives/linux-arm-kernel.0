@@ -1,16 +1,50 @@
-From: bevenson@melinkcorp.com (Bryan Evenson)
-Date: Tue, 19 Nov 2013 14:45:41 -0500
-Subject: at91: ubi: UBIFS error (pid 1): ubifs_iget: failed to read inode 1,
- error -2
-Message-ID: <91586D499ADFD74FBCFB8425266A5DE40153BB2BE545@pluto.melinkcorp.local>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 19 Nov 2013 20:40:00 +0100
+Subject: [PATCH 08/10] ASoC: ux500_pcm: Differentiate between pdata and
+ DT initialisation
+In-Reply-To: <20131119193341.GC19953@lee--X1>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+ <1384859269-19801-9-git-send-email-lee.jones@linaro.org>
+ <20131119184829.GF2674@sirena.org.uk> <20131119193341.GC19953@lee--X1>
+Message-ID: <528BBE90.4020802@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am using an Atmel AT91SAM9G25 board with Micron's MT29F2G08ABAEAWP NAND flash.  I am on Atmel's variant of the 3.6.9 kernel.  Specifically, I'm using https://github.com/linux4sam/linux-at91/tree/linux-3.6.9-at91 commit 5fe012d4aee98ef82df66e6763882c735902ed0f.   I have several boards in which I see the error message shown in the message subject when the device is reset due to a power cycle and the device fails to continue to load the filesystem.  On one board I erased and re-wrote the filesystem and the device is working just fine through multiple power cycles.  My questions are:
+On 11/19/2013 08:33 PM, Lee Jones wrote:
+> On Tue, 19 Nov 2013, Mark Brown wrote:
+> 
+>> On Tue, Nov 19, 2013 at 11:07:47AM +0000, Lee Jones wrote:
+>>
+>>> require slightly different flags to inform the core that we 'are'
+>>> booting with DT.
+>>
+>> Is there some situation when we would want to say we're booting from DT
+>> when we aren't?  Just wondering about the quotes.
+> 
+> The quotes do 'not' mean anything special. :)
+> 
+>>> +static const struct snd_dmaengine_pcm_config ux500_dmaengine_of_pcm_config = {
+>>> +	.pcm_hardware = &ux500_pcm_hw,
+>>> +	.prealloc_buffer_size = 128 * 1024,
+>>
+>> You shouldn't need to set this explicitly, the generic code should be
+>> able to pick a number for you - if you do need this number please
+>> explain why the number was chosen in the comments (or fix the core to
+>> guess better).  At the minute the core just makes up a number too but at
+>> least then it's a consistent random number between platforms.
+>>
+>> Can you also get away without the pcm_hardware - the core should also
+>> have support for discovering this by querying the DMA controller?
+> 
+> Despite the '+'s, I'm not actually adding these parameters, I'm
+> duplicating the pdata version and removing the stuff I 'know' that's
+> not required. I don't know what happens when/if these two parameters
+> are removed. I can add this to my TODO when I rip out platform data
+> support, which will happen when this stuff lands.
+> 
 
-1. Is this a known issue with the version of the kernel that I am using?  I've searched this mailing list and the latest mainline kernel commits, and I didn't see anything directly related to this issue.
-2. If so, is there a fix in a later kernel version?
-3. If not, what would be helpful in figuring out what is going on?  I still have a bad device that I haven't touched the flash on.
+I think the patch is fine for now. Once non-DT support has been removed for
+ux500 we should be able to remove the whole ux500_pcm.c file (Assuming that
+the ux500 DMA engine driver gains dma_slave_caps support).
 
-Thanks,
-Bryan
+- Lars
