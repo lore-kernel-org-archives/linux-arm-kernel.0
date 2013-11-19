@@ -1,66 +1,47 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 19 Nov 2013 10:49:24 +0800
-Subject: mx6qsabresd: Adding eMMC suport
-In-Reply-To: <CAOMZO5DvYQRBWmJwXBA_kDG_rt0rpreLzshx+dY_UEttQMSE-g@mail.gmail.com>
-References: <CAOMZO5DvYQRBWmJwXBA_kDG_rt0rpreLzshx+dY_UEttQMSE-g@mail.gmail.com>
-Message-ID: <20131119024923.GB6176@b29396-Latitude-E6410>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 19 Nov 2013 11:56:29 +0900
+Subject: [PATCH 7/7] ARM: shmobile: armadillo-reference: Use low level
+ IRQ for ST1231
+In-Reply-To: <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131119025629.GA14794@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Sat, Nov 09, 2013 at 01:23:59PM +0100, Laurent Pinchart wrote:
+> The device is configured to generate an active-low interrupt signal that
+> needs to be acknowledged by the host. Configure the IRQ to trigger on
+> low level.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> index aef425f..04e9d49 100644
+> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> @@ -95,7 +95,7 @@
+>  		compatible = "sitronix,st1232";
+>  		reg = <0x55>;
+>  		interrupt-parent = <&irqpin1>;
+> -		interrupts = <2 IRQ_TYPE_NONE>; /* IRQ10: hwirq 2 on irqpin1 */
+> +		interrupts = <2 IRQ_TYPE_LOW_LEVEL>;
 
-On Mon, Nov 18, 2013 at 12:49:27PM -0200, Fabio Estevam wrote:
-> Hi,
-> 
-> When I add support to esdhc4 port, which is connected to a eMMC on mx6qsabresd:
-> 
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -229,6 +229,10 @@
->                 pinctrl_usdhc3: usdhc3grp {
->                         fsl,pins = <MX6QDL_USDHC3_PINGRP1>;
->                 };
-> +
-> +               pinctrl_usdhc4: usdhc4grp {
-> +                       fsl,pins = <MX6QDL_USDHC4_PINGRP1>;
-> +               };
->         };
->  };
-> 
-> @@ -304,3 +308,11 @@
->         wp-gpios = <&gpio2 1 0>;
->         status = "okay";
->  };
-> +
-> +&usdhc4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usdhc4>;
-> +       bus-width = <8>;
-> +       non-removable;
-> +       status = "okay";
-> +};
-> 
-> I get the following:
-> 
-> mmc2: Timeout waiting for hardware interrupt.
->  mmcblk1boot1: unknown partition table
-> mmc2: Timeout waiting for hardware interrupt.
->  mmcblk1boot0: unknown partition table
-> 
-> The boots proceeds until the end, but there is a big delay due to the
-> above messages.
-> 
-> Does anything special need to be done in order to support eMMC?
-> 
+I believe this should be IRQ_TYPE_LEVEL_LOW.
 
-It's already fixed but still not in Chris' tree.
-Please refer to:
-http://comments.gmane.org/gmane.linux.kernel.mmc/23339
+I have dequeued this patch for now.
 
-Regards
-Dong Aisheng
-
-> Regards,
+>  		pinctrl-0 = <&st1232_pins>;
+>  		pinctrl-names = "default";
+>  		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+> -- 
+> 1.8.1.5
 > 
-> Fabio Estevam
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
