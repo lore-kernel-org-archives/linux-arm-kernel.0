@@ -1,81 +1,89 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Nov 2013 11:30:25 -0600
-Subject: cpufreq on PandaBoard
-In-Reply-To: <87hab8nwdl.fsf@gmail.com>
-References: <87eh6ca150.fsf@gmail.com> <528B7D61.5020206@ti.com>
- <87hab8nwdl.fsf@gmail.com>
-Message-ID: <528BA031.5050201@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 19 Nov 2013 17:35:02 +0000
+Subject: [PATCH] arm: mm: refactor v7 cache cleaning ops to use way/index
+ sequence
+In-Reply-To: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20131119173502.GB2566@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 11:18 AM, Ben Gamari wrote:
-> Nishanth Menon <nm@ti.com> writes:
+On Tue, Nov 19, 2013 at 03:29:53PM +0000, Lorenzo Pieralisi wrote:
+> Set-associative caches on all v7 implementations map the index bits
+> to physical addresses LSBs and tag bits to MSBs. On most systems with
+> sane DRAM controller configurations, this means that the current v7
+> cache flush routine using set/way operations triggers a DRAM memory
+> controller precharge/activate for every cache line writeback since the
+> cache routine cleans lines by first fixing the index and then looping
+> through ways.
 > 
->> On 11/19/2013 08:59 AM, Ben Gamari wrote:
->>>
->>> Booting a PandaBoard with a recent kernel and devicetree appears to be a
->>> rather messy process. There are dozens of devicetree-related warnings
->>> spewed on boot (many pertaining to missing regulators). At the moment,
->>> however, I'm most interested in this,
->>>
->>>     cpufreq-cpu0 cpufreq-cpu0.0: no of_node; not parsing pinctrl DT
->>>     cpu cpu0: dummy supplies not allowed
->>>     cpufreq_cpu0: failed to get cpu0 regulator: -19
->>>     cpufreq_cpu0: failed to get cpu0 clock: -2
->>>     cpufreq-cpu0: probe of cpufreq-cpu0.0 failed with error -2
->>>
->>> What is the status of cpufreq on the PandaBoard? Is this expected to
->>> work?
->>>
->>> More generally, if one wants a fairly recent kernel supporting the
->>> PandaBoard's hardware what kernel tree should be used? Is mainline not
->>> yet appropriate? Is linux-next preferred? Perhaps a ti-maintained tree?
->>
->> for upstream: Wait for the clock nodes to get merged.. we are at v9 of
->> discussion thread here[1].
->>
-> I take it that the clock node work does not itself fix cpufreq? I've
-> built the 3.12-dt-clks-v10-dev branch. On the bright side, it boots and
-> appears to run just fine. Unfortunately, there isn't even a mention of
-> cpufreq in the boot log.
+> Given the random content of cache tags, swapping the order between
+> indexes and ways loops do not prevent DRAM pages precharge and
+> activate cycles but at least, on average, improves the chances that
+> either multiple lines hit the same page or multiple lines belong to
+> different DRAM banks, improving throughput significantly.
+> 
+> This patch swaps the inner loops in the v7 cache flushing routine to
+> carry out the clean operations first on all sets belonging to a given
+> way (looping through sets) and then decrementing the way.
+> 
+> Benchmarks showed that by swapping the ordering in which sets and ways
+> are decremented in the v7 cache flushing routine, that uses set/way
+> operations, time required to flush caches is reduced significantly,
+> owing to improved writebacks throughput to the DRAM controller.
 
-You are probably picking up a branch that is yet to be posted :)...
-and I assume you know the risk of in-development patches ;) - the
-branch looks to introduce purely clock nodes which patch [2] adds on
-to and makes cpufreq work as a start..
+For the correctness of this patch:
 
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+My understanding of the performance implications is more limited, so
+I'm happy to defer to others on that.
+
+Cheers
+---Dave
 
 > 
-> I've seen your Google+ post[1] from May enumerating the steps to having
-> working DVFS. It would be useful to post an update showing what has been
-> merged, what is waiting for merge, and what is still in progress.
-
-We are still at "step 1 - get clock nodes" :(... and no, situation has
-not improved since May 2013 when I originally posted that G+ comment
-(and not because we have not been trying..).
-
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/mm/cache-v7.S | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 > 
->> for ti-maintained tree, you need to talk to TI support folks for
->> appropriate kernel for your product line.
->>
-> I wasn't asking for official support, just wondering where work is
-> currently happening.
-
-they are happening here in linux-omap mailing list.. just that the
-changes are pretty fundamental and a lot of discussions have been
-taking place
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index b5c467a..778bcf8 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -146,18 +146,18 @@ flush_levels:
+>  	ldr	r7, =0x7fff
+>  	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
+>  loop1:
+> -	mov	r9, r4				@ create working copy of max way size
+> +	mov	r9, r7				@ create working copy of max index
+>  loop2:
+> - ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
+> - THUMB(	lsl	r6, r9, r5		)
+> + ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
+> + THUMB(	lsl	r6, r4, r5		)
+>   THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
+> - ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
+> - THUMB(	lsl	r6, r7, r2		)
+> + ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
+> + THUMB(	lsl	r6, r9, r2		)
+>   THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
+>  	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
+> -	subs	r9, r9, #1			@ decrement the way
+> +	subs	r9, r9, #1			@ decrement the index
+>  	bge	loop2
+> -	subs	r7, r7, #1			@ decrement the index
+> +	subs	r4, r4, #1			@ decrement the way
+>  	bge	loop1
+>  skip:
+>  	add	r10, r10, #2			@ increment cache number
+> -- 
+> 1.8.2.2
 > 
-> Thanks for your help.
-> 
-> Cheers,
-> 
-> - Ben
 > 
 > 
-> [1] https://plus.google.com/112464029509057661457/posts/gvyZQcNieoq
-> 
-[2] http://marc.info/?l=linux-omap&m=138193821608515&w=2
-
--- 
-Regards,
-Nishanth Menon
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
