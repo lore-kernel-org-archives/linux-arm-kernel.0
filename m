@@ -1,44 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Nov 2013 11:35:57 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131115175241.GB27174@quad.lixom.net>
- <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
-Message-ID: <20131119113557.GI5914@e106331-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Nov 2013 11:38:58 +0000
+Subject: [PATCH] ARM: move firmware_ops to drivers/firmware
+In-Reply-To: <528A53E4.90401@wwwdotorg.org>
+References: <1384678169-28228-1-git-send-email-acourbot@nvidia.com>
+ <CAHkRjk5LBOFx3ir49RgEsaFwvp5UCpTjYFWto+URXebAsOP0RA@mail.gmail.com>
+ <52898417.80601@nvidia.com> <20131118115842.GE4050@arm.com>
+ <528A4869.2020701@wwwdotorg.org> <20131118173047.GF9838@arm.com>
+ <528A53E4.90401@wwwdotorg.org>
+Message-ID: <20131119113858.GE26487@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> > > That
-> > > sounds like an arcane board file equivalent, and is counter to the
-> > > entire reason for using UEFI and ACPI -- having a well-defined
-> > > (excluding particular driver bindings, and I'm not arguing well-defined
-> > > means nice) stable standard that allows the kernel to boot on an
-> > > arbitrary platform without requiring arbitrary platform-specific code
-> > > everywhere in the boot path.
-> > >
-> > > It might not be pretty, and it will certainly require a lot of work, but
-> > > I'd prefer it at least for a semblance of uniformity.
-> >
-> > That is a red herring -- that booting standard has _nothing_ to do with
-> > ACPI. Once you've got a standard that is well-defined enough like that,
-> > you no longer need the runtime portions of ACPI to deal with it. You
-> > can just hardcode it. You need a way to probe _which_ type of standard
-> > is used, but from there on out you can assume that things are the same
-> > way.
+On Mon, Nov 18, 2013 at 05:52:36PM +0000, Stephen Warren wrote:
+> On 11/18/2013 10:30 AM, Catalin Marinas wrote:
+> > On Mon, Nov 18, 2013 at 05:03:37PM +0000, Stephen Warren wrote:
+> >> On 11/18/2013 04:58 AM, Catalin Marinas wrote:
+> >> ...
+> >>> Of course, trusted foundations interface could be plugged into cpu_ops
+> >>> on arm64 but I will NAK it on the grounds of not using the PSCI API, nor
+> >>> the SMC calling convention (and it's easy to fix when porting to ARMv8).
+> >>> If a supported standard API is used, then there is no need for
+> >>> additional code in the kernel.
+> >>
+> >> What happens when someone takes an existing working secure-mode SW stack
+> >> and simply re-uses it on some new ARMv8 SoC. Are you going to force
+> >> people working on upstream to re-write the secure mode firmware in
+> >> shipped hardware before allowing upstream kernel support?
+> > 
+> > Don't confuse the secure stack with the secure monitor running at EL3.
+> > If you want AArch64 support for lower levels (EL2, EL1, EL0), your
+> > monitor _must_ be AArch64. You can't run legacy AArch32 code at EL3 and
+> > have lower levels in AArch64 mode (architectural constraint).
 > 
-> The UEFI spec pulls in portions of ACPI. I do not know the full extent
-> of the interaction between the two, but I know that they are not
-> completely decoupled. As you have pointed out we are not experienced
-> with ACPI or UEFI, so I don't think we can make statements that one is
-> perfectly fine without the other.
+> I was assuming that vendors would take the existing source code and
+> simply rebuild it to create the AArch64 secure world.
 
-Given Leif's comments it seems that they are decoupled sufficiently to
-be considered separately.
+Some C code can probably be reused but not the EL3 entry/exit code,
+world switching and AArch64 initialisation. The main differences in
+ARMv8 EL3 is that it has its own MMU and it can only be entered via SMC
+and exit via ERET (you can no longer switch from/to secure SVC by
+writing to CPSR). So apart from a different instruction set, the new
+exception model requires a rewrite of the secure monitor logic used to
+handle SMCs, switch worlds, pass arguments between worlds.
 
-Apologies for adding to the confusion here.
+> As such, the same SMC IDs, same structures, etc. would be used. The
+> only source difference would be to perhaps change some 32-bit
+> registers/struct-fields up to 64-bit. Naively that sounds like the
+> lowest-effort way to get an AArch64 secure world, so I'm purely
+> guessing that that's what vendors will do.
 
-Mark.
+It looks simpler in theory until you hit the new exception model and
+realise the clear separation between EL3 (previously secure monitor) and
+secure EL1 (previously secure SVC). I'm not referring to the whole
+secure stack here, just the things I mentioned above.
+
+> > You can
+> > still keep the secure services at S-EL1 in AArch32, only that the SMCs
+> > are handled by EL3 (and that's another aspect the SMC calling convention
+> > spec is trying to address, mixed register-width secure/non-secure OSes).
+> 
+> I'm not sure of the implications of that statement. Since you mention
+> SMCs being handled by EL3, I think the quick-and-dirty conversion I
+> mention above is still likely to be used.
+
+What I meant is that a secure OS (providing cryptography, banking etc.
+services) can run in secure EL1 in AArch32 mode, it does not need to be
+converted (though it helps from a performance perspective, new
+instructions). But the world switching (which is pretty tightly coupled
+with secure SVC on ARMv7) and SMC handling need to be rewritten.
+
+And it's usually EL3 where you would place power management firmware on
+ARMv8 (cache/TLB maintenance, power controller access). This is usually
+done by the SoC vendor and not the secure OS provider (the latter may do
+the final link).
+
+-- 
+Catalin
