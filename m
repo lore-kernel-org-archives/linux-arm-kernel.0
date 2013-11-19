@@ -1,50 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 Nov 2013 22:44:28 +0100
-Subject: [PATCH] ARM: ux500: delete remnant pin config macros
-Message-ID: <1384897468-21723-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 19 Nov 2013 22:49:04 +0100
+Subject: [PATCH] ARM: ux500: delete Nomadik pinctrl AUXDATA
+Message-ID: <1384897744-30801-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This deletes a few final pin configuration macros from the
-ux500.
+This deletes the AUXDATA hammering down the Nomadik pin
+controller name to "pinctrl-db8500". We have removed all
+dependencies on this name.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-pins.c | 22 ----------------------
- 1 file changed, 22 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index ff532ba30610..c98004beeccd 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -23,28 +23,6 @@ BIAS(abx500_out_lo, PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0));
- BIAS(abx500_in_pd, PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN, 1));
- BIAS(abx500_in_nopull, PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN, 0));
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 0b5b27b4a7b4..448906054817 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -167,9 +167,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("stericsson,ux500-hash", 0xa03c2000, "hash1", NULL),
+ 	OF_DEV_AUXDATA("stericsson,snd-soc-mop500", 0, "snd-soc-mop500.0",
+ 			NULL),
+-	/* Requires device name bindings. */
+-	OF_DEV_AUXDATA("stericsson,db8500-pinctrl", U8500_PRCMU_BASE,
+-		"pinctrl-db8500", NULL),
+ 	{},
+ };
  
--/* We use these to define hog settings that are always done on boot */
--#define DB8500_MUX_HOG(group,func) \
--	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-db8500", group, func)
--#define DB8500_PIN_HOG(pin,conf) \
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-db8500", pin, conf)
--
--/* These are default states associated with device and changed runtime */
--#define DB8500_MUX(group,func,dev) \
--	PIN_MAP_MUX_GROUP_DEFAULT(dev, "pinctrl-db8500", group, func)
--#define DB8500_PIN(pin,conf,dev) \
--	PIN_MAP_CONFIGS_PIN_DEFAULT(dev, "pinctrl-db8500", pin, conf)
--#define DB8500_PIN_IDLE(pin, conf, dev) \
--	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_IDLE, "pinctrl-db8500",	\
--			    pin, conf)
--#define DB8500_PIN_SLEEP(pin, conf, dev) \
--	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_SLEEP, "pinctrl-db8500",	\
--			    pin, conf)
--#define DB8500_MUX_STATE(group, func, dev, state) \
--	PIN_MAP_MUX_GROUP(dev, state, "pinctrl-db8500", group, func)
--#define DB8500_PIN_STATE(pin, conf, dev, state) \
--	PIN_MAP_CONFIGS_PIN(dev, state, "pinctrl-db8500", pin, conf)
--
- #define AB8500_MUX_HOG(group, func) \
- 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-ab8500.0", group, func)
- #define AB8500_PIN_HOG(pin, conf) \
 -- 
 1.8.3.1
