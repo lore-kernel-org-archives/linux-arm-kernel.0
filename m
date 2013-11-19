@@ -1,170 +1,96 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon, 18 Nov 2013 22:55:16 -0800
-Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
-In-Reply-To: <20131118132844.GA2308@e103592.cambridge.arm.com>
-References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
- <1384157427-31613-2-git-send-email-victor.kamensky@linaro.org>
- <20131118132844.GA2308@e103592.cambridge.arm.com>
-Message-ID: <CAA3XUr3NTwmU_Dg8X7FLu5w1d6uGUvhYPGi3dh-=D3t0JB=6Fw@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 Nov 2013 15:15:58 +0800
+Subject: UEFI Clock
+In-Reply-To: <CAPw-ZT=rNKhbD+omXHSuzHVhtmhvJ8e6GogyNFE4qYYaPdjCEA@mail.gmail.com>
+References: <5289993F.5020905@linaro.org>
+ <CAPw-ZT=rNKhbD+omXHSuzHVhtmhvJ8e6GogyNFE4qYYaPdjCEA@mail.gmail.com>
+Message-ID: <528B102E.3020302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 November 2013 05:39, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Mon, Nov 11, 2013 at 12:10:27AM -0800, Victor Kamensky wrote:
->> In case of armv7-m architecture arm instructions are not allowed.
->> For this architecture CONFIG_CPU_THUMBONLY is set. Use this macro
->> to emit conditionally arm instructions or nops in thumb mode.
+On 2013-11-18 13:57, Loc Ho wrote:
+> Hi,
+> 
+>>>> I will be looking into covering the clock driver to support UEFI.
+>>>> Before I do this, can someone explain to me how x86 system handle each
+>>>> IP clock as I don't see such thing?
+>>>
+>>> UEFI is completely unrelated to the clock drivers, it is only a firmware
+>>> interface for the OS loader. UEFI mostly disappears after Linux is
+>>> loaded. Are you perhaps asking about ACPI?
+>>>
+>>> There isn't such a thing on x86. This is entirely new territory. On x86
+>>> as far as I know any clock manipulation that does need to be done would
+>>> be performed by an ACPI method, but there is no concept of an IP clock
+>>> in the ACPI namespace, and so no standard way of describing them.
 >>
->> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->> ---
->>  arch/arm/kernel/sigreturn_codes.S | 25 ++++++++++++++++++-------
->>  1 file changed, 18 insertions(+), 7 deletions(-)
+>> Yes, there is no standard way (ACPI device object or ACPI table) to
+>> describe clocks for x86 in ACPI spec, but there is a table called GTDT
+>> (Generic Timer Description Table) for ARM which contains information
+>> for arch timer initialization.
 >>
->> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
->> index 3c5d0f2..899fb86 100644
->> --- a/arch/arm/kernel/sigreturn_codes.S
->> +++ b/arch/arm/kernel/sigreturn_codes.S
->> @@ -41,17 +41,29 @@
->>       .arch armv4t
->>  #endif
->>
->> +/*
->> + * In CPU_THUMBONLY kernel case arm opcodes are not allowed
->> + */
->> +#ifndef CONFIG_CPU_THUMBONLY
->> +#define ARM_INSTR(code...) .arm ; \
->> +                        code
->> +#else
->> +#define ARM_INSTR(code...) .thumb ; \
->> +                        nop ;    \
->> +                        nop ;
->> +#endif
->> +
->
-> Maybe use .org to force the layout, instead of nop-padding,
-> and don't emit the ARM instructions at all in the THUMBONLY
-> case.
->
-> So, this becomes something like:
->
-> sigreturn_codes:
->
-> #ifndef CONFIG_CPU_THUMBONLY
->         .arm
->         mov     r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
->         swi     #(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE)
-> #endif
->         .org    sigreturn_codes + 8 + 12 * 0
->         .thumb
->         movs    r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
->         swi     #0
->
-> #ifndef CONFIG_CPU_THUMBONLY
->         .arm
->         mov     r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
->         swi     #(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)
-> #endif
->         .org    sigreturn_codes + 8 + 12 * 1
->         .thumb
->         movs    r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
->         swi     #0
->
-> ...etc.
->
-> This will just leave gaps in the right places without needing
-> to worry about what to fill them with (which shouldn't matter).
->
-> Ideally the ifdefs can be hidden with macros to make things
-> look a bit less ugly.  You could keep ARM_INSTR() unmodified,
-> and define separate macros that spit out the .org and related
-> stuff, like:
->
-> .macro arm_slot n
->                 .org    sigreturn_codes + 12 * (\n)
->  ARM_INSTR(     .arm    )
-> .endm
->
-> .macro thumb_slot n
->                 .org    sigreturn_codes + 12 * (\n) + 8
->                 .thumb
-> .endm
->
->
-> Then you get
->
-> sigreturn_codes:
->
-> arm_slot 0
->  ARM_INSTR(     mov     r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)       )
->  ARM_INSTR(     mov     r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)       )
-> thumb_slot 0
->                 movs    r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
->                 swi     #0
->
-> arm_slot 1
->  ARM_INSTR(     mov     r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)    )
->  ARM_INSTR(     swi     #(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)   )
-> thumb_slot 1
->                 movs    r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
->                 swi     #0
->
-> Still not ideal, but it might work.
+>> you can refer to ACPI spec 5.0 chapter 5.2.24:
+>> http://www.acpi.info/spec50.htm
+> [Loc Ho]
+> Do you know how an IP (such as SATA controller) clock is enabled for
+> x86? Or x86 is mostly PCIe and the clock is handled inside the driver
 
-Thanks, Dave! I've tried above and it works. I've sent version 3
-of patch as [1]. Please take a look at it.
+Sorry, I have no idea about this :(
 
-Thanks,
-Victor
+> itself. Another related question would be how x86 enables the PCIe
+> controller clock? Is that too handled inside the host controller
+> driver itself or by some standard method within ACPI?
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/212307.html
+AFAIK, there is a HPET table for x86 for timer init, but there is
+no standard method within ACPI to get timer for devices in DSDT.
 
-> Cheers
-> ---Dave
->
->>       .section .rodata
->>       .global sigreturn_codes
->>       .type   sigreturn_codes, #object
+> 
+>>>
+>>> You'd be much better of talking to Al Stone and Grame Gregory about what
+>>> their plans are for clock support in ACPI and to post your question to
+>>> the ACPI mailing list.
 >>
->> -     .arm
->> +     .align
+>> We already finished the implementation of convert fixed clock and arch
+>> timer to ACPI, and I had already post the RFC patch set for review now:
 >>
->>  sigreturn_codes:
->>
->>       /* ARM sigreturn syscall code snippet */
->> -     mov     r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
->> -     swi     #(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE)
->> +ARM_INSTR(mov        r7, #(__NR_sigreturn - __NR_SYSCALL_BASE))
->> +ARM_INSTR(swi        #(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
->>
->>       /* Thumb sigreturn syscall code snippet */
->>       .thumb
->> @@ -59,9 +71,8 @@ sigreturn_codes:
->>       swi     #0
->>
->>       /* ARM sigreturn_rt syscall code snippet */
->> -     .arm
->> -     mov     r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
->> -     swi     #(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)
->> +ARM_INSTR(mov        r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE))
->> +ARM_INSTR(swi        #(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
->>
->>       /* Thumb sigreturn_rt syscall code snippet */
->>       .thumb
->> @@ -74,7 +85,7 @@ sigreturn_codes:
->>        * it is thumb case or not, so we need additional
->>        * word after real last entry.
->>        */
->> -     .arm
->> +     .align
->>       .space  4
->>
->>       .size   sigreturn_codes, . - sigreturn_codes
->> --
->> 1.8.1.4
->>
->>
->> _______________________________________________
->> linaro-kernel mailing list
->> linaro-kernel at lists.linaro.org
->> http://lists.linaro.org/mailman/listinfo/linaro-kernel
->
+>> http://marc.info/?l=linaro-acpi&m=138450991609818&w=2
+> [Loc Ho]
+> Looked over this one. We will take this patch into our kernel.
+
+It is RFC, still needs some update, I will send another version soon.
+I will send to linaro-acpi at lists.linaro.org, it is a public mailing
+list.
+
+> 
+>> http://marc.info/?l=linaro-acpi&m=138198249622451&w=2
+> [Loc Ho]
+> From what I can tell with DT, the only reason that an IP would need
+> this would be an common clock interface for framework to enable an IP
+> clock. If the framework expected an clock instance and one isn't
+> available, it will fail. Other than that, if an IP can handle its
+> clock initialization, do we really need this at all. For reference
+> clock and a few others, this is required if an IP clock is scaled from
+> an reference clock for say. I would like an agreement on the IP clock
+> itself. Is it required or they will be handled by the IP driver
+> itself?
+> 
+> Please be aware of the following limitation that we (at APM) ran into
+> and looking for an fix:
+> 
+> 1. The fixed 32-bit memory resource can NOT be overlapped with another
+> memory resource with kernel version below 3.12. Don't know if this
+> limitation still existed in 3.12 kernel. May be this limit is removed
+> if one use 64-bit resource address but hasn't tried yet.
+> 2. Overlap memory resource may be required if the same clock resource
+> combined other reset fields into the same registers. For this, one can
+> NOT use the standard _CRS as the same region may be defined with the
+> IP driver. Don't see an solution besides to use an non-standard
+> address. Then, what do one put in the _CRS as the ACPI expect one. If
+> you use an empty entry with 0 for address and 0 for length, other OS
+> vendor will complaint as well.
+
+I didn't catch up with the limitation clearly, if any specific example,
+that would be great.
+
+Thanks
+Hanjun
