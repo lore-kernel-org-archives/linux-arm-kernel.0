@@ -1,21 +1,39 @@
-From: zql@glomationinc.com (Zhong Li)
-Date: Tue, 19 Nov 2013 13:09:26 -0500
-Subject: [alsa-devel] Bug? Sound support for at91sam9x5-wm8731 based boards
-In-Reply-To: <CACQ1gAgykmgPKY4SHujnNtm4Sr=wt5knLkQL-MRS_pC73bOi4Q@mail.gmail.com>
-References: <1384878685-1515-1-git-send-email-tony@atomide.com>
- <1384878685-1515-3-git-send-email-tony@atomide.com>
- <031f01cee547$950b5670$bf220350$@com>
- <CACQ1gAgykmgPKY4SHujnNtm4Sr=wt5knLkQL-MRS_pC73bOi4Q@mail.gmail.com>
-Message-ID: <033601cee552$7c2c2570$74847050$@com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 19 Nov 2013 13:13:08 -0500
+Subject: [PATCH 4/4] keystone: dts: add paclk divider clock node
+In-Reply-To: <1384884788-29137-1-git-send-email-m-karicheri2@ti.com>
+References: <1384884788-29137-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1384884788-29137-4-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Can you give a little more background ? :
-> - What kernel ?
-> - Command line to reproduce ?
-> 
-> Richard.
+PA subsystem has a fixed factor clock at the input which is
+input clock divided by 3. This patch adds this clock node to dts
 
-One of the testing hardware is the Atmel at91sam9g25-ek (the CPU module and the carrier board).  We tried both the 2.6.39 patched with the Atmel patches and the mainline 3.12-rc.  The command to test the sound is just the simple aplay <sound-test-file>.  The wav file is available here, https://drive.google.com/file/d/0B3TSFX4Mq9PoeTdJOGVaZk5rTWM/edit?usp=sharing.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ arch/arm/boot/dts/keystone-clocks.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Thanks
+diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
+index 1ebc203..3715511 100644
+--- a/arch/arm/boot/dts/keystone-clocks.dtsi
++++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+@@ -159,6 +159,15 @@ clocks {
+ 		clock-output-names = "chipclk13";
+ 	};
+ 
++	paclk13: paclk13 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&papllclk>;
++		clock-div = <3>;
++		clock-mult = <1>;
++		clock-output-names = "paclk13";
++	};
++
+ 	chipclk14: chipclk14 {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+-- 
+1.7.9.5
