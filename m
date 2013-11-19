@@ -1,116 +1,183 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Nov 2013 16:28:21 +0000
-Subject: [PATCH v3 3/8] clk: shmobile: Add MSTP clock support
-In-Reply-To: <1384872347-11724-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1384872347-11724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1384872347-11724-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131119162821.GQ5914@e106331-lin.cambridge.arm.com>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Tue, 19 Nov 2013 10:31:01 -0600
+Subject: [PATCH] cpufreq, highbank: enable ECME thermal notifications
+In-Reply-To: <1382226889-11062-1-git-send-email-mark.langsdorf@calxeda.com>
+References: <1382226889-11062-1-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <528B9245.70409@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 02:45:42PM +0000, Laurent Pinchart wrote:
-> MSTP clocks are gate clocks controlled through a register that handles
-> up to 32 clocks. The register is often sparsely populated.
+Would it be possible to get some kind of ACK or NAK for this patch?
+Thank you.
 
-Does that mean some clocks aren't wired up, or that some clocks don't
-exist at all?
+--Mark Langsdorf
+Calxeda, Inc.
 
-What is the behaviour of the unpopulated bits?
 
+On 10/19/2013 06:54 PM, Mark Langsdorf wrote:
+> The ECME sends thermal messages with a maximum and minimum allowed
+> frequency when the SoC status reaches certain trip points known to the
+> ECME. Use a notifier function to capture those messages and pass them
+> to a work-queued function that can trigger a policy re-evaluation by
+> cpufreq, capping the allowable frequencies.
 > 
-> Those clocks are found on Renesas ARM SoCs.
+> The core of the policy adjusting code was taken from
+> drivers/thermal/cpu_cooling.c.
 > 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
 > ---
->  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  48 +++++
->  drivers/clk/shmobile/Makefile                      |   1 +
->  drivers/clk/shmobile/clk-mstp.c                    | 229 +++++++++++++++++++++
->  3 files changed, 278 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
->  create mode 100644 drivers/clk/shmobile/clk-mstp.c
+>  drivers/cpufreq/highbank-cpufreq.c | 117 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 117 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> new file mode 100644
-> index 0000000..126b17e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> @@ -0,0 +1,48 @@
-> +* Renesas CPG Module Stop (MSTP) Clocks
+> diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
+> index b61b5a3..f0521d3 100644
+> --- a/drivers/cpufreq/highbank-cpufreq.c
+> +++ b/drivers/cpufreq/highbank-cpufreq.c
+> @@ -17,15 +17,32 @@
+>  #include <linux/module.h>
+>  #include <linux/clk.h>
+>  #include <linux/cpu.h>
+> +#include <linux/cpufreq.h>
+>  #include <linux/err.h>
+>  #include <linux/of.h>
+>  #include <linux/mailbox.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/workqueue.h>
+>  
+>  #define HB_CPUFREQ_CHANGE_NOTE	0x80000001
+> +#define HB_CPUFREQ_HEALTH_NOTE  0x00001001
+> +#define HB_CPUFREQ_TPS_REPORT	1
+>  #define HB_CPUFREQ_IPC_LEN	7
+>  #define HB_CPUFREQ_VOLT_RETRIES	15
+>  
+> +#define NOTIFY_INVALID NULL
 > +
-> +The CPG can gate SoC device clocks. The gates are organized in groups of up to
-> +32 gates.
+> +struct hb_notify_device {
+> +	unsigned long max_freq;
+> +	unsigned long min_freq;
+> +	unsigned long thermal_state;
+> +	struct cpumask *allowed_cpus;
+> +};
 > +
-> +This device tree binding describes a single 32 gate clocks group per node.
-> +Clocks are referenced by user nodes by the MSTP node phandle and the clock
-> +index in the group, from 0 to 31.
+> +static struct hb_notify_device hb_records, *notify_device = NOTIFY_INVALID;
+> +static struct work_struct hb_thermal_wq;
 > +
-> +Required Properties:
-> +
-> +  - compatible: Must be one of the following
-> +    - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
-> +    - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
-> +    - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
-> +  - reg: Base address and length of the memory resource used by the MSTP
-> +    clocks
-
-There are two entries in the example, the code seems to assume they are
-particular registers, but this implies one.
-
-Are these not part of a larger bank of registers?
-
-> +  - clocks: Reference to the parent clocks
-
-How many, and what do they correspond to?
-
-> +  - #clock-cells: Must be 1
-> +  - clock-output-names: The name of the clocks as free-form strings
-> +  - renesas,indices: Indices of the gate clocks into the group (0 to 31)
-
-The description of this property doesn't describe half of what it means.
-I believe something like the below does:
-
-- renesas,indices: A list of clock IDs (single cells), one for each
-  clock present. Each entry may correspond to a clock-output-names entry
-  at the same index, and its location in the list defines the
-  corresponding clock-specifier for the entry.
-
-I'd imagine we have a few sparse clocks by now, and we might be able to
-make this more uniform. But I may be mistaken.
-
-[...]
-
-> +static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
+>  static int hb_voltage_change(unsigned int freq)
+>  {
+>  	u32 msg[HB_CPUFREQ_IPC_LEN] = {HB_CPUFREQ_CHANGE_NOTE, freq / 1000000};
+> @@ -33,6 +50,89 @@ static int hb_voltage_change(unsigned int freq)
+>  	return pl320_ipc_transmit(msg);
+>  }
+>  
+> +static int hb_thermal_cpufreq_notify(struct notifier_block *nb,
+> +				    unsigned long event, void *data)
 > +{
-> +	struct mstp_clock *clock = to_mstp_clock(hw);
-> +	struct mstp_clock_group *group = clock->group;
-> +	u32 bitmask = BIT(clock->bit_index);
-> +	unsigned long flags;
-> +	unsigned int i;
-> +	u32 value;
+> +	struct cpufreq_policy *policy = data;
+> +	unsigned long max_freq = 0, min_freq = 0;
 > +
-> +	spin_lock_irqsave(&group->lock, flags);
-> +
-> +	value = clk_readl(group->smstpcr);
-> +	if (enable)
-> +		value &= ~bitmask;
-> +	else
-> +		value |= bitmask;
-> +	clk_writel(value, group->smstpcr);
-> +
-> +	spin_unlock_irqrestore(&group->lock, flags);
-> +
-> +	if (!enable || !group->mstpsr)
+> +	if (event != CPUFREQ_ADJUST || notify_device == NOTIFY_INVALID)
 > +		return 0;
 > +
-> +	for (i = 1000; i > 0; --i) {
-> +		if (!(clk_readl(group->mstpsr) & bitmask))
-> +			break;
-> +		cpu_relax();
+> +	if (cpumask_test_cpu(policy->cpu, notify_device->allowed_cpus)) {
+> +		max_freq = notify_device->max_freq;
+> +		min_freq = notify_device->min_freq;
 > +	}
-
-Any particular reason for 1000 times? Is there a known minimum time to
-switch a clock between disabled and enabled? A comment would be nice.
-
-Cheers,
-Mark.
+> +
+> +	/* Never exceed user_policy.max */
+> +	if (max_freq > policy->user_policy.max)
+> +		max_freq = policy->user_policy.max;
+> +	if (min_freq < policy->user_policy.min)
+> +		min_freq = policy->user_policy.min;
+> +
+> +	if ((policy->max != max_freq) || (policy->min != min_freq))
+> +		cpufreq_verify_within_limits(policy, min_freq, max_freq);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct notifier_block hb_thermal_cpufreq_nb = {
+> +	.notifier_call = hb_thermal_cpufreq_notify,
+> +};
+> +
+> +/*
+> + * We can't call cpufreq_adjust_policy from inside a notifier, so
+> + * do it from inside a workqueue
+> + */
+> +static void hb_thermal_wq_task(struct work_struct *work)
+> +{
+> +	unsigned int cpuid;
+> +	struct cpumask *mask = hb_records.allowed_cpus;
+> +
+> +	notify_device = &hb_records;
+> +
+> +	for_each_cpu(cpuid, mask) {
+> +		struct cpufreq_policy policy;
+> +		if (cpufreq_get_policy(&policy, cpuid) == 0) {
+> +			cpufreq_update_policy(cpuid);
+> +			break;
+> +		}
+> +	}
+> +	notify_device = NOTIFY_INVALID;
+> +}
+> +
+> +static int hb_thermal_tps_notify(struct notifier_block *nb,
+> +				unsigned long action, void *mailbox)
+> +{
+> +	unsigned long *data = (unsigned long *) mailbox;
+> +
+> +	if ((action != HB_CPUFREQ_HEALTH_NOTE) &&
+> +			(data[0] != HB_CPUFREQ_TPS_REPORT))
+> +		return 0;
+> +
+> +	/*
+> +	 * If we're already at this thermal state, or if ECME isn't
+> +	 * sending frequency data, there's nothing to do
+> +	 */
+> +	if ((hb_records.thermal_state == data[1]) || !data[2] || !data[3])
+> +		return NOTIFY_DONE;
+> +
+> +	hb_records.thermal_state = data[1];
+> +	hb_records.min_freq = data[2];
+> +	hb_records.max_freq = data[3];
+> +	notify_device = &hb_records;
+> +
+> +	schedule_work(&hb_thermal_wq);
+> +
+> +	pr_warn("ECME TPS event: frequencies limited to %lu-%lu MHz\n",
+> +	       hb_records.min_freq, hb_records.max_freq);
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block hb_thermal_tps_nb = {
+> +	.notifier_call = hb_thermal_tps_notify,
+> +};
+> +
+>  static int hb_cpufreq_clk_notify(struct notifier_block *nb,
+>  				unsigned long action, void *hclk)
+>  {
+> @@ -100,6 +200,23 @@ static int hb_cpufreq_driver_init(void)
+>  		goto out_put_node;
+>  	}
+>  
+> +	/*
+> +	 * Set up thermal state notifications from ECME, but continue
+> +	 * running even if they don't work.
+> +	 */
+> +	ret = pl320_ipc_register_notifier(&hb_thermal_tps_nb);
+> +	if (!ret) {
+> +		ret = cpufreq_register_notifier(&hb_thermal_cpufreq_nb,
+> +				CPUFREQ_POLICY_NOTIFIER);
+> +		if (ret)
+> +			pl320_ipc_unregister_notifier(&hb_thermal_tps_nb);
+> +		else {
+> +			hb_records.allowed_cpus = (struct cpumask *)
+> +						cpu_possible_mask;
+> +			INIT_WORK(&hb_thermal_wq, hb_thermal_wq_task);
+> +		}
+> +	}
+> +
+>  	/* Instantiate cpufreq-cpu0 */
+>  	platform_device_register_full(&devinfo);
+>  
+> 
