@@ -1,62 +1,62 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 19 Nov 2013 13:27:53 +0100
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <20131030134702.19B57C402A0@trevor.secretlab.ca>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
- <20131030134702.19B57C402A0@trevor.secretlab.ca>
-Message-ID: <528B5949.20204@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Nov 2013 12:28:01 +0000
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <528A98C8.9040803@wwwdotorg.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <cover.1384798508.git.jason@lakedaemon.net>
+ <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
+ <528A65DF.8060000@wwwdotorg.org>
+ <20131118191955.GG10335@titan.lakedaemon.net>
+ <528A6944.3070303@wwwdotorg.org>
+ <20131118192852.GI10335@titan.lakedaemon.net>
+ <528A6CA3.9030904@wwwdotorg.org>
+ <20131118195243.GJ10335@titan.lakedaemon.net>
+ <528A98C8.9040803@wwwdotorg.org>
+Message-ID: <20131119122801.GL16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant!
+On Mon, Nov 18, 2013 at 03:46:32PM -0700, Stephen Warren wrote:
+> Again, the point is not that it's hard to write the script. As you
+> demonstrated, it's easy. The problem is that then, everybody has to do
+> something different for Tegra, forever. No matter how small the actual
+> cost of doing it is, it's still non-scalable to require that everyone
+> know about this special case. I'm not convinced the issue would be
+> isolated to Tegra either.
 
-On 2013-10-30 14:47, Grant Likely wrote:
-> On Fri, 11 Oct 2013 09:27:26 +0200, Marek Szyprowski<m.szyprowski@samsung.com>  wrote:
-> > Hi all!
-> >
-> > Benjamin Herrenschmidt pointed a few issues in the proposed design of
-> > device tree bindings for contiguous memory allocator and reserved memory
-> > regions:
-> >https://lkml.org/lkml/2013/9/15/151
-> >http://www.spinics.net/lists/arm-kernel/msg273548.html
-> >
-> > Some time has passed, but there is still no consensus on the bindings
-> > for the reserved memory and various drawback of this solution has been
-> > shown, so in my opinion the best I can do now is to revert them
-> > completely and start from scratch again later.
->
-> Hi Marek,
->
-> At the ARM summit last week in Edinburgh, several of us sat down and
-> hammered out a new proposal for handling reserved memory regions based
-> on the work that you started here. Below you will find a new binding
-> document. I started looking at implementing this, but haven't made much
-> progress.
->
-> Please take a look and let me know what you think.
->
-> Also, while I'm thinking about it, I took another look at the code and I
-> think the code supporting reserved regions should go directly into
-> drivers/of/fdt.c and drivers/of/memory.c.  Also, the reserved regions
-> parsing should be enabled unconditionally insted of filtered by (DMA_CMA
-> || (HAVE_GENERIC_DMA_COHERENT && HAVE_MEMBLOCK). If the hardware
-> description says to reserve a region, then the kernel must always do so,
-> even if it doesn't actually use it for anything.
+That's why there's the facility to allow an override to the script,
+just like there's the facility to override the default script when
+running "make install".
 
-Thanks for discussing this item. I'm really sorry for the late reply, but
-various 'more_imporant_things(tm)' have eaten me completely last weeks.
+The script which the kernel uses is just a template for what kernel
+developers expect to be the common case.  That's not necessarily what
+most distros do.
 
-The proposal look good for me. I'm not convinced that we really need the
-support for 'reg' property, as the fixed memory region is a special case
-of generic dynamic allocation specified by the size and alloc-ranges, but
-I assume that there have been already a long discussion about this, so I
-accept the common consensus.
+In fact, most distros today provide their own installation script which
+gets run automatically when you do "make install" which copies the
+kernel and then rebuilds an initramfs with everything appropriate for
+that kernel inside.
 
-Grant: have you started working on the code, which implements such binding?
-If not, I will try to start do it and post the code soon for review.
+Even the distro script can be overridden with a script in ~/bin by the
+user running "make install" (which therefore doesn't even have to be
+root if installing it into a location accessible by the user.)
 
-Best regards
--- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+This is really no different.  If the as-supplied-by-the-kernel script
+doesn't fit your needs, you are free to override it.
+
+What this gives us is the facility for distros to _sanely_ hook into
+the kernel build process to obtain the DT files if they so wish.
+
+As for renaming the files from what we have in the kernel, I'd say...
+why bother.  What if we have two DT blobs with the same compatible
+string (which is not unlikely when you have two configurations for a
+platform)?  I'd recommend keeping the names in the kernel tree when
+installing.  If a distro needs to find the compatible string, then
+that's a bit of parsing they should do.  Otherwise, we lose the ability
+to tell users "you need this DT blob file called X" because X will
+depend whether it's been installed or not.
+
+And in some cases where getting the wrong DT blob could end up quite
+literally destroying your hardware (eg, by setting an LDO regulator to
+bypass mode), it's extremely important that anything here is _simple_
+and doesn't involve lots of indirection.
