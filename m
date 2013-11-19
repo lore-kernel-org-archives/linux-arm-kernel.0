@@ -1,43 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Nov 2013 12:01:25 +0000
-Subject: [GIT PULL] prefetch support for 3.13
-In-Reply-To: <20131119092741.GC28642@pengutronix.de>
-References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
- <20131111090810.GI14892@pengutronix.de>
- <20131111112554.GE28302@mudshark.cambridge.arm.com>
- <20131119092741.GC28642@pengutronix.de>
-Message-ID: <20131119120125.GE11778@mudshark.cambridge.arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 19 Nov 2013 13:03:51 +0100
+Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+In-Reply-To: <20131119102506.GG31504@ulmo.nvidia.com>
+References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com><1384853593-32202-3-git-send-email-hdoyu@nvidia.com><20131119102506.GG31504@ulmo.nvidia.com>
+Message-ID: <20131119.140351.1342214267287135109.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 09:27:41AM +0000, Uwe Kleine-K?nig wrote:
-> On Mon, Nov 11, 2013 at 11:25:54AM +0000, Will Deacon wrote:
-> > I see gas is being as helpful as ever. Something like the (untested) patch
-> > below should fix the issue.
-> > 
-> > Will
-> > 
-> > --->8
-> > 
-> > diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-> > index e0c68d5bb7dc..52886b89706c 100644
-> > --- a/arch/arm/lib/bitops.h
-> > +++ b/arch/arm/lib/bitops.h
-> > @@ -10,7 +10,7 @@ UNWIND(       .fnstart        )
-> >         and     r3, r0, #31             @ Get bit offset
-> >         mov     r0, r0, lsr #5
-> >         add     r1, r1, r0, lsl #2      @ Get word offset
-> > -#if __LINUX_ARM_ARCH__ >= 7
-> > +#if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
-> >         .arch_extension mp
-> >         ALT_SMP(W(pldw) [r1])
-> >         ALT_UP(W(nop))
-> > 
-> It does fix compilation and I booted successfully on my efm32-tree +
-> next-20131119 + this patch + the patch for the be signal stuff.
+Hi Thierry,
 
-Ok, great. Mind if I add your tested-by before I put it in the patch system?
+Thierry Reding <thierry.reding@gmail.com> wrote @ Tue, 19 Nov 2013 11:25:07 +0100:
 
-Cheers,
+> From earlier discussions I thought the goal was to actually defer this
+> until all nodes referred to by the iommus property were actually
+> registered. The above only checks that the phandles can be resolved to
+> valid struct device_node:s. That doesn't mean that an actual IOMMU has
+> been registered for it, only that the devices have been created.
 
-Will
+Currently "bus->iommu_ops" is set at the end of tegra_smmu_probe(). So
+if "bus->iommu_ops" is set, it means that an iommu instance is
+populated at that time.
+
+> If you really only rely on dev->bus->iommu_ops to be present, then there
+> is no need to go through the loop in the first place, since you have
+> access to it immediately through the struct device that's passed into
+> the function.
+
+As mentioned in the above, "bus->iommu_ops" is set when an iommu
+instance is populated. "iommus=" is used only to defer a device probe
+until an iommu instance shows up although multiple IOMMUs are not
+supported yet correctly as you pointed out.
+
+> Furthermore, relying on dev->bus->iommu_ops will prevent multiple IOMMUs
+> from being used at all, since only one IOMMU can register iommu_ops with
+> the bus, right? So I think what we really need here is a way to resolve
+> the IOMMU using a phandle and return the associated struct
+> iommu_ops.
+
+Multiple IOMMU support doesn't work right now. It needs to be
+discussed a bit more.
+
+> I also have some trouble understanding how the current IOMMU framework
+> is supposed to work together with multiple IOMMUs for one device. The
+> .add_device() callback seems to be missing crucial information to help
+> decide whether the device to be added is actually one that it covers.
+> Also with an of_iommu_attach() function, doesn't that become more or
+> less redundant?
+
+I understand what you meant. In the current tegra SMMU implementation,
+iommu_ops is set when an iommu is populated so that we cannot use
+iommu_ops before that time. That's why of_iommu_attach() was
+introduced here. I couldn't set iommu_ops at drvier init yet because
+we support SMMU and GART with a single image and the current IOMMU
+framework assume that there's one IOMMU on the bus. If we set
+iommu_ops at driver init, the latter one would overwrite it.
