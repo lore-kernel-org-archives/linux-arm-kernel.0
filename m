@@ -1,46 +1,27 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 19 Nov 2013 10:59:39 -0800
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <528BB1F2.4080107@wwwdotorg.org>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
- <528BB1F2.4080107@wwwdotorg.org>
-Message-ID: <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
+From: trini@ti.com (Tom Rini)
+Date: Tue, 19 Nov 2013 14:06:04 -0500
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131119152157.GO5914@e106331-lin.cambridge.arm.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115175241.GB27174@quad.lixom.net>
+ <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
+ <201311191505.33636.arnd@arndb.de>
+ <20131119152157.GO5914@e106331-lin.cambridge.arm.com>
+Message-ID: <20131119190604.GH420@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 10:46 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/19/2013 10:15 AM, Tomasz Figa wrote:
->> This patch extends the range of settings configurable via pinfunc API
->> to cover pin value as well. This allows configuration of default values
->> of pins.
->
-> Shouldn't there be a driver that acquires the GPIO that's output to the
-> pin, and configures the output value? IIRC there have been previous
-> discussions re: having a list of e.g. initial GPIO output values in DT,
-> and that was rejected, and this patch seems to be doing almost the exact
-> same thing, just at the pinctrl level rather than GPIO level.
->
-> That all said, I admit this could be a useful feature...
+On Tue, Nov 19, 2013 at 03:21:57PM +0000, Mark Rutland wrote:
+[snip]
+> I think that with ACPI systems the data we would have to convert is
+> going to be larger and more varied than that. Given we already have code
+> in the kernel for handling ACPI, I believe it would be more valuable to
+> leverage that and support ACPI directly in those places which require it
 
-I haven't followed all of the previous discussions, but I know I've
-run into scenarios where something like this would be useful.  The one
-that comes to mind is:
+I'll bite.  How realistic a proprosition is that?  When I've talked with
+a few folks here and there they say, roughly, that "the ARM bit" being
+set means it's a whole new ball game, and no, they don't expect to be
+able to re-use a lot of the existing code.
 
-* We've got GPIOs that default at bootup to a pulled up input since
-the default state of the pin should be "high".
-
-* These pins are really intended to be outputs, like an "enable",
-"reset", or "power down" line for a peripheral.  The pullup is strong
-enough to give us a good default state but we really want outputs.
-
-* We'd like to provide this GPIO to a peripheral through device tree.
-...and we'd like all the pinmux to be setup automatically so we use
-pinctrl-names = "default".
-
-* If we set the pinmux up as "output" then there's a chance that the
-line will glitch at bootup since the pinmux happens (changing the pin
-to output) before the driver has a chance to run.
-
-
-Does that sound like the same scenario you're trying to solve Tomasz?
+-- 
+Tom
