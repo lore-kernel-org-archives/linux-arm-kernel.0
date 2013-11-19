@@ -1,34 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 19 Nov 2013 13:43:18 -0500
-Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
-In-Reply-To: <528BB0A4.9030501@wwwdotorg.org>
-References: <528A65DF.8060000@wwwdotorg.org>
- <20131118191955.GG10335@titan.lakedaemon.net>
- <528A6944.3070303@wwwdotorg.org>
- <20131118192852.GI10335@titan.lakedaemon.net>
- <528A6CA3.9030904@wwwdotorg.org>
- <20131118195243.GJ10335@titan.lakedaemon.net>
- <528A98C8.9040803@wwwdotorg.org>
- <20131119122801.GL16735@n2100.arm.linux.org.uk>
- <20131119142336.GA28859@titan.lakedaemon.net>
- <528BB0A4.9030501@wwwdotorg.org>
-Message-ID: <20131119184318.GC28859@titan.lakedaemon.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 19 Nov 2013 13:43:31 -0500
+Subject: [PATCH 2/4] keystone: dts: add/modify clock nodes
+In-Reply-To: <1384884788-29137-2-git-send-email-m-karicheri2@ti.com>
+References: <1384884788-29137-1-git-send-email-m-karicheri2@ti.com>
+ <1384884788-29137-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <528BB153.60402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 11:40:36AM -0700, Stephen Warren wrote:
-> On 11/19/2013 07:23 AM, Jason Cooper wrote:
-> ...
-> > That's why I prefer to rename the dtbs, it removes the need to parse the
-> > dtb (fdtget *isn't* currently built/installed by default in dtc)
+On Tuesday 19 November 2013 01:13 PM, Murali Karicheri wrote:
+> K2 SoC has separate ref clock inputs for various clocks. This patch
+> adds following changes:-
+>  - Add separate ref clock nodes for ARM, DDR3A, DDR3B and PA PLL input
+>    clocks
+>  - While at it, rename  refclkmain to refclksys based on device User
+>    Guide naming convention
 > 
-> fdtget is in fact both built and installed by default. At the very least
-> in the latest dtc source, and it's certainly part of at least the Ubuntu
-> packages for older versions too, so I assume it's been the default for a
-> while.
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  arch/arm/boot/dts/keystone-clocks.dtsi |   48 ++++++++++++++++++++++++--------
+>  1 file changed, 36 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
+> index d6713b1..3f1cf28 100644
+> --- a/arch/arm/boot/dts/keystone-clocks.dtsi
+> +++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+> @@ -13,17 +13,45 @@ clocks {
+>  	#size-cells = <1>;
+>  	ranges;
+>  
+> -	refclkmain: refclkmain {
+> +	refclksys: refclksys {
+>  		#clock-cells = <0>;
+>  		compatible = "fixed-clock";
+>  		clock-frequency = <122880000>;
+> -		clock-output-names = "refclk-main";
+> +		clock-output-names = "refclk-sys";
+> +	};
+> +
+> +	refclkpass: refclkpass {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <122880000>;
+> +		clock-output-names = "refclk-pass";
+> +	};
+> +
 
-Ah.  Gentoo must be the weird one. :(
+lets move these nodes which are board dependent to board file.
+This came in for NAND patches as well. I suggested to create a
+k2hk-evm.dts file.
 
-thx,
-
-Jason.
+Regards,
+Santosh
