@@ -1,11 +1,14 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 19 Nov 2013 17:35:27 +0000
-Subject: [PATCH 1/3] ARM: mm: Rewire LPAE set_huge_pte_at
-In-Reply-To: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
-References: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1384882529-28104-2-git-send-email-steve.capper@linaro.org>
+Date: Tue, 19 Nov 2013 17:35:26 +0000
+Subject: [PATCH 0/3] Simplify set_huge_pte_at, pte_same for LPAE
+Message-ID: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hello,
+The following patch series is my attempt at fixing a rather nasty bug
+which became visible in 3.12-rc1 when running the libhugetlbfs test
+suite. (This problem only just came to my attention yesterday).
 
 For LPAE, set_huge_pte_at calls set_pte_at which then calls
 set_pte_ext, which in turn is wired up to call cpu_v7_set_pte_ext,
@@ -35,32 +38,33 @@ mprotect test will cause the afformentioned corruption and before the
 set of tests completes, the system will be left in an unresponsive
 state. (calls to fork fail with -ENOMEM).
 
-This patch re-implements set_huge_pte_at to dereference the pte value
-explicitly. hugetlb_cow is no longer called spuriously, and the unit
-tests complete succesfully.
+This was an absolute pig to debug and, as this is the second time I've
+ran into issues caused by ptes being modified in transit, I've opted to
+re-implement set_huge_pte_at such that it just dereferences the pte.
+(in a similar manner as arm64). This has also allowed me to revert the
+pte_same logic change (that removed the NG bit from comparison), by
+also setting the NG bit for all new huge ptes.
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
- arch/arm/include/asm/hugetlb-3level.h | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+These patches are against 3.12, and I have tested this series on an
+Arndale board with LPAE running libhugetlbfs.
 
-diff --git a/arch/arm/include/asm/hugetlb-3level.h b/arch/arm/include/asm/hugetlb-3level.h
-index d4014fb..211e9a8 100644
---- a/arch/arm/include/asm/hugetlb-3level.h
-+++ b/arch/arm/include/asm/hugetlb-3level.h
-@@ -40,7 +40,12 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
- static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 				   pte_t *ptep, pte_t pte)
- {
--	set_pte_at(mm, addr, ptep, pte);
-+	VM_BUG_ON(addr >= TASK_SIZE);
-+
-+	if (pte_present_user(pte))
-+		__sync_icache_dcache(pte);
-+
-+	*ptep = pte;
- }
- 
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+I would really value any comments/critique/flames on this series.
+Especially as I've ommitted the DCCMVAC at the end of set_huge_pte_at
+as I couldn't see why it was needed, please yell at me if it is needed!
+:-)
+
+Cheers,
+-- 
+Steve
+
+Steve Capper (3):
+  ARM: mm: Rewire LPAE set_huge_pte_at
+  ARM: mm: Make LPAE huge page ptes NG by default
+  Revert "ARM: mm: correct pte_same behaviour for LPAE."
+
+ arch/arm/include/asm/hugetlb-3level.h |  7 ++++++-
+ arch/arm/include/asm/pgtable-3level.h | 19 +------------------
+ 2 files changed, 7 insertions(+), 19 deletions(-)
+
 -- 
 1.8.1.4
