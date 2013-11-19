@@ -1,67 +1,98 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 19 Nov 2013 15:14:18 +0000
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <528B5949.20204@samsung.com>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com> <
- 20131030134702.19B57C402A0@trevor.secretlab.ca> <528B5949.20204@samsung.com >
-Message-ID: <20131119151418.8BB2BC4079D@trevor.secretlab.ca>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 19 Nov 2013 19:17:46 +0400
+Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
+In-Reply-To: <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
+Message-ID: <528B811A.1030501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Nov 2013 13:27:53 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hi Grant!
-> 
-> On 2013-10-30 14:47, Grant Likely wrote:
-> > On Fri, 11 Oct 2013 09:27:26 +0200, Marek Szyprowski<m.szyprowski@samsung.com>  wrote:
-> > > Hi all!
-> > >
-> > > Benjamin Herrenschmidt pointed a few issues in the proposed design of
-> > > device tree bindings for contiguous memory allocator and reserved memory
-> > > regions:
-> > >https://lkml.org/lkml/2013/9/15/151
-> > >http://www.spinics.net/lists/arm-kernel/msg273548.html
-> > >
-> > > Some time has passed, but there is still no consensus on the bindings
-> > > for the reserved memory and various drawback of this solution has been
-> > > shown, so in my opinion the best I can do now is to revert them
-> > > completely and start from scratch again later.
-> >
-> > Hi Marek,
-> >
-> > At the ARM summit last week in Edinburgh, several of us sat down and
-> > hammered out a new proposal for handling reserved memory regions based
-> > on the work that you started here. Below you will find a new binding
-> > document. I started looking at implementing this, but haven't made much
-> > progress.
-> >
-> > Please take a look and let me know what you think.
-> >
-> > Also, while I'm thinking about it, I took another look at the code and I
-> > think the code supporting reserved regions should go directly into
-> > drivers/of/fdt.c and drivers/of/memory.c.  Also, the reserved regions
-> > parsing should be enabled unconditionally insted of filtered by (DMA_CMA
-> > || (HAVE_GENERIC_DMA_COHERENT && HAVE_MEMBLOCK). If the hardware
-> > description says to reserve a region, then the kernel must always do so,
-> > even if it doesn't actually use it for anything.
-> 
-> Thanks for discussing this item. I'm really sorry for the late reply, but
-> various 'more_imporant_things(tm)' have eaten me completely last weeks.
-> 
-> The proposal look good for me. I'm not convinced that we really need the
-> support for 'reg' property, as the fixed memory region is a special case
-> of generic dynamic allocation specified by the size and alloc-ranges, but
-> I assume that there have been already a long discussion about this, so I
-> accept the common consensus.
+On 11/19/2013 05:00 PM, Linus Walleij wrote:
+> On Fri, Nov 15, 2013 at 9:47 AM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
+>
+>> This is a considerable rework of my previous attempt to update sa1100 irq
+>> handling. IRQ code is updated to support MULTI_IRQ_HANDLER and is mostly
+>> prepared to be converted to irqchip driver (if the need arises in future).
+>> I have integrated idea of Linus Waleij to use irq domains. GPIO irq handling
+>> is split to gpio driver, which also undergo an update/rewrite.
+>
+> Overall this is looking very nice. However when I apply this on top
+> of (a working and booting) mainline HEAD, I get this:
 
-It is absolutely necessary for some use cases. For example, a
-framebuffer enabled by firmware and passed onto the kernel for
-flicker-free boot. Some platforms have fixed regions that cannot be
-moved up.
+[skipped]
 
-> Grant: have you started working on the code, which implements such binding?
-> If not, I will try to start do it and post the code soon for review.
+> This is caused by the patch:
+> "ARM: sa1100: convert gpio driver to be a proper platform driver"
+>
+> The reason: UARTs are initialized *very* early and the UART quirk used on the
+> h3600 is using GPIOs through the .set_mctrl hooks back into
+> arch/arm/mach-sa1100/h3xxx.c functions
+> h3xxx_uart_set_mctrl()
+> h3xxx_uart_get_mctrl()
+>
+> And that happens before the GPIO driver gets registered -> crash.
 
-No, please go ahead and start.
+That is not the issue. The real issue is h3xxx using those gpio's 
+without previously calling gpio_request. Unfortunately sa1100 driver 
+doesn't have a good place to request gpios. When faced this problem 
+during locomo refactoring, I ended up with the following piece of code:
 
-g.
+========== Cut here ============
+static struct gpio collie_uart_gpio[] = {
+         { COLLIE_GPIO_CTS, GPIOF_IN, "CTS" },
+         { COLLIE_GPIO_RTS, GPIOF_OUT_INIT_LOW, "RTS" },
+         { COLLIE_GPIO_DTR, GPIOF_OUT_INIT_LOW, "DTR" },
+         { COLLIE_GPIO_DSR, GPIOF_IN, "DSR" },
+};
+
+static bool collie_uart_gpio_ok;
+
+static void collie_uart_set_mctrl(struct uart_port *port, u_int mctrl)
+{
+         if (!collie_uart_gpio_ok) {
+                 int rc = gpio_request_array(collie_uart_gpio,
+                                 ARRAY_SIZE(collie_uart_gpio));
+                 if (rc)
+                         printk("collie_uart_set_mctrl: gpio request 
+%d\n", rc);
+                 else
+                         collie_uart_gpio_ok = true;
+         }
+
+         if (collie_uart_gpio_ok) {
+                 gpio_set_value(COLLIE_GPIO_RTS, !(mctrl & TIOCM_RTS));
+                 gpio_set_value(COLLIE_GPIO_DTR, !(mctrl & TIOCM_DTR));
+         }
+}
+=========== Cut here ===============
+
+Same goes for get_mctr().
+
+Russell, Linus, what do you think about the previous solution?
+
+
+Another solution would be to make sa1100 distinguish between console 
+output (where it doesn't have to control rts/dtr) and normal uart work 
+(where 'modem' lines should be used).
+
+I have the feeling that sa11x0-serial driver would need to be somewhat 
+modified at least. I understand the conception behind unified 
+"port_fns", but I think that those should be split to a per-port 
+platform data.
+
+> This is why the device is registered from the machine in the first place
+> I think.
+>
+> I don't know what the proper solution is, but I think you can keep most
+> of the platform device conversion if you also keep the special initialization
+> call.
+
+
+That would be possible solution if we can't come up with usefull way to 
+handle h3xxx (and collie) gpios.
+
+-- 
+With best wishes
+Dmitry
