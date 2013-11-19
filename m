@@ -1,24 +1,22 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 19 Nov 2013 15:23:54 -0800
-Subject: [PATCH 25/31] serial: tegra: convert to standard DMA DT bindings
-In-Reply-To: <1384548866-13141-26-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 19 Nov 2013 15:24:07 -0800
+Subject: [PATCH 24/31] serial: tegra: use reset framework
+In-Reply-To: <1384548866-13141-25-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-26-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131119232354.GB24947@kroah.com>
+ <1384548866-13141-25-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131119232407.GC24947@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:54:20PM -0700, Stephen Warren wrote:
+On Fri, Nov 15, 2013 at 01:54:19PM -0700, Stephen Warren wrote:
 > From: Stephen Warren <swarren@nvidia.com>
 > 
-> By using dma_request_slave_channel_or_err(), the DMA slave ID can be
-> looked up from standard DT properties, and squirrelled away during
-> channel allocation. Hence, there's no need to use a custom DT property
-> to store the slave ID.
-> 
-> DMA channel allocation is moved to probe() so that deferred probe works.
+> Tegra's clock driver now provides an implementation of the common
+> reset API (include/linux/reset.h). Use this instead of the old Tegra-
+> specific API; that will soon be removed.
 > 
 > Cc: treding at nvidia.com
+> Cc: pdeschrijver at nvidia.com
 > Cc: linux-tegra at vger.kernel.org
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
