@@ -1,47 +1,108 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Nov 2013 14:39:54 -0700
-Subject: [PATCHv5 4/9] iommu/tegra: smmu: register device to iommu
- dynamically
-In-Reply-To: <1384853593-32202-5-git-send-email-hdoyu@nvidia.com>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com>
- <1384853593-32202-5-git-send-email-hdoyu@nvidia.com>
-Message-ID: <528BDAAA.4000203@wwwdotorg.org>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 19 Nov 2013 13:42:38 -0800
+Subject: [PATCH 1/1] irq-gic: add capability to set bypass flag in GIC
+Message-ID: <1384897358-22940-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 02:33 AM, Hiroshi Doyu wrote:
-> platform_devices are registered as IOMMU'able dynamically via
-> add_device() and remove_device().
-> 
-> Tegra SMMU can have multiple address spaces(AS). IOMMU'able devices
-> can belong to one of them. Multiple IOVA maps are created at boot-up,
-> which can be attached to devices later. We reserve 2 of them for
-> static assignment, AS[0] for system default, AS[1] for AHB clusters as
-> protected domain from others, where there are many traditional
-> pheripheral devices like USB, SD/MMC. They should be isolated from
-> some smart devices like host1x for system robustness. Even if smart
-> devices behaves wrongly, the traditional devices(SD/MMC, USB) wouldn't
-> be affected, and the system could continue most likely. DMA API(ARM)
-> needs ARM_DMA_USE_IOMMU to be enabled.
+The GIC-400 implementation allows for FIQ and IRQ bypass. In the
+X-Gene implementation, the FIQ bypass must be enabled at all time.
+Otherwise, some PPI will appear as FIQ and cause kernel problem.
 
-> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ drivers/irqchip/irq-gic.c       |   15 +++++++++++----
+ include/linux/irqchip/arm-gic.h |    4 ++--
+ 2 files changed, 13 insertions(+), 6 deletions(-)
 
-> +static int smmu_iommu_add_device(struct device *dev)
-> +{
-> +	int err = -EPROBE_DEFER;
-> +	u32 swgroups = dev->platform_data;
-> +	struct dma_iommu_mapping *map = NULL;
-> +
-> +	if (test_bit(TEGRA_SWGROUP_PPCS, swgroups))
-> +		map = smmu_handle->map[SYSTEM_PROTECTED];
-> +	else
-> +		map = smmu_handle->map[SYSTEM_DEFAULT];
-> +
-> +	if (map)
-> +		err = arm_iommu_attach_device(dev, map);
-> +	else
-> +		return -EPROBE_DEFER;
-
-Given that patch 2 exists, if this test fails, then surely the
-appropriate error code is some fatal error, not -EPROBE_DEFER; any
-deferrals should have happened long before this point.
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index d0e9480..aa7342e 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -65,6 +65,7 @@ struct gic_chip_data {
+ #endif
+ 	struct irq_domain *domain;
+ 	unsigned int gic_irqs;
++	unsigned int bypass_flag;
+ #ifdef CONFIG_GIC_NON_BANKED
+ 	void __iomem *(*get_base)(union gic_base *);
+ #endif
+@@ -450,7 +451,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+ 
+ 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, base + GIC_CPU_CTRL);
++	writel_relaxed(gic->bypass_flag | 1, base + GIC_CPU_CTRL);
+ }
+ 
+ void gic_cpu_if_down(void)
+@@ -591,7 +592,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+ 
+ 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
++	writel_relaxed(gic_data[gic_nr].bypass_flag | 1, cpu_base + GIC_CPU_CTRL);
+ }
+ 
+ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+@@ -733,7 +734,8 @@ const struct irq_domain_ops gic_irq_domain_ops = {
+ 
+ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 			   void __iomem *dist_base, void __iomem *cpu_base,
+-			   u32 percpu_offset, struct device_node *node)
++			   u32 percpu_offset, u32 bypass_val,
++			   struct device_node *node)
+ {
+ 	irq_hw_number_t hwirq_base;
+ 	struct gic_chip_data *gic;
+@@ -821,6 +823,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 
+ 	set_handle_irq(gic_handle_irq);
+ 
++	gic->bypass_flag = (bypass_val & 0xf) << 4;
+ 	gic_chip.flags |= gic_arch_extn.flags;
+ 	gic_dist_init(gic);
+ 	gic_cpu_init(gic);
+@@ -835,6 +838,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+ 	void __iomem *cpu_base;
+ 	void __iomem *dist_base;
+ 	u32 percpu_offset;
++	u32 bypass_val;
+ 	int irq;
+ 
+ 	if (WARN_ON(!node))
+@@ -849,7 +853,10 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+ 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+ 		percpu_offset = 0;
+ 
+-	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
++	if (of_property_read_u32(node, "bypass-flags", &bypass_val))
++		bypass_val = 0;
++
++	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, bypass_val, node);
+ 
+ 	if (parent) {
+ 		irq = irq_of_parse_and_map(node, 0);
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 0e5d9ec..999515b 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -64,14 +64,14 @@ struct device_node;
+ extern struct irq_chip gic_arch_extn;
+ 
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+-		    u32 offset, struct device_node *);
++		    u32 offset, u32 bypass_val, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_cpu_if_down(void);
+ 
+ static inline void gic_init(unsigned int nr, int start,
+ 			    void __iomem *dist , void __iomem *cpu)
+ {
+-	gic_init_bases(nr, start, dist, cpu, 0, NULL);
++	gic_init_bases(nr, start, dist, cpu, 0, 0, NULL);
+ }
+ 
+ #endif /* __ASSEMBLY */
+-- 
+1.7.6.1
