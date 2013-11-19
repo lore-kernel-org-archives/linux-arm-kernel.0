@@ -1,50 +1,91 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 19 Nov 2013 20:40:00 +0100
-Subject: [PATCH 08/10] ASoC: ux500_pcm: Differentiate between pdata and
- DT initialisation
-In-Reply-To: <20131119193341.GC19953@lee--X1>
-References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
- <1384859269-19801-9-git-send-email-lee.jones@linaro.org>
- <20131119184829.GF2674@sirena.org.uk> <20131119193341.GC19953@lee--X1>
-Message-ID: <528BBE90.4020802@metafoo.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 19 Nov 2013 11:50:35 -0800
+Subject: [PATCH v2] arm/arm64: kvm: Use virt_to_idmap instead of
+ virt_to_phys for idmap mappings
+In-Reply-To: <1384887489-15290-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1384887489-15290-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAMJs5B_4UppZOTFh98R0-MoVsJ3d=qYvHys2ES=XDL+JkGfdkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 08:33 PM, Lee Jones wrote:
-> On Tue, 19 Nov 2013, Mark Brown wrote:
-> 
->> On Tue, Nov 19, 2013 at 11:07:47AM +0000, Lee Jones wrote:
->>
->>> require slightly different flags to inform the core that we 'are'
->>> booting with DT.
->>
->> Is there some situation when we would want to say we're booting from DT
->> when we aren't?  Just wondering about the quotes.
-> 
-> The quotes do 'not' mean anything special. :)
-> 
->>> +static const struct snd_dmaengine_pcm_config ux500_dmaengine_of_pcm_config = {
->>> +	.pcm_hardware = &ux500_pcm_hw,
->>> +	.prealloc_buffer_size = 128 * 1024,
->>
->> You shouldn't need to set this explicitly, the generic code should be
->> able to pick a number for you - if you do need this number please
->> explain why the number was chosen in the comments (or fix the core to
->> guess better).  At the minute the core just makes up a number too but at
->> least then it's a consistent random number between platforms.
->>
->> Can you also get away without the pcm_hardware - the core should also
->> have support for discovering this by querying the DMA controller?
-> 
-> Despite the '+'s, I'm not actually adding these parameters, I'm
-> duplicating the pdata version and removing the stuff I 'know' that's
-> not required. I don't know what happens when/if these two parameters
-> are removed. I can add this to my TODO when I rip out platform data
-> support, which will happen when this stuff lands.
-> 
+On 19 November 2013 10:58, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+> KVM initialisation fails on architectures implementing virt_to_idmap()
+> because virt_to_phys() on such architectures won't fetch you the correct
+> idmap page.
+>
+> So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
+> Since the KVM code is shared between arm and arm64, we create
+> kvm_virt_to_phys() and handle the redirection in respective headers.
 
-I think the patch is fine for now. Once non-DT support has been removed for
-ux500 we should be able to remove the whole ux500_pcm.c file (Assuming that
-the ux500 DMA engine driver gains dma_slave_caps support).
+sending this to the kvmarm list would be nice.
 
-- Lars
+>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> Update the earlier version as per Marc's suggestion
+>
+>  arch/arm/include/asm/kvm_mmu.h   |    1 +
+>  arch/arm/kvm/mmu.c               |    8 ++++----
+>  arch/arm64/include/asm/kvm_mmu.h |    1 +
+>  3 files changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 77de4a4..2d122ad 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -140,6 +140,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+>  }
+>
+>  #define kvm_flush_dcache_to_poc(a,l)   __cpuc_flush_dcache_area((a), (l))
+> +#define kvm_virt_to_phys(x)            virt_to_idmap((unsigned long)(x))
+>
+>  #endif /* !__ASSEMBLY__ */
+>
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 5809069..659db0e 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -916,9 +916,9 @@ int kvm_mmu_init(void)
+>  {
+>         int err;
+>
+> -       hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
+> -       hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
+> -       hyp_idmap_vector = virt_to_phys(__kvm_hyp_init);
+> +       hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
+> +       hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
+> +       hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
+>
+>         if ((hyp_idmap_start ^ hyp_idmap_end) & PAGE_MASK) {
+>                 /*
+> @@ -945,7 +945,7 @@ int kvm_mmu_init(void)
+>                  */
+>                 kvm_flush_dcache_to_poc(init_bounce_page, len);
+>
+> -               phys_base = virt_to_phys(init_bounce_page);
+> +               phys_base = kvm_virt_to_phys(init_bounce_page);
+>                 hyp_idmap_vector += phys_base - hyp_idmap_start;
+>                 hyp_idmap_start = phys_base;
+>                 hyp_idmap_end = phys_base + len;
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 680f74e..7f1f940 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -136,6 +136,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+>  }
+>
+>  #define kvm_flush_dcache_to_poc(a,l)   __flush_dcache_area((a), (l))
+> +#define kvm_virt_to_phys(x)            __virt_to_phys((unsigned long)(x))
+>
+>  #endif /* __ASSEMBLY__ */
+>  #endif /* __ARM64_KVM_MMU_H__ */
+> --
+> 1.7.9.5
+>
+
+Looks good to me.
+
+-Christoffer
