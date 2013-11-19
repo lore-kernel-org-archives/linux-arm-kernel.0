@@ -1,105 +1,185 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 19 Nov 2013 10:40:54 +0100
-Subject: Report from 2013 ARM kernel summit
-In-Reply-To: <20131115070627.6CF65C4079B@trevor.secretlab.ca>
-References: <20131111.114723.1885845500744256130.hdoyu@nvidia.com><20131115070627.6CF65C4079B@trevor.secretlab.ca>
-Message-ID: <20131119.114054.663999769447782808.hdoyu@nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 19 Nov 2013 15:22:47 +0530
+Subject: [PATCH 2/3] Phy: Exynos: Add Exynos5250 sata phy driver
+In-Reply-To: <CAKuRcOK8XDKGsY3w2fwnrqtyH2HN0LjrqE6AoE0dSkaVOy5ozA@mail.gmail.com>
+References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>	<1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>	<524AC56C.1060501@ti.com>	<CA+NduCAwnqz4_YNoVnpfV3O6fn=2QTdv4zgEdYRv4qjMRvWeag@mail.gmail.com>	<52846442.2020307@ti.com>
+ <CAKuRcOK8XDKGsY3w2fwnrqtyH2HN0LjrqE6AoE0dSkaVOy5ozA@mail.gmail.com>
+Message-ID: <528B34EF.3030108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
-
-Grant Likely <grant.likely@secretlab.ca> wrote @ Fri, 15 Nov 2013 08:06:27 +0100:
-
-> On Mon, 11 Nov 2013 10:47:23 +0100, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> > Missed some MLs. Resending....
-> > 
-> > Grant Likely <grant.likely@secretlab.ca> wrote @ Fri, 8 Nov 2013 14:20:46 +0100:
-> > 
-> > > Early Init, Deferred Probe and Init Order
-> > ...
-> > > The big problem with deferring to initcalls is that the kernel doesn?t
-> > > have any information about dependencies between devices and so doesn?t
-> > > know what order to call modules in. Right now driver probe order is
-> > > roughly determined by kernel link order first, and registration order
-> > > second for devices populated during or after initcalls. Olof commented
-> > > that the current driver model is based on the assumption that devices
-> > > live in a single hierarchy. There is no easy way to add in dependency
-> > > data with the current structure, and in most cases dependencies aren?t
-> > > specifically on other devices, but rather on the service provided by
-> > > another device (ie, a GPIO line).
-> > 
-> > I think that an IOMMU device is also the service provider for other
-> > devices, where an single IOMMU device resides in the bus to provide
-> > the address translation to the bus children.
-> > 
-> > > Kumar is concerned that deferred probe won?t work in all situations. For
-> > > instance, what about a device that has an optional dependency? Does it
-> > > fail to probe in the hope that the dependency will show up later? It was
-> > 
-> > Other devices don't know if the system has IOMMU or not. IOMMU'able
-> > devices' population can be deferred till IOMMU device is populated,
-> > but they don't know if there's really IOMMU device exists or not at
-> > their population time.
+On Friday 15 November 2013 11:17 AM, Yuvaraj Kumar wrote:
+> On Thu, Nov 14, 2013 at 11:18 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Monday 07 October 2013 07:35 PM, Yuvaraj Cd wrote:
+>>> On Tue, Oct 1, 2013 at 6:21 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> On Tuesday 01 October 2013 12:03 PM, Yuvaraj Kumar C D wrote:
+>>>>> This patch adds the sata phy driver for Exynos5250.Exynos5250 sata
+>>>>> phy comprises of CMU and TRSV blocks which are of I2C register Map.
+>>>>> So this patch also adds a i2c client driver, which is used configure
+>>>>> the CMU and TRSV block of exynos5250 SATA PHY.
+>>>>
+>>>> Why not make the Exynos5250 sata phy as a i2c client driver instead?
+>>>>>
+>>>>> This patch incorporates the generic phy framework to deal with sata
+>>>>> phy.
+>>>>>
+>>>>> This patch depends on the below patch
+>>>>>       [1].drivers: phy: add generic PHY framework
+>>>>>               by Kishon Vijay Abraham I<kishon@ti.com>
+>>>>>
+>>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>>>> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>>>>> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+>>>>> ---
+>>>>>  drivers/phy/Kconfig                      |    6 +
+>>>>>  drivers/phy/Makefile                     |    1 +
+>>>>>  drivers/phy/exynos/Kconfig               |    5 +
+>>>>>  drivers/phy/exynos/Makefile              |    5 +
+>>>>>  drivers/phy/exynos/exynos5250_phy_i2c.c  |   53 +++++++
+>>>>>  drivers/phy/exynos/sata_phy_exynos5250.c |  248 ++++++++++++++++++++++++++++++
+>>>>>  drivers/phy/exynos/sata_phy_exynos5250.h |   33 ++++
+>>>>>  7 files changed, 351 insertions(+)
+>>>>>  create mode 100644 drivers/phy/exynos/Kconfig
+>>>>>  create mode 100644 drivers/phy/exynos/Makefile
+>>>>>  create mode 100644 drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>>>  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.c
+>>>>>  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.h
+>>>>>
+>>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>>> index 5f85909..ab3d1c6 100644
+>>>>> --- a/drivers/phy/Kconfig
+>>>>> +++ b/drivers/phy/Kconfig
+>>>>> @@ -11,3 +11,9 @@ menuconfig GENERIC_PHY
+>>>>>         devices present in the kernel. This layer will have the generic
+>>>>>         API by which phy drivers can create PHY using the phy framework and
+>>>>>         phy users can obtain reference to the PHY.
+>>>>> +
+>>>>> +if GENERIC_PHY
+>>>>
+>>>> NAK. Just select GENERIC_PHY from your driver Kconfig.
+>>>>> +
+>>>>> +source "drivers/phy/exynos/Kconfig"
+>>>>> +
+>>>>> +endif
+>>>>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>>>>> index 9e9560f..e0223d7 100644
+>>>>> --- a/drivers/phy/Makefile
+>>>>> +++ b/drivers/phy/Makefile
+>>>>> @@ -3,3 +3,4 @@
+>>>>>  #
+>>>>>
+>>>>>  obj-$(CONFIG_GENERIC_PHY)    += phy-core.o
+>>>>> +obj-$(CONFIG_PHY_SAMSUNG_SATA)       += exynos/
+>>>>
+>>>> simply have phy-exynos5250 in drivers/phy.
+>>> ok.
+>>>>> diff --git a/drivers/phy/exynos/Kconfig b/drivers/phy/exynos/Kconfig
+>>>>> new file mode 100644
+>>>>> index 0000000..fa125fb
+>>>>> --- /dev/null
+>>>>> +++ b/drivers/phy/exynos/Kconfig
+>>>>> @@ -0,0 +1,5 @@
+>>>>> +config PHY_SAMSUNG_SATA
+>>>>> +     tristate "Samsung Sata SerDes/PHY driver"
+>>>>> +     help
+>>>>> +       Support for Samsung sata SerDes/Phy found on Samsung
+>>>>> +       SoCs.
+>>>>> diff --git a/drivers/phy/exynos/Makefile b/drivers/phy/exynos/Makefile
+>>>>> new file mode 100644
+>>>>> index 0000000..50dc7eb
+>>>>> --- /dev/null
+>>>>> +++ b/drivers/phy/exynos/Makefile
+>>>>> @@ -0,0 +1,5 @@
+>>>>> +#
+>>>>> +# Makefile for the exynos phy drivers.
+>>>>> +#
+>>>>> +ccflags-y := -Idrivers/phy/exynos
+>>>>> +obj-$(CONFIG_PHY_SAMSUNG_SATA)       += sata_phy_exynos5250.o exynos5250_phy_i2c.o
+>>>>> diff --git a/drivers/phy/exynos/exynos5250_phy_i2c.c b/drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>>> new file mode 100644
+>>>>> index 0000000..9c75d3b
+>>>>> --- /dev/null
+>>>>> +++ b/drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>>> @@ -0,0 +1,53 @@
+>>>>> +/*
+>>>>> + * Copyright (C) 2013 Samsung Electronics Co.Ltd
+>>>>> + * Author:
+>>>>> + *   Yuvaraj C D <yuvaraj.cd@samsung.com>
+>>>>> + *
+>>>>> + * This program is free software; you can redistribute  it and/or modify it
+>>>>> + * under  the terms of  the GNU General  Public License as published by the
+>>>>> + * Free Software Foundation;  either version 2 of the  License, or (at your
+>>>>> + * option) any later version.
+>>>>> + *
+>>>>> + */
+>>>>> +
+>>>>> +#include <linux/kernel.h>
+>>>>> +#include <linux/i2c.h>
+>>>>> +#include <linux/module.h>
+>>>>> +#include "sata_phy_exynos5250.h"
+>>>>> +
+>>>>> +static int exynos_sata_i2c_probe(struct i2c_client *client,
+>>>>> +             const struct i2c_device_id *i2c_id)
+>>>>> +{
+>>>>> +     sataphy_attach_i2c_client(client);
+>>>>> +
+>>>>> +     dev_info(&client->adapter->dev,
+>>>>> +             "attached %s into i2c adapter successfully\n",
+>>>>> +             client->name);
+>>>>> +
+>>>>> +     return 0;
+>>>>> +}
+>>>>> +
+>>>>> +static int exynos_sata_i2c_remove(struct i2c_client *client)
+>>>>> +{
+>>>>> +     dev_info(&client->adapter->dev,
+>>>>> +             "detached %s from i2c adapter successfully\n",
+>>>>> +             client->name);
+>>>>> +
+>>>>> +     return 0;
+>>>>> +}
+>>>>> +
+>>>>> +static const struct i2c_device_id phy_i2c_device_match[] = {
+>>>>> +     { "sata-phy-i2c", 0 },
+>>>>> +};
+>>>>> +MODULE_DEVICE_TABLE(of, phy_i2c_device_match);
+>>>>> +
+>>>>> +struct i2c_driver sataphy_i2c_driver = {
+>>>>> +     .probe    = exynos_sata_i2c_probe,
+>>>>> +     .id_table = phy_i2c_device_match,
+>>>>> +     .remove         = exynos_sata_i2c_remove,
+>>>>> +     .driver   = {
+>>>>> +             .name = "sata-phy-i2c",
+>>>>> +             .owner = THIS_MODULE,
+>>>>> +             .of_match_table = (void *)phy_i2c_device_match,
+>>>>> +             },
+>>>>> +};
+>>>>
+>>>> As I just mentioned above, we can merge this driver with the below one.
+>>> True, Initially it was merged.But already existing drivers of which
+>>> are of similar to this kind were done in this way.
+>>> Please refer  /drivers/gpu/drm//exynos/exynos_hdmiphy.c
+>>
+>> Can you point to any discussions where it was decided to go with this approach?
+> Sorry,what I meant is exynos_hdmiphy.c is already exist in the
+> mainline with this approach.
 > 
-> Deferring the population might complicate the common code by changing
-> the time that devices get created. Right now the code is oriented around
-> doing it all at once.
+> Initially it was merged on my local patches(Not upstreamed).But after
+> referring to the
+> exynos_hdmiphy.c driver and with lot of internal discussions ,it was
+> decided to go with
+
+I don't have any idea about the internal discussions whatever you had. IMO
+Exynos5250 sata phy driver should be modelled as an i2c client driver if you
+don't have a good reason to do otherwise.
+
+Thanks
+Kishon
+
+> the already existing approach.
 > 
-> However, it would be possible to cause a probe deferal on devices that
-> requires an IOMMU in a way that it would be triggered by the bus instead
-> of by the individual device drivers.
-> 
-> I don't really know the details well enough to comment intelliently.
-> Craft up the patches and see what it looks like.
-
-I have just sent v5 as below:
-  [PATCHv5 0/9] Unifying Tegra IOMMU(SMMU) driver among Tegra SoCs
-  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007004.html
-
-Driver core part is:
-  [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007003.html
-
-Any comment would be really appreciated.
-
-> > > The suggestion was made that it would be a really nice to have the core
-> > > kernel sort out probe order rather than using deferred probe. Grant
-> > > replied that deferred probe was designed as the simplest possible
-> > > solution to the problem, and by no means is he attached to it if someone
-> > > can come up with a better approach. He did consider other options that
-> > > put dependency resolution into the core, but it ended up pulling all
-> > > kinds of GPIO, IRQ, Clock and DMA details into the core which made it
-> > > quite complex.
-> > 
-> > I have a problem to control the poplution order for IOMMU in Tegra
-> > SoC, and currently I haven't found any framework so that I inserted an
-> > IOMMU hook in the driver core[1] since I discussed with Stephen Warren
-> > and we thought that the number of those subsystem which requires this
-> > kind of control isn't so many. This patch depends on a certain DT
-> > bindings("#stream-id-cells") if a device has an dependency on IOMMU or
-> > not. But at least this doesn't require anything for a client driver
-> > side at all. The exsiting driver can be used as they are. The current
-> > design is:
-> > 
-> > 1, When a device is populated, it checks if that device is IOMMU'able
-> >    or not. This is identified by "#stream-id-cells" in DT. If
-> >    a device is normal(non IOMMU), a device is populated. If a device
-> >    is IOMMU'able, it continues to be checked.
-> > 
-> > 2, When an IOMMU device has been already populated,
-> >    "dev->bus->iommu_ops" is set. If so a device(client) is registered
-> >    as IOMMU'able, and the rest of population process continues. If not
-> >    set yet, a device population would be deferred til
-> >    "dev->bus->iommu_ops" is set.
-> > 
-> > 3, After an IOMMU device has been already populated, deferred
-> >    population will be continued.
-> > 
-> > I'm not so sure if this dependecy on "#stream-id-cells" is acceptable
-> > or not, but I haven't any better idea right now.
-> 
-> It seems a little fragile to me too. I'd rather the IOMMU requirement be
-> described more explicitly.
-
-I think that Will Deacon can do better than I.
+>>
+>> Thanks
+>> Kishon
