@@ -1,22 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Nov 2013 11:46:10 -0700
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
-Message-ID: <528BB1F2.4080107@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Nov 2013 18:48:29 +0000
+Subject: [PATCH 08/10] ASoC: ux500_pcm: Differentiate between pdata and
+ DT initialisation
+In-Reply-To: <1384859269-19801-9-git-send-email-lee.jones@linaro.org>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+ <1384859269-19801-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131119184829.GF2674@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 10:15 AM, Tomasz Figa wrote:
-> This patch extends the range of settings configurable via pinfunc API
-> to cover pin value as well. This allows configuration of default values
-> of pins.
+On Tue, Nov 19, 2013 at 11:07:47AM +0000, Lee Jones wrote:
 
-Shouldn't there be a driver that acquires the GPIO that's output to the
-pin, and configures the output value? IIRC there have been previous
-discussions re: having a list of e.g. initial GPIO output values in DT,
-and that was rejected, and this patch seems to be doing almost the exact
-same thing, just at the pinctrl level rather than GPIO level.
+> require slightly different flags to inform the core that we 'are'
+> booting with DT.
 
-That all said, I admit this could be a useful feature...
+Is there some situation when we would want to say we're booting from DT
+when we aren't?  Just wondering about the quotes.
+
+> +static const struct snd_dmaengine_pcm_config ux500_dmaengine_of_pcm_config = {
+> +	.pcm_hardware = &ux500_pcm_hw,
+> +	.prealloc_buffer_size = 128 * 1024,
+
+You shouldn't need to set this explicitly, the generic code should be
+able to pick a number for you - if you do need this number please
+explain why the number was chosen in the comments (or fix the core to
+guess better).  At the minute the core just makes up a number too but at
+least then it's a consistent random number between platforms.
+
+Can you also get away without the pcm_hardware - the core should also
+have support for discovering this by querying the DMA controller?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/18068609/attachment.sig>
