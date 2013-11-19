@@ -1,38 +1,25 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Nov 2013 09:01:53 -0600
-Subject: cpufreq on PandaBoard
-In-Reply-To: <87eh6ca150.fsf@gmail.com>
-References: <87eh6ca150.fsf@gmail.com>
-Message-ID: <528B7D61.5020206@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Nov 2013 15:02:12 +0000
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <20131119142336.GA28859@titan.lakedaemon.net>
+References: <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
+ <528A65DF.8060000@wwwdotorg.org>
+ <20131118191955.GG10335@titan.lakedaemon.net>
+ <528A6944.3070303@wwwdotorg.org>
+ <20131118192852.GI10335@titan.lakedaemon.net>
+ <528A6CA3.9030904@wwwdotorg.org>
+ <20131118195243.GJ10335@titan.lakedaemon.net>
+ <528A98C8.9040803@wwwdotorg.org>
+ <20131119122801.GL16735@n2100.arm.linux.org.uk>
+ <20131119142336.GA28859@titan.lakedaemon.net>
+Message-ID: <20131119150212.GM16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 08:59 AM, Ben Gamari wrote:
-> 
-> Booting a PandaBoard with a recent kernel and devicetree appears to be a
-> rather messy process. There are dozens of devicetree-related warnings
-> spewed on boot (many pertaining to missing regulators). At the moment,
-> however, I'm most interested in this,
-> 
->     cpufreq-cpu0 cpufreq-cpu0.0: no of_node; not parsing pinctrl DT
->     cpu cpu0: dummy supplies not allowed
->     cpufreq_cpu0: failed to get cpu0 regulator: -19
->     cpufreq_cpu0: failed to get cpu0 clock: -2
->     cpufreq-cpu0: probe of cpufreq-cpu0.0 failed with error -2
-> 
-> What is the status of cpufreq on the PandaBoard? Is this expected to
-> work?
-> 
-> More generally, if one wants a fairly recent kernel supporting the
-> PandaBoard's hardware what kernel tree should be used? Is mainline not
-> yet appropriate? Is linux-next preferred? Perhaps a ti-maintained tree?
-for upstream: Wait for the clock nodes to get merged.. we are at v9 of
-discussion thread here[1].
+On Tue, Nov 19, 2013 at 09:23:36AM -0500, Jason Cooper wrote:
+> All I'm suggesting doing is extending the same standard we have for
+> compatible strings at the node level to the board level.  If we don't
+> change the filename, then we *have* to extend the consistent naming to
+> the dts files as well.
 
-for ti-maintained tree, you need to talk to TI support folks for
-appropriate kernel for your product line.
-
-[1] http://marc.info/?t=138271672500002&r=1&w=2
--- 
-Regards,
-Nishanth Menon
+That, in itself, is not a bad thing to do, and totally solves the problem.
