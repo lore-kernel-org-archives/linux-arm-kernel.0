@@ -1,28 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Nov 2013 11:07:39 +0000
-Subject: [PATCH 00/10] ASoC: dma: ARM: ux500: Obtain DMA data from Device Tree
-Message-ID: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 19 Nov 2013 11:07:41 +0000
+Subject: [PATCH 02/10] dma: ste_dma40: Parse flags property for new 'high
+ priority channel' request
+In-Reply-To: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1384859269-19801-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At this moment in time the Ux500 ASoC driver obtains its DMA information
-via AUXDATA platform data passing. To make the driver more independent
-we have to start extracting it from the Device Tree.
+This is used for MSP (audio) devices which is about to be fully DT:ed.
+
+Acked-by: Vinod Koul <vinod.koul@intel.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/dma/ste_dma40.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index b8c031b..00a2de9 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -2409,6 +2409,7 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
+ #define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
+ #define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
+ #define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
++#define D40_DT_FLAGS_HIGH_PRIO(flags)  ((flags >> 4) & 0x1)
  
-If this patch-set could go through ASoC as a whole, it would drive down
-the chance of a dependency mess. Vinod has already provided Acks for his
-parts, so it's just between you two Linus and Mark.
-
- Documentation/devicetree/bindings/dma/ste-dma40.txt |   3 ++
- arch/arm/boot/dts/ste-dbx5x0.dtsi                   |  15 ++++++++++
- arch/arm/mach-ux500/board-mop500-audio.c            |   8 +++---
- drivers/dma/ste_dma40.c                             |   4 +++
- include/linux/platform_data/asoc-ux500-msp.h        |   9 +-----
- sound/soc/ux500/mop500.c                            |   2 ++
- sound/soc/ux500/ux500_msp_dai.c                     | 150 +++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------
- sound/soc/ux500/ux500_msp_i2s.c                     |  56 +++++++++++++++++++++++++++----------
- sound/soc/ux500/ux500_msp_i2s.h                     |   2 +-
- sound/soc/ux500/ux500_pcm.c                         |  32 +++++++++++++++------
- 10 files changed, 160 insertions(+), 121 deletions(-)
-
-Cc: Mark Brown <broonie@kernel.org>
+ static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+ 				  struct of_dma *ofdma)
+@@ -2446,6 +2447,9 @@ static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+ 		cfg.use_fixed_channel = true;
+ 	}
+ 
++	if (D40_DT_FLAGS_HIGH_PRIO(flags))
++		cfg.high_priority = true;
++
+ 	return dma_request_channel(cap, stedma40_filter, &cfg);
+ }
+ 
+-- 
+1.8.1.2
