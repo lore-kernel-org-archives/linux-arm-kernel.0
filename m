@@ -1,49 +1,63 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 19 Nov 2013 16:44:17 +0000
-Subject: [PATCH v4] ARM: vexpress/TC2: Implement MCPM power_down_finish()
-In-Reply-To: <alpine.LFD.2.10.1311111134200.9667@knanqh.ubzr>
-References: <20131108185613.GF2602@localhost.localdomain>
- <1384160080.4495.2.camel@hornet>
- <20131111134030.GA2391@e103592.cambridge.arm.com>
- <1384180911.4495.77.camel@hornet>
- <alpine.LFD.2.10.1311111134200.9667@knanqh.ubzr>
-Message-ID: <1384879457.3381.21.camel@linaro1.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Nov 2013 17:52:51 +0100
+Subject: ACPI vs DT at runtime
+In-Reply-To: <201311191334.46788.david.goodenough@btconnect.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
+ com> <201311191348.44660.arnd@arndb.de>
+ <201311191334.46788.david.goodenough@btconnect.com>
+Message-ID: <201311191752.51973.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-11-11 at 11:35 -0500, Nicolas Pitre wrote:
-> On Mon, 11 Nov 2013, Pawel Moll wrote:
-> 
-> > On Mon, 2013-11-11 at 13:40 +0000, Dave P Martin wrote:
-> > > On Mon, Nov 11, 2013 at 08:54:40AM +0000, Pawel Moll wrote:
-> > > > On Fri, 2013-11-08 at 18:56 +0000, Dave Martin wrote:
-> > > > > Hi Pawel, did you manage to take a look at this?
-> > > > > 
-> > > > > I want to have something in place here, otherwise there's a nice WARN_ON
-> > > > > to look forward to in 3.13 :)
-> > > > > 
-> > > > > I don't think I've seen a response from you so far?
-> > > > 
-> > > > On Fri, 2013-11-01 at 12:21 +0000, Pawel Moll wrote:
-> > > > > PS. I actually had a look at the patches after you reminded me last week
-> > > > > (two weeks ago? ;-)
-> > > > 
-> > > > Acked-by: Pawel Moll <pawel.moll@arm.com>
-> > > 
-> > > Thanks
-> > > 
-> > > What's the best way to send this upstream?
+On Tuesday 19 November 2013, David Goodenough wrote:
+> On Tuesday 19 Nov 2013, Arnd Bergmann wrote:
+> > On Monday 18 November 2013, David Goodenough wrote:
+> > > Would it not be possible to have ACPI read the hardware configuration
+> > > from the DT, and provide whatever services it wants, while also allowing
+> > > the kernel to retain the DT for its hardware config?  I suppose the only
+> > > thing that would be needed would be some way to mark paricular bits of
+> > > hardware (I am largely thinking of the things lmsensors deals with) as
+> > > being used by ACPI and being off limits to the kernel.
 > > 
-> > Through arm-soc, I believe. Generally Nico was pulling this stuff into
-> > his PM branch (except for the one case of me helping out with the SPC).
-> > 
-> > Nevertheless I'm happy to queue it if you want me to.
-> 
-> Please do so as I've nothing queued on my side at the moment.
+> > While that may be possible, I don't see what problem that solves. Nobody
+> > has so far explained what problem they want to solve by using ACPI. The
+> > only reason we are discussing this is Jon's statement that "everybody
+> > will use it". For any specific thing you might want to do in ACPI while
+> > leaving the rest in DT, I suspect there is an easier solution in using
+> > just DT.
+>
+> It strikes me that ACPI is really two things, a provider of configuration
+> information and a provider of power management services.
 
-I notice that this isn't in linux-next, has it fallen through the
-cracks? Its absence produces a rather ugly warning and backtrace on
-TC2...
+As the acronym says, yes ;-)
 
--- 
-Tixy
+> The first of
+> these is - on ARM - more or less duplicated by DT, and so rather than having 
+> to go through the excercise of modifying the kernel to support both sources
+> of configuration information, I am suggesting making not just the kernel
+> and uboot (or whatever boot loader) use DT, but also ACPI.  So the ACPI
+> module for an ARM box would not have separate config information coded
+> into it, but rather would either read the DT from the same place as
+> the bootloader/kernel, or act as the source of the DT for the bootloader
+> /kernel.  This way the kernel does not have to be modified again, and
+> can simply use DT whether ACPI is present or not.
+
+Well, this is what Olof suggested, and it may or may not be possible,
+depending on what kind of data people actually want to put into ACPI
+here.
+
+> > Since you seem to have something specific in mind, can you elaborate on
+> > why you think lmsensors (or any other device you can think of) would
+> > benefit from ACPI?
+> Its the other way around.  lmsensors often fights with ACPI in the x86
+> world for control of sensors and fans, and on x86 motherboards they do
+> silly tricks like hiding I2C busses from the kernel so that ACPI can
+> have sole control.  Thus lmsensors (which on x86 boxes could use a source
+> of information like DT as busses like I2C provide no chip ID services) needs 
+> to know which sensor chips are being used or controlled by ACPI so that it 
+> does not interfere.
+
+Ah, I see. I suppose on a server, those sensors are part of the BMC anyway
+and are accessible through IPMI only, so I'd hope that wouldn't be an issue.
+
+	Arnd
