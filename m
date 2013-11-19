@@ -1,55 +1,178 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 19 Nov 2013 10:21:30 -0600
-Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
-In-Reply-To: <20131119081455.GD7443@pengutronix.de>
-References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
- <1384215177.17054.2.camel@linux-builds1> <5281A332.6060300@gmail.com>
- <20131112074028.GW28790@pengutronix.de>
- <CADhT+wffgF1veA8ec4zF7J3_4tsKUZXcq5-X9cLCgN5D3A7Nrw@mail.gmail.com>
- <20131119081455.GD7443@pengutronix.de>
-Message-ID: <1384878090.24993.0.camel@linux-builds1>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 19 Nov 2013 18:22:54 +0200
+Subject: [PATCH v5 3/7] gpio: davinci: use irqdomain
+In-Reply-To: <CACRpkda7h4hsMYv_2gdrY+JB80kHu3BkS5OOGyGhEZFc_UkCig@mail.gmail.com>
+References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>	<1383905510-31760-4-git-send-email-prabhakar.csengg@gmail.com>	<CACRpkdaJg4wqtD5xhPVrHJHxFoVwau6jidbOuQ9xFSK_6drxPQ@mail.gmail.com>	<528A2565.4000802@ti.com>
+ <CACRpkda7h4hsMYv_2gdrY+JB80kHu3BkS5OOGyGhEZFc_UkCig@mail.gmail.com>
+Message-ID: <528B905E.6000206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-11-19 at 09:14 +0100, Steffen Trumtrar wrote:
-> Hi Dinh!
-> 
-> On Mon, Nov 18, 2013 at 11:11:52AM -0600, Dinh Nguyen wrote:
-> > Hi Steffen,
-> > 
-> > 
-> > On Tue, Nov 12, 2013 at 1:40 AM, Steffen Trumtrar <s.trumtrar@pengutronix.de
-> > > wrote:
-> > > I actually also wanted to change the l3_sp_clk, as it seems to be neglect
-> > > the "1 or 2" divider from l3_mp_clk IIRC, but I couldn't come up with a
-> > > good
-> > > way without changing the binding or something. What do you thing about
-> > > that?
-> > > Is that wrong at the moment or do I miss something?
-> > >
-> > 
-> > Ah yes, the l3_sp_clk's parent should be l3_mp_clk and not mainclk.
-> > 
-> > Thanks for spotting that...
-> > 
-> > Dinh
-> > 
-> 
-> Hm, that doesn't sound right. Don't we currently have Gate+Divider combo in
-> the l3_mp_clk? If you turn off the clock gate from the l3_mp_clk, then l3_sp_clk
-> would also be turned off.
-> But according to Figure 2-3 in cv_5v4.pdf
-> 
-> 	DIV1 --------> GATE -----> L3_MP_CLK
->                  |
-> 		 |---- DIV2 -----> L3_SP_CLK
-> 
-> So, l3_sp_clk's parent is the divider of l3_mp_clk but NOT the gate.
+On 11/19/2013 01:06 AM, Linus Walleij wrote:
+> On Mon, Nov 18, 2013 at 3:34 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>> On 11/18/2013 03:11 PM, Linus Walleij wrote:
+>
+>>> I think we recently established that map creating cannot be done
+>>> in gpio_to_irq* functions as that will not work properly if you request
+>>> an IRQ from device tree without first obtaining the IRQ from the GPIO
+>>> number with this function.
+>>
+>> Why? Could you point on corresponding thread, pls?
+>
+> All that contain this:
+> "gpio: interrupt consistency check for OF GPIO IRQs"
+> http://marc.info/?l=linux-kernel&w=2&r=1&s=interrupt+consistency&q=b
 
-ah, yes. I'll have to dig into this issue a bit more.
+Thanks.
 
-Dinh
-> 
-> Regards,
-> Steffen
-> 
+>
+>> Current call tree is:
+>> irq_create_of_mapping()
+>> |-hwirq = omain->ops->xlate()
+>> |-irq_create_mapping(domain, hwirq)
+>
+> OK that works for the pure device-tree scenario so mostly
+> this is OK.
+>
+> The problem that appear is if someone is using platform data-provided
+> IRQs off the irq_chip without calling gpio_to_irq() on the GPIO line
+> first. This has been determined to be legal to do, so preferably
+> create the map when registering the lines.
+
+Ok, I understand. It may fail in case if someone will define/calculate
+  IRQ number for device manually in board code, like:
+  dev_irq = (DA850_N_CP_INTC_IRQ + gpioN)
+
+Also, looks like It is possible to fail if Main/arch IRQ controller
+code doesn't make call of irq_alloc_descs() during init, so
+allocated_irqs will be empty.
+
+Actually, the irq_find_mapping() was called before from 
+gpio_to_irq_banked() in v4 of this series - than It was changed
+according to my comment, to get maximum benefits of using linear IRQ
+domain.
+
+Before recommending that, I've checked Davinci platform code and didn't
+find any risk places - BUT, Seems my findings need to be confirmed by
+Sekhar.
+
+I purpose to move forward as is if above will be confirmed. Otherwise,
+we can switch to use irq_domain_add_legacy().
+
+>
+>>> Also: please write a patch that marks the IRQ lines.
+>>> Call gpio_lock_as_irq(*gpio_chip, offset); in the
+>>> irqchip startup/shutdown functions. (Can be a separate
+>>> patch.)
+>>
+>> It seems, some misunderstanding is here. So I'd like to clarify few points
+>> and would be very appreciate for your comments:
+>> 1) This patch itself will work unless we switch to DT (as in the following
+>> patch)
+>
+> Sure.... but this does not seem to have much to do
+> with my request to use gpio_lock_as_irq().
+
+Oh no. Your request about gpio_lock_as_irq() is absolutely valid :)
+And it has to be added
+
+>
+>> 2) After this patch the following object structure will be created during
+>> Davinci GPIO driver initialization (DA850 has 144 IRQ lines):
+>> - gpio_chip0(0..31)
+>>    |- irq_domain1
+>> - gpio_chip1(32..63)
+>>    |- irq_domain2
+>> - gpio_chip2(64..95)
+>>    |- irq_domain3
+>> - gpio_chip3(96..127)
+>>    |- irq_domain4
+>> - gpio_chip4(128..143)
+>>    |- irq_domain5
+>
+> OK that's nice.
+>
+>> 3) But in case of DT only one GPIO controller node will be created
+>> Example:
+>> gpio: gpio at 1e26000 {
+>>          compatible = "ti,dm6441-gpio";
+>>          gpio-controller;
+>>          reg = <0x226000 0x1000>;
+>>          interrupt-parent = <&intc>;
+>>          interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
+>>                  44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
+>>                  46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
+>>                  48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
+>>                  50 IRQ_TYPE_EDGE_BOTH>;
+>>          interrupt-controller;
+>>          #interrupt-cells = <2>;
+>>          ti,ngpio = <144>;
+>>          ti,davinci-gpio-unbanked = <0>;
+>> }
+>
+> Yep...
+>
+>> 4) As result, to make GPIO bindings/mappings work - we'll need to implement
+>> .of_xlate() callback per GPIO chip, which will provide us with valid valid
+>> gpio_chip and offset of gpio inside chip
+>> (It was discussed before and supposed to be done as next step).
+>
+> Yeah.. this is usually a bit tricky.
+>
+>> For example, gpio_chip3 and offset=15 should be selected:
+>> devA {
+>>     gpios = <&gpio 111 GPIO_ACTIVE_HIGH>;
+>> }
+>>
+>> 5) What should be done to make GPIO IRQ bindings/mappings work?
+>>
+>> Example:
+>> devB {
+>>     interrupt-parent = <&gpio>;
+>>     interrupts = <111 IRQ_TYPE_EDGE_BOTH>;
+>> }
+>>
+>> Should we implement one IRQ domain per all GPIO chips (per GPIO controller)?
+>
+> I don't know, I cannot really see where the problem is.
+>
+> The IRQ domain is for translationg hardware numbers such as bit offsets
+> into Linux IRQ numbers and nothing else, so I'd suggest that as long as
+> the thing you are translating/mapping is something simple like a bit
+> index you're doing the right thing.
+>
+> If it becomes something complex where that index is not just a bit
+> but an index into an array of registers at various locations it is
+> abusing the irqdomain.
+>
+> So I think you should create one irqdomain per GPIO instance
+> or bank or whatever you want to call it: like if there is this one
+> register with 32 bits, then it gets its own IRQdomain.
+>
+> I think you should try to keep the 5 irqdomains, but whatever
+> gives the simplest code is usually the right answer, and
+> divide-and-conquer (split down the problem) is usually a good
+> idea.
+>
+> How the GPIO block(s) are represented in the device tree is
+> another totally separate issue about hardware description,
+> do not let the device tree model your driver structure.
+
+Thanks for you comments, but looks like I have to be more specific :)
+
+How irq_find_host() will look for proper IRQ domain in our case?
+And will it work at all, taking into account that all (5) IRQ domains
+will have the same value of "of_node" property?
+of_irq_to_resource()
+|-irq_of_parse_and_map()
+   |-irq_create_of_mapping()
+     |-irq_find_host(irq_data->np)
+  where np will point on GPIO node.
+
+As result my question is about what do DT core frameworks allow or not
+allow to do? And according to that implementation of driver can be
+changed.
+
+Regards,
+-grygorii
