@@ -1,38 +1,49 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Mon, 18 Nov 2013 15:49:16 -0800
-Subject: [PATCH v2 1/2] watchdog: bcm281xx: Watchdog Driver
-In-Reply-To: <5286F41F.6090504@roeck-us.net>
-References: <1384549081-9571-1-git-send-email-markus.mayer@linaro.org>
- <1384549081-9571-2-git-send-email-markus.mayer@linaro.org>
- <5286F41F.6090504@roeck-us.net>
-Message-ID: <CAPdLdq=vhM_cpFFWZvdX90feJzzwowLRWsSBG5gaPaDdgjUbdw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 18 Nov 2013 19:04:40 -0500
+Subject: [PATCH] ARM: OMAP2+: Fix undefined reference to set_cntfreq
+In-Reply-To: <20131118232145.GX10317@atomide.com>
+References: <20131118215855.GW10317@atomide.com> <528A9E8C.9040903@ti.com>
+ <20131118232145.GX10317@atomide.com>
+Message-ID: <528AAB18.7040105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2013 20:27, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 11/15/2013 12:58 PM, Markus Mayer wrote:
->>
->> This commit adds support for the watchdog timer used on the BCM281xx
->> family of SoCs.
->>
->> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
->
->
-> You are using two different e-mail addresses, the one here and the one in
-> MODULE_AUTHOR.
-> Any chance to use only one ? Of course, there may be a reason, so maybe it
-> is ok.
+On Monday 18 November 2013 06:21 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [131118 15:11]:
+>> On Monday 18 November 2013 04:58 PM, Tony Lindgren wrote:
+>>> If CONFIG_SOC_HAS_REALTIME_COUNTER is not selected for omap5
+>>> or dra7xx, we can get the following error:
+>>>
+>>> arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_init':
+>>> :(.text+0x7ab0): undefined reference to `set_cntfreq'
+>>>
+>>> Fix the issue by not trying to initalize the realtime counter
+>>> unles CONFIG_SOC_HAS_REALTIME_COUNTER is selected.
+>>>
+>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>>>
+>> How about a dummy inline function of set_cntfreq() ?
+>> Having #ifdef in middle of the code looks pretty ugly.
+> 
+> Sure, here's an updated version.
+> 
+Thanks for quick spin.
 
-There is indeed reason behind the madness. I am wearing two hats of
-sorts. I work for Broadcom, but I am assigned to Linaro, hence the
-somewhat adventurous construction with two e-mail addresses.
-
-I addressed your remaining comments and will be sending out v3 of the
-patch shortly.
-
-Thanks,
--Markus
-
--- 
-Markus Mayer
-Broadcom Landing Team
+> 
+> 
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Mon, 18 Nov 2013 13:56:48 -0800
+> Subject: [PATCH] ARM: OMAP2+: Fix undefined reference to set_cntfreq
+> 
+> If CONFIG_SOC_HAS_REALTIME_COUNTER is not selected for omap5
+> or dra7xx, we can get the following error:
+> 
+> arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_init':
+> :(.text+0x7ab0): undefined reference to `set_cntfreq'
+> 
+> Fix the issue by not trying to initalize the realtime counter
+> unles CONFIG_SOC_HAS_REALTIME_COUNTER is selected.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
