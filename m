@@ -1,34 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 Nov 2013 10:28:19 +0100
-Subject: [PATCH v3] ARM: signal: fix armv7-m build issue in
- sigreturn_codes.S
-In-Reply-To: <1384843790-14394-2-git-send-email-victor.kamensky@linaro.org>
-References: <1384843790-14394-1-git-send-email-victor.kamensky@linaro.org>
- <1384843790-14394-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20131119092819.GD28642@pengutronix.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 19 Nov 2013 11:33:05 +0200
+Subject: [PATCHv5 1/9] of: introduce of_property_for_earch_phandle_with_args()
+In-Reply-To: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com>
+References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1384853593-32202-2-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The following pattern of code is tempting:
 
-On Mon, Nov 18, 2013 at 10:49:50PM -0800, Victor Kamensky wrote:
-> After "ARM: signal: sigreturn_codes should be endian neutral to
-> work in BE8" commit, thumb only platforms, like armv7m, fails to
-> compile sigreturn_codes.S. The reason is that for such arch
-> values '.arm' directive and arm opcodes are not allowed.
-> 
-> Fix conditionally enables arm opcodes only if no CONFIG_CPU_THUMBONLY
-> defined and it uses .org instructions to keep sigreturn_codes
-> layout.
-> 
-> Suggested-by: Dave Martin <Dave.Martin@arm.com>
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+  for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
 
-Best regards and thanks
-Uwe
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+v5:
+New patch for v5.
+---
+ include/linux/of.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 276c546..131fef5 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -613,6 +613,9 @@ static inline int of_property_read_u32(const struct device_node *np,
+ 		s;						\
+ 		s = of_prop_next_string(prop, s))
+ 
++#define of_property_for_each_phandle_with_args(np, list, cells, i, args) \
++	for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
++
+ #if defined(CONFIG_PROC_FS) && defined(CONFIG_PROC_DEVICETREE)
+ extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
+ extern void proc_device_tree_add_prop(struct proc_dir_entry *pde, struct property *prop);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.1.5
