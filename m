@@ -1,49 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 18 Nov 2013 19:04:40 -0500
-Subject: [PATCH] ARM: OMAP2+: Fix undefined reference to set_cntfreq
-In-Reply-To: <20131118232145.GX10317@atomide.com>
-References: <20131118215855.GW10317@atomide.com> <528A9E8C.9040903@ti.com>
- <20131118232145.GX10317@atomide.com>
-Message-ID: <528AAB18.7040105@ti.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Mon, 18 Nov 2013 17:24:08 -0800
+Subject: [PATCH v3 0/2] watchdog: bcm281xx: Watchdog Driver
+Message-ID: <1384824250-16727-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 November 2013 06:21 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [131118 15:11]:
->> On Monday 18 November 2013 04:58 PM, Tony Lindgren wrote:
->>> If CONFIG_SOC_HAS_REALTIME_COUNTER is not selected for omap5
->>> or dra7xx, we can get the following error:
->>>
->>> arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_init':
->>> :(.text+0x7ab0): undefined reference to `set_cntfreq'
->>>
->>> Fix the issue by not trying to initalize the realtime counter
->>> unles CONFIG_SOC_HAS_REALTIME_COUNTER is selected.
->>>
->>> Signed-off-by: Tony Lindgren <tony@atomide.com>
->>>
->> How about a dummy inline function of set_cntfreq() ?
->> Having #ifdef in middle of the code looks pretty ugly.
-> 
-> Sure, here's an updated version.
-> 
-Thanks for quick spin.
+This is version 3 of the watchdog driver for the BCM281xx family of mobile
+SoCs.
 
-> 
-> 
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Mon, 18 Nov 2013 13:56:48 -0800
-> Subject: [PATCH] ARM: OMAP2+: Fix undefined reference to set_cntfreq
-> 
-> If CONFIG_SOC_HAS_REALTIME_COUNTER is not selected for omap5
-> or dra7xx, we can get the following error:
-> 
-> arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_init':
-> :(.text+0x7ab0): undefined reference to `set_cntfreq'
-> 
-> Fix the issue by not trying to initalize the realtime counter
-> unles CONFIG_SOC_HAS_REALTIME_COUNTER is selected.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Changes since version 2:
+
+- BCM_KONA_WDT_NAME: "bcm-kona-wdt" -> "bcm_kona_wdt"
+- Don't initialize static variable
+- Remove '{'/'}' from single-line statements
+- busy_count retains the maximum loop count of the longest loop rather
+  than an over-all maximum
+- Use seq_puts() in lieu of seq_printf() in 2 locations
+- Removed error message after devm_kzalloc()
+- Added MODULE_ALIAS
+
+Changes since version 1:
+
+- Added module name to "help" section in Kconfig A few cosmetic code
+- simplifications and fixes Removed most dev_info() calls and changed the
+- remaining ones to dev_dbg() Renamed SECWDOG_WD_LOAD_FLAG_MASK to
+- SECWDOG_WD_LOAD_FLAG Added some comments to secure_register_read() and
+- struct bcm_kona_wdt Added delay to secure_register_read() Reduced maximum
+- retry loop from 10000 to 1000 Introduced "busy_count" variable to count
+- how often secure_register_read() gets stalled; this is available through
+- debugfs Simplified secure_register_read() to return -ETIMEDOUT rather than
+- using a variable parameter to indicate a timeout error Got rid of all uses
+- of -EAGAIN Fixed return value check for debugfs_create_dir() Simplified
+- bcm_kona_wdt_debugfs_init() by getting rid of goto Created new generic
+- function bcm_kona_wdt_ctrl_reg_modify() The following functions now use
+- bcm_kona_wdt_ctrl_reg_modify():
+    - bcm_kona_wdt_set_resolution_reg() bcm_kona_wdt_set_timeout_reg()
+    - bcm_kona_wdt_stop()
+- Made bcm_kona_wdt_set_timeout_reg() more generic, so bcm_kona_wdt_start()
+  can use it Removed MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR)
+
+
+
+
+Markus Mayer (2):
+  watchdog: bcm281xx: Watchdog Driver
+  ARM: bcm281xx: watchdog configuration
+
+ arch/arm/configs/bcm_defconfig  |    3 +
+ drivers/watchdog/Kconfig        |   22 +++
+ drivers/watchdog/Makefile       |    1 +
+ drivers/watchdog/bcm_kona_wdt.c |  366 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 392 insertions(+)
+ create mode 100644 drivers/watchdog/bcm_kona_wdt.c
+
+-- 
+1.7.9.5
