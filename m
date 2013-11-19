@@ -1,55 +1,73 @@
-From: bgamari.foss@gmail.com (Ben Gamari)
-Date: Tue, 19 Nov 2013 09:37:22 -0500
-Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
-In-Reply-To: <528AE58B.5030209@ti.com>
-References: <87hab9agjr.fsf@gmail.com> <528AE58B.5030209@ti.com>
-Message-ID: <87mwl0o3tp.fsf@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Nov 2013 14:38:40 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <alpine.DEB.2.02.1311191304260.27757@kaball.uk.xensource.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131115175241.GB27174@quad.lixom.net>
+ <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1311191304260.27757@kaball.uk.xensource.com>
+Message-ID: <20131119143840.GN5914@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lokesh Vutla <lokeshvutla@ti.com> writes:
-
-> Hi Ben,
-> On Monday 18 November 2013 08:44 PM, Ben Gamari wrote:
->> I'm having difficulty getting a PandaBoard ES rev. B1 to boot v3.12 and
->> linux-next (30121118). I'm booting with a brand new u-boot
->> (c2e5e802ecb7ab668ce9911b210ed68c804b349f).
->> 
->> In both cases the device appears to hang shortly before one would expect
->> init to start as seen in the boot output below. I'm booting with the
->> omap4-panda-es devicetree. As far as I can tell, the machine is
->> completely dead and will not respond to even sysrq. I have a PandaBoard
->> A4 which apparently has no trouble with the same kernel image.
+On Tue, Nov 19, 2013 at 01:56:26PM +0000, Stefano Stabellini wrote:
+> On Tue, 19 Nov 2013, Mark Rutland wrote:
+> > > We all know DT considerably better to a point where I would recommend
+> > > that they flash a DTB in their UEFI firmware instead of go with ACPI. For
+> > > simple hardware and basic devices we've got most bindings sorted out by
+> > > now, and we've decided on backwards compatibility from here on out.
+> > 
+> > If a vendor does this, with a DTB that correctly describes their
+> > hardware then I am not against it (and would prefer this case to mapping
+> > from ACPI to DT).
 > 
-> Which defconfig are you using ?
->
-I derived the config from RobertCNelson's Debian Wheezy image. It did
-require some modification, however.
+> I think that the firmware passing a DTB to the bootloader/kernel is the
+> best option we have.
+> 
+> 
+> > For that case we will also require a nailed-down boot
+> > protocol that allows for either DTB or ACPI.
+> 
+> The latest documentation patch for the "arm/arm64 UEFI boot protocol"
+> implies that UEFI on ARM is already capable of passing a DTB to the
+> kernel:
+> 
+> "The implementation depends on receiving information about the UEFI
+> environment in a Flattened Device Tree (FDT) - so is only available with
+> CONFIG_OF."
+> 
+> Maybe we just need to better document it?
 
-> Can you see if CPU_IDLE is enabled in your defconfig?
->
-Yes, CPU_IDLE is enabled.
+Yes, we just need to document it.
 
-> I saw a similar failure on my panda es when CPU_IDLE is enabled.
-> If this is the case for you please apply this[1] patch and give a try.
->
+As far as I'm aware, there are two ways we might boot the kernel:
 
-Indeed that did the trick. Thanks for the reference!
+1) Via the current boot protocol, passing a DTB in a particular
+register.
 
-I do however now see periodic messages of the form,
+2) As an EFI application. As I understand it in this case the DTB will
+be saved in a system table (I may have got the terminology wrong here),
+and the EFI stub will need to look it up to pass it to the kernel.
 
-    [   42.143005] gic_timer_retrigger: lost localtimer interrupt
+As long as that's well defined and does not preclude ACPI, then I am
+happy.
 
-Any idea what this might be due to?
+> 
+> 
+> > (only one at a time)
+> 
+> I would not go as far as requiring that only one is available.
+> Certainly I would mandate that either of them are independently complete
+> and sufficient to describe the platform.
 
-Cheers,
+At that point we need to choose one to prefer. This will be a completely
+arbitrary choice, but as in the EFI case we would expect a DTB stub (for
+passing some options in /chosen), preferring the DT if it's more than a
+stub would make sense to me.
 
-- Ben
+The key point is that the kernel will rely solely on one of them to
+provide hardware description.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 489 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/b18d28cb/attachment.sig>
+Thanks,
+Mark.
