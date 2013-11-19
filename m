@@ -1,70 +1,42 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 19 Nov 2013 17:35:26 +0000
-Subject: [PATCH 0/3] Simplify set_huge_pte_at, pte_same for LPAE
-Message-ID: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Nov 2013 17:35:24 +0000
+Subject: Report from 2013 ARM kernel summit
+In-Reply-To: <20131119.114054.663999769447782808.hdoyu@nvidia.com>
+References: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
+ <20131115070627.6CF65C4079B@trevor.secretlab.ca>
+ <20131119.114054.663999769447782808.hdoyu@nvidia.com>
+Message-ID: <20131119173524.GK11778@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-The following patch series is my attempt at fixing a rather nasty bug
-which became visible in 3.12-rc1 when running the libhugetlbfs test
-suite. (This problem only just came to my attention yesterday).
+On Tue, Nov 19, 2013 at 09:40:54AM +0000, Hiroshi Doyu wrote:
+> Grant Likely <grant.likely@secretlab.ca> wrote @ Fri, 15 Nov 2013 08:06:27 +0100:
+> > On Mon, 11 Nov 2013 10:47:23 +0100, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> > > 1, When a device is populated, it checks if that device is IOMMU'able
+> > >    or not. This is identified by "#stream-id-cells" in DT. If
+> > >    a device is normal(non IOMMU), a device is populated. If a device
+> > >    is IOMMU'able, it continues to be checked.
 
-For LPAE, set_huge_pte_at calls set_pte_at which then calls
-set_pte_ext, which in turn is wired up to call cpu_v7_set_pte_ext,
-which is defined in proc-v7-3level.S.
+[...]
 
-For huge pages, given newprot a pgprot_t value for a shared writable
-VMA, and ptep a pointer to a pte belonging to this VMA; the following
-behaviour is assumed by core code:
-   hugetlb_change_protection(vma, address, end, newprot);
-   ...
+> > > I'm not so sure if this dependecy on "#stream-id-cells" is acceptable
+> > > or not, but I haven't any better idea right now.
+> > 
+> > It seems a little fragile to me too. I'd rather the IOMMU requirement be
+> > described more explicitly.
+> 
+> I think that Will Deacon can do better than I.
 
-   huge_pte_write(huge_ptep_get(ptep)); /* should be true! */
+I already commented briefly here:
 
-Unfortunately, cpu_v7_set_pte_ext will change the bit layout of the
-resultant pte, and will set the read only bit if the dirty bit is not
-also enabled.
+  http://www.spinics.net/lists/devicetree/msg11513.html
 
-If one were to allocate a read only shared huge page, then fault it in,
-and then mprotect it to be writeable. A subsequent write to that huge
-page will result in a spurious call to hugetlb_cow, which causes
-corruption. This call is optimised away prior to:
- 37a2140 mm, hugetlb: do not use a page in page cache for cow
-         optimization
+basically deferring to DT people :)
 
-If one runs the libhugetlbfs test suite on v3.12-rc1 upwards, then the
-mprotect test will cause the afformentioned corruption and before the
-set of tests completes, the system will be left in an unresponsive
-state. (calls to fork fail with -ENOMEM).
+Anyway, I'm happy to tighten up the IOMMU requirement description but
+*not* at the expense of breaking what we currently have for the ARM SMMU,
+which is being used by Calxeda.
 
-This was an absolute pig to debug and, as this is the second time I've
-ran into issues caused by ptes being modified in transit, I've opted to
-re-implement set_huge_pte_at such that it just dereferences the pte.
-(in a similar manner as arm64). This has also allowed me to revert the
-pte_same logic change (that removed the NG bit from comparison), by
-also setting the NG bit for all new huge ptes.
+Adding Andreas and Rob for input on potential binding additions to the SMMU.
 
-These patches are against 3.12, and I have tested this series on an
-Arndale board with LPAE running libhugetlbfs.
-
-I would really value any comments/critique/flames on this series.
-Especially as I've ommitted the DCCMVAC at the end of set_huge_pte_at
-as I couldn't see why it was needed, please yell at me if it is needed!
-:-)
-
-Cheers,
--- 
-Steve
-
-Steve Capper (3):
-  ARM: mm: Rewire LPAE set_huge_pte_at
-  ARM: mm: Make LPAE huge page ptes NG by default
-  Revert "ARM: mm: correct pte_same behaviour for LPAE."
-
- arch/arm/include/asm/hugetlb-3level.h |  7 ++++++-
- arch/arm/include/asm/pgtable-3level.h | 19 +------------------
- 2 files changed, 7 insertions(+), 19 deletions(-)
-
--- 
-1.8.1.4
+Will
