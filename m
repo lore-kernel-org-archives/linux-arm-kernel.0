@@ -1,33 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Nov 2013 10:16:05 +0000
-Subject: ARM topic: Is DT on ARM the solution, or is there something
- better?
-In-Reply-To: <20131119091140.GE31504@ulmo.nvidia.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131118122644.GA26046@ulmo.nvidia.com>
- <20131118134022.26EE7C409EC@trevor.secretlab.ca>
- <20131118135727.GD14306@sirena.org.uk>
- <20131118152920.GL26046@ulmo.nvidia.com>
- <20131118155022.GB28334@sirena.org.uk>
- <20131118160626.GN26046@ulmo.nvidia.com>
- <20131118183502.GP2674@sirena.org.uk>
- <20131119091140.GE31504@ulmo.nvidia.com>
-Message-ID: <20131119101605.GX2674@sirena.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 19 Nov 2013 11:20:19 +0100
+Subject: [PATCH v4 0/4] Energy Micro efm32 support
+In-Reply-To: <20131104105836.GI14892@pengutronix.de>
+References: <20131104105836.GI14892@pengutronix.de>
+Message-ID: <20131119102019.GF28642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 10:11:42AM +0100, Thierry Reding wrote:
+Hello,
 
-> Isn't that the reason why PSCI and similar have been conceived? Even DT
-> is a byproduct of those developments. What we've been doing so far is to
+On Mon, Nov 04, 2013 at 11:58:36AM +0100, Uwe Kleine-K?nig wrote:
+> now that 3.12 is out, I patted my efm32 tree and I consider the base
+> platform support ready for merging. I put it into my for-next branch at
+> 
+> 	git://git.pengutronix.de/git/ukl/linux.git for-next
+> 
+> so it should make it into the next next. I target 3.14-rc1 to make it
+> in. The patches have a few runtime (but no compile-time) dependencies on
+> these patches:
+> 
+> 	ARM: call of_clk_init from default time_init handler
+> 	clocksource: Provide timekeeping for efm32 SoCs
+> 	clk: new driver for efm32 SoC
+> 
+> All but the last patch are already in next, Mike promised to take the
+> last one. DEBUG_LL is broken without
+> 
+> 	ARM: DEBUG_LL on efm32 SoCs
+I'd like to get patch 4 (ARM: new platform for Energy Micro's EFM32
+Cortex-M3 SoCs) in. In the state as it was sent here it build depends on
+patches 1 - 3.  Patches 2 and 3 are in Russell's patch tracker (7890/1
+and 7889/1). What do you think about patch 1? Some of the
+NEED_MACH_TIMEX_H are already fixed by patches that I sent out. The
+options here are:
 
-Right, but notice that PSCI is getting introduce along with ARMv8 -
-nobody is deploying it on ARMv7 and below.  The new CPU architecture
-gave a pressing reason to switch and ate the cost of doing so.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/532b57e6/attachment.sig>
+	- rework patch 4 to not depend on patch 1 (easy)
+	- merge v5 of patch 1 (which is conservative, i.e. introduces
+	  more NEED_MACH_TIMEX_H as probably will be needed in 3.14-rc1
+	  and fix up later)
+	- depend on all sent patches and coordinate accordingly (at
+	  least: watchdog, clocksource, rtc).
+
+I'd prefer the 2nd option as I didn't get Acks on all patches needed for
+the third. What do you think?
+
+Russell, if you are happy with patches 2 and 3 and would apply them to
+your tree I could prepare a branch for the arm-soc people to pull which
+bases on your tree and has patch 1 (v5).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
