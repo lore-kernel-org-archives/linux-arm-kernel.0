@@ -1,36 +1,37 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 19 Nov 2013 19:41:21 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
- <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
- <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <87li0kkhzx.fsf@natisbad.org>
- <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119174323.GH913@1wt.eu>
- <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20131119184121.GN913@1wt.eu>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 19 Nov 2013 11:42:17 -0700
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <20131119122801.GL16735@n2100.arm.linux.org.uk>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <cover.1384798508.git.jason@lakedaemon.net>
+ <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
+ <528A65DF.8060000@wwwdotorg.org>
+ <20131118191955.GG10335@titan.lakedaemon.net>
+ <528A6944.3070303@wwwdotorg.org>
+ <20131118192852.GI10335@titan.lakedaemon.net>
+ <528A6CA3.9030904@wwwdotorg.org>
+ <20131118195243.GJ10335@titan.lakedaemon.net>
+ <528A98C8.9040803@wwwdotorg.org>
+ <20131119122801.GL16735@n2100.arm.linux.org.uk>
+Message-ID: <528BB109.2060201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 10:31:50AM -0800, Eric Dumazet wrote:
-> On Tue, 2013-11-19 at 18:43 +0100, Willy Tarreau wrote:
+On 11/19/2013 05:28 AM, Russell King - ARM Linux wrote:
+> On Mon, Nov 18, 2013 at 03:46:32PM -0700, Stephen Warren wrote:
+>> Again, the point is not that it's hard to write the script. As you
+>> demonstrated, it's easy. The problem is that then, everybody has to do
+>> something different for Tegra, forever. No matter how small the actual
+>> cost of doing it is, it's still non-scalable to require that everyone
+>> know about this special case. I'm not convinced the issue would be
+>> isolated to Tegra either.
 > 
-> > - #define MVNETA_TX_DONE_TIMER_PERIOD 10
-> > + #define MVNETA_TX_DONE_TIMER_PERIOD (1000/HZ)
-> > 
-> 
-> I suggested this in a prior mail :
-> 
-> #define MVNETA_TX_DONE_TIMER_PERIOD 1
+> That's why there's the facility to allow an override to the script,
+> just like there's the facility to override the default script when
+> running "make install".
 
-Ah sorry, I remember now.
+Again, you are completely missing the point about that not scaling at all.
 
-> But apparently it was triggering strange crashes...
-
-Ah, when a bug hides another one, it's the situation I prefer, because
-by working on one, you end up fixing two :-)
-
-Cheers,
-Willy
+But I will go and investigate what it takes to support renaming the
+DTBs. Everyone (using Tegra) will have to update their bootloader, but
+perhaps that can be dealt with.
