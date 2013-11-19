@@ -1,68 +1,190 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 19 Nov 2013 23:07:56 +0100
-Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
-In-Reply-To: <1384896868.11209.3.camel@linux-builds1>
-References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
- <1384215177.17054.2.camel@linux-builds1>
- <5281A332.6060300@gmail.com>
- <20131112074028.GW28790@pengutronix.de>
- <CADhT+wffgF1veA8ec4zF7J3_4tsKUZXcq5-X9cLCgN5D3A7Nrw@mail.gmail.com>
- <20131119081455.GD7443@pengutronix.de>
- <1384896868.11209.3.camel@linux-builds1>
-Message-ID: <20131119220756.GE7443@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Nov 2013 23:24:05 +0100
+Subject: [PATCH] pinctrl: nomadik: decomission non-DT boot path
+Message-ID: <1384899845-10876-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 03:34:28PM -0600, Dinh Nguyen wrote:
-> Hi Steffen,
-> 
-> On Tue, 2013-11-19 at 09:14 +0100, Steffen Trumtrar wrote:
-> > Hi Dinh!
-> > 
-> > On Mon, Nov 18, 2013 at 11:11:52AM -0600, Dinh Nguyen wrote:
-> > > Hi Steffen,
-> > > 
-> > > 
-> > > On Tue, Nov 12, 2013 at 1:40 AM, Steffen Trumtrar <s.trumtrar@pengutronix.de
-> > > > wrote:
-> > > > I actually also wanted to change the l3_sp_clk, as it seems to be neglect
-> > > > the "1 or 2" divider from l3_mp_clk IIRC, but I couldn't come up with a
-> > > > good
-> > > > way without changing the binding or something. What do you thing about
-> > > > that?
-> > > > Is that wrong at the moment or do I miss something?
-> > > >
-> > > 
-> > > Ah yes, the l3_sp_clk's parent should be l3_mp_clk and not mainclk.
-> > > 
-> > > Thanks for spotting that...
-> > > 
-> > > Dinh
-> > > 
-> > 
-> > Hm, that doesn't sound right. Don't we currently have Gate+Divider combo in
-> > the l3_mp_clk? If you turn off the clock gate from the l3_mp_clk, then l3_sp_clk
-> > would also be turned off.
-> > But according to Figure 2-3 in cv_5v4.pdf
-> > 
-> > 	DIV1 --------> GATE -----> L3_MP_CLK
-> >                  |
-> > 		 |---- DIV2 -----> L3_SP_CLK
-> > 
-> > So, l3_sp_clk's parent is the divider of l3_mp_clk but NOT the gate.
-> 
-> I just doubled checked. The L3_SP_CLK is taken before the gate of the
-> L3_MP_CLK, so turning off the L3_MP_CLK does not turn off the L3_SP_CLK.
-> So with this information, I think the parent for the L3_SP_CLK can be
-> the L3_MP_CLK, so that the extra divider is accounted for.
+After the patches deleting the last board registering this
+pin controller as a platform device has been deleted,
+proceed to remove the non-DT boot patch and depend on
+OF being available and the device to be coming up by
+a DT node.
 
-Yes. Giving it another thought, you are right. That should be okay.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This will be merged through ARM SoC with dependent
+patches removing the dependence on platform data headers
+etc.
+---
+ drivers/pinctrl/pinctrl-nomadik.c | 80 +++++++++++----------------------------
+ 1 file changed, 22 insertions(+), 58 deletions(-)
 
-Thanks,
-Steffen
-
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 3895f1415ef9..983662e846a4 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -4,7 +4,7 @@
+  * Copyright (C) 2008,2009 STMicroelectronics
+  * Copyright (C) 2009 Alessandro Rubini <rubini@unipv.it>
+  *   Rewritten based on work by Prafulla WADASKAR <prafulla.wadaskar@st.com>
+- * Copyright (C) 2011 Linus Walleij <linus.walleij@linaro.org>
++ * Copyright (C) 2011-2013 Linus Walleij <linus.walleij@linaro.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -1240,7 +1240,7 @@ static const struct irq_domain_ops nmk_gpio_irq_simple_ops = {
+ 
+ static int nmk_gpio_probe(struct platform_device *dev)
+ {
+-	struct nmk_gpio_platform_data *pdata = dev->dev.platform_data;
++	struct nmk_gpio_platform_data *pdata;
+ 	struct device_node *np = dev->dev.of_node;
+ 	struct nmk_gpio_chip *nmk_chip;
+ 	struct gpio_chip *chip;
+@@ -1248,32 +1248,24 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	struct clk *clk;
+ 	int secondary_irq;
+ 	void __iomem *base;
+-	int irq_start = 0;
+ 	int irq;
+ 	int ret;
+ 
+-	if (!pdata && !np) {
+-		dev_err(&dev->dev, "No platform data or device tree found\n");
+-		return -ENODEV;
+-	}
+-
+-	if (np) {
+-		pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
+-		if (!pdata)
+-			return -ENOMEM;
+-
+-		if (of_get_property(np, "st,supports-sleepmode", NULL))
+-			pdata->supports_sleepmode = true;
++	pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
+ 
+-		if (of_property_read_u32(np, "gpio-bank", &dev->id)) {
+-			dev_err(&dev->dev, "gpio-bank property not found\n");
+-			return -EINVAL;
+-		}
++	if (of_get_property(np, "st,supports-sleepmode", NULL))
++		pdata->supports_sleepmode = true;
+ 
+-		pdata->first_gpio = dev->id * NMK_GPIO_PER_CHIP;
+-		pdata->num_gpio   = NMK_GPIO_PER_CHIP;
++	if (of_property_read_u32(np, "gpio-bank", &dev->id)) {
++		dev_err(&dev->dev, "gpio-bank property not found\n");
++		return -EINVAL;
+ 	}
+ 
++	pdata->first_gpio = dev->id * NMK_GPIO_PER_CHIP;
++	pdata->num_gpio = NMK_GPIO_PER_CHIP;
++
+ 	irq = platform_get_irq(dev, 0);
+ 	if (irq < 0)
+ 		return irq;
+@@ -1321,10 +1313,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	clk_enable(nmk_chip->clk);
+ 	nmk_chip->lowemi = readl_relaxed(nmk_chip->addr + NMK_GPIO_LOWEMI);
+ 	clk_disable(nmk_chip->clk);
+-
+-#ifdef CONFIG_OF_GPIO
+ 	chip->of_node = np;
+-#endif
+ 
+ 	ret = gpiochip_add(&nmk_chip->chip);
+ 	if (ret)
+@@ -1336,10 +1325,8 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 
+ 	platform_set_drvdata(dev, nmk_chip);
+ 
+-	if (!np)
+-		irq_start = pdata->first_irq;
+ 	nmk_chip->domain = irq_domain_add_simple(np,
+-				NMK_GPIO_PER_CHIP, irq_start,
++				NMK_GPIO_PER_CHIP, 0,
+ 				&nmk_gpio_irq_simple_ops, nmk_chip);
+ 	if (!nmk_chip->domain) {
+ 		dev_err(&dev->dev, "failed to create irqdomain\n");
+@@ -2072,11 +2059,10 @@ static int nmk_pinctrl_resume(struct platform_device *pdev)
+ 
+ static int nmk_pinctrl_probe(struct platform_device *pdev)
+ {
+-	const struct platform_device_id *platid = platform_get_device_id(pdev);
++	const struct of_device_id *match;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *prcm_np;
+ 	struct nmk_pinctrl *npct;
+-	struct resource *res;
+ 	unsigned int version = 0;
+ 	int i;
+ 
+@@ -2084,16 +2070,10 @@ static int nmk_pinctrl_probe(struct platform_device *pdev)
+ 	if (!npct)
+ 		return -ENOMEM;
+ 
+-	if (platid)
+-		version = platid->driver_data;
+-	else if (np) {
+-		const struct of_device_id *match;
+-
+-		match = of_match_device(nmk_pinctrl_match, &pdev->dev);
+-		if (!match)
+-			return -ENODEV;
+-		version = (unsigned int) match->data;
+-	}
++	match = of_match_device(nmk_pinctrl_match, &pdev->dev);
++	if (!match)
++		return -ENODEV;
++	version = (unsigned int) match->data;
+ 
+ 	/* Poke in other ASIC variants here */
+ 	if (version == PINCTRL_NMK_STN8815)
+@@ -2103,17 +2083,9 @@ static int nmk_pinctrl_probe(struct platform_device *pdev)
+ 	if (version == PINCTRL_NMK_DB8540)
+ 		nmk_pinctrl_db8540_init(&npct->soc);
+ 
+-	if (np) {
+-		prcm_np = of_parse_phandle(np, "prcm", 0);
+-		if (prcm_np)
+-			npct->prcm_base = of_iomap(prcm_np, 0);
+-	}
+-
+-	/* Allow platform passed information to over-write DT. */
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (res)
+-		npct->prcm_base = devm_ioremap(&pdev->dev, res->start,
+-					       resource_size(res));
++	prcm_np = of_parse_phandle(np, "prcm", 0);
++	if (prcm_np)
++		npct->prcm_base = of_iomap(prcm_np, 0);
+ 	if (!npct->prcm_base) {
+ 		if (version == PINCTRL_NMK_STN8815) {
+ 			dev_info(&pdev->dev,
+@@ -2172,13 +2144,6 @@ static struct platform_driver nmk_gpio_driver = {
+ 	.probe = nmk_gpio_probe,
+ };
+ 
+-static const struct platform_device_id nmk_pinctrl_id[] = {
+-	{ "pinctrl-stn8815", PINCTRL_NMK_STN8815 },
+-	{ "pinctrl-db8500", PINCTRL_NMK_DB8500 },
+-	{ "pinctrl-db8540", PINCTRL_NMK_DB8540 },
+-	{ }
+-};
+-
+ static struct platform_driver nmk_pinctrl_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+@@ -2186,7 +2151,6 @@ static struct platform_driver nmk_pinctrl_driver = {
+ 		.of_match_table = nmk_pinctrl_match,
+ 	},
+ 	.probe = nmk_pinctrl_probe,
+-	.id_table = nmk_pinctrl_id,
+ #ifdef CONFIG_PM
+ 	.suspend = nmk_pinctrl_suspend,
+ 	.resume = nmk_pinctrl_resume,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.3.1
