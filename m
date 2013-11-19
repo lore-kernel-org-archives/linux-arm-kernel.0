@@ -1,104 +1,54 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Nov 2013 12:10:01 -0700
-Subject: [PATCH] pinctrl: samsung: Allow grouping multiple pinmux/pinconf
- nodes
-In-Reply-To: <1384881034-10520-1-git-send-email-t.figa@samsung.com>
-References: <1384881034-10520-1-git-send-email-t.figa@samsung.com>
-Message-ID: <528BB789.5020201@wwwdotorg.org>
+Date: Tue, 19 Nov 2013 12:16:35 -0700
+Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
+ pinfunc.
+In-Reply-To: <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
+References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>	<528BB1F2.4080107@wwwdotorg.org>
+ <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
+Message-ID: <528BB913.6080409@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 10:10 AM, Tomasz Figa wrote:
-> One of remaining limitations of current pinctrl-samsung driver was
-> the inability to parse multiple pinmux/pinconf group nodes grouped
-> inside a single device tree node. It made defining groups of pins for
-> single purpose, but with different parameters very inconvenient.
+On 11/19/2013 11:59 AM, Doug Anderson wrote:
+> On Tue, Nov 19, 2013 at 10:46 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 11/19/2013 10:15 AM, Tomasz Figa wrote:
+>>> This patch extends the range of settings configurable via pinfunc API
+>>> to cover pin value as well. This allows configuration of default values
+>>> of pins.
+>>
+>> Shouldn't there be a driver that acquires the GPIO that's output to the
+>> pin, and configures the output value? IIRC there have been previous
+>> discussions re: having a list of e.g. initial GPIO output values in DT,
+>> and that was rejected, and this patch seems to be doing almost the exact
+>> same thing, just at the pinctrl level rather than GPIO level.
+>>
+>> That all said, I admit this could be a useful feature...
 > 
-> This patch implements Tegra-like support for grouping multiple pinctrl
-> groups inside one device tree node, by completely changing the way
-> pin groups and functions are parsed from device tree.
-
-> The code creating
-> pinctrl maps from DT nodes has been borrowed from pinctrl-tegra,
-
-A lot of the Tegra code has been slightly generalized and put into
-pinconf-generic.c. Can the Samsung driver be converted to use that core
-code rather than adding another copy of it? Perhaps this isn't possible
-given the backwards-compatibility requirements that allow either 1- or
-2-level nodes though, although I imagine that could be added to the core
-code. One thing you'd certainly need to do is enhance the code in
-pinconf-generic.c so that you could substitute your own
-pinconf_generic_parse_dt_config() function or dt_params[] table, to
-allow for the SoC-specific property names, but I doubt that's too hard.
-Tegra could be converted then too:-)
-
-> while
-> the initial creation of groups and functions has been completely
-> rewritten with following assumptions:
->  - each group consists of just one pin and does not depend on data
->    from device tree,
->  - each function is represented by a device tree child node of the
->    pin controller, which in turn can contain multiple child nodes
->    for pins that need to have different configuration values.
-
-OK, I think that sounds reasonable.
-
-> Device Tree bindings are fully backwards compatible. New functionality
-> can be used by defining a new pinctrl group consisting of several child
-> nodes, as on following example:
+> I haven't followed all of the previous discussions, but I know I've
+> run into scenarios where something like this would be useful.  The one
+> that comes to mind is:
 > 
-> 	sd4_bus8: sd4-bus-width8 {
-> 		part-1 {
-> 			samsung,pins = "gpk0-3", "gpk0-4",
-> 					"gpk0-5", "gpk0-6";
-> 			samsung,pin-function = <3>;
-> 			samsung,pin-pud = <3>;
-> 			samsung,pin-drv = <3>;
-> 		};
-> 		part-2 {
-> 			samsung,pins = "gpk1-3", "gpk1-4",
-> 					"gpk1-5", "gpk1-6";
-> 			samsung,pin-function = <4>;
-> 			samsung,pin-pud = <4>;
-> 			samsung,pin-drv = <3>;
-> 		};
-> 	};
+> * We've got GPIOs that default at bootup to a pulled up input since
+> the default state of the pin should be "high".
+> 
+> * These pins are really intended to be outputs, like an "enable",
+> "reset", or "power down" line for a peripheral.  The pullup is strong
+> enough to give us a good default state but we really want outputs.
+> 
+> * We'd like to provide this GPIO to a peripheral through device tree.
+> ...and we'd like all the pinmux to be setup automatically so we use
+> pinctrl-names = "default".
+> 
+> * If we set the pinmux up as "output" then there's a chance that the
+> line will glitch at bootup since the pinmux happens (changing the pin
+> to output) before the driver has a chance to run.
 
-OK, that all looks great!
-
-> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-
-The DT changes fully, and the code a little briefly,
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-
-Just a minor comment below,
-
-> diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-
-> +static int samsung_pinctrl_create_function(struct device *dev,
-> +				struct samsung_pinctrl_drv_data *drvdata,
-> +				struct device_node *func_np,
-> +				struct samsung_pmx_func *func)
-...
-> +	for (i = 0; i < npins; ++i) {
-> +		const char *gname;
-> +		char *gname_copy;
-> +
-> +		ret = of_property_read_string_index(func_np, "samsung,pins",
-> +							i, &gname);
-> +		if (ret) {
-> +			dev_err(dev,
-> +				"failed to read pin name %d from %s node\n",
-> +				i, func_np->name);
-> +			return ret;
->  		}
-> +
-> +		gname_copy = devm_kzalloc(dev, strlen(gname) + 1, GFP_KERNEL);
-> +		if (!gname_copy)
-> +			return -ENOMEM;
-> +		strcpy(gname_copy, gname);
-
-Is the lifetime of the string "returned" by
-of_property_read_string_index() really so short that you must copy the
-string? I'd be tempted just to store the pointer, although perhaps you
-need to get() the node so that's safe.
+I think that last point should be addressed by having a driver that owns
+the GPIO set it to the desired output level, and the implementation of
+the SoC's GPIO driver communicate with the pinctrl driver (which might
+be the same driver; not sure here) so that gpio_direction_output()
+causes the pinctrl HW to be programmed as output only after the GPIO HW
+is programmed as output and with the correct output value. In this
+scenario, the pinctrl default state wouldn't touch the pin's
+input/output setting; that operation would be deferred until the driver
+set up the GPIO as an output.
