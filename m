@@ -1,63 +1,55 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 19 Nov 2013 18:17:32 +0200
-Subject: [PATCH 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <528AF349.9070902@roeck-us.net>
-References: <1384795139-19466-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384795139-19466-2-git-send-email-ivan.khoronzhuk@ti.com>
- <528AF349.9070902@roeck-us.net>
-Message-ID: <528B8F1C.3090506@ti.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 19 Nov 2013 10:21:30 -0600
+Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
+In-Reply-To: <20131119081455.GD7443@pengutronix.de>
+References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1384215177.17054.2.camel@linux-builds1> <5281A332.6060300@gmail.com>
+ <20131112074028.GW28790@pengutronix.de>
+ <CADhT+wffgF1veA8ec4zF7J3_4tsKUZXcq5-X9cLCgN5D3A7Nrw@mail.gmail.com>
+ <20131119081455.GD7443@pengutronix.de>
+Message-ID: <1384878090.24993.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 07:12 AM, Guenter Roeck wrote:
-> On 11/18/2013 09:18 AM, Ivan Khoronzhuk wrote:
->> To reduce code duplicate and increase code readability use WDT core
->> code to handle WDT interface.
->>
->> Remove io_lock as the WDT core uses mutex to lock each wdt device.
->> Remove wdt_state as the WDT core track state with its own variable.
->>
->> The watchdog_init_timeout() can read timeout value from timeout-sec
->> property if the passed value is out of bounds. The heartbeat is
->> initialized in next way. If heartbeat is not set thought module
->> parameter, try to read it's value from WDT node timeout-sec property.
->> If node has no one, use default value.
->>
->> The heartbeat is hold in wdd->timeout by WDT core, so use it in
->> order to set timeout period.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>   drivers/watchdog/Kconfig       |    2 +
->>   drivers/watchdog/davinci_wdt.c |  152
->> ++++++++++------------------------------
->>   2 files changed, 39 insertions(+), 115 deletions(-)
->>
->> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->> index d1d53f3..d7db13d 100644
->> --- a/drivers/watchdog/Kconfig
->> +++ b/drivers/watchdog/Kconfig
->> @@ -271,6 +271,8 @@ config IOP_WATCHDOG
->>   config DAVINCI_WATCHDOG
->>       tristate "DaVinci watchdog"
->>       depends on ARCH_DAVINCI
->> +    select WATCHDOG_CORE
->> +    select WATCHDOG_NOWAYOUT
->
-> Is this mandatory, ie is it correct that the watchdog can not be stopped
-> once started ?
->
-> Assuming it is,
+On Tue, 2013-11-19 at 09:14 +0100, Steffen Trumtrar wrote:
+> Hi Dinh!
+> 
+> On Mon, Nov 18, 2013 at 11:11:52AM -0600, Dinh Nguyen wrote:
+> > Hi Steffen,
+> > 
+> > 
+> > On Tue, Nov 12, 2013 at 1:40 AM, Steffen Trumtrar <s.trumtrar@pengutronix.de
+> > > wrote:
+> > > I actually also wanted to change the l3_sp_clk, as it seems to be neglect
+> > > the "1 or 2" divider from l3_mp_clk IIRC, but I couldn't come up with a
+> > > good
+> > > way without changing the binding or something. What do you thing about
+> > > that?
+> > > Is that wrong at the moment or do I miss something?
+> > >
+> > 
+> > Ah yes, the l3_sp_clk's parent should be l3_mp_clk and not mainclk.
+> > 
+> > Thanks for spotting that...
+> > 
+> > Dinh
+> > 
+> 
+> Hm, that doesn't sound right. Don't we currently have Gate+Divider combo in
+> the l3_mp_clk? If you turn off the clock gate from the l3_mp_clk, then l3_sp_clk
+> would also be turned off.
+> But according to Figure 2-3 in cv_5v4.pdf
+> 
+> 	DIV1 --------> GATE -----> L3_MP_CLK
+>                  |
+> 		 |---- DIV2 -----> L3_SP_CLK
+> 
+> So, l3_sp_clk's parent is the divider of l3_mp_clk but NOT the gate.
 
-Yes, it is. Davinci WDT can't be stopped and once it's expired - it can 
-be rearmed only after hardware reset.
+ah, yes. I'll have to dig into this issue a bit more.
 
->
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->
-
-Thanks a lot for your review.
-
-Regards,
--grygorii
+Dinh
+> 
+> Regards,
+> Steffen
+> 
