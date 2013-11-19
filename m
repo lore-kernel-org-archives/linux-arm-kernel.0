@@ -1,63 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Nov 2013 17:52:51 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <201311191334.46788.david.goodenough@btconnect.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <201311191348.44660.arnd@arndb.de>
- <201311191334.46788.david.goodenough@btconnect.com>
-Message-ID: <201311191752.51973.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 19 Nov 2013 11:58:58 -0500 (EST)
+Subject: [PATCH] arm: mm: refactor v7 cache cleaning ops to use way/index
+ sequence
+In-Reply-To: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.10.1311191155080.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 November 2013, David Goodenough wrote:
-> On Tuesday 19 Nov 2013, Arnd Bergmann wrote:
-> > On Monday 18 November 2013, David Goodenough wrote:
-> > > Would it not be possible to have ACPI read the hardware configuration
-> > > from the DT, and provide whatever services it wants, while also allowing
-> > > the kernel to retain the DT for its hardware config?  I suppose the only
-> > > thing that would be needed would be some way to mark paricular bits of
-> > > hardware (I am largely thinking of the things lmsensors deals with) as
-> > > being used by ACPI and being off limits to the kernel.
-> > 
-> > While that may be possible, I don't see what problem that solves. Nobody
-> > has so far explained what problem they want to solve by using ACPI. The
-> > only reason we are discussing this is Jon's statement that "everybody
-> > will use it". For any specific thing you might want to do in ACPI while
-> > leaving the rest in DT, I suspect there is an easier solution in using
-> > just DT.
->
-> It strikes me that ACPI is really two things, a provider of configuration
-> information and a provider of power management services.
+On Tue, 19 Nov 2013, Lorenzo Pieralisi wrote:
 
-As the acronym says, yes ;-)
+> Set-associative caches on all v7 implementations map the index bits
+> to physical addresses LSBs and tag bits to MSBs. On most systems with
+> sane DRAM controller configurations, this means that the current v7
+> cache flush routine using set/way operations triggers a DRAM memory
+> controller precharge/activate for every cache line writeback since the
+> cache routine cleans lines by first fixing the index and then looping
+> through ways.
+> 
+> Given the random content of cache tags, swapping the order between
+> indexes and ways loops do not prevent DRAM pages precharge and
+> activate cycles but at least, on average, improves the chances that
+> either multiple lines hit the same page or multiple lines belong to
+> different DRAM banks, improving throughput significantly.
+> 
+> This patch swaps the inner loops in the v7 cache flushing routine to
+> carry out the clean operations first on all sets belonging to a given
+> way (looping through sets) and then decrementing the way.
+> 
+> Benchmarks showed that by swapping the ordering in which sets and ways
+> are decremented in the v7 cache flushing routine, that uses set/way
+> operations, time required to flush caches is reduced significantly,
+> owing to improved writebacks throughput to the DRAM controller.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-> The first of
-> these is - on ARM - more or less duplicated by DT, and so rather than having 
-> to go through the excercise of modifying the kernel to support both sources
-> of configuration information, I am suggesting making not just the kernel
-> and uboot (or whatever boot loader) use DT, but also ACPI.  So the ACPI
-> module for an ARM box would not have separate config information coded
-> into it, but rather would either read the DT from the same place as
-> the bootloader/kernel, or act as the source of the DT for the bootloader
-> /kernel.  This way the kernel does not have to be modified again, and
-> can simply use DT whether ACPI is present or not.
+Could you include some benchmark results so we have an idea of the 
+expected improvement scale?  Other than that...
 
-Well, this is what Olof suggested, and it may or may not be possible,
-depending on what kind of data people actually want to put into ACPI
-here.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> > Since you seem to have something specific in mind, can you elaborate on
-> > why you think lmsensors (or any other device you can think of) would
-> > benefit from ACPI?
-> Its the other way around.  lmsensors often fights with ACPI in the x86
-> world for control of sensors and fans, and on x86 motherboards they do
-> silly tricks like hiding I2C busses from the kernel so that ACPI can
-> have sole control.  Thus lmsensors (which on x86 boxes could use a source
-> of information like DT as busses like I2C provide no chip ID services) needs 
-> to know which sensor chips are being used or controlled by ACPI so that it 
-> does not interfere.
-
-Ah, I see. I suppose on a server, those sensors are part of the BMC anyway
-and are accessible through IPMI only, so I'd hope that wouldn't be an issue.
-
-	Arnd
+> ---
+>  arch/arm/mm/cache-v7.S | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index b5c467a..778bcf8 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -146,18 +146,18 @@ flush_levels:
+>  	ldr	r7, =0x7fff
+>  	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
+>  loop1:
+> -	mov	r9, r4				@ create working copy of max way size
+> +	mov	r9, r7				@ create working copy of max index
+>  loop2:
+> - ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
+> - THUMB(	lsl	r6, r9, r5		)
+> + ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
+> + THUMB(	lsl	r6, r4, r5		)
+>   THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
+> - ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
+> - THUMB(	lsl	r6, r7, r2		)
+> + ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
+> + THUMB(	lsl	r6, r9, r2		)
+>   THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
+>  	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
+> -	subs	r9, r9, #1			@ decrement the way
+> +	subs	r9, r9, #1			@ decrement the index
+>  	bge	loop2
+> -	subs	r7, r7, #1			@ decrement the index
+> +	subs	r4, r4, #1			@ decrement the way
+>  	bge	loop1
+>  skip:
+>  	add	r10, r10, #2			@ increment cache number
+> -- 
+> 1.8.2.2
+> 
+> 
