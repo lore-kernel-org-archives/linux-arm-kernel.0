@@ -1,55 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Nov 2013 14:58:05 -0700
-Subject: [PATCH V4] kbuild: dtbs_install: new make target
-In-Reply-To: <1384896475-8744-1-git-send-email-jason@lakedaemon.net>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <1384896475-8744-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <528BDEED.8080708@wwwdotorg.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 19 Nov 2013 23:07:56 +0100
+Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
+In-Reply-To: <1384896868.11209.3.camel@linux-builds1>
+References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1384215177.17054.2.camel@linux-builds1>
+ <5281A332.6060300@gmail.com>
+ <20131112074028.GW28790@pengutronix.de>
+ <CADhT+wffgF1veA8ec4zF7J3_4tsKUZXcq5-X9cLCgN5D3A7Nrw@mail.gmail.com>
+ <20131119081455.GD7443@pengutronix.de>
+ <1384896868.11209.3.camel@linux-builds1>
+Message-ID: <20131119220756.GE7443@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 02:27 PM, Jason Cooper wrote:
-> Unlike other build products in the Linux kernel, there is no 'make
-> *install' mechanism to put devicetree blobs in a standard place.
+On Tue, Nov 19, 2013 at 03:34:28PM -0600, Dinh Nguyen wrote:
+> Hi Steffen,
 > 
-> This patch is an attempt to fix this problem.  Akin to 'make install',
-> this creates a new make target, dtbs_install.  The script that gets
-> called defers to a distribution or user supplied installdtbs binary,
-> if found in the system.  Otherwise, the default action is to install a
-> given dtb into
+> On Tue, 2013-11-19 at 09:14 +0100, Steffen Trumtrar wrote:
+> > Hi Dinh!
+> > 
+> > On Mon, Nov 18, 2013 at 11:11:52AM -0600, Dinh Nguyen wrote:
+> > > Hi Steffen,
+> > > 
+> > > 
+> > > On Tue, Nov 12, 2013 at 1:40 AM, Steffen Trumtrar <s.trumtrar@pengutronix.de
+> > > > wrote:
+> > > > I actually also wanted to change the l3_sp_clk, as it seems to be neglect
+> > > > the "1 or 2" divider from l3_mp_clk IIRC, but I couldn't come up with a
+> > > > good
+> > > > way without changing the binding or something. What do you thing about
+> > > > that?
+> > > > Is that wrong at the moment or do I miss something?
+> > > >
+> > > 
+> > > Ah yes, the l3_sp_clk's parent should be l3_mp_clk and not mainclk.
+> > > 
+> > > Thanks for spotting that...
+> > > 
+> > > Dinh
+> > > 
+> > 
+> > Hm, that doesn't sound right. Don't we currently have Gate+Divider combo in
+> > the l3_mp_clk? If you turn off the clock gate from the l3_mp_clk, then l3_sp_clk
+> > would also be turned off.
+> > But according to Figure 2-3 in cv_5v4.pdf
+> > 
+> > 	DIV1 --------> GATE -----> L3_MP_CLK
+> >                  |
+> > 		 |---- DIV2 -----> L3_SP_CLK
+> > 
+> > So, l3_sp_clk's parent is the divider of l3_mp_clk but NOT the gate.
 > 
->   /lib/modules/${kernel_version}/devicetree/${dts_filename}.dtb
+> I just doubled checked. The L3_SP_CLK is taken before the gate of the
+> L3_MP_CLK, so turning off the L3_MP_CLK does not turn off the L3_SP_CLK.
+> So with this information, I think the parent for the L3_SP_CLK can be
+> the L3_MP_CLK, so that the extra divider is accounted for.
 
-I still don't see why you wouldn't install the files in
-/lib/devicetrees, but I suppose that location is fine.
+Yes. Giving it another thought, you are right. That should be okay.
 
-> This is done to keep dtbs from different kernel versions separate until
-> things have settled down.  Once the dtbs are stable, and not so strongly
-> linked to the kernel version, the devicetree files will most likely move
-> to their own repo.  Users will need to upgrade install scripts at that
-> time.
-> 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> Question: should I make a note about the filenames not being considered an ABI,
-> or just let it be?
+Thanks,
+Steffen
 
-I still believe they're an ABI.
-
-I guess Grant meant that they aren't an ABI to the kernel at run-time,
-unlike the content which is an ABI. That's fine.
-
-However, I believe the files certainly are an ABI to any script that
-takes them from the "make dtbs_install" output directory.
-
-Perhaps the best resolution is to just say nothing and let it be:-)
-
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-
-> +dtbs_install: dtbs
-> +	$(CONFIG_SHELL) $(srctree)/scripts/installdtbs.sh $(KERNELRELEASE) \
-> +	"$(MODLIB)/devicetree" "$(srctree)/$(boot)/dts"
-
-I still think this rule should be in Makefile not arch/arm/Makefile.
-
-Aside from those couple of issues, this version looks OK to me.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
