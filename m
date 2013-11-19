@@ -1,42 +1,36 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Nov 2013 14:16:17 -0600
-Subject: [Inquiry] How to boot using USB device and configure PCI using
- OMAP4460/4470?
-In-Reply-To: <CAB8gEUtYG9agU2i=fEKocfw1wjvBDfHvo5=fLNpABeNtFiXSxA@mail.gmail.com>
-References: <CAB8gEUt-_-w4wJkdo3bH7qiLOaqFusfL85rs58n00twD1qpxLA@mail.gmail.com>
- <20131114154505.GC15835@saruman.home>
- <CAB8gEUtYG9agU2i=fEKocfw1wjvBDfHvo5=fLNpABeNtFiXSxA@mail.gmail.com>
-Message-ID: <20131119201617.GC4715@saruman.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Nov 2013 21:24:31 +0100
+Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
+In-Reply-To: <528B811A.1030501@gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
+ <528B811A.1030501@gmail.com>
+Message-ID: <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 09:47:42AM +0800, Maggie Mae Roxas wrote:
-> Hi Felipe,
-> Good morning.
-> 
-> Thank you very much for the feedback.
-> 
-> > all you need to do is write a flasher and a small "bootloader" which
-> > knows about usb. ROM code can receive data via USB and jump to that
-> > data's entry point.
-> > It's all in the TRM.
-> OK, I will look into this.
-> However, it seems like this question (1) is not kernel-related.
-> Can you direct me to the correct contact person for this?
-> 
-> > that's because OMAP4 doesn't have a PCI controller.
-> But TI OMAP4470 Blaze Tablet 2 Development Platform contains PCI (miniPCIe).
-> How is Blaze 2 tablet's kernel configured then..?
+On Tue, Nov 19, 2013 at 4:17 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> On 11/19/2013 05:00 PM, Linus Walleij wrote:
 
-oh, that's a COM connector. It's used to interface with TI's WiLink
-devices.  The actual bus there is SDIO.
+>> And that happens before the GPIO driver gets registered -> crash.
+>
+> That is not the issue. The real issue is h3xxx using those gpio's without
+> previously calling gpio_request.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/c29ac9a3/attachment.sig>
+Really? But that wasn't done before this patch either.
+
+It is basically OK to use the gpio_* functions before or
+without requesting the GPIOs, it won't look nice but it
+works.
+
+> Unfortunately sa1100 driver doesn't have a
+> good place to request gpios. When faced this problem during locomo
+> refactoring, I ended up with the following piece of code:
+(...)
+> Russell, Linus, what do you think about the previous solution?
+
+That looks OK but is that really the problem?
+
+Yours,
+Linus Walleij
