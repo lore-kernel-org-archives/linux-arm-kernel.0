@@ -1,115 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Nov 2013 16:50:31 +0100
-Subject: [RFC PATCH 1/3] iio: accel: Add device tree probing for STMicro
- accelerometers
-In-Reply-To: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1384876234-1211-2-git-send-email-maxime.ripard@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Nov 2013 16:14:54 +0000
+Subject: [PATCH] arm: mm: refactor v7 cache cleaning ops to use
+ way/index sequence
+In-Reply-To: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1384874993-4577-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20131119161454.GL26487@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the compatibles supported by the st_sensors library. This uses kind
-of a hack, since the st_sensors core will actively check at probe time
-that the device name matches the one reported when using old style i2c
-probing, and that this name will be different with device tree.
+On Tue, Nov 19, 2013 at 03:29:53PM +0000, Lorenzo Pieralisi wrote:
+> Set-associative caches on all v7 implementations map the index bits
+> to physical addresses LSBs and tag bits to MSBs. On most systems with
+> sane DRAM controller configurations, this means that the current v7
+> cache flush routine using set/way operations triggers a DRAM memory
+> controller precharge/activate for every cache line writeback since the
+> cache routine cleans lines by first fixing the index and then looping
+> through ways.
+> 
+> Given the random content of cache tags, swapping the order between
+> indexes and ways loops do not prevent DRAM pages precharge and
+> activate cycles but at least, on average, improves the chances that
+> either multiple lines hit the same page or multiple lines belong to
+> different DRAM banks, improving throughput significantly.
+> 
+> This patch swaps the inner loops in the v7 cache flushing routine to
+> carry out the clean operations first on all sets belonging to a given
+> way (looping through sets) and then decrementing the way.
+> 
+> Benchmarks showed that by swapping the ordering in which sets and ways
+> are decremented in the v7 cache flushing routine, that uses set/way
+> operations, time required to flush caches is reduced significantly,
+> owing to improved writebacks throughput to the DRAM controller.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/mm/cache-v7.S | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index b5c467a..778bcf8 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -146,18 +146,18 @@ flush_levels:
+>  	ldr	r7, =0x7fff
+>  	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
+>  loop1:
+> -	mov	r9, r4				@ create working copy of max way size
+> +	mov	r9, r7				@ create working copy of max index
+>  loop2:
+> - ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
+> - THUMB(	lsl	r6, r9, r5		)
+> + ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
+> + THUMB(	lsl	r6, r4, r5		)
+>   THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
+> - ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
+> - THUMB(	lsl	r6, r7, r2		)
+> + ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
+> + THUMB(	lsl	r6, r9, r2		)
+>   THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
+>  	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../devicetree/bindings/iio/accel/st_accel_i2c.txt | 22 +++++++++++++++
- drivers/iio/accel/st_accel_i2c.c                   | 33 ++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
-
-diff --git a/Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt b/Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
-new file mode 100644
-index 000000000000..4a1efdf1775f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
-@@ -0,0 +1,22 @@
-+* ST Micro accelerometer sensors 
-+
-+Required properties:
-+  - compatible : should be either:
-+	* "st,lis3dh"
-+	* "st,lis331dlh"
-+	* "st,lsm303dl-accel"
-+	* "st,lsm303dlh-accel"
-+	* "st,lsm303dlhc-accel"
-+	* "st,lsm303dlm-accel"
-+	* "st,lsm330-accel"
-+	* "st,lsm330d-accel"
-+	* "st,lsm330dl-accel"
-+	* "st,lsm330dlc-accel"
-+  - reg : the I2C address of the sensor
-+
-+Example:
-+
-+accel: accel at 19 {
-+	compatible = "st,lsm330dlc-accel";
-+	reg = <0x19>;
-+};
-diff --git a/drivers/iio/accel/st_accel_i2c.c b/drivers/iio/accel/st_accel_i2c.c
-index d7bedbdfc81d..de2bf76378d8 100644
---- a/drivers/iio/accel/st_accel_i2c.c
-+++ b/drivers/iio/accel/st_accel_i2c.c
-@@ -13,11 +13,27 @@
- #include <linux/slab.h>
- #include <linux/i2c.h>
- #include <linux/iio/iio.h>
-+#include <linux/of_device.h>
- 
- #include <linux/iio/common/st_sensors.h>
- #include <linux/iio/common/st_sensors_i2c.h>
- #include "st_accel.h"
- 
-+static const struct of_device_id st_accel_of_table[] = {
-+	{ .compatible = "st,lis3dh", .data = LIS3DH_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lis331dlh", .data = LIS331DLH_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm303dl-accel", .data = LSM303DL_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm303dlh-accel", .data = LSM303DLH_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm303dlhc-accel", .data = LSM303DLHC_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm303dlm-accel", .data = LSM303DLM_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm330-accel", .data = LSM330_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm330d-accel", .data = LSM330D_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm330dl-accel", .data = LSM330DL_ACCEL_DEV_NAME },
-+	{ .compatible = "st,lsm330dlc-accel", .data = LSM330DLC_ACCEL_DEV_NAME },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, st_accel_of_table);
-+
- static int st_accel_i2c_probe(struct i2c_client *client,
- 						const struct i2c_device_id *id)
- {
-@@ -34,6 +50,22 @@ static int st_accel_i2c_probe(struct i2c_client *client,
- 
- 	st_sensors_i2c_configure(indio_dev, client, adata);
- 
-+	/*
-+	 * If we are probed through DT, st_sensors_i2c_configure will
-+	 * fill the indio_dev->name string with the client->name,
-+	 * which is the compatible without the vendor prefix.  Since
-+	 * compatibles separators are usually "-", and that the
-+	 * convention in this driver is using "_", we obviously have a
-+	 * problem when the st-sensors core checks that the two
-+	 * strings matches. We need to set again the indio_dev->name
-+	 * string to the real value used by the core later on.
-+	 */
-+	if (client->dev.of_node) {
-+		const struct of_device_id *device;
-+		device = of_match_device(st_accel_of_table, &client->dev);
-+		indio_dev->name = device->data;
-+	}
-+
- 	err = st_accel_common_probe(indio_dev, client->dev.platform_data);
- 	if (err < 0)
- 		return err;
-@@ -67,6 +99,7 @@ static struct i2c_driver st_accel_driver = {
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name = "st-accel-i2c",
-+		.of_match_table = of_match_ptr(st_accel_of_table),
- 	},
- 	.probe = st_accel_i2c_probe,
- 	.remove = st_accel_i2c_remove,
--- 
-1.8.4.2
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
