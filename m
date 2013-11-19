@@ -1,57 +1,47 @@
-From: david.goodenough@btconnect.com (David Goodenough)
-Date: Tue, 19 Nov 2013 13:34:46 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <201311191348.44660.arnd@arndb.de>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <201311182247.03540.david.goodenough@btconnect.com>
- <201311191348.44660.arnd@arndb.de>
-Message-ID: <201311191334.46788.david.goodenough@btconnect.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 19 Nov 2013 13:43:11 +0000
+Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
+In-Reply-To: <20131118135439.GC16735@n2100.arm.linux.org.uk>
+References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
+ <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
+ <5283DB34.9050301@gmail.com> <201311141332.58498.arnd@arndb.de>
+ <CACxGe6uMWjfmB4WDKs+vu05224jqpbDZBHT_ZXnqxw17JzUqvw@mail.gmail.com>
+ <5284E236.1000606@gmail.com>
+ <CACxGe6sgRwiakJLUCtaaQ2NF51PpkoNZvZr6EoE-BPeZiDsDFQ@mail.gmail.com>
+ <20131118135439.GC16735@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6vYi3T6Eq3928My5JjO3jtmXQEb_R6Qqvz9trhyfRmuJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 Nov 2013, Arnd Bergmann wrote:
-> On Monday 18 November 2013, David Goodenough wrote:
-> > Would it not be possible to have ACPI read the hardware configuration
-> > from the DT, and provide whatever services it wants, while also allowing
-> > the kernel to retain the DT for its hardware config?  I suppose the only
-> > thing that would be needed would be some way to mark paricular bits of
-> > hardware (I am largely thinking of the things lmsensors deals with) as
-> > being used by ACPI and being off limits to the kernel.
-> 
-> While that may be possible, I don't see what problem that solves. Nobody
-> has so far explained what problem they want to solve by using ACPI. The
-> only reason we are discussing this is Jon's statement that "everybody
-> will use it". For any specific thing you might want to do in ACPI while
-> leaving the rest in DT, I suspect there is an easier solution in using
-> just DT.
-It strikes me that ACPI is really two things, a provider of configuration
-information and a provider of power management services.  The first of
-these is - on ARM - more or less duplicated by DT, and so rather than having 
-to go through the excercise of modifying the kernel to support both sources
-of configuration information, I am suggesting making not just the kernel
-and uboot (or whatever boot loader) use DT, but also ACPI.  So the ACPI
-module for an ARM box would not have separate config information coded
-into it, but rather would either read the DT from the same place as
-the bootloader/kernel, or act as the source of the DT for the bootloader
-/kernel.  This way the kernel does not have to be modified again, and
-can simply use DT whether ACPI is present or not.
-> 
-> Since you seem to have something specific in mind, can you elaborate on
-> why you think lmsensors (or any other device you can think of) would
-> benefit from ACPI?
-Its the other way around.  lmsensors often fights with ACPI in the x86
-world for control of sensors and fans, and on x86 motherboards they do
-silly tricks like hiding I2C busses from the kernel so that ACPI can
-have sole control.  Thus lmsensors (which on x86 boxes could use a source
-of information like DT as busses like I2C provide no chip ID services) needs 
-to know which sensor chips are being used or controlled by ACPI so that it 
-does not interfere.
+On Mon, Nov 18, 2013 at 1:54 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 15, 2013 at 02:16:29AM +0900, Grant Likely wrote:
+>> On Thu, Nov 14, 2013 at 11:46 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> > If this is a required feature then we should make machine_desc common
+>> > (or at least part of it) with the other arches that have copied arm and
+>> > then add it to arm64 as well. Then I could do further consolidation of
+>> > the FDT machine matching code. Otherwise this is all just pointless
+>> > architecture variation that really has nothing to do with the architecture.
+>>
+>> I think you are missing my point. go ahead, take it out of
+>> /proc/cpuinfo. That's not the issue.
+>
+> You do realise this is a user API issue, right?
+>
+> http://fossies.org/dox/glibc-2.18/ports_2sysdeps_2unix_2sysv_2linux_2arm_2ioperm_8c_source.html
+>
+> Right, it only has four strings which it matches against, but this is
+> evidence that /proc/cpuinfo is a user API, and the strings therein are
+> used by userspace in ways you don't expect.
+>
+> We can't just go around removing things.
 
-David
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Not everything we end up exporting ends up being an ABI. If nobody
+uses it (or complains when we remove it in the obscure cases) then
+there is no problem :-)
+
+You're absolutely right here though. I strongly doubt the string
+matters for the DT platforms, but you're right that it should not be
+changed for the old board support.
+
+g.
