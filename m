@@ -1,32 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 Nov 2013 22:49:04 +0100
-Subject: [PATCH] ARM: ux500: delete Nomadik pinctrl AUXDATA
-Message-ID: <1384897744-30801-1-git-send-email-linus.walleij@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 19 Nov 2013 14:52:01 -0700
+Subject: [PATCHv5 6/9] iommu/tegra: smmu: get swgroups from DT "iommus="
+In-Reply-To: <1384853593-32202-7-git-send-email-hdoyu@nvidia.com>
+References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com>
+ <1384853593-32202-7-git-send-email-hdoyu@nvidia.com>
+Message-ID: <528BDD81.1000507@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This deletes the AUXDATA hammering down the Nomadik pin
-controller name to "pinctrl-db8500". We have removed all
-dependencies on this name.
+On 11/19/2013 02:33 AM, Hiroshi Doyu wrote:
+> This provides the info about which swgroups a device belongs to. This
+> info is passed from DT. This is necessary for the unified SMMU driver
+> among Tegra SoCs since each has different H/W accelerators.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cpu-db8500.c | 3 ---
- 1 file changed, 3 deletions(-)
+> diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 0b5b27b4a7b4..448906054817 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -167,9 +167,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("stericsson,ux500-hash", 0xa03c2000, "hash1", NULL),
- 	OF_DEV_AUXDATA("stericsson,snd-soc-mop500", 0, "snd-soc-mop500.0",
- 			NULL),
--	/* Requires device name bindings. */
--	OF_DEV_AUXDATA("stericsson,db8500-pinctrl", U8500_PRCMU_BASE,
--		"pinctrl-db8500", NULL),
- 	{},
- };
- 
--- 
-1.8.3.1
+>  - nvidia,#asids : # of ASIDs
+>  - dma-window : IOVA start address and length.
+>  - nvidia,ahb : phandle to the ahb bus connected to SMMU.
+> +- iommus: phandle to an iommu device which a device is
+> +  attached to and indicates which swgroups a device belongs to(SWGROUP ID).
+> +  SWGROUP ID is from 0 to 63, and a device can belong to multiple SWGROUPS.
+
+I'm sure I've said this before:
+
+#iommu-cells isn't documented.
+
+The list of properties you added to is a list of properties that the
+IOMMU node should contain. However, the iommus property is something
+that *client* nodes should contain, not the IOMMU node itself.
+
+Instead, I think you want something like:
+
+-Required properties:
++Required properties in the IOMMU node:
+ ... the current list of properties
++#iommu-cells. Should be 2. In client IOMMU specifiers, the two cells
++  represent a 64-bit bitmask of SWGROUP IDs under which the device
++  initiates transactions. The least significant word is first. See
++  <dt-bindings/memory/tegra-swgroup.h> for a list of valid values.
++
++Required properties in device nodes affected by the IOMMU:
++- iommus: A list of phandle plus specifier pairs for each IOMMU that
++    affects master transactions initiated by the device. The number of
++    cells in each specifier is defined by the #iommu-cells property in
++    the IOMMU node referred to by the phandle. The meaning of the
++    specifier cells is defined by the referenced IOMMU's binding.
+
+Aside from those layout/wording issues, this is certainly the binding
+that I think makes sense.
+
+> +	host1x {
+> +		compatible = "nvidia,tegra30-host1x", "simple-bus";
+> +		iommus = <&smmu TEGRA_SWGROUP_CELLS(HC)>;
+> +		....
+> +		gr3d {
+> +			compatible = "nvidia,tegra30-gr3d";
+> +			nvidia,memory-clients = <&smmu TEGRA_SWGROUP_CELLS(NV)
+> +						       TEGRA_SWGROUP_CELLS(NV2)>;
+
+I think you forgot to update "nvidia,memory-clients" to "iommus" there.
+
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+
+> +static int smmu_of_get_swgroups(struct device *dev, unsigned long *swgroups)
+
+This doesn't seem to be used by anything in this patch.
