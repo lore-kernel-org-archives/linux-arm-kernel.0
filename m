@@ -1,31 +1,31 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 19 Nov 2013 14:01:09 -0800
-Subject: [PATCH 0/4] Add missing components for X-Gene reboot drivers.
-In-Reply-To: <1384294092-18794-1-git-send-email-fkan@apm.com>
-References: <1384294092-18794-1-git-send-email-fkan@apm.com>
-Message-ID: <CAL85gmDaV-d5xS8gM1RFEqCsa3ocaym+bjxhFueYiqtf-N4NBg@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 20 Nov 2013 09:01:44 +1100
+Subject: [PATCH 0/2] Revert support for reserved memory regions defined
+ in device tree
+In-Reply-To: <20131119151418.8BB2BC4079D@trevor.secretlab.ca>
+References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
+ < 20131030134702.19B57C402A0@trevor.secretlab.ca>
+ <528B5949.20204@samsung.com >
+ <20131119151418.8BB2BC4079D@trevor.secretlab.ca>
+Message-ID: <1384898504.26969.48.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on this?
+On Tue, 2013-11-19 at 15:14 +0000, Grant Likely wrote:
+> > The proposal look good for me. I'm not convinced that we really need the
+> > support for 'reg' property, as the fixed memory region is a special case
+> > of generic dynamic allocation specified by the size and alloc-ranges, but
+> > I assume that there have been already a long discussion about this, so I
+> > accept the common consensus.
+> 
+> It is absolutely necessary for some use cases. For example, a
+> framebuffer enabled by firmware and passed onto the kernel for
+> flicker-free boot. Some platforms have fixed regions that cannot be
+> moved up.
 
-On Tue, Nov 12, 2013 at 2:08 PM, Feng Kan <fkan@apm.com> wrote:
-> Add dts node for X-Gene reboot driver. Apply documentation dts binding.
-> Some minor compile warning fix and enable reboot driver by default.
->
-> Feng Kan (4):
->   Documentation: add dts binding for X-Gene reboot dts node.
->   arm64: add missing dts entry for X-Gene platform.
->   arm64: Enable system reset via arch Kconfig for X-Gene system.
->   arm64: removed using of the mask attribute in the dts for reset bit.
->
->  .../devicetree/bindings/arm64/xgene/reboot.txt     |   11 +++++++++++
->  arch/arm64/Kconfig                                 |    1 +
->  arch/arm64/boot/dts/apm-storm.dtsi                 |    5 +++++
->  drivers/power/reset/xgene-reboot.c                 |    5 ++---
->  4 files changed, 19 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm64/xgene/reboot.txt
->
-> --
-> 1.7.6.1
->
+Arguably that could be covered with alloc-range and size by making the range be
+the reg property content basically (and thus size == size of range) but I
+prefer the reg property, it's a clearer statement of intent.
+
+Cheers,
+Ben.
