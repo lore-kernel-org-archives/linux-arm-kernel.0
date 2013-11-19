@@ -1,43 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Nov 2013 11:07:41 +0000
-Subject: [PATCH 02/10] dma: ste_dma40: Parse flags property for new 'high
- priority channel' request
+Date: Tue, 19 Nov 2013 11:07:40 +0000
+Subject: [PATCH 01/10] dma: ste_dma40: Expand DT binding to accept
+ 'high-priority channel' flag
 In-Reply-To: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
 References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1384859269-19801-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1384859269-19801-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is used for MSP (audio) devices which is about to be fully DT:ed.
 
+Cc: devicetree at vger.kernel.org
 Acked-by: Vinod Koul <vinod.koul@intel.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/dma/ste-dma40.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index b8c031b..00a2de9 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2409,6 +2409,7 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
- #define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
- #define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
- #define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
-+#define D40_DT_FLAGS_HIGH_PRIO(flags)  ((flags >> 4) & 0x1)
+diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+index a8c21c2..1f5729f 100644
+--- a/Documentation/devicetree/bindings/dma/ste-dma40.txt
++++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+@@ -50,6 +50,9 @@ Each dmas request consists of 4 cells:
+         0x00000008: Use fixed channel:
+                 Use automatic channel selection when unset
+                 Use DMA request line number when set
++        0x00000010: Set channel as high priority:
++                Normal priority when unset
++                High priority when set
  
- static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
- 				  struct of_dma *ofdma)
-@@ -2446,6 +2447,9 @@ static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
- 		cfg.use_fixed_channel = true;
- 	}
- 
-+	if (D40_DT_FLAGS_HIGH_PRIO(flags))
-+		cfg.high_priority = true;
-+
- 	return dma_request_channel(cap, stedma40_filter, &cfg);
- }
+ Example:
  
 -- 
 1.8.1.2
