@@ -1,111 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 Nov 2013 22:28:19 +0100
-Subject: [PATCH 2/2] clksrc: delete nomadik MTU non-DT boot path
-Message-ID: <1384896499-9428-1-git-send-email-linus.walleij@linaro.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 19 Nov 2013 15:34:28 -0600
+Subject: [PATCH 0/4] Socfpga: clk: trivial fixes and cleanup
+In-Reply-To: <20131119081455.GD7443@pengutronix.de>
+References: <1383836828-24886-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1384215177.17054.2.camel@linux-builds1> <5281A332.6060300@gmail.com>
+ <20131112074028.GW28790@pengutronix.de>
+ <CADhT+wffgF1veA8ec4zF7J3_4tsKUZXcq5-X9cLCgN5D3A7Nrw@mail.gmail.com>
+ <20131119081455.GD7443@pengutronix.de>
+Message-ID: <1384896868.11209.3.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both platforms using the MTU (Nomadik and Ux500) have now been
-converted to use device tree exclusively, thus let us delete
-this platform data header and make this driver a fully
-self-contained DT-only driver.
+Hi Steffen,
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Daniel/tglx: seeking an ACK from either of you guys to take this
-in the ux500-devicetree branch where the last user is deleted.
----
- drivers/clocksource/nomadik-mtu.c                  | 23 +++++-----------------
- .../linux/platform_data/clocksource-nomadik-mtu.h  |  9 ---------
- 2 files changed, 5 insertions(+), 27 deletions(-)
- delete mode 100644 include/linux/platform_data/clocksource-nomadik-mtu.h
+On Tue, 2013-11-19 at 09:14 +0100, Steffen Trumtrar wrote:
+> Hi Dinh!
+> 
+> On Mon, Nov 18, 2013 at 11:11:52AM -0600, Dinh Nguyen wrote:
+> > Hi Steffen,
+> > 
+> > 
+> > On Tue, Nov 12, 2013 at 1:40 AM, Steffen Trumtrar <s.trumtrar@pengutronix.de
+> > > wrote:
+> > > I actually also wanted to change the l3_sp_clk, as it seems to be neglect
+> > > the "1 or 2" divider from l3_mp_clk IIRC, but I couldn't come up with a
+> > > good
+> > > way without changing the binding or something. What do you thing about
+> > > that?
+> > > Is that wrong at the moment or do I miss something?
+> > >
+> > 
+> > Ah yes, the l3_sp_clk's parent should be l3_mp_clk and not mainclk.
+> > 
+> > Thanks for spotting that...
+> > 
+> > Dinh
+> > 
+> 
+> Hm, that doesn't sound right. Don't we currently have Gate+Divider combo in
+> the l3_mp_clk? If you turn off the clock gate from the l3_mp_clk, then l3_sp_clk
+> would also be turned off.
+> But according to Figure 2-3 in cv_5v4.pdf
+> 
+> 	DIV1 --------> GATE -----> L3_MP_CLK
+>                  |
+> 		 |---- DIV2 -----> L3_SP_CLK
+> 
+> So, l3_sp_clk's parent is the divider of l3_mp_clk but NOT the gate.
 
-diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
-index ed7b73b508e0..f00b5c9ce8b6 100644
---- a/drivers/clocksource/nomadik-mtu.c
-+++ b/drivers/clocksource/nomadik-mtu.c
-@@ -20,7 +20,6 @@
- #include <linux/jiffies.h>
- #include <linux/delay.h>
- #include <linux/err.h>
--#include <linux/platform_data/clocksource-nomadik-mtu.h>
- #include <linux/sched_clock.h>
- #include <asm/mach/time.h>
- 
-@@ -103,7 +102,7 @@ static int nmdk_clkevt_next(unsigned long evt, struct clock_event_device *ev)
- 	return 0;
- }
- 
--void nmdk_clkevt_reset(void)
-+static void nmdk_clkevt_reset(void)
- {
- 	if (clkevt_periodic) {
- 		/* Timer: configure load and background-load, and fire it up */
-@@ -144,7 +143,7 @@ static void nmdk_clkevt_mode(enum clock_event_mode mode,
- 	}
- }
- 
--void nmdk_clksrc_reset(void)
-+static void nmdk_clksrc_reset(void)
- {
- 	/* Disable */
- 	writel(0, mtu_base + MTU_CR(0));
-@@ -192,8 +191,8 @@ static struct irqaction nmdk_timer_irq = {
- 	.dev_id		= &nmdk_clkevt,
- };
- 
--static void __init __nmdk_timer_init(void __iomem *base, int irq,
--				     struct clk *pclk, struct clk *clk)
-+static void __init nmdk_timer_init(void __iomem *base, int irq,
-+				   struct clk *pclk, struct clk *clk)
- {
- 	unsigned long rate;
- 
-@@ -245,18 +244,6 @@ static void __init __nmdk_timer_init(void __iomem *base, int irq,
- 	register_current_timer_delay(&mtu_delay_timer);
- }
- 
--void __init nmdk_timer_init(void __iomem *base, int irq)
--{
--	struct clk *clk0, *pclk0;
--
--	pclk0 = clk_get_sys("mtu0", "apb_pclk");
--	BUG_ON(IS_ERR(pclk0));
--	clk0 = clk_get_sys("mtu0", NULL);
--	BUG_ON(IS_ERR(clk0));
--
--	__nmdk_timer_init(base, irq, pclk0, clk0);
--}
--
- static void __init nmdk_timer_of_init(struct device_node *node)
- {
- 	struct clk *pclk;
-@@ -280,7 +267,7 @@ static void __init nmdk_timer_of_init(struct device_node *node)
- 	if (irq <= 0)
- 		panic("Can't parse IRQ");
- 
--	__nmdk_timer_init(base, irq, pclk, clk);
-+	nmdk_timer_init(base, irq, pclk, clk);
- }
- CLOCKSOURCE_OF_DECLARE(nomadik_mtu, "st,nomadik-mtu",
- 		       nmdk_timer_of_init);
-diff --git a/include/linux/platform_data/clocksource-nomadik-mtu.h b/include/linux/platform_data/clocksource-nomadik-mtu.h
-deleted file mode 100644
-index 80088973b734..000000000000
---- a/include/linux/platform_data/clocksource-nomadik-mtu.h
-+++ /dev/null
-@@ -1,9 +0,0 @@
--#ifndef __PLAT_MTU_H
--#define __PLAT_MTU_H
--
--void nmdk_timer_init(void __iomem *base, int irq);
--void nmdk_clkevt_reset(void);
--void nmdk_clksrc_reset(void);
--
--#endif /* __PLAT_MTU_H */
--
--- 
-1.8.3.1
+I just doubled checked. The L3_SP_CLK is taken before the gate of the
+L3_MP_CLK, so turning off the L3_MP_CLK does not turn off the L3_SP_CLK.
+So with this information, I think the parent for the L3_SP_CLK can be
+the L3_MP_CLK, so that the extra divider is accounted for.
+
+Dinh
+> 
+> Regards,
+> Steffen
+> 
