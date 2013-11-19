@@ -1,42 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Nov 2013 09:52:47 -0200
-Subject: [PATCH v2 1/6] mmc: sdhci: clear auto cmd setting bits for no
- data cmds
-In-Reply-To: <1383142193-24950-2-git-send-email-b29396@freescale.com>
-References: <1383142193-24950-1-git-send-email-b29396@freescale.com>
- <1383142193-24950-2-git-send-email-b29396@freescale.com>
-Message-ID: <CAOMZO5ANNpai2LuQxrW82scFdZw6aPRLZOobna60SsoVVwKS9Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Nov 2013 11:57:44 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131115175241.GB27174@quad.lixom.net>
+ <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
+Message-ID: <20131119115744.GK16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 12:09 PM, Dong Aisheng <b29396@freescale.com> wrote:
-> The auto cmd settings bits should be cleared before sending new commands
-> or we may receive command timeout error for normal commands due to wrongly
-> pre-sent auto cmd.
->
-> e.g. we receive CMD13 timeout error due to ACMD23 is wrongly enabled
-> by former data commands.
->
-> mmc2: new high speed DDR MMC card at address 0001
-> mmcblk1: mmc2:0001 SEM08G 7.39 GiB
-> mmcblk1boot0: mmc2:0001 SEM08G partition 1 2.00 MiB
-> mmcblk1boot1: mmc2:0001 SEM08G partition 2 2.00 MiB
-> mmcblk1rpmb: mmc2:0001 SEM08G partition 3 128 KiB
->  mmcblk1: p1 p2 p3 p4 < p5 p6 p7 >
-> mmc2: Timeout waiting for hardware interrupt.
->  mmcblk1boot1: unknown partition table
-> mmc2: Timeout waiting for hardware interrupt.
->  mmcblk1boot0: unknown partition table
->
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+On Tue, Nov 19, 2013 at 11:30:15AM +0000, Mark Rutland wrote:
+> I'm not sure it's entirely reasonable to assume that Microsoft will
+> swoop in and develop standards that are useful to us or even applicable
+> to the vast majority of the systems that are likely to exist.
 
-Thanks for the patch, Dong.
+It's not in their interest to do this, so it won't happen.
 
-This fixes the eMMC interrupt timeout issue on mx6qsabresd.
+> Outside of the ARM Linux community there is work ongoing to change ACPI
+> to better suit the level of variation we seem in the ARM space (see
+> Darren Hart's presentation from ELCE [1]). We need to be involved now in
+> order to make sure that this is actually generally applicable.
 
-I think we should mark it for stable. At least 3.11 and 3.12 have this
-issue and your patch fixes it.
+It may have been interesting to have attended some of these talks, but
+because the LF botched up and never told the KSummit invitees that they
+had free access to ELCE until after ELCE had finished...
 
-Regards,
+> I think that we need to be involved in ACPI from today if we have any
+> hope of having something sane in future.
 
-Fabio Estevam
+I fully agree with that.  If we're not involved now, we're going to end
+up with something that's already designed and implemented on systems
+which we'll then _have_ no option but to accept or just not be able to
+run mainline kernels on such systems.
+
+To ignore ACPI now would be extremely n?ieve.
