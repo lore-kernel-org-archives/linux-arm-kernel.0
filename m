@@ -1,152 +1,199 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Nov 2013 11:36:32 +0100
-Subject: [PATCH] iio: mxs-lradc: compute temperature from channel 8 and 9
-Message-ID: <1384857392-2199-1-git-send-email-maxime.ripard@free-electrons.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 19 Nov 2013 16:10:45 +0530
+Subject: [PATCH 2/3] Phy: Exynos: Add Exynos5250 sata phy driver
+In-Reply-To: <CAKuRcOKztSPZc0qKRE2TfwALzKqW2uan4azL22KRJ0ZzGMx9wA@mail.gmail.com>
+References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>	<1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>	<524AC56C.1060501@ti.com>	<CA+NduCAwnqz4_YNoVnpfV3O6fn=2QTdv4zgEdYRv4qjMRvWeag@mail.gmail.com>	<52846442.2020307@ti.com>	<CAKuRcOK8XDKGsY3w2fwnrqtyH2HN0LjrqE6AoE0dSkaVOy5ozA@mail.gmail.com>	<528B34EF.3030108@ti.com>
+ <CAKuRcOKztSPZc0qKRE2TfwALzKqW2uan4azL22KRJ0ZzGMx9wA@mail.gmail.com>
+Message-ID: <528B402D.3070704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Tuesday 19 November 2013 03:42 PM, Yuvaraj Kumar wrote:
+> On Tue, Nov 19, 2013 at 3:22 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> On Friday 15 November 2013 11:17 AM, Yuvaraj Kumar wrote:
+>>> On Thu, Nov 14, 2013 at 11:18 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On Monday 07 October 2013 07:35 PM, Yuvaraj Cd wrote:
+>>>>> On Tue, Oct 1, 2013 at 6:21 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>>>> On Tuesday 01 October 2013 12:03 PM, Yuvaraj Kumar C D wrote:
+>>>>>>> This patch adds the sata phy driver for Exynos5250.Exynos5250 sata
+>>>>>>> phy comprises of CMU and TRSV blocks which are of I2C register Map.
+>>>>>>> So this patch also adds a i2c client driver, which is used configure
+>>>>>>> the CMU and TRSV block of exynos5250 SATA PHY.
+>>>>>>
+>>>>>> Why not make the Exynos5250 sata phy as a i2c client driver instead?
+>>>>>>>
+>>>>>>> This patch incorporates the generic phy framework to deal with sata
+>>>>>>> phy.
+>>>>>>>
+>>>>>>> This patch depends on the below patch
+>>>>>>>       [1].drivers: phy: add generic PHY framework
+>>>>>>>               by Kishon Vijay Abraham I<kishon@ti.com>
+>>>>>>>
+>>>>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>>>>>> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>>>>>>> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+>>>>>>> ---
+>>>>>>>  drivers/phy/Kconfig                      |    6 +
+>>>>>>>  drivers/phy/Makefile                     |    1 +
+>>>>>>>  drivers/phy/exynos/Kconfig               |    5 +
+>>>>>>>  drivers/phy/exynos/Makefile              |    5 +
+>>>>>>>  drivers/phy/exynos/exynos5250_phy_i2c.c  |   53 +++++++
+>>>>>>>  drivers/phy/exynos/sata_phy_exynos5250.c |  248 ++++++++++++++++++++++++++++++
+>>>>>>>  drivers/phy/exynos/sata_phy_exynos5250.h |   33 ++++
+>>>>>>>  7 files changed, 351 insertions(+)
+>>>>>>>  create mode 100644 drivers/phy/exynos/Kconfig
+>>>>>>>  create mode 100644 drivers/phy/exynos/Makefile
+>>>>>>>  create mode 100644 drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>>>>>  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.c
+>>>>>>>  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.h
+>>>>>>>
+>>>>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>>>>> index 5f85909..ab3d1c6 100644
+>>>>>>> --- a/drivers/phy/Kconfig
+>>>>>>> +++ b/drivers/phy/Kconfig
+>>>>>>> @@ -11,3 +11,9 @@ menuconfig GENERIC_PHY
+>>>>>>>         devices present in the kernel. This layer will have the generic
+>>>>>>>         API by which phy drivers can create PHY using the phy framework and
+>>>>>>>         phy users can obtain reference to the PHY.
+>>>>>>> +
+>>>>>>> +if GENERIC_PHY
+>>>>>>
+>>>>>> NAK. Just select GENERIC_PHY from your driver Kconfig.
+>>>>>>> +
+>>>>>>> +source "drivers/phy/exynos/Kconfig"
+>>>>>>> +
+>>>>>>> +endif
+>>>>>>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>>>>>>> index 9e9560f..e0223d7 100644
+>>>>>>> --- a/drivers/phy/Makefile
+>>>>>>> +++ b/drivers/phy/Makefile
+>>>>>>> @@ -3,3 +3,4 @@
+>>>>>>>  #
+>>>>>>>
+>>>>>>>  obj-$(CONFIG_GENERIC_PHY)    += phy-core.o
+>>>>>>> +obj-$(CONFIG_PHY_SAMSUNG_SATA)       += exynos/
+>>>>>>
+>>>>>> simply have phy-exynos5250 in drivers/phy.
+>>>>> ok.
+>>>>>>> diff --git a/drivers/phy/exynos/Kconfig b/drivers/phy/exynos/Kconfig
+>>>>>>> new file mode 100644
+>>>>>>> index 0000000..fa125fb
+>>>>>>> --- /dev/null
+>>>>>>> +++ b/drivers/phy/exynos/Kconfig
+>>>>>>> @@ -0,0 +1,5 @@
+>>>>>>> +config PHY_SAMSUNG_SATA
+>>>>>>> +     tristate "Samsung Sata SerDes/PHY driver"
+>>>>>>> +     help
+>>>>>>> +       Support for Samsung sata SerDes/Phy found on Samsung
+>>>>>>> +       SoCs.
+>>>>>>> diff --git a/drivers/phy/exynos/Makefile b/drivers/phy/exynos/Makefile
+>>>>>>> new file mode 100644
+>>>>>>> index 0000000..50dc7eb
+>>>>>>> --- /dev/null
+>>>>>>> +++ b/drivers/phy/exynos/Makefile
+>>>>>>> @@ -0,0 +1,5 @@
+>>>>>>> +#
+>>>>>>> +# Makefile for the exynos phy drivers.
+>>>>>>> +#
+>>>>>>> +ccflags-y := -Idrivers/phy/exynos
+>>>>>>> +obj-$(CONFIG_PHY_SAMSUNG_SATA)       += sata_phy_exynos5250.o exynos5250_phy_i2c.o
+>>>>>>> diff --git a/drivers/phy/exynos/exynos5250_phy_i2c.c b/drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>>>>> new file mode 100644
+>>>>>>> index 0000000..9c75d3b
+>>>>>>> --- /dev/null
+>>>>>>> +++ b/drivers/phy/exynos/exynos5250_phy_i2c.c
+>>>>>>> @@ -0,0 +1,53 @@
+>>>>>>> +/*
+>>>>>>> + * Copyright (C) 2013 Samsung Electronics Co.Ltd
+>>>>>>> + * Author:
+>>>>>>> + *   Yuvaraj C D <yuvaraj.cd@samsung.com>
+>>>>>>> + *
+>>>>>>> + * This program is free software; you can redistribute  it and/or modify it
+>>>>>>> + * under  the terms of  the GNU General  Public License as published by the
+>>>>>>> + * Free Software Foundation;  either version 2 of the  License, or (at your
+>>>>>>> + * option) any later version.
+>>>>>>> + *
+>>>>>>> + */
+>>>>>>> +
+>>>>>>> +#include <linux/kernel.h>
+>>>>>>> +#include <linux/i2c.h>
+>>>>>>> +#include <linux/module.h>
+>>>>>>> +#include "sata_phy_exynos5250.h"
+>>>>>>> +
+>>>>>>> +static int exynos_sata_i2c_probe(struct i2c_client *client,
+>>>>>>> +             const struct i2c_device_id *i2c_id)
+>>>>>>> +{
+>>>>>>> +     sataphy_attach_i2c_client(client);
+>>>>>>> +
+>>>>>>> +     dev_info(&client->adapter->dev,
+>>>>>>> +             "attached %s into i2c adapter successfully\n",
+>>>>>>> +             client->name);
+>>>>>>> +
+>>>>>>> +     return 0;
+>>>>>>> +}
+>>>>>>> +
+>>>>>>> +static int exynos_sata_i2c_remove(struct i2c_client *client)
+>>>>>>> +{
+>>>>>>> +     dev_info(&client->adapter->dev,
+>>>>>>> +             "detached %s from i2c adapter successfully\n",
+>>>>>>> +             client->name);
+>>>>>>> +
+>>>>>>> +     return 0;
+>>>>>>> +}
+>>>>>>> +
+>>>>>>> +static const struct i2c_device_id phy_i2c_device_match[] = {
+>>>>>>> +     { "sata-phy-i2c", 0 },
+>>>>>>> +};
+>>>>>>> +MODULE_DEVICE_TABLE(of, phy_i2c_device_match);
+>>>>>>> +
+>>>>>>> +struct i2c_driver sataphy_i2c_driver = {
+>>>>>>> +     .probe    = exynos_sata_i2c_probe,
+>>>>>>> +     .id_table = phy_i2c_device_match,
+>>>>>>> +     .remove         = exynos_sata_i2c_remove,
+>>>>>>> +     .driver   = {
+>>>>>>> +             .name = "sata-phy-i2c",
+>>>>>>> +             .owner = THIS_MODULE,
+>>>>>>> +             .of_match_table = (void *)phy_i2c_device_match,
+>>>>>>> +             },
+>>>>>>> +};
+>>>>>>
+>>>>>> As I just mentioned above, we can merge this driver with the below one.
+>>>>> True, Initially it was merged.But already existing drivers of which
+>>>>> are of similar to this kind were done in this way.
+>>>>> Please refer  /drivers/gpu/drm//exynos/exynos_hdmiphy.c
+>>>>
+>>>> Can you point to any discussions where it was decided to go with this approach?
+>>> Sorry,what I meant is exynos_hdmiphy.c is already exist in the
+>>> mainline with this approach.
+>>>
+>>> Initially it was merged on my local patches(Not upstreamed).But after
+>>> referring to the
+>>> exynos_hdmiphy.c driver and with lot of internal discussions ,it was
+>>> decided to go with
+>>
+>> I don't have any idea about the internal discussions whatever you had. IMO
+>> Exynos5250 sata phy driver should be modelled as an i2c client driver if you
+>> don't have a good reason to do otherwise.
+> In Exynos5250,some of the registers of SATA PHY controller are I/O
+> mapped and some are accessible
+> only through I2C controller.
+> As the whole registers of SATA PHY controller cannot be accessible
+> through I2C bus, it cannot be made as an i2c client driver.
 
-The mxs LRADC is able to read an internal die temperature sensor. The
-temperature has to be calculated from the value read on channel 8 and channel 9.
-To be able to expose the result to hwmon, implement iio channel 8 as
-(channel 9 - channel 8). Then, implement IIO_CHAN_INFO_SCALE and
-IIO_CHAN_INFO_OFFSET so that it can be processed by hwmon through the in kernel
-provider/consumer mechanism.
+Ah ok.. Makes sense. Thanks for clarifying.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
----
- drivers/staging/iio/adc/mxs-lradc.c | 91 +++++++++++++++++++++++++++++++------
- 1 file changed, 78 insertions(+), 13 deletions(-)
+Cheers
+Kishon
 
-diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-index a08c1736458b..fec76090dae5 100644
---- a/drivers/staging/iio/adc/mxs-lradc.c
-+++ b/drivers/staging/iio/adc/mxs-lradc.c
-@@ -231,20 +231,11 @@ struct mxs_lradc {
- /*
-  * Raw I/O operations
-  */
--static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
--			const struct iio_chan_spec *chan,
--			int *val, int *val2, long m)
-+static int mxs_lradc_read_single(struct iio_dev *iio_dev, int chan, int *val)
- {
- 	struct mxs_lradc *lradc = iio_priv(iio_dev);
- 	int ret;
- 
--	if (m != IIO_CHAN_INFO_RAW)
--		return -EINVAL;
--
--	/* Check for invalid channel */
--	if (chan->channel > LRADC_MAX_TOTAL_CHANS)
--		return -EINVAL;
--
- 	/*
- 	 * See if there is no buffered operation in progess. If there is, simply
- 	 * bail out. This can be improved to support both buffered and raw IO at
-@@ -269,7 +260,7 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
- 	/* Clean the slot's previous content, then set new one. */
- 	writel(LRADC_CTRL4_LRADCSELECT_MASK(0),
- 		lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_CLR);
--	writel(chan->channel, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
-+	writel(chan, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
- 
- 	writel(0, lradc->base + LRADC_CH(0));
- 
-@@ -298,6 +289,71 @@ err:
- 	return ret;
- }
- 
-+static int mxs_lradc_read_temp(struct iio_dev *iio_dev, int *val)
-+{
-+	int ret, min, max;
-+
-+	ret = mxs_lradc_read_single(iio_dev, 8, &min);
-+	if (ret != IIO_VAL_INT)
-+		return ret;
-+
-+	ret = mxs_lradc_read_single(iio_dev, 9, &max);
-+	if (ret != IIO_VAL_INT)
-+		return ret;
-+
-+	*val = max - min;
-+
-+	return IIO_VAL_INT;
-+}
-+
-+static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
-+			const struct iio_chan_spec *chan,
-+			int *val, int *val2, long m)
-+{
-+	/* Check for invalid channel */
-+	if (chan->channel > LRADC_MAX_TOTAL_CHANS)
-+		return -EINVAL;
-+
-+	switch (m) {
-+	case IIO_CHAN_INFO_RAW:
-+		if (chan->type == IIO_TEMP)
-+			return mxs_lradc_read_temp(iio_dev, val);
-+
-+		return mxs_lradc_read_single(iio_dev, chan->channel, val);
-+
-+	case IIO_CHAN_INFO_SCALE:
-+		if (chan->type == IIO_TEMP) {
-+			/* From the datasheet, we have to multiply by 1.012 and
-+			 * divide by 4
-+			 */
-+			*val = 0;
-+			*val2 = 253000;
-+			return IIO_VAL_INT_PLUS_MICRO;
-+		}
-+
-+		return -EINVAL;
-+
-+	case IIO_CHAN_INFO_OFFSET:
-+		if (chan->type == IIO_TEMP) {
-+			/* The calculated value from the ADC is in Kelvin, we
-+			 * want Celsius for hwmon so the offset is
-+			 * -272.15 * scale
-+			 */
-+			*val = -1075;
-+			*val2 = 691699;
-+
-+			return IIO_VAL_INT_PLUS_MICRO;
-+		}
-+
-+		return -EINVAL;
-+
-+	default:
-+		break;
-+	}
-+
-+	return -EINVAL;
-+}
-+
- static const struct iio_info mxs_lradc_iio_info = {
- 	.driver_module		= THIS_MODULE,
- 	.read_raw		= mxs_lradc_read_raw,
-@@ -835,8 +891,17 @@ static const struct iio_chan_spec mxs_lradc_chan_spec[] = {
- 	MXS_ADC_CHAN(5, IIO_VOLTAGE),
- 	MXS_ADC_CHAN(6, IIO_VOLTAGE),
- 	MXS_ADC_CHAN(7, IIO_VOLTAGE),	/* VBATT */
--	MXS_ADC_CHAN(8, IIO_TEMP),	/* Temp sense 0 */
--	MXS_ADC_CHAN(9, IIO_TEMP),	/* Temp sense 1 */
-+	/* Combined Temperature sensors */
-+	{
-+		.type = IIO_TEMP,
-+		.indexed = 1,
-+		.scan_index = 8,
-+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-+				      BIT(IIO_CHAN_INFO_OFFSET) |
-+				      BIT(IIO_CHAN_INFO_SCALE),
-+		.channel = 8,
-+		.scan_type = {.sign = 'u', .realbits = 18, .storagebits = 32,},
-+	},
- 	MXS_ADC_CHAN(10, IIO_VOLTAGE),	/* VDDIO */
- 	MXS_ADC_CHAN(11, IIO_VOLTAGE),	/* VTH */
- 	MXS_ADC_CHAN(12, IIO_VOLTAGE),	/* VDDA */
--- 
-1.8.4.2
+>>
+>> Thanks
+>> Kishon
+>>
+>>> the already existing approach.
+>>>
+>>>>
+>>>> Thanks
+>>>> Kishon
+>>
