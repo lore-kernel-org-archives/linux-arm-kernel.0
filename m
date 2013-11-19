@@ -1,38 +1,113 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 19 Nov 2013 13:59:49 +0100
-Subject: [PATCH v2 7/7] ARM: shmobile: armadillo-reference: Use low level IRQ
- for ST1231
-In-Reply-To: <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1384865989-12875-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 19 Nov 2013 14:02:50 +0100
+Subject: [PATCH RFC] ARM/dts: am335x-boneblack: Add HDMI audio support
+In-Reply-To: <18d71a32fb46d34197fd2e0ec5dc8ebc36371704.1384863282.git.jsarha@ti.com>
+References: <cover.1384863282.git.jsarha@ti.com>
+ <18d71a32fb46d34197fd2e0ec5dc8ebc36371704.1384863282.git.jsarha@ti.com>
+Message-ID: <528B617A.4080102@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device is configured to generate an active-low interrupt signal that
-needs to be acknowledged by the host. Configure the IRQ to trigger on
-low level.
+Hi Jyri,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+A side question related to audio cape support on BBB. In the "official" 
+3.8.13 CircuitCo version the HDMI audio support was breaking the 
+audio-cape support due to some bad hacks in the mcasp driver.
 
-Changes since v1:
+Is this still the case with you series?
 
-- Fixed typo (IRQ_TYPE_LOW_LEVEL -> IRQ_TYPE_LEVEL_LOW)
+Thanks,
+Benoit
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index aef425f..7b80f19 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -95,7 +95,7 @@
- 		compatible = "sitronix,st1232";
- 		reg = <0x55>;
- 		interrupt-parent = <&irqpin1>;
--		interrupts = <2 IRQ_TYPE_NONE>; /* IRQ10: hwirq 2 on irqpin1 */
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
- 		pinctrl-0 = <&st1232_pins>;
- 		pinctrl-names = "default";
- 		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+
+On 19/11/2013 13:21, Jyri Sarha wrote:
+> Adds mcasp0_pins, clk_mcasp0_fixed, clk_mcasp0, mcasp0, hdmi_audio,
+> and sound nodes.
+>
+> Signed-off-by: Jyri Sarha <jsarha@ti.com>
+> ---
+>   arch/arm/boot/dts/am335x-boneblack.dts |   52 ++++++++++++++++++++++++++++++++
+>   1 file changed, 52 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+> index 6b71ad9..b5a2404 100644
+> --- a/arch/arm/boot/dts/am335x-boneblack.dts
+> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
+> @@ -60,12 +60,35 @@
+>   			0x1b0 0x03      /* xdma_event_intr0, OMAP_MUX_MODE3 | AM33XX_PIN_OUTPUT */
+>   		>;
+>   	};
+> +
+> +	mcasp0_pins: mcasp0_pins {
+> +		pinctrl-single,pins = <
+> +			0x1ac (PIN_INPUT_PULLUP | MUX_MODE0) /* mcasp0_ahclkx.mcasp0_ahclkx */
+> +			0x19c (PIN_OUTPUT_PULLDOWN | MUX_MODE2) /* mcasp0_ahclkr.mcasp0_axr2 */
+> +			0x194 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* mcasp0_fsx.mcasp0_fsx */
+> +			0x190 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_aclkx.mcasp0_aclkx */
+> +			0x06c (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpmc_a11.gpio1_27 */
+> +		>;
+> +	};
+>   };
+>
+>   &lcdc {
+>   	status = "okay";
+>   };
+>
+> +&mcasp0	{
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mcasp0_pins>;
+> +	status = "okay";
+> +	op-mode = <0>;	/* MCASP_IIS_MODE */
+> +	tdm-slots = <2>;
+> +	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+> +			0 0 1 0
+> +		>;
+> +	tx-num-evt = <1>;
+> +	rx-num-evt = <1>;
+> +};
+> +
+>   / {
+>   	hdmi {
+>   		compatible = "ti,tilcdc,slave";
+> @@ -75,4 +98,33 @@
+>   		pinctrl-1 = <&nxp_hdmi_bonelt_off_pins>;
+>   		status = "okay";
+>   	};
+> +
+> +	clk_mcasp0_fixed: clk_mcasp0_fixed {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <24576000>;
+> +	};
+> +
+> +	clk_mcasp0: clk_mcasp0 {
+> +		#clock-cells = <0>;
+> +		compatible = "gpio-clock";
+> +		clocks = <&clk_mcasp0_fixed>;
+> +		enable-gpios = <&gpio1 27 GPIO_ACTIVE_HIGH>; /* BeagleBone Black Clk enable on GPIO1_27 */
+> +	};
+> +
+> +	hdmi_audio: hdmi_audio at 0 {
+> +	       compatible = "linux,hdmi-audio";
+> +	       status = "okay";
+> +	};
+> +
+> +	sound {
+> +		compatible = "ti,am33xx-beaglebone-black";
+> +		ti,model = "TI BeagleBone Black";
+> +		ti,audio-codec = <&hdmi_audio>;
+> +		ti,mcasp-controller = <&mcasp0>;
+> +		ti,audio-routing =
+> +			"HDMI Out",	"TX";
+> +		clocks = <&clk_mcasp0>;
+> +		clock-names = "ti,codec-clock";
+> +	};
+>   };
+>
+
+
 -- 
-1.8.3.2
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
