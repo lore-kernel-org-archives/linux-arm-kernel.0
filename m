@@ -1,28 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Nov 2013 11:40:36 -0700
-Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
-In-Reply-To: <20131119142336.GA28859@titan.lakedaemon.net>
-References: <cover.1384798508.git.jason@lakedaemon.net>
- <eaf050fbd62803784856a4f37d4b332f7778e22c.1384798508.git.jason@lakedaemon.net>
- <528A65DF.8060000@wwwdotorg.org>
- <20131118191955.GG10335@titan.lakedaemon.net>
- <528A6944.3070303@wwwdotorg.org>
- <20131118192852.GI10335@titan.lakedaemon.net>
- <528A6CA3.9030904@wwwdotorg.org>
- <20131118195243.GJ10335@titan.lakedaemon.net>
- <528A98C8.9040803@wwwdotorg.org>
- <20131119122801.GL16735@n2100.arm.linux.org.uk>
- <20131119142336.GA28859@titan.lakedaemon.net>
-Message-ID: <528BB0A4.9030501@wwwdotorg.org>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 19 Nov 2013 19:41:21 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
+ <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20131119184121.GN913@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 07:23 AM, Jason Cooper wrote:
-...
-> That's why I prefer to rename the dtbs, it removes the need to parse the
-> dtb (fdtget *isn't* currently built/installed by default in dtc)
+On Tue, Nov 19, 2013 at 10:31:50AM -0800, Eric Dumazet wrote:
+> On Tue, 2013-11-19 at 18:43 +0100, Willy Tarreau wrote:
+> 
+> > - #define MVNETA_TX_DONE_TIMER_PERIOD 10
+> > + #define MVNETA_TX_DONE_TIMER_PERIOD (1000/HZ)
+> > 
+> 
+> I suggested this in a prior mail :
+> 
+> #define MVNETA_TX_DONE_TIMER_PERIOD 1
 
-fdtget is in fact both built and installed by default. At the very least
-in the latest dtc source, and it's certainly part of at least the Ubuntu
-packages for older versions too, so I assume it's been the default for a
-while.
+Ah sorry, I remember now.
+
+> But apparently it was triggering strange crashes...
+
+Ah, when a bug hides another one, it's the situation I prefer, because
+by working on one, you end up fixing two :-)
+
+Cheers,
+Willy
