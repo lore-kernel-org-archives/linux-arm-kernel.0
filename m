@@ -1,99 +1,105 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 18 Nov 2013 21:16:13 -0800
-Subject: [PATCH 5/6] watchdog: davinci: reuse driver for keystone arch
-In-Reply-To: <1384795139-19466-6-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1384795139-19466-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384795139-19466-6-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <528AF41D.4010306@roeck-us.net>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Tue, 19 Nov 2013 06:28:42 +0100
+Subject: [PATCH RFC 00/10] ARM: STi: Add dwmac glue and reset controller
+In-Reply-To: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <528AF70A.7080603@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2013 09:18 AM, Ivan Khoronzhuk wrote:
-> The keystone arch use the same IP watchdog, so add "ti,keystone-wdt"
-> compatible and correct identity.
+On 11/12/2013 2:51 PM, srinivas.kandagatla at st.com wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 >
-> The Keystone arch is using clocks in DT and source clock for watchdog
-> has to be specified, so add this to binding.
+> Hi All,
 >
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> This patch series adds Ethernet support to STi series SOCs STiH415 and STiH416.
+> STi SOC series integrates dwmac IP from synopsis, however there is a hardware
+> glue on top of this standard IP, this glue needs to configured before the
+> actual dwmac can be used.
+> To add this a new driver dwmac-sti is introduced whose responsibility is to
+> configure dwmac glue and before dwmac driver, this is achieved by making dwmac
+> device node as child to ethernet glue node. Inspired by usb/dwc3.
+> Also the glue needs to come out of softreset which is why we have added a
+> softreset controller to driver which looked perfectly neat, rather then
+> driving the softreset bit from the glue driver.
+>
+> Also as part of power management in glue driver, I found that there was no
+> function to determine if the child device is a wakeup source or not.
+> I have added a new api device_child_may_wakeup API which could be useful for
+> drivers like this. "PM / wakeup : Introduce device_child_may_wakeup" patch has
+> that new API and "net: stmmac:sti: Add STi SOC glue driver." glue driver uses
+> this new API.
+>
+> The reason for combining all these patches in a same series is because of
+> dependencies.
+>
+> This patch series is tested on B2000 and B2020 boards with STiH415, STiH416
+> SOC on ethernet 100/1000 Links.
+>
+> Comments?
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Hello Srini
+ll these patches are ok for me and, as you know, I have already started
+using them while porting other SoC. Glue logic is mandatory now!
 
-> ---
->   .../devicetree/bindings/watchdog/davinci-wdt.txt   |   11 +++++++++--
->   drivers/watchdog/Kconfig                           |    4 ++--
->   drivers/watchdog/davinci_wdt.c                     |    3 ++-
->   3 files changed, 13 insertions(+), 5 deletions(-)
+Thanks
+peppe
+
 >
-> diff --git a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-> index e450134..0f1aa99 100644
-> --- a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-> @@ -1,16 +1,23 @@
-> -DaVinci Watchdog Timer (WDT) Controller
-> +Texas Instruments DaVinci/Keystone Watchdog Timer (WDT) Controller
+> Thanks,
+> srini
 >
->   Required properties:
-> -- compatible : Should be "ti,davinci-wdt"
-> +- compatible : Should be "ti,davinci-wdt" or "ti,keystone-wdt"
->   - reg : Should contain WDT registers location and length
-> +- clocks : phandle reference to the controller clock.
-> +	   Required only for Keystone arch. See clock-bindings.txt
+> Srinivas Kandagatla (6):
+>    drivers: reset: stih415: add softreset controller
+>    drivers: reset: stih416: add softreset controller
+>    PM / wakeup : Introduce device_child_may_wakeup
+>    net: stmmac:sti: Add STi SOC glue driver.
+>    ARM: STi: Add STiH415 ethernet support.
+>    ARM: STi: Add STiH416 ethernet support.
 >
->   Optional properties:
->   - timeout-sec : Contains the watchdog timeout in seconds
+> Stephen Gallimore (4):
+>    drivers: reset: STi SoC system configuration reset controller support
+>    drivers: reset: Reset controller driver for STiH415
+>    drivers: reset: Reset controller driver for STiH416
+>    ARM: STi: Add reset controller support to mach-sti Kconfig
 >
-> +Documentation:
-> +Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
-> +Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
-> +
->   Examples:
->
->   wdt: wdt at 2320000 {
->   	compatible = "ti,davinci-wdt";
->   	reg = <0x02320000 0x80>;
->   	timeout-sec = <30>;
-> +	clocks = <&clkwdtimer0>;
->   };
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index d7db13d..addfc2c 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -270,12 +270,12 @@ config IOP_WATCHDOG
->
->   config DAVINCI_WATCHDOG
->   	tristate "DaVinci watchdog"
-> -	depends on ARCH_DAVINCI
-> +	depends on ARCH_DAVINCI || ARCH_KEYSTONE
->   	select WATCHDOG_CORE
->   	select WATCHDOG_NOWAYOUT
->   	help
->   	  Say Y here if to include support for the watchdog timer
-> -	  in the DaVinci DM644x/DM646x processors.
-> +	  in the DaVinci DM644x/DM646x or Keystone processors.
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called davinci_wdt.
->
-> diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-> index 55deaf8..a6d365a 100644
-> --- a/drivers/watchdog/davinci_wdt.c
-> +++ b/drivers/watchdog/davinci_wdt.c
-> @@ -143,7 +143,7 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
->
->   static const struct watchdog_info davinci_wdt_info = {
->   	.options = WDIOF_KEEPALIVEPING,
-> -	.identity = "DaVinci Watchdog",
-> +	.identity = "DaVinci/Keystone Watchdog",
->   };
->
->   static const struct watchdog_ops davinci_wdt_ops = {
-> @@ -212,6 +212,7 @@ static int davinci_wdt_remove(struct platform_device *pdev)
->
->   static const struct of_device_id davinci_wdt_of_match[] = {
->   	{ .compatible = "ti,davinci-wdt", },
-> +	{ .compatible = "ti,keystone-wdt", },
->   	{},
->   };
->   MODULE_DEVICE_TABLE(of, davinci_wdt_of_match);
+>   .../devicetree/bindings/net/sti-dwmac.txt          |   45 +++
+>   .../devicetree/bindings/reset/st,sti-powerdown.txt |   46 +++
+>   .../devicetree/bindings/reset/st,sti-softreset.txt |   45 +++
+>   arch/arm/boot/dts/stih415-clock.dtsi               |   14 +
+>   arch/arm/boot/dts/stih415-pinctrl.dtsi             |   82 ++++++
+>   arch/arm/boot/dts/stih415.dtsi                     |   67 +++++
+>   arch/arm/boot/dts/stih416-clock.dtsi               |   14 +
+>   arch/arm/boot/dts/stih416-pinctrl.dtsi             |  106 +++++++
+>   arch/arm/boot/dts/stih416.dtsi                     |   69 +++++
+>   arch/arm/boot/dts/stih41x-b2000.dtsi               |   32 +++
+>   arch/arm/boot/dts/stih41x-b2020.dtsi               |   33 +++
+>   arch/arm/mach-sti/Kconfig                          |    3 +
+>   drivers/base/power/wakeup.c                        |   23 ++
+>   drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
+>   drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    |  294 ++++++++++++++++++++
+>   drivers/reset/Kconfig                              |    2 +
+>   drivers/reset/Makefile                             |    3 +
+>   drivers/reset/sti/Kconfig                          |   15 +
+>   drivers/reset/sti/Makefile                         |    4 +
+>   drivers/reset/sti/reset-stih415.c                  |   99 +++++++
+>   drivers/reset/sti/reset-stih416.c                  |  101 +++++++
+>   drivers/reset/sti/reset-syscfg.c                   |  186 ++++++++++++
+>   drivers/reset/sti/reset-syscfg.h                   |   69 +++++
+>   .../dt-bindings/reset-controller/stih415-resets.h  |   23 ++
+>   .../dt-bindings/reset-controller/stih416-resets.h  |   25 ++
+>   include/linux/pm_wakeup.h                          |    1 +
+>   26 files changed, 1402 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/net/sti-dwmac.txt
+>   create mode 100644 Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
+>   create mode 100644 Documentation/devicetree/bindings/reset/st,sti-softreset.txt
+>   create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+>   create mode 100644 drivers/reset/sti/Kconfig
+>   create mode 100644 drivers/reset/sti/Makefile
+>   create mode 100644 drivers/reset/sti/reset-stih415.c
+>   create mode 100644 drivers/reset/sti/reset-stih416.c
+>   create mode 100644 drivers/reset/sti/reset-syscfg.c
+>   create mode 100644 drivers/reset/sti/reset-syscfg.h
+>   create mode 100644 include/dt-bindings/reset-controller/stih415-resets.h
+>   create mode 100644 include/dt-bindings/reset-controller/stih416-resets.h
 >
