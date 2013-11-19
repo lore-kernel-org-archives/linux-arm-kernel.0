@@ -1,30 +1,42 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 19 Nov 2013 12:51:37 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131119113557.GI5914@e106331-lin.cambridge.arm.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131115175241.GB27174@quad.lixom.net>
- <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
- <20131119113557.GI5914@e106331-lin.cambridge.arm.com>
-Message-ID: <20131119115137.GC22634@rocoto.smurfnet.nu>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Nov 2013 09:52:47 -0200
+Subject: [PATCH v2 1/6] mmc: sdhci: clear auto cmd setting bits for no
+ data cmds
+In-Reply-To: <1383142193-24950-2-git-send-email-b29396@freescale.com>
+References: <1383142193-24950-1-git-send-email-b29396@freescale.com>
+ <1383142193-24950-2-git-send-email-b29396@freescale.com>
+Message-ID: <CAOMZO5ANNpai2LuQxrW82scFdZw6aPRLZOobna60SsoVVwKS9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 11:35:57AM +0000, Mark Rutland wrote:
-> > The UEFI spec pulls in portions of ACPI. I do not know the full extent
-> > of the interaction between the two, but I know that they are not
-> > completely decoupled. As you have pointed out we are not experienced
-> > with ACPI or UEFI, so I don't think we can make statements that one is
-> > perfectly fine without the other.
-> 
-> Given Leif's comments it seems that they are decoupled sufficiently to
-> be considered separately.
+On Wed, Oct 30, 2013 at 12:09 PM, Dong Aisheng <b29396@freescale.com> wrote:
+> The auto cmd settings bits should be cleared before sending new commands
+> or we may receive command timeout error for normal commands due to wrongly
+> pre-sent auto cmd.
+>
+> e.g. we receive CMD13 timeout error due to ACMD23 is wrongly enabled
+> by former data commands.
+>
+> mmc2: new high speed DDR MMC card at address 0001
+> mmcblk1: mmc2:0001 SEM08G 7.39 GiB
+> mmcblk1boot0: mmc2:0001 SEM08G partition 1 2.00 MiB
+> mmcblk1boot1: mmc2:0001 SEM08G partition 2 2.00 MiB
+> mmcblk1rpmb: mmc2:0001 SEM08G partition 3 128 KiB
+>  mmcblk1: p1 p2 p3 p4 < p5 p6 p7 >
+> mmc2: Timeout waiting for hardware interrupt.
+>  mmcblk1boot1: unknown partition table
+> mmc2: Timeout waiting for hardware interrupt.
+>  mmcblk1boot0: unknown partition table
+>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-Well, UEFI should be considered separately from ACPI.
+Thanks for the patch, Dong.
 
-I am not convinced it makes sense to consider ACPI for any case that
-does not also include UEFI.
+This fixes the eMMC interrupt timeout issue on mx6qsabresd.
 
-/
-    Leif
+I think we should mark it for stable. At least 3.11 and 3.12 have this
+issue and your patch fixes it.
+
+Regards,
+
+Fabio Estevam
