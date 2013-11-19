@@ -1,33 +1,24 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 19 Nov 2013 12:33:21 +0400
-Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
-In-Reply-To: <20131116124750.GA26318@anuminas.rup.mentorg.com>
-References: <20131116124750.GA26318@anuminas.rup.mentorg.com>
-Message-ID: <CALT56yOcUChApUP6rOyXqWuK55ZR0Ooj457XVP2b7bVR9yk-8A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Nov 2013 09:37:06 +0100
+Subject: [PATCH V4 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
+References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <CACRpkdYM1XcBAznCpmPU+j2kHFPKYA98OAYrpLhcSJr4KbRZzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Nov 14, 2013 at 1:18 PM, Sricharan R <r.sricharan@ti.com> wrote:
 
-On Sat, Nov 16, 2013 at 4:47 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> When converting from tosa-keyboard driver to matrix keyboard, tosa keys
-> received extra 1 column shift. Replace that with correct values to make
-> keyboard work again.
+> The minimal crossbar driver to track and allocate free GIC lines and configure the
+> crossbar is added here, along with the DT bindings.
 >
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->  arch/arm/mach-pxa/tosa.c | 102 +++++++++++++++++++++++------------------------
->  1 file changed, 51 insertions(+), 51 deletions(-)
+> V4:
+>    Addressed a couple of comments and split the DTS file updates in to
+>    a separate series.
 
-As nobody seems to object, I would like to use my tosa maintainer
-powers and push
-this patch for inclusion.
+I'm pretty happy with the work and effort put into this now it's looking
+real elegant.
+FWIW: Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Both Eric and Haojian seem to be unresponsive now.
-Russell, can I push it to your patch system? Or should I push it to
-arm-soc guys?
-
--- 
-With best wishes
-Dmitry
+Yours,
+Linus Walleij
