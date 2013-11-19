@@ -1,56 +1,53 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 19 Nov 2013 13:03:51 +0100
-Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <20131119102506.GG31504@ulmo.nvidia.com>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com><1384853593-32202-3-git-send-email-hdoyu@nvidia.com><20131119102506.GG31504@ulmo.nvidia.com>
-Message-ID: <20131119.140351.1342214267287135109.hdoyu@nvidia.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Tue, 19 Nov 2013 14:12:20 +0200
+Subject: [PATCH RFC 0/9] Beaglebone-Black HDMI audio
+Message-ID: <cover.1384862950.git.jsarha@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+This set of patches implements PCM HDMI audio driver for
+Beaglebone-Black HDMI output. The patches have been rebased
+on top of:
+git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound topic/davinci
 
-Thierry Reding <thierry.reding@gmail.com> wrote @ Tue, 19 Nov 2013 11:25:07 +0100:
+There is couple of earlier RFC versions of the clk patch floating
+around, but the one here is the latest version.
 
-> From earlier discussions I thought the goal was to actually defer this
-> until all nodes referred to by the iommus property were actually
-> registered. The above only checks that the phandles can be resolved to
-> valid struct device_node:s. That doesn't mean that an actual IOMMU has
-> been registered for it, only that the devices have been created.
+I'll send the associated dts changes shortly as a separate patch.
 
-Currently "bus->iommu_ops" is set at the end of tegra_smmu_probe(). So
-if "bus->iommu_ops" is set, it means that an iommu instance is
-populated at that time.
+Best regards,
+Jyri
 
-> If you really only rely on dev->bus->iommu_ops to be present, then there
-> is no need to go through the loop in the first place, since you have
-> access to it immediately through the struct device that's passed into
-> the function.
+Jyri Sarha (9):
+  clk: add gpio controlled clock
+  ASoC: davinci-evm: Add named clock reference to DT bindings
+  ASoC: davinci-evm: HDMI audio support for TDA998x trough McASP I2S
+    bus
+  ASoC: hdmi-codec: Add devicetree binding with documentation
+  ASoC: hdmi-codec: Add SNDRV_PCM_FMTBIT_32_LE playback format
+  ASoC: davinci: HDMI audio build for AM33XX and TDA998x
+  drm/tilcdc: Add I2C HDMI audio config for tda998x
+  ARM: OMAP2+: omap2plus_defconfig: Enable tilcdc and TDA998X HDMI
+    support
+  ARM: OMAP2+: omap2plus_defconfig: Enable BeagleBone Black HDMI audio
+    support
 
-As mentioned in the above, "bus->iommu_ops" is set when an iommu
-instance is populated. "iommus=" is used only to defer a device probe
-until an iommu instance shows up although multiple IOMMUs are not
-supported yet correctly as you pointed out.
+ .../devicetree/bindings/clock/gpio-clock.txt       |   21 ++
+ .../bindings/sound/davinci-evm-audio.txt           |   12 +-
+ Documentation/devicetree/bindings/sound/hdmi.txt   |   17 ++
+ arch/arm/configs/omap2plus_defconfig               |    5 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-gpio.c                             |  209 ++++++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_slave.c              |   24 ++-
+ include/linux/clk-provider.h                       |   25 +++
+ sound/soc/codecs/hdmi.c                            |   12 +-
+ sound/soc/davinci/Kconfig                          |   12 ++
+ sound/soc/davinci/Makefile                         |    1 +
+ sound/soc/davinci/davinci-evm.c                    |  227 +++++++++++++++++++-
+ 12 files changed, 558 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/gpio-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/hdmi.txt
+ create mode 100644 drivers/clk/clk-gpio.c
 
-> Furthermore, relying on dev->bus->iommu_ops will prevent multiple IOMMUs
-> from being used at all, since only one IOMMU can register iommu_ops with
-> the bus, right? So I think what we really need here is a way to resolve
-> the IOMMU using a phandle and return the associated struct
-> iommu_ops.
-
-Multiple IOMMU support doesn't work right now. It needs to be
-discussed a bit more.
-
-> I also have some trouble understanding how the current IOMMU framework
-> is supposed to work together with multiple IOMMUs for one device. The
-> .add_device() callback seems to be missing crucial information to help
-> decide whether the device to be added is actually one that it covers.
-> Also with an of_iommu_attach() function, doesn't that become more or
-> less redundant?
-
-I understand what you meant. In the current tegra SMMU implementation,
-iommu_ops is set when an iommu is populated so that we cannot use
-iommu_ops before that time. That's why of_iommu_attach() was
-introduced here. I couldn't set iommu_ops at drvier init yet because
-we support SMMU and GART with a single image and the current IOMMU
-framework assume that there's one IOMMU on the bus. If we set
-iommu_ops at driver init, the latter one would overwrite it.
+-- 
+1.7.9.5
