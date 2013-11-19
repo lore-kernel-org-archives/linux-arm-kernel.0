@@ -1,90 +1,138 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 19 Nov 2013 23:40:50 +0100
-Subject: [PATCH 1/2] ARM: ux500: decomission the non-DT MTU init sequence
-In-Reply-To: <1384896471-9384-1-git-send-email-linus.walleij@linaro.org>
-References: <1384896471-9384-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <528BE8F2.3030507@linaro.org>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 19 Nov 2013 16:41:13 -0600
+Subject: [PATCH v5 01/17] powerpc/fsl-pci: improve clock API use
+In-Reply-To: <1384729577-7336-2-git-send-email-gsi@denx.de>
+References: <1384729577-7336-1-git-send-email-gsi@denx.de>
+ <1384729577-7336-2-git-send-email-gsi@denx.de>
+Message-ID: <1384900872.1403.381.camel@snotra.buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 10:27 PM, Linus Walleij wrote:
-> The MTU is now only initialized using the native clocksource
-> device tree matching.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Mon, 2013-11-18 at 00:06 +0100, Gerhard Sittig wrote:
+> make the Freescale PCI driver get, prepare and enable the PCI clock
+> during probe(); the clock gets put upon device shutdown by the devm
+> approach
+> 
+> clock lookup is non-fatal as not all platforms may provide clock specs
+> in their device tree or implement a device tree based clock provider,
+> but failure to enable clocks after successful lookup is fatal
+> 
+> the driver appears to not have a remove() routine, so no reference to
+> the clock is kept during use, and the clock isn't released (the devm
+> approach will put the clock, but it won't get disabled or unprepared)
+> 
+> the 85xx/86xx platforms go through the probe() routine, where clock
+> lookup occurs and the clock gets acquired if one was specified; the
+> 512x/83xx platforms don't pass through probe() but instead directly call
+> the add_bridge() routine at a point in time where the clock provider has
+> not been setup yet even if the platform implements one -- add comments
+> to the code paths as a reminder for the potential need of a workaround
+> in the platform's clock driver, and to keep awareness if code should get
+> re-arranged or moved
+> 
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Kumar Gala <galak@kernel.crashing.org>
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Signed-off-by: Gerhard Sittig <gsi@denx.de>
 > ---
->   arch/arm/mach-ux500/timer.c | 28 ++--------------------------
->   1 file changed, 2 insertions(+), 26 deletions(-)
->
-> diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-> index ca60bbd9361b..1a9051b6f932 100644
-> --- a/arch/arm/mach-ux500/timer.c
-> +++ b/arch/arm/mach-ux500/timer.c
-> @@ -10,7 +10,6 @@
->   #include <linux/clocksource.h>
->   #include <linux/of.h>
->   #include <linux/of_address.h>
-> -#include <linux/platform_data/clocksource-nomadik-mtu.h>
->
->   #include <asm/smp_twd.h>
->
-> @@ -44,17 +43,14 @@ const static struct of_device_id prcmu_timer_of_match[] __initconst = {
->
->   void __init ux500_timer_init(void)
->   {
-> -	void __iomem *mtu_timer_base;
->   	void __iomem *prcmu_timer_base;
->   	void __iomem *tmp_base;
->   	struct device_node *np;
->
-> -	if (cpu_is_u8500_family() || cpu_is_ux540_family()) {
-> -		mtu_timer_base = __io_address(U8500_MTU0_BASE);
-> +	if (cpu_is_u8500_family() || cpu_is_ux540_family())
->   		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
-> -	} else {
-> +	else
->   		ux500_unknown_soc();
-> -	}
->
->   	np = of_find_matching_node(NULL, prcmu_timer_of_match);
->   	if (!np)
-> @@ -67,26 +63,6 @@ void __init ux500_timer_init(void)
->   	prcmu_timer_base = tmp_base;
->
->   dt_fail:
-> -	/* Doing it the old fashioned way. */
-> -
-> -	/*
-> -	 * Here we register the timerblocks active in the system.
-> -	 * Localtimers (twd) is started when both cpu is up and running.
-> -	 * MTU register a clocksource, clockevent and sched_clock.
-> -	 * Since the MTU is located in the VAPE power domain
-> -	 * it will be cleared in sleep which makes it unsuitable.
-> -	 * We however need it as a timer tick (clockevent)
-> -	 * during boot to calibrate delay until twd is started.
-> -	 * RTC-RTT have problems as timer tick during boot since it is
-> -	 * depending on delay which is not yet calibrated. RTC-RTT is in the
-> -	 * always-on powerdomain and is used as clockevent instead of twd when
-> -	 * sleeping.
-> -	 * The PRCMU timer 4 register a clocksource and
-> -	 * sched_clock with higher rating then MTU since is always-on.
-> -	 *
-> -	 */
-> -	if (!of_have_populated_dt())
-> -		nmdk_timer_init(mtu_timer_base, IRQ_MTU0);
+>  arch/powerpc/sysdev/fsl_pci.c |   52 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
 
-If no timer have been defined in the dt [or wrongly defined], is there a 
-message to tell the user what is wrong ?
-
->   	clksrc_dbx500_prcmu_init(prcmu_timer_base);
->   	ux500_twd_init();
->   }
->
+Please coordinate this change with Minghuan Lian's patchset (posted Oct
+23) to move the bulk of this driver outside of arch/powerpc.
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
+> index ccfb50ddfe38..efa0916f61b6 100644
+> --- a/arch/powerpc/sysdev/fsl_pci.c
+> +++ b/arch/powerpc/sysdev/fsl_pci.c
+> @@ -17,6 +17,8 @@
+>   * Free Software Foundation;  either version 2 of the  License, or (at your
+>   * option) any later version.
+>   */
+> +
+> +#include <linux/clk.h>
+>  #include <linux/kernel.h>
+>  #include <linux/pci.h>
+>  #include <linux/delay.h>
+> @@ -755,6 +757,32 @@ int __init mpc83xx_add_bridge(struct device_node *dev)
+>  	const int *bus_range;
+>  	int primary;
+>  
+> +	/*
+> +	 * 85xx/86xx platforms take the path through the probe() routine
+> +	 * as one would expect, PCI related clocks get acquired there if
+> +	 * specified
+> +	 *
+> +	 * 83xx/512x _don't_ pass through probe(), this add_bridge()
+> +	 * routine instead is called from within .setup_arch() at a
+> +	 * point in time where clock providers haven't been setup yet;
+> +	 * so clocks cannot get acquired here -- lookup would always
+> +	 * fail even on those platforms which implement the provider
+> +	 *
+> +	 * there is no counterpart for add_bridge() just like there is
+> +	 * no remove() counterpart for probe(), so in either case the
+> +	 * PCI related clock won't get released, and all of the
+> +	 * 512x/83xx/85xx/86xx platforms behave in identical ways
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+How is it identical if 85xx/86xx will acquire a clock in probe(), but
+83xx/512x can't acquire it in add_bridge()?
+
+Could you explain the relevance of releasing clocks here?
+
+> +	 *
+> +	 * this comment is here to "keep the balance" against the
+> +	 * probe() routine, and as a reminder to acquire clocks if the
+> +	 * add_bridge() call should move to some later point in time
+> +	 *
+> +	 * until then clock providers are expected to work around the
+> +	 * peripheral driver's not acquiring the PCI clock on those
+> +	 * platforms where clock providers exist, while nothing needs to
+> +	 * be done for those platforms without a clock provider
+> +	 */
+
+What would be involved in moving 83xx/512x to use .probe() as well?
+
+>  	is_mpc83xx_pci = 1;
+>  
+>  	if (!of_device_is_available(dev)) {
+> @@ -1086,9 +1114,33 @@ void fsl_pci_assign_primary(void)
+>  
+>  static int fsl_pci_probe(struct platform_device *pdev)
+>  {
+> +	struct clk *clk;
+>  	int ret;
+>  	struct device_node *node;
+>  
+> +	/*
+> +	 * clock lookup is non-fatal since the driver is shared among
+> +	 * platforms and not all of them provide clocks specs in their
+> +	 * device tree, but failure to enable a specified clock is
+> +	 * considered fatal
+> +	 *
+> +	 * note that only the 85xx and 86xx platforms pass through this
+> +	 * probe() routine, while 83xx and 512x directly invoke the
+> +	 * mpc83xx_add_bridge() routine from within .setup_arch() code
+> +	 */
+> +	clk = devm_clk_get(&pdev->dev, "ipg");
+> +	if (!IS_ERR(clk)) {
+> +		ret = clk_prepare_enable(clk);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "Could not enable PCI clock\n");
+> +			return ret;
+> +		}
+> +		/*
+> +		 * TODO where to store the 'clk' reference?  there appears
+> +		 * to be no remove() routine which undoes what probe() does
+> +		 */
+> +	}
+
+There is a .remove(); this driver just doesn't support it.
+
+As for where to store things, you could turn private_data into a struct
+rather than a direct iomem pointer.  Or just replace the comment with a
+non-TODO statement that says we'll never release the clock because the
+PCI controller driver is non-removable.
+
+-Scott
