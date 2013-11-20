@@ -1,59 +1,75 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 20 Nov 2013 18:12:27 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <8761s0cqhh.fsf@natisbad.org>
- <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> <87y54u59zq.fsf@natisbad.org>
- <20131112083633.GB10318@1wt.eu> <87a9hagex1.fsf@natisbad.org>
- <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
- <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20131120171227.GG8581@1wt.eu>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 20 Nov 2013 18:20:23 +0100
+Subject: [PATCH 5/9] ARM: at91/dt: add mmc0 slot0 support to at91rm9200ek
+ board
+In-Reply-To: <528CDFFB.1020601@overkiz.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+ <1377687995-10758-1-git-send-email-b.brezillon@overkiz.com>
+ <20131120145926.GE14627@ns203013.ovh.net>
+ <528CDFFB.1020601@overkiz.com>
+Message-ID: <20131120172023.GI14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
-
-On Sun, Nov 17, 2013 at 09:41:38AM -0800, Eric Dumazet wrote:
-> On Sun, 2013-11-17 at 15:19 +0100, Willy Tarreau wrote:
+On 17:14 Wed 20 Nov     , boris brezillon wrote:
+> On 20/11/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 13:06 Wed 28 Aug     , Boris BREZILLON wrote:
+> >>Add slot0 of mmc0 pinctrl pins definitions:
+> >>  - detect pin
+> >>  - write protect pin
+> >>  - enable slot0 pin: this pin is connected to an external switch which
+> >>    enable mmc0 slot0 or spi dataflash connected to cs3
+> >>
+> >>The mmc0 device is not enabled, as it depends on the choosen functionnality
+> >>(spi cs3 or mmc0 slot0).
+> >>
+> >>Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> >>---
+> >>  arch/arm/boot/dts/at91rm9200ek.dts |   35 +++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 35 insertions(+)
+> >>
+> >>diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
+> >>index f2d6d79..2bad423 100644
+> >>--- a/arch/arm/boot/dts/at91rm9200ek.dts
+> >>+++ b/arch/arm/boot/dts/at91rm9200ek.dts
+> >>@@ -39,6 +39,23 @@
+> >>  						atmel,pins = <AT91_PIOD 5 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;
+> >>  					};
+> >>  				};
+> >>+
+> >>+				mmc0 {
+> >>+					pinctrl_mmc0_slot0_detect: mmc0_slot0_detect-0 {
+> >>+						atmel,pins =
+> >>+							<AT91_PIOB 27 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+> >>+					};
+> >>+
+> >>+					pinctrl_mmc0_slot0_write_protect: mmc0_slot0_write_protect-0 {
+> >>+						atmel,pins =
+> >>+							<AT91_PIOA 17 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
+> >>+					};
+> >>+
+> >>+					pinctrl_mmc0_slot0_switch: mmc0_slot0_switch-0 {
+> >>+						atmel,pins =
+> >>+							<AT91_PIOB 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(1))>;
+> >>+					};
+> >nack this is a regulator the pinctrl API is not done for gpio default value
 > 
-> > 
-> > So it is fairly possible that in your case you can't fill the link if you
-> > consume too many descriptors. For example, if your server uses TCP_NODELAY
-> > and sends incomplete segments (which is quite common), it's very easy to
-> > run out of descriptors before the link is full.
+> I know this can be represented as a regulator, but looking at the
+> datasheet, this looks more
+> like a switch than a regulator.
+
+so you load the dt via user space and use the regulator NOT the pinctrl
+
+I do not want to see gpio control via pinctrl as we have no tracability of it
+in gpio lib what so ever
+
 > 
-> BTW I have a very simple patch for TCP stack that could help this exact
-> situation...
-> 
-> Idea is to use TCP Small Queue so that we dont fill qdisc/TX ring with
-> very small frames, and let tcp_sendmsg() have more chance to fill
-> complete packets.
-> 
-> Again, for this to work very well, you need that NIC performs TX
-> completion in reasonable amount of time...
+> Anyway, why didn't you told me that when I proposed the OUTPUT
+> support for at91 pinctrl driver ?
 
-Eric, first I would like to confirm that I could reproduce Arnaud's issue
-using 3.10.19 (160 kB/s in the worst case).
+you never get my Ack for this and I'm the pinctrl-at91 maintainer
 
-Second, I confirm that your patch partially fixes it and my performance
-can be brought back to what I had with 3.10-rc7, but with a lot of
-concurrent streams. In fact, in 3.10-rc7, I managed to constantly saturate
-the wire when transfering 7 concurrent streams (118.6 kB/s). With the patch
-applied, performance is still only 27 MB/s at 7 concurrent streams, and I
-need at least 35 concurrent streams to fill the pipe. Strangely, after
-2 GB of cumulated data transferred, the bandwidth divided by 11-fold and
-fell to 10 MB/s again.
+so NACK
 
-If I revert both "0ae5f47eff tcp: TSQ can use a dynamic limit" and
-your latest patch, the performance is back to original.
-
-Now I understand there's a major issue with the driver. But since the
-patch emphasizes the situations where drivers take a lot of time to
-wake the queue up, don't you think there could be an issue with low
-bandwidth links (eg: PPPoE over xDSL, 10 Mbps ethernet, etc...) ?
-I'm a bit worried about what we might discover in this area I must
-confess (despite generally being mostly focused on 10+ Gbps).
-
-Best regards,
-Willy
+Best Regards,
+J.
