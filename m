@@ -1,102 +1,95 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Nov 2013 22:05:07 +0100
-Subject: [PATCH RFC v1 4/7] net: phy: suspend unused PHYs on mdio_bus
- in late_initcall
-In-Reply-To: <CAGVrzcYBexBWrh2Nz8tu0KRLQ4YPjtJux9N-TC07-Hxf3On1FQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 20 Nov 2013 13:10:12 -0800
+Subject: [PATCH RFC v1 0/7] net: phy: Ethernet PHY powerdown optimization
+In-Reply-To: <528D217B.5020500@gmail.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1384978913-8052-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAGVrzcYBexBWrh2Nz8tu0KRLQ4YPjtJux9N-TC07-Hxf3On1FQ@mail.gmail.com>
-Message-ID: <528D2403.5040204@gmail.com>
+ <20131120.153642.2045230991917379052.davem@davemloft.net>
+ <528D217B.5020500@gmail.com>
+Message-ID: <CAGVrzcZ5wV2eHPNfr-xToOEc6jbBJXiNQ+OtZv2j+yGbS9YW-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2013 09:58 PM, Florian Fainelli wrote:
-> 2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
->> Since phy_attach ensures PHYs are resumed, we can now suspend all
->> PHYs that have no attached netdev after initcalls.
->
-> I do like the idea, but I think you might want to make sure that the
-> MDIO bus suspend policy was set to "auto" (which is the default afair)
-> not to expose unexpected behavior.
-
-Ok, TBH I haven't looked through all of phy internals. If we are fine
-with the overall approach, I could use some guidance in the individual
-patches and policies.
-
+2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+> On 11/20/2013 09:36 PM, David Miller wrote:
 >>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
->> Cc: David S. Miller <davem@davemloft.net>
->> Cc: netdev at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>   drivers/net/phy/mdio_bus.c |   27 +++++++++++++++++++++++++++
->>   1 files changed, 27 insertions(+), 0 deletions(-)
+>> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Date: Wed, 20 Nov 2013 21:21:46 +0100
 >>
->> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
->> index 5617876..10eba58 100644
->> --- a/drivers/net/phy/mdio_bus.c
->> +++ b/drivers/net/phy/mdio_bus.c
->> @@ -320,6 +320,33 @@ static int mdio_bus_match(struct device *dev, struct device_driver *drv)
->>                  (phydev->phy_id & phydrv->phy_id_mask));
->>   }
->>
->> +static int mdio_bus_suspend_unused(struct device *busdev, void *data)
->> +{
->> +       struct mii_bus *bus = to_mii_bus(busdev);
->> +       struct phy_device *phydev;
->> +       struct phy_driver *phydrv;
->> +       int i;
->> +
->> +       for (i = 0; i < PHY_MAX_ADDR; i++) {
->> +               if (!bus->phy_map[i])
->> +                       continue;
->> +
->> +               phydev = to_phy_device(&bus->phy_map[i]->dev);
->> +               phydrv = to_phy_driver(phydev->dev.driver);
->> +               if (!phydev->attached_dev && phydrv && phydrv->suspend)
->> +                       phy_suspend(phydev);
->> +       }
->> +
->> +       return 0;
->
-> You might want to reuse mdio_bus_phy_may_suspend() here to have a
-> central place checking for phydev->attached_dev and phydrv->suspend
-> just in case we need to add more callbacks in the future or implicit
-> PHY state machine hooks. That might also take care of my concern
-> expressed above.
-
-Unfortunately, mdio_bus_phy_may_suspend() doesn't help here. It will
-correctly tell that unconnected PHYs may_suspend but also that PHYs
-connected to PM aware drivers may_suspend.
-
-I tried it and it will also suspend the PHY taken by mv643xx_eth.
-
-But actually, as phy_suspend/resume check for phydrv->suspend
-themselves, we can just call it on !phydev->attached_dev and remove
-the additional checks.
-
->> +}
->> +
->> +static int mdio_bus_class_suspend_unused(void)
->> +{
->> +       return class_for_each_device(&mdio_bus_class, NULL, NULL,
->> +                                    mdio_bus_suspend_unused);
->> +}
->> +late_initcall_sync(mdio_bus_class_suspend_unused);
->> +
->>   #ifdef CONFIG_PM
->>
->>   static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
->> --
->> 1.7.2.5
+>>> Ethernet PHYs consume a significant amount of power when link is
+>>> detected.
+>>> Especially, for embedded systems it can be easily 20-40% of total system
+>>> power. Now, currently most likely all ethernet drivers leave PHYs powered
+>>> on, even if the device is taken down. Also, some stupid boot loaders
+>>> power
+>>> on all PHYs available.
+>>>
+>>> This RFC deals with saving power consumed by ethernet PHYs, that have no
+>>> corresponding ethernet device driver or are attached to ethernet devices
+>>> which are taken down by user request, i.e. ifconfig ethN down. Ports with
+>>> no link, i.e. cable removed, are already quite good at power saving due
+>>> to
+>>> PHY internal link detection.
 >>
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> The idea is sound and the goal is of course valuable, but it brings up
+>> a chronically reoccurring issue as of late.
+>>
+>> You cannot reset the PHY or take it down without somehow retaining the
+>> settings the PHY had when you bring it back up.
 >
 >
+> Right, as far as I understand BMCR powerdown, i.e. what is called in
+> genphy_suspend/resume, powers down the PHY but _does_ retain PHY config.
+> It is not resetting the device.
+
+Right that's also my understanding of how BMCR powerdown works. That
+said, I am relatively sure that we can find PHY devices for which this
+is not true.
+
+As for the PHY state machine, I think we need a new state
+PHY_SUSPENDED  and upon calling phy_start() we make sure that we treat
+PHY_SUSPENDED just like we treat PHY_HALTED today since that would
+make sure that the PHY parameters are applied correctly upon resume
+(interrupt configuration, autoneg and and such).
+
+There is still some discussion on how we should deal with
+auto-suspending the PHY when phy_stop() is called, and how does that
+differ from the PHY_HALTED state? So this also raises the question of
+whether PHY_HALTED is really different from PHY_SUSPENDED. The only
+difference with your patches would be that we have put the PHY into a
+low-power mode.
+
 >
+> I haven't checked a lot of datasheets but [1] notes that "registers will
+> preserve their configuration". Even if we have PHYs that do not preserve
+> it, they should have a device specific callback for suspend/resume that
+> takes care of preserving it.
+
+Right, but the PHY driver should only take care of restoring "state
+less" PHY context, while the PHY state machine has to restore a "state
+aware" PHY device context. So for quirky PHY chips, or those having
+advanced power management features, we definitively need the two to be
+helping each other.
+
+>
+> [1] http://www.ti.com/lit/an/snoa463a/snoa463a.pdf
+>
+>
+>> If I ifdown/ifup a device, my ethtool link configuration better be
+>> retained.
+>>
+>> This means the PHY layer must have a way to reprogram the device when
+>> it is brought back up, with whatever settings the software state
+>> things are there.
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Florian
