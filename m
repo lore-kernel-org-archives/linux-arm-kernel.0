@@ -1,28 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Nov 2013 13:06:56 +0100
-Subject: [PATCH v2 3/4] ata: add APM X-Gene SoC 6.0Gbps SATA PHY driver
-In-Reply-To: <20131120113704.GT5914@e106331-lin.cambridge.arm.com>
-References: <1384905197-3566-1-git-send-email-lho@apm.com>
- <1384905197-3566-4-git-send-email-lho@apm.com>
- <20131120113704.GT5914@e106331-lin.cambridge.arm.com>
-Message-ID: <40736575.jvgUcOHqUx@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 20 Nov 2013 14:09:01 +0200
+Subject: [PATCH] clk: keystone: gate: fix error handling on init
+Message-ID: <1384949341-26486-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 November 2013 11:37:05 Mark Rutland wrote:
-> > +static void phy_rd(void *addr, u32 *val)
-> > +{
-> > +       *val = readl(addr);
-> > +#if defined(XGENE_DBG1_CSR)
-> > +       pr_debug("SATAPHY CSR RD: 0x%p value: 0x%08x\n", addr, *val);
-> 
-> Can you not use dev_dbg here as you do elsehere?
-> 
-> Either that or make your own debug print function, with the ifdefs
-> hidden in its definition.
-> 
+This patch fixes Keystone gate control clock driver initialization path:
+1) clk_register_psc() returns error code and not a pure pointer, hence
+its return value need to be checked using IS_ERR(clk) macro.
 
-pr_debug() is already conditional on #ifdef DEBUG, the extra #if
-can just get removed here.
+2) Mapped IO memory isn't unmapped in case of errors, hence fix it.
 
-	Arnd
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/clk/keystone/gate.c |   12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
+index 1f333bc..17a5983 100644
+--- a/drivers/clk/keystone/gate.c
++++ b/drivers/clk/keystone/gate.c
+@@ -223,8 +223,7 @@ static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
+ 	data->domain_base = of_iomap(node, i);
+ 	if (!data->domain_base) {
+ 		pr_err("%s: domain ioremap failed\n", __func__);
+-		iounmap(data->control_base);
+-		goto out;
++		goto unmap_ctrl;
+ 	}
+ 
+ 	of_property_read_u32(node, "domain-id", &data->domain_id);
+@@ -237,16 +236,21 @@ static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
+ 	parent_name = of_clk_get_parent_name(node, 0);
+ 	if (!parent_name) {
+ 		pr_err("%s: Parent clock not found\n", __func__);
+-		goto out;
++		goto unmap_domain;
+ 	}
+ 
+ 	clk = clk_register_psc(NULL, clk_name, parent_name, data, lock);
+-	if (clk) {
++	if (!IS_ERR(clk)) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+ 		return;
+ 	}
+ 
+ 	pr_err("%s: error registering clk %s\n", __func__, node->name);
++
++unmap_domain:
++	iounmap(data->domain_base);
++unmap_ctrl:
++	iounmap(data->control_base);
+ out:
+ 	kfree(data);
+ 	return;
+-- 
+1.7.9.5
