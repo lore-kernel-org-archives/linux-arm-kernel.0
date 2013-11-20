@@ -1,79 +1,121 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 20 Nov 2013 19:20:11 +0800
-Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
-In-Reply-To: <201311101848.12215.marex@denx.de>
-References: <1380194306-5243-1-git-send-email-marex@denx.de>
- <20131008043631.GA18365@gondor.apana.org.au>
- <201310081233.37136.marex@denx.de>
- <201311101848.12215.marex@denx.de>
-Message-ID: <20131120112010.GA20958@gondor.apana.org.au>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 20 Nov 2013 11:21:04 +0000
+Subject: [PATCH v4] ARM: signal: fix armv7-m build issue in
+ sigreturn_codes.S
+In-Reply-To: <1384932072-8103-2-git-send-email-victor.kamensky@linaro.org>
+References: <1384932072-8103-1-git-send-email-victor.kamensky@linaro.org>
+ <1384932072-8103-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131120112059.GA2582@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 10, 2013 at 06:48:11PM +0100, Marek Vasut wrote:
-> Hi,
+On Tue, Nov 19, 2013 at 11:21:12PM -0800, Victor Kamensky wrote:
+> After "ARM: signal: sigreturn_codes should be endian neutral to
+> work in BE8" commit, thumb only platforms, like armv7m, fails to
+> compile sigreturn_codes.S. The reason is that for such arch
+> values '.arm' directive and arm opcodes are not allowed.
 > 
-> > Hello Herbert,
-> > 
-> > > On Mon, Oct 07, 2013 at 05:48:26PM +0200, Marek Vasut wrote:
-> > > > Hello Christoph,
-> > > > 
-> > > > > Hello Marek,
-> > > > > 
-> > > > > > Marek Vasut <marex@denx.de> hat am 28. September 2013 um 05:35
-> > > > > > geschrieben: [...]
-> > > > > > 
-> > > > > > > > 3) What are those ugly new IOCTLs in the dcp.c driver?
-> > > > > > > 
-> > > > > > > When I firstly posted the driver in the mailinglist, there where
-> > > > > > > one person who actually used this interface (it was introduced in
-> > > > > > > Freescale's SDK) to use the OTP keys for crypto. As far as I have
-> > > > > > > seen, the crypto API does not support such keys (i.e. there seems
-> > > > > > > to be no way to tell a driver to use some kind of special keys -
-> > > > > > > which are not delivered by the user - via the API).
-> > > > > > > Therefore I added this miscdevice and adopted Freescale's
-> > > > > > > interface.
-> > > > > > 
-> > > > > > The keys are programmed into the OTP registers, correct? There is
-> > > > > > OCOTP d
-> > > > > >
-> > > > > >river
-> > > > > >for the MX23/MX28 OTP hardware. This is what should have been used
-> > > > > >then.
-> > > > > >
-> > > > > > NOTE: This IOCTL interface seems like quite an abusive way to allow
-> > > > > > userl
-> > > > > >
-> > > > > >and to
-> > > > > >access the crypto API in kernel. I understand this is used by some
-> > > > > >Freesc ale tool, but won't it be better to fix the Freescale tool
-> > > > > >instead ?
-> > > > > 
-> > > > > the IOCTL interface is used to AES encrypt a bootstream with the AES
-> > > > > key in OCOTP.
-> > > > > The idea is that only the DCP can read/access the key once it has
-> > > > > been programmed
-> > > > > into the OCOTP. If the crypto API has means to tell the DCP to use
-> > > > > the key from OCOTP, the tool from Freescale is a minor problem.
-> > > > 
-> > > > Ah right. I suspect the crypto API services shall not be exported into
-> > > > userland at all, yes ? So there has to be some kind of workaround here
-> > > > for this freescale tool, which is rather unfortunate.
-> > > 
-> > > These ioctls have to go.  I should have never let them through in
-> > > the first place.  Can someone cook up a patch to kill them please?
-> > 
-> > I can do that. I wonder if we can't agree to nuke the in-tree driver
-> > altogether instead and replace it by this one though. Does it not sound
-> > more reasonable?
+> Fix conditionally enables arm opcodes only if no CONFIG_CPU_THUMBONLY
+> defined and it uses .org instructions to keep sigreturn_codes
+> layout.
 > 
-> Bump?
+> Suggested-by: Dave Martin <Dave.Martin@arm.com>
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Well as it's been months and nobody has stepped up to maintain
-the in-tree driver then yes we can get rid of it.
+I believe this looks correct now:
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+Cheers
+---Dave
+
+> ---
+>  arch/arm/kernel/sigreturn_codes.S | 40 ++++++++++++++++++++++++++++++---------
+>  1 file changed, 31 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
+> index 3c5d0f2..b84d0cb 100644
+> --- a/arch/arm/kernel/sigreturn_codes.S
+> +++ b/arch/arm/kernel/sigreturn_codes.S
+> @@ -30,6 +30,27 @@
+>   * snippets.
+>   */
+>  
+> +/*
+> + * In CPU_THUMBONLY case kernel arm opcodes are not allowed.
+> + * Note in this case codes skips those instructions but it uses .org
+> + * directive to keep correct layout of sigreturn_codes array.
+> + */
+> +#ifndef CONFIG_CPU_THUMBONLY
+> +#define ARM_OK(code...)	code
+> +#else
+> +#define ARM_OK(code...)
+> +#endif
+> +
+> +	.macro arm_slot n
+> +	.org	sigreturn_codes + 12 * (\n)
+> +ARM_OK(	.arm	)
+> +	.endm
+> +
+> +	.macro thumb_slot n
+> +	.org	sigreturn_codes + 12 * (\n) + 8
+> +	.thumb
+> +	.endm
+> +
+>  #if __LINUX_ARM_ARCH__ <= 4
+>  	/*
+>  	 * Note we manually set minimally required arch that supports
+> @@ -45,26 +66,27 @@
+>  	.global sigreturn_codes
+>  	.type	sigreturn_codes, #object
+>  
+> -	.arm
+> +	.align
+>  
+>  sigreturn_codes:
+>  
+>  	/* ARM sigreturn syscall code snippet */
+> -	mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+> -	swi	#(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+> +	arm_slot 0
+> +ARM_OK(	mov	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)	)
+> +ARM_OK(	swi	#(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE)	)
+>  
+>  	/* Thumb sigreturn syscall code snippet */
+> -	.thumb
+> +	thumb_slot 0
+>  	movs	r7, #(__NR_sigreturn - __NR_SYSCALL_BASE)
+>  	swi	#0
+>  
+>  	/* ARM sigreturn_rt syscall code snippet */
+> -	.arm
+> -	mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+> -	swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)
+> +	arm_slot 1
+> +ARM_OK(	mov	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)	)
+> +ARM_OK(	swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)	)
+>  
+>  	/* Thumb sigreturn_rt syscall code snippet */
+> -	.thumb
+> +	thumb_slot 1
+>  	movs	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
+>  	swi	#0
+>  
+> @@ -74,7 +96,7 @@ sigreturn_codes:
+>  	 * it is thumb case or not, so we need additional
+>  	 * word after real last entry.
+>  	 */
+> -	.arm
+> +	arm_slot 2
+>  	.space	4
+>  
+>  	.size	sigreturn_codes, . - sigreturn_codes
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
