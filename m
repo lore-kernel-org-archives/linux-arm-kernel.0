@@ -1,24 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Nov 2013 09:51:07 -0500
-Subject: [PATCH] clk: keystone: gate: fix error handling on init
-In-Reply-To: <1384949341-26486-1-git-send-email-grygorii.strashko@ti.com>
-References: <1384949341-26486-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <528CCC5B.4010204@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 20 Nov 2013 15:56:09 +0100
+Subject: [PATCH 1/9] ARM: at91/dt: add rm9200 spi0 chip select pins
+ definitions
+In-Reply-To: <1377687742-10618-1-git-send-email-b.brezillon@overkiz.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+ <1377687742-10618-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131120145609.GC14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 November 2013 07:09 AM, Grygorii Strashko wrote:
-> This patch fixes Keystone gate control clock driver initialization path:
-> 1) clk_register_psc() returns error code and not a pure pointer, hence
-> its return value need to be checked using IS_ERR(clk) macro.
+On 13:02 Wed 28 Aug     , Boris BREZILLON wrote:
+> Add spi0 cs pinctrl pins definitions.
 > 
-> 2) Mapped IO memory isn't unmapped in case of errors, hence fix it.
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > ---
-Looks good. Thanks !!
+>  arch/arm/boot/dts/at91rm9200.dtsi |   20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+> index f770655..69b76c7 100644
+> --- a/arch/arm/boot/dts/at91rm9200.dtsi
+> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
+> @@ -486,6 +486,26 @@
+>  							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PA1 periph A SPI0_MOSI pin */
+>  							 AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA2 periph A SPI0_SPCK pin */
+>  					};
+> +
+> +					pinctrl_spi0_cs0: spi0_cs0-0 {
+> +						atmel,pins =
+> +							<AT91_PIOA 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA3 periph A SPI0_NPCS0 pin */
+> +					};
+> +
+> +					pinctrl_spi0_cs1: spi0_cs1-0 {
+> +						atmel,pins =
+> +							<AT91_PIOA 4 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;	/* PA4 GPIO SPI0_NPCS1 pin */
+> +					};
+> +
+> +					pinctrl_spi0_cs2: spi0_cs2-0 {
+> +						atmel,pins =
+> +							<AT91_PIOA 5 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;	/* PA5 GPIO SPI0_NPCS2 pin */
+> +					};
+> +
+> +					pinctrl_spi0_cs3: spi0_cs3-0 {
+> +						atmel,pins =
+> +							<AT91_PIOA 6 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;	/* PA6 GPIO SPI0_NPCS3 pin */
+> +					};
+nack the pin are not multidrive there is only one master
 
-Mike, If you are ok can you please consider it for fixes ?
-
-Regards,
-Santosh
+Best Regards,
+J.
+>  				};
+>  
+>  				pioA: gpio at fffff400 {
+> -- 
+> 1.7.9.5
+> 
