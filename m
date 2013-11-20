@@ -1,47 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Nov 2013 18:00:12 +0000
-Subject: [PATCH V4 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <CAPrCYkcu7wVjoV5Q=pd55Zn8+PR30n3WJ8F6t=qV4BMLhZFcxA@mail.gmail.com>
-References: <1384946021-22100-1-git-send-email-vkale@apm.com>
- <1384946021-22100-3-git-send-email-vkale@apm.com>
- <528CB5AC.5080007@arm.com>
- <CAPrCYkcu7wVjoV5Q=pd55Zn8+PR30n3WJ8F6t=qV4BMLhZFcxA@mail.gmail.com>
-Message-ID: <20131120180012.GJ19352@mudshark.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 20 Nov 2013 22:03:02 +0400
+Subject: [PATCH v2 4/4] arm64: Add APM X-Gene SoC 6.0Gbps SATA PHY DTS
+ entries
+In-Reply-To: <1384905197-3566-5-git-send-email-lho@apm.com>
+References: <1384905197-3566-1-git-send-email-lho@apm.com>
+ <1384905197-3566-2-git-send-email-lho@apm.com>
+ <1384905197-3566-3-git-send-email-lho@apm.com>
+ <1384905197-3566-4-git-send-email-lho@apm.com>
+ <1384905197-3566-5-git-send-email-lho@apm.com>
+Message-ID: <528CF956.3040104@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 05:28:50PM +0000, Vinayak Kale wrote:
-> In Will's existing code, I think he was taking care of 'no IRQ' case
-> by comparing pmu_device->num_resources. Do you think this is not
-> enough and we must enforce the check after each platform_get_irq()?
-> Existing driver code snippet as below for quick reference.
-> 
-> [snip]
-> static int
-> armpmu_reserve_hardware(struct arm_pmu *armpmu)
-> {
->         int i, err, irq, irqs;
->         struct platform_device *pmu_device = armpmu->plat_device;
-> 
->         if (!pmu_device) {
->                 pr_err("no PMU device registered\n");
->                 return -ENODEV;
->         }
-> 
->         irqs = min(pmu_device->num_resources, num_possible_cpus());
->         if (irqs < 1) {
->                 pr_err("no irqs for PMUs defined\n");
->                 return -ENODEV;
->         }
+Hello.
 
-This bit is fine.
+On 20-11-2013 3:53, Loc Ho wrote:
 
->         for (i = 0; i < irqs; ++i) {
->                 err = 0;
->                 irq = platform_get_irq(pmu_device, i);
->                 if (irq < 0)
->                          continue;
+> arm64: Add APM X-Gene SoC 6.0Gbps SATA PHY DTS entries
 
-This is a bug, which you can fix in your patch. IRQ0 isn't valid.
+> This patch adds the DTS entries for the APM X-Gene SoC 6.0Gbps SATA PHY
+> driver. The PHY for controller 0 and 1 are enabled by default.
 
-Will
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   arch/arm64/boot/dts/apm-storm.dtsi |   28 ++++++++++++++++++++++++++++
+>   1 files changed, 28 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> index 359d7b6..1d1c8bc 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -193,5 +193,33 @@
+>   			reg = <0x0 0x17000014 0x0 0x100>;
+>   			mask = <0x1>;
+>   		};
+> +
+> +		sataphy0: sataphy at 1f210000 {
+
+    The nodes should better be named like "sata-phy at 1f210000" to better comply 
+with the "ethernet-phy" name we see in the ePAPR spec.
+
+WBR, Sergei
