@@ -1,33 +1,55 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 20 Nov 2013 13:00:10 +0900
-Subject: [PATCH] ARM: shmobile: Hook up SW30-SW36 on Koelsch
-Message-ID: <20131120040010.30077.40904.sendpatchset@w520>
+From: Li.Xiubo@freescale.com (Li Xiubo)
+Date: Wed, 20 Nov 2013 04:16:09 +0000
+Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <20131120033745.GD11009@MrMyself>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131101085904.GC28401@MrMyself>
+ <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20131104043338.GA2345@MrMyself>
+ <1DD289F6464F0949A2FCA5AA6DC23F828AE980@039-SN2MPN1-012.039d.mgd.msft.net>
+ <20131120033745.GD11009@MrMyself>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828AF608@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+> > > The udelay just doesn't make sense to what you are talking about.
+> > >
+> > > Does SAI really need 10us delay between two register-updating?
+> > >
+> >
+> > No, this is not must be.
+> 
+> Then you should explain in your comments why you really put it here or
+> just drop it if it's just a mistake.
+> 
 
-Add support for Koelsch SW30-SW36 using GPIO keys.
+The udelay will be removed then.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
 
- arch/arm/mach-shmobile/board-koelsch.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+> > > ISSUE 2: There are two cases listed in 'Synchronous mode'.
+> > > 	 However, your driver doesn't take care of them.
+> > > 	 The SAI's synchronous mode looks like more flexible
+> > > 	 than SSI's. The driver needs to be more sophisticated
+> > > 	 so that it can handle multiple cases when TX/RX clocks
+> > > 	 are controlled by either TX or RX, and surely, the
+> > > 	 asynchronous mode as well.
+> > >
+> >
+> > Because in Vybrid the transmitter bit clock and frame sync are to be
+> > used by both the transmitter and receiver, and only this case can be
+> > used here, so now I only handle this case.
+> 
+> It's fairly okay if adding explicit comments to indicate that currently
+> the driver only supports its Synchronous mode with clocks controlled by
+> TX only.
+> 
 
---- 0016/arch/arm/mach-shmobile/board-koelsch.c
-+++ work/arch/arm/mach-shmobile/board-koelsch.c	2013-11-20 12:49:32.000000000 +0900
-@@ -64,6 +64,13 @@ static struct gpio_keys_button gpio_butt
- 	GPIO_KEY(KEY_3,		RCAR_GP_PIN(5, 2),	"SW2-pin3"),
- 	GPIO_KEY(KEY_2,		RCAR_GP_PIN(5, 1),	"SW2-pin2"),
- 	GPIO_KEY(KEY_1,		RCAR_GP_PIN(5, 0),	"SW2-pin1"),
-+	GPIO_KEY(KEY_G,		RCAR_GP_PIN(7, 6),	"SW36"),
-+	GPIO_KEY(KEY_F,		RCAR_GP_PIN(7, 5),	"SW35"),
-+	GPIO_KEY(KEY_E,		RCAR_GP_PIN(7, 4),	"SW34"),
-+	GPIO_KEY(KEY_D,		RCAR_GP_PIN(7, 3),	"SW33"),
-+	GPIO_KEY(KEY_C,		RCAR_GP_PIN(7, 2),	"SW32"),
-+	GPIO_KEY(KEY_B,		RCAR_GP_PIN(7, 1),	"SW31"),
-+	GPIO_KEY(KEY_A,		RCAR_GP_PIN(7, 0),	"SW30"),
- };
- 
- static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
+Just think, on other platforms maybe only the Rx's clock is available.
+Thus I think there should be one DT property to control this, and then the SAI driver can be more flexible.
+
+Or could you give me some more practical ideas ?
+
+--
+Best Regards,
+Xiubo
