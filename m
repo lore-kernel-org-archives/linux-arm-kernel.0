@@ -1,54 +1,50 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 20 Nov 2013 11:17:37 +0100
-Subject: [PATCH V2 4/6] ARM: imx: imx53: Add SATA PHY clock
-In-Reply-To: <1384942659-5362-1-git-send-email-marex@denx.de>
-References: <1384942659-5362-1-git-send-email-marex@denx.de>
-Message-ID: <1384942659-5362-4-git-send-email-marex@denx.de>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 20 Nov 2013 11:22:10 +0100
+Subject: [alsa-devel] Bug? Sound support for at91sam9x5-wm8731 based boards
+In-Reply-To: <033601cee552$7c2c2570$74847050$@com>
+References: <1384878685-1515-1-git-send-email-tony@atomide.com>
+ <1384878685-1515-3-git-send-email-tony@atomide.com>
+ <031f01cee547$950b5670$bf220350$@com>
+ <CACQ1gAgykmgPKY4SHujnNtm4Sr=wt5knLkQL-MRS_pC73bOi4Q@mail.gmail.com>
+ <033601cee552$7c2c2570$74847050$@com>
+Message-ID: <CACQ1gAhvS7PSbK0SuhrB8TPS8Rkd-AdqZ-=T+Ntjyx7PsR7XaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SATA PHY clock which are derived from the USB PHY1 clock. Note that this
-patch derives the SATA PHY clock from USB PHY1 clock gate so that the SATA
-driver can ungate both the SATA PHY clock and USB PHY1 clock for the SATA to
-work correctly.
+[added Nicolas Ferre and Bo Shen ]
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Linux-IDE <linux-ide@vger.kernel.org>
----
- arch/arm/mach-imx/clk-imx51-imx53.c    | 1 +
- include/dt-bindings/clock/imx5-clock.h | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+2013/11/19 Zhong Li <zql@glomationinc.com>:
+>> Can you give a little more background ? :
+>> - What kernel ?
+>> - Command line to reproduce ?
+>>
+>> Richard.
+>
+> One of the testing hardware is the Atmel at91sam9g25-ek (the CPU module and the carrier board).  We tried both the 2.6.39 patched with the Atmel patches and the mainline 3.12-rc.  The command to test the sound is just the simple aplay <sound-test-file>.  The wav file is available here, https://drive.google.com/file/d/0B3TSFX4Mq9PoeTdJOGVaZk5rTWM/edit?usp=sharing.
+>
+> Thanks
 
-V2: Rename 'IMX5_CLK_SATA_PHY' to 'IMX5_CLK_SATA_REF' as well as
-    'sata_phy' to 'sata_ref' .
+Ok, I reproduce the bug on g35-ek with a v3.11.7+(sam9x5 sound patches) kernel
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 07d275f..3f01df2 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -244,6 +244,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk[IMX5_CLK_SPDIF0_GATE]	= imx_clk_gate2("spdif0_gate", "spdif0_com_sel", MXC_CCM_CCGR5, 26);
- 	clk[IMX5_CLK_SPDIF_IPG_GATE]	= imx_clk_gate2("spdif_ipg_gate", "ipg", MXC_CCM_CCGR5, 30);
- 	clk[IMX5_CLK_SAHARA_IPG_GATE]	= imx_clk_gate2("sahara_ipg_gate", "ipg", MXC_CCM_CCGR4, 14);
-+	clk[IMX5_CLK_SATA_REF]		= imx_clk_fixed_factor("sata_ref", "usb_phy1_gate", 1, 1);
- 
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
- 		if (IS_ERR(clk[i]))
-diff --git a/include/dt-bindings/clock/imx5-clock.h b/include/dt-bindings/clock/imx5-clock.h
-index 5c2f634..5f2667ec 100644
---- a/include/dt-bindings/clock/imx5-clock.h
-+++ b/include/dt-bindings/clock/imx5-clock.h
-@@ -197,6 +197,7 @@
- #define IMX5_CLK_SPDIF_IPG_GATE		185
- #define IMX5_CLK_OCRAM			186
- #define IMX5_CLK_SAHARA_IPG_GATE	187
--#define IMX5_CLK_END			188
-+#define IMX5_CLK_SATA_REF		188
-+#define IMX5_CLK_END			189
- 
- #endif /* __DT_BINDINGS_CLOCK_IMX5_H */
+So, *sometimes*,  the left and right channel are swapped. ( I found
+also the ratio 1 out of 6 (but once it has happened, it seems to be
+more often))
+I tested that with the file given by Zhong Li, and with a file I
+created with audacity (440Hz only on right channel).
+I could see at the scope that the channels are swapped before the
+w8731 codec (the data on the TD line are sometime on the low edge of
+TF, instead of always being on the high edge (I2S mode)).
+There's, in both cases, a clock period (TK) between the rising/falling
+edge of TF and the 1st data bit on TD, so the mode is always I2S, and
+the channel data are swapped.
+
+I'll try to have a look (but I don't have much time right now)
+
+If someone could test that on a sam9g20 or a WM8904 based board, since
+they share the same DAI format, they may have the same problem.
+
+Thanks !
+Richard
+
 -- 
-1.8.4.2
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
