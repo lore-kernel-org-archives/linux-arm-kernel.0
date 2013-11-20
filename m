@@ -1,46 +1,167 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Nov 2013 10:31:11 +0000
-Subject: Report from 2013 ARM kernel summit
-In-Reply-To: <528BCDCE.6070006@gmail.com>
-References: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
- <20131115070627.6CF65C4079B@trevor.secretlab.ca>
- <20131119.114054.663999769447782808.hdoyu@nvidia.com>
- <20131119173524.GK11778@mudshark.cambridge.arm.com>
- <528BCDCE.6070006@gmail.com>
-Message-ID: <20131120103111.GB19352@mudshark.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 20 Nov 2013 12:32:28 +0200
+Subject: [PATCH v3 09/10] ARM: dts: omap3-beagle-xm: Add USB Host support
+In-Reply-To: <528BD2AF.2030607@ti.com>
+References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
+ <1380012836-29900-10-git-send-email-rogerq@ti.com> <528BD2AF.2030607@ti.com>
+Message-ID: <528C8FBC.7020407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 08:45:02PM +0000, Rob Herring wrote:
-> On 11/19/2013 11:35 AM, Will Deacon wrote:
-> > Adding Andreas and Rob for input on potential binding additions to the SMMU.
+Nishant,
+
+On 11/19/2013 11:05 PM, Nishanth Menon wrote:
 > 
-> The above proposal would be an incompatible change. However, I think we
-> could still deal with a change in this binding at this stage.
 > 
-> One way approach to handle this without changing the binding would be to
-> scan the DT for all iommu's up front and create a list of all nodes and
-> their iommu parent. The fact that the hierarchy is described in a way
-> that doesn't fit Linux well is really a Linux implementation detail.
+> On 09/24/2013 03:53 AM, Roger Quadros wrote:
+>> Provide RESET GPIO and Power regulator for the USB PHY,
+>> the USB Host port mode and the PHY device for the controller.
+>> Also provide pin multiplexer information for USB host pins.
+>>
+>> We also relocate omap3_pmx_core pin definations so that they
+>> are close to omap3_pmx_wkup pin definations.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
 > 
-> If changing the binding, a simple approach would be to allow
-> 'smmu-parent' to be a bus and/or device property and not just for
-> chained iommu's. This could be a global or bus property that is
-> inherited. Like interrupt-parent, you would have to deal with the parent
-> being itself. Also, perhaps iommu-parent would be a better name. In any
-> case, I'd like to see this all be a generic iommu binding.
+> just using this thread, but a question ->
+> 
+> I am kernel * master                                   dec8e46 Merge
+> tag 'arc-v3.13-rc1-part2' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/vgupta/arc
+> 
+> and I see that VAUX2 which supplies USB_1V8[1] is not enabled -> I did
+> a quick patch and it did seem to work (Usb keyboard, networking, mouse
+> etc on my ehci ports seems to come up good) - any suggestions how we'd
+> like to handle this?
 
-I like that idea. I've recently been toying with removing the chained IOMMU
-support, since I don't think anybody is using it who is interested in
-mainline. However, making it more general sounds like a better idea.
+It worked for me without your patch. It could be that u-boot is enabling
+that regulator for me. I'm on u-boot-v2013.10.
 
-One potential issue is that I think the nvidia guys want to describe masters
-that master via multiple SMMUs (which I believe was the motivation for
-moving the stream-ids out into the master nodes, rather than keeping them in
-the SMMU). Again, that's not something we can easily add to the arm-smmu,
-because the incoming stream-ids are a property of the SMMU node.
+In any case, your patch seems the right thing to do. We should take it in
+the rc cycle.
 
-So the question is: do we actually need to describe masters that master
-through multiple SMMUs as a single node in the devicetree?
+> 
+> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> @@ -169,6 +169,14 @@
+>         bus-width = <8>;
+>  };
+> 
+> +&vaux2 {
+> +       regulator-name = "HubPower";
+> +       regulator-min-microvolt = <1800000>;
+> +       regulator-max-microvolt = <1800000>;
+> +       regulator-always-on;
+> +};
+> +
+> +
+> 
+> [1]
+> https://github.com/CircuitCo/BeagleBoard-xM-RevC/blob/master/BeagleBoard-xM_revC_SCH.pdf?raw=true
 
-Will
+
+cheers,
+-roger
+
+> 
+>>  arch/arm/boot/dts/omap3-beagle-xm.dts |   65 ++++++++++++++++++++++++++++-----
+>>  1 files changed, 56 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> index afdb164..b081f5a 100644
+>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> @@ -69,6 +69,23 @@
+>>  		};
+>>  
+>>  	};
+>> +
+>> +	/* HS USB Port 2 Power */
+>> +	hsusb2_power: hsusb2_power_reg {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "hsusb2_vbus";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
+>> +		startup-delay-us = <70000>;
+>> +	};
+>> +
+>> +	/* HS USB Host PHY on PORT 2 */
+>> +	hsusb2_phy: hsusb2_phy {
+>> +		compatible = "usb-nop-xceiv";
+>> +		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>; /* gpio_147 */
+>> +		vcc-supply = <&hsusb2_power>;
+>> +	};
+>>  };
+>>  
+>>  &omap3_pmx_wkup {
+>> @@ -79,6 +96,37 @@
+>>  	};
+>>  };
+>>  
+>> +&omap3_pmx_core {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <
+>> +			&hsusbb2_pins
+>> +	>;
+>> +
+>> +	uart3_pins: pinmux_uart3_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
+>> +			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
+>> +		>;
+>> +	};
+>> +
+>> +	hsusbb2_pins: pinmux_hsusbb2_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+>> +			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+>> +			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
+>> +			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
+>> +			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
+>> +			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
+>> +			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
+>> +			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
+>> +			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
+>> +			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
+>> +			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
+>> +			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+>> +		>;
+>> +	};
+>> +};
+>> +
+>>  &i2c1 {
+>>  	clock-frequency = <2600000>;
+>>  
+>> @@ -148,15 +196,6 @@
+>>  	power = <50>;
+>>  };
+>>  
+>> -&omap3_pmx_core {
+>> -	uart3_pins: pinmux_uart3_pins {
+>> -		pinctrl-single,pins = <
+>> -			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
+>> -			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
+>> -		>;
+>> -	};
+>> -};
+>> -
+>>  &uart3 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&uart3_pins>;
+>> @@ -166,3 +205,11 @@
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&gpio1_pins>;
+>>  };
+>> +
+>> +&usbhshost {
+>> +	port2-mode = "ehci-phy";
+>> +};
+>> +
+>> +&usbhsehci {
+>> +	phys = <0 &hsusb2_phy>;
+>> +};
+>>
+> 
+> 
