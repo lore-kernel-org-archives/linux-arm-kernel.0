@@ -1,48 +1,71 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 20 Nov 2013 13:49:42 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
-Message-ID: <20131120134942.95DBFC4079D@trevor.secretlab.ca>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 20 Nov 2013 14:53:09 +0100
+Subject: Report from 2013 ARM kernel summit
+In-Reply-To: <20131120103111.GB19352@mudshark.cambridge.arm.com>
+References: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
+ <20131115070627.6CF65C4079B@trevor.secretlab.ca>
+ <20131119.114054.663999769447782808.hdoyu@nvidia.com>
+ <20131119173524.GK11778@mudshark.cambridge.arm.com>
+ <528BCDCE.6070006@gmail.com>
+ <20131120103111.GB19352@mudshark.cambridge.arm.com>
+Message-ID: <20131120135308.GC8279@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Nov 2013 09:57:17 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Nov 15, 2013 at 01:44:10AM +0000, Olof Johansson wrote:
-> > The more I start to see early UEFI/ACPI code, the more I am certain
-> > that we want none of that crap in the kernel. It's making things
-> > considerably messier, while we're already very busy trying to convert
-> > everything over and enable DT -- we'll be preempting that effort just
-> > to add even more boilerplate everywhere and total progress will be
-> > hurt.
+On Wed, Nov 20, 2013 at 10:31:11AM +0000, Will Deacon wrote:
+> On Tue, Nov 19, 2013 at 08:45:02PM +0000, Rob Herring wrote:
+> > On 11/19/2013 11:35 AM, Will Deacon wrote:
+> > > Adding Andreas and Rob for input on potential binding additions to the SMMU.
+> > 
+> > The above proposal would be an incompatible change. However, I think we
+> > could still deal with a change in this binding at this stage.
+> > 
+> > One way approach to handle this without changing the binding would be to
+> > scan the DT for all iommu's up front and create a list of all nodes and
+> > their iommu parent. The fact that the hierarchy is described in a way
+> > that doesn't fit Linux well is really a Linux implementation detail.
+> > 
+> > If changing the binding, a simple approach would be to allow
+> > 'smmu-parent' to be a bus and/or device property and not just for
+> > chained iommu's. This could be a global or bus property that is
+> > inherited. Like interrupt-parent, you would have to deal with the parent
+> > being itself. Also, perhaps iommu-parent would be a better name. In any
+> > case, I'd like to see this all be a generic iommu binding.
 > 
-> We are certainly under a lot of pressure with the device tree migration,
-> and I agree that adding another information source is going to be a
-> source of pain. However, I'd argue that we're going to encounter pain
-> regardless of which approach we take.
+> I like that idea. I've recently been toying with removing the chained IOMMU
+> support, since I don't think anybody is using it who is interested in
+> mainline. However, making it more general sounds like a better idea.
 > 
-> I'm of the opinion that the only way we should support ACPI is as a
-> first-class citizen. We don't need to modify every driver and subsystem
-> to support ACPI, only those necessary to support the minimal set of
-> platforms using ACPI. ACPI is new in the arm space, and we can enforce
-> quality standards on ACPI _now_ above what we're allowing for DT, and
-> avoid future problems.
+> One potential issue is that I think the nvidia guys want to describe masters
+> that master via multiple SMMUs (which I believe was the motivation for
+> moving the stream-ids out into the master nodes, rather than keeping them in
+> the SMMU). Again, that's not something we can easily add to the arm-smmu,
+> because the incoming stream-ids are a property of the SMMU node.
 
-Translated ACPI tables really don't make any sense at all. While the
-models are similar in some regards, they are very different in others
-and any translator (I suspect) would become very complicated to deal
-with all the edge cases.
+If I remember correctly, one of the reasons for the proposal was also
+that the interrupt-parent property turned out to be insufficient for
+some use-cases, which lead to Grant's proposal of the new interrupts-
+extended property. Since that comparison has already been drawn, I think
+we can agree that both are used in similar ways. Therefore we should
+consider what we've learned from interrupt-parent when designing this
+generic IOMMU binding to avoid having to introduce iommu-extended at
+some point.
 
-> I'm not sure that translating ACPI tables to dt makes any sense. If AML
-> is used (even sparingly), I do not believe that we can do any sensible
-> conversion to device tree. My understanding is that AML includes
-> functionality for modifying ACPI tables, and I don't see how we can
-> possibly support that without having to add a lot of boilerplate to all
-> the code handling AML to add a device tree backend...
+> So the question is: do we actually need to describe masters that master
+> through multiple SMMUs as a single node in the devicetree?
 
-The dynamic features of AML would be a no-go. Basically, an AML method
-can cause SSDT blocks to be loaded/unloaded at runtime. It doesn't edit
-the tree provided at runtime, but it does augment it.
+I would think so, yes. The alternative would be to have several nodes
+that describe the same device, and that conflicts on a different level.
 
-g.
+Perhaps it could be done by having separate sub-nodes that each use a
+different IOMMU, but that sounds like a much grosser solution. That
+pretty much boils down to interrupt-parent/interrupt-map.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131120/58474dce/attachment.sig>
