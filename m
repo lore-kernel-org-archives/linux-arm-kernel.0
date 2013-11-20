@@ -1,25 +1,34 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 20 Nov 2013 10:13:09 -0500
-Subject: [RESEND PATCH 1/6] ahci: imx: Explicitly clear
- IMX6Q_GPR13_SATA_MPLL_CLK_EN
-In-Reply-To: <201311201611.44120.marex@denx.de>
-References: <1384942659-5362-1-git-send-email-marex@denx.de>
- <1384943242-8201-1-git-send-email-marex@denx.de>
- <20131120145907.GA28946@htj.dyndns.org>
- <201311201611.44120.marex@denx.de>
-Message-ID: <20131120151309.GC28946@htj.dyndns.org>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 20 Nov 2013 17:22:21 +0200
+Subject: [PATCH 3/7] mtd: nand: davinci: check required ti,
+ davinci-chipselect property
+In-Reply-To: <1384960945-14528-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1384960945-14528-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1384960945-14528-4-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 04:11:43PM +0100, Marek Vasut wrote:
-> It's already done in 2/6 of the series, I hope that is OK. Otherwise I can 
-> separate this formating change from the 2/6 patch and shove it in front of this 
-> one even. Which one do you prefer please?
+The property "ti,davinci-chipselect" is required. So we have to check
+if it is set.
 
-Oops, sorry about missing that.  As long as the end result is correct,
-I don't mind either way.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/mtd/nand/davinci_nand.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Thanks!
-
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index ddcd7c8..9a96ac7 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -545,6 +545,9 @@ static struct davinci_nand_pdata
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-chipselect", &prop))
+ 			pdev->id = prop;
++		else
++			return ERR_PTR(-EINVAL);
++
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-mask-ale", &prop))
+ 			pdata->mask_ale = prop;
 -- 
-tejun
+1.7.9.5
