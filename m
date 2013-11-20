@@ -1,27 +1,82 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 20 Nov 2013 10:21:24 -0800
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <20131120181532.GM8581@1wt.eu>
-References: <20131112083633.GB10318@1wt.eu> <87a9hagex1.fsf@natisbad.org>
- <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
- <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120171227.GG8581@1wt.eu> <20131120173436.GK8581@1wt.eu>
- <1384969222.10637.20.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120181532.GM8581@1wt.eu>
-Message-ID: <1384971684.10637.22.camel@edumazet-glaptop2.roam.corp.google.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu, 21 Nov 2013 02:21:24 +0800
+Subject: [PATCH 1/3] ARM: EXYNOS: pmu: Constify data tables
+Message-ID: <1384971686-7208-1-git-send-email-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-11-20 at 19:15 +0100, Willy Tarreau wrote:
+These tables are all immutable, make them const to save 4416 bytes of RAM.
 
-> No, I was on latest stable (3.10.19) which exhibits the regression but does
-> not yet have your fix above. Then I tested the patch your proposed in this
-> thread, then this latest one. Since the patch is not yet even in Linus'
-> tree, I'm not sure Arnaud has tried it yet.
+size arch/arm/mach-exynos/pmu.o
+   text	   data	    bss
+    848	   4420	      4		// before
+   5264	      4	      4		// after
 
-Oh right ;)
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ arch/arm/mach-exynos/pmu.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-BTW Linus tree has the fix, I just checked this now.
-
-(Linus got David changes 19 hours ago)
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 97d6885..6609145 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -17,9 +17,9 @@
+ 
+ #include "common.h"
+ 
+-static struct exynos_pmu_conf *exynos_pmu_config;
++static const struct exynos_pmu_conf *exynos_pmu_config;
+ 
+-static struct exynos_pmu_conf exynos4210_pmu_config[] = {
++static const struct exynos_pmu_conf exynos4210_pmu_config[] = {
+ 	/* { .reg = address, .val = { AFTR, LPA, SLEEP } */
+ 	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
+ 	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
+@@ -95,7 +95,7 @@ static struct exynos_pmu_conf exynos4210_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
+ 
+-static struct exynos_pmu_conf exynos4x12_pmu_config[] = {
++static const struct exynos_pmu_conf exynos4x12_pmu_config[] = {
+ 	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
+ 	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
+ 	{ S5P_DIS_IRQ_CENTRAL0,			{ 0x0, 0x0, 0x0 } },
+@@ -203,7 +203,7 @@ static struct exynos_pmu_conf exynos4x12_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
+ 
+-static struct exynos_pmu_conf exynos4412_pmu_config[] = {
++static const struct exynos_pmu_conf exynos4412_pmu_config[] = {
+ 	{ S5P_ARM_CORE2_LOWPWR,			{ 0x0, 0x0, 0x2 } },
+ 	{ S5P_DIS_IRQ_CORE2,			{ 0x0, 0x0, 0x0 } },
+ 	{ S5P_DIS_IRQ_CENTRAL2,			{ 0x0, 0x0, 0x0 } },
+@@ -213,7 +213,7 @@ static struct exynos_pmu_conf exynos4412_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
+ 
+-static struct exynos_pmu_conf exynos5250_pmu_config[] = {
++static const struct exynos_pmu_conf exynos5250_pmu_config[] = {
+ 	/* { .reg = address, .val = { AFTR, LPA, SLEEP } */
+ 	{ EXYNOS5_ARM_CORE0_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
+ 	{ EXYNOS5_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
+@@ -317,7 +317,7 @@ static struct exynos_pmu_conf exynos5250_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
+ 
+-static void __iomem *exynos5_list_both_cnt_feed[] = {
++static void __iomem * const exynos5_list_both_cnt_feed[] = {
+ 	EXYNOS5_ARM_CORE0_OPTION,
+ 	EXYNOS5_ARM_CORE1_OPTION,
+ 	EXYNOS5_ARM_COMMON_OPTION,
+@@ -331,7 +331,7 @@ static void __iomem *exynos5_list_both_cnt_feed[] = {
+ 	EXYNOS5_TOP_PWR_SYSMEM_OPTION,
+ };
+ 
+-static void __iomem *exynos5_list_diable_wfi_wfe[] = {
++static void __iomem * const exynos5_list_diable_wfi_wfe[] = {
+ 	EXYNOS5_ARM_CORE1_OPTION,
+ 	EXYNOS5_FSYS_ARM_OPTION,
+ 	EXYNOS5_ISP_ARM_OPTION,
+-- 
+1.8.4.1
