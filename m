@@ -1,27 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Nov 2013 15:33:24 -0500
-Subject: [PATCH 0/3] Reuse davinci-nand driver for Keystone arch
-In-Reply-To: <528D18EC.6000501@ti.com>
-References: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
- <528D18EC.6000501@ti.com>
-Message-ID: <528D1C94.7010100@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 20 Nov 2013 15:36:42 -0500 (EST)
+Subject: [PATCH RFC v1 0/7] net: phy: Ethernet PHY powerdown optimization
+In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131120.153642.2045230991917379052.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 November 2013 03:17 PM, Grygorii Strashko wrote:
-> On 11/20/2013 06:24 PM, Ivan Khoronzhuk wrote:
->> This series contains updates of Davinci nand driver, in order to be
->> reused for Keystone platform.
->>
->> Depends on:
->> - Davinci nand driver fixes and updates:
->>    https://lkml.org/lkml/2013/11/20/271
-> 
-> ^^^^ I suggest to merge this series with above one as it
-> should not break anything.
-> 
-I agree. That way the mtd patch series can go
-together nicely. 
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Wed, 20 Nov 2013 21:21:46 +0100
 
-Regards,
-Santosh
+> Ethernet PHYs consume a significant amount of power when link is detected.
+> Especially, for embedded systems it can be easily 20-40% of total system
+> power. Now, currently most likely all ethernet drivers leave PHYs powered
+> on, even if the device is taken down. Also, some stupid boot loaders power
+> on all PHYs available.
+> 
+> This RFC deals with saving power consumed by ethernet PHYs, that have no
+> corresponding ethernet device driver or are attached to ethernet devices
+> which are taken down by user request, i.e. ifconfig ethN down. Ports with
+> no link, i.e. cable removed, are already quite good at power saving due to
+> PHY internal link detection.
+
+The idea is sound and the goal is of course valuable, but it brings up
+a chronically reoccurring issue as of late.
+
+You cannot reset the PHY or take it down without somehow retaining the
+settings the PHY had when you bring it back up.
+
+If I ifdown/ifup a device, my ethtool link configuration better be
+retained.
+
+This means the PHY layer must have a way to reprogram the device when
+it is brought back up, with whatever settings the software state
+things are there.
