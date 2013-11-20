@@ -1,59 +1,50 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 20 Nov 2013 16:02:55 +0100
-Subject: [PATCH 8/9] ARM: at91/dt: add new at91rm9200ek_mmc board
-In-Reply-To: <1377693456-11133-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377693456-11133-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131120150255.GH14627@ns203013.ovh.net>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Wed, 20 Nov 2013 16:01:11 +0100
+Subject: [PATCH] mmc: atmel-mci: fix timeout errors in SDIO mode when using DMA
+Message-ID: <1384959671-5646-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:37 Wed 28 Aug     , Boris BREZILLON wrote:
-> Add a new at91rm9200ek_mmc board (based on at91rm9200ek board) which enables
-> mmc0/slot0.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-no for multiple dts
+With some SDIO devices, timeout errors can happen when reading data. To solve
+this issue the DMA transfer has to be activated before sending the command to
+the device. This order is incorrect in PDC mode. So we have to take care if we
+are using DMA or PDC to know when to send the MMC command.
 
-this need to handle at user space level
+Cc: <stable@vger.kernel.org> #3.2+
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-Best Regards,
-J.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->  arch/arm/boot/dts/at91rm9200ek_mmc.dts |   23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91rm9200ek_mmc.dts
-> 
-> diff --git a/arch/arm/boot/dts/at91rm9200ek_mmc.dts b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
-> new file mode 100644
-> index 0000000..c87a861
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
-> @@ -0,0 +1,23 @@
-> +/*
-> + * at91rm9200ek.dts - Device Tree file for Atmel AT91RM9200 evaluation kit with
-> + *                    an MMC slot
-> + *
-> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-> + *
-> + * Licensed under GPLv2 only
-> + */
-> +/dts-v1/;
-> +#include "at91rm9200ek.dts"
-> +
-> +/ {
-> +	model = "Atmel AT91RM9200 evaluation kit with MMC slot";
-> +	compatible = "atmel,at91rm9200ek-mmc", "atmel,at91rm9200ek", "atmel,at91rm9200";
-> +
-> +	ahb {
-> +		apb {
-> +			mmc0: mmc at fffb4000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 1.7.9.5
-> 
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index b8dfe0d..289da71 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -1193,11 +1193,22 @@ static void atmci_start_request(struct atmel_mci *host,
+ 	iflags |= ATMCI_CMDRDY;
+ 	cmd = mrq->cmd;
+ 	cmdflags = atmci_prepare_command(slot->mmc, cmd);
+-	atmci_send_command(host, cmd, cmdflags);
++
++	/*
++	 * DMA transfer should be started before sending the command to avoid
++	 * unexpected errors especially for read operations in SDIO mode.
++	 * Unfortunately, in PDC mode, command has to be sent before starting
++	 * the transfer.
++	 */
++	if (host->submit_data != &atmci_submit_data_dma)
++		atmci_send_command(host, cmd, cmdflags);
+ 
+ 	if (data)
+ 		host->submit_data(host, data);
+ 
++	if (host->submit_data == &atmci_submit_data_dma)
++		atmci_send_command(host, cmd, cmdflags);
++
+ 	if (mrq->stop) {
+ 		host->stop_cmdr = atmci_prepare_command(slot->mmc, mrq->stop);
+ 		host->stop_cmdr |= ATMCI_CMDR_STOP_XFER;
+-- 
+1.7.9.5
