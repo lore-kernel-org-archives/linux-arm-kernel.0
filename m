@@ -1,20 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 20 Nov 2013 13:52:21 -0500 (EST)
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <1384968607.10637.14.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120171227.GG8581@1wt.eu>
- <1384968607.10637.14.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20131120.135221.974195642039657856.davem@davemloft.net>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Wed, 20 Nov 2013 21:03:06 +0200
+Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
+In-Reply-To: <20131120182102.GK14627@ns203013.ovh.net>
+References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131120182102.GK14627@ns203013.ovh.net>
+Message-ID: <528D076A.8070806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Dumazet <eric.dumazet@gmail.com>
-Date: Wed, 20 Nov 2013 09:30:07 -0800
+On 11/20/2013 08:21 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> +				the chip select signal.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-wsetup:		write setup width, ns
+>> +				Time between the beginning of a memory cycle
+>> +				and the activation of write strobe.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-wstrobe:	write strobe width, ns
+>> +				Time between the activation and deactivation of
+>> +				the write strobe.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-whold:		write hold width, ns
+>> +				Time between the deactivation of the write
+>> +				strobe and the end of the cycle (which may be
+>> +				either an address change or the deactivation of
+>> +				the chip select signal.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +If any of the above parameters are absent, current parameter value will be taken
+>> +from the corresponding HW reg.
+>> +
+>> +The name for cs node must be in format csN, where N is the cs number.
+> 
+> this is wired we should use reg instead to represent the cs as done for SPI
+> or a an other property
+> 
+> Best Regards,
+> J.
+> 
 
-> max (128KB , 1-2 ms) of buffering per flow should be enough to reach
-> line rate, even for a single flow, but this means the sk_sndbuf value
-> for the socket must take into account the pipe size _plus_ 1ms of
-> buffering.
+Ok, I will add new property cs-chipselect like following :
 
-And we can implement this using the estimated pacing rate.
+ti,cs-chipselect:	number of chipselect. Indicates on the
+			aemif driver which chipselect is used
+			for accessing the memory.
+			For compatibles "ti,davinci-aemif" and 
+			"ti,keystone-aemif" it can be in range [0-3].
+			For compatible "ti,omap-L138-aemif" range is [2-5].
+
+Is it OK?
+
+-- 
+Regards,
+Ivan Khoronzhuk
