@@ -1,28 +1,67 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Nov 2013 19:48:37 -0500
-Subject: [PATCH v2 0/4 - Keystone DTS and clock driver updates]
-In-Reply-To: <1384908316-4388-1-git-send-email-m-karicheri2@ti.com>
-References: <1384908316-4388-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <528C06E5.2050607@ti.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 20 Nov 2013 01:52:14 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <1384908228.8604.136.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
+ <1384906129.8604.132.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131120003519.GA22150@1wt.eu>
+ <1384908228.8604.136.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20131120005214.GB22150@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Murali,
-
-On Tuesday 19 November 2013 07:45 PM, Murali Karicheri wrote:
-> This patch series add a K2HK (K2 Hawking/Kepler) EVM
-> dts file and make some updates to the existing dts
-> files and Keystone PLL clk driver.
+On Tue, Nov 19, 2013 at 04:43:48PM -0800, Eric Dumazet wrote:
+> On Wed, 2013-11-20 at 01:35 +0100, Willy Tarreau wrote:
+> > On Tue, Nov 19, 2013 at 04:08:49PM -0800, Eric Dumazet wrote:
+> > > On Wed, 2013-11-20 at 00:53 +0100, Arnaud Ebalard wrote:
+> > > 
+> > > > Anyway, I think if the thread keeps going on improving mvneta, I'll do
+> > > > all additional tests from RAM and will stop polluting netdev w/ possible
+> > > > sata/disk/fs issues.
+> > > 
+> > > ;)
+> > > 
+> > > Alternative would be to use netperf or iperf to not use disk at all
+> > > and focus on TCP/network issues only.
+> > 
+> > Yes, that's for the same reason that I continue to use inject/httpterm
+> > for such purposes :
+> >   - httpterm uses tee()+splice() to send pre-built pages without copying ;
+> >   - inject uses recv(MSG_TRUNC) to ack everything without copying.
+> > 
+> > Both of them are really interesting to test the hardware's capabilities
+> > and to push components in the middle to their limits without causing too
+> > much burden to the end points.
+> > 
+> > I don't know if either netperf or iperf can make use of this now, and
+> > I've been used to my tools, but I should take a look again.
 > 
-> Murali Karicheri (4):
->   clk: keystone: use clkod register bits for postdiv
->   keystone: dts: add a k2hk-evm specific dts file
->   keystone: dts: fix typo in the ddr3 pllclk node name
->   keystone: dts: add paclk divider clock node
+> netperf -t TCP_SENDFILE  does the zero copy at sender.
 > 
-Thanks for the updates. I will add the dts patches in
-my arm-soc queue and also pick the clock patch in
-clock updates for Mike to pick it up.
+> And more generally -V option does copy avoidance
+> 
+> (Use splice(sockfd -> nullfd) at receiver if I remember well)
 
-Regards,
-Santosh
+OK thanks for the info.
+
+> Anyway, we should do the normal copy, because it might demonstrate
+> scheduling problems.
+
+Yes, especially in this case, though I got the issue with GSO only,
+so it might vary as well.
+
+> If you want to test raw speed, you could use pktgen ;)
+
+Except I'm mostly focused on HTTP as you know. And for generating higher
+packet rates than pktgen, I have an absolutely ugly patch that I'm a
+bit ashamed of for mvneta to multiply the number of emitted descriptors
+for a given skb by skb->sk->sk_mark (which I set using setsockopt), this
+allows me to generate up to 1.488 Mpps on a USB-powered system, not that
+bad in my opinion :-)
+
+Willy
