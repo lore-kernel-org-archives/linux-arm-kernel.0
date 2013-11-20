@@ -1,36 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Nov 2013 00:20:08 +0000
-Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
-In-Reply-To: <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
-References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
- <528B811A.1030501@gmail.com>
- <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
-Message-ID: <20131120002007.GR16735@n2100.arm.linux.org.uk>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 20 Nov 2013 01:35:19 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <1384906129.8604.132.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
+ <1384906129.8604.132.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20131120003519.GA22150@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 09:24:31PM +0100, Linus Walleij wrote:
-> On Tue, Nov 19, 2013 at 4:17 PM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
-> > On 11/19/2013 05:00 PM, Linus Walleij wrote:
+On Tue, Nov 19, 2013 at 04:08:49PM -0800, Eric Dumazet wrote:
+> On Wed, 2013-11-20 at 00:53 +0100, Arnaud Ebalard wrote:
 > 
-> >> And that happens before the GPIO driver gets registered -> crash.
-> >
-> > That is not the issue. The real issue is h3xxx using those gpio's without
-> > previously calling gpio_request.
+> > Anyway, I think if the thread keeps going on improving mvneta, I'll do
+> > all additional tests from RAM and will stop polluting netdev w/ possible
+> > sata/disk/fs issues.
 > 
-> Really? But that wasn't done before this patch either.
+> ;)
 > 
-> It is basically OK to use the gpio_* functions before or
-> without requesting the GPIOs, it won't look nice but it
-> works.
+> Alternative would be to use netperf or iperf to not use disk at all
+> and focus on TCP/network issues only.
 
-Using gpio_* functions without first having the GPIO requested causes
-a complaint at boot time... so it's really undesirable to do this.
+Yes, that's for the same reason that I continue to use inject/httpterm
+for such purposes :
+  - httpterm uses tee()+splice() to send pre-built pages without copying ;
+  - inject uses recv(MSG_TRUNC) to ack everything without copying.
 
-Also note that we _do_ have sa11x0 platforms which request their GPIOs
-in their arch_initcall callback, so the sa11x0 GPIO driver better be
-around at that point otherwise things *will* fail.
+Both of them are really interesting to test the hardware's capabilities
+and to push components in the middle to their limits without causing too
+much burden to the end points.
 
-I suspect that means the SA11x0 GPIO driver must be initialised early.
+I don't know if either netperf or iperf can make use of this now, and
+I've been used to my tools, but I should take a look again.
+
+Cheers,
+Willy
