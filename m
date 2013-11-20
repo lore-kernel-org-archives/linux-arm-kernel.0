@@ -1,33 +1,67 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 20 Nov 2013 19:29:19 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <1384971684.10637.22.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
- <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120171227.GG8581@1wt.eu> <20131120173436.GK8581@1wt.eu>
- <1384969222.10637.20.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120181532.GM8581@1wt.eu>
- <1384971684.10637.22.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20131120182919.GO8581@1wt.eu>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Nov 2013 10:35:49 -0800
+Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
+In-Reply-To: <87wqk3n54l.fsf@gmail.com>
+References: <87hab9agjr.fsf@gmail.com>
+ <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
+ <87wqk3n54l.fsf@gmail.com>
+Message-ID: <20131120183548.GH10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 10:21:24AM -0800, Eric Dumazet wrote:
-> On Wed, 2013-11-20 at 19:15 +0100, Willy Tarreau wrote:
+* Ben Gamari <bgamari.foss@gmail.com> [131119 19:07]:
+> Chao Xu <caesarxuchao@gmail.com> writes:
 > 
-> > No, I was on latest stable (3.10.19) which exhibits the regression but does
-> > not yet have your fix above. Then I tested the patch your proposed in this
-> > thread, then this latest one. Since the patch is not yet even in Linus'
-> > tree, I'm not sure Arnaud has tried it yet.
-> 
-> Oh right ;)
-> 
-> BTW Linus tree has the fix, I just checked this now.
-> 
-> (Linus got David changes 19 hours ago)
+> > Hi,
+> >
+> > I also try to boot v3.12 on my pandaboard rev A2, but it hangs at
+> > "starting kernel". My SD card is originally loaded with a linaro 12.04
+> > ubuntu-developer image. I have tried with v3.7 and v3.8 uImage and
+> > both of them work normally, but v3.12 hangs. Is there any trick I
+> > missed? Do I need to use the new u-boot as used by Ben?
+> >
+> I've written up some of my experiences bringing up 3.12 on the
+> PandaBoard here[1]. You may find it helpful. Regardless, I would
+> definitely try upgrading u-boot.
 
-Ah yes I didn't look far enough back.
+Nice investigative blogging :)
 
-Thanks,
-Willy
+Care to also update it with the other issues remaining on pandaboard?
+Sounds like we're pretty close to having things working nicely with
+mainline kernel on it, so let's just fix those issues ASAP.
+
+I'm aware of at least two issues:
+
+1.  The WLAN not working after a soft reset, or if the interface is
+    reset with ifconfig down. This could be a typo somewhere in the
+    .dts file for the WLAN regulator or something like that.
+
+2. Suspend and resume does not wake-up from serial console and spews
+   a bunch of warnings. The wake-up issue can be fixed with the new
+   the new interrupts-extended property to use the wake IRQs, I'll
+   try to update my patches for that today.
+ 
+> > And here is a separate problem with building u-boot. I cloned the
+> > upstream u-boot repository. The latest commit is
+> > c2e5e802ecb7ab668ce9911b210ed68c804b349f. Then I did:
+> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- omap4_panda_config
+> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j8
+> > cp MLO u-boot.img /media/boot/
+> > But when turn on my pandaboard, there is NO output from the serial
+> > console. I didn't change the other file in the boot partition. They
+> > are from linaro 12.04 ubuntu-developer image.
+> >
+> I would check that you have earlyprintk enabled (both in the kernel
+> configuration as well as on the kernel command line). Moreover, ensure
+> that the correct serial devices is selected for low-level debug output
+> (in the kernel configuration).
+
+I wonder if we also have some dependency to some earlier versions of
+u-boot as u-boot now only muxes the essential pins?
+
+Regards,
+
+Tony
+ 
+
+> [1] http://bgamari.github.io/posts/2013-11-17-running-modern-kernel-on-pandaboard.html
