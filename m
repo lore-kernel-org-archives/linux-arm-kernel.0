@@ -1,113 +1,45 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Nov 2013 22:20:50 +0100
-Subject: [PATCH RFC v1 0/7] net: phy: Ethernet PHY powerdown optimization
-In-Reply-To: <CAGVrzcZ5wV2eHPNfr-xToOEc6jbBJXiNQ+OtZv2j+yGbS9YW-w@mail.gmail.com>
-References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131120.153642.2045230991917379052.davem@davemloft.net>
- <528D217B.5020500@gmail.com>
- <CAGVrzcZ5wV2eHPNfr-xToOEc6jbBJXiNQ+OtZv2j+yGbS9YW-w@mail.gmail.com>
-Message-ID: <528D27B2.4000707@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Nov 2013 14:24:49 -0700
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>		<1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>		<CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>		<1384766276.14845.155.camel@smile>	<528A5170.3090809@wwwdotorg.org>		<1384862421.14845.222.camel@smile>	<528B9CAE.3040600@wwwdotorg.org>		<CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>		<528BFDD0.3090503@wwwdotorg.org>		<CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>		<528CFE68.6060908@wwwdotorg.org>	
+ <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>	
+ <528D0C06.9080006@wwwdotorg.org>
+ <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+Message-ID: <528D28A1.2050307@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2013 10:10 PM, Florian Fainelli wrote:
-> 2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
->> On 11/20/2013 09:36 PM, David Miller wrote:
->>>
->>> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> Date: Wed, 20 Nov 2013 21:21:46 +0100
->>>
->>>> Ethernet PHYs consume a significant amount of power when link is
->>>> detected.
->>>> Especially, for embedded systems it can be easily 20-40% of total system
->>>> power. Now, currently most likely all ethernet drivers leave PHYs powered
->>>> on, even if the device is taken down. Also, some stupid boot loaders
->>>> power
->>>> on all PHYs available.
->>>>
->>>> This RFC deals with saving power consumed by ethernet PHYs, that have no
->>>> corresponding ethernet device driver or are attached to ethernet devices
->>>> which are taken down by user request, i.e. ifconfig ethN down. Ports with
->>>> no link, i.e. cable removed, are already quite good at power saving due
->>>> to
->>>> PHY internal link detection.
->>>
->>>
->>> The idea is sound and the goal is of course valuable, but it brings up
->>> a chronically reoccurring issue as of late.
->>>
->>> You cannot reset the PHY or take it down without somehow retaining the
->>> settings the PHY had when you bring it back up.
->>
->>
->> Right, as far as I understand BMCR powerdown, i.e. what is called in
->> genphy_suspend/resume, powers down the PHY but _does_ retain PHY config.
->> It is not resetting the device.
->
-> Right that's also my understanding of how BMCR powerdown works. That
-> said, I am relatively sure that we can find PHY devices for which this
-> is not true.
+On 11/20/2013 01:23 PM, Williams, Dan J wrote:
+...
+> Why do the drivers that call dma_request_channel need to convert it to
+> an ERR value?  i.e. what's problematic about the below (not compile
+> tested)?
+...
+> diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+...
+> @@ -22,16 +22,20 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
+>  				struct samsung_dma_req *param,
+>  				struct device *dev, char *ch_name)
+...
+> +	if (dev->of_node) {
+> +		chan = dma_request_slave_channel(dev, ch_name);
+> +		return IS_ERR(chan) ? (unsigned) NULL : (unsigned) chan;
+> +	} else {
+>  		return (unsigned)dma_request_channel(mask, pl330_filter,
+>  							(void *)dma_ch);
+> +	}
 
-No doubt.
+The argument is that if a function returns errors encoded as an ERR
+pointer, then callers must assume that any non-IS_ERR value that the
+function returns is valid. NULL is one of those values. As such, callers
+can no longer check the value against NULL, but must use IS_ERR().
+Converting any IS_ERR() returns to NULL theoretically is the act of
+converting one valid return value to some other completely random return
+value.
 
-> As for the PHY state machine, I think we need a new state
-> PHY_SUSPENDED  and upon calling phy_start() we make sure that we treat
-> PHY_SUSPENDED just like we treat PHY_HALTED today since that would
-> make sure that the PHY parameters are applied correctly upon resume
-> (interrupt configuration, autoneg and and such).
->
-> There is still some discussion on how we should deal with
-> auto-suspending the PHY when phy_stop() is called, and how does that
-> differ from the PHY_HALTED state? So this also raises the question of
-> whether PHY_HALTED is really different from PHY_SUSPENDED. The only
-> difference with your patches would be that we have put the PHY into a
-> low-power mode.
+The converse is true for functions that return errors encoded as NULL;
+callers must check those return results against NULL.
 
-Well, I haven't thought about WoL and stuff and how the driver should
-leave the PHY for that to work. Suspend support isn't really spread
-among ARM SoCs :P
-
-But if you can run some tests on non-ARM platforms you might already
-been testing with, I am sure we can work it out. Maybe, we just have
-PHY_SUSPENDED and deal with it differently if any regressions pop up?
-
-Also, suspend_unused and auto-suspend on phy_stop can be disabled by
-default for some kernel versions until we have enough coverage?
-
->> I haven't checked a lot of datasheets but [1] notes that "registers will
->> preserve their configuration". Even if we have PHYs that do not preserve
->> it, they should have a device specific callback for suspend/resume that
->> takes care of preserving it.
->
-> Right, but the PHY driver should only take care of restoring "state
-> less" PHY context, while the PHY state machine has to restore a "state
-> aware" PHY device context. So for quirky PHY chips, or those having
-> advanced power management features, we definitively need the two to be
-> helping each other.
-
-I see it was a good idea to send the RFC early. The savings are
-impressive but I was already quite sure that it has the potential to
-break (at least) the quirky PHYs.
-
-Sebastian
-
->>
->> [1] http://www.ti.com/lit/an/snoa463a/snoa463a.pdf
->>
->>
->>> If I ifdown/ifup a device, my ethtool link configuration better be
->>> retained.
->>>
->>> This means the PHY layer must have a way to reprogram the device when
->>> it is brought back up, with whatever settings the software state
->>> things are there.
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
+There's no intersection between those two sets of legal tests.
