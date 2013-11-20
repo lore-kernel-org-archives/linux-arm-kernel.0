@@ -1,36 +1,38 @@
 From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 20 Nov 2013 16:43:39 +0530
-Subject: [PATCH V4 0/2] genirq: arm64: perf: support for percpu pmu interrupt
-Message-ID: <1384946021-22100-1-git-send-email-vkale@apm.com>
+Date: Wed, 20 Nov 2013 16:43:40 +0530
+Subject: [PATCH V4 1/2] genirq: Add an accessor for IRQ_PER_CPU flag
+In-Reply-To: <1384946021-22100-1-git-send-email-vkale@apm.com>
+References: <1384946021-22100-1-git-send-email-vkale@apm.com>
+Message-ID: <1384946021-22100-2-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support to handle interrupt registration/deregistration
-in arm64 pmu driver when pmu interrupt type is percpu.
+This patch adds an accessor function for IRQ_PER_CPU flag.
+The accessor function is useful to dertermine whether an IRQ is percpu or not.
 
-Changelog:
-V4:
-* In arm64 pmu driver: Avoid using irq_to_desc() to check validity of irq.
+Signed-off-by: Vinayak Kale <vkale@apm.com>
+---
+ include/linux/irqdesc.h |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-V3:
-* Remove validity check for 'desc' from accessor function in irqdesc.h .
-  Instead, check the irq 'desc' validity in arm64 pmu driver.
-
-V2:
-* To determine whether an IRQ is percpu or not, added an accessor function in
-  irqdesc.h . This approach was used by Chris Smith here[1] for similar changes
-  in arm pmu driver.
-* In arm64 pmu driver: Got rid of unnecessary pointer typecastings.
-
-[1] http://lkml.indiana.edu/hypermail/linux/kernel/1207.3/02955.html
-
-Vinayak Kale (2):
-  genirq: Add an accessor for IRQ_PER_CPU flag
-  arm64: perf: add support for percpu pmu interrupt
-
- arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
- include/linux/irqdesc.h        |    8 +++
- 2 files changed, 89 insertions(+), 27 deletions(-)
-
+diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+index 56fb646..26e2661 100644
+--- a/include/linux/irqdesc.h
++++ b/include/linux/irqdesc.h
+@@ -152,6 +152,14 @@ static inline int irq_balancing_disabled(unsigned int irq)
+ 	return desc->status_use_accessors & IRQ_NO_BALANCING_MASK;
+ }
+ 
++static inline int irq_is_percpu(unsigned int irq)
++{
++	struct irq_desc *desc;
++
++	desc = irq_to_desc(irq);
++	return desc->status_use_accessors & IRQ_PER_CPU;
++}
++
+ static inline void
+ irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+ {
 -- 
 1.7.9.5
