@@ -1,50 +1,49 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 20 Nov 2013 17:17:06 +0100
-Subject: [PATCH 7/9] ARM: at91/dt: add i2c devices connected to
- at91rm9200ek board
-In-Reply-To: <20131120150132.GG14627@ns203013.ovh.net>
-References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377688107-10830-1-git-send-email-b.brezillon@overkiz.com>
- <20131120150132.GG14627@ns203013.ovh.net>
-Message-ID: <528CE082.2000400@overkiz.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 20 Nov 2013 10:21:14 -0600
+Subject: [PATCH] clk: socfpga: Correct the parent clock for l3_sp_clk and
+ dbg_clk
+Message-ID: <1384964474-2848-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2013 16:01, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:08 Wed 28 Aug     , Boris BREZILLON wrote:
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> ---
->>   arch/arm/boot/dts/at91rm9200ek.dts |   12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
->> index b3e7425..fd2601a 100644
->> --- a/arch/arm/boot/dts/at91rm9200ek.dts
->> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
->> @@ -147,6 +147,18 @@
->>   		};
->>   	};
->>   
->> +	i2c at 0 {
->> +		status = "okay";
->> +
->> +		ics1523 at 26 {
->> +			reg = <0x26>;
->> +		};
->> +
->> +		dac3550 at 4d {
->> +			reg = <0x4d>;
-> missing compatible
+From: Dinh Nguyen <dinguyen@altera.com>
 
-I can't find any matching compatible for these devices.
-Do you know what should be used ?
+The l3_sp_clk's parent should be the l3_mp_clk. This will account for
+the extra divider that is present for the l3_mp_clk.
 
->> +		};
->> +	};
->> +
->>   	leds {
->>   		compatible = "gpio-leds";
->>   
->> -- 
->> 1.7.9.5
->>
+The dbg_clk's parent should be the dbg_at_clk. This will account for
+the extra divider that is present for the dbg_at_clk.
+
+Reported-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/socfpga.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 6d09b8d..2c10bed 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -281,7 +281,7 @@
+ 					l3_sp_clk: l3_sp_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&mainclk>;
++						clocks = <&l3_mp_clk>;
+ 						div-reg = <0x64 2 2>;
+ 					};
+ 
+@@ -312,7 +312,7 @@
+ 					dbg_clk: dbg_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&dbg_base_clk>;
++						clocks = <&dbg_at_clk>;
+ 						div-reg = <0x68 2 2>;
+ 						clk-gate = <0x60 5>;
+ 					};
+-- 
+1.7.9.5
