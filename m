@@ -1,35 +1,46 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Wed, 20 Nov 2013 20:24:19 +0200
-Subject: [PATCH] ARM: keystone: enable big endian support
-Message-ID: <1384971859-7748-1-git-send-email-taras.kondratiuk@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Nov 2013 11:24:40 -0700
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
+ <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+ <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
+ <1384862421.14845.222.camel@smile> <528B9CAE.3040600@wwwdotorg.org>
+ <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
+ <528BFDD0.3090503@wwwdotorg.org>
+ <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
+Message-ID: <528CFE68.6060908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone code is big endian compatible,
-so mark it as one that supports big endian.
+On 11/19/2013 05:38 PM, Dan Williams wrote:
+> On Tue, Nov 19, 2013 at 4:09 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> Deferred probe certainly isn't the only error that can be returned
+>> though,
+> 
+> Of course, but do any of those other ones matter?  Certainly not if
+> they've all been hidden behind a NULL return from
+> dma_request_slave_channel().
+> 
+>> so I don't think "defer" in the name makes much sense. The
+>> function as I wrote it returns a standard "error pointer" value.
+>> Typically, callers would simply propagate *any* error code back to the
+>> caller of probe() without even looking at it; it's the driver core that
+>> checks for -EPROBE_DEFER vs. other error codes. In some cases, drivers
+>> do check in order to avoid printing failure messages in the deferred
+>> probe case, but again that's pretty standard, and not something specific
+>> to this API.
+> 
+> Right, but the only reason to introduce this API is to propagate
+> EPROBE_DEFER, right?  It also serves to document drivers that are
+> prepared for / depend on deferred probing support.
 
-Note this patch just allows to select Big endian build
-for ARCH_KEYSTONE, but it does not enable BE by default.
+Well, that's the reason I'm introducing the API, but it's not really
+what the API actually does.
 
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
----
-Based on Linus' master tip (b4789b8).
-Tested on Keystone2 EVM.
+That said, in the interests of moving this forward, I'll go for your
+suggested name dma_slave_request_channel_defer().
 
-arch/arm/mach-keystone/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index f20c53e..8a9e943 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_KEYSTONE
- 	select ARM_ERRATA_798181 if SMP
- 	select COMMON_CLK_KEYSTONE
- 	select TI_EDMA
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
--- 
-1.7.9.5
+Do I need an ack from Vinod on the function name, or the patches?
