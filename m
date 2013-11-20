@@ -1,163 +1,44 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 20 Nov 2013 09:45:48 +0100
-Subject: [PATCH v8 1/4] ARM: dts: imx27 iomux device node
-In-Reply-To: <1384937151-11160-1-git-send-email-mpa@pengutronix.de>
-References: <1384937151-11160-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1384937151-11160-2-git-send-email-mpa@pengutronix.de>
+Date: Wed, 20 Nov 2013 09:45:47 +0100
+Subject: [PATCH v8 0/4] pinctrl: imx27: imx27 pincontrol driver
+Message-ID: <1384937151-11160-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a iomux node for imx27 pinctrl driver. The gpio
-registers are embedded in the iomux memory area. So this patch moves
-them into the iomux node for a better hardware description.
+Hi,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/imx27.dtsi | 125 +++++++++++++++++++++++--------------------
- 1 file changed, 67 insertions(+), 58 deletions(-)
+This version has some commit message updates. It still depends on the pinctrl driver patch [1].
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index b7a1c6d..f119296 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -10,6 +10,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include "imx27-pingrp.h"
- 
- / {
- 	aliases {
-@@ -235,64 +236,72 @@
- 				status = "disabled";
- 			};
- 
--			gpio1: gpio at 10015000 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015000 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio2: gpio at 10015100 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015100 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio3: gpio at 10015200 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015200 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio4: gpio at 10015300 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015300 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio5: gpio at 10015400 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015400 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			gpio6: gpio at 10015500 {
--				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
--				reg = <0x10015500 0x100>;
--				interrupts = <8>;
--				gpio-controller;
--				#gpio-cells = <2>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
-+			iomuxc: iomuxc at 10015000 {
-+				compatible = "fsl,imx27-iomuxc";
-+				reg = <0x10015000 0x600>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				gpio1: gpio at 10015000 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015000 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio2: gpio at 10015100 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015100 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio3: gpio at 10015200 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015200 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio4: gpio at 10015300 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015300 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio5: gpio at 10015400 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015400 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio6: gpio at 10015500 {
-+					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+					reg = <0x10015500 0x100>;
-+					interrupts = <8>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 			};
- 
- 			audmux: audmux at 10016000 {
+Regards,
+
+Markus
+
+[1] [PATCH] pinctrl: imx1-core populate subdevices
+    <1384193987-20740-1-git-send-email-mpa@pengutronix.de>
+    http://thread.gmane.org/gmane.linux.drivers.devicetree/51584
+
+
+Changes in v8:
+ - Update commit messages to describe updated patch content
+
+Changes in v7:
+ - Added patch for imx27-pingrp.h
+ - Pin nodes moved to board dts files
+ - gpio nodes in imx27.dtsi moved to iomux node
+
+
+Markus Pargmann (4):
+  ARM: dts: imx27 iomux device node
+  ARM: dts: imx27 phyCARD-S pinctrl
+  ARM: dts: imx27 phycore move uart1 to rdk
+  ARM: dts: imx27 phycore pinctrl
+
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts |  43 ++++++++
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts |  16 +++
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts   |  23 +++++
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dts   |  20 +++-
+ arch/arm/boot/dts/imx27.dtsi                     | 125 ++++++++++++-----------
+ 5 files changed, 165 insertions(+), 62 deletions(-)
+
 -- 
 1.8.4.2
