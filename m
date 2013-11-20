@@ -1,67 +1,76 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 20 Nov 2013 12:07:45 -0800
-Subject: [PATCH v2 2/4] Documentation: Add APM X-Gene SoC 6.0Gbps SATA PHY
- driver binding documentation
-In-Reply-To: <20131120094328.GS5914@e106331-lin.cambridge.arm.com>
-References: <1384905197-3566-1-git-send-email-lho@apm.com>
- <1384905197-3566-2-git-send-email-lho@apm.com>
- <1384905197-3566-3-git-send-email-lho@apm.com>
- <20131120094328.GS5914@e106331-lin.cambridge.arm.com>
-Message-ID: <CAPw-ZTnvbLRN1v6Oyhyf=zXBuiOZQquDs6qx8PzF3cX_GnPTGw@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 20 Nov 2013 22:11:48 +0200
+Subject: [PATCH] PM / Clocks: fix pm_clk_resume/suspend if
+ CONFIG_PM_RUNTIME is set
+In-Reply-To: <528D1327.7080205@codeaurora.org>
+References: <1384954307-27094-1-git-send-email-grygorii.strashko@ti.com>
+ <528D0296.1070001@codeaurora.org> <528D082C.3040405@ti.com>
+ <528D1327.7080205@codeaurora.org>
+Message-ID: <528D1784.8080704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/20/2013 09:53 PM, Stephen Boyd wrote:
+> On 11/20/13 11:06, Grygorii Strashko wrote:
+>> On 11/20/2013 08:42 PM, Stephen Boyd wrote:
+>>> On 11/20/13 05:31, Grygorii Strashko wrote:
+>>>> @@ -230,7 +230,7 @@ int pm_clk_suspend(struct device *dev)
+>>>>    	list_for_each_entry_reverse(ce, &psd->clock_list, node) {
+>>>>    		if (ce->status < PCE_STATUS_ERROR) {
+>>>>    			if (ce->status == PCE_STATUS_ENABLED)
+>>>> -				clk_disable(ce->clk);
+>>>> +				clk_disable_unprepare(ce->clk);
+>>>>    			ce->status = PCE_STATUS_ACQUIRED;
+>>>>    		}
+>>>>    	}
+>>>> @@ -259,7 +259,7 @@ int pm_clk_resume(struct device *dev)
+>>>>    
+>>>>    	list_for_each_entry(ce, &psd->clock_list, node) {
+>>>>    		if (ce->status < PCE_STATUS_ERROR) {
+>>>> -			clk_enable(ce->clk);
+>>>> +			clk_prepare_enable(ce->clk);
+>>>>    			ce->status = PCE_STATUS_ENABLED;
+>>>>    		}
+>>>>    	}
+>>> This is inside a spin_lock_irqsave(). You should be getting scheduling
+>>> while atomic warnings with this change. Are you testing with
+>>> DEBUG_ATOMIC_SLEEP=y?
+>> Ops, thanks. No, It's not tested with DEBUG_ATOMIC_SLEEP and
+>> I agree with you.
+>>
+>> So, I see two option here:
+>> 1) split above loops on two
+>> 2) add calls of clk_prepare()/clk_unprepare() in pm_clk_notify()
+>>
+>> In my opinion option [2] is better.
+>>
+> 
+> Doesn't that mean the clock will always be prepared as long as the
+> device is present? That doesn't sound good. I would like the clocks to
+> be disabled and unprepared as long as the device is suspended.
 
->> +- compatible         : Shall be "apm,xgene-ahci-phy" or
->> +                       "apm,xgene-ahci-phy2". The "apm,xgene-ahci-phy"
->> +                       describes an port shared with SGMII Ethernet port.
->> +                       The "apm,xgene-ahci-phy2" describes an port not
->> +                       shared with SGMII and the PLL located at another
->> +                       memory resource region.
->
-> Is there not a better name available than "apm,xgene-ahci-phy2"?
-[Loc Ho]
-I will name it apm,xgene-ahci-phyx.
+Yep (
 
->> +- reg                        : First PHY memory resource
->> +                       Second separate PHY PLL clock memory resource if
->> +                       type "apm,xgene-ahci-phy2"
->
-> Is ths PLL actually part of the PHY, or does it just feed the PHY?
-[Loc Ho]
-This is always the PLL clock macro in each IP. For the 3rd controller,
-we require an extra clock macro and can NOT use the original clock
-macro as it is not mux'ed with the SGMII port.
+> 
+> What is the lock protecting? The linked list or something more? Can we
+> remove the locks?
 
->
->> +- txeyetuning                : Manual control to fine tune the capture of the serial
->> +                       bit lines from the automatic calibrated position.
->> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
->> +                       Range from 0 to 0x7f. Default is 0xa.
->
-> If you have a property for which the name consists of multiple words,
-> split the words with '-'.
->
-> What does this actually mean?
->
-> What units are these values in?
->
-> What effect do those values have?
-[Loc Ho]
-Will provide in next version.
+Looks like it's protecting linked list pm_clock_entry'es.
 
->
->> +- txeyedirection     : Eye tuning manual control direction. 0 means sample
->> +                       data earlier than the nominal sampling point. 1 means
->> +                       sample data later than the nominal sampling point.
->> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
->> +                       Default is 0x0.
->
-> Likewise, use '-'.
->
-> s/than/then/ ?
-[Loc Ho]
-I believe that than is appropriate here a we are doing an comparison.
+> 
+> It looks like even if you just remove the locks here, the PM core is
+> free to call this function with irqs disabled if pm_runtime_irq_safe()
+> has been called on the device. Perhaps runtime PM can only do the
+> clk_enable()/clk_disable() part and the clk_unprepare()/clk_prepare()
+> calls should happen in the system suspend callbacks?
 
--Loc
+Even don't know what to say :( On Keystone clk_unprepare()/clk_prepare() are NOPs.
+But clk_prepare() has to be called at least once before clk_enable() :((
+So, solution with suspend/resume will not fix current problem :( unfortunately.
+
+FYI, Now pm_clk_suspend/pm_clk_resume are called from arch/arm/mach-keystone/pm_domain.c
+(also similar solution is used by Davinci, but issue has not been detected because
+PM runtime hasn't been used by Davinci IP drivers before)
+
+Regards,
+- grygorii
