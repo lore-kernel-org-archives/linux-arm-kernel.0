@@ -1,30 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 20 Nov 2013 10:09:59 +0000
-Subject: [PATCH RFC 4/9] ASoC: hdmi-codec: Add devicetree binding with
- documentation
-In-Reply-To: <20131120102342.7befe75e@armhf>
-References: <cover.1384862950.git.jsarha@ti.com>
- <829968f1a6b34176de8a04dd4ad473b2b37be783.1384862950.git.jsarha@ti.com>
- <20131120102342.7befe75e@armhf>
-Message-ID: <20131120100959.GV2674@sirena.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 20 Nov 2013 11:16:24 +0100
+Subject: [PATCH] ARM: at91: remove redundant dependency
+In-Reply-To: <1384932191-8967-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1384932191-8967-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <528C8BF8.4080803@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 10:23:42AM +0100, Jean-Francois Moine wrote:
+On 20/11/2013 08:23, Michael Opdenacker :
+> From: Yanis Moreno <yanis.moreno63@gmail.com>
+>
+> This removes the "depends on SOC_SAM_V7" statement
+> in a Kconfig section that's under an "if SOC_SAM_V7"
+> condition (same parameter).
+>
+> Signed-off-by: Yanis Moreno <yanis.moreno63@gmail.com>
+> Reviewed-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+>
 
-> But now, I am wondering again about these `empty`codecs:
-> - in a DT context, should we continue to add / modify such codecs?
-> - what do you think about my generic DT codec? (indeed, I would do a new
->   version according to the previous remarks)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-We still want to be able to have users just name the CODEC on their
-board rather than have to type in all the details from the datasheet,
-if we're going to try to amalgamate the drivers it should still let
-people do that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131120/09c87c68/attachment.sig>
+Thanks for this fix. Integrated in at91-3.14-cleanup branch.
+Best regards.
+
+> ---
+>   arch/arm/mach-at91/Kconfig |    1 -
+>   1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 699b71e..d1b3fe5 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -61,7 +61,6 @@ comment "Atmel AT91 Processor"
+>   if SOC_SAM_V7
+>   config SOC_SAMA5D3
+>   	bool "SAMA5D3 family"
+> -	depends on SOC_SAM_V7
+>   	select SOC_SAMA5
+>   	select HAVE_FB_ATMEL
+>   	select HAVE_AT91_DBGU1
+>
+
+
+-- 
+Nicolas Ferre
