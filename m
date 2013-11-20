@@ -1,436 +1,363 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 20 Nov 2013 17:52:33 +0000
-Subject: [PATCH V3] ARM: trace: Add tracepoint for the Inter Processor
- Interrupt
-In-Reply-To: <528B710E.2050505@linaro.org>
-References: <1383814887-15415-1-git-send-email-daniel.lezcano@linaro.org>
- <528B710E.2050505@linaro.org>
-Message-ID: <20131120175233.GB2582@e103592.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 20 Nov 2013 18:54:34 +0100
+Subject: [PATCH v2 4/5] regulator: max14577: Add regulator driver for Maxim
+ 14577
+In-Reply-To: <1384956732-19526-5-git-send-email-k.kozlowski@samsung.com>
+References: <1384956732-19526-1-git-send-email-k.kozlowski@samsung.com>
+ <1384956732-19526-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <3176793.htnYthLYeH@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 03:09:18PM +0100, Daniel Lezcano wrote:
-> On 11/07/2013 10:01 AM, Daniel Lezcano wrote:
-> >The Inter Processor Interrupt is used on ARM to tell another processor to do
-> >a specific action. This is mainly used to emulate a timer interrupt on an idle
-> >cpu, force a cpu to reschedule or run a function on another processor context.
-> >
-> >Add a tracepoint when raising an IPI and in the entry/exit handler functions.
-> >
-> >When a cpu raises an IPI, the targeted cpus is an interesting information, the
-> >cpumask conversion in hexa is added in the trace using the cpumask_scnprintf
-> >function.
-> >
-> >Tested-on Vexpress TC2 (5 processors).
-> >Tested-on u8500 (2 processors).
-> >
-> >Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+Hi Krzysztof,
+
+On Wednesday, November 20, 2013 03:12:11 PM Krzysztof Kozlowski wrote:
+> MAX14577 chip is a multi-function device which includes MUIC,
+> charger and voltage regulator. The driver is located in drivers/mfd.
 > 
-> Hi guys,
+> This patch adds regulator driver for MAX14577 chip. There are two
+> regulators in this chip:
+> 1. Safeout LDO with constant voltage output of 4.9V. It can be only
+>    enabled or disabled.
+> 2. Current regulator for the charger. It provides current from 90mA up
+>    to 950mA.
+> Driver supports Device Tree.
 > 
-> did you have time to look at this patch ?
-
-I just spotted this recently.
-
-It seems a potentially useful idea, and seems to work (on ARM Vexpress/
-TC2 anyway, which is what I have in front of me right now).
-
-> We are writing a tool [1] to do some statistics about the cpu's idle
-> times and giving the source of the wakeup. We hope it could be
-> useful for the community to do some measurements but we need the IPI
-> tracepoints to be more accurate.
-
-It's not obvious to me what already exists.  Are the new tracepoints
-giving genuinely more information?  Or otherwise, how/why is the
-information "more accurate" than what was available previously?
-
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/regulator/Kconfig    |    7 ++
+>  drivers/regulator/Makefile   |    1 +
+>  drivers/regulator/max14577.c |  282 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 290 insertions(+)
+>  create mode 100644 drivers/regulator/max14577.c
 > 
-> Thanks in advance
->   -- Daniel
-> 
-> [1] https://git.linaro.org/gitweb?p=tools/idlestat.git;a=summary
-> 
-> >---
-> >  arch/arm/include/asm/smp.h   |    9 ++++
-> >  arch/arm/kernel/smp.c        |   34 +++++++------
-> >  arch/arm64/include/asm/smp.h |    7 +++
-> >  arch/arm64/kernel/smp.c      |   21 ++++++--
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index ce785f4..11ee053 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -249,6 +249,13 @@ config REGULATOR_LP8788
+>  	help
+>  	  This driver supports LP8788 voltage regulator chip.
+>  
+> +config REGULATOR_MAX14577
+> +	tristate "Maxim 14577 regulator"
+> +	depends on MFD_MAX14577
+> +	help
+> +	  This driver controls a Maxim 14577 regulator via I2C bus.
+> +	  The regulators include safeout LDO and current regulator 'CHARGER'.
+> +
+>  config REGULATOR_MAX1586
+>  	tristate "Maxim 1586/1587 voltage regulator"
+>  	depends on I2C
+> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> index 01c597e..654bd43 100644
+> --- a/drivers/regulator/Makefile
+> +++ b/drivers/regulator/Makefile
+> @@ -35,6 +35,7 @@ obj-$(CONFIG_REGULATOR_LP872X) += lp872x.o
+>  obj-$(CONFIG_REGULATOR_LP8788) += lp8788-buck.o
+>  obj-$(CONFIG_REGULATOR_LP8788) += lp8788-ldo.o
+>  obj-$(CONFIG_REGULATOR_LP8755) += lp8755.o
+> +obj-$(CONFIG_REGULATOR_MAX14577) += max14577.o
+>  obj-$(CONFIG_REGULATOR_MAX1586) += max1586.o
+>  obj-$(CONFIG_REGULATOR_MAX8649)	+= max8649.o
+>  obj-$(CONFIG_REGULATOR_MAX8660) += max8660.o
+> diff --git a/drivers/regulator/max14577.c b/drivers/regulator/max14577.c
+> new file mode 100644
+> index 0000000..f449e57
+> --- /dev/null
+> +++ b/drivers/regulator/max14577.c
+> @@ -0,0 +1,282 @@
+> +/*
+> + * max14577.c - Regulator driver for the Maxim 14577
+> + *
+> + * Copyright (C) 2013 Samsung Electronics
+> + * Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/driver.h>
+> +#include <linux/mfd/max14577.h>
+> +#include <linux/mfd/max14577-private.h>
+> +#include <linux/regulator/of_regulator.h>
+> +
+> +struct max14577_regulator {
+> +	struct device *dev;
+> +	struct max14577 *max14577;
+> +	int num_regulators;
+> +	struct regulator_dev **regulators;
+> +};
+> +
+> +static int max14577_reg_is_enabled(struct regulator_dev *rdev)
+> +{
+> +	int rid = rdev_get_id(rdev);
+> +	struct regmap *rmap = rdev->regmap;
+> +	u8 reg_data;
+> +
+> +	switch (rid) {
+> +	case MAX14577_CHARGER:
+> +		max14577_read_reg(rmap, MAX14577_CHG_REG_CHG_CTRL2, &reg_data);
+> +		if ((reg_data & CHGCTRL2_MBCHOSTEN_MASK) == 0)
+> +			return 0;
+> +		max14577_read_reg(rmap, MAX14577_CHG_REG_STATUS3, &reg_data);
+> +		if ((reg_data & STATUS3_CGMBC_MASK) == 0)
+> +			return 0;
+> +		/* MBCHOSTEN and CGMBC are on */
+> +		return 1;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +}
+> +
+> +static int max14577_reg_get_current_limit(struct regulator_dev *rdev)
+> +{
+> +	u8 reg_data;
+> +	struct regmap *rmap = rdev->regmap;
+> +
+> +	if (rdev_get_id(rdev) != MAX14577_CHARGER)
+> +		return -EINVAL;
+> +
+> +	max14577_read_reg(rmap, MAX14577_CHG_REG_CHG_CTRL4, &reg_data);
+> +
+> +	if ((reg_data & CHGCTRL4_MBCICHWRCL_MASK) == 0)
+> +		return MAX14577_REGULATOR_CURRENT_LIMIT_MIN;
+> +
+> +	reg_data = ((reg_data & CHGCTRL4_MBCICHWRCH_MASK) >>
+> +			CHGCTRL4_MBCICHWRCH_SHIFT);
+> +	return MAX14577_REGULATOR_CURRENT_LIMIT_HIGH_START +
+> +		reg_data * MAX14577_REGULATOR_CURRENT_LIMIT_HIGH_STEP;
+> +}
+> +
+> +static int max14577_reg_set_current_limit(struct regulator_dev *rdev,
+> +		int min_uA, int max_uA)
+> +{
+> +	int i, current_bits = 0xf;
+> +	u8 reg_data;
+> +
+> +	if (rdev_get_id(rdev) != MAX14577_CHARGER)
+> +		return -EINVAL;
+> +
+> +	if (min_uA > MAX14577_REGULATOR_CURRENT_LIMIT_MAX ||
+> +			max_uA < MAX14577_REGULATOR_CURRENT_LIMIT_MIN)
+> +		return -EINVAL;
+> +
+> +	if (max_uA < MAX14577_REGULATOR_CURRENT_LIMIT_HIGH_START) {
+> +		/* Less than 200 mA, so set 90mA (turn only Low Bit off) */
+> +		u8 reg_data = 0x0 << CHGCTRL4_MBCICHWRCL_SHIFT;
+> +		return max14577_update_reg(rdev->regmap,
+> +				MAX14577_CHG_REG_CHG_CTRL4,
+> +				CHGCTRL4_MBCICHWRCL_MASK, reg_data);
+> +	}
+> +
+> +	/* max_uA is in range: <LIMIT_HIGH_START, inifinite>, so search for
+> +	 * valid current starting from LIMIT_MAX. */
+> +	for (i = MAX14577_REGULATOR_CURRENT_LIMIT_MAX;
+> +			i >= MAX14577_REGULATOR_CURRENT_LIMIT_HIGH_START;
+> +			i -= MAX14577_REGULATOR_CURRENT_LIMIT_HIGH_STEP) {
+> +		if (i <= max_uA)
+> +			break;
+> +		current_bits--;
+> +	}
+> +	BUG_ON(current_bits < 0); /* Cannot happen */
+> +	/* Turn Low Bit on (use range 200mA-950 mA) */
+> +	reg_data = 0x1 << CHGCTRL4_MBCICHWRCL_SHIFT;
+> +	/* and set proper High Bits */
+> +	reg_data |= current_bits << CHGCTRL4_MBCICHWRCH_SHIFT;
+> +
+> +	return max14577_update_reg(rdev->regmap, MAX14577_CHG_REG_CHG_CTRL4,
+> +			CHGCTRL4_MBCICHWRCL_MASK | CHGCTRL4_MBCICHWRCH_MASK,
+> +			reg_data);
+> +}
+> +
+> +static struct regulator_ops max14577_safeout_ops = {
+> +	.is_enabled		= regulator_is_enabled_regmap,
+> +	.enable			= regulator_enable_regmap,
+> +	.disable		= regulator_disable_regmap,
+> +	.list_voltage		= regulator_list_voltage_linear,
+> +};
+> +
+> +static struct regulator_ops max14577_charger_ops = {
+> +	.is_enabled		= max14577_reg_is_enabled,
+> +	.enable			= regulator_enable_regmap,
+> +	.disable		= regulator_disable_regmap,
+> +	.get_current_limit	= max14577_reg_get_current_limit,
+> +	.set_current_limit	= max14577_reg_set_current_limit,
+> +};
+> +
+> +static struct regulator_desc supported_regulators[] = {
+> +	{
+> +		.name = "SAFEOUT",
+> +		.id = MAX14577_SAFEOUT,
+> +		.ops = &max14577_safeout_ops,
+> +		.type = REGULATOR_VOLTAGE,
+> +		.owner = THIS_MODULE,
+> +		.n_voltages = 1,
+> +		.min_uV = MAX14577_REGULATOR_SAFEOUT_VOLTAGE,
+> +		.enable_reg = MAX14577_REG_CONTROL2,
+> +		.enable_mask = CTRL2_SFOUTORD_MASK,
+> +	}, {
+> +		.name = "CHARGER",
+> +		.id = MAX14577_CHARGER,
+> +		.ops = &max14577_charger_ops,
+> +		.type = REGULATOR_CURRENT,
+> +		.owner = THIS_MODULE,
+> +		.enable_reg = MAX14577_CHG_REG_CHG_CTRL2,
+> +		.enable_mask = CHGCTRL2_MBCHOSTEN_MASK,
+> +	}
+> +};
+> +
+> +#ifdef CONFIG_OF
+> +static int max14577_regulator_dt_parse_pdata(struct platform_device *pdev,
+> +					struct max14577_platform_data *pdata)
+> +{
+> +	struct max14577 *max14577 = dev_get_drvdata(pdev->dev.parent);
+> +	struct device_node *np;
+> +	struct max14577_regulator_platform_data *reg_pdata;
+> +	struct of_regulator_match rmatch;
+> +	int i, ret, cnt = 0;
+> +
+> +	np = of_get_child_by_name(max14577->dev->of_node, "regulators");
+> +	if (!np)
+> +		return -EINVAL;
+> +
+> +	reg_pdata = devm_kzalloc(&pdev->dev, sizeof(*reg_pdata) *
+> +			     ARRAY_SIZE(supported_regulators), GFP_KERNEL);
+> +	if (!reg_pdata)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(supported_regulators); i++) {
+> +		rmatch.name = supported_regulators[i].name;
+> +		ret = of_regulator_match(&pdev->dev, np, &rmatch, 1);
+> +		if (ret != 1)
+> +			continue;
+> +		dev_dbg(&pdev->dev, "Found regulator %d/%s\n",
+> +				supported_regulators[i].id,
+> +				supported_regulators[i].name);
+> +		reg_pdata[cnt].id = supported_regulators[i].id;
+> +		reg_pdata[cnt].initdata = rmatch.init_data;
+> +		reg_pdata[cnt].of_node = rmatch.of_node;
+> +		cnt++;
+> +	}
+> +
+> +	pdata->num_regulators = cnt;
+> +	pdata->regulators = reg_pdata;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static int max14577_regulator_dt_parse_pdata(struct platform_device *pdev,
+> +					struct max14577_platform_data *pdata)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static int max14577_regulator_probe(struct platform_device *pdev)
+> +{
+> +	struct max14577_regulator *info;
+> +	struct max14577 *max14577 = dev_get_drvdata(pdev->dev.parent);
+> +	struct max14577_platform_data *pdata = dev_get_platdata(max14577->dev);
+> +	int i, size;
+> +	struct regulator_config config = {};
+> +
+> +	if (!pdata) {
+> +		/* Parent must provide pdata */
+> +		dev_err(&pdev->dev, "No MFD driver platform data found.\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (max14577->dev->of_node) {
+> +		int ret = max14577_regulator_dt_parse_pdata(pdev, pdata);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	info = devm_kzalloc(&pdev->dev, sizeof(struct max14577_regulator),
+> +			GFP_KERNEL);
+> +	if (!info)
+> +		return -ENOMEM;
+> +
+> +	size = sizeof(struct regulator_dev *) * pdata->num_regulators;
+> +	info->regulators = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+> +	if (!info->regulators) {
+> +		dev_err(&pdev->dev, "Cannot allocate memory for regulators\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	info->dev = &pdev->dev;
+> +	info->max14577 = max14577;
+> +	info->num_regulators = pdata->num_regulators;
+> +
+> +	config.dev = &pdev->dev;
+> +	config.regmap = max14577->regmap;
+> +	config.driver_data = info;
+> +	platform_set_drvdata(pdev, info);
 
-Is there any reason for this to be specific to ARM?
+I don't see any code in this driver that reads from "info" so unless
+I'm missing something obvious "info" is redundant and can be removed
+altogether.
 
-Not all arches have that ipi_msg_type enum, so it would be worth
-thinking about what is common and how to make it more generic.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-Wiring up the tracepoint for other arches could be left to other
-people, but it's a good idea to have a framework that they can
-fit into.
-
-> >  include/trace/events/ipi.h   |  112 ++++++++++++++++++++++++++++++++++++++++++
-> >  5 files changed, 164 insertions(+), 19 deletions(-)
-> >  create mode 100644 include/trace/events/ipi.h
-> >
-> >diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-> >index a8cae71c..788706c 100644
-> >--- a/arch/arm/include/asm/smp.h
-> >+++ b/arch/arm/include/asm/smp.h
-> >@@ -18,6 +18,15 @@
-> >  # error "<asm/smp.h> included in non-SMP build"
-> >  #endif
-> >
-> >+enum ipi_msg_type {
-> >+	IPI_WAKEUP,
-> >+	IPI_TIMER,
-> >+	IPI_RESCHEDULE,
-> >+	IPI_CALL_FUNC,
-> >+	IPI_CALL_FUNC_SINGLE,
-> >+	IPI_CPU_STOP,
-> >+};
-> >+
-> >  #define raw_smp_processor_id() (current_thread_info()->cpu)
-> >
-> >  struct seq_file;
-> >diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> >index 72024ea..9ca8ce8 100644
-> >--- a/arch/arm/kernel/smp.c
-> >+++ b/arch/arm/kernel/smp.c
-> >@@ -46,6 +46,9 @@
-> >  #include <asm/mach/arch.h>
-> >  #include <asm/mpu.h>
-> >
-> >+#define CREATE_TRACE_POINTS
-> >+#include <trace/events/ipi.h>
-> >+
-> >  /*
-> >   * as from 2.5, kernels no longer have an init_tasks structure
-> >   * so we need some other way of telling a new secondary core
-> >@@ -59,15 +62,6 @@ struct secondary_data secondary_data;
-> >   */
-> >  volatile int pen_release = -1;
-> >
-> >-enum ipi_msg_type {
-> >-	IPI_WAKEUP,
-> >-	IPI_TIMER,
-> >-	IPI_RESCHEDULE,
-> >-	IPI_CALL_FUNC,
-> >-	IPI_CALL_FUNC_SINGLE,
-> >-	IPI_CPU_STOP,
-
-There are a couple of new entries you'll need to add when rebasing.
-They'll also need adding in show_ipi_name().
-
-> >-};
-> >-
-> >  static DECLARE_COMPLETION(cpu_running);
-> >
-> >  static struct smp_operations smp_ops;
-> >@@ -433,19 +427,25 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
-> >  		smp_cross_call = fn;
-> >  }
-> >
-> >+static void ipi_raise(const struct cpumask *mask, int ipinr)
-> >+{
-> >+	trace_ipi_raise(mask, ipinr);
-> >+	smp_cross_call(mask, ipinr);
-> >+}
-> >+
-> >  void arch_send_call_function_ipi_mask(const struct cpumask *mask)
-> >  {
-> >-	smp_cross_call(mask, IPI_CALL_FUNC);
-> >+	ipi_raise(mask, IPI_CALL_FUNC);
-> >  }
-> >
-> >  void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
-> >  {
-> >-	smp_cross_call(mask, IPI_WAKEUP);
-> >+	ipi_raise(mask, IPI_WAKEUP);
-> >  }
-> >
-> >  void arch_send_call_function_single_ipi(int cpu)
-> >  {
-> >-	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> >+	ipi_raise(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> >  }
-> >
-> >  static const char *ipi_types[NR_IPI] = {
-> >@@ -487,7 +487,7 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
-> >  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> >  void tick_broadcast(const struct cpumask *mask)
-> >  {
-> >-	smp_cross_call(mask, IPI_TIMER);
-> >+	ipi_raise(mask, IPI_TIMER);
-> >  }
-> >  #endif
-> >
-> >@@ -528,6 +528,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
-> >  	unsigned int cpu = smp_processor_id();
-> >  	struct pt_regs *old_regs = set_irq_regs(regs);
-> >
-> >+	trace_ipi_handler_entry(ipinr);
-> >+
-> >  	if (ipinr < NR_IPI)
-> >  		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-> >
-> >@@ -571,11 +573,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
-> >  		break;
-> >  	}
-> >  	set_irq_regs(old_regs);
-> >+
-> >+	trace_ipi_handler_exit(ipinr);
-> >  }
-> >
-> >  void smp_send_reschedule(int cpu)
-> >  {
-> >-	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
-> >+	ipi_raise(cpumask_of(cpu), IPI_RESCHEDULE);
-> >  }
-> >
-> >  void smp_send_stop(void)
-> >@@ -586,7 +590,7 @@ void smp_send_stop(void)
-> >  	cpumask_copy(&mask, cpu_online_mask);
-> >  	cpumask_clear_cpu(smp_processor_id(), &mask);
-> >  	if (!cpumask_empty(&mask))
-> >-		smp_cross_call(&mask, IPI_CPU_STOP);
-> >+		ipi_raise(&mask, IPI_CPU_STOP);
-> >
-> >  	/* Wait up to one second for other CPUs to stop */
-> >  	timeout = USEC_PER_SEC;
-> >diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> >index 4b8023c..7ebaa3a 100644
-> >--- a/arch/arm64/include/asm/smp.h
-> >+++ b/arch/arm64/include/asm/smp.h
-> >@@ -24,6 +24,13 @@
-> >  # error "<asm/smp.h> included in non-SMP build"
-> >  #endif
-> >
-> >+enum ipi_msg_type {
-> >+	IPI_RESCHEDULE,
-> >+	IPI_CALL_FUNC,
-> >+	IPI_CALL_FUNC_SINGLE,
-> >+	IPI_CPU_STOP,
-> >+};
-> >+
-> >  #define raw_smp_processor_id() (current_thread_info()->cpu)
-> >
-> >  struct seq_file;
-> >diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> >index 78db90d..c987b9f 100644
-> >--- a/arch/arm64/kernel/smp.c
-> >+++ b/arch/arm64/kernel/smp.c
-> >@@ -48,6 +48,9 @@
-> >  #include <asm/tlbflush.h>
-> >  #include <asm/ptrace.h>
-> >
-> >+#define CREATE_TRACE_POINTS
-> >+#include <trace/events/ipi.h>
-> >+
-> >  /*
-> >   * as from 2.5, kernels no longer have an init_tasks structure
-> >   * so we need some other way of telling a new secondary core
-> >@@ -426,14 +429,20 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
-> >  	smp_cross_call = fn;
-> >  }
-> >
-> >+static void ipi_raise(const struct cpumask *mask, int ipinr)
-> >+{
-> >+	trace_ipi_raise(mask, ipinr);
-> >+	smp_cross_call(mask, ipinr);
-> >+}
-> >+
-> >  void arch_send_call_function_ipi_mask(const struct cpumask *mask)
-> >  {
-> >-	smp_cross_call(mask, IPI_CALL_FUNC);
-> >+	ipi_raise(mask, IPI_CALL_FUNC);
-> >  }
-> >
-> >  void arch_send_call_function_single_ipi(int cpu)
-> >  {
-> >-	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> >+	ipi_raise(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> >  }
-> >
-> >  static const char *ipi_types[NR_IPI] = {
-> >@@ -501,6 +510,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
-> >  	unsigned int cpu = smp_processor_id();
-> >  	struct pt_regs *old_regs = set_irq_regs(regs);
-> >
-> >+	trace_ipi_handler_entry(ipinr);
-> >+
-> >  	if (ipinr >= IPI_RESCHEDULE && ipinr < IPI_RESCHEDULE + NR_IPI)
-> >  		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_RESCHEDULE]);
-> >
-> >@@ -532,11 +543,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
-> >  		break;
-> >  	}
-> >  	set_irq_regs(old_regs);
-> >+
-> >+	trace_ipi_handler_exit(ipinr);
-> >  }
-> >
-> >  void smp_send_reschedule(int cpu)
-> >  {
-> >-	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
-> >+	ipi_raise(cpumask_of(cpu), IPI_RESCHEDULE);
-> >  }
-> >
-> >  void smp_send_stop(void)
-> >@@ -549,7 +562,7 @@ void smp_send_stop(void)
-> >  		cpumask_copy(&mask, cpu_online_mask);
-> >  		cpu_clear(smp_processor_id(), mask);
-> >
-> >-		smp_cross_call(&mask, IPI_CPU_STOP);
-> >+		ipi_raise(&mask, IPI_CPU_STOP);
-> >  	}
-> >
-> >  	/* Wait up to one second for other CPUs to stop */
-> >diff --git a/include/trace/events/ipi.h b/include/trace/events/ipi.h
-> >new file mode 100644
-> >index 0000000..fa22d4f
-> >--- /dev/null
-> >+++ b/include/trace/events/ipi.h
-> >@@ -0,0 +1,112 @@
-> >+#undef TRACE_SYSTEM
-> >+#define TRACE_SYSTEM ipi
-
-Would it make sense to put these under irq instead?
-
-IPIs are a special kind of interrupt, but interrupts nonetheless.
-
-irq:ipi_ might make sense as a prefix ... the IRQ folks might have a
-view though.
-
-> >+
-> >+#if !defined(_TRACE_IPI_H) || defined(TRACE_HEADER_MULTI_READ)
-> >+#define _TRACE_IPI_H
-> >+
-> >+#include <linux/tracepoint.h>
-> >+
-> >+#define ipi_name(ipinr) { IPI_##ipinr, #ipinr }
-> >+#define show_ipi_name(val)				\
-> >+	__print_symbolic(val,				\
-> >+			 ipi_name(WAKEUP),		\
-> >+			 ipi_name(TIMER),		\
-> >+			 ipi_name(RESCHEDULE),		\
-> >+			 ipi_name(CALL_FUNC),		\
-> >+			 ipi_name(CALL_FUNC_SINGLE),	\
-> >+			 ipi_name(CPU_STOP))
-
-I can see this being a bit of a pain to maintain.  How do we keep it in
-sync with the arch headers?
-
-One option would be for the arch to provide this, or find a way to
-define the common entries in one place and the arch-specific entries
-via the arch headers.
-
-Cheers
----Dave
-
-> >+
-> >+#define show_cpumask(srcp)				\
-> >+	({						\
-> >+		char *buf = __get_dynamic_array(buf);	\
-> >+		cpumask_scnprintf(buf, NR_CPUS, srcp);	\
-> >+		buf;					\
-> >+	})
-> >+
-> >+DECLARE_EVENT_CLASS(ipi,
-> >+
-> >+    TP_PROTO(int ipinr),
-> >+
-> >+    TP_ARGS(ipinr),
-> >+
-> >+    TP_STRUCT__entry(
-> >+	    __field(int, ipinr)
-> >+    ),
-> >+
-> >+    TP_fast_assign(
-> >+	    __entry->ipinr = ipinr;
-> >+    ),
-> >+
-> >+    TP_printk("ipi=%d, name=%s", __entry->ipinr,
-> >+	      show_ipi_name(__entry->ipinr))
-> >+);
-> >+
-> >+/**
-> >+ * ipi_handle_entry - called right before the IPI handler
-> >+ * @ipinr: the IPI number
-> >+ *
-> >+ * The @ipinr value must be valid and the action name associated with
-> >+ * the IPI value is given in the trace.
-> >+ */
-> >+DEFINE_EVENT_CONDITION(ipi, ipi_handler_entry,
-> >+
-> >+    TP_PROTO(int ipinr),
-> >+
-> >+    TP_ARGS(ipinr),
-> >+
-> >+    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0)
-> >+);
-> >+
-> >+/**
-> >+ * ipi_handle_exit - called right after the IPI handler
-> >+ * @ipinr: the IPI number
-> >+ *
-> >+ * The @ipinr value must be valid and the action name associated with
-> >+ * the IPI value is given in the trace.
-> >+ */
-> >+DEFINE_EVENT_CONDITION(ipi, ipi_handler_exit,
-> >+
-> >+    TP_PROTO(int ipinr),
-> >+
-> >+    TP_ARGS(ipinr),
-> >+
-> >+    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0)
-> >+);
-> >+
-> >+/**
-> >+ * ipi_raise - called when a smp cross call is made
-> >+ * @ipinr: the IPI number
-> >+ * @cpumask: the recipients for the IPI
-> >+ *
-> >+ * The @ipinr value must be valid and the action name associated with
-> >+ * the IPI value is given in the trace as well as the cpumask of the
-> >+ * targeted cpus.
-> >+ */
-> >+TRACE_EVENT_CONDITION(ipi_raise,
-> >+
-> >+    TP_PROTO(const struct cpumask *cpumask, int ipinr),
-> >+
-> >+    TP_ARGS(cpumask, ipinr),
-> >+
-> >+    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
-> >+
-> >+    TP_STRUCT__entry(
-> >+	    __field(int, ipinr)
-> >+	    __field(const struct cpumask *, cpumask)
-> >+	    __dynamic_array(char, buf, NR_CPUS)
-> >+    ),
-> >+
-> >+    TP_fast_assign(
-> >+	    __entry->ipinr = ipinr;
-> >+	    __entry->cpumask = cpumask;
-> >+    ),
-> >+
-> >+    TP_printk("ipi=%d, cpumask=0x%s, name=%s", __entry->ipinr,
-> >+	      show_cpumask(__entry->cpumask),
-> >+	      show_ipi_name(__entry->ipinr))
-> >+);
-> >+
-> >+#endif /* _TRACE_IPI_H */
-> >+
-> >+/* This part must be outside protection */
-> >+#include <trace/define_trace.h>
-> >
-> 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +	for (i = 0; i < pdata->num_regulators; i++) {
+> +		int id = pdata->regulators[i].id;
+> +
+> +		config.init_data = pdata->regulators[i].initdata;
+> +		config.of_node = pdata->regulators[i].of_node;
+> +
+> +		info->regulators[i] = devm_regulator_register(&pdev->dev,
+> +				&supported_regulators[id], &config);
+> +		if (IS_ERR(info->regulators[i])) {
+> +			int ret = PTR_ERR(info->regulators[i]);
+> +			dev_err(&pdev->dev,
+> +					"Regulator init failed for ID %d with error: %d\n",
+> +					id, ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver max14577_regulator_driver = {
+> +	.driver = {
+> +		   .owner = THIS_MODULE,
+> +		   .name = "max14577-regulator",
+> +		   },
+> +	.probe	= max14577_regulator_probe,
+> +};
+> +
+> +static int __init max14577_regulator_init(void)
+> +{
+> +	BUILD_BUG_ON(MAX14577_REGULATOR_CURRENT_LIMIT_HIGH_START +
+> +			MAX14577_REGULATOR_CURRENT_LIMIT_HIGH_STEP * 0xf !=
+> +			MAX14577_REGULATOR_CURRENT_LIMIT_MAX);
+> +	return platform_driver_register(&max14577_regulator_driver);
+> +}
+> +subsys_initcall(max14577_regulator_init);
+> +
+> +static void __exit max14577_regulator_exit(void)
+> +{
+> +	platform_driver_unregister(&max14577_regulator_driver);
+> +}
+> +module_exit(max14577_regulator_exit);
+> +
+> +MODULE_AUTHOR("Krzysztof Kozlowski <k.kozlowski@samsung.com>");
+> +MODULE_DESCRIPTION("MAXIM 14577 regulator driver");
+> +MODULE_LICENSE("GPL");
