@@ -1,38 +1,40 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Wed, 20 Nov 2013 03:14:09 +0000
-Subject: [PATCHv2 3/8] ARM: dts: Enables SAI ALSA SoC DAI device for
- Vybrid VF610 TOWER board.
-In-Reply-To: <87bo1hk2i7.fsf@nbsps.com>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-4-git-send-email-Li.Xiubo@freescale.com>
- <87bo1hk2i7.fsf@nbsps.com>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828AD451@039-SN2MPN1-012.039d.mgd.msft.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 20 Nov 2013 11:14:24 +0800
+Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
+In-Reply-To: <CALT56yOcUChApUP6rOyXqWuK55ZR0Ooj457XVP2b7bVR9yk-8A@mail.gmail.com>
+References: <20131116124750.GA26318@anuminas.rup.mentorg.com>
+ <CALT56yOcUChApUP6rOyXqWuK55ZR0Ooj457XVP2b7bVR9yk-8A@mail.gmail.com>
+Message-ID: <528C2910.8030705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > This patch add and enable SAI device.
-> >
-> > arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
-> > 1 file changed, 6 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/vf610-twr.dts
-> > b/arch/arm/boot/dts/vf610-twr.dts index 1a58678..e4106dd 100644
-> > --- a/arch/arm/boot/dts/vf610-twr.dts
-> > +++ b/arch/arm/boot/dts/vf610-twr.dts
-> >>> -57,6 +57,12 @@
-> > 	status = "okay";
-> > };
-> 
-> Should we put a comment here that a TWR-AUDIO-SGTL board is needed?  Or
-> is this better in a menuconfig?  I guess TWR-AUDIO-SGTL is needed as this
-> codec is not on the VF610-TWR main board?
-> 
+On 11/19/2013 04:33 PM, Dmitry Eremin-Solenikov wrote:
+> Hello,
+>
+> On Sat, Nov 16, 2013 at 4:47 PM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
+>> When converting from tosa-keyboard driver to matrix keyboard, tosa keys
+>> received extra 1 column shift. Replace that with correct values to make
+>> keyboard work again.
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> ---
+>>   arch/arm/mach-pxa/tosa.c | 102 +++++++++++++++++++++++------------------------
+>>   1 file changed, 51 insertions(+), 51 deletions(-)
+>
+> As nobody seems to object, I would like to use my tosa maintainer
+> powers and push
+> this patch for inclusion.
+>
+> Both Eric and Haojian seem to be unresponsive now.
+> Russell, can I push it to your patch system? Or should I push it to
+> arm-soc guys?
+>
 
-Yes, the SGTL5000 codec is not on the VF610-TWR main board, and needs an extra TWR-AUDIO-SGTL board.
+Hi Dmitry,
 
-IMO, puting this comment in the menuconfig is much better.
+I can take this patch. I didn't response since I'm waiting the new 
+v3.13-rc1. I'm sorry on inconvenience.
 
-
---
-Best Regards,
-Xiubo
+Best Regards
+Haojian
