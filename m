@@ -1,79 +1,32 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 20 Nov 2013 18:24:57 +0200
-Subject: [PATCH 1/3] mtd: nand: davinci: reuse driver for Keystone arch
-In-Reply-To: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1384964699-15134-2-git-send-email-ivan.khoronzhuk@ti.com>
+Date: Wed, 20 Nov 2013 18:24:56 +0200
+Subject: [PATCH 0/3] Reuse davinci-nand driver for Keystone arch
+Message-ID: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone arch has compatible nand device, so reuse it.
-In case with Keystone it depends on TI_AEMIF because AEMIF
-driver is responsible to set timings.
+This series contains updates of Davinci nand driver, in order to be
+reused for Keystone platform.
 
-See http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+Depends on:
+- Davinci nand driver fixes and updates:
+  https://lkml.org/lkml/2013/11/20/271
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- .../devicetree/bindings/mtd/davinci-nand.txt       |    8 +++++---
- drivers/mtd/nand/Kconfig                           |    6 +++---
- drivers/mtd/nand/davinci_nand.c                    |    1 +
- 3 files changed, 9 insertions(+), 6 deletions(-)
+- Introduce AEMIF driver for Davinci/Keystone archs:
+  http://lkml.org/lkml/2013/11/11/352
 
-diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-index befaa5b..cfb18ab 100644
---- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-@@ -1,14 +1,16 @@
--Device tree bindings for Texas instruments Davinci NAND controller
-+Device tree bindings for Texas instruments Davinci/Keystone NAND controller
- 
--This file provides information, what the device node for the davinci NAND
--interface contains.
-+This file provides information, what the device node for the davinci/keystone
-+NAND interface contains.
- 
- Documentation:
- Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
-+Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
- 
- Required properties:
- 
- - compatible:			"ti,davinci-nand"
-+				"ti,keystone-nand"
- 
- - reg:				Contains 2 offset/length values:
- 				- offset and length for the access window.
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index d885298..8bf69c7 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -492,11 +492,11 @@ config MTD_NAND_SH_FLCTL
- 	  for NAND Flash using FLCTL.
- 
- config MTD_NAND_DAVINCI
--        tristate "Support NAND on DaVinci SoC"
--        depends on ARCH_DAVINCI
-+        tristate "Support NAND on DaVinci/Keystone SoC"
-+        depends on ARCH_DAVINCI || (ARCH_KEYSTONE && TI_AEMIF)
-         help
- 	  Enable the driver for NAND flash chips on Texas Instruments
--	  DaVinci processors.
-+	  DaVinci/Keystone processors.
- 
- config MTD_NAND_TXX9NDFMC
- 	tristate "NAND Flash support for TXx9 SoC"
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index f7b21b8..8459720 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -523,6 +523,7 @@ static struct nand_ecclayout hwecc4_2048 __initconst = {
- #if defined(CONFIG_OF)
- static const struct of_device_id davinci_nand_of_match[] = {
- 	{.compatible = "ti,davinci-nand", },
-+	{.compatible = "ti,keystone-nand", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
+V1:
+https://lkml.org/lkml/2013/11/11/352
+
+Ivan Khoronzhuk (3):
+  mtd: nand: davinci: reuse driver for Keystone arch
+  mtd: nand: davinci: don't set timings if AEMIF is used
+  mtd: nand: davinci: don't request AEMIF address range
+
+ .../devicetree/bindings/mtd/davinci-nand.txt       |    8 +--
+ drivers/mtd/nand/Kconfig                           |    6 +--
+ drivers/mtd/nand/davinci_nand.c                    |   57 +++++++++++++-------
+ 3 files changed, 45 insertions(+), 26 deletions(-)
+
 -- 
 1.7.9.5
