@@ -1,66 +1,61 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 20 Nov 2013 02:06:11 +0100
-Subject: [PATCH v2 07/11] ARM: dts: AM33XX BASE0033: add pinmux and user led
- support.
+Date: Wed, 20 Nov 2013 02:06:13 +0100
+Subject: [PATCH v2 09/11] ARM: dts: AM33XX IGEP0033: add USB support.
 In-Reply-To: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1384909575-19108-8-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1384909575-19108-10-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Enric Balletbo i Serra <eballetbo@iseebcn.com>
 
-Enable the user leds on the IGEP AQUILA EXPANSION. The has two leds,
-one green and one red, that are controllable by software.
+Add node to support the USB Host and the USB OTG on the IGEP AQUILA
+Processor Board.
 
 Signed-off-by: Enric Balletbo i Serra <eballetbo@iseebcn.com>
 ---
- arch/arm/boot/dts/am335x-base0033.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/am335x-igep0033.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-base0033.dts b/arch/arm/boot/dts/am335x-base0033.dts
-index 3a97613..2878024 100644
---- a/arch/arm/boot/dts/am335x-base0033.dts
-+++ b/arch/arm/boot/dts/am335x-base0033.dts
-@@ -22,6 +22,25 @@
- 		pinctrl-1 = <&nxp_hdmi_off_pins>;
- 		status = "okay";
- 	};
-+
-+	leds_base {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_base_pins>;
-+
-+		compatible = "gpio-leds";
-+
-+		led at 0 {
-+			label = "base:red:user";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;	/* gpio1_21 */
-+			default-state = "off";
-+		};
-+
-+		led at 1 {
-+			label = "base:green:user";
-+			gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;	/* gpio2_0 */
-+			default-state = "off";
-+		};
-+	};
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index 6196244..7063311 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -199,6 +199,35 @@
+ 	pinctrl-0 = <&uart0_pins>;
  };
  
- &am33xx_pinmux {
-@@ -55,6 +74,13 @@
- 			0x1b0 (PIN_OUTPUT | MUX_MODE3)	/* xdma_event_intr0.clkout1 */
- 		>;
- 	};
++&usb {
++	status = "okay";
 +
-+	leds_base_pins: pinmux_leds_base_pins {
-+		pinctrl-single,pins = <
-+			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
-+			0x88 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_csn3.gpio2_0 */
-+		>;
++	control at 44e10000 {
++		status = "okay";
 +	};
- };
++
++	usb-phy at 47401300 {
++		status = "okay";
++	};
++
++	usb-phy at 47401b00 {
++		status = "okay";
++	};
++
++	usb at 47401000 {
++		status = "okay";
++	};
++
++	usb at 47401800 {
++		status = "okay";
++		dr_mode = "host";
++	};
++
++	dma-controller at 07402000  {
++		status = "okay";
++	};
++};
++
+ #include "tps65910.dtsi"
  
- &lcdc {
+ &tps {
 -- 
 1.8.4.2
