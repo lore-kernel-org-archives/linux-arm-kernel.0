@@ -1,87 +1,35 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 20 Nov 2013 12:36:55 -0800
-Subject: [PATCH RFC v1 2/7] net: phy: provide phy_resume/phy_suspend
- helpers
-In-Reply-To: <1384978913-8052-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1384978913-8052-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAGVrzcZ9uDK9X-K86Esxb=93tkHuV4-RXxZ8Us-vNJ9UxcTFpQ@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Wed, 20 Nov 2013 22:38:46 +0200
+Subject: [PATCH 0/3] Reuse davinci-nand driver for Keystone arch
+In-Reply-To: <528D1C94.7010100@ti.com>
+References: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <528D18EC.6000501@ti.com> <528D1C94.7010100@ti.com>
+Message-ID: <528D1DD6.9010808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
-> This adds helper functions to resume and suspend a given phy_device
-> by calling the corresponding driver callbacks if available.
+On 11/20/2013 10:33 PM, Santosh Shilimkar wrote:
+> On Wednesday 20 November 2013 03:17 PM, Grygorii Strashko wrote:
+>> On 11/20/2013 06:24 PM, Ivan Khoronzhuk wrote:
+>>> This series contains updates of Davinci nand driver, in order to be
+>>> reused for Keystone platform.
+>>>
+>>> Depends on:
+>>> - Davinci nand driver fixes and updates:
+>>>     https://lkml.org/lkml/2013/11/20/271
+>>
+>> ^^^^ I suggest to merge this series with above one as it
+>> should not break anything.
+>>
+> I agree. That way the mtd patch series can go
+> together nicely.
 >
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Regards,
+> Santosh
+>
 
-Looks good, thanks Sebastian:
-
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-
-> ---
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/phy/phy_device.c |   19 +++++++++++++++++++
->  include/linux/phy.h          |    2 ++
->  2 files changed, 21 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-> index 74630e9..2442895 100644
-> --- a/drivers/net/phy/phy_device.c
-> +++ b/drivers/net/phy/phy_device.c
-> @@ -625,6 +625,25 @@ void phy_detach(struct phy_device *phydev)
->  }
->  EXPORT_SYMBOL(phy_detach);
->
-> +int phy_suspend(struct phy_device *phydev)
-> +{
-> +       struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
-> +
-> +       if (phydrv->suspend)
-> +               return phydrv->suspend(phydev);
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL(phy_suspend);
-> +
-> +int phy_resume(struct phy_device *phydev)
-> +{
-> +       struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
-> +
-> +       if (phydrv->resume)
-> +               return phydrv->resume(phydev);
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL(phy_resume);
->
->  /* Generic PHY support and helper functions */
->
-> diff --git a/include/linux/phy.h b/include/linux/phy.h
-> index 64ab823..ed0d6d8 100644
-> --- a/include/linux/phy.h
-> +++ b/include/linux/phy.h
-> @@ -552,6 +552,8 @@ void phy_detach(struct phy_device *phydev);
->  void phy_start(struct phy_device *phydev);
->  void phy_stop(struct phy_device *phydev);
->  int phy_start_aneg(struct phy_device *phydev);
-> +int phy_suspend(struct phy_device *phydev);
-> +int phy_resume(struct phy_device *phydev);
->
->  int phy_stop_interrupts(struct phy_device *phydev);
->
-> --
-> 1.7.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
-
+Ok, I will combine them
 
 -- 
-Florian
+Regards,
+Ivan Khoronzhuk
