@@ -1,13 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Nov 2013 21:21:49 +0100
-Subject: [PATCH RFC v1 3/7] net: phy: resume/suspend PHYs on attach/detach
+Date: Wed, 20 Nov 2013 21:21:52 +0100
+Subject: [PATCH RFC v1 6/7] net: mvneta: resume/suspend PHY on port start/stop
 In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1384978913-8052-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384978913-8052-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This ensures PHYs are resumed on attach and suspended on detach.
+Network PHYs consume a noticable amount of power. This adds phy_resume
+on start_dev and phy_suspend on stop_dev to save this power if the
+port is down anyway.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -16,29 +18,28 @@ Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/phy/phy_device.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-index 2442895..a421fc6 100644
---- a/drivers/net/phy/phy_device.c
-+++ b/drivers/net/phy/phy_device.c
-@@ -570,6 +570,8 @@ static int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
- 	if (err)
- 		phy_detach(phydev);
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index b8e232b..8688e91 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2194,6 +2194,7 @@ static void mvneta_start_dev(struct mvneta_port *pp)
+ 	mvreg_write(pp, MVNETA_INTR_NEW_MASK,
+ 		    MVNETA_RX_INTR_MASK(rxq_number));
  
-+	phy_resume(phydev);
-+
- 	return err;
++	phy_resume(pp->phy_dev);
+ 	phy_start(pp->phy_dev);
+ 	netif_tx_start_all_queues(pp->dev);
  }
- 
-@@ -615,6 +617,7 @@ void phy_detach(struct phy_device *phydev)
+@@ -2201,6 +2202,7 @@ static void mvneta_start_dev(struct mvneta_port *pp)
+ static void mvneta_stop_dev(struct mvneta_port *pp)
  {
- 	phydev->attached_dev->phydev = NULL;
- 	phydev->attached_dev = NULL;
-+	phy_suspend(phydev);
+ 	phy_stop(pp->phy_dev);
++	phy_suspend(pp->phy_dev);
  
- 	/* If the device had no specific driver before (i.e. - it
- 	 * was using the generic driver), we unbind the device
+ 	napi_disable(&pp->napi);
+ 
 -- 
 1.7.2.5
