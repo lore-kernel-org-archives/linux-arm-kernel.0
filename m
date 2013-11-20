@@ -1,15 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Nov 2013 21:21:53 +0100
-Subject: [PATCH RFC v1 7/7] net: cpsw: resume/suspend PHY on port start/stop
+Date: Wed, 20 Nov 2013 21:21:51 +0100
+Subject: [PATCH RFC v1 5/7] net: mv643xx_eth: resume/suspend PHY on port
+ start/stop
 In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1384978913-8052-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384978913-8052-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Network PHYs consume a noticable amount of power. This adds phy_resume
-on slave_open and phy_suspend on slave_stop to save this power if the
-port is down anyway.
+on port start and phy_suspend on port stop to save this power if the
+port is down anyway. While at it, also properly start/stop the phy.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -18,28 +19,33 @@ Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/ethernet/ti/cpsw.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 90d41d2..f1dc54f 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1013,6 +1013,7 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
- 	} else {
- 		dev_info(priv->dev, "phy found : id is : 0x%x\n",
- 			 slave->phy->phy_id);
-+		phy_resume(slave->phy);
- 		phy_start(slave->phy);
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 00cd36e..55805b2 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2097,6 +2097,8 @@ static void port_start(struct mv643xx_eth_private *mp)
  
- 		/* Configure GMII_SEL register */
-@@ -1081,6 +1082,7 @@ static void cpsw_slave_stop(struct cpsw_slave *slave, struct cpsw_priv *priv)
- 	if (!slave->phy)
- 		return;
- 	phy_stop(slave->phy);
-+	phy_suspend(slave->phy);
- 	phy_disconnect(slave->phy);
- 	slave->phy = NULL;
+ 		mv643xx_eth_get_settings(mp->dev, &cmd);
+ 		phy_reset(mp);
++		phy_resume(mp->phy);
++		phy_start(mp->phy);
+ 		mv643xx_eth_set_settings(mp->dev, &cmd);
+ 	}
+ 
+@@ -2306,6 +2308,11 @@ static int mv643xx_eth_stop(struct net_device *dev)
+ 	for (i = 0; i < mp->txq_count; i++)
+ 		txq_deinit(mp->txq + i);
+ 
++	if (mp->phy) {
++		phy_stop(mp->phy);
++		phy_suspend(mp->phy);
++	}
++
+ 	return 0;
  }
+ 
 -- 
 1.7.2.5
