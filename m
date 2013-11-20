@@ -1,230 +1,72 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 20 Nov 2013 22:58:50 +0530
-Subject: [PATCH V4 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <528CB5AC.5080007@arm.com>
-References: <1384946021-22100-1-git-send-email-vkale@apm.com>
- <1384946021-22100-3-git-send-email-vkale@apm.com>
- <528CB5AC.5080007@arm.com>
-Message-ID: <CAPrCYkcu7wVjoV5Q=pd55Zn8+PR30n3WJ8F6t=qV4BMLhZFcxA@mail.gmail.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 20 Nov 2013 09:30:07 -0800
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <20131120171227.GG8581@1wt.eu>
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
+ <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
+ <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
+ <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131120171227.GG8581@1wt.eu>
+Message-ID: <1384968607.10637.14.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, 2013-11-20 at 18:12 +0100, Willy Tarreau wrote:
+> Hi guys,
 
-On Wed, Nov 20, 2013 at 6:44 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> [dropped patches at apm.com]
->
-> Vinayak,
->
-> Please keep reviewers on CC, as it makes easier to track the changes.
-Sure, will do.
->
-> On 20/11/13 11:13, Vinayak Kale wrote:
->> Add support for irq registration when pmu interrupt is percpu.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> ---
->>  arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
->>  1 file changed, 81 insertions(+), 27 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index cea1594..de12ba8 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -22,6 +22,7 @@
->>
->>  #include <linux/bitmap.h>
->>  #include <linux/interrupt.h>
->> +#include <linux/irq.h>
->>  #include <linux/kernel.h>
->>  #include <linux/export.h>
->>  #include <linux/perf_event.h>
->> @@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
->>  }
->>
->>  static void
->> +armpmu_disable_percpu_irq(void *data)
->> +{
->> +     struct arm_pmu *armpmu = data;
->> +     struct platform_device *pmu_device = armpmu->plat_device;
->> +     int irq = platform_get_irq(pmu_device, 0);
->> +
->> +     cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
->> +     disable_percpu_irq(irq);
->> +}
->> +
->> +static void
->>  armpmu_release_hardware(struct arm_pmu *armpmu)
->>  {
->>       int i, irq, irqs;
->>       struct platform_device *pmu_device = armpmu->plat_device;
->>
->>       irqs = min(pmu_device->num_resources, num_possible_cpus());
->> +     if (irqs < 1)
->> +             return;
->>
->> -     for (i = 0; i < irqs; ++i) {
->> -             if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> -                     continue;
->> -             irq = platform_get_irq(pmu_device, i);
->> -             if (irq >= 0)
->> -                     free_irq(irq, armpmu);
->> +     irq = platform_get_irq(pmu_device, 0);
->> +     if (irq < 0)
->
-> So I'm going to sound like a stuck record: irq == 0 is not a valid IRQ
-> number, full stop. This is how we express the fact that there is no IRQ.
->
-> If you're touching that code, you might as well fix this buglet.
-In Will's existing code, I think he was taking care of 'no IRQ' case
-by comparing pmu_device->num_resources. Do you think this is not
-enough and we must enforce the check after each platform_get_irq()?
-Existing driver code snippet as below for quick reference.
+> Eric, first I would like to confirm that I could reproduce Arnaud's issue
+> using 3.10.19 (160 kB/s in the worst case).
+> 
+> Second, I confirm that your patch partially fixes it and my performance
+> can be brought back to what I had with 3.10-rc7, but with a lot of
+> concurrent streams. In fact, in 3.10-rc7, I managed to constantly saturate
+> the wire when transfering 7 concurrent streams (118.6 kB/s). With the patch
+> applied, performance is still only 27 MB/s at 7 concurrent streams, and I
+> need at least 35 concurrent streams to fill the pipe. Strangely, after
+> 2 GB of cumulated data transferred, the bandwidth divided by 11-fold and
+> fell to 10 MB/s again.
+> 
+> If I revert both "0ae5f47eff tcp: TSQ can use a dynamic limit" and
+> your latest patch, the performance is back to original.
+> 
+> Now I understand there's a major issue with the driver. But since the
+> patch emphasizes the situations where drivers take a lot of time to
+> wake the queue up, don't you think there could be an issue with low
+> bandwidth links (eg: PPPoE over xDSL, 10 Mbps ethernet, etc...) ?
+> I'm a bit worried about what we might discover in this area I must
+> confess (despite generally being mostly focused on 10+ Gbps).
 
-[snip]
-static int
-armpmu_reserve_hardware(struct arm_pmu *armpmu)
-{
-        int i, err, irq, irqs;
-        struct platform_device *pmu_device = armpmu->plat_device;
+Well, all TCP performance results are highly dependent on the workload,
+and both receivers and senders behavior.
 
-        if (!pmu_device) {
-                pr_err("no PMU device registered\n");
-                return -ENODEV;
-        }
+We made many improvements like TSO auto sizing, DRS (dynamic Right
+Sizing), and if the application used some specific settings (like
+SO_SNDBUF / SO_RCVBUF or other tweaks), we can not guarantee that same
+exact performance is reached from kernel version X to kernel version Y.
 
-        irqs = min(pmu_device->num_resources, num_possible_cpus());
-        if (irqs < 1) {
-                pr_err("no irqs for PMUs defined\n");
-                return -ENODEV;
-        }
-        for (i = 0; i < irqs; ++i) {
-                err = 0;
-                irq = platform_get_irq(pmu_device, i);
-                if (irq < 0)
-                         continue;
+We try to make forward progress, there is little gain to revert all
+these great works. Linux had this tendency to favor throughput by using
+overly large skbs. Its time to do better.
 
-[snip]
->
->> +             return;
->> +
->> +     if (irq_is_percpu(irq)) {
->> +             on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
->> +             free_percpu_irq(irq, &cpu_hw_events);
->> +     } else {
->> +             for (i = 0; i < irqs; ++i) {
->> +                     if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> +                             continue;
->> +                     irq = platform_get_irq(pmu_device, i);
->> +                     if (irq >= 0)
->
-> Same here.
->
->> +                             free_irq(irq, armpmu);
->> +             }
->>       }
->>  }
->>
->> +static void
->> +armpmu_enable_percpu_irq(void *data)
->> +{
->> +     struct arm_pmu *armpmu = data;
->> +     struct platform_device *pmu_device = armpmu->plat_device;
->> +     int irq = platform_get_irq(pmu_device, 0);
->> +
->> +     enable_percpu_irq(irq, 0);
->> +     cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
->> +}
->> +
->>  static int
->>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>  {
->> @@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>               return -ENODEV;
->>       }
->>
->> -     for (i = 0; i < irqs; ++i) {
->> -             err = 0;
->> -             irq = platform_get_irq(pmu_device, i);
->> -             if (irq < 0)
->> -                     continue;
->> +     irq = platform_get_irq(pmu_device, 0);
->> +     if (irq < 0) {
->
-> And here.
->
->> +             pr_err("failed to get an irq for PMU device\n");
->> +             return -ENODEV;
->> +     }
->>
->> -             /*
->> -              * If we have a single PMU interrupt that we can't shift,
->> -              * assume that we're running on a uniprocessor machine and
->> -              * continue. Otherwise, continue without this interrupt.
->> -              */
->> -             if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
->> -                     pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
->> -                                 irq, i);
->> -                     continue;
->> -             }
->> +     if (irq_is_percpu(irq)) {
->> +             err = request_percpu_irq(irq, armpmu->handle_irq,
->> +                             "arm-pmu", &cpu_hw_events);
->>
->> -             err = request_irq(irq, armpmu->handle_irq,
->> -                               IRQF_NOBALANCING,
->> -                               "arm-pmu", armpmu);
->>               if (err) {
->> -                     pr_err("unable to request IRQ%d for ARM PMU counters\n",
->> -                             irq);
->> +                     pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
->> +                                     irq);
->>                       armpmu_release_hardware(armpmu);
->>                       return err;
->>               }
->>
->> -             cpumask_set_cpu(i, &armpmu->active_irqs);
->> +             on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
->> +     } else {
->> +             for (i = 0; i < irqs; ++i) {
->> +                     err = 0;
->> +                     irq = platform_get_irq(pmu_device, i);
->> +                     if (irq < 0)
->
-> And here.
->
->> +                             continue;
->> +
->> +                     /*
->> +                      * If we have a single PMU interrupt that we can't shift,
->> +                      * assume that we're running on a uniprocessor machine and
->> +                      * continue. Otherwise, continue without this interrupt.
->> +                      */
->> +                     if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
->> +                             pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
->> +                                             irq, i);
->> +                             continue;
->> +                     }
->> +
->> +                     err = request_irq(irq, armpmu->handle_irq,
->> +                                     IRQF_NOBALANCING,
->> +                                     "arm-pmu", armpmu);
->> +                     if (err) {
->> +                             pr_err("unable to request IRQ%d for ARM PMU counters\n",
->> +                                             irq);
->> +                             armpmu_release_hardware(armpmu);
->> +                             return err;
->> +                     }
->> +
->> +                     cpumask_set_cpu(i, &armpmu->active_irqs);
->> +             }
->>       }
->>
->>       return 0;
->>
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+As explained, some drivers are buggy, and need fixes.
+
+If nobody wants to fix them, this really means no one is interested
+getting them fixed.
+
+I am willing to help if you provide details, because otherwise I need
+a crystal ball ;)
+
+One known problem of TCP is the fact that an incoming ACK making room in
+socket write queue immediately wakeup a blocked thread (POLLOUT), even
+if only one MSS was ack, and write queue has 2MB of outstanding bytes.
+
+All these scheduling problems should be identified and fixed, and yes,
+this will require a dozen more patches.
+
+max (128KB , 1-2 ms) of buffering per flow should be enough to reach
+line rate, even for a single flow, but this means the sk_sndbuf value
+for the socket must take into account the pipe size _plus_ 1ms of
+buffering.
