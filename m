@@ -1,40 +1,57 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 20 Nov 2013 19:21:02 +0100
-Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20131120182102.GK14627@ns203013.ovh.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 20 Nov 2013 16:20:48 -0200
+Subject: [PATCH] ARM: dts: imx6q-sabrelite: Place 'status' as the last node
+Message-ID: <1384971648-27056-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +				the chip select signal.
-> +				Minimum value is 1 (0 treated as 1).
-> +
-> +- ti,cs-wsetup:		write setup width, ns
-> +				Time between the beginning of a memory cycle
-> +				and the activation of write strobe.
-> +				Minimum value is 1 (0 treated as 1).
-> +
-> +- ti,cs-wstrobe:	write strobe width, ns
-> +				Time between the activation and deactivation of
-> +				the write strobe.
-> +				Minimum value is 1 (0 treated as 1).
-> +
-> +- ti,cs-whold:		write hold width, ns
-> +				Time between the deactivation of the write
-> +				strobe and the end of the cycle (which may be
-> +				either an address change or the deactivation of
-> +				the chip select signal.
-> +				Minimum value is 1 (0 treated as 1).
-> +
-> +If any of the above parameters are absent, current parameter value will be taken
-> +from the corresponding HW reg.
-> +
-> +The name for cs node must be in format csN, where N is the cs number.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-this is wired we should use reg instead to represent the cs as done for SPI
-or a an other property
+In order to follow the standard approach used on other imx dts files, place the
+'status' node as the last one.
 
-Best Regards,
-J.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-sabrelite.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index ec9e4c1..75760ed 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -71,9 +71,9 @@
+ };
+ 
+ &audmux {
+-	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
+ };
+ 
+ &ecspi1 {
+@@ -99,10 +99,10 @@
+ };
+ 
+ &i2c1 {
+-	status = "okay";
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
+ 
+ 	codec: sgtl5000 at 0a {
+ 		compatible = "fsl,sgtl5000";
+@@ -200,9 +200,9 @@
+ };
+ 
+ &uart2 {
+-	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
+ };
+ 
+ &usbh1 {
+-- 
+1.8.1.2
