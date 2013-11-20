@@ -1,41 +1,46 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 20 Nov 2013 11:27:22 +0100
-Subject: [RESEND PATCH 1/6] ahci: imx: Explicitly clear
- IMX6Q_GPR13_SATA_MPLL_CLK_EN
-In-Reply-To: <1384942659-5362-1-git-send-email-marex@denx.de>
-References: <1384942659-5362-1-git-send-email-marex@denx.de>
-Message-ID: <1384943242-8201-1-git-send-email-marex@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 Nov 2013 10:31:11 +0000
+Subject: Report from 2013 ARM kernel summit
+In-Reply-To: <528BCDCE.6070006@gmail.com>
+References: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
+ <20131115070627.6CF65C4079B@trevor.secretlab.ca>
+ <20131119.114054.663999769447782808.hdoyu@nvidia.com>
+ <20131119173524.GK11778@mudshark.cambridge.arm.com>
+ <528BCDCE.6070006@gmail.com>
+Message-ID: <20131120103111.GB19352@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must clear this IMX6Q_GPR13_SATA_MPLL_CLK_EN bit on i.MX6Q, otherwise
-Linux will fail to find the attached drive on some boards.
+On Tue, Nov 19, 2013 at 08:45:02PM +0000, Rob Herring wrote:
+> On 11/19/2013 11:35 AM, Will Deacon wrote:
+> > Adding Andreas and Rob for input on potential binding additions to the SMMU.
+> 
+> The above proposal would be an incompatible change. However, I think we
+> could still deal with a change in this binding at this stage.
+> 
+> One way approach to handle this without changing the binding would be to
+> scan the DT for all iommu's up front and create a list of all nodes and
+> their iommu parent. The fact that the hierarchy is described in a way
+> that doesn't fit Linux well is really a Linux implementation detail.
+> 
+> If changing the binding, a simple approach would be to allow
+> 'smmu-parent' to be a bus and/or device property and not just for
+> chained iommu's. This could be a global or bus property that is
+> inherited. Like interrupt-parent, you would have to deal with the parent
+> being itself. Also, perhaps iommu-parent would be a better name. In any
+> case, I'd like to see this all be a generic iommu binding.
 
-This entire fix was:
-Reported-by: Eric Nelson <eric.nelson@boundarydevices.com>
+I like that idea. I've recently been toying with removing the chained IOMMU
+support, since I don't think anybody is using it who is interested in
+mainline. However, making it more general sounds like a better idea.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Linux-IDE <linux-ide@vger.kernel.org>
----
- drivers/ata/ahci_imx.c | 1 +
- 1 file changed, 1 insertion(+)
+One potential issue is that I think the nvidia guys want to describe masters
+that master via multiple SMMUs (which I believe was the motivation for
+moving the stream-ids out into the master nodes, rather than keeping them in
+the SMMU). Again, that's not something we can easily add to the arm-smmu,
+because the incoming stream-ids are a property of the SMMU node.
 
-RESEND: Fix the Cc here.
+So the question is: do we actually need to describe masters that master
+through multiple SMMUs as a single node in the devicetree?
 
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index ae2d73f..478921b 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -125,6 +125,7 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
- 			| IMX6Q_GPR13_SATA_TX_BOOST_MASK
- 			| IMX6Q_GPR13_SATA_TX_LVL_MASK
- 			| IMX6Q_GPR13_SATA_TX_EDGE_RATE
-+			| IMX6Q_GPR13_SATA_MPLL_CLK_EN
- 			, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
- 			| IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M
- 			| IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F
--- 
-1.8.4.2
+Will
