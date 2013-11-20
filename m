@@ -1,94 +1,58 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 20 Nov 2013 10:04:15 +0100
-Subject: [PATCH 1/8] ASoC: fsl-ssi: Move ac97 specific setup to seperate
- function
+Date: Wed, 20 Nov 2013 10:04:18 +0100
+Subject: [PATCH 4/8] ASoC: fsl-ssi: Add offline_config flag
 In-Reply-To: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
 References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1384938262-20554-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <1384938262-20554-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a pure cleanup patch to increase code readability.
+imx50-ssi and later versions of this IP support online reconfiguration
+of all registers. The reference manual does not list any registers that
+can only be configured while the SSI unit is disabled. This patch
+introduces the flag for later use.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 57 +++++++++++++++++++++++++++----------------------
- 1 file changed, 32 insertions(+), 25 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 35e2773..fb8f52a 100644
+index d493d2d..d268785 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -321,6 +321,36 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 	return ret;
- }
+@@ -154,6 +154,7 @@ struct fsl_ssi_private {
+ 	bool ssi_on_imx;
+ 	bool imx_ac97;
+ 	bool use_dma;
++	bool offline_config;
+ 	struct clk *clk;
+ 	struct snd_dmaengine_dai_dma_data dma_params_tx;
+ 	struct snd_dmaengine_dai_dma_data dma_params_rx;
+@@ -1033,6 +1034,24 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+                 /* Older 8610 DTs didn't have the fifo-depth property */
+ 		ssi_private->fifo_depth = 8;
  
-+static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
-+{
-+	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
-+
 +	/*
-+	 * Setup the clock control register
++	 * imx50 and later SoCs have a slightly different IP that allows the
++	 * SSI configuration while the SSI unit is running.
++	 *
++	 * More important, it is necessary on those SoCs to configure the
++	 * sperate TX/RX DMA bits just before starting the stream
++	 * (fsl_ssi_trigger). The SDMA unit has to be configured before fsl_ssi
++	 * sends any DMA requests to the SDMA unit, otherwise it is not defined
++	 * how the SDMA unit handles the DMA request.
++	 *
++	 * SDMA units are present on devices starting at imx35 but the imx35
++	 * reference manual states that the DMA bits should not be changed
++	 * while the SSI unit is running (SSIEN). So we support the necessary
++	 * online configuration of fsl-ssi starting at imx50.
 +	 */
-+	write_ssi(CCSR_SSI_SxCCR_WL(17) | CCSR_SSI_SxCCR_DC(13),
-+			&ssi->stccr);
-+	write_ssi(CCSR_SSI_SxCCR_WL(17) | CCSR_SSI_SxCCR_DC(13),
-+			&ssi->srccr);
++	if (hw_type != FSL_SSI_MX50)
++		ssi_private->offline_config = true;
 +
-+	/*
-+	 * Enable AC97 mode and startup the SSI
-+	 */
-+	write_ssi(CCSR_SSI_SACNT_AC97EN | CCSR_SSI_SACNT_FV,
-+			&ssi->sacnt);
-+	write_ssi(0xff, &ssi->saccdis);
-+	write_ssi(0x300, &ssi->saccen);
-+
-+	/*
-+	 * Enable SSI, Transmit and Receive. AC97 has to communicate with the
-+	 * codec before a stream is started.
-+	 */
-+	write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_SSIEN |
-+			CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE);
-+
-+	write_ssi(CCSR_SSI_SOR_WAIT(3), &ssi->sor);
-+}
-+
- static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
- {
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
-@@ -387,31 +417,8 @@ static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
- 	 * because it is also running without an active substream. Normally SSI
- 	 * is only enabled when there is a substream.
- 	 */
--	if (ssi_private->imx_ac97) {
--		/*
--		 * Setup the clock control register
--		 */
--		write_ssi(CCSR_SSI_SxCCR_WL(17) | CCSR_SSI_SxCCR_DC(13),
--				&ssi->stccr);
--		write_ssi(CCSR_SSI_SxCCR_WL(17) | CCSR_SSI_SxCCR_DC(13),
--				&ssi->srccr);
--
--		/*
--		 * Enable AC97 mode and startup the SSI
--		 */
--		write_ssi(CCSR_SSI_SACNT_AC97EN | CCSR_SSI_SACNT_FV,
--				&ssi->sacnt);
--		write_ssi(0xff, &ssi->saccdis);
--		write_ssi(0x300, &ssi->saccen);
--
--		/*
--		 * Enable SSI, Transmit and Receive
--		 */
--		write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_SSIEN |
--				CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE);
--
--		write_ssi(CCSR_SSI_SOR_WAIT(3), &ssi->sor);
--	}
-+	if (ssi_private->imx_ac97)
-+		fsl_ssi_setup_ac97(ssi_private);
- 
- 	return 0;
- }
+ 	if (hw_type == FSL_SSI_MX21 || hw_type == FSL_SSI_MX50) {
+ 		u32 dma_events[2];
+ 		ssi_private->ssi_on_imx = true;
 -- 
 1.8.4.2
