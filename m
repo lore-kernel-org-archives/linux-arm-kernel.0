@@ -1,42 +1,39 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 20 Nov 2013 01:35:19 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <1384906129.8604.132.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <87li0kkhzx.fsf@natisbad.org>
- <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119174323.GH913@1wt.eu>
- <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
- <1384906129.8604.132.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20131120003519.GA22150@1wt.eu>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 19 Nov 2013 16:38:29 -0800
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <528BFDD0.3090503@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
+ <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+ <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
+ <1384862421.14845.222.camel@smile> <528B9CAE.3040600@wwwdotorg.org>
+ <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
+ <528BFDD0.3090503@wwwdotorg.org>
+Message-ID: <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 04:08:49PM -0800, Eric Dumazet wrote:
-> On Wed, 2013-11-20 at 00:53 +0100, Arnaud Ebalard wrote:
-> 
-> > Anyway, I think if the thread keeps going on improving mvneta, I'll do
-> > all additional tests from RAM and will stop polluting netdev w/ possible
-> > sata/disk/fs issues.
-> 
-> ;)
-> 
-> Alternative would be to use netperf or iperf to not use disk at all
-> and focus on TCP/network issues only.
+On Tue, Nov 19, 2013 at 4:09 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> Deferred probe certainly isn't the only error that can be returned
+> though,
 
-Yes, that's for the same reason that I continue to use inject/httpterm
-for such purposes :
-  - httpterm uses tee()+splice() to send pre-built pages without copying ;
-  - inject uses recv(MSG_TRUNC) to ack everything without copying.
+Of course, but do any of those other ones matter?  Certainly not if
+they've all been hidden behind a NULL return from
+dma_request_slave_channel().
 
-Both of them are really interesting to test the hardware's capabilities
-and to push components in the middle to their limits without causing too
-much burden to the end points.
+> so I don't think "defer" in the name makes much sense. The
+> function as I wrote it returns a standard "error pointer" value.
+> Typically, callers would simply propagate *any* error code back to the
+> caller of probe() without even looking at it; it's the driver core that
+> checks for -EPROBE_DEFER vs. other error codes. In some cases, drivers
+> do check in order to avoid printing failure messages in the deferred
+> probe case, but again that's pretty standard, and not something specific
+> to this API.
 
-I don't know if either netperf or iperf can make use of this now, and
-I've been used to my tools, but I should take a look again.
+Right, but the only reason to introduce this API is to propagate
+EPROBE_DEFER, right?  It also serves to document drivers that are
+prepared for / depend on deferred probing support.
 
-Cheers,
-Willy
+Good old bike shedding... I only jumped in because I think changing it
+to dma_slave_request_chan() would indeed be confusing .
