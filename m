@@ -1,58 +1,30 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 20 Nov 2013 14:09:01 +0200
-Subject: [PATCH] clk: keystone: gate: fix error handling on init
-Message-ID: <1384949341-26486-1-git-send-email-grygorii.strashko@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Nov 2013 20:21:37 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.13, part 2
+Message-ID: <20131120122135.GA22308@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes Keystone gate control clock driver initialization path:
-1) clk_register_psc() returns error code and not a pure pointer, hence
-its return value need to be checked using IS_ERR(clk) macro.
+The following changes since commit 036e29918078e38b0b127b89deb4c595028c1bc0:
 
-2) Mapped IO memory isn't unmapped in case of errors, hence fix it.
+  ARM: dts: i.MX51: Fix OTG PHY clock (2013-11-11 22:58:45 +0800)
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/clk/keystone/gate.c |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+are available in the git repository at:
 
-diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-index 1f333bc..17a5983 100644
---- a/drivers/clk/keystone/gate.c
-+++ b/drivers/clk/keystone/gate.c
-@@ -223,8 +223,7 @@ static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
- 	data->domain_base = of_iomap(node, i);
- 	if (!data->domain_base) {
- 		pr_err("%s: domain ioremap failed\n", __func__);
--		iounmap(data->control_base);
--		goto out;
-+		goto unmap_ctrl;
- 	}
- 
- 	of_property_read_u32(node, "domain-id", &data->domain_id);
-@@ -237,16 +236,21 @@ static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
- 	parent_name = of_clk_get_parent_name(node, 0);
- 	if (!parent_name) {
- 		pr_err("%s: Parent clock not found\n", __func__);
--		goto out;
-+		goto unmap_domain;
- 	}
- 
- 	clk = clk_register_psc(NULL, clk_name, parent_name, data, lock);
--	if (clk) {
-+	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		return;
- 	}
- 
- 	pr_err("%s: error registering clk %s\n", __func__, node->name);
-+
-+unmap_domain:
-+	iounmap(data->domain_base);
-+unmap_ctrl:
-+	iounmap(data->control_base);
- out:
- 	kfree(data);
- 	return;
--- 
-1.7.9.5
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.13-2
+
+for you to fetch changes up to 793b4b10720174b6b27beaf915425248858d7fc5:
+
+  ARM: dts: imx6qdl: disable spdif "rxtx5" clock option (2013-11-18 09:21:29 +0800)
+
+----------------------------------------------------------------
+The imx fixes for 3.13, part 2:
+ - Disable S/PDIF "rxtx5" clock option to fix the clocksource breakage
+   introduced by S/PDIF driver
+
+----------------------------------------------------------------
+Shawn Guo (1):
+      ARM: dts: imx6qdl: disable spdif "rxtx5" clock option
+
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
