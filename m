@@ -1,86 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 20 Nov 2013 12:08:45 -0500
-Subject: [PATCH V4] kbuild: dtbs_install: new make target
-In-Reply-To: <528BDEED.8080708@wwwdotorg.org>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <1384896475-8744-1-git-send-email-jason@lakedaemon.net>
- <528BDEED.8080708@wwwdotorg.org>
-Message-ID: <20131120170845.GJ28859@titan.lakedaemon.net>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 20 Nov 2013 18:12:27 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <8761s0cqhh.fsf@natisbad.org>
+ <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site> <87y54u59zq.fsf@natisbad.org>
+ <20131112083633.GB10318@1wt.eu> <87a9hagex1.fsf@natisbad.org>
+ <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
+ <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20131120171227.GG8581@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 02:58:05PM -0700, Stephen Warren wrote:
-> On 11/19/2013 02:27 PM, Jason Cooper wrote:
-> > Unlike other build products in the Linux kernel, there is no 'make
-> > *install' mechanism to put devicetree blobs in a standard place.
+Hi guys,
+
+On Sun, Nov 17, 2013 at 09:41:38AM -0800, Eric Dumazet wrote:
+> On Sun, 2013-11-17 at 15:19 +0100, Willy Tarreau wrote:
+> 
 > > 
-> > This patch is an attempt to fix this problem.  Akin to 'make install',
-> > this creates a new make target, dtbs_install.  The script that gets
-> > called defers to a distribution or user supplied installdtbs binary,
-> > if found in the system.  Otherwise, the default action is to install a
-> > given dtb into
-> > 
-> >   /lib/modules/${kernel_version}/devicetree/${dts_filename}.dtb
+> > So it is fairly possible that in your case you can't fill the link if you
+> > consume too many descriptors. For example, if your server uses TCP_NODELAY
+> > and sends incomplete segments (which is quite common), it's very easy to
+> > run out of descriptors before the link is full.
 > 
-> I still don't see why you wouldn't install the files in
-> /lib/devicetrees, but I suppose that location is fine.
-
-Hmm, after sleeping on it a night, I've come around.  If we install to
-/lib/devicetree/${kernel_version}/, then when the devicetree moves to
-it's own repo, it should be able to install to /lib/devicetree.
-
-So this:
- 1) hints at the still strong connection between a dtb and the kernel
-    version
- 2) doesn't sound odd like installing dtbs into a modules directory
- 3) allows a future independent repository to install
-    non-kernel-version-dependent dtbs in a sane location.
-
-I'm still not in favor of installing to /boot/anything since /boot is
-often a separate, small partition.  I even set mine not to automount.
-The number and size of dtbs is only going to grow.  Better to install
-them in a location with lots of space, and /lib is used to having the
-kernel modules installed in it.
-
-> > This is done to keep dtbs from different kernel versions separate until
-> > things have settled down.  Once the dtbs are stable, and not so strongly
-> > linked to the kernel version, the devicetree files will most likely move
-> > to their own repo.  Users will need to upgrade install scripts at that
-> > time.
-> > 
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > ---
-> > Question: should I make a note about the filenames not being considered an ABI,
-> > or just let it be?
+> BTW I have a very simple patch for TCP stack that could help this exact
+> situation...
 > 
-> I still believe they're an ABI.
+> Idea is to use TCP Small Queue so that we dont fill qdisc/TX ring with
+> very small frames, and let tcp_sendmsg() have more chance to fill
+> complete packets.
 > 
-> I guess Grant meant that they aren't an ABI to the kernel at run-time,
-> unlike the content which is an ABI. That's fine.
-> 
-> However, I believe the files certainly are an ABI to any script that
-> takes them from the "make dtbs_install" output directory.
-> 
-> Perhaps the best resolution is to just say nothing and let it be:-)
+> Again, for this to work very well, you need that NIC performs TX
+> completion in reasonable amount of time...
 
-Fine by me.
+Eric, first I would like to confirm that I could reproduce Arnaud's issue
+using 3.10.19 (160 kB/s in the worst case).
 
-> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> 
-> > +dtbs_install: dtbs
-> > +	$(CONFIG_SHELL) $(srctree)/scripts/installdtbs.sh $(KERNELRELEASE) \
-> > +	"$(MODLIB)/devicetree" "$(srctree)/$(boot)/dts"
-> 
-> I still think this rule should be in Makefile not arch/arm/Makefile.
+Second, I confirm that your patch partially fixes it and my performance
+can be brought back to what I had with 3.10-rc7, but with a lot of
+concurrent streams. In fact, in 3.10-rc7, I managed to constantly saturate
+the wire when transfering 7 concurrent streams (118.6 kB/s). With the patch
+applied, performance is still only 27 MB/s at 7 concurrent streams, and I
+need at least 35 concurrent streams to fill the pipe. Strangely, after
+2 GB of cumulated data transferred, the bandwidth divided by 11-fold and
+fell to 10 MB/s again.
 
-d*mn.  I sent this version too quick.  Thanks for catching that.  I
-didn't expand my test coverage after moving installdtbs.sh.
+If I revert both "0ae5f47eff tcp: TSQ can use a dynamic limit" and
+your latest patch, the performance is back to original.
 
-> Aside from those couple of issues, this version looks OK to me.
+Now I understand there's a major issue with the driver. But since the
+patch emphasizes the situations where drivers take a lot of time to
+wake the queue up, don't you think there could be an issue with low
+bandwidth links (eg: PPPoE over xDSL, 10 Mbps ethernet, etc...) ?
+I'm a bit worried about what we might discover in this area I must
+confess (despite generally being mostly focused on 10+ Gbps).
 
-Great!  Hopefully Linus won't have any concerns when it passes through
-him.
-
-thx,
-
-Jason.
+Best regards,
+Willy
