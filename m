@@ -1,44 +1,59 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 20 Nov 2013 16:01:32 +0100
-Subject: [PATCH 7/9] ARM: at91/dt: add i2c devices connected to
- at91rm9200ek board
-In-Reply-To: <1377688107-10830-1-git-send-email-b.brezillon@overkiz.com>
+Date: Wed, 20 Nov 2013 16:02:55 +0100
+Subject: [PATCH 8/9] ARM: at91/dt: add new at91rm9200ek_mmc board
+In-Reply-To: <1377693456-11133-1-git-send-email-b.brezillon@overkiz.com>
 References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377688107-10830-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131120150132.GG14627@ns203013.ovh.net>
+ <1377693456-11133-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131120150255.GH14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:08 Wed 28 Aug     , Boris BREZILLON wrote:
+On 14:37 Wed 28 Aug     , Boris BREZILLON wrote:
+> Add a new at91rm9200ek_mmc board (based on at91rm9200ek board) which enables
+> mmc0/slot0.
+
+no for multiple dts
+
+this need to handle at user space level
+
+Best Regards,
+J.
+> 
 > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > ---
->  arch/arm/boot/dts/at91rm9200ek.dts |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  arch/arm/boot/dts/at91rm9200ek_mmc.dts |   23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91rm9200ek_mmc.dts
 > 
-> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-> index b3e7425..fd2601a 100644
-> --- a/arch/arm/boot/dts/at91rm9200ek.dts
-> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
-> @@ -147,6 +147,18 @@
->  		};
->  	};
->  
-> +	i2c at 0 {
-> +		status = "okay";
+> diff --git a/arch/arm/boot/dts/at91rm9200ek_mmc.dts b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+> new file mode 100644
+> index 0000000..c87a861
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+> @@ -0,0 +1,23 @@
+> +/*
+> + * at91rm9200ek.dts - Device Tree file for Atmel AT91RM9200 evaluation kit with
+> + *                    an MMC slot
+> + *
+> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+> + *
+> + * Licensed under GPLv2 only
+> + */
+> +/dts-v1/;
+> +#include "at91rm9200ek.dts"
 > +
-> +		ics1523 at 26 {
-> +			reg = <0x26>;
-> +		};
+> +/ {
+> +	model = "Atmel AT91RM9200 evaluation kit with MMC slot";
+> +	compatible = "atmel,at91rm9200ek-mmc", "atmel,at91rm9200ek", "atmel,at91rm9200";
 > +
-> +		dac3550 at 4d {
-> +			reg = <0x4d>;
-missing compatible
+> +	ahb {
+> +		apb {
+> +			mmc0: mmc at fffb4000 {
+> +				status = "okay";
+> +			};
 > +		};
 > +	};
-> +
->  	leds {
->  		compatible = "gpio-leds";
->  
+> +};
 > -- 
 > 1.7.9.5
 > 
