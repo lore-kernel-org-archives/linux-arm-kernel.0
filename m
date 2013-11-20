@@ -1,34 +1,96 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 20 Nov 2013 14:23:07 -0800
-Subject: [PATCH v2 3/4] ata: add APM X-Gene SoC 6.0Gbps SATA PHY driver
-In-Reply-To: <201311201641.20230.arnd@arndb.de>
-References: <1384905197-3566-1-git-send-email-lho@apm.com>
- <1384905197-3566-4-git-send-email-lho@apm.com>
- <20131120150658.GB28946@htj.dyndns.org>
- <201311201641.20230.arnd@arndb.de>
-Message-ID: <CAPw-ZTmGvjyfgpiJy-9G26g5KDVmkYv85418H3RgCPCnq_0CTg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 20 Nov 2013 14:36:14 -0800
+Subject: [PATCH RFC v1 4/7] net: phy: suspend unused PHYs on mdio_bus in
+ late_initcall
+In-Reply-To: <528D2403.5040204@gmail.com>
+References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1384978913-8052-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAGVrzcYBexBWrh2Nz8tu0KRLQ4YPjtJux9N-TC07-Hxf3On1FQ@mail.gmail.com>
+ <528D2403.5040204@gmail.com>
+Message-ID: <CAGVrzcbQFYGjy=mPXZ6rh_LGAAMcpSRNjm2WFyMZ8C+FffbyLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> On Wednesday 20 November 2013, Tejun Heo wrote:
->> On Tue, Nov 19, 2013 at 04:53:16PM -0700, Loc Ho wrote:
->> > This patch adds support for APM X-Gene SoC 6.0Gbps SATA PHY. This is the
->> > physical layer interface for the corresponding SATA host controller. This
->> > driver uses the new PHY generic framework posted by Kishon Vijay Abrahm.
+2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+> On 11/20/2013 09:58 PM, Florian Fainelli wrote:
 >>
->> Hmm... this is related to ahci but isn't even a libata driver and is
->> the first such driver proposed.  Are we sure drivers/ata is the best
->> home for this?  Shouldn't we create a separate directory somewhere?
->> It's confusing, at least to me, to have non-libata driver under
->> drivers/ata.
+>> 2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+>>>
+>>> Since phy_attach ensures PHYs are resumed, we can now suspend all
+>>> PHYs that have no attached netdev after initcalls.
+>>
+>>
+>> I do like the idea, but I think you might want to make sure that the
+>> MDIO bus suspend policy was set to "auto" (which is the default afair)
+>> not to expose unexpected behavior.
 >
-> It needs to be in drivers/phy, which is currently being prepared for
-> the next merge window and which contains the generic interface used
-> in this driver.
-[Loc Ho]
-I will move it to drivers/phy. The PHY framework did make it to the
-final release of 3.12.00.
+>
+> Ok, TBH I haven't looked through all of phy internals. If we are fine
+> with the overall approach, I could use some guidance in the individual
+> patches and policies.
+>
+>
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+>>> Cc: David S. Miller <davem@davemloft.net>
+>>> Cc: netdev at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> ---
+>>>   drivers/net/phy/mdio_bus.c |   27 +++++++++++++++++++++++++++
+>>>   1 files changed, 27 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+>>> index 5617876..10eba58 100644
+>>> --- a/drivers/net/phy/mdio_bus.c
+>>> +++ b/drivers/net/phy/mdio_bus.c
+>>> @@ -320,6 +320,33 @@ static int mdio_bus_match(struct device *dev, struct
+>>> device_driver *drv)
+>>>                  (phydev->phy_id & phydrv->phy_id_mask));
+>>>   }
+>>>
+>>> +static int mdio_bus_suspend_unused(struct device *busdev, void *data)
+>>> +{
+>>> +       struct mii_bus *bus = to_mii_bus(busdev);
+>>> +       struct phy_device *phydev;
+>>> +       struct phy_driver *phydrv;
+>>> +       int i;
+>>> +
+>>> +       for (i = 0; i < PHY_MAX_ADDR; i++) {
+>>> +               if (!bus->phy_map[i])
+>>> +                       continue;
+>>> +
+>>> +               phydev = to_phy_device(&bus->phy_map[i]->dev);
+>>> +               phydrv = to_phy_driver(phydev->dev.driver);
+>>> +               if (!phydev->attached_dev && phydrv && phydrv->suspend)
+>>> +                       phy_suspend(phydev);
+>>> +       }
+>>> +
+>>> +       return 0;
+>>
+>>
+>> You might want to reuse mdio_bus_phy_may_suspend() here to have a
+>> central place checking for phydev->attached_dev and phydrv->suspend
+>> just in case we need to add more callbacks in the future or implicit
+>> PHY state machine hooks. That might also take care of my concern
+>> expressed above.
+>
+>
+> Unfortunately, mdio_bus_phy_may_suspend() doesn't help here. It will
+> correctly tell that unconnected PHYs may_suspend but also that PHYs
+> connected to PM aware drivers may_suspend.
 
--Loc
+I agree for the first part which is why I was suggesting it, we are
+sure we will return early because of the if (!netdev) branch.
+
+>
+> I tried it and it will also suspend the PHY taken by mv643xx_eth.
+>
+> But actually, as phy_suspend/resume check for phydrv->suspend
+> themselves, we can just call it on !phydev->attached_dev and remove
+> the additional checks.
+
+Sure, sounds good.
+-- 
+Florian
