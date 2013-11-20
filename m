@@ -1,123 +1,99 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:09:14 -0600
-Subject: [RFT/RFC/PATCH 27/31] arm: omap: irq: drop omap_pending_irq()
+Date: Wed, 20 Nov 2013 12:09:16 -0600
+Subject: [RFT/RFC/PATCH 29/31] arm: omap: irq: remove nr_irqs argument
 In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
 References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-28-git-send-email-balbi@ti.com>
+Message-ID: <1384970958-4118-30-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already ack pending IRQs during suspend,
-which renders the check for pending IRQs
-quite unnecessary.
+we can set our global omap_nr_irqs early on
+and drop the extra argument to omap_init_irq().
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/common.h      |  1 -
- arch/arm/mach-omap2/cpuidle34xx.c |  2 +-
- arch/arm/mach-omap2/irq.c         | 11 -----------
- arch/arm/mach-omap2/pm24xx.c      | 11 -----------
- arch/arm/mach-omap2/pm34xx.c      |  3 ---
- 5 files changed, 1 insertion(+), 27 deletions(-)
+ arch/arm/mach-omap2/irq.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 427160b..f44a410 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -198,7 +198,6 @@ extern struct device *omap4_get_dsp_device(void);
- void omap2_init_irq(void);
- void omap3_init_irq(void);
- void ti81xx_init_irq(void);
--extern int omap_irq_pending(void);
- void omap_gic_of_init(void);
- 
- #ifdef CONFIG_CACHE_L2X0
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index e18709d..96cced3 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -112,7 +112,7 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
- {
- 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
- 
--	if (omap_irq_pending() || need_resched())
-+	if (need_resched())
- 		goto return_sleep_time;
- 
- 	/* Deny idle for C1 */
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 5425258..397157a 100644
+index 5d4e883..a411ed4 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -186,17 +186,6 @@ static void __init omap_irq_soft_reset(void)
- 	intc_writel(INTC_SYSCONFIG, 1 << 0);
+@@ -207,8 +207,7 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+ 				IRQ_NOREQUEST | IRQ_NOPROBE, 0);
  }
  
--int omap_irq_pending(void)
--{
--	int irq;
--
--	for (irq = 0; irq < omap_nr_irqs; irq += 32)
--		if (intc_readl(INTC_PENDING_IRQ0 +
--					((irq >> 5) << 5)))
--			return 1;
--	return 0;
--}
--
- static __init void
- omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+-static void __init omap_init_irq(u32 base, int nr_irqs,
+-				 struct device_node *node)
++static void __init omap_init_irq(u32 base, struct device_node *node)
  {
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 8c07594..33ea27c 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -88,17 +88,11 @@ static int omap2_enter_full_retention(void)
+ 	int j, irq_base;
  
- 	omap2_gpio_prepare_for_idle(0);
- 
--	/* One last check for pending IRQs to avoid extra latency due
--	 * to sleeping unnecessarily. */
--	if (omap_irq_pending())
--		goto no_sleep;
--
- 	/* Jump to SRAM suspend code */
- 	omap2_sram_suspend(sdrc_read_reg(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_POWER));
- 
--no_sleep:
- 	omap2_gpio_resume_after_idle();
- 
- 	clk_enable(osc_ck);
-@@ -181,15 +175,10 @@ static int omap2_can_sleep(void)
- static void omap2_pm_idle(void)
- {
- 	if (!omap2_can_sleep()) {
--		if (omap_irq_pending())
--			return;
- 		omap2_enter_mpu_retention();
+@@ -216,15 +215,13 @@ static void __init omap_init_irq(u32 base, int nr_irqs,
+ 	if (WARN_ON(!omap_irq_base))
  		return;
+ 
+-	omap_nr_irqs = nr_irqs;
+-
+-	irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
++	irq_base = irq_alloc_descs(-1, 0, omap_nr_irqs, 0);
+ 	if (irq_base < 0) {
+ 		pr_warn("Couldn't allocate IRQ numbers\n");
+ 		irq_base = 0;
  	}
  
--	if (omap_irq_pending())
--		return;
--
- 	omap2_enter_full_retention();
+-	domain = irq_domain_add_legacy(node, nr_irqs, irq_base, 0,
++	domain = irq_domain_add_legacy(node, omap_nr_irqs, irq_base, 0,
+ 			&irq_domain_simple_ops, NULL);
+ 
+ 	omap_irq_soft_reset();
+@@ -270,19 +267,22 @@ out:
+ 
+ void __init omap2_init_irq(void)
+ {
+-	omap_init_irq(OMAP24XX_IC_BASE, 96, NULL);
++	omap_nr_irqs = 96;
++	omap_init_irq(OMAP24XX_IC_BASE, NULL);
+ 	set_handle_irq(omap_intc_handle_irq);
  }
  
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 2764796..7c43fa0 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -338,9 +338,6 @@ void omap_sram_idle(void)
- 
- static void omap3_pm_idle(void)
+ void __init omap3_init_irq(void)
  {
--	if (omap_irq_pending())
--		return;
--
- 	trace_cpu_idle(1, smp_processor_id());
+-	omap_init_irq(OMAP34XX_IC_BASE, 96, NULL);
++	omap_nr_irqs = 96;
++	omap_init_irq(OMAP34XX_IC_BASE, NULL);
+ 	set_handle_irq(omap_intc_handle_irq);
+ }
  
- 	omap_sram_idle();
+ void __init ti81xx_init_irq(void)
+ {
+-	omap_init_irq(OMAP34XX_IC_BASE, 128, NULL);
++	omap_nr_irqs = 96;
++	omap_init_irq(OMAP34XX_IC_BASE, NULL);
+ 	set_handle_irq(omap_intc_handle_irq);
+ }
+ 
+@@ -290,7 +290,8 @@ static int __init intc_of_init(struct device_node *node,
+ 			     struct device_node *parent)
+ {
+ 	struct resource res;
+-	u32 nr_irq = 96;
++
++	omap_nr_irqs = 96;
+ 
+ 	if (WARN_ON(!node))
+ 		return -ENODEV;
+@@ -301,9 +302,9 @@ static int __init intc_of_init(struct device_node *node,
+ 	}
+ 
+ 	if (of_device_is_compatible(node, "ti,am33xx-intc"))
+-		nr_irq = 128;
++		omap_nr_irqs = 128;
+ 
+-	omap_init_irq(res.start, nr_irq, of_node_get(node));
++	omap_init_irq(res.start, of_node_get(node));
+ 
+ 	set_handle_irq(omap_intc_handle_irq);
+ 
 -- 
 1.8.4.GIT
