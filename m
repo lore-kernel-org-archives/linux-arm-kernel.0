@@ -1,186 +1,106 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:08:58 -0600
-Subject: [RFT/RFC/PATCH 11/31] arm: omap: irq: reorganize code a little bit
+Date: Wed, 20 Nov 2013 12:09:04 -0600
+Subject: [RFT/RFC/PATCH 17/31] arm: omap: irq: drop .handle_irq and .init_irq
+ fields
 In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
 References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-12-git-send-email-balbi@ti.com>
+Message-ID: <1384970958-4118-18-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-no functional changes, just moving code around.
+now we can safely drop those fields from our machine_desc.
+
+While at that, also drop the now unused omap_intc_of_init()
+definition.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 133 +++++++++++++++++++++++-----------------------
- 1 file changed, 66 insertions(+), 67 deletions(-)
+ arch/arm/mach-omap2/board-generic.c | 12 ------------
+ arch/arm/mach-omap2/common.h        |  1 -
+ arch/arm/mach-omap2/irq.c           |  5 -----
+ 3 files changed, 18 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 19f1652..d63bf99 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -48,8 +48,6 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap242x_map_io,
+ 	.init_early	= omap2420_init_early,
+-	.init_irq	= omap_intc_of_init,
+-	.handle_irq	= omap2_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_time	= omap2_sync32k_timer_init,
+ 	.dt_compat	= omap242x_boards_compat,
+@@ -67,8 +65,6 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap243x_map_io,
+ 	.init_early	= omap2430_init_early,
+-	.init_irq	= omap_intc_of_init,
+-	.handle_irq	= omap2_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_time	= omap2_sync32k_timer_init,
+ 	.dt_compat	= omap243x_boards_compat,
+@@ -86,8 +82,6 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap3430_init_early,
+-	.init_irq	= omap_intc_of_init,
+-	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap3_init_late,
+ 	.init_time	= omap3_sync32k_timer_init,
+@@ -104,8 +98,6 @@ DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap3630_init_early,
+-	.init_irq	= omap_intc_of_init,
+-	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap3_init_late,
+ 	.init_time	= omap3_sync32k_timer_init,
+@@ -123,8 +115,6 @@ DT_MACHINE_START(OMAP3_GP_DT, "Generic OMAP3-GP (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap3430_init_early,
+-	.init_irq	= omap_intc_of_init,
+-	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap3_init_late,
+ 	.init_time	= omap3_secure_sync32k_timer_init,
+@@ -143,8 +133,6 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= am33xx_map_io,
+ 	.init_early	= am33xx_init_early,
+-	.init_irq	= omap_intc_of_init,
+-	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= am33xx_init_late,
+ 	.init_time	= omap3_gptimer_timer_init,
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 89e73fe..4df64c36 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -201,7 +201,6 @@ void ti81xx_init_irq(void);
+ extern int omap_irq_pending(void);
+ void omap2_intc_handle_irq(struct pt_regs *regs);
+ void omap3_intc_handle_irq(struct pt_regs *regs);
+-void omap_intc_of_init(void);
+ void omap_gic_of_init(void);
+ 
+ #ifdef CONFIG_CACHE_L2X0
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index b586317..45c5acc 100644
+index 5c3ab05..8104f85 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -57,10 +57,6 @@
-  * for each bank.. when in doubt, consult the TRM.
-  */
+@@ -325,11 +325,6 @@ static int __init intc_of_init(struct device_node *node,
  
--static struct irq_domain *domain;
--static void __iomem *omap_irq_base;
--static int omap_nr_irqs = 96;
--
- /* Structure to save interrupt controller context */
- struct omap_intc_regs {
- 	u32 sysconfig;
-@@ -70,6 +66,11 @@ struct omap_intc_regs {
- 	u32 ilr[INTCPS_NR_ILR_REGS];
- 	u32 mir[INTCPS_NR_MIR_REGS];
- };
-+static struct omap_intc_regs intc_context;
-+
-+static struct irq_domain *domain;
-+static void __iomem *omap_irq_base;
-+static int omap_nr_irqs = 96;
+ IRQCHIP_DECLARE(omap_intc, "ti,omap2-intc", intc_of_init);
  
- /* INTC bank register get/set */
- static void intc_writel(u32 reg, u32 val)
-@@ -82,6 +83,61 @@ static u32 intc_readl(u32 reg)
- 	return readl_relaxed(omap_irq_base + reg);
- }
- 
-+void omap_intc_save_context(void)
-+{
-+	int i;
-+
-+	intc_context.sysconfig =
-+		intc_readl(INTC_SYSCONFIG);
-+	intc_context.protection =
-+		intc_readl(INTC_PROTECTION);
-+	intc_context.idle =
-+		intc_readl(INTC_IDLE);
-+	intc_context.threshold =
-+		intc_readl(INTC_THRESHOLD);
-+
-+	for (i = 0; i < omap_nr_irqs; i++)
-+		intc_context.ilr[i] =
-+			intc_readl((INTC_ILR0 + 0x4 * i));
-+	for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
-+		intc_context.mir[i] =
-+			intc_readl(INTC_MIR0 + (0x20 * i));
-+}
-+
-+void omap_intc_restore_context(void)
-+{
-+	int i;
-+
-+	intc_writel(INTC_SYSCONFIG, intc_context.sysconfig);
-+	intc_writel(INTC_PROTECTION, intc_context.protection);
-+	intc_writel(INTC_IDLE, intc_context.idle);
-+	intc_writel(INTC_THRESHOLD, intc_context.threshold);
-+
-+	for (i = 0; i < omap_nr_irqs; i++)
-+		intc_writel(INTC_ILR0 + 0x4 * i,
-+				intc_context.ilr[i]);
-+
-+	for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
-+		intc_writel(INTC_MIR0 + 0x20 * i,
-+			intc_context.mir[i]);
-+	/* MIRs are saved and restore with other PRCM registers */
-+}
-+
-+void omap3_intc_prepare_idle(void)
-+{
-+	/*
-+	 * Disable autoidle as it can stall interrupt controller,
-+	 * cf. errata ID i540 for 3430 (all revisions up to 3.1.x)
-+	 */
-+	intc_writel(INTC_SYSCONFIG, 0);
-+}
-+
-+void omap3_intc_resume_idle(void)
-+{
-+	/* Re-enable autoidle */
-+	intc_writel(INTC_SYSCONFIG, 1);
-+}
-+
- /* XXX: FIQ and additional INTC support (only MPU@the moment) */
- static void omap_ack_irq(struct irq_data *d)
- {
-@@ -125,6 +181,12 @@ int omap_irq_pending(void)
- 	return 0;
- }
- 
-+void omap3_intc_suspend(void)
-+{
-+	/* A pending interrupt would prevent OMAP from entering suspend */
-+	omap_ack_irq(NULL);
-+}
-+
- static __init void
- omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- {
-@@ -257,69 +319,6 @@ void __init omap_intc_of_init(void)
- 	of_irq_init(irq_match);
- }
- 
--static struct omap_intc_regs intc_context;
--
--void omap_intc_save_context(void)
+-void __init omap_intc_of_init(void)
 -{
--	int i;
--
--	intc_context.sysconfig =
--		intc_readl(INTC_SYSCONFIG);
--	intc_context.protection =
--		intc_readl(INTC_PROTECTION);
--	intc_context.idle =
--		intc_readl(INTC_IDLE);
--	intc_context.threshold =
--		intc_readl(INTC_THRESHOLD);
--
--	for (i = 0; i < omap_nr_irqs; i++)
--		intc_context.ilr[i] =
--			intc_readl((INTC_ILR0 + 0x4 * i));
--	for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
--		intc_context.mir[i] =
--			intc_readl(INTC_MIR0 + (0x20 * i));
--}
--
--void omap_intc_restore_context(void)
--{
--	int i;
--
--	intc_writel(INTC_SYSCONFIG, intc_context.sysconfig);
--	intc_writel(INTC_PROTECTION, intc_context.protection);
--	intc_writel(INTC_IDLE, intc_context.idle);
--	intc_writel(INTC_THRESHOLD, intc_context.threshold);
--
--	for (i = 0; i < omap_nr_irqs; i++)
--		intc_writel(INTC_ILR0 + 0x4 * i,
--				intc_context.ilr[i]);
--
--	for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
--		intc_writel(INTC_MIR0 + 0x20 * i,
--			intc_context.mir[i]);
--	/* MIRs are saved and restore with other PRCM registers */
--}
--
--void omap3_intc_suspend(void)
--{
--	/* A pending interrupt would prevent OMAP from entering suspend */
--	omap_ack_irq(NULL);
--}
--
--void omap3_intc_prepare_idle(void)
--{
--	/*
--	 * Disable autoidle as it can stall interrupt controller,
--	 * cf. errata ID i540 for 3430 (all revisions up to 3.1.x)
--	 */
--	intc_writel(INTC_SYSCONFIG, 0);
--}
--
--void omap3_intc_resume_idle(void)
--{
--	/* Re-enable autoidle */
--	intc_writel(INTC_SYSCONFIG, 1);
+-	of_irq_init(&irqchip_of_match_omap_intc);
 -}
 -
  asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
