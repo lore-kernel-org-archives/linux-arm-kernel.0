@@ -1,57 +1,79 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 20 Nov 2013 17:23:56 +0100
-Subject: [alsa-devel] Bug? Sound support for at91sam9x5-wm8731 based boards
-In-Reply-To: <CACQ1gAhvS7PSbK0SuhrB8TPS8Rkd-AdqZ-=T+Ntjyx7PsR7XaQ@mail.gmail.com>
-References: <1384878685-1515-1-git-send-email-tony@atomide.com>
- <1384878685-1515-3-git-send-email-tony@atomide.com>
- <031f01cee547$950b5670$bf220350$@com>
- <CACQ1gAgykmgPKY4SHujnNtm4Sr=wt5knLkQL-MRS_pC73bOi4Q@mail.gmail.com>
- <033601cee552$7c2c2570$74847050$@com>
- <CACQ1gAhvS7PSbK0SuhrB8TPS8Rkd-AdqZ-=T+Ntjyx7PsR7XaQ@mail.gmail.com>
-Message-ID: <CACQ1gAh7UAkT1s_=gOKpzEt5bm9FAGf0gL-yM6=r5ch7bMksBA@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 20 Nov 2013 18:24:57 +0200
+Subject: [PATCH 1/3] mtd: nand: davinci: reuse driver for Keystone arch
+In-Reply-To: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1384964699-15134-2-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/20 Richard Genoud <richard.genoud@gmail.com>:
-> [added Nicolas Ferre and Bo Shen ]
->
-> 2013/11/19 Zhong Li <zql@glomationinc.com>:
->>
->> One of the testing hardware is the Atmel at91sam9g25-ek (the CPU module and the carrier board).  We tried both the 2.6.39 patched with the Atmel patches and the mainline 3.12-rc.  The command to test the sound is just the simple aplay <sound-test-file>.  The wav file is available here, https://drive.google.com/file/d/0B3TSFX4Mq9PoeTdJOGVaZk5rTWM/edit?usp=sharing.
->>
->> Thanks
->
-> Ok, I reproduce the bug on g35-ek with a v3.11.7+(sam9x5 sound patches) kernel
->
-> So, *sometimes*,  the left and right channel are swapped. ( I found
-> also the ratio 1 out of 6 (but once it has happened, it seems to be
-> more often))
-> I tested that with the file given by Zhong Li, and with a file I
-> created with audacity (440Hz only on right channel).
-> I could see at the scope that the channels are swapped before the
-> w8731 codec (the data on the TD line are sometime on the low edge of
-> TF, instead of always being on the high edge (I2S mode)).
-> There's, in both cases, a clock period (TK) between the rising/falling
-> edge of TF and the 1st data bit on TD, so the mode is always I2S, and
-> the channel data are swapped.
->
-> I'll try to have a look (but I don't have much time right now)
->
-> If someone could test that on a sam9g20 or a WM8904 based board, since
-> they share the same DAI format, they may have the same problem.
+The Keystone arch has compatible nand device, so reuse it.
+In case with Keystone it depends on TI_AEMIF because AEMIF
+driver is responsible to set timings.
 
-After reading the sources (mainly sound/soc/atmel/atmel_ssc_dai.c), I
-don't understand how the right and left channel are synchronized.
-(which one will be on TF rising edge, and which one on TF falling edge
-?)
-In the SSC_TCMR register, the start event is TF_FALLING when there
-only one channel (i.e. mono source always on left channel)
-With a stereo source, it's TF_EDGE (Detection of any edge on TF
-signal) ; so the samples are transferred on rising and falling edge.
-I didn't see anything in the SSC what could synchronize the first
-sample with a TF falling edge.
-Or I missed something ?
+See http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
 
-Nicolas, Bo, any idea ?
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ .../devicetree/bindings/mtd/davinci-nand.txt       |    8 +++++---
+ drivers/mtd/nand/Kconfig                           |    6 +++---
+ drivers/mtd/nand/davinci_nand.c                    |    1 +
+ 3 files changed, 9 insertions(+), 6 deletions(-)
 
-Richard.
+diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+index befaa5b..cfb18ab 100644
+--- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+@@ -1,14 +1,16 @@
+-Device tree bindings for Texas instruments Davinci NAND controller
++Device tree bindings for Texas instruments Davinci/Keystone NAND controller
+ 
+-This file provides information, what the device node for the davinci NAND
+-interface contains.
++This file provides information, what the device node for the davinci/keystone
++NAND interface contains.
+ 
+ Documentation:
+ Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
++Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+ 
+ Required properties:
+ 
+ - compatible:			"ti,davinci-nand"
++				"ti,keystone-nand"
+ 
+ - reg:				Contains 2 offset/length values:
+ 				- offset and length for the access window.
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index d885298..8bf69c7 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -492,11 +492,11 @@ config MTD_NAND_SH_FLCTL
+ 	  for NAND Flash using FLCTL.
+ 
+ config MTD_NAND_DAVINCI
+-        tristate "Support NAND on DaVinci SoC"
+-        depends on ARCH_DAVINCI
++        tristate "Support NAND on DaVinci/Keystone SoC"
++        depends on ARCH_DAVINCI || (ARCH_KEYSTONE && TI_AEMIF)
+         help
+ 	  Enable the driver for NAND flash chips on Texas Instruments
+-	  DaVinci processors.
++	  DaVinci/Keystone processors.
+ 
+ config MTD_NAND_TXX9NDFMC
+ 	tristate "NAND Flash support for TXx9 SoC"
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index f7b21b8..8459720 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -523,6 +523,7 @@ static struct nand_ecclayout hwecc4_2048 __initconst = {
+ #if defined(CONFIG_OF)
+ static const struct of_device_id davinci_nand_of_match[] = {
+ 	{.compatible = "ti,davinci-nand", },
++	{.compatible = "ti,keystone-nand", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
+-- 
+1.7.9.5
