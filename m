@@ -1,57 +1,73 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 20 Nov 2013 08:27:21 -0800
-Subject: [PATCH v4 1/2] watchdog: bcm281xx: Watchdog Driver
-In-Reply-To: <CAPdLdqmxFnJ9HZa04buh8NecMszEAp11VRU4Q159vZ+=NG9p3A@mail.gmail.com>
-References: <1384888074-19696-1-git-send-email-markus.mayer@linaro.org>
- <1384888074-19696-2-git-send-email-markus.mayer@linaro.org>
- <CAPdLdqmxFnJ9HZa04buh8NecMszEAp11VRU4Q159vZ+=NG9p3A@mail.gmail.com>
-Message-ID: <20131120162721.GB28683@roeck-us.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Nov 2013 09:30:35 -0700
+Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+In-Reply-To: <20131120.160359.1043627108929095327.hdoyu@nvidia.com>
+References: <528BD6A7.3030908@wwwdotorg.org><20131120.051708.396722414386125310.hdoyu@nvidia.com><20131120131447.GA8279@ulmo.nvidia.com>
+ <20131120.160359.1043627108929095327.hdoyu@nvidia.com>
+Message-ID: <528CE3AB.60806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 08:12:37AM -0800, Markus Mayer wrote:
-> On 19 November 2013 11:07, Markus Mayer <markus.mayer@linaro.org> wrote:
-> > This commit adds support for the watchdog timer used on the BCM281xx
-> > family of SoCs.
-> >
-> > Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-> > Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> > ---
-> >  drivers/watchdog/Kconfig        |   22 +++
-> >  drivers/watchdog/Makefile       |    1 +
-> >  drivers/watchdog/bcm_kona_wdt.c |  365 +++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 388 insertions(+)
-> >  create mode 100644 drivers/watchdog/bcm_kona_wdt.c
-> >
-> 
-> [...]
-> 
-> > diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> > index 6c5bb27..7c860ca 100644
-> > --- a/drivers/watchdog/Makefile
-> > +++ b/drivers/watchdog/Makefile
-> > @@ -55,6 +55,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
-> >  obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
-> >  obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
-> >  obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-> > +obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
-> >
-> >  # AVR32 Architecture
-> >  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> 
-> Just to let everyone know, due to the watchdog -> mainline merge a few
-> days ago, there's a trivial merge conflict now in the makefile. I'll
-> send out a re-based v5 of this patch once 3.13-rc1 has been tagged
-> (unless you would like a rebased-to-tip version before then).
-> 
-Hi Markus,
+On 11/20/2013 07:03 AM, Hiroshi Doyu wrote:
+> Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 20 Nov 2013 14:14:48 +0100:
 
-Yes, I noticed when I merged it into my watchdog-next branch.
+(Yes, what Thierry said)
 
-Reminds me ... v3 had a whitespace problem. I don't recall if you fixed
-that in v4. If you didn't, that might be a better reason to send v5.
-Take your patch and apply it with "git am" to find out.
+> ....
+>>> Does the above mean the following?
+>>>
+>>> int of_iommu_attach(struct device *dev)
+>>> {
+>>> 	int i;
+>>> 	struct of_phandle_args args;
+>>>
+>>> 	of_property_for_each_phandle_with_args(dev->of_node, "iommus",
+>>> 					       "#iommu-cells", i, &args)
+>>> 		if (!args->np->dev->driver)
+>>> 			return -EPROBE_DEFER;
+>>> 	return 0;
+>>> }
+>>
+>> Not quite. The above would only check that a driver was bound to the
+>> device. But if that device isn't an IOMMU then this doesn't help you.
+> 
+> I thought that, as long as a device is a normal one, it's ok to let it
+> go to be populated.
 
-Thanks,
-Guenter
+I don't understand what that means.
+
+> We only care about that, IOMMU devices comes
+> first, and clients should come later than IOMMUs, for population. In
+> the above if all IOMMUs are not populated, client devices are always
+> deferred. "args->np->dev" always points an IOMMU device in a
+> loop. Otherwise(no "iommus=") it goes out from the loop immediately.
+
+I'm not sure what that means. Perhaps you're sauying the dev->driver
+isn't set until the driver is probe()d for the device, so if
+dev->driver!=NULL, then we know the driver probed() successfully for it?
+That does go most of the way, but as Thierry pointed out, it doesn't
+guarantee that the dev->driver is an IOMMU driver, just that it's *some*
+driver. Perhaps this won't actually make any difference in practice, but
+AFAIK, all other subsystems do perform the strict check, so I don't see
+why the IOMMU subsystem shouldn't.
+
+...
+> There's the following case at least we have already had.
+> 
+> "memory controller"---"smmu_a"---bus--+--"smmu_b"--"device_a"
+>                                       |
+>                                       |
+>                                       +--"device_b"
+> 
+> "smmu_b" isn't related to a bus at all.
+
+Yes, smmu_b is related to a bus.
+
+Admittedly perhaps not a bus that the CPU can master transactions onto,
+but there's still a (perhaps point-point) bus that device_a masters, and
+smmu_b acts as a slave.
+
+Note that not all buses in the diagram above are represented as bus
+objects in the Linux kernel (or even in DT), since those tend to
+concentrate only on representing buses that the CPU masters, rather than
+additionally representing buses that only HW devices master.
