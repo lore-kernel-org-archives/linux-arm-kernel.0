@@ -1,35 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 20 Nov 2013 18:39:12 +0100
-Subject: [RFC] mtd: gpmc: add BCH support for plain AM335x
-Message-ID: <1384969152-10411-1-git-send-email-wsa@the-dreams.de>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 20 Nov 2013 09:40:22 -0800
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <20131120173436.GK8581@1wt.eu>
+References: <slrnl83jr5.49f.xiyou.wangcong@linux-6brj.site>
+ <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
+ <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
+ <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131120171227.GG8581@1wt.eu> <20131120173436.GK8581@1wt.eu>
+Message-ID: <1384969222.10637.20.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a kernel without OMAP3 support but only AM335x, we can't
-activate the needed MTD_NAND_OMAP_BCH symbol.
+On Wed, 2013-11-20 at 18:34 +0100, Willy Tarreau wrote:
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
+> One important point, I was looking for the other patch you pointed
+> in this long thread and finally found it :
+> 
+> > So
+> > http://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=98e09386c0ef4dfd48af7ba60ff908f0d525cdee
+> > 
+> > restored this minimal amount of buffering, and let the bigger amount for
+> > 40Gb NICs ;)
+> 
+> This one definitely restores original performance, so it's a much better
+> bet in my opinion :-)
 
-Actually, I wonder if this is fix will scale. Maybe someone with more insight
-about TI SoCs could find a better expression of supported SoCs. This is the
-only one I could test .
+I don't understand. I thought you were using this patch.
 
- drivers/mtd/nand/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 93ae6a6..f9455e4 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -95,7 +95,7 @@ config MTD_NAND_OMAP2
- 	  platforms.
- 
- config MTD_NAND_OMAP_BCH
--	depends on MTD_NAND && MTD_NAND_OMAP2 && ARCH_OMAP3
-+	depends on MTD_NAND && MTD_NAND_OMAP2 && (ARCH_OMAP3 || SOC_AM33XX)
- 	tristate "Support hardware based BCH error correction"
- 	default n
- 	select BCH
--- 
-1.8.4.2
+I guess we are spending time on a already solved problem.
