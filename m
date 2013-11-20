@@ -1,76 +1,36 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 20 Nov 2013 22:11:48 +0200
-Subject: [PATCH] PM / Clocks: fix pm_clk_resume/suspend if
- CONFIG_PM_RUNTIME is set
-In-Reply-To: <528D1327.7080205@codeaurora.org>
-References: <1384954307-27094-1-git-send-email-grygorii.strashko@ti.com>
- <528D0296.1070001@codeaurora.org> <528D082C.3040405@ti.com>
- <528D1327.7080205@codeaurora.org>
-Message-ID: <528D1784.8080704@ti.com>
+Date: Wed, 20 Nov 2013 22:13:34 +0200
+Subject: [PATCH 0/7] Davinci nand driver fixes and updates
+In-Reply-To: <1384960945-14528-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1384960945-14528-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <528D17EE.50402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2013 09:53 PM, Stephen Boyd wrote:
-> On 11/20/13 11:06, Grygorii Strashko wrote:
->> On 11/20/2013 08:42 PM, Stephen Boyd wrote:
->>> On 11/20/13 05:31, Grygorii Strashko wrote:
->>>> @@ -230,7 +230,7 @@ int pm_clk_suspend(struct device *dev)
->>>>    	list_for_each_entry_reverse(ce, &psd->clock_list, node) {
->>>>    		if (ce->status < PCE_STATUS_ERROR) {
->>>>    			if (ce->status == PCE_STATUS_ENABLED)
->>>> -				clk_disable(ce->clk);
->>>> +				clk_disable_unprepare(ce->clk);
->>>>    			ce->status = PCE_STATUS_ACQUIRED;
->>>>    		}
->>>>    	}
->>>> @@ -259,7 +259,7 @@ int pm_clk_resume(struct device *dev)
->>>>    
->>>>    	list_for_each_entry(ce, &psd->clock_list, node) {
->>>>    		if (ce->status < PCE_STATUS_ERROR) {
->>>> -			clk_enable(ce->clk);
->>>> +			clk_prepare_enable(ce->clk);
->>>>    			ce->status = PCE_STATUS_ENABLED;
->>>>    		}
->>>>    	}
->>> This is inside a spin_lock_irqsave(). You should be getting scheduling
->>> while atomic warnings with this change. Are you testing with
->>> DEBUG_ATOMIC_SLEEP=y?
->> Ops, thanks. No, It's not tested with DEBUG_ATOMIC_SLEEP and
->> I agree with you.
->>
->> So, I see two option here:
->> 1) split above loops on two
->> 2) add calls of clk_prepare()/clk_unprepare() in pm_clk_notify()
->>
->> In my opinion option [2] is better.
->>
-> 
-> Doesn't that mean the clock will always be prepared as long as the
-> device is present? That doesn't sound good. I would like the clocks to
-> be disabled and unprepared as long as the device is suspended.
+On 11/20/2013 05:22 PM, Ivan Khoronzhuk wrote:
+> This series contains fixes and updates of Davinci nand driver, in
+> order to prepare it to be reused for Keystone platform.
+>
+> V1:
+> https://lkml.org/lkml/2013/11/11/352
+>
+> Ivan Khoronzhuk (7):
+>    mtd: nand: davinci: fix driver registration
+>    mtd: nand: davinci: return ENOMEM if memory allocation is failed
+>    mtd: nand: davinci: check required ti,davinci-chipselect property
+>    mtd: nand: davinci: simplify error handling
+>    mtd: nand: davinci: move bindings under mtd
+>    mtd: nand: davinci: extend description of bindings
+>    mtd: nand: davinci: adjust DT properties to MTD generic
 
-Yep (
+For overall series:
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-> 
-> What is the lock protecting? The linked list or something more? Can we
-> remove the locks?
-
-Looks like it's protecting linked list pm_clock_entry'es.
-
-> 
-> It looks like even if you just remove the locks here, the PM core is
-> free to call this function with irqs disabled if pm_runtime_irq_safe()
-> has been called on the device. Perhaps runtime PM can only do the
-> clk_enable()/clk_disable() part and the clk_unprepare()/clk_prepare()
-> calls should happen in the system suspend callbacks?
-
-Even don't know what to say :( On Keystone clk_unprepare()/clk_prepare() are NOPs.
-But clk_prepare() has to be called at least once before clk_enable() :((
-So, solution with suspend/resume will not fix current problem :( unfortunately.
-
-FYI, Now pm_clk_suspend/pm_clk_resume are called from arch/arm/mach-keystone/pm_domain.c
-(also similar solution is used by Davinci, but issue has not been detected because
-PM runtime hasn't been used by Davinci IP drivers before)
-
-Regards,
-- grygorii
+>
+>   .../devicetree/bindings/arm/davinci/nand.txt       |   46 ----------
+>   .../devicetree/bindings/mtd/davinci-nand.txt       |   92 ++++++++++++++++++++
+>   drivers/mtd/nand/davinci_nand.c                    |   68 +++++++--------
+>   3 files changed, 126 insertions(+), 80 deletions(-)
+>   delete mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
+>   create mode 100644 Documentation/devicetree/bindings/mtd/davinci-nand.txt
+>
