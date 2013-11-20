@@ -1,167 +1,174 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 20 Nov 2013 10:04:22 +0100
-Subject: [PATCH 8/8] ARM: DTS: imx5* imx6*, use imx50-ssi
+Date: Wed, 20 Nov 2013 10:04:19 +0100
+Subject: [PATCH 5/8] ASoC: fsl-ssi: Add configuration helper functions
 In-Reply-To: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
 References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1384938262-20554-9-git-send-email-mpa@pengutronix.de>
+Message-ID: <1384938262-20554-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx50-ssi and imx21-ssi are different IPs. imx50-ssi supports online
-reconfiguration and needs this for correct interaction with SDMA. This
-patch adds imx50-ssi before each imx21-ssi for all imx5/imx6 SoCs.
+This patch adds a struct 'fsl_ssi_rxtx_reg_val' which holds register
+values necessary to enable rx/tx. Based on those preset register values,
+the added configuration functions will cleanly enable/disable different
+parts of the SSI IP while supporting online/offline configuration.
+Different operating modes can be setup directly as different register
+values in fsl_ssi_reg_val.
+
+These functions and structs will help to cleanup and simplify the
+trigger function to support many different IP versions (online/offline
+configuration) and different operating modes.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi   | 10 +++++++---
- arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
- arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
- arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
- 4 files changed, 32 insertions(+), 12 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 122 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 122 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 54cee65..706bdf3 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -150,7 +150,9 @@
- 				};
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index d268785..45279e6 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -125,6 +125,18 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+ #define FSLSSI_SISR_MASK (FSLSSI_SIER_DBG_RX_FLAGS | FSLSSI_SIER_DBG_TX_FLAGS)
+ #endif
  
- 				ssi2: ssi at 70014000 {
--					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
-+					compatible = "fsl,imx51-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x70014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-@@ -427,7 +429,8 @@
- 			};
++struct fsl_ssi_reg_val {
++	u32 sier;
++	u32 srcr;
++	u32 stcr;
++	u32 scr;
++};
++
++struct fsl_ssi_rxtx_reg_val {
++	struct fsl_ssi_reg_val rx;
++	struct fsl_ssi_reg_val tx;
++};
++
+ /**
+  * fsl_ssi_private: per-SSI private data
+  *
+@@ -161,6 +173,8 @@ struct fsl_ssi_private {
+ 	struct imx_dma_data filter_data_tx;
+ 	struct imx_dma_data filter_data_rx;
+ 	struct imx_pcm_fiq_params fiq_params;
++	/* Register values for rx/tx configuration */
++	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
  
- 			ssi1: ssi at 83fcc000 {
--				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx51-ssi", "fsl,imx50-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x83fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks 48>;
-@@ -479,7 +482,8 @@
- 			};
+ 	struct {
+ 		unsigned int rfrc;
+@@ -445,6 +459,114 @@ static void fsl_ssi_debugfs_remove(struct fsl_ssi_private *ssi_private)
  
- 			ssi3: ssi at 83fe8000 {
--				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx51-ssi", "fsl,imx50-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x83fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks 50>;
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 4307e80..1f5c622 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -149,7 +149,9 @@
- 				};
+ #endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
  
- 				ssi2: ssi at 50014000 {
--					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+					compatible = "fsl,imx53-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x50014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-@@ -1049,7 +1051,8 @@
- 			};
- 
- 			ssi1: ssi at 63fcc000 {
--				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx53-ssi", "fsl,imx50-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x63fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks 48>;
-@@ -1076,7 +1079,8 @@
- 			};
- 
- 			ssi3: ssi at 63fe8000 {
--				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx53-ssi", "fsl,imx50-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x63fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks 50>;
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ccd55c2..26dc080 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -201,7 +201,9 @@
- 				};
- 
- 				ssi1: ssi at 02028000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks 178>;
-@@ -214,7 +216,9 @@
- 				};
- 
- 				ssi2: ssi at 0202c000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks 179>;
-@@ -227,7 +231,9 @@
- 				};
- 
- 				ssi3: ssi at 02030000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks 180>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index c46651e..22cec8b 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -191,7 +191,9 @@
- 				};
- 
- 				ssi1: ssi at 02028000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI1>;
-@@ -203,7 +205,9 @@
- 				};
- 
- 				ssi2: ssi at 0202c000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI2>;
-@@ -215,7 +219,9 @@
- 				};
- 
- 				ssi3: ssi at 02030000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx50-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI3>;
++/*
++ * Enable/Disable all rx/tx config flags at once.
++ */
++static void fsl_ssi_rxtx_config(struct fsl_ssi_private *ssi_private,
++		bool enable)
++{
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	struct fsl_ssi_rxtx_reg_val *vals = &ssi_private->rxtx_reg_val;
++
++	if (enable) {
++		write_ssi_mask(&ssi->sier, 0, vals->rx.sier | vals->tx.sier);
++		write_ssi_mask(&ssi->srcr, 0, vals->rx.srcr | vals->tx.srcr);
++		write_ssi_mask(&ssi->stcr, 0, vals->rx.stcr | vals->tx.stcr);
++	} else {
++		write_ssi_mask(&ssi->srcr, vals->rx.srcr | vals->tx.srcr, 0);
++		write_ssi_mask(&ssi->stcr, vals->rx.stcr | vals->tx.stcr, 0);
++		write_ssi_mask(&ssi->sier, vals->rx.sier | vals->tx.sier, 0);
++	}
++}
++
++/*
++ * Enable/Disable a ssi configuration. You have to pass either
++ * ssi_private->rxtx_reg_val.rx or tx as vals parameter.
++ */
++static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
++		struct fsl_ssi_reg_val *vals)
++{
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	struct fsl_ssi_reg_val *avals;
++	u32 scr_val = read_ssi(&ssi->scr);
++	int nr_active_streams = !!(scr_val & CCSR_SSI_SCR_TE) +
++				!!(scr_val & CCSR_SSI_SCR_RE);
++
++	/* Find the other direction values rx or tx which we do not want to
++	 * modify */
++	if (&ssi_private->rxtx_reg_val.rx == vals)
++		avals = &ssi_private->rxtx_reg_val.tx;
++	else
++		avals = &ssi_private->rxtx_reg_val.rx;
++
++	/* If vals should be disabled, start with disabling the unit */
++	if (!enable) {
++		u32 scr = vals->scr & (vals->scr ^ avals->scr);
++		write_ssi_mask(&ssi->scr, scr, 0);
++	}
++
++	/*
++	 * We are running on a SoC which does not support online SSI
++	 * reconfiguration, so we have to enable all necessary flags at once
++	 * even if we do not use them later (capture and playback configuration)
++	 */
++	if (ssi_private->offline_config) {
++		if ((enable && !nr_active_streams) ||
++				(!enable && nr_active_streams == 1))
++			fsl_ssi_rxtx_config(ssi_private, enable);
++
++		goto config_done;
++	}
++
++	/*
++	 * Configure single direction units while the SSI unit is running
++	 * (online configuration)
++	 */
++	if (enable) {
++		write_ssi_mask(&ssi->sier, 0, vals->sier);
++		write_ssi_mask(&ssi->srcr, 0, vals->srcr);
++		write_ssi_mask(&ssi->stcr, 0, vals->stcr);
++	} else {
++		u32 sier;
++		u32 srcr;
++		u32 stcr;
++
++		/*
++		 * Disabling the necessary flags for one of rx/tx while the
++		 * other stream is active is a little bit more difficult. We
++		 * have to disable only those flags that differ between both
++		 * streams (rx XOR tx) and that are set in the stream that is
++		 * disabled now. Otherwise we could alter flags of the other
++		 * stream
++		 */
++
++		/* These assignments are simply vals without bits set in avals*/
++		sier = vals->sier & (vals->sier ^ avals->sier);
++		srcr = vals->srcr & (vals->srcr ^ avals->srcr);
++		stcr = vals->stcr & (vals->stcr ^ avals->stcr);
++
++		write_ssi_mask(&ssi->srcr, srcr, 0);
++		write_ssi_mask(&ssi->stcr, stcr, 0);
++		write_ssi_mask(&ssi->sier, sier, 0);
++	}
++
++config_done:
++	/* Enabling of subunits is done after configuration */
++	if (enable)
++		write_ssi_mask(&ssi->scr, 0, vals->scr);
++}
++
++
++static void fsl_ssi_rx_config(struct fsl_ssi_private *ssi_private, bool enable)
++{
++	fsl_ssi_config(ssi_private, enable, &ssi_private->rxtx_reg_val.rx);
++}
++
++static void fsl_ssi_tx_config(struct fsl_ssi_private *ssi_private, bool enable)
++{
++	fsl_ssi_config(ssi_private, enable, &ssi_private->rxtx_reg_val.tx);
++}
++
+ static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
+ {
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
 -- 
 1.8.4.2
