@@ -1,160 +1,55 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 20 Nov 2013 00:53:43 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-References: <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
- <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
- <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <87li0kkhzx.fsf@natisbad.org>
- <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119174323.GH913@1wt.eu>
- <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119184121.GN913@1wt.eu>
-Message-ID: <874n780wzc.fsf@natisbad.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 20 Nov 2013 09:02:31 +0900
+Subject: [PATCH v2] ARM: shmobile: Use ->init_late() on Lager
+Message-ID: <20131120000231.27016.39549.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Magnus Damm <damm@opensource.se>
 
-Willy Tarreau <w@1wt.eu> writes:
+Hook in shmobile_init_late() on Lager V2. This enables some PM
+related things like CPUIdle and Suspend-to-RAM.
 
-> On Tue, Nov 19, 2013 at 10:31:50AM -0800, Eric Dumazet wrote:
->> On Tue, 2013-11-19 at 18:43 +0100, Willy Tarreau wrote:
->> 
->> > - #define MVNETA_TX_DONE_TIMER_PERIOD 10
->> > + #define MVNETA_TX_DONE_TIMER_PERIOD (1000/HZ)
->> > 
->> 
->> I suggested this in a prior mail :
->> 
->> #define MVNETA_TX_DONE_TIMER_PERIOD 1
->
-> Ah sorry, I remember now.
->
->> But apparently it was triggering strange crashes...
->
-> Ah, when a bug hides another one, it's the situation I prefer, because
-> by working on one, you end up fixing two :-)
+With this patch applied it is possible to use Suspend-to-RAM:
+# echo enabled > /sys/class/tty/ttySC6/power/wakeup
+# echo mem > /sys/power/state 
+(wake by sending a character on the serial console)
 
-Follow me just for one sec: today, I got a USB 3.0 Gigabit Ethernet
-adapter. More specifically an AX88179-based one (Logitec LAN-GTJU3H3),
-about which there is currently a thread on netdev and linux-usb
-lists. Anyway, I decided to give it a try on my RN102 just to check what
-performance I could achieve. So I basically did the same experiment as
-yesterday (wget on client against a 1GB file located on the filesystem
-served by an apache on the NAS) except that time the AX88179-based
-adapater was used instead of the mvneta-based interface. Well, the
-download started at a high rate (90MB/s) but then drops and I get some
-SATA error on the NAS (similar to the errors I already got during
-12.0-rc series [1] to finally *erroneously* consider it was an artefact).
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-So I decided to remove the SATA controllers and disks from the equation:
-I switched to my ReadyNAS 2120 whose GbE interfaces are also based on
-mvneta driver and comes w/ 2GB of RAM. The main additional difference is
-that the device is a dual core armada @1.2GHz, where the RN102 is a
-single core armada @1.2GHz. I created a dummy 1GB file *in RAM*
-(/run/shm) to have it served by the apache2 instead of the file
-previously stored on the disks. 
+ Changes since V1:
+ - added missing include <mach/common.h> to DT reference code
 
-I started w/ todays linus tree (dec8e46178b) with Eric's revert patch
-for c9eeec26e32e (tcp: TSQ can use a dynamic limit) and also the change
-to mvneta driver to have:
+ Written on top of renesas.git renesas-devel-v3.12-20131119
 
--#define MVNETA_TX_DONE_TIMER_PERIOD    10
-+#define MVNETA_TX_DONE_TIMER_PERIOD    1
+ arch/arm/mach-shmobile/board-lager-reference.c |    2 ++
+ arch/arm/mach-shmobile/board-lager.c           |    1 +
+ 2 files changed, 3 insertions(+)
 
-Here are the average speed given by wget for the following TCP send
-window:
-
-   4 MB:  19 MB/s
-   2 MB:  21 MB/s
-   1 MB:  21 MB/s
-  512KB:  23 MB/s
-  384KB: 105 MB/s
-  256KB: 112 MB/s
-  128KB: 111 MB/s
-   64KB:  93 MB/s
-
-Then, I decided to redo the exact same test w/o the change on
-MVNETA_TX_DONE_TIMER_PERIOD (i.e. w/ the initial value of 10). I get the
-exact same results as with the MVNETA_TX_DONE_TIMER_PERIOD set to 1, i.e:
-
-   4 MB:  20 MB/s
-   2 MB:  21 MB/s
-   1 MB:  21 MB/s
-  512KB:  22 MB/s
-  384KB: 105 MB/s
-  256KB: 112 MB/s
-  128KB: 111 MB/s
-   64KB:  93 MB/s
-
-And, then, I also dropped Eric's revert patch for c9eeec26e32e (tcp: TSQ
-can use a dynamic limit), just to verify we came back where the thread
-started but i got a surprise:
-
-   4 MB:  10 MB/s
-   2 MB:  11 MB/s
-   1 MB:  10 MB/s
-  512KB:  12 MB/s
-  384KB: 104 MB/s
-  256KB: 112 MB/s
-  128KB: 112 MB/s
-   64KB:  93 MB/s
-
-Instead of the 256KB/s I had observed the low value was now 10MB/s. I
-thought it was due to the switch from RN102 to RN2120 so I came back
-to the RN102 w/o any specific patch for mvneta nor your revert patch for 
-c9eeec26e32e, i.e. only Linus tree as it is today (dec8e46178b). The
-file is served from the disk:
-
-   4 MB:   5 MB/s
-   2 MB:   5 MB/s
-   1 MB:   5 MB/s
-  512KB:   5 MB/s
-  384KB:  90 MB/s for 4s, then 3 MB/s
-  256KB:  80 MB/s for 3s, then 2 MB/s
-  128KB:  90 MB/s for 3s, then 3 MB/s
-   64KB:  80 MB/s for 3s, then 3 MB/S
-
-Then, I allocated a dummy 400MB file in RAM (/run/shm) and redid the
-test on the RN102:
-
-   4 MB:   8 MB/s
-   2 MB:   8 MB/s
-   1 MB:  92 MB/s
-  512KB:  90 MB/s
-  384KB:  90 MB/s
-  256KB:  90 MB/s
-  128KB:  90 MB/s
-   64KB:  60 MB/s
-
-In the end, here are the conclusions *I* draw from this test session,
-do not hesitate to correct me:
-
- - Eric, it seems something changed in linus tree betwen the beginning
-   of the thread and now, which somehow reduces the effect of the
-   regression we were seen: I never got back the 256KB/s.
- - You revert patch still improves the perf a lot
- - It seems reducing MVNETA_TX_DONE_TIMER_PERIOD does not help
- - w/ your revert patch, I can confirm that mvneta driver is capable of
-   doing line rate w/ proper tweak of TCP send window (256KB instead of
-   4M)
- - It seems I will I have to spend some time on the SATA issues I
-   previously thought were an artefact of not cleaning my tree during a
-   debug session [1], i.e. there is IMHO an issue.
-
-What I do not get is what can cause the perf to drop from 90MB/s to
-3MB/s (w/ a 256KB send window) when streaming from the disk instead of
-the RAM. I have no issue having dd read from the fs @ 150MB/s and
-mvneta streaming from RAM @ 90MB/s but both together get me 3MB/s after
-a few seconds.
-
-Anyway, I think if the thread keeps going on improving mvneta, I'll do
-all additional tests from RAM and will stop polluting netdev w/ possible
-sata/disk/fs issues.
-
-Cheers,
-
-a+
-
-[1]: http://thread.gmane.org/gmane.linux.ports.arm.kernel/271508
+--- 0001/arch/arm/mach-shmobile/board-lager-reference.c
++++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-11-20 08:14:45.000000000 +0900
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
++#include <mach/common.h>
+ #include <mach/rcar-gen2.h>
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
+@@ -41,5 +42,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+--- 0001/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2013-11-20 08:14:34.000000000 +0900
+@@ -259,5 +259,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_init,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
