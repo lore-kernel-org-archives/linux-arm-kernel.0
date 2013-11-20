@@ -1,15 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Nov 2013 21:21:50 +0100
-Subject: [PATCH RFC v1 4/7] net: phy: suspend unused PHYs on mdio_bus in
- late_initcall
+Date: Wed, 20 Nov 2013 21:21:47 +0100
+Subject: [PATCH RFC v1 1/7] net: phy: marvell: provide genphy suspend/resume
 In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1384978913-8052-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384978913-8052-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since phy_attach ensures PHYs are resumed, we can now suspend all
-PHYs that have no attached netdev after initcalls.
+Marvell PHYs support generic PHY suspend/resume, so provide those
+callbacks to all marvell specific drivers.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -18,46 +17,111 @@ Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/phy/mdio_bus.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+ drivers/net/phy/marvell.c |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-index 5617876..10eba58 100644
---- a/drivers/net/phy/mdio_bus.c
-+++ b/drivers/net/phy/mdio_bus.c
-@@ -320,6 +320,33 @@ static int mdio_bus_match(struct device *dev, struct device_driver *drv)
- 		(phydev->phy_id & phydrv->phy_id_mask));
- }
- 
-+static int mdio_bus_suspend_unused(struct device *busdev, void *data)
-+{
-+	struct mii_bus *bus = to_mii_bus(busdev);
-+	struct phy_device *phydev;
-+	struct phy_driver *phydrv;
-+	int i;
-+
-+	for (i = 0; i < PHY_MAX_ADDR; i++) {
-+		if (!bus->phy_map[i])
-+			continue;
-+
-+		phydev = to_phy_device(&bus->phy_map[i]->dev);
-+		phydrv = to_phy_driver(phydev->dev.driver);
-+		if (!phydev->attached_dev && phydrv && phydrv->suspend)
-+			phy_suspend(phydev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mdio_bus_class_suspend_unused(void)
-+{
-+	return class_for_each_device(&mdio_bus_class, NULL, NULL,
-+				     mdio_bus_suspend_unused);
-+}
-+late_initcall_sync(mdio_bus_class_suspend_unused);
-+
- #ifdef CONFIG_PM
- 
- static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
+diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
+index 2e3c778e..bd37e45 100644
+--- a/drivers/net/phy/marvell.c
++++ b/drivers/net/phy/marvell.c
+@@ -894,6 +894,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &genphy_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -907,6 +909,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &genphy_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -920,6 +924,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &marvell_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -933,6 +939,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &genphy_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = {.owner = THIS_MODULE,},
+ 	},
+ 	{
+@@ -946,6 +954,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
+ 		.did_interrupt = &m88e1121_did_interrupt,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -961,6 +971,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.did_interrupt = &m88e1121_did_interrupt,
+ 		.get_wol = &m88e1318_get_wol,
+ 		.set_wol = &m88e1318_set_wol,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -974,6 +986,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &genphy_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -987,6 +1001,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &genphy_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -1000,6 +1016,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &genphy_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -1013,6 +1031,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.read_status = &genphy_read_status,
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ 	{
+@@ -1026,6 +1046,8 @@ static struct phy_driver marvell_drivers[] = {
+ 		.ack_interrupt = &marvell_ack_interrupt,
+ 		.config_intr = &marvell_config_intr,
+ 		.did_interrupt = &m88e1121_did_interrupt,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
+ 		.driver = { .owner = THIS_MODULE },
+ 	},
+ };
 -- 
 1.7.2.5
