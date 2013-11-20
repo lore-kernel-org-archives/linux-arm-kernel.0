@@ -1,30 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 20 Nov 2013 20:21:37 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 3.13, part 2
-Message-ID: <20131120122135.GA22308@S2101-09.ap.freescale.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Nov 2013 12:31:52 +0000
+Subject: [PATCH v2 0/8] ARM: s3c64xx: Let amba-pl08x driver handle DMA
+In-Reply-To: <52644563.1000203@samsung.com>
+References: <1381950659-12703-1-git-send-email-tomasz.figa@gmail.com>
+ <20131017102201.GK2443@sirena.org.uk>
+ <52644563.1000203@samsung.com>
+Message-ID: <20131120123152.GZ2674@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 036e29918078e38b0b127b89deb4c595028c1bc0:
+On Mon, Oct 21, 2013 at 06:04:35AM +0900, Kukjin Kim wrote:
 
-  ARM: dts: i.MX51: Fix OTG PHY clock (2013-11-11 22:58:45 +0800)
+> Applied this whole series.
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.13-2
-
-for you to fetch changes up to 793b4b10720174b6b27beaf915425248858d7fc5:
-
-  ARM: dts: imx6qdl: disable spdif "rxtx5" clock option (2013-11-18 09:21:29 +0800)
-
-----------------------------------------------------------------
-The imx fixes for 3.13, part 2:
- - Disable S/PDIF "rxtx5" clock option to fix the clocksource breakage
-   introduced by S/PDIF driver
-
-----------------------------------------------------------------
-Shawn Guo (1):
-      ARM: dts: imx6qdl: disable spdif "rxtx5" clock option
-
- arch/arm/boot/dts/imx6qdl.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This didn't seem to make it into -next or your tree, it'd be really
+helpful to be able to merge into both ASoC and SPI so they can be used
+for some framework work (I already have some patches for ASoC).  Would
+it be possible to get the changes published on a separate branch or
+signed tag so I can pull it into those subsystems for the next merge
+window?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131120/374b91ea/attachment.sig>
