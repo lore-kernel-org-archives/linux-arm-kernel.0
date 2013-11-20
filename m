@@ -1,53 +1,65 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 20 Nov 2013 15:57:45 +0100
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
- <528BB1F2.4080107@wwwdotorg.org>
- <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
-Message-ID: <2071510.uxGIu18IfS@amdc1227>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 20 Nov 2013 16:00:36 +0100
+Subject: [PATCH 6/9] ARM: at91/dt: add spi0 support to at91rm9200ek board
+In-Reply-To: <1377688052-10794-1-git-send-email-b.brezillon@overkiz.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+ <1377688052-10794-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131120150036.GF14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 of November 2013 10:59:39 Doug Anderson wrote:
-> On Tue, Nov 19, 2013 at 10:46 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > On 11/19/2013 10:15 AM, Tomasz Figa wrote:
-> >> This patch extends the range of settings configurable via pinfunc API
-> >> to cover pin value as well. This allows configuration of default values
-> >> of pins.
-> >
-> > Shouldn't there be a driver that acquires the GPIO that's output to the
-> > pin, and configures the output value? IIRC there have been previous
-> > discussions re: having a list of e.g. initial GPIO output values in DT,
-> > and that was rejected, and this patch seems to be doing almost the exact
-> > same thing, just at the pinctrl level rather than GPIO level.
-> >
-> > That all said, I admit this could be a useful feature...
+On 13:07 Wed 28 Aug     , Boris BREZILLON wrote:
+> Add spi0 cs3 switch pinctrl pin definitions: this pin is used to select
+> between mmc0 slot0 and spi dataflash connected to cs3.
 > 
-> I haven't followed all of the previous discussions, but I know I've
-> run into scenarios where something like this would be useful.  The one
-> that comes to mind is:
+> Enable spi0 controller and define the mtd_dataflash connected to cs0.
 > 
-> * We've got GPIOs that default at bootup to a pulled up input since
-> the default state of the pin should be "high".
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>  arch/arm/boot/dts/at91rm9200ek.dts |   20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 > 
-> * These pins are really intended to be outputs, like an "enable",
-> "reset", or "power down" line for a peripheral.  The pullup is strong
-> enough to give us a good default state but we really want outputs.
-> 
-> * We'd like to provide this GPIO to a peripheral through device tree.
-> ...and we'd like all the pinmux to be setup automatically so we use
-> pinctrl-names = "default".
-> 
-> * If we set the pinmux up as "output" then there's a chance that the
-> line will glitch at bootup since the pinmux happens (changing the pin
-> to output) before the driver has a chance to run.
-> 
-> 
-> Does that sound like the same scenario you're trying to solve Tomasz?
+> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
+> index 2bad423..b3e7425 100644
+> --- a/arch/arm/boot/dts/at91rm9200ek.dts
+> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
+> @@ -56,6 +56,13 @@
+>  							<AT91_PIOB 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(1))>;
+>  					};
+>  				};
+> +
+> +				spi0 {
+> +					pinctrl_spi0_cs3_switch: spi0_cs3_switch-0 {
+> +						atmel,pins =
+> +							<AT91_PIOB 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
+> +					};
+same as mmc nack pinctrl is not for gpio default value
 
-Yes. That's one of the use cases I had in my mind.
-
-Best regards,
-Tomasz
+this is regulator
+> +				};
+>  			};
+>  
+>  			dbgu: serial at fffff200 {
+> @@ -119,6 +126,19 @@
+>  					wp-gpios = <&pioA 17 GPIO_ACTIVE_HIGH>;
+>  				};
+>  			};
+> +
+> +			spi0: spi at fffe0000 {
+> +				pinctrl-0 = <&pinctrl_spi0 &pinctrl_spi0_cs0>;
+> +				cs-gpios = <&pioA 3 GPIO_ACTIVE_HIGH>, <0>,
+> +					   <0>, <0>;
+> +				status = "okay";
+> +
+> +				mtd_dataflash at 0 {
+> +					compatible = "atmel,at45", "atmel,dataflash";
+> +					spi-max-frequency = <15000000>;
+> +					reg = <0>;
+> +				};
+> +			};
+>  		};
+>  
+>  		usb0: ohci at 00300000 {
+> -- 
+> 1.7.9.5
+> 
