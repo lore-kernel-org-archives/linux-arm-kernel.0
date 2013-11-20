@@ -1,52 +1,84 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 20 Nov 2013 11:43:26 +0100
-Subject: [PATCH RESEND 0/7] crypto: at91/atmel: add Device Tree support
-In-Reply-To: <cover.1383922546.git.nicolas.ferre@atmel.com>
-References: <cover.1383922546.git.nicolas.ferre@atmel.com>
-Message-ID: <528C924E.50206@atmel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 20 Nov 2013 10:52:05 +0000
+Subject: [PATCH v2] arm: mm: refactor v7 cache cleaning ops to use way/index
+ sequence
+Message-ID: <1384944725-32142-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2013 16:08, Nicolas Ferre :
-> This series adds Device Tree support to the Atmel crypto drivers
-> (AES/[T]DES/SHA). The Device Tree entries are very simple and only
-> declare the reg/irq values and the link to DMA.
+Set-associative caches on all v7 implementations map the index bits
+to physical addresses LSBs and tag bits to MSBs. As the last level
+of cache on current and upcoming ARM systems grows in size,
+this means that under normal DRAM controller configurations, the
+current v7 cache flush routine using set/way operations triggers a
+DRAM memory controller precharge/activate for every cache line
+writeback since the cache routine cleans lines by first fixing the
+index and then looping through ways (index bits are mapped to lower
+physical addresses on all v7 cache implementations; this means that,
+with last level cache sizes in the order of MBytes, lines belonging
+to the same set but different ways map to different DRAM pages).
 
-Herbert,
+Given the random content of cache tags, swapping the order between
+indexes and ways loops do not prevent DRAM pages precharge and
+activate cycles but at least, on average, improves the chances that
+either multiple lines hit the same page or multiple lines belong to
+different DRAM banks, improving throughput significantly.
 
-ping?
+This patch swaps the inner loops in the v7 cache flushing routine
+to carry out the clean operations first on all sets belonging to
+a given way (looping through sets) and then decrementing the way.
 
-Could I have your "Acked-by" for taking these patches through the 
-arm-soc git tree, or do you want that we split this series so that you 
-can take the driver part of it?
+Benchmarks showed that by swapping the ordering in which sets and
+ways are decremented in the v7 cache flushing routine, that uses
+set/way operations, time required to flush caches is reduced
+significantly, owing to improved writebacks throughput to the DRAM
+controller.
 
-Best regards,
+Benchmarks results vary and depend heavily on the last level of
+cache tag RAM content when cache is cleaned and invalidated, ranging
+from 2x throughput when all tag RAM entries contain dirty lines
+mapping to sequential pages of RAM to 1x (ie no improvement) when
+all tag RAM accesses trigger a DRAM precharge/activate cycle, as the
+current code implies on most DRAM controller configurations.
 
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/mm/cache-v7.S | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-> Some trivial patches are preceding this move to Device Tree to clean
-> things up beforehand.
->
-> The series has already been sent but a little bit scattered. So I collect
-> everything, this time.
->
-> Nicolas Ferre (7):
->    ARM: at91/dt/trivial: use macro for AES irq type
->    ARM: at91/dt/trivial: before sama5d3, Atmel MPU were using at91 prefix
->    ARM: at91/dt/sama5d3: add DMA information to SHA/AES/TDES nodes
->    crypto: atmel-aes - add support for Device Tree
->    crypto: atmel-tdes - add support for Device Tree
->    crypto: atmel-sha - add support for Device Tree
->    crypto: atmel-sha - add sha information to the log
->
->   .../devicetree/bindings/crypto/atmel-crypto.txt    |  68 ++++++++++
->   arch/arm/boot/dts/sama5d3.dtsi                     |  16 ++-
->   drivers/crypto/atmel-aes.c                         | 143 ++++++++++++++-------
->   drivers/crypto/atmel-sha.c                         | 103 +++++++++++----
->   drivers/crypto/atmel-tdes.c                        | 143 ++++++++++++++-------
->   5 files changed, 346 insertions(+), 127 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/crypto/atmel-crypto.txt
->
-
-
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index b5c467a..778bcf8 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -146,18 +146,18 @@ flush_levels:
+ 	ldr	r7, =0x7fff
+ 	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
+ loop1:
+-	mov	r9, r4				@ create working copy of max way size
++	mov	r9, r7				@ create working copy of max index
+ loop2:
+- ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
+- THUMB(	lsl	r6, r9, r5		)
++ ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
++ THUMB(	lsl	r6, r4, r5		)
+  THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
+- ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
+- THUMB(	lsl	r6, r7, r2		)
++ ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
++ THUMB(	lsl	r6, r9, r2		)
+  THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
+ 	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
+-	subs	r9, r9, #1			@ decrement the way
++	subs	r9, r9, #1			@ decrement the index
+ 	bge	loop2
+-	subs	r7, r7, #1			@ decrement the index
++	subs	r4, r4, #1			@ decrement the way
+ 	bge	loop1
+ skip:
+ 	add	r10, r10, #2			@ increment cache number
 -- 
-Nicolas Ferre
+1.8.2.2
