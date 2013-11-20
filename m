@@ -1,75 +1,57 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 20 Nov 2013 18:20:23 +0100
-Subject: [PATCH 5/9] ARM: at91/dt: add mmc0 slot0 support to at91rm9200ek
- board
-In-Reply-To: <528CDFFB.1020601@overkiz.com>
-References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377687995-10758-1-git-send-email-b.brezillon@overkiz.com>
- <20131120145926.GE14627@ns203013.ovh.net>
- <528CDFFB.1020601@overkiz.com>
-Message-ID: <20131120172023.GI14627@ns203013.ovh.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Nov 2013 10:21:50 -0700
+Subject: [PATCH V4] kbuild: dtbs_install: new make target
+In-Reply-To: <20131120170845.GJ28859@titan.lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <1384896475-8744-1-git-send-email-jason@lakedaemon.net>
+ <528BDEED.8080708@wwwdotorg.org>
+ <20131120170845.GJ28859@titan.lakedaemon.net>
+Message-ID: <528CEFAE.4080502@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:14 Wed 20 Nov     , boris brezillon wrote:
-> On 20/11/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >On 13:06 Wed 28 Aug     , Boris BREZILLON wrote:
-> >>Add slot0 of mmc0 pinctrl pins definitions:
-> >>  - detect pin
-> >>  - write protect pin
-> >>  - enable slot0 pin: this pin is connected to an external switch which
-> >>    enable mmc0 slot0 or spi dataflash connected to cs3
-> >>
-> >>The mmc0 device is not enabled, as it depends on the choosen functionnality
-> >>(spi cs3 or mmc0 slot0).
-> >>
-> >>Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> >>---
-> >>  arch/arm/boot/dts/at91rm9200ek.dts |   35 +++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 35 insertions(+)
-> >>
-> >>diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-> >>index f2d6d79..2bad423 100644
-> >>--- a/arch/arm/boot/dts/at91rm9200ek.dts
-> >>+++ b/arch/arm/boot/dts/at91rm9200ek.dts
-> >>@@ -39,6 +39,23 @@
-> >>  						atmel,pins = <AT91_PIOD 5 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;
-> >>  					};
-> >>  				};
-> >>+
-> >>+				mmc0 {
-> >>+					pinctrl_mmc0_slot0_detect: mmc0_slot0_detect-0 {
-> >>+						atmel,pins =
-> >>+							<AT91_PIOB 27 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> >>+					};
-> >>+
-> >>+					pinctrl_mmc0_slot0_write_protect: mmc0_slot0_write_protect-0 {
-> >>+						atmel,pins =
-> >>+							<AT91_PIOA 17 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
-> >>+					};
-> >>+
-> >>+					pinctrl_mmc0_slot0_switch: mmc0_slot0_switch-0 {
-> >>+						atmel,pins =
-> >>+							<AT91_PIOB 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(1))>;
-> >>+					};
-> >nack this is a regulator the pinctrl API is not done for gpio default value
+On 11/20/2013 10:08 AM, Jason Cooper wrote:
+> On Tue, Nov 19, 2013 at 02:58:05PM -0700, Stephen Warren wrote:
+>> On 11/19/2013 02:27 PM, Jason Cooper wrote:
+>>> Unlike other build products in the Linux kernel, there is no 'make
+>>> *install' mechanism to put devicetree blobs in a standard place.
+>>>
+>>> This patch is an attempt to fix this problem.  Akin to 'make install',
+>>> this creates a new make target, dtbs_install.  The script that gets
+>>> called defers to a distribution or user supplied installdtbs binary,
+>>> if found in the system.  Otherwise, the default action is to install a
+>>> given dtb into
+>>>
+>>>   /lib/modules/${kernel_version}/devicetree/${dts_filename}.dtb
+>>
+>> I still don't see why you wouldn't install the files in
+>> /lib/devicetrees, but I suppose that location is fine.
 > 
-> I know this can be represented as a regulator, but looking at the
-> datasheet, this looks more
-> like a switch than a regulator.
-
-so you load the dt via user space and use the regulator NOT the pinctrl
-
-I do not want to see gpio control via pinctrl as we have no tracability of it
-in gpio lib what so ever
-
+> Hmm, after sleeping on it a night, I've come around.  If we install to
+> /lib/devicetree/${kernel_version}/, then when the devicetree moves to
+> it's own repo, it should be able to install to /lib/devicetree.
 > 
-> Anyway, why didn't you told me that when I proposed the OUTPUT
-> support for at91 pinctrl driver ?
+> So this:
+>  1) hints at the still strong connection between a dtb and the kernel
+>     version
+>  2) doesn't sound odd like installing dtbs into a modules directory
+>  3) allows a future independent repository to install
+>     non-kernel-version-dependent dtbs in a sane location.
+> 
+> I'm still not in favor of installing to /boot/anything since /boot is
+> often a separate, small partition.  I even set mine not to automount.
+> The number and size of dtbs is only going to grow.  Better to install
+> them in a location with lots of space, and /lib is used to having the
+> kernel modules installed in it.
 
-you never get my Ack for this and I'm the pinctrl-at91 maintainer
+Isn't installdtbs (the in-kernel version) typically installing to a
+temporary staging directory, which is then packaged up by some process?
 
-so NACK
+If you point DESTDIR/INSTALL_MOD_PATH/... at / when running it, or
+install a custom /sbin/installdtbs that ignores the path and always
+copies the files to /, then haven't you specifically opted in to /boot
+being an available and appropriate location?
 
-Best Regards,
-J.
+As such, I'm tending to agree with Grant that /boot/devicetrees/...
+makes more sense that /lib/devicetrees/...; my use of "/lib" above was
+simply me writing to fast and typing the wrong thing!
