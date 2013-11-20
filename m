@@ -1,14 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Nov 2013 21:21:52 +0100
-Subject: [PATCH RFC v1 6/7] net: mvneta: resume/suspend PHY on port start/stop
+Date: Wed, 20 Nov 2013 21:21:53 +0100
+Subject: [PATCH RFC v1 7/7] net: cpsw: resume/suspend PHY on port start/stop
 In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1384978913-8052-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384978913-8052-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Network PHYs consume a noticable amount of power. This adds phy_resume
-on start_dev and phy_suspend on stop_dev to save this power if the
+on slave_open and phy_suspend on slave_stop to save this power if the
 port is down anyway.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
@@ -18,28 +18,28 @@ Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/ethernet/marvell/mvneta.c |    2 ++
+ drivers/net/ethernet/ti/cpsw.c |    2 ++
  1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index b8e232b..8688e91 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2194,6 +2194,7 @@ static void mvneta_start_dev(struct mvneta_port *pp)
- 	mvreg_write(pp, MVNETA_INTR_NEW_MASK,
- 		    MVNETA_RX_INTR_MASK(rxq_number));
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 90d41d2..f1dc54f 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -1013,6 +1013,7 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
+ 	} else {
+ 		dev_info(priv->dev, "phy found : id is : 0x%x\n",
+ 			 slave->phy->phy_id);
++		phy_resume(slave->phy);
+ 		phy_start(slave->phy);
  
-+	phy_resume(pp->phy_dev);
- 	phy_start(pp->phy_dev);
- 	netif_tx_start_all_queues(pp->dev);
+ 		/* Configure GMII_SEL register */
+@@ -1081,6 +1082,7 @@ static void cpsw_slave_stop(struct cpsw_slave *slave, struct cpsw_priv *priv)
+ 	if (!slave->phy)
+ 		return;
+ 	phy_stop(slave->phy);
++	phy_suspend(slave->phy);
+ 	phy_disconnect(slave->phy);
+ 	slave->phy = NULL;
  }
-@@ -2201,6 +2202,7 @@ static void mvneta_start_dev(struct mvneta_port *pp)
- static void mvneta_stop_dev(struct mvneta_port *pp)
- {
- 	phy_stop(pp->phy_dev);
-+	phy_suspend(pp->phy_dev);
- 
- 	napi_disable(&pp->napi);
- 
 -- 
 1.7.2.5
