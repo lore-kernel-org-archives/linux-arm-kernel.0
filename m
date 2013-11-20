@@ -1,56 +1,48 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 20 Nov 2013 14:38:57 +0100
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <528BB1F2.4080107@wwwdotorg.org>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
- <528BB1F2.4080107@wwwdotorg.org>
-Message-ID: <1751377.1AvsyJs1NG@amdc1227>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 20 Nov 2013 13:49:42 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
+ com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+Message-ID: <20131120134942.95DBFC4079D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Tuesday 19 of November 2013 11:46:10 Stephen Warren wrote:
-> On 11/19/2013 10:15 AM, Tomasz Figa wrote:
-> > This patch extends the range of settings configurable via pinfunc API
-> > to cover pin value as well. This allows configuration of default values
-> > of pins.
+On Fri, 15 Nov 2013 09:57:17 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Nov 15, 2013 at 01:44:10AM +0000, Olof Johansson wrote:
+> > The more I start to see early UEFI/ACPI code, the more I am certain
+> > that we want none of that crap in the kernel. It's making things
+> > considerably messier, while we're already very busy trying to convert
+> > everything over and enable DT -- we'll be preempting that effort just
+> > to add even more boilerplate everywhere and total progress will be
+> > hurt.
 > 
-> Shouldn't there be a driver that acquires the GPIO that's output to the
-> pin, and configures the output value? IIRC there have been previous
-> discussions re: having a list of e.g. initial GPIO output values in DT,
-> and that was rejected, and this patch seems to be doing almost the exact
-> same thing, just at the pinctrl level rather than GPIO level.
-
-Well, on the contrary, I remember a discussion about specifying initial
-clock tree configuration in DT (on Linaro Connect in Dublin, but AFAIR
-also on the ML before. Through analogy, I would extend this to initial
-pin settins. However maybe the use cases behind this will make things
-clearer.
-
+> We are certainly under a lot of pressure with the device tree migration,
+> and I agree that adding another information source is going to be a
+> source of pain. However, I'd argue that we're going to encounter pain
+> regardless of which approach we take.
 > 
-> That all said, I admit this could be a useful feature...
+> I'm of the opinion that the only way we should support ACPI is as a
+> first-class citizen. We don't need to modify every driver and subsystem
+> to support ACPI, only those necessary to support the minimal set of
+> platforms using ACPI. ACPI is new in the arm space, and we can enforce
+> quality standards on ACPI _now_ above what we're allowing for DT, and
+> avoid future problems.
 
-Two specific things I had in mind with this have been:
+Translated ACPI tables really don't make any sense at all. While the
+models are similar in some regards, they are very different in others
+and any translator (I suspect) would become very complicated to deal
+with all the edge cases.
 
- - pins of the SoC unused on particular boards, which often need different
-   configuration depending on pin bank, SoC revision and so on. I know
-   that _ideally_ this should be done by "firmware", but I believe we
-   have enough historic experience to know that we shouldn't expect from
-   the bootloader more than that it just loads us, as the name would
-   suggest (and I have even had experience with bootloaders that couldn't
-   properly do this basic task, screwing up, for example, by leaving MMU
-   turned on before jumping to the kernel).
+> I'm not sure that translating ACPI tables to dt makes any sense. If AML
+> is used (even sparingly), I do not believe that we can do any sensible
+> conversion to device tree. My understanding is that AML includes
+> functionality for modifying ACPI tables, and I don't see how we can
+> possibly support that without having to add a lot of boilerplate to all
+> the code handling AML to add a device tree backend...
 
- - initializing safe default state of all pins on the board, to cope with
-   configurations when not all drivers are enabled. As an example, take an
-   embedded board with a little of flash storage, where the kernel has to
-   be really small, so not all SoC drivers can be compiled into it. Moving
-   the responsibility of setting initial pin states to drivers would leave
-   pins of inexistent drivers unconfigured.
+The dynamic features of AML would be a no-go. Basically, an AML method
+can cause SSDT blocks to be loaded/unloaded at runtime. It doesn't edit
+the tree provided at runtime, but it does augment it.
 
-I don't think I need to explain why misconfigured pins are a bad thing.
-
-Best regards,
-Tomasz
+g.
