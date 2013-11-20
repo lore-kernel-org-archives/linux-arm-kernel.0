@@ -1,28 +1,39 @@
-From: mad_soft@inbox.lv (Dmitry Artamonow)
-Date: Wed, 20 Nov 2013 11:43:33 +0400
-Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
-In-Reply-To: <CALT56yP-LsO_8qgpa3R6JQSWW2pGkNWBUtab8L2hQnC5UdoKvQ@mail.gmail.com>
-References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
- <528B811A.1030501@gmail.com>
- <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
- <20131120002007.GR16735@n2100.arm.linux.org.uk>
- <CALT56yP-LsO_8qgpa3R6JQSWW2pGkNWBUtab8L2hQnC5UdoKvQ@mail.gmail.com>
-Message-ID: <528C6825.3010907@inbox.lv>
+From: Li.Xiubo@freescale.com (Li Xiubo)
+Date: Wed, 20 Nov 2013 07:49:06 +0000
+Subject: [PATCHv2 6/8] ASoC: fsl: add SGTL5000 based audio machine driver.
+In-Reply-To: <20131101184008.GF2493@sirena.org.uk>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-7-git-send-email-Li.Xiubo@freescale.com>
+ <20131101184008.GF2493@sirena.org.uk>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828B38EC@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-20.11.2013 04:45, Dmitry Eremin-Solenikov ?????:
-> On Wed, Nov 20, 2013 at 4:20 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk>  wrote:
->> Also note that we _do_ have sa11x0 platforms which request their GPIOs
->> in their arch_initcall callback, so the sa11x0 GPIO driver better be
->> around at that point otherwise things *will* fail.
-> Which ones if you have them in your mind?
 
-FYI, h3100 and h3600 do exactly this - they request UART gpios at
-arch_initcall time (see h3600_mach_init() in arch/arm/mach-sa1100/h3600.c)
+> > +	/* TODO: The SAI driver should figure this out for us */
+> > +	switch (channels) {
+> > +	case 2:
+> > +		snd_soc_dai_set_tdm_slot(cpu_dai, 0xfffffffc, 0xfffffffc, 2,
+> 0);
+> > +		break;
+> > +	case 1:
+> > +		snd_soc_dai_set_tdm_slot(cpu_dai, 0xfffffffe, 0xfffffffe, 1,
+> 0);
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> 
+> Yes, it should - this code should probably just be copied straight into
+> the SAI driver.  If we need to support other configurations we can do
+> that later.
+> 
 
----
-Best regards,
-Dmitry Artamonow
+Well, yes.
+I have considered carefully about this, It maybe nicer to move this to SAI driver's .hw_params.
+
+
+
+--
+Best Regards,
+Xiubo
