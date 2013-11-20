@@ -1,46 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Nov 2013 11:24:40 -0700
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
- <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
- <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
- <1384862421.14845.222.camel@smile> <528B9CAE.3040600@wwwdotorg.org>
- <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
- <528BFDD0.3090503@wwwdotorg.org>
- <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
-Message-ID: <528CFE68.6060908@wwwdotorg.org>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Wed, 20 Nov 2013 10:24:54 -0800
+Subject: [PATCH v4 1/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <20131120162721.GB28683@roeck-us.net>
+References: <1384888074-19696-1-git-send-email-markus.mayer@linaro.org>
+ <1384888074-19696-2-git-send-email-markus.mayer@linaro.org>
+ <CAPdLdqmxFnJ9HZa04buh8NecMszEAp11VRU4Q159vZ+=NG9p3A@mail.gmail.com>
+ <20131120162721.GB28683@roeck-us.net>
+Message-ID: <CAPdLdq=xUjsr1ykTHh3t_Uy9kBkKXbW0gpAmtgiOfj8gC42yeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2013 05:38 PM, Dan Williams wrote:
-> On Tue, Nov 19, 2013 at 4:09 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> Deferred probe certainly isn't the only error that can be returned
->> though,
-> 
-> Of course, but do any of those other ones matter?  Certainly not if
-> they've all been hidden behind a NULL return from
-> dma_request_slave_channel().
-> 
->> so I don't think "defer" in the name makes much sense. The
->> function as I wrote it returns a standard "error pointer" value.
->> Typically, callers would simply propagate *any* error code back to the
->> caller of probe() without even looking at it; it's the driver core that
->> checks for -EPROBE_DEFER vs. other error codes. In some cases, drivers
->> do check in order to avoid printing failure messages in the deferred
->> probe case, but again that's pretty standard, and not something specific
->> to this API.
-> 
-> Right, but the only reason to introduce this API is to propagate
-> EPROBE_DEFER, right?  It also serves to document drivers that are
-> prepared for / depend on deferred probing support.
+> Hi Markus,
+>
+> Yes, I noticed when I merged it into my watchdog-next branch.
+>
+> Reminds me ... v3 had a whitespace problem. I don't recall if you fixed
+> that in v4. If you didn't, that might be a better reason to send v5.
 
-Well, that's the reason I'm introducing the API, but it's not really
-what the API actually does.
+That's still there, unfortunately. Trailing space on the first
+help-text line in Kconfig:
+    Support for the watchdog timer on the following Broadcom BCM281xx
 
-That said, in the interests of moving this forward, I'll go for your
-suggested name dma_slave_request_channel_defer().
+So, I'll generate v5 with that fixed. Do you prefer I also rebase it
+right now to whatever current tip is to take care of the merge
+conflict?
 
-Do I need an ack from Vinod on the function name, or the patches?
+Thanks,
+-Markus
+
+-- 
+Markus Mayer
+Broadcom Landing Team
