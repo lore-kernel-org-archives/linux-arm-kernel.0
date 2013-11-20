@@ -1,65 +1,51 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 20 Nov 2013 16:00:36 +0100
-Subject: [PATCH 6/9] ARM: at91/dt: add spi0 support to at91rm9200ek board
-In-Reply-To: <1377688052-10794-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377688052-10794-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131120150036.GF14627@ns203013.ovh.net>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 20 Nov 2013 09:59:07 -0500
+Subject: [RESEND PATCH 1/6] ahci: imx: Explicitly clear
+ IMX6Q_GPR13_SATA_MPLL_CLK_EN
+In-Reply-To: <1384943242-8201-1-git-send-email-marex@denx.de>
+References: <1384942659-5362-1-git-send-email-marex@denx.de>
+ <1384943242-8201-1-git-send-email-marex@denx.de>
+Message-ID: <20131120145907.GA28946@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:07 Wed 28 Aug     , Boris BREZILLON wrote:
-> Add spi0 cs3 switch pinctrl pin definitions: this pin is used to select
-> between mmc0 slot0 and spi dataflash connected to cs3.
+On Wed, Nov 20, 2013 at 11:27:22AM +0100, Marek Vasut wrote:
+> We must clear this IMX6Q_GPR13_SATA_MPLL_CLK_EN bit on i.MX6Q, otherwise
+> Linux will fail to find the attached drive on some boards.
 > 
-> Enable spi0 controller and define the mtd_dataflash connected to cs0.
+> This entire fix was:
+> Reported-by: Eric Nelson <eric.nelson@boundarydevices.com>
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Linux-IDE <linux-ide@vger.kernel.org>
 > ---
->  arch/arm/boot/dts/at91rm9200ek.dts |   20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  drivers/ata/ahci_imx.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-> index 2bad423..b3e7425 100644
-> --- a/arch/arm/boot/dts/at91rm9200ek.dts
-> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
-> @@ -56,6 +56,13 @@
->  							<AT91_PIOB 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(1))>;
->  					};
->  				};
-> +
-> +				spi0 {
-> +					pinctrl_spi0_cs3_switch: spi0_cs3_switch-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
-> +					};
-same as mmc nack pinctrl is not for gpio default value
+> RESEND: Fix the Cc here.
+> 
+> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+> index ae2d73f..478921b 100644
+> --- a/drivers/ata/ahci_imx.c
+> +++ b/drivers/ata/ahci_imx.c
+> @@ -125,6 +125,7 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
+>  			| IMX6Q_GPR13_SATA_TX_BOOST_MASK
+>  			| IMX6Q_GPR13_SATA_TX_LVL_MASK
+>  			| IMX6Q_GPR13_SATA_TX_EDGE_RATE
+> +			| IMX6Q_GPR13_SATA_MPLL_CLK_EN
+>  			, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
+>  			| IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M
+>  			| IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F
 
-this is regulator
-> +				};
->  			};
->  
->  			dbgu: serial at fffff200 {
-> @@ -119,6 +126,19 @@
->  					wp-gpios = <&pioA 17 GPIO_ACTIVE_HIGH>;
->  				};
->  			};
-> +
-> +			spi0: spi at fffe0000 {
-> +				pinctrl-0 = <&pinctrl_spi0 &pinctrl_spi0_cs0>;
-> +				cs-gpios = <&pioA 3 GPIO_ACTIVE_HIGH>, <0>,
-> +					   <0>, <0>;
-> +				status = "okay";
-> +
-> +				mtd_dataflash at 0 {
-> +					compatible = "atmel,at45", "atmel,dataflash";
-> +					spi-max-frequency = <15000000>;
-> +					reg = <0>;
-> +				};
-> +			};
->  		};
->  
->  		usb0: ohci at 00300000 {
-> -- 
-> 1.7.9.5
-> 
+Not your fault but when things stretch over multiples lines, the
+convention is to put the operators and commas at the end of each line
+not the other way around.  I'd appreciate if you add a trivial patch
+to update that too.
+
+Thanks.
+
+-- 
+tejun
