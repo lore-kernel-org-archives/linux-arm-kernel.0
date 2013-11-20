@@ -1,93 +1,53 @@
-From: t.dakhran@samsung.com (Tarek Dakhran)
-Date: Wed, 20 Nov 2013 17:54:31 +0400
-Subject: [PATCH v3 0/4] Exynos 5410 Dual cluster support
-In-Reply-To: <1951315.Ol55YFu91h@flatron>
-References: <1383811969-32712-1-git-send-email-v.tyrtov@samsung.com>
- <1951315.Ol55YFu91h@flatron>
-Message-ID: <528CBF17.4020500@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Nov 2013 13:56:18 +0000
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <20131120131004.ACA1BC4079D@trevor.secretlab.ca>
+References: <528A6CA3.9030904@wwwdotorg.org>
+ <20131118195243.GJ10335@titan.lakedaemon.net>
+ <528A98C8.9040803@wwwdotorg.org>
+ <20131119122801.GL16735@n2100.arm.linux.org.uk>
+ <20131119142336.GA28859@titan.lakedaemon.net>
+ <20131119150212.GM16735@n2100.arm.linux.org.uk>
+ <20131119152047.GB28859@titan.lakedaemon.net>
+ <20131119152146.GN16735@n2100.arm.linux.org.uk>
+ <20131119192246.GP16735@n2100.arm.linux.org.uk>
+ <20131120131004.ACA1BC4079D@trevor.secretlab.ca>
+Message-ID: <20131120135617.GS16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 20, 2013 at 01:10:04PM +0000, Grant Likely wrote:
+> On Tue, 19 Nov 2013 19:22:46 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Tue, Nov 19, 2013 at 03:21:46PM +0000, Russell King - ARM Linux wrote:
+> > > On Tue, Nov 19, 2013 at 10:20:47AM -0500, Jason Cooper wrote:
+> > > > By "That" are you referring to extending the standard for compatible
+> > > > strings to the board level, or forcing consistent naming on the dts
+> > > > files?
+> > > 
+> > > A consistent file naming on both the dtb and dts files.
+> > 
+> > It's time to knock the idea of naming the DT blobs after the compatible
+> > string on its head as well.  That's really not going to work.  Just
+> > leave the filenames as is, and move the problem into userspace to solve.
+> > 
+> [...]
+> > 
+> > Just use the filenames we already have in the kernel tree.  Let userspace
+> > parse the DT blobs for the compatible strings - it can then provide the
+> > user with the choice of all and _also_ show that certain of DT blobs
+> > may be compatible with a range of boards as well.
+> 
+> Yes, the consistent filename format is a non-problem. The files that
+> exist already have names. Nothing else is going to use them. Done.
 
-On 20.11.2013 03:23, Tomasz Figa wrote:
-> Hi,
->
-> On Thursday 07 of November 2013 12:12:45 Vyacheslav Tyrtov wrote:
->> The series of patches represent support of Exynos 5410 SoC
->>
->> The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
->> Patches allow all 8 CPU cores (4 x A7 and 4 x A15) to run at the same time
->>
->> Patches add new platform description, support of clock controller,
->> dual cluster support and device tree for Exynos 5410
->>
->> Has been build on v3.12.
->> Has been tested on Exynos 5410 reference board (exynos_defconfig).
-> I've applied the patches on top of today's linux-next and tried to boot
-> my ODROID-XU using exynos5410-smdk5410.dts and exynos_defconfig, but all
-> I can get is an imprecise external abort, when the kernel tries to jump
-> to init. Full boot log below. Any ideas?
->
-> Best regards,
-> Tomasz
->
-> 8><------------
->
-> U-Boot 2012.07-g2bcb371 (Nov 19 2013 - 20:17:37) for Exynos5410
->
-> CPU: Exynos5410 Rev2.3 [Samsung SOC on SMP Platform Base on ARM CortexA15]
-> APLL = 900MHz, KPLL = 600MHz
-[snip]
->    
-> Starting kernel ...
->
-> Uncompressing Linux... done, booting the kernel.
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Initializing cgroup subsys cpuset
-> [    0.000000] Initializing cgroup subsys cpu
-> [    0.000000] Initializing cgroup subsys cpuacct
-> [    0.000000] Linux version 3.12.0-next-20131119-00004-g27f3f5f-dirty (tom3q at flatron) (gcc version 4.7.2 (Gentoo 4.7.2-r1 p1.6, pie-0.5.5) ) #11 SMP PREEMPT Wed Nov 20 00:08:02 CET 2013
-> [    0.000000] CPU: ARMv7 Processor [412fc0f3] revision 3 (ARMv7), cr=10c5387d
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> [    0.000000] Machine model: Hardkernel ODROID-XU board based on EXYNOS5410
-> [    0.000000] bootconsole [earlycon0] enabled
-> [    0.000000] debug: ignoring loglevel setting.
-> [    0.000000] Memory policy: Data cache writealloc
-> [    0.000000] CPU EXYNOS5410 (id 0xe5410023)
-> [    0.000000] On node 0 totalpages: 262144
-[snip]
-> [    5.040000] isa bounce pool size: 16 pages
-> [    5.045000] mmcblk0: mmc1:e624 SU16G 14.8 GiB
-> [    5.050000]  mmcblk0: p1
-> [    5.120000] EXT3-fs (mmcblk0p1): error: couldn't mount because of unsupported optional features (240)
-> [    5.125000] EXT2-fs (mmcblk0p1): error: couldn't mount because of unsupported optional features (240)
-> [    5.145000] EXT4-fs (mmcblk0p1): mounted filesystem with ordered data mode. Opts: (null)
-> [    5.150000] VFS: Mounted root (ext4 filesystem) readonly on device 179:1.
-> [    5.165000] devtmpfs: mounted
-> [    5.170000] Freeing unused kernel memory: 228K (c0513000 - c054c000)
-> [    5.195000] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-> [    5.210000] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000007
-> [    5.210000]
-> [    5.210000] CPU: 2 PID: 1 Comm: init Not tainted 3.12.0-next-20131119-00004-g27f3f5f-dirty #11
-> [    5.210000] [<c0014068>] (unwind_backtrace+0x0/0xf8) from [<c0011438>] (show_stack+0x10/0x14)
-> [    5.210000] [<c0011438>] (show_stack+0x10/0x14) from [<c03a486c>] (dump_stack+0x7c/0xbc)
-> [    5.210000] [<c03a486c>] (dump_stack+0x7c/0xbc) from [<c03a1e78>] (panic+0x8c/0x1e4)
-> [    5.210000] [<c03a1e78>] (panic+0x8c/0x1e4) from [<c001f504>] (do_exit+0x850/0x920)
-> [    5.210000] [<c001f504>] (do_exit+0x850/0x920) from [<c001f63c>] (do_group_exit+0x3c/0xb0)
-> [    5.210000] [<c001f63c>] (do_group_exit+0x3c/0xb0) from [<c0029e1c>] (get_signal_to_deliver+0x1d4/0x538)
-> [    5.210000] [<c0029e1c>] (get_signal_to_deliver+0x1d4/0x538) from [<c0010974>] (do_signal+0x100/0x40c)
-> [    5.210000] [<c0010974>] (do_signal+0x100/0x40c) from [<c0010fb4>] (do_work_pending+0x68/0xa8)
-> [    5.210000] [<c0010fb4>] (do_work_pending+0x68/0xa8) from [<c000e620>] (work_pending+0xc/0x20)
-> [    5.300000] CPU3: stopping
-> [    5.300000] CPU: 3 PID: 0 Comm: swapper/3 Not tainted 3.12.0-next-20131119-00004-g27f3f5f-dirty #11
->
-Tomasz, there is CCI on/off switcher on smdk5410 board, also there is 
-XOMCCI pin on SoC.
-Looks like switcher on board controls the XOMCCI SoC pin.
+Grant, you have the wrong end of the stick.  This discussion is about
+what happens when files from
 
-When I turn switcher OFF, I getting the same problem you got.
-Please, check the cci state on Odroid-XU Board, maybe it is turned off.
+	$(objtree)/arch/arm/boot/dts
 
-Best regards,
-     Tarek Dakhran
+get installed into
+
+	/lib/modules/$(kernelversion)/...
+
+and their renaming from the filenames we already have in arch/arm/boot/dts
+to a filename generated from the compatible string.
