@@ -1,95 +1,42 @@
-From: bgamari.foss@gmail.com (Ben Gamari)
-Date: Wed, 20 Nov 2013 14:17:09 -0500
-Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
-In-Reply-To: <20131120183548.GH10317@atomide.com>
-References: <87hab9agjr.fsf@gmail.com>
- <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
- <87wqk3n54l.fsf@gmail.com> <20131120183548.GH10317@atomide.com>
-Message-ID: <87r4aanaru.fsf@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 20 Nov 2013 11:21:02 -0800
+Subject: [PATCH] arm: KVM: Don't return PSCI_INVAL if waitqueue is inactive
+In-Reply-To: <CAFEAcA-b5CTMQLsYikHcExVDjy8BL3gnx=Z7f4jVGPCkJsD6Ew@mail.gmail.com>
+References: <1384973499-30659-1-git-send-email-christoffer.dall@linaro.org>
+ <CAFEAcA-b5CTMQLsYikHcExVDjy8BL3gnx=Z7f4jVGPCkJsD6Ew@mail.gmail.com>
+Message-ID: <20131120192102.GF9314@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-> * Ben Gamari <bgamari.foss@gmail.com> [131119 19:07]:
->> Chao Xu <caesarxuchao@gmail.com> writes:
->> 
->> > Hi,
->> >
->> > I also try to boot v3.12 on my pandaboard rev A2, but it hangs at
->> > "starting kernel". My SD card is originally loaded with a linaro 12.04
->> > ubuntu-developer image. I have tried with v3.7 and v3.8 uImage and
->> > both of them work normally, but v3.12 hangs. Is there any trick I
->> > missed? Do I need to use the new u-boot as used by Ben?
->> >
->> I've written up some of my experiences bringing up 3.12 on the
->> PandaBoard here[1]. You may find it helpful. Regardless, I would
->> definitely try upgrading u-boot.
->
-> Nice investigative blogging :)
->
-Thanks!
-
-> Care to also update it with the other issues remaining on pandaboard?
+On Wed, Nov 20, 2013 at 07:12:42PM +0000, Peter Maydell wrote:
+> On 20 November 2013 18:51, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > Therefore, set the pause flag on the vcpu at VCPU init time (which can
+> > reasonably be expected to be completed for all CPUs by user space before
+> > running any VCPUs) and clear both this flag and the feature (in case the
+> > feature can somehow get set again in the future) and ping the waitqueue
+> > on turning on a VCPU using PSCI.
 > 
-Sure.
+> Tangential, but your phrasing prompted me to ask: how does
+> the "start in PSCI power-off" boot protocol work for system reset?
+> Since the kernel doesn't currently provide a "reset this v CPU"
+> ioctl userspace has to do reset manually[*]; how do we say "take
+> this vCPU which has started up and run once, and put it back
+> into PSCI power-off" ?
+> 
+> [*] this is pretty tedious, since it involves reading every CPU
+> register on the vCPU before first run in order to feed the kernel
+> back a bunch of info it already knows about the reset state of
+> a vCPU.
+> 
+So, from looking at the code and the API specification calling
+KVM_ARM_VCPU_INIT does exactly this and also resets all core and cp15
+registers for you - you would here be able to set the power-off flag and
+pause those CPUs so PSCI can wake them up again.
 
-> Sounds like we're pretty close to having things working nicely with
-> mainline kernel on it, so let's just fix those issues ASAP.
->
-> I'm aware of at least two issues:
->
-> 1.  The WLAN not working after a soft reset, or if the interface is
->     reset with ifconfig down. This could be a typo somewhere in the
->     .dts file for the WLAN regulator or something like that.
->
-Yes, although frankly I've more or less given up on the wl12xx. This is
-really a matter for linux-wireless@ but for some reason I find that it
-is terribly unreliable. It stay associated without a problem but for
-some reason I encounter extremely long (>2 seconds) dropouts where no
-traffic can get in or out. Nothing is logged so I really have no idea
-how to go about debugging this. Ultimately Ethernet is fine for my
-purposes anyways.
+Am I missing something here?
 
-> 2. Suspend and resume does not wake-up from serial console and spews
->    a bunch of warnings. The wake-up issue can be fixed with the new
->    the new interrupts-extended property to use the wake IRQs, I'll
->    try to update my patches for that today.
->  
-Thankfully this is for a build-bot so this should be a problem for me.
+This makes me wonder if it's worth adding to
+Documentation/virtual/kvm/api.txt that KVM_ARM_VCPU_INIT should be
+called on all VCPUs before running any of the VCPUs...
 
-I'll mention these in the write-up.
-
->> > And here is a separate problem with building u-boot. I cloned the
->> > upstream u-boot repository. The latest commit is
->> > c2e5e802ecb7ab668ce9911b210ed68c804b349f. Then I did:
->> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- omap4_panda_config
->> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j8
->> > cp MLO u-boot.img /media/boot/
->> > But when turn on my pandaboard, there is NO output from the serial
->> > console. I didn't change the other file in the boot partition. They
->> > are from linaro 12.04 ubuntu-developer image.
->> >
->> I would check that you have earlyprintk enabled (both in the kernel
->> configuration as well as on the kernel command line). Moreover, ensure
->> that the correct serial devices is selected for low-level debug output
->> (in the kernel configuration).
->
-> I wonder if we also have some dependency to some earlier versions of
-> u-boot as u-boot now only muxes the essential pins?
->
-I haven't been very careful in characterizing the behavior of various
-u-boot versions (although I've tried several) so I'm afraid I can't say.
-
-Thanks again for your help.
-
-Cheers,
-
-- Ben
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 489 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131120/25d18364/attachment.sig>
+-Christoffer
