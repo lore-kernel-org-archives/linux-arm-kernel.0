@@ -1,61 +1,51 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Wed, 20 Nov 2013 11:04:02 -0500
-Subject: [PATCHv2 3/8] ARM: dts: Enables SAI ALSA SoC DAI device for
- Vybrid VF610 TOWER board.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F828AD451@039-SN2MPN1-012.039d.mgd.msft.net>
- (Li Xiubo's message of "Wed, 20 Nov 2013 03:14:09 +0000")
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-4-git-send-email-Li.Xiubo@freescale.com>
- <87bo1hk2i7.fsf@nbsps.com>
- <1DD289F6464F0949A2FCA5AA6DC23F828AD451@039-SN2MPN1-012.039d.mgd.msft.net>
-Message-ID: <87hab7hxfx.fsf@nbsps.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Wed, 20 Nov 2013 08:12:37 -0800
+Subject: [PATCH v4 1/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <1384888074-19696-2-git-send-email-markus.mayer@linaro.org>
+References: <1384888074-19696-1-git-send-email-markus.mayer@linaro.org>
+ <1384888074-19696-2-git-send-email-markus.mayer@linaro.org>
+Message-ID: <CAPdLdqmxFnJ9HZa04buh8NecMszEAp11VRU4Q159vZ+=NG9p3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-[sorry, I should have copied alsa-devel at alsa-project.org previously].
-
-On 19 Nov 2013, Li.Xiubo at freescale.com wrote:
-
->>> This patch add and enable SAI device.
->>>
->>> arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
->>> 1 file changed, 6 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/vf610-twr.dts
->>> b/arch/arm/boot/dts/vf610-twr.dts index 1a58678..e4106dd 100644
->>> --- a/arch/arm/boot/dts/vf610-twr.dts
->>> +++ b/arch/arm/boot/dts/vf610-twr.dts
->>>>> -57,6 +57,12 @@
->>> 	status = "okay";
->>> };
->>
->> Should we put a comment here that a TWR-AUDIO-SGTL board is needed?  Or
->> is this better in a menuconfig?  I guess TWR-AUDIO-SGTL is needed as this
->> codec is not on the VF610-TWR main board?
->>
+On 19 November 2013 11:07, Markus Mayer <markus.mayer@linaro.org> wrote:
+> This commit adds support for the watchdog timer used on the BCM281xx
+> family of SoCs.
 >
-> Yes, the SGTL5000 codec is not on the VF610-TWR main board, and needs an extra
-> 	TWR-AUDIO-SGTL board.
+> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  drivers/watchdog/Kconfig        |   22 +++
+>  drivers/watchdog/Makefile       |    1 +
+>  drivers/watchdog/bcm_kona_wdt.c |  365 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 388 insertions(+)
+>  create mode 100644 drivers/watchdog/bcm_kona_wdt.c
 >
-> IMO, puting this comment in the menuconfig is much better.
 
-I agree.  I guess the patch set 6 makes more sense.  Also, you might
-consider adding a printk in the 'fsl_sgtl5000_probe()'.  I guess that
-devm_snd_soc_register_card() will fail if the board is not present?  As
-the board is not 'standard' people may come asking why the audio fails
-on the 'VF610-TWR'.
+[...]
 
-+	ret = devm_snd_soc_register_card(&pdev->dev, &fsl_sgt1500_card);
-+	if (ret) {
-+		dev_err(&pdev->dev, "register soc sound card failed :%d\n"
-+                               "TWR-AUDIO-SGTL board required.\n",
-+				ret);
-+		return ret;
-+	}
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 6c5bb27..7c860ca 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -55,6 +55,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+>  obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+>  obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
+>  obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
+> +obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
+>
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
 
-Especially, you can make one kernel that handles both cases w/wo
-TWR-AUDIO-SGTL board attached.
+Just to let everyone know, due to the watchdog -> mainline merge a few
+days ago, there's a trivial merge conflict now in the makefile. I'll
+send out a re-based v5 of this patch once 3.13-rc1 has been tagged
+(unless you would like a rebased-to-tip version before then).
 
-Thanks for your work.
-Bill Pringlemeir.
+Regards,
+-Markus
+
+-- 
+Markus Mayer
+Broadcom Landing Team
