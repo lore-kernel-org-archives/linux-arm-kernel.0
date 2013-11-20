@@ -1,59 +1,86 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:09:09 -0600
-Subject: [RFT/RFC/PATCH 22/31] arm: boot: dts: omap2/3/am33xx: drop ti,
- intc-size
+Date: Wed, 20 Nov 2013 12:09:13 -0600
+Subject: [RFT/RFC/PATCH 26/31] arm: omap: irq: drop omap2_intc_handle_irq()
 In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
 References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-23-git-send-email-balbi@ti.com>
+Message-ID: <1384970958-4118-27-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we are now infering number of IRQ lines based
-on correct compatible flag, which renders this
-binding completely useless.
+that was just a no-op wrapper around omap_intc_handle_irq
+anyway.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 1 -
- arch/arm/boot/dts/omap2.dtsi  | 1 -
- arch/arm/boot/dts/omap3.dtsi  | 1 -
- 3 files changed, 3 deletions(-)
+ arch/arm/mach-omap2/common.h |  1 -
+ arch/arm/mach-omap2/irq.c    | 16 ++++++----------
+ 2 files changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 93dd479..63acc21 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -106,7 +106,6 @@
- 			compatible = "ti,am33xx-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
--			ti,intc-size = <128>;
- 			reg = <0x48200000 0x1000>;
- 		};
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index bfc5e5f..427160b 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -199,7 +199,6 @@ void omap2_init_irq(void);
+ void omap3_init_irq(void);
+ void ti81xx_init_irq(void);
+ extern int omap_irq_pending(void);
+-void omap2_intc_handle_irq(struct pt_regs *regs);
+ void omap_gic_of_init(void);
  
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index a2bfcde..50f8aff 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -57,7 +57,6 @@
- 			compatible = "ti,omap2-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
--			ti,intc-size = <96>;
- 			reg = <0x480FE000 0x1000>;
- 		};
+ #ifdef CONFIG_CACHE_L2X0
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index f72af7a..5425258 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -245,7 +245,8 @@ static void __init omap_init_irq(u32 base, int nr_irqs,
+ 		omap_alloc_gc(omap_irq_base + j, j + irq_base, 32);
+ }
  
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index e42d17d..6d9626a 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -92,7 +92,6 @@
- 			compatible = "ti,omap3-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
--			ti,intc-size = <96>;
- 			reg = <0x48200000 0x1000>;
- 		};
+-static inline void omap_intc_handle_irq(struct pt_regs *regs)
++static asmlinkage void __exception_irq_entry
++omap_intc_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqnr;
  
+@@ -279,27 +280,22 @@ out:
+ 	} while (irqnr);
+ }
+ 
+-asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs)
+-{
+-	omap_intc_handle_irq(regs);
+-}
+-
+ void __init omap2_init_irq(void)
+ {
+ 	omap_init_irq(OMAP24XX_IC_BASE, 96, NULL);
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ }
+ 
+ void __init omap3_init_irq(void)
+ {
+ 	omap_init_irq(OMAP34XX_IC_BASE, 96, NULL);
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ }
+ 
+ void __init ti81xx_init_irq(void)
+ {
+ 	omap_init_irq(OMAP34XX_IC_BASE, 128, NULL);
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ }
+ 
+ static int __init intc_of_init(struct device_node *node,
+@@ -321,7 +317,7 @@ static int __init intc_of_init(struct device_node *node,
+ 
+ 	omap_init_irq(res.start, nr_irq, of_node_get(node));
+ 
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ 
+ 	return 0;
+ }
 -- 
 1.8.4.GIT
