@@ -1,105 +1,118 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 20 Nov 2013 21:06:20 +0200
-Subject: [PATCH] PM / Clocks: fix pm_clk_resume/suspend if
- CONFIG_PM_RUNTIME is set
-In-Reply-To: <528D0296.1070001@codeaurora.org>
-References: <1384954307-27094-1-git-send-email-grygorii.strashko@ti.com>
- <528D0296.1070001@codeaurora.org>
-Message-ID: <528D082C.3040405@ti.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 20 Nov 2013 20:11:45 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <874n780wzc.fsf@natisbad.org>
+References: <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
+Message-ID: <20131120191145.GP8581@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Arnaud,
 
-On 11/20/2013 08:42 PM, Stephen Boyd wrote:
-> On 11/20/13 05:31, Grygorii Strashko wrote:
->> The following warning is shown and clk_enable() failed on Keystone platform
->> if CONFIG_PM_RUNTIME is set and Runtime PM is enabled for Davinci gpio driver:
->> [    0.564486] ------------[ cut here ]------------
->> [    0.569221] WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:883__clk_enable+0x8c/0x98()
->> [    0.577070] Modules linked in:
->> [    0.580231] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-10116-g11d59938-dirty #259
->> [    0.588368] [<c0014d34>] (unwind_backtrace+0x0/0xf8) from [<c0011eb8>] (show_stack+0x10/0x14)
->> [    0.597018] [<c0011eb8>] (show_stack+0x10/0x14) from [<c03c5df0>] (dump_stack+0x64/0xa4)
->> [    0.605235] [<c03c5df0>] (dump_stack+0x64/0xa4) from [<c00216b8>] (warn_slowpath_common+0x68/0x88)
->> [    0.614315] [<c00216b8>] (warn_slowpath_common+0x68/0x88) from [<c00216f4>] (warn_slowpath_null+0x1c/0x24)
->> [    0.624092] [<c00216f4>] (warn_slowpath_null+0x1c/0x24) from [<c0287a60>] (__clk_enable+0x8c/0x98)
->> [    0.633173] [<c0287a60>] (__clk_enable+0x8c/0x98) from [<c0287c54>] (clk_enable+0x18/0x2c)
->> [    0.641556] [<c0287c54>] (clk_enable+0x18/0x2c) from [<c023677c>] (pm_clk_resume+0x5c/0x80)
->> [    0.650025] [<c023677c>] (pm_clk_resume+0x5c/0x80) from [<c001eba8>] (keystone_pm_runtime_resume+0xc/0x18)
->> [    0.659800] [<c001eba8>] (keystone_pm_runtime_resume+0xc/0x18) from [<c02344e4>] (__rpm_callback+0x34/0x70)
->> [    0.669662] [<c02344e4>] (__rpm_callback+0x34/0x70) from [<c0234548>] (rpm_callback+0x28/0x88)
->> [    0.678390] [<c0234548>] (rpm_callback+0x28/0x88) from [<c023590c>] (rpm_resume+0x3c8/0x684)
->> [    0.686942] [<c023590c>] (rpm_resume+0x3c8/0x684) from [<c0235e40>] (__pm_runtime_resume+0x4c/0x64)
->> [    0.696111] [<c0235e40>] (__pm_runtime_resume+0x4c/0x64) from [<c0204798>] (davinci_gpio_probe+0x20c/0x5ac)
->> [    0.705983] [<c0204798>] (davinci_gpio_probe+0x20c/0x5ac) from [<c02310cc>] (platform_drv_probe+0x18/0x48)
->> [    0.715758] [<c02310cc>] (platform_drv_probe+0x18/0x48) from [<c022fa0c>] (driver_probe_device+0x80/0x21c)
->> [    0.725532] [<c022fa0c>] (driver_probe_device+0x80/0x21c) from [<c022fc34>] (__driver_attach+0x8c/0x90)
->> [    0.735044] [<c022fc34>] (__driver_attach+0x8c/0x90) from [<c022e35c>] (bus_for_each_dev+0x60/0x94)
->> [    0.744207] [<c022e35c>] (bus_for_each_dev+0x60/0x94) from [<c022f24c>] (bus_add_driver+0xdc/0x1d0)
->> [    0.753371] [<c022f24c>] (bus_add_driver+0xdc/0x1d0) from [<c023002c>] (driver_register+0x78/0xf4)
->> [    0.762449] [<c023002c>] (driver_register+0x78/0xf4) from [<c00088fc>] (do_one_initcall+0xec/0x148)
->> [    0.771616] [<c00088fc>] (do_one_initcall+0xec/0x148) from [<c0538c0c>] (kernel_init_freeable+0xfc/0x1c8)
->> [    0.781303] [<c0538c0c>] (kernel_init_freeable+0xfc/0x1c8) from [<c03c19d0>] (kernel_init+0x8/0x110)
->> [    0.790553] [<c03c19d0>] (kernel_init+0x8/0x110) from [<c000e318>] (ret_from_fork+0x14/0x3c)
->> [    0.799117] ---[ end trace 6588a0ec7fbc847a ]---
+first, thanks for all these tests.
+
+On Wed, Nov 20, 2013 at 12:53:43AM +0100, Arnaud Ebalard wrote:
+(...)
+> In the end, here are the conclusions *I* draw from this test session,
+> do not hesitate to correct me:
 > 
-> Please omit the timestamps here.
+>  - Eric, it seems something changed in linus tree betwen the beginning
+>    of the thread and now, which somehow reduces the effect of the
+>    regression we were seen: I never got back the 256KB/s.
+>  - You revert patch still improves the perf a lot
+>  - It seems reducing MVNETA_TX_DONE_TIMER_PERIOD does not help
+>  - w/ your revert patch, I can confirm that mvneta driver is capable of
+>    doing line rate w/ proper tweak of TCP send window (256KB instead of
+>    4M)
+>  - It seems I will I have to spend some time on the SATA issues I
+>    previously thought were an artefact of not cleaning my tree during a
+>    debug session [1], i.e. there is IMHO an issue.
 
-ok.
+Could you please try Eric's patch that was just merged into Linus' tree
+if it was not yet in the kernel you tried :
 
-> 
->>
->> This happens because the clk_enable() is called without clk_prepare()
->> from pm_clk_resume().
->>
->> Hence, switch to use clk_prepare_enable()/clk_disable_unprepare()
->> instead of clk_enable()/clk_disable() in case if CONFIG_PM_RUNTIME is
->> set.
->> Actually, This is remainder fix of the earlier commit c122f27e1c
->> "base: power - use clk_prepare_enable and clk_prepare_disable".
->>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->>   drivers/base/power/clock_ops.c |    4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
->> index 9d8fde7..60d389a 100644
->> --- a/drivers/base/power/clock_ops.c
->> +++ b/drivers/base/power/clock_ops.c
->> @@ -230,7 +230,7 @@ int pm_clk_suspend(struct device *dev)
->>   	list_for_each_entry_reverse(ce, &psd->clock_list, node) {
->>   		if (ce->status < PCE_STATUS_ERROR) {
->>   			if (ce->status == PCE_STATUS_ENABLED)
->> -				clk_disable(ce->clk);
->> +				clk_disable_unprepare(ce->clk);
->>   			ce->status = PCE_STATUS_ACQUIRED;
->>   		}
->>   	}
->> @@ -259,7 +259,7 @@ int pm_clk_resume(struct device *dev)
->>   
->>   	list_for_each_entry(ce, &psd->clock_list, node) {
->>   		if (ce->status < PCE_STATUS_ERROR) {
->> -			clk_enable(ce->clk);
->> +			clk_prepare_enable(ce->clk);
->>   			ce->status = PCE_STATUS_ENABLED;
->>   		}
->>   	}
-> 
-> This is inside a spin_lock_irqsave(). You should be getting scheduling
-> while atomic warnings with this change. Are you testing with
-> DEBUG_ATOMIC_SLEEP=y?
+  98e09386c0e  tcp: tsq: restore minimal amount of queueing
 
-Ops, thanks. No, It's not tested with DEBUG_ATOMIC_SLEEP and 
-I agree with you.
+For me it restored the original performance (I saturate the Gbps with
+about 7 concurrent streams).
 
-So, I see two option here:
-1) split above loops on two
-2) add calls of clk_prepare()/clk_unprepare() in pm_clk_notify()
+Further, I wrote the small patch below for mvneta. I'm not sure it's
+smp-safe but it's a PoC. In mvneta_poll() which currently is only called
+upon Rx interrupt, it tries to flush all possible remaining Tx descriptors
+if any. That significantly improved my transfer rate, now I easily achieve
+1 Gbps using a single TCP stream on the mirabox. Not tried on the AX3 yet.
 
-In my opinion option [2] is better.
+It also increased the overall connection rate by 10% on empty HTTP responses
+(small packets), very likely by reducing the dead time between some segments!
 
-Regards,
--grygorii
+You'll probably want to give it a try, so here it comes.
+
+Cheers,
+Willy
+
+>From d1a00e593841223c7d871007b1e1fc528afe8e4d Mon Sep 17 00:00:00 2001
+From: Willy Tarreau <w@1wt.eu>
+Date: Wed, 20 Nov 2013 19:47:11 +0100
+Subject: EXP: net: mvneta: try to flush Tx descriptor queue upon Rx
+ interrupts
+
+Right now the mvneta driver doesn't handle Tx IRQ, and solely relies on a
+timer to flush Tx descriptors. This causes jerky output traffic with bursts
+and pauses, making it difficult to reach line rate with very few streams.
+This patch tries to improve the situation which is complicated by the lack
+of public datasheet from Marvell. The workaround consists in trying to flush
+pending buffers during the Rx polling. The idea is that for symmetric TCP
+traffic, ACKs received in response to the packets sent will trigger the Rx
+interrupt and will anticipate the flushing of the descriptors.
+
+The results are quite good, a single TCP stream is now capable of saturating
+a gigabit.
+
+This is only a workaround, it doesn't address asymmetric traffic nor datagram
+based traffic.
+
+Signed-off-by: Willy Tarreau <w@1wt.eu>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 5aed8ed..59e1c86 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2013,6 +2013,26 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
+ 	}
  
+ 	pp->cause_rx_tx = cause_rx_tx;
++
++	/* Try to flush pending Tx buffers if any */
++	if (test_bit(MVNETA_F_TX_DONE_TIMER_BIT, &pp->flags)) {
++		int tx_todo = 0;
++
++		mvneta_tx_done_gbe(pp,
++	                           (((1 << txq_number) - 1) &
++	                           MVNETA_CAUSE_TXQ_SENT_DESC_ALL_MASK),
++	                           &tx_todo);
++
++		if (tx_todo > 0) {
++			mod_timer(&pp->tx_done_timer,
++			          jiffies + msecs_to_jiffies(MVNETA_TX_DONE_TIMER_PERIOD));
++		}
++		else {
++			clear_bit(MVNETA_F_TX_DONE_TIMER_BIT, &pp->flags);
++			del_timer(&pp->tx_done_timer);
++		}
++	}
++
+ 	return rx_done;
+ }
+ 
+-- 
+1.7.12.1
