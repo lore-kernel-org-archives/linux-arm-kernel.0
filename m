@@ -1,99 +1,59 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:09:16 -0600
-Subject: [RFT/RFC/PATCH 29/31] arm: omap: irq: remove nr_irqs argument
+Date: Wed, 20 Nov 2013 12:09:18 -0600
+Subject: [RFT/RFC/PATCH 31/31] arm: omap: irq: get rid of ifdef hack
 In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
 References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-30-git-send-email-balbi@ti.com>
+Message-ID: <1384970958-4118-32-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we can set our global omap_nr_irqs early on
-and drop the extra argument to omap_init_irq().
+we don't need the ifdef if we have omap_nr_pending
+telling us how many pending registers we have
+on current platform. This solves a possible
+problem where we could try to handle bogus
+interrupts on OMAP2 and OMAP3 if using single
+zImage kernel, because we would end up reading
+the following pending FIQ register.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/irq.c | 22 +++++++---------------
+ 1 file changed, 7 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 5d4e883..a411ed4 100644
+index 1b2266a..35669c1 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -207,8 +207,7 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- 				IRQ_NOREQUEST | IRQ_NOPROBE, 0);
- }
- 
--static void __init omap_init_irq(u32 base, int nr_irqs,
--				 struct device_node *node)
-+static void __init omap_init_irq(u32 base, struct device_node *node)
+@@ -234,23 +234,15 @@ static void __init omap_init_irq(u32 base, struct device_node *node)
+ static asmlinkage void __exception_irq_entry
+ omap_intc_handle_irq(struct pt_regs *regs)
  {
- 	int j, irq_base;
+-	u32 irqnr;
++	u32 irqnr = 0;
++	int i;
  
-@@ -216,15 +215,13 @@ static void __init omap_init_irq(u32 base, int nr_irqs,
- 	if (WARN_ON(!omap_irq_base))
- 		return;
- 
--	omap_nr_irqs = nr_irqs;
+ 	do {
+-		irqnr = intc_readl(INTC_PENDING_IRQ0);
+-		if (irqnr)
+-			goto out;
 -
--	irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
-+	irq_base = irq_alloc_descs(-1, 0, omap_nr_irqs, 0);
- 	if (irq_base < 0) {
- 		pr_warn("Couldn't allocate IRQ numbers\n");
- 		irq_base = 0;
- 	}
+-		irqnr = intc_readl(INTC_PENDING_IRQ1);
+-		if (irqnr)
+-			goto out;
+-
+-		irqnr = intc_readl(INTC_PENDING_IRQ2);
+-#if IS_ENABLED(CONFIG_SOC_TI81XX) || IS_ENABLED(CONFIG_SOC_AM33XX)
+-		if (irqnr)
+-			goto out;
+-		irqnr = intc_readl(INTC_PENDING_IRQ3);
+-#endif
++		for (i = 0; i < omap_nr_pending; i++) {
++			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
++			if (irqnr)
++				goto out;
++		}
  
--	domain = irq_domain_add_legacy(node, nr_irqs, irq_base, 0,
-+	domain = irq_domain_add_legacy(node, omap_nr_irqs, irq_base, 0,
- 			&irq_domain_simple_ops, NULL);
- 
- 	omap_irq_soft_reset();
-@@ -270,19 +267,22 @@ out:
- 
- void __init omap2_init_irq(void)
- {
--	omap_init_irq(OMAP24XX_IC_BASE, 96, NULL);
-+	omap_nr_irqs = 96;
-+	omap_init_irq(OMAP24XX_IC_BASE, NULL);
- 	set_handle_irq(omap_intc_handle_irq);
- }
- 
- void __init omap3_init_irq(void)
- {
--	omap_init_irq(OMAP34XX_IC_BASE, 96, NULL);
-+	omap_nr_irqs = 96;
-+	omap_init_irq(OMAP34XX_IC_BASE, NULL);
- 	set_handle_irq(omap_intc_handle_irq);
- }
- 
- void __init ti81xx_init_irq(void)
- {
--	omap_init_irq(OMAP34XX_IC_BASE, 128, NULL);
-+	omap_nr_irqs = 96;
-+	omap_init_irq(OMAP34XX_IC_BASE, NULL);
- 	set_handle_irq(omap_intc_handle_irq);
- }
- 
-@@ -290,7 +290,8 @@ static int __init intc_of_init(struct device_node *node,
- 			     struct device_node *parent)
- {
- 	struct resource res;
--	u32 nr_irq = 96;
-+
-+	omap_nr_irqs = 96;
- 
- 	if (WARN_ON(!node))
- 		return -ENODEV;
-@@ -301,9 +302,9 @@ static int __init intc_of_init(struct device_node *node,
- 	}
- 
- 	if (of_device_is_compatible(node, "ti,am33xx-intc"))
--		nr_irq = 128;
-+		omap_nr_irqs = 128;
- 
--	omap_init_irq(res.start, nr_irq, of_node_get(node));
-+	omap_init_irq(res.start, of_node_get(node));
- 
- 	set_handle_irq(omap_intc_handle_irq);
- 
+ out:
+ 		if (!irqnr)
 -- 
 1.8.4.GIT
