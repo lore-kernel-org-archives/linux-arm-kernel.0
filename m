@@ -1,23 +1,22 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Nov 2013 08:53:52 +0000
-Subject: [PATCH] ARM: ux500: get rid of unused header
-In-Reply-To: <1384898168-12809-1-git-send-email-linus.walleij@linaro.org>
-References: <1384898168-12809-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20131120085351.GF19953@lee--X1>
+Date: Wed, 20 Nov 2013 08:54:23 +0000
+Subject: [PATCH] ARM: ux500: delete Nomadik pinctrl AUXDATA
+In-Reply-To: <1384897744-30801-1-git-send-email-linus.walleij@linaro.org>
+References: <1384897744-30801-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131120085423.GG19953@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 19 Nov 2013, Linus Walleij wrote:
 
-> This removes the unused inclusion of
-> <linux/platform_data/pinctrl-nomadik.h> which is
-> the last user in the entire kernel of this platform
-> data header.
+> This deletes the AUXDATA hammering down the Nomadik pin
+> controller name to "pinctrl-db8500". We have removed all
+> dependencies on this name.
 > 
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/mach-ux500/board-mop500-audio.c | 1 -
->  1 file changed, 1 deletion(-)
+>  arch/arm/mach-ux500/cpu-db8500.c | 3 ---
+>  1 file changed, 3 deletions(-)
 
 Acked-by: Lee Jones <lee.jones@linaro.org>
 
