@@ -1,28 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Nov 2013 16:41:19 +0100
-Subject: [PATCH v2 3/4] ata: add APM X-Gene SoC 6.0Gbps SATA PHY driver
-In-Reply-To: <20131120150658.GB28946@htj.dyndns.org>
-References: <1384905197-3566-1-git-send-email-lho@apm.com>
- <1384905197-3566-4-git-send-email-lho@apm.com>
- <20131120150658.GB28946@htj.dyndns.org>
-Message-ID: <201311201641.20230.arnd@arndb.de>
+Date: Wed, 20 Nov 2013 16:37:36 +0100
+Subject: [PATCH 00/31] ARM: tegra: use common reset and DMA bindings
+In-Reply-To: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201311201637.36733.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 November 2013, Tejun Heo wrote:
-> On Tue, Nov 19, 2013 at 04:53:16PM -0700, Loc Ho wrote:
-> > This patch adds support for APM X-Gene SoC 6.0Gbps SATA PHY. This is the
-> > physical layer interface for the corresponding SATA host controller. This
-> > driver uses the new PHY generic framework posted by Kishon Vijay Abrahm.
-> 
-> Hmm... this is related to ahci but isn't even a libata driver and is
-> the first such driver proposed.  Are we sure drivers/ata is the best
-> home for this?  Shouldn't we create a separate directory somewhere?
-> It's confusing, at least to me, to have non-libata driver under
-> drivers/ata.
+On Friday 15 November 2013, Stephen Warren wrote:
+> This series implements a common reset framework driver for Tegra, and
+> updates all relevant Tegra drivers to use it. It also removes the custom
+> DMA bindings and replaced them with the standard DMA DT bindings.
 
-It needs to be in drivers/phy, which is currently being prepared for
-the next merge window and which contains the generic interface used
-in this driver.
+The series is rather long, so I may have missed it, but I think you need one
+more patch to the apbdma binding to document the use of #dma-cells, what
+value it has, and what the format of the dma specifiers in slave drivers
+needs to be.
 
 	Arnd
