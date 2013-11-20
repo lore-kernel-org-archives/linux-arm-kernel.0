@@ -1,169 +1,35 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 20 Nov 2013 16:43:41 +0530
-Subject: [PATCH V4 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1384946021-22100-1-git-send-email-vkale@apm.com>
-References: <1384946021-22100-1-git-send-email-vkale@apm.com>
-Message-ID: <1384946021-22100-3-git-send-email-vkale@apm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 20 Nov 2013 19:18:23 +0800
+Subject: [PATCH RESEND 0/7] crypto: at91/atmel: add Device Tree support
+In-Reply-To: <528C924E.50206@atmel.com>
+References: <cover.1383922546.git.nicolas.ferre@atmel.com>
+ <528C924E.50206@atmel.com>
+Message-ID: <20131120111823.GA20591@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for irq registration when pmu interrupt is percpu.
+On Wed, Nov 20, 2013 at 11:43:26AM +0100, Nicolas Ferre wrote:
+> On 08/11/2013 16:08, Nicolas Ferre :
+> >This series adds Device Tree support to the Atmel crypto drivers
+> >(AES/[T]DES/SHA). The Device Tree entries are very simple and only
+> >declare the reg/irq values and the link to DMA.
+> 
+> Herbert,
+> 
+> ping?
+> 
+> Could I have your "Acked-by" for taking these patches through the
+> arm-soc git tree, or do you want that we split this series so that
+> you can take the driver part of it?
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
----
- arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
- 1 file changed, 81 insertions(+), 27 deletions(-)
+Sure please push them through the arm-soc tree.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index cea1594..de12ba8 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/bitmap.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/perf_event.h>
-@@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
- }
- 
- static void
-+armpmu_disable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-+	disable_percpu_irq(irq);
-+}
-+
-+static void
- armpmu_release_hardware(struct arm_pmu *armpmu)
- {
- 	int i, irq, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
- 
- 	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+	if (irqs < 1)
-+		return;
- 
--	for (i = 0; i < irqs; ++i) {
--		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
--			continue;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, armpmu);
-+	irq = platform_get_irq(pmu_device, 0);
-+	if (irq < 0)
-+		return;
-+
-+	if (irq_is_percpu(irq)) {
-+		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
-+		free_percpu_irq(irq, &cpu_hw_events);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-+				continue;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq >= 0)
-+				free_irq(irq, armpmu);
-+		}
- 	}
- }
- 
-+static void
-+armpmu_enable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	enable_percpu_irq(irq, 0);
-+	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-+}
-+
- static int
- armpmu_reserve_hardware(struct arm_pmu *armpmu)
- {
-@@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 		return -ENODEV;
- 	}
- 
--	for (i = 0; i < irqs; ++i) {
--		err = 0;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq < 0)
--			continue;
-+	irq = platform_get_irq(pmu_device, 0);
-+	if (irq < 0) {
-+		pr_err("failed to get an irq for PMU device\n");
-+		return -ENODEV;
-+	}
- 
--		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
--		 */
--		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
--			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				    irq, i);
--			continue;
--		}
-+	if (irq_is_percpu(irq)) {
-+		err = request_percpu_irq(irq, armpmu->handle_irq,
-+				"arm-pmu", &cpu_hw_events);
- 
--		err = request_irq(irq, armpmu->handle_irq,
--				  IRQF_NOBALANCING,
--				  "arm-pmu", armpmu);
- 		if (err) {
--			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
-+			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
-+					irq);
- 			armpmu_release_hardware(armpmu);
- 			return err;
- 		}
- 
--		cpumask_set_cpu(i, &armpmu->active_irqs);
-+		on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			err = 0;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq < 0)
-+				continue;
-+
-+			/*
-+			 * If we have a single PMU interrupt that we can't shift,
-+			 * assume that we're running on a uniprocessor machine and
-+			 * continue. Otherwise, continue without this interrupt.
-+			 */
-+			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-+				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+						irq, i);
-+				continue;
-+			}
-+
-+			err = request_irq(irq, armpmu->handle_irq,
-+					IRQF_NOBALANCING,
-+					"arm-pmu", armpmu);
-+			if (err) {
-+				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+						irq);
-+				armpmu_release_hardware(armpmu);
-+				return err;
-+			}
-+
-+			cpumask_set_cpu(i, &armpmu->active_irqs);
-+		}
- 	}
- 
- 	return 0;
+You can add my ack:
+
+Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
+
+Thanks,
 -- 
-1.7.9.5
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
