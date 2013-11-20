@@ -1,69 +1,39 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 20 Nov 2013 20:26:16 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <20131120191145.GP8581@1wt.eu> (Willy Tarreau's message of "Wed,
- 20 Nov 2013 20:11:45 +0100")
-References: <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
- <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <87li0kkhzx.fsf@natisbad.org>
- <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119174323.GH913@1wt.eu>
- <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
- <20131120191145.GP8581@1wt.eu>
-Message-ID: <87zjoyoox3.fsf@natisbad.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 20 Nov 2013 19:27:52 +0000
+Subject: [PATCH] arm: KVM: Don't return PSCI_INVAL if waitqueue is inactive
+In-Reply-To: <20131120192102.GF9314@cbox>
+References: <1384973499-30659-1-git-send-email-christoffer.dall@linaro.org>
+ <CAFEAcA-b5CTMQLsYikHcExVDjy8BL3gnx=Z7f4jVGPCkJsD6Ew@mail.gmail.com>
+ <20131120192102.GF9314@cbox>
+Message-ID: <CAFEAcA8Eobge+o8FiQgUYZv7=rHBpbQOpa7Y36OS904v_-MMNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Willy Tarreau <w@1wt.eu> writes:
-
-> first, thanks for all these tests.
+On 20 November 2013 19:21, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Nov 20, 2013 at 07:12:42PM +0000, Peter Maydell wrote:
+>> Tangential, but your phrasing prompted me to ask: how does
+>> the "start in PSCI power-off" boot protocol work for system reset?
+>> Since the kernel doesn't currently provide a "reset this v CPU"
+>> ioctl userspace has to do reset manually[*]; how do we say "take
+>> this vCPU which has started up and run once, and put it back
+>> into PSCI power-off" ?
+>>
+>> [*] this is pretty tedious, since it involves reading every CPU
+>> register on the vCPU before first run in order to feed the kernel
+>> back a bunch of info it already knows about the reset state of
+>> a vCPU.
+>>
+> So, from looking at the code and the API specification calling
+> KVM_ARM_VCPU_INIT does exactly this and also resets all core and cp15
+> registers for you - you would here be able to set the power-off flag and
+> pause those CPUs so PSCI can wake them up again.
 >
-> On Wed, Nov 20, 2013 at 12:53:43AM +0100, Arnaud Ebalard wrote:
-> (...)
->> In the end, here are the conclusions *I* draw from this test session,
->> do not hesitate to correct me:
->> 
->>  - Eric, it seems something changed in linus tree betwen the beginning
->>    of the thread and now, which somehow reduces the effect of the
->>    regression we were seen: I never got back the 256KB/s.
->>  - You revert patch still improves the perf a lot
->>  - It seems reducing MVNETA_TX_DONE_TIMER_PERIOD does not help
->>  - w/ your revert patch, I can confirm that mvneta driver is capable of
->>    doing line rate w/ proper tweak of TCP send window (256KB instead of
->>    4M)
->>  - It seems I will I have to spend some time on the SATA issues I
->>    previously thought were an artefact of not cleaning my tree during a
->>    debug session [1], i.e. there is IMHO an issue.
->
-> Could you please try Eric's patch that was just merged into Linus' tree
-> if it was not yet in the kernel you tried :
->
->   98e09386c0e  tcp: tsq: restore minimal amount of queueing
+> Am I missing something here?
 
-I have it in my quilt set.
+Well, we call KVM_ARM_VCPU_INIT as part of our CPU init,
+but I didn't think you were allowed to call it a second time
+later on to do a CPU reset (ie as part of system reset when
+the guest asks for a system reset as part of 'shutdown -r now').
+Is that valid? If so, it would probably be good to specifically document it...
 
-
-> For me it restored the original performance (I saturate the Gbps with
-> about 7 concurrent streams).
->
-> Further, I wrote the small patch below for mvneta. I'm not sure it's
-> smp-safe but it's a PoC. In mvneta_poll() which currently is only called
-> upon Rx interrupt, it tries to flush all possible remaining Tx descriptors
-> if any. That significantly improved my transfer rate, now I easily achieve
-> 1 Gbps using a single TCP stream on the mirabox. Not tried on the AX3 yet.
->
-> It also increased the overall connection rate by 10% on empty HTTP responses
-> (small packets), very likely by reducing the dead time between some segments!
->
-> You'll probably want to give it a try, so here it comes.
-
-hehe, I was falling short of patches to test tonight ;-) I will give it
-a try now.
-
-Cheers,
-
-a+
+-- PMM
