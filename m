@@ -1,167 +1,52 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 20 Nov 2013 12:32:28 +0200
-Subject: [PATCH v3 09/10] ARM: dts: omap3-beagle-xm: Add USB Host support
-In-Reply-To: <528BD2AF.2030607@ti.com>
-References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
- <1380012836-29900-10-git-send-email-rogerq@ti.com> <528BD2AF.2030607@ti.com>
-Message-ID: <528C8FBC.7020407@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 20 Nov 2013 11:43:26 +0100
+Subject: [PATCH RESEND 0/7] crypto: at91/atmel: add Device Tree support
+In-Reply-To: <cover.1383922546.git.nicolas.ferre@atmel.com>
+References: <cover.1383922546.git.nicolas.ferre@atmel.com>
+Message-ID: <528C924E.50206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishant,
+On 08/11/2013 16:08, Nicolas Ferre :
+> This series adds Device Tree support to the Atmel crypto drivers
+> (AES/[T]DES/SHA). The Device Tree entries are very simple and only
+> declare the reg/irq values and the link to DMA.
 
-On 11/19/2013 11:05 PM, Nishanth Menon wrote:
-> 
-> 
-> On 09/24/2013 03:53 AM, Roger Quadros wrote:
->> Provide RESET GPIO and Power regulator for the USB PHY,
->> the USB Host port mode and the PHY device for the controller.
->> Also provide pin multiplexer information for USB host pins.
->>
->> We also relocate omap3_pmx_core pin definations so that they
->> are close to omap3_pmx_wkup pin definations.
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
-> 
-> just using this thread, but a question ->
-> 
-> I am kernel * master                                   dec8e46 Merge
-> tag 'arc-v3.13-rc1-part2' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/vgupta/arc
-> 
-> and I see that VAUX2 which supplies USB_1V8[1] is not enabled -> I did
-> a quick patch and it did seem to work (Usb keyboard, networking, mouse
-> etc on my ehci ports seems to come up good) - any suggestions how we'd
-> like to handle this?
+Herbert,
 
-It worked for me without your patch. It could be that u-boot is enabling
-that regulator for me. I'm on u-boot-v2013.10.
+ping?
 
-In any case, your patch seems the right thing to do. We should take it in
-the rc cycle.
+Could I have your "Acked-by" for taking these patches through the 
+arm-soc git tree, or do you want that we split this series so that you 
+can take the driver part of it?
 
-> 
-> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> @@ -169,6 +169,14 @@
->         bus-width = <8>;
->  };
-> 
-> +&vaux2 {
-> +       regulator-name = "HubPower";
-> +       regulator-min-microvolt = <1800000>;
-> +       regulator-max-microvolt = <1800000>;
-> +       regulator-always-on;
-> +};
-> +
-> +
-> 
-> [1]
-> https://github.com/CircuitCo/BeagleBoard-xM-RevC/blob/master/BeagleBoard-xM_revC_SCH.pdf?raw=true
+Best regards,
 
 
-cheers,
--roger
+> Some trivial patches are preceding this move to Device Tree to clean
+> things up beforehand.
+>
+> The series has already been sent but a little bit scattered. So I collect
+> everything, this time.
+>
+> Nicolas Ferre (7):
+>    ARM: at91/dt/trivial: use macro for AES irq type
+>    ARM: at91/dt/trivial: before sama5d3, Atmel MPU were using at91 prefix
+>    ARM: at91/dt/sama5d3: add DMA information to SHA/AES/TDES nodes
+>    crypto: atmel-aes - add support for Device Tree
+>    crypto: atmel-tdes - add support for Device Tree
+>    crypto: atmel-sha - add support for Device Tree
+>    crypto: atmel-sha - add sha information to the log
+>
+>   .../devicetree/bindings/crypto/atmel-crypto.txt    |  68 ++++++++++
+>   arch/arm/boot/dts/sama5d3.dtsi                     |  16 ++-
+>   drivers/crypto/atmel-aes.c                         | 143 ++++++++++++++-------
+>   drivers/crypto/atmel-sha.c                         | 103 +++++++++++----
+>   drivers/crypto/atmel-tdes.c                        | 143 ++++++++++++++-------
+>   5 files changed, 346 insertions(+), 127 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/crypto/atmel-crypto.txt
+>
 
-> 
->>  arch/arm/boot/dts/omap3-beagle-xm.dts |   65 ++++++++++++++++++++++++++++-----
->>  1 files changed, 56 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> index afdb164..b081f5a 100644
->> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> @@ -69,6 +69,23 @@
->>  		};
->>  
->>  	};
->> +
->> +	/* HS USB Port 2 Power */
->> +	hsusb2_power: hsusb2_power_reg {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "hsusb2_vbus";
->> +		regulator-min-microvolt = <3300000>;
->> +		regulator-max-microvolt = <3300000>;
->> +		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
->> +		startup-delay-us = <70000>;
->> +	};
->> +
->> +	/* HS USB Host PHY on PORT 2 */
->> +	hsusb2_phy: hsusb2_phy {
->> +		compatible = "usb-nop-xceiv";
->> +		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>; /* gpio_147 */
->> +		vcc-supply = <&hsusb2_power>;
->> +	};
->>  };
->>  
->>  &omap3_pmx_wkup {
->> @@ -79,6 +96,37 @@
->>  	};
->>  };
->>  
->> +&omap3_pmx_core {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <
->> +			&hsusbb2_pins
->> +	>;
->> +
->> +	uart3_pins: pinmux_uart3_pins {
->> +		pinctrl-single,pins = <
->> +			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
->> +			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
->> +		>;
->> +	};
->> +
->> +	hsusbb2_pins: pinmux_hsusbb2_pins {
->> +		pinctrl-single,pins = <
->> +			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
->> +			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
->> +			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
->> +			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
->> +			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
->> +			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
->> +			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
->> +			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
->> +			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
->> +			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
->> +			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
->> +			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
->> +		>;
->> +	};
->> +};
->> +
->>  &i2c1 {
->>  	clock-frequency = <2600000>;
->>  
->> @@ -148,15 +196,6 @@
->>  	power = <50>;
->>  };
->>  
->> -&omap3_pmx_core {
->> -	uart3_pins: pinmux_uart3_pins {
->> -		pinctrl-single,pins = <
->> -			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
->> -			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
->> -		>;
->> -	};
->> -};
->> -
->>  &uart3 {
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&uart3_pins>;
->> @@ -166,3 +205,11 @@
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&gpio1_pins>;
->>  };
->> +
->> +&usbhshost {
->> +	port2-mode = "ehci-phy";
->> +};
->> +
->> +&usbhsehci {
->> +	phys = <0 &hsusb2_phy>;
->> +};
->>
-> 
-> 
+
+-- 
+Nicolas Ferre
