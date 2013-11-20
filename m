@@ -1,14 +1,18 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 20 Nov 2013 20:22:31 +0100
+Date: Wed, 20 Nov 2013 20:26:16 +0100
 Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-References: <20131112083633.GB10318@1wt.eu> <87a9hagex1.fsf@natisbad.org>
- <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
- <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
+In-Reply-To: <20131120191145.GP8581@1wt.eu> (Willy Tarreau's message of "Wed,
+ 20 Nov 2013 20:11:45 +0100")
+References: <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu>
  <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120171227.GG8581@1wt.eu> <20131120173436.GK8581@1wt.eu>
- <1384969222.10637.20.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120181532.GM8581@1wt.eu>
-Message-ID: <87bo1eq3ns.fsf@natisbad.org>
+ <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
+ <20131120191145.GP8581@1wt.eu>
+Message-ID: <87zjoyoox3.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,32 +20,49 @@ Hi,
 
 Willy Tarreau <w@1wt.eu> writes:
 
-> On Wed, Nov 20, 2013 at 09:40:22AM -0800, Eric Dumazet wrote:
->> On Wed, 2013-11-20 at 18:34 +0100, Willy Tarreau wrote:
->> 
->> > One important point, I was looking for the other patch you pointed
->> > in this long thread and finally found it :
->> > 
->> > > So
->> > > http://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=98e09386c0ef4dfd48af7ba60ff908f0d525cdee
->> > > 
->> > > restored this minimal amount of buffering, and let the bigger amount for
->> > > 40Gb NICs ;)
->> > 
->> > This one definitely restores original performance, so it's a much better
->> > bet in my opinion :-)
->> 
->> I don't understand. I thought you were using this patch.
+> first, thanks for all these tests.
 >
-> No, I was on latest stable (3.10.19) which exhibits the regression but does
-> not yet have your fix above. Then I tested the patch your proposed in this
-> thread, then this latest one. Since the patch is not yet even in Linus'
-> tree, I'm not sure Arnaud has tried it yet.
+> On Wed, Nov 20, 2013 at 12:53:43AM +0100, Arnaud Ebalard wrote:
+> (...)
+>> In the end, here are the conclusions *I* draw from this test session,
+>> do not hesitate to correct me:
+>> 
+>>  - Eric, it seems something changed in linus tree betwen the beginning
+>>    of the thread and now, which somehow reduces the effect of the
+>>    regression we were seen: I never got back the 256KB/s.
+>>  - You revert patch still improves the perf a lot
+>>  - It seems reducing MVNETA_TX_DONE_TIMER_PERIOD does not help
+>>  - w/ your revert patch, I can confirm that mvneta driver is capable of
+>>    doing line rate w/ proper tweak of TCP send window (256KB instead of
+>>    4M)
+>>  - It seems I will I have to spend some time on the SATA issues I
+>>    previously thought were an artefact of not cleaning my tree during a
+>>    debug session [1], i.e. there is IMHO an issue.
+>
+> Could you please try Eric's patch that was just merged into Linus' tree
+> if it was not yet in the kernel you tried :
+>
+>   98e09386c0e  tcp: tsq: restore minimal amount of queueing
 
-This is the one I have used for a week now, since its publication by
-Eric a week ago:
+I have it in my quilt set.
 
- http://www.spinics.net/lists/netdev/msg257396.html
+
+> For me it restored the original performance (I saturate the Gbps with
+> about 7 concurrent streams).
+>
+> Further, I wrote the small patch below for mvneta. I'm not sure it's
+> smp-safe but it's a PoC. In mvneta_poll() which currently is only called
+> upon Rx interrupt, it tries to flush all possible remaining Tx descriptors
+> if any. That significantly improved my transfer rate, now I easily achieve
+> 1 Gbps using a single TCP stream on the mirabox. Not tried on the AX3 yet.
+>
+> It also increased the overall connection rate by 10% on empty HTTP responses
+> (small packets), very likely by reducing the dead time between some segments!
+>
+> You'll probably want to give it a try, so here it comes.
+
+hehe, I was falling short of patches to test tonight ;-) I will give it
+a try now.
 
 Cheers,
 
