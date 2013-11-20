@@ -1,31 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Nov 2013 18:03:58 +0100
-Subject: [PATCH 00/31] ARM: tegra: use common reset and DMA bindings
-In-Reply-To: <528CE71D.5090300@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <201311201637.36733.arnd@arndb.de> <528CE71D.5090300@wwwdotorg.org>
-Message-ID: <201311201803.58393.arnd@arndb.de>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 20 Nov 2013 18:05:29 +0100
+Subject: [PATCH 1/9] ARM: at91/dt: add rm9200 spi0 chip select pins
+ definitions
+In-Reply-To: <528CDC75.1010404@overkiz.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+ <1377687742-10618-1-git-send-email-b.brezillon@overkiz.com>
+ <20131120145609.GC14627@ns203013.ovh.net> <528CDC75.1010404@overkiz.com>
+Message-ID: <528CEBD9.4080607@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 November 2013, Stephen Warren wrote:
-> > +- #iommu-cells : Must be <1>. This dictates the length of DMA specifiers in
-> > +  client nodes' dmas properties. The specifier represents the DMA request
-> > +  select value for the peripheral. For more details, consult the Tegra TRM's
-> > +  documentation of the APB DMA channel control register REQ_SEL field.
-> >  
-> >  Examples:
-> >  
-> > @@ -36,4 +40,5 @@ apbdma: dma at 6000a000 {
-> >       clocks = <&tegra_car 34>;
-> >       resets = <&tegra_car 34>;
-> >       reset-names = "dma";
-> > +     #iommu-cells = <1>;
+On 20/11/2013 16:59, boris brezillon wrote:
+> On 20/11/2013 15:56, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 13:02 Wed 28 Aug     , Boris BREZILLON wrote:
+>>> Add spi0 cs pinctrl pins definitions.
+>>>
+>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>>> ---
+>>>   arch/arm/boot/dts/at91rm9200.dtsi |   20 ++++++++++++++++++++
+>>>   1 file changed, 20 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi
+>>> b/arch/arm/boot/dts/at91rm9200.dtsi
+>>> index f770655..69b76c7 100644
+>>> --- a/arch/arm/boot/dts/at91rm9200.dtsi
+>>> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
+>>> @@ -486,6 +486,26 @@
+>>>                                AT91_PIOA 1 AT91_PERIPH_A
+>>> AT91_PINCTRL_NONE    /* PA1 periph A SPI0_MOSI pin */
+>>>                                AT91_PIOA 2 AT91_PERIPH_A
+>>> AT91_PINCTRL_NONE>;    /* PA2 periph A SPI0_SPCK pin */
+>>>                       };
+>>> +
+>>> +                    pinctrl_spi0_cs0: spi0_cs0-0 {
+>>> +                        atmel,pins =
+>>> +                            <AT91_PIOA 3 AT91_PERIPH_A
+>>> AT91_PINCTRL_NONE>;    /* PA3 periph A SPI0_NPCS0 pin */
+>>> +                    };
+>>> +
+>>> +                    pinctrl_spi0_cs1: spi0_cs1-0 {
+>>> +                        atmel,pins =
+>>> +                            <AT91_PIOA 4 AT91_PERIPH_GPIO
+>>> AT91_PINCTRL_MULTI_DRIVE>;    /* PA4 GPIO SPI0_NPCS1 pin */
+>>> +                    };
+>>> +
+>>> +                    pinctrl_spi0_cs2: spi0_cs2-0 {
+>>> +                        atmel,pins =
+>>> +                            <AT91_PIOA 5 AT91_PERIPH_GPIO
+>>> AT91_PINCTRL_MULTI_DRIVE>;    /* PA5 GPIO SPI0_NPCS2 pin */
+>>> +                    };
+>>> +
+>>> +                    pinctrl_spi0_cs3: spi0_cs3-0 {
+>>> +                        atmel,pins =
+>>> +                            <AT91_PIOA 6 AT91_PERIPH_GPIO
+>>> AT91_PINCTRL_MULTI_DRIVE>;    /* PA6 GPIO SPI0_NPCS3 pin */
+>>> +                    };
+>> nack the pin are not multidrive there is only one master
+> Right, this is a mistake.
+>
+> But the pins should be configured as OUTPUT with HIGH level
+> (see
+> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91rm9200_devices.c#L589).
+>
 
+Okay, my mistake again, declaring "cs-gpios" property should suffice 
+(the atmel spi driver will configure it accordingly when probing the spi 
+device).
 
-s/iommu/dma/
-
-Otherwise looks good. The dts files are correct, so I guess it's just
-a typo here.
-
-	Arnd
+>
+>>
+>> Best Regards,
+>> J.
+>>>                   };
+>>>                   pioA: gpio at fffff400 {
+>>> --
+>>> 1.7.9.5
+>>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
