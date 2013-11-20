@@ -1,35 +1,76 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Wed, 20 Nov 2013 22:38:46 +0200
-Subject: [PATCH 0/3] Reuse davinci-nand driver for Keystone arch
-In-Reply-To: <528D1C94.7010100@ti.com>
-References: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
- <528D18EC.6000501@ti.com> <528D1C94.7010100@ti.com>
-Message-ID: <528D1DD6.9010808@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 20 Nov 2013 12:48:08 -0800
+Subject: [PATCH RFC v1 7/7] net: cpsw: resume/suspend PHY on port
+ start/stop
+In-Reply-To: <1384978913-8052-8-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1384978913-8052-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAGVrzcZ+5oaucp+OSeGGe=6MBjEwi4K=E_NbCm3PjR_Owyxstw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2013 10:33 PM, Santosh Shilimkar wrote:
-> On Wednesday 20 November 2013 03:17 PM, Grygorii Strashko wrote:
->> On 11/20/2013 06:24 PM, Ivan Khoronzhuk wrote:
->>> This series contains updates of Davinci nand driver, in order to be
->>> reused for Keystone platform.
->>>
->>> Depends on:
->>> - Davinci nand driver fixes and updates:
->>>     https://lkml.org/lkml/2013/11/20/271
->>
->> ^^^^ I suggest to merge this series with above one as it
->> should not break anything.
->>
-> I agree. That way the mtd patch series can go
-> together nicely.
+2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+> Network PHYs consume a noticable amount of power. This adds phy_resume
+> on slave_open and phy_suspend on slave_stop to save this power if the
+> port is down anyway.
 >
-> Regards,
-> Santosh
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/ethernet/ti/cpsw.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 >
+> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> index 90d41d2..f1dc54f 100644
+> --- a/drivers/net/ethernet/ti/cpsw.c
+> +++ b/drivers/net/ethernet/ti/cpsw.c
+> @@ -1013,6 +1013,7 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
+>         } else {
+>                 dev_info(priv->dev, "phy found : id is : 0x%x\n",
+>                          slave->phy->phy_id);
+> +               phy_resume(slave->phy);
+>                 phy_start(slave->phy);
 
-Ok, I will combine them
+Cannot phy_start() figure this out for us based on the internal PHY
+device state machine?
+
+I would imagine that you would want to call phy_suspend/resume from an
+Ethernet driver's PM suspend/resume callbacks to make sure that the
+PHY also enters a low power mode, but I do not want to have to
+remember that I need to call phy_resume before phy_start for instance.
+As of today we have PHY_HALTED/PHY_RESUMING, and I think we certainly
+need at least a PHY_SUSPENDED state to help us with that.
+
+>
+>                 /* Configure GMII_SEL register */
+> @@ -1081,6 +1082,7 @@ static void cpsw_slave_stop(struct cpsw_slave *slave, struct cpsw_priv *priv)
+>         if (!slave->phy)
+>                 return;
+>         phy_stop(slave->phy);
+> +       phy_suspend(slave->phy);
+
+Same here, why is not that hidden in phy_stop? If there is any fear
+that this breaks setups where WoL is used or such, we could add a new
+argument to phy_connect() and friends which says whether it is okay to
+auto-suspend the PHY upon PHY_stop
+
+>         phy_disconnect(slave->phy);
+>         slave->phy = NULL;
+>  }
+> --
+> 1.7.2.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Florian
