@@ -1,47 +1,28 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 21 Nov 2013 02:21:26 +0800
-Subject: [PATCH 3/3] ARM: EXYNOS: Constify clksrc immutable register restore
- tables
-In-Reply-To: <1384971686-7208-1-git-send-email-djkurtz@chromium.org>
-References: <1384971686-7208-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <1384971686-7208-3-git-send-email-djkurtz@chromium.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Nov 2013 11:22:03 -0700
+Subject: [PATCH 13/31] dma: tegra: register as an OF DMA controller
+In-Reply-To: <201311201628.57951.arnd@arndb.de>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-14-git-send-email-swarren@wwwdotorg.org>
+ <201311201628.57951.arnd@arndb.de>
+Message-ID: <528CFDCB.1080200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clksrc tables are constant, they are not used to store register values
-at suspend.
+On 11/20/2013 08:28 AM, Arnd Bergmann wrote:
+> On Friday 15 November 2013, Stephen Warren wrote:
+...
+>> @@ -1383,6 +1409,10 @@ static int tegra_dma_probe(struct platform_device *pdev)
+>>                 goto err_irq;
+>>         }
+>>  
+>> +       tegra_dma_info.dma_cap = tdma->dma_dev.cap_mask;
+>> +       ret = of_dma_controller_register(pdev->dev.of_node,
+>> +                                        of_dma_simple_xlate, &tegra_dma_info);
+>> +
+> 
+> I would suggest to use a custom xlate() function based on
+> dma_get_slave_channel() that was added recently: Iterating through all
+> channels is not necessary any more.
 
-size arch/arm/mach-exynos/pm.o
-   text	   data	    bss
-   1591	    212	     12	   // Before
-   1671	    132	     12	   // After
-
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
----
- arch/arm/mach-exynos/pm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index c679db5..7fb0f13 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -36,7 +36,7 @@
- 
- #include "common.h"
- 
--static struct sleep_save exynos4_set_clksrc[] = {
-+static const struct sleep_save exynos4_set_clksrc[] = {
- 	{ .reg = EXYNOS4_CLKSRC_MASK_TOP		, .val = 0x00000001, },
- 	{ .reg = EXYNOS4_CLKSRC_MASK_CAM		, .val = 0x11111111, },
- 	{ .reg = EXYNOS4_CLKSRC_MASK_TV			, .val = 0x00000111, },
-@@ -48,7 +48,7 @@ static struct sleep_save exynos4_set_clksrc[] = {
- 	{ .reg = EXYNOS4_CLKSRC_MASK_DMC		, .val = 0x00010000, },
- };
- 
--static struct sleep_save exynos4210_set_clksrc[] = {
-+static const struct sleep_save exynos4210_set_clksrc[] = {
- 	{ .reg = EXYNOS4210_CLKSRC_MASK_LCD1		, .val = 0x00001111, },
- };
- 
--- 
-1.8.4.1
+OK, I've converted to that locally, and will repost soon.
