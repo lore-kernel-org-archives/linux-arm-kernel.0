@@ -1,42 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 20 Nov 2013 11:21:02 -0800
-Subject: [PATCH] arm: KVM: Don't return PSCI_INVAL if waitqueue is inactive
-In-Reply-To: <CAFEAcA-b5CTMQLsYikHcExVDjy8BL3gnx=Z7f4jVGPCkJsD6Ew@mail.gmail.com>
-References: <1384973499-30659-1-git-send-email-christoffer.dall@linaro.org>
- <CAFEAcA-b5CTMQLsYikHcExVDjy8BL3gnx=Z7f4jVGPCkJsD6Ew@mail.gmail.com>
-Message-ID: <20131120192102.GF9314@cbox>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Nov 2013 11:22:10 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix populating the hwmod data from device
+ tree
+In-Reply-To: <20131120181255.GG10317@atomide.com>
+References: <20131120025620.GF10317@atomide.com>
+ <20131120181255.GG10317@atomide.com>
+Message-ID: <20131120192209.GI10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 07:12:42PM +0000, Peter Maydell wrote:
-> On 20 November 2013 18:51, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > Therefore, set the pause flag on the vcpu at VCPU init time (which can
-> > reasonably be expected to be completed for all CPUs by user space before
-> > running any VCPUs) and clear both this flag and the feature (in case the
-> > feature can somehow get set again in the future) and ping the waitqueue
-> > on turning on a VCPU using PSCI.
-> 
-> Tangential, but your phrasing prompted me to ask: how does
-> the "start in PSCI power-off" boot protocol work for system reset?
-> Since the kernel doesn't currently provide a "reset this v CPU"
-> ioctl userspace has to do reset manually[*]; how do we say "take
-> this vCPU which has started up and run once, and put it back
-> into PSCI power-off" ?
-> 
-> [*] this is pretty tedious, since it involves reading every CPU
-> register on the vCPU before first run in order to feed the kernel
-> back a bunch of info it already knows about the reset state of
-> a vCPU.
-> 
-So, from looking at the code and the API specification calling
-KVM_ARM_VCPU_INIT does exactly this and also resets all core and cp15
-registers for you - you would here be able to set the power-off flag and
-pause those CPUs so PSCI can wake them up again.
+* Tony Lindgren <tony@atomide.com> [131120 10:13]:
+> * Tony Lindgren <tony@atomide.com> [131119 18:57]:
+> > We have some device tree properties where the ti,hwmod has multiple
+> > values:
+> > 
+> > am33xx.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> > am4372.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
 
-Am I missing something here?
+I think these should be defined in the .dtsi files as separate devices
+and removed from the related omap_hwmod_*_data.c files.
 
-This makes me wonder if it's worth adding to
-Documentation/virtual/kvm/api.txt that KVM_ARM_VCPU_INIT should be
-called on all VCPUs before running any of the VCPUs...
+> > dra7.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2";
 
--Christoffer
+These too should be defined in the .dtsi file. Looks like we're missing
+the related data in the omap_hwmod_7xx_data.c file anyways?
+
+> > omap3.dtsi:	ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
+> > omap3.dtsi:	ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
+
+OK the sidetone data we can probably parse using the ti,hwmods as
+an index.
+
+> > omap4.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+> > omap5.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+
+Benoit, I guess these mean that those devices should be created
+dynamically, right?
+
+Yet we've removed the related data in commit 3b9b10 and are not
+passing it in the .dtsi file?
+
+So these should be created as separate devices in the .dtsi file
+instead AFAIK.
+
+> Hmm I think this also needs part two to it to populate the right IO space
+> based on the index, this probably now wrongly populates the first IO space
+> for all the hwmod instances in the group.
+
+Yeah this patch clearly is not the right fix to the problem of
+missing data.
+
+Regards,
+
+Tony
