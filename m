@@ -1,32 +1,76 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 20 Nov 2013 19:18:23 +0800
-Subject: [PATCH RESEND 0/7] crypto: at91/atmel: add Device Tree support
-In-Reply-To: <528C924E.50206@atmel.com>
-References: <cover.1383922546.git.nicolas.ferre@atmel.com>
- <528C924E.50206@atmel.com>
-Message-ID: <20131120111823.GA20591@gondor.apana.org.au>
+Date: Wed, 20 Nov 2013 19:20:11 +0800
+Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
+In-Reply-To: <201311101848.12215.marex@denx.de>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <20131008043631.GA18365@gondor.apana.org.au>
+ <201310081233.37136.marex@denx.de>
+ <201311101848.12215.marex@denx.de>
+Message-ID: <20131120112010.GA20958@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 11:43:26AM +0100, Nicolas Ferre wrote:
-> On 08/11/2013 16:08, Nicolas Ferre :
-> >This series adds Device Tree support to the Atmel crypto drivers
-> >(AES/[T]DES/SHA). The Device Tree entries are very simple and only
-> >declare the reg/irq values and the link to DMA.
+On Sun, Nov 10, 2013 at 06:48:11PM +0100, Marek Vasut wrote:
+> Hi,
 > 
-> Herbert,
+> > Hello Herbert,
+> > 
+> > > On Mon, Oct 07, 2013 at 05:48:26PM +0200, Marek Vasut wrote:
+> > > > Hello Christoph,
+> > > > 
+> > > > > Hello Marek,
+> > > > > 
+> > > > > > Marek Vasut <marex@denx.de> hat am 28. September 2013 um 05:35
+> > > > > > geschrieben: [...]
+> > > > > > 
+> > > > > > > > 3) What are those ugly new IOCTLs in the dcp.c driver?
+> > > > > > > 
+> > > > > > > When I firstly posted the driver in the mailinglist, there where
+> > > > > > > one person who actually used this interface (it was introduced in
+> > > > > > > Freescale's SDK) to use the OTP keys for crypto. As far as I have
+> > > > > > > seen, the crypto API does not support such keys (i.e. there seems
+> > > > > > > to be no way to tell a driver to use some kind of special keys -
+> > > > > > > which are not delivered by the user - via the API).
+> > > > > > > Therefore I added this miscdevice and adopted Freescale's
+> > > > > > > interface.
+> > > > > > 
+> > > > > > The keys are programmed into the OTP registers, correct? There is
+> > > > > > OCOTP d
+> > > > > >
+> > > > > >river
+> > > > > >for the MX23/MX28 OTP hardware. This is what should have been used
+> > > > > >then.
+> > > > > >
+> > > > > > NOTE: This IOCTL interface seems like quite an abusive way to allow
+> > > > > > userl
+> > > > > >
+> > > > > >and to
+> > > > > >access the crypto API in kernel. I understand this is used by some
+> > > > > >Freesc ale tool, but won't it be better to fix the Freescale tool
+> > > > > >instead ?
+> > > > > 
+> > > > > the IOCTL interface is used to AES encrypt a bootstream with the AES
+> > > > > key in OCOTP.
+> > > > > The idea is that only the DCP can read/access the key once it has
+> > > > > been programmed
+> > > > > into the OCOTP. If the crypto API has means to tell the DCP to use
+> > > > > the key from OCOTP, the tool from Freescale is a minor problem.
+> > > > 
+> > > > Ah right. I suspect the crypto API services shall not be exported into
+> > > > userland at all, yes ? So there has to be some kind of workaround here
+> > > > for this freescale tool, which is rather unfortunate.
+> > > 
+> > > These ioctls have to go.  I should have never let them through in
+> > > the first place.  Can someone cook up a patch to kill them please?
+> > 
+> > I can do that. I wonder if we can't agree to nuke the in-tree driver
+> > altogether instead and replace it by this one though. Does it not sound
+> > more reasonable?
 > 
-> ping?
-> 
-> Could I have your "Acked-by" for taking these patches through the
-> arm-soc git tree, or do you want that we split this series so that
-> you can take the driver part of it?
+> Bump?
 
-Sure please push them through the arm-soc tree.
-
-You can add my ack:
-
-Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
+Well as it's been months and nobody has stepped up to maintain
+the in-tree driver then yes we can get rid of it.
 
 Thanks,
 -- 
