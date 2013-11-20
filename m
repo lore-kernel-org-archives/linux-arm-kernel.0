@@ -1,43 +1,57 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 20 Nov 2013 18:24:59 +0200
-Subject: [PATCH 3/3] mtd: nand: davinci: don't request AEMIF address range
-In-Reply-To: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1384964699-15134-4-git-send-email-ivan.khoronzhuk@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 20 Nov 2013 08:27:21 -0800
+Subject: [PATCH v4 1/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <CAPdLdqmxFnJ9HZa04buh8NecMszEAp11VRU4Q159vZ+=NG9p3A@mail.gmail.com>
+References: <1384888074-19696-1-git-send-email-markus.mayer@linaro.org>
+ <1384888074-19696-2-git-send-email-markus.mayer@linaro.org>
+ <CAPdLdqmxFnJ9HZa04buh8NecMszEAp11VRU4Q159vZ+=NG9p3A@mail.gmail.com>
+Message-ID: <20131120162721.GB28683@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TI AEMIF driver registers are used to setup timings for each chip
-select. The same registers range is used to setup NAND settings.
-The AEMIF and NAND drivers not use the same registers in this range.
+On Wed, Nov 20, 2013 at 08:12:37AM -0800, Markus Mayer wrote:
+> On 19 November 2013 11:07, Markus Mayer <markus.mayer@linaro.org> wrote:
+> > This commit adds support for the watchdog timer used on the BCM281xx
+> > family of SoCs.
+> >
+> > Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+> > Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> > ---
+> >  drivers/watchdog/Kconfig        |   22 +++
+> >  drivers/watchdog/Makefile       |    1 +
+> >  drivers/watchdog/bcm_kona_wdt.c |  365 +++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 388 insertions(+)
+> >  create mode 100644 drivers/watchdog/bcm_kona_wdt.c
+> >
+> 
+> [...]
+> 
+> > diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> > index 6c5bb27..7c860ca 100644
+> > --- a/drivers/watchdog/Makefile
+> > +++ b/drivers/watchdog/Makefile
+> > @@ -55,6 +55,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+> >  obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+> >  obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
+> >  obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
+> > +obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
+> >
+> >  # AVR32 Architecture
+> >  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> 
+> Just to let everyone know, due to the watchdog -> mainline merge a few
+> days ago, there's a trivial merge conflict now in the makefile. I'll
+> send out a re-based v5 of this patch once 3.13-rc1 has been tagged
+> (unless you would like a rebased-to-tip version before then).
+> 
+Hi Markus,
 
-In case with TI AEMIF driver, the memory address range is requested
-already by AEMIF, so we cannot request it twice, just ioremap.
+Yes, I noticed when I merged it into my watchdog-next branch.
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/mtd/nand/davinci_nand.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Reminds me ... v3 had a whitespace problem. I don't recall if you fixed
+that in v4. If you didn't, that might be a better reason to send v5.
+Take your patch and apply it with "git am" to find out.
 
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index e904364..aa30708 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -638,9 +638,11 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	if (IS_ERR(vaddr))
- 		return PTR_ERR(vaddr);
- 
--	base = devm_ioremap_resource(&pdev->dev, res2);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
-+	if (!base) {
-+		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
-+		return -EADDRNOTAVAIL;
-+	}
- 
- 	info->dev		= &pdev->dev;
- 	info->base		= base;
--- 
-1.7.9.5
+Thanks,
+Guenter
