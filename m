@@ -1,61 +1,82 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 20 Nov 2013 04:17:08 +0100
-Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <528BD6A7.3030908@wwwdotorg.org>
-References: <20131119102506.GG31504@ulmo.nvidia.com><20131119.140351.1342214267287135109.hdoyu@nvidia.com><528BD6A7.3030908@wwwdotorg.org>
-Message-ID: <20131120.051708.396722414386125310.hdoyu@nvidia.com>
+From: Li.Xiubo@freescale.com (Li Xiubo)
+Date: Wed, 20 Nov 2013 03:37:45 +0000
+Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <20131104043338.GA2345@MrMyself>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131101085904.GC28401@MrMyself>
+ <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20131104043338.GA2345@MrMyself>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828AE980@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 19 Nov 2013 22:22:47 +0100:
-
-> On 11/19/2013 05:03 AM, Hiroshi Doyu wrote:
-> > Hi Thierry,
-> > 
-> > Thierry Reding <thierry.reding@gmail.com> wrote @ Tue, 19 Nov 2013 11:25:07 +0100:
-> > 
-> >> From earlier discussions I thought the goal was to actually defer this
-> >> until all nodes referred to by the iommus property were actually
-> >> registered. The above only checks that the phandles can be resolved to
-> >> valid struct device_node:s. That doesn't mean that an actual IOMMU has
-> >> been registered for it, only that the devices have been created.
-> > 
-> > Currently "bus->iommu_ops" is set at the end of tegra_smmu_probe(). So
-> > if "bus->iommu_ops" is set, it means that an iommu instance is
-> > populated at that time.
+ 
+> The udelay just doesn't make sense to what you are talking about.
 > 
-> Yes, but that's the register bus, upon which the device is a client, not
-> the bus upon which the device is a bus master. They aren't necessarily
-> the same.
+> Does SAI really need 10us delay between two register-updating?
 > 
-> There's no getting around the fact that, as Thierry said, you need to
-> search for a registered IOMMU device for each phandle, and defer probe
-> if any aren't registered yet.
+
+No, this is not must be.
+
+> We basically use udelay only if the IP hardware actually needs it: some
+> IP needs time to boot itself up after doing software reset for example.
+> But it doesn't look reasonable to me by using udelay to make sure "the
+> last enabled".
 > 
-> If we do that, then you shouldn't need to look at the value of
-> dev->bus->iommu_ops at all; if all IOMMUs in the list were registered,
-> then iommu_ops must have been set when (one of them) was registered, and
-> if not, then it possibly wasn't, so defer probe.
+> And from the 'Synchronous mode' you just provided, there're another issue:
 > 
-> That way, this code won't have to change if the core IOMMU code gets
-> extended to support multiple IOMMUs, devices mastering transactions onto
-> buses other than their register bus, etc.
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		tcsr |= FSL_SAI_CSR_TERE;
+> +		rcsr |= FSL_SAI_CSR_TERE;
+> +		writel(rcsr, sai->base + FSL_SAI_RCSR);
+> +		udelay(10);
+> +		writel(tcsr, sai->base + FSL_SAI_TCSR);
+> +		break;
+> +
+> +	case SNDRV_PCM_TRIGGER_STOP:
+> +	case SNDRV_PCM_TRIGGER_SUSPEND:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> +		if (!(dai->playback_active || dai->capture_active)) {
+> +			tcsr &= ~FSL_SAI_CSR_TERE;
+> +			rcsr &= ~FSL_SAI_CSR_TERE;
+> +		}
+> +		writel(rcsr, sai->base + FSL_SAI_RCSR);
+> +		udelay(10);
+> +		writel(tcsr, sai->base + FSL_SAI_TCSR);
+> +		break;
+> 
+> ISSUE 1: You might make sure transmitter is the last enabled.
+> 	 However, it's not the first disabled. Is this okay?
+> 
 
-Does the above mean the following?
+Yes, this is just programming mistake. I'll revise it.
 
-int of_iommu_attach(struct device *dev)
-{
-	int i;
-	struct of_phandle_args args;
-
-	of_property_for_each_phandle_with_args(dev->of_node, "iommus",
-					       "#iommu-cells", i, &args)
-		if (!args->np->dev->driver)
-			return -EPROBE_DEFER;
-	return 0;
-}
+In this case the transmitter should be the last enabled and the first disabled.
 
 
-"args->np->dev->driver" needs the following patch:
+> ISSUE 2: There are two cases listed in 'Synchronous mode'.
+> 	 However, your driver doesn't take care of them.
+> 	 The SAI's synchronous mode looks like more flexible
+> 	 than SSI's. The driver needs to be more sophisticated
+> 	 so that it can handle multiple cases when TX/RX clocks
+> 	 are controlled by either TX or RX, and surely, the
+> 	 asynchronous mode as well.
+> 
 
-  http://lists.linuxfoundation.org/pipermail/iommu/2013-July/006023.html
+Because in Vybrid the transmitter bit clock and frame sync are to be used by both the transmitter and receiver, and only this case can be used here, so now I only handle this case.
+
+> 
+> And there's another personal tip: I think you can first try to focus on
+> this SAI driver and pend the others. There might be two many things you
+> need to refine if you are doing them at the same time.
+> 
+
+I'll implement them later if needed.
+
+
+--
+Best Regards,
+Xiubo
