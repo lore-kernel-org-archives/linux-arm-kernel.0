@@ -1,45 +1,195 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 20 Nov 2013 13:10:04 +0000
-Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
-In-Reply-To: <20131119192246.GP16735@n2100.arm.linux.org.uk>
-References: <528A6944.3070303@wwwdotorg.org> <20131118192852.GI10335@titan.
- lakedaemon.net> <528A6CA3.9030904@wwwdotorg.org> <20131118195243.GJ10335@
- titan.lakedaemon.net> <528A98C8.9040803@wwwdotorg.org> <20131119122801.
- GL16735@n2100.arm.linux.org.uk> <20131119142336.GA28859@titan.lakedaemon.
- net> <20131119150212.GM16735@n2100.arm.linux.org.uk> <20131119152047.
- GB28859@titan.lakedaemon.net> <20131119152146.GN16735@n2100.arm.linux.org.
- uk> <20131119192246.GP16735@n2100.arm.linux.org.uk>
-Message-ID: <20131120131004.ACA1BC4079D@trevor.secretlab.ca>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Nov 2013 13:14:20 +0000
+Subject: [PATCH V4 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1384946021-22100-3-git-send-email-vkale@apm.com>
+References: <1384946021-22100-1-git-send-email-vkale@apm.com>
+ <1384946021-22100-3-git-send-email-vkale@apm.com>
+Message-ID: <528CB5AC.5080007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Nov 2013 19:22:46 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Nov 19, 2013 at 03:21:46PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Nov 19, 2013 at 10:20:47AM -0500, Jason Cooper wrote:
-> > > By "That" are you referring to extending the standard for compatible
-> > > strings to the board level, or forcing consistent naming on the dts
-> > > files?
-> > 
-> > A consistent file naming on both the dtb and dts files.
-> 
-> It's time to knock the idea of naming the DT blobs after the compatible
-> string on its head as well.  That's really not going to work.  Just
-> leave the filenames as is, and move the problem into userspace to solve.
-> 
-[...]
-> 
-> Just use the filenames we already have in the kernel tree.  Let userspace
-> parse the DT blobs for the compatible strings - it can then provide the
-> user with the choice of all and _also_ show that certain of DT blobs
-> may be compatible with a range of boards as well.
+[dropped patches at apm.com]
 
-Yes, the consistent filename format is a non-problem. The files that
-exist already have names. Nothing else is going to use them. Done. It
-makes total sense to require that new files follow some sane naming
-convention, but it is a mistake to project that back and say all
-existing files must also be renamed.
+Vinayak,
 
-Sure it may look untidy, particularly to those of us with
-obsessive-compulsive tendencies, but it isn't actually a problem.
+Please keep reviewers on CC, as it makes easier to track the changes.
 
-g.
+On 20/11/13 11:13, Vinayak Kale wrote:
+> Add support for irq registration when pmu interrupt is percpu.
+> 
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
+>  1 file changed, 81 insertions(+), 27 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index cea1594..de12ba8 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -22,6 +22,7 @@
+>  
+>  #include <linux/bitmap.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/export.h>
+>  #include <linux/perf_event.h>
+> @@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
+>  }
+>  
+>  static void
+> +armpmu_disable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = data;
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +	disable_percpu_irq(irq);
+> +}
+> +
+> +static void
+>  armpmu_release_hardware(struct arm_pmu *armpmu)
+>  {
+>  	int i, irq, irqs;
+>  	struct platform_device *pmu_device = armpmu->plat_device;
+>  
+>  	irqs = min(pmu_device->num_resources, num_possible_cpus());
+> +	if (irqs < 1)
+> +		return;
+>  
+> -	for (i = 0; i < irqs; ++i) {
+> -		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+> -			continue;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq >= 0)
+> -			free_irq(irq, armpmu);
+> +	irq = platform_get_irq(pmu_device, 0);
+> +	if (irq < 0)
+
+So I'm going to sound like a stuck record: irq == 0 is not a valid IRQ
+number, full stop. This is how we express the fact that there is no IRQ.
+
+If you're touching that code, you might as well fix this buglet.
+
+> +		return;
+> +
+> +	if (irq_is_percpu(irq)) {
+> +		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
+> +		free_percpu_irq(irq, &cpu_hw_events);
+> +	} else {
+> +		for (i = 0; i < irqs; ++i) {
+> +			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+> +				continue;
+> +			irq = platform_get_irq(pmu_device, i);
+> +			if (irq >= 0)
+
+Same here.
+
+> +				free_irq(irq, armpmu);
+> +		}
+>  	}
+>  }
+>  
+> +static void
+> +armpmu_enable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = data;
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	enable_percpu_irq(irq, 0);
+> +	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +}
+> +
+>  static int
+>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  {
+> @@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  		return -ENODEV;
+>  	}
+>  
+> -	for (i = 0; i < irqs; ++i) {
+> -		err = 0;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq < 0)
+> -			continue;
+> +	irq = platform_get_irq(pmu_device, 0);
+> +	if (irq < 0) {
+
+And here.
+
+> +		pr_err("failed to get an irq for PMU device\n");
+> +		return -ENODEV;
+> +	}
+>  
+> -		/*
+> -		 * If we have a single PMU interrupt that we can't shift,
+> -		 * assume that we're running on a uniprocessor machine and
+> -		 * continue. Otherwise, continue without this interrupt.
+> -		 */
+> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> -				    irq, i);
+> -			continue;
+> -		}
+> +	if (irq_is_percpu(irq)) {
+> +		err = request_percpu_irq(irq, armpmu->handle_irq,
+> +				"arm-pmu", &cpu_hw_events);
+>  
+> -		err = request_irq(irq, armpmu->handle_irq,
+> -				  IRQF_NOBALANCING,
+> -				  "arm-pmu", armpmu);
+>  		if (err) {
+> -			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+> -				irq);
+> +			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
+> +					irq);
+>  			armpmu_release_hardware(armpmu);
+>  			return err;
+>  		}
+>  
+> -		cpumask_set_cpu(i, &armpmu->active_irqs);
+> +		on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
+> +	} else {
+> +		for (i = 0; i < irqs; ++i) {
+> +			err = 0;
+> +			irq = platform_get_irq(pmu_device, i);
+> +			if (irq < 0)
+
+And here.
+
+> +				continue;
+> +
+> +			/*
+> +			 * If we have a single PMU interrupt that we can't shift,
+> +			 * assume that we're running on a uniprocessor machine and
+> +			 * continue. Otherwise, continue without this interrupt.
+> +			 */
+> +			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> +				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> +						irq, i);
+> +				continue;
+> +			}
+> +
+> +			err = request_irq(irq, armpmu->handle_irq,
+> +					IRQF_NOBALANCING,
+> +					"arm-pmu", armpmu);
+> +			if (err) {
+> +				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+> +						irq);
+> +				armpmu_release_hardware(armpmu);
+> +				return err;
+> +			}
+> +
+> +			cpumask_set_cpu(i, &armpmu->active_irqs);
+> +		}
+>  	}
+>  
+>  	return 0;
+> 
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
