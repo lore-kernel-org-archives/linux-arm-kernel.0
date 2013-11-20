@@ -1,39 +1,59 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 20 Nov 2013 07:40:57 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131119184827.GD20967@quad.lixom.net>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <5289A356.4060004@jonmasters.org>
- <20131118150052.GC24408@sirena.org.uk>
- <20131118191336.GB5886@quad.lixom.net>
- <20131119091216.GA4412@netboy>
- <20131119184827.GD20967@quad.lixom.net>
-Message-ID: <20131120064056.GB5272@netboy>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 19 Nov 2013 23:21:11 -0800
+Subject: [PATCH v4] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
+Message-ID: <1384932072-8103-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 10:48:27AM -0800, Olof Johansson wrote:
-> 
-> This is just a tangent and a distraction anyway: You should know by
-> now that we've decided to keep backwards compatibility going forward,
-> so any argument about why we did it differently before is leading nowhere.
+Hi,
 
-Yes, I know it is tangent, but the tone in which you address people
-(like Jon Masters) who complain about DT quality is really not fair.
+Here is version 4 of fix to armv7-m build failure in 
+sigreturn_codes.S. The difference with version 3 is
+fixed formating and renamed internally used macro
+as per Dave's comments on [3].
 
-When DT for arm was first proposed, I argued against it in vain.
-Since then, I have really, truly tried my best to keep on top of the
-DT discussions on the arm list, because everyone working on the arm
-platform will have to know DT intimately, whether they want to or not.
+Solution is based on .org directive Dave's suggestion 
+on last email in [1].
 
-Now, I never saw any proclamation or discussion about "DT is in flux"
-on the arm list. If I had, I surely would have complained, and loudly.
-AFAICT, this decision was made in rather private circles, but you talk
-as if this was abundantly clear. *It was not.*
+It uses conditional compilation and it uses .org 
+directive to keep sigreturn_codes layout.
 
-Or if it was announced in some way, just show me where. Otherwise,
-please stop the "we were upfront about this from day one" excuses.
+Note I did not use ARM and THUMB macros because 
+those switch between CONFIG_THUMB2_KERNEL and not.
+On v7a kernel we need both arm and thumb snipets
+regardless of CONFIG_THUMB2_KERNEL setting.
+And conditional compilation only kicks in with
+CONFIG_CPU_THUMBONLY, for that local ARM_INSTR
+macro is created.
+
+Version 3 [3] conditional compilation and .org directive.
+Pretty much the same code but incorrectly formated. Please 
+look at [3] for details.
+
+Version 2 [2] tried to use '.acrh armv4t' directive
+to allow both arm and thumb2 opcodes, but solution
+deemed to be too fragile.
+
+Version 1 [1] used conditional compilation and added
+thumb2 nop instructions in  CONFIG_CPU_THUMBONLY
+
+Fix was tested
+   linux-next with efm32_defconfig build (along with few other fixes)
+   rmk-next BE/LE vexpress build/boot and LTP rt_sigaction0? tests run
+   Uwe tested version 1 and 3 with efm32
 
 Thanks,
-Richard
+Victor
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210393.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210949.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/212307.html
+
+Victor Kamensky (1):
+  ARM: signal: fix armv7-m build issue in sigreturn_codes.S
+
+ arch/arm/kernel/sigreturn_codes.S | 40 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 31 insertions(+), 9 deletions(-)
+
+-- 
+1.8.1.4
