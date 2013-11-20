@@ -1,54 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Nov 2013 18:56:20 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix populating the hwmod data from device tree
-Message-ID: <20131120025620.GF10317@atomide.com>
+From: bgamari.foss@gmail.com (Ben Gamari)
+Date: Tue, 19 Nov 2013 22:06:50 -0500
+Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
+In-Reply-To: <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
+References: <87hab9agjr.fsf@gmail.com>
+ <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
+Message-ID: <87wqk3n54l.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have some device tree properties where the ti,hwmod has multiple
-values:
+Chao Xu <caesarxuchao@gmail.com> writes:
 
-am33xx.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-am4372.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-dra7.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2";
-omap3.dtsi:	ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
-omap3.dtsi:	ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
-omap4.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
-omap5.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+> Hi,
+>
+> I also try to boot v3.12 on my pandaboard rev A2, but it hangs at
+> "starting kernel". My SD card is originally loaded with a linaro 12.04
+> ubuntu-developer image. I have tried with v3.7 and v3.8 uImage and
+> both of them work normally, but v3.12 hangs. Is there any trick I
+> missed? Do I need to use the new u-boot as used by Ben?
+>
+I've written up some of my experiences bringing up 3.12 on the
+PandaBoard here[1]. You may find it helpful. Regardless, I would
+definitely try upgrading u-boot.
 
-So we need to handle the whole string array instead of just the
-first string to find the related hwmod entry.
+> And here is a separate problem with building u-boot. I cloned the
+> upstream u-boot repository. The latest commit is
+> c2e5e802ecb7ab668ce9911b210ed68c804b349f. Then I did:
+> make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- omap4_panda_config
+> make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j8
+> cp MLO u-boot.img /media/boot/
+> But when turn on my pandaboard, there is NO output from the serial
+> console. I didn't change the other file in the boot partition. They
+> are from linaro 12.04 ubuntu-developer image.
+>
+I would check that you have earlyprintk enabled (both in the kernel
+configuration as well as on the kernel command line). Moreover, ensure
+that the correct serial devices is selected for low-level debug output
+(in the kernel configuration).
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Cheers,
 
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2228,11 +2228,23 @@ static struct device_node *of_dev_hwmod_lookup(struct device_node *np,
- 						struct omap_hwmod *oh)
- {
- 	struct device_node *np0 = NULL, *np1 = NULL;
--	const char *p;
- 
- 	for_each_child_of_node(np, np0) {
--		if (of_find_property(np0, "ti,hwmods", NULL)) {
--			p = of_get_property(np0, "ti,hwmods", NULL);
-+		int count, i;
-+
-+		count = of_property_count_strings(np0, "ti,hwmods");
-+		if (count < 1)
-+			continue;
-+
-+		for (i = 0; i < count; i++) {
-+			const char *p;
-+			int res;
-+
-+			res = of_property_read_string_index(np0, "ti,hwmods",
-+							    i, &p);
-+			if (res)
-+				continue;
-+
- 			if (!strcmp(p, oh->name))
- 				return np0;
- 			np1 = of_dev_hwmod_lookup(np0, oh);
+- Ben
+
+[1] http://bgamari.github.io/posts/2013-11-17-running-modern-kernel-on-pandaboard.html
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131119/380fc28b/attachment-0001.sig>
