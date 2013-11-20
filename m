@@ -1,54 +1,61 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 20 Nov 2013 20:06:41 +0400
-Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
-In-Reply-To: <528C2910.8030705@gmail.com>
-References: <20131116124750.GA26318@anuminas.rup.mentorg.com>
- <CALT56yOcUChApUP6rOyXqWuK55ZR0Ooj457XVP2b7bVR9yk-8A@mail.gmail.com>
- <528C2910.8030705@gmail.com>
-Message-ID: <CALT56yM4vZ=UAJfA4T_9YgVFLj98-TaZi3GTxi95T2Dd1CDJoQ@mail.gmail.com>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Wed, 20 Nov 2013 11:04:02 -0500
+Subject: [PATCHv2 3/8] ARM: dts: Enables SAI ALSA SoC DAI device for
+ Vybrid VF610 TOWER board.
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F828AD451@039-SN2MPN1-012.039d.mgd.msft.net>
+ (Li Xiubo's message of "Wed, 20 Nov 2013 03:14:09 +0000")
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-4-git-send-email-Li.Xiubo@freescale.com>
+ <87bo1hk2i7.fsf@nbsps.com>
+ <1DD289F6464F0949A2FCA5AA6DC23F828AD451@039-SN2MPN1-012.039d.mgd.msft.net>
+Message-ID: <87hab7hxfx.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Wed, Nov 20, 2013 at 7:14 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On 11/19/2013 04:33 PM, Dmitry Eremin-Solenikov wrote:
->>
->> Hello,
->>
->> On Sat, Nov 16, 2013 at 4:47 PM, Dmitry Eremin-Solenikov
->> <dbaryshkov@gmail.com> wrote:
+[sorry, I should have copied alsa-devel at alsa-project.org previously].
+
+On 19 Nov 2013, Li.Xiubo at freescale.com wrote:
+
+>>> This patch add and enable SAI device.
 >>>
->>> When converting from tosa-keyboard driver to matrix keyboard, tosa keys
->>> received extra 1 column shift. Replace that with correct values to make
->>> keyboard work again.
+>>> arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
+>>> 1 file changed, 6 insertions(+)
 >>>
->>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>> ---
->>>   arch/arm/mach-pxa/tosa.c | 102
->>> +++++++++++++++++++++++------------------------
->>>   1 file changed, 51 insertions(+), 51 deletions(-)
+>>> diff --git a/arch/arm/boot/dts/vf610-twr.dts
+>>> b/arch/arm/boot/dts/vf610-twr.dts index 1a58678..e4106dd 100644
+>>> --- a/arch/arm/boot/dts/vf610-twr.dts
+>>> +++ b/arch/arm/boot/dts/vf610-twr.dts
+>>>>> -57,6 +57,12 @@
+>>> 	status = "okay";
+>>> };
 >>
->>
->> As nobody seems to object, I would like to use my tosa maintainer
->> powers and push
->> this patch for inclusion.
->>
->> Both Eric and Haojian seem to be unresponsive now.
->> Russell, can I push it to your patch system? Or should I push it to
->> arm-soc guys?
+>> Should we put a comment here that a TWR-AUDIO-SGTL board is needed?  Or
+>> is this better in a menuconfig?  I guess TWR-AUDIO-SGTL is needed as this
+>> codec is not on the VF610-TWR main board?
 >>
 >
-> Hi Dmitry,
+> Yes, the SGTL5000 codec is not on the VF610-TWR main board, and needs an extra
+> 	TWR-AUDIO-SGTL board.
 >
-> I can take this patch. I didn't response since I'm waiting the new
-> v3.13-rc1. I'm sorry on inconvenience.
+> IMO, puting this comment in the menuconfig is much better.
 
-No problem here. I was just hoping that this patch can slip into
-3.13-trivial-fixes (as it was initially posted some time ago).
-No problem if it goes to next (3.14) kernel though.
+I agree.  I guess the patch set 6 makes more sense.  Also, you might
+consider adding a printk in the 'fsl_sgtl5000_probe()'.  I guess that
+devm_snd_soc_register_card() will fail if the board is not present?  As
+the board is not 'standard' people may come asking why the audio fails
+on the 'VF610-TWR'.
 
--- 
-With best wishes
-Dmitry
++	ret = devm_snd_soc_register_card(&pdev->dev, &fsl_sgt1500_card);
++	if (ret) {
++		dev_err(&pdev->dev, "register soc sound card failed :%d\n"
++                               "TWR-AUDIO-SGTL board required.\n",
++				ret);
++		return ret;
++	}
+
+Especially, you can make one kernel that handles both cases w/wo
+TWR-AUDIO-SGTL board attached.
+
+Thanks for your work.
+Bill Pringlemeir.
