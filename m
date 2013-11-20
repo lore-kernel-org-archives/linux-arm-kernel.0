@@ -1,36 +1,34 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:09:05 -0600
-Subject: [RFT/RFC/PATCH 18/31] arm: omap: irq: add specific compatibles for
- omap3 and am33xx devices
+Date: Wed, 20 Nov 2013 12:09:06 -0600
+Subject: [RFT/RFC/PATCH 19/31] arm: omap: irq: use compatible flag to figure
+ out number of IRQ lines
 In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
 References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-19-git-send-email-balbi@ti.com>
+Message-ID: <1384970958-4118-20-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-with this, we can use a compatible flag to figure
-out how many irq lines are wired up, no need for
-our TI-specific ti,intc-size binding.
+so far, only am33xx has 128 lines, all other devices
+have only 96.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/irq.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 8104f85..1e1015c 100644
+index 1e1015c..fd89488 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -323,7 +323,9 @@ static int __init intc_of_init(struct device_node *node,
- 	return 0;
- }
+@@ -313,6 +313,9 @@ static int __init intc_of_init(struct device_node *node,
+ 		return -EINVAL;
+ 	}
  
--IRQCHIP_DECLARE(omap_intc, "ti,omap2-intc", intc_of_init);
-+IRQCHIP_DECLARE(omap2_intc, "ti,omap2-intc", intc_of_init);
-+IRQCHIP_DECLARE(omap3_intc, "ti,omap3-intc", intc_of_init);
-+IRQCHIP_DECLARE(am33xx_intc, "ti,am33xx-intc", intc_of_init);
++	if (of_device_is_compatible(node, "ti,am33xx-intc"))
++		nr_irq = 128;
++
+ 	if (of_property_read_u32(node, "ti,intc-size", &nr_irq))
+ 		pr_warn("unable to get intc-size, default to %d\n", nr_irq);
  
- asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
- {
 -- 
 1.8.4.GIT
