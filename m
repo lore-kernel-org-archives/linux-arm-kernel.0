@@ -1,96 +1,65 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 20 Nov 2013 14:36:14 -0800
-Subject: [PATCH RFC v1 4/7] net: phy: suspend unused PHYs on mdio_bus in
- late_initcall
-In-Reply-To: <528D2403.5040204@gmail.com>
-References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1384978913-8052-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAGVrzcYBexBWrh2Nz8tu0KRLQ4YPjtJux9N-TC07-Hxf3On1FQ@mail.gmail.com>
- <528D2403.5040204@gmail.com>
-Message-ID: <CAGVrzcbQFYGjy=mPXZ6rh_LGAAMcpSRNjm2WFyMZ8C+FffbyLQ@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 21 Nov 2013 02:48:03 +0400
+Subject: [PATCH 1/2] pcmcia: sa1111: pass sa1111_dev to badge4-specific code
+In-Reply-To: <1384987684-10692-1-git-send-email-dbaryshkov@gmail.com>
+References: <1384987684-10692-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1384987684-10692-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
-> On 11/20/2013 09:58 PM, Florian Fainelli wrote:
->>
->> 2013/11/20 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
->>>
->>> Since phy_attach ensures PHYs are resumed, we can now suspend all
->>> PHYs that have no attached netdev after initcalls.
->>
->>
->> I do like the idea, but I think you might want to make sure that the
->> MDIO bus suspend policy was set to "auto" (which is the default afair)
->> not to expose unexpected behavior.
->
->
-> Ok, TBH I haven't looked through all of phy internals. If we are fine
-> with the overall approach, I could use some guidance in the individual
-> patches and policies.
->
->
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> ---
->>> Cc: David S. Miller <davem@davemloft.net>
->>> Cc: netdev at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> ---
->>>   drivers/net/phy/mdio_bus.c |   27 +++++++++++++++++++++++++++
->>>   1 files changed, 27 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
->>> index 5617876..10eba58 100644
->>> --- a/drivers/net/phy/mdio_bus.c
->>> +++ b/drivers/net/phy/mdio_bus.c
->>> @@ -320,6 +320,33 @@ static int mdio_bus_match(struct device *dev, struct
->>> device_driver *drv)
->>>                  (phydev->phy_id & phydrv->phy_id_mask));
->>>   }
->>>
->>> +static int mdio_bus_suspend_unused(struct device *busdev, void *data)
->>> +{
->>> +       struct mii_bus *bus = to_mii_bus(busdev);
->>> +       struct phy_device *phydev;
->>> +       struct phy_driver *phydrv;
->>> +       int i;
->>> +
->>> +       for (i = 0; i < PHY_MAX_ADDR; i++) {
->>> +               if (!bus->phy_map[i])
->>> +                       continue;
->>> +
->>> +               phydev = to_phy_device(&bus->phy_map[i]->dev);
->>> +               phydrv = to_phy_driver(phydev->dev.driver);
->>> +               if (!phydev->attached_dev && phydrv && phydrv->suspend)
->>> +                       phy_suspend(phydev);
->>> +       }
->>> +
->>> +       return 0;
->>
->>
->> You might want to reuse mdio_bus_phy_may_suspend() here to have a
->> central place checking for phydev->attached_dev and phydrv->suspend
->> just in case we need to add more callbacks in the future or implicit
->> PHY state machine hooks. That might also take care of my concern
->> expressed above.
->
->
-> Unfortunately, mdio_bus_phy_may_suspend() doesn't help here. It will
-> correctly tell that unconnected PHYs may_suspend but also that PHYs
-> connected to PM aware drivers may_suspend.
+Pass sa1111_dev to platform-specific init code, as it is done by lubbock
+and neponset. This removes a compilation warnings:
 
-I agree for the first part which is why I was suggesting it, we are
-sure we will return early because of the if (!netdev) branch.
+drivers/pcmcia/sa1111_badge4.c: In function 'pcmcia_badge4_init':
+drivers/pcmcia/sa1111_badge4.c:147:5: warning: passing argument 1 of 'sa1111_pcmcia_add' from incompatible pointer type [enabled by default]
+In file included from drivers/pcmcia/sa1111_badge4.c:26:0:
+drivers/pcmcia/sa1111_generic.h:15:5: note: expected 'struct sa1111_dev *' but argument is of type 'struct device *'
 
->
-> I tried it and it will also suspend the PHY taken by mv643xx_eth.
->
-> But actually, as phy_suspend/resume check for phydrv->suspend
-> themselves, we can just call it on !phydev->attached_dev and remove
-> the additional checks.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/pcmcia/sa1111_badge4.c  | 2 +-
+ drivers/pcmcia/sa1111_generic.c | 2 +-
+ drivers/pcmcia/sa1111_generic.h | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Sure, sounds good.
+diff --git a/drivers/pcmcia/sa1111_badge4.c b/drivers/pcmcia/sa1111_badge4.c
+index 4d206f4..12f0dd0 100644
+--- a/drivers/pcmcia/sa1111_badge4.c
++++ b/drivers/pcmcia/sa1111_badge4.c
+@@ -132,7 +132,7 @@ static struct pcmcia_low_level badge4_pcmcia_ops = {
+ 	.nr			= 2,
+ };
+ 
+-int pcmcia_badge4_init(struct device *dev)
++int pcmcia_badge4_init(struct sa1111_dev *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
+index 65b02c3..a353186 100644
+--- a/drivers/pcmcia/sa1111_generic.c
++++ b/drivers/pcmcia/sa1111_generic.c
+@@ -197,7 +197,7 @@ static int pcmcia_probe(struct sa1111_dev *dev)
+ 	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + PCCR);
+ 
+ #ifdef CONFIG_SA1100_BADGE4
+-	pcmcia_badge4_init(&dev->dev);
++	pcmcia_badge4_init(dev);
+ #endif
+ #ifdef CONFIG_SA1100_JORNADA720
+ 	pcmcia_jornada720_init(&dev->dev);
+diff --git a/drivers/pcmcia/sa1111_generic.h b/drivers/pcmcia/sa1111_generic.h
+index f6376e3..86b9cc8 100644
+--- a/drivers/pcmcia/sa1111_generic.h
++++ b/drivers/pcmcia/sa1111_generic.h
+@@ -18,7 +18,7 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ extern void sa1111_pcmcia_socket_state(struct soc_pcmcia_socket *, struct pcmcia_state *);
+ extern int sa1111_pcmcia_configure_socket(struct soc_pcmcia_socket *, const socket_state_t *);
+ 
+-extern int pcmcia_badge4_init(struct device *);
++extern int pcmcia_badge4_init(struct sa1111_dev *);
+ extern int pcmcia_jornada720_init(struct device *);
+ extern int pcmcia_lubbock_init(struct sa1111_dev *);
+ extern int pcmcia_neponset_init(struct sa1111_dev *);
 -- 
-Florian
+1.8.4.2
