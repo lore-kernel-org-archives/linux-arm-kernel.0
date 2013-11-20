@@ -1,11 +1,13 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 20 Nov 2013 11:17:39 +0100
-Subject: [PATCH 6/6] ARM: dts: imx53: Enable AHCI SATA for M53EVK
+Date: Wed, 20 Nov 2013 11:17:38 +0100
+Subject: [PATCH V2 5/6] ARM: dts: imx53: Add AHCI SATA DT node
 In-Reply-To: <1384942659-5362-1-git-send-email-marex@denx.de>
 References: <1384942659-5362-1-git-send-email-marex@denx.de>
-Message-ID: <1384942659-5362-6-git-send-email-marex@denx.de>
+Message-ID: <1384942659-5362-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+The AHCI-IMX driver now supports i.MX53 as well. Add DT node.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
@@ -13,23 +15,33 @@ Cc: Richard Zhu <r65037@freescale.com>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Linux-IDE <linux-ide@vger.kernel.org>
 ---
- arch/arm/boot/dts/imx53-m53evk.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 7a006cb..c623774 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -315,6 +315,10 @@
- 	status = "okay";
- };
+V2: Rename 'IMX5_CLK_SATA_PHY' to 'IMX5_CLK_SATA_REF' as well as
+    'sata_phy' to 'sata_ref' .
+
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index b330ef7..4b2053b 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -86,6 +86,17 @@
+ 		interrupt-parent = <&tzic>;
+ 		ranges;
  
-+&sata {
-+	status = "okay";
-+};
++		sata: sata at 10000000 {
++			compatible = "fsl,imx53-ahci";
++			reg = <0x10000000 0x1000>;
++			interrupts = <28>;
++			clocks = <&clks IMX5_CLK_SATA_GATE>,
++				 <&clks IMX5_CLK_SATA_REF>,
++				 <&clks IMX5_CLK_AHB>;
++			clock-names = "sata_gate", "sata_ref", "ahb";
++			status = "disabled";
++		};
 +
- &ssi2 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
+ 		ipu: ipu at 18000000 {
+ 			#crtc-cells = <1>;
+ 			compatible = "fsl,imx53-ipu";
 -- 
 1.8.4.2
