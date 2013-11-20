@@ -1,46 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 20 Nov 2013 10:16:23 -0800
-Subject: [PATCH V4 1/2] genirq: Add an accessor for IRQ_PER_CPU flag
-In-Reply-To: <1384946021-22100-2-git-send-email-vkale@apm.com>
-References: <1384946021-22100-1-git-send-email-vkale@apm.com>
- <1384946021-22100-2-git-send-email-vkale@apm.com>
-Message-ID: <528CFC77.5050200@codeaurora.org>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Wed, 20 Nov 2013 13:18:13 -0500
+Subject: Kernel build failing randomly
+Message-ID: <CANacCWyQiG_txsRuCD+pLSijc02ZThvGSRCywO7VF1R02z0yPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/13 03:13, Vinayak Kale wrote:
-> This patch adds an accessor function for IRQ_PER_CPU flag.
-> The accessor function is useful to dertermine whether an IRQ is percpu or not.
->
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> ---
+Hi,
 
-This looks like a copy of Chris Smith's patch. Shouldn't Chris be the
-author and the commit text be whatever Chris sent?
+I am seeing some random build errors in the final stage of
+the kernel build. At times just rerunning the command is
+sufficient to get a working zImage/uImage.
 
->  include/linux/irqdesc.h |    8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
-> index 56fb646..26e2661 100644
-> --- a/include/linux/irqdesc.h
-> +++ b/include/linux/irqdesc.h
-> @@ -152,6 +152,14 @@ static inline int irq_balancing_disabled(unsigned int irq)
->  	return desc->status_use_accessors & IRQ_NO_BALANCING_MASK;
->  }
->  
-> +static inline int irq_is_percpu(unsigned int irq)
-> +{
-> +	struct irq_desc *desc;
-> +
-> +	desc = irq_to_desc(irq);
-> +	return desc->status_use_accessors & IRQ_PER_CPU;
-> +}
-> +
->  static inline void
->  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
->  {
+This is based on v3.12 with omap2plus_defconfig but i
+do remember seeing this a few days back 3.12-rcX also.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I haven't seen any fixed pattern to reproduce this.
+
+Bad case
+===
+$ make uImage LOADADDR=0x80008000
+[...]
+  LINK    vmlinux
+  LD      vmlinux.o
+  MODPOST vmlinux.o
+  GEN     .version
+  CHK     include/generated/compile.h
+  UPD     include/generated/compile.h
+  CC      init/version.o
+  LD      init/built-in.o
+scripts/link-vmlinux.sh: line 52: 28021 Killed                  ${LD}
+${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2} -T ${lds} ${KBUILD_VMLINUX_INIT}
+--start-group ${KBUILD_VMLINUX_MAIN} --end-group ${1}
+make: *** [vmlinux] Error 137
+
+A single rerun of the make command works most of the times.
+
+In case it helps, i am using the Linaro 4.7.3 toolchain inside a Ubuntu VM.
+
+Regards,
+Vaibhav
