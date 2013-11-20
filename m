@@ -1,33 +1,77 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Nov 2013 10:23:50 -0700
-Subject: [PATCH 00/31] ARM: tegra: use common reset and DMA bindings
-In-Reply-To: <201311201803.58393.arnd@arndb.de>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <201311201637.36733.arnd@arndb.de> <528CE71D.5090300@wwwdotorg.org>
- <201311201803.58393.arnd@arndb.de>
-Message-ID: <528CF026.5020309@wwwdotorg.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 20 Nov 2013 18:27:22 +0100
+Subject: [PATCH 8/9] ARM: at91/dt: add new at91rm9200ek_mmc board
+In-Reply-To: <528CE3E6.1040802@overkiz.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+ <1377693456-11133-1-git-send-email-b.brezillon@overkiz.com>
+ <20131120150255.GH14627@ns203013.ovh.net>
+ <528CE3E6.1040802@overkiz.com>
+Message-ID: <20131120172722.GJ14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2013 10:03 AM, Arnd Bergmann wrote:
-> On Wednesday 20 November 2013, Stephen Warren wrote:
->>> +- #iommu-cells : Must be <1>. This dictates the length of DMA specifiers in
->>> +  client nodes' dmas properties. The specifier represents the DMA request
->>> +  select value for the peripheral. For more details, consult the Tegra TRM's
->>> +  documentation of the APB DMA channel control register REQ_SEL field.
->>>  
->>>  Examples:
->>>  
->>> @@ -36,4 +40,5 @@ apbdma: dma at 6000a000 {
->>>       clocks = <&tegra_car 34>;
->>>       resets = <&tegra_car 34>;
->>>       reset-names = "dma";
->>> +     #iommu-cells = <1>;
+On 17:31 Wed 20 Nov     , boris brezillon wrote:
+> On 20/11/2013 16:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 14:37 Wed 28 Aug     , Boris BREZILLON wrote:
+> >>Add a new at91rm9200ek_mmc board (based on at91rm9200ek board) which enables
+> >>mmc0/slot0.
+> >no for multiple dts
+> >
+> >this need to handle at user space level
 > 
+> You mean, by controlling the regulator using the sysfs interface, or
+> by loading
+> only the appropriate driver ?
+load the partial dts via userspace
 > 
-> s/iommu/dma/
+> What if both drivers are loaded (or not compiled as modules) ?
+> This will lead to one device being unusable (and maybe even worst)...
 > 
-> Otherwise looks good. The dts files are correct, so I guess it's just
-> a typo here.
+this will never be the case
 
-Thanks, fixed locally.
+Best Regards,
+J.
+> Please explain what you had in mind ?
+> 
+> >
+> >Best Regards,
+> >J.
+> >>Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> >>---
+> >>  arch/arm/boot/dts/at91rm9200ek_mmc.dts |   23 +++++++++++++++++++++++
+> >>  1 file changed, 23 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/at91rm9200ek_mmc.dts
+> >>
+> >>diff --git a/arch/arm/boot/dts/at91rm9200ek_mmc.dts b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+> >>new file mode 100644
+> >>index 0000000..c87a861
+> >>--- /dev/null
+> >>+++ b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+> >>@@ -0,0 +1,23 @@
+> >>+/*
+> >>+ * at91rm9200ek.dts - Device Tree file for Atmel AT91RM9200 evaluation kit with
+> >>+ *                    an MMC slot
+> >>+ *
+> >>+ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+> >>+ *
+> >>+ * Licensed under GPLv2 only
+> >>+ */
+> >>+/dts-v1/;
+> >>+#include "at91rm9200ek.dts"
+> >>+
+> >>+/ {
+> >>+	model = "Atmel AT91RM9200 evaluation kit with MMC slot";
+> >>+	compatible = "atmel,at91rm9200ek-mmc", "atmel,at91rm9200ek", "atmel,at91rm9200";
+> >>+
+> >>+	ahb {
+> >>+		apb {
+> >>+			mmc0: mmc at fffb4000 {
+> >>+				status = "okay";
+> >>+			};
+> >>+		};
+> >>+	};
+> >>+};
+> >>-- 
+> >>1.7.9.5
+> >>
+> 
