@@ -1,40 +1,28 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 20 Nov 2013 16:36:59 +0900
-Subject: [PATCH] ARM: shmobile: Configure r8a7791 PFC on Koelsch via DTS
-Message-ID: <20131120073659.22718.79556.sendpatchset@w520>
+From: mad_soft@inbox.lv (Dmitry Artamonow)
+Date: Wed, 20 Nov 2013 11:43:33 +0400
+Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
+In-Reply-To: <CALT56yP-LsO_8qgpa3R6JQSWW2pGkNWBUtab8L2hQnC5UdoKvQ@mail.gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
+ <528B811A.1030501@gmail.com>
+ <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
+ <20131120002007.GR16735@n2100.arm.linux.org.uk>
+ <CALT56yP-LsO_8qgpa3R6JQSWW2pGkNWBUtab8L2hQnC5UdoKvQ@mail.gmail.com>
+Message-ID: <528C6825.3010907@inbox.lv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+20.11.2013 04:45, Dmitry Eremin-Solenikov ?????:
+> On Wed, Nov 20, 2013 at 4:20 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk>  wrote:
+>> Also note that we _do_ have sa11x0 platforms which request their GPIOs
+>> in their arch_initcall callback, so the sa11x0 GPIO driver better be
+>> around at that point otherwise things *will* fail.
+> Which ones if you have them in your mind?
 
-Configure the "D" set of data signals for SCIF0 and SCIF1
-on the Koelsch board to setup pinctrl serial console bits.
+FYI, h3100 and h3600 do exactly this - they request UART gpios at
+arch_initcall time (see h3600_mach_init() in arch/arm/mach-sa1100/h3600.c)
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
-
- arch/arm/boot/dts/r8a7791-koelsch-reference.dts |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
---- 0001/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-+++ work/arch/arm/boot/dts/r8a7791-koelsch-reference.dts	2013-11-20 16:23:06.000000000 +0900
-@@ -30,3 +30,19 @@
- 		#size-cells = <1>;
- 	};
- };
-+
-+&pfc {
-+	pinctrl-0 = <&scif0_pins &scif1_pins>;
-+	pinctrl-names = "default";
-+
-+	scif0_pins: serial0 {
-+		renesas,groups = "scif0_data_d";
-+		renesas,function = "scif0";
-+	};
-+
-+	scif1_pins: serial1 {
-+		renesas,groups = "scif1_data_d";
-+		renesas,function = "scif1";
-+	};
-+};
-+
+Best regards,
+Dmitry Artamonow
