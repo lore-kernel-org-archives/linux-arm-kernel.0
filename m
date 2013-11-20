@@ -1,45 +1,142 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Nov 2013 14:24:49 -0700
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>		<1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>		<CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>		<1384766276.14845.155.camel@smile>	<528A5170.3090809@wwwdotorg.org>		<1384862421.14845.222.camel@smile>	<528B9CAE.3040600@wwwdotorg.org>		<CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>		<528BFDD0.3090503@wwwdotorg.org>		<CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>		<528CFE68.6060908@wwwdotorg.org>	
- <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>	
- <528D0C06.9080006@wwwdotorg.org>
- <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
-Message-ID: <528D28A1.2050307@wwwdotorg.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 20 Nov 2013 22:28:50 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+References: <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
+ <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
+ <20131120191145.GP8581@1wt.eu>
+Message-ID: <87txf692zx.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2013 01:23 PM, Williams, Dan J wrote:
-...
-> Why do the drivers that call dma_request_channel need to convert it to
-> an ERR value?  i.e. what's problematic about the below (not compile
-> tested)?
-...
-> diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
-...
-> @@ -22,16 +22,20 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
->  				struct samsung_dma_req *param,
->  				struct device *dev, char *ch_name)
-...
-> +	if (dev->of_node) {
-> +		chan = dma_request_slave_channel(dev, ch_name);
-> +		return IS_ERR(chan) ? (unsigned) NULL : (unsigned) chan;
-> +	} else {
->  		return (unsigned)dma_request_channel(mask, pl330_filter,
->  							(void *)dma_ch);
+Hi,
+
+Willy Tarreau <w@1wt.eu> writes:
+
+> From d1a00e593841223c7d871007b1e1fc528afe8e4d Mon Sep 17 00:00:00 2001
+> From: Willy Tarreau <w@1wt.eu>
+> Date: Wed, 20 Nov 2013 19:47:11 +0100
+> Subject: EXP: net: mvneta: try to flush Tx descriptor queue upon Rx
+>  interrupts
+>
+> Right now the mvneta driver doesn't handle Tx IRQ, and solely relies on a
+> timer to flush Tx descriptors. This causes jerky output traffic with bursts
+> and pauses, making it difficult to reach line rate with very few streams.
+> This patch tries to improve the situation which is complicated by the lack
+> of public datasheet from Marvell. The workaround consists in trying to flush
+> pending buffers during the Rx polling. The idea is that for symmetric TCP
+> traffic, ACKs received in response to the packets sent will trigger the Rx
+> interrupt and will anticipate the flushing of the descriptors.
+>
+> The results are quite good, a single TCP stream is now capable of saturating
+> a gigabit.
+>
+> This is only a workaround, it doesn't address asymmetric traffic nor datagram
+> based traffic.
+>
+> Signed-off-by: Willy Tarreau <w@1wt.eu>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 5aed8ed..59e1c86 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -2013,6 +2013,26 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
+>  	}
+>  
+>  	pp->cause_rx_tx = cause_rx_tx;
+> +
+> +	/* Try to flush pending Tx buffers if any */
+> +	if (test_bit(MVNETA_F_TX_DONE_TIMER_BIT, &pp->flags)) {
+> +		int tx_todo = 0;
+> +
+> +		mvneta_tx_done_gbe(pp,
+> +	                           (((1 << txq_number) - 1) &
+> +	                           MVNETA_CAUSE_TXQ_SENT_DESC_ALL_MASK),
+> +	                           &tx_todo);
+> +
+> +		if (tx_todo > 0) {
+> +			mod_timer(&pp->tx_done_timer,
+> +			          jiffies + msecs_to_jiffies(MVNETA_TX_DONE_TIMER_PERIOD));
+> +		}
+> +		else {
+> +			clear_bit(MVNETA_F_TX_DONE_TIMER_BIT, &pp->flags);
+> +			del_timer(&pp->tx_done_timer);
+> +		}
 > +	}
+> +
+>  	return rx_done;
+>  }
 
-The argument is that if a function returns errors encoded as an ERR
-pointer, then callers must assume that any non-IS_ERR value that the
-function returns is valid. NULL is one of those values. As such, callers
-can no longer check the value against NULL, but must use IS_ERR().
-Converting any IS_ERR() returns to NULL theoretically is the act of
-converting one valid return value to some other completely random return
-value.
+With current Linus tree (head being b4789b8e: aacraid: prevent invalid
+pointer dereference), as a baseline here is what I get:
 
-The converse is true for functions that return errors encoded as NULL;
-callers must check those return results against NULL.
+ w/ tcp_wmem left w/ default values (4096 16384 4071360)
 
-There's no intersection between those two sets of legal tests.
+  via netperf (TCP_MAERTS/TCP_STREAM): 151.13 / 935.50 Mbits/s
+  via wget against apache: 15.4 MB/s
+  via wget against nginx: 104 MB/s
+ 
+ w/ tcp_wmem set to 4096 16384 262144:
+
+  via netperf (TCP_MAERTS/TCP_STREAM): 919.89 / 935.50 Mbits/s
+  via wget against apache: 63.3 MB/s
+  via wget against nginx: 104 MB/s
+ 
+With your patch on top of it (and tcp_wmem kept at its default value):
+
+ via netperf: 939.16 / 935.44 Mbits/s
+ via wget against apache: 65.9 MB/s (top reports 69.5 sy, 30.1 si
+                                     and 72% CPU for apache2)
+ via wget against nginx: 106 MB/s
+
+
+With your patch and MVNETA_TX_DONE_TIMER_PERIOD set to 1 instead of 10
+(still w/ and tcp_wmem kept at its default value):
+
+ via netperf: 939.12 / 935.84 Mbits/s
+ via wget against apache: 63.7 MB/s
+ via wget against nginx: 108 MB/s
+
+So:
+
+ - First, Eric's patch sitting in Linus tree does fix the regression
+   I had on 3.11.7 and early 3.12 (15.4 MB/s vs 256KB/s).
+
+ - As can be seen in the results of first test, Eric's patch still
+   requires some additional tweaking of tcp_wmem to get netperf and
+   apache somewhat happy w/ perfectible drivers (63.3 MB/s instead of
+   15.4MB/s by setting max tcp send buffer space to 256KB for apache).
+
+ - For unknown reasons, nginx manages to provide a 104MB/s download rate
+   even with a tcp_wmem set to default and no specific patch of mvneta.
+
+ - Now, Willy's patch seems to makes netperf happy (link saturated from
+   server to client), w/o tweaking tcp_wmem.
+
+ - Again with Willy's patch I guess the "limitations" of the platform
+   (1.2GHz CPU w/ 512MB of RAM) somehow prevent Apache to saturate the
+   link. All I can say is that the same test some months ago on a 1.6GHz
+   ARMv5TE (kirkwood 88f6282) w/ 256MB of RAM gave me 108MB/s. I do not
+   know if it is some apache regression, some mvneta vs mv63xx_eth
+   difference or some CPU frequency issue but having netperf and  nginx
+   happy make me wonder about Apache.
+
+ - Willy, setting MVNETA_TX_DONE_TIMER_PERIOD to 1 instead of 10 w/ your
+   patch does not improve the already good value I get w/ your patch.
+
+
+In the end if you iterate on your work to push a version of your patch
+upstream, I'll be happy to test it. And thanks for the time you already
+spent!
+
+Cheers,
+
+a+
