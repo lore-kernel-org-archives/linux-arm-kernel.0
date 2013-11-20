@@ -1,36 +1,45 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 20 Nov 2013 13:04:38 +0000
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <1384898504.26969.48.camel@pasglop>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com> <
- 20131030134702.19B57C402A0@trevor.secretlab.ca> <528B5949.20204@samsung.com >
- <20131119151418.8BB2BC4079D@trevor.secretlab.ca> <1384898504.26969.48.
- camel@pasglop>
-Message-ID: <20131120130438.3A4C5C4079D@trevor.secretlab.ca>
+Date: Wed, 20 Nov 2013 13:10:04 +0000
+Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
+In-Reply-To: <20131119192246.GP16735@n2100.arm.linux.org.uk>
+References: <528A6944.3070303@wwwdotorg.org> <20131118192852.GI10335@titan.
+ lakedaemon.net> <528A6CA3.9030904@wwwdotorg.org> <20131118195243.GJ10335@
+ titan.lakedaemon.net> <528A98C8.9040803@wwwdotorg.org> <20131119122801.
+ GL16735@n2100.arm.linux.org.uk> <20131119142336.GA28859@titan.lakedaemon.
+ net> <20131119150212.GM16735@n2100.arm.linux.org.uk> <20131119152047.
+ GB28859@titan.lakedaemon.net> <20131119152146.GN16735@n2100.arm.linux.org.
+ uk> <20131119192246.GP16735@n2100.arm.linux.org.uk>
+Message-ID: <20131120131004.ACA1BC4079D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Nov 2013 09:01:44 +1100, Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
-> On Tue, 2013-11-19 at 15:14 +0000, Grant Likely wrote:
-> > > The proposal look good for me. I'm not convinced that we really need the
-> > > support for 'reg' property, as the fixed memory region is a special case
-> > > of generic dynamic allocation specified by the size and alloc-ranges, but
-> > > I assume that there have been already a long discussion about this, so I
-> > > accept the common consensus.
+On Tue, 19 Nov 2013 19:22:46 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Tue, Nov 19, 2013 at 03:21:46PM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Nov 19, 2013 at 10:20:47AM -0500, Jason Cooper wrote:
+> > > By "That" are you referring to extending the standard for compatible
+> > > strings to the board level, or forcing consistent naming on the dts
+> > > files?
 > > 
-> > It is absolutely necessary for some use cases. For example, a
-> > framebuffer enabled by firmware and passed onto the kernel for
-> > flicker-free boot. Some platforms have fixed regions that cannot be
-> > moved up.
+> > A consistent file naming on both the dtb and dts files.
 > 
-> Arguably that could be covered with alloc-range and size by making the range be
-> the reg property content basically (and thus size == size of range) but I
-> prefer the reg property, it's a clearer statement of intent.
+> It's time to knock the idea of naming the DT blobs after the compatible
+> string on its head as well.  That's really not going to work.  Just
+> leave the filenames as is, and move the problem into userspace to solve.
+> 
+[...]
+> 
+> Just use the filenames we already have in the kernel tree.  Let userspace
+> parse the DT blobs for the compatible strings - it can then provide the
+> user with the choice of all and _also_ show that certain of DT blobs
+> may be compatible with a range of boards as well.
 
-True, but I agree on liking 'reg'. Plus I suspect that the simplest
-implementation will resolve the size+alloc-ranges property into a
-generated 'reg' property during early boot so that the existing decode
-APIs work on any reserved range.  :-)
+Yes, the consistent filename format is a non-problem. The files that
+exist already have names. Nothing else is going to use them. Done. It
+makes total sense to require that new files follow some sane naming
+convention, but it is a mistake to project that back and say all
+existing files must also be renamed.
+
+Sure it may look untidy, particularly to those of us with
+obsessive-compulsive tendencies, but it isn't actually a problem.
 
 g.
