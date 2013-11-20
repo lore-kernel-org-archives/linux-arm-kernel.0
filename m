@@ -1,96 +1,50 @@
 From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 20 Nov 2013 17:14:51 +0100
-Subject: [PATCH 5/9] ARM: at91/dt: add mmc0 slot0 support to at91rm9200ek
- board
-In-Reply-To: <20131120145926.GE14627@ns203013.ovh.net>
+Date: Wed, 20 Nov 2013 17:17:06 +0100
+Subject: [PATCH 7/9] ARM: at91/dt: add i2c devices connected to
+ at91rm9200ek board
+In-Reply-To: <20131120150132.GG14627@ns203013.ovh.net>
 References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377687995-10758-1-git-send-email-b.brezillon@overkiz.com>
- <20131120145926.GE14627@ns203013.ovh.net>
-Message-ID: <528CDFFB.1020601@overkiz.com>
+ <1377688107-10830-1-git-send-email-b.brezillon@overkiz.com>
+ <20131120150132.GG14627@ns203013.ovh.net>
+Message-ID: <528CE082.2000400@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:06 Wed 28 Aug     , Boris BREZILLON wrote:
->> Add slot0 of mmc0 pinctrl pins definitions:
->>   - detect pin
->>   - write protect pin
->>   - enable slot0 pin: this pin is connected to an external switch which
->>     enable mmc0 slot0 or spi dataflash connected to cs3
->>
->> The mmc0 device is not enabled, as it depends on the choosen functionnality
->> (spi cs3 or mmc0 slot0).
->>
+On 20/11/2013 16:01, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 13:08 Wed 28 Aug     , Boris BREZILLON wrote:
 >> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 >> ---
->>   arch/arm/boot/dts/at91rm9200ek.dts |   35 +++++++++++++++++++++++++++++++++++
->>   1 file changed, 35 insertions(+)
+>>   arch/arm/boot/dts/at91rm9200ek.dts |   12 ++++++++++++
+>>   1 file changed, 12 insertions(+)
 >>
 >> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
->> index f2d6d79..2bad423 100644
+>> index b3e7425..fd2601a 100644
 >> --- a/arch/arm/boot/dts/at91rm9200ek.dts
 >> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
->> @@ -39,6 +39,23 @@
->>   						atmel,pins = <AT91_PIOD 5 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;
->>   					};
->>   				};
->> +
->> +				mmc0 {
->> +					pinctrl_mmc0_slot0_detect: mmc0_slot0_detect-0 {
->> +						atmel,pins =
->> +							<AT91_PIOB 27 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
->> +					};
->> +
->> +					pinctrl_mmc0_slot0_write_protect: mmc0_slot0_write_protect-0 {
->> +						atmel,pins =
->> +							<AT91_PIOA 17 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
->> +					};
->> +
->> +					pinctrl_mmc0_slot0_switch: mmc0_slot0_switch-0 {
->> +						atmel,pins =
->> +							<AT91_PIOB 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(1))>;
->> +					};
-> nack this is a regulator the pinctrl API is not done for gpio default value
-
-I know this can be represented as a regulator, but looking at the 
-datasheet, this looks more
-like a switch than a regulator.
-
-Anyway, why didn't you told me that when I proposed the OUTPUT support 
-for at91 pinctrl driver ?
-And BTW pinctrl OUTPUT config is already supported by some pinctrl drivers
-( 
-http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt#L159).
-
->> +				};
->>   			};
->>   
->>   			dbgu: serial at fffff200 {
->> @@ -84,6 +101,24 @@
->>   					reg = <0>;
->>   				};
->>   			};
->> +
->> +			mmc0: mmc at fffb4000 {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +				pinctrl-0 = <&pinctrl_mmc0_clk
->> +					     &pinctrl_mmc0_slot0_cmd_dat0
->> +					     &pinctrl_mmc0_slot0_dat1_3
->> +					     &pinctrl_mmc0_slot0_detect
->> +					     &pinctrl_mmc0_slot0_write_protect
->> +					     &pinctrl_mmc0_slot0_switch>;
->> +
->> +				slot0: slot at 0 {
->> +					reg = <0>;
->> +					bus-width = <4>;
->> +					cd-gpios = <&pioB 27 GPIO_ACTIVE_HIGH>;
->> +					wp-gpios = <&pioA 17 GPIO_ACTIVE_HIGH>;
->> +				};
->> +			};
+>> @@ -147,6 +147,18 @@
 >>   		};
+>>   	};
 >>   
->>   		usb0: ohci at 00300000 {
+>> +	i2c at 0 {
+>> +		status = "okay";
+>> +
+>> +		ics1523 at 26 {
+>> +			reg = <0x26>;
+>> +		};
+>> +
+>> +		dac3550 at 4d {
+>> +			reg = <0x4d>;
+> missing compatible
+
+I can't find any matching compatible for these devices.
+Do you know what should be used ?
+
+>> +		};
+>> +	};
+>> +
+>>   	leds {
+>>   		compatible = "gpio-leds";
+>>   
 >> -- 
 >> 1.7.9.5
 >>
