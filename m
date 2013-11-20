@@ -1,67 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Nov 2013 10:35:49 -0800
-Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
-In-Reply-To: <87wqk3n54l.fsf@gmail.com>
-References: <87hab9agjr.fsf@gmail.com>
- <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
- <87wqk3n54l.fsf@gmail.com>
-Message-ID: <20131120183548.GH10317@atomide.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 20 Nov 2013 10:40:34 -0800
+Subject: [PATCH v4 1/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <CAPdLdq=xUjsr1ykTHh3t_Uy9kBkKXbW0gpAmtgiOfj8gC42yeA@mail.gmail.com>
+References: <1384888074-19696-1-git-send-email-markus.mayer@linaro.org>
+ <1384888074-19696-2-git-send-email-markus.mayer@linaro.org>
+ <CAPdLdqmxFnJ9HZa04buh8NecMszEAp11VRU4Q159vZ+=NG9p3A@mail.gmail.com>
+ <20131120162721.GB28683@roeck-us.net>
+ <CAPdLdq=xUjsr1ykTHh3t_Uy9kBkKXbW0gpAmtgiOfj8gC42yeA@mail.gmail.com>
+Message-ID: <20131120184034.GC30952@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ben Gamari <bgamari.foss@gmail.com> [131119 19:07]:
-> Chao Xu <caesarxuchao@gmail.com> writes:
+On Wed, Nov 20, 2013 at 10:24:54AM -0800, Markus Mayer wrote:
+> > Hi Markus,
+> >
+> > Yes, I noticed when I merged it into my watchdog-next branch.
+> >
+> > Reminds me ... v3 had a whitespace problem. I don't recall if you fixed
+> > that in v4. If you didn't, that might be a better reason to send v5.
 > 
-> > Hi,
-> >
-> > I also try to boot v3.12 on my pandaboard rev A2, but it hangs at
-> > "starting kernel". My SD card is originally loaded with a linaro 12.04
-> > ubuntu-developer image. I have tried with v3.7 and v3.8 uImage and
-> > both of them work normally, but v3.12 hangs. Is there any trick I
-> > missed? Do I need to use the new u-boot as used by Ben?
-> >
-> I've written up some of my experiences bringing up 3.12 on the
-> PandaBoard here[1]. You may find it helpful. Regardless, I would
-> definitely try upgrading u-boot.
+> That's still there, unfortunately. Trailing space on the first
+> help-text line in Kconfig:
+>     Support for the watchdog timer on the following Broadcom BCM281xx
+> 
+> So, I'll generate v5 with that fixed. Do you prefer I also rebase it
+> right now to whatever current tip is to take care of the merge
+> conflict?
+> 
+I would suggest to wait for -rc1 and rebase to it before you send the new
+version. After all, it won't make it into 3.13 anyway, so no need to hurry.
 
-Nice investigative blogging :)
-
-Care to also update it with the other issues remaining on pandaboard?
-Sounds like we're pretty close to having things working nicely with
-mainline kernel on it, so let's just fix those issues ASAP.
-
-I'm aware of at least two issues:
-
-1.  The WLAN not working after a soft reset, or if the interface is
-    reset with ifconfig down. This could be a typo somewhere in the
-    .dts file for the WLAN regulator or something like that.
-
-2. Suspend and resume does not wake-up from serial console and spews
-   a bunch of warnings. The wake-up issue can be fixed with the new
-   the new interrupts-extended property to use the wake IRQs, I'll
-   try to update my patches for that today.
- 
-> > And here is a separate problem with building u-boot. I cloned the
-> > upstream u-boot repository. The latest commit is
-> > c2e5e802ecb7ab668ce9911b210ed68c804b349f. Then I did:
-> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- omap4_panda_config
-> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j8
-> > cp MLO u-boot.img /media/boot/
-> > But when turn on my pandaboard, there is NO output from the serial
-> > console. I didn't change the other file in the boot partition. They
-> > are from linaro 12.04 ubuntu-developer image.
-> >
-> I would check that you have earlyprintk enabled (both in the kernel
-> configuration as well as on the kernel command line). Moreover, ensure
-> that the correct serial devices is selected for low-level debug output
-> (in the kernel configuration).
-
-I wonder if we also have some dependency to some earlier versions of
-u-boot as u-boot now only muxes the essential pins?
-
-Regards,
-
-Tony
- 
-
-> [1] http://bgamari.github.io/posts/2013-11-17-running-modern-kernel-on-pandaboard.html
+Thanks,
+Guenter
