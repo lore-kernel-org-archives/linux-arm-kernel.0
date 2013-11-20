@@ -1,33 +1,66 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:09:02 -0600
-Subject: [RFT/RFC/PATCH 15/31] arm: omap: irq: call set_handle_irq() from
- intc_of_init
-In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
-References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-16-git-send-email-balbi@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Nov 2013 10:12:56 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix populating the hwmod data from device
+ tree
+In-Reply-To: <20131120025620.GF10317@atomide.com>
+References: <20131120025620.GF10317@atomide.com>
+Message-ID: <20131120181255.GG10317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will let us drop .handle_irq and .init_irq fields
-from our generic machine_descs.
+* Tony Lindgren <tony@atomide.com> [131119 18:57]:
+> We have some device tree properties where the ti,hwmod has multiple
+> values:
+> 
+> am33xx.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> am4372.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> dra7.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2";
+> omap3.dtsi:	ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
+> omap3.dtsi:	ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
+> omap4.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+> omap5.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+> 
+> So we need to handle the whole string array instead of just the
+> first string to find the related hwmod entry.
+> 
+> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2228,11 +2228,23 @@ static struct device_node *of_dev_hwmod_lookup(struct device_node *np,
+>  						struct omap_hwmod *oh)
+>  {
+>  	struct device_node *np0 = NULL, *np1 = NULL;
+> -	const char *p;
+>  
+>  	for_each_child_of_node(np, np0) {
+> -		if (of_find_property(np0, "ti,hwmods", NULL)) {
+> -			p = of_get_property(np0, "ti,hwmods", NULL);
+> +		int count, i;
+> +
+> +		count = of_property_count_strings(np0, "ti,hwmods");
+> +		if (count < 1)
+> +			continue;
+> +
+> +		for (i = 0; i < count; i++) {
+> +			const char *p;
+> +			int res;
+> +
+> +			res = of_property_read_string_index(np0, "ti,hwmods",
+> +							    i, &p);
+> +			if (res)
+> +				continue;
+> +
+>  			if (!strcmp(p, oh->name))
+>  				return np0;
+>  			np1 = of_dev_hwmod_lookup(np0, oh);
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap2/irq.c | 2 ++
- 1 file changed, 2 insertions(+)
+Hmm I think this also needs part two to it to populate the right IO space
+based on the index, this probably now wrongly populates the first IO space
+for all the hwmod instances in the group.
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 8ef2bfd..503d345 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -317,6 +317,8 @@ static int __init intc_of_init(struct device_node *node,
- 
- 	omap_init_irq(res.start, nr_irq, of_node_get(node));
- 
-+	set_handle_irq(omap2_intc_handle_irq);
-+
- 	return 0;
- }
- 
--- 
-1.8.4.GIT
+Regards,
+
+Tony
