@@ -1,14 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Nov 2013 21:21:47 +0100
-Subject: [PATCH RFC v1 1/7] net: phy: marvell: provide genphy suspend/resume
+Date: Wed, 20 Nov 2013 21:21:48 +0100
+Subject: [PATCH RFC v1 2/7] net: phy: provide phy_resume/phy_suspend helpers
 In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1384978913-8052-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1384978913-8052-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell PHYs support generic PHY suspend/resume, so provide those
-callbacks to all marvell specific drivers.
+This adds helper functions to resume and suspend a given phy_device
+by calling the corresponding driver callbacks if available.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -17,111 +17,52 @@ Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/phy/marvell.c |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+ drivers/net/phy/phy_device.c |   19 +++++++++++++++++++
+ include/linux/phy.h          |    2 ++
+ 2 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
-index 2e3c778e..bd37e45 100644
---- a/drivers/net/phy/marvell.c
-+++ b/drivers/net/phy/marvell.c
-@@ -894,6 +894,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -907,6 +909,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -920,6 +924,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &marvell_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -933,6 +939,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = {.owner = THIS_MODULE,},
- 	},
- 	{
-@@ -946,6 +954,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
- 		.did_interrupt = &m88e1121_did_interrupt,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -961,6 +971,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.did_interrupt = &m88e1121_did_interrupt,
- 		.get_wol = &m88e1318_get_wol,
- 		.set_wol = &m88e1318_set_wol,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -974,6 +986,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -987,6 +1001,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -1000,6 +1016,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -1013,6 +1031,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -1026,6 +1046,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
- 		.did_interrupt = &m88e1121_did_interrupt,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- };
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index 74630e9..2442895 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -625,6 +625,25 @@ void phy_detach(struct phy_device *phydev)
+ }
+ EXPORT_SYMBOL(phy_detach);
+ 
++int phy_suspend(struct phy_device *phydev)
++{
++	struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
++
++	if (phydrv->suspend)
++		return phydrv->suspend(phydev);
++	return 0;
++}
++EXPORT_SYMBOL(phy_suspend);
++
++int phy_resume(struct phy_device *phydev)
++{
++	struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
++
++	if (phydrv->resume)
++		return phydrv->resume(phydev);
++	return 0;
++}
++EXPORT_SYMBOL(phy_resume);
+ 
+ /* Generic PHY support and helper functions */
+ 
+diff --git a/include/linux/phy.h b/include/linux/phy.h
+index 64ab823..ed0d6d8 100644
+--- a/include/linux/phy.h
++++ b/include/linux/phy.h
+@@ -552,6 +552,8 @@ void phy_detach(struct phy_device *phydev);
+ void phy_start(struct phy_device *phydev);
+ void phy_stop(struct phy_device *phydev);
+ int phy_start_aneg(struct phy_device *phydev);
++int phy_suspend(struct phy_device *phydev);
++int phy_resume(struct phy_device *phydev);
+ 
+ int phy_stop_interrupts(struct phy_device *phydev);
+ 
 -- 
 1.7.2.5
