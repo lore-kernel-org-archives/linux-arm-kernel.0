@@ -1,58 +1,167 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 20 Nov 2013 10:04:18 +0100
-Subject: [PATCH 4/8] ASoC: fsl-ssi: Add offline_config flag
+Date: Wed, 20 Nov 2013 10:04:22 +0100
+Subject: [PATCH 8/8] ARM: DTS: imx5* imx6*, use imx50-ssi
 In-Reply-To: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
 References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1384938262-20554-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1384938262-20554-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx50-ssi and later versions of this IP support online reconfiguration
-of all registers. The reference manual does not list any registers that
-can only be configured while the SSI unit is disabled. This patch
-introduces the flag for later use.
+imx50-ssi and imx21-ssi are different IPs. imx50-ssi supports online
+reconfiguration and needs this for correct interaction with SDMA. This
+patch adds imx50-ssi before each imx21-ssi for all imx5/imx6 SoCs.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/imx51.dtsi   | 10 +++++++---
+ arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
+ arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
+ arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
+ 4 files changed, 32 insertions(+), 12 deletions(-)
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index d493d2d..d268785 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -154,6 +154,7 @@ struct fsl_ssi_private {
- 	bool ssi_on_imx;
- 	bool imx_ac97;
- 	bool use_dma;
-+	bool offline_config;
- 	struct clk *clk;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
-@@ -1033,6 +1034,24 @@ static int fsl_ssi_probe(struct platform_device *pdev)
-                 /* Older 8610 DTs didn't have the fifo-depth property */
- 		ssi_private->fifo_depth = 8;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 54cee65..706bdf3 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -150,7 +150,9 @@
+ 				};
  
-+	/*
-+	 * imx50 and later SoCs have a slightly different IP that allows the
-+	 * SSI configuration while the SSI unit is running.
-+	 *
-+	 * More important, it is necessary on those SoCs to configure the
-+	 * sperate TX/RX DMA bits just before starting the stream
-+	 * (fsl_ssi_trigger). The SDMA unit has to be configured before fsl_ssi
-+	 * sends any DMA requests to the SDMA unit, otherwise it is not defined
-+	 * how the SDMA unit handles the DMA request.
-+	 *
-+	 * SDMA units are present on devices starting at imx35 but the imx35
-+	 * reference manual states that the DMA bits should not be changed
-+	 * while the SSI unit is running (SSIEN). So we support the necessary
-+	 * online configuration of fsl-ssi starting at imx50.
-+	 */
-+	if (hw_type != FSL_SSI_MX50)
-+		ssi_private->offline_config = true;
-+
- 	if (hw_type == FSL_SSI_MX21 || hw_type == FSL_SSI_MX50) {
- 		u32 dma_events[2];
- 		ssi_private->ssi_on_imx = true;
+ 				ssi2: ssi at 70014000 {
+-					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
++					compatible = "fsl,imx51-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x70014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks 49>;
+@@ -427,7 +429,8 @@
+ 			};
+ 
+ 			ssi1: ssi at 83fcc000 {
+-				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx51-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x83fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks 48>;
+@@ -479,7 +482,8 @@
+ 			};
+ 
+ 			ssi3: ssi at 83fe8000 {
+-				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx51-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x83fe8000 0x4000>;
+ 				interrupts = <96>;
+ 				clocks = <&clks 50>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 4307e80..1f5c622 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -149,7 +149,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 50014000 {
+-					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++					compatible = "fsl,imx53-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x50014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks 49>;
+@@ -1049,7 +1051,8 @@
+ 			};
+ 
+ 			ssi1: ssi at 63fcc000 {
+-				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx53-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x63fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks 48>;
+@@ -1076,7 +1079,8 @@
+ 			};
+ 
+ 			ssi3: ssi at 63fe8000 {
+-				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx53-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x63fe8000 0x4000>;
+ 				interrupts = <96>;
+ 				clocks = <&clks 50>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index ccd55c2..26dc080 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -201,7 +201,9 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 0x04>;
+ 					clocks = <&clks 178>;
+@@ -214,7 +216,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 0x04>;
+ 					clocks = <&clks 179>;
+@@ -227,7 +231,9 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 0x04>;
+ 					clocks = <&clks 180>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index c46651e..22cec8b 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -191,7 +191,9 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI1>;
+@@ -203,7 +205,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI2>;
+@@ -215,7 +219,9 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI3>;
 -- 
 1.8.4.2
