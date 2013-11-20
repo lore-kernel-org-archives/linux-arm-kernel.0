@@ -1,76 +1,33 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:09:17 -0600
-Subject: [RFT/RFC/PATCH 30/31] arm: omap: irq: introduce omap_nr_pending
+Date: Wed, 20 Nov 2013 12:09:02 -0600
+Subject: [RFT/RFC/PATCH 15/31] arm: omap: irq: call set_handle_irq() from
+ intc_of_init
 In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
 References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-31-git-send-email-balbi@ti.com>
+Message-ID: <1384970958-4118-16-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-that variable will tell us how many INTC_PENDING_IRQn
-registers we have. It'll be used on a following patch
-to cleanup omap_intc_handle_irq() a bit.
+this will let us drop .handle_irq and .init_irq fields
+from our generic machine_descs.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/irq.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index a411ed4..1b2266a 100644
+index 8ef2bfd..503d345 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -70,6 +70,7 @@ static struct omap_intc_regs intc_context;
+@@ -317,6 +317,8 @@ static int __init intc_of_init(struct device_node *node,
  
- static struct irq_domain *domain;
- static void __iomem *omap_irq_base;
-+static int omap_nr_pending = 3;
- static int omap_nr_irqs = 96;
+ 	omap_init_irq(res.start, nr_irq, of_node_get(node));
  
- /* INTC bank register get/set */
-@@ -268,6 +269,7 @@ out:
- void __init omap2_init_irq(void)
- {
- 	omap_nr_irqs = 96;
-+	omap_nr_pending = 3;
- 	omap_init_irq(OMAP24XX_IC_BASE, NULL);
- 	set_handle_irq(omap_intc_handle_irq);
++	set_handle_irq(omap2_intc_handle_irq);
++
+ 	return 0;
  }
-@@ -275,6 +277,7 @@ void __init omap2_init_irq(void)
- void __init omap3_init_irq(void)
- {
- 	omap_nr_irqs = 96;
-+	omap_nr_pending = 3;
- 	omap_init_irq(OMAP34XX_IC_BASE, NULL);
- 	set_handle_irq(omap_intc_handle_irq);
- }
-@@ -282,6 +285,7 @@ void __init omap3_init_irq(void)
- void __init ti81xx_init_irq(void)
- {
- 	omap_nr_irqs = 96;
-+	omap_nr_pending = 4;
- 	omap_init_irq(OMAP34XX_IC_BASE, NULL);
- 	set_handle_irq(omap_intc_handle_irq);
- }
-@@ -291,6 +295,7 @@ static int __init intc_of_init(struct device_node *node,
- {
- 	struct resource res;
- 
-+	omap_nr_pending = 3;
- 	omap_nr_irqs = 96;
- 
- 	if (WARN_ON(!node))
-@@ -301,8 +306,10 @@ static int __init intc_of_init(struct device_node *node,
- 		return -EINVAL;
- 	}
- 
--	if (of_device_is_compatible(node, "ti,am33xx-intc"))
-+	if (of_device_is_compatible(node, "ti,am33xx-intc")) {
- 		omap_nr_irqs = 128;
-+		omap_nr_pending = 4;
-+	}
- 
- 	omap_init_irq(res.start, of_node_get(node));
  
 -- 
 1.8.4.GIT
