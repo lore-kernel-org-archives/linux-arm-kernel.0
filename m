@@ -1,84 +1,134 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 20 Nov 2013 10:52:05 +0000
-Subject: [PATCH v2] arm: mm: refactor v7 cache cleaning ops to use way/index
- sequence
-Message-ID: <1384944725-32142-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Nov 2013 10:58:26 +0000
+Subject: [PATCH 1/1] irq-gic: add capability to set bypass flag in GIC
+In-Reply-To: <1384897358-22940-1-git-send-email-fkan@apm.com>
+References: <1384897358-22940-1-git-send-email-fkan@apm.com>
+Message-ID: <528C95D2.5090200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set-associative caches on all v7 implementations map the index bits
-to physical addresses LSBs and tag bits to MSBs. As the last level
-of cache on current and upcoming ARM systems grows in size,
-this means that under normal DRAM controller configurations, the
-current v7 cache flush routine using set/way operations triggers a
-DRAM memory controller precharge/activate for every cache line
-writeback since the cache routine cleans lines by first fixing the
-index and then looping through ways (index bits are mapped to lower
-physical addresses on all v7 cache implementations; this means that,
-with last level cache sizes in the order of MBytes, lines belonging
-to the same set but different ways map to different DRAM pages).
+[dropping <patches@apm.com> from the CC list, as someone seems to have
+ tripped on the config file, and I'm tired of getting bounces]
 
-Given the random content of cache tags, swapping the order between
-indexes and ways loops do not prevent DRAM pages precharge and
-activate cycles but at least, on average, improves the chances that
-either multiple lines hit the same page or multiple lines belong to
-different DRAM banks, improving throughput significantly.
+Feng,
 
-This patch swaps the inner loops in the v7 cache flushing routine
-to carry out the clean operations first on all sets belonging to
-a given way (looping through sets) and then decrementing the way.
+On 19/11/13 21:42, Feng Kan wrote:
+> The GIC-400 implementation allows for FIQ and IRQ bypass. In the
+> X-Gene implementation, the FIQ bypass must be enabled at all time.
+> Otherwise, some PPI will appear as FIQ and cause kernel problem.
 
-Benchmarks showed that by swapping the ordering in which sets and
-ways are decremented in the v7 cache flushing routine, that uses
-set/way operations, time required to flush caches is reduced
-significantly, owing to improved writebacks throughput to the DRAM
-controller.
+How comes? Are only PPIs affected? When you say "some PPIs", can you be
+more specific?
 
-Benchmarks results vary and depend heavily on the last level of
-cache tag RAM content when cache is cleaned and invalidated, ranging
-from 2x throughput when all tag RAM entries contain dirty lines
-mapping to sequential pages of RAM to 1x (ie no improvement) when
-all tag RAM accesses trigger a DRAM precharge/activate cycle, as the
-current code implies on most DRAM controller configurations.
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  drivers/irqchip/irq-gic.c       |   15 +++++++++++----
+>  include/linux/irqchip/arm-gic.h |    4 ++--
+>  2 files changed, 13 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index d0e9480..aa7342e 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -65,6 +65,7 @@ struct gic_chip_data {
+>  #endif
+>  	struct irq_domain *domain;
+>  	unsigned int gic_irqs;
+> +	unsigned int bypass_flag;
+>  #ifdef CONFIG_GIC_NON_BANKED
+>  	void __iomem *(*get_base)(union gic_base *);
+>  #endif
+> @@ -450,7 +451,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>  
+>  	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+> -	writel_relaxed(1, base + GIC_CPU_CTRL);
+> +	writel_relaxed(gic->bypass_flag | 1, base + GIC_CPU_CTRL);
+>  }
+>  
+>  void gic_cpu_if_down(void)
+> @@ -591,7 +592,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>  
+>  	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+> -	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+> +	writel_relaxed(gic_data[gic_nr].bypass_flag | 1, cpu_base + GIC_CPU_CTRL);
+>  }
+>  
+>  static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+> @@ -733,7 +734,8 @@ const struct irq_domain_ops gic_irq_domain_ops = {
+>  
+>  void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  			   void __iomem *dist_base, void __iomem *cpu_base,
+> -			   u32 percpu_offset, struct device_node *node)
+> +			   u32 percpu_offset, u32 bypass_val,
+> +			   struct device_node *node)
+>  {
+>  	irq_hw_number_t hwirq_base;
+>  	struct gic_chip_data *gic;
+> @@ -821,6 +823,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  
+>  	set_handle_irq(gic_handle_irq);
+>  
+> +	gic->bypass_flag = (bypass_val & 0xf) << 4;
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/mm/cache-v7.S | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Beware, the top 2 bits are reserved on GICv1, and shouldn't be messed with.
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index b5c467a..778bcf8 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -146,18 +146,18 @@ flush_levels:
- 	ldr	r7, =0x7fff
- 	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
- loop1:
--	mov	r9, r4				@ create working copy of max way size
-+	mov	r9, r7				@ create working copy of max index
- loop2:
-- ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
-- THUMB(	lsl	r6, r9, r5		)
-+ ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
-+ THUMB(	lsl	r6, r4, r5		)
-  THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
-- ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
-- THUMB(	lsl	r6, r7, r2		)
-+ ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
-+ THUMB(	lsl	r6, r9, r2		)
-  THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
- 	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
--	subs	r9, r9, #1			@ decrement the way
-+	subs	r9, r9, #1			@ decrement the index
- 	bge	loop2
--	subs	r7, r7, #1			@ decrement the index
-+	subs	r4, r4, #1			@ decrement the way
- 	bge	loop1
- skip:
- 	add	r10, r10, #2			@ increment cache number
+>  	gic_chip.flags |= gic_arch_extn.flags;
+>  	gic_dist_init(gic);
+>  	gic_cpu_init(gic);
+> @@ -835,6 +838,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>  	void __iomem *cpu_base;
+>  	void __iomem *dist_base;
+>  	u32 percpu_offset;
+> +	u32 bypass_val;
+>  	int irq;
+>  
+>  	if (WARN_ON(!node))
+> @@ -849,7 +853,10 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>  	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+>  		percpu_offset = 0;
+>  
+> -	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
+> +	if (of_property_read_u32(node, "bypass-flags", &bypass_val))
+> +		bypass_val = 0;
+
+[adding Mark on Cc, so he can comment on the DT parts]
+
+Where's the DT documentation update? Also, as this is an
+implementation-specific quirk, you should consider using a separate
+compatible string and move the handling of this issue into some X-Gene
+specific code.
+
+> +	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, bypass_val, node);
+>  
+>  	if (parent) {
+>  		irq = irq_of_parse_and_map(node, 0);
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index 0e5d9ec..999515b 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -64,14 +64,14 @@ struct device_node;
+>  extern struct irq_chip gic_arch_extn;
+>  
+>  void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+> -		    u32 offset, struct device_node *);
+> +		    u32 offset, u32 bypass_val, struct device_node *);
+>  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+>  void gic_cpu_if_down(void);
+>  
+>  static inline void gic_init(unsigned int nr, int start,
+>  			    void __iomem *dist , void __iomem *cpu)
+>  {
+> -	gic_init_bases(nr, start, dist, cpu, 0, NULL);
+> +	gic_init_bases(nr, start, dist, cpu, 0, 0, NULL);
+>  }
+>  
+>  #endif /* __ASSEMBLY */
+> 
+
+Cheers,
+
+	M.
 -- 
-1.8.2.2
+Jazz is not dead. It just smells funny...
