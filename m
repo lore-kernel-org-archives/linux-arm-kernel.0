@@ -1,66 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Nov 2013 10:12:56 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix populating the hwmod data from device
- tree
-In-Reply-To: <20131120025620.GF10317@atomide.com>
-References: <20131120025620.GF10317@atomide.com>
-Message-ID: <20131120181255.GG10317@atomide.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 20 Nov 2013 19:15:32 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+In-Reply-To: <1384969222.10637.20.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <20131112083633.GB10318@1wt.eu> <87a9hagex1.fsf@natisbad.org>
+ <20131112100126.GB23981@1wt.eu> <87vbzxd473.fsf@natisbad.org>
+ <20131113072257.GB10591@1wt.eu> <20131117141940.GA18569@1wt.eu>
+ <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131120171227.GG8581@1wt.eu> <20131120173436.GK8581@1wt.eu>
+ <1384969222.10637.20.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20131120181532.GM8581@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131119 18:57]:
-> We have some device tree properties where the ti,hwmod has multiple
-> values:
+On Wed, Nov 20, 2013 at 09:40:22AM -0800, Eric Dumazet wrote:
+> On Wed, 2013-11-20 at 18:34 +0100, Willy Tarreau wrote:
 > 
-> am33xx.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> am4372.dtsi:	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> dra7.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2";
-> omap3.dtsi:	ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
-> omap3.dtsi:	ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
-> omap4.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
-> omap5.dtsi:	ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+> > One important point, I was looking for the other patch you pointed
+> > in this long thread and finally found it :
+> > 
+> > > So
+> > > http://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=98e09386c0ef4dfd48af7ba60ff908f0d525cdee
+> > > 
+> > > restored this minimal amount of buffering, and let the bigger amount for
+> > > 40Gb NICs ;)
+> > 
+> > This one definitely restores original performance, so it's a much better
+> > bet in my opinion :-)
 > 
-> So we need to handle the whole string array instead of just the
-> first string to find the related hwmod entry.
-> 
-> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -2228,11 +2228,23 @@ static struct device_node *of_dev_hwmod_lookup(struct device_node *np,
->  						struct omap_hwmod *oh)
->  {
->  	struct device_node *np0 = NULL, *np1 = NULL;
-> -	const char *p;
->  
->  	for_each_child_of_node(np, np0) {
-> -		if (of_find_property(np0, "ti,hwmods", NULL)) {
-> -			p = of_get_property(np0, "ti,hwmods", NULL);
-> +		int count, i;
-> +
-> +		count = of_property_count_strings(np0, "ti,hwmods");
-> +		if (count < 1)
-> +			continue;
-> +
-> +		for (i = 0; i < count; i++) {
-> +			const char *p;
-> +			int res;
-> +
-> +			res = of_property_read_string_index(np0, "ti,hwmods",
-> +							    i, &p);
-> +			if (res)
-> +				continue;
-> +
->  			if (!strcmp(p, oh->name))
->  				return np0;
->  			np1 = of_dev_hwmod_lookup(np0, oh);
+> I don't understand. I thought you were using this patch.
 
-Hmm I think this also needs part two to it to populate the right IO space
-based on the index, this probably now wrongly populates the first IO space
-for all the hwmod instances in the group.
+No, I was on latest stable (3.10.19) which exhibits the regression but does
+not yet have your fix above. Then I tested the patch your proposed in this
+thread, then this latest one. Since the patch is not yet even in Linus'
+tree, I'm not sure Arnaud has tried it yet.
+
+> I guess we are spending time on a already solved problem.
+
+That's possible indeed. Sorry if I was not clear enough, I tried.
 
 Regards,
-
-Tony
+Willy
