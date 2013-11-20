@@ -1,30 +1,35 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 21 Nov 2013 02:48:02 +0400
-Subject: [PATCH 0/2] pcmcia: small fixes for sa1111 machine code
-Message-ID: <1384987684-10692-1-git-send-email-dbaryshkov@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Nov 2013 16:47:18 -0700
+Subject: [PATCH 1/5] clk: tegra: fix blink clock rate
+Message-ID: <1384991242-13596-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit dec8e46178bad9f1717a948572d76e0f804be801:
+From: Stephen Warren <swarren@nvidia.com>
 
-  Merge tag 'arc-v3.13-rc1-part2' of git://git.kernel.org/pub/scm/linux/kernel/git/vgupta/arc (2013-11-19 11:44:15 -0800)
+The blink clock rate needs to be configured, or it will run at ~1Hz
+rather than the desired 32KHz. If it runs at the wrong rate, e.g. the
+SDIO WiFi on Seaboard and Cardhu will fail to be detected.
 
-are available in the git repository at:
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This probably needs to be squashed into commit 32721a734a3d "clk: tegra:
+move PMC, fixed clocks to common files".
+---
+ drivers/clk/tegra/clk-tegra-pmc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-  git://github.com/lumag/linux sa1111-pcmcia
-
-for you to fetch changes up to d968c6bc2fad65739e546e4adf6b72ec1f4748e7:
-
-  pcmcia: sa1111: pass sa1111_dev to jornada720-specific code (2013-11-21 01:27:24 +0400)
-
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (2):
-      pcmcia: sa1111: pass sa1111_dev to badge4-specific code
-      pcmcia: sa1111: pass sa1111_dev to jornada720-specific code
-
- drivers/pcmcia/sa1111_badge4.c     | 2 +-
- drivers/pcmcia/sa1111_generic.c    | 4 ++--
- drivers/pcmcia/sa1111_generic.h    | 4 ++--
- drivers/pcmcia/sa1111_jornada720.c | 3 ++-
- 4 files changed, 7 insertions(+), 6 deletions(-)
+diff --git a/drivers/clk/tegra/clk-tegra-pmc.c b/drivers/clk/tegra/clk-tegra-pmc.c
+index 00e8275a7178..08b21c1ee867 100644
+--- a/drivers/clk/tegra/clk-tegra-pmc.c
++++ b/drivers/clk/tegra/clk-tegra-pmc.c
+@@ -114,6 +114,7 @@ void __init tegra_pmc_clk_init(void __iomem *pmc_base,
+ 	}
+ 
+ 	/* blink */
++	writel_relaxed(0, pmc_base + PMC_BLINK_TIMER);
+ 	clk = clk_register_gate(NULL, "blink_override", "clk_32k", 0,
+ 				pmc_base + PMC_DPD_PADS_ORIDE,
+ 				PMC_DPD_PADS_ORIDE_BLINK_ENB, 0, NULL);
+-- 
+1.8.1.5
