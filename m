@@ -1,73 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Nov 2013 09:30:35 -0700
-Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <20131120.160359.1043627108929095327.hdoyu@nvidia.com>
-References: <528BD6A7.3030908@wwwdotorg.org><20131120.051708.396722414386125310.hdoyu@nvidia.com><20131120131447.GA8279@ulmo.nvidia.com>
- <20131120.160359.1043627108929095327.hdoyu@nvidia.com>
-Message-ID: <528CE3AB.60806@wwwdotorg.org>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 20 Nov 2013 17:31:34 +0100
+Subject: [PATCH 8/9] ARM: at91/dt: add new at91rm9200ek_mmc board
+In-Reply-To: <20131120150255.GH14627@ns203013.ovh.net>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+ <1377693456-11133-1-git-send-email-b.brezillon@overkiz.com>
+ <20131120150255.GH14627@ns203013.ovh.net>
+Message-ID: <528CE3E6.1040802@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2013 07:03 AM, Hiroshi Doyu wrote:
-> Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 20 Nov 2013 14:14:48 +0100:
+On 20/11/2013 16:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 14:37 Wed 28 Aug     , Boris BREZILLON wrote:
+>> Add a new at91rm9200ek_mmc board (based on at91rm9200ek board) which enables
+>> mmc0/slot0.
+> no for multiple dts
+>
+> this need to handle at user space level
 
-(Yes, what Thierry said)
+You mean, by controlling the regulator using the sysfs interface, or by 
+loading
+only the appropriate driver ?
 
-> ....
->>> Does the above mean the following?
->>>
->>> int of_iommu_attach(struct device *dev)
->>> {
->>> 	int i;
->>> 	struct of_phandle_args args;
->>>
->>> 	of_property_for_each_phandle_with_args(dev->of_node, "iommus",
->>> 					       "#iommu-cells", i, &args)
->>> 		if (!args->np->dev->driver)
->>> 			return -EPROBE_DEFER;
->>> 	return 0;
->>> }
+What if both drivers are loaded (or not compiled as modules) ?
+This will lead to one device being unusable (and maybe even worst)...
+
+Please explain what you had in mind ?
+
+>
+> Best Regards,
+> J.
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>   arch/arm/boot/dts/at91rm9200ek_mmc.dts |   23 +++++++++++++++++++++++
+>>   1 file changed, 23 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/at91rm9200ek_mmc.dts
 >>
->> Not quite. The above would only check that a driver was bound to the
->> device. But if that device isn't an IOMMU then this doesn't help you.
-> 
-> I thought that, as long as a device is a normal one, it's ok to let it
-> go to be populated.
-
-I don't understand what that means.
-
-> We only care about that, IOMMU devices comes
-> first, and clients should come later than IOMMUs, for population. In
-> the above if all IOMMUs are not populated, client devices are always
-> deferred. "args->np->dev" always points an IOMMU device in a
-> loop. Otherwise(no "iommus=") it goes out from the loop immediately.
-
-I'm not sure what that means. Perhaps you're sauying the dev->driver
-isn't set until the driver is probe()d for the device, so if
-dev->driver!=NULL, then we know the driver probed() successfully for it?
-That does go most of the way, but as Thierry pointed out, it doesn't
-guarantee that the dev->driver is an IOMMU driver, just that it's *some*
-driver. Perhaps this won't actually make any difference in practice, but
-AFAIK, all other subsystems do perform the strict check, so I don't see
-why the IOMMU subsystem shouldn't.
-
-...
-> There's the following case at least we have already had.
-> 
-> "memory controller"---"smmu_a"---bus--+--"smmu_b"--"device_a"
->                                       |
->                                       |
->                                       +--"device_b"
-> 
-> "smmu_b" isn't related to a bus at all.
-
-Yes, smmu_b is related to a bus.
-
-Admittedly perhaps not a bus that the CPU can master transactions onto,
-but there's still a (perhaps point-point) bus that device_a masters, and
-smmu_b acts as a slave.
-
-Note that not all buses in the diagram above are represented as bus
-objects in the Linux kernel (or even in DT), since those tend to
-concentrate only on representing buses that the CPU masters, rather than
-additionally representing buses that only HW devices master.
+>> diff --git a/arch/arm/boot/dts/at91rm9200ek_mmc.dts b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+>> new file mode 100644
+>> index 0000000..c87a861
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+>> @@ -0,0 +1,23 @@
+>> +/*
+>> + * at91rm9200ek.dts - Device Tree file for Atmel AT91RM9200 evaluation kit with
+>> + *                    an MMC slot
+>> + *
+>> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+>> + *
+>> + * Licensed under GPLv2 only
+>> + */
+>> +/dts-v1/;
+>> +#include "at91rm9200ek.dts"
+>> +
+>> +/ {
+>> +	model = "Atmel AT91RM9200 evaluation kit with MMC slot";
+>> +	compatible = "atmel,at91rm9200ek-mmc", "atmel,at91rm9200ek", "atmel,at91rm9200";
+>> +
+>> +	ahb {
+>> +		apb {
+>> +			mmc0: mmc at fffb4000 {
+>> +				status = "okay";
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> -- 
+>> 1.7.9.5
+>>
