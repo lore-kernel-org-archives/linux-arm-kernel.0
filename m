@@ -1,55 +1,30 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Wed, 20 Nov 2013 04:16:09 +0000
-Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
-In-Reply-To: <20131120033745.GD11009@MrMyself>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
- <20131101085904.GC28401@MrMyself>
- <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
- <20131104043338.GA2345@MrMyself>
- <1DD289F6464F0949A2FCA5AA6DC23F828AE980@039-SN2MPN1-012.039d.mgd.msft.net>
- <20131120033745.GD11009@MrMyself>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828AF608@039-SN2MPN1-012.039d.mgd.msft.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 20 Nov 2013 13:18:05 +0900
+Subject: [PATCH] ARM: shmobile: Use r8a7791 suffix for IRQC compat string
+Message-ID: <20131120041805.30114.27761.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > The udelay just doesn't make sense to what you are talking about.
-> > >
-> > > Does SAI really need 10us delay between two register-updating?
-> > >
-> >
-> > No, this is not must be.
-> 
-> Then you should explain in your comments why you really put it here or
-> just drop it if it's just a mistake.
-> 
+From: Magnus Damm <damm@opensource.se>
 
-The udelay will be removed then.
+Add "renesas,irqc-r8a7791" to the compatible string for IRQC
+in case of r8a7791. This makes the IRQC follow the same style
+as the other devices and also makes it more future proof.
 
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-> > > ISSUE 2: There are two cases listed in 'Synchronous mode'.
-> > > 	 However, your driver doesn't take care of them.
-> > > 	 The SAI's synchronous mode looks like more flexible
-> > > 	 than SSI's. The driver needs to be more sophisticated
-> > > 	 so that it can handle multiple cases when TX/RX clocks
-> > > 	 are controlled by either TX or RX, and surely, the
-> > > 	 asynchronous mode as well.
-> > >
-> >
-> > Because in Vybrid the transmitter bit clock and frame sync are to be
-> > used by both the transmitter and receiver, and only this case can be
-> > used here, so now I only handle this case.
-> 
-> It's fairly okay if adding explicit comments to indicate that currently
-> the driver only supports its Synchronous mode with clocks controlled by
-> TX only.
-> 
+ arch/arm/boot/dts/r8a7791.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Just think, on other platforms maybe only the Rx's clock is available.
-Thus I think there should be one DT property to control this, and then the SAI driver can be more flexible.
-
-Or could you give me some more practical ideas ?
-
---
-Best Regards,
-Xiubo
+--- 0001/arch/arm/boot/dts/r8a7791.dtsi
++++ work/arch/arm/boot/dts/r8a7791.dtsi	2013-11-20 12:21:36.000000000 +0900
+@@ -154,7 +154,7 @@
+ 	};
+ 
+ 	irqc0: interrupt-controller at e61c0000 {
+-		compatible = "renesas,irqc";
++		compatible = "renesas,irqc-r8a7791", "renesas,irqc";
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+ 		reg = <0 0xe61c0000 0 0x200>;
