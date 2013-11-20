@@ -1,51 +1,53 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Nov 2013 12:08:59 -0600
-Subject: [RFT/RFC/PATCH 12/31] arm: omap: irq: add suspend/resume methods
+Date: Wed, 20 Nov 2013 12:09:03 -0600
+Subject: [RFT/RFC/PATCH 16/31] arm: omap: irq: use IRQCHIP_DECLARE macro
 In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
 References: <1384970958-4118-1-git-send-email-balbi@ti.com>
-Message-ID: <1384970958-4118-13-git-send-email-balbi@ti.com>
+Message-ID: <1384970958-4118-17-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-there is a generic way to suspend/resume irqchips,
-let's use that instead of our homebrew version.
+IRQCHIP_DECLARE macro is used to declare the same
+of_device_id structure for irqchips, it's just
+a helper. No functional changes.
+
+Note that we're temporarily including irqchip.h
+with its full path, until we move this driver
+to drivers/irqchip/.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/mach-omap2/irq.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 45c5acc..6dfa6cf 100644
+index 503d345..5c3ab05 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -150,6 +150,18 @@ static void omap_mask_ack_irq(struct irq_data *d)
- 	omap_ack_irq(d);
+@@ -26,6 +26,7 @@
+ #include "soc.h"
+ #include "iomap.h"
+ #include "common.h"
++#include "../../drivers/irqchip/irqchip.h"
+ 
+ /* selected INTC register offsets */
+ 
+@@ -322,14 +323,11 @@ static int __init intc_of_init(struct device_node *node,
+ 	return 0;
  }
  
-+static void omap_suspend_irq(struct irq_data *d)
-+{
-+	omap3_intc_prepare_idle();
-+	omap_intc_save_context();
-+}
-+
-+static void omap_resume_irq(struct irq_data *d)
-+{
-+	omap_intc_restore_context();
-+	omap3_intc_resume_idle();
-+}
-+
- static void __init omap_irq_soft_reset(void)
- {
- 	unsigned long tmp;
-@@ -199,6 +211,8 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- 	ct->chip.irq_ack = omap_mask_ack_irq;
- 	ct->chip.irq_mask = irq_gc_mask_disable_reg;
- 	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
-+	ct->chip.irq_suspend = omap_suspend_irq;
-+	ct->chip.irq_resume = omap_resume_irq;
- 	ct->chip.flags |= IRQCHIP_SKIP_SET_WAKE;
+-static struct of_device_id irq_match[] __initdata = {
+-	{ .compatible = "ti,omap2-intc", .data = intc_of_init, },
+-	{ }
+-};
++IRQCHIP_DECLARE(omap_intc, "ti,omap2-intc", intc_of_init);
  
- 	ct->regs.enable = INTC_MIR_CLEAR0;
+ void __init omap_intc_of_init(void)
+ {
+-	of_irq_init(irq_match);
++	of_irq_init(&irqchip_of_match_omap_intc);
+ }
+ 
+ asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
 -- 
 1.8.4.GIT
