@@ -1,80 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 20 Nov 2013 13:47:58 -0600
-Subject: Report from 2013 ARM kernel summit
-In-Reply-To: <20131120135308.GC8279@ulmo.nvidia.com>
-References: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
- <20131115070627.6CF65C4079B@trevor.secretlab.ca>
- <20131119.114054.663999769447782808.hdoyu@nvidia.com>
- <20131119173524.GK11778@mudshark.cambridge.arm.com>
- <528BCDCE.6070006@gmail.com>
- <20131120103111.GB19352@mudshark.cambridge.arm.com>
- <20131120135308.GC8279@ulmo.nvidia.com>
-Message-ID: <CAL_Jsq+js4kzsrdCbFzzxiJhaD9uHz_yhqNFG5HZuW7AgKAfGg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 Nov 2013 11:53:11 -0800
+Subject: [PATCH] PM / Clocks: fix pm_clk_resume/suspend if
+ CONFIG_PM_RUNTIME is set
+In-Reply-To: <528D082C.3040405@ti.com>
+References: <1384954307-27094-1-git-send-email-grygorii.strashko@ti.com>
+ <528D0296.1070001@codeaurora.org> <528D082C.3040405@ti.com>
+Message-ID: <528D1327.7080205@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 7:53 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Nov 20, 2013 at 10:31:11AM +0000, Will Deacon wrote:
->> On Tue, Nov 19, 2013 at 08:45:02PM +0000, Rob Herring wrote:
->> > On 11/19/2013 11:35 AM, Will Deacon wrote:
->> > > Adding Andreas and Rob for input on potential binding additions to the SMMU.
->> >
->> > The above proposal would be an incompatible change. However, I think we
->> > could still deal with a change in this binding at this stage.
->> >
->> > One way approach to handle this without changing the binding would be to
->> > scan the DT for all iommu's up front and create a list of all nodes and
->> > their iommu parent. The fact that the hierarchy is described in a way
->> > that doesn't fit Linux well is really a Linux implementation detail.
->> >
->> > If changing the binding, a simple approach would be to allow
->> > 'smmu-parent' to be a bus and/or device property and not just for
->> > chained iommu's. This could be a global or bus property that is
->> > inherited. Like interrupt-parent, you would have to deal with the parent
->> > being itself. Also, perhaps iommu-parent would be a better name. In any
->> > case, I'd like to see this all be a generic iommu binding.
->>
->> I like that idea. I've recently been toying with removing the chained IOMMU
->> support, since I don't think anybody is using it who is interested in
->> mainline. However, making it more general sounds like a better idea.
->>
->> One potential issue is that I think the nvidia guys want to describe masters
->> that master via multiple SMMUs (which I believe was the motivation for
->> moving the stream-ids out into the master nodes, rather than keeping them in
->> the SMMU). Again, that's not something we can easily add to the arm-smmu,
->> because the incoming stream-ids are a property of the SMMU node.
+On 11/20/13 11:06, Grygorii Strashko wrote:
+> On 11/20/2013 08:42 PM, Stephen Boyd wrote:
+>> On 11/20/13 05:31, Grygorii Strashko wrote:
+>>> @@ -230,7 +230,7 @@ int pm_clk_suspend(struct device *dev)
+>>>   	list_for_each_entry_reverse(ce, &psd->clock_list, node) {
+>>>   		if (ce->status < PCE_STATUS_ERROR) {
+>>>   			if (ce->status == PCE_STATUS_ENABLED)
+>>> -				clk_disable(ce->clk);
+>>> +				clk_disable_unprepare(ce->clk);
+>>>   			ce->status = PCE_STATUS_ACQUIRED;
+>>>   		}
+>>>   	}
+>>> @@ -259,7 +259,7 @@ int pm_clk_resume(struct device *dev)
+>>>   
+>>>   	list_for_each_entry(ce, &psd->clock_list, node) {
+>>>   		if (ce->status < PCE_STATUS_ERROR) {
+>>> -			clk_enable(ce->clk);
+>>> +			clk_prepare_enable(ce->clk);
+>>>   			ce->status = PCE_STATUS_ENABLED;
+>>>   		}
+>>>   	}
+>> This is inside a spin_lock_irqsave(). You should be getting scheduling
+>> while atomic warnings with this change. Are you testing with
+>> DEBUG_ATOMIC_SLEEP=y?
+> Ops, thanks. No, It's not tested with DEBUG_ATOMIC_SLEEP and 
+> I agree with you.
 >
-> If I remember correctly, one of the reasons for the proposal was also
-> that the interrupt-parent property turned out to be insufficient for
-> some use-cases, which lead to Grant's proposal of the new interrupts-
-> extended property. Since that comparison has already been drawn, I think
-> we can agree that both are used in similar ways. Therefore we should
-> consider what we've learned from interrupt-parent when designing this
-> generic IOMMU binding to avoid having to introduce iommu-extended at
-> some point.
-
-The problem in that case is really the interrupts property not having
-a phandle. This case would be a bit different because there is not an
-analogous property to interrupts.
-
-However, I don't really like connections described via phandles being
-done differently for different bindings. And this one has been a bit
-unusual.
-
->> So the question is: do we actually need to describe masters that master
->> through multiple SMMUs as a single node in the devicetree?
+> So, I see two option here:
+> 1) split above loops on two
+> 2) add calls of clk_prepare()/clk_unprepare() in pm_clk_notify()
 >
-> I would think so, yes. The alternative would be to have several nodes
-> that describe the same device, and that conflicts on a different level.
+> In my opinion option [2] is better.
 >
-> Perhaps it could be done by having separate sub-nodes that each use a
-> different IOMMU, but that sounds like a much grosser solution. That
-> pretty much boils down to interrupt-parent/interrupt-map.
 
-Perhaps not within the DT, but we could have this case with IOMMUs
-within PCIe bus and the PCIe RC itself behind an IOMMU.
+Doesn't that mean the clock will always be prepared as long as the
+device is present? That doesn't sound good. I would like the clocks to
+be disabled and unprepared as long as the device is suspended.
 
-I'll reply to Hiroshi's email with more on a variation of his proposal.
+What is the lock protecting? The linked list or something more? Can we
+remove the locks?
 
-Rob
+It looks like even if you just remove the locks here, the PM core is
+free to call this function with irqs disabled if pm_runtime_irq_safe()
+has been called on the device. Perhaps runtime PM can only do the
+clk_enable()/clk_disable() part and the clk_unprepare()/clk_prepare()
+calls should happen in the system suspend callbacks?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
