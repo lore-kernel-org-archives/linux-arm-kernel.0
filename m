@@ -1,75 +1,35 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 20 Nov 2013 18:38:28 +0100
-Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
-In-Reply-To: <1384968607.10637.14.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <87y54u59zq.fsf@natisbad.org> <20131112083633.GB10318@1wt.eu>
- <87a9hagex1.fsf@natisbad.org> <20131112100126.GB23981@1wt.eu>
- <87vbzxd473.fsf@natisbad.org> <20131113072257.GB10591@1wt.eu>
- <20131117141940.GA18569@1wt.eu>
- <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131120171227.GG8581@1wt.eu>
- <1384968607.10637.14.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20131120173828.GL8581@1wt.eu>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 20 Nov 2013 18:39:12 +0100
+Subject: [RFC] mtd: gpmc: add BCH support for plain AM335x
+Message-ID: <1384969152-10411-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 09:30:07AM -0800, Eric Dumazet wrote:
-> Well, all TCP performance results are highly dependent on the workload,
-> and both receivers and senders behavior.
-> 
-> We made many improvements like TSO auto sizing, DRS (dynamic Right
-> Sizing), and if the application used some specific settings (like
-> SO_SNDBUF / SO_RCVBUF or other tweaks), we can not guarantee that same
-> exact performance is reached from kernel version X to kernel version Y.
+When building a kernel without OMAP3 support but only AM335x, we can't
+activate the needed MTD_NAND_OMAP_BCH symbol.
 
-Of course, which is why I only care when there's a significant
-difference. If I need 6 streams in a version and 8 in another one to
-fill the wire, I call them identical. It's only when we dig into the
-details that we analyse the differences.
+Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+---
 
-> We try to make forward progress, there is little gain to revert all
-> these great works. Linux had this tendency to favor throughput by using
-> overly large skbs. Its time to do better.
+Actually, I wonder if this is fix will scale. Maybe someone with more insight
+about TI SoCs could find a better expression of supported SoCs. This is the
+only one I could test .
 
-I agree. Unfortunately our mails have crossed each other, so just to
-keep this tread mostly linear, your next patch here :
+ drivers/mtd/nand/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-   http://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=98e09386c0ef4dfd48af7ba60ff908f0d525cdee
-
-Fixes that regression and the performance is back to normal which is
-good.
-
-> As explained, some drivers are buggy, and need fixes.
-
-Agreed!
-
-> If nobody wants to fix them, this really means no one is interested
-> getting them fixed.
-
-I was exactly reading the code when I found a window with your patch
-above that I was looking for :-)
-
-> I am willing to help if you provide details, because otherwise I need
-> a crystal ball ;)
-> 
-> One known problem of TCP is the fact that an incoming ACK making room in
-> socket write queue immediately wakeup a blocked thread (POLLOUT), even
-> if only one MSS was ack, and write queue has 2MB of outstanding bytes.
-
-Indeed.
-
-> All these scheduling problems should be identified and fixed, and yes,
-> this will require a dozen more patches.
-> 
-> max (128KB , 1-2 ms) of buffering per flow should be enough to reach
-> line rate, even for a single flow, but this means the sk_sndbuf value
-> for the socket must take into account the pipe size _plus_ 1ms of
-> buffering.
-
-Which is the purpose of your patch above and I confirm it fixes the
-problem.
-
-Now looking at how to workaround this lack of Tx IRQ.
-
-Thanks!
-Willy
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 93ae6a6..f9455e4 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -95,7 +95,7 @@ config MTD_NAND_OMAP2
+ 	  platforms.
+ 
+ config MTD_NAND_OMAP_BCH
+-	depends on MTD_NAND && MTD_NAND_OMAP2 && ARCH_OMAP3
++	depends on MTD_NAND && MTD_NAND_OMAP2 && (ARCH_OMAP3 || SOC_AM33XX)
+ 	tristate "Support hardware based BCH error correction"
+ 	default n
+ 	select BCH
+-- 
+1.8.4.2
