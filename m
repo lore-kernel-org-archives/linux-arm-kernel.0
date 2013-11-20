@@ -1,195 +1,167 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Nov 2013 13:14:20 +0000
-Subject: [PATCH V4 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1384946021-22100-3-git-send-email-vkale@apm.com>
-References: <1384946021-22100-1-git-send-email-vkale@apm.com>
- <1384946021-22100-3-git-send-email-vkale@apm.com>
-Message-ID: <528CB5AC.5080007@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 20 Nov 2013 14:14:48 +0100
+Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+In-Reply-To: <20131120.051708.396722414386125310.hdoyu@nvidia.com>
+References: <20131119102506.GG31504@ulmo.nvidia.com>
+ <20131119.140351.1342214267287135109.hdoyu@nvidia.com>
+ <528BD6A7.3030908@wwwdotorg.org>
+ <20131120.051708.396722414386125310.hdoyu@nvidia.com>
+Message-ID: <20131120131447.GA8279@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[dropped patches at apm.com]
-
-Vinayak,
-
-Please keep reviewers on CC, as it makes easier to track the changes.
-
-On 20/11/13 11:13, Vinayak Kale wrote:
-> Add support for irq registration when pmu interrupt is percpu.
+On Wed, Nov 20, 2013 at 04:17:08AM +0100, Hiroshi Doyu wrote:
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 19 Nov 2013 22:22:47 +0100:
 > 
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> ---
->  arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
->  1 file changed, 81 insertions(+), 27 deletions(-)
+> > On 11/19/2013 05:03 AM, Hiroshi Doyu wrote:
+> > > Hi Thierry,
+> > > 
+> > > Thierry Reding <thierry.reding@gmail.com> wrote @ Tue, 19 Nov 2013 11:25:07 +0100:
+> > > 
+> > >> From earlier discussions I thought the goal was to actually defer this
+> > >> until all nodes referred to by the iommus property were actually
+> > >> registered. The above only checks that the phandles can be resolved to
+> > >> valid struct device_node:s. That doesn't mean that an actual IOMMU has
+> > >> been registered for it, only that the devices have been created.
+> > > 
+> > > Currently "bus->iommu_ops" is set at the end of tegra_smmu_probe(). So
+> > > if "bus->iommu_ops" is set, it means that an iommu instance is
+> > > populated at that time.
+> > 
+> > Yes, but that's the register bus, upon which the device is a client, not
+> > the bus upon which the device is a bus master. They aren't necessarily
+> > the same.
+> > 
+> > There's no getting around the fact that, as Thierry said, you need to
+> > search for a registered IOMMU device for each phandle, and defer probe
+> > if any aren't registered yet.
+> > 
+> > If we do that, then you shouldn't need to look at the value of
+> > dev->bus->iommu_ops at all; if all IOMMUs in the list were registered,
+> > then iommu_ops must have been set when (one of them) was registered, and
+> > if not, then it possibly wasn't, so defer probe.
+> > 
+> > That way, this code won't have to change if the core IOMMU code gets
+> > extended to support multiple IOMMUs, devices mastering transactions onto
+> > buses other than their register bus, etc.
 > 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index cea1594..de12ba8 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -22,6 +22,7 @@
->  
->  #include <linux/bitmap.h>
->  #include <linux/interrupt.h>
-> +#include <linux/irq.h>
->  #include <linux/kernel.h>
->  #include <linux/export.h>
->  #include <linux/perf_event.h>
-> @@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
->  }
->  
->  static void
-> +armpmu_disable_percpu_irq(void *data)
-> +{
-> +	struct arm_pmu *armpmu = data;
-> +	struct platform_device *pmu_device = armpmu->plat_device;
-> +	int irq = platform_get_irq(pmu_device, 0);
-> +
-> +	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-> +	disable_percpu_irq(irq);
-> +}
-> +
-> +static void
->  armpmu_release_hardware(struct arm_pmu *armpmu)
->  {
->  	int i, irq, irqs;
->  	struct platform_device *pmu_device = armpmu->plat_device;
->  
->  	irqs = min(pmu_device->num_resources, num_possible_cpus());
-> +	if (irqs < 1)
-> +		return;
->  
-> -	for (i = 0; i < irqs; ++i) {
-> -		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-> -			continue;
-> -		irq = platform_get_irq(pmu_device, i);
-> -		if (irq >= 0)
-> -			free_irq(irq, armpmu);
-> +	irq = platform_get_irq(pmu_device, 0);
-> +	if (irq < 0)
-
-So I'm going to sound like a stuck record: irq == 0 is not a valid IRQ
-number, full stop. This is how we express the fact that there is no IRQ.
-
-If you're touching that code, you might as well fix this buglet.
-
-> +		return;
-> +
-> +	if (irq_is_percpu(irq)) {
-> +		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
-> +		free_percpu_irq(irq, &cpu_hw_events);
-> +	} else {
-> +		for (i = 0; i < irqs; ++i) {
-> +			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-> +				continue;
-> +			irq = platform_get_irq(pmu_device, i);
-> +			if (irq >= 0)
-
-Same here.
-
-> +				free_irq(irq, armpmu);
-> +		}
->  	}
->  }
->  
-> +static void
-> +armpmu_enable_percpu_irq(void *data)
-> +{
-> +	struct arm_pmu *armpmu = data;
-> +	struct platform_device *pmu_device = armpmu->plat_device;
-> +	int irq = platform_get_irq(pmu_device, 0);
-> +
-> +	enable_percpu_irq(irq, 0);
-> +	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-> +}
-> +
->  static int
->  armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  {
-> @@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  		return -ENODEV;
->  	}
->  
-> -	for (i = 0; i < irqs; ++i) {
-> -		err = 0;
-> -		irq = platform_get_irq(pmu_device, i);
-> -		if (irq < 0)
-> -			continue;
-> +	irq = platform_get_irq(pmu_device, 0);
-> +	if (irq < 0) {
-
-And here.
-
-> +		pr_err("failed to get an irq for PMU device\n");
-> +		return -ENODEV;
-> +	}
->  
-> -		/*
-> -		 * If we have a single PMU interrupt that we can't shift,
-> -		 * assume that we're running on a uniprocessor machine and
-> -		 * continue. Otherwise, continue without this interrupt.
-> -		 */
-> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> -				    irq, i);
-> -			continue;
-> -		}
-> +	if (irq_is_percpu(irq)) {
-> +		err = request_percpu_irq(irq, armpmu->handle_irq,
-> +				"arm-pmu", &cpu_hw_events);
->  
-> -		err = request_irq(irq, armpmu->handle_irq,
-> -				  IRQF_NOBALANCING,
-> -				  "arm-pmu", armpmu);
->  		if (err) {
-> -			pr_err("unable to request IRQ%d for ARM PMU counters\n",
-> -				irq);
-> +			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
-> +					irq);
->  			armpmu_release_hardware(armpmu);
->  			return err;
->  		}
->  
-> -		cpumask_set_cpu(i, &armpmu->active_irqs);
-> +		on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
-> +	} else {
-> +		for (i = 0; i < irqs; ++i) {
-> +			err = 0;
-> +			irq = platform_get_irq(pmu_device, i);
-> +			if (irq < 0)
-
-And here.
-
-> +				continue;
-> +
-> +			/*
-> +			 * If we have a single PMU interrupt that we can't shift,
-> +			 * assume that we're running on a uniprocessor machine and
-> +			 * continue. Otherwise, continue without this interrupt.
-> +			 */
-> +			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-> +				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> +						irq, i);
-> +				continue;
-> +			}
-> +
-> +			err = request_irq(irq, armpmu->handle_irq,
-> +					IRQF_NOBALANCING,
-> +					"arm-pmu", armpmu);
-> +			if (err) {
-> +				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-> +						irq);
-> +				armpmu_release_hardware(armpmu);
-> +				return err;
-> +			}
-> +
-> +			cpumask_set_cpu(i, &armpmu->active_irqs);
-> +		}
->  	}
->  
->  	return 0;
+> Does the above mean the following?
 > 
+> int of_iommu_attach(struct device *dev)
+> {
+> 	int i;
+> 	struct of_phandle_args args;
+> 
+> 	of_property_for_each_phandle_with_args(dev->of_node, "iommus",
+> 					       "#iommu-cells", i, &args)
+> 		if (!args->np->dev->driver)
+> 			return -EPROBE_DEFER;
+> 	return 0;
+> }
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Not quite. The above would only check that a driver was bound to the
+device. But if that device isn't an IOMMU then this doesn't help you.
+
+The standard way to solve this issue is to add the IOMMU to a global
+list upon registration. Typically subsystems have some way to do that
+already, but it seems like IOMMU doesn't. It looks like that's one of
+the side-effects of the assumption that there will always only be a
+single IOMMU (per bus).
+
+There's also no base object that IOMMU drivers implement, which is the
+way it's usually done in other subsystems. The absence of that makes it
+more difficult. I suspect the easiest way to do that would be to add a
+new type, something like this:
+
+	struct iommu {
+		struct list_head list;
+		struct device *dev;
+	};
+
+Then modify the driver to do something like this (tegra-smmu.c):
+
+	struct smmu_device {
+		struct iommu iommu;
+
+		...
+	};
+
+	...
+
+	static int tegra_smmu_probe(struct platform_device *pdev)
+	{
+		struct smmu_device *smmu;
+
+		...
+
+		smmu->iommu.dev = &pdev->dev;
+
+		iommu_add(&smmu->iommu);
+
+		...
+	}
+
+	static int tegra_smmu_remove(struct platform_device *pdev)
+	{
+		struct smmu_device *smmu;
+
+		...
+
+		iommu_del(&smmu->iommu);
+	}
+
+The implementation of iommu_add() and iommu_del() could be as simple as:
+
+	static DEFINE_MUTEX(iommus_lock);
+	static LIST_HEAD(iommus_list);
+
+	void iommu_add(struct iommu *iommu)
+	{
+		INIT_LIST_HEAD(&iommu->list);
+		mutex_lock(&iommus_lock);
+		list_add_tail(&iommu->list, &iommus_list);
+		mutex_unlock(&iommus_lock);
+	}
+
+	void iommu_del(struct iommu *iommu)
+	{
+		INIT_LIST_HEAD(&iommu->list);
+		mutex_lock(&iommus_lock);
+		list_del(&iommu->list);
+		mutex_unlock(&iommus_lock);
+	}
+
+And then you can implement a lookup function to match an IOMMU to the
+phandle, like so:
+
+	struct iommu *of_find_iommu_by_node(struct device_node *np)
+	{
+		struct iommu *iommu;
+
+		mutex_lock(&iommus_lock);
+
+		list_for_each_entry(iommu, &iommus_list, list) {
+			if (iommu->dev->of_node == np) {
+				mutex_unlock(&iommus_lock);
+				return iommu;
+			}
+		}
+
+		mutex_unlock(&iommus_lock);
+		return NULL;
+	}
+
+With that you can use of_find_iommu_by_node() in the loop to check
+whether an IOMMU has really been registered.
+
+Of course that all is somewhat intrusive and Joerg might have some
+objections.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131120/d6017976/attachment.sig>
