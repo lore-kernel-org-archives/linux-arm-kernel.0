@@ -1,52 +1,66 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Nov 2013 15:36:03 -0600
-Subject: [PATCHv5 1/9] of: introduce
- of_property_for_earch_phandle_with_args()
-In-Reply-To: <20131121.192051.747601347584525020.hdoyu@nvidia.com>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com>
- <20131121151218.befbb483c0cf09cdcd4cd4dd@nvidia.com>
- <20131121155649.48C96C406A3@trevor.secretlab.ca>
- <20131121.192051.747601347584525020.hdoyu@nvidia.com>
-Message-ID: <CAL_JsqK_TRjt9KigRA4yXcvEq0XriGxCy+50CY-BdJd62vHLCg@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 21 Nov 2013 22:51:09 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+References: <1384710098.8604.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
+ <20131120191145.GP8581@1wt.eu> <87txf692zx.fsf@natisbad.org>
+ <20131120215435.GT8581@1wt.eu> <20131121004430.GX8581@1wt.eu>
+Message-ID: <871u298lv6.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 11:20 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> Grant Likely <grant.likely@linaro.org> wrote @ Thu, 21 Nov 2013 16:56:49 +0100:
->
->> On Thu, 21 Nov 2013 15:12:18 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
->> > On Thu, 21 Nov 2013 13:43:28 +0100
->> > Grant Likely <grant.likely@linaro.org> wrote:
->> >
->> > > On Tue, 19 Nov 2013 11:33:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
->> > > > The following pattern of code is tempting:
->> > > >
->> > > >   for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
->> > > >
->> > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->> > >
->> > > That's a very minimal commit message. Can you elaborate please.
->> >
->> > The above can be:
->> >
->> > "
->> >   The following pattern of code is tempting to add a new member for
->> >   of_property_for_each_*() family as an idiom.
->> >
->> >     for (i = 0;
->> >         !of_parse_phandle_with_args(np, list, cells, i, args); i++)
->> >                   <do something with "args">;
->> > "
->>
->> I really do like commit messages to be full enough that a future reader
->> can figure out why a patch was written. ie:
->
-> Updated as:
->
->   [PATCHv6+ 01/13] of: introduce of_property_for_earch_phandle_with_args()
+Hi,
 
-You also have a typo in the subject.
+Willy Tarreau <w@1wt.eu> writes:
 
-s/earch/each/
+> OK it paid off. And very well :-)
+>
+> I did it at once and it worked immediately. I generally don't like this
+> because I always fear that some bug was left there hidden in the code. I have
+> only tested it on the Mirabox, so I'll have to try on the OpenBlocks AX3-4 and
+> on the XP-GP board for some SMP stress tests.
+>
+> I upgraded my Mirabox to latest Linus' git (commit 5527d151) and compared
+> with and without the patch.
+>
+>   without :
+>       - need at least 12 streams to reach gigabit.
+>       - 60% of idle CPU remains at 1 Gbps
+>       - HTTP connection rate on empty objects is 9950 connections/s
+>       - cumulated outgoing traffic on two ports reaches 1.3 Gbps
+>
+>   with the patch :
+>       - a single stream easily saturates the gigabit
+>       - 87% of idle CPU at 1 Gbps (12 streams, 90% idle at 1 stream)
+>       - HTTP connection rate on empty objects is 10250 connections/s
+>       - I saturate the two gig ports at 99% CPU, so 2 Gbps sustained output.
+>
+> BTW I must say I was impressed to see that big an improvement in CPU
+> usage between 3.10 and 3.13, I suspect some of the Tx queue improvements
+> that Eric has done in between account for this.
+>
+> I cut the patch in 3 parts :
+>    - one which reintroduces the hidden bits of the driver
+>    - one which replaces the timer with the IRQ
+>    - one which changes the default Tx coalesce from 16 to 4 packets
+>      (larger was preferred with the timer, but less is better now).
+>
+> I'm attaching them, please test them on your device.
 
-Rob
+Well, on the RN102 (Armada 370), I get the same results as with your
+previous patch, i.e. netperf and nginx saturate the link. Apache still
+lagging behind though.
+
+> Note that this is *not* for inclusion at the moment as it has not been
+> tested on the SMP CPUs.
+
+I tested it on my RN2120 (2-core armada XP): I got no problem and the
+link saturated w/ apache, nginx and netperf. Good work!
+
+Cheers,
+
+a+
