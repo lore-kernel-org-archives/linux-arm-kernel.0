@@ -1,226 +1,51 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 21 Nov 2013 13:30:37 +0200
-Subject: [PATCH v2 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <1385033437-13235-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385033437-13235-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1385033437-13235-3-git-send-email-ivan.khoronzhuk@ti.com>
+From: denis.ciocca@st.com (Denis CIOCCA)
+Date: Thu, 21 Nov 2013 12:41:24 +0100
+Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
+ gyroscopes
+In-Reply-To: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <528DF164.8060009@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for AEMIF controller drivers/memory/ti-aemif.c
+Hi Maxime, everyone,
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- .../bindings/memory-controllers/ti-aemif.txt       |  201 ++++++++++++++++++++
- 1 file changed, 201 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+only one point: it's possible to use the same names with DT? (using _ 
+instead of -)
+Why only for i2c?
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
-new file mode 100644
-index 0000000..7fc7efe
---- /dev/null
-+++ b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
-@@ -0,0 +1,201 @@
-+* Device tree bindings for Texas instruments AEMIF controller
-+
-+Th Async External Memory Interface (EMIF16/AEMIF) controller is intended to
-+provide a glue-less interface to a variety of asynchronous memory devices like
-+ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
-+can be accessed at any given time via four chip selects with 64M byte access
-+per chip select. Synchronous memories such as DDR1 SD RAM, SDR SDRAM
-+and Mobile SDR are not supported.
-+
-+Documentation:
-+Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
-+OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-+Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
-+
-+Required properties:
-+
-+- compatible:		"ti,davinci-aemif"
-+			"ti,keystone-aemif"
-+			"ti,omap-L138-aemif"
-+
-+- #address-cells:	Must be 2. The first cell is the memory partition
-+			number. The 0 partition is for chip selects. And the
-+			second cell is the offset into the partition, for the 0
-+			partition it corresponds to chip select offset.
-+
-+- #size-cells:		Must be set to 1.
-+
-+- reg:			contains offset/length value for AEMIF control registers
-+			space.
-+
-+- ranges:		Must be set up to reflect the memory layout for 4
-+			chipselects and for AEMIF control range.
-+
-+- clocks:		phandle reference to the controller clock. Required only
-+			if clock tree data present in device tree.
-+			See clock-bindings.txt
-+
-+- clock-names:		clock name. It has to be "aemif". Required only if clock
-+			tree data present in device tree, in another case don't
-+			use it.
-+			See clock-bindings.txt
-+
-+- clock-ranges:		Empty property indicating that child nodes can inherit
-+			named clocks. Required only if clock tree data present
-+			in device tree.
-+			See clock-bindings.txt
-+
-+
-+Child chip-select (cs) nodes contain the memory devices nodes connected to
-+such as NOR (e.g. cfi-flash) and NAND (ti,davinci-nand, see davinci-nand.txt).
-+There might be board specific devices like FPGAs.
-+
-+Required child cs node properties:
-+
-+- compatible:		"ti,aemif-cs"
-+
-+- #address-cells:	Must be 2. The first cell is the memory partition
-+			number. The 0 partition is for chip selects. And the
-+			second cell is the offset into the partition, for the 0
-+			partition it corresponds to chip select offset.
-+
-+- #size-cells:		Must be 1.
-+
-+- ranges:		Empty property indicating that child nodes can inherit
-+			memory layout.
-+
-+- clock-ranges:		Empty property indicating that child nodes can inherit
-+			named clocks. Required only if clock tree data present
-+			in device tree.
-+
-+- ti,cs-chipselect:	number of chipselect. Indicates on the aemif driver
-+			which chipselect is used for accessing the memory. For
-+			compatibles "ti,davinci-aemif" and "ti,keystone-aemif"
-+			it can be in range [0-3]. For compatible
-+			"ti,omap-L138-aemif" range is [2-5].
-+
-+Optional child cs node properties:
-+
-+- ti,bus-width:			width of the asynchronous device's data bus
-+				8 or 16 if not preset 8
-+
-+- ti,cs-ss:		enable/disable select strobe mode
-+				In select strobe mode chip select behaves as
-+				the strobe and is active only during the strobe
-+				period. If present then enable.
-+
-+- ti,cs-ew:		enable/disable extended wait mode
-+				if set, the controller monitors the EMIFWAIT pin
-+				mapped to that chip select to determine if the
-+				device wants to extend the strobe period. If
-+				present then enable.
-+
-+- ti,cs-ta:		minimum turn around time, ns
-+				Time between the end of one asynchronous memory
-+				access and the start of another asynchronous
-+				memory access. This delay is not incurred
-+				between a read followed by read or a write
-+				followed by a write to same chip select.
-+
-+- ti,cs-rsetup:		read setup width, ns
-+				Time between the beginning of a memory cycle
-+				and the activation of read strobe.
-+				Minimum value is 1 (0 treated as 1).
-+
-+- ti,cs-rstobe:		read strobe width, ns
-+				Time between the activation and deactivation of
-+				the read strobe.
-+				Minimum value is 1 (0 treated as 1).
-+
-+- ti,cs-rhold:		read hold width, ns
-+				Time between the deactivation of the read
-+				strobe and the end of the cycle (which may be
-+				either an address change or the deactivation of
-+				the chip select signal.
-+				Minimum value is 1 (0 treated as 1).
-+
-+- ti,cs-wsetup:		write setup width, ns
-+				Time between the beginning of a memory cycle
-+				and the activation of write strobe.
-+				Minimum value is 1 (0 treated as 1).
-+
-+- ti,cs-wstrobe:	write strobe width, ns
-+				Time between the activation and deactivation of
-+				the write strobe.
-+				Minimum value is 1 (0 treated as 1).
-+
-+- ti,cs-whold:		write hold width, ns
-+				Time between the deactivation of the write
-+				strobe and the end of the cycle (which may be
-+				either an address change or the deactivation of
-+				the chip select signal.
-+				Minimum value is 1 (0 treated as 1).
-+
-+If any of the above parameters are absent, current parameter value will be taken
-+from the corresponding HW reg.
-+
-+Example for aemif, davinci nand and nor flash chip select shown below.
-+
-+memory-controller at 21000A00 {
-+	compatible = "ti,keystone-aemif";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	clocks = <&clkaemif 0>;
-+	clock-names = "aemif";
-+	clock-ranges;
-+	reg = <0x2100A00 0x00000100>;
-+	ranges = <0 0 0x70000000 0x10000000
-+		  1 0 0x21000A00 0x0000100>;
-+
-+	nand:cs2 {
-+		compatible = "ti,aemif-cs";
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		clock-ranges;
-+		ranges;
-+
-+		ti,cs-chipselect = <2>;
-+		/* all timings in nanoseconds */
-+		ti,cs-ta = <0>;
-+		ti,cs-rhold = <7>;
-+		ti,cs-rstrobe = <42>;
-+		ti,cs-rsetup = <14>;
-+		ti,cs-whold = <7>;
-+		ti,cs-wstrobe = <42>;
-+		ti,cs-wsetup = <14>;
-+
-+		nand at 0,0x8000000 {
-+			compatible = "ti,davinci-nand";
-+			reg = <0 0x8000000 0x4000000
-+			       1 0x0000000 0x0000100>;
-+
-+			.. see davinci-nand.txt
-+		};
-+	};
-+
-+	nor:cs0 {
-+		compatible = "ti,aemif-cs";
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		clock-ranges;
-+		ranges;
-+
-+		ti,cs-chipselect = <0>;
-+		/* all timings in nanoseconds */
-+		ti,cs-ta = <0>;
-+		ti,cs-rhold = <8>;
-+		ti,cs-rstrobe = <40>;
-+		ti,cs-rsetup = <14>;
-+		ti,cs-whold = <7>;
-+		ti,cs-wstrobe = <40>;
-+		ti,cs-wsetup = <14>;
-+		ti,cs-asize = <1>;
-+
-+		flash at 0,0x0000000 {
-+			compatible = "cfi-flash";
-+			reg = <0 0x0000000 0x4000000>;
-+
-+			...
-+		};
-+	};
-+};
--- 
-1.7.9.5
+Thanks,
+Denis
+
+> Hi everyone,
+>
+> This is an attempt at adding the DT probing to the st_sensors
+> accelerometers and gyroscopes.
+>
+> It's somewhat hackish, because the core actively checks for the value
+> of the device at probe time, and DT probing generates a quite
+> different name.
+>
+> I first tried to turn the function st_sensors_check_device_support the
+> other way around, with the "leaf" providing the sensor structure, and
+> the function checking that it's consistent with the WAI stored in the
+> sensor. However, it turned to be a quite intrusive change, so I'm
+> sending the easiest one, to try to get some feedback :)
+>
+> Thanks!
+> Maxime
+>
+> Maxime Ripard (3):
+>    iio: accel: Add device tree probing for STMicro accelerometers
+>    iio: accel: Add device tree probing for STMicro gyroscopes
+>    ARM: cfa10057: Add the accelerometer and gyroscope to the device tree
+>
+>   .../devicetree/bindings/iio/accel/st_accel_i2c.txt | 22 +++++++++++++++
+>   .../devicetree/bindings/iio/gyro/st_gyro_i2c.txt   | 20 +++++++++++++
+>   arch/arm/boot/dts/imx28-cfa10057.dts               | 13 +++++++++
+>   drivers/iio/accel/st_accel_i2c.c                   | 33 ++++++++++++++++++++++
+>   drivers/iio/gyro/st_gyro_i2c.c                     | 31 ++++++++++++++++++++
+>   5 files changed, 119 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
+>   create mode 100644 Documentation/devicetree/bindings/iio/gyro/st_gyro_i2c.txt
+>
