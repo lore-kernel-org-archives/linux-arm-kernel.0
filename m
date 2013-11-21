@@ -1,34 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Nov 2013 19:33:02 +0100
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 21 Nov 2013 18:38:02 +0000
 Subject: ACPI vs DT at runtime
-In-Reply-To: <20131121175822.GA9590@quad.lixom.net>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131121162944.F087FC406A3@trevor.secretlab.ca>
- <20131121175822.GA9590@quad.lixom.net>
-Message-ID: <201311211933.03106.arnd@arndb.de>
+In-Reply-To: <20131121170122.GB22960@srcf.ucam.org>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
+ com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com> <20131115175241.
+ GB27174@quad.lixom.net> <20131119113015.GH5914@e106331-lin.cambridge.arm.
+ com> <20131121162944.F087FC406A3@trevor.secretlab.ca> <20131121170122.
+ GB22960@srcf.ucam.org>
+Message-ID: <20131121183802.3A4B5C40753@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 November 2013, Olof Johansson wrote:
+On Thu, 21 Nov 2013 17:01:22 +0000, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
 > On Thu, Nov 21, 2013 at 04:29:44PM +0000, Grant Likely wrote:
->
-> > We are pushing a lot of boundaries and doing things on ACPI that have
-> > never been done before. SPI, GPIOs, Clocks, Regulators, composite
-> > devices, key-value properties. All brand new territory, and the Linux
-> > world is driving a lot of it.
 > 
-> This is a bit of a surprise and a significant concern.
+> > Personally, I think the issue of ACPI support should be taken on a
+> > patch-by-patch basis. A lot of the things that need to be done are quite
+> > discrete and fairly well contained. If the patches don't look that way
+> > then push back on them. For the parts that look ready, go ahead and
+> > merge it. Push back on the ones that don't.
 > 
-> The whole point behind ACPI is that it's supposed to abstract away nearly
-> all of that, and not expose clocks, regulators and other things to
-> the kernel. If we're going to expose it, then we might as well go all
-> the way and do it with DT.
+> I think the most valuable thing in ACPI is the static data tables. 
+> Things like BERT, EINJ, HEST, MPST and the various other bits of RAS 
+> functionality have value in the ARM world, and being able to share the 
+> implementation is a benefit. But that can be implemented without 
+> worrying about using ACPI for device discovery or interfacing.
 
-I think you are talking about different things here: Grant's example was
-about embedded x86 adding these so they can reuse the kernel infrastructure
-we already have without changing their entire firmware, which I think is
-fine, but he also said in the past that we wouldn't have that on PC-style
-ARM servers. Other people are pushing for that though (for SoC-style
-ARM servers I suppose), as Russell mentioned earlier.
+/complete digression.../ As far as static tables are concerned, it would
+be trivial to pull those into a DT system.
 
-	Arnd
+g.
