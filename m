@@ -1,85 +1,81 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 21 Nov 2013 16:42:29 +0100
-Subject: [PATCH v2 1/4] x86: move arch_cpu_uevent() to generic code
+Date: Thu, 21 Nov 2013 16:42:30 +0100
+Subject: [PATCH v2 2/4] cpu: advertise CPU features over udev in a generic way
 In-Reply-To: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1385048552-12528-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1385048552-12528-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only x86 implements arch_cpu_uevent(), and there is nothing arch
-specific about it, so move it to drivers/base/cpu.c.
+This patch implements a generic modalias 'cpu:type:...:feature:...'
+which enables CPU feature flag based module loading in a generic way.
+All the arch needs to do is enable CONFIG_ARCH_HAS_CPU_AUTOPROBE and
+implement arch_print_cpu_modalias(). The modules need to declare the
+CPU feature they depend on with MODULE_DEVICE_TABLE(cpu, ...)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/x86/kernel/cpu/match.c | 11 -----------
- drivers/base/cpu.c          | 15 ++++++++++++++-
- include/linux/cpu.h         |  1 -
- 3 files changed, 14 insertions(+), 13 deletions(-)
+ include/linux/mod_devicetable.h   | 11 +++++++++++
+ scripts/mod/devicetable-offsets.c |  3 +++
+ scripts/mod/file2alias.c          | 10 ++++++++++
+ 3 files changed, 24 insertions(+)
 
-diff --git a/arch/x86/kernel/cpu/match.c b/arch/x86/kernel/cpu/match.c
-index 3656537..ab6082a 100644
---- a/arch/x86/kernel/cpu/match.c
-+++ b/arch/x86/kernel/cpu/match.c
-@@ -78,14 +78,3 @@ ssize_t arch_print_cpu_modalias(struct device *dev,
- 	*buf++ = '\n';
- 	return buf - bufptr;
- }
--
--int arch_cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
--{
--	char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
--	if (buf) {
--		arch_print_cpu_modalias(NULL, NULL, buf);
--		add_uevent_var(env, "MODALIAS=%s", buf);
--		kfree(buf);
--	}
--	return 0;
--}
-diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
-index 848ebbd..49c6f4b 100644
---- a/drivers/base/cpu.c
-+++ b/drivers/base/cpu.c
-@@ -275,6 +275,19 @@ static void cpu_device_release(struct device *dev)
- 	 */
- }
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 45e9214..da20e57 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -564,6 +564,17 @@ struct x86_cpu_id {
+ #define X86_MODEL_ANY  0
+ #define X86_FEATURE_ANY 0	/* Same as FPU, you can't test for that */
  
-+#ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
-+static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
-+{
-+	char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
-+	if (buf) {
-+		arch_print_cpu_modalias(NULL, NULL, buf);
-+		add_uevent_var(env, "MODALIAS=%s", buf);
-+		kfree(buf);
-+	}
-+	return 0;
-+}
-+#endif
++/*
++ * Generic table type for tracking CPU features.
++ * @feature:	the bit number of the feature (0 - 65535)
++ *
++ * How the bit numbers map to actual CPU features is entirely up to the arch
++ */
 +
- /*
-  * register_cpu - Setup a sysfs device for a CPU.
-  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
-@@ -296,7 +309,7 @@ int register_cpu(struct cpu *cpu, int num)
- 	cpu->dev.offline = !cpu_online(num);
- 	cpu->dev.of_node = of_get_cpu_node(num, NULL);
- #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
--	cpu->dev.bus->uevent = arch_cpu_uevent;
-+	cpu->dev.bus->uevent = cpu_uevent;
- #endif
- 	cpu->dev.groups = common_cpu_attr_groups;
- 	if (cpu->hotpluggable)
-diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-index 801ff9e..c12ddd1 100644
---- a/include/linux/cpu.h
-+++ b/include/linux/cpu.h
-@@ -44,7 +44,6 @@ extern ssize_t arch_cpu_release(const char *, size_t);
- struct notifier_block;
++struct generic_cpu_id {
++	__u16	feature;
++};
++
+ #define IPACK_ANY_FORMAT 0xff
+ #define IPACK_ANY_ID (~0)
+ struct ipack_device_id {
+diff --git a/scripts/mod/devicetable-offsets.c b/scripts/mod/devicetable-offsets.c
+index bb5d115..1aa2126 100644
+--- a/scripts/mod/devicetable-offsets.c
++++ b/scripts/mod/devicetable-offsets.c
+@@ -174,6 +174,9 @@ int main(void)
+ 	DEVID_FIELD(x86_cpu_id, model);
+ 	DEVID_FIELD(x86_cpu_id, vendor);
  
- #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
--extern int arch_cpu_uevent(struct device *dev, struct kobj_uevent_env *env);
- extern ssize_t arch_print_cpu_modalias(struct device *dev,
- 				       struct device_attribute *attr,
- 				       char *bufptr);
++	DEVID(generic_cpu_id);
++	DEVID_FIELD(generic_cpu_id, feature);
++
+ 	DEVID(mei_cl_device_id);
+ 	DEVID_FIELD(mei_cl_device_id, name);
+ 
+diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
+index 2370863..efc7abe 100644
+--- a/scripts/mod/file2alias.c
++++ b/scripts/mod/file2alias.c
+@@ -1135,6 +1135,16 @@ static int do_x86cpu_entry(const char *filename, void *symval,
+ }
+ ADD_TO_DEVTABLE("x86cpu", x86_cpu_id, do_x86cpu_entry);
+ 
++/* LOOKS like cpu:type:*:feature:*FEAT* */
++static int do_cpu_entry(const char *filename, void *symval, char *alias)
++{
++	DEF_FIELD(symval, generic_cpu_id, feature);
++
++	sprintf(alias, "cpu:type:*:feature:*%04X*", feature);
++	return 1;
++}
++ADD_TO_DEVTABLE("cpu", generic_cpu_id, do_cpu_entry);
++
+ /* Looks like: mei:S */
+ static int do_mei_entry(const char *filename, void *symval,
+ 			char *alias)
 -- 
 1.8.3.2
