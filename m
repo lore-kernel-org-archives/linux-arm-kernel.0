@@ -1,48 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Nov 2013 13:36:02 +0100
-Subject: [PATCH] ARM: ks8695: delete local <mach/gpio.h> header
-Message-ID: <1385037362-24278-1-git-send-email-linus.walleij@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 21 Nov 2013 12:37:52 +0000
+Subject: CMA on AArch64
+In-Reply-To: <20131121121135.GW16735@n2100.arm.linux.org.uk>
+References: <528D2C7E.2010107@codeaurora.org> <20131121120559.GC22663@arm.com>
+ <20131121121135.GW16735@n2100.arm.linux.org.uk>
+Message-ID: <20131121123751.GD22663@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header is not used by anything, and since the arch does
-not specify NEED_MACH_GPIO_H it is not included into
-<linux/gpio.h> either. Delete it.
+On Thu, Nov 21, 2013 at 12:11:35PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 21, 2013 at 12:06:00PM +0000, Catalin Marinas wrote:
+> > On Wed, Nov 20, 2013 at 09:41:18PM +0000, Laura Abbott wrote:
+> > > I noticed there is currently no CMA support for AArch64. Is this already 
+> > > on someone's TODO list or is this still open?
+> > 
+> > It's more like a wish list but there were other things that took
+> > priority. The arm64 DMA mapping code currently only supports swiotlb and
+> > our next plan is for IOMMU mapping. But I would like parts of the DMA
+> > IOMMU code under arch/arm to be made into a library (similar to the
+> > lib/swiotlb.c) so that other architectures can easily make use of it.
+> 
+> If you're referring to dmabounce.c, that's a 100% no-way-ever-even-if-
+> hell-freezes-over NACK.
 
-Cc: Greg Ungerer <gerg@uclinux.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Greg: can you ACK this so I can take it through the GPIO
-tree?
----
- arch/arm/mach-ks8695/include/mach/gpio.h | 19 -------------------
- 1 file changed, 19 deletions(-)
- delete mode 100644 arch/arm/mach-ks8695/include/mach/gpio.h
+Does dmabounce.c implement IOMMU support? I'm talking about functions
+like __alloc_iova, __iommu_create_mapping etc.
 
-diff --git a/arch/arm/mach-ks8695/include/mach/gpio.h b/arch/arm/mach-ks8695/include/mach/gpio.h
-deleted file mode 100644
-index f5fda36e4512..000000000000
---- a/arch/arm/mach-ks8695/include/mach/gpio.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * arch/arm/mach-ks8695/include/mach/gpio.h
-- *
-- * Copyright (C) 2006 Andrew Victor
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __ASM_ARCH_GPIO_H_
--#define __ASM_ARCH_GPIO_H_
--
--/*
-- * Map IRQ number to GPIO line.
-- */
--extern int irq_to_gpio(unsigned int irq);
--
--#endif
+The generic swiotlb code has enough bouncing capabilities for my needs.
+
 -- 
-1.8.3.1
+Catalin
