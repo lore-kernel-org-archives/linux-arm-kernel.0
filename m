@@ -1,51 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Nov 2013 13:16:03 +0100
-Subject: [PATCH v4 2/4] Documentation:: Add documentation for APM X-Gene
- SoC SATA host controller DTS binding
-In-Reply-To: <1385014298-15700-3-git-send-email-lho@apm.com>
-References: <1385014298-15700-1-git-send-email-lho@apm.com>
- <1385014298-15700-2-git-send-email-lho@apm.com>
- <1385014298-15700-3-git-send-email-lho@apm.com>
-Message-ID: <201311211316.03647.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 21 Nov 2013 12:20:11 +0000
+Subject: [PATCH v2 1/5] mfd: max14577: Add max14577 MFD driver core
+In-Reply-To: <1385034199.748.21.camel@AMDC1943>
+References: <1384956732-19526-1-git-send-email-k.kozlowski@samsung.com>
+ <1384956732-19526-2-git-send-email-k.kozlowski@samsung.com>
+ <20131121103408.GA22536@lee--X1> <1385034199.748.21.camel@AMDC1943>
+Message-ID: <20131121122011.GD23067@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 November 2013, Loc Ho wrote:
-> +SATA host controller nodes are defined to describe on-chip Serial ATA
-> +controllers. Each SATA controller (pair of ports) have its own node.
-> +
-> +Required properties:
-> +- compatible		: Shall be "apm,xgene-ahci"
-> +- reg			: First memory resource shall be the AHCI memory
-> +			  resource.
-> +			  Second memory resource shall be the host controller
-> +			  memory resource.
-> +- interrupt-parent	: Interrupt controller
-> +- interrupts		: Interrupt mapping for SATA host controller IRQ
-> +- clocks		: Reference to the clock entry
-> +- phys			: PHY reference
-> +- phy-names		: Name of the PHY reference. The name should be
-> +			  formed by "sataphy" plus lower case hex for the
-> +			  lower 32-bit PHY CSR address (2nd memory resource)
+> Thanks for pointing these out however after using regmap_irq_chip whole
+> file won't be needed anymore.
 
-I've tried to explain this before, but apparently you missed the point:
+That's fine.
 
-Any "*-names" property is supposed to be the identifier inside the device you
-are describing, *not* an identifier for what it points to, as that already
-has a name. The idea is that the driver can ask for phy (or clock, irq,
-memory, etc) "foo" here, with foo identifying the functionality in the
-device. If you only have one phy, you probably don't want to name it at
-all. If you imagine a device that was connected to two different phys
-depending on the mode it's used in (e.g. SATA-II vs SATA-6G), you would
-list this as
+> > > +static int max14577_i2c_probe(struct i2c_client *i2c,
+> > > +			      const struct i2c_device_id *id)
+> > > +{
+> > > +	struct max14577 *max14577;
+> > > +	struct max14577_platform_data *pdata = dev_get_platdata(&i2c->dev);
+> > > +	u8 reg_data;
+> > > +	int ret = 0;
+> > > +
+> > > +	if (i2c->dev.of_node) {
+> > 
+> > Can you pull this out. It looks neater as the top as:
+> >   struct device_node *np = i2c->dev.of_node;
+> 
+> I am not sure if I understand you correctly. You would like to change
+> this to:
+> -------------------------
+> static int max14577_i2c_probe(struct i2c_client *i2c,
+>                               const struct i2c_device_id *id)
+> {
+>         struct max14577 *max14577;
+>         struct max14577_platform_data *pdata =
+> dev_get_platdata(&i2c->dev);
+>         struct device_node *np = i2c->dev.of_node;
+>         u8 reg_data;
+>         int ret = 0;
+> 
+>         if (np) {
+>                 pdata = devm_kzalloc(&i2c->dev,
+>                                 sizeof(struct max14577_platform_data),
+>                                 GFP_KERNEL);
+> -------------------------
+> The variable 'np' would be used only once.
 
- - phy-names		: one name per references in the "phys" property.
-			  valid names are "sata-ii" and "sata-6g".
+I know, but it's more in keeping with the rest of the subsystem.
 
-If the generic phy subsystem requires you to name this, I'd suggest either
-changing the phy subsystem to make the name optional, or to just call it
-"serdes", as that is the kind of phy you are connected to.
+> > > +
+> > > +	ret = mfd_add_devices(max14577->dev, -1, max14577_devs,
+> > > +			ARRAY_SIZE(max14577_devs), NULL, 0, NULL);
+> > 
+> > You should be passing the irqdomain as the final parameter here.
+> 
+> I replaced the IRQ handling with regmap_irq_chip so this would look like
+> this:
+> -------------------------
+>         ret = mfd_add_devices(max14577->dev, -1, max14577_devs,
+>                         ARRAY_SIZE(max14577_devs), NULL, 0,
+>                         regmap_irq_get_domain(max14577->irq_data));
+> -------------------------
+> Am I correct?
 
-Does this make more sense to you now?
+if regmap_irq_get_domain() returns an irqdomain, then yes.
 
-	Arnd
+> > > +	return i2c_add_driver(&max14577_i2c_driver);
+> > > +}
+> > > +subsys_initcall(max14577_i2c_init);
+> > > +
+> > > +static void __exit max14577_i2c_exit(void)
+> > > +{
+> > > +	i2c_del_driver(&max14577_i2c_driver);
+> > > +}
+> > > +module_exit(max14577_i2c_exit);
+> > 
+> > >>>>>>>>>>>>>>>>>>>>>>
+> > 
+> > Remove all this and replace with:
+> >   module_i2c_driver(max14577_i2c_driver);
+> 
+> The subsys_initcall is needed. Marek Szyprowski replied to this here:
+> http://thread.gmane.org/gmane.linux.drivers.devicetree/51903/focus=1594651
+
+Okay, but this will need to be changed when USB Gadget starts to
+support -EPROBE_DEFER
+
+> > > +struct max14577_regulator_platform_data {
+> > > +	int id;
+> > > +	struct regulator_init_data *initdata;
+> > > +	struct device_node *of_node;
+> > 
+> > Do you ever set this? What's the point of it is it's set in the device?
+> 
+> Do you mean the whole struct max14577_regulator_platform_data or only
+> some member of it (of_node?)?
+
+Initially only the of_node. Usually MFD children are able to call back
+into their parent to fetch these details. Also mfd_add_device() goes
+out of its way to fill in the child's own of_node.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
