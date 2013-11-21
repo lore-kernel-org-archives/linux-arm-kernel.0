@@ -1,51 +1,143 @@
 From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 21 Nov 2013 23:45:25 +0530
-Subject: [PATCH v6 0/6] gpio: daVinci: cleanup and feature enhancement
-Message-ID: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
+Date: Thu, 21 Nov 2013 23:45:26 +0530
+Subject: [PATCH v6 1/6] gpio: davinci: use readl/writel instead of __raw_*
+In-Reply-To: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <1385057731-4348-2-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 
-This patch series does the following
-1> Ports the driver to use irqdomain.
-2> Adds dt binding support for gpio-davinci.
-3> Adds DA850 dt support goio.
+This patch replaces the __raw_readl/writel with
+readl and writel, Altough the code runs on ARMv5
+based SOCs, changing this will help copying the code
+for other uses.
 
-Changes for v6:
-1: GPIO driver now migrated to irq domain legacy.
-2: Fixed review comments pointed by Grygorii.
-3: Included Ack's.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+---
+ drivers/gpio/gpio-davinci.c |   36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-This patch series is based on following fixup series
-http://us.generation-nt.com/answer/patch-0-2-davinci-gpio-fixes-help-212978272.html
-
-This patch series has been tested for both banked and Un-banked GPIO.
-
-KV Sujith (3):
-  gpio: davinci: add OF support
-  ARM: davinci: da850: add GPIO DT node
-  ARM: davinci: da850 evm: add GPIO pinumux entries DT node
-
-Lad, Prabhakar (3):
-  gpio: davinci: use readl/writel instead of __raw_*
-  This patch converts the davinci gpio driver to use irqdomain    
-    support.
-  gpio: davinci: remove unused variable intc_irq_num
-
- .../devicetree/bindings/gpio/gpio-davinci.txt      |   41 +++++
- arch/arm/boot/dts/da850-evm.dts                    |   20 +++
- arch/arm/boot/dts/da850.dtsi                       |   14 ++
- arch/arm/mach-davinci/da830.c                      |    1 -
- arch/arm/mach-davinci/da850.c                      |    1 -
- arch/arm/mach-davinci/dm355.c                      |    1 -
- arch/arm/mach-davinci/dm365.c                      |    1 -
- arch/arm/mach-davinci/dm644x.c                     |    1 -
- arch/arm/mach-davinci/dm646x.c                     |    1 -
- drivers/gpio/gpio-davinci.c                        |  173 ++++++++++++++------
- include/linux/platform_data/gpio-davinci.h         |    3 +-
- 11 files changed, 195 insertions(+), 62 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 84be701..1f33fcd 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -82,14 +82,14 @@ static inline int __davinci_direction(struct gpio_chip *chip,
+ 	u32 mask = 1 << offset;
+ 
+ 	spin_lock_irqsave(&d->lock, flags);
+-	temp = __raw_readl(&g->dir);
++	temp = readl(&g->dir);
+ 	if (out) {
+ 		temp &= ~mask;
+-		__raw_writel(mask, value ? &g->set_data : &g->clr_data);
++		writel(mask, value ? &g->set_data : &g->clr_data);
+ 	} else {
+ 		temp |= mask;
+ 	}
+-	__raw_writel(temp, &g->dir);
++	writel(temp, &g->dir);
+ 	spin_unlock_irqrestore(&d->lock, flags);
+ 
+ 	return 0;
+@@ -118,7 +118,7 @@ static int davinci_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	struct davinci_gpio_controller *d = chip2controller(chip);
+ 	struct davinci_gpio_regs __iomem *g = d->regs;
+ 
+-	return (1 << offset) & __raw_readl(&g->in_data);
++	return (1 << offset) & readl(&g->in_data);
+ }
+ 
+ /*
+@@ -130,7 +130,7 @@ davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 	struct davinci_gpio_controller *d = chip2controller(chip);
+ 	struct davinci_gpio_regs __iomem *g = d->regs;
+ 
+-	__raw_writel((1 << offset), value ? &g->set_data : &g->clr_data);
++	writel((1 << offset), value ? &g->set_data : &g->clr_data);
+ }
+ 
+ static int davinci_gpio_probe(struct platform_device *pdev)
+@@ -227,8 +227,8 @@ static void gpio_irq_disable(struct irq_data *d)
+ 	struct davinci_gpio_regs __iomem *g = irq2regs(d->irq);
+ 	u32 mask = (u32) irq_data_get_irq_handler_data(d);
+ 
+-	__raw_writel(mask, &g->clr_falling);
+-	__raw_writel(mask, &g->clr_rising);
++	writel(mask, &g->clr_falling);
++	writel(mask, &g->clr_rising);
+ }
+ 
+ static void gpio_irq_enable(struct irq_data *d)
+@@ -242,9 +242,9 @@ static void gpio_irq_enable(struct irq_data *d)
+ 		status = IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING;
+ 
+ 	if (status & IRQ_TYPE_EDGE_FALLING)
+-		__raw_writel(mask, &g->set_falling);
++		writel(mask, &g->set_falling);
+ 	if (status & IRQ_TYPE_EDGE_RISING)
+-		__raw_writel(mask, &g->set_rising);
++		writel(mask, &g->set_rising);
+ }
+ 
+ static int gpio_irq_type(struct irq_data *d, unsigned trigger)
+@@ -286,10 +286,10 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ 		int		res;
+ 
+ 		/* ack any irqs */
+-		status = __raw_readl(&g->intstat) & mask;
++		status = readl(&g->intstat) & mask;
+ 		if (!status)
+ 			break;
+-		__raw_writel(status, &g->intstat);
++		writel(status, &g->intstat);
+ 
+ 		/* now demux them to the right lowlevel handler */
+ 		n = d->irq_base;
+@@ -346,9 +346,9 @@ static int gpio_irq_type_unbanked(struct irq_data *data, unsigned trigger)
+ 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
+ 		return -EINVAL;
+ 
+-	__raw_writel(mask, (trigger & IRQ_TYPE_EDGE_FALLING)
++	writel(mask, (trigger & IRQ_TYPE_EDGE_FALLING)
+ 		     ? &g->set_falling : &g->clr_falling);
+-	__raw_writel(mask, (trigger & IRQ_TYPE_EDGE_RISING)
++	writel(mask, (trigger & IRQ_TYPE_EDGE_RISING)
+ 		     ? &g->set_rising : &g->clr_rising);
+ 
+ 	return 0;
+@@ -432,8 +432,8 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 
+ 		/* default trigger: both edges */
+ 		g = gpio2regs(0);
+-		__raw_writel(~0, &g->set_falling);
+-		__raw_writel(~0, &g->set_rising);
++		writel(~0, &g->set_falling);
++		writel(~0, &g->set_rising);
+ 
+ 		/* set the direct IRQs up to use that irqchip */
+ 		for (gpio = 0; gpio < pdata->gpio_unbanked; gpio++, irq++) {
+@@ -456,8 +456,8 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 
+ 		/* disabled by default, enabled only as needed */
+ 		g = gpio2regs(gpio);
+-		__raw_writel(~0, &g->clr_falling);
+-		__raw_writel(~0, &g->clr_rising);
++		writel(~0, &g->clr_falling);
++		writel(~0, &g->clr_rising);
+ 
+ 		/* set up all irqs in this bank */
+ 		irq_set_chained_handler(bank_irq, gpio_irq_handler);
+@@ -485,7 +485,7 @@ done:
+ 	 * BINTEN -- per-bank interrupt enable. genirq would also let these
+ 	 * bits be set/cleared dynamically.
+ 	 */
+-	__raw_writel(binten, gpio_base + BINTEN);
++	writel(binten, gpio_base + BINTEN);
+ 
+ 	printk(KERN_INFO "DaVinci: %d gpio irqs\n", irq - gpio_to_irq(0));
+ 
 -- 
 1.7.9.5
