@@ -1,69 +1,52 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 21 Nov 2013 11:34:44 +0100
-Subject: [PATCH 5/9] ARM: at91/dt: add mmc0 slot0 support to at91rm9200ek
- board
-In-Reply-To: <CACRpkdboBg4YOnMNiar0DDBVnoky=zNky+Pzyp1=P_POtH15qQ@mail.gmail.com>
-References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>	<1377687995-10758-1-git-send-email-b.brezillon@overkiz.com>	<20131120145926.GE14627@ns203013.ovh.net>	<528CDFFB.1020601@overkiz.com>
- <CACRpkdboBg4YOnMNiar0DDBVnoky=zNky+Pzyp1=P_POtH15qQ@mail.gmail.com>
-Message-ID: <528DE1C4.6060900@overkiz.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 21 Nov 2013 10:46:54 +0000
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
+ device tree case
+In-Reply-To: <20131118192256.GU10317@atomide.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-2-git-send-email-tony@atomide.com>
+ <20131118102907.GC13640@lee--X1>
+ <20131118172510.GI16038@saruman.home>
+ <20131118174638.GQ13640@lee--X1>
+ <20131118181110.GM10317@atomide.com>
+ <20131118190921.GT13640@lee--X1>
+ <20131118192256.GU10317@atomide.com>
+Message-ID: <20131121104654.GA23067@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, 18 Nov 2013, Tony Lindgren wrote:
 
-On 21/11/2013 10:48, Linus Walleij wrote:
-> On Wed, Nov 20, 2013 at 5:14 PM, boris brezillon
-> <b.brezillon@overkiz.com> wrote:
->> On 20/11/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> On 13:06 Wed 28 Aug     , Boris BREZILLON wrote:
->>>> mmc0_slot0_switch-0 {
->>>> +                                               atmel,pins =
->>>> +                                                       <AT91_PIOB 22
->>>> AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(1))>;
->>>> +                                       };
->>> nack this is a regulator the pinctrl API is not done for gpio default
->>> value
->> I know this can be represented as a regulator, but looking at the datasheet,
->> this looks more like a switch than a regulator.
-> No matter whether it's a switch or a GPIO regulator it seems we
-> are in violent agreement that it should not be controlled by the
-> pin control states at least.
->
-> Start with making it a GPIO then you can figure out whether
-> a GPIO regulator or drivers/extcon/extcon-gpio.c should be
-> used.
+> * Lee Jones <lee.jones@linaro.org> [131118 11:10]:
+> > > > Are you Acking this patch by the way?
+> > > 
+> > > If this looks acceptable to you guys, I'd like to merge this via my fixes
+> > > branch this week with your acks if that works for you. That way I can base
+> > > my omap legacy platform data removal patches on my fixes branch while keep
+> > > things working for the drivers. Alternatively I can naturally base my
+> > > legacy data removal on -rc2 too if this gets merged to mainline by then 
+> > > via the MFD tree.
+> > 
+> > I can either send it up for the -rcs, or I can create an immutable
+> > branch for you to pull from. That way the patch can do in via ARM-SoC
+> > and MFD and we can let Git sort it out.
+> 
+> OK great, I'd prefer an immutable branch that I can merge in too. Then
+> you can bundle it with other MFD fixes for the -rc series and send it
+> in when it suits you :)
 
-Thanks for pointing this out. I wasn't aware of the extcon subsystem.
+https://git.linaro.org/gitweb?p=people/ljones/mfd.git;a=shortlog;h=refs/heads/for-mfd-fixes
 
-Actually, I think it's a little bit more tricky.
+Here Tony, you can take this one.
 
-The switch connected to gpio PB22 is used to enable one device or the other:
-  - PB22 set to high level enables slot0 of mmc0 (connect mmc signals to 
-the mmc
-    connector)
-  - PB22 set to low level enables the dataflash (connect to the SPI0 
-signals to the
-    dataflash device)
+I will simply apply my other fixes on top of it.
 
-I can declare a regulator for the mmc device and attach it to the mmc 
-(AFAIK, the
-mmc core will request the mmc regulator for us, and configure it 
-accordingly).
+The issue is, I will most likely have to rebase it on top of -rc1 prior
+to sending a request to Linus, so in that regard it's not exactly
+immutable.
 
-But AFAICT (tell me if I'm wrong), there's no such things for spi devices.
-
-The pinctrl approach has the benefit of providing a transparent way (no 
-existing
-drivers modifications) to enable one device or the other.
-
-But if you think this is better done (or cleaner) with an extcon or a 
-regulator device,
-I'll try to find a way to do it this way.
-
-Best Regards,
-
-Boris
-
->
-> Yours,
-> Linus Walleij
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
