@@ -1,32 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 21 Nov 2013 12:37:52 +0000
-Subject: CMA on AArch64
-In-Reply-To: <20131121121135.GW16735@n2100.arm.linux.org.uk>
-References: <528D2C7E.2010107@codeaurora.org> <20131121120559.GC22663@arm.com>
- <20131121121135.GW16735@n2100.arm.linux.org.uk>
-Message-ID: <20131121123751.GD22663@arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 21 Nov 2013 12:43:28 +0000
+Subject: [PATCHv5 1/9] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <1384853593-32202-2-git-send-email-hdoyu@nvidia.com>
+References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com> <
+ 1384853593-32202-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20131121124328.46BC1C40A2C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 12:11:35PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 21, 2013 at 12:06:00PM +0000, Catalin Marinas wrote:
-> > On Wed, Nov 20, 2013 at 09:41:18PM +0000, Laura Abbott wrote:
-> > > I noticed there is currently no CMA support for AArch64. Is this already 
-> > > on someone's TODO list or is this still open?
-> > 
-> > It's more like a wish list but there were other things that took
-> > priority. The arm64 DMA mapping code currently only supports swiotlb and
-> > our next plan is for IOMMU mapping. But I would like parts of the DMA
-> > IOMMU code under arch/arm to be made into a library (similar to the
-> > lib/swiotlb.c) so that other architectures can easily make use of it.
+On Tue, 19 Nov 2013 11:33:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> The following pattern of code is tempting:
 > 
-> If you're referring to dmabounce.c, that's a 100% no-way-ever-even-if-
-> hell-freezes-over NACK.
+>   for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 
-Does dmabounce.c implement IOMMU support? I'm talking about functions
-like __alloc_iova, __iommu_create_mapping etc.
+That's a very minimal commit message. Can you elaborate please.
 
-The generic swiotlb code has enough bouncing capabilities for my needs.
+> ---
+> v5:
+> New patch for v5.
+> ---
+>  include/linux/of.h | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 276c546..131fef5 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -613,6 +613,9 @@ static inline int of_property_read_u32(const struct device_node *np,
+>  		s;						\
+>  		s = of_prop_next_string(prop, s))
+>  
+> +#define of_property_for_each_phandle_with_args(np, list, cells, i, args) \
+> +	for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
+> +
 
--- 
-Catalin
+That works, but pretty darn inefficient. We need an iterator version of
+of_parse_phandle_with_args() to loop over all the entries.
+
+>  #if defined(CONFIG_PROC_FS) && defined(CONFIG_PROC_DEVICETREE)
+>  extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
+>  extern void proc_device_tree_add_prop(struct proc_dir_entry *pde, struct property *prop);
+> -- 
+> 1.8.1.5
+> 
