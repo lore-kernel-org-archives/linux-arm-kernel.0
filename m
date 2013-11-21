@@ -1,46 +1,40 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 21 Nov 2013 18:20:51 +0100
-Subject: [PATCHv5 1/9] of: introduce
- of_property_for_earch_phandle_with_args()
-In-Reply-To: <20131121155649.48C96C406A3@trevor.secretlab.ca>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com><20131121151218.befbb483c0cf09cdcd4cd4dd@nvidia.com><20131121155649.48C96C406A3@trevor.secretlab.ca>
-Message-ID: <20131121.192051.747601347584525020.hdoyu@nvidia.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Thu, 21 Nov 2013 11:27:49 -0600
+Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
+ wl12xx
+In-Reply-To: <20131121165823.GM10317@atomide.com>
+References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
+ <1385041804-19115-2-git-send-email-balajitk@ti.com>
+ <20131121165823.GM10317@atomide.com>
+Message-ID: <528E4295.2040109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@linaro.org> wrote @ Thu, 21 Nov 2013 16:56:49 +0100:
+On 11/21/2013 10:58 AM, Tony Lindgren wrote:
+> * Balaji T K <balajitk@ti.com> [131121 05:51]:
+>> pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
+>> and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
+>>
+>> Fix the following error message:
+>> pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
+>> pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
 
-> On Thu, 21 Nov 2013 15:12:18 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> > On Thu, 21 Nov 2013 13:43:28 +0100
-> > Grant Likely <grant.likely@linaro.org> wrote:
-> > 
-> > > On Tue, 19 Nov 2013 11:33:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> > > > The following pattern of code is tempting:
-> > > > 
-> > > >   for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
-> > > > 
-> > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > > 
-> > > That's a very minimal commit message. Can you elaborate please.
-> > 
-> > The above can be:
-> > 
-> > "
-> >   The following pattern of code is tempting to add a new member for
-> >   of_property_for_each_*() family as an idiom.
-> >   
-> >     for (i = 0;
-> >         !of_parse_phandle_with_args(np, list, cells, i, args); i++)
-> >                   <do something with "args">;
-> > "
-> 
-> I really do like commit messages to be full enough that a future reader
-> can figure out why a patch was written. ie:
+Why is the led pins moved then?
 
-Updated as:
+>> SDIO card is not detected after moving pin mux to omap4_pmx_core since
+>> sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
+> Cool, does this fix the issue with the WLAN not coming up after a warm reset
+> on panda?
+>
+> Regards,
+>
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-  [PATCHv6+ 01/13] of: introduce of_property_for_earch_phandle_with_args()
-    http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007063.html
 
-This doesn't depend on anything and this can be merged
-independetly. Thanks for your help.
+-- 
+------------------
+Dan Murphy
