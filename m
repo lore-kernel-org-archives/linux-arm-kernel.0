@@ -1,41 +1,50 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 21 Nov 2013 13:59:09 +0900
-Subject: [PATCH] ARM: shmobile: Use r8a7790 suffix for IRQC compat string
-In-Reply-To: <20131120000740.27032.66529.sendpatchset@w520>
-References: <20131120000740.27032.66529.sendpatchset@w520>
-Message-ID: <20131121045907.GV31130@verge.net.au>
+Date: Thu, 21 Nov 2013 14:02:07 +0900
+Subject: [PATCH v2 7/7] ARM: shmobile: armadillo-reference: Use low level
+ IRQ for ST1231
+In-Reply-To: <1384865989-12875-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1384865989-12875-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131121050207.GW31130@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 09:07:40AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Tue, Nov 19, 2013 at 01:59:49PM +0100, Laurent Pinchart wrote:
+> The device is configured to generate an active-low interrupt signal that
+> needs to be acknowledged by the host. Configure the IRQ to trigger on
+> low level.
 > 
-> Add "renesas,irqc-r8a7790" to the compatible string for IRQC
-> in case of r8a7790. This makes the IRQC follow the same style
-> as the other devices and also makes it more future proof.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > ---
-> 
->  arch/arm/boot/dts/r8a7790.dtsi |    2 +-
+>  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Changes since v1:
+> 
+> - Fixed typo (IRQ_TYPE_LOW_LEVEL -> IRQ_TYPE_LEVEL_LOW)
+
 
 Thanks, I will queue this up.
 Assuming all goes will I plan to push this and other updates
 today or tomorrow.
 
 > 
-> --- 0003/arch/arm/boot/dts/r8a7790.dtsi
-> +++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-11-20 08:20:30.000000000 +0900
-> @@ -171,7 +171,7 @@
->  	};
->  
->  	irqc0: interrupt-controller at e61c0000 {
-> -		compatible = "renesas,irqc";
-> +		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
->  		#interrupt-cells = <2>;
->  		interrupt-controller;
->  		reg = <0 0xe61c0000 0 0x200>;
+> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> index aef425f..7b80f19 100644
+> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> @@ -95,7 +95,7 @@
+>  		compatible = "sitronix,st1232";
+>  		reg = <0x55>;
+>  		interrupt-parent = <&irqpin1>;
+> -		interrupts = <2 IRQ_TYPE_NONE>; /* IRQ10: hwirq 2 on irqpin1 */
+> +		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+>  		pinctrl-0 = <&st1232_pins>;
+>  		pinctrl-names = "default";
+>  		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+> -- 
+> 1.8.3.2
+> 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
 > the body of a message to majordomo at vger.kernel.org
