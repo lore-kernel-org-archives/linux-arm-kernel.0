@@ -1,24 +1,52 @@
-From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
-Date: Thu, 21 Nov 2013 16:01:26 -0500
-Subject: Kernel build failing randomly
-In-Reply-To: <20131121122253.GA2826@e103592.cambridge.arm.com>
-References: <20131121122253.GA2826@e103592.cambridge.arm.com>
-Message-ID: <CANacCWx0pW2p6637WgzXpYMOk+V=w7CwsJxm37pFLR9Mx+b5bQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 21 Nov 2013 15:36:03 -0600
+Subject: [PATCHv5 1/9] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <20131121.192051.747601347584525020.hdoyu@nvidia.com>
+References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com>
+ <20131121151218.befbb483c0cf09cdcd4cd4dd@nvidia.com>
+ <20131121155649.48C96C406A3@trevor.secretlab.ca>
+ <20131121.192051.747601347584525020.hdoyu@nvidia.com>
+Message-ID: <CAL_JsqK_TRjt9KigRA4yXcvEq0XriGxCy+50CY-BdJd62vHLCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On Thu, Nov 21, 2013 at 7:22 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+On Thu, Nov 21, 2013 at 11:20 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> Grant Likely <grant.likely@linaro.org> wrote @ Thu, 21 Nov 2013 16:56:49 +0100:
 >
-> Check dmesg after this happens.  Recent kernels generally log info about
-> process deaths like this.
+>> On Thu, 21 Nov 2013 15:12:18 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+>> > On Thu, 21 Nov 2013 13:43:28 +0100
+>> > Grant Likely <grant.likely@linaro.org> wrote:
+>> >
+>> > > On Tue, 19 Nov 2013 11:33:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+>> > > > The following pattern of code is tempting:
+>> > > >
+>> > > >   for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
+>> > > >
+>> > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+>> > >
+>> > > That's a very minimal commit message. Can you elaborate please.
+>> >
+>> > The above can be:
+>> >
+>> > "
+>> >   The following pattern of code is tempting to add a new member for
+>> >   of_property_for_each_*() family as an idiom.
+>> >
+>> >     for (i = 0;
+>> >         !of_parse_phandle_with_args(np, list, cells, i, args); i++)
+>> >                   <do something with "args">;
+>> > "
+>>
+>> I really do like commit messages to be full enough that a future reader
+>> can figure out why a patch was written. ie:
 >
-> If your VM is low on resources, it's possible the OOM killer is killing
-> the final link.
+> Updated as:
 >
+>   [PATCHv6+ 01/13] of: introduce of_property_for_earch_phandle_with_args()
 
-Just checked dmesg and OOM killer it is. Thanks!
+You also have a typo in the subject.
 
-Regards,
-Vaibhav
+s/earch/each/
+
+Rob
