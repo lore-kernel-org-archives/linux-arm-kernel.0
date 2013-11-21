@@ -1,44 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 21 Nov 2013 14:52:27 -0800
-Subject: Patches from ARM folks solicited for the -stable tree
-In-Reply-To: <alpine.DEB.2.02.1311212210150.9743@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1311210442560.30143@utopia.booyaka.com>
- <20131121153254.GA3422@kroah.com>
- <alpine.DEB.2.02.1311211818000.30143@utopia.booyaka.com>
- <20131121185021.GA15057@kroah.com>
- <alpine.DEB.2.02.1311212210150.9743@utopia.booyaka.com>
-Message-ID: <20131121225227.GA12201@kroah.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 21 Nov 2013 14:54:37 -0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.13, part 2
+In-Reply-To: <20131120122135.GA22308@S2101-09.ap.freescale.net> (Shawn Guo's
+ message of "Wed, 20 Nov 2013 20:21:37 +0800")
+References: <20131120122135.GA22308@S2101-09.ap.freescale.net>
+Message-ID: <87siup8ixe.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 10:15:37PM +0000, Paul Walmsley wrote:
-> On Thu, 21 Nov 2013, Greg Kroah-Hartman wrote:
-> 
-> > On Thu, Nov 21, 2013 at 06:20:29PM +0000, Paul Walmsley wrote:
-> > > On Thu, 21 Nov 2013, Greg Kroah-Hartman wrote:
-> > > 
-> > > > On Thu, Nov 21, 2013 at 04:43:37AM +0000, Paul Walmsley wrote:
-> > > >
-> > > > > These days it seems like I have about one patch per merge window that 
-> > > > > could be a stable candidate.
-> > > > 
-> > > > That's all?
-> > > 
-> > > The better we are at writing and testing our patches, the fewer -stable 
-> > > candidates we'll have :-)  
-> > 
-> > No new device ids? quirks? 
-> 
-> It's true that the focus here for -stable has mostly been for fixes for 
-> code that causes some kind of crash or failure, rather than new device 
-> support.  Including new device support could probably increase the amount 
-> of -stable patches by quite a bit.  The problem with this is that it could 
-> cause hard-to-find regressions in the -stable kernel.  For example, on 
-> OMAP, adding support for a new device could potentially cause PM 
-> regressions on the rest of the system, depending on how the driver 
-> operates.  So the bar for those types of patches seems pretty high if it's 
-> really intended to be a "stable" kernel.
+Shawn Guo <shawn.guo@linaro.org> writes:
 
-Then those "types" of patches are not device ids or quirks being added
-to a table, so of course I wouldn't want to take those into the stable
-tree...
+> The following changes since commit 036e29918078e38b0b127b89deb4c595028c1bc0:
+>
+>   ARM: dts: i.MX51: Fix OTG PHY clock (2013-11-11 22:58:45 +0800)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.13-2
+>
+> for you to fetch changes up to 793b4b10720174b6b27beaf915425248858d7fc5:
+>
+>   ARM: dts: imx6qdl: disable spdif "rxtx5" clock option (2013-11-18 09:21:29 +0800)
+>
+> ----------------------------------------------------------------
+> The imx fixes for 3.13, part 2:
+>  - Disable S/PDIF "rxtx5" clock option to fix the clocksource breakage
+>    introduced by S/PDIF driver
+>
+
+Applied to fixes branch.
+
+Thanks,
+
+Kevin
