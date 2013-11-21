@@ -1,86 +1,65 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 21 Nov 2013 19:40:10 +0400
-Subject: [PATCH 2/6] arm: sa1100: h3600: refactor LCD GPIO handling
+Date: Thu, 21 Nov 2013 19:40:11 +0400
+Subject: [PATCH 3/6] arm: sa1100: h3100: refactor IrDA GPIO handling
 In-Reply-To: <1385048414-9812-1-git-send-email-dbaryshkov@gmail.com>
 References: <1385048414-9812-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1385048414-9812-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1385048414-9812-4-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use gpio_request_array to request all GPIOs at once. Also don't call
-gpio_free. There is little point freeing LCD gpios once they are
-requested. Instead guard them with bool variable.
+As GPIOs are going to move to platform device, there is no guarantee
+that they will be available at init_machine time.
+
+Request and free all GPIOs from IrDA startup/shutdown callbacks and not
+at init_machine time.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/h3600.c | 48 ++++++++++++++++++++++++--------------------
- 1 file changed, 26 insertions(+), 22 deletions(-)
+ arch/arm/mach-sa1100/h3100.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
-index b8dc5bd..559c2a0 100644
---- a/arch/arm/mach-sa1100/h3600.c
-+++ b/arch/arm/mach-sa1100/h3600.c
-@@ -28,35 +28,39 @@
+diff --git a/arch/arm/mach-sa1100/h3100.c b/arch/arm/mach-sa1100/h3100.c
+index 5b78c9f..daa27c4 100644
+--- a/arch/arm/mach-sa1100/h3100.c
++++ b/arch/arm/mach-sa1100/h3100.c
+@@ -89,6 +89,11 @@ static void __init h3100_map_io(void)
  /*
-  * helper for sa1100fb
+  * This turns the IRDA power on or off on the Compaq H3100
   */
-+static struct gpio h3600_lcd_gpio[] = {
-+	{ H3XXX_EGPIO_LCD_ON,	GPIOF_OUT_INIT_LOW,	"LCD power" },
-+	{ H3600_EGPIO_LCD_PCI,	GPIOF_OUT_INIT_LOW,	"LCD control" },
-+	{ H3600_EGPIO_LCD_5V_ON, GPIOF_OUT_INIT_LOW,	"LCD 5v" },
-+	{ H3600_EGPIO_LVDD_ON,	GPIOF_OUT_INIT_LOW,	"LCD 9v/-6.5v" },
++static struct gpio h3100_irda_gpio[] = {
++	{ H3100_GPIO_IR_ON,	GPIOF_OUT_INIT_LOW, "IrDA power" },
++	{ H3100_GPIO_IR_FSEL,	GPIOF_OUT_INIT_LOW, "IrDA fsel" },
 +};
 +
-+static bool h3600_lcd_request(void)
-+{
-+	static bool h3600_lcd_ok;
-+	int rc;
-+
-+	if (h3600_lcd_ok)
-+		return true;
-+
-+	rc = gpio_request_array(h3600_lcd_gpio, ARRAY_SIZE(h3600_lcd_gpio));
-+	if (rc)
-+		pr_err("%s: can't request GPIOs\n", __func__);
-+	else
-+		h3600_lcd_ok = true;
-+
-+	return h3600_lcd_ok;
-+}
-+
- static void h3600_lcd_power(int enable)
+ static int h3100_irda_set_power(struct device *dev, unsigned int state)
  {
--	if (gpio_request(H3XXX_EGPIO_LCD_ON, "LCD power")) {
--		pr_err("%s: can't request H3XXX_EGPIO_LCD_ON\n", __func__);
--		goto err1;
--	}
--	if (gpio_request(H3600_EGPIO_LCD_PCI, "LCD control")) {
--		pr_err("%s: can't request H3XXX_EGPIO_LCD_PCI\n", __func__);
--		goto err2;
--	}
--	if (gpio_request(H3600_EGPIO_LCD_5V_ON, "LCD 5v")) {
--		pr_err("%s: can't request H3XXX_EGPIO_LCD_5V_ON\n", __func__);
--		goto err3;
--	}
--	if (gpio_request(H3600_EGPIO_LVDD_ON, "LCD 9v/-6.5v")) {
--		pr_err("%s: can't request H3600_EGPIO_LVDD_ON\n", __func__);
--		goto err4;
--	}
-+	if (!h3600_lcd_request())
-+		return;
- 
- 	gpio_direction_output(H3XXX_EGPIO_LCD_ON, enable);
- 	gpio_direction_output(H3600_EGPIO_LCD_PCI, enable);
- 	gpio_direction_output(H3600_EGPIO_LCD_5V_ON, enable);
- 	gpio_direction_output(H3600_EGPIO_LVDD_ON, enable);
--
--	gpio_free(H3600_EGPIO_LVDD_ON);
--err4:	gpio_free(H3600_EGPIO_LCD_5V_ON);
--err3:	gpio_free(H3600_EGPIO_LCD_PCI);
--err2:	gpio_free(H3XXX_EGPIO_LCD_ON);
--err1:	return;
+ 	gpio_set_value(H3100_GPIO_IR_ON, state);
+@@ -100,14 +105,24 @@ static void h3100_irda_set_speed(struct device *dev, unsigned int speed)
+ 	gpio_set_value(H3100_GPIO_IR_FSEL, !(speed < 4000000));
  }
  
- static const struct sa1100fb_rgb h3600_rgb_16 = {
++static int h3100_irda_startup(struct device *dev)
++{
++	return gpio_request_array(h3100_irda_gpio, sizeof(h3100_irda_gpio));
++}
++
++static void h3100_irda_shutdown(struct device *dev)
++{
++	return gpio_free_array(h3100_irda_gpio, sizeof(h3100_irda_gpio));
++}
++
+ static struct irda_platform_data h3100_irda_data = {
+ 	.set_power	= h3100_irda_set_power,
+ 	.set_speed	= h3100_irda_set_speed,
++	.startup	= h3100_irda_startup,
++	.shutdown	= h3100_irda_shutdown,
+ };
+ 
+ static struct gpio_default_state h3100_default_gpio[] = {
+-	{ H3100_GPIO_IR_ON,	GPIO_MODE_OUT0, "IrDA power" },
+-	{ H3100_GPIO_IR_FSEL,	GPIO_MODE_OUT0, "IrDA fsel" },
+ 	{ H3XXX_GPIO_COM_DCD,	GPIO_MODE_IN,	"COM DCD" },
+ 	{ H3XXX_GPIO_COM_CTS,	GPIO_MODE_IN,	"COM CTS" },
+ 	{ H3XXX_GPIO_COM_RTS,	GPIO_MODE_OUT0,	"COM RTS" },
 -- 
 1.8.4.2
