@@ -1,39 +1,83 @@
-From: marc.ceeeee@gmail.com (Marc C)
-Date: Wed, 20 Nov 2013 23:58:04 -0800
-Subject: [RFC] ARM Generic Timer + Interaction with WFI on Cortex-A15
-Message-ID: <528DBD0C.6040203@gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 21 Nov 2013 09:00:52 +0100
+Subject: [PATCHv9][ 3/3] ARM: dts: cpuimx35 Add touchscreen support.
+In-Reply-To: <20131121050922.GF18477@ns203013.ovh.net>
+References: <1383916659-9988-1-git-send-email-denis@eukrea.com>
+ <1383916659-9988-3-git-send-email-denis@eukrea.com>
+ <20131121050922.GF18477@ns203013.ovh.net>
+Message-ID: <20131121090052.1684db75@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-I have a question regarding the interaction with the ARM Generic (or
-architected) timer, high-resolution timer support, and the WFI instruction.
+Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 14:17 Fri 08 Nov     , Denis Carikli wrote:
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > Cc: linux-input at vger.kernel.org
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Eric B?nard <eric@eukrea.com>
+> > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > ---
+> > ChangeLog v8->v9:
+> > - Added Grant Likely in the cc list.
+> > - Adapted to the removal of the pinctrl properties in the tsc2007 documentation.
+> > - Fixed the gpios property (before, it was set to active high by error).
+> > 
+> > ChangeLog v7->v8:
+> > - Added Shawn Guo in the cc list.
+> > ---
+> >  arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi |   21 +++++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+> > index b9cb5a5..f25a40f 100644
+> > --- a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+> > +++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+> > @@ -36,6 +36,27 @@
+> >  		compatible = "nxp,pcf8563";
+> >  		reg = <0x51>;
+> >  	};
+> > +
+> > +	tsc2007: tsc2007 at 48 {
+> > +		compatible = "ti,tsc2007";
+> > +		reg = <0x48>;
+> > +		interrupt-parent = <&gpio3>;
+> > +		interrupts = <0x2 0x8>;
+> > +		gpios = <&gpio3 2 1>;
+> as explain on the binding drop this gpios this is an IRQ not a gpio
+> 
+> NACK
+The driver needs an interrupt to get notified about pendown events and
+needs to poll the pendown signal to find out when the pen has been
+lifted. Both the interrupt and the pendown signal happen to be
+signalled on the same pin. Thus, IMO it is perfectly well to have the
+interrupt property as well as the gpios property here.
 
-This commit [1] sets up the "C3STOP" flag on the arch_timer. According
-to the commit log, an ARM core which implements the ARM Generic Timer
-may power-down and thus invalidate some registers within the timer.
-Therefore, flagging the timer with C3STOP will ensure that an
-appropriate broadcast timer will be used whenever the CPU goes into idle.
+How would you tell the driver which pin to poll for detecting the pen
+up event?
 
-However, according to this article [2], there is a difference in
-implementation between the Cortex-A7 and Cortex-A15, wherein the A7 will
-power-down on idle, and the A15 will not.
+Having a platform callback with hardcoded GPIO numbers is not an option.
 
-Now, given the 2 citations, can someone explain why the C3STOP flag is
-used for _all_ implementations? Is it not the case that the A15-based
-arch_timer can be used as a broadcast timer, even if the kernel is
-configured to call WFI and put the CPU into low-power mode?
 
-There have been some recent commits which conditionally setup the C3STOP
-flag, depending on the CONFIG_CPU_IDLE flag. However, my concern is that
-there are some ARM implementations that can actually go into low-power
-mode and still use the arch_timer reliably.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Thank you,
-Marc C
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-[1] -
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=27a5569dc66ecce06cb532542ddcd0b6da8783f6
-[2] -
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka16107.html
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
