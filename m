@@ -1,48 +1,25 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 21 Nov 2013 12:43:28 +0000
-Subject: [PATCHv5 1/9] of: introduce
- of_property_for_earch_phandle_with_args()
-In-Reply-To: <1384853593-32202-2-git-send-email-hdoyu@nvidia.com>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com> <
- 1384853593-32202-2-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20131121124328.46BC1C40A2C@trevor.secretlab.ca>
+Date: Thu, 21 Nov 2013 12:56:14 +0000
+Subject: [PATCH] ARM: CCI : Fix implicit declaration of function error
+In-Reply-To: <20131017121227.GC2442@localhost.localdomain>
+References: <20131017121227.GC2442@localhost.localdomain>
+Message-ID: <20131121125614.26955C40A2C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Nov 2013 11:33:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> The following pattern of code is tempting:
+On Thu, 17 Oct 2013 13:12:28 +0100, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Mon, Oct 14, 2013 at 03:52:27PM +0530, Majunath Goudar wrote:
+> > This patch adds a inline dummy implementations of_find_matching_node()
+> > in "#ifdef CONFIG_OF" else part. Without this patch,build system can
+> > lead to issues. This was discovered during randconfig testing,in which
+> > ARM_CCI was enabled w/o CONFIG_OF being enabled,leading to the following error:
 > 
->   for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> Without fetching config info from the DT, the CCI driver is not usable,
+> so it makes no sense to build this driver without CONFIG_OF.
 
-That's a very minimal commit message. Can you elaborate please.
+I agree here, and that is the big reason why I'm resistant to blanket
+implementation of empty OF related functions. If those functions are
+called, then most likely the code strongly depends on CONFIG_OF. Leaving
+the blank ones out catches scenarios like this.
 
-> ---
-> v5:
-> New patch for v5.
-> ---
->  include/linux/of.h | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 276c546..131fef5 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -613,6 +613,9 @@ static inline int of_property_read_u32(const struct device_node *np,
->  		s;						\
->  		s = of_prop_next_string(prop, s))
->  
-> +#define of_property_for_each_phandle_with_args(np, list, cells, i, args) \
-> +	for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
-> +
-
-That works, but pretty darn inefficient. We need an iterator version of
-of_parse_phandle_with_args() to loop over all the entries.
-
->  #if defined(CONFIG_PROC_FS) && defined(CONFIG_PROC_DEVICETREE)
->  extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
->  extern void proc_device_tree_add_prop(struct proc_dir_entry *pde, struct property *prop);
-> -- 
-> 1.8.1.5
-> 
+g.
