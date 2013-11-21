@@ -1,45 +1,44 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 21 Nov 2013 13:28:16 +0200
-Subject: [PATCH v2 01/10] mtd: nand: davinci: fix driver registration
+Date: Thu, 21 Nov 2013 13:28:17 +0200
+Subject: [PATCH v2 02/10] mtd: nand: davinci: return ENOMEM if memory
+ allocation is failed
 In-Reply-To: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1385033305-13179-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1385033305-13179-3-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kernel is booted using DT, there is no guarantee that Davinci
-NAND device has been created already at the time when driver init
-function is executed. Therefore, platform_driver_probe() can't be used
-because this may result the Davinci NAND driver will never be probed.
-The driver probing has to be made with core mechanism.
+In case when memory allocation is failed the driver should return
+ENOMEM instead of ENODEV.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/mtd/nand/davinci_nand.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/davinci_nand.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index b77a01e..d87213f 100644
+index d87213f..ddcd7c8 100644
 --- a/drivers/mtd/nand/davinci_nand.c
 +++ b/drivers/mtd/nand/davinci_nand.c
-@@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
- }
+@@ -541,7 +541,7 @@ static struct davinci_nand_pdata
+ 				GFP_KERNEL);
+ 		pdev->dev.platform_data = pdata;
+ 		if (!pdata)
+-			return NULL;
++			return ERR_PTR(-ENOMEM);
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-chipselect", &prop))
+ 			pdev->id = prop;
+@@ -598,6 +598,9 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
+ 	nand_ecc_modes_t		ecc_mode;
  
- static struct platform_driver nand_davinci_driver = {
-+	.probe		= nand_davinci_probe,
- 	.remove		= __exit_p(nand_davinci_remove),
- 	.driver		= {
- 		.name	= "davinci_nand",
-@@ -886,7 +887,7 @@ static struct platform_driver nand_davinci_driver = {
- };
- MODULE_ALIAS("platform:davinci_nand");
- 
--module_platform_driver_probe(nand_davinci_driver, nand_davinci_probe);
-+module_platform_driver(nand_davinci_driver);
- 
- MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Texas Instruments");
+ 	pdata = nand_davinci_get_pdata(pdev);
++	if (IS_ERR(pdata))
++		return PTR_ERR(pdata);
++
+ 	/* insist on board-specific configuration */
+ 	if (!pdata)
+ 		return -ENODEV;
 -- 
 1.7.9.5
