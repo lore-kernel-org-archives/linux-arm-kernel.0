@@ -1,37 +1,56 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Thu, 21 Nov 2013 19:45:06 +0200
-Subject: [PATCH v2 00/10] Reuse davinci-nand driver for Keystone arch
-In-Reply-To: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <CAArO44tOemuo0PyWMuwwGBb77Lt4_pqbDoKWzROLBi0HGC8F7A@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 21 Nov 2013 09:49:42 -0800
+Subject: [PATCH v4 2/4] Documentation:: Add documentation for APM X-Gene
+ SoC SATA host controller DTS binding
+In-Reply-To: <201311211316.03647.arnd@arndb.de>
+References: <1385014298-15700-1-git-send-email-lho@apm.com>
+ <1385014298-15700-2-git-send-email-lho@apm.com>
+ <1385014298-15700-3-git-send-email-lho@apm.com>
+ <201311211316.03647.arnd@arndb.de>
+Message-ID: <CAPw-ZTmyUjqcHhcqpjvwY-+xOKSyJh1MwA=KgjdDzmWpPXE3GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2013 13:28, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
-> This series contains fixes and updates of Davinci nand driver in
-> order to reuse it for Keystone platform.
->
-> The series is combination of two following series:
-> - Davinci nand driver fixes and updates:
->   https://lkml.org/lkml/2013/11/20/271
-> - Reuse davinci-nand driver for Keystone arch
->   https://lkml.org/lkml/2013/11/20/315
->
-> Ivan Khoronzhuk (10):
->   mtd: nand: davinci: fix driver registration
->   mtd: nand: davinci: return ENOMEM if memory allocation is failed
->   mtd: nand: davinci: check required ti,davinci-chipselect property
->   mtd: nand: davinci: simplify error handling
->   mtd: nand: davinci: move bindings under mtd
->   mtd: nand: davinci: extend description of bindings
->   mtd: nand: davinci: adjust DT properties to MTD generic
->   mtd: nand: davinci: reuse driver for Keystone arch
->   mtd: nand: davinci: don't set timings if AEMIF is used
->   mtd: nand: davinci: don't request AEMIF address range
+Hi,
 
-For all series:
-Reviewed-by: Taras Kondratiuk <taras@ti.com>
+>> +SATA host controller nodes are defined to describe on-chip Serial ATA
+>> +controllers. Each SATA controller (pair of ports) have its own node.
+>> +
+>> +Required properties:
+>> +- compatible         : Shall be "apm,xgene-ahci"
+>> +- reg                        : First memory resource shall be the AHCI memory
+>> +                       resource.
+>> +                       Second memory resource shall be the host controller
+>> +                       memory resource.
+>> +- interrupt-parent   : Interrupt controller
+>> +- interrupts         : Interrupt mapping for SATA host controller IRQ
+>> +- clocks             : Reference to the clock entry
+>> +- phys                       : PHY reference
+>> +- phy-names          : Name of the PHY reference. The name should be
+>> +                       formed by "sataphy" plus lower case hex for the
+>> +                       lower 32-bit PHY CSR address (2nd memory resource)
+>
+> I've tried to explain this before, but apparently you missed the point:
+>
+> Any "*-names" property is supposed to be the identifier inside the device you
+> are describing, *not* an identifier for what it points to, as that already
+> has a name. The idea is that the driver can ask for phy (or clock, irq,
+> memory, etc) "foo" here, with foo identifying the functionality in the
+> device. If you only have one phy, you probably don't want to name it at
+> all. If you imagine a device that was connected to two different phys
+> depending on the mode it's used in (e.g. SATA-II vs SATA-6G), you would
+> list this as
+>
+>  - phy-names            : one name per references in the "phys" property.
+>                           valid names are "sata-ii" and "sata-6g".
+>
+> If the generic phy subsystem requires you to name this, I'd suggest either
+> changing the phy subsystem to make the name optional, or to just call it
+> "serdes", as that is the kind of phy you are connected to.
+>
+> Does this make more sense to you now?
+>
+[Loc Ho]
+Okay... Got it. I will name it as 'sata-6g'
 
--- 
-Regards,
-Taras Kondratiuk
+-Loc
