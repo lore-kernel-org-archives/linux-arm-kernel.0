@@ -1,123 +1,72 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 21 Nov 2013 11:40:13 +0900
-Subject: [PATCH v2] ARM: tegra: switch FUSE clock on before usage
-Message-ID: <1385001613-19098-1-git-send-email-acourbot@nvidia.com>
+From: Li.Xiubo@freescale.com (Li Xiubo)
+Date: Thu, 21 Nov 2013 02:58:22 +0000
+Subject: [PATCHv2 3/8] ARM: dts: Enables SAI ALSA SoC DAI device for
+ Vybrid VF610 TOWER board.
+In-Reply-To: <87hab7hxfx.fsf@nbsps.com>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-4-git-send-email-Li.Xiubo@freescale.com>
+ <87bo1hk2i7.fsf@nbsps.com>
+ <1DD289F6464F0949A2FCA5AA6DC23F828AD451@039-SN2MPN1-012.039d.mgd.msft.net>
+ <87hab7hxfx.fsf@nbsps.com>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828B5046@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FUSE clock is enabled by most bootloaders, but we cannot expect it to be
-on in all contexts (e.g. kexec).
 
-Ensure the FUSE clock is enabled before any of its registers is touched.
-Since FUSE is touched very early during system boot (before the clock
-devices are registered), directly manipulate the clock register bit in
-case the clock device cannot be acquired.
+> >>> This patch add and enable SAI device.
+> >>>
+> >>> arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
+> >>> 1 file changed, 6 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/vf610-twr.dts
+> >>> b/arch/arm/boot/dts/vf610-twr.dts index 1a58678..e4106dd 100644
+> >>> --- a/arch/arm/boot/dts/vf610-twr.dts
+> >>> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> >>>>> -57,6 +57,12 @@
+> >>> 	status = "okay";
+> >>> };
+> >>
+> >> Should we put a comment here that a TWR-AUDIO-SGTL board is needed?
+> >> Or is this better in a menuconfig?  I guess TWR-AUDIO-SGTL is needed
+> >> as this codec is not on the VF610-TWR main board?
+> >>
+> >
+> > Yes, the SGTL5000 codec is not on the VF610-TWR main board, and needs
+> an extra
+> > 	TWR-AUDIO-SGTL board.
+> >
+> > IMO, puting this comment in the menuconfig is much better.
+> 
+> I agree.  I guess the patch set 6 makes more sense.  Also, you might
+> consider adding a printk in the 'fsl_sgtl5000_probe()'.  I guess that
+> devm_snd_soc_register_card() will fail if the board is not present?  
+>
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Yes, you are right.
+The logs:
++++++++++++
+vf610-sgtl5000 sound.3: ASoC: CODEC (null) not registered
+vf610-sgtl5000 sound.3: register soc sound card failed :-517
+-----------
+
+
+> +	ret = devm_snd_soc_register_card(&pdev->dev, &fsl_sgt1500_card);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "register soc sound card failed :%d\n"
+> +                               "TWR-AUDIO-SGTL board required.\n",
+> +				ret);
+> +		return ret;
+> +	}
+> 
+> Especially, you can make one kernel that handles both cases w/wo TWR-
+> AUDIO-SGTL board attached.
+> 
+
+Yes, it looks nicer.
+
+Well, as one log about the CODEC already exists? Should the "TWR-AUDIO-SGTL board required.\n" log is still needed here ?
+
+
 --
-Changelog since v1:
-- Moved clock device definition into another patch
-- Kept the initial idea of enabling the fuse clock at init and keeping
-  it that way until the clock framework takes it over. The reason is
-  that exported functions might be called from tegra_init_fuse() that
-  acquire the clock (e.g. tegra_get_revision()). Since we don't have
-  any enable counter here, the clock would be disabled earlier than we
-  want if we were to allow disabling of the clock before the clock
-  framework is available.
----
- arch/arm/mach-tegra/fuse.c | 41 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 40 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-index 9a4e910c3796..2adc2ab081e2 100644
---- a/arch/arm/mach-tegra/fuse.c
-+++ b/arch/arm/mach-tegra/fuse.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <linux/export.h>
- #include <linux/random.h>
-+#include <linux/clk.h>
- #include <linux/tegra-soc.h>
- 
- #include "fuse.h"
-@@ -54,6 +55,7 @@ int tegra_cpu_speedo_id;		/* only exist in Tegra30 and later */
- int tegra_soc_speedo_id;
- enum tegra_revision tegra_revision;
- 
-+static struct clk *fuse_clk;
- static int tegra_fuse_spare_bit;
- static void (*tegra_init_speedo_data)(void);
- 
-@@ -77,6 +79,22 @@ static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
- 	[TEGRA_REVISION_A04]     = "A04",
- };
- 
-+static void tegra_fuse_enable_clk(void)
-+{
-+	if (IS_ERR(fuse_clk))
-+		fuse_clk = clk_get_sys(NULL, "fuse");
-+	if (IS_ERR(fuse_clk))
-+		return;
-+	clk_prepare_enable(fuse_clk);
-+}
-+
-+static void tegra_fuse_disable_clk(void)
-+{
-+	if (IS_ERR(fuse_clk))
-+		return;
-+	clk_disable_unprepare(fuse_clk);
-+}
-+
- u32 tegra_fuse_readl(unsigned long offset)
- {
- 	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
-@@ -84,7 +102,15 @@ u32 tegra_fuse_readl(unsigned long offset)
- 
- bool tegra_spare_fuse(int bit)
- {
--	return tegra_fuse_readl(tegra_fuse_spare_bit + bit * 4);
-+	bool ret;
-+
-+	tegra_fuse_enable_clk();
-+
-+	ret = tegra_fuse_readl(tegra_fuse_spare_bit + bit * 4);
-+
-+	tegra_fuse_disable_clk();
-+
-+	return ret;
- }
- 
- static enum tegra_revision tegra_get_revision(u32 id)
-@@ -113,10 +139,14 @@ static void tegra_get_process_id(void)
- {
- 	u32 reg;
- 
-+	tegra_fuse_enable_clk();
-+
- 	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
- 	tegra_cpu_process_id = (reg >> 6) & 3;
- 	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
- 	tegra_core_process_id = (reg >> 12) & 3;
-+
-+	tegra_fuse_disable_clk();
- }
- 
- u32 tegra_read_chipid(void)
-@@ -159,6 +189,15 @@ void __init tegra_init_fuse(void)
- 	reg |= 1 << 28;
- 	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
- 
-+	/*
-+	 * Enable FUSE clock. This needs to be hardcoded because the clock
-+	 * subsystem is not active during early boot.
-+	 */
-+	reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x14));
-+	reg |= 1 << 7;
-+	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x14));
-+	fuse_clk = ERR_PTR(-EINVAL);
-+
- 	reg = tegra_fuse_readl(FUSE_SKU_INFO);
- 	randomness[0] = reg;
- 	tegra_sku_id = reg & 0xFF;
--- 
-1.8.4.2
+Best Regards,
+Xiubo
