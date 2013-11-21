@@ -1,64 +1,55 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 21 Nov 2013 16:42:32 +0100
-Subject: [PATCH v2 4/4] arm64: advertise CPU features for modalias matching
-In-Reply-To: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1385048552-12528-5-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu, 21 Nov 2013 16:42:28 +0100
+Subject: [PATCH v2 0/4] wire up CPU features to udev based module loading
+Message-ID: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the generic implementation in drivers/base/cpu.c
-that allows modules to be loaded automatically based on the
-optional features supported (and advertised over udev) by the
-CPU.
+X86 maintainer(s): if you have no objections to this approach, may I please have
+your ack(s) on the x86 bits so I can work with Catalin to take the series
+upstream through his tree?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig        |  3 +++
- arch/arm64/kernel/setup.c | 20 ++++++++++++++++++++
- 2 files changed, 23 insertions(+)
+This series implements automatic module loading based on optional CPU features,
+and tries to do so in a generic way.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c044548..50cd97f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -202,6 +202,9 @@ config ARCH_WANT_HUGE_PMD_SHARE
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
- 	def_bool y
- 
-+config ARCH_HAS_CPU_AUTOPROBE
-+	def_bool y
-+
- source "mm/Kconfig"
- 
- config XEN_DOM0
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 055cfb8..775a531 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -366,3 +366,23 @@ const struct seq_operations cpuinfo_op = {
- 	.stop	= c_stop,
- 	.show	= c_show
- };
-+
-+ssize_t arch_print_cpu_modalias(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	unsigned int caps;
-+	ssize_t n;
-+	int i;
-+
-+	/*
-+	 * With 32 features maximum (taking 5 bytes each to print), we don't
-+	 * need to worry about overrunning the PAGE_SIZE sized buffer.
-+	 */
-+	n = sprintf(buf, "cpu:type:%s:feature:", ELF_PLATFORM);
-+	for (caps = elf_hwcap, i = 0; caps; caps >>= 1, i++)
-+		if (caps & 1)
-+			n += sprintf(&buf[n], ",%04X", i);
-+	buf[n++] = '\n';
-+	return n;
-+}
+Typical usage would look like this:
+
+static struct cpu_feature mod_cpu_feature[] = {
+        { HWCAP_CRC32 },
+        {}
+};
+MODULE_DEVICE_TABLE(cpu, mod_cpu_feature);
+
+where (on the arm64 arch) the module in question would be loaded automatically
+if the CPU has support for the optional CRC instructions. [Note that the example
+is based on a pending patch by Steve Capper: 'arm64: Add hwcaps for crypto and
+CRC32 extensions']
+
+Changes wrt v1:
+- use ELF_PLATFORM rather than hardcoded name for printing modalias on arm64
+
+Changes wrt RFC version of this series:
+- this time, instead of doing something entirely separate for non-x86 archs, the
+  new generic modalias version allocates enough bits to cover all x86 features
+  (320+), and the x86 version was tweaked to resemble the generic one more
+  closely (i.e., both use 'cpu:type:...:feature:...' now)
+- removed the weak and alias GCC attribute foo
+
+Ard Biesheuvel (4):
+  x86: move arch_cpu_uevent() to generic code
+  cpu: advertise CPU features over udev in a generic way
+  x86: align with generic cpu modalias
+  arm64: advertise CPU features for modalias matching
+
+ arch/arm64/Kconfig                |  3 +++
+ arch/arm64/kernel/setup.c         | 20 ++++++++++++++++++++
+ arch/x86/kernel/cpu/match.c       | 14 +-------------
+ drivers/base/cpu.c                | 15 ++++++++++++++-
+ include/linux/cpu.h               |  1 -
+ include/linux/mod_devicetable.h   | 11 +++++++++++
+ scripts/mod/devicetable-offsets.c |  3 +++
+ scripts/mod/file2alias.c          | 20 +++++++++++++++-----
+ 8 files changed, 67 insertions(+), 20 deletions(-)
+
 -- 
 1.8.3.2
