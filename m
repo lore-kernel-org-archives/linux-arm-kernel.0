@@ -1,57 +1,39 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 21 Nov 2013 07:50:35 +0000
-Subject: [RFC PATCH V2 2/2] kbuild: dtbs_install: new make target
-In-Reply-To: <20131120135617.GS16735@n2100.arm.linux.org.uk>
-References: <528A6CA3.9030904@wwwdotorg.org> <20131118195243.GJ10335@titan.
- lakedaemon.net> <528A98C8.9040803@wwwdotorg.org> <20131119122801.GL16735@
- n2100.arm.linux.org.uk> <20131119142336.GA28859@titan.lakedaemon.net> <
- 20131119150212.GM16735@n2100.arm.linux.org.uk> <20131119152047.GB28859@
- titan.lakedaemon.net> <20131119152146.GN16735@n2100.arm.linux.org.uk> <
- 20131119192246.GP16735@n2100.arm.linux.org.uk> <20131120131004.ACA1BC4079D@
- trevor.secretlab.ca> <20131120135617.GS16735@n2100.arm.linux.org.uk>
-Message-ID: <20131121075035.3075EC4077A@trevor.secretlab.ca>
+From: marc.ceeeee@gmail.com (Marc C)
+Date: Wed, 20 Nov 2013 23:58:04 -0800
+Subject: [RFC] ARM Generic Timer + Interaction with WFI on Cortex-A15
+Message-ID: <528DBD0C.6040203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Nov 2013 13:56:18 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Wed, Nov 20, 2013 at 01:10:04PM +0000, Grant Likely wrote:
-> > On Tue, 19 Nov 2013 19:22:46 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > > On Tue, Nov 19, 2013 at 03:21:46PM +0000, Russell King - ARM Linux wrote:
-> > > > On Tue, Nov 19, 2013 at 10:20:47AM -0500, Jason Cooper wrote:
-> > > > > By "That" are you referring to extending the standard for compatible
-> > > > > strings to the board level, or forcing consistent naming on the dts
-> > > > > files?
-> > > > 
-> > > > A consistent file naming on both the dtb and dts files.
-> > > 
-> > > It's time to knock the idea of naming the DT blobs after the compatible
-> > > string on its head as well.  That's really not going to work.  Just
-> > > leave the filenames as is, and move the problem into userspace to solve.
-> > > 
-> > [...]
-> > > 
-> > > Just use the filenames we already have in the kernel tree.  Let userspace
-> > > parse the DT blobs for the compatible strings - it can then provide the
-> > > user with the choice of all and _also_ show that certain of DT blobs
-> > > may be compatible with a range of boards as well.
-> > 
-> > Yes, the consistent filename format is a non-problem. The files that
-> > exist already have names. Nothing else is going to use them. Done.
-> 
-> Grant, you have the wrong end of the stick.  This discussion is about
-> what happens when files from
-> 
-> 	$(objtree)/arch/arm/boot/dts
-> 
-> get installed into
-> 
-> 	/lib/modules/$(kernelversion)/...
-> 
-> and their renaming from the filenames we already have in arch/arm/boot/dts
-> to a filename generated from the compatible string.
+Hello,
 
-Umm, I don't follow where we're having a disconnect. That is what I'm
-talking about. I'm arguing that renaming the files with installing them
-is a bad idea. Are you not arguing the same here?
+I have a question regarding the interaction with the ARM Generic (or
+architected) timer, high-resolution timer support, and the WFI instruction.
 
-g.
+This commit [1] sets up the "C3STOP" flag on the arch_timer. According
+to the commit log, an ARM core which implements the ARM Generic Timer
+may power-down and thus invalidate some registers within the timer.
+Therefore, flagging the timer with C3STOP will ensure that an
+appropriate broadcast timer will be used whenever the CPU goes into idle.
+
+However, according to this article [2], there is a difference in
+implementation between the Cortex-A7 and Cortex-A15, wherein the A7 will
+power-down on idle, and the A15 will not.
+
+Now, given the 2 citations, can someone explain why the C3STOP flag is
+used for _all_ implementations? Is it not the case that the A15-based
+arch_timer can be used as a broadcast timer, even if the kernel is
+configured to call WFI and put the CPU into low-power mode?
+
+There have been some recent commits which conditionally setup the C3STOP
+flag, depending on the CONFIG_CPU_IDLE flag. However, my concern is that
+there are some ARM implementations that can actually go into low-power
+mode and still use the arch_timer reliably.
+
+Thank you,
+Marc C
+
+[1] -
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=27a5569dc66ecce06cb532542ddcd0b6da8783f6
+[2] -
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka16107.html
