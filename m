@@ -1,39 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Nov 2013 14:14:02 +0100
-Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
- gyroscopes
-In-Reply-To: <528DF164.8060009@st.com>
-References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
- <528DF164.8060009@st.com>
-Message-ID: <20131121131402.GF1029@lukather>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 21 Nov 2013 13:15:58 +0000
+Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+In-Reply-To: <1384853593-32202-3-git-send-email-hdoyu@nvidia.com>
+References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com> <
+ 1384853593-32202-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20131121131558.E5B82C40A2C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+On Tue, 19 Nov 2013 11:33:06 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> IOMMU devices on the bus need to be poplulated first, then iommu
+> master devices are done later.
+> 
+> With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
+> whether a device can be an iommu msater or not. If a device can, we'll
+> defer to populate that device till an iommu device is populated. Once
+> an iommu device is populated, "dev->bus->iommu_ops" is set in the
+> bus. Then, those defered iommu master devices are populated and
+> configured for IOMMU with help of the already populated iommu device
+> via iommu_ops->add_device(). Multiple IOMMUs can be listed on this
+> "iommus" binding so that a device can have multiple IOMMUs attached.
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+> v5:
+> Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
+> 
+> v4:
+> This is newly added, and the successor of the following RFC:
+>   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
+>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
+> ---
+>  drivers/base/dd.c        |  5 +++++
+>  drivers/iommu/of_iommu.c | 22 ++++++++++++++++++++++
+>  include/linux/of_iommu.h |  7 +++++++
+>  3 files changed, 34 insertions(+)
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 35fa368..6e892d4 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/async.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pinctrl/devinfo.h>
+> +#include <linux/of_iommu.h>
+>  
+>  #include "base.h"
+>  #include "power/power.h"
+> @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+>  
+>  	dev->driver = drv;
+>  
+> +	ret = of_iommu_attach(dev);
+> +	if (ret)
+> +		goto probe_failed;
+> +
+>  	/* If using pinctrl, bind pins now before probing */
+>  	ret = pinctrl_bind_pins(dev);
+>  	if (ret)
 
-On Thu, Nov 21, 2013 at 12:41:24PM +0100, Denis CIOCCA wrote:
-> only one point: it's possible to use the same names with DT? (using _ 
-> instead of -)
+I'm very concerned about this approach. Hooking into the core probe
+path for things like this is not going to scale well. I'm not thrilled
+with the pinctrl hook being here either, but that is already merged. :-(
+Also, hooking in here is going affect every single device device driver
+probe path, and a large number of them are never, ever, going to have
+iommu interactions.
 
-Yes, it is, but only for i2c as far as I'm aware, and usually the DT
-compatibles are with - as a separator (I looked into the ePAPR, but
-couldn't get any explanations or requirements on this, even though
-it's used in all of their examples)
+There needs to be a less invasive way of doing what you want. I still
+feel like the individual device drivers themselves need to be aware that
+they might be hooking through an IOMMU. Or, if they are hooking through
+a bus like PCIe, then have the PCIe bus defer creating child devices
+until the IOMMU is configured and in place.
 
-> Why only for i2c?
-
-Because I was only interested in i2c :)
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131121/88174551/attachment.sig>
+g.
