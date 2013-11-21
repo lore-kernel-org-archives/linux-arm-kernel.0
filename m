@@ -1,121 +1,174 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 21 Nov 2013 11:24:07 +0000
-Subject: [PATCH RFC v3 00/12] arm64: suspend/resume implementation
-Message-ID: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Thu, 21 Nov 2013 11:24:15 +0000
+Subject: [PATCH RFC v3 08/12] arm64: kernel: implement HW breakpoints CPU PM
+ notifier
+In-Reply-To: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1385033059-25896-9-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is v3 of a previous posting:
+When a CPU is shutdown either through CPU idle or suspend to RAM, the
+content of HW breakpoint registers must be reset or restored to proper
+values when CPU resume from low power states. This patch adds debug register
+restore operations to the HW breakpoint control function and implements a
+CPU PM notifier that allows to restore the content of HW breakpoint registers
+to allow proper suspend/resume operations.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204471.html
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm64/kernel/hw_breakpoint.c | 79 ++++++++++++++++++++++++++++++++-------
+ 1 file changed, 66 insertions(+), 13 deletions(-)
 
-CPU idle driver and PSCI suspend implementation used for testing are not
-published as part of this series since they depend on standardization
-of PSCI bindings for C-states; code can be made available on a separate branch
-if required.
-
-v3 changes:
-
-- Rebased to 3.12
-- Removed unused macros, merged them in generic cpu_do_{suspend}/{resume}
-- Refactored hw breakpoint reset code
-- Split Kconfig and make infrastructure
-- Moved debug monitors save/restore to cpu_do_{suspend}/{resume} and
-  cpu_suspend interface
-
-v2 changes:
-
-- Rebased to 3.12-rc4
-- Changed cpu_suspend prototype
-- Added macros to save/restore CPU registers
-- Improved register/load/store scheduling in context save/restore
-- Changed Kconfig option
-- Refactored the stack allocation and context struct layout
-- Fixed a bug in cpu_suspend return path
-- Added tick broadcast support
-- Dropped RFC tag
-
-This patch series provides an implementation of suspend/resume and
-related CPU PM notifiers for the arm64 architecture. The implementation
-has been tweaked and code made a bit more generic wrt ARM 32 bits
-version. The cpu_suspend call prototype accepts a single parameter that
-is translated by the CPU operations suspend protocol backend into a
-series of protocol (eg PSCI) specific parameters and function calls.
-This allows for generic suspend-to-RAM and CPU idle drivers, where the
-platform complexity is hidden behind the CPU ops suspend protocol
-implementation.
-
-The context restore split between processor specific functions and
-generic code has been kept similar to arm32 as well, since this makes
-sense from a functionality perspective, even though there is just a
-an architecture specific save/restore implementation for arm64, for v8.
-Code that deals with turning on the MMU and returning from suspend is kept
-in the same file as the the suspend method itself, so that assembly code is
-self contained in a single file and separated from the interface.
-
-The CPU register context is allocated on the stack; this behaviour is
-the same as in the arm 32-bit port, even though context could have been
-allocated statically as a NR_CPUS array of struct and the context
-addresses stored once of all in the context pointers array after virtual
-to physical conversion. Current solution uses the stack, since there is
-no need to allocate additional context space for context that can be
-easily saved on the suspend threads stacks, with no additional memory
-requirement.
-
-Cache flushing is kept to a minimum; the cpu_suspend method cleans only the
-few bytes of context to DRAM that need to be retrieved with the MMU off,
-the remainder of cache cleaning is delegated to suspend finishers.
-
-The series also provides patches to simplify the MPIDR_EL1 management
-and MPIDR_EL1 hashing that are integrated to the series but are also useful
-as stand alone code.
-
-Code has been tested on AEM v8 models and a simple CPU idle driver that
-enables a C-state where CPUs are shutdown when wfi is hit.
-
-KVM CPU PM notifier has been tested using kvm-tools, and by booting a KVM guest
-on a host with deep idle states enabled.
-
-HW breakpoint CPU PM notifier has been tested using a simple perf test that
-sets up per-cpu watchpoints and checks the proper behaviour when deep idle
-states are enabled.
-
-Lorenzo Pieralisi (12):
-  arm64: kernel: add MPIDR_EL1 accessors macros
-  arm64: kernel: build MPIDR_EL1 hash function data structure
-  arm64: kernel: suspend/resume registers save/restore
-  arm64: kernel: cpu_{suspend/resume} implementation
-  arm64: kernel: implement fpsimd CPU PM notifier
-  arm: kvm: implement CPU PM notifier
-  arm64: kernel: refactor code to install/uninstall breakpoints
-  arm64: kernel: implement HW breakpoints CPU PM notifier
-  arm64: enable generic clockevent broadcast
-  arm64: kernel: add CPU idle call
-  arm64: kernel: add PM build infrastructure
-  arm64: add CPU power management menu/entries
-
- arch/arm/kvm/arm.c                |  30 ++++++
- arch/arm64/Kconfig                |  21 ++++
- arch/arm64/include/asm/cpu_ops.h  |   6 ++
- arch/arm64/include/asm/cputype.h  |  10 ++
- arch/arm64/include/asm/hardirq.h  |   2 +-
- arch/arm64/include/asm/proc-fns.h |   3 +
- arch/arm64/include/asm/smp_plat.h |  13 +++
- arch/arm64/include/asm/suspend.h  |  27 +++++
- arch/arm64/kernel/Makefile        |   1 +
- arch/arm64/kernel/asm-offsets.c   |  11 ++
- arch/arm64/kernel/fpsimd.c        |  36 +++++++
- arch/arm64/kernel/hw_breakpoint.c | 221 ++++++++++++++++++++++++++------------
- arch/arm64/kernel/process.c       |   7 +-
- arch/arm64/kernel/setup.c         |  70 ++++++++++++
- arch/arm64/kernel/sleep.S         | 184 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c           |  17 +++
- arch/arm64/kernel/suspend.c       | 109 +++++++++++++++++++
- arch/arm64/mm/proc.S              |  69 ++++++++++++
- 18 files changed, 767 insertions(+), 70 deletions(-)
- create mode 100644 arch/arm64/include/asm/suspend.h
- create mode 100644 arch/arm64/kernel/sleep.S
- create mode 100644 arch/arm64/kernel/suspend.c
-
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index e894591..bcaaac9 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -20,6 +20,7 @@
+ 
+ #define pr_fmt(fmt) "hw-breakpoint: " fmt
+ 
++#include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/perf_event.h>
+@@ -171,7 +172,8 @@ static enum debug_el debug_exception_level(int privilege)
+ 
+ enum hw_breakpoint_ops {
+ 	HW_BREAKPOINT_INSTALL,
+-	HW_BREAKPOINT_UNINSTALL
++	HW_BREAKPOINT_UNINSTALL,
++	HW_BREAKPOINT_RESTORE
+ };
+ 
+ /**
+@@ -210,6 +212,10 @@ static int hw_breakpoint_slot_setup(struct perf_event **slots, int max_slots,
+ 				return i;
+ 			}
+ 			break;
++		case HW_BREAKPOINT_RESTORE:
++			if (*slot == bp)
++				return i;
++			break;
+ 		default:
+ 			pr_warn_once("Unhandled hw breakpoint ops %d\n", ops);
+ 			return -EINVAL;
+@@ -256,7 +262,8 @@ static int hw_breakpoint_control(struct perf_event *bp,
+ 		 * level.
+ 		 */
+ 		enable_debug_monitors(dbg_el);
+-
++		/* Fall through */
++	case HW_BREAKPOINT_RESTORE:
+ 		/* Setup the address register. */
+ 		write_wb_reg(val_reg, i, info->address);
+ 
+@@ -840,18 +847,36 @@ void hw_breakpoint_thread_switch(struct task_struct *next)
+ /*
+  * CPU initialisation.
+  */
+-static void reset_ctrl_regs(void *unused)
++static void hw_breakpoint_reset(void *unused)
+ {
+ 	int i;
+-
+-	for (i = 0; i < core_num_brps; ++i) {
+-		write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
+-		write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
++	struct perf_event **slots;
++	/*
++	 * When a CPU goes through cold-boot, it does not have any installed
++	 * slot, so it is safe to share the same function for restoring and
++	 * resetting breakpoints; when a CPU is hotplugged in, it goes
++	 * through the slots, which are all empty, hence it just resets control
++	 * and value for debug registers.
++	 * When this function is triggered on warm-boot through a CPU PM
++	 * notifier some slots might be initialized; if so they are
++	 * reprogrammed according to the debug slots content.
++	 */
++	for (slots = this_cpu_ptr(bp_on_reg), i = 0; i < core_num_brps; ++i) {
++		if (slots[i]) {
++			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
++		} else {
++			write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
++			write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
++		}
+ 	}
+ 
+-	for (i = 0; i < core_num_wrps; ++i) {
+-		write_wb_reg(AARCH64_DBG_REG_WCR, i, 0UL);
+-		write_wb_reg(AARCH64_DBG_REG_WVR, i, 0UL);
++	for (slots = this_cpu_ptr(wp_on_reg), i = 0; i < core_num_wrps; ++i) {
++		if (slots[i]) {
++			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
++		} else {
++			write_wb_reg(AARCH64_DBG_REG_WCR, i, 0UL);
++			write_wb_reg(AARCH64_DBG_REG_WVR, i, 0UL);
++		}
+ 	}
+ }
+ 
+@@ -861,7 +886,7 @@ static int hw_breakpoint_reset_notify(struct notifier_block *self,
+ {
+ 	int cpu = (long)hcpu;
+ 	if (action == CPU_ONLINE)
+-		smp_call_function_single(cpu, reset_ctrl_regs, NULL, 1);
++		smp_call_function_single(cpu, hw_breakpoint_reset, NULL, 1);
+ 	return NOTIFY_OK;
+ }
+ 
+@@ -869,6 +894,33 @@ static struct notifier_block hw_breakpoint_reset_nb = {
+ 	.notifier_call = hw_breakpoint_reset_notify,
+ };
+ 
++#ifdef CONFIG_CPU_PM
++static int hw_breakpoint_cpu_pm_notify(struct notifier_block *self,
++				       unsigned long action,
++				       void *v)
++{
++	if (action == CPU_PM_EXIT) {
++		hw_breakpoint_reset(NULL);
++		return NOTIFY_OK;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block hw_breakpoint_cpu_pm_nb = {
++	.notifier_call = hw_breakpoint_cpu_pm_notify,
++};
++
++static void __init hw_breakpoint_pm_init(void)
++{
++	cpu_pm_register_notifier(&hw_breakpoint_cpu_pm_nb);
++}
++#else
++static inline void hw_breakpoint_pm_init(void)
++{
++}
++#endif
++
+ /*
+  * One-time initialisation.
+  */
+@@ -884,8 +936,8 @@ static int __init arch_hw_breakpoint_init(void)
+ 	 * Reset the breakpoint resources. We assume that a halting
+ 	 * debugger will leave the world in a nice state for us.
+ 	 */
+-	smp_call_function(reset_ctrl_regs, NULL, 1);
+-	reset_ctrl_regs(NULL);
++	smp_call_function(hw_breakpoint_reset, NULL, 1);
++	hw_breakpoint_reset(NULL);
+ 
+ 	/* Register debug fault handlers. */
+ 	hook_debug_fault_code(DBG_ESR_EVT_HWBP, breakpoint_handler, SIGTRAP,
+@@ -895,6 +947,7 @@ static int __init arch_hw_breakpoint_init(void)
+ 
+ 	/* Register hotplug notifier. */
+ 	register_cpu_notifier(&hw_breakpoint_reset_nb);
++	hw_breakpoint_pm_init();
+ 
+ 	return 0;
+ }
 -- 
 1.8.4
