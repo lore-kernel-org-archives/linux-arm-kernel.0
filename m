@@ -1,57 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Nov 2013 11:09:50 +0000
-Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
- device tree case
-In-Reply-To: <20131121104654.GA23067@lee--X1>
-References: <1384562167-14725-1-git-send-email-tony@atomide.com>
- <1384562167-14725-2-git-send-email-tony@atomide.com>
- <20131118102907.GC13640@lee--X1>
- <20131118172510.GI16038@saruman.home>
- <20131118174638.GQ13640@lee--X1>
- <20131118181110.GM10317@atomide.com>
- <20131118190921.GT13640@lee--X1>
- <20131118192256.GU10317@atomide.com>
- <20131121104654.GA23067@lee--X1>
-Message-ID: <20131121110950.GC23067@lee--X1>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 21 Nov 2013 11:24:13 +0000
+Subject: [PATCH RFC v3 06/12] arm: kvm: implement CPU PM notifier
+In-Reply-To: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1385033059-25896-7-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Here Tony, you can take this one.
-> 
-> I will simply apply my other fixes on top of it.
-> 
-> The issue is, I will most likely have to rebase it on top of -rc1 prior
-> to sending a request to Linus, so in that regard it's not exactly
-> immutable.
-> 
+Upon CPU shutdown and consequent warm-reboot, the hypervisor CPU state
+must be re-initialized. This patch implements a CPU PM notifier that
+upon warm-boot calls a KVM hook to reinitialize properly the hypervisor
+state so that the CPU can be safely resumed.
 
-Ignore the above. This is what you want:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/kvm/arm.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-The following changes since commit 5e01dc7b26d9f24f39abace5da98ccbd6a5ceb52:
-
-  Linux 3.12 (2013-11-03 15:41:51 -0800)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/ljones/mfd.git tags/ib-tony
-
-for you to fetch changes up to f984370913d3ba5d13806cc8ac6fc26f8ebd1694:
-
-  mfd: twl-core: Fix passing of platform data in the device tree case (2013-11-21 10:42:36 +0000)
-
-----------------------------------------------------------------
-warning: refname 'ib-tony' is ambiguous.
-Immutable branch for Tony Lindgren
-
-----------------------------------------------------------------
-Tony Lindgren (1):
-      mfd: twl-core: Fix passing of platform data in the device tree case
-
- drivers/mfd/twl-core.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 2a700e0..b18165c 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -17,6 +17,7 @@
+  */
+ 
+ #include <linux/cpu.h>
++#include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ #include <linux/kvm_host.h>
+@@ -853,6 +854,33 @@ static struct notifier_block hyp_init_cpu_nb = {
+ 	.notifier_call = hyp_init_cpu_notify,
+ };
+ 
++#ifdef CONFIG_CPU_PM
++static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
++				    unsigned long cmd,
++				    void *v)
++{
++	if (cmd == CPU_PM_EXIT) {
++		cpu_init_hyp_mode(NULL);
++		return NOTIFY_OK;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block hyp_init_cpu_pm_nb = {
++	.notifier_call = hyp_init_cpu_pm_notifier,
++};
++
++static void __init hyp_cpu_pm_init(void)
++{
++	cpu_pm_register_notifier(&hyp_init_cpu_pm_nb);
++}
++#else
++static inline void hyp_cpu_pm_init(void)
++{
++}
++#endif
++
+ /**
+  * Inits Hyp-mode on all online CPUs
+  */
+@@ -1013,6 +1041,8 @@ int kvm_arch_init(void *opaque)
+ 		goto out_err;
+ 	}
+ 
++	hyp_cpu_pm_init();
++
+ 	kvm_coproc_table_init();
+ 	return 0;
+ out_err:
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.4
