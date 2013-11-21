@@ -1,51 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Nov 2013 12:46:55 -0800
-Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
-In-Reply-To: <20131121022125.GA2445@earth.universe>
-References: <1379277856-24571-1-git-send-email-sre@debian.org>
- <1379277856-24571-4-git-send-email-sre@debian.org>
- <20131121013858.GK10317@atomide.com>
- <20131121022125.GA2445@earth.universe>
-Message-ID: <20131121204654.GB10023@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 21 Nov 2013 20:47:04 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131121192136.GA16735@n2100.arm.linux.org.uk>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
+ com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com> <5289A356.
+ 4060004@jonmasters.org> <20131118150052.GC24408@sirena.org.uk> <
+ 20131118191336.GB5886@quad.lixom.net> <20131119091216.GA4412@netboy> <
+ 20131119184827.GD20967@quad.lixom.net> <20131120064056.GB5272@netboy> <
+ 20131121192136.GA16735@n2100.arm.linux.org.uk>
+Message-ID: <20131121204704.E4487C40753@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@debian.org> [131120 18:22]:
-> On Wed, Nov 20, 2013 at 05:38:59PM -0800, Tony Lindgren wrote:
+On Thu, 21 Nov 2013 19:21:36 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 20, 2013 at 07:40:57AM +0100, Richard Cochran wrote:
+> > Now, I never saw any proclamation or discussion about "DT is in flux"
+> > on the arm list. If I had, I surely would have complained, and loudly.
+> > AFAICT, this decision was made in rather private circles, but you talk
+> > as if this was abundantly clear. *It was not.*
 > 
-> In the public documentation of the omaps all SSI related stuff is
-> missing and memory areas are marked as reserved. I could not find
-> out how to receive the NDA version, so the following is purely
-> speculation based on the code.
+> DT has been discussed several times over this year alone, which
+> included discussions about the stability of bindings.  Various
+> people in those threads (including myself) have put their views
+> forward.
 > 
-> If I understand it right the HW looks like this:
+> My position has been that if an interface ends up being published in a
+> -final kernel, then it is part of the ABI, because a -final kernel is
+> an end-product.  It's a final release which says "we've done the
+> development, it's finished for users use."  If it's not then it shouldn't
+> be in a -final kernel, or if it has to be there for development purposes,
+> it needs to be hidden behind a "this is in development" label.
 > 
-> +-----------------+
-> |    GDD (DMA)    | <- this one is currently called ssi-controller
-> +--------+--------+
-> | Port 1 | Port 2 | <- these are currently called ssi-port
-> +--------+--------+
-> 
-> I think the GDD part must be enabled while Port 1 or Port 2 is
-> enabled. The last RFC driver from Carlos did not even split up the
-> irq/memory areas into different platform devices, but just requested
-> all of them in one ssi platform device.
+> I've said that several times in the DT discussions and I believe
+> basically been ignored.  Frankly, I've said my bit and I've given up
+> caring.
 
-Might be worth checking. If these blocks have the revision and SYSC
-register in the beginning of their address space like all omap modules,
-then they are completely separate blocks and can idle independently.
+Umm. Not sure why you feel ignored. We're absolutely going for stability
+now.
 
-The fact that they have separate interrutps makes me think that's the
-case, otherwise there would be just interrupt(s) at the ssi-controllel
-level.
-
-> > The other binding pieces can be added later on as they get are ready.
-> 
-> Sure. They are almost finished btw. I was able to get a gsm network
-> scan.
-
-That's great :)
-
-Regards,
-
-Tony
+g.
