@@ -1,32 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 21 Nov 2013 12:06:00 +0000
-Subject: CMA on AArch64
-In-Reply-To: <528D2C7E.2010107@codeaurora.org>
-References: <528D2C7E.2010107@codeaurora.org>
-Message-ID: <20131121120559.GC22663@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 21 Nov 2013 13:06:06 +0100
+Subject: [PATCH] ARM: exynos_defconfig: increase CONFIG_NR_CPUS value to 8
+Message-ID: <1511364.Pd4tSi34z7@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+Current CONFIG_NR_CPUS value (2) is too small for:
+- EXYNOS4412 (4 cores)
+- EXYNOS5440 (4 cores)
+- EXYNOS5410 (8 cores)
+- EXYNOS5420 (8 cores)
 
-On Wed, Nov 20, 2013 at 09:41:18PM +0000, Laura Abbott wrote:
-> I noticed there is currently no CMA support for AArch64. Is this already 
-> on someone's TODO list or is this still open?
+Set CONFIG_NR_CPUS to 8 so it is correct for all currently
+supported SoCs.
 
-It's more like a wish list but there were other things that took
-priority. The arm64 DMA mapping code currently only supports swiotlb and
-our next plan is for IOMMU mapping. But I would like parts of the DMA
-IOMMU code under arch/arm to be made into a library (similar to the
-lib/swiotlb.c) so that other architectures can easily make use of it.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Yet another feature is DMA cache coherency management (primarily
-streaming DMA) and I have a patch but I want this driven via DT rather
-than drivers or SoC code calling set_dma_ops explicitly (the bindings
-definition is work in progress).
-
-Anyway, I think the CMA support wouldn't interfere much with the above
-and could be merged. If you have time, please feel free to send some
-patches ;).
-
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index ad7dfbb..aec8a3e 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -13,7 +13,7 @@ CONFIG_S3C24XX_PWM=y
+ CONFIG_ARCH_EXYNOS5=y
+ CONFIG_MACH_EXYNOS4_DT=y
+ CONFIG_SMP=y
+-CONFIG_NR_CPUS=2
++CONFIG_NR_CPUS=8
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
 -- 
-Catalin
+1.8.2.3
