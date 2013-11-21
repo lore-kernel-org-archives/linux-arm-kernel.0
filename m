@@ -1,29 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Nov 2013 19:40:22 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <201311211926.03228.arnd@arndb.de>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <201311181605.37300.arnd@arndb.de>
- <20131121161037.C528CC406A3@trevor.secretlab.ca>
- <201311211926.03228.arnd@arndb.de>
-Message-ID: <20131121194022.GA14725@sirena.org.uk>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 21 Nov 2013 13:48:52 -0600
+Subject: [PATCH] ARM: kernel: Detect DTB overwrite and error out
+In-Reply-To: <528E397A.2030100@wwwdotorg.org>
+References: <1385006644-16024-1-git-send-email-joelf@ti.com>
+ <528E397A.2030100@wwwdotorg.org>
+Message-ID: <528E63A4.7050708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 07:26:02PM +0100, Arnd Bergmann wrote:
+On 11/21/2013 10:48 AM, Stephen Warren wrote:
+> On 11/20/2013 09:04 PM, Joel Fernandes wrote:
+>> Kernel can silenty fail for DT-boot after the decompression stage, if DTB is
+>> overwritten. Instead of simply failing, we detect the condition and print an
+>> error.
+>>
+>> One may think that it is sufficient for the bootloader to place the DTB away
+>> from kernel, but this is not the right fix because: (1) We add more dependence
+>> to the bootloader's stupidity (2) the decompressed kernel end address is not
+>> known to the loader. Also, we shouldn't depend on bootloader for silently
+>> failing us, so we detect the condition and error out.
+> 
+> If this problem happens, is there any guarantee that the kernel will
+> still execute far enough to actually print this error message? Can the
 
-> + A number of subsystems that Intel needs to handle on embedded systems
->   should really not be described in detail on servers on any architecture
->   but instead be handled in AML or SMBIOS (e.g. pinctrl or phy).
+Yes, because till this point we don't depend on DTB yet. We're still just about
+to parse it. The problem detected here is the kernel overwriting the DTB, not
+the other way.
 
-Are we 100% sure about this assumption?  We're saying "server" here but
-how much of that is really "distro" - if it is distro then you start to
-get things like laptops coming into play which do have a lot more of the
-fun stuff that we see on embedded devices in active use.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131121/2b2de12c/attachment.sig>
+> decompressor detect this condition instead?
+
+no because:
+
+(1) AIUI, decompressor doesn't have access to vmlinux symbols like _end.
+decompressor code is not linked with vmlinux.
+
+(2) The DTB pointer is physical and the _end symbol is virtual so assembly code
+has to do the physical to virtual translation before the cmp can be done
+which is more messy.
+
+thanks,
+
+-Joel
