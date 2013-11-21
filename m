@@ -1,53 +1,131 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Nov 2013 17:53:45 -0600
-Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <20131118135439.GC16735@n2100.arm.linux.org.uk>
-References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
- <CAOesGMg7Mt+p8U7Z5sLQDqoFG-QEUi94Vt=pxXM0NqyefBLxVA@mail.gmail.com>
- <5283DB34.9050301@gmail.com> <201311141332.58498.arnd@arndb.de>
- <CACxGe6uMWjfmB4WDKs+vu05224jqpbDZBHT_ZXnqxw17JzUqvw@mail.gmail.com>
- <5284E236.1000606@gmail.com>
- <CACxGe6sgRwiakJLUCtaaQ2NF51PpkoNZvZr6EoE-BPeZiDsDFQ@mail.gmail.com>
- <20131118135439.GC16735@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqLpjEWyhwNjLW7cwBiHq+7_a3gQFd0c32Tc8txeNij66Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Nov 2013 15:57:29 -0800
+Subject: [PATCH 3/3] ARM: OMAP2+: Fix eMMC on n900 with device tree
+In-Reply-To: <20131121231751.GA9772@earth.universe>
+References: <1385059866-10646-1-git-send-email-tony@atomide.com>
+ <1385059866-10646-4-git-send-email-tony@atomide.com>
+ <20131121231751.GA9772@earth.universe>
+Message-ID: <20131121235729.GD10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 7:54 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 15, 2013 at 02:16:29AM +0900, Grant Likely wrote:
->> On Thu, Nov 14, 2013 at 11:46 PM, Rob Herring <robherring2@gmail.com> wrote:
->> > If this is a required feature then we should make machine_desc common
->> > (or at least part of it) with the other arches that have copied arm and
->> > then add it to arm64 as well. Then I could do further consolidation of
->> > the FDT machine matching code. Otherwise this is all just pointless
->> > architecture variation that really has nothing to do with the architecture.
->>
->> I think you are missing my point. go ahead, take it out of
->> /proc/cpuinfo. That's not the issue.
->
-> You do realise this is a user API issue, right?
->
-> http://fossies.org/dox/glibc-2.18/ports_2sysdeps_2unix_2sysv_2linux_2arm_2ioperm_8c_source.html
->
-> Right, it only has four strings which it matches against, but this is
-> evidence that /proc/cpuinfo is a user API, and the strings therein are
-> used by userspace in ways you don't expect.
->
-> We can't just go around removing things.
+* Sebastian Reichel <sre@debian.org> [131121 15:18]:
+> Hi Tony,
+> 
+> On Thu, Nov 21, 2013 at 10:51:06AM -0800, Tony Lindgren wrote:
+> > Looks like we need to configure the regulators and use the pdata
+> > quirk to make eMMC work with device tree.
+> > 
+> > It seems that mostly vmmc2 is used, and only some earlier revisions
+> > like the macro board used vaux3.
+> > 
+> > Note that we can add support for the macro board later as needed
+> > by including the common n900 .dts file and configuring the vaux3
+> > instead of vmmc2, and adding support for the smc91x Ethernet.
+> >
+> > ---
+> > 
+> > Can you guys please test this on production n900 devices?
+> > 
+> > I've tested it with my old macro board where I had to patch in vaux3
+> > instead of vmmc2. I think there's some confusion in the legacy code
+> > comments, or else I'm confused. In any case, vaux3 works for the macro
+> > board, and I suspect that the production versions have vmmc2.
+> > 
+> > If this does not work and vaux3 as regulator works, please also dump
+> > out the system_rev from your board.
+> 
+> The good news is, that I got eMMC working :) The bad news is, that it
+> did not work with your patch :( I included my DTS nodes below. The
+> phone is HW/System revision 0x2101.
 
-I mentioned the string changes in the commit message. If we take the
-hard line here, then we can never change these strings and are stuck
-with them forever. And in turn, we can never consolidate several board
-machine_descs into an SoC machine_desc. However, in the DT case we've
-already been changing this string as platforms have been converted to
-DT and I don't think anyone has complained. I think we should fix this
-sooner rather than later as more DT platforms become entrenched.
+Oh ok, I must have parsed the revisions wrong way then, and the macro
+I tried it on must be something newer than I thought :)
+ 
+> I have a second N900, which has HW revision 0x2204. I did not yet test
+> the patch with this phone, but legacy code also seems to use vaux3 for
+> it. Seems like we need two n900.dts files?
 
-Stepping back, where should this information come from in the DT case?
-This is an easy thing to have in the DT and not in the kernel. It
-seems like a no-brainer to me. Or perhaps we say the Hardware field is
-deprecated and remove it on DT? It is already available in
-/proc/device-tree.
+Well let's use just vaux3 then with a comment to the .dts file if that
+works also on your 0x2204. It works on my 0x0010 too.
 
-Rob
+I folded in your changes to the updated patch below. Care to reply with
+your Signed-off-by too assuming it works also on your 0x2204 n900?
+
+Regards,
+
+Tony 
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 20 Nov 2013 18:03:39 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix eMMC on n900 with device tree
+
+Looks like we need to configure the regulators and use the pdata
+quirk to make eMMC work with device tree.
+
+It seems that mostly vaux3 is used, and only some earlier revisions
+used vmmc2. This has been tested to work on devices where the
+system_rev passed by the bootloader has versions 0x0010 and 0x2101.
+
+Cc: devicetree at vger.kernel.org
+Cc: Pavel Machek <pavel@ucw.cz>
+Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+Cc: Sebastian Reichel <sre@debian.org>
+[tony at atomide.com: updated with pinctrl changes and comments from Sebastian]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index c4f20bf..c2c306d 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -125,6 +125,21 @@
+ 		>;
+ 	};
+ 
++	mmc2_pins: pinmux_mmc2_pins {
++		pinctrl-single,pins = <
++			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk */
++			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd */
++			0x12c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc2_dat0 */
++			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1 */
++			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2 */
++			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3 */
++			0x134 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat4 */
++			0x136 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat5 */
++			0x138 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat6 */
++			0x13a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat7 */
++		>;
++	};
++
+ 	display_pins: pinmux_display_pins {
+ 		pinctrl-single,pins = <
+ 			0x0d4 (PIN_OUTPUT | MUX_MODE4)		/* RX51_LCD_RESET_GPIO */
+@@ -358,8 +373,14 @@
+ 	cd-gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>; /* 160 */
+ };
+ 
++/* most boards use vaux3, only some old versions use vmmc2 instead */
+ &mmc2 {
+-	status = "disabled";
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++	vmmc-supply = <&vaux3>;
++	vmmc_aux-supply = <&vsim>;
++	bus-width = <8>;
++	non-removable;
+ };
+ 
+ &mmc3 {
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 10c7145..39f020c 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -139,6 +139,7 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 
+ static struct pdata_init pdata_quirks[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP3
++	{ "nokia,omap3-n900", hsmmc2_internal_input_clk, },
+ 	{ "nokia,omap3-n9", hsmmc2_internal_input_clk, },
+ 	{ "nokia,omap3-n950", hsmmc2_internal_input_clk, },
+ 	{ "isee,omap3-igep0020", omap3_igep0020_legacy_init, },
