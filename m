@@ -1,85 +1,37 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 21 Nov 2013 15:43:15 -0200
-Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
-Message-ID: <1385055795-24002-1-git-send-email-fabio.estevam@freescale.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Thu, 21 Nov 2013 19:45:06 +0200
+Subject: [PATCH v2 00/10] Reuse davinci-nand driver for Keystone arch
+In-Reply-To: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <CAArO44tOemuo0PyWMuwwGBb77Lt4_pqbDoKWzROLBi0HGC8F7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 22ceeee1 (pwm-backlight: Add power supply support) caused breakage on 
-boards that do not define the backlight regulator on their dts files.
+On 21 November 2013 13:28, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
+> This series contains fixes and updates of Davinci nand driver in
+> order to reuse it for Keystone platform.
+>
+> The series is combination of two following series:
+> - Davinci nand driver fixes and updates:
+>   https://lkml.org/lkml/2013/11/20/271
+> - Reuse davinci-nand driver for Keystone arch
+>   https://lkml.org/lkml/2013/11/20/315
+>
+> Ivan Khoronzhuk (10):
+>   mtd: nand: davinci: fix driver registration
+>   mtd: nand: davinci: return ENOMEM if memory allocation is failed
+>   mtd: nand: davinci: check required ti,davinci-chipselect property
+>   mtd: nand: davinci: simplify error handling
+>   mtd: nand: davinci: move bindings under mtd
+>   mtd: nand: davinci: extend description of bindings
+>   mtd: nand: davinci: adjust DT properties to MTD generic
+>   mtd: nand: davinci: reuse driver for Keystone arch
+>   mtd: nand: davinci: don't set timings if AEMIF is used
+>   mtd: nand: davinci: don't request AEMIF address range
 
-Instead of making the backlight regulator mandatory, treat it as optional 
-instead, so that we do not have breakage.
+For all series:
+Reviewed-by: Taras Kondratiuk <taras@ti.com>
 
-This avoids the need for adding a dummy regulator on every dts file that uses 
-the pwm-backlight.
-
-Tested on a mx6qsabresd.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- .../devicetree/bindings/video/backlight/pwm-backlight.txt |  2 +-
- drivers/video/backlight/pwm_bl.c                          | 15 +++++++--------
- 2 files changed, 8 insertions(+), 9 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-index 764db86..ed3dc3c 100644
---- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-+++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-@@ -10,13 +10,13 @@ Required properties:
-       last value in the array represents a 100% duty cycle (brightest).
-   - default-brightness-level: the default brightness level (index into the
-       array defined by the "brightness-levels" property)
--  - power-supply: regulator for supply voltage
- 
- Optional properties:
-   - pwm-names: a list of names for the PWM devices specified in the
-                "pwms" property (see PWM binding[0])
-   - enable-gpios: contains a single GPIO specifier for the GPIO which enables
-                   and disables the backlight (see GPIO binding[1])
-+  - power-supply: regulator for supply voltage
- 
- [0]: Documentation/devicetree/bindings/pwm/pwm.txt
- [1]: Documentation/devicetree/bindings/gpio/gpio.txt
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index fb80d68..fb3008c 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -50,9 +50,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
- 	if (pb->enabled)
- 		return;
- 
--	err = regulator_enable(pb->power_supply);
--	if (err < 0)
--		dev_err(pb->dev, "failed to enable power supply\n");
-+	if (!IS_ERR(pb->power_supply)) {
-+		err = regulator_enable(pb->power_supply);
-+		if (err < 0)
-+			dev_err(pb->dev, "failed to enable power supply\n");
-+	}
- 
- 	if (gpio_is_valid(pb->enable_gpio)) {
- 		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-@@ -80,7 +82,8 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
- 			gpio_set_value(pb->enable_gpio, 0);
- 	}
- 
--	regulator_disable(pb->power_supply);
-+	if (!IS_ERR(pb->power_supply))
-+		regulator_disable(pb->power_supply);
- 	pb->enabled = false;
- }
- 
-@@ -283,10 +286,6 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	}
- 
- 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
--	if (IS_ERR(pb->power_supply)) {
--		ret = PTR_ERR(pb->power_supply);
--		goto err_gpio;
--	}
- 
- 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
- 	if (IS_ERR(pb->pwm)) {
 -- 
-1.8.1.2
+Regards,
+Taras Kondratiuk
