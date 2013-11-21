@@ -1,28 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Nov 2013 12:57:13 -0700
-Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
- monitor
-In-Reply-To: <20131121190051.GY16735@n2100.arm.linux.org.uk>
-References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
- <52828EF5.6090909@wwwdotorg.org>
- <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
- <5282E068.1070608@nvidia.com>
- <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
- <528E5596.7090606@wwwdotorg.org>
- <CAOesGMgB_FUDkD9=wgZgreaspEyKoSqpkpGZtzuUjb=G6m_nEg@mail.gmail.com>
- <20131121190051.GY16735@n2100.arm.linux.org.uk>
-Message-ID: <528E6599.6050302@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 21 Nov 2013 20:03:44 +0000
+Subject: ACPI
+In-Reply-To: <201311191915.57516.arnd@arndb.de>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <201311191915.57516.arnd@arndb.de>
+Message-ID: <20131121200344.GD14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2013 12:00 PM, Russell King - ARM Linux wrote:
-> On Thu, Nov 21, 2013 at 10:51:09AM -0800, Olof Johansson wrote:
->> An ack from Russell would be appreciated, or we'd need to set up a
->> shared branch given the Tegra dependencies that would go on top.
->> Either is ok with me.
-> 
-> Note that I'm *not* looking at anything new until after the merge window
-> has closed, so I'm not acking or reviewing anything at the moment.
+On Tue, Nov 19, 2013 at 07:15:57PM +0100, Arnd Bergmann wrote:
 
-OK, that's fair. Do we need to ping you again or repost once -rc1 is
-out, or do you have a TODO list that you'll check?
+> of them apply here. You keep saying "servers", but that isn't actually
+> a feature of how the system is designed, rather than what is running
+> on them. Given these examples (or any others, you could come up with),
+> which ones do you actually see as relevant here:
+
+> 1. An exterprise server (SPARC enterprise M9000, Power 795, Integrity
+>    Superdome) with the CPU core changed to run ARM instructions
+> 2. An ATX whitebox server mainboard with one to four sockets and PC
+>    peripherals and plug-compatible ARM CPU chips.
+> 3. A purpose-built server SoC based on standard components
+> 4. A new server SoC based on an older proprietary embedded or mobile
+>    SoC design (think Exynos, OMAP, Snapdragon, ... based)
+> 5. A server built from using a cheap devboard (BeagleBone, Cubieboard, ...
+>    style) with an unmodified SoC.
+> 6. A virtual machine running on KVM or Xen.
+
+I'd also ask if we need to consider desktops and laptops here - do we
+really mean distros here rather than servers, even if servers are the
+primary use case for distros right now?
+
+> The other really helpful would be a list of things that actually
+> speak in favor of doing ACPI, from a system design perspective.
+> What is it that people want out of it?
+
++1.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131121/c28c9a46/attachment.sig>
