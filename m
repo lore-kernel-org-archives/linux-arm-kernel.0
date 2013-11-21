@@ -1,62 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 21 Nov 2013 16:42:08 +0100
-Subject: [PATCH] mmc: atmel-mci: fix timeout errors in SDIO mode when
- using DMA
-In-Reply-To: <1384959671-5646-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1384959671-5646-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <528E29D0.9080507@atmel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 21 Nov 2013 16:42:29 +0100
+Subject: [PATCH v2 1/4] x86: move arch_cpu_uevent() to generic code
+In-Reply-To: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1385048552-12528-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2013 16:01, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> With some SDIO devices, timeout errors can happen when reading data. To solve
-> this issue the DMA transfer has to be activated before sending the command to
-> the device. This order is incorrect in PDC mode. So we have to take care if we
-> are using DMA or PDC to know when to send the MMC command.
->
-> Cc: <stable@vger.kernel.org> #3.2+
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Only x86 implements arch_cpu_uevent(), and there is nothing arch
+specific about it, so move it to drivers/base/cpu.c.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/x86/kernel/cpu/match.c | 11 -----------
+ drivers/base/cpu.c          | 15 ++++++++++++++-
+ include/linux/cpu.h         |  1 -
+ 3 files changed, 14 insertions(+), 13 deletions(-)
 
-Thanks, bye,
-
-> ---
->   drivers/mmc/host/atmel-mci.c |   13 ++++++++++++-
->   1 file changed, 12 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index b8dfe0d..289da71 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -1193,11 +1193,22 @@ static void atmci_start_request(struct atmel_mci *host,
->   	iflags |= ATMCI_CMDRDY;
->   	cmd = mrq->cmd;
->   	cmdflags = atmci_prepare_command(slot->mmc, cmd);
-> -	atmci_send_command(host, cmd, cmdflags);
-> +
-> +	/*
-> +	 * DMA transfer should be started before sending the command to avoid
-> +	 * unexpected errors especially for read operations in SDIO mode.
-> +	 * Unfortunately, in PDC mode, command has to be sent before starting
-> +	 * the transfer.
-> +	 */
-> +	if (host->submit_data != &atmci_submit_data_dma)
-> +		atmci_send_command(host, cmd, cmdflags);
->
->   	if (data)
->   		host->submit_data(host, data);
->
-> +	if (host->submit_data == &atmci_submit_data_dma)
-> +		atmci_send_command(host, cmd, cmdflags);
-> +
->   	if (mrq->stop) {
->   		host->stop_cmdr = atmci_prepare_command(slot->mmc, mrq->stop);
->   		host->stop_cmdr |= ATMCI_CMDR_STOP_XFER;
->
-
-
+diff --git a/arch/x86/kernel/cpu/match.c b/arch/x86/kernel/cpu/match.c
+index 3656537..ab6082a 100644
+--- a/arch/x86/kernel/cpu/match.c
++++ b/arch/x86/kernel/cpu/match.c
+@@ -78,14 +78,3 @@ ssize_t arch_print_cpu_modalias(struct device *dev,
+ 	*buf++ = '\n';
+ 	return buf - bufptr;
+ }
+-
+-int arch_cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
+-{
+-	char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+-	if (buf) {
+-		arch_print_cpu_modalias(NULL, NULL, buf);
+-		add_uevent_var(env, "MODALIAS=%s", buf);
+-		kfree(buf);
+-	}
+-	return 0;
+-}
+diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+index 848ebbd..49c6f4b 100644
+--- a/drivers/base/cpu.c
++++ b/drivers/base/cpu.c
+@@ -275,6 +275,19 @@ static void cpu_device_release(struct device *dev)
+ 	 */
+ }
+ 
++#ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
++static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
++{
++	char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
++	if (buf) {
++		arch_print_cpu_modalias(NULL, NULL, buf);
++		add_uevent_var(env, "MODALIAS=%s", buf);
++		kfree(buf);
++	}
++	return 0;
++}
++#endif
++
+ /*
+  * register_cpu - Setup a sysfs device for a CPU.
+  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
+@@ -296,7 +309,7 @@ int register_cpu(struct cpu *cpu, int num)
+ 	cpu->dev.offline = !cpu_online(num);
+ 	cpu->dev.of_node = of_get_cpu_node(num, NULL);
+ #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+-	cpu->dev.bus->uevent = arch_cpu_uevent;
++	cpu->dev.bus->uevent = cpu_uevent;
+ #endif
+ 	cpu->dev.groups = common_cpu_attr_groups;
+ 	if (cpu->hotpluggable)
+diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+index 801ff9e..c12ddd1 100644
+--- a/include/linux/cpu.h
++++ b/include/linux/cpu.h
+@@ -44,7 +44,6 @@ extern ssize_t arch_cpu_release(const char *, size_t);
+ struct notifier_block;
+ 
+ #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+-extern int arch_cpu_uevent(struct device *dev, struct kobj_uevent_env *env);
+ extern ssize_t arch_print_cpu_modalias(struct device *dev,
+ 				       struct device_attribute *attr,
+ 				       char *bufptr);
 -- 
-Nicolas Ferre
+1.8.3.2
