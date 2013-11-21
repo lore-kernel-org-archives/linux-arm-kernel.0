@@ -1,40 +1,85 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Thu, 21 Nov 2013 11:27:49 -0600
-Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
- wl12xx
-In-Reply-To: <20131121165823.GM10317@atomide.com>
-References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
- <1385041804-19115-2-git-send-email-balajitk@ti.com>
- <20131121165823.GM10317@atomide.com>
-Message-ID: <528E4295.2040109@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 21 Nov 2013 15:43:15 -0200
+Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
+Message-ID: <1385055795-24002-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2013 10:58 AM, Tony Lindgren wrote:
-> * Balaji T K <balajitk@ti.com> [131121 05:51]:
->> pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
->> and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
->>
->> Fix the following error message:
->> pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
->> pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
+Commit 22ceeee1 (pwm-backlight: Add power supply support) caused breakage on 
+boards that do not define the backlight regulator on their dts files.
 
-Why is the led pins moved then?
+Instead of making the backlight regulator mandatory, treat it as optional 
+instead, so that we do not have breakage.
 
->> SDIO card is not detected after moving pin mux to omap4_pmx_core since
->> sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
-> Cool, does this fix the issue with the WLAN not coming up after a warm reset
-> on panda?
->
-> Regards,
->
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This avoids the need for adding a dummy regulator on every dts file that uses 
+the pwm-backlight.
 
+Tested on a mx6qsabresd.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ .../devicetree/bindings/video/backlight/pwm-backlight.txt |  2 +-
+ drivers/video/backlight/pwm_bl.c                          | 15 +++++++--------
+ 2 files changed, 8 insertions(+), 9 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+index 764db86..ed3dc3c 100644
+--- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
++++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+@@ -10,13 +10,13 @@ Required properties:
+       last value in the array represents a 100% duty cycle (brightest).
+   - default-brightness-level: the default brightness level (index into the
+       array defined by the "brightness-levels" property)
+-  - power-supply: regulator for supply voltage
+ 
+ Optional properties:
+   - pwm-names: a list of names for the PWM devices specified in the
+                "pwms" property (see PWM binding[0])
+   - enable-gpios: contains a single GPIO specifier for the GPIO which enables
+                   and disables the backlight (see GPIO binding[1])
++  - power-supply: regulator for supply voltage
+ 
+ [0]: Documentation/devicetree/bindings/pwm/pwm.txt
+ [1]: Documentation/devicetree/bindings/gpio/gpio.txt
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index fb80d68..fb3008c 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -50,9 +50,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
+ 	if (pb->enabled)
+ 		return;
+ 
+-	err = regulator_enable(pb->power_supply);
+-	if (err < 0)
+-		dev_err(pb->dev, "failed to enable power supply\n");
++	if (!IS_ERR(pb->power_supply)) {
++		err = regulator_enable(pb->power_supply);
++		if (err < 0)
++			dev_err(pb->dev, "failed to enable power supply\n");
++	}
+ 
+ 	if (gpio_is_valid(pb->enable_gpio)) {
+ 		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
+@@ -80,7 +82,8 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
+ 			gpio_set_value(pb->enable_gpio, 0);
+ 	}
+ 
+-	regulator_disable(pb->power_supply);
++	if (!IS_ERR(pb->power_supply))
++		regulator_disable(pb->power_supply);
+ 	pb->enabled = false;
+ }
+ 
+@@ -283,10 +286,6 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+-	if (IS_ERR(pb->power_supply)) {
+-		ret = PTR_ERR(pb->power_supply);
+-		goto err_gpio;
+-	}
+ 
+ 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pb->pwm)) {
 -- 
-------------------
-Dan Murphy
+1.8.1.2
