@@ -1,65 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Nov 2013 11:57:00 -0700
-Subject: [PATCHv6+ 01/13] of: introduce
- of_property_for_earch_phandle_with_args()
-In-Reply-To: <20131121.191720.1487772262083864095.hdoyu@nvidia.com>
-References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com><1385041249-7705-2-git-send-email-hdoyu@nvidia.com>
- <20131121.191720.1487772262083864095.hdoyu@nvidia.com>
-Message-ID: <528E577C.2050506@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Nov 2013 10:58:45 -0800
+Subject: N900 board code in 3.14
+In-Reply-To: <20131116155031.GA5104@earth.universe>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <20131116120508.GA22335@earth.universe>
+ <20131116141226.GD10317@atomide.com>
+ <20131116155031.GA5104@earth.universe>
+Message-ID: <20131121185844.GA10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2013 10:17 AM, Hiroshi Doyu wrote:
-> Iterating over a property containing a list of phandles with arguments
-> is a common operation for device drivers. This patch adds a new
-> of_property_for_each_phandle_with_args() macro to make the iteration
-> simpler.
+* Sebastian Reichel <sre@ring0.de> [131116 07:51]:
+> On Sat, Nov 16, 2013 at 06:12:26AM -0800, Tony Lindgren wrote:
+> > [...]
+> > >  b) I could not get the 32GB eMMC working. For me the chip is not found
+> > >     and I don't know how to debug it.
+> > 
+> > OK the eMMC issue might be related to the control module PBIAS
+> > register support missing. If so, that should be fixable with the
+> > auxdata until we have a minimal control module device driver to
+> > deal with the PBIAS and expose those features as regulators to
+> > the omap-hsmmc driver.
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
-> v6+:
-> Use the description, which Grant Likely proposed, to be full enough
-> that a future reader can figure out why a patch was written.
->   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007062.html
+> I wasn't aware, that PBIAS register support is missing for DT
+> boot. The existing board code uses a 2.8-3.0V regulator for mmc1,
+> so missing PBIAS is probably the problem.
 
-This new version only addresses one of the concerns that Grant had,
-namely the commit message.
+Right, sorry I was confused, looks like we don't need to worry about
+that. And looks like Balaji just posted patches for the PBIAS support.
 
-> diff --git a/include/linux/of.h b/include/linux/of.h
+Also, I just posted a patch to fix the eMMC that you may want to
+try out.
+ 
+> > > [...]
+> > > 
+> > > My suggestion would be:
+> > >  1. Find a better workaround for omapdss to acquire the SDI
+> > >     regulator. My current hack is obviously not acceptable.
+> > >  2. Load the panel driver via DT as seen above and reference
+> > >     the omapdss interface with something like the above
+> > >     "ti,dss-source".
+> > 
+> > To me it seems that we should be able to add minimal panel entries to DT
+> > if we stick to existing standard bindings. Then the timings etc can be
+> > set up based on the compatible flag. So I would leave out the properties
+> > for ti,sdi-datapairs and ti,dss-source for now, and just set those in
+> > the driver based on the sony,acx565akm compatible flag. Or maybe it should
+> > be sony,acx565akm-n900 if there's some board specific configuration info.
+> 
+> So we add reset-gpio and label to the DT data (they are panel
+> specific and independent of omapdss) and just hardcode "dsi.0"
+> with 2 data lanes into the driver? That sounds fine for me.
+> 
+> If neither Tomi nor anybody else has better ideas I will cook a
+> patch for that. I'm not sure how to setup the vdds_sdi regulator for
+> omapdss, though. Is there an example for a legacy driver using a DT
+> regulator available?
 
-> +#define of_property_for_each_phandle_with_args(np, list, cells, i, args) \
-> +	for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
-> +
+Not that I know of :) But I guess only the panel driver would need to
+parse the compatible flag and the rest of the DSS could still be
+initialize the legacy way if needed.
 
-Grant also wanted the actual implementation fixed so that it wasn't so
-inefficient.
+Regards,
 
-What this current patch does is basically:
-
-for every entry in the property:
-    for every entry in the property before the current index:
-        parse the phandle+specifier
-
-That's roughly O(n^2). (n is # entries in the property)
-
-Instead, what should happen is:
-
-for every entry in the property:
-    parse the phandle+specifier
-    yield the result
-
-That's roughly O(n).
-
-In other words, an implementation more along the lines of
-include/linux/of.h's:
-
-#define of_property_for_each_u32(np, propname, prop, p, u)      \
-        for (prop = of_find_property(np, propname, NULL),       \
-                p = of_prop_next_u32(prop, NULL, &u);           \
-                p;                                              \
-                p = of_prop_next_u32(prop, p, &u))
-
-... so you'd need functions like of_prop_first_specifier() and
-of_prop_next_specifier(), and perhaps some associated set of state
-variables, perhaps with all the state wrapped into a single struct for
-simplicity.
+Tony
