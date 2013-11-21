@@ -1,32 +1,40 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 21 Nov 2013 18:23:07 +0000
+Date: Thu, 21 Nov 2013 18:26:03 +0000
 Subject: ACPI vs DT at runtime
-In-Reply-To: <201311182247.03540.david.goodenough@btconnect.com>
+In-Reply-To: <528A4F5F.7080104@jonmasters.org>
 References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <20131118190929.GA5886@quad.lixom.net> <20131118213256.8EC15C401C6@
- trevor.secretlab.ca> <201311182247.03540.david.goodenough@btconnect.com>
-Message-ID: <20131121182307.47735C406A3@trevor.secretlab.ca>
+ com> <3371903.8j54vrCjEN@wuerfel> <
+ CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com> <
+ 201311180945.52764.arnd@arndb.de> <528A4F5F.7080104@jonmasters.org>
+Message-ID: <20131121182603.B15C8C406A3@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013 22:47:03 +0000, David Goodenough <david.goodenough@btconnect.com> wrote:
-> On Monday 18 Nov 2013, Grant Likely wrote:
-> > I fully support getting ACPI up on ARM and the current work is good.
-> > However, it cannot short-circuit the kernel development process.
-> > Absolutely, push back hard on the ACPI and UEFI patches where the code
-> > is not ready.
+On Mon, 18 Nov 2013 12:33:19 -0500, Jon Masters <jonathan@jonmasters.org> wrote:
+> On 11/18/2013 03:45 AM, Arnd Bergmann wrote:
+> > On Sunday 17 November 2013, Olof Johansson wrote:
 > 
-> Would it not be possible to have ACPI read the hardware configuration
-> from the DT, and provide whatever services it wants, while also allowing
-> the kernel to retain the DT for its hardware config?  I suppose the only
-> thing that would be needed would be some way to mark paricular bits of
-> hardware (I am largely thinking of the things lmsensors deals with) as
-> being used by ACPI and being off limits to the kernel.
+> >> Yep, and together for review is a critical part. I'm not saying that
+> >> the ideal solution is a flashed DTB, but it's better than ACPI. A
+> >> flashed DTB that's _easy to update_ as part of an OS install would
+> >> probably be one of the best solutions we could ask for though.
+> > 
+> > Right: the assumption on the DT boot interfaces is that board designers
+> > make mistakes and are working on moving targets, so we need ways to update
+> > the DTB. By contrast, the assumption on ACPI is that server firmware
+> > authors know what they are doing and you shouldn't let anyone else mess
+> > with the ACPI bits because doing so might damage your hardware. We're
+> > in trouble if the second assumption turns out wrong.
+> 
+> In the server space we *never* ship updated ACPI tables in Red Hat
+> products, and we never would ship updated tables as part of the OS.
+> Platform data is platform data. It belongs to the vendor shipping the
+> system, never to the OS. Yes, there are workarounds for bugs but on the
+> whole you do in fact count on server vendors not to screw it up, and if
+> they do then it is up to them to ship a BIOS update for their hardware.
 
-I don't think there's a lot of interesting work there. It is more
-interesting to me to boot DT-only for production, but be able to use
-those same systems to develop and mature the ACPI support as quickly as
-possible. That is essentially what is being done right now by the Linaro
-ACPI team on the Versatile Express.
+Agreed, shipping tables with RHEL is insane. If DT is used on the
+servers, then the firmware needs to provide the DT, with the option to
+override only when *absolutely* necessary.
 
 g.
