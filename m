@@ -1,98 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Nov 2013 12:04:18 -0700
-Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <20131121131558.E5B82C40A2C@trevor.secretlab.ca>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com> <
- 1384853593-32202-3-git-send-email-hdoyu@nvidia.com>
- <20131121131558.E5B82C40A2C@trevor.secretlab.ca>
-Message-ID: <528E5932.1070105@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 21 Nov 2013 20:04:33 +0100
+Subject: ARM network performance and dma_mask (was: [BUG,REGRESSION?]
+ 3.11.6+,3.12: GbE iface rate drops to few KB/s)
+In-Reply-To: <20131121183834.GB18513@1wt.eu>
+References: <87li0kkhzx.fsf@natisbad.org>
+ <1384869194.8604.92.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119174323.GH913@1wt.eu>
+ <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
+ <20131120191145.GP8581@1wt.eu> <87txf692zx.fsf@natisbad.org>
+ <20131120215435.GT8581@1wt.eu> <20131121004430.GX8581@1wt.eu>
+ <20131121183834.GB18513@1wt.eu>
+Message-ID: <20131121200433.4cb97d9e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2013 06:15 AM, Grant Likely wrote:
-> On Tue, 19 Nov 2013 11:33:06 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
->> IOMMU devices on the bus need to be poplulated first, then iommu
->> master devices are done later.
->>
->> With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
->> whether a device can be an iommu msater or not. If a device can, we'll
->> defer to populate that device till an iommu device is populated. Once
->> an iommu device is populated, "dev->bus->iommu_ops" is set in the
->> bus. Then, those defered iommu master devices are populated and
->> configured for IOMMU with help of the already populated iommu device
->> via iommu_ops->add_device(). Multiple IOMMUs can be listed on this
->> "iommus" binding so that a device can have multiple IOMMUs attached.
->>
->> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->> ---
->> v5:
->> Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
->>
->> v4:
->> This is newly added, and the successor of the following RFC:
->>   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
->>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
->> ---
->>  drivers/base/dd.c        |  5 +++++
->>  drivers/iommu/of_iommu.c | 22 ++++++++++++++++++++++
->>  include/linux/of_iommu.h |  7 +++++++
->>  3 files changed, 34 insertions(+)
->>
->> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> index 35fa368..6e892d4 100644
->> --- a/drivers/base/dd.c
->> +++ b/drivers/base/dd.c
->> @@ -25,6 +25,7 @@
->>  #include <linux/async.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/pinctrl/devinfo.h>
->> +#include <linux/of_iommu.h>
->>  
->>  #include "base.h"
->>  #include "power/power.h"
->> @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->>  
->>  	dev->driver = drv;
->>  
->> +	ret = of_iommu_attach(dev);
->> +	if (ret)
->> +		goto probe_failed;
->> +
->>  	/* If using pinctrl, bind pins now before probing */
->>  	ret = pinctrl_bind_pins(dev);
->>  	if (ret)
-> 
-> I'm very concerned about this approach. Hooking into the core probe
-> path for things like this is not going to scale well. I'm not thrilled
-> with the pinctrl hook being here either, but that is already merged. :-(
-> Also, hooking in here is going affect every single device device driver
-> probe path, and a large number of them are never, ever, going to have
-> iommu interactions.
-> 
-> There needs to be a less invasive way of doing what you want. I still
-> feel like the individual device drivers themselves need to be aware that
-> they might be hooking through an IOMMU. Or, if they are hooking through
-> a bus like PCIe, then have the PCIe bus defer creating child devices
-> until the IOMMU is configured and in place.
+Dear Willy Tarreau,
 
-I general though, couldn't any MMIO on-SoC device potentially be
-affected by an IOMMU? The point of putting the call to of_iommu_attach()
-here rather than inside individual driver's probe() is to avoid
-requiring "every" driver having to paste more boiler-plate into probe().
+On Thu, 21 Nov 2013 19:38:34 +0100, Willy Tarreau wrote:
 
-Perhaps what we need is a flag in struct device to indicate that the
-driver/device is MMIO, and hence potentially affected by an IOMMU. would
-the following work better for you?
+> While we were diagnosing a network performance regression that we finally
+> found and fixed, it appeared during a test that Linus' tree shows a much
+> higher performance on Armada 370 (armv7) than its predecessors. I can
+> saturate the two Gig links of my Mirabox each with a single TCP flow and
+> keep up to 25% of idle CPU in the optimal case. In 3.12.1 or 3.10.20, I
+> can achieve around 1.3 Gbps when the two ports are used in parallel.
 
-+	if (drv->is_mmio) { // let's bikeshed on the field name:-)
-+		ret = of_iommu_attach(dev);
-+		if (ret)
-+			goto probe_failed;
-+	}
+Interesting finding and analysis, once again!
 
-I've often thought that struct device_driver (or similar) should declare
-the set of resources that a device needs (e.g. a list of GPIO names,
-regulator names, etc.), so that the driver core can parse all these
-standard properties from DT/... before calling the custom probe()
-function for all the non-standard stuff. This "is_mmio" flag would fit
-into that model well.
+> I'm not at ease with these things so I'd like to ask your opinion here, is
+> this supposed to be an improvement or a fix ? Is this something we should
+> backport into stable versions, or is there something to fix in the armada
+> platform so that it works just as if the patch was applied ?
+
+I guess the driver should have been setting its dma_mask to 0xffffffff,
+since the platform is capable of doing DMA on the first 32 bits of the
+physical address space, probably something like calling
+pci_set_dma_mask(pdev, DMA_BIT_MASK(32)) or something like that. I know
+Russell has recently added some helpers to prevent stupid people (like
+me) from doing mistakes when setting the DMA masks. Certainly worth
+having a look.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
