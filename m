@@ -1,25 +1,35 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 21 Nov 2013 12:56:14 +0000
-Subject: [PATCH] ARM: CCI : Fix implicit declaration of function error
-In-Reply-To: <20131017121227.GC2442@localhost.localdomain>
-References: <20131017121227.GC2442@localhost.localdomain>
-Message-ID: <20131121125614.26955C40A2C@trevor.secretlab.ca>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Nov 2013 13:58:54 +0100
+Subject: [PATCH 1/2] ARM: lpc32xx: delete local <mach/gpio.h> header
+Message-ID: <1385038734-9742-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Oct 2013 13:12:28 +0100, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Mon, Oct 14, 2013 at 03:52:27PM +0530, Majunath Goudar wrote:
-> > This patch adds a inline dummy implementations of_find_matching_node()
-> > in "#ifdef CONFIG_OF" else part. Without this patch,build system can
-> > lead to issues. This was discovered during randconfig testing,in which
-> > ARM_CCI was enabled w/o CONFIG_OF being enabled,leading to the following error:
-> 
-> Without fetching config info from the DT, the CCI driver is not usable,
-> so it makes no sense to build this driver without CONFIG_OF.
+This header is not used by anything, and since the arch does
+not specify NEED_MACH_GPIO_H it is not included into
+<linux/gpio.h> either. Delete it.
 
-I agree here, and that is the big reason why I'm resistant to blanket
-implementation of empty OF related functions. If those functions are
-called, then most likely the code strongly depends on CONFIG_OF. Leaving
-the blank ones out catches scenarios like this.
+Cc: Roland Stigge <stigge@antcom.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Roland, can you please ACK this so I can take it through the
+GPIO tree?
+---
+ arch/arm/mach-lpc32xx/include/mach/gpio.h | 6 ------
+ 1 file changed, 6 deletions(-)
+ delete mode 100644 arch/arm/mach-lpc32xx/include/mach/gpio.h
 
-g.
+diff --git a/arch/arm/mach-lpc32xx/include/mach/gpio.h b/arch/arm/mach-lpc32xx/include/mach/gpio.h
+deleted file mode 100644
+index 0052e7a76179..000000000000
+--- a/arch/arm/mach-lpc32xx/include/mach/gpio.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef __MACH_GPIO_H
+-#define __MACH_GPIO_H
+-
+-#include "gpio-lpc32xx.h"
+-
+-#endif /* __MACH_GPIO_H */
+-- 
+1.8.3.1
