@@ -1,307 +1,67 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 21 Nov 2013 12:43:19 +0100
-Subject: [PATCH v2 1/5] mfd: max14577: Add max14577 MFD driver core
-In-Reply-To: <20131121103408.GA22536@lee--X1>
-References: <1384956732-19526-1-git-send-email-k.kozlowski@samsung.com>
- <1384956732-19526-2-git-send-email-k.kozlowski@samsung.com>
- <20131121103408.GA22536@lee--X1>
-Message-ID: <1385034199.748.21.camel@AMDC1943>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 21 Nov 2013 12:00:25 +0000
+Subject: [RFC] ARM Generic Timer + Interaction with WFI on Cortex-A15
+In-Reply-To: <528DBD0C.6040203@gmail.com>
+References: <528DBD0C.6040203@gmail.com>
+Message-ID: <20131121120025.GC31695@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-11-21 at 10:34 +0000, Lee Jones wrote:
-> <snip>
+On Thu, Nov 21, 2013 at 07:58:04AM +0000, Marc C wrote:
+> Hello,
 > 
-> > +/**
-> > + * After resuming from suspend it may happen that IRQ is signalled but
-> > + * IRQ GPIO is not high. Also the interrupt registers won't have any data
-> > + * (all of them equal to 0x00).
-> > + *
-> > + * In such case retry few times reading the interrupt registers.
-> > + */
-> > +#define IRQ_READ_REG_RETRY_CNT		5
+> I have a question regarding the interaction with the ARM Generic (or
+> architected) timer, high-resolution timer support, and the WFI instruction.
 > 
-> Where is this used?
+> This commit [1] sets up the "C3STOP" flag on the arch_timer. According
+> to the commit log, an ARM core which implements the ARM Generic Timer
+> may power-down and thus invalidate some registers within the timer.
+> Therefore, flagging the timer with C3STOP will ensure that an
+> appropriate broadcast timer will be used whenever the CPU goes into idle.
 > 
-> <snip>
-> 
-> > +#define DECLARE_IRQ(idx, _group, _mask)		\
-> > +	[(idx)] = { .group = (_group), .mask = (_mask) }
-> 
-> I'm pretty sure the parentheses are supurfluous.
-> 
-> > +static const inline struct max14577_irq_data *
-> > irq_to_max14577_irq(struct max14577 *max14577, int irq)
-> 
-> We should tab this back out.
-> 
-> > +{
-> > +	struct irq_data *data = irq_get_irq_data(irq);
-> > +	return &max14577_irqs[data->hwirq];
-> 
-> Shouldn't you be using irq_create_mapping() or irq_find_mapping() here?
-> 
-> > +static void max14577_irq_mask(struct irq_data *data)
-> > +{
-> > +	struct max14577 *max14577 = irq_get_chip_data(data->irq);
-> 
->                                     irq_data_get_irq_chip_data(data); ?
-> 
-> > +	const struct max14577_irq_data *irq_data =
-> > +	    irq_to_max14577_irq(max14577, data->irq);
-> > +
-> > +	if (!irq_data)
-> > +		return;
-> > +
-> > +	if (irq_data->group >= MAX14577_IRQ_REGS_NUM)
-> > +		return;
-> > +
-> > +	max14577->irq_masks_cur[irq_data->group] &= ~irq_data->mask;
-> > +}
-> 
-> <snip>
-> 
-> > +int max14577_irq_resume(struct max14577 *max14577)
-> > +{
-> > +	int ret = 0;
-> > +
-> > +	if (max14577->irq && max14577->irq_domain)
-> > +		ret = max14577_irq_thread(0, max14577);
-> > +
-> > +	return ret >= 0 ? 0 : ret;
-> 
-> Please open this out to something more easily comprehensible.
+> However, according to this article [2], there is a difference in
+> implementation between the Cortex-A7 and Cortex-A15, wherein the A7 will
+> power-down on idle, and the A15 will not.
 
-Thanks for pointing these out however after using regmap_irq_chip whole
-file won't be needed anymore.
+There is a difference in implementation, which implies that A15 local
+timers might still be running when a CPU is power gated since the
+local timer voltage domain is different from the vcpu, voltage to the core.
 
-(...)
+It is an A15 oddity. On A7 and newer cores, the local timer will be
+held in reset/power down when a single core is shutdown.
 
-> > +static int max14577_i2c_probe(struct i2c_client *i2c,
-> > +			      const struct i2c_device_id *id)
-> > +{
-> > +	struct max14577 *max14577;
-> > +	struct max14577_platform_data *pdata = dev_get_platdata(&i2c->dev);
-> > +	u8 reg_data;
-> > +	int ret = 0;
-> > +
-> > +	if (i2c->dev.of_node) {
+See, point is, even if on A15 the timer is still running when a single
+core is shutdown, this might not be true when the A15 cluster goes down.
+
+At that point in time, when the last CPU running in a cluster is about
+to call a cluster shutdown, how can you offload the local timer of _another_
+CPU to an always-on timer acting as broadcast ? Wake up that CPU up just
+to enter broadcast mode ? This is not really power efficient and we add
+complexity in the kernel. There might be a way to solve this by using
+the clock event API but I would rule it out.
+
+It is basically the same reason why we save/restore the GIC CPU IF
+configuration whenever a single core goes down (but the GIC stays on),
+because there is no way to read it from other CPUs when the GIC is shutdown
+for good (NB this is just an example and is likely to change with future GIC
+implementations).
+
+Since it is an A15 oddity, I think we should not care and keep things as
+they are in the kernel.
+
+> Now, given the 2 citations, can someone explain why the C3STOP flag is
+> used for _all_ implementations? Is it not the case that the A15-based
+> arch_timer can be used as a broadcast timer, even if the kernel is
+> configured to call WFI and put the CPU into low-power mode?
 > 
-> Can you pull this out. It looks neater as the top as:
->   struct device_node *np = i2c->dev.of_node;
+> There have been some recent commits which conditionally setup the C3STOP
+> flag, depending on the CONFIG_CPU_IDLE flag. However, my concern is that
+> there are some ARM implementations that can actually go into low-power
+> mode and still use the arch_timer reliably.
 
-I am not sure if I understand you correctly. You would like to change
-this to:
--------------------------
-static int max14577_i2c_probe(struct i2c_client *i2c,
-                              const struct i2c_device_id *id)
-{
-        struct max14577 *max14577;
-        struct max14577_platform_data *pdata =
-dev_get_platdata(&i2c->dev);
-        struct device_node *np = i2c->dev.of_node;
-        u8 reg_data;
-        int ret = 0;
+It is an A15 oddity and we should not care, given that this behaviour is
+platform specific and likely to fail in most common A15 implementations.
 
-        if (np) {
-                pdata = devm_kzalloc(&i2c->dev,
-                                sizeof(struct max14577_platform_data),
-                                GFP_KERNEL);
--------------------------
-The variable 'np' would be used only once.
+Thank you for pointing that out though.
 
-
-> 
-> > +		pdata = devm_kzalloc(&i2c->dev,
-> > +				sizeof(struct max14577_platform_data),
-> 
-> I prefer:
->   sizeof(*pdata),
-
-OK. Line will be shorter. I will change this patter also in other
-places.
-
-> 
-> > +				GFP_KERNEL);
-> > +		if (!pdata)
-> > +			return -ENOMEM;
-> > +		i2c->dev.platform_data = pdata;
-> > +	}
-> > +
-> > +	if (IS_ERR_OR_NULL(pdata)) {
-> 
-> It's not likely to be an ERR, just do:
->  if (!pdata) {
-
-OK.
-
-
-> > +		dev_err(&i2c->dev, "No platform data found: %ld\n",
-> > +				PTR_ERR(pdata));
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	max14577 = devm_kzalloc(&i2c->dev, sizeof(struct max14577), GFP_KERNEL);
-> > +	if (!max14577)
-> > +		return -ENOMEM;
-> > +
-> > +	i2c_set_clientdata(i2c, max14577);
-> > +	max14577->pdata = pdata;
-> 
-> How many different places do you want to store this?
-> 
-> > +	max14577->dev = &i2c->dev;
-> 
-> You're storing dev here anyway.
-> 
-> Remove the pdata property and get it from dev when/if you require it.
-
-OK.
-
-
-> > +	max14577->i2c = i2c;
-> > +	max14577->irq = i2c->irq;
-> > +
-> > +	max14577->regmap = devm_regmap_init_i2c(i2c, &max14577_regmap_config);
-> > +	if (IS_ERR(max14577->regmap)) {
-> > +		ret = PTR_ERR(max14577->regmap);
-> > +		dev_err(max14577->dev, "Failed to allocate register map: %d\n",
-> > +				ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = max14577_read_reg(max14577->regmap, MAX14577_REG_DEVICEID,
-> > +			&reg_data);
-> > +	if (ret) {
-> > +		dev_err(max14577->dev, "Device not found on this channel: %d\n",
-> > +				ret);
-> > +		return ret;
-> > +	}
-> > +	max14577->vendor_id = (reg_data & 0x7);
-> > +	max14577->device_id = ((reg_data & 0xF8) >> 0x3);
-> > +	dev_info(max14577->dev, "Device ID: 0x%x, vendor: 0x%x\n",
-> > +			max14577->device_id, max14577->vendor_id);
-> > +
-> > +	ret = max14577_irq_init(max14577);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +
-> > +	ret = mfd_add_devices(max14577->dev, -1, max14577_devs,
-> > +			ARRAY_SIZE(max14577_devs), NULL, 0, NULL);
-> 
-> You should be passing the irqdomain as the final parameter here.
-
-I replaced the IRQ handling with regmap_irq_chip so this would look like
-this:
--------------------------
-        ret = mfd_add_devices(max14577->dev, -1, max14577_devs,
-                        ARRAY_SIZE(max14577_devs), NULL, 0,
-                        regmap_irq_get_domain(max14577->irq_data));
--------------------------
-Am I correct?
-
-
-> > +	if (ret < 0)
-> > +		goto err_mfd;
-> > +
-> > +	device_init_wakeup(max14577->dev, 1);
-> > +
-> > +	return 0;
-> > +
-> > +err_mfd:
-> > +	max14577_irq_exit(max14577);
-> > +	return ret;
-> > +}
-> > +
-> > +static int max14577_i2c_remove(struct i2c_client *i2c)
-> > +{
-> > +	struct max14577 *max14577 = i2c_get_clientdata(i2c);
-> > +
-> > +	mfd_remove_devices(max14577->dev);
-> > +	max14577_irq_exit(max14577);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct i2c_device_id max14577_i2c_id[] = {
-> > +	{ MAX14577_MFD_DEV_NAME, 0 },
-> 
-> Can you use the proper name here, these types of defines are pretty ugly.
-
-OK.
-
-> <snip>
-> 
-> > +#ifdef CONFIG_OF
-> > +static struct of_device_id max14577_dt_match[] = {
-> > +	{ .compatible = "maxim,max14577", },
-> > +	{},
-> > +};
-> > +#else
-> > +#define max14577_dt_match	NULL
-> > +#endif
-> 
-> You don't need to do this and use of_match_ptr().
-> 
-> Remove the #ifdef.
-
-Yes, Mark also pointed this.
-
-> 
-> > +static SIMPLE_DEV_PM_OPS(max14577_pm, max14577_suspend, max14577_resume);
-> > +
-> > +static struct i2c_driver max14577_i2c_driver = {
-> > +	.driver = {
-> > +		.name = MAX14577_MFD_DEV_NAME,
-> 
-> Can you use the proper name here, these types of defines are pretty ugly.
-
-OK.
-
-> 
-> > +		.owner = THIS_MODULE,
-> > +		.pm = &max14577_pm,
-> > +		.of_match_table = of_match_ptr(max14577_dt_match),
-> > +	},
-> > +	.probe = max14577_i2c_probe,
-> > +	.remove = max14577_i2c_remove,
-> > +	.id_table = max14577_i2c_id,
-> > +};
-> 
-> >>>>>>>>>>>>>>>>>>>>>>
-> 
-> > +static int __init max14577_i2c_init(void)
-> > +{
-> > +	return i2c_add_driver(&max14577_i2c_driver);
-> > +}
-> > +subsys_initcall(max14577_i2c_init);
-> > +
-> > +static void __exit max14577_i2c_exit(void)
-> > +{
-> > +	i2c_del_driver(&max14577_i2c_driver);
-> > +}
-> > +module_exit(max14577_i2c_exit);
-> 
-> >>>>>>>>>>>>>>>>>>>>>>
-> 
-> Remove all this and replace with:
->   module_i2c_driver(max14577_i2c_driver);
-
-The subsys_initcall is needed. Marek Szyprowski replied to this here:
-http://thread.gmane.org/gmane.linux.drivers.devicetree/51903/focus=1594651
-
-
-(...)
-
-> > +struct max14577_regulator_platform_data {
-> > +	int id;
-> > +	struct regulator_init_data *initdata;
-> > +	struct device_node *of_node;
-> 
-> Do you ever set this? What's the point of it is it's set in the device?
-
-Do you mean the whole struct max14577_regulator_platform_data or only
-some member of it (of_node?)?
-
-Best regards,
-Krzysztof
+Lorenzo
