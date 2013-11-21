@@ -1,69 +1,80 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 21 Nov 2013 15:58:23 +0900
-Subject: [PATCH v2] ARM: shmobile: Use ->init_late() on Lager
-In-Reply-To: <20131121045536.GT31130@verge.net.au>
-References: <20131120000231.27016.39549.sendpatchset@w520>
- <20131121045536.GT31130@verge.net.au>
-Message-ID: <20131121065821.GA4753@verge.net.au>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 21 Nov 2013 09:32:22 +0200
+Subject: at91: ubi: UBIFS error (pid 1): ubifs_iget: failed to read inode
+ 1, error -2
+In-Reply-To: <91586D499ADFD74FBCFB8425266A5DE40153BB2BE711@pluto.melinkcorp.local>
+References: <91586D499ADFD74FBCFB8425266A5DE40153BB2BE545@pluto.melinkcorp.local>
+ <91586D499ADFD74FBCFB8425266A5DE40153BB2BE711@pluto.melinkcorp.local>
+Message-ID: <528DB706.3070901@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 01:55:37PM +0900, Simon Horman wrote:
-> On Wed, Nov 20, 2013 at 09:02:31AM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Hook in shmobile_init_late() on Lager V2. This enables some PM
-> > related things like CPUIdle and Suspend-to-RAM.
-> > 
-> > With this patch applied it is possible to use Suspend-to-RAM:
-> > # echo enabled > /sys/class/tty/ttySC6/power/wakeup
-> > # echo mem > /sys/power/state 
-> > (wake by sending a character on the serial console)
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > ---
-> > 
-> >  Changes since V1:
-> >  - added missing include <mach/common.h> to DT reference code
-> > 
-> >  Written on top of renesas.git renesas-devel-v3.12-20131119
-> > 
-> >  arch/arm/mach-shmobile/board-lager-reference.c |    2 ++
-> >  arch/arm/mach-shmobile/board-lager.c           |    1 +
-> >  2 files changed, 3 insertions(+)
-> > 
-> > --- 0001/arch/arm/mach-shmobile/board-lager-reference.c
-> > +++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-11-20 08:14:45.000000000 +0900
-> > @@ -20,6 +20,7 @@
-> >  
-> >  #include <linux/init.h>
-> >  #include <linux/of_platform.h>
-> > +#include <mach/common.h>
-> >  #include <mach/rcar-gen2.h>
-> >  #include <mach/r8a7790.h>
-> >  #include <asm/mach/arch.h>
-> > @@ -41,5 +42,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
-> >  	.init_early	= r8a7790_init_early,
-> >  	.init_time	= rcar_gen2_timer_init,
-> >  	.init_machine	= lager_add_standard_devices,
-> > +	.init_late	= shmobile_init_late,
-> >  	.dt_compat	= lager_boards_compat_dt,
-> >  MACHINE_END
-> > --- 0001/arch/arm/mach-shmobile/board-lager.c
-> > +++ work/arch/arm/mach-shmobile/board-lager.c	2013-11-20 08:14:34.000000000 +0900
-> > @@ -259,5 +259,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
-> >  	.init_early	= r8a7790_init_early,
-> >  	.init_time	= rcar_gen2_timer_init,
-> >  	.init_machine	= lager_init,
-> > +	.init_late	= shmobile_init_late,
-> >  	.dt_compat	= lager_boards_compat_dt,
-> >  MACHINE_END
+On 20/11/13 16:04, Bryan Evenson wrote:
+> Adding appropriate UBIFS maintainers and the mtd mailing list to the thread as this deals with the UBIFS.
 > 
-> 
-> Thanks. I have manually applied the following onto the soc3 branch.
-> Please check that it is correct.
-> 
-> Assuming all goes will I plan to push this and other updates
-> today or tomorrow.
+>> -----Original Message-----
+>> From: linux-arm-kernel [mailto:linux-arm-kernel-
+>> bounces at lists.infradead.org] On Behalf Of Bryan Evenson
+>> Sent: Tuesday, November 19, 2013 2:46 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Subject: at91: ubi: UBIFS error (pid 1): ubifs_iget: failed to read
+>> inode 1, error -2
 
-Take II: I have applied your patch as is without any manual intervention.
+Sounds the same as the error reported here:
+
+	http://lists.infradead.org/pipermail/linux-mtd/2013-May/047083.html
+
+>>
+>> I am using an Atmel AT91SAM9G25 board with Micron's MT29F2G08ABAEAWP
+>> NAND flash.  I am on Atmel's variant of the 3.6.9 kernel.
+>> Specifically, I'm using https://github.com/linux4sam/linux-
+>> at91/tree/linux-3.6.9-at91 commit
+>> 5fe012d4aee98ef82df66e6763882c735902ed0f.   I have several boards in
+>> which I see the error message shown in the message subject when the
+>> device is reset due to a power cycle and the device fails to continue
+>> to load the filesystem.  On one board I erased and re-wrote the
+>> filesystem and the device is working just fine through multiple power
+>> cycles.  My questions are:
+>>
+>> 1. Is this a known issue with the version of the kernel that I am
+>> using?  I've searched this mailing list and the latest mainline kernel
+>> commits, and I didn't see anything directly related to this issue.
+>> 2. If so, is there a fix in a later kernel version?
+>> 3. If not, what would be helpful in figuring out what is going on?  I
+>> still have a bad device that I haven't touched the flash on.
+>>
+> 
+> I took a deeper look at the commit history of the kernel I am using, and the last UBI/UBIFS patches to my kernel that I found in the mainline kernel are:
+> 
+> UBIFS: fix mounting problems after power cuts
+> UBIFS: introduce categorized lprops counter
+> 
+> which were merged into the mainline kernel on 2012-11-15.  I don't see any UBI/UBIFS related patches since then that specifically mention the error I'm seeing.  However, there are a few notable bugs that have been fixed since then such as:
+> 
+> UBIFS: fix use of freed ubifs_orphan objects
+> UBIFS: fix double free of ubifs_orphan objects
+> ubifs: wait for page writeback to provide stable pages
+> UBIFS: prepare to fix a horrid bug
+> UBIFS: fix a horrid bug
+> UBI: Fix PEB leak in wear_leveling_worker()
+> 
+> Could not having these fixes in place lead to the issue I'm seeing if there is a power cut?  The kernel I am using does not yet have support for fastmap and I am using the default UBI/UBIFS configuration (4096 wear-leveling, 2% reserved eraseblocks for bad eraseblock handling).  The boards on which I am having an issue are test boards that have been in use long enough that wear-leveling should be occurring.  And as previously noted, I still have at least one board in its broken state if the flash image would be useful for someone (or if someone knows what I should be looking for to figure out what happened).
+
+If it is the same problem as above you need the first 2 at least.
+
+> 
+> Thanks,
+> Bryan
+> 
+>> Thanks,
+>> Bryan
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
