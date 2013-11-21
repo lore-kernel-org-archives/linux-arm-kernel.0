@@ -1,113 +1,46 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 21 Nov 2013 23:45:28 +0530
-Subject: [PATCH v6 3/6] gpio: davinci: remove unused variable intc_irq_num
-In-Reply-To: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1385057731-4348-4-git-send-email-prabhakar.csengg@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 21 Nov 2013 18:16:08 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131120064056.GB5272@netboy>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
+ com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com> <5289A356.
+ 4060004@jonmasters.org> <20131118150052.GC24408@sirena.org.uk> <
+ 20131118191336.GB5886@quad.lixom.net> <20131119091216.GA4412@netboy> <
+ 20131119184827.GD20967@quad.lixom.net> <20131120064056.GB5272@netboy>
+Message-ID: <20131121181608.1DDDCC406A3@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+On Wed, 20 Nov 2013 07:40:57 +0100, Richard Cochran <richardcochran@gmail.com> wrote:
+> On Tue, Nov 19, 2013 at 10:48:27AM -0800, Olof Johansson wrote:
+> > 
+> > This is just a tangent and a distraction anyway: You should know by
+> > now that we've decided to keep backwards compatibility going forward,
+> > so any argument about why we did it differently before is leading nowhere.
+> 
+> Yes, I know it is tangent, but the tone in which you address people
+> (like Jon Masters) who complain about DT quality is really not fair.
+> 
+> When DT for arm was first proposed, I argued against it in vain.
+> Since then, I have really, truly tried my best to keep on top of the
+> DT discussions on the arm list, because everyone working on the arm
+> platform will have to know DT intimately, whether they want to or not.
+> 
+> Now, I never saw any proclamation or discussion about "DT is in flux"
+> on the arm list. If I had, I surely would have complained, and loudly.
+> AFAICT, this decision was made in rather private circles, but you talk
+> as if this was abundantly clear. *It was not.*
+> 
+> Or if it was announced in some way, just show me where. Otherwise,
+> please stop the "we were upfront about this from day one" excuses.
 
-As the davinci-gpio driver is migrated to use irqdomain
-there is no need to pass the irq base for the gpio driver.
-This patch removes this variable from davinci_gpio_platform_data
-and also the refrences from the machine file.
+No, I cannot point at any one place where it was stated outright. My
+memory is not that good. There were lots of times the stability of DT
+bindings was discussed, and I certainly have told people on the mailing
+list to keep their dtb updated while we are figuring out things like
+clock bindings and adding functionality. I'm sorry that it wasn't more
+clear. As has already been said in this thread, when the DT migration
+started, we didn't know how it should all look and work. It took time to
+figure out what was sane and what was not.
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/mach-davinci/da830.c              |    1 -
- arch/arm/mach-davinci/da850.c              |    1 -
- arch/arm/mach-davinci/dm355.c              |    1 -
- arch/arm/mach-davinci/dm365.c              |    1 -
- arch/arm/mach-davinci/dm644x.c             |    1 -
- arch/arm/mach-davinci/dm646x.c             |    1 -
- include/linux/platform_data/gpio-davinci.h |    1 -
- 7 files changed, 7 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 0813b51..fb72035 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -1153,7 +1153,6 @@ static struct davinci_id da830_ids[] = {
- 
- static struct davinci_gpio_platform_data da830_gpio_platform_data = {
- 	.ngpio = 128,
--	.intc_irq_num = DA830_N_CP_INTC_IRQ,
- };
- 
- int __init da830_register_gpio(void)
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 352984e..4379317 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1283,7 +1283,6 @@ int __init da850_register_vpif_capture(struct vpif_capture_config
- 
- static struct davinci_gpio_platform_data da850_gpio_platform_data = {
- 	.ngpio = 144,
--	.intc_irq_num = DA850_N_CP_INTC_IRQ,
- };
- 
- int __init da850_register_gpio(void)
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index 536ce52..a1713cc 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -900,7 +900,6 @@ static struct resource dm355_gpio_resources[] = {
- 
- static struct davinci_gpio_platform_data dm355_gpio_platform_data = {
- 	.ngpio		= 104,
--	.intc_irq_num	= DAVINCI_N_AINTC_IRQ,
- };
- 
- int __init dm355_gpio_register(void)
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 9c96520..2595097 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -713,7 +713,6 @@ static struct resource dm365_gpio_resources[] = {
- 
- static struct davinci_gpio_platform_data dm365_gpio_platform_data = {
- 	.ngpio		= 104,
--	.intc_irq_num	= DAVINCI_N_AINTC_IRQ,
- 	.gpio_unbanked	= 8,
- };
- 
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 72a3aa7..d83436d 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -786,7 +786,6 @@ static struct resource dm644_gpio_resources[] = {
- 
- static struct davinci_gpio_platform_data dm644_gpio_platform_data = {
- 	.ngpio		= 71,
--	.intc_irq_num	= DAVINCI_N_AINTC_IRQ,
- };
- 
- int __init dm644x_gpio_register(void)
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index d1b646c..5d289f4 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -763,7 +763,6 @@ static struct resource dm646x_gpio_resources[] = {
- 
- static struct davinci_gpio_platform_data dm646x_gpio_platform_data = {
- 	.ngpio		= 43,
--	.intc_irq_num	= DAVINCI_N_AINTC_IRQ,
- };
- 
- int __init dm646x_gpio_register(void)
-diff --git a/include/linux/platform_data/gpio-davinci.h b/include/linux/platform_data/gpio-davinci.h
-index 0c3551b..fbe2f75 100644
---- a/include/linux/platform_data/gpio-davinci.h
-+++ b/include/linux/platform_data/gpio-davinci.h
-@@ -28,7 +28,6 @@ enum davinci_gpio_type {
- struct davinci_gpio_platform_data {
- 	u32	ngpio;
- 	u32	gpio_unbanked;
--	u32	intc_irq_num;
- };
- 
- 
--- 
-1.7.9.5
+g.
