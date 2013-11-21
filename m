@@ -1,50 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Nov 2013 18:54:08 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131121175822.GA9590@quad.lixom.net>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
- <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131115175241.GB27174@quad.lixom.net>
- <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
- <20131121162944.F087FC406A3@trevor.secretlab.ca>
- <20131121175822.GA9590@quad.lixom.net>
-Message-ID: <20131121185408.GX16735@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Nov 2013 11:57:00 -0700
+Subject: [PATCHv6+ 01/13] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <20131121.191720.1487772262083864095.hdoyu@nvidia.com>
+References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com><1385041249-7705-2-git-send-email-hdoyu@nvidia.com>
+ <20131121.191720.1487772262083864095.hdoyu@nvidia.com>
+Message-ID: <528E577C.2050506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 09:58:22AM -0800, Olof Johansson wrote:
-> On Thu, Nov 21, 2013 at 04:29:44PM +0000, Grant Likely wrote:
-> > We are pushing a lot of boundaries and doing things on ACPI that have
-> > never been done before. SPI, GPIOs, Clocks, Regulators, composite
-> > devices, key-value properties. All brand new territory, and the Linux
-> > world is driving a lot of it.
+On 11/21/2013 10:17 AM, Hiroshi Doyu wrote:
+> Iterating over a property containing a list of phandles with arguments
+> is a common operation for device drivers. This patch adds a new
+> of_property_for_each_phandle_with_args() macro to make the iteration
+> simpler.
 > 
-> This is a bit of a surprise and a significant concern.
-> 
-> The whole point behind ACPI is that it's supposed to abstract away nearly
-> all of that, and _not_ expose clocks, regulators and other things to
-> the kernel. If we're going to expose it, then we might as well go all
-> the way and do it with DT.
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+> v6+:
+> Use the description, which Grant Likely proposed, to be full enough
+> that a future reader can figure out why a patch was written.
+>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007062.html
 
-This depends what you want from ACPI, and what market ACPI is being
-targetted at.
+This new version only addresses one of the concerns that Grant had,
+namely the commit message.
 
-If ACPI is targetted at the embedded end, then having that information is
-fundamental to good power management (think about it - if you're doing
-hard power management where you need to turn on a clock from IRQ context,
-can you do that by running some AML code from that context?)
+> diff --git a/include/linux/of.h b/include/linux/of.h
 
-If ACPI is targetted at just the server end, then at the moment it's
-probably not something that's required, because fine-grained power
-management isn't found on such platforms.
+> +#define of_property_for_each_phandle_with_args(np, list, cells, i, args) \
+> +	for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
+> +
 
-However, that could very well change - we are in a world where we've had
-the golden years of cheap energy, and energy costs are going to go one
-way and one way only - so for the server market, power management to the
-same extent that we see in the embedded world will eventually transition
-over into that market too.
+Grant also wanted the actual implementation fixed so that it wasn't so
+inefficient.
 
-At that point, the OS is probably going to have to know these kinds of
-details so it can do fine grained power management from tricky contexts...
-or we'll be running native code fragments provided by the vendor to do
-that...
+What this current patch does is basically:
+
+for every entry in the property:
+    for every entry in the property before the current index:
+        parse the phandle+specifier
+
+That's roughly O(n^2). (n is # entries in the property)
+
+Instead, what should happen is:
+
+for every entry in the property:
+    parse the phandle+specifier
+    yield the result
+
+That's roughly O(n).
+
+In other words, an implementation more along the lines of
+include/linux/of.h's:
+
+#define of_property_for_each_u32(np, propname, prop, p, u)      \
+        for (prop = of_find_property(np, propname, NULL),       \
+                p = of_prop_next_u32(prop, NULL, &u);           \
+                p;                                              \
+                p = of_prop_next_u32(prop, p, &u))
+
+... so you'd need functions like of_prop_first_specifier() and
+of_prop_next_specifier(), and perhaps some associated set of state
+variables, perhaps with all the state wrapped into a single struct for
+simplicity.
