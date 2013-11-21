@@ -1,10 +1,10 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 21 Nov 2013 06:09:22 +0100
-Subject: [PATCHv9][ 3/3] ARM: dts: cpuimx35 Add touchscreen support.
-In-Reply-To: <1383916659-9988-3-git-send-email-denis@eukrea.com>
+Date: Thu, 21 Nov 2013 06:10:53 +0100
+Subject: [PATCHv9][ 2/3] ARM: dts: cpuimx51 Add touchscreen support.
+In-Reply-To: <1383916659-9988-2-git-send-email-denis@eukrea.com>
 References: <1383916659-9988-1-git-send-email-denis@eukrea.com>
- <1383916659-9988-3-git-send-email-denis@eukrea.com>
-Message-ID: <20131121050922.GF18477@ns203013.ovh.net>
+ <1383916659-9988-2-git-send-email-denis@eukrea.com>
+Message-ID: <20131121051053.GG18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,54 +26,51 @@ On 14:17 Fri 08 Nov     , Denis Carikli wrote:
 > Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
 > ChangeLog v8->v9:
-> - Added Grant Likely in the cc list.
+> - Added Grant Likely in the Cc list.
 > - Adapted to the removal of the pinctrl properties in the tsc2007 documentation.
 > - Fixed the gpios property (before, it was set to active high by error).
 > 
 > ChangeLog v7->v8:
 > - Added Shawn Guo in the cc list.
 > ---
->  arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+>  arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi |   14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> index b9cb5a5..f25a40f 100644
-> --- a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> +++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> @@ -36,6 +36,27 @@
+> diff --git a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+> index b22841a..b04c65b 100644
+> --- a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+> @@ -42,11 +42,23 @@
 >  		compatible = "nxp,pcf8563";
 >  		reg = <0x51>;
 >  	};
 > +
-> +	tsc2007: tsc2007 at 48 {
+> +	tsc2007: tsc2007 at 49 {
 > +		compatible = "ti,tsc2007";
-> +		reg = <0x48>;
-> +		interrupt-parent = <&gpio3>;
-> +		interrupts = <0x2 0x8>;
-> +		gpios = <&gpio3 2 1>;
+> +		reg = <0x49>;
+> +		interrupt-parent = <&gpio4>;
+> +		interrupts = <0x0 0x8>;
+> +		gpios = <&gpio4 0 1>;
+> +		ti,x-plate-ohms = <180>;
 as explain on the binding drop this gpios this is an IRQ not a gpio
 
 NACK
 
 Best Regards,
 J.
-> +		ti,x-plate-ohms = <180>;
-> +        };
-> +
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	imx35-eukrea {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <MX35_PAD_ATA_DA2__GPIO3_2 0x80000000>;
-> +		};
 > +	};
 >  };
 >  
->  &nfc {
+>  &iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+>  	imx51-eukrea {
+> -		pinctrl_tsc2007_1: tsc2007grp-1 {
+> +		pinctrl_hog: hoggrp {
+>  			fsl,pins = <
+>  				MX51_PAD_GPIO_NAND__GPIO_NAND 0x1f5
+>  				MX51_PAD_NANDF_D8__GPIO4_0 0x1f5
 > -- 
 > 1.7.9.5
 > 
