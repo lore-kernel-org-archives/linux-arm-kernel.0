@@ -1,38 +1,23 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 21 Nov 2013 11:01:04 -0800
-Subject: [PATCH v3 3/4] ata: Add APM X-Gene SoC SATA host controller driver
-In-Reply-To: <201311211420.28509.arnd@arndb.de>
-References: <1384465153-29902-1-git-send-email-lho@apm.com>
- <201311151448.16279.arnd@arndb.de>
- <CAPw-ZTmaz3nnV3ThRgecT_RaYYW0bmfWvL8Kr-S3z1aKyUWc+w@mail.gmail.com>
- <201311211420.28509.arnd@arndb.de>
-Message-ID: <CAPw-ZTnRbZid1Bzg6r62LjoEPRWpbDU7TAg=d=qVazEWVaUGjA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Nov 2013 19:00:51 +0000
+Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
+ monitor
+In-Reply-To: <CAOesGMgB_FUDkD9=wgZgreaspEyKoSqpkpGZtzuUjb=G6m_nEg@mail.gmail.com>
+References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
+ <52828EF5.6090909@wwwdotorg.org>
+ <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
+ <5282E068.1070608@nvidia.com>
+ <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
+ <528E5596.7090606@wwwdotorg.org>
+ <CAOesGMgB_FUDkD9=wgZgreaspEyKoSqpkpGZtzuUjb=G6m_nEg@mail.gmail.com>
+Message-ID: <20131121190051.GY16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 21, 2013 at 10:51:09AM -0800, Olof Johansson wrote:
+> An ack from Russell would be appreciated, or we'd need to set up a
+> shared branch given the Tegra dependencies that would go on top.
+> Either is ok with me.
 
->> >> diff --git a/drivers/ata/sata_xgene.h b/drivers/ata/sata_xgene.h
->> >> new file mode 100644
->> >> index 0000000..51e73f6
->> >> --- /dev/null
->> >> +++ b/drivers/ata/sata_xgene.h
->> >
->> > This file should probably just be folded into the driver, since it contains no
->> > interfaces between  modules, just internal definitions.
->> [Loc Ho]
->> I can get rip this header file now. But in the future I may need to
->> add this back as I intended this driver to also support running from
->> our co-processor (ARMv7 32-bit). For that, I will need anothe file and
->> other function that will need knowledge of the context structure and
->> etc.
->
-> Hmm, is the code for that coprocessor compiled from the kernel source?
-> If not, it shouldn't really make a difference as it won't live in a shared
-> code repository.
->
-[Loc Ho]
-The co-processors are just ARM based core and the same kernel can be
-build to support it. Let's not worry about this yet.
-
--Loc
+Note that I'm *not* looking at anything new until after the merge window
+has closed, so I'm not acking or reviewing anything at the moment.
