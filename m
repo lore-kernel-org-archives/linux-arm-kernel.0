@@ -1,63 +1,33 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Thu, 21 Nov 2013 17:39:03 +0200
-Subject: [PATCH] clk: keystone: gate: don't use reserved bits
-In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52965812@DBDE04.ent.ti.com>
-References: <1385047851-14407-1-git-send-email-ivan.khoronzhuk@ti.com>
- <448912EABC71F84BBCADFD3C67C4BE52965812@DBDE04.ent.ti.com>
-Message-ID: <528E2917.1060707@ti.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 21 Nov 2013 19:40:08 +0400
+Subject: [PATCH 0/6] arm: sa1100: refactor h3xxx GPIO handling
+Message-ID: <1385048414-9812-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2013 05:35 PM, Shilimkar, Santosh wrote:
-> Sorry for top posting. The user-guide is not upto date....
->
-> State
-> 4:0
-> R
-> Actual state
-> Current Power Domain State.
-> Only PSM states Off and On are ?key states? that users should consider in normal run time situation. States with bit 4 = 1 are transitional states helpful for debug if PSM is stuck in those states.
->
-> Regards,
-> Santosh
->
-> ________________________________________
-> From: Khoronzhuk, Ivan
-> Sent: Thursday, November 21, 2013 10:30 AM
-> To: Shilimkar, Santosh
-> Cc: Mike Turquette; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Strashko, Grygorii; Khoronzhuk, Ivan
-> Subject: [PATCH] clk: keystone: gate: don't use reserved bits
->
-> According to TRM http://www.ti.com/lit/ug/sprugv4b/sprugv4b.pdf
-> the Power Domain Status Register (PDSTAT) has 0-1 bits for power
-> domain status, but PDSTAT_STATE_MASK is defined with 0x1F. In that
-> case we operate with reserved bits. So correct PDSTAT_STATE_MASK
-> to be 0x03.
->
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->   drivers/clk/keystone/gate.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-> index 1f333bc..995ae80 100644
-> --- a/drivers/clk/keystone/gate.c
-> +++ b/drivers/clk/keystone/gate.c
-> @@ -35,7 +35,7 @@
->
->   #define MDSTAT_STATE_MASK      0x3f
->   #define MDSTAT_MCKOUT          BIT(12)
-> -#define PDSTAT_STATE_MASK      0x1f
-> +#define PDSTAT_STATE_MASK      0x03
->   #define MDCTL_FORCE            BIT(31)
->   #define MDCTL_LRESET           BIT(8)
->   #define PDCTL_NEXT             BIT(0)
-> --
-> 1.7.9.5
->
+Linus,
 
-Ok
+I have been thinking abbout h3100/h3600 and GPIO issues.Could you please
+review and test these patches. It is an attempt to cleanup and refactor GPIO
+handling not to call gpio_request at init_machine time.
 
--- 
-Regards,
-Ivan Khoronzhuk
+  git://github.com/lumag/linux h3xxx-gpios
+
+for you to fetch changes up to c9027b88b6e79556599ca625d2c674704985474a:
+
+  arm: sa1100: h3xxx: drop hand-coded gpio_request_array analogue (2013-11-21 01:51:02 +0400)
+
+----------------------------------------------------------------
+Dmitry Eremin-Solenikov (6):
+      arm: sa1100: h3100: refactor LCD GPIO handling
+      arm: sa1100: h3600: refactor LCD GPIO handling
+      arm: sa1100: h3100: refactor IrDA GPIO handling
+      arm: sa1100: h3600: refactor IrDA GPIO handling
+      arm: sa1100: h3xxx: move serial port GPIO handling to common place
+      arm: sa1100: h3xxx: drop hand-coded gpio_request_array analogue
+
+ arch/arm/mach-sa1100/h3100.c              | 61 ++++++++++++++++++++++++++++++++++++++++++++-----------------
+ arch/arm/mach-sa1100/h3600.c              | 81 +++++++++++++++++++++++++++++++++------------------------------------------------
+ arch/arm/mach-sa1100/h3xxx.c              | 58 +++++++++++++++++++++++++++-------------------------------
+ arch/arm/mach-sa1100/include/mach/h3xxx.h | 11 -----------
+ 4 files changed, 104 insertions(+), 107 deletions(-)
