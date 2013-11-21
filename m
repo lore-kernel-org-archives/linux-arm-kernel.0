@@ -1,38 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 21 Nov 2013 10:52:31 -0800
-Subject: Patches from ARM folks solicited for the -stable tree
-In-Reply-To: <20131121185021.GA15057@kroah.com>
-References: <alpine.DEB.2.02.1311210442560.30143@utopia.booyaka.com>
- <20131121153254.GA3422@kroah.com>
- <alpine.DEB.2.02.1311211818000.30143@utopia.booyaka.com>
- <20131121185021.GA15057@kroah.com>
-Message-ID: <CAOesGMh=55jMdPE-wNha-A4hvRBNhAwWqZzWVSDxtcAApe4jAw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 21 Nov 2013 18:53:18 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131121162944.F087FC406A3@trevor.secretlab.ca>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131115175241.GB27174@quad.lixom.net>
+ <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
+ <20131121162944.F087FC406A3@trevor.secretlab.ca>
+Message-ID: <20131121185318.GG8120@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 10:50 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Thu, Nov 21, 2013 at 06:20:29PM +0000, Paul Walmsley wrote:
->> On Thu, 21 Nov 2013, Greg Kroah-Hartman wrote:
->>
->> > On Thu, Nov 21, 2013 at 04:43:37AM +0000, Paul Walmsley wrote:
->> >
->> > > These days it seems like I have about one patch per merge window that
->> > > could be a stable candidate.
->> >
->> > That's all?
->>
->> The better we are at writing and testing our patches, the fewer -stable
->> candidates we'll have :-)
->
-> No new device ids?  quirks?  And if you aren't finding bugs in your
-> code, then no one's using it :)
+On Thu, Nov 21, 2013 at 04:29:44PM +0000, Grant Likely wrote:
 
-It's been common that we need driver changes _and_ DTS updates, so
-things have fallen off the list because of that.
+> We are pushing a lot of boundaries and doing things on ACPI that have
+> never been done before. SPI, GPIOs, Clocks, Regulators, composite
+> devices, key-value properties. All brand new territory, and the Linux
+> world is driving a lot of it.
 
-I do have a couple of DTS changes I've been meaning to submit but
-never got around to. Any week now...
+Indeed, and at a subsystem and platform independent driver level we do
+have the x86 embedded platforms working with ACPI right now so Linux is
+going to need to cope with some of this regardless of what people end up
+doing for ARM servers - Intel are sending me patches for ACPI support in
+ASoC for example.
 
+> Personally, I think the issue of ACPI support should be taken on a
+> patch-by-patch basis. A lot of the things that need to be done are quite
+> discrete and fairly well contained. If the patches don't look that way
+> then push back on them. For the parts that look ready, go ahead and
+> merge it. Push back on the ones that don't.
 
--Olof
++1.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131121/1285621f/attachment.sig>
