@@ -1,46 +1,182 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 21 Nov 2013 18:16:08 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131120064056.GB5272@netboy>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com> <5289A356.
- 4060004@jonmasters.org> <20131118150052.GC24408@sirena.org.uk> <
- 20131118191336.GB5886@quad.lixom.net> <20131119091216.GA4412@netboy> <
- 20131119184827.GD20967@quad.lixom.net> <20131120064056.GB5272@netboy>
-Message-ID: <20131121181608.1DDDCC406A3@trevor.secretlab.ca>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 21 Nov 2013 23:45:29 +0530
+Subject: [PATCH v6 4/6] gpio: davinci: add OF support
+In-Reply-To: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <1385057731-4348-5-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Nov 2013 07:40:57 +0100, Richard Cochran <richardcochran@gmail.com> wrote:
-> On Tue, Nov 19, 2013 at 10:48:27AM -0800, Olof Johansson wrote:
-> > 
-> > This is just a tangent and a distraction anyway: You should know by
-> > now that we've decided to keep backwards compatibility going forward,
-> > so any argument about why we did it differently before is leading nowhere.
-> 
-> Yes, I know it is tangent, but the tone in which you address people
-> (like Jon Masters) who complain about DT quality is really not fair.
-> 
-> When DT for arm was first proposed, I argued against it in vain.
-> Since then, I have really, truly tried my best to keep on top of the
-> DT discussions on the arm list, because everyone working on the arm
-> platform will have to know DT intimately, whether they want to or not.
-> 
-> Now, I never saw any proclamation or discussion about "DT is in flux"
-> on the arm list. If I had, I surely would have complained, and loudly.
-> AFAICT, this decision was made in rather private circles, but you talk
-> as if this was abundantly clear. *It was not.*
-> 
-> Or if it was announced in some way, just show me where. Otherwise,
-> please stop the "we were upfront about this from day one" excuses.
+From: KV Sujith <sujithkv@ti.com>
 
-No, I cannot point at any one place where it was stated outright. My
-memory is not that good. There were lots of times the stability of DT
-bindings was discussed, and I certainly have told people on the mailing
-list to keep their dtb updated while we are figuring out things like
-clock bindings and adding functionality. I'm sorry that it wasn't more
-clear. As has already been said in this thread, when the DT migration
-started, we didn't know how it should all look and work. It took time to
-figure out what was sane and what was not.
+This patch adds OF parser support for davinci gpio
+driver and also appropriate documentation in gpio-davinci.txt
+located at Documentation/devicetree/bindings/gpio/.
 
-g.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: KV Sujith <sujithkv@ti.com>
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+[prabhakar.csengg at gmail.com: simplified the OF code, removed
+		unnecessary DT property and also simplified
+		the commit message]
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+---
+ .../devicetree/bindings/gpio/gpio-davinci.txt      |   41 ++++++++++++++
+ drivers/gpio/gpio-davinci.c                        |   57 ++++++++++++++++++--
+ 2 files changed, 95 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+new file mode 100644
+index 0000000..a2e839d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+@@ -0,0 +1,41 @@
++Davinci GPIO controller bindings
++
++Required Properties:
++- compatible: should be "ti,dm6441-gpio"
++
++- reg: Physical base address of the controller and the size of memory mapped
++       registers.
++
++- gpio-controller : Marks the device node as a gpio controller.
++
++- interrupt-parent: phandle of the parent interrupt controller.
++
++- interrupts: Array of GPIO interrupt number. Only banked or unbanked IRQs are
++	      supported at a time.
++
++- ti,ngpio: The number of GPIO pins supported.
++
++- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt
++		             line to processor.
++
++The GPIO controller also acts as an interrupt controller. It uses the default
++two cells specifier as described in Documentation/devicetree/bindings/
++interrupt-controller/interrupts.txt.
++
++Example:
++
++gpio: gpio at 1e26000 {
++	compatible = "ti,dm6441-gpio";
++	gpio-controller;
++	reg = <0x226000 0x1000>;
++	interrupt-parent = <&intc>;
++	interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
++		44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
++		46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
++		48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
++		50 IRQ_TYPE_EDGE_BOTH>;
++	ti,ngpio = <144>;
++	ti,davinci-gpio-unbanked = <0>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++};
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 4d6adbc..5bdd9f8 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -17,6 +17,9 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/gpio-davinci.h>
+ 
+@@ -134,6 +137,40 @@ davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 	writel((1 << offset), value ? &g->set_data : &g->clr_data);
+ }
+ 
++static struct davinci_gpio_platform_data *
++davinci_gpio_get_pdata(struct platform_device *pdev)
++{
++	struct device_node *dn = pdev->dev.of_node;
++	struct davinci_gpio_platform_data *pdata;
++	int ret;
++	u32 val;
++
++	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
++		return pdev->dev.platform_data;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return NULL;
++
++	ret = of_property_read_u32(dn, "ti,ngpio", &val);
++	if (ret)
++		goto of_err;
++
++	pdata->ngpio = val;
++
++	ret = of_property_read_u32(dn, "ti,davinci-gpio-unbanked", &val);
++	if (ret)
++		goto of_err;
++
++	pdata->gpio_unbanked = val;
++
++	return pdata;
++
++of_err:
++	dev_err(&pdev->dev, "Populating pdata from DT failed: err %d\n", ret);
++	return NULL;
++}
++
+ static int davinci_gpio_probe(struct platform_device *pdev)
+ {
+ 	int i, base;
+@@ -144,12 +181,14 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
+ 
+-	pdata = dev->platform_data;
++	pdata = davinci_gpio_get_pdata(pdev);
+ 	if (!pdata) {
+ 		dev_err(dev, "No platform data found\n");
+ 		return -EINVAL;
+ 	}
+ 
++	dev->platform_data = pdata;
++
+ 	/*
+ 	 * The gpio banks conceptually expose a segmented bitmap,
+ 	 * and "ngpio" is one more than the largest zero-based
+@@ -195,6 +234,9 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+ 		if (chips[i].chip.ngpio > 32)
+ 			chips[i].chip.ngpio = 32;
+ 
++#ifdef CONFIG_OF_GPIO
++		chips[i].chip.of_node = dev->of_node;
++#endif
+ 		spin_lock_init(&chips[i].lock);
+ 
+ 		regs = gpio2regs(base);
+@@ -506,11 +548,20 @@ done:
+ 	return 0;
+ }
+ 
++#if IS_ENABLED(CONFIG_OF)
++static const struct of_device_id davinci_gpio_ids[] = {
++	{ .compatible = "ti,dm6441-gpio", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
++#endif
++
+ static struct platform_driver davinci_gpio_driver = {
+ 	.probe		= davinci_gpio_probe,
+ 	.driver		= {
+-		.name	= "davinci_gpio",
+-		.owner	= THIS_MODULE,
++		.name		= "davinci_gpio",
++		.owner		= THIS_MODULE,
++		.of_match_table	= of_match_ptr(davinci_gpio_ids),
+ 	},
+ };
+ 
+-- 
+1.7.9.5
