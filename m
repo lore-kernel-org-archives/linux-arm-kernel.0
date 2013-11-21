@@ -1,76 +1,65 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 21 Nov 2013 13:15:58 +0000
-Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <1384853593-32202-3-git-send-email-hdoyu@nvidia.com>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com> <
- 1384853593-32202-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20131121131558.E5B82C40A2C@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Nov 2013 14:20:28 +0100
+Subject: [PATCH v3 3/4] ata: Add APM X-Gene SoC SATA host controller driver
+In-Reply-To: <CAPw-ZTmaz3nnV3ThRgecT_RaYYW0bmfWvL8Kr-S3z1aKyUWc+w@mail.gmail.com>
+References: <1384465153-29902-1-git-send-email-lho@apm.com>
+ <201311151448.16279.arnd@arndb.de>
+ <CAPw-ZTmaz3nnV3ThRgecT_RaYYW0bmfWvL8Kr-S3z1aKyUWc+w@mail.gmail.com>
+Message-ID: <201311211420.28509.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Nov 2013 11:33:06 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> IOMMU devices on the bus need to be poplulated first, then iommu
-> master devices are done later.
-> 
-> With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
-> whether a device can be an iommu msater or not. If a device can, we'll
-> defer to populate that device till an iommu device is populated. Once
-> an iommu device is populated, "dev->bus->iommu_ops" is set in the
-> bus. Then, those defered iommu master devices are populated and
-> configured for IOMMU with help of the already populated iommu device
-> via iommu_ops->add_device(). Multiple IOMMUs can be listed on this
-> "iommus" binding so that a device can have multiple IOMMUs attached.
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
-> v5:
-> Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
-> 
-> v4:
-> This is newly added, and the successor of the following RFC:
->   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
->   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
-> ---
->  drivers/base/dd.c        |  5 +++++
->  drivers/iommu/of_iommu.c | 22 ++++++++++++++++++++++
->  include/linux/of_iommu.h |  7 +++++++
->  3 files changed, 34 insertions(+)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 35fa368..6e892d4 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -25,6 +25,7 @@
->  #include <linux/async.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pinctrl/devinfo.h>
-> +#include <linux/of_iommu.h>
->  
->  #include "base.h"
->  #include "power/power.h"
-> @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  
->  	dev->driver = drv;
->  
-> +	ret = of_iommu_attach(dev);
-> +	if (ret)
-> +		goto probe_failed;
-> +
->  	/* If using pinctrl, bind pins now before probing */
->  	ret = pinctrl_bind_pins(dev);
->  	if (ret)
+On Saturday 16 November 2013, Loc Ho wrote:
 
-I'm very concerned about this approach. Hooking into the core probe
-path for things like this is not going to scale well. I'm not thrilled
-with the pinctrl hook being here either, but that is already merged. :-(
-Also, hooking in here is going affect every single device device driver
-probe path, and a large number of them are never, ever, going to have
-iommu interactions.
 
-There needs to be a less invasive way of doing what you want. I still
-feel like the individual device drivers themselves need to be aware that
-they might be hooking through an IOMMU. Or, if they are hooking through
-a bus like PCIe, then have the PCIe bus defer creating child devices
-until the IOMMU is configured and in place.
+> >
+> > config SATA_XGENE
+> >         tristate "APM X-Gene 6.0Gbps SATA host controller support"
+> >         depends on ARM64 || COMPILE_TEST
+> >         ...
+> >
+> [Loc Ho]
+> Okay. How about this?
+> 
+>  depends on ARM64 || COMPILE_TEST
+>  select SATA_XGENE_PHY && SATA_AHCI_PLATFORM
 
-g.
+I think you already found the mistake withis and corrected this in v4.
+
+> > The interface you are looking for is pr_debug() or dev_dbg(), which get
+> > built-in only if the DEBUG macro is set.
+> >
+> > In a lot of cases, it's actually best to remove debug output like this from
+> > the driver once you have it working  -- whoever is debugging problems in
+> > the driver next might need completely different debugging information or
+> > can add them back easily if needed.
+> >
+> > It's your choice if you want to use pr_debug() or remove that output
+> > entirely. If you remove it, best remove the helper functions entirely
+> > and use readl/writel directly.
+> [Loc Ho]
+> I would like to keep this function for now until this driver actual
+> being used in production. I will use pr_debug.
+
+Ok.
+
+> >> diff --git a/drivers/ata/sata_xgene.h b/drivers/ata/sata_xgene.h
+> >> new file mode 100644
+> >> index 0000000..51e73f6
+> >> --- /dev/null
+> >> +++ b/drivers/ata/sata_xgene.h
+> >
+> > This file should probably just be folded into the driver, since it contains no
+> > interfaces between  modules, just internal definitions.
+> [Loc Ho]
+> I can get rip this header file now. But in the future I may need to
+> add this back as I intended this driver to also support running from
+> our co-processor (ARMv7 32-bit). For that, I will need anothe file and
+> other function that will need knowledge of the context structure and
+> etc.
+
+Hmm, is the code for that coprocessor compiled from the kernel source?
+If not, it shouldn't really make a difference as it won't live in a shared
+code repository.
+
+	Arnd
