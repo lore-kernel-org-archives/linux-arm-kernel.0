@@ -1,35 +1,46 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 21 Nov 2013 23:13:10 +0100
-Subject: ARM network performance and dma_mask
-In-Reply-To: <528E82C6.2010106@gmail.com>
-References: <20131119174323.GH913@1wt.eu>
- <1384885910.8604.110.camel@edumazet-glaptop2.roam.corp.google.com>
- <20131119184121.GN913@1wt.eu> <874n780wzc.fsf@natisbad.org>
- <20131120191145.GP8581@1wt.eu> <87txf692zx.fsf@natisbad.org>
- <20131120215435.GT8581@1wt.eu> <20131121004430.GX8581@1wt.eu>
- <20131121183834.GB18513@1wt.eu> <528E82C6.2010106@gmail.com>
-Message-ID: <20131121221310.GG18513@1wt.eu>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 21 Nov 2013 22:15:37 +0000 (UTC)
+Subject: Patches from ARM folks solicited for the -stable tree
+In-Reply-To: <20131121185021.GA15057@kroah.com>
+References: <alpine.DEB.2.02.1311210442560.30143@utopia.booyaka.com>
+ <20131121153254.GA3422@kroah.com>
+ <alpine.DEB.2.02.1311211818000.30143@utopia.booyaka.com>
+ <20131121185021.GA15057@kroah.com>
+Message-ID: <alpine.DEB.2.02.1311212210150.9743@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 04:01:42PM -0600, Rob Herring wrote:
-> The patch was to fix this issue[1]. It is fixed in the core code because
-> dma_mask not being set has been a known issue with DT probing for some
-> time. Since most drivers don't seem to care, we've gotten away with it.
-> I thought the normal failure mode was drivers failing to probe.
+On Thu, 21 Nov 2013, Greg Kroah-Hartman wrote:
 
-It seems that very few drivers try to set their mask, so probably that
-the default value was already OK even though less performant.
-
-> As to why it helps performance, I'm not really sure. Perhaps it is
-> causing some bounce buffers to be used.
-
-That's also the thing I have been thinking about, and given this device
-only has a 16-bit DDR bus, bounce buffers can make a difference.
-
-> Rob
+> On Thu, Nov 21, 2013 at 06:20:29PM +0000, Paul Walmsley wrote:
+> > On Thu, 21 Nov 2013, Greg Kroah-Hartman wrote:
+> > 
+> > > On Thu, Nov 21, 2013 at 04:43:37AM +0000, Paul Walmsley wrote:
+> > >
+> > > > These days it seems like I have about one patch per merge window that 
+> > > > could be a stable candidate.
+> > > 
+> > > That's all?
+> > 
+> > The better we are at writing and testing our patches, the fewer -stable 
+> > candidates we'll have :-)  
 > 
-> [1] http://lists.xen.org/archives/html/xen-devel/2013-10/msg00092.html
+> No new device ids? quirks? 
 
-Thanks for your quick explanation Rob!
-Willy
+It's true that the focus here for -stable has mostly been for fixes for 
+code that causes some kind of crash or failure, rather than new device 
+support.  Including new device support could probably increase the amount 
+of -stable patches by quite a bit.  The problem with this is that it could 
+cause hard-to-find regressions in the -stable kernel.  For example, on 
+OMAP, adding support for a new device could potentially cause PM 
+regressions on the rest of the system, depending on how the driver 
+operates.  So the bar for those types of patches seems pretty high if it's 
+really intended to be a "stable" kernel.
+
+> And if you aren't finding bugs in your code, then no one's using it :)
+
+Yeah that's probably increasingly an issue for the older OMAP platforms 
+these days.
+
+
+- Paul
