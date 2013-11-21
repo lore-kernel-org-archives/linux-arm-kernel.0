@@ -1,40 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 21 Nov 2013 18:26:03 +0000
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Nov 2013 19:26:02 +0100
 Subject: ACPI vs DT at runtime
-In-Reply-To: <528A4F5F.7080104@jonmasters.org>
+In-Reply-To: <20131121161037.C528CC406A3@trevor.secretlab.ca>
 References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <3371903.8j54vrCjEN@wuerfel> <
- CAOesGMiYyOcvr3Aqs-p8zc=XDwJM9NZtNxtxrTZssc6F=siZCw@mail.gmail.com> <
- 201311180945.52764.arnd@arndb.de> <528A4F5F.7080104@jonmasters.org>
-Message-ID: <20131121182603.B15C8C406A3@trevor.secretlab.ca>
+ com> <201311181605.37300.arnd@arndb.de>
+ <20131121161037.C528CC406A3@trevor.secretlab.ca>
+Message-ID: <201311211926.03228.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Nov 2013 12:33:19 -0500, Jon Masters <jonathan@jonmasters.org> wrote:
-> On 11/18/2013 03:45 AM, Arnd Bergmann wrote:
-> > On Sunday 17 November 2013, Olof Johansson wrote:
-> 
-> >> Yep, and together for review is a critical part. I'm not saying that
-> >> the ideal solution is a flashed DTB, but it's better than ACPI. A
-> >> flashed DTB that's _easy to update_ as part of an OS install would
-> >> probably be one of the best solutions we could ask for though.
-> > 
-> > Right: the assumption on the DT boot interfaces is that board designers
-> > make mistakes and are working on moving targets, so we need ways to update
-> > the DTB. By contrast, the assumption on ACPI is that server firmware
-> > authors know what they are doing and you shouldn't let anyone else mess
-> > with the ACPI bits because doing so might damage your hardware. We're
-> > in trouble if the second assumption turns out wrong.
-> 
-> In the server space we *never* ship updated ACPI tables in Red Hat
-> products, and we never would ship updated tables as part of the OS.
-> Platform data is platform data. It belongs to the vendor shipping the
-> system, never to the OS. Yes, there are workarounds for bugs but on the
-> whole you do in fact count on server vendors not to screw it up, and if
-> they do then it is up to them to ship a BIOS update for their hardware.
+On Thursday 21 November 2013, Grant Likely wrote:
+> This too should look transparent to device drivers. DT and ACPI have
+> different mechanism for doing cross tree references, but the concept is
+> the same. A driver calling something like "platform_get_my_gpio_resource()"
+> should do the right thing with either an ACPI or DT backend. None of
+> that should appear as custom device driver or architecture code. It
+> should be generic code supporting the driver core.
 
-Agreed, shipping tables with RHEL is insane. If DT is used on the
-servers, then the firmware needs to provide the DT, with the option to
-override only when *absolutely* necessary.
+I definitely agree with the approach, and I've already made some suggestions
+for how to implement parts of this. The problem is that this will touch
+dozens of subsystems and hundreds of device drivers. We have the experience
+of having done it all before when introducing the DT interfaces and some of
+the new subsystems, which is a big advantage for doing it again, but on the
+other hand there are now more drivers than we had before, and we have to
+be more careful so we don't break the existing code base.
 
-g.
+> Regardless of the ACPI on ARM question, we need to do this anyway. There
+> are Intel platforms that need it.
+
+There is certainly some overhead, but my guess is that it's actually
+less than half of the total work because they are trying to do something
+completely different:
+
+- Intel are doing this only for embedded systems, so they don't have to
+  worry about subsystems that are only relevant to servers (e.g. fault
+  isolation)
+- Significant parts of the x86 architecture are completely standardized
+  and don't need to be described in a complex matter (e.g. IOMMU)
++ A number of subsystems that Intel needs to handle on embedded systems
+  should really not be described in detail on servers on any architecture
+  but instead be handled in AML or SMBIOS (e.g. pinctrl or phy).
++ Some subsystems won't even be used on servers and don't need to be
+  handled at all but are very relevant to embedded systems (e.g. v4l or
+  dmaengine)
+
+For the parts that do overlap (e.g. irqdomain or reset), we should
+certainly work together across architectures. 
+
+	Arnd
