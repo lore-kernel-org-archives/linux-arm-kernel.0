@@ -1,71 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 Nov 2013 11:00:24 +0000
-Subject: Report from 2013 ARM kernel summit
-In-Reply-To: <CAL_Jsq+AxEWhkOhxwAZ=+rpzDZ+yC1b3ZV541UhOu9kiwUhUdQ@mail.gmail.com>
-References: <20131119.114054.663999769447782808.hdoyu@nvidia.com>
- <20131119173524.GK11778@mudshark.cambridge.arm.com>
- <528BCDCE.6070006@gmail.com>
- <20131120.083955.1386179068365424976.hdoyu@nvidia.com>
- <CAL_Jsq+AxEWhkOhxwAZ=+rpzDZ+yC1b3ZV541UhOu9kiwUhUdQ@mail.gmail.com>
-Message-ID: <20131121110024.GA8395@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 21 Nov 2013 11:09:50 +0000
+Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
+ device tree case
+In-Reply-To: <20131121104654.GA23067@lee--X1>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <1384562167-14725-2-git-send-email-tony@atomide.com>
+ <20131118102907.GC13640@lee--X1>
+ <20131118172510.GI16038@saruman.home>
+ <20131118174638.GQ13640@lee--X1>
+ <20131118181110.GM10317@atomide.com>
+ <20131118190921.GT13640@lee--X1>
+ <20131118192256.GU10317@atomide.com>
+ <20131121104654.GA23067@lee--X1>
+Message-ID: <20131121110950.GC23067@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 08:02:10PM +0000, Rob Herring wrote:
-> On Wed, Nov 20, 2013 at 12:39 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> >   smmu_a: iommu at xxxxxxxx {
-> >         #iommu-cells = <2>;
-> >         ....
-> >   };
-> >
-> >   smmu_b: iommu at xxxxxxxx {
-> >         #iommu-cells = <3>;
-> >         ....
-> >   };
-> >
-> >   device_a {
-> >          iommus = <&smmu_a param1 param2>,
-> >                   <&smmu_b param1 param2 param3>;
-> >   };
-> >
-> > This can describe the relation between a device and an iommu
-> > independently. The number of params needed for each IOMMU can be
-> > sepcified by #iommu-cells in its iommu entry.
-> >
-> >   device_a <-> smmu_a, needs 2 params for a device
-> >   device_a <-> smmu_b, needs 3 params for a device
-> >
-> > For example, "smmu_a" can be an bus level global IOMMU where all child
-> > devices can be an master of "smmu_a", and "smmu_b" is a local IOMMU
-> > only for "device_a".
-> >
-> > "memory controller"---"smmu_a"---bus--+--"smmu_b"--"device_a"
-> >                                       |
-> >                                       |
-> >                                       +--"device_b"
+> Here Tony, you can take this one.
 > 
-> I think the above binding would be the correct way to describe things
-> if you have 1 device connected to 2 IOMMUs (directly rather than
-> chained). IIUC, that is something you have on tegra?
+> I will simply apply my other fixes on top of it.
 > 
-> For the topology above where you are chaining iommu's, I think
-> something like this is more accurately describing the hierarchy:
+> The issue is, I will most likely have to rebase it on top of -rc1 prior
+> to sending a request to Linus, so in that regard it's not exactly
+> immutable.
 > 
->   smmu_b: iommu at xxxxxxxx {
->         #iommu-cells = <3>;
->          iommus = <&smmu_a param1 param2>;
->        ....
->   };
->   device_a {
->          iommus = <&smmu_b param1 param2 param3>;
->   };
-> 
-> I remember discussing this with Will and seem to recall some issue
-> with describing things this way. But looking at it now, I don't see
-> what that was.
 
-I think it was the usual issue with StreamID remastering. For example, if
-you had a device going into two chained IOMMUs, you need a way to relate the
-StreamIDs of the device to the remastered IDs coming out of the first SMMU.
+Ignore the above. This is what you want:
 
-Will
+The following changes since commit 5e01dc7b26d9f24f39abace5da98ccbd6a5ceb52:
+
+  Linux 3.12 (2013-11-03 15:41:51 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ljones/mfd.git tags/ib-tony
+
+for you to fetch changes up to f984370913d3ba5d13806cc8ac6fc26f8ebd1694:
+
+  mfd: twl-core: Fix passing of platform data in the device tree case (2013-11-21 10:42:36 +0000)
+
+----------------------------------------------------------------
+warning: refname 'ib-tony' is ambiguous.
+Immutable branch for Tony Lindgren
+
+----------------------------------------------------------------
+Tony Lindgren (1):
+      mfd: twl-core: Fix passing of platform data in the device tree case
+
+ drivers/mfd/twl-core.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
