@@ -1,63 +1,64 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 21 Nov 2013 16:42:31 +0100
-Subject: [PATCH v2 3/4] x86: align with generic cpu modalias
+Date: Thu, 21 Nov 2013 16:42:32 +0100
+Subject: [PATCH v2 4/4] arm64: advertise CPU features for modalias matching
 In-Reply-To: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1385048552-12528-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1385048552-12528-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1385048552-12528-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Align with the new generic 'cpu:type:...:features:...' modalias
-by moving the 'x86' prefix and the vendor/family/model IDs into
-the 'type' field.
+This enables the generic implementation in drivers/base/cpu.c
+that allows modules to be loaded automatically based on the
+optional features supported (and advertised over udev) by the
+CPU.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/x86/kernel/cpu/match.c |  3 +--
- scripts/mod/file2alias.c    | 10 +++++-----
- 2 files changed, 6 insertions(+), 7 deletions(-)
+ arch/arm64/Kconfig        |  3 +++
+ arch/arm64/kernel/setup.c | 20 ++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/arch/x86/kernel/cpu/match.c b/arch/x86/kernel/cpu/match.c
-index ab6082a..82e92b2 100644
---- a/arch/x86/kernel/cpu/match.c
-+++ b/arch/x86/kernel/cpu/match.c
-@@ -56,8 +56,7 @@ ssize_t arch_print_cpu_modalias(struct device *dev,
- 	int i, n;
- 	char *buf = bufptr;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c044548..50cd97f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -202,6 +202,9 @@ config ARCH_WANT_HUGE_PMD_SHARE
+ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	def_bool y
  
--	n = snprintf(buf, size, "x86cpu:vendor:%04X:family:%04X:"
--		     "model:%04X:feature:",
-+	n = snprintf(buf, size, "cpu:type:x86,ven%04Xfam%04Xmod%04X:feature:",
- 		boot_cpu_data.x86_vendor,
- 		boot_cpu_data.x86,
- 		boot_cpu_data.x86_model);
-diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
-index efc7abe..856c343 100644
---- a/scripts/mod/file2alias.c
-+++ b/scripts/mod/file2alias.c
-@@ -1110,7 +1110,7 @@ static int do_amba_entry(const char *filename,
- }
- ADD_TO_DEVTABLE("amba", amba_id, do_amba_entry);
++config ARCH_HAS_CPU_AUTOPROBE
++	def_bool y
++
+ source "mm/Kconfig"
  
--/* LOOKS like x86cpu:vendor:VVVV:family:FFFF:model:MMMM:feature:*,FEAT,*
-+/* LOOKS like cpu:type:x86,venVVVVfamFFFFmodMMMM:feature:*,FEAT,*
-  * All fields are numbers. It would be nicer to use strings for vendor
-  * and feature, but getting those out of the build system here is too
-  * complicated.
-@@ -1124,10 +1124,10 @@ static int do_x86cpu_entry(const char *filename, void *symval,
- 	DEF_FIELD(symval, x86_cpu_id, model);
- 	DEF_FIELD(symval, x86_cpu_id, vendor);
- 
--	strcpy(alias, "x86cpu:");
--	ADD(alias, "vendor:",  vendor != X86_VENDOR_ANY, vendor);
--	ADD(alias, ":family:", family != X86_FAMILY_ANY, family);
--	ADD(alias, ":model:",  model  != X86_MODEL_ANY,  model);
-+	strcpy(alias, "cpu:type:x86,");
-+	ADD(alias, "ven", vendor != X86_VENDOR_ANY, vendor);
-+	ADD(alias, "fam", family != X86_FAMILY_ANY, family);
-+	ADD(alias, "mod", model  != X86_MODEL_ANY,  model);
- 	strcat(alias, ":feature:*");
- 	if (feature != X86_FEATURE_ANY)
- 		sprintf(alias + strlen(alias), "%04X*", feature);
+ config XEN_DOM0
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 055cfb8..775a531 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -366,3 +366,23 @@ const struct seq_operations cpuinfo_op = {
+ 	.stop	= c_stop,
+ 	.show	= c_show
+ };
++
++ssize_t arch_print_cpu_modalias(struct device *dev,
++				struct device_attribute *attr,
++				char *buf)
++{
++	unsigned int caps;
++	ssize_t n;
++	int i;
++
++	/*
++	 * With 32 features maximum (taking 5 bytes each to print), we don't
++	 * need to worry about overrunning the PAGE_SIZE sized buffer.
++	 */
++	n = sprintf(buf, "cpu:type:%s:feature:", ELF_PLATFORM);
++	for (caps = elf_hwcap, i = 0; caps; caps >>= 1, i++)
++		if (caps & 1)
++			n += sprintf(&buf[n], ",%04X", i);
++	buf[n++] = '\n';
++	return n;
++}
 -- 
 1.8.3.2
