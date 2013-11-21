@@ -1,63 +1,68 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Thu, 21 Nov 2013 11:40:14 +0530
-Subject: [PATCH V4 1/2] genirq: Add an accessor for IRQ_PER_CPU flag
-In-Reply-To: <CAPrCYkefGMfweREk8bBKsO2VY4Tnc-fUZW8sw_K5ugRj5zJUFA@mail.gmail.com>
-References: <1384946021-22100-1-git-send-email-vkale@apm.com>
- <1384946021-22100-2-git-send-email-vkale@apm.com>
- <528CFC77.5050200@codeaurora.org>
- <CAPrCYkefGMfweREk8bBKsO2VY4Tnc-fUZW8sw_K5ugRj5zJUFA@mail.gmail.com>
-Message-ID: <CAPrCYkdpHPPY6D1dj5R=QJ5mtmKUfTx+M7wRMV-t2LrZMdSW9w@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 20 Nov 2013 23:11:34 -0700
+Subject: [PATCH v4 0/4] ata: Add APM X-Gene SoC SATA host controller support
+Message-ID: <1385014298-15700-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[removing chris.smith at st.com]
+ata: Add APM X-Gene SoC SATA host controller support
 
-On Thu, Nov 21, 2013 at 11:36 AM, Vinayak Kale <vkale@apm.com> wrote:
-> On Wed, Nov 20, 2013 at 11:46 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 11/20/13 03:13, Vinayak Kale wrote:
->>> This patch adds an accessor function for IRQ_PER_CPU flag.
->>> The accessor function is useful to dertermine whether an IRQ is percpu or not.
->>>
->>> Signed-off-by: Vinayak Kale <vkale@apm.com>
->>> ---
->>
->> This looks like a copy of Chris Smith's patch. Shouldn't Chris be the
->> author and the commit text be whatever Chris sent?
->
-> In the cover letter of this patch series I did mention about Chris's
-> earlier patch. I didn't know his email-id earlier, have found the
-> mail-id now. CCing the mail-id to check whether it's still valid.
->
+This patch adds support for the APM X-Gene SoC SATA host controller. In
+order for the host controller to work, the corresponding SATA PHY driver
+musts also be available.
 
-Chris's mail-id doesn't seem to be valid, the earlier mail to his
-mail-id [chris.smith at st.com] bounced.
-Please let me know in such case how to mention original author's credits.
+v4:
+ * Remove the ID property in DT
+ * Remove the temporary PHY direct function call and use PHY function
+ * Change printk to pr_debug
+ * Move the IOB flush addresses into the DT
+ * Remove the parameters retrieval function as no longer needed
+ * Remove the header file as no longer needed 
+ * Require v2 patch of the SATA PHY driver. Require slightly modification
+   in the Kconfig as it is moved to folder driver/phy and use Kconfig
+   PHY_XGENE_SATA instead SATA_XGENE_PHY.
 
->>
->>>  include/linux/irqdesc.h |    8 ++++++++
->>>  1 file changed, 8 insertions(+)
->>>
->>> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
->>> index 56fb646..26e2661 100644
->>> --- a/include/linux/irqdesc.h
->>> +++ b/include/linux/irqdesc.h
->>> @@ -152,6 +152,14 @@ static inline int irq_balancing_disabled(unsigned int irq)
->>>       return desc->status_use_accessors & IRQ_NO_BALANCING_MASK;
->>>  }
->>>
->>> +static inline int irq_is_percpu(unsigned int irq)
->>> +{
->>> +     struct irq_desc *desc;
->>> +
->>> +     desc = irq_to_desc(irq);
->>> +     return desc->status_use_accessors & IRQ_PER_CPU;
->>> +}
->>> +
->>>  static inline void
->>>  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
->>>  {
->>
->> --
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->> hosted by The Linux Foundation
->>
+v3:
+ * Move out the SATA PHY to another driver
+ * Remove the clock-cells entry from DTS
+ * Remove debug wrapper
+ * Remove delay functions wrapper
+ * Clean up resource and IRQ query
+ * Remove query clock name
+ * Switch to use dma_set_mask/dma_coherent_mask
+ * Remove un-necessary devm_kfree
+ * Update GPL license header to v2
+ * Spilt up function xgene_ahci_hardreset
+ * Spilt up function xgene_ahci_probe
+ * Remove all reference of CONFIG_ARCH_MSLIM
+ * Clean up chip revision code
+
+v2:
+ * Clean up file sata_xgene.c with Lindent and etc
+ * Clean up file sata_xgene_serdes.c with Lindent and etc
+ * Add description to each patch
+
+v1:
+ * inital version
+
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+Loc Ho (4):
+  ata: Export required functions by APM X-Gene SATA driver
+  Documentation:: Add documentation for APM X-Gene SoC SATA host
+    controller DTS binding
+  ata: Add APM X-Gene SoC SATA host controller driver
+  arm64: Add APM X-Gene SoC SATA host controller DTS entries
+
+ .../devicetree/bindings/ata/apm-xgene.txt          |   56 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   33 +
+ drivers/ata/Kconfig                                |    8 +
+ drivers/ata/Makefile                               |    1 +
+ drivers/ata/ahci.h                                 |    6 +
+ drivers/ata/libahci.c                              |   13 +-
+ drivers/ata/sata_xgene.c                           | 1128 ++++++++++++++++++++
+ 7 files changed, 1240 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
+ create mode 100644 drivers/ata/sata_xgene.c
