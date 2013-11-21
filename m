@@ -1,49 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Nov 2013 11:48:54 -0700
-Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
- monitor
-In-Reply-To: <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
-References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>	<52828EF5.6090909@wwwdotorg.org>	<CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>	<5282E068.1070608@nvidia.com>
- <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
-Message-ID: <528E5596.7090606@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Nov 2013 10:51:05 -0800
+Subject: [PATCH 2/3] ARM: OMAP2+: Add fixed regulator to omap2plus_defconfig
+In-Reply-To: <1385059866-10646-1-git-send-email-tony@atomide.com>
+References: <1385059866-10646-1-git-send-email-tony@atomide.com>
+Message-ID: <1385059866-10646-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Russell, a question for you at the bottom)
+We do not have REGULATOR_FIXED selected if no boards are selected
+and we boot with device tree. This can cause various devices to
+fail.
 
-On 11/13/2013 10:57 AM, Olof Johansson wrote:
-> On Tue, Nov 12, 2013 at 6:14 PM, Alex Courbot <acourbot@nvidia.com> wrote:
->> On 11/13/2013 05:38 AM, Olof Johansson wrote:
-...
->>> I pinged Russell, and he brought up the fact that there were earlier
->>> requests to move it to drivers/firmware. It would make sense to try to
->>> get that done before merging, especially if you anticipate someone
->>> using TF on 64-bit platforms.
->>
->> IIRC when we discussed this point your last comment was as follows:
-> 
-> Touche. :) Thanks for the reminder.
-> 
->> On Tue, Oct 29, 2013 at 6:55 AM, Olof Johansson <olof@lixom.net> wrote:
->>> I think we can probably merge this under arch/arm now, and when we
->>> figure out what needs to be common with ARM64 we can move it out to a
->>> good location. It might be that mostly just a header file with ABI
->>> conventions needs to be shared, not actual implementation, for
->>> example.
->>
->> So I thought we agreed on that. If in the end we prefer to move the ARM
->> firmware interface into drivers/firmware, I'm fine with that too (Tomasz
->> also confirmed he would be ok with it) but I wonder if that would not be
->> somehow premature.
-...
-> Well, as I already said I'm ok with things going into arch/arm to
-> start with, as long as Russell is.
-...
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Russell, the patch Alex sent to move firmware_ops into drivers/firmware
-was rejected, so I don't think we can update this series to move the
-code there instead.
-
-So, are you OK with merging this series as-is, in arch/arm/firmware? If
-you could ack the patch/series to indicate that, it would be awesome.
-Thanks.
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 98a50c3..bfa80a1 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -173,6 +173,7 @@ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65217=y
+ CONFIG_MFD_TPS65910=y
+ CONFIG_TWL6040_CORE=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_PALMAS=y
+ CONFIG_REGULATOR_TPS65023=y
+ CONFIG_REGULATOR_TPS6507X=y
+-- 
+1.8.1.1
