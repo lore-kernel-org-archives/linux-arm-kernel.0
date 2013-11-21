@@ -1,33 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Nov 2013 10:24:56 -0500
-Subject: [PATCH] ARM: mv78xx0: delete local <mach/gpio.h> header
-In-Reply-To: <1385046390-13499-1-git-send-email-linus.walleij@linaro.org>
-References: <1385046390-13499-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20131121152456.GB29241@titan.lakedaemon.net>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 21 Nov 2013 16:17:02 +0100
+Subject: [PATCH 1/2] ARM: lpc32xx: delete local <mach/gpio.h> header
+In-Reply-To: <1385038734-9742-1-git-send-email-linus.walleij@linaro.org>
+References: <1385038734-9742-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <528E23EE.1030506@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 04:06:30PM +0100, Linus Walleij wrote:
+On 11/21/2013 01:58 PM, Linus Walleij wrote:
 > This header is not used by anything, and since the arch does
 > not specify NEED_MACH_GPIO_H it is not included into
 > <linux/gpio.h> either. Delete it.
 > 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Roland Stigge <stigge@antcom.de>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> I'm seeking an ACK from one of the mv78xx0 maintainers to
-> take this through the GPIO tree.
+> Roland, can you please ACK this so I can take it through the
+> GPIO tree?
 > ---
->  arch/arm/mach-mv78xx0/include/mach/gpio.h | 9 ---------
->  1 file changed, 9 deletions(-)
->  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/gpio.h
+>  arch/arm/mach-lpc32xx/include/mach/gpio.h | 6 ------
+>  1 file changed, 6 deletions(-)
+>  delete mode 100644 arch/arm/mach-lpc32xx/include/mach/gpio.h
+> 
+> diff --git a/arch/arm/mach-lpc32xx/include/mach/gpio.h b/arch/arm/mach-lpc32xx/include/mach/gpio.h
+> deleted file mode 100644
+> index 0052e7a76179..000000000000
+> --- a/arch/arm/mach-lpc32xx/include/mach/gpio.h
+> +++ /dev/null
+> @@ -1,6 +0,0 @@
+> -#ifndef __MACH_GPIO_H
+> -#define __MACH_GPIO_H
+> -
+> -#include "gpio-lpc32xx.h"
+> -
+> -#endif /* __MACH_GPIO_H */
+> 
 
-Build-tested with mv78xx0_defconfig against today's Linus' HEAD.
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+Acked-by: Roland Stigge <stigge@antcom.de>
