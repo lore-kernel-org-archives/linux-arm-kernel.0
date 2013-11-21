@@ -1,54 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 21 Nov 2013 10:06:42 -0800
-Subject: Patches from ARM folks solicited for the -stable tree
-In-Reply-To: <alpine.DEB.2.02.1311210442560.30143@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1311210442560.30143@utopia.booyaka.com>
-Message-ID: <CAOesGMgKPxRQk_XWpGcCWzi_fw3wSWUnXCXo-eF4JZ21-30HZg@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 21 Nov 2013 23:45:25 +0530
+Subject: [PATCH v6 0/6] gpio: daVinci: cleanup and feature enhancement
+Message-ID: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 
-First, let's make sure linux-arm-kernel is cc:d on the
-platform-maintainers emails. I meant it mostly to be used as a cc list
-for extra attention to avoid having to find things on LAKML, not as a
-standalone list.
+This patch series does the following
+1> Ports the driver to use irqdomain.
+2> Adds dt binding support for gpio-davinci.
+3> Adds DA850 dt support goio.
 
-On Wed, Nov 20, 2013 at 8:43 PM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> Talking with Greg KH last month, he mentioned that the -stable maintainers
-> aren't seeing enough patches from ARM SoC folks.  I'd assume this includes
-> both subarchitecture and driver code.  So maybe this is something we can
-> all change?
->
-> The stable kernel submission information is available here:
->
->    https://www.kernel.org/doc/Documentation/stable_kernel_rules.txt
->
-> These days it seems like I have about one patch per merge window that
-> could be a stable candidate.
+Changes for v6:
+1: GPIO driver now migrated to irq domain legacy.
+2: Fixed review comments pointed by Grygorii.
+3: Included Ack's.
 
-Thanks for bringing this up.
+This patch series is based on following fixup series
+http://us.generation-nt.com/answer/patch-0-2-davinci-gpio-fixes-help-212978272.html
 
-That does seem low, and we should be more mindful of it. I'm not
-giving excuses but I think there are a few contributing factors to it:
+This patch series has been tested for both banked and Un-banked GPIO.
 
-1) We've had people work on new functionality more than anything, so
-regressions don't really apply there, thus fewer stable fixes
+KV Sujith (3):
+  gpio: davinci: add OF support
+  ARM: davinci: da850: add GPIO DT node
+  ARM: davinci: da850 evm: add GPIO pinumux entries DT node
 
-2) Of the major platforms, very few actual products ship based on
-mainline, so the feedback loop for fixes is veeery long (or
-nonexistent). Most android platforms ship with substantially different
-kernel trees and drivers, which means that whatever bugs they fix
-don't apply to our versions (and would never find a way from -stable
-into their product trees) :(
+Lad, Prabhakar (3):
+  gpio: davinci: use readl/writel instead of __raw_*
+  This patch converts the davinci gpio driver to use irqdomain    
+    support.
+  gpio: davinci: remove unused variable intc_irq_num
 
-3) We've got fewer people relying on the older release (see above), in
-the sense that we've so far had quite few distros ship kernels.
+ .../devicetree/bindings/gpio/gpio-davinci.txt      |   41 +++++
+ arch/arm/boot/dts/da850-evm.dts                    |   20 +++
+ arch/arm/boot/dts/da850.dtsi                       |   14 ++
+ arch/arm/mach-davinci/da830.c                      |    1 -
+ arch/arm/mach-davinci/da850.c                      |    1 -
+ arch/arm/mach-davinci/dm355.c                      |    1 -
+ arch/arm/mach-davinci/dm365.c                      |    1 -
+ arch/arm/mach-davinci/dm644x.c                     |    1 -
+ arch/arm/mach-davinci/dm646x.c                     |    1 -
+ drivers/gpio/gpio-davinci.c                        |  173 ++++++++++++++------
+ include/linux/platform_data/gpio-davinci.h         |    3 +-
+ 11 files changed, 195 insertions(+), 62 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
 
-All three of the above should slowly be changing to the opposite,
-which should also mean more stable patches. I'm looking forward to
-that.
-
-
--Olof
+-- 
+1.7.9.5
