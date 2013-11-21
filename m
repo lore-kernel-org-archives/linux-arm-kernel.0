@@ -1,83 +1,23 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 21 Nov 2013 09:00:52 +0100
-Subject: [PATCHv9][ 3/3] ARM: dts: cpuimx35 Add touchscreen support.
-In-Reply-To: <20131121050922.GF18477@ns203013.ovh.net>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Thu, 21 Nov 2013 09:03:15 +0100
+Subject: [PATCHv9][ 1/3] Input: tsc2007: Add device tree support.
+In-Reply-To: <20131121050544.GE18477@ns203013.ovh.net>
 References: <1383916659-9988-1-git-send-email-denis@eukrea.com>
- <1383916659-9988-3-git-send-email-denis@eukrea.com>
- <20131121050922.GF18477@ns203013.ovh.net>
-Message-ID: <20131121090052.1684db75@ipc1.ka-ro>
+ <20131121050544.GE18477@ns203013.ovh.net>
+Message-ID: <20131121090315.298a4a14@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jean Christophe,
 
-Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:17 Fri 08 Nov     , Denis Carikli wrote:
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > Cc: linux-input at vger.kernel.org
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Eric B?nard <eric@eukrea.com>
-> > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > ---
-> > ChangeLog v8->v9:
-> > - Added Grant Likely in the cc list.
-> > - Adapted to the removal of the pinctrl properties in the tsc2007 documentation.
-> > - Fixed the gpios property (before, it was set to active high by error).
-> > 
-> > ChangeLog v7->v8:
-> > - Added Shawn Guo in the cc list.
-> > ---
-> >  arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi |   21 +++++++++++++++++++++
-> >  1 file changed, 21 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> > index b9cb5a5..f25a40f 100644
-> > --- a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> > +++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> > @@ -36,6 +36,27 @@
-> >  		compatible = "nxp,pcf8563";
-> >  		reg = <0x51>;
-> >  	};
-> > +
-> > +	tsc2007: tsc2007 at 48 {
-> > +		compatible = "ti,tsc2007";
-> > +		reg = <0x48>;
-> > +		interrupt-parent = <&gpio3>;
-> > +		interrupts = <0x2 0x8>;
-> > +		gpios = <&gpio3 2 1>;
-> as explain on the binding drop this gpios this is an IRQ not a gpio
-> 
-> NACK
-The driver needs an interrupt to get notified about pendown events and
-needs to poll the pendown signal to find out when the pen has been
-lifted. Both the interrupt and the pendown signal happen to be
-signalled on the same pin. Thus, IMO it is perfectly well to have the
-interrupt property as well as the gpios property here.
+Le Thu, 21 Nov 2013 06:05:44 +0100,
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
+> > +Optional properties:
+> > +- gpios: the interrupt gpio the chip is connected to (trough the penirq pin).
+> nack use interrupt property this a non-sense that we do today to pass irq via
+> gpio property the should NEVER known it's a gpio just an irq
 
-How would you tell the driver which pin to poll for detecting the pen
-up event?
+read previous email and you will see the GPIO is used to get the signal
+level on the pin and not the IRQ.
 
-Having a platform callback with hardcoded GPIO numbers is not an option.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Eric
