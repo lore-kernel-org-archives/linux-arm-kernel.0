@@ -1,33 +1,24 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 21 Nov 2013 13:11:03 +0100
-Subject: [PATCH] ARM: exynos_defconfig: increase CONFIG_NR_CPUS value to 8
-In-Reply-To: <1511364.Pd4tSi34z7@amdc1032>
-References: <1511364.Pd4tSi34z7@amdc1032>
-Message-ID: <3699555.ZHO9r7FOJe@amdc1227>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Nov 2013 12:11:35 +0000
+Subject: CMA on AArch64
+In-Reply-To: <20131121120559.GC22663@arm.com>
+References: <528D2C7E.2010107@codeaurora.org> <20131121120559.GC22663@arm.com>
+Message-ID: <20131121121135.GW16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bart,
-
-On Thursday 21 of November 2013 13:06:06 Bartlomiej Zolnierkiewicz wrote:
-> Current CONFIG_NR_CPUS value (2) is too small for:
-> - EXYNOS4412 (4 cores)
-> - EXYNOS5440 (4 cores)
-> - EXYNOS5410 (8 cores)
-> - EXYNOS5420 (8 cores)
+On Thu, Nov 21, 2013 at 12:06:00PM +0000, Catalin Marinas wrote:
+> Hi Laura,
 > 
-> Set CONFIG_NR_CPUS to 8 so it is correct for all currently
-> supported SoCs.
+> On Wed, Nov 20, 2013 at 09:41:18PM +0000, Laura Abbott wrote:
+> > I noticed there is currently no CMA support for AArch64. Is this already 
+> > on someone's TODO list or is this still open?
 > 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> It's more like a wish list but there were other things that took
+> priority. The arm64 DMA mapping code currently only supports swiotlb and
+> our next plan is for IOMMU mapping. But I would like parts of the DMA
+> IOMMU code under arch/arm to be made into a library (similar to the
+> lib/swiotlb.c) so that other architectures can easily make use of it.
 
-Definitely a change we want to have.
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+If you're referring to dmabounce.c, that's a 100% no-way-ever-even-if-
+hell-freezes-over NACK.
