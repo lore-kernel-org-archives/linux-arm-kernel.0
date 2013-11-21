@@ -1,72 +1,49 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Thu, 21 Nov 2013 02:58:22 +0000
-Subject: [PATCHv2 3/8] ARM: dts: Enables SAI ALSA SoC DAI device for
- Vybrid VF610 TOWER board.
-In-Reply-To: <87hab7hxfx.fsf@nbsps.com>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-4-git-send-email-Li.Xiubo@freescale.com>
- <87bo1hk2i7.fsf@nbsps.com>
- <1DD289F6464F0949A2FCA5AA6DC23F828AD451@039-SN2MPN1-012.039d.mgd.msft.net>
- <87hab7hxfx.fsf@nbsps.com>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828B5046@039-SN2MPN1-012.039d.mgd.msft.net>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Thu, 21 Nov 2013 11:13:48 +0800
+Subject: [Inquiry] How to boot using USB device and configure PCI using
+ OMAP4460/4470?
+In-Reply-To: <20131119201617.GC4715@saruman.home>
+References: <CAB8gEUt-_-w4wJkdo3bH7qiLOaqFusfL85rs58n00twD1qpxLA@mail.gmail.com>
+ <20131114154505.GC15835@saruman.home>
+ <CAB8gEUtYG9agU2i=fEKocfw1wjvBDfHvo5=fLNpABeNtFiXSxA@mail.gmail.com>
+ <20131119201617.GC4715@saruman.home>
+Message-ID: <CAB8gEUvbOeJedMUehtrDHy9YzHv-rU3CqiZO=FYGjqhGzS07LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Felipe,
+Good morning.
 
-> >>> This patch add and enable SAI device.
-> >>>
-> >>> arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
-> >>> 1 file changed, 6 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/vf610-twr.dts
-> >>> b/arch/arm/boot/dts/vf610-twr.dts index 1a58678..e4106dd 100644
-> >>> --- a/arch/arm/boot/dts/vf610-twr.dts
-> >>> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> >>>>> -57,6 +57,12 @@
-> >>> 	status = "okay";
-> >>> };
-> >>
-> >> Should we put a comment here that a TWR-AUDIO-SGTL board is needed?
-> >> Or is this better in a menuconfig?  I guess TWR-AUDIO-SGTL is needed
-> >> as this codec is not on the VF610-TWR main board?
-> >>
-> >
-> > Yes, the SGTL5000 codec is not on the VF610-TWR main board, and needs
-> an extra
-> > 	TWR-AUDIO-SGTL board.
-> >
-> > IMO, puting this comment in the menuconfig is much better.
-> 
-> I agree.  I guess the patch set 6 makes more sense.  Also, you might
-> consider adding a printk in the 'fsl_sgtl5000_probe()'.  I guess that
-> devm_snd_soc_register_card() will fail if the board is not present?  
+> oh, that's a COM connector. It's used to interface with TI's WiLink
+> devices.  The actual bus there is SDIO.
+I see. So the interface used is SDIO.
+Thank you for your confirmation.
+We can now close this thread. :)
+
+Regards,
+Maj
+
+On Wed, Nov 20, 2013 at 4:16 AM, Felipe Balbi <balbi@ti.com> wrote:
+> On Tue, Nov 19, 2013 at 09:47:42AM +0800, Maggie Mae Roxas wrote:
+>> Hi Felipe,
+>> Good morning.
+>>
+>> Thank you very much for the feedback.
+>>
+>> > all you need to do is write a flasher and a small "bootloader" which
+>> > knows about usb. ROM code can receive data via USB and jump to that
+>> > data's entry point.
+>> > It's all in the TRM.
+>> OK, I will look into this.
+>> However, it seems like this question (1) is not kernel-related.
+>> Can you direct me to the correct contact person for this?
+>>
+>> > that's because OMAP4 doesn't have a PCI controller.
+>> But TI OMAP4470 Blaze Tablet 2 Development Platform contains PCI (miniPCIe).
+>> How is Blaze 2 tablet's kernel configured then..?
 >
-
-Yes, you are right.
-The logs:
-+++++++++++
-vf610-sgtl5000 sound.3: ASoC: CODEC (null) not registered
-vf610-sgtl5000 sound.3: register soc sound card failed :-517
------------
-
-
-> +	ret = devm_snd_soc_register_card(&pdev->dev, &fsl_sgt1500_card);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "register soc sound card failed :%d\n"
-> +                               "TWR-AUDIO-SGTL board required.\n",
-> +				ret);
-> +		return ret;
-> +	}
-> 
-> Especially, you can make one kernel that handles both cases w/wo TWR-
-> AUDIO-SGTL board attached.
-> 
-
-Yes, it looks nicer.
-
-Well, as one log about the CODEC already exists? Should the "TWR-AUDIO-SGTL board required.\n" log is still needed here ?
-
-
---
-Best Regards,
-Xiubo
+> oh, that's a COM connector. It's used to interface with TI's WiLink
+> devices.  The actual bus there is SDIO.
+>
+> --
+> balbi
