@@ -1,44 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Nov 2013 20:03:44 +0000
-Subject: ACPI
-In-Reply-To: <201311191915.57516.arnd@arndb.de>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <201311191915.57516.arnd@arndb.de>
-Message-ID: <20131121200344.GD14725@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Nov 2013 12:55:19 -0700
+Subject: [PATCH V5] kbuild: dtbs_install: new make target
+In-Reply-To: <1385062552-9882-1-git-send-email-jason@lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <1385062552-9882-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <528E6527.50904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 07:15:57PM +0100, Arnd Bergmann wrote:
+On 11/21/2013 12:35 PM, Jason Cooper wrote:
+> Unlike other build products in the Linux kernel, there is no 'make
+> *install' mechanism to put devicetree blobs in a standard place.
+> 
+> This patch is an attempt to fix this problem.  Akin to 'make install',
+> this creates a new make target, dtbs_install.  The script that gets
+> called defers to a distribution or user supplied installdtbs binary,
+> if found in the system.  Otherwise, the default action is to install a
+> given dtb into
+> 
+>   /boot/devicetrees/${kernel_version}/${dts_filename}.dtb
+> 
+> This is done to keep dtbs from different kernel versions separate until
+> things have settled down.  Once the dtbs are stable, and not so strongly
+> linked to the kernel version, the devicetree files will most likely move
+> to their own repo.  Users will need to upgrade install scripts at that
+> time.
 
-> of them apply here. You keep saying "servers", but that isn't actually
-> a feature of how the system is designed, rather than what is running
-> on them. Given these examples (or any others, you could come up with),
-> which ones do you actually see as relevant here:
-
-> 1. An exterprise server (SPARC enterprise M9000, Power 795, Integrity
->    Superdome) with the CPU core changed to run ARM instructions
-> 2. An ATX whitebox server mainboard with one to four sockets and PC
->    peripherals and plug-compatible ARM CPU chips.
-> 3. A purpose-built server SoC based on standard components
-> 4. A new server SoC based on an older proprietary embedded or mobile
->    SoC design (think Exynos, OMAP, Snapdragon, ... based)
-> 5. A server built from using a cheap devboard (BeagleBone, Cubieboard, ...
->    style) with an unmodified SoC.
-> 6. A virtual machine running on KVM or Xen.
-
-I'd also ask if we need to consider desktops and laptops here - do we
-really mean distros here rather than servers, even if servers are the
-primary use case for distros right now?
-
-> The other really helpful would be a list of things that actually
-> speak in favor of doing ACPI, from a system design perspective.
-> What is it that people want out of it?
-
-+1.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131121/c28c9a46/attachment.sig>
+Acked-by: Stephen Warren <swarren@nvidia.com>
