@@ -1,87 +1,57 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 21 Nov 2013 10:49:47 +0200
-Subject: Report from 2013 ARM kernel summit
-In-Reply-To: <528D1A0F.2000508@wwwdotorg.org>
-References: <20131119.114054.663999769447782808.hdoyu@nvidia.com>
- <20131119173524.GK11778@mudshark.cambridge.arm.com>
- <528BCDCE.6070006@gmail.com>
- <20131120.083955.1386179068365424976.hdoyu@nvidia.com>
- <CAL_Jsq+AxEWhkOhxwAZ=+rpzDZ+yC1b3ZV541UhOu9kiwUhUdQ@mail.gmail.com>
- <528D1A0F.2000508@wwwdotorg.org>
-Message-ID: <20131121104947.ed22de3061521105e43054d8@nvidia.com>
+Date: Thu, 21 Nov 2013 11:01:11 +0200
+Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+In-Reply-To: <528CE3AB.60806@wwwdotorg.org>
+References: <528BD6A7.3030908@wwwdotorg.org>
+ <20131120.051708.396722414386125310.hdoyu@nvidia.com>
+ <20131120131447.GA8279@ulmo.nvidia.com>
+ <20131120.160359.1043627108929095327.hdoyu@nvidia.com>
+ <528CE3AB.60806@wwwdotorg.org>
+Message-ID: <20131121110111.2a5c3ed92fa0e12efd5dcf44@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Nov 2013 21:22:39 +0100
+On Wed, 20 Nov 2013 17:30:35 +0100
 Stephen Warren <swarren@wwwdotorg.org> wrote:
 ...
-> >> In PATCHv5[2], we took the following DT binding where multiple cell
-> >> properties seem to work ok.
+> >>> Does the above mean the following?
+> >>>
+> >>> int of_iommu_attach(struct device *dev)
+> >>> {
+> >>> 	int i;
+> >>> 	struct of_phandle_args args;
+> >>>
+> >>> 	of_property_for_each_phandle_with_args(dev->of_node, "iommus",
+> >>> 					       "#iommu-cells", i, &args)
+> >>> 		if (!args->np->dev->driver)
+> >>> 			return -EPROBE_DEFER;
+> >>> 	return 0;
+> >>> }
 > >>
-> >>   smmu_a: iommu at xxxxxxxx {
-> >>         #iommu-cells = <2>;
-> >>         ....
-> >>   };
-> >>
-> >>   smmu_b: iommu at xxxxxxxx {
-> >>         #iommu-cells = <3>;
-> >>         ....
-> >>   };
-> >>
-> >>   device_a {
-> >>          iommus = <&smmu_a param1 param2>,
-> >>                   <&smmu_b param1 param2 param3>;
-> >>   };
-> >>
-> >> This can describe the relation between a device and an iommu
-> >> independently. The number of params needed for each IOMMU can be
-> >> sepcified by #iommu-cells in its iommu entry.
-> >>
-> >>   device_a <-> smmu_a, needs 2 params for a device
-> >>   device_a <-> smmu_b, needs 3 params for a device
-> >>
-> >> For example, "smmu_a" can be an bus level global IOMMU where all child
-> >> devices can be an master of "smmu_a", and "smmu_b" is a local IOMMU
-> >> only for "device_a".
-> >>
-> >> "memory controller"---"smmu_a"---bus--+--"smmu_b"--"device_a"
-> >>                                       |
-> >>                                       |
-> >>                                       +--"device_b"
+> >> Not quite. The above would only check that a driver was bound to the
+> >> device. But if that device isn't an IOMMU then this doesn't help you.
 > > 
-> > I think the above binding would be the correct way to describe things
-> > if you have 1 device connected to 2 IOMMUs (directly rather than
-> > chained). IIUC, that is something you have on tegra?
+> > I thought that, as long as a device is a normal one, it's ok to let it
+> > go to be populated.
 > 
-> I'm not sure that we do, but perhaps; Hiroshi will have to answer.
-> Certainly whenever I personally mentioned chained IOMMUs it was simply
-> in the context of making sure the bindings allowed for any potential
-> arbitrary HW configuration, not because I had specific knowledge of one
-> that actually exists.
+> I don't understand what that means.
+> 
+> > We only care about that, IOMMU devices comes
+> > first, and clients should come later than IOMMUs, for population. In
+> > the above if all IOMMUs are not populated, client devices are always
+> > deferred. "args->np->dev" always points an IOMMU device in a
+> > loop. Otherwise(no "iommus=") it goes out from the loop immediately.
+> 
+> I'm not sure what that means. Perhaps you're sauying the dev->driver
+> isn't set until the driver is probe()d for the device, so if
+> dev->driver!=NULL, then we know the driver probed() successfully for it?
 
-In tegra, IOMMUs are chained in a way that:
+Yes
 
-- "device_a" run in "smmu_b"'s virtual address space.
-- "device_a"'s requesting address is transted into "smmu_a"'s virtual
-  address via "smmu_b".
-- This "smmu_a"'s virtual address is translated into physical address
-  via "smmu_a".
+> That does go most of the way, but as Thierry pointed out, it doesn't
+> guarantee that the dev->driver is an IOMMU driver, just that it's *some*
+> driver. Perhaps this won't actually make any difference in practice, but
+> AFAIK, all other subsystems do perform the strict check, so I don't see
+> why the IOMMU subsystem shouldn't.
 
-"smmu_a" and "smmu_b" are different driver although we haven't
-converted "smmu_b" as the standard IOMMU API yet.
-
-> > For the topology above where you are chaining iommu's, I think
-> > something like this is more accurately describing the hierarchy:
-> > 
-> >   smmu_b: iommu at xxxxxxxx {
-> >         #iommu-cells = <3>;
-> >          iommus = <&smmu_a param1 param2>;
-> >        ....
-> >   };
-> >   device_a {
-> >          iommus = <&smmu_b param1 param2 param3>;
-> >   };
-
-This describes the dependency between IOMMUs in Tegra. We can populate
-"smmu_a" always earlier than "smmu_b". Those dependency/hierarchy can
-be stored in IOMMU class(global IOMMU list), which Thierry suggested.
+Ok, now I got the one Thierry pointed out. Will implement that.
