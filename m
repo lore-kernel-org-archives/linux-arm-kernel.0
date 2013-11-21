@@ -1,53 +1,44 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 21 Nov 2013 15:16:39 -0200
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Provide a backlight regulator
-Message-ID: <1385054199-21400-1-git-send-email-fabio.estevam@freescale.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 21 Nov 2013 18:17:20 +0100
+Subject: [PATCHv6+ 01/13] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <1385041249-7705-2-git-send-email-hdoyu@nvidia.com>
+References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com><1385041249-7705-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20131121.191720.1487772262083864095.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without providing the backlight regulator the following error is seen:
+Iterating over a property containing a list of phandles with arguments
+is a common operation for device drivers. This patch adds a new
+of_property_for_each_phandle_with_args() macro to make the iteration
+simpler.
 
-pwm-backlight backlight.14: dummy supplies not allowed
-
-,and LVDS screen is blank.
-
-Provide a dummy backlight regulator, so that the LVDS panel can be functional
-again.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
-Tested on linux-next 20131120
+v6+:
+Use the description, which Grant Likely proposed, to be full enough
+that a future reader can figure out why a patch was written.
+  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007062.html
 
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+v5:
+New patch for v5.
+---
+ include/linux/of.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 4239ef9..07206d2 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -47,6 +47,15 @@
- 			gpio = <&gpio4 10 0>;
- 			enable-active-high;
- 		};
-+
-+		reg_backlight: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "lcd-supply";
-+			regulator-min-microvolt = <3200000>;
-+			regulator-max-microvolt = <3200000>;
-+			regulator-always-on;
-+		};
- 	};
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 276c546..131fef5 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -613,6 +613,9 @@ static inline int of_property_read_u32(const struct device_node *np,
+ 		s;						\
+ 		s = of_prop_next_string(prop, s))
  
- 	gpio-keys {
-@@ -91,6 +100,7 @@
- 		pwms = <&pwm1 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <7>;
-+		power-supply = <&reg_backlight>;
- 		status = "okay";
- 	};
- };
++#define of_property_for_each_phandle_with_args(np, list, cells, i, args) \
++	for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
++
+ #if defined(CONFIG_PROC_FS) && defined(CONFIG_PROC_DEVICETREE)
+ extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
+ extern void proc_device_tree_add_prop(struct proc_dir_entry *pde, struct property *prop);
 -- 
-1.8.1.2
+1.8.1.5
