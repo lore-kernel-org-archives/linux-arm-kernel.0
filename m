@@ -1,57 +1,37 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 21 Nov 2013 11:01:11 +0200
-Subject: [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <528CE3AB.60806@wwwdotorg.org>
-References: <528BD6A7.3030908@wwwdotorg.org>
- <20131120.051708.396722414386125310.hdoyu@nvidia.com>
- <20131120131447.GA8279@ulmo.nvidia.com>
- <20131120.160359.1043627108929095327.hdoyu@nvidia.com>
- <528CE3AB.60806@wwwdotorg.org>
-Message-ID: <20131121110111.2a5c3ed92fa0e12efd5dcf44@nvidia.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 21 Nov 2013 11:13:57 +0200
+Subject: [PATCH 11/31] dma: add channel request API that supports
+ deferred probe
+In-Reply-To: <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
+ <CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>
+ <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
+ <1384862421.14845.222.camel@smile> <528B9CAE.3040600@wwwdotorg.org>
+ <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
+ <528BFDD0.3090503@wwwdotorg.org>
+ <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
+ <528CFE68.6060908@wwwdotorg.org>
+ <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>
+ <528D0C06.9080006@wwwdotorg.org>
+ <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+ <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+Message-ID: <1385025237.6723.28.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Nov 2013 17:30:35 +0100
-Stephen Warren <swarren@wwwdotorg.org> wrote:
-...
-> >>> Does the above mean the following?
-> >>>
-> >>> int of_iommu_attach(struct device *dev)
-> >>> {
-> >>> 	int i;
-> >>> 	struct of_phandle_args args;
-> >>>
-> >>> 	of_property_for_each_phandle_with_args(dev->of_node, "iommus",
-> >>> 					       "#iommu-cells", i, &args)
-> >>> 		if (!args->np->dev->driver)
-> >>> 			return -EPROBE_DEFER;
-> >>> 	return 0;
-> >>> }
-> >>
-> >> Not quite. The above would only check that a driver was bound to the
-> >> device. But if that device isn't an IOMMU then this doesn't help you.
-> > 
-> > I thought that, as long as a device is a normal one, it's ok to let it
-> > go to be populated.
-> 
-> I don't understand what that means.
-> 
-> > We only care about that, IOMMU devices comes
-> > first, and clients should come later than IOMMUs, for population. In
-> > the above if all IOMMUs are not populated, client devices are always
-> > deferred. "args->np->dev" always points an IOMMU device in a
-> > loop. Otherwise(no "iommus=") it goes out from the loop immediately.
-> 
-> I'm not sure what that means. Perhaps you're sauying the dev->driver
-> isn't set until the driver is probe()d for the device, so if
-> dev->driver!=NULL, then we know the driver probed() successfully for it?
+On Wed, 2013-11-20 at 19:22 -0800, Dan Williams wrote:
+> On Wed, Nov 20, 2013 at 1:24 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-Yes
+[]
 
-> That does go most of the way, but as Thierry pointed out, it doesn't
-> guarantee that the dev->driver is an IOMMU driver, just that it's *some*
-> driver. Perhaps this won't actually make any difference in practice, but
-> AFAIK, all other subsystems do perform the strict check, so I don't see
-> why the IOMMU subsystem shouldn't.
+> I'm proposing that clients explicitly handle an updated
+> dma_request_slave_channel and we skip this interim
+> dma_request_slave_channel_no_err step.
 
-Ok, now I got the one Thierry pointed out. Will implement that.
+Actually this makes more sense.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
