@@ -1,174 +1,204 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 21 Nov 2013 11:24:15 +0000
-Subject: [PATCH RFC v3 08/12] arm64: kernel: implement HW breakpoints CPU PM
- notifier
+Date: Thu, 21 Nov 2013 11:24:09 +0000
+Subject: [PATCH RFC v3 02/12] arm64: kernel: build MPIDR_EL1 hash function
+ data structure
 In-Reply-To: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1385033059-25896-9-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1385033059-25896-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is shutdown either through CPU idle or suspend to RAM, the
-content of HW breakpoint registers must be reset or restored to proper
-values when CPU resume from low power states. This patch adds debug register
-restore operations to the HW breakpoint control function and implements a
-CPU PM notifier that allows to restore the content of HW breakpoint registers
-to allow proper suspend/resume operations.
+On ARM64 SMP systems, cores are identified by their MPIDR_EL1 register.
+The MPIDR_EL1 guidelines in the ARM ARM do not provide strict enforcement of
+MPIDR_EL1 layout, only recommendations that, if followed, split the MPIDR_EL1
+on ARM 64 bit platforms in four affinity levels. In multi-cluster
+systems like big.LITTLE, if the affinity guidelines are followed, the
+MPIDR_EL1 can not be considered a linear index. This means that the
+association between logical CPU in the kernel and the HW CPU identifier
+becomes somewhat more complicated requiring methods like hashing to
+associate a given MPIDR_EL1 to a CPU logical index, in order for the look-up
+to be carried out in an efficient and scalable way.
+
+This patch provides a function in the kernel that starting from the
+cpu_logical_map, implement collision-free hashing of MPIDR_EL1 values by
+checking all significative bits of MPIDR_EL1 affinity level bitfields.
+The hashing can then be carried out through bits shifting and ORing; the
+resulting hash algorithm is a collision-free though not minimal hash that can
+be executed with few assembly instructions. The mpidr_el1 is filtered through a
+mpidr mask that is built by checking all bits that toggle in the set of
+MPIDR_EL1s corresponding to possible CPUs. Bits that do not toggle do not
+carry information so they do not contribute to the resulting hash.
+
+Pseudo code:
+
+/* check all bits that toggle, so they are required */
+for (i = 1, mpidr_el1_mask = 0; i < num_possible_cpus(); i++)
+	mpidr_el1_mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
+
+/*
+ * Build shifts to be applied to aff0, aff1, aff2, aff3 values to hash the
+ * mpidr_el1
+ * fls() returns the last bit set in a word, 0 if none
+ * ffs() returns the first bit set in a word, 0 if none
+ */
+fs0 = mpidr_el1_mask[7:0] ? ffs(mpidr_el1_mask[7:0]) - 1 : 0;
+fs1 = mpidr_el1_mask[15:8] ? ffs(mpidr_el1_mask[15:8]) - 1 : 0;
+fs2 = mpidr_el1_mask[23:16] ? ffs(mpidr_el1_mask[23:16]) - 1 : 0;
+fs3 = mpidr_el1_mask[39:32] ? ffs(mpidr_el1_mask[39:32]) - 1 : 0;
+ls0 = fls(mpidr_el1_mask[7:0]);
+ls1 = fls(mpidr_el1_mask[15:8]);
+ls2 = fls(mpidr_el1_mask[23:16]);
+ls3 = fls(mpidr_el1_mask[39:32]);
+bits0 = ls0 - fs0;
+bits1 = ls1 - fs1;
+bits2 = ls2 - fs2;
+bits3 = ls3 - fs3;
+aff0_shift = fs0;
+aff1_shift = 8 + fs1 - bits0;
+aff2_shift = 16 + fs2 - (bits0 + bits1);
+aff3_shift = 32 + fs3 - (bits0 + bits1 + bits2);
+u32 hash(u64 mpidr_el1) {
+	u32 l[4];
+	u64 mpidr_el1_masked = mpidr_el1 & mpidr_el1_mask;
+	l[0] = mpidr_el1_masked & 0xff;
+	l[1] = mpidr_el1_masked & 0xff00;
+	l[2] = mpidr_el1_masked & 0xff0000;
+	l[3] = mpidr_el1_masked & 0xff00000000;
+	return (l[0] >> aff0_shift | l[1] >> aff1_shift | l[2] >> aff2_shift |
+		l[3] >> aff3_shift);
+}
+
+The hashing algorithm relies on the inherent properties set in the ARM ARM
+recommendations for the MPIDR_EL1. Exotic configurations, where for instance
+the MPIDR_EL1 values at a given affinity level have large holes, can end up
+requiring big hash tables since the compression of values that can be achieved
+through shifting is somewhat crippled when holes are present. Kernel warns if
+the number of buckets of the resulting hash table exceeds the number of
+possible CPUs by a factor of 4, which is a symptom of a very sparse HW
+MPIDR_EL1 configuration.
+
+The hash algorithm is quite simple and can easily be implemented in assembly
+code, to be used in code paths where the kernel virtual address space is
+not set-up (ie cpu_resume) and instruction and data fetches are strongly
+ordered so code must be compact and must carry out few data accesses.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/kernel/hw_breakpoint.c | 79 ++++++++++++++++++++++++++++++++-------
- 1 file changed, 66 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/smp_plat.h | 13 ++++++++
+ arch/arm64/kernel/setup.c         | 70 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 83 insertions(+)
 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index e894591..bcaaac9 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -20,6 +20,7 @@
+diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+index ed43a0d..59e2823 100644
+--- a/arch/arm64/include/asm/smp_plat.h
++++ b/arch/arm64/include/asm/smp_plat.h
+@@ -21,6 +21,19 @@
  
- #define pr_fmt(fmt) "hw-breakpoint: " fmt
+ #include <asm/types.h>
  
-+#include <linux/cpu_pm.h>
- #include <linux/errno.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/perf_event.h>
-@@ -171,7 +172,8 @@ static enum debug_el debug_exception_level(int privilege)
- 
- enum hw_breakpoint_ops {
- 	HW_BREAKPOINT_INSTALL,
--	HW_BREAKPOINT_UNINSTALL
-+	HW_BREAKPOINT_UNINSTALL,
-+	HW_BREAKPOINT_RESTORE
- };
- 
- /**
-@@ -210,6 +212,10 @@ static int hw_breakpoint_slot_setup(struct perf_event **slots, int max_slots,
- 				return i;
- 			}
- 			break;
-+		case HW_BREAKPOINT_RESTORE:
-+			if (*slot == bp)
-+				return i;
-+			break;
- 		default:
- 			pr_warn_once("Unhandled hw breakpoint ops %d\n", ops);
- 			return -EINVAL;
-@@ -256,7 +262,8 @@ static int hw_breakpoint_control(struct perf_event *bp,
- 		 * level.
- 		 */
- 		enable_debug_monitors(dbg_el);
--
-+		/* Fall through */
-+	case HW_BREAKPOINT_RESTORE:
- 		/* Setup the address register. */
- 		write_wb_reg(val_reg, i, info->address);
- 
-@@ -840,18 +847,36 @@ void hw_breakpoint_thread_switch(struct task_struct *next)
- /*
-  * CPU initialisation.
-  */
--static void reset_ctrl_regs(void *unused)
-+static void hw_breakpoint_reset(void *unused)
- {
- 	int i;
--
--	for (i = 0; i < core_num_brps; ++i) {
--		write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
--		write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
-+	struct perf_event **slots;
-+	/*
-+	 * When a CPU goes through cold-boot, it does not have any installed
-+	 * slot, so it is safe to share the same function for restoring and
-+	 * resetting breakpoints; when a CPU is hotplugged in, it goes
-+	 * through the slots, which are all empty, hence it just resets control
-+	 * and value for debug registers.
-+	 * When this function is triggered on warm-boot through a CPU PM
-+	 * notifier some slots might be initialized; if so they are
-+	 * reprogrammed according to the debug slots content.
-+	 */
-+	for (slots = this_cpu_ptr(bp_on_reg), i = 0; i < core_num_brps; ++i) {
-+		if (slots[i]) {
-+			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
-+		} else {
-+			write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
-+			write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
-+		}
- 	}
- 
--	for (i = 0; i < core_num_wrps; ++i) {
--		write_wb_reg(AARCH64_DBG_REG_WCR, i, 0UL);
--		write_wb_reg(AARCH64_DBG_REG_WVR, i, 0UL);
-+	for (slots = this_cpu_ptr(wp_on_reg), i = 0; i < core_num_wrps; ++i) {
-+		if (slots[i]) {
-+			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
-+		} else {
-+			write_wb_reg(AARCH64_DBG_REG_WCR, i, 0UL);
-+			write_wb_reg(AARCH64_DBG_REG_WVR, i, 0UL);
-+		}
- 	}
- }
- 
-@@ -861,7 +886,7 @@ static int hw_breakpoint_reset_notify(struct notifier_block *self,
- {
- 	int cpu = (long)hcpu;
- 	if (action == CPU_ONLINE)
--		smp_call_function_single(cpu, reset_ctrl_regs, NULL, 1);
-+		smp_call_function_single(cpu, hw_breakpoint_reset, NULL, 1);
- 	return NOTIFY_OK;
- }
- 
-@@ -869,6 +894,33 @@ static struct notifier_block hw_breakpoint_reset_nb = {
- 	.notifier_call = hw_breakpoint_reset_notify,
- };
- 
-+#ifdef CONFIG_CPU_PM
-+static int hw_breakpoint_cpu_pm_notify(struct notifier_block *self,
-+				       unsigned long action,
-+				       void *v)
-+{
-+	if (action == CPU_PM_EXIT) {
-+		hw_breakpoint_reset(NULL);
-+		return NOTIFY_OK;
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block hw_breakpoint_cpu_pm_nb = {
-+	.notifier_call = hw_breakpoint_cpu_pm_notify,
++struct mpidr_hash {
++	u64	mask;
++	u32	shift_aff[4];
++	u32	bits;
 +};
 +
-+static void __init hw_breakpoint_pm_init(void)
++extern struct mpidr_hash mpidr_hash;
++
++static inline u32 mpidr_hash_size(void)
 +{
-+	cpu_pm_register_notifier(&hw_breakpoint_cpu_pm_nb);
++	return 1 << mpidr_hash.bits;
 +}
-+#else
-+static inline void hw_breakpoint_pm_init(void)
++
+ /*
+  * Logical CPU mapping.
+  */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 0bc5e4c..e91d33e 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -113,6 +113,75 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
+ 	return phys_id == cpu_logical_map(cpu);
+ }
+ 
++struct mpidr_hash mpidr_hash;
++#ifdef CONFIG_SMP
++/**
++ * smp_build_mpidr_hash - Pre-compute shifts required at each affinity
++ *			  level in order to build a linear index from an
++ *			  MPIDR value. Resulting algorithm is a collision
++ *			  free hash carried out through shifting and ORing
++ */
++static void __init smp_build_mpidr_hash(void)
 +{
++	u32 i, affinity, fs[4], bits[4], ls;
++	u64 mask = 0;
++	/*
++	 * Pre-scan the list of MPIDRS and filter out bits that do
++	 * not contribute to affinity levels, ie they never toggle.
++	 */
++	for_each_possible_cpu(i)
++		mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
++	pr_debug("mask of set bits %#llx\n", mask);
++	/*
++	 * Find and stash the last and first bit set at all affinity levels to
++	 * check how many bits are required to represent them.
++	 */
++	for (i = 0; i < 4; i++) {
++		affinity = MPIDR_AFFINITY_LEVEL(mask, i);
++		/*
++		 * Find the MSB bit and LSB bits position
++		 * to determine how many bits are required
++		 * to express the affinity level.
++		 */
++		ls = fls(affinity);
++		fs[i] = affinity ? ffs(affinity) - 1 : 0;
++		bits[i] = ls - fs[i];
++	}
++	/*
++	 * An index can be created from the MPIDR_EL1 by isolating the
++	 * significant bits@each affinity level and by shifting
++	 * them in order to compress the 32 bits values space to a
++	 * compressed set of values. This is equivalent to hashing
++	 * the MPIDR_EL1 through shifting and ORing. It is a collision free
++	 * hash though not minimal since some levels might contain a number
++	 * of CPUs that is not an exact power of 2 and their bit
++	 * representation might contain holes, eg MPIDR_EL1[7:0] = {0x2, 0x80}.
++	 */
++	mpidr_hash.shift_aff[0] = MPIDR_LEVEL_SHIFT(0) + fs[0];
++	mpidr_hash.shift_aff[1] = MPIDR_LEVEL_SHIFT(1) + fs[1] - bits[0];
++	mpidr_hash.shift_aff[2] = MPIDR_LEVEL_SHIFT(2) + fs[2] -
++						(bits[1] + bits[0]);
++	mpidr_hash.shift_aff[3] = MPIDR_LEVEL_SHIFT(3) +
++				  fs[3] - (bits[2] + bits[1] + bits[0]);
++	mpidr_hash.mask = mask;
++	mpidr_hash.bits = bits[3] + bits[2] + bits[1] + bits[0];
++	pr_debug("MPIDR hash: aff0[%u] aff1[%u] aff2[%u] aff3[%u] mask[%#llx] bits[%u]\n",
++		mpidr_hash.shift_aff[0],
++		mpidr_hash.shift_aff[1],
++		mpidr_hash.shift_aff[2],
++		mpidr_hash.shift_aff[3],
++		mpidr_hash.mask,
++		mpidr_hash.bits);
++	/*
++	 * 4x is an arbitrary value used to warn on a hash table much bigger
++	 * than expected on most systems.
++	 */
++	if (mpidr_hash_size() > 4 * num_possible_cpus())
++		pr_warn("Large number of MPIDR hash buckets detected\n");
++	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
 +}
 +#endif
 +
- /*
-  * One-time initialisation.
-  */
-@@ -884,8 +936,8 @@ static int __init arch_hw_breakpoint_init(void)
- 	 * Reset the breakpoint resources. We assume that a halting
- 	 * debugger will leave the world in a nice state for us.
- 	 */
--	smp_call_function(reset_ctrl_regs, NULL, 1);
--	reset_ctrl_regs(NULL);
-+	smp_call_function(hw_breakpoint_reset, NULL, 1);
-+	hw_breakpoint_reset(NULL);
+ static void __init setup_processor(void)
+ {
+ 	struct cpu_info *cpu_info;
+@@ -231,6 +300,7 @@ void __init setup_arch(char **cmdline_p)
+ 	cpu_read_bootcpu_ops();
+ #ifdef CONFIG_SMP
+ 	smp_init_cpus();
++	smp_build_mpidr_hash();
+ #endif
  
- 	/* Register debug fault handlers. */
- 	hook_debug_fault_code(DBG_ESR_EVT_HWBP, breakpoint_handler, SIGTRAP,
-@@ -895,6 +947,7 @@ static int __init arch_hw_breakpoint_init(void)
- 
- 	/* Register hotplug notifier. */
- 	register_cpu_notifier(&hw_breakpoint_reset_nb);
-+	hw_breakpoint_pm_init();
- 
- 	return 0;
- }
+ #ifdef CONFIG_VT
 -- 
 1.8.4
