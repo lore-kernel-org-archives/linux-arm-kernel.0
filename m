@@ -1,55 +1,38 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 21 Nov 2013 13:23:22 +0000
-Subject: [PATCHv5 4/9] iommu/tegra: smmu: register device to iommu
- dynamically
-In-Reply-To: <528BDAAA.4000203@wwwdotorg.org>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com> <
- 1384853593-32202-5-git-send-email-hdoyu@nvidia.com> <528BDAAA.4000203@
- wwwdotorg.org>
-Message-ID: <20131121132322.EFDD1C40A2C@trevor.secretlab.ca>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 21 Nov 2013 14:34:18 +0100
+Subject: [PATCH v2 1/5] mfd: max14577: Add max14577 MFD driver core
+In-Reply-To: <20131121122011.GD23067@lee--X1>
+References: <1384956732-19526-1-git-send-email-k.kozlowski@samsung.com>
+ <1384956732-19526-2-git-send-email-k.kozlowski@samsung.com>
+ <20131121103408.GA22536@lee--X1> <1385034199.748.21.camel@AMDC1943>
+ <20131121122011.GD23067@lee--X1>
+Message-ID: <1385040858.748.27.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Nov 2013 14:39:54 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/19/2013 02:33 AM, Hiroshi Doyu wrote:
-> > platform_devices are registered as IOMMU'able dynamically via
-> > add_device() and remove_device().
+
+On Thu, 2013-11-21 at 12:20 +0000, Lee Jones wrote:
+(...)
+> > > > +struct max14577_regulator_platform_data {
+> > > > +	int id;
+> > > > +	struct regulator_init_data *initdata;
+> > > > +	struct device_node *of_node;
+> > > 
+> > > Do you ever set this? What's the point of it is it's set in the device?
 > > 
-> > Tegra SMMU can have multiple address spaces(AS). IOMMU'able devices
-> > can belong to one of them. Multiple IOVA maps are created at boot-up,
-> > which can be attached to devices later. We reserve 2 of them for
-> > static assignment, AS[0] for system default, AS[1] for AHB clusters as
-> > protected domain from others, where there are many traditional
-> > pheripheral devices like USB, SD/MMC. They should be isolated from
-> > some smart devices like host1x for system robustness. Even if smart
-> > devices behaves wrongly, the traditional devices(SD/MMC, USB) wouldn't
-> > be affected, and the system could continue most likely. DMA API(ARM)
-> > needs ARM_DMA_USE_IOMMU to be enabled.
+> > Do you mean the whole struct max14577_regulator_platform_data or only
+> > some member of it (of_node?)?
 > 
-> > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-> 
-> > +static int smmu_iommu_add_device(struct device *dev)
-> > +{
-> > +	int err = -EPROBE_DEFER;
-> > +	u32 swgroups = dev->platform_data;
-> > +	struct dma_iommu_mapping *map = NULL;
-> > +
-> > +	if (test_bit(TEGRA_SWGROUP_PPCS, swgroups))
-> > +		map = smmu_handle->map[SYSTEM_PROTECTED];
-> > +	else
-> > +		map = smmu_handle->map[SYSTEM_DEFAULT];
-> > +
-> > +	if (map)
-> > +		err = arm_iommu_attach_device(dev, map);
-> > +	else
-> > +		return -EPROBE_DEFER;
-> 
-> Given that patch 2 exists, if this test fails, then surely the
-> appropriate error code is some fatal error, not -EPROBE_DEFER; any
-> deferrals should have happened long before this point.
+> Initially only the of_node. Usually MFD children are able to call back
+> into their parent to fetch these details. Also mfd_add_device() goes
+> out of its way to fill in the child's own of_node.
 
-Will need to be revisited. Patching into the core really_probe() like
-patch #2 does is a really bad approach which would mean that returning
-EPROBE_DEFER is appropriate here.
+The of_node is needed for regulator driver. It is passed in struct regulator_config
+to devm_regulator_register():
+	config.of_node = pdata->regulators[i].of_node;
+	info->regulators[i] = devm_regulator_register(&pdev->dev,
+	                              &supported_regulators[id], &config);
 
-g.
+
+Best regards,
+Krzysztof
