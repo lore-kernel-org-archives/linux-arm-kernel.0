@@ -1,51 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 21 Nov 2013 20:44:39 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <CAOesGMgxGq1Zmo+Dq-Rmy2F02-=12yUzB0AKn35yK2j3CacNRQ@mail.gmail.com>
-References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
- com> <20131115095717.GC1709@e106331-lin.cambridge.arm.com> <20131115175241.
- GB27174@quad.lixom.net> <20131119113015.GH5914@e106331-lin.cambridge.arm.
- com> <20131121162944.F087FC406A3@trevor.secretlab.ca> <20131121175822.
- GA9590@quad.lixom.net> <20131121185408.GX16735@n2100.arm.linux.org.uk> <
- CAOesGMgzUSMDy99XojipfRd5OM88UhfbCYO0aoc5m-Q8Fwnddg@mail.gmail.com> <
- 20131121190126.GZ16735@n2100.arm.linux.org.uk> <
- CAOesGMgxGq1Zmo+Dq-Rmy2F02-=12yUzB0AKn35yK2j3CacNRQ@mail.gmail.com>
-Message-ID: <20131121204439.BC38AC40753@trevor.secretlab.ca>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Nov 2013 12:46:55 -0800
+Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
+In-Reply-To: <20131121022125.GA2445@earth.universe>
+References: <1379277856-24571-1-git-send-email-sre@debian.org>
+ <1379277856-24571-4-git-send-email-sre@debian.org>
+ <20131121013858.GK10317@atomide.com>
+ <20131121022125.GA2445@earth.universe>
+Message-ID: <20131121204654.GB10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Nov 2013 11:31:10 -0800, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Nov 21, 2013 at 11:01 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Nov 21, 2013 at 10:59:41AM -0800, Olof Johansson wrote:
-> >> On Thu, Nov 21, 2013 at 10:54 AM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > This depends what you want from ACPI, and what market ACPI is being
-> >> > targetted at.
-> >>
-> >> We're talking ACPI on servers here.
-> >
-> > Now read the rest of my email, thanks.
+* Sebastian Reichel <sre@debian.org> [131120 18:22]:
+> On Wed, Nov 20, 2013 at 05:38:59PM -0800, Tony Lindgren wrote:
 > 
-> Yes, there are use cases for ACPI on embedded, which is what Intel is
-> getting into and the standard is changing accordingly. On embedded ARM
-> we're quite comfortable with DT for now, so it doesn't make sense to
-> consider ACPI there just for the sake of it, as far as I am concerned.
+> In the public documentation of the omaps all SSI related stuff is
+> missing and memory areas are marked as reserved. I could not find
+> out how to receive the NDA version, so the following is purely
+> speculation based on the code.
 > 
-> And, on servers, using the embedded-targeted bindings that expose all
-> hardware details (and leaving implementation to the kernel) seems
-> counter to the main target of forwards- and backwards compatibility.
-> That can only really be achieved by getting rid of hardware diversity
-> and reaching standardized hardware platforms with discoverable
-> devices. Keeping the complex parts of power management out of the
-> kernel on those platforms is going to be important too.
+> If I understand it right the HW looks like this:
+> 
+> +-----------------+
+> |    GDD (DMA)    | <- this one is currently called ssi-controller
+> +--------+--------+
+> | Port 1 | Port 2 | <- these are currently called ssi-port
+> +--------+--------+
+> 
+> I think the GDD part must be enabled while Port 1 or Port 2 is
+> enabled. The last RFC driver from Carlos did not even split up the
+> irq/memory areas into different platform devices, but just requested
+> all of them in one ssi platform device.
 
-That is something that can definitely push back on. We've got the
-collision of what have we been required to do for embedded SoCs with
-technology designed for systems that aren't quite as much "fun". The
-ACPI team has been investigating what is needed to port existing device
-drivers to use ACPI bindings, but it is resonable to say that clocks and
-regulators (for example) have no business being described in the ACPI
-tree.
+Might be worth checking. If these blocks have the revision and SYSC
+register in the beginning of their address space like all omap modules,
+then they are completely separate blocks and can idle independently.
 
-g.
+The fact that they have separate interrutps makes me think that's the
+case, otherwise there would be just interrupt(s) at the ssi-controllel
+level.
+
+> > The other binding pieces can be added later on as they get are ready.
+> 
+> Sure. They are almost finished btw. I was able to get a gsm network
+> scan.
+
+That's great :)
+
+Regards,
+
+Tony
