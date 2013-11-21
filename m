@@ -1,23 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Nov 2013 19:00:51 +0000
-Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure
- monitor
-In-Reply-To: <CAOesGMgB_FUDkD9=wgZgreaspEyKoSqpkpGZtzuUjb=G6m_nEg@mail.gmail.com>
-References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
- <52828EF5.6090909@wwwdotorg.org>
- <CAOesGMhatp9ZQr=eTCtQ_9a_E9LXKdTCzJd+P7Sy9Ut9wtvnsA@mail.gmail.com>
- <5282E068.1070608@nvidia.com>
- <CAOesGMgcvTFD4u9b7T5HNhuJe_PQyV25Ei++v8hG8AsY_rOdyw@mail.gmail.com>
- <528E5596.7090606@wwwdotorg.org>
- <CAOesGMgB_FUDkD9=wgZgreaspEyKoSqpkpGZtzuUjb=G6m_nEg@mail.gmail.com>
-Message-ID: <20131121190051.GY16735@n2100.arm.linux.org.uk>
+Date: Thu, 21 Nov 2013 19:01:26 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <CAOesGMgzUSMDy99XojipfRd5OM88UhfbCYO0aoc5m-Q8Fwnddg@mail.gmail.com>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131115175241.GB27174@quad.lixom.net>
+ <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
+ <20131121162944.F087FC406A3@trevor.secretlab.ca>
+ <20131121175822.GA9590@quad.lixom.net>
+ <20131121185408.GX16735@n2100.arm.linux.org.uk>
+ <CAOesGMgzUSMDy99XojipfRd5OM88UhfbCYO0aoc5m-Q8Fwnddg@mail.gmail.com>
+Message-ID: <20131121190126.GZ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 10:51:09AM -0800, Olof Johansson wrote:
-> An ack from Russell would be appreciated, or we'd need to set up a
-> shared branch given the Tegra dependencies that would go on top.
-> Either is ok with me.
+On Thu, Nov 21, 2013 at 10:59:41AM -0800, Olof Johansson wrote:
+> On Thu, Nov 21, 2013 at 10:54 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > This depends what you want from ACPI, and what market ACPI is being
+> > targetted at.
+> 
+> We're talking ACPI on servers here.
 
-Note that I'm *not* looking at anything new until after the merge window
-has closed, so I'm not acking or reviewing anything at the moment.
+Now read the rest of my email, thanks.
