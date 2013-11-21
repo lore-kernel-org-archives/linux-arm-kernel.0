@@ -1,61 +1,55 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 21 Nov 2013 15:56:49 +0000
-Subject: [PATCHv5 1/9] of: introduce
- of_property_for_earch_phandle_with_args()
-In-Reply-To: <20131121151218.befbb483c0cf09cdcd4cd4dd@nvidia.com>
-References: <1384853593-32202-1-git-send-email-hdoyu@nvidia.com> <
- 1384853593-32202-2-git-send-email-hdoyu@nvidia.com> <20131121124328.
- 46BC1C40A2C@trevor.secretlab.ca> <20131121151218.befbb483c0cf09cdcd4cd4dd@
- nvidia.com>
-Message-ID: <20131121155649.48C96C406A3@trevor.secretlab.ca>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 21 Nov 2013 16:00:28 +0000
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131115232109.GT16735@n2100.arm.linux.org.uk>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.
+ com> <20131115175241.GB27174@quad.lixom.net> <20131115180832.GR16735@n2100.
+ arm.linux.org.uk> <201311152056.47846.arnd@arndb.de> <20131115232109.
+ GT16735@n2100.arm.linux.org.uk>
+Message-ID: <20131121160028.45F03C406A3@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Nov 2013 15:12:18 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> On Thu, 21 Nov 2013 13:43:28 +0100
-> Grant Likely <grant.likely@linaro.org> wrote:
-> 
-> > On Tue, 19 Nov 2013 11:33:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> > > The following pattern of code is tempting:
+On Fri, 15 Nov 2013 23:21:09 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 15, 2013 at 08:56:47PM +0100, Arnd Bergmann wrote:
+> > On Friday 15 November 2013, Russell King - ARM Linux wrote:
+> > > On Fri, Nov 15, 2013 at 09:52:41AM -0800, Olof Johansson wrote:
+> > > > If we knew exactly what we wanted, it'd be a different story. _We
+> > > > don't_. We're into year FOUR of the device tree conversion and we're just
+> > > > now reaching a point where we think we know what a good solution looks
+> > > > like. The first two years were easy -- they were the trivial devices we're
+> > > > now talking about on ACPI. After that it got harder. Going through all
+> > > > of that again with ACPI? No. No way. Microsoft gets to do it and while
+> > > > they're busy sorting it out, we'll boot with device tree.
 > > > 
-> > >   for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
+> > > However, there's a very big danger here.  I disagree with the stance
+> > > you're taking.
 > > > 
-> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > It seems that under ACPI and DT, we refer to properties by string names.
+> > > That's good, but do we really want to have different string names for the
+> > > same property.
 > > 
-> > That's a very minimal commit message. Can you elaborate please.
+> > For all I know, doing this in ACPI is something that is only now being
+> > discussed as Intel wants to be able to reuse the existing features from
+> > DT enabled drivers in the kernel and share the implementation between
+> > embedded x86 SoCs and embedded ARM/PowerPC/MIPS/... SoCs. That part actually
+> > isn't as crazy.
+> > 
+> > The existing ACPI usage however is basically all binary and cannot be
+> > shared with DT, in particular it won't help for the orthogonal problem of
+> > using ACPI to get "enterprise server" features on ARM64.
 > 
-> The above can be:
+> That's strange, because the patches I've seen from people who want to
+> add ACPI support to AMBA are all based around very similar strings to
+> those in DT to lookup the same data in ACPI.
 > 
-> "
->   The following pattern of code is tempting to add a new member for
->   of_property_for_each_*() family as an idiom.
->   
->     for (i = 0;
->         !of_parse_phandle_with_args(np, list, cells, i, args); i++)
->                   <do something with "args">;
-> "
+> What's been done there is the function which reads from DT has been
+> duplicated, and instead of reading the information from DT, it reads it
+> from ACPI instead using string names without the vendor prefix.
 
-I really do like commit messages to be full enough that a future reader
-can figure out why a patch was written. ie:
-
-	"Iterating over a property containing a list of phandles with
-	arguments is a common operation for device drivers. This patch
-	adds a new of_property_for_each_phandle_with_args() macro to
-	make the iteration simpler."
+The fact that they are using different strings is a problem though. Push
+back on that. As much as possible the property formats between DT and
+ACPI should be identical. This is entirely new territory for ACPI and we
+have significant influence over it.
 
 g.
-
-> 
-> Actual usage is here:
-> 
->         int i;
->         struct of_phandle_args args;
-> 
->         of_property_for_each_phandle_with_args(dev->of_node, "iommus",
->                                                "#iommu-cells", i, &args) {
->                 pr_debug("%s(i=%d) %s\n", __func__, i, dev_name(dev));
-> 
->                 if (!of_find_iommu_by_node(args.np))
->                         return -EPROBE_DEFER;
-> 
-> Is this acceptable?
