@@ -1,166 +1,35 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 21 Nov 2013 13:28:19 +0200
-Subject: [PATCH v2 04/10] mtd: nand: davinci: simplify error handling
+Date: Thu, 21 Nov 2013 13:28:18 +0200
+Subject: [PATCH v2 03/10] mtd: nand: davinci: check required ti,
+ davinci-chipselect property
 In-Reply-To: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1385033305-13179-5-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1385033305-13179-4-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is not needed to use a lot of names for err handling.
-It complicates code support and reading.
+The property "ti,davinci-chipselect" is required. So we have to check
+if it is set.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/mtd/nand/davinci_nand.c |   46 +++++++++++++++------------------------
- 1 file changed, 17 insertions(+), 29 deletions(-)
+ drivers/mtd/nand/davinci_nand.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index 9a96ac7..c0be223 100644
+index ddcd7c8..9a96ac7 100644
 --- a/drivers/mtd/nand/davinci_nand.c
 +++ b/drivers/mtd/nand/davinci_nand.c
-@@ -615,8 +615,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
- 	if (!info) {
- 		dev_err(&pdev->dev, "unable to allocate memory\n");
--		ret = -ENOMEM;
--		goto err_nomem;
-+		return -ENOMEM;
- 	}
- 
- 	platform_set_drvdata(pdev, info);
-@@ -625,20 +624,16 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	res2 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
- 	if (!res1 || !res2) {
- 		dev_err(&pdev->dev, "resource missing\n");
--		ret = -EINVAL;
--		goto err_nomem;
-+		return -EINVAL;
- 	}
- 
- 	vaddr = devm_ioremap_resource(&pdev->dev, res1);
--	if (IS_ERR(vaddr)) {
--		ret = PTR_ERR(vaddr);
--		goto err_ioremap;
--	}
-+	if (IS_ERR(vaddr))
-+		return PTR_ERR(vaddr);
+@@ -545,6 +545,9 @@ static struct davinci_nand_pdata
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-chipselect", &prop))
+ 			pdev->id = prop;
++		else
++			return ERR_PTR(-EINVAL);
 +
- 	base = devm_ioremap_resource(&pdev->dev, res2);
--	if (IS_ERR(base)) {
--		ret = PTR_ERR(base);
--		goto err_ioremap;
--	}
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
- 
- 	info->dev		= &pdev->dev;
- 	info->base		= base;
-@@ -705,7 +700,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 			spin_unlock_irq(&davinci_nand_lock);
- 
- 			if (ret == -EBUSY)
--				goto err_ecc;
-+				return ret;
- 
- 			info->chip.ecc.calculate = nand_davinci_calculate_4bit;
- 			info->chip.ecc.correct = nand_davinci_correct_4bit;
-@@ -721,8 +716,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 		info->chip.ecc.strength = pdata->ecc_bits;
- 		break;
- 	default:
--		ret = -EINVAL;
--		goto err_ecc;
-+		return -EINVAL;
- 	}
- 	info->chip.ecc.mode = ecc_mode;
- 
-@@ -730,7 +724,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	if (IS_ERR(info->clk)) {
- 		ret = PTR_ERR(info->clk);
- 		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
--		goto err_clk;
-+		return ret;
- 	}
- 
- 	ret = clk_prepare_enable(info->clk);
-@@ -759,7 +753,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 							info->core_chipsel);
- 	if (ret < 0) {
- 		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
--		goto err_timing;
-+		goto err;
- 	}
- 
- 	spin_lock_irq(&davinci_nand_lock);
-@@ -775,7 +769,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	ret = nand_scan_ident(&info->mtd, pdata->mask_chipsel ? 2 : 1, NULL);
- 	if (ret < 0) {
- 		dev_dbg(&pdev->dev, "no NAND chip(s) found\n");
--		goto err_scan;
-+		goto err;
- 	}
- 
- 	/* Update ECC layout if needed ... for 1-bit HW ECC, the default
-@@ -789,7 +783,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 		if (!chunks || info->mtd.oobsize < 16) {
- 			dev_dbg(&pdev->dev, "too small\n");
- 			ret = -EINVAL;
--			goto err_scan;
-+			goto err;
- 		}
- 
- 		/* For small page chips, preserve the manufacturer's
-@@ -820,7 +814,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 		dev_warn(&pdev->dev, "no 4-bit ECC support yet "
- 				"for 4KiB-page NAND\n");
- 		ret = -EIO;
--		goto err_scan;
-+		goto err;
- 
- syndrome_done:
- 		info->chip.ecc.layout = &info->ecclayout;
-@@ -828,7 +822,7 @@ syndrome_done:
- 
- 	ret = nand_scan_tail(&info->mtd);
- 	if (ret < 0)
--		goto err_scan;
-+		goto err;
- 
- 	if (pdata->parts)
- 		ret = mtd_device_parse_register(&info->mtd, NULL, NULL,
-@@ -841,7 +835,7 @@ syndrome_done:
- 						NULL, 0);
- 	}
- 	if (ret < 0)
--		goto err_scan;
-+		goto err;
- 
- 	val = davinci_nand_readl(info, NRCSR_OFFSET);
- 	dev_info(&pdev->dev, "controller rev. %d.%d\n",
-@@ -849,8 +843,7 @@ syndrome_done:
- 
- 	return 0;
- 
--err_scan:
--err_timing:
-+err:
- 	clk_disable_unprepare(info->clk);
- 
- err_clk_enable:
-@@ -858,11 +851,6 @@ err_clk_enable:
- 	if (ecc_mode == NAND_ECC_HW_SYNDROME)
- 		ecc4_busy = false;
- 	spin_unlock_irq(&davinci_nand_lock);
--
--err_ecc:
--err_clk:
--err_ioremap:
--err_nomem:
- 	return ret;
- }
- 
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-mask-ale", &prop))
+ 			pdata->mask_ale = prop;
 -- 
 1.7.9.5
