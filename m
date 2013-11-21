@@ -1,66 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Nov 2013 10:58:45 -0800
-Subject: N900 board code in 3.14
-In-Reply-To: <20131116155031.GA5104@earth.universe>
-References: <1384562167-14725-1-git-send-email-tony@atomide.com>
- <20131116120508.GA22335@earth.universe>
- <20131116141226.GD10317@atomide.com>
- <20131116155031.GA5104@earth.universe>
-Message-ID: <20131121185844.GA10023@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 21 Nov 2013 10:59:41 -0800
+Subject: ACPI vs DT at runtime
+In-Reply-To: <20131121185408.GX16735@n2100.arm.linux.org.uk>
+References: <CAOesGMjKeRb=fFJM0MabDihbEiCGM4EqW9D5i_6-RFxTnpB4Qw@mail.gmail.com>
+ <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131115175241.GB27174@quad.lixom.net>
+ <20131119113015.GH5914@e106331-lin.cambridge.arm.com>
+ <20131121162944.F087FC406A3@trevor.secretlab.ca>
+ <20131121175822.GA9590@quad.lixom.net>
+ <20131121185408.GX16735@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMgzUSMDy99XojipfRd5OM88UhfbCYO0aoc5m-Q8Fwnddg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [131116 07:51]:
-> On Sat, Nov 16, 2013 at 06:12:26AM -0800, Tony Lindgren wrote:
-> > [...]
-> > >  b) I could not get the 32GB eMMC working. For me the chip is not found
-> > >     and I don't know how to debug it.
-> > 
-> > OK the eMMC issue might be related to the control module PBIAS
-> > register support missing. If so, that should be fixable with the
-> > auxdata until we have a minimal control module device driver to
-> > deal with the PBIAS and expose those features as regulators to
-> > the omap-hsmmc driver.
-> 
-> I wasn't aware, that PBIAS register support is missing for DT
-> boot. The existing board code uses a 2.8-3.0V regulator for mmc1,
-> so missing PBIAS is probably the problem.
+On Thu, Nov 21, 2013 at 10:54 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Nov 21, 2013 at 09:58:22AM -0800, Olof Johansson wrote:
+>> On Thu, Nov 21, 2013 at 04:29:44PM +0000, Grant Likely wrote:
+>> > We are pushing a lot of boundaries and doing things on ACPI that have
+>> > never been done before. SPI, GPIOs, Clocks, Regulators, composite
+>> > devices, key-value properties. All brand new territory, and the Linux
+>> > world is driving a lot of it.
+>>
+>> This is a bit of a surprise and a significant concern.
+>>
+>> The whole point behind ACPI is that it's supposed to abstract away nearly
+>> all of that, and _not_ expose clocks, regulators and other things to
+>> the kernel. If we're going to expose it, then we might as well go all
+>> the way and do it with DT.
+>
+> This depends what you want from ACPI, and what market ACPI is being
+> targetted at.
 
-Right, sorry I was confused, looks like we don't need to worry about
-that. And looks like Balaji just posted patches for the PBIAS support.
+We're talking ACPI on servers here.
 
-Also, I just posted a patch to fix the eMMC that you may want to
-try out.
- 
-> > > [...]
-> > > 
-> > > My suggestion would be:
-> > >  1. Find a better workaround for omapdss to acquire the SDI
-> > >     regulator. My current hack is obviously not acceptable.
-> > >  2. Load the panel driver via DT as seen above and reference
-> > >     the omapdss interface with something like the above
-> > >     "ti,dss-source".
-> > 
-> > To me it seems that we should be able to add minimal panel entries to DT
-> > if we stick to existing standard bindings. Then the timings etc can be
-> > set up based on the compatible flag. So I would leave out the properties
-> > for ti,sdi-datapairs and ti,dss-source for now, and just set those in
-> > the driver based on the sony,acx565akm compatible flag. Or maybe it should
-> > be sony,acx565akm-n900 if there's some board specific configuration info.
-> 
-> So we add reset-gpio and label to the DT data (they are panel
-> specific and independent of omapdss) and just hardcode "dsi.0"
-> with 2 data lanes into the driver? That sounds fine for me.
-> 
-> If neither Tomi nor anybody else has better ideas I will cook a
-> patch for that. I'm not sure how to setup the vdds_sdi regulator for
-> omapdss, though. Is there an example for a legacy driver using a DT
-> regulator available?
 
-Not that I know of :) But I guess only the panel driver would need to
-parse the compatible flag and the rest of the DSS could still be
-initialize the legacy way if needed.
-
-Regards,
-
-Tony
+-Olof
