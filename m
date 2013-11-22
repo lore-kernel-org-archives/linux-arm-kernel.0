@@ -1,20 +1,22 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Nov 2013 09:20:50 -0700
-Subject: [PATCH] clk: tegra: add FUSE clock device
-In-Reply-To: <20131122134140.GE26617@tbergstrom-lnx.Nvidia.com>
-References: <1385001490-18927-1-git-send-email-acourbot@nvidia.com>
- <20131122134140.GE26617@tbergstrom-lnx.Nvidia.com>
-Message-ID: <528F8462.4010105@wwwdotorg.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 22 Nov 2013 16:22:37 +0000
+Subject: [PATCH 00/23] mtd: st_spi_fsm: Add new device
+Message-ID: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 06:41 AM, Peter De Schrijver wrote:
-> On Thu, Nov 21, 2013 at 03:38:10AM +0100, Alexandre Courbot wrote:
->> This clock is needed to ensure the FUSE registers can be accessed
->> without freezing the system.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> 
-> Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+The first bunch of these patches have been on the MLs before, but 
+didn't receive a great deal of attention for the most part. We are
+a little more featureful this time however. We can now successfully
+setup and configure the N25Q256. We still can't read/write/erase
+it though. I'll start work on that next week and will provide it in
+the next instalment.
 
-Aren't you taking this patch through the clock tree?
+ arch/arm/boot/dts/stih416-b2105.dts     |  14 +++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi  |  12 ++
+ drivers/mtd/devices/Kconfig             |   7 ++
+ drivers/mtd/devices/Makefile            |   1 +
+ drivers/mtd/devices/serial_flash_cmds.h |  91 ++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.c        | 737 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h        | 419 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 1281 insertions(+)
