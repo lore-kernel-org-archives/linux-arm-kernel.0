@@ -1,79 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Nov 2013 09:37:25 +0000
-Subject: [PATCH v2 2/4] Documentation: Add APM X-Gene SoC 6.0Gbps SATA
- PHY driver binding documentation
-In-Reply-To: <CAPw-ZTnvbLRN1v6Oyhyf=zXBuiOZQquDs6qx8PzF3cX_GnPTGw@mail.gmail.com>
-References: <1384905197-3566-1-git-send-email-lho@apm.com>
- <1384905197-3566-2-git-send-email-lho@apm.com>
- <1384905197-3566-3-git-send-email-lho@apm.com>
- <20131120094328.GS5914@e106331-lin.cambridge.arm.com>
- <CAPw-ZTnvbLRN1v6Oyhyf=zXBuiOZQquDs6qx8PzF3cX_GnPTGw@mail.gmail.com>
-Message-ID: <20131122093725.GB7817@e106331-lin.cambridge.arm.com>
+From: ignatov.a@samsung.com (Alexey Ignatov)
+Date: Fri, 22 Nov 2013 13:47:09 +0400
+Subject: [PATCH 5/5] arm: Enable IRQs before attempting to read user	space
+ in __und_usr
+In-Reply-To: <20131121102923.GV16735@n2100.arm.linux.org.uk>
+References: <1377689664-27614-1-git-send-email-catalin.marinas@arm.com>
+ <1377689664-27614-6-git-send-email-catalin.marinas@arm.com>
+ <loom.20131121T102616-386@post.gmane.org>
+ <20131121102923.GV16735@n2100.arm.linux.org.uk>
+Message-ID: <20131122094709.GA23067@lexs-sg.rnd.samsung.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 08:07:45PM +0000, Loc Ho wrote:
-> Hi,
+On 10:29 Thu 21 Nov     , Russell King - ARM Linux wrote:
+> On Thu, Nov 21, 2013 at 09:35:34AM +0000, Alexey Ignatov wrote:
+> > Catalin Marinas <catalin.marinas <at> arm.com> writes:
+> > 
+> > > The Undef abort handler in the kernel reads the undefined instruction
+> > > from user space. If the page table was modified from another CPU, the
+> > > user access could fail and do_page_fault() will be executed with
+> > > interrupts disabled. This can potentially deadlock on ARM11MPCore or on
+> > > Cortex-A15 with erratum 798181 workaround enabled (both implying IPI for
+> > > TLB maintenance with page table lock held).
+> > > 
+> > > This patch enables the IRQs in __und_usr before attempting to read the
+> > > instruction from user space.
+> > 
+> > This patch moves enable_irq call from do_fpe directly to __und_usr handler,
+> > but __und_svc handler also calls do_fpe (via call_fpe), so now this codepath
+> > runs with disabled irqs. This behavior change doesn't look good for me.
 > 
-> >> +- compatible         : Shall be "apm,xgene-ahci-phy" or
-> >> +                       "apm,xgene-ahci-phy2". The "apm,xgene-ahci-phy"
-> >> +                       describes an port shared with SGMII Ethernet port.
-> >> +                       The "apm,xgene-ahci-phy2" describes an port not
-> >> +                       shared with SGMII and the PLL located at another
-> >> +                       memory resource region.
-> >
-> > Is there not a better name available than "apm,xgene-ahci-phy2"?
-> [Loc Ho]
-> I will name it apm,xgene-ahci-phyx.
-> 
-> >> +- reg                        : First PHY memory resource
-> >> +                       Second separate PHY PLL clock memory resource if
-> >> +                       type "apm,xgene-ahci-phy2"
-> >
-> > Is ths PLL actually part of the PHY, or does it just feed the PHY?
-> [Loc Ho]
-> This is always the PLL clock macro in each IP. For the 3rd controller,
-> we require an extra clock macro and can NOT use the original clock
-> macro as it is not mux'ed with the SGMII port.
+> However, you're not executing FPA instructions in the kernel as a general
+> rule, so it doesn't matter.
 
-Ok. Is the reference clock into the PLL always on, or might we need to
-describe it?
+Theoretically, ok.
 
-> 
-> >
-> >> +- txeyetuning                : Manual control to fine tune the capture of the serial
-> >> +                       bit lines from the automatic calibrated position.
-> >> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
-> >> +                       Range from 0 to 0x7f. Default is 0xa.
-> >
-> > If you have a property for which the name consists of multiple words,
-> > split the words with '-'.
-> >
-> > What does this actually mean?
-> >
-> > What units are these values in?
-> >
-> > What effect do those values have?
-> [Loc Ho]
-> Will provide in next version.
-
-Cheers.
-
-> 
-> >
-> >> +- txeyedirection     : Eye tuning manual control direction. 0 means sample
-> >> +                       data earlier than the nominal sampling point. 1 means
-> >> +                       sample data later than the nominal sampling point.
-> >> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
-> >> +                       Default is 0x0.
-> >
-> > Likewise, use '-'.
-> >
-> > s/than/then/ ?
-> [Loc Ho]
-> I believe that than is appropriate here a we are doing an comparison.
-
-Apologies, you are corerct; I completely misread this.
-
-Thanks,
-Mark.
+It seems that we cought this deadlock on Cortex-A15 and this patch fixes things
+(testing in progress). Is there any plans to mainline?
