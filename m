@@ -1,40 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Nov 2013 01:29:54 +0100
-Subject: ACPI
-In-Reply-To: <20131121200344.GD14725@sirena.org.uk>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <201311191915.57516.arnd@arndb.de> <20131121200344.GD14725@sirena.org.uk>
-Message-ID: <201311220129.54828.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 21 Nov 2013 16:54:12 -0800
+Subject: [PATCH V4 1/2] genirq: Add an accessor for IRQ_PER_CPU flag
+In-Reply-To: <CAPrCYkdpHPPY6D1dj5R=QJ5mtmKUfTx+M7wRMV-t2LrZMdSW9w@mail.gmail.com>
+References: <1384946021-22100-1-git-send-email-vkale@apm.com>	<1384946021-22100-2-git-send-email-vkale@apm.com>	<528CFC77.5050200@codeaurora.org>	<CAPrCYkefGMfweREk8bBKsO2VY4Tnc-fUZW8sw_K5ugRj5zJUFA@mail.gmail.com>
+ <CAPrCYkdpHPPY6D1dj5R=QJ5mtmKUfTx+M7wRMV-t2LrZMdSW9w@mail.gmail.com>
+Message-ID: <528EAB34.6010105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 November 2013, Mark Brown wrote:
-> On Tue, Nov 19, 2013 at 07:15:57PM +0100, Arnd Bergmann wrote:
-> 
-> > of them apply here. You keep saying "servers", but that isn't actually
-> > a feature of how the system is designed, rather than what is running
-> > on them. Given these examples (or any others, you could come up with),
-> > which ones do you actually see as relevant here:
-> 
-> > 1. An exterprise server (SPARC enterprise M9000, Power 795, Integrity
-> >    Superdome) with the CPU core changed to run ARM instructions
-> > 2. An ATX whitebox server mainboard with one to four sockets and PC
-> >    peripherals and plug-compatible ARM CPU chips.
-> > 3. A purpose-built server SoC based on standard components
-> > 4. A new server SoC based on an older proprietary embedded or mobile
-> >    SoC design (think Exynos, OMAP, Snapdragon, ... based)
-> > 5. A server built from using a cheap devboard (BeagleBone, Cubieboard, ...
-> >    style) with an unmodified SoC.
-> > 6. A virtual machine running on KVM or Xen.
-> 
-> I'd also ask if we need to consider desktops and laptops here - do we
-> really mean distros here rather than servers, even if servers are the
-> primary use case for distros right now?
+On 11/20/13 22:10, Vinayak Kale wrote:
+> [removing chris.smith at st.com]
+>
+> On Thu, Nov 21, 2013 at 11:36 AM, Vinayak Kale <vkale@apm.com> wrote:
+>> On Wed, Nov 20, 2013 at 11:46 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> On 11/20/13 03:13, Vinayak Kale wrote:
+>>>> This patch adds an accessor function for IRQ_PER_CPU flag.
+>>>> The accessor function is useful to dertermine whether an IRQ is percpu or not.
+>>>>
+>>>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>>>> ---
+>>> This looks like a copy of Chris Smith's patch. Shouldn't Chris be the
+>>> author and the commit text be whatever Chris sent?
+>> In the cover letter of this patch series I did mention about Chris's
+>> earlier patch. I didn't know his email-id earlier, have found the
+>> mail-id now. CCing the mail-id to check whether it's still valid.
+>>
+> Chris's mail-id doesn't seem to be valid, the earlier mail to his
+> mail-id [chris.smith at st.com] bounced.
+> Please let me know in such case how to mention original author's credits.
 
-Jon has previously said (multiple times) that he cares about servers
-only, so I assume that is still given. If you take the exact same
-hardware and firmware and add a PCIe GPU to turn it into a workstation
-or laptop, I don't see that change anything from the kernel perspective,
-but I'm trying to narrow the scope here, not widen it ;-)
+It's up to the maintainer accepting the patch. If I was picking up the
+patch I would say it doesn't really matter if the mail-id is valid
+anymore. Leave the original patch intact and just add your sign-off. If
+you took the patch and significantly changed it it's good to put
+"Based-on-a-patch-by:" and then take over authorship.
 
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
