@@ -1,63 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:22:59 +0000
-Subject: [PATCH 22/23] mtd: st_spi_fsm: Provide the default read/write
- configurations
-In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-23-git-send-email-lee.jones@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 22 Nov 2013 17:25:41 +0100
+Subject: [PATCH v2] ARM: at91: sama5d3: reduce TWI internal clock frequency
+In-Reply-To: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20131122162541.GE7420@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Message sequences can vary depending on how many pads (lines) are
-required to address the chip (mode & dummy), how many data pads (lines)
-are required to write out to the chip which will determine speed
-amongst other things which are detailed by the SFDP specification. We
-are able to use multiple configurations for each chip, but they need
-to me matched to a device's capabilities. These configurations are
-listed in preference order - most preferred first.
+On Fri, Nov 22, 2013 at 05:08:43PM +0100, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> With some devices, transfer hangs during I2C frame transmission. This issue
+> disappears when reducing the internal frequency of the TWI IP. Even if it is
+> indicated that internal clock max frequency is 66MHz, it seems we have
+> oversampling on I2C signals making TWI believe that a transfer in progress
+> is done.
+> 
+> This fix has no impact on the I2C bus frequency.
+> 
+> Cc: <stable@vger.kernel.org> #3.10+
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/st_spi_fsm.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 475bbd1..2b7df68 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -30,6 +30,33 @@
- 
- static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
- 
-+/*
-+ * FSM message sequence configurations:
-+ *
-+ * All configs are presented in order of preference
-+ */
-+
-+/* Default READ configurations, in order of preference */
-+static struct seq_rw_config default_read_configs[] = {
-+	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ_1_4_4,	0, 4, 4, 0x00, 2, 4},
-+	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ_1_1_4,	0, 1, 4, 0x00, 4, 0},
-+	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ_1_2_2,	0, 2, 2, 0x00, 4, 0},
-+	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ_1_1_2,	0, 1, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ_FAST,	0, 1, 1, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ,		0, 1, 1, 0x00, 0, 0},
-+	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
-+};
-+
-+/* Default WRITE configurations */
-+static struct seq_rw_config default_write_configs[] = {
-+	{FLASH_FLAG_WRITE_1_4_4, FLASH_CMD_WRITE_1_4_4, 1, 4, 4, 0x00, 0, 0},
-+	{FLASH_FLAG_WRITE_1_1_4, FLASH_CMD_WRITE_1_1_4, 1, 1, 4, 0x00, 0, 0},
-+	{FLASH_FLAG_WRITE_1_2_2, FLASH_CMD_WRITE_1_2_2, 1, 2, 2, 0x00, 0, 0},
-+	{FLASH_FLAG_WRITE_1_1_2, FLASH_CMD_WRITE_1_1_2, 1, 1, 2, 0x00, 0, 0},
-+	{FLASH_FLAG_READ_WRITE,  FLASH_CMD_WRITE,       1, 1, 1, 0x00, 0, 0},
-+	{0x00,			 0,			 0, 0, 0, 0x00, 0, 0},
-+};
-+
- static struct stfsm_seq stfsm_seq_read_jedec = {
- 	.data_size = TRANSFER_SIZE(8),
- 	.seq_opc[0] = (SEQ_OPC_PADS_1 |
--- 
-1.8.1.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/4e783c64/attachment.sig>
