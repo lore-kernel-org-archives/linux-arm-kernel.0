@@ -1,44 +1,38 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 22 Nov 2013 19:33:02 +0100
-Subject: [PATCH 1/2] ARM: at91: at91sam9g45: set default mmc pinctrl-names
-In-Reply-To: <1385128193-9963-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1385128193-9963-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20131122183302.GN14627@ns203013.ovh.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 22 Nov 2013 18:33:56 +0000
+Subject: [PATCH 2/8] ASoC: fsl-ssi: Move sysfs stats to debugfs
+In-Reply-To: <20131122164204.GB5893@pengutronix.de>
+References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
+ <1384938262-20554-3-git-send-email-mpa@pengutronix.de>
+ <20131121142208.GU2674@sirena.org.uk>
+ <20131122164204.GB5893@pengutronix.de>
+Message-ID: <20131122183356.GQ14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:49 Fri 22 Nov     , ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> pinctrl-names property was missing from mmc nodes.
-> 
-> Cc: <stable@vger.kernel.org> #3.11+
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-on both Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/boot/dts/at91sam9g45.dtsi |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index c3e5148..cf7de80 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -618,6 +618,7 @@
->  				compatible = "atmel,hsmci";
->  				reg = <0xfff80000 0x600>;
->  				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				pinctrl-names = "default";
->  				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(0)>;
->  				dma-names = "rxtx";
->  				#address-cells = <1>;
-> @@ -629,6 +630,7 @@
->  				compatible = "atmel,hsmci";
->  				reg = <0xfffd0000 0x600>;
->  				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				pinctrl-names = "default";
->  				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(13)>;
->  				dma-names = "rxtx";
->  				#address-cells = <1>;
-> -- 
-> 1.7.9.5
-> 
+On Fri, Nov 22, 2013 at 05:42:04PM +0100, Markus Pargmann wrote:
+> On Thu, Nov 21, 2013 at 02:22:08PM +0000, Mark Brown wrote:
+> > On Wed, Nov 20, 2013 at 10:04:16AM +0100, Markus Pargmann wrote:
+
+> > > This patch moves the statistics to debugfs and disables interrupts
+> > > completely if the kernel is build without DEBUG_FS enabled.
+
+> > We can still see the error counts through /proc/interrupts even without
+> > the debugfs file.
+
+> The interrupts are visible without the debugfs file when enabled through
+> SIER register. But it does not show the specific reason for the interrupts.
+
+> I am not sure what you suggest. To remove the stats file completely and
+> always disable interrupts?
+
+No, I'm suggesting not disabling interrupts completely when debugfs is
+disabled.  Since we can still see the interrupts happening even if
+debugfs is not enabled we're still getting diagnostics.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/02cdf897/attachment.sig>
