@@ -1,31 +1,83 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Fri, 22 Nov 2013 17:35:33 +0100
-Subject: [PATCH 3/3] ARM: OMAP2+: Fix eMMC on n900 with device tree
-In-Reply-To: <20131121235729.GD10023@atomide.com>
-References: <1385059866-10646-1-git-send-email-tony@atomide.com>
- <1385059866-10646-4-git-send-email-tony@atomide.com>
- <20131121231751.GA9772@earth.universe>
- <20131121235729.GD10023@atomide.com>
-Message-ID: <20131122163532.GA32331@earth.universe>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Sat, 23 Nov 2013 00:31:32 +0800
+Subject: [PATCH v7 0/4] Add dual-fifo mode support of i.MX ssi
+In-Reply-To: <cover.1384352281.git.b42378@freescale.com>
+References: <cover.1384352281.git.b42378@freescale.com>
+Message-ID: <20131122163132.GB17344@MrMyself>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 03:57:29PM -0800, Tony Lindgren wrote:
-> Well let's use just vaux3 then with a comment to the .dts file if that
-> works also on your 0x2204. It works on my 0x0010 too.
+Hi all,
+
+   I'm sorry to push this. But this series has been an orphan for a while.
+   Could any one please receive and foster it?
+
+Thank you.
+Nicolin Chen
+
+On Wed, Nov 13, 2013 at 10:55:23PM +0800, Nicolin Chen wrote:
+>  * ! This series of patches has a direct dependency between them. When
+>  * ! applying them, we need to apply to one single branch. Otherwise,
+>  * ! it would break currect branches.
 > 
-> I folded in your changes to the updated patch below. Care to reply with
-> your Signed-off-by too assuming it works also on your 0x2204 n900?
-
-It does work with the 0x2204 phone.
-
-Signed-off-by: Sebastian Reichel <sre@debian.org>
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/f13c7aaf/attachment.sig>
+> Changelog
+> v7:
+>  * Appended missing Acked-by to all four patches.
+>  * Sorry that I didn't add them at the first place.
+> v6:
+>  * PATCH-1: Use goto err_firmware instead of return directly.
+>  *
+>  * Nothing changes for the other three ack-ed patches
+> v5:
+>  * PATCH-3: Add period size constraint when using dual fifo mode
+>  *
+>  * Nothing changes for the other three patches
+> v4:
+>  * PATCH-3: Drop useless register configuration.
+>  *
+>  * Nothing changes for the other three patches
+> v3:
+>  * PATCH-1: Add comments to indicate the end of v1 and v2 array.
+>  * PATCH-3: Use better way to keep watermark as even number.
+>  *
+>  * Nothing changes for PATCH-2 and PATCH-4
+> v2:
+>  * Instead of adding rogue scripts to current SDMA driver based on firmware
+>  * V1, we define the new SDMA firmware as version 2 and bisect the PATCH-1
+>  * to two patches: The first is to add version check code to the SDMA driver;
+>  * And the second is to add SSI dual FIFO DMATYPE.
+>  *
+>  * Nothing changes for the last two patches.
+> v1:
+>  * SSI can reduce hardware overrun/underrun possibility when using dual
+>  * fifo mode. To support this mode, we need to first update sdma sciprt
+>  * list, and then enable dual fifo BIT in SSI driver, and last update DT
+>  * bindings of i.MX series.
+> 
+> Nicolin Chen (4):
+>   dma: imx-sdma: Add sdma firmware version 2 support
+>   dma: imx-sdma: Add new dma type for ssi dual fifo script
+>   ASoC: fsl_ssi: Add dual fifo mode support
+>   ARM: dts: imx: use dual-fifo sdma script for ssi
+> 
+>  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |  1 +
+>  arch/arm/boot/dts/imx51.dtsi                       |  4 ++--
+>  arch/arm/boot/dts/imx53.dtsi                       |  4 ++--
+>  arch/arm/boot/dts/imx6qdl.dtsi                     | 12 +++++-----
+>  arch/arm/boot/dts/imx6sl.dtsi                      | 12 +++++-----
+>  drivers/dma/imx-sdma.c                             | 19 ++++++++++++++-
+>  include/linux/platform_data/dma-imx-sdma.h         |  5 ++++
+>  include/linux/platform_data/dma-imx.h              |  1 +
+>  sound/soc/fsl/fsl_ssi.c                            | 27 +++++++++++++++++++++-
+>  9 files changed, 67 insertions(+), 18 deletions(-)
+> 
+> -- 
+> 1.8.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
