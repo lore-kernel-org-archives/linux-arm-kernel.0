@@ -1,86 +1,58 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 22 Nov 2013 12:46:11 -0800
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <528FB62C.2060607@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
- <1384862421.14845.222.camel@smile> <528B9CAE.3040600@wwwdotorg.org>
- <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
- <528BFDD0.3090503@wwwdotorg.org>
- <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
- <528CFE68.6060908@wwwdotorg.org>
- <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>
- <528D0C06.9080006@wwwdotorg.org>
- <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
- <528D28A1.2050307@wwwdotorg.org>
- <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
- <528E4F55.9070204@wwwdotorg.org>
- <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
- <528F95A9.2050305@wwwdotorg.org>
- <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
- <528F9DF9.6080706@wwwdotorg.org>
- <CAPcyv4ig3TWAYWsw5_-MWfKABma9-JCF=Gh-inuxeJF6su-NVw@mail.gmail.com>
- <528FB62C.2060607@wwwdotorg.org>
-Message-ID: <CAPcyv4h6iRNy=uv2vFdUVWXssW03uxpBzD34d3rG469zMEp0YQ@mail.gmail.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Fri, 22 Nov 2013 15:59:45 -0500
+Subject: ACPI
+In-Reply-To: <201311222131.08787.arnd@arndb.de>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <201311220129.54828.arnd@arndb.de> <528ED801.8040705@jonmasters.org>
+ <201311222131.08787.arnd@arndb.de>
+Message-ID: <528FC5C1.1080403@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 11:53 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/22/2013 12:49 PM, Dan Williams wrote:
->> On Fri, Nov 22, 2013 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>>> The proposal is dma_request_slave_channel only returns errors or valid
->>>>>> pointers, never NULL.
->>>>>
->>>>> OK, so if you make that assumption, I guess it's safe.
->>>>
->>>> I made that assumption because that is what your original patch proposed:
->>>>
->>>> +/**
->>>> + * dma_request_slave_channel_or_err - try to allocate an exclusive
->>>> slave channel
->>>> + * @dev:       pointer to client device structure
->>>> + * @name:      slave channel name
->>>> + *
->>>> + * Returns pointer to appropriate dma channel on success or an error pointer.
->>>> + */
->>>>
->>>> What's the benefit of leaking NULL values to callers?  If they already
->>>> need to check for err, why force them to check for NULL too?
->>>
->>> "Returns pointer to appropriate dma channel on success or an error
->>> pointer." means that callers only have to check for an ERR value. If the
->>> function returns NULL, then other DMA-related functions must treat that
->>> as a valid channel ID. This is case (a) in my previous email.
->>
->> How can a channel be "valid" and NULL at the same time?  Without the
->> guarantee that dma_request_channel always returns a non-null-channel
->> pointer or an error pointer you're forcing clients to use or open-code
->> IS_ERR_OR_NULL.
->
-> No, callers should just follow the documentation. If all error cases are
-> indicated by an ERR pointer, then there is no need to check for NULL. In
-> fact, client must not check anything beyond whether the value is an ERR
-> value or not. So, there's no need to use IS_ERR_OR_NULL.
->
-> It's up to the API to make sure that it returns values that are valid
-> for other calls to related APIs. If that doesn't include NULL, it won't
-> return NULL. If it does, it might. But, that's an internal
-> implementation detail of the API (and associated APIs), not something
-> that clients should know about.
->
-> One situation where a NULL might be valid is where the return value
-> isn't really a pointer, but an integer index or ID cast to a pointer.
+On 11/22/2013 03:31 PM, Arnd Bergmann wrote:
+> On Friday 22 November 2013, Jon Masters wrote:
+> 
+>> By 64-bit ARM server, I mean a system conformant with a series of
+>> specifications that define what such a server system consists of. It
+>> might be a physical system featuring an ARM-based SoC containing a core
+>> conformant to the v8 Architecture, along with standardized peripherals,
+>> or it might be a virtual platform. The boot architecture would include
+>> UEFI (specifically a sequential progression from an initial EL3 reset
+>> secure ROM on through to a verified Tiano build), and ACPI being used to
+>> convey the platform devices, as well as for runtime event delivery.
+> 
+> Ok, that narrows it down a little, although not in the way I expected.
+> 
+> It seems there is a secret spec along the lines of the older PREP, CHRP,
+> PAPR. Since the group behind this spec has not yet revealed itself, I will
+> refer to them as SPECTRE (maybe that should be SPCTR?) for the sake of
+> discussion.
 
-Ok that's the piece I am missing, and maybe explains why
-samsung_dmadev_request() looks so broken.  Are there really
-implementations out there that somehow know that the return value from
-dma_request_slave channel is not a (struct dma_chan *)??
+That's an *awesome* choice of name. Made my afternoon :) If there were
+an organization such as SPECTRE, I really hope that it would come with
+those lap cats (I seem to be missing mine - but I do have a stuffed
+plush white toy cat in my Amazon wishlist, and a birthday coming..).
 
-At that point just change the prototype of dma_request_slave_channel to:
+But regardless of the existence or otherwise of any organization, I
+would expect to see some standards documents appearing in the not too
+distant future. I share the concern that this stuff needs to be out in
+public, but above all, all else, what I care about above all is that
+when there are ARM server systems in market in the next few years that
+you can run *any* one-size-fits-all generic Operating System you would
+like to choose to run, and freely move from one OS to another. That
+includes the ability to run generic Linux distributions, Hypervisors,
+non-Unix Operating Systems, and so on. To do that requires that the
+underlying server platform be standardized in the same way that it is
+elsewhere on other arches, with sensitivity to a wide world of choice.
 
-MAGIC_t dma_request_slave_channel(struct device *dev, const char *name)
+A few years ago, a strategic direction was chosen by a few industry
+players around UEFI and ACPI on ARM. I look forward to seeing standards
+published, to seeing more emerging members of this market announced
+their intentions, and to an engaging dialog about how support for these
+systems will be implemented so that there is one standardized 64-bit ARM
+server platform upon which customers can run anything they want. I hope
+we can have some really engaging conversation very soon about it.
 
-Those clients need to be killed or fixed, otherwise how do you
-guarantee that the 'integer index or ID' does not collide with the
-ERR_PTR() number space?
+Thanks,
+
+Jon.
