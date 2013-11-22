@@ -1,58 +1,88 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Fri, 22 Nov 2013 15:59:45 -0500
-Subject: ACPI
-In-Reply-To: <201311222131.08787.arnd@arndb.de>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <201311220129.54828.arnd@arndb.de> <528ED801.8040705@jonmasters.org>
- <201311222131.08787.arnd@arndb.de>
-Message-ID: <528FC5C1.1080403@jonmasters.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 22 Nov 2013 15:05:08 -0600
+Subject: [PATCH v2] arm64: enable EDAC on arm64
+Message-ID: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 03:31 PM, Arnd Bergmann wrote:
-> On Friday 22 November 2013, Jon Masters wrote:
-> 
->> By 64-bit ARM server, I mean a system conformant with a series of
->> specifications that define what such a server system consists of. It
->> might be a physical system featuring an ARM-based SoC containing a core
->> conformant to the v8 Architecture, along with standardized peripherals,
->> or it might be a virtual platform. The boot architecture would include
->> UEFI (specifically a sequential progression from an initial EL3 reset
->> secure ROM on through to a verified Tiano build), and ACPI being used to
->> convey the platform devices, as well as for runtime event delivery.
-> 
-> Ok, that narrows it down a little, although not in the way I expected.
-> 
-> It seems there is a secret spec along the lines of the older PREP, CHRP,
-> PAPR. Since the group behind this spec has not yet revealed itself, I will
-> refer to them as SPECTRE (maybe that should be SPCTR?) for the sake of
-> discussion.
+From: Rob Herring <rob.herring@calxeda.com>
 
-That's an *awesome* choice of name. Made my afternoon :) If there were
-an organization such as SPECTRE, I really hope that it would come with
-those lap cats (I seem to be missing mine - but I do have a stuffed
-plush white toy cat in my Amazon wishlist, and a birthday coming..).
+Implement atomic_scrub and enable EDAC for arm64.
 
-But regardless of the existence or otherwise of any organization, I
-would expect to see some standards documents appearing in the not too
-distant future. I share the concern that this stuff needs to be out in
-public, but above all, all else, what I care about above all is that
-when there are ARM server systems in market in the next few years that
-you can run *any* one-size-fits-all generic Operating System you would
-like to choose to run, and freely move from one OS to another. That
-includes the ability to run generic Linux distributions, Hypervisors,
-non-Unix Operating Systems, and so on. To do that requires that the
-underlying server platform be standardized in the same way that it is
-elsewhere on other arches, with sensitivity to a wide world of choice.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+v2:
+- Add loop for exclusive store success
+- Fix size to be 32-bits at a time. The framework gives no alignment
+  guarantees.
 
-A few years ago, a strategic direction was chosen by a few industry
-players around UEFI and ACPI on ARM. I look forward to seeing standards
-published, to seeing more emerging members of this market announced
-their intentions, and to an engaging dialog about how support for these
-systems will be implemented so that there is one standardized 64-bit ARM
-server platform upon which customers can run anything they want. I hope
-we can have some really engaging conversation very soon about it.
+ arch/arm64/Kconfig            |  1 +
+ arch/arm64/include/asm/edac.h | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
+ create mode 100644 arch/arm64/include/asm/edac.h
 
-Thanks,
-
-Jon.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 88c8b6c1..109687a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -11,6 +11,7 @@ config ARM64
+ 	select BUILDTIME_EXTABLE_SORT
+ 	select CLONE_BACKWARDS
+ 	select COMMON_CLK
++	select EDAC_SUPPORT
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_IOMAP
+ 	select GENERIC_IRQ_PROBE
+diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
+new file mode 100644
+index 0000000..6d2d262
+--- /dev/null
++++ b/arch/arm64/include/asm/edac.h
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2013 Calxeda, Inc.
++ * Based on PPC version Copyright 2007 MontaVista Software, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef ASM_EDAC_H
++#define ASM_EDAC_H
++/*
++ * ECC atomic, DMA, SMP and interrupt safe scrub function.
++ * Implements the per arch atomic_scrub() that EDAC use for software
++ * ECC scrubbing.  It reads memory and then writes back the original
++ * value, allowing the hardware to detect and correct memory errors.
++ */
++static inline void atomic_scrub(void *va, u32 size)
++{
++	unsigned int *virt_addr = va;
++	unsigned int i;
++
++	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
++		long result;
++		unsigned long tmp;
++
++		asm volatile("// atomic_scrub\n"
++		"1:	ldxr	%w0, %2\n"
++		"	stxr	%w1, %w0, %2\n"
++		"	cbnz	%w1, 1b"
++			: "=&r" (result), "=&r" (tmp), "+Q" (*virt_addr)
++			: : "cc");
++	}
++}
++
++#endif
+-- 
+1.8.1.2
