@@ -1,55 +1,69 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:22:54 +0000
-Subject: [PATCH 17/23] mtd: st_spi_fsm: Provide the sequence for enabling
- 32bit addressing mode
+Date: Fri, 22 Nov 2013 16:22:48 +0000
+Subject: [PATCH 11/23] ARM: STi: Add support for the FSM Serial Flash
+ Controller
 In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
 References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385137380-28968-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FSM Serial Flash Controller is driven by issuing a standard set of
-register writes we call a message sequence. This patch supplies a method
-to prepare the message sequence responsible for setting 32bit addressing
-mode on the Flash chip.
+Here we add the necessary device nodes required for successful device
+probing and Pinctrl setup for the FSM.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/stih416-b2105.dts    | 14 ++++++++++++++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi | 12 ++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 583a0ab..a56fb98 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -66,6 +66,28 @@ static struct stfsm_seq stfsm_seq_erase_sector = {
- 		    SEQ_CFG_STARTSEQ),
- };
+diff --git a/arch/arm/boot/dts/stih416-b2105.dts b/arch/arm/boot/dts/stih416-b2105.dts
+index e518eb0..7acdfdf 100644
+--- a/arch/arm/boot/dts/stih416-b2105.dts
++++ b/arch/arm/boot/dts/stih416-b2105.dts
+@@ -33,6 +33,20 @@
+ 			status = "okay";
+ 		};
  
-+static int stfsm_n25q_prepare_en_32bit_addr_seq(struct stfsm_seq *seq)
-+{
-+	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_EN4B_ADDR));
-+	seq->seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_WREN) |
-+			   SEQ_OPC_CSDEASSERT);
++		/* FSM */
++		spifsm: spifsm at fe902000{
++		        compatible         = "st,spi-fsm", "simple-bus";
++		        reg                =  <0xfe902000 0x1000>;
++		        reg-names          = "spi-fsm";
++		        pinctrl-0          = <&pinctrl_fsm>;
 +
-+	seq->seq[0] = STFSM_INST_CMD2;
-+	seq->seq[1] = STFSM_INST_CMD1;
-+	seq->seq[2] = STFSM_INST_WAIT;
-+	seq->seq[3] = STFSM_INST_STOP;
++			st,syscfg	   = <&syscfg_rear>;
++		        st,boot-device-reg = <0x958>;
++		        st,boot-device-spi = <0x1a>;
 +
-+	seq->seq_cfg = (SEQ_CFG_PADS_1 |
-+			SEQ_CFG_ERASE |
-+			SEQ_CFG_READNOTWRITE |
-+			SEQ_CFG_CSDEASSERT |
-+			SEQ_CFG_STARTSEQ);
++		        status = "okay";
++		};
 +
-+	return 0;
-+}
-+
- static inline int stfsm_is_idle(struct stfsm *fsm)
- {
- 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
+ 		leds {
+ 			compatible	= "gpio-leds";
+ 			fp_led {
+diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+index 10bb4df..9a48710 100644
+--- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+@@ -235,6 +235,18 @@
+ 				};
+ 			};
+ 
++			fsm {
++				pinctrl_fsm: fsm {
++					st,pins {
++						spi-fsm-clk     = <&PIO12 2     OUT     ALT1>;
++						spi-fsm-cs      = <&PIO12 3     OUT     ALT1>;
++						spi-fsm-mosi    = <&PIO12 4     OUT     ALT1>;
++						spi-fsm-miso    = <&PIO12 5     IN      ALT1>;
++						spi-fsm-hol     = <&PIO12 6     OUT     ALT1>;
++						spi-fsm-wp      = <&PIO12 7     OUT     ALT1>;
++					};
++				};
++			};
+ 		};
+ 
+ 		pin-controller-rear {
 -- 
 1.8.1.2
