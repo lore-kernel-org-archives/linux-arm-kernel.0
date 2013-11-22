@@ -1,81 +1,111 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 22 Nov 2013 11:05:08 -0600
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Nov 2013 09:08:01 -0800
 Subject: [PATCH 6/8] devicetree: doc: Document ti,timer-parent property
-In-Reply-To: <20131122155838.GF10023@atomide.com>
+In-Reply-To: <528F8807.7050803@ti.com>
 References: <1385085414-9034-1-git-send-email-joelf@ti.com>
  <1385085414-9034-7-git-send-email-joelf@ti.com>
- <20131122155838.GF10023@atomide.com>
-Message-ID: <528F8EC4.9050506@ti.com>
+ <20131122155838.GF10023@atomide.com> <528F8807.7050803@ti.com>
+Message-ID: <20131122170800.GG10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 09:58 AM, Tony Lindgren wrote:
-> * Joel Fernandes <joelf@ti.com> [131121 18:00]:
->> +Required properties for system timers (clockevents/clocksource):
->> +- ti,timer-parent:	System timer's parent mux clock needs to be setup.
->> +			This is currently hardcoded in code, for DT boot we
->> +			move this to DT.
->> +
+* Joel Fernandes <joelf@ti.com> [131122 08:37]:
+> Hi Tony,
 > 
-> This can be replaced with just clk_set_rate, or clk_set_parent if needed.
-> Or by having a clocks = <&32k_clk> property in the dmtimer node in the
-> .dts file.
+> Thanks for your comments, few replies inline below..
 > 
->>  Optional properties:
->>  - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
+> On 11/22/2013 09:58 AM, Tony Lindgren wrote:
+> > * Joel Fernandes <joelf@ti.com> [131121 18:00]:
+> >> +Required properties for system timers (clockevents/clocksource):
+> >> +- ti,timer-parent:	System timer's parent mux clock needs to be setup.
+> >> +			This is currently hardcoded in code, for DT boot we
+> >> +			move this to DT.
+> >> +
+> > 
+> > This can be replaced with just clk_set_rate, or clk_set_parent if needed.
+> > Or by having a clocks = <&32k_clk> property in the dmtimer node in the
+> > .dts file.
+> > 
 > 
-> Hmm this we may not need, this can probably be deciphered from the compatible
-> flag already?
+> Sure, but clock-data is still not available to make this possible in mainline.
+> We also discussed earlier right that we don't want dependencies as much as
+> possible to get one chunk in and working at a time. I was thinking like for a
+> first-pass since there's a lot of unrelated code that doesn't have dependencies,
+> but needs this to work, we can introduce this property for now and drop it later
+> as a "cost of migration"?
 
-I was thinking maybe we can improve the of_clocksource_init matching
-capabilities to match better, not just on compatible but other properties for
-better selection?
+I don't think there's a dependency here to the omap clocks as the dmtimer
+can implement the clocksource separately and internally still use clk_get
+using the clock alias table.
+ 
+> >>  Optional properties:
+> >>  - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
+> > 
+> > Hmm this we may not need, this can probably be deciphered from the compatible
+> > flag already?
+> 
+> How? Compatible contains the same string, for example for OMAP4:
+> 
+> timer8 has:
+>                         compatible = "ti,omap4430-timer";
+>                         ti,timer-pwm;
+>                         ti,timer-dsp;
+> 
+> and timer9 has:
+>                         compatible = "ti,omap4430-timer";
+>                         ti,hwmods = "timer9";
+>                         ti,timer-pwm;
+> 
 
-For example, a generic clocksource DT property to say that the timer is in the
-wakeup domain and so should be preferred as the clocksource? Also additional
-properties to force its selection?
+Some of these features are always hardwired certain way and could be mapped to
+the right timer based on the timer offset and the compatible flag if we want
+to avoid adding the ti,timer-alwon property. It seems that most omaps have
+just one always on timer that's the first timer, and only on am33xx it does
+not exist?
 
-Then we can switch to clocksource_of_init and have it do the selection. Not sure
-if there is such a need or value for other ARM platforms so we may be over
-complicating the framework to handle these quirks. Comments welcomed about it.
+I'm fine adding ti,timer-alwon if it help to leave out static data in the
+driver and avoid patching the driver for every new SoC. But sounds like in
+this case we really have just the am33xx exception to the rule?
 
-thanks,
+> > Then for the users of a specific dmtimer, they can select the right one using
+> > the interrupt-parent property:
+> > 
+> > timer1: timer at 0x4800abcd {
+> > 	compatible = "ti,omap5430-timer";
+> > 	#interrupt-cells = <1>;		/* needs irqchip implemented for dmtimer */
+> > 	interrupt-controller;
+> > 	#clock-cells = <1>;		/* needs clocksource implemented for dmtimer */
+> > 	clock-output-names = "32k", "sys_ck";
+> > 	...
+> > };
+> 
+> In reference to my last thread reply, irqchip may not be available early in the
+> boot process (.init_time) for system timer usage?
 
--Joel
+Hmm it should be, looks like we have in arch/arm/kernel/irq.c:
 
-> 
-> Then for the users of a specific dmtimer, they can select the right one using
-> the interrupt-parent property:
-> 
-> timer1: timer at 0x4800abcd {
-> 	compatible = "ti,omap5430-timer";
-> 	#interrupt-cells = <1>;		/* needs irqchip implemented for dmtimer */
-> 	interrupt-controller;
-> 	#clock-cells = <1>;		/* needs clocksource implemented for dmtimer */
-> 	clock-output-names = "32k", "sys_ck";
-> 	...
-> };
-> 
-> counter32k: counter at 4ae04000 {
-> 	compatible = "ti,omap-counter32k";
-> 	#clock-cells = <1>;		/* needs clocksource implemented for 32k counter */
-> 	clock-output-names = "32k";
-> 	...
-> };
-> 
-> timer {
-> 	compatible = "ti,omap5-timer";
-> 	interrupt-parent = <&timer1>;
-> 	interrupts = <1>;
-> 	clocks = <&timer1 0>,		/* use timer1 as clockevent, clock index 0 = 32k, 1 = sys_ck ... */
-> 		 <&counter32k 0>;	/* use 32k counter as clocksource */
-> };
-> 
->>  - ti,timer-dsp:		Indicates the timer can interrupt the on-chip DSP in
-> 
-> This can be probably also be mapped based on the compatible property?
-> 
-> Regards,
-> 
-> Tony
-> 
+void __init init_IRQ(void)
+{
+	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+		irqchip_init();
+	else    
+		machine_desc->init_irq();
+}               
+
+Then in init/main.c has:
+	...
+	early_irq_init();
+	init_IRQ();
+	tick_init();
+	init_timers();
+	hrtimers_init();
+	softirq_init();
+	timekeeping_init();
+	time_init();
+	...
+
+So looks like we should have irqchip available?
+
+Regards,
+
+Tony
