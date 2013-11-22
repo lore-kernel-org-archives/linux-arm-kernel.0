@@ -1,48 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Nov 2013 09:11:35 -0800
-Subject: [PATCH 6/8] devicetree: doc: Document ti,timer-parent property
-In-Reply-To: <528F8EC4.9050506@ti.com>
-References: <1385085414-9034-1-git-send-email-joelf@ti.com>
- <1385085414-9034-7-git-send-email-joelf@ti.com>
- <20131122155838.GF10023@atomide.com> <528F8EC4.9050506@ti.com>
-Message-ID: <20131122171135.GH10023@atomide.com>
+Date: Fri, 22 Nov 2013 09:14:21 -0800
+Subject: [PATCH 3/3] ARM: OMAP2+: Fix eMMC on n900 with device tree
+In-Reply-To: <20131122163532.GA32331@earth.universe>
+References: <1385059866-10646-1-git-send-email-tony@atomide.com>
+ <1385059866-10646-4-git-send-email-tony@atomide.com>
+ <20131121231751.GA9772@earth.universe>
+ <20131121235729.GD10023@atomide.com>
+ <20131122163532.GA32331@earth.universe>
+Message-ID: <20131122171421.GI10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joel Fernandes <joelf@ti.com> [131122 09:06]:
-> On 11/22/2013 09:58 AM, Tony Lindgren wrote:
-> > * Joel Fernandes <joelf@ti.com> [131121 18:00]:
-> >> +Required properties for system timers (clockevents/clocksource):
-> >> +- ti,timer-parent:	System timer's parent mux clock needs to be setup.
-> >> +			This is currently hardcoded in code, for DT boot we
-> >> +			move this to DT.
-> >> +
+* Sebastian Reichel <sre@ring0.de> [131122 08:38]:
+> On Thu, Nov 21, 2013 at 03:57:29PM -0800, Tony Lindgren wrote:
+> > Well let's use just vaux3 then with a comment to the .dts file if that
+> > works also on your 0x2204. It works on my 0x0010 too.
 > > 
-> > This can be replaced with just clk_set_rate, or clk_set_parent if needed.
-> > Or by having a clocks = <&32k_clk> property in the dmtimer node in the
-> > .dts file.
-> > 
-> >>  Optional properties:
-> >>  - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
-> > 
-> > Hmm this we may not need, this can probably be deciphered from the compatible
-> > flag already?
+> > I folded in your changes to the updated patch below. Care to reply with
+> > your Signed-off-by too assuming it works also on your 0x2204 n900?
 > 
-> I was thinking maybe we can improve the of_clocksource_init matching
-> capabilities to match better, not just on compatible but other properties for
-> better selection?
+> It does work with the 0x2204 phone.
 > 
-> For example, a generic clocksource DT property to say that the timer is in the
-> wakeup domain and so should be preferred as the clocksource? Also additional
-> properties to force its selection?
-> 
-> Then we can switch to clocksource_of_init and have it do the selection. Not sure
-> if there is such a need or value for other ARM platforms so we may be over
-> complicating the framework to handle these quirks. Comments welcomed about it.
+> Signed-off-by: Sebastian Reichel <sre@debian.org>
 
-Maybe, but so far it seems that it can all be specified in the board specific
-.dts file using standard properties, so I'd first play with that.
+OK good to hear. I'll update the patch with that.
 
-Regards,
+Thanks,
 
 Tony
