@@ -1,75 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Nov 2013 19:51:55 +0000
-Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
-In-Reply-To: <CALT56yNPmjje=8w2-3xo-80nVum2bhedMio8kp+gvizeGxQ5Kw@mail.gmail.com>
-References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
- <528B811A.1030501@gmail.com>
- <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
- <20131120002007.GR16735@n2100.arm.linux.org.uk>
- <CALT56yP-LsO_8qgpa3R6JQSWW2pGkNWBUtab8L2hQnC5UdoKvQ@mail.gmail.com>
- <20131122175814.GC16735@n2100.arm.linux.org.uk>
- <CALT56yNPmjje=8w2-3xo-80nVum2bhedMio8kp+gvizeGxQ5Kw@mail.gmail.com>
-Message-ID: <20131122195154.GD16735@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 22 Nov 2013 12:53:16 -0700
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <CAPcyv4ig3TWAYWsw5_-MWfKABma9-JCF=Gh-inuxeJF6su-NVw@mail.gmail.com>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>	<1384766276.14845.155.camel@smile>	<528A5170.3090809@wwwdotorg.org>	<1384862421.14845.222.camel@smile>	<528B9CAE.3040600@wwwdotorg.org>	<CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>	<528BFDD0.3090503@wwwdotorg.org>	<CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>	<528CFE68.6060908@wwwdotorg.org>	<CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>	<528D0C06.9080006@wwwdotorg.org>	<1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>	<528D28A1.2050307@wwwdotorg.org>	<CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>	<528E4F55.9070204@wwwdotorg.org>	<CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>	<528F95A9.2050305@wwwdotorg.org>	<CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>	<528F9DF9.6080706@wwwdotorg.org>
+ <CAPcyv4ig3TWAYWsw5_-MWfKABma9-JCF=Gh-inuxeJF6su-NVw@mail.gmail.com>
+Message-ID: <528FB62C.2060607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 11:12:05PM +0400, Dmitry Eremin-Solenikov wrote:
-> On Fri, Nov 22, 2013 at 9:58 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Nov 20, 2013 at 04:45:40AM +0400, Dmitry Eremin-Solenikov wrote:
-> >> On Wed, Nov 20, 2013 at 4:20 AM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > Also note that we _do_ have sa11x0 platforms which request their GPIOs
-> >> > in their arch_initcall callback, so the sa11x0 GPIO driver better be
-> >> > around at that point otherwise things *will* fail.
-> >>
-> >> Which ones if you have them in your mind?
-> >>
-> >> > I suspect that means the SA11x0 GPIO driver must be initialised early.
-> >>
-> >> Anyway in these patches gpio-sa1100 driver is registered at postcore
-> >> initcall, so gpios should
-> >> be available before arch_initcall functions.
-> >
-> > No it won't - quite simply because the platforms get called before
-> > sa1100_init() is run - they have to be because the platforms get to
-> > customise the platform data passed to the SA11x0 devices, which has
-> > to happen before sa1100_init() registers the devices.
+On 11/22/2013 12:49 PM, Dan Williams wrote:
+> On Fri, Nov 22, 2013 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>> The proposal is dma_request_slave_channel only returns errors or valid
+>>>>> pointers, never NULL.
+>>>>
+>>>> OK, so if you make that assumption, I guess it's safe.
+>>>
+>>> I made that assumption because that is what your original patch proposed:
+>>>
+>>> +/**
+>>> + * dma_request_slave_channel_or_err - try to allocate an exclusive
+>>> slave channel
+>>> + * @dev:       pointer to client device structure
+>>> + * @name:      slave channel name
+>>> + *
+>>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>>> + */
+>>>
+>>> What's the benefit of leaking NULL values to callers?  If they already
+>>> need to check for err, why force them to check for NULL too?
+>>
+>> "Returns pointer to appropriate dma channel on success or an error
+>> pointer." means that callers only have to check for an ERR value. If the
+>> function returns NULL, then other DMA-related functions must treat that
+>> as a valid channel ID. This is case (a) in my previous email.
 > 
-> They both belong to arch_initicall level, aren't they? So ordering is
-> guarded only by having customize_machine(which calls init_machine)
-> from arch/arm/kernel/ before sa1100_init from arch/arm/mach-sa1100/?
+> How can a channel be "valid" and NULL at the same time?  Without the
+> guarantee that dma_request_channel always returns a non-null-channel
+> pointer or an error pointer you're forcing clients to use or open-code
+> IS_ERR_OR_NULL.
 
-Here:
+No, callers should just follow the documentation. If all error cases are
+indicated by an ERR pointer, then there is no need to check for NULL. In
+fact, client must not check anything beyond whether the value is an ERR
+value or not. So, there's no need to use IS_ERR_OR_NULL.
 
-c05b5194 T __initcall3_start
-c05b5194 t __initcall_gate_vma_init3
-c05b5198 t __initcall_customize_machine3
-c05b519c t __initcall_exceptions_init3
-c05b51a0 t __initcall_sa1100_init3
-c05b51a4 t __initcall_dma_bus_init3
-c05b51a8 t __initcall_dma_channel_table_init3
-c05b51ac t __initcall_sa1110_clk_init3
+It's up to the API to make sure that it returns values that are valid
+for other calls to related APIs. If that doesn't include NULL, it won't
+return NULL. If it does, it might. But, that's an internal
+implementation detail of the API (and associated APIs), not something
+that clients should know about.
 
-* There we can see customize_machine() is called before sa1100_init().
-
-* customize_machine() calls the machine specific .init_machine function.
-
-* Several platforms call gpio_request() from their .init_machine function
-  for SA11x0 GPIOs.
-
-* You're adding the SA11x0 GPIO device in sa1100_init().
-
-Therefore, those platforms which call gpio_request() will fail.
-
-What is soo difficult to understand about this?
-
-> For sa1100 there are only 2.5 platforms which use gpiolib - collie and h3xxx.
-> (The half is for simpad, which registers gpio chip from platform code, but
-> doesn't use it otherwise -- in platform code, of course).
-
-Oh well, I guess it doesn't matter then, if we're only breaking 2.5
-platforms.
-
-No.  It does matter.  This needs fixing.
+One situation where a NULL might be valid is where the return value
+isn't really a pointer, but an integer index or ID cast to a pointer.
