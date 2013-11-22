@@ -1,101 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:22:44 +0000
-Subject: [PATCH 07/23] mtd: st_spi_fsm: Add support for JEDEC ID extraction
-In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-8-git-send-email-lee.jones@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 22 Nov 2013 17:42:04 +0100
+Subject: [PATCH 2/8] ASoC: fsl-ssi: Move sysfs stats to debugfs
+In-Reply-To: <20131121142208.GU2674@sirena.org.uk>
+References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
+ <1384938262-20554-3-git-send-email-mpa@pengutronix.de>
+ <20131121142208.GU2674@sirena.org.uk>
+Message-ID: <20131122164204.GB5893@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once we start supporting devices it will be handy go detect them
-dynamically. This will be done using the chip's unique JEDEC ID. This
-patch allows us to extract a device's JEDEC ID using the a predefined
-FSM register write sequence.
+Hi,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/st_spi_fsm.c | 55 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+On Thu, Nov 21, 2013 at 02:22:08PM +0000, Mark Brown wrote:
+> On Wed, Nov 20, 2013 at 10:04:16AM +0100, Markus Pargmann wrote:
+> 
+> > This patch moves the statistics to debugfs and disables interrupts
+> > completely if the kernel is build without DEBUG_FS enabled.
+> 
+> We can still see the error counts through /proc/interrupts even without
+> the debugfs file.
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 73c55b4..f937329 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -25,6 +25,22 @@
- 
- #include "st_spi_fsm.h"
- 
-+static struct stfsm_seq stfsm_seq_read_jedec = {
-+	.data_size = TRANSFER_SIZE(8),
-+	.seq_opc[0] = (SEQ_OPC_PADS_1 |
-+		       SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_RDID)),
-+	.seq = {
-+		STFSM_INST_CMD1,
-+		STFSM_INST_DATA_READ,
-+		STFSM_INST_STOP,
-+	},
-+	.seq_cfg = (SEQ_CFG_PADS_1 |
-+		    SEQ_CFG_READNOTWRITE |
-+		    SEQ_CFG_CSDEASSERT |
-+		    SEQ_CFG_STARTSEQ),
-+};
-+
- static inline int stfsm_is_idle(struct stfsm *fsm)
- {
- 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
-@@ -91,6 +107,42 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
- 	}
- }
- 
-+static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
-+{
-+	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
-+	uint32_t tmp[2];
-+
-+	stfsm_load_seq(fsm, seq);
-+
-+	stfsm_read_fifo(fsm, tmp, 8);
-+
-+	memcpy(jedec, tmp, 5);
-+
-+	stfsm_wait_seq(fsm);
-+}
-+
-+static struct flash_info * stfsm_jedec_probe(struct stfsm *fsm)
-+{
-+	u16                     ext_jedec;
-+	u32			jedec;
-+	u8			id[5];
-+
-+	stfsm_read_jedec(fsm, id);
-+
-+	jedec     = id[0] << 16 | id[1] << 8 | id[2];
-+	/*
-+	 * JEDEC also defines an optional "extended device information"
-+	 * string for after vendor-specific data, after the three bytes
-+	 * we use here. Supporting some chips might require using it.
-+	 */
-+	ext_jedec = id[3] << 8  | id[4];
-+
-+	dev_dbg(fsm->dev, "JEDEC =  0x%08x [%02x %02x %02x %02x %02x]\n",
-+		jedec, id[0], id[1], id[2], id[3], id[4]);
-+
-+	return NULL;
-+}
-+
- static void stfsm_clear_fifo(struct stfsm *fsm)
- {
- 	uint32_t avail;
-@@ -243,6 +295,9 @@ static int stfsm_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	/* Detect SPI FLASH device */
-+	stfsm_jedec_probe(fsm);
-+
- 	platform_set_drvdata(pdev, fsm);
- 
- 	fsm->mtd.dev.parent	= &pdev->dev;
+The interrupts are visible without the debugfs file when enabled through
+SIER register. But it does not show the specific reason for the interrupts.
+
+I am not sure what you suggest. To remove the stats file completely and
+always disable interrupts?
+
+Regards,
+
+Markus
+
 -- 
-1.8.1.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
