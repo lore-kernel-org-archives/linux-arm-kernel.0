@@ -1,134 +1,62 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 22 Nov 2013 13:14:28 -0800
-Subject: [PATCH 2/5] net: MOXA ART: connect to PHY and add ethtool support
-In-Reply-To: <1385132242-3204-2-git-send-email-jonas.jensen@gmail.com>
-References: <1385132242-3204-1-git-send-email-jonas.jensen@gmail.com>
- <1385132242-3204-2-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <CAGVrzcZOKegkSTtzF9RyuEhWcz6Popm69ZFirYdTfeXLfVRdhQ@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sat, 23 Nov 2013 01:20:29 +0400
+Subject: [PATCH 7/9] ARM: sa1100: move gpio irq handling to GPIO driver
+In-Reply-To: <20131122200242.GE16735@n2100.arm.linux.org.uk>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+ <1384505280-25389-8-git-send-email-dbaryshkov@gmail.com>
+ <20131122174528.GB16735@n2100.arm.linux.org.uk>
+ <CALT56yM1rf7onJNu6L9tG52RrmDXcuWSoa=JfpakZRO+e7vnEQ@mail.gmail.com>
+ <20131122200242.GE16735@n2100.arm.linux.org.uk>
+Message-ID: <CALT56yPaXp8Zwnv-oXiA3NT=7myMcMBckbEF4u_LERNC_Q2ykQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jonas,
+Hello,
 
-> +       if (!priv->phy_dev)
-> +               return -ENODEV;
-
-This should not be required since you will fail probing the interface
-if you cannot connect to the PHY device.
-
-> +
-> +       return phy_ethtool_gset(priv->phy_dev, cmd);
-> +}
-> +
-> +static int moxart_set_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
-> +{
-> +       struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> +
-> +       if (!priv->phy_dev)
-> +               return -ENODEV;
-
-Same here
-
-> +
-> +       return phy_ethtool_sset(priv->phy_dev, cmd);
-> +}
-> +
-> +static int moxart_nway_reset(struct net_device *ndev)
-> +{
-> +       struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> +
-> +       if (!priv->phy_dev)
-> +               return -EINVAL;
-
-And here
-
-[snip]
-
-> +       if (!priv->phy_dev)
-> +               return -ENODEV;
-
-And here
-
-> +
-> +       return phy_mii_ioctl(priv->phy_dev, ir, cmd);
-> +}
-> +
->  static void moxart_mac_free_memory(struct net_device *ndev)
->  {
->         struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> @@ -169,6 +314,10 @@ static int moxart_mac_open(struct net_device *ndev)
->         moxart_update_mac_address(ndev);
->         moxart_mac_setup_desc_ring(ndev);
->         moxart_mac_enable(ndev);
-> +
-> +       if (priv->phy_dev)
-> +               phy_start(priv->phy_dev);
-> +
->         netif_start_queue(ndev);
+On Sat, Nov 23, 2013 at 12:02 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 22, 2013 at 11:46:10PM +0400, Dmitry Eremin-Solenikov wrote:
+>> On Fri, Nov 22, 2013 at 9:45 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > Therefore, if we want to have certain GPIOs triggering wakeups (iow,
+>> > those GPIOs which have had enable_irq_wake() called on them) but not
+>> > those which haven't, we need to reprogram GRER and GFER with the
+>> > GPIOs which can wake the system up.
+>>
+>> I thought so. I was puzzled, because that would mean, that we want to wake
+>> up from a GPIO, which is masked in GPIO_IRQ_mask, but enabled in PWER.
+>> Is that the real scenario/usecase? If we/kernel has disabled IRQ
+>> through _mask_irq,
+>> I thought, we didn't expect events from that pin (including wakeup), did we?
 >
->         netdev_dbg(ndev, "%s: IMR=0x%x, MACCR=0x%x\n",
-> @@ -184,6 +333,9 @@ static int moxart_mac_stop(struct net_device *ndev)
+> So, if a device driver decides that it wants to be woken up by a GPIO
+> and therefore calls enable_irq_wake() on it, but also calls disable_irq()
+> on that same interrupt to avoid _receiving_ the interrupt until it's
+> ready, does that mean that the system should _not_ be woken up?
 >
->         napi_disable(&priv->napi);
+> I doubt many systems work this way - later PXA devices certainly don't,
+> where the wakeup is triggered from the silicon on the pad interface
+> rather than the interrupt controller - where the state of the IRQ masks
+> have no bearing what so ever on it.
 >
-> +       if (priv->phy_dev)
-> +               phy_stop(priv->phy_dev);
-> +
->         netif_stop_queue(ndev);
+> Please, stop thinking about changing the behaviour of any of the SA11x0
+> stuff.  Treat the code as-is as authoritive on the way things should be
+> done, and _carefully_ "adjust it" to how you'd like to see it - so we
+> can have a higher confidence that stuff isn't being broken or behaviour
+> isn't changed.
 >
->         /* disable all interrupts */
-> @@ -429,12 +581,22 @@ static struct net_device_ops moxart_netdev_ops = {
->         .ndo_set_mac_address    = moxart_set_mac_address,
->         .ndo_validate_addr      = eth_validate_addr,
->         .ndo_change_mtu         = eth_change_mtu,
-> +       .ndo_do_ioctl           = moxart_do_ioctl,
->  };
+> Such behaviour changes would include looping differently while handling
+> interrupts.
 >
-> +static void moxart_adjust_link(struct net_device *ndev)
-> +{
-> +#ifdef DEBUG
-> +       struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> +
-> +       phy_print_status(priv->phy_dev);
-> +#endif
+> And more importantly, treat SA11x0 as a reference implementation for
+> IRQ stuff; that's the platform I developed the IRQ handling stuff on
+> which became the basis for tglx's IRQ layer in the kernel.
 
-This is too simplistic, you should at least do the following:
+OK, I got your message. I agree that I don't have enough level of knowledge
+to rework SA11x0 it in such big steps.
 
-- check for an update in the PHY duplex setting and update the
-Ethernet MAC with this new setting
-- check for an update in the PHY speed settings and update relevant
-MAC registers (RX/TX clock speed, PHY speed etc...)
+Thank you for your explanations.
 
-Also, it is a good practice to retain the previous link
-state/duplex/speed, compare them against the phydev values and call
-phy_print_status() if there is any change.
-
-> +}
-> +
->  static int moxart_mac_probe(struct platform_device *pdev)
->  {
->         struct device *p_dev = &pdev->dev;
-> -       struct device_node *node = p_dev->of_node;
-> +       struct device_node *node = p_dev->of_node, *phy_node;
->         struct net_device *ndev;
->         struct moxart_mac_priv_t *priv;
->         struct resource *res;
-> @@ -455,6 +617,20 @@ static int moxart_mac_probe(struct platform_device *pdev)
->         priv = netdev_priv(ndev);
->         priv->ndev = ndev;
->
-> +       phy_node = of_parse_phandle(node, "phy-handle", 0);
-> +       if (!phy_node)
-> +               dev_err(p_dev, "of_parse_phandle failed\n");
-> +
-> +       if (phy_node) {
-> +               priv->phy_dev = of_phy_connect(priv->ndev, phy_node,
-> +                                              &moxart_adjust_link,
-> +                                              0, PHY_INTERFACE_MODE_MII);
-
-Unless the hardware supports anything but MII, this is fine. A nicer
-binding would include a "phy-mode" or "phy-connection-type" property
-which describes how the Ethernet MAC and PHY are connected to each
-other. You can then retrieve that property using of_get_phy_mode().
 -- 
-Florian
+With best wishes
+Dmitry
