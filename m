@@ -1,76 +1,43 @@
-From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Fri, 22 Nov 2013 13:00:03 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <CAHkRjk5MstjD9JFk+co8k89i8geJBmSF6uObhGdmWSe0GJHo8g@mail.gmail.com>
-References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131118150052.GC24408@sirena.org.uk> <20131119091216.GA4412@netboy>
- <20131120064056.GB5272@netboy>
- <20131121192136.GA16735@n2100.arm.linux.org.uk>
- <20131121204704.E4487C40753@trevor.secretlab.ca>
- <CAHkRjk5MstjD9JFk+co8k89i8geJBmSF6uObhGdmWSe0GJHo8g@mail.gmail.com>
-Message-ID: <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 22 Nov 2013 12:57:31 +0000
+Subject: Patches from ARM folks solicited for the -stable tree
+In-Reply-To: <20131121225227.GA12201@kroah.com>
+References: <alpine.DEB.2.02.1311210442560.30143@utopia.booyaka.com>
+ <20131121153254.GA3422@kroah.com>
+ <alpine.DEB.2.02.1311211818000.30143@utopia.booyaka.com>
+ <20131121185021.GA15057@kroah.com>
+ <alpine.DEB.2.02.1311212210150.9743@utopia.booyaka.com>
+ <20131121225227.GA12201@kroah.com>
+Message-ID: <20131122125731.GL14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Thu, Nov 21, 2013 at 02:52:27PM -0800, Greg Kroah-Hartman wrote:
+> On Thu, Nov 21, 2013 at 10:15:37PM +0000, Paul Walmsley wrote:
 
-On Nov 22, 2013, at 12:43 PM, Catalin Marinas wrote:
+> > It's true that the focus here for -stable has mostly been for fixes for 
+> > code that causes some kind of crash or failure, rather than new device 
+> > support.  Including new device support could probably increase the amount 
+> > of -stable patches by quite a bit.  The problem with this is that it could 
+> > cause hard-to-find regressions in the -stable kernel.  For example, on 
+> > OMAP, adding support for a new device could potentially cause PM 
+> > regressions on the rest of the system, depending on how the driver 
+> > operates.  So the bar for those types of patches seems pretty high if it's 
+> > really intended to be a "stable" kernel.
 
-> On 21 November 2013 20:47, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Thu, 21 Nov 2013 19:21:36 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->>> On Wed, Nov 20, 2013 at 07:40:57AM +0100, Richard Cochran wrote:
->>>> Now, I never saw any proclamation or discussion about "DT is in flux"
->>>> on the arm list. If I had, I surely would have complained, and loudly.
->>>> AFAICT, this decision was made in rather private circles, but you talk
->>>> as if this was abundantly clear. *It was not.*
->>> 
->>> DT has been discussed several times over this year alone, which
->>> included discussions about the stability of bindings.  Various
->>> people in those threads (including myself) have put their views
->>> forward.
->>> 
->>> My position has been that if an interface ends up being published in a
->>> -final kernel, then it is part of the ABI, because a -final kernel is
->>> an end-product.  It's a final release which says "we've done the
->>> development, it's finished for users use."  If it's not then it shouldn't
->>> be in a -final kernel, or if it has to be there for development purposes,
->>> it needs to be hidden behind a "this is in development" label.
-> 
-> +1
-> 
->>> I've said that several times in the DT discussions and I believe
->>> basically been ignored.  Frankly, I've said my bit and I've given up
->>> caring.
->> 
->> Umm. Not sure why you feel ignored. We're absolutely going for stability
->> now.
-> 
-> What I was hoping for is a better way to enforce this by taking the
-> dts files out of the kernel. I think that's the point where the
-> bindings can become ABI. In the meantime we rely on contributors and
-> reviewers making sure backwards compatibility is preserved. But I
-> guess we'll eventually get there.
-> 
+> Then those "types" of patches are not device ids or quirks being added
+> to a table, so of course I wouldn't want to take those into the stable
+> tree...
 
-As one that's going to be dealing with this, please don't take the DTS
-files from the kernel.
-
-If you do this, I can guarantee that within a year almost no ARM board using DT
-will boot a mainline kernel.
-
-The reason is that vendors have enough trouble (and failing) tracking a single
-tree, adding yet another will just end to the vendor trees as far as the eye can see.
-
-Maybe, maybe, EVMs from silicon vendors will still boot, but I doubt any other
-customer board will work.
-
-> -- 
-> Catalin
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Regards
-
--- Pantelis
+What happens moderately often (not just for OMAP) is that the driver
+level change is a stable suitable change by itself but starting to use
+the driver can expose a requirement to do additional work on some
+existing SoCs to integrate it properly since the driver starts using SoC
+integraton that isn't altogether there or correct.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/b300f7b4/attachment.sig>
