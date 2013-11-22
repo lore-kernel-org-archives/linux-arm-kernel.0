@@ -1,114 +1,94 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 22 Nov 2013 15:22:32 +0100
-Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
-In-Reply-To: <1385055795-24002-1-git-send-email-fabio.estevam@freescale.com>
-References: <1385055795-24002-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20131122142231.GA1741@ulmo.nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 22 Nov 2013 15:28:16 +0100
+Subject: [PATCH 1/2] ARM: mvebu: second PCIe unit of Armada XP mv78230
+ is only x1 capable
+In-Reply-To: <20131122134449.GG29241@titan.lakedaemon.net>
+References: <cover.1383681717.git.arno@natisbad.org>
+ <b5f36f547bb12ed4e5398401685523625ca50312.1383681717.git.arno@natisbad.org>
+ <20131106154326.27a4cc27@skate> <877gclcsjf.fsf@natisbad.org>
+ <20131106181241.GG8308@titan.lakedaemon.net>
+ <87txf5z666.fsf@natisbad.org>
+ <20131122134449.GG29241@titan.lakedaemon.net>
+Message-ID: <20131122152816.73e4eb90@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 03:43:15PM -0200, Fabio Estevam wrote:
-> Commit 22ceeee1 (pwm-backlight: Add power supply support) caused breakage on 
-> boards that do not define the backlight regulator on their dts files.
-> 
-> Instead of making the backlight regulator mandatory, treat it as optional 
-> instead, so that we do not have breakage.
-> 
-> This avoids the need for adding a dummy regulator on every dts file that uses 
-> the pwm-backlight.
+Dear Jason Cooper,
 
-That was actually part of an earlier version of this patch. It was
-rejected on the grounds that regulators really aren't optional. They are
-there, but in most cases just not described in DT (most likely because
-they aren't controllable and always on).
+On Fri, 22 Nov 2013 08:44:49 -0500, Jason Cooper wrote:
+> On Fri, Nov 22, 2013 at 12:28:01AM +0100, Arnaud Ebalard wrote:
+> > Hi Jason,
+> > 
+> > Jason Cooper <jason@lakedaemon.net> writes:
+> > 
+> > > On Wed, Nov 06, 2013 at 07:08:04PM +0100, Arnaud Ebalard wrote:
+> > >> Hi,
+> > >> 
+> > >> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
+> > >> 
+> > >> > On Tue, 05 Nov 2013 21:45:48 +0100, Arnaud Ebalard wrote:
+> > >> >> Various Marvell datasheets advertise second PCIe unit of mv78230
+> > >> >> flavour of Armada XP as x4/quad x1 capable. This second unit is in
+> > >> >> fact only x1 capable. This patch fixes current mv78230 .dtsi to
+> > >> >> reflect that, i.e. makes 1.0 the second interface (instead of 2.0
+> > >> >> at the moment). This was successfully tested on a mv78230-based
+> > >> >> ReadyNAS 2120 platform with a x1 device (FL1009 XHCI controller)
+> > >> >> connected to this second interface.
+> > >> >> 
+> > >> >> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> > >> >> ---
+> > >> >>  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 24 ++++++++++++------------
+> > >> >>  1 file changed, 12 insertions(+), 12 deletions(-)
+> > >> >
+> > >> > Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > >> 
+> > >> Thanks for the review of both patches, Thomas. And no relation, but
+> > >> thanks for 714086029116b6 ;-)
+> > >> 
+> > >> > This is actually a bug fix, and the problem exists since commit
+> > >> > 9d8f44f02d4a5f6e7b8d138ea8f8c6e30ae6e1a3, and therefore in 3.10, 3.11
+> > >> > and 3.12.
+> > >> >
+> > >> > However, while the PCIe DT stuff was merged in 3.10, the actual driver
+> > >> > itself was only merged in 3.11, so in 3.10, there is no chance to hit
+> > >> > the bug.
+> > >> >
+> > >> > Therefore, having this fix pushed to the stable 3.11.x and 3.12.x trees
+> > >> > would be good.
+> > >
+> > > oops, I forgot to reply to this.  I disagree here.  We shouldn't assume
+> > > that the dts file used will be from the same commit and the kernel
+> > > built.  Additionally, it doesn't hurt to backport the change the whole
+> > > way.
+> > >
+> > >> Jason, any action required on my side regarding the relay of the two
+> > >> patches to stable team or will you handle that once they are in your
+> > >> tree (or Linus one)?
+> > >
+> > > I'll take care of it.
+> > 
+> > I may have missed something but I expected those two patches to hit
+> > Linus tree after 3.12 to be part of 3.13-rc1. Am I just too impatient?
+> 
+> It is a fix, but as (iirc) Thomas mentioned, there is the risk of
+> breaking existing PCIe boards.  So, I was sitting on it till after
+> v3.13-rc1 drops.  I'd like for it to have a run in -next and get a few
+> more Tested-by's before pushing it.
 
-But even so, the regulator core now has functionality to return a dummy
-regulator if none is specified in DT, specifically so that users don't
-have to special case the handling of "optional" regulators. That should
-be enough to keep all boards working even if no power-supply property
-was given in the DTS. As a matter of fact it's a constellation that I
-explicitly tested and found to work well.
+Hum, did I say that it could break existing PCIe boards? I might have
+lost the context, but I don't quite see how it could break existing
+PCIe boards. The patches from Arnaud can only make *more* PCIe cards
+detected, without affecting the ones that were already correctly
+detected.
 
-Cc'ing Mark Brown, perhaps he can help figure out what's causing this.
+So I don't think there should be any "suspicion" of potential breakage
+with those two patches, there are only improving things without any
+risk of breaking existing things, as far as I can remember.
 
-Thierry
+Best regards,
 
-> 
-> Tested on a mx6qsabresd.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  .../devicetree/bindings/video/backlight/pwm-backlight.txt |  2 +-
->  drivers/video/backlight/pwm_bl.c                          | 15 +++++++--------
->  2 files changed, 8 insertions(+), 9 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> index 764db86..ed3dc3c 100644
-> --- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> +++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> @@ -10,13 +10,13 @@ Required properties:
->        last value in the array represents a 100% duty cycle (brightest).
->    - default-brightness-level: the default brightness level (index into the
->        array defined by the "brightness-levels" property)
-> -  - power-supply: regulator for supply voltage
->  
->  Optional properties:
->    - pwm-names: a list of names for the PWM devices specified in the
->                 "pwms" property (see PWM binding[0])
->    - enable-gpios: contains a single GPIO specifier for the GPIO which enables
->                    and disables the backlight (see GPIO binding[1])
-> +  - power-supply: regulator for supply voltage
->  
->  [0]: Documentation/devicetree/bindings/pwm/pwm.txt
->  [1]: Documentation/devicetree/bindings/gpio/gpio.txt
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index fb80d68..fb3008c 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -50,9 +50,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
->  	if (pb->enabled)
->  		return;
->  
-> -	err = regulator_enable(pb->power_supply);
-> -	if (err < 0)
-> -		dev_err(pb->dev, "failed to enable power supply\n");
-> +	if (!IS_ERR(pb->power_supply)) {
-> +		err = regulator_enable(pb->power_supply);
-> +		if (err < 0)
-> +			dev_err(pb->dev, "failed to enable power supply\n");
-> +	}
->  
->  	if (gpio_is_valid(pb->enable_gpio)) {
->  		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-> @@ -80,7 +82,8 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
->  			gpio_set_value(pb->enable_gpio, 0);
->  	}
->  
-> -	regulator_disable(pb->power_supply);
-> +	if (!IS_ERR(pb->power_supply))
-> +		regulator_disable(pb->power_supply);
->  	pb->enabled = false;
->  }
->  
-> @@ -283,10 +286,6 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	}
->  
->  	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
-> -	if (IS_ERR(pb->power_supply)) {
-> -		ret = PTR_ERR(pb->power_supply);
-> -		goto err_gpio;
-> -	}
->  
->  	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
->  	if (IS_ERR(pb->pwm)) {
-> -- 
-> 1.8.1.2
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/b1a2ee3c/attachment.sig>
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
