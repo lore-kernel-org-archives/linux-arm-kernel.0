@@ -1,69 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:22:48 +0000
-Subject: [PATCH 11/23] ARM: STi: Add support for the FSM Serial Flash
- Controller
-In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-12-git-send-email-lee.jones@linaro.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 22 Nov 2013 10:42:01 -0600
+Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
+ clocksource/clockevent system timers
+In-Reply-To: <CAL_JsqKS=cGeAhj+K04SOtA8nJRR3MXxS3ry-kzjQOkZx3yK4g@mail.gmail.com>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-6-git-send-email-joelf@ti.com>
+ <CAL_JsqKS=cGeAhj+K04SOtA8nJRR3MXxS3ry-kzjQOkZx3yK4g@mail.gmail.com>
+Message-ID: <528F8959.7080207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we add the necessary device nodes required for successful device
-probing and Pinctrl setup for the FSM.
+On 11/22/2013 09:58 AM, Rob Herring wrote:
+> On Thu, Nov 21, 2013 at 7:56 PM, Joel Fernandes <joelf@ti.com> wrote:
+>> This work is a migration effort of OMAP system timers to the
+>> clocksource/clockevent framework. Consider this as a first-pass in this effort.
+>> There are few cleanups that need to be done first. The HWMOD code is
+>> intertwined with the timer code. HWMOD code cleanups in the future will
+>> hopefully make most of this code go away, so till then we separate out the
+>> power/clocks portion of the code from the actual timer bits.  This will
+>> facilitate near-future work of adapting the system timer as a clocksource.
+>>
+>> New functions for OF-only boot are introduced, and we can soon delete the old
+>> versions once we migrate all platforms. Currently only AM335x is migrated and
+>> testedA new omap_generic_timer_init function is introduced for DT platforms.
+>> Code required earlier for non-DT platforms such as setup of timer IDs and timer
+>> parent clock is not required.  parent clocks are automatically setup by the mux
+>> clock driver through DT so they no longer need to be hardcoded.
+>>
+>> The init code will try to pick the best timer for clocksource and clockevent
+>> however bindings are added to force a particular timer as clocksource or
+>> clockevent through DT.
+>>
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>>  .../devicetree/bindings/arm/omap/timer.txt         |  12 ++
+>>  arch/arm/mach-omap2/common.h                       |   1 +
+>>  arch/arm/mach-omap2/timer.c                        | 235 +++++++++++++++++++++
+>>  3 files changed, 248 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>> index d02e27c..6cf7a75 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>> @@ -32,6 +32,18 @@ Optional properties:
+>>  - ti,timer-secure:     Indicates the timer is reserved on a secure OMAP device
+>>                         and therefore cannot be used by the kernel.
+>>
+>> +- ti,timer-clockevent,
+>> +  ti,timer-clocksource These properties force the system timer code to choose
+>> +                       the particular timer as a clockevent or clocksource.
+>> +                       If these properties are not specified, the timer code
+>> +                       picks up a "ti,timer-alwon" as the clocksource and a
+>> +                       timer containing one of the following properties as
+>> +                       the clockevent in the following order:
+>> +                               ti,timer-alwon
+>> +                               ti,timer-dsp
+>> +                               ti,timer-pwm
+>> +                               ti,timer-secure
+> 
+> These properties were added specifically for the reason of avoiding
+> linux specific properties like these. When is this not sufficient?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih416-b2105.dts    | 14 ++++++++++++++
- arch/arm/boot/dts/stih416-pinctrl.dtsi | 12 ++++++++++++
- 2 files changed, 26 insertions(+)
+Some platforms cannot use certain timers as clockevents and clocksource, to keep
+this code functionally equivalent and working, I added these properties so that
+its possible to select specific timers as clockevents/sources as was being done
+in the non-DT case. I'm open to suggestions for doing this in a better way for DT.
 
-diff --git a/arch/arm/boot/dts/stih416-b2105.dts b/arch/arm/boot/dts/stih416-b2105.dts
-index e518eb0..7acdfdf 100644
---- a/arch/arm/boot/dts/stih416-b2105.dts
-+++ b/arch/arm/boot/dts/stih416-b2105.dts
-@@ -33,6 +33,20 @@
- 			status = "okay";
- 		};
- 
-+		/* FSM */
-+		spifsm: spifsm at fe902000{
-+		        compatible         = "st,spi-fsm", "simple-bus";
-+		        reg                =  <0xfe902000 0x1000>;
-+		        reg-names          = "spi-fsm";
-+		        pinctrl-0          = <&pinctrl_fsm>;
-+
-+			st,syscfg	   = <&syscfg_rear>;
-+		        st,boot-device-reg = <0x958>;
-+		        st,boot-device-spi = <0x1a>;
-+
-+		        status = "okay";
-+		};
-+
- 		leds {
- 			compatible	= "gpio-leds";
- 			fp_led {
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index 10bb4df..9a48710 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -235,6 +235,18 @@
- 				};
- 			};
- 
-+			fsm {
-+				pinctrl_fsm: fsm {
-+					st,pins {
-+						spi-fsm-clk     = <&PIO12 2     OUT     ALT1>;
-+						spi-fsm-cs      = <&PIO12 3     OUT     ALT1>;
-+						spi-fsm-mosi    = <&PIO12 4     OUT     ALT1>;
-+						spi-fsm-miso    = <&PIO12 5     IN      ALT1>;
-+						spi-fsm-hol     = <&PIO12 6     OUT     ALT1>;
-+						spi-fsm-wp      = <&PIO12 7     OUT     ALT1>;
-+					};
-+				};
-+			};
- 		};
- 
- 		pin-controller-rear {
--- 
-1.8.1.2
+> 
+> And I agree with the comment to use OF_CLKSRC.
+> 
+
+There are difficulties I mentioned in a previous post [1] stating why it may not
+be possible to use OF_CLKSRC macros, and still keep the code functionally
+equivalent to when it was non-DT.
+
+thanks,
+
+-Joel
+
+[1] http://marc.info/?l=linux-arm-kernel&m=138513299917850&w=2
