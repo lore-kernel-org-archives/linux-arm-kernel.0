@@ -1,33 +1,23 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 22 Nov 2013 15:50:24 -0800
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAPcyv4iL8LSXfpfAugCAVK11A5fvJ4kYZXneNC6V5HZeTRY+4g@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 22 Nov 2013 15:57:16 -0800
+Subject: [PATCH 0/3] arm/arm64: KVM: vgic: Various bugfixes and improvements
+Message-ID: <1385164639-18710-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A question about the patch:
+This small series contains two initial bugfixes and a performance
+optimization that reduces world-switch cost slightly in the vgic
+handling code.
 
-On Fri, Nov 15, 2013 at 12:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-[..]
-> diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-> index 0b88dd3d05f4..928141f6f21b 100644
-> --- a/drivers/dma/of-dma.c
-> +++ b/drivers/dma/of-dma.c
-> @@ -181,11 +181,13 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
->
->                 of_node_put(dma_spec.np);
->
-> +               if (!ofdma && defer)
-> +                       return ERR_PTR(-EPROBE_DEFER);
->                 if (chan)
->                         return chan;
->         }
+Applies to kvm-arm-next.
 
-Why do we need to make this conditional on the value of 'defer'?  If
-the client cares it will propagate the error if it does not care then
-nothing is gained by converting this to -ENODEV.
+Christoffer Dall (3):
+  arm/arm64: KVM: vgic: Bugfix in handle_mmio_cfg_reg
+  arm/arm64: KVM: vgic: Bugfix in vgic_dispatch_sgi
+  arm/arm64: KVM: vgic: Use non-atomic bitops
+
+ virt/kvm/arm/vgic.c | 46 +++++++++++++++++++++++-----------------------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
+
+-- 
+1.8.4.3
