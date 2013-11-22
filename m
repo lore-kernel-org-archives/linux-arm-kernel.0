@@ -1,103 +1,41 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 22 Nov 2013 14:36:10 -0700
-Subject: [PATCH 3/4] ARM: mvebu: NETGEAR ReadyNAS 104 .dts file cleanup
-In-Reply-To: <bd899cfc2b0b3d22a7442d76b3901ca81ca86f11.1385148929.git.arno@natisbad.org>
-References: <cover.1385148929.git.arno@natisbad.org>
- <bd899cfc2b0b3d22a7442d76b3901ca81ca86f11.1385148929.git.arno@natisbad.org>
-Message-ID: <20131122213610.GC30358@obsidianresearch.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Fri, 22 Nov 2013 16:37:42 -0500
+Subject: ACPI
+In-Reply-To: <528FC5C1.1080403@jonmasters.org>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <201311220129.54828.arnd@arndb.de> <528ED801.8040705@jonmasters.org>
+ <201311222131.08787.arnd@arndb.de> <528FC5C1.1080403@jonmasters.org>
+Message-ID: <528FCEA6.1060602@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 09:07:01PM +0100, Arnaud Ebalard wrote:
->  			mdio {
->  				phy0: ethernet-phy at 0 {
-> +					compatible = "marvell,88e1318s";
->  					reg = <0>;
->  				};
->  
->  				phy1: ethernet-phy at 1 {
-> +					compatible = "marvell,88e1318s";
->  					reg = <1>;
->  				};
->  			};
+On 11/22/2013 03:59 PM, Jon Masters wrote:
 
-Just an inquiry, are these compatible strings OK?
+> A few years ago, a strategic direction was chosen by a few industry
+> players around UEFI and ACPI on ARM. I look forward to seeing standards
+> published, to seeing more emerging members of this market announced
+> their intentions, and to an engaging dialog about how support for these
+> systems will be implemented so that there is one standardized 64-bit ARM
+> server platform upon which customers can run anything they want. I hope
+> we can have some really engaging conversation very soon about it.
 
-Documentation/devicetree/bindings/net/phy.txt doesn't really give
-guidance.
+To answer the rest of the thread a little more, what I look forward to
+is (eventually) replacing every singe one of my personal servers with a
+64-bit ARM based one running a generic OS. In the case of the Fedora
+Server release (see the recent revival of that in connection with other
+changes in the Fedora space), it is my intention that there ultimately
+be supported ISO download media that can even be installed in a local
+drive if anyone is antiquated enough to build such an ARM system. But
+certainly installing multi-million node clusters (which will be the
+norm) based upon HP Moonshot and other vendor hardware should "just
+work", using standardized network boot and installation of any OS choice
+you care to make, as should moving from one to another.
 
-For self-discoverable busses I would expect to see a structured
-compatible string, or property, that encodes the phy-id - such as what
-the PCI binding does with vid/did:
+The bottom line for me is that for those moving from existing
+architectures into the new world, everything else remains the same. Same
+OEM vendor tooling used to design and build systems and deliver and
+support them, same installation experience, very very boring. This is
+exactly how ARM will succeed in the market. One Platform. Very very
+boring and straightforward installation and management, and so on.
 
-"compatible" Construct a list of names in most-specific to
-             least-specific order. The names shall be derived from
-	     values of the Vendor ID, Device ID, Subsystem Vendor ID,
-	     Subsystem ID, Revision ID and Class Code bytes, and shall
-             have the following form, and be placed in the list in the
-             following order:
-
-  pciVVVV,DDDD.SSSS.ssss.RR (1)
-
-So, I would think something like this:
-
-compatible = "ethernet-phy-id0141,0e90"; /* Marvell 88E1318 */
-
-?
-
-A big rational for this is that the kernel already has complete
-infrastructure for matching drivers to the numeric phy-id.
-
-I have a small patch to make the OF mdio bus scanner get the phy-id
-from DT. I didn't use compatible string in this patch, but it would be
-easy to change, and this demonstrates what we could do with a
-structured compatible string (attached).
-
-Grant? Rob? I could make some patches for this if you agree.
-
-Regards,
-Jason
-
->From 1aab2047b6dfb8b814673718dfa7ef0ea0c7a0ef Mon Sep 17 00:00:00 2001
-From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Date: Thu, 12 Sep 2013 17:36:13 -0600
-Subject: [PATCH] of_mdio: Allow the DT to specify the phy ID and avoid
- autoprobing
-
-This makes the generic of_mdiobus_register parse the DT property
-'phy-id'. If present it should be the numeric constant that matches the
-phy-id register normally readable through MDIO.
-
-When the ID is given the phy autoprobing is defeated and the phy is
-created directly.
-
-This is necessary to support phy's that cannot be autoprobed when
-of_mdiobus_register is called. Specifically, my case has the phy in
-reset at that time, the reset is only released once the ethernet
-driver starts.
-
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/of/of_mdio.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-index d5a57a9..dbe6932 100644
---- a/drivers/of/of_mdio.c
-+++ b/drivers/of/of_mdio.c
-@@ -81,7 +81,12 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
- 
- 		is_c45 = of_device_is_compatible(child,
- 						 "ethernet-phy-ieee802.3-c45");
--		phy = get_phy_device(mdio, addr, is_c45);
-+		paddr = of_get_property(child, "phy-id", &len);
-+		if (paddr && len <= sizeof(*paddr) && !is_c45)
-+			phy = phy_device_create(mdio, addr, be32_to_cpup(paddr),
-+						0, NULL);
-+		else
-+			phy = get_phy_device(mdio, addr, is_c45);
- 
- 		if (!phy || IS_ERR(phy)) {
- 			dev_err(&mdio->dev,
--- 
-1.8.1.2
+Jon.
