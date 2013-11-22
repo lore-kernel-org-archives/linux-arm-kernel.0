@@ -1,49 +1,94 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Nov 2013 11:43:32 +0000
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20131121204704.E4487C40753@trevor.secretlab.ca>
-References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131118150052.GC24408@sirena.org.uk> <20131119091216.GA4412@netboy>
- <20131120064056.GB5272@netboy> <20131121192136.GA16735@n2100.arm.linux.org.uk>
- <20131121204704.E4487C40753@trevor.secretlab.ca>
-Message-ID: <CAHkRjk5MstjD9JFk+co8k89i8geJBmSF6uObhGdmWSe0GJHo8g@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 22 Nov 2013 09:53:32 -0200
+Subject: [RFC] ARM: lib: delay-loop: Add align directive to fix BogoMIPS
+ calculation
+Message-ID: <1385121212-30182-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2013 20:47, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, 21 Nov 2013 19:21:36 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> On Wed, Nov 20, 2013 at 07:40:57AM +0100, Richard Cochran wrote:
->> > Now, I never saw any proclamation or discussion about "DT is in flux"
->> > on the arm list. If I had, I surely would have complained, and loudly.
->> > AFAICT, this decision was made in rather private circles, but you talk
->> > as if this was abundantly clear. *It was not.*
->>
->> DT has been discussed several times over this year alone, which
->> included discussions about the stability of bindings.  Various
->> people in those threads (including myself) have put their views
->> forward.
->>
->> My position has been that if an interface ends up being published in a
->> -final kernel, then it is part of the ABI, because a -final kernel is
->> an end-product.  It's a final release which says "we've done the
->> development, it's finished for users use."  If it's not then it shouldn't
->> be in a -final kernel, or if it has to be there for development purposes,
->> it needs to be hidden behind a "this is in development" label.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-+1
+Currently mx53 (CortexA8) running at 1GHz reports:
+Calibrating delay loop... 663.55 BogoMIPS (lpj=3317760)
 
->> I've said that several times in the DT discussions and I believe
->> basically been ignored.  Frankly, I've said my bit and I've given up
->> caring.
->
-> Umm. Not sure why you feel ignored. We're absolutely going for stability
-> now.
+Tom Evans verified that alignments of 0x0 and 0x8 run the two instructions of
+__loop_delay in one clock cycle (1 clock/loop), while alignments of 0x4 and 
+0xc take 3 clocks to run the loop twice. (1.5 clock/loop)
 
-What I was hoping for is a better way to enforce this by taking the
-dts files out of the kernel. I think that's the point where the
-bindings can become ABI. In the meantime we rely on contributors and
-reviewers making sure backwards compatibility is preserved. But I
-guess we'll eventually get there.
+The original object code looks like this:
 
+00000010 <__loop_const_udelay>:
+  10:	e3e01000 	mvn	r1, #0
+  14:	e51f201c 	ldr	r2, [pc, #-28]	; 0 <__loop_udelay-0x8>
+  18:	e5922000 	ldr	r2, [r2]
+  1c:	e0800921 	add	r0, r0, r1, lsr #18
+  20:	e1a00720 	lsr	r0, r0, #14
+  24:	e0822b21 	add	r2, r2, r1, lsr #22
+  28:	e1a02522 	lsr	r2, r2, #10
+  2c:	e0000092 	mul	r0, r2, r0
+  30:	e0800d21 	add	r0, r0, r1, lsr #26
+  34:	e1b00320 	lsrs	r0, r0, #6
+  38:	01a0f00e 	moveq	pc, lr
+
+0000003c <__loop_delay>:
+  3c:	e2500001 	subs	r0, r0, #1
+  40:	8afffffe 	bhi	3c <__loop_delay>
+  44:	e1a0f00e 	mov	pc, lr
+
+After adding the 'align 3' directive to __loop_delay (align to 8 bytes):
+
+00000010 <__loop_const_udelay>:
+  10:	e3e01000 	mvn	r1, #0
+  14:	e51f201c 	ldr	r2, [pc, #-28]	; 0 <__loop_udelay-0x8>
+  18:	e5922000 	ldr	r2, [r2]
+  1c:	e0800921 	add	r0, r0, r1, lsr #18
+  20:	e1a00720 	lsr	r0, r0, #14
+  24:	e0822b21 	add	r2, r2, r1, lsr #22
+  28:	e1a02522 	lsr	r2, r2, #10
+  2c:	e0000092 	mul	r0, r2, r0
+  30:	e0800d21 	add	r0, r0, r1, lsr #26
+  34:	e1b00320 	lsrs	r0, r0, #6
+  38:	01a0f00e 	moveq	pc, lr
+  3c:	e320f000 	nop	{0}
+
+00000040 <__loop_delay>:
+  40:	e2500001 	subs	r0, r0, #1
+  44:	8afffffe 	bhi	40 <__loop_delay>
+  48:	e1a0f00e 	mov	pc, lr
+  4c:	e320f000 	nop	{0}
+
+, which now reports:
+Calibrating delay loop... 996.14 BogoMIPS (lpj=4980736)
+
+Some more test results:
+
+On mx31 (ARM1136) running at 532 MHz, before the patch:
+Calibrating delay loop... 351.43 BogoMIPS (lpj=1757184)
+
+On mx31 (ARM1136) running at 532 MHz after the patch:
+Calibrating delay loop... 528.79 BogoMIPS (lpj=2643968)
+
+Also tested on mx6 (CortexA9) and on mx27 (ARM926), which shows the same 
+BogoMIPS value before and after this patch.
+
+Reported-by: Tom Evans <tom_usenet@optusnet.com.au>
+Suggested-by: Tom Evans <tom_usenet@optusnet.com.au>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/lib/delay-loop.S | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/lib/delay-loop.S b/arch/arm/lib/delay-loop.S
+index 36b668d..5e5673b8 100644
+--- a/arch/arm/lib/delay-loop.S
++++ b/arch/arm/lib/delay-loop.S
+@@ -40,6 +40,7 @@ ENTRY(__loop_const_udelay)			@ 0 <= r0 <= 0x7fffff06
+ /*
+  * loops = r0 * HZ * loops_per_jiffy / 1000000
+  */
++		.align 3
+ 
+ @ Delay routine
+ ENTRY(__loop_delay)
 -- 
-Catalin
+1.8.1.2
