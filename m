@@ -1,65 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Nov 2013 21:31:08 +0100
-Subject: ACPI
-In-Reply-To: <528ED801.8040705@jonmasters.org>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <201311220129.54828.arnd@arndb.de> <528ED801.8040705@jonmasters.org>
-Message-ID: <201311222131.08787.arnd@arndb.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 22 Nov 2013 12:46:11 -0800
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <528FB62C.2060607@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384766276.14845.155.camel@smile> <528A5170.3090809@wwwdotorg.org>
+ <1384862421.14845.222.camel@smile> <528B9CAE.3040600@wwwdotorg.org>
+ <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
+ <528BFDD0.3090503@wwwdotorg.org>
+ <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
+ <528CFE68.6060908@wwwdotorg.org>
+ <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>
+ <528D0C06.9080006@wwwdotorg.org>
+ <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+ <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+ <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <CAPcyv4ig3TWAYWsw5_-MWfKABma9-JCF=Gh-inuxeJF6su-NVw@mail.gmail.com>
+ <528FB62C.2060607@wwwdotorg.org>
+Message-ID: <CAPcyv4h6iRNy=uv2vFdUVWXssW03uxpBzD34d3rG469zMEp0YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 November 2013, Jon Masters wrote:
+On Fri, Nov 22, 2013 at 11:53 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/22/2013 12:49 PM, Dan Williams wrote:
+>> On Fri, Nov 22, 2013 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>>> The proposal is dma_request_slave_channel only returns errors or valid
+>>>>>> pointers, never NULL.
+>>>>>
+>>>>> OK, so if you make that assumption, I guess it's safe.
+>>>>
+>>>> I made that assumption because that is what your original patch proposed:
+>>>>
+>>>> +/**
+>>>> + * dma_request_slave_channel_or_err - try to allocate an exclusive
+>>>> slave channel
+>>>> + * @dev:       pointer to client device structure
+>>>> + * @name:      slave channel name
+>>>> + *
+>>>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>>>> + */
+>>>>
+>>>> What's the benefit of leaking NULL values to callers?  If they already
+>>>> need to check for err, why force them to check for NULL too?
+>>>
+>>> "Returns pointer to appropriate dma channel on success or an error
+>>> pointer." means that callers only have to check for an ERR value. If the
+>>> function returns NULL, then other DMA-related functions must treat that
+>>> as a valid channel ID. This is case (a) in my previous email.
+>>
+>> How can a channel be "valid" and NULL at the same time?  Without the
+>> guarantee that dma_request_channel always returns a non-null-channel
+>> pointer or an error pointer you're forcing clients to use or open-code
+>> IS_ERR_OR_NULL.
+>
+> No, callers should just follow the documentation. If all error cases are
+> indicated by an ERR pointer, then there is no need to check for NULL. In
+> fact, client must not check anything beyond whether the value is an ERR
+> value or not. So, there's no need to use IS_ERR_OR_NULL.
+>
+> It's up to the API to make sure that it returns values that are valid
+> for other calls to related APIs. If that doesn't include NULL, it won't
+> return NULL. If it does, it might. But, that's an internal
+> implementation detail of the API (and associated APIs), not something
+> that clients should know about.
+>
+> One situation where a NULL might be valid is where the return value
+> isn't really a pointer, but an integer index or ID cast to a pointer.
 
-> By 64-bit ARM server, I mean a system conformant with a series of
-> specifications that define what such a server system consists of. It
-> might be a physical system featuring an ARM-based SoC containing a core
-> conformant to the v8 Architecture, along with standardized peripherals,
-> or it might be a virtual platform. The boot architecture would include
-> UEFI (specifically a sequential progression from an initial EL3 reset
-> secure ROM on through to a verified Tiano build), and ACPI being used to
-> convey the platform devices, as well as for runtime event delivery.
+Ok that's the piece I am missing, and maybe explains why
+samsung_dmadev_request() looks so broken.  Are there really
+implementations out there that somehow know that the return value from
+dma_request_slave channel is not a (struct dma_chan *)??
 
-Ok, that narrows it down a little, although not in the way I expected.
+At that point just change the prototype of dma_request_slave_channel to:
 
-It seems there is a secret spec along the lines of the older PREP, CHRP,
-PAPR. Since the group behind this spec has not yet revealed itself, I will
-refer to them as SPECTRE (maybe that should be SPCTR?) for the sake of
-discussion.
+MAGIC_t dma_request_slave_channel(struct device *dev, const char *name)
 
->From your description, it sounds like SPECTRE is actually trying to make
-the job easier for the operating system to some degree by defining a
-standard hardware platform. If this actually works out and they hardware
-people don't screw up too much, supporting that platform should be
-a no-brainer, and I see no fundamental problem with adding ACPI support
-for that.
-
-What I also take away from this is that we should not any ACPI support
-for platforms that are not SPECTRE compliant, because that would
-add a long-term maintainance cost without the benefits, especially
-if it ends up implementing an incompatible ACPI dialect. I certainly
-don't want to have to maintain two or more versions of ACPI (e.g.
-one doing power management using AML and one using SoC specific 
-device drivers).
-
-Unfortunately it is impossible to know at this point what work is
-actually relevant for SPECTRE and what is not, so we can't really
-merge anything specific to ARM64+ACPI until we have access to an
-actual spec, or we get a video message by someone with a monocle
-and a lap cat to shed some more light on the actual requirements.
-There is also the danger that either the SPECTRE spec or the
-actual implementations are so screwed up that we still wouldn't
-merge anything, but you can probably judge better how likely that
-worst-case scenario is.
-
-Those people that have inside knowledge of SPECTRE can in the meantime
-work on the patches and get them reviewed (I think this is happening
-anyway), and we can certainly keep working with Intel to enable 
-whatever features they need for embedded x86 with ACPI.
-
-> I expect to see a series of useful announcements soon that will serve to
-> articulate what I am referring to by an ARM v8 server. I will followup
-> then with more thoughts about how this fits together.
-
-Sounds good.
-
-	Arnd
+Those clients need to be killed or fixed, otherwise how do you
+guarantee that the 'integer index or ID' does not collide with the
+ERR_PTR() number space?
