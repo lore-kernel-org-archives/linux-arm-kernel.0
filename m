@@ -1,45 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 Nov 2013 13:19:48 +0000
-Subject: ACPI
-In-Reply-To: <201311220129.54828.arnd@arndb.de>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <201311191915.57516.arnd@arndb.de>
- <20131121200344.GD14725@sirena.org.uk>
- <201311220129.54828.arnd@arndb.de>
-Message-ID: <20131122131948.GM14725@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 22 Nov 2013 08:31:29 -0500
+Subject: [PATCH V5] kbuild: dtbs_install: new make target
+In-Reply-To: <20131122074224.4984DC40753@trevor.secretlab.ca>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <1385062552-9882-1-git-send-email-jason@lakedaemon.net>
+ <653B066B-5B24-4817-86EF-D4D9F129123D@codeaurora.org>
+ <CAOesGMjsYxhjpg7Gsw69-x5v5XgZ1NZifJ+z48sMizfdMW-tAg@mail.gmail.com>
+ <20131122074224.4984DC40753@trevor.secretlab.ca>
+Message-ID: <20131122133129.GD29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 01:29:54AM +0100, Arnd Bergmann wrote:
-> On Thursday 21 November 2013, Mark Brown wrote:
+On Fri, Nov 22, 2013 at 07:42:24AM +0000, Grant Likely wrote:
+> On Thu, 21 Nov 2013 15:36:47 -0800, Olof Johansson <olof@lixom.net> wrote:
+> > On Thu, Nov 21, 2013 at 3:31 PM, Kumar Gala <galak@codeaurora.org> wrote:
+> > >
+> > > On Nov 21, 2013, at 1:35 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > >
+> > >> Unlike other build products in the Linux kernel, there is no 'make
+> > >> *install' mechanism to put devicetree blobs in a standard place.
+> > >>
+> > >> This patch is an attempt to fix this problem.  Akin to 'make install',
+> > >> this creates a new make target, dtbs_install.  The script that gets
+> > >> called defers to a distribution or user supplied installdtbs binary,
+> > >> if found in the system.  Otherwise, the default action is to install a
+> > >> given dtb into
+> > >>
+> > >>  /boot/devicetrees/${kernel_version}/${dts_filename}.dtb
+> > 
+> > Random bikeshed of the day. Maybe this was already covered in the long
+> > thread and just tell me to shut up and go away if it was and I'm not
+> > presenting new arguments:
+> > 
+> > I like this whole approach, but I'm all for shorter pathnames as long
+> > as they are unique. Also, keeping it below 8 can be useful for FAT
+> > /boot filesystems. I propose /boot/dtb/ instead.
+> 
+> Makes sense to me.
 
-> > I'd also ask if we need to consider desktops and laptops here - do we
-> > really mean distros here rather than servers, even if servers are the
-> > primary use case for distros right now?
+hmm, following that logic, there are 497 dts files in todays HEAD.  Only
+116 of those are 8 characters or less (114 if you remove dupes).  Which
+means a vast majority of dtb file names would have issues in Olof's
+scenario.
 
-> Jon has previously said (multiple times) that he cares about servers
-> only, so I assume that is still given. If you take the exact same
+Might I re-suggest /lib/devicetrees (or, /lib/dtb, or /lib/dtbs)?
 
-Ah, I'd not seen that - but of course there are a bunch of different
-and overlapping userbases out there each with their own focuses.
+thx,
 
-> hardware and firmware and add a PCIe GPU to turn it into a workstation
-> or laptop, I don't see that change anything from the kernel perspective,
-> but I'm trying to narrow the scope here, not widen it ;-)
-
-Indeed.  I'd be surprised if people built too many systems that way
-though, especially laptops.
-
-I'm perfectly prepared to believe that the answer here is that nobody
-cares about ACPI on anything other than some subset of servers (which
-will depend in part on what people see ACPI doing for them) but I figure
-it's important to ask the question, especially given that Intel seem to
-be deploying more embedded style hardware in these applications - Linux
-may have to cope with these cases anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/5c1556c1/attachment.sig>
+Jason.
