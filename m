@@ -1,49 +1,48 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 22 Nov 2013 16:07:34 +0100
-Subject: [PATCH] ARM: at91: sama5d3: reduce TWI internal clock frequency
-In-Reply-To: <20131122145835.GB7420@katana>
-References: <1385129228-11225-1-git-send-email-ludovic.desroches@atmel.com>
- <20131122143350.GA7420@katana>
- <20131122145141.GB30749@ludovic.desroches@atmel.com>
- <20131122145835.GB7420@katana>
-Message-ID: <20131122150734.GC30749@ludovic.desroches@atmel.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 22 Nov 2013 09:09:11 -0600
+Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
+ clocksource/clockevent system timers
+In-Reply-To: <20131122035127.GA1417@saruman.home>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-6-git-send-email-joelf@ti.com>
+ <20131122035127.GA1417@saruman.home>
+Message-ID: <528F7397.5070603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 03:58:35PM +0100, Wolfram Sang wrote:
-> On Fri, Nov 22, 2013 at 03:51:41PM +0100, Ludovic Desroches wrote:
-> > Hi Wolfram,
-> > 
-> > On Fri, Nov 22, 2013 at 03:33:51PM +0100, Wolfram Sang wrote:
-> > > On Fri, Nov 22, 2013 at 03:07:08PM +0100, ludovic.desroches at atmel.com wrote:
-> > > > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > > > 
-> > > > There are still I2C unexpected behaviors which are solved by reducing TWI
-> > > > internal frequency.
-> > > > 
-> > > > Cc: <stable@vger.kernel.org> #3.10+
-> > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > > 
-> > > I think the commit message needs more details. Is this a true bugfix
-> > > because the real bus frequency was too high because of the wrong
-> > > divider? Is this a workaround which makes things work but will make the
-> > > bus frequency slower than it should be?
-> > 
-> > This fix doesn't concern the i2c bus frequency, only the internal IP frequency.
-> > 
-> > TWI has been validated at 66MHz. With some devices, transfer hangs during i2c
-> > frame transmission. This issue disappears when reducing the internal frequency
-> > of the IP. Maybe there is some oversampling on i2c signals.
-> > Unfortunately, I have no clear status about the root cause that's why
-> > the commit message was imprecise.
+On 11/21/2013 09:51 PM, Felipe Balbi wrote:
+> Hi,
 > 
-> This paragraph is a way better commit message IMO :)
+> On Thu, Nov 21, 2013 at 07:56:51PM -0600, Joel Fernandes wrote:
 > 
+> [...]
+> 
+>> New functions for OF-only boot are introduced, and we can soon delete the old
+>> versions once we migrate all platforms. Currently only AM335x is migrated and
+> 
+> actually, you don't need to initialize .init_timer at all in DT boot.
 
-Ok I'll update it.
+Actually we still do, because the plan is to keep the hwmod stuff that's
+required in timer.c in a custom .init_time, and then of_clocksource_init maybe
+called to do what you're suggesting but (not yet) more on that below.
 
-Thanks for the review Wolfram.
+> Just use CLKSOURCE_OF_DECLARE() and pass your omap_generic_timer_init()
+> as argument (although, I'd call it omap_of_timer_init()).
+> That will put of_device_id structure on a special section
+> (__clksource_of_table) and pass your function as a data argument. That
+> function will be called automatically during init.
+>
 
-Regards
+I thought of doing that, but currently the timer selection for clocksource
+is not a simple matching of compatible string, rather it is selecting the timer
+based on properties such as ti,timer-alwon and such.
 
-Ludovic
+In omap3 for example, there are needs for specific timers and such have been
+provided with the macros passing in timer id etc. Right now, this can be forced
+through DT with the "ti,timer-clocksource" property I introduced. All this
+selection algorithm is too complex to be handle directly by the
+CLOCKSOURCE_OF_DECLARE / clocksource_of_init matching mechanism.
+
+thanks,
+
+-Joel
