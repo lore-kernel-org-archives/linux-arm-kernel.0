@@ -1,57 +1,75 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 22 Nov 2013 08:41:13 -0500
-Subject: [PATCH] ARM: mvebu: Add DT entry for ReadyNAS Duo v2 to use
- gpio-poweroff driver
-In-Reply-To: <87iovl4ahq.fsf@natisbad.org>
-References: <87iovl4ahq.fsf@natisbad.org>
-Message-ID: <20131122134113.GF29241@titan.lakedaemon.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 22 Nov 2013 15:41:40 +0200
+Subject: [PATCH] clk: tegra: add FUSE clock device
+In-Reply-To: <1385001490-18927-1-git-send-email-acourbot@nvidia.com>
+References: <1385001490-18927-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <20131122134140.GE26617@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 12:10:25AM +0100, Arnaud Ebalard wrote:
+On Thu, Nov 21, 2013 at 03:38:10AM +0100, Alexandre Courbot wrote:
+> This clock is needed to ensure the FUSE registers can be accessed
+> without freezing the system.
 > 
-> Without that fix, at the end of the shutdown process, the board is
-> still powered (led glowing, fan running, ...).
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
-> Hi,
-> 
-> I have prepared some cleanup patches for existing ReadyNAS .dts files
-> which I intend to send for review in the next fex days. The GPIO
-> voltage level is still a value below but the cleanup patch for this
-> .dts will handle that globally.
-> 
->  arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-> index e6a102c..4e3cae1 100644
-> --- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-> +++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-> @@ -60,6 +60,10 @@
->  				marvell,pins = "mpp29";
->  				marvell,function = "gpio";
->  			};
-> +			pmx_poweroff: pmx-poweroff {
-> +				marvell,pins = "mpp30";
-> +				marvell,function = "gpio";
-> +			};
->  		};
->  
->  		clocks {
-> @@ -158,6 +162,13 @@
->  		};
->  	};
->  
-> +	gpio-poweroff {
-> +		compatible = "gpio-poweroff";
-> +		pinctrl-0 = <&pmx_poweroff>;
-> +		pinctrl-names = "default";
-> +		gpios = <&gpio0 30 1>;
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 
-GPIO_... ?
+Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-thx,
-
-Jason.
+>  drivers/clk/tegra/clk-tegra114.c | 1 +
+>  drivers/clk/tegra/clk-tegra124.c | 1 +
+>  drivers/clk/tegra/clk-tegra20.c  | 1 +
+>  drivers/clk/tegra/clk-tegra30.c  | 2 +-
+>  4 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+> index dbab27f773b5..b29d31d94d2e 100644
+> --- a/drivers/clk/tegra/clk-tegra114.c
+> +++ b/drivers/clk/tegra/clk-tegra114.c
+> @@ -925,6 +925,7 @@ static struct tegra_devclk devclks[] __initdata = {
+>  	{ .con_id = "sclk", .dt_id = TEGRA114_CLK_SCLK },
+>  	{ .con_id = "hclk", .dt_id = TEGRA114_CLK_HCLK },
+>  	{ .con_id = "pclk", .dt_id = TEGRA114_CLK_PCLK },
+> +	{ .con_id = "fuse", .dt_id = TEGRA114_CLK_FUSE },
+>  	{ .dev_id = "rtc-tegra", .dt_id = TEGRA114_CLK_RTC },
+>  	{ .dev_id = "timer", .dt_id = TEGRA114_CLK_TIMER },
+>  };
+> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+> index 266e80b51d38..e123fd218983 100644
+> --- a/drivers/clk/tegra/clk-tegra124.c
+> +++ b/drivers/clk/tegra/clk-tegra124.c
+> @@ -1007,6 +1007,7 @@ static struct tegra_devclk devclks[] __initdata = {
+>  	{ .con_id = "sclk", .dt_id = TEGRA124_CLK_SCLK },
+>  	{ .con_id = "hclk", .dt_id = TEGRA124_CLK_HCLK },
+>  	{ .con_id = "pclk", .dt_id = TEGRA124_CLK_PCLK },
+> +	{ .con_id = "fuse", .dt_id = TEGRA124_CLK_FUSE },
+>  	{ .dev_id = "rtc-tegra", .dt_id = TEGRA124_CLK_RTC },
+>  	{ .dev_id = "timer", .dt_id = TEGRA124_CLK_TIMER },
+>  };
+> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> index 58faac5f509e..9dd264886621 100644
+> --- a/drivers/clk/tegra/clk-tegra20.c
+> +++ b/drivers/clk/tegra/clk-tegra20.c
+> @@ -452,6 +452,7 @@ static struct tegra_devclk devclks[] __initdata = {
+>  	{ .con_id = "sclk", .dt_id = TEGRA20_CLK_SCLK },
+>  	{ .con_id = "hclk", .dt_id = TEGRA20_CLK_HCLK },
+>  	{ .con_id = "pclk", .dt_id = TEGRA20_CLK_PCLK },
+> +	{ .con_id = "fuse", .dt_id = TEGRA20_CLK_FUSE },
+>  	{ .con_id = "twd", .dt_id = TEGRA20_CLK_TWD },
+>  	{ .con_id = "audio", .dt_id = TEGRA20_CLK_AUDIO },
+>  	{ .con_id = "audio_2x", .dt_id = TEGRA20_CLK_AUDIO_2X },
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+> index 51c093c96657..6d96b307d48c 100644
+> --- a/drivers/clk/tegra/clk-tegra30.c
+> +++ b/drivers/clk/tegra/clk-tegra30.c
+> @@ -659,7 +659,7 @@ static struct tegra_devclk devclks[] __initdata = {
+>  	{ .con_id = "pcie", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIE },
+>  	{ .con_id = "afi", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_AFI },
+>  	{ .con_id = "pciex", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIEX },
+> -	{ .con_id = "fuse", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE },
+> +	{ .con_id = "fuse", .dt_id = TEGRA30_CLK_FUSE },
+>  	{ .con_id = "fuse_burn", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE_BURN },
+>  	{ .con_id = "apbif", .dev_id = "tegra30-ahub", .dt_id = TEGRA30_CLK_APBIF },
+>  	{ .con_id = "hda2hdmi", .dev_id = "tegra30-hda", .dt_id = TEGRA30_CLK_HDA2HDMI },
+> -- 
+> 1.8.4.2
+> 
