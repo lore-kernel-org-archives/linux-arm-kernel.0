@@ -1,85 +1,100 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Fri, 22 Nov 2013 16:49:47 +0100
-Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
-In-Reply-To: <1345852300-2213-2-git-send-email-marex@denx.de>
-References: <1345852300-2213-1-git-send-email-marex@denx.de>
- <1345852300-2213-2-git-send-email-marex@denx.de>
-Message-ID: <20131122154947.GE24508@pengutronix.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 22 Nov 2013 16:51:04 +0100
+Subject: [PATCH v4 0/5] mfd: max14577: Add max14577 MFD drivers
+Message-ID: <1385135469-27044-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek, Peter,
+Hi,
 
-On Sat, Aug 25, 2012 at 01:51:38AM +0200, Marek Vasut wrote:
-> Add the pinmux settings for USB PHY overcurrent pins.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   30 ++++++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
-> 
-> V2: This is pulled from the M28EVK and SPS1 board files, put it into common
->     file.
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index b996c2d..3cba62d 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -520,6 +520,36 @@
->  					fsl,voltage = <1>;
->  					fsl,pull-up = <1>;
->  				};
-> +
-> +				usbphy0_pins_a: usbphy0 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x2152 /* MX28_PAD_SSP2_SS2__USB0_OVERCURRENT */
-> +					>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				usbphy0_pins_b: usbphy0 at 1 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x3061 /* MX28_PAD_AUART1_CTS__USB0_OVERCURRENT */
-> +					>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				usbphy1_pins_a: usbphy1 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x2142 /* MX28_PAD_SSP2_SS1__USB1_OVERCURRENT */
-> +					>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
->  			};
->  
->  			digctl at 8001c000 {
-> -- 
-> 1.7.10.4
+This is fourth version of patchset adding drivers for MAXIM 14577 chip.
+
+Description
+-----------
+The chip contains Micro-USB Interface Circuit and Li+ Battery Charger.
+It contains accessory and USB charger detection logic. It supports USB 2.0
+Hi-Speed, UART and stereo audio signals over Micro-USB connector.
+
+The battery charger is compliant with the USB Battery Charging Specification
+Revision 1.1. It has also SFOUT LDO output for powering USB devices.
+
+The patchset consists of following drivers:
+1. MFD core driver.
+2. Extcon driver for the MUIC (Micro USB Interface Controller).
+3. Charger driver using power supply class.
+4. Regulator driver for SFOUT and charger.
+5. Documentation of device tree bindings.
+
+The patchset is rebased on latest Linus' tree (v3.12-11097-ga5d6e63) however
+testing was mostly done on 3.10.
 
 
-@Marek: Did you test the overcurrent functionality with the MX28 and this pinmux?
+Changes since v3:
+-----------------
+1. Applied suggestions from Lee Jones and Alexander Shiyan.
+2. Extcon (2/5): Use system_power_efficient_wq for delayed cable detection
+   (pointed by Mark Brown).
+3. Regulator (4/5): Add compatible string to regulators node so MFD core will
+   match it to the driver. Simplify and fix DT parsing. (Lee Jones)
+4. Regulator (4/5): Get rid of regulators variable. (Bartlomiej Zolnierkiewicz).
 
-I currently can not trigger any overcurrent events and also don't
-see changes in the PORTSC register after pulling the OC pin to 3V3.
+Changes since v2:
+-----------------
+1. Replaced max14577-irq.c with regmap_irq_chip, as suggested by Mark Brown.
+2. Applied suggestions from review (Mark Brown, Lee Jones).
+3. Regulator: Added registering unconditionally of all regulators (Mark Brown).
+4. Regulator: Removed the "struct max14577_regulator *info" (Bartlomiej
+   Zolnierkiewicz).
+5. Extcon: Removed work-around for hardware reboot (USB cable attached with
+   factory button set to D/L mode) as it is not needed.
 
-Thanks,
-Michael
+Changes since v1:
+-----------------
+1. Applied comments from review (Mark Brown, Mark Rutland).
+2. Removed any DT bindings which are not needed.
+3. Removed "wakeup" node from bindings.
+4. Fixed interrupt handling during resume. This lead to removal of the weird
+   IRQ/GPIO code discussed during review.
+5. Minor fixes pointed by checkpatch, added authors.
+6. Use of_get_child_by_name() for accessing regulators bindings.
+7. Added documentation of bindings (fifth patch).
+
+
+Best regards,
+Krzysztof Kozlowski
+
+Chanwoo Choi (2):
+  mfd: max14577: Add max14577 MFD driver core
+  extcon: max14577: Add extcon-max14577 driver to support MUIC device
+
+Krzysztof Kozlowski (3):
+  charger: max14577: Add charger support for Maxim 14577
+  regulator: max14577: Add regulator driver for Maxim 14577
+  mfd: max14577: Add device tree bindings document
+
+ Documentation/devicetree/bindings/mfd/max14577.txt |   48 ++
+ drivers/extcon/Kconfig                             |   10 +
+ drivers/extcon/Makefile                            |    1 +
+ drivers/extcon/extcon-max14577.c                   |  752 ++++++++++++++++++++
+ drivers/mfd/Kconfig                                |   13 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/max14577.c                             |  244 +++++++
+ drivers/power/Kconfig                              |    7 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/max14577_charger.c                   |  311 ++++++++
+ drivers/regulator/Kconfig                          |    7 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/max14577.c                       |  268 +++++++
+ include/linux/mfd/max14577-private.h               |  330 +++++++++
+ include/linux/mfd/max14577.h                       |   69 ++
+ 15 files changed, 2063 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
+ create mode 100644 drivers/extcon/extcon-max14577.c
+ create mode 100644 drivers/mfd/max14577.c
+ create mode 100644 drivers/power/max14577_charger.c
+ create mode 100644 drivers/regulator/max14577.c
+ create mode 100644 include/linux/mfd/max14577-private.h
+ create mode 100644 include/linux/mfd/max14577.h
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
