@@ -1,33 +1,37 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 21 Nov 2013 19:56:54 -0600
-Subject: [PATCH 8/8] ARM: AM33xx: Move to using omap_generic_timer_init for
- init_time
-In-Reply-To: <1385085414-9034-1-git-send-email-joelf@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 21 Nov 2013 21:51:28 -0600
+Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
+ clocksource/clockevent system timers
+In-Reply-To: <1385085414-9034-6-git-send-email-joelf@ti.com>
 References: <1385085414-9034-1-git-send-email-joelf@ti.com>
-Message-ID: <1385085414-9034-9-git-send-email-joelf@ti.com>
+ <1385085414-9034-6-git-send-email-joelf@ti.com>
+Message-ID: <20131122035127.GA1417@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier patch in this series introduced a function omap_generic_timer_init
-for all DT platforms. Use it for AM33xx SoC.
+Hi,
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- arch/arm/mach-omap2/board-generic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Nov 21, 2013 at 07:56:51PM -0600, Joel Fernandes wrote:
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 87162e1..cfda6bc 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -180,7 +180,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.init_irq	= omap_intc_of_init,
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
--	.init_time	= omap3_gptimer_timer_init,
-+	.init_time	= omap_generic_timer_init,
- 	.dt_compat	= am33xx_boards_compat,
- 	.restart	= am33xx_restart,
- MACHINE_END
+[...]
+
+> New functions for OF-only boot are introduced, and we can soon delete the old
+> versions once we migrate all platforms. Currently only AM335x is migrated and
+
+actually, you don't need to initialize .init_timer at all in DT boot.
+Just use CLKSOURCE_OF_DECLARE() and pass your omap_generic_timer_init()
+as argument (although, I'd call it omap_of_timer_init()).
+
+That will put of_device_id structure on a special section
+(__clksource_of_table) and pass your function as a data argument. That
+function will be called automatically during init.
+
 -- 
-1.8.1.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131121/cacbd4ae/attachment.sig>
