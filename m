@@ -1,81 +1,101 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 22 Nov 2013 10:42:01 -0600
-Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
- clocksource/clockevent system timers
-In-Reply-To: <CAL_JsqKS=cGeAhj+K04SOtA8nJRR3MXxS3ry-kzjQOkZx3yK4g@mail.gmail.com>
-References: <1385085414-9034-1-git-send-email-joelf@ti.com>
- <1385085414-9034-6-git-send-email-joelf@ti.com>
- <CAL_JsqKS=cGeAhj+K04SOtA8nJRR3MXxS3ry-kzjQOkZx3yK4g@mail.gmail.com>
-Message-ID: <528F8959.7080207@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 22 Nov 2013 16:22:44 +0000
+Subject: [PATCH 07/23] mtd: st_spi_fsm: Add support for JEDEC ID extraction
+In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
+References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385137380-28968-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 09:58 AM, Rob Herring wrote:
-> On Thu, Nov 21, 2013 at 7:56 PM, Joel Fernandes <joelf@ti.com> wrote:
->> This work is a migration effort of OMAP system timers to the
->> clocksource/clockevent framework. Consider this as a first-pass in this effort.
->> There are few cleanups that need to be done first. The HWMOD code is
->> intertwined with the timer code. HWMOD code cleanups in the future will
->> hopefully make most of this code go away, so till then we separate out the
->> power/clocks portion of the code from the actual timer bits.  This will
->> facilitate near-future work of adapting the system timer as a clocksource.
->>
->> New functions for OF-only boot are introduced, and we can soon delete the old
->> versions once we migrate all platforms. Currently only AM335x is migrated and
->> testedA new omap_generic_timer_init function is introduced for DT platforms.
->> Code required earlier for non-DT platforms such as setup of timer IDs and timer
->> parent clock is not required.  parent clocks are automatically setup by the mux
->> clock driver through DT so they no longer need to be hardcoded.
->>
->> The init code will try to pick the best timer for clocksource and clockevent
->> however bindings are added to force a particular timer as clocksource or
->> clockevent through DT.
->>
->> Signed-off-by: Joel Fernandes <joelf@ti.com>
->> ---
->>  .../devicetree/bindings/arm/omap/timer.txt         |  12 ++
->>  arch/arm/mach-omap2/common.h                       |   1 +
->>  arch/arm/mach-omap2/timer.c                        | 235 +++++++++++++++++++++
->>  3 files changed, 248 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
->> index d02e27c..6cf7a75 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
->> @@ -32,6 +32,18 @@ Optional properties:
->>  - ti,timer-secure:     Indicates the timer is reserved on a secure OMAP device
->>                         and therefore cannot be used by the kernel.
->>
->> +- ti,timer-clockevent,
->> +  ti,timer-clocksource These properties force the system timer code to choose
->> +                       the particular timer as a clockevent or clocksource.
->> +                       If these properties are not specified, the timer code
->> +                       picks up a "ti,timer-alwon" as the clocksource and a
->> +                       timer containing one of the following properties as
->> +                       the clockevent in the following order:
->> +                               ti,timer-alwon
->> +                               ti,timer-dsp
->> +                               ti,timer-pwm
->> +                               ti,timer-secure
-> 
-> These properties were added specifically for the reason of avoiding
-> linux specific properties like these. When is this not sufficient?
+Once we start supporting devices it will be handy go detect them
+dynamically. This will be done using the chip's unique JEDEC ID. This
+patch allows us to extract a device's JEDEC ID using the a predefined
+FSM register write sequence.
 
-Some platforms cannot use certain timers as clockevents and clocksource, to keep
-this code functionally equivalent and working, I added these properties so that
-its possible to select specific timers as clockevents/sources as was being done
-in the non-DT case. I'm open to suggestions for doing this in a better way for DT.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/devices/st_spi_fsm.c | 55 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-> 
-> And I agree with the comment to use OF_CLKSRC.
-> 
-
-There are difficulties I mentioned in a previous post [1] stating why it may not
-be possible to use OF_CLKSRC macros, and still keep the code functionally
-equivalent to when it was non-DT.
-
-thanks,
-
--Joel
-
-[1] http://marc.info/?l=linux-arm-kernel&m=138513299917850&w=2
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index 73c55b4..f937329 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -25,6 +25,22 @@
+ 
+ #include "st_spi_fsm.h"
+ 
++static struct stfsm_seq stfsm_seq_read_jedec = {
++	.data_size = TRANSFER_SIZE(8),
++	.seq_opc[0] = (SEQ_OPC_PADS_1 |
++		       SEQ_OPC_CYCLES(8) |
++		       SEQ_OPC_OPCODE(FLASH_CMD_RDID)),
++	.seq = {
++		STFSM_INST_CMD1,
++		STFSM_INST_DATA_READ,
++		STFSM_INST_STOP,
++	},
++	.seq_cfg = (SEQ_CFG_PADS_1 |
++		    SEQ_CFG_READNOTWRITE |
++		    SEQ_CFG_CSDEASSERT |
++		    SEQ_CFG_STARTSEQ),
++};
++
+ static inline int stfsm_is_idle(struct stfsm *fsm)
+ {
+ 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
+@@ -91,6 +107,42 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+ 	}
+ }
+ 
++static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
++{
++	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
++	uint32_t tmp[2];
++
++	stfsm_load_seq(fsm, seq);
++
++	stfsm_read_fifo(fsm, tmp, 8);
++
++	memcpy(jedec, tmp, 5);
++
++	stfsm_wait_seq(fsm);
++}
++
++static struct flash_info * stfsm_jedec_probe(struct stfsm *fsm)
++{
++	u16                     ext_jedec;
++	u32			jedec;
++	u8			id[5];
++
++	stfsm_read_jedec(fsm, id);
++
++	jedec     = id[0] << 16 | id[1] << 8 | id[2];
++	/*
++	 * JEDEC also defines an optional "extended device information"
++	 * string for after vendor-specific data, after the three bytes
++	 * we use here. Supporting some chips might require using it.
++	 */
++	ext_jedec = id[3] << 8  | id[4];
++
++	dev_dbg(fsm->dev, "JEDEC =  0x%08x [%02x %02x %02x %02x %02x]\n",
++		jedec, id[0], id[1], id[2], id[3], id[4]);
++
++	return NULL;
++}
++
+ static void stfsm_clear_fifo(struct stfsm *fsm)
+ {
+ 	uint32_t avail;
+@@ -243,6 +295,9 @@ static int stfsm_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	/* Detect SPI FLASH device */
++	stfsm_jedec_probe(fsm);
++
+ 	platform_set_drvdata(pdev, fsm);
+ 
+ 	fsm->mtd.dev.parent	= &pdev->dev;
+-- 
+1.8.1.2
