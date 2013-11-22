@@ -1,440 +1,126 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 22 Nov 2013 14:56:03 -0800
-Subject: [PATCH v5 1/2] watchdog: bcm281xx: Watchdog Driver
-In-Reply-To: <1385160964-18578-1-git-send-email-markus.mayer@linaro.org>
-References: <1385160964-18578-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1385160964-18578-2-git-send-email-markus.mayer@linaro.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 22 Nov 2013 15:13:28 -0800
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <528FD1C2.2030108@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <528B9CAE.3040600@wwwdotorg.org>
+ <CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>
+ <528BFDD0.3090503@wwwdotorg.org>
+ <CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>
+ <528CFE68.6060908@wwwdotorg.org>
+ <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>
+ <528D0C06.9080006@wwwdotorg.org>
+ <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+ <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+ <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <CAPcyv4ig3TWAYWsw5_-MWfKABma9-JCF=Gh-inuxeJF6su-NVw@mail.gmail.com>
+ <528FB62C.2060607@wwwdotorg.org>
+ <CAPcyv4h6iRNy=uv2vFdUVWXssW03uxpBzD34d3rG469zMEp0YQ@mail.gmail.com>
+ <528FD1C2.2030108@wwwdotorg.org>
+Message-ID: <CAPcyv4g_zW_hTi0JacH04bgF-5wv=W1RhRi4M55Qzxc=wEyETA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for the watchdog timer used on the BCM281xx
-family of SoCs.
+On Fri, Nov 22, 2013 at 1:50 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/22/2013 01:46 PM, Dan Williams wrote:
+>> On Fri, Nov 22, 2013 at 11:53 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 11/22/2013 12:49 PM, Dan Williams wrote:
+>>>> On Fri, Nov 22, 2013 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>>>>> The proposal is dma_request_slave_channel only returns errors or valid
+>>>>>>>> pointers, never NULL.
+>>>>>>>
+>>>>>>> OK, so if you make that assumption, I guess it's safe.
+>>>>>>
+>>>>>> I made that assumption because that is what your original patch proposed:
+>>>>>>
+>>>>>> +/**
+>>>>>> + * dma_request_slave_channel_or_err - try to allocate an exclusive
+>>>>>> slave channel
+>>>>>> + * @dev:       pointer to client device structure
+>>>>>> + * @name:      slave channel name
+>>>>>> + *
+>>>>>> + * Returns pointer to appropriate dma channel on success or an error pointer.
+>>>>>> + */
+>>>>>>
+>>>>>> What's the benefit of leaking NULL values to callers?  If they already
+>>>>>> need to check for err, why force them to check for NULL too?
+>>>>>
+>>>>> "Returns pointer to appropriate dma channel on success or an error
+>>>>> pointer." means that callers only have to check for an ERR value. If the
+>>>>> function returns NULL, then other DMA-related functions must treat that
+>>>>> as a valid channel ID. This is case (a) in my previous email.
+>>>>
+>>>> How can a channel be "valid" and NULL at the same time?  Without the
+>>>> guarantee that dma_request_channel always returns a non-null-channel
+>>>> pointer or an error pointer you're forcing clients to use or open-code
+>>>> IS_ERR_OR_NULL.
+>>>
+>>> No, callers should just follow the documentation. If all error cases are
+>>> indicated by an ERR pointer, then there is no need to check for NULL. In
+>>> fact, client must not check anything beyond whether the value is an ERR
+>>> value or not. So, there's no need to use IS_ERR_OR_NULL.
+>>>
+>>> It's up to the API to make sure that it returns values that are valid
+>>> for other calls to related APIs. If that doesn't include NULL, it won't
+>>> return NULL. If it does, it might. But, that's an internal
+>>> implementation detail of the API (and associated APIs), not something
+>>> that clients should know about.
+>>>
+>>> One situation where a NULL might be valid is where the return value
+>>> isn't really a pointer, but an integer index or ID cast to a pointer.
+>>
+>> Ok that's the piece I am missing, and maybe explains why
+>> samsung_dmadev_request() looks so broken.  Are there really
+>> implementations out there that somehow know that the return value from
+>> dma_request_slave channel is not a (struct dma_chan *)??
+>
+> No client of the API should know that; it'd be more like an agreement
+> between multiple functions in the subsystem:
+>
+> handle = subsystemx_allocate_something();
+> ...
+> subsystemx_use_handle(handle);
+>
+> Where subsystemx_allocate_something() casts from ID to "pointer", and
+> subsystemx_use_handle() casts back from "pointer" to ID. The callers
+> would have no idea this was happening.
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/watchdog/Kconfig        |   22 +++
- drivers/watchdog/Makefile       |    1 +
- drivers/watchdog/bcm_kona_wdt.c |  365 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 388 insertions(+)
- create mode 100644 drivers/watchdog/bcm_kona_wdt.c
+That's a bug not a feature.  That's someone abusing an api and
+breaking type safety to pass arbitrary data.  But since we're talking
+in abstract 'buggy_subsytemx' terms why worry?
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 5be6e91..24bc93a 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -1139,6 +1139,28 @@ config BCM2835_WDT
- 	  To compile this driver as a loadable module, choose M here.
- 	  The module will be called bcm2835_wdt.
- 
-+config BCM_KONA_WDT
-+	tristate "BCM Kona Watchdog"
-+	depends on ARCH_BCM
-+	select WATCHDOG_CORE
-+	help
-+	  Support for the watchdog timer on the following Broadcom BCM281xx
-+	  family, which includes BCM11130, BCM11140, BCM11351, BCM28145 and
-+	  BCM28155 variants.
-+
-+	  Say 'Y' or 'M' here to enable the driver. The module will be called
-+	  bcm_kona_wdt.
-+
-+config BCM_KONA_WDT_DEBUG
-+	bool "DEBUGFS support for BCM Kona Watchdog"
-+	depends on BCM_KONA_WDT
-+	help
-+	  If enabled, adds /sys/kernel/debug/bcm-kona-wdt/info which provides
-+	  access to the driver's internal data structures as well as watchdog
-+	  timer hardware registres.
-+
-+	  If in doubt, say 'N'.
-+
- config LANTIQ_WDT
- 	tristate "Lantiq SoC watchdog"
- 	depends on LANTIQ
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 91bd95a..af22516 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -57,6 +57,7 @@ obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
- obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
- obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
- obj-$(CONFIG_SIRFSOC_WATCHDOG) += sirfsoc_wdt.o
-+obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
-new file mode 100644
-index 0000000..9fe174b
---- /dev/null
-+++ b/drivers/watchdog/bcm_kona_wdt.c
-@@ -0,0 +1,365 @@
-+/*
-+ * Copyright (C) 2013 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/debugfs.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/watchdog.h>
-+
-+#define SECWDOG_CTRL_REG		0x00000000
-+#define SECWDOG_COUNT_REG		0x00000004
-+
-+#define SECWDOG_RESERVED_MASK		0x1dffffff
-+#define SECWDOG_WD_LOAD_FLAG		0x10000000
-+#define SECWDOG_EN_MASK			0x08000000
-+#define SECWDOG_SRSTEN_MASK		0x04000000
-+#define SECWDOG_RES_MASK		0x00f00000
-+#define SECWDOG_COUNT_MASK		0x000fffff
-+
-+#define SECWDOG_MAX_COUNT		SECWDOG_COUNT_MASK
-+#define SECWDOG_CLKS_SHIFT		20
-+#define SECWDOG_MAX_RES			15
-+#define SECWDOG_DEFAULT_RESOLUTION	4
-+#define SECWDOG_MAX_TRY			1000
-+
-+#define SECS_TO_TICKS(x, w)		((x) << (w)->resolution)
-+#define TICKS_TO_SECS(x, w)		((x) >> (w)->resolution)
-+
-+#define BCM_KONA_WDT_NAME		"bcm_kona_wdt"
-+
-+struct bcm_kona_wdt {
-+	void __iomem *base;
-+	/*
-+	 * One watchdog tick is 1/(2^resolution) seconds. Resolution can take
-+	 * the values 0-15, meaning one tick can be 1s to 30.52us. Our default
-+	 * resolution of 4 means one tick is 62.5ms.
-+	 *
-+	 * The watchdog counter is 20 bits. Depending on resolution, the maximum
-+	 * counter value of 0xfffff expires after about 12 days (resolution 0)
-+	 * down to only 32s (resolution 15). The default resolution of 4 gives
-+	 * us a maximum of about 18 hours and 12 minutes before the watchdog
-+	 * times out.
-+	 */
-+	int resolution;
-+	spinlock_t lock;
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+	struct dentry *debugfs;
-+#endif
-+};
-+
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+static unsigned long busy_count;
-+#endif
-+
-+static int secure_register_read(void __iomem *addr)
-+{
-+	uint32_t val;
-+	unsigned count = 0;
-+
-+	/*
-+	 * If the WD_LOAD_FLAG is set, the watchdog counter field is being
-+	 * updated in hardware. Once the WD timer is updated in hardware, it
-+	 * gets cleared.
-+	 */
-+	do {
-+		if (unlikely(count > 1))
-+			udelay(5);
-+		val = readl_relaxed(addr);
-+		count++;
-+	} while ((val & SECWDOG_WD_LOAD_FLAG) && count < SECWDOG_MAX_TRY);
-+
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+	/* Remember the maximum number iterations due to WD_LOAD_FLAG */
-+	if (count > busy_count)
-+		busy_count = count;
-+#endif
-+
-+	/* This is the only place we return a negative value. */
-+	if (val & SECWDOG_WD_LOAD_FLAG)
-+		return -ETIMEDOUT;
-+
-+	/* We always mask out reserved bits. */
-+	val &= SECWDOG_RESERVED_MASK;
-+
-+	return val;
-+}
-+
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+
-+static int bcm_kona_wdt_dbg_show(struct seq_file *s, void *data)
-+{
-+	int ctl_val, cur_val, ret;
-+	unsigned long flags;
-+	struct bcm_kona_wdt *wdt = s->private;
-+
-+	if (!wdt)
-+		return seq_puts(s, "No device pointer\n");
-+
-+	spin_lock_irqsave(&wdt->lock, flags);
-+	ctl_val = secure_register_read(wdt->base + SECWDOG_CTRL_REG);
-+	cur_val = secure_register_read(wdt->base + SECWDOG_COUNT_REG);
-+	spin_unlock_irqrestore(&wdt->lock, flags);
-+
-+	if (ctl_val < 0 || cur_val < 0) {
-+		ret = seq_puts(s, "Error accessing hardware\n");
-+	} else {
-+		int ctl, cur, ctl_sec, cur_sec, res;
-+
-+		ctl = ctl_val & SECWDOG_COUNT_MASK;
-+		res = (ctl_val & SECWDOG_RES_MASK) >> SECWDOG_CLKS_SHIFT;
-+		cur = cur_val & SECWDOG_COUNT_MASK;
-+		ctl_sec = TICKS_TO_SECS(ctl, wdt);
-+		cur_sec = TICKS_TO_SECS(cur, wdt);
-+		ret = seq_printf(s, "Resolution: %d / %d\n"
-+				"Control: %d s / %d (%#x) ticks\n"
-+				"Current: %d s / %d (%#x) ticks\n"
-+				"Busy count: %lu\n", res,
-+				wdt->resolution, ctl_sec, ctl, ctl, cur_sec,
-+				cur, cur, busy_count);
-+	}
-+
-+	return ret;
-+}
-+
-+static int bcm_kona_dbg_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, bcm_kona_wdt_dbg_show, inode->i_private);
-+}
-+
-+static const struct file_operations bcm_kona_dbg_operations = {
-+	.open		= bcm_kona_dbg_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
-+};
-+
-+static struct dentry *bcm_kona_wdt_debugfs_init(struct bcm_kona_wdt *wdt,
-+	struct watchdog_device *wdd)
-+{
-+	struct dentry *dir;
-+
-+	dir = debugfs_create_dir(BCM_KONA_WDT_NAME, NULL);
-+	if (IS_ERR_OR_NULL(dir))
-+		return NULL;
-+
-+	if (debugfs_create_file("info", S_IFREG | S_IRUGO, dir, wdt,
-+				&bcm_kona_dbg_operations))
-+		return dir;
-+
-+	/* Clean up */
-+	debugfs_remove_recursive(dir);
-+	return NULL;
-+}
-+
-+static void bcm_kona_debugfs_exit(struct dentry *dir)
-+{
-+	debugfs_remove_recursive(dir);
-+}
-+
-+#endif /* CONFIG_BCM_KONA_WDT_DEBUG */
-+
-+static int bcm_kona_wdt_ctrl_reg_modify(struct bcm_kona_wdt *wdt,
-+					unsigned mask, unsigned newval)
-+{
-+	int val;
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	spin_lock_irqsave(&wdt->lock, flags);
-+
-+	val = secure_register_read(wdt->base + SECWDOG_CTRL_REG);
-+	if (val < 0) {
-+		ret = val;
-+	} else {
-+		val &= ~mask;
-+		val |= newval;
-+		writel_relaxed(val, wdt->base + SECWDOG_CTRL_REG);
-+	}
-+
-+	spin_unlock_irqrestore(&wdt->lock, flags);
-+
-+	return ret;
-+}
-+
-+static int bcm_kona_wdt_set_resolution_reg(struct bcm_kona_wdt *wdt)
-+{
-+	if (wdt->resolution > SECWDOG_MAX_RES)
-+		return -EINVAL;
-+
-+	return bcm_kona_wdt_ctrl_reg_modify(wdt, SECWDOG_RES_MASK,
-+					wdt->resolution << SECWDOG_CLKS_SHIFT);
-+}
-+
-+static int bcm_kona_wdt_set_timeout_reg(struct watchdog_device *wdog,
-+					unsigned watchdog_flags)
-+{
-+	struct bcm_kona_wdt *wdt = watchdog_get_drvdata(wdog);
-+
-+	return bcm_kona_wdt_ctrl_reg_modify(wdt, SECWDOG_COUNT_MASK,
-+					SECS_TO_TICKS(wdog->timeout, wdt) |
-+					watchdog_flags);
-+}
-+
-+static int bcm_kona_wdt_set_timeout(struct watchdog_device *wdog,
-+	unsigned int t)
-+{
-+	wdog->timeout = t;
-+	return 0;
-+}
-+
-+static unsigned int bcm_kona_wdt_get_timeleft(struct watchdog_device *wdog)
-+{
-+	struct bcm_kona_wdt *wdt = watchdog_get_drvdata(wdog);
-+	int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&wdt->lock, flags);
-+	val = secure_register_read(wdt->base + SECWDOG_COUNT_REG);
-+	spin_unlock_irqrestore(&wdt->lock, flags);
-+
-+	if (val < 0)
-+		return val;
-+
-+	return TICKS_TO_SECS(val & SECWDOG_COUNT_MASK, wdt);
-+}
-+
-+static int bcm_kona_wdt_start(struct watchdog_device *wdog)
-+{
-+	return bcm_kona_wdt_set_timeout_reg(wdog,
-+					SECWDOG_EN_MASK | SECWDOG_SRSTEN_MASK);
-+}
-+
-+static int bcm_kona_wdt_stop(struct watchdog_device *wdog)
-+{
-+	struct bcm_kona_wdt *wdt = watchdog_get_drvdata(wdog);
-+
-+	return bcm_kona_wdt_ctrl_reg_modify(wdt, SECWDOG_EN_MASK |
-+					    SECWDOG_SRSTEN_MASK, 0);
-+}
-+
-+static struct watchdog_ops bcm_kona_wdt_ops = {
-+	.owner =	THIS_MODULE,
-+	.start =	bcm_kona_wdt_start,
-+	.stop =		bcm_kona_wdt_stop,
-+	.set_timeout =	bcm_kona_wdt_set_timeout,
-+	.get_timeleft =	bcm_kona_wdt_get_timeleft,
-+};
-+
-+static struct watchdog_info bcm_kona_wdt_info = {
-+	.options =	WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE |
-+			WDIOF_KEEPALIVEPING,
-+	.identity =	"Broadcom Kona Watchdog Timer",
-+};
-+
-+static struct watchdog_device bcm_kona_wdt_wdd = {
-+	.info =		&bcm_kona_wdt_info,
-+	.ops =		&bcm_kona_wdt_ops,
-+	.min_timeout =	1,
-+	.max_timeout =	SECWDOG_MAX_COUNT >> SECWDOG_DEFAULT_RESOLUTION,
-+	.timeout =	SECWDOG_MAX_COUNT >> SECWDOG_DEFAULT_RESOLUTION,
-+};
-+
-+static void bcm_kona_wdt_shutdown(struct platform_device *pdev)
-+{
-+	bcm_kona_wdt_stop(&bcm_kona_wdt_wdd);
-+}
-+
-+static int bcm_kona_wdt_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct bcm_kona_wdt *wdt;
-+	struct resource *res;
-+	int ret;
-+
-+	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	wdt->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(wdt->base))
-+		return -ENODEV;
-+
-+	wdt->resolution = SECWDOG_DEFAULT_RESOLUTION;
-+	ret = bcm_kona_wdt_set_resolution_reg(wdt);
-+	if (ret) {
-+		dev_err(dev, "Failed to set resolution (error: %d)", ret);
-+		return ret;
-+	}
-+
-+	spin_lock_init(&wdt->lock);
-+	platform_set_drvdata(pdev, wdt);
-+	watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
-+
-+	ret = bcm_kona_wdt_set_timeout_reg(&bcm_kona_wdt_wdd, 0);
-+	if (ret) {
-+		dev_err(dev, "Failed set watchdog timeout");
-+		return ret;
-+	}
-+
-+	ret = watchdog_register_device(&bcm_kona_wdt_wdd);
-+	if (ret) {
-+		dev_err(dev, "Failed to register watchdog device");
-+		return ret;
-+	}
-+
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+	wdt->debugfs = bcm_kona_wdt_debugfs_init(wdt, &bcm_kona_wdt_wdd);
-+#endif
-+	dev_dbg(dev, "Broadcom Kona Watchdog Timer");
-+
-+	return 0;
-+}
-+
-+static int bcm_kona_wdt_remove(struct platform_device *pdev)
-+{
-+#ifdef CONFIG_BCM_KONA_WDT_DEBUG
-+	struct bcm_kona_wdt *wdt = platform_get_drvdata(pdev);
-+
-+	if (wdt->debugfs)
-+		bcm_kona_debugfs_exit(wdt->debugfs);
-+#endif /* CONFIG_BCM_KONA_WDT_DEBUG */
-+	bcm_kona_wdt_shutdown(pdev);
-+	watchdog_unregister_device(&bcm_kona_wdt_wdd);
-+	dev_dbg(&pdev->dev, "Watchdog driver disabled");
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bcm_kona_wdt_of_match[] = {
-+	{ .compatible = "brcm,kona-wdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcm_kona_wdt_of_match);
-+
-+static struct platform_driver bcm_kona_wdt_driver = {
-+	.driver = {
-+			.name = BCM_KONA_WDT_NAME,
-+			.owner = THIS_MODULE,
-+			.of_match_table = bcm_kona_wdt_of_match,
-+		  },
-+	.probe = bcm_kona_wdt_probe,
-+	.remove = bcm_kona_wdt_remove,
-+	.shutdown = bcm_kona_wdt_shutdown,
-+};
-+
-+module_platform_driver(bcm_kona_wdt_driver);
-+
-+MODULE_ALIAS("platform:" BCM_KONA_WDT_NAME);
-+MODULE_AUTHOR("Markus Mayer <mmayer@broadcom.com>");
-+MODULE_DESCRIPTION("Broadcom Kona Watchdog Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+> I'm not actually aware of any specific cases where that actually happens
+> right now, it's just that given the way subsystemx_allocate_something()
+> is documented (valid handle/cookie return or ERR value) it's legal for
+> "subsystemx" to work that way if it wants, and it should be able to
+> change between this cast-a-handle style and actual pointer returns
+> without clients being affected.
+
+Wait, this busted way of doing things is documented?
+
+>> At that point just change the prototype of dma_request_slave_channel to:
+>>
+>> MAGIC_t dma_request_slave_channel(struct device *dev, const char *name)
+>>
+>> Those clients need to be killed or fixed, otherwise how do you
+>> guarantee that the 'integer index or ID' does not collide with the
+>> ERR_PTR() number space?
+>
+> subsystemx_allocate_something() would have to ensure that. Probably just
+> by imposing a maximum limit on the handle/ID values.
+>
+> Anyway, your proposal can certainly /work/. I simply wanted to point out
+> that it was different to the two currently accepted styles of return
+> value. If you're sure e.g. Russell isn't going to shout at me or you for
+> introducing an API that works as you describe, we certainly could go
+> ahead with it. Should we explicitly ping him to confirm that?
+
+He already has in other threads IS_ERR_OR_NULL() must die, this
+proposal is not that.  Let me go back to your note about "case 2" and
+clarify.
