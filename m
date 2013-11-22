@@ -1,38 +1,54 @@
-From: ignatov.a@samsung.com (Alexey Ignatov)
-Date: Fri, 22 Nov 2013 13:47:09 +0400
-Subject: [PATCH 5/5] arm: Enable IRQs before attempting to read user	space
- in __und_usr
-In-Reply-To: <20131121102923.GV16735@n2100.arm.linux.org.uk>
-References: <1377689664-27614-1-git-send-email-catalin.marinas@arm.com>
- <1377689664-27614-6-git-send-email-catalin.marinas@arm.com>
- <loom.20131121T102616-386@post.gmane.org>
- <20131121102923.GV16735@n2100.arm.linux.org.uk>
-Message-ID: <20131122094709.GA23067@lexs-sg.rnd.samsung.ru>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 22 Nov 2013 10:57:59 +0100
+Subject: [PATCH v3 3/5] charger: max14577: Add charger support for Maxim
+ 14577
+In-Reply-To: <1385110476.285183224@f131.i.mail.ru>
+References: <1385109972-28059-1-git-send-email-k.kozlowski@samsung.com>
+ <1385109972-28059-4-git-send-email-k.kozlowski@samsung.com>
+ <1385110476.285183224@f131.i.mail.ru>
+Message-ID: <1385114279.29083.7.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:29 Thu 21 Nov     , Russell King - ARM Linux wrote:
-> On Thu, Nov 21, 2013 at 09:35:34AM +0000, Alexey Ignatov wrote:
-> > Catalin Marinas <catalin.marinas <at> arm.com> writes:
+
+
+On Fri, 2013-11-22 at 12:54 +0400, Alexander Shiyan wrote:
+> > MAX14577 chip is a multi-function device which includes MUIC, charger
+> > and voltage regulator. The driver is located in drivers/mfd.
 > > 
-> > > The Undef abort handler in the kernel reads the undefined instruction
-> > > from user space. If the page table was modified from another CPU, the
-> > > user access could fail and do_page_fault() will be executed with
-> > > interrupts disabled. This can potentially deadlock on ARM11MPCore or on
-> > > Cortex-A15 with erratum 798181 workaround enabled (both implying IPI for
-> > > TLB maintenance with page table lock held).
-> > > 
-> > > This patch enables the IRQs in __und_usr before attempting to read the
-> > > instruction from user space.
+> > This patch supports battery charging control of MAX14577 chip and
+> > provides power supply class information to userspace.
 > > 
-> > This patch moves enable_irq call from do_fpe directly to __und_usr handler,
-> > but __und_svc handler also calls do_fpe (via call_fpe), so now this codepath
-> > runs with disabled irqs. This behavior change doesn't look good for me.
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ...
+> > diff --git a/drivers/power/max14577_charger.c b/drivers/power/max14577_charger.c
+> ...
+> > +static struct platform_driver max14577_charger_driver = {
+> > +	.driver = {
+> > +		.owner	= THIS_MODULE,
+> > +		.name	= "max14577-charger",
+> > +	},
+> > +	.probe		= max14577_charger_probe,
+> > +	.remove		= max14577_charger_remove,
+> > +};
+> > +
+> > +static int __init max14577_charger_init(void)
+> > +{
+> > +	return platform_driver_register(&max14577_charger_driver);
+> > +}
+> > +
+> > +static void __exit max14577_charger_exit(void)
+> > +{
+> > +	platform_driver_unregister(&max14577_charger_driver);
+> > +}
+> > +
+> > +module_init(max14577_charger_init);
+> > +module_exit(max14577_charger_exit);
 > 
-> However, you're not executing FPA instructions in the kernel as a general
-> rule, so it doesn't matter.
+> Replace "module_init" & "module_exit" with module_platform_driver here.
 
-Theoretically, ok.
+Sure, thanks for pointing this.
 
-It seems that we cought this deadlock on Cortex-A15 and this patch fixes things
-(testing in progress). Is there any plans to mainline?
+Best regards,
+Krzysztof
