@@ -1,186 +1,186 @@
 From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
-Date: Fri, 22 Nov 2013 11:31:50 +0530
-Subject: [PATCH V2 2/2] ARM: dts: Enable ahci sata and sata phy
-In-Reply-To: <1384158778-27555-3-git-send-email-yuvaraj.cd@samsung.com>
-References: <1384158778-27555-1-git-send-email-yuvaraj.cd@samsung.com>
- <1384158778-27555-3-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <CAKuRcO+Wq8Gwe+ds38=-Nb3mYxdiDAn_h9iTjuGj2EZAtup0nQ@mail.gmail.com>
+Date: Fri, 22 Nov 2013 11:32:42 +0530
+Subject: [PATCH V2] i2c: s3c2410 : Add polling mode support
+In-Reply-To: <1384168820-2986-1-git-send-email-yuvaraj.cd@samsung.com>
+References: <1384168820-2986-1-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <CAKuRcOK3gJiPr3PC2-Vf6w0xeQEuEw6N2c7d0sYZYLuesJC_kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Any comments on this patch?
 
-On Mon, Nov 11, 2013 at 2:02 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
-> This patch adds dt entry for ahci sata controller and its
-> corresponding phy controller.phy node has been added w.r.t
-> new generic phy framework.
+On Mon, Nov 11, 2013 at 4:50 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+> From: Vasanth Ananthan <vasanthananthan@gmail.com>
 >
-> Changes since V1:
->         1.Minor changes to node name convention
->         2.Updated binding document.
+> This patch adds polling mode support for i2c-s3c2410 driver.The
+> SATA PHY controller's CMU and TRSV block's are of I2C register
+> map in exynos5250.These blocks can be configured using i2c.
 >
+> But i2c controller instance on which these block's sits lacks an
+> interrupt line.Also the current i2c-s3c2410 driver is only interrupt
+> driven, thus a polling mode support is required in the driver for
+> supporting this controller. This patch adds this support to the driver.
+>
+> Changes from V1:
+>         1.Changed the is_ack() to have even period b/w polls and
+>           used usleep_range() instead of udelay().
+>
+> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
 > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
 > ---
->  .../devicetree/bindings/ata/exynos-sata-phy.txt    |   19 +++++++++++++-----
->  .../devicetree/bindings/ata/exynos-sata.txt        |   17 +++++++++++-----
->  arch/arm/boot/dts/exynos5250-arndale.dts           |    9 ++++++++-
->  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    8 ++------
->  arch/arm/boot/dts/exynos5250.dtsi                  |   21 ++++++++++++++++----
->  5 files changed, 53 insertions(+), 21 deletions(-)
+>  .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    2 +
+>  drivers/i2c/busses/i2c-s3c2410.c                   |   66 +++++++++++++++++---
+>  2 files changed, 58 insertions(+), 10 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-> index 37824fa..a679e17 100644
-> --- a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-> +++ b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-> @@ -4,11 +4,20 @@ SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
->  Each SATA PHY controller should have its own node.
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+> index 296eb45..278de8e 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+> @@ -10,6 +10,8 @@ Required properties:
+>            inside HDMIPHY block found on several samsung SoCs
+>        (d) "samsung, exynos5440-i2c", for s3c2440-like i2c used
+>            on EXYNOS5440 which does not need GPIO configuration.
+> +      (e) "samsung, exynos5-sata-phy-i2c", for s3c2440-like i2c used as
+> +          a host to SATA PHY controller on an internal bus.
+>    - reg: physical base address of the controller and length of memory mapped
+>      region.
+>    - interrupts: interrupt number to the cpu.
+> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+> index 3747b9b..08ed126 100644
+> --- a/drivers/i2c/busses/i2c-s3c2410.c
+> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> @@ -85,6 +85,7 @@
+>  #define QUIRK_S3C2440          (1 << 0)
+>  #define QUIRK_HDMIPHY          (1 << 1)
+>  #define QUIRK_NO_GPIO          (1 << 2)
+> +#define QUIRK_POLL             (1 << 3)
 >
->  Required properties:
-> -- compatible        : compatible list, contains "samsung,exynos5-sata-phy"
-> +- compatible        : compatible list, contains "samsung,exynos5250-sata-phy"
->  - reg               : <registers mapping>
+>  /* Max time to wait for bus to become idle after a xfer (in us) */
+>  #define S3C2410_IDLE_TIMEOUT   5000
+> @@ -141,6 +142,8 @@ static struct platform_device_id s3c24xx_driver_ids[] = {
+>  };
+>  MODULE_DEVICE_TABLE(platform, s3c24xx_driver_ids);
 >
->  Example:
-> -        sata at ffe07000 {
-> -                compatible = "samsung,exynos5-sata-phy";
-> -                reg = <0xffe07000 0x1000>;
-> -        };
-> +       sata_phy: sata-phy at 12170000 {
-> +               compatible = "samsung,exynos5250-sata-phy";
-> +               reg = <0x12170000 0x1ff>;
-> +               clocks = <&clock 287>;
-> +               clock-names = "sata_phyctrl";
-> +               #phy-cells = <0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +               sataphy-pmu {
-> +                       reg = <0x10040724 0x4>;
-> +                       };
-> +       };
-> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata.txt b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> index 0849f10..8ec7327 100644
-> --- a/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> +++ b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> @@ -8,10 +8,17 @@ Required properties:
->  - interrupts        : <interrupt mapping for SATA IRQ>
->  - reg               : <registers mapping>
->  - samsung,sata-freq : <frequency in MHz>
-> +- phys              : as mentioned in phy-bindings.txt
-> +- phy-names         : as mentioned in phy-bindings.txt
->
->  Example:
-> -        sata at ffe08000 {
-> -                compatible = "samsung,exynos5-sata";
-> -                reg = <0xffe08000 0x1000>;
-> -                interrupts = <115>;
-> -        };
-> +       sata at 122F0000 {
-> +               compatible = "snps,dwc-ahci";
-> +               samsung,sata-freq = <66>;
-> +               reg = <0x122F0000 0x1ff>;
-> +               interrupts = <0 115 0>;
-> +               clocks = <&clock 277>, <&clock 143>;
-> +               clock-names = "sata", "sclk_sata";
-> +               phys = <&sata_phy>;
-> +               phy-names = "sata-phy";
-> +       };
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index b77a37e..434e4f3 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -381,7 +381,14 @@
->         };
->
->         i2c at 121D0000 {
-> -               status = "disabled";
-> +               samsung,i2c-sda-delay = <100>;
-> +               samsung,i2c-max-bus-freq = <40000>;
-> +               samsung,i2c-slave-addr = <0x38>;
+> +static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat);
 > +
-> +               sata-phy {
-> +                       compatible = "sata-phy-i2c";
-> +                       reg = <0x38>;
-> +               };
->         };
+>  #ifdef CONFIG_OF
+>  static const struct of_device_id s3c24xx_i2c_match[] = {
+>         { .compatible = "samsung,s3c2410-i2c", .data = (void *)0 },
+> @@ -149,6 +152,8 @@ static const struct of_device_id s3c24xx_i2c_match[] = {
+>           .data = (void *)(QUIRK_S3C2440 | QUIRK_HDMIPHY | QUIRK_NO_GPIO) },
+>         { .compatible = "samsung,exynos5440-i2c",
+>           .data = (void *)(QUIRK_S3C2440 | QUIRK_NO_GPIO) },
+> +       { .compatible = "samsung,exynos5-sata-phy-i2c",
+> +         .data = (void *)(QUIRK_S3C2440 | QUIRK_POLL | QUIRK_NO_GPIO) },
+>         {},
+>  };
+>  MODULE_DEVICE_TABLE(of, s3c24xx_i2c_match);
+> @@ -187,7 +192,8 @@ static inline void s3c24xx_i2c_master_complete(struct s3c24xx_i2c *i2c, int ret)
+>         if (ret)
+>                 i2c->msg_idx = ret;
 >
->         mmc_0: mmc at 12200000 {
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 13746df..eeeeef9 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -90,16 +90,12 @@
->                 samsung,i2c-max-bus-freq = <40000>;
->                 samsung,i2c-slave-addr = <0x38>;
+> -       wake_up(&i2c->wait);
+> +       if (!(i2c->quirks & QUIRK_POLL))
+> +               wake_up(&i2c->wait);
+>  }
 >
-> -               sata-phy {
-> -                       compatible = "samsung,sata-phy";
-> +               sata-phy at 38 {
-> +                       compatible = "sata-phy-i2c";
->                         reg = <0x38>;
->                 };
->         };
+>  static inline void s3c24xx_i2c_disable_ack(struct s3c24xx_i2c *i2c)
+> @@ -224,6 +230,22 @@ static inline void s3c24xx_i2c_enable_irq(struct s3c24xx_i2c *i2c)
+>         writel(tmp | S3C2410_IICCON_IRQEN, i2c->regs + S3C2410_IICCON);
+>  }
 >
-> -       sata at 122F0000 {
-> -               samsung,sata-freq = <66>;
-> -       };
-> -
->         i2c at 12C80000 {
->                 samsung,i2c-sda-delay = <100>;
->                 samsung,i2c-max-bus-freq = <66000>;
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 80b5df5..d24db31 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -46,6 +46,7 @@
->                 i2c6 = &i2c_6;
->                 i2c7 = &i2c_7;
->                 i2c8 = &i2c_8;
-> +               i2c9 = &i2c_9;
->                 pinctrl0 = &pinctrl_0;
->                 pinctrl1 = &pinctrl_1;
->                 pinctrl2 = &pinctrl_2;
-> @@ -216,16 +217,28 @@
->         };
+> +static bool is_ack(struct s3c24xx_i2c *i2c)
+> +{
+> +       int tries;
+> +
+> +       for (tries = 50; tries; --tries) {
+> +               if (readl(i2c->regs + S3C2410_IICCON)
+> +                       & S3C2410_IICCON_IRQPEND) {
+> +                       if (!(readl(i2c->regs + S3C2410_IICSTAT)
+> +                               & S3C2410_IICSTAT_LASTBIT))
+> +                               return true;
+> +               }
+> +               usleep_range(1000, 2000);
+> +       }
+> +       dev_err(i2c->dev, "ack was not recieved\n");
+> +       return false;
+> +}
 >
->         sata at 122F0000 {
-> -               compatible = "samsung,exynos5-sata-ahci";
-> +               compatible = "snps,dwc-ahci";
-> +               samsung,sata-freq = <66>;
->                 reg = <0x122F0000 0x1ff>;
->                 interrupts = <0 115 0>;
->                 clocks = <&clock 277>, <&clock 143>;
->                 clock-names = "sata", "sclk_sata";
-> +               phys = <&sata_phy>;
-> +               phy-names = "sata-phy";
->         };
+>  /* s3c24xx_i2c_message_start
+>   *
+> @@ -268,6 +290,16 @@ static void s3c24xx_i2c_message_start(struct s3c24xx_i2c *i2c,
 >
-> -       sata-phy at 12170000 {
-> -               compatible = "samsung,exynos5-sata-phy";
-> +       sata_phy: sata-phy at 12170000 {
-> +               compatible = "samsung,exynos5250-sata-phy";
->                 reg = <0x12170000 0x1ff>;
-> +               clocks = <&clock 287>;
-> +               clock-names = "sata_phyctrl";
-> +               #phy-cells = <0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +               sataphy-pmu {
-> +                       reg = <0x10040724 0x4>;
-> +                       };
->         };
+>         stat |= S3C2410_IICSTAT_START;
+>         writel(stat, i2c->regs + S3C2410_IICSTAT);
+> +
+> +       if (i2c->quirks & QUIRK_POLL) {
+> +               while ((i2c->msg_num != 0) && is_ack(i2c)) {
+> +                       i2c_s3c_irq_nextbyte(i2c, stat);
+> +                       stat = readl(i2c->regs + S3C2410_IICSTAT);
+> +
+> +                       if (stat & S3C2410_IICSTAT_ARBITR)
+> +                               dev_err(i2c->dev, "deal with arbitration loss\n");
+> +               }
+> +       }
+>  }
 >
->         i2c_0: i2c at 12C60000 {
-> @@ -334,7 +347,7 @@
->                 clock-names = "i2c";
->         };
+>  static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
+> @@ -675,6 +707,15 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+>         s3c24xx_i2c_enable_irq(i2c);
+>         s3c24xx_i2c_message_start(i2c, msgs);
 >
-> -       i2c at 121D0000 {
-> +       i2c_9: i2c at 121D0000 {
->                  compatible = "samsung,exynos5-sata-phy-i2c";
->                  reg = <0x121D0000 0x100>;
->                  #address-cells = <1>;
+> +       if (i2c->quirks & QUIRK_POLL) {
+> +               ret = i2c->msg_idx;
+> +
+> +               if (ret != num)
+> +                       dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
+> +
+> +               goto out;
+> +       }
+> +
+>         timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
+>
+>         ret = i2c->msg_idx;
+> @@ -820,6 +861,9 @@ static int s3c24xx_i2c_clockrate(struct s3c24xx_i2c *i2c, unsigned int *got)
+>         if (div1 == 512)
+>                 iiccon |= S3C2410_IICCON_TXDIV_512;
+>
+> +       if (i2c->quirks & QUIRK_POLL)
+> +               iiccon |= S3C2410_IICCON_SCALE(2);
+> +
+>         writel(iiccon, i2c->regs + S3C2410_IICCON);
+>
+>         if (i2c->quirks & QUIRK_S3C2440) {
+> @@ -1117,18 +1161,20 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+>          * ensure no current IRQs pending
+>          */
+>
+> -       i2c->irq = ret = platform_get_irq(pdev, 0);
+> -       if (ret <= 0) {
+> -               dev_err(&pdev->dev, "cannot find IRQ\n");
+> -               return ret;
+> -       }
+> +       if (!(i2c->quirks & QUIRK_POLL)) {
+> +               i2c->irq = ret = platform_get_irq(pdev, 0);
+> +               if (ret <= 0) {
+> +                       dev_err(&pdev->dev, "cannot find IRQ\n");
+> +                       return ret;
+> +               }
+>
+>         ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq, 0,
+> -                              dev_name(&pdev->dev), i2c);
+> +                               dev_name(&pdev->dev), i2c);
+>
+> -       if (ret != 0) {
+> -               dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
+> -               return ret;
+> +               if (ret != 0) {
+> +                       dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
+> +                       return ret;
+> +               }
+>         }
+>
+>         ret = s3c24xx_i2c_register_cpufreq(i2c);
 > --
 > 1.7.9.5
 >
