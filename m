@@ -1,66 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 09:31:18 +0000
-Subject: [PATCH v3 1/5] mfd: max14577: Add max14577 MFD driver core
-In-Reply-To: <1385109972-28059-2-git-send-email-k.kozlowski@samsung.com>
-References: <1385109972-28059-1-git-send-email-k.kozlowski@samsung.com>
- <1385109972-28059-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20131122093118.GH23067@lee--X1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Nov 2013 09:37:25 +0000
+Subject: [PATCH v2 2/4] Documentation: Add APM X-Gene SoC 6.0Gbps SATA
+ PHY driver binding documentation
+In-Reply-To: <CAPw-ZTnvbLRN1v6Oyhyf=zXBuiOZQquDs6qx8PzF3cX_GnPTGw@mail.gmail.com>
+References: <1384905197-3566-1-git-send-email-lho@apm.com>
+ <1384905197-3566-2-git-send-email-lho@apm.com>
+ <1384905197-3566-3-git-send-email-lho@apm.com>
+ <20131120094328.GS5914@e106331-lin.cambridge.arm.com>
+ <CAPw-ZTnvbLRN1v6Oyhyf=zXBuiOZQquDs6qx8PzF3cX_GnPTGw@mail.gmail.com>
+Message-ID: <20131122093725.GB7817@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Nov 2013, Krzysztof Kozlowski wrote:
-
-> From: Chanwoo Choi <cw00.choi@samsung.com>
+On Wed, Nov 20, 2013 at 08:07:45PM +0000, Loc Ho wrote:
+> Hi,
 > 
-> This patch adds max14577 core/irq driver to support MUIC(Micro USB IC)
-> device and charger device and support irq domain method to control
-> internal interrupt of max14577 device. Also, this patch supports DT
-> binding with max14577_i2c_parse_dt().
+> >> +- compatible         : Shall be "apm,xgene-ahci-phy" or
+> >> +                       "apm,xgene-ahci-phy2". The "apm,xgene-ahci-phy"
+> >> +                       describes an port shared with SGMII Ethernet port.
+> >> +                       The "apm,xgene-ahci-phy2" describes an port not
+> >> +                       shared with SGMII and the PLL located at another
+> >> +                       memory resource region.
+> >
+> > Is there not a better name available than "apm,xgene-ahci-phy2"?
+> [Loc Ho]
+> I will name it apm,xgene-ahci-phyx.
 > 
-> The MAXIM 14577 chip contains Micro-USB Interface Circuit and Li+ Battery
-> Charger. It contains accessory and USB charger detection logic. It supports
-> USB 2.0 Hi-Speed, UART and stereo audio signals over Micro-USB connector.
+> >> +- reg                        : First PHY memory resource
+> >> +                       Second separate PHY PLL clock memory resource if
+> >> +                       type "apm,xgene-ahci-phy2"
+> >
+> > Is ths PLL actually part of the PHY, or does it just feed the PHY?
+> [Loc Ho]
+> This is always the PLL clock macro in each IP. For the 3rd controller,
+> we require an extra clock macro and can NOT use the original clock
+> macro as it is not mux'ed with the SGMII port.
+
+Ok. Is the reference clock into the PLL always on, or might we need to
+describe it?
+
 > 
-> The battery charger is compliant with the USB Battery Charging Specification
-> Revision 1.1. It has also SFOUT LDO output for powering USB devices.
+> >
+> >> +- txeyetuning                : Manual control to fine tune the capture of the serial
+> >> +                       bit lines from the automatic calibrated position.
+> >> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
+> >> +                       Range from 0 to 0x7f. Default is 0xa.
+> >
+> > If you have a property for which the name consists of multiple words,
+> > split the words with '-'.
+> >
+> > What does this actually mean?
+> >
+> > What units are these values in?
+> >
+> > What effect do those values have?
+> [Loc Ho]
+> Will provide in next version.
+
+Cheers.
+
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/mfd/Kconfig                  |   13 ++
->  drivers/mfd/Makefile                 |    1 +
->  drivers/mfd/max14577.c               |  241 +++++++++++++++++++++++++
->  include/linux/mfd/max14577-private.h |  324 ++++++++++++++++++++++++++++++++++
->  include/linux/mfd/max14577.h         |   70 ++++++++
->  5 files changed, 649 insertions(+)
->  create mode 100644 drivers/mfd/max14577.c
->  create mode 100644 include/linux/mfd/max14577-private.h
->  create mode 100644 include/linux/mfd/max14577.h
+> >
+> >> +- txeyedirection     : Eye tuning manual control direction. 0 means sample
+> >> +                       data earlier than the nominal sampling point. 1 means
+> >> +                       sample data later than the nominal sampling point.
+> >> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
+> >> +                       Default is 0x0.
+> >
+> > Likewise, use '-'.
+> >
+> > s/than/then/ ?
+> [Loc Ho]
+> I believe that than is appropriate here a we are doing an comparison.
 
-<snip>
+Apologies, you are corerct; I completely misread this.
 
-> +static struct mfd_cell max14577_devs[] = {
-> +	{ .name = "max14577-muic", },
-> +	{ .name = "max14577-regulator", },
-> +	{ .name = "max14577-charger", },
-> +};
-
-If these all support device tree, shouldn't you be populating
-max14577_devs[x].of_compatible too? That way the MFD core will
-automatically setup your dev.of_node pointers for you?
-
-<snip>
-
-> +	max14577->vendor_id = (reg_data & 0x7);
-> +	max14577->device_id = ((reg_data & 0xF8) >> 0x3);
-
-I'm not too keen on these magic numbers, can you create #defines for
-them please? If there are any other interesting address, it might be
-worth creating some for those too.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Mark.
