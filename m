@@ -1,72 +1,49 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 22 Nov 2013 19:42:47 +0100
-Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <528D076A.8070806@ti.com>
-References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
- <20131120182102.GK14627@ns203013.ovh.net> <528D076A.8070806@ti.com>
-Message-ID: <20131122184247.GO14627@ns203013.ovh.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 22 Nov 2013 10:43:49 -0800
+Subject: [PATCH] PM / Clocks: fix pm_clk_resume/suspend if
+ CONFIG_PM_RUNTIME is set
+In-Reply-To: <528D1C49.3020301@ti.com> (Santosh Shilimkar's message of "Wed,
+ 20 Nov 2013 15:32:09 -0500")
+References: <1384954307-27094-1-git-send-email-grygorii.strashko@ti.com>
+ <528D0296.1070001@codeaurora.org> <528D082C.3040405@ti.com>
+ <528D1327.7080205@codeaurora.org> <528D1784.8080704@ti.com>
+ <528D1C49.3020301@ti.com>
+Message-ID: <87ppps6zve.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:03 Wed 20 Nov     , ivan.khoronzhuk wrote:
-> On 11/20/2013 08:21 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> +				the chip select signal.
-> >> +				Minimum value is 1 (0 treated as 1).
-> >> +
-> >> +- ti,cs-wsetup:		write setup width, ns
-> >> +				Time between the beginning of a memory cycle
-> >> +				and the activation of write strobe.
-> >> +				Minimum value is 1 (0 treated as 1).
-> >> +
-> >> +- ti,cs-wstrobe:	write strobe width, ns
-> >> +				Time between the activation and deactivation of
-> >> +				the write strobe.
-> >> +				Minimum value is 1 (0 treated as 1).
-> >> +
-> >> +- ti,cs-whold:		write hold width, ns
-> >> +				Time between the deactivation of the write
-> >> +				strobe and the end of the cycle (which may be
-> >> +				either an address change or the deactivation of
-> >> +				the chip select signal.
-> >> +				Minimum value is 1 (0 treated as 1).
-> >> +
-> >> +If any of the above parameters are absent, current parameter value will be taken
-> >> +from the corresponding HW reg.
-> >> +
-> >> +The name for cs node must be in format csN, where N is the cs number.
-> > 
-> > this is wired we should use reg instead to represent the cs as done for SPI
-> > or a an other property
-> > 
-> > Best Regards,
-> > J.
-> > 
-> 
-> Ok, I will add new property cs-chipselect like following :
-> 
-> ti,cs-chipselect:	number of chipselect. Indicates on the
-> 			aemif driver which chipselect is used
-> 			for accessing the memory.
-> 			For compatibles "ti,davinci-aemif" and 
-> 			"ti,keystone-aemif" it can be in range [0-3].
-> 			For compatible "ti,omap-L138-aemif" range is [2-5].
-> 
-> Is it OK?
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-yes
+[...]
 
-I just have one issue the whole memory concept
+>>> It looks like even if you just remove the locks here, the PM core is
+>>> free to call this function with irqs disabled if pm_runtime_irq_safe()
+>>> has been called on the device. Perhaps runtime PM can only do the
+>>> clk_enable()/clk_disable() part and the clk_unprepare()/clk_prepare()
+>>> calls should happen in the system suspend callbacks?
+>> 
+>> Even don't know what to say :( On Keystone clk_unprepare()/clk_prepare() are NOPs.
+>> But clk_prepare() has to be called at least once before clk_enable() :((
+>> So, solution with suspend/resume will not fix current problem :( unfortunately.
+>> 
+>> FYI, Now pm_clk_suspend/pm_clk_resume are called from arch/arm/mach-keystone/pm_domain.c
+>> (also similar solution is used by Davinci, but issue has not been detected because
+>> PM runtime hasn't been used by Davinci IP drivers before)
+>> 
+> One way to deal with this is to have clk_unprepare()/clk_prepare()
+> called from dev_pm_domain ops before calling pm_clk_[suspend/resume]() if we
+> can't have that as part of runtime code.
 
-for me we should do as done on pinctrl have a phandle on the device that
-require it and handle it at device core level
+That doesn't solve the irq_safe problem that Stephen pointed out without
+being very careful.  Basically, if you have _any_ potentially sleeping
+calls in this path, you can never allow devices to use
+pm_runtime_irq_safe().
 
-as the memory controller is not necessarely on the same bus as the memory
-device them selves
+Also, I don't like having the clk_enable in the PM core but the
+clk_prepare in the platform-specific pm_domain.  That seems prone for
+platforms to get wrong.
 
-Best Regards,
-J.
-> 
-> -- 
-> Regards,
-> Ivan Khoronzhuk
+I'll need to think about this a little more before having any idea what
+to do here.
+
+Kevin
