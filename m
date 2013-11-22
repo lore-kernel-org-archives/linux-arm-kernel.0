@@ -1,99 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:22:47 +0000
-Subject: [PATCH 10/23] mtd: st_spi_fsm: Dynamically setup flash device based
- on JEDEC ID
+Date: Fri, 22 Nov 2013 16:22:50 +0000
+Subject: [PATCH 13/23] mtd: st_spi_fsm: Fetch platform specific configurations
 In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
 References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385137380-28968-14-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using previously added infrastructure we can now extract a device's JEDEC
-ID, compare it to a list of known and supported devices and make assumptions
-based on known characteristics of a given chip.
+All supported platforms are able to pass specific configurations via
+the Device Tree on boot. Here we add a function which is to be called
+during the probing process which will extract them, or make other
+assumptions based on capabilities provided.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 26 +++++++++++++++++++++++++-
- drivers/mtd/devices/st_spi_fsm.h |  1 +
- 2 files changed, 26 insertions(+), 1 deletion(-)
+ drivers/mtd/devices/st_spi_fsm.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index ddab76f..a66dbac 100644
+index 0b32fef..5bced00 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -124,6 +124,7 @@ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
- 
- static struct flash_info * stfsm_jedec_probe(struct stfsm *fsm)
- {
-+	struct flash_info	*info;
- 	u16                     ext_jedec;
- 	u32			jedec;
- 	u8			id[5];
-@@ -141,6 +142,15 @@ static struct flash_info * stfsm_jedec_probe(struct stfsm *fsm)
- 	dev_dbg(fsm->dev, "JEDEC =  0x%08x [%02x %02x %02x %02x %02x]\n",
- 		jedec, id[0], id[1], id[2], id[3], id[4]);
- 
-+	for (info = flash_types; info->name; info++) {
-+		if (info->jedec_id == jedec) {
-+			if (info->ext_id && info->ext_id != ext_jedec)
-+				continue;
-+			return info;
-+		}
-+	}
-+	dev_err(fsm->dev, "Unrecognized JEDEC id %06x\n", jedec);
-+
- 	return NULL;
+@@ -273,6 +273,15 @@ static int stfsm_init(struct stfsm *fsm)
+ 	return 0;
  }
  
-@@ -251,6 +261,7 @@ static int stfsm_init(struct stfsm *fsm)
++static void stfsm_fetch_platform_configs(struct platform_device *pdev)
++{
++	struct stfsm *fsm = platform_get_drvdata(pdev);
++	struct flash_info *info = fsm->info;
++
++	if (info->sector_size * info->n_sectors > 0xFFFFFF)
++		info->flags |= FLASH_FLAG_32BITADDR;
++}
++
  static int stfsm_probe(struct platform_device *pdev)
  {
  	struct device_node *np = pdev->dev.of_node;
-+	struct flash_info *info;
- 	struct resource *res;
- 	struct stfsm *fsm;
- 	int ret;
-@@ -297,7 +308,11 @@ static int stfsm_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Detect SPI FLASH device */
--	stfsm_jedec_probe(fsm);
-+	info = stfsm_jedec_probe(fsm);
-+	if (!info)
-+		return -ENODEV;
-+
-+	fsm->info = info;
+@@ -331,6 +340,8 @@ static int stfsm_probe(struct platform_device *pdev)
  
  	platform_set_drvdata(pdev, fsm);
  
-@@ -306,6 +321,15 @@ static int stfsm_probe(struct platform_device *pdev)
- 	fsm->mtd.writesize	= 4;
- 	fsm->mtd.writebufsize	= fsm->mtd.writesize;
- 	fsm->mtd.flags		= MTD_CAP_NORFLASH;
-+	fsm->mtd.size		= info->sector_size * info->n_sectors;
-+	fsm->mtd.erasesize	= info->sector_size;
++	stfsm_fetch_platform_configs(pdev);
 +
-+	dev_err(&pdev->dev,
-+		"Found serial flash device: %s\n"
-+		" size = %llx (%lldMiB) erasesize = 0x%08x (%uKiB)\n",
-+		info->name,
-+		(long long)fsm->mtd.size, (long long)(fsm->mtd.size >> 20),
-+		fsm->mtd.erasesize, (fsm->mtd.erasesize >> 10));
- 
- 	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
- }
-diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
-index e4e5bfa..60341f2 100644
---- a/drivers/mtd/devices/st_spi_fsm.h
-+++ b/drivers/mtd/devices/st_spi_fsm.h
-@@ -235,6 +235,7 @@ struct stfsm {
- 	struct resource		*region;
- 	struct mtd_info		mtd;
- 	struct mutex		lock;
-+	struct flash_info 	*info;
- 
- 	uint32_t		fifo_dir_delay;
- };
+ 	fsm->mtd.dev.parent	= &pdev->dev;
+ 	fsm->mtd.type		= MTD_NORFLASH;
+ 	fsm->mtd.writesize	= 4;
 -- 
 1.8.1.2
