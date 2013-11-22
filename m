@@ -1,90 +1,67 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 22 Nov 2013 12:38:23 -0500
-Subject: [PATCH 10/12] mtd: nand: davinci: don't set timings if AEMIF
- is used
-In-Reply-To: <528E3DD4.7030607@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-11-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D53@DNCE04.ent.ti.com>
- <528307F0.6000805@ti.com> <52838941.4060207@ti.com> <5284ABB9.70608@ti.com>
- <5284DFE7.70308@ti.com> <528E3DD4.7030607@ti.com>
-Message-ID: <528F968F.40306@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Nov 2013 17:45:28 +0000
+Subject: [PATCH 7/9] ARM: sa1100: move gpio irq handling to GPIO driver
+In-Reply-To: <1384505280-25389-8-git-send-email-dbaryshkov@gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+ <1384505280-25389-8-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20131122174528.GB16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 November 2013 12:07 PM, Nori, Sekhar wrote:
-> On 11/14/2013 8:06 PM, Santosh Shilimkar wrote:
->> On Thursday 14 November 2013 05:53 AM, Nori, Sekhar wrote:
->>> On Wednesday 13 November 2013 07:44 PM, Santosh Shilimkar wrote:
->>>> On Wednesday 13 November 2013 12:02 AM, Sekhar Nori wrote:
->>>>> On Monday 11 November 2013 10:40 PM, Khoronzhuk, Ivan wrote:
->>>>>> If Davinci AEMIF is used we don't need to set timings and bus width.
->>>>>> It is done by AEMIF driver (drivers/memory/davinci-aemfi.c).
->>>>>>
->>>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>>>> ---
->>>>>>  drivers/mtd/nand/davinci_nand.c |   22 +++++++++++++++-------
->>>>>>  1 file changed, 15 insertions(+), 7 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
->>>>>> index 4705214..879e915 100644
->>>>>> --- a/drivers/mtd/nand/davinci_nand.c
->>>>>> +++ b/drivers/mtd/nand/davinci_nand.c
->>>>>> @@ -742,27 +742,35 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
->>>>>>                 goto err_clk_enable;
->>>>>>         }
->>>>>>
->>>>>> +#if !IS_ENABLED(CONFIG_TI_DAVINCI_AEMIF)
->>>>>
->>>>> This is a hack! Just because AEMIF driver is enabled, it does not
->>>>> guarantee that the timings have been setup by it. Instead of configuring
->>>>> timings in two drivers, why not just convert everyone over to use the
->>>>> new driver. Dont worry about breaking old platforms, I will help test
->>>>> and ack them.
->>>>>
->>>> How about you take a stab at and convert the DaVinci code over to make
->>>> use of new driver. We are trying to re-use as much as possible from the
->>>> common drivers and also making an option so that the DaVinci arch can
->>>> move over to these drivers if they want to.
->>>
->>> Sure I could.
->>>
->> Thanks
->>
->>> Ivan,
->>>
->>> The AEMIF driver does not use platfrom_data currently. Is that something
->>> you can add or you want me to take a stab at that as well?
->>>
->> The AEMIF new driver is device tree only and thats the direction. So the
->> better thing would be to convert Davinci to DT and then make use of this
->> new driver. Thats how most of the new drivers used on arm socs are
->> moving. Adding platform data to new driver is a step in backward
->> direction so I would want to avoid that.
+On Fri, Nov 15, 2013 at 12:47:58PM +0400, Dmitry Eremin-Solenikov wrote:
+> mach-sa1100's irq.c contains a mixture of system and GPIO irqs handling.
+> Split out GPIO irqchip to gpio-sa1100.c. To decouple first 11 GPIO IRQs
+> handling, make IRQ0-IRQ10 use chained irq handler that just passes the
+> IRQ to GPIO IRQs.
 > 
-> Yes, that would be the ideal way. But the reality is that there is close
-> to zero chance of all the DaVinci platforms using AEMIF ever getting
-> converted to DT. This means that we will never be able to get rid of
-> this piece of code.
->
-Well that means some of those platforms support will get deprecated
-soon considering other basic frameworks like irq, timer wheel etc
-is assuming the DT direction. But its your call because if you
-want those platforms to live, you need to convert them to DT.
- 
-> I do agree platform data is not the direction you want to take on ARM
-> but at the same time its not really a deprecated mechanism as far as the
-> broader kernel is concerned.
-> 
-> So, can we consider adding platform data mechanism to the AEMIF driver?
-> 
-Sorry but answer is "NO". If the above hack is really bothering you,
-we can actually rip out the above code in question and move it
-to mach-davinci. Infact thats the best direction to make the
-mtd nandn driver independent of any platform quirks(dt, pdata etc)
+> Also during this refactoring introduce irq domain support for sa1100
+> gpio irqs.
 
-Ivan already has a patch to do that and he is going to post
-that patch. With that patch, we won't need $subject patch.
+I'm not sure I quite like this change... How much testing has this had?
+I'd much prefer that this code just isn't touched because of all the
+problems we've had here in years back with IRQs from CF cards being
+dropped and the like.  This was very hard to get right, especially when
+interacting with the SA1111.
 
-Regards,
-Santosh
+> @@ -136,3 +301,58 @@ static int __init sa1100_gpio_init(void)
+>  	return platform_driver_register(&sa1100_gpio_driver);
+>  }
+>  postcore_initcall(sa1100_gpio_init);
+> +
+> +#ifdef CONFIG_PM
+> +static unsigned long	saved_gplr;
+> +static unsigned long	saved_gpdr;
+> +static unsigned long	saved_grer;
+> +static unsigned long	saved_gfer;
+> +
+> +static int sa1100_gpio_suspend(void)
+> +{
+> +	struct sa1100_gpio_chip *sgc = chip;
+> +	saved_gplr = readl_relaxed(sgc->regbase + GPLR_OFFSET);
+> +	saved_gpdr = readl_relaxed(sgc->regbase + GPDR_OFFSET);
+> +	saved_grer = readl_relaxed(sgc->regbase + GRER_OFFSET);
+> +	saved_gfer = readl_relaxed(sgc->regbase + GFER_OFFSET);
+> +
+> +	/* Clear GPIO transition detect bits */
+> +	writel_relaxed(0xffffffff, sgc->regbase + GEDR_OFFSET);
+> +
+> +	/* FIXME: Original code also reprogramed GRER/GFER here,
+> +	 * I don't see the purpose though.
+> +	GRER = PWER & sgc->gpio_rising;
+> +	GFER = PWER & sgc->gpio_falling;
+> +	 */
+
+So you thought you'd just comment it out because you don't understand...
+Not really the way things are done.  If you don't understand something,
+you shouldn't be touching the code.
+
+In this case, it's quite simple.  GRER and GFER need to be programmed
+with the interrupts which we want to be active for _each_ mode of the
+system.
+
+Therefore, if we want to have certain GPIOs triggering wakeups (iow,
+those GPIOs which have had enable_irq_wake() called on them) but not
+those which haven't, we need to reprogram GRER and GFER with the
+GPIOs which can wake the system up.
+
+Quite simple and obvious really.
