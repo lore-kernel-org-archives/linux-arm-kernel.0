@@ -1,74 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 22 Nov 2013 08:19:22 -0500
-Subject: [PATCH V5] kbuild: dtbs_install: new make target
-In-Reply-To: <653B066B-5B24-4817-86EF-D4D9F129123D@codeaurora.org>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <1385062552-9882-1-git-send-email-jason@lakedaemon.net>
- <653B066B-5B24-4817-86EF-D4D9F129123D@codeaurora.org>
-Message-ID: <20131122131922.GC29241@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 22 Nov 2013 13:19:48 +0000
+Subject: ACPI
+In-Reply-To: <201311220129.54828.arnd@arndb.de>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <201311191915.57516.arnd@arndb.de>
+ <20131121200344.GD14725@sirena.org.uk>
+ <201311220129.54828.arnd@arndb.de>
+Message-ID: <20131122131948.GM14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 05:31:49PM -0600, Kumar Gala wrote:
-> On Nov 21, 2013, at 1:35 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > diff --git a/Makefile b/Makefile
-> > index 920ad07180c9..bd28cb211411 100644
-> > --- a/Makefile
-> > +++ b/Makefile
-> > @@ -339,6 +339,7 @@ OBJDUMP		= $(CROSS_COMPILE)objdump
-> > AWK		= awk
-> > GENKSYMS	= scripts/genksyms/genksyms
-> > INSTALLKERNEL  := installkernel
-> > +INSTALLDTBS    := installdtbs
-> > DEPMOD		= /sbin/depmod
-> > PERL		= perl
-> > CHECK		= sparse
-> > @@ -391,7 +392,7 @@ KERNELVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(S
-> > export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION
-> > export ARCH SRCARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC
-> > export CPP AR NM STRIP OBJCOPY OBJDUMP
-> > -export MAKE AWK GENKSYMS INSTALLKERNEL PERL UTS_MACHINE
-> > +export MAKE AWK GENKSYMS INSTALLKERNEL INSTALLDTBS PERL UTS_MACHINE
-> > export HOSTCXX HOSTCXXFLAGS LDFLAGS_MODULE CHECK CHECKFLAGS
-> > 
-> > export KBUILD_CPPFLAGS NOSTDINC_FLAGS LINUXINCLUDE OBJCOPYFLAGS LDFLAGS
-> > @@ -704,6 +705,15 @@ export KBUILD_IMAGE ?= vmlinux
-> > export	INSTALL_PATH ?= /boot
-> > 
-> > #
-> > +# INSTALL_DTBS_PATH specifies a prefix for relocations required by build roots.
-> > +# Like INSTALL_MOD_PATH, it isn't defined in the Makefile, but can be passed as
-> > +# an argument if needed.
-> > +#
-> 
-> Nit, do we want to match INSTALL_MOD_PATH and drop the ?S? for INSTALL_DTB_PATH?
+On Fri, Nov 22, 2013 at 01:29:54AM +0100, Arnd Bergmann wrote:
+> On Thursday 21 November 2013, Mark Brown wrote:
 
-Yeah, I can go either way on this one.  So, sure.
+> > I'd also ask if we need to consider desktops and laptops here - do we
+> > really mean distros here rather than servers, even if servers are the
+> > primary use case for distros right now?
 
-thx,
+> Jon has previously said (multiple times) that he cares about servers
+> only, so I assume that is still given. If you take the exact same
 
-Jason.
+Ah, I'd not seen that - but of course there are a bunch of different
+and overlapping userbases out there each with their own focuses.
 
-> > +
-> > +DTBBOOT = $(INSTALL_DTBS_PATH)/boot/devicetrees/$(KERNELRELEASE)
-> > +export DTBBOOT
-> > +
-> > +#
-> > # INSTALL_MOD_PATH specifies a prefix to MODLIB for module directory
-> > # relocations required by build roots.  This is not defined in the
-> > # makefile but the argument can be passed to make if needed.
-> > @@ -914,6 +924,14 @@ firmware_install: FORCE
-> > 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.fwinst obj=firmware __fw_install
-> > 
-> > # ---------------------------------------------------------------------------
-> > +# devicetree install
-> > +PHONY += dtbs_install
-> > +
-> > +dtbs_install:
-> > +	$(CONFIG_SHELL) $(srctree)/scripts/installdtbs.sh $(KERNELRELEASE) \
-> > +	"$(DTBBOOT)" "$(srctree)"
-> > +
-> > +# ---------------------------------------------------------------------------
-> > # Kernel headers
-> > 
-> > #Default location for installed headers
+> hardware and firmware and add a PCIe GPU to turn it into a workstation
+> or laptop, I don't see that change anything from the kernel perspective,
+> but I'm trying to narrow the scope here, not widen it ;-)
+
+Indeed.  I'd be surprised if people built too many systems that way
+though, especially laptops.
+
+I'm perfectly prepared to believe that the answer here is that nobody
+cares about ACPI on anything other than some subset of servers (which
+will depend in part on what people see ACPI doing for them) but I figure
+it's important to ask the question, especially given that Intel seem to
+be deploying more embedded style hardware in these applications - Linux
+may have to cope with these cases anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/5c1556c1/attachment.sig>
