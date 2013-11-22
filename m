@@ -1,38 +1,62 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 22 Nov 2013 15:48:24 -0800
-Subject: crypto dependency in bit sliced AES
-In-Reply-To: <20131122225256.GG16735@n2100.arm.linux.org.uk>
-References: <CAKv+Gu8PESZ3uFZ6Rf+sma9QeRd7xSyrEa=RVCeDR1KtmLKEAA@mail.gmail.com>
- <20131122225256.GG16735@n2100.arm.linux.org.uk>
-Message-ID: <CA+55aFwRWGdA934GQdo6QpEuxRxeECvrpi9ctJWcVQ5pCyF1iw@mail.gmail.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Fri, 22 Nov 2013 23:48:29 +0000
+Subject: [PATCH 2/5] net: MOXA ART: connect to PHY and add ethtool support
+In-Reply-To: <1385132242-3204-2-git-send-email-jonas.jensen@gmail.com>
+References: <1385132242-3204-1-git-send-email-jonas.jensen@gmail.com>
+ <1385132242-3204-2-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1385164109.20467.56.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 2:52 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 22, 2013 at 11:09:00PM +0100, Ard Biesheuvel wrote:
->> Hello Russell,
->>
->> To my surprise, Linus has decided to release 3.13-rc1 without honoring
->> Herbert's crypto pull requests for 3.13
->>
->> http://marc.info/?l=linux-crypto-vger&m=138381130023859&w=2
->> http://marc.info/?l=linux-crypto-vger&m=138482768727213&w=2
->>
->> which contain my patch 'crypto: create generic version of ablk_helper'
->
-> That's annoying.  Linus, is there any chance that this missed pull
-> request could happen?  It's clearly been missed for what ever reason.
+On Fri, 2013-11-22 at 15:57 +0100, Jonas Jensen wrote:
+> The kernel now has a MDIO bus driver and a phy_driver (RTL8201CP),
+> connect to this PHY using OF and add ethtool support.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+> 
+> Notes:
+>     Applies to next-20131122
+> 
+>  drivers/net/ethernet/moxa/moxart_ether.c | 179 ++++++++++++++++++++++++++++++-
+>  drivers/net/ethernet/moxa/moxart_ether.h |   1 +
+>  2 files changed, 179 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+> index 3c14afd..bcc6005 100644
+> --- a/drivers/net/ethernet/moxa/moxart_ether.c
+> +++ b/drivers/net/ethernet/moxa/moxart_ether.c
+> @@ -26,9 +26,15 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/crc32.h>
+>  #include <linux/crc32c.h>
+> +#include <linux/phy.h>
+> +#include <linux/of_mdio.h>
+>  
+>  #include "moxart_ether.h"
+>  
+> +#define DRV_NAME                "moxart-ethernet"
+> +#define DRV_VERSION             "0.2"
+> +#define MOXART_NUM_STATS        16
 
-So looking through my emails, I don't have it, but since it clearly
-made it to lkml, I accept that Herbert sent it to me in time. It
-probably got eaten as spam, I think we've had that issue with Herbert
-before.
+MOXART_NUM_STATS should be defined as ARRAY_SIZE(ethtool_stats_keys).
 
-Herbert, any idea why gmail would consider your emails spam? Mind
-re-sending it once more, and I'll try to see if I get it..
+[...]
+> +static void moxart_get_drvinfo(struct net_device *ndev,
+> +			       struct ethtool_drvinfo *info)
+> +{
+> +	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
+> +	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+> +	strlcpy(info->bus_info, dev_name(&ndev->dev), sizeof(info->bus_info));
+> +	info->n_stats = MOXART_NUM_STATS;
+[...]
 
-I actually see an email from Herbert *replying* to Borislav in my
-archives, but I do not see the pull request emails themselves.
+Don't initialise n_stats here; the core will initialise it using your
+get_sset_count implementation.
 
-              Linus
+Ben.
+
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
