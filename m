@@ -1,37 +1,81 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 22 Nov 2013 17:42:04 +0100
-Subject: [PATCH 2/8] ASoC: fsl-ssi: Move sysfs stats to debugfs
-In-Reply-To: <20131121142208.GU2674@sirena.org.uk>
-References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
- <1384938262-20554-3-git-send-email-mpa@pengutronix.de>
- <20131121142208.GU2674@sirena.org.uk>
-Message-ID: <20131122164204.GB5893@pengutronix.de>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 22 Nov 2013 11:05:08 -0600
+Subject: [PATCH 6/8] devicetree: doc: Document ti,timer-parent property
+In-Reply-To: <20131122155838.GF10023@atomide.com>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-7-git-send-email-joelf@ti.com>
+ <20131122155838.GF10023@atomide.com>
+Message-ID: <528F8EC4.9050506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 21, 2013 at 02:22:08PM +0000, Mark Brown wrote:
-> On Wed, Nov 20, 2013 at 10:04:16AM +0100, Markus Pargmann wrote:
+On 11/22/2013 09:58 AM, Tony Lindgren wrote:
+> * Joel Fernandes <joelf@ti.com> [131121 18:00]:
+>> +Required properties for system timers (clockevents/clocksource):
+>> +- ti,timer-parent:	System timer's parent mux clock needs to be setup.
+>> +			This is currently hardcoded in code, for DT boot we
+>> +			move this to DT.
+>> +
 > 
-> > This patch moves the statistics to debugfs and disables interrupts
-> > completely if the kernel is build without DEBUG_FS enabled.
+> This can be replaced with just clk_set_rate, or clk_set_parent if needed.
+> Or by having a clocks = <&32k_clk> property in the dmtimer node in the
+> .dts file.
 > 
-> We can still see the error counts through /proc/interrupts even without
-> the debugfs file.
+>>  Optional properties:
+>>  - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
+> 
+> Hmm this we may not need, this can probably be deciphered from the compatible
+> flag already?
 
-The interrupts are visible without the debugfs file when enabled through
-SIER register. But it does not show the specific reason for the interrupts.
+I was thinking maybe we can improve the of_clocksource_init matching
+capabilities to match better, not just on compatible but other properties for
+better selection?
 
-I am not sure what you suggest. To remove the stats file completely and
-always disable interrupts?
+For example, a generic clocksource DT property to say that the timer is in the
+wakeup domain and so should be preferred as the clocksource? Also additional
+properties to force its selection?
 
-Regards,
+Then we can switch to clocksource_of_init and have it do the selection. Not sure
+if there is such a need or value for other ARM platforms so we may be over
+complicating the framework to handle these quirks. Comments welcomed about it.
 
-Markus
+thanks,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-Joel
+
+> 
+> Then for the users of a specific dmtimer, they can select the right one using
+> the interrupt-parent property:
+> 
+> timer1: timer at 0x4800abcd {
+> 	compatible = "ti,omap5430-timer";
+> 	#interrupt-cells = <1>;		/* needs irqchip implemented for dmtimer */
+> 	interrupt-controller;
+> 	#clock-cells = <1>;		/* needs clocksource implemented for dmtimer */
+> 	clock-output-names = "32k", "sys_ck";
+> 	...
+> };
+> 
+> counter32k: counter at 4ae04000 {
+> 	compatible = "ti,omap-counter32k";
+> 	#clock-cells = <1>;		/* needs clocksource implemented for 32k counter */
+> 	clock-output-names = "32k";
+> 	...
+> };
+> 
+> timer {
+> 	compatible = "ti,omap5-timer";
+> 	interrupt-parent = <&timer1>;
+> 	interrupts = <1>;
+> 	clocks = <&timer1 0>,		/* use timer1 as clockevent, clock index 0 = 32k, 1 = sys_ck ... */
+> 		 <&counter32k 0>;	/* use 32k counter as clocksource */
+> };
+> 
+>>  - ti,timer-dsp:		Indicates the timer can interrupt the on-chip DSP in
+> 
+> This can be probably also be mapped based on the compatible property?
+> 
+> Regards,
+> 
+> Tony
+> 
