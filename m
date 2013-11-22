@@ -1,56 +1,20 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 22 Nov 2013 17:08:43 +0100
-Subject: [PATCH v2] ARM: at91: sama5d3: reduce TWI internal clock frequency
-Message-ID: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 22 Nov 2013 09:20:50 -0700
+Subject: [PATCH] clk: tegra: add FUSE clock device
+In-Reply-To: <20131122134140.GE26617@tbergstrom-lnx.Nvidia.com>
+References: <1385001490-18927-1-git-send-email-acourbot@nvidia.com>
+ <20131122134140.GE26617@tbergstrom-lnx.Nvidia.com>
+Message-ID: <528F8462.4010105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 11/22/2013 06:41 AM, Peter De Schrijver wrote:
+> On Thu, Nov 21, 2013 at 03:38:10AM +0100, Alexandre Courbot wrote:
+>> This clock is needed to ensure the FUSE registers can be accessed
+>> without freezing the system.
+>>
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> 
+> Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-With some devices, transfer hangs during I2C frame transmission. This issue
-disappears when reducing the internal frequency of the TWI IP. Even if it is
-indicated that internal clock max frequency is 66MHz, it seems we have
-oversampling on I2C signals making TWI believe that a transfer in progress
-is done.
-
-This fix has no impact on the I2C bus frequency.
-
-Cc: <stable@vger.kernel.org> #3.10+
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
-
-v2: update commit message
-
- arch/arm/mach-at91/sama5d3.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index 4012797..4ee0de5 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -95,19 +95,19 @@ static struct clk twi0_clk = {
- 	.name		= "twi0_clk",
- 	.pid		= SAMA5D3_ID_TWI0,
- 	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
-+	.div		= AT91_PMC_PCR_DIV8,
- };
- static struct clk twi1_clk = {
- 	.name		= "twi1_clk",
- 	.pid		= SAMA5D3_ID_TWI1,
- 	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
-+	.div		= AT91_PMC_PCR_DIV8,
- };
- static struct clk twi2_clk = {
- 	.name		= "twi2_clk",
- 	.pid		= SAMA5D3_ID_TWI2,
- 	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
-+	.div		= AT91_PMC_PCR_DIV8,
- };
- static struct clk mmc0_clk = {
- 	.name		= "mci0_clk",
--- 
-1.7.9.5
+Aren't you taking this patch through the clock tree?
