@@ -1,85 +1,50 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 22 Nov 2013 14:01:15 -0600
-Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
- clocksource/clockevent system timers
-In-Reply-To: <528F8959.7080207@ti.com>
-References: <1385085414-9034-1-git-send-email-joelf@ti.com>
- <1385085414-9034-6-git-send-email-joelf@ti.com>
- <CAL_JsqKS=cGeAhj+K04SOtA8nJRR3MXxS3ry-kzjQOkZx3yK4g@mail.gmail.com>
- <528F8959.7080207@ti.com>
-Message-ID: <CAL_JsqJoH_yWP-Aae2REb=qzV6c56=WQoVLV8cFgX+_b+voM5g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Nov 2013 20:02:42 +0000
+Subject: [PATCH 7/9] ARM: sa1100: move gpio irq handling to GPIO driver
+In-Reply-To: <CALT56yM1rf7onJNu6L9tG52RrmDXcuWSoa=JfpakZRO+e7vnEQ@mail.gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+ <1384505280-25389-8-git-send-email-dbaryshkov@gmail.com>
+ <20131122174528.GB16735@n2100.arm.linux.org.uk>
+ <CALT56yM1rf7onJNu6L9tG52RrmDXcuWSoa=JfpakZRO+e7vnEQ@mail.gmail.com>
+Message-ID: <20131122200242.GE16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 10:42 AM, Joel Fernandes <joelf@ti.com> wrote:
-> On 11/22/2013 09:58 AM, Rob Herring wrote:
->> On Thu, Nov 21, 2013 at 7:56 PM, Joel Fernandes <joelf@ti.com> wrote:
->>> This work is a migration effort of OMAP system timers to the
->>> clocksource/clockevent framework. Consider this as a first-pass in this effort.
->>> There are few cleanups that need to be done first. The HWMOD code is
->>> intertwined with the timer code. HWMOD code cleanups in the future will
->>> hopefully make most of this code go away, so till then we separate out the
->>> power/clocks portion of the code from the actual timer bits.  This will
->>> facilitate near-future work of adapting the system timer as a clocksource.
->>>
->>> New functions for OF-only boot are introduced, and we can soon delete the old
->>> versions once we migrate all platforms. Currently only AM335x is migrated and
->>> testedA new omap_generic_timer_init function is introduced for DT platforms.
->>> Code required earlier for non-DT platforms such as setup of timer IDs and timer
->>> parent clock is not required.  parent clocks are automatically setup by the mux
->>> clock driver through DT so they no longer need to be hardcoded.
->>>
->>> The init code will try to pick the best timer for clocksource and clockevent
->>> however bindings are added to force a particular timer as clocksource or
->>> clockevent through DT.
->>>
->>> Signed-off-by: Joel Fernandes <joelf@ti.com>
->>> ---
->>>  .../devicetree/bindings/arm/omap/timer.txt         |  12 ++
->>>  arch/arm/mach-omap2/common.h                       |   1 +
->>>  arch/arm/mach-omap2/timer.c                        | 235 +++++++++++++++++++++
->>>  3 files changed, 248 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
->>> index d02e27c..6cf7a75 100644
->>> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
->>> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
->>> @@ -32,6 +32,18 @@ Optional properties:
->>>  - ti,timer-secure:     Indicates the timer is reserved on a secure OMAP device
->>>                         and therefore cannot be used by the kernel.
->>>
->>> +- ti,timer-clockevent,
->>> +  ti,timer-clocksource These properties force the system timer code to choose
->>> +                       the particular timer as a clockevent or clocksource.
->>> +                       If these properties are not specified, the timer code
->>> +                       picks up a "ti,timer-alwon" as the clocksource and a
->>> +                       timer containing one of the following properties as
->>> +                       the clockevent in the following order:
->>> +                               ti,timer-alwon
->>> +                               ti,timer-dsp
->>> +                               ti,timer-pwm
->>> +                               ti,timer-secure
->>
->> These properties were added specifically for the reason of avoiding
->> linux specific properties like these. When is this not sufficient?
->
-> Some platforms cannot use certain timers as clockevents and clocksource, to keep
-> this code functionally equivalent and working, I added these properties so that
-> its possible to select specific timers as clockevents/sources as was being done
-> in the non-DT case. I'm open to suggestions for doing this in a better way for DT.
+On Fri, Nov 22, 2013 at 11:46:10PM +0400, Dmitry Eremin-Solenikov wrote:
+> Hello,
+> 
+> On Fri, Nov 22, 2013 at 9:45 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Therefore, if we want to have certain GPIOs triggering wakeups (iow,
+> > those GPIOs which have had enable_irq_wake() called on them) but not
+> > those which haven't, we need to reprogram GRER and GFER with the
+> > GPIOs which can wake the system up.
+> 
+> I thought so. I was puzzled, because that would mean, that we want to wake
+> up from a GPIO, which is masked in GPIO_IRQ_mask, but enabled in PWER.
+> Is that the real scenario/usecase? If we/kernel has disabled IRQ
+> through _mask_irq,
+> I thought, we didn't expect events from that pin (including wakeup), did we?
 
-There has to be a defined reason why a given timer cannot be used. You
-are not explaining what that reason is. Define a property or set of
-properties that describe the h/w feature or quirk.
+So, if a device driver decides that it wants to be woken up by a GPIO
+and therefore calls enable_irq_wake() on it, but also calls disable_irq()
+on that same interrupt to avoid _receiving_ the interrupt until it's
+ready, does that mean that the system should _not_ be woken up?
 
->>
->> And I agree with the comment to use OF_CLKSRC.
->>
->
-> There are difficulties I mentioned in a previous post [1] stating why it may not
-> be possible to use OF_CLKSRC macros, and still keep the code functionally
-> equivalent to when it was non-DT.
+I doubt many systems work this way - later PXA devices certainly don't,
+where the wakeup is triggered from the silicon on the pad interface
+rather than the interrupt controller - where the state of the IRQ masks
+have no bearing what so ever on it.
 
-Sorry, I don't buy it.
+Please, stop thinking about changing the behaviour of any of the SA11x0
+stuff.  Treat the code as-is as authoritive on the way things should be
+done, and _carefully_ "adjust it" to how you'd like to see it - so we
+can have a higher confidence that stuff isn't being broken or behaviour
+isn't changed.
 
-Rob
+Such behaviour changes would include looping differently while handling
+interrupts.
+
+And more importantly, treat SA11x0 as a reference implementation for
+IRQ stuff; that's the platform I developed the IRQ handling stuff on
+which became the basis for tglx's IRQ layer in the kernel.
