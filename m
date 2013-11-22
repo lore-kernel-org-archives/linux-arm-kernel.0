@@ -1,83 +1,104 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Sat, 23 Nov 2013 00:31:32 +0800
-Subject: [PATCH v7 0/4] Add dual-fifo mode support of i.MX ssi
-In-Reply-To: <cover.1384352281.git.b42378@freescale.com>
-References: <cover.1384352281.git.b42378@freescale.com>
-Message-ID: <20131122163132.GB17344@MrMyself>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 22 Nov 2013 16:23:00 +0000
+Subject: [PATCH 23/23] mtd: st_spi_fsm: Supply the N25Qxxx specific read
+ configurations
+In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
+References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385137380-28968-24-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The N25Qxxx Serial Flash devices required different sequence
+configurations depending on whether they're running in 24bit (3Byte)
+or 32bit (4Byte) mode. We provide those here.
 
-   I'm sorry to push this. But this series has been an orphan for a while.
-   Could any one please receive and foster it?
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/devices/st_spi_fsm.c | 43 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h | 10 ++++++++++
+ 2 files changed, 53 insertions(+)
 
-Thank you.
-Nicolin Chen
-
-On Wed, Nov 13, 2013 at 10:55:23PM +0800, Nicolin Chen wrote:
->  * ! This series of patches has a direct dependency between them. When
->  * ! applying them, we need to apply to one single branch. Otherwise,
->  * ! it would break currect branches.
-> 
-> Changelog
-> v7:
->  * Appended missing Acked-by to all four patches.
->  * Sorry that I didn't add them at the first place.
-> v6:
->  * PATCH-1: Use goto err_firmware instead of return directly.
->  *
->  * Nothing changes for the other three ack-ed patches
-> v5:
->  * PATCH-3: Add period size constraint when using dual fifo mode
->  *
->  * Nothing changes for the other three patches
-> v4:
->  * PATCH-3: Drop useless register configuration.
->  *
->  * Nothing changes for the other three patches
-> v3:
->  * PATCH-1: Add comments to indicate the end of v1 and v2 array.
->  * PATCH-3: Use better way to keep watermark as even number.
->  *
->  * Nothing changes for PATCH-2 and PATCH-4
-> v2:
->  * Instead of adding rogue scripts to current SDMA driver based on firmware
->  * V1, we define the new SDMA firmware as version 2 and bisect the PATCH-1
->  * to two patches: The first is to add version check code to the SDMA driver;
->  * And the second is to add SSI dual FIFO DMATYPE.
->  *
->  * Nothing changes for the last two patches.
-> v1:
->  * SSI can reduce hardware overrun/underrun possibility when using dual
->  * fifo mode. To support this mode, we need to first update sdma sciprt
->  * list, and then enable dual fifo BIT in SSI driver, and last update DT
->  * bindings of i.MX series.
-> 
-> Nicolin Chen (4):
->   dma: imx-sdma: Add sdma firmware version 2 support
->   dma: imx-sdma: Add new dma type for ssi dual fifo script
->   ASoC: fsl_ssi: Add dual fifo mode support
->   ARM: dts: imx: use dual-fifo sdma script for ssi
-> 
->  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |  1 +
->  arch/arm/boot/dts/imx51.dtsi                       |  4 ++--
->  arch/arm/boot/dts/imx53.dtsi                       |  4 ++--
->  arch/arm/boot/dts/imx6qdl.dtsi                     | 12 +++++-----
->  arch/arm/boot/dts/imx6sl.dtsi                      | 12 +++++-----
->  drivers/dma/imx-sdma.c                             | 19 ++++++++++++++-
->  include/linux/platform_data/dma-imx-sdma.h         |  5 ++++
->  include/linux/platform_data/dma-imx.h              |  1 +
->  sound/soc/fsl/fsl_ssi.c                            | 27 +++++++++++++++++++++-
->  9 files changed, 67 insertions(+), 18 deletions(-)
-> 
-> -- 
-> 1.8.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index 2b7df68..c906739 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -57,6 +57,49 @@ static struct seq_rw_config default_write_configs[] = {
+ 	{0x00,			 0,			 0, 0, 0, 0x00, 0, 0},
+ };
+ 
++/*
++ * [N25Qxxx] Configuration
++ */
++#define N25Q_VCR_DUMMY_CYCLES(x)	(((x) & 0xf) << 4)
++#define N25Q_VCR_XIP_DISABLED		((uint8_t)0x1 << 3)
++#define N25Q_VCR_WRAP_CONT		0x3
++
++/* N25Q 3-byte Address READ configurations
++ *	- 'FAST' variants configured for 8 dummy cycles.
++ *
++ * Note, the number of dummy cycles used for 'FAST' READ operations is
++ * configurable and would normally be tuned according to the READ command and
++ * operating frequency.  However, this applies universally to all 'FAST' READ
++ * commands, including those used by the SPIBoot controller, and remains in
++ * force until the device is power-cycled.  Since the SPIBoot controller is
++ * hard-wired to use 8 dummy cycles, we must configure the device to also use 8
++ * cycles.
++ */
++static struct seq_rw_config n25q_read3_configs[] = {
++	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ_1_4_4,	0, 4, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ_1_1_4,	0, 1, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ_1_2_2,	0, 2, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ_1_1_2,	0, 1, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ_FAST,	0, 1, 1, 0x00, 0, 8},
++	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ,	        0, 1, 1, 0x00, 0, 0},
++	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
++};
++
++/* N25Q 4-byte Address READ configurations
++ *	- use special 4-byte address READ commands (reduces overheads, and
++ *        reduces risk of hitting watchdog reset issues).
++ *	- 'FAST' variants configured for 8 dummy cycles (see note above.)
++ */
++static struct seq_rw_config n25q_read4_configs[] = {
++	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ4_1_4_4,	0, 4, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ4_1_1_4,	0, 1, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ4_1_2_2,	0, 2, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ4_1_1_2,	0, 1, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ4_FAST,	0, 1, 1, 0x00, 0, 8},
++	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ4,	0, 1, 1, 0x00, 0, 0},
++	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
++};
++
+ static struct stfsm_seq stfsm_seq_read_jedec = {
+ 	.data_size = TRANSFER_SIZE(8),
+ 	.seq_opc[0] = (SEQ_OPC_PADS_1 |
+diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
+index 8eb9e20..163c09f 100644
+--- a/drivers/mtd/devices/st_spi_fsm.h
++++ b/drivers/mtd/devices/st_spi_fsm.h
+@@ -229,6 +229,15 @@
+ #define FLASH_CMD_READ4_1_1_4	0x6c
+ #define FLASH_CMD_READ4_1_4_4	0xec
+ 
++/*
++ * Flags to tweak operation of default read/write/erase routines
++ */
++#define CFG_READ_TOGGLE_32BIT_ADDR	0x00000001
++#define CFG_WRITE_TOGGLE_32BIT_ADDR	0x00000002
++#define CFG_WRITE_EX_32BIT_ADDR_DELAY	0x00000004
++#define CFG_ERASESEC_TOGGLE_32BIT_ADDR	0x00000008
++#define CFG_S25FL_CHECK_ERROR_FLAGS	0x00000010
++
+ struct stfsm {
+ 	struct device		*dev;
+ 	void __iomem		*base;
+@@ -237,6 +246,7 @@ struct stfsm {
+ 	struct mutex		lock;
+ 	struct flash_info 	*info;
+ 
++	uint32_t		configuration;
+ 	uint32_t		fifo_dir_delay;
+ 	bool			booted_from_spi;
+ 	bool			reset_signal;
+-- 
+1.8.1.2
