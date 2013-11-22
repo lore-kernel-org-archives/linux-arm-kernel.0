@@ -1,50 +1,98 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:22:50 +0000
-Subject: [PATCH 13/23] mtd: st_spi_fsm: Fetch platform specific configurations
+Date: Fri, 22 Nov 2013 16:22:52 +0000
+Subject: [PATCH 15/23] mtd: st_spi_fsm: Fetch boot-device from mode pins
 In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
 References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-14-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385137380-28968-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All supported platforms are able to pass specific configurations via
-the Device Tree on boot. Here we add a function which is to be called
-during the probing process which will extract them, or make other
-assumptions based on capabilities provided.
+It's important for us to determine which device was used to boot from in
+order to make some correct decisions surrounding Power Management. On
+each of the platforms which support the FSM this is communicated via
+a set of mode pins held in the system configuration area. This patch
+determine the boot device and stores the result.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 41 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h |  1 +
+ 2 files changed, 42 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 0b32fef..5bced00 100644
+index 80657a4..dec2f83 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -273,6 +273,15 @@ static int stfsm_init(struct stfsm *fsm)
- 	return 0;
+@@ -14,7 +14,9 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/regmap.h>
+ #include <linux/platform_device.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/sched.h>
+ #include <linux/delay.h>
+@@ -346,9 +348,48 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+ {
+ 	struct stfsm *fsm = platform_get_drvdata(pdev);
+ 	struct flash_info *info = fsm->info;
++	struct device_node *np = pdev->dev.of_node;
++	struct regmap *regmap;
++	uint32_t boot_device_reg;
++	uint32_t boot_device_spi;
++	uint32_t boot_device;     /* Value we read from *boot_device_reg */
++	int ret;
+ 
++	/* Booting from SPI NOR Flash is the default */
++	fsm->booted_from_spi = true;
++
++	/* Use device size to determine address width */
+ 	if (info->sector_size * info->n_sectors > 0xFFFFFF)
+ 		info->flags |= FLASH_FLAG_32BITADDR;
++
++	regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
++	if (!IS_ERR(regmap)) {
++		ret = PTR_ERR(regmap);
++		goto boot_device_fail;
++	}
++
++	/* Where in the syscon the boot device information lives */
++	ret = of_property_read_u32(np, "boot-device-reg", &boot_device_reg);
++	if (ret)
++		goto boot_device_fail;
++
++	/* Boot device value when booted from SPI NOR */
++	ret = of_property_read_u32(np, "boot-device-spi", &boot_device_spi);
++	if (ret)
++		goto boot_device_fail;
++
++	ret = regmap_read(regmap, boot_device_reg, &boot_device);
++	if (ret)
++		goto boot_device_fail;
++
++	if (boot_device != boot_device_spi)
++		fsm->booted_from_spi = false;
++
++	return;
++
++boot_device_fail:
++	dev_warn(&pdev->dev,
++		 "failed to fetch boot device, assuming boot from SPI\n");
  }
  
-+static void stfsm_fetch_platform_configs(struct platform_device *pdev)
-+{
-+	struct stfsm *fsm = platform_get_drvdata(pdev);
-+	struct flash_info *info = fsm->info;
-+
-+	if (info->sector_size * info->n_sectors > 0xFFFFFF)
-+		info->flags |= FLASH_FLAG_32BITADDR;
-+}
-+
  static int stfsm_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -331,6 +340,8 @@ static int stfsm_probe(struct platform_device *pdev)
+diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
+index 737ecd9..2e12bff 100644
+--- a/drivers/mtd/devices/st_spi_fsm.h
++++ b/drivers/mtd/devices/st_spi_fsm.h
+@@ -238,6 +238,7 @@ struct stfsm {
+ 	struct flash_info 	*info;
  
- 	platform_set_drvdata(pdev, fsm);
+ 	uint32_t		fifo_dir_delay;
++	bool			booted_from_spi;
+ };
  
-+	stfsm_fetch_platform_configs(pdev);
-+
- 	fsm->mtd.dev.parent	= &pdev->dev;
- 	fsm->mtd.type		= MTD_NORFLASH;
- 	fsm->mtd.writesize	= 4;
+ struct stfsm_seq {
 -- 
 1.8.1.2
