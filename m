@@ -1,102 +1,64 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 22 Nov 2013 16:55:48 +0100
-Subject: [PATCH v3 4/5] regulator: max14577: Add regulator driver for Maxim
- 14577
-In-Reply-To: <20131122101551.GJ23067@lee--X1>
-References: <1385109972-28059-1-git-send-email-k.kozlowski@samsung.com>
- <1385109972-28059-5-git-send-email-k.kozlowski@samsung.com>
- <20131122101551.GJ23067@lee--X1>
-Message-ID: <1385135748.27216.1.camel@AMDC1943>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 22 Nov 2013 09:58:01 -0600
+Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
+ clocksource/clockevent system timers
+In-Reply-To: <1385085414-9034-6-git-send-email-joelf@ti.com>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-6-git-send-email-joelf@ti.com>
+Message-ID: <CAL_JsqKS=cGeAhj+K04SOtA8nJRR3MXxS3ry-kzjQOkZx3yK4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-11-22 at 10:15 +0000, Lee Jones wrote:
-> > +#ifdef CONFIG_OF
-> > +static int max14577_regulator_dt_parse_pdata(struct platform_device *pdev,
-> > +					struct max14577_platform_data *pdata)
-> > +{
-> > +	struct max14577 *max14577 = dev_get_drvdata(pdev->dev.parent);
-> > +	struct device_node *np;
-> > +	struct max14577_regulator_platform_data *reg_pdata;
-> > +	struct of_regulator_match rmatch;
-> > +	int i, ret;
-> > +
-> > +	np = of_get_child_by_name(max14577->dev->of_node, "regulators");
-> > +	if (!np)
-> > +		return -EINVAL;
-> 
-> No need to do this. If instead you use a compatible string and set
-> it's MFD cell's .of_compatible property, the MFD core will set
-> pdev->dev.of_node for you.
-> 
-> > +	reg_pdata = devm_kzalloc(&pdev->dev, sizeof(*reg_pdata) *
-> > +			     ARRAY_SIZE(supported_regulators), GFP_KERNEL);
-> > +	if (!reg_pdata)
-> > +		return -ENOMEM;
-> > +
-> > +	for (i = 0; i < ARRAY_SIZE(supported_regulators); i++) {
-> > +		rmatch.name = supported_regulators[i].name;
-> > +		ret = of_regulator_match(&pdev->dev, np, &rmatch, 1);
-> > +		if (ret != 1)
-> > +			continue;
-> > +		dev_dbg(&pdev->dev, "Found regulator %d/%s\n",
-> > +				supported_regulators[i].id,
-> > +				supported_regulators[i].name);
-> > +		reg_pdata[i].id = supported_regulators[i].id;
-> > +		reg_pdata[i].initdata = rmatch.init_data;
-> > +		reg_pdata[i].of_node = rmatch.of_node;
-> > +	}
-> > +
-> > +	pdata->regulators = reg_pdata;
-> > +
-> > +	return 0;
-> > +}
-> > +#else
-> > +static int max14577_regulator_dt_parse_pdata(struct platform_device *pdev,
-> > +					struct max14577_platform_data *pdata)
-> > +{
-> > +	return 0;
-> > +}
-> > +#endif
-> 
-> No need for this either. Just check for the device's of_node.
-> 
-> > +static int max14577_regulator_probe(struct platform_device *pdev)
-> > +{
-> > +	struct max14577 *max14577 = dev_get_drvdata(pdev->dev.parent);
-> > +	struct max14577_platform_data *pdata = dev_get_platdata(max14577->dev);
-> > +	int i, size;
-> > +	struct regulator_config config = {};
-> > +	struct regulator_dev **regulators;
-> > +
-> > +	if (!pdata) {
-> > +		/* Parent must provide pdata */
-> > +		dev_err(&pdev->dev, "No MFD driver platform data found.\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	if (max14577->dev->of_node) {
-> > +		int ret = max14577_regulator_dt_parse_pdata(pdev, pdata);
-> 
-> This will overwrite pdata which is wrong.
-> 
-> pdata should always take precedence over DT.
-> 
-> <snip>
-> 
-> > +	for (i = 0; i < ARRAY_SIZE(supported_regulators); i++) {
-> > +		/*
-> > +		 * Index of supported_regulators[] is also the id and must
-> > +		 * match index of pdata->regulators[].
-> > +		 */
-> > +		config.init_data = pdata->regulators[i].initdata;
-> > +		config.of_node = pdata->regulators[i].of_node;
-> 
-> I still thing this is superfluous. Why don't you run though the nodes
-> here instead of doing it in MFD and passing this stuff through?
+On Thu, Nov 21, 2013 at 7:56 PM, Joel Fernandes <joelf@ti.com> wrote:
+> This work is a migration effort of OMAP system timers to the
+> clocksource/clockevent framework. Consider this as a first-pass in this effort.
+> There are few cleanups that need to be done first. The HWMOD code is
+> intertwined with the timer code. HWMOD code cleanups in the future will
+> hopefully make most of this code go away, so till then we separate out the
+> power/clocks portion of the code from the actual timer bits.  This will
+> facilitate near-future work of adapting the system timer as a clocksource.
+>
+> New functions for OF-only boot are introduced, and we can soon delete the old
+> versions once we migrate all platforms. Currently only AM335x is migrated and
+> testedA new omap_generic_timer_init function is introduced for DT platforms.
+> Code required earlier for non-DT platforms such as setup of timer IDs and timer
+> parent clock is not required.  parent clocks are automatically setup by the mux
+> clock driver through DT so they no longer need to be hardcoded.
+>
+> The init code will try to pick the best timer for clocksource and clockevent
+> however bindings are added to force a particular timer as clocksource or
+> clockevent through DT.
+>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  .../devicetree/bindings/arm/omap/timer.txt         |  12 ++
+>  arch/arm/mach-omap2/common.h                       |   1 +
+>  arch/arm/mach-omap2/timer.c                        | 235 +++++++++++++++++++++
+>  3 files changed, 248 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+> index d02e27c..6cf7a75 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+> @@ -32,6 +32,18 @@ Optional properties:
+>  - ti,timer-secure:     Indicates the timer is reserved on a secure OMAP device
+>                         and therefore cannot be used by the kernel.
+>
+> +- ti,timer-clockevent,
+> +  ti,timer-clocksource These properties force the system timer code to choose
+> +                       the particular timer as a clockevent or clocksource.
+> +                       If these properties are not specified, the timer code
+> +                       picks up a "ti,timer-alwon" as the clocksource and a
+> +                       timer containing one of the following properties as
+> +                       the clockevent in the following order:
+> +                               ti,timer-alwon
+> +                               ti,timer-dsp
+> +                               ti,timer-pwm
+> +                               ti,timer-secure
 
-I have rewritten the regulator init code (and DT parsing). I think it
-reflects your comments. Please look at version 4 of patches.
+These properties were added specifically for the reason of avoiding
+linux specific properties like these. When is this not sufficient?
 
-Best regards,
-Krzysztof
+And I agree with the comment to use OF_CLKSRC.
+
+Rob
