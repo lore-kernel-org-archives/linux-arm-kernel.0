@@ -1,14 +1,14 @@
 From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 22 Nov 2013 15:57:20 +0100
-Subject: [PATCH 3/5] net: MOXA ART: add IFF_LIVE_ADDR_CHANGE flag
+Date: Fri, 22 Nov 2013 15:57:21 +0100
+Subject: [PATCH 4/5] net: MOXA ART: generate random address
 In-Reply-To: <1385132242-3204-1-git-send-email-jonas.jensen@gmail.com>
 References: <1385132242-3204-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1385132242-3204-3-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1385132242-3204-4-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-.ndo_set_mac_address hook callback already supports IFF_LIVE_ADDR_CHANGE
-so add it to our flags.
+The address register is zero:ed on boot, fill it with a randomly generated
+address on probe.
 
 Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 ---
@@ -16,21 +16,25 @@ Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 Notes:
     Applies to next-20131122
 
- drivers/net/ethernet/moxa/moxart_ether.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/moxa/moxart_ether.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index bcc6005..08c3905 100644
+index 08c3905..c02075a 100644
 --- a/drivers/net/ethernet/moxa/moxart_ether.c
 +++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -688,7 +688,7 @@ static int moxart_mac_probe(struct platform_device *pdev)
- 	ether_setup(ndev);
- 	ndev->netdev_ops = &moxart_netdev_ops;
- 	netif_napi_add(ndev, &priv->napi, moxart_rx_poll, RX_DESC_NUM);
--	ndev->priv_flags |= IFF_UNICAST_FLT;
-+	ndev->priv_flags |= IFF_UNICAST_FLT | IFF_LIVE_ADDR_CHANGE;
- 	ndev->irq = irq;
+@@ -700,6 +700,12 @@ static int moxart_mac_probe(struct platform_device *pdev)
+ 		goto init_fail;
+ 	}
  
- 	SET_NETDEV_DEV(ndev, &pdev->dev);
++	if (!is_valid_ether_addr(ndev->dev_addr)) {
++		eth_hw_addr_random(ndev);
++		netdev_info(ndev, "generated random MAC address %pM\n",
++			    ndev->dev_addr);
++	}
++
+ 	netdev_dbg(ndev, "%s: IRQ=%d address=%pM\n",
+ 		   __func__, ndev->irq, ndev->dev_addr);
+ 
 -- 
 1.8.2.1
