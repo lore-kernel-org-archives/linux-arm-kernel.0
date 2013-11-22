@@ -1,37 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 22 Nov 2013 10:04:55 -0500
-Subject: [PATCH 0/2] ARM: mvebu: fix DT def. of PCIe units for mv78230
- and mv78260
-In-Reply-To: <cover.1383681717.git.arno@natisbad.org>
-References: <cover.1383681717.git.arno@natisbad.org>
-Message-ID: <20131122150455.GH29241@titan.lakedaemon.net>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 22 Nov 2013 16:07:34 +0100
+Subject: [PATCH] ARM: at91: sama5d3: reduce TWI internal clock frequency
+In-Reply-To: <20131122145835.GB7420@katana>
+References: <1385129228-11225-1-git-send-email-ludovic.desroches@atmel.com>
+ <20131122143350.GA7420@katana>
+ <20131122145141.GB30749@ludovic.desroches@atmel.com>
+ <20131122145835.GB7420@katana>
+Message-ID: <20131122150734.GC30749@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud, Thomas,
-
-On Tue, Nov 05, 2013 at 09:45:33PM +0100, Arnaud Ebalard wrote:
-> Second patch fixes mv78260 .dtsi to reflect the fact that the two first
-> units are x4 and quad x1 capable, and third (and last) interface is x4
-> only. This patch has only been compiled and not tested on real hardware.
-> As associated changes are quite error-prone, I think it needs some
-> careful review.
-
-This, in addition to changing the .dtsi files is where my "let's take
-time merging this" came from.
-
-...
-> Arnaud Ebalard (2):
->   ARM: mvebu: second PCIe unit of Armada XP mv78230 is only x1 capable
->   ARM: mvebu: fix second and third PCIe units of Armada XP mv78260
+On Fri, Nov 22, 2013 at 03:58:35PM +0100, Wolfram Sang wrote:
+> On Fri, Nov 22, 2013 at 03:51:41PM +0100, Ludovic Desroches wrote:
+> > Hi Wolfram,
+> > 
+> > On Fri, Nov 22, 2013 at 03:33:51PM +0100, Wolfram Sang wrote:
+> > > On Fri, Nov 22, 2013 at 03:07:08PM +0100, ludovic.desroches at atmel.com wrote:
+> > > > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > > 
+> > > > There are still I2C unexpected behaviors which are solved by reducing TWI
+> > > > internal frequency.
+> > > > 
+> > > > Cc: <stable@vger.kernel.org> #3.10+
+> > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > 
+> > > I think the commit message needs more details. Is this a true bugfix
+> > > because the real bus frequency was too high because of the wrong
+> > > divider? Is this a workaround which makes things work but will make the
+> > > bus frequency slower than it should be?
+> > 
+> > This fix doesn't concern the i2c bus frequency, only the internal IP frequency.
+> > 
+> > TWI has been validated at 66MHz. With some devices, transfer hangs during i2c
+> > frame transmission. This issue disappears when reducing the internal frequency
+> > of the IP. Maybe there is some oversampling on i2c signals.
+> > Unfortunately, I have no clear status about the root cause that's why
+> > the commit message was imprecise.
 > 
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi |  24 +++----
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 109 ++++++++++++++++++++++++-------
->  2 files changed, 97 insertions(+), 36 deletions(-)
+> This paragraph is a way better commit message IMO :)
+> 
 
-At any rate, since these are going to -stable anyway, there's no need to
-rush it.  These are currently queued up as fixes for v3.13-rc1.
+Ok I'll update it.
 
-thx,
+Thanks for the review Wolfram.
 
-Jason.
+Regards
+
+Ludovic
