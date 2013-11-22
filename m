@@ -1,59 +1,46 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 22 Nov 2013 15:58:04 +0100
-Subject: [PATCHv2] ARM: mvebu: Add DT entry for ReadyNAS Duo v2 to use
- gpio-poweroff driver
-Message-ID: <87eh68fpqb.fsf@natisbad.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 22 Nov 2013 15:58:35 +0100
+Subject: [PATCH] ARM: at91: sama5d3: reduce TWI internal clock frequency
+In-Reply-To: <20131122145141.GB30749@ludovic.desroches@atmel.com>
+References: <1385129228-11225-1-git-send-email-ludovic.desroches@atmel.com>
+ <20131122143350.GA7420@katana>
+ <20131122145141.GB30749@ludovic.desroches@atmel.com>
+Message-ID: <20131122145835.GB7420@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 22, 2013 at 03:51:41PM +0100, Ludovic Desroches wrote:
+> Hi Wolfram,
+> 
+> On Fri, Nov 22, 2013 at 03:33:51PM +0100, Wolfram Sang wrote:
+> > On Fri, Nov 22, 2013 at 03:07:08PM +0100, ludovic.desroches at atmel.com wrote:
+> > > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > 
+> > > There are still I2C unexpected behaviors which are solved by reducing TWI
+> > > internal frequency.
+> > > 
+> > > Cc: <stable@vger.kernel.org> #3.10+
+> > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > 
+> > I think the commit message needs more details. Is this a true bugfix
+> > because the real bus frequency was too high because of the wrong
+> > divider? Is this a workaround which makes things work but will make the
+> > bus frequency slower than it should be?
+> 
+> This fix doesn't concern the i2c bus frequency, only the internal IP frequency.
+> 
+> TWI has been validated at 66MHz. With some devices, transfer hangs during i2c
+> frame transmission. This issue disappears when reducing the internal frequency
+> of the IP. Maybe there is some oversampling on i2c signals.
+> Unfortunately, I have no clear status about the root cause that's why
+> the commit message was imprecise.
 
-Without that fix, at the end of the shutdown process, the board is
-still powered (led glowing, fan running, ...).
+This paragraph is a way better commit message IMO :)
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
-
-Changes since v1:
- - use macro instead of value for GPIO voltage level
-
- arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index e6a102c..551bfed 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -1,5 +1,6 @@
- /dts-v1/;
- 
-+#include <dt-bindings/gpio/gpio.h>
- #include "kirkwood.dtsi"
- #include "kirkwood-6282.dtsi"
- 
-@@ -60,6 +61,10 @@
- 				marvell,pins = "mpp29";
- 				marvell,function = "gpio";
- 			};
-+			pmx_poweroff: pmx-poweroff {
-+				marvell,pins = "mpp30";
-+				marvell,function = "gpio";
-+			};
- 		};
- 
- 		clocks {
-@@ -158,6 +163,13 @@
- 		};
- 	};
- 
-+	gpio-poweroff {
-+		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&pmx_poweroff>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
-+	};
-+
-         regulators {
-                 compatible = "simple-bus";
-                 #address-cells = <1>;
--- 
-1.8.4.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/7a20bd79/attachment.sig>
