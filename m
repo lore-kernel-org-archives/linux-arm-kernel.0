@@ -1,54 +1,71 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 22 Nov 2013 12:26:45 -0700
-Subject: [PATCH V2 1/6] ahci: imx: Explicitly clear
- IMX6Q_GPR13_SATA_MPLL_CLK_EN
-In-Reply-To: <1385118304-27435-1-git-send-email-marex@denx.de>
-References: <1385118304-27435-1-git-send-email-marex@denx.de>
-Message-ID: <528FAFF5.9040404@boundarydevices.com>
+From: fkan@apm.com (Feng Kan)
+Date: Fri, 22 Nov 2013 11:37:08 -0800
+Subject: [PATCH 1/1] irq-gic: add capability to set bypass flag in GIC
+In-Reply-To: <528C95D2.5090200@arm.com>
+References: <1384897358-22940-1-git-send-email-fkan@apm.com>
+ <528C95D2.5090200@arm.com>
+Message-ID: <CAL85gmD9sxyn9ELNQePbCYAAnovSE_vgbdYZccrkTdX1YPRhiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 4:04 AM, Marek Vasut wrote:
-> We must clear this IMX6Q_GPR13_SATA_MPLL_CLK_EN bit on i.MX6Q, otherwise
-> Linux will fail to find the attached drive on some boards.
->
-> This entire fix was:
-> Reported-by: Eric Nelson <eric.nelson@boundarydevices.com>
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: Linux-IDE <linux-ide@vger.kernel.org>
-> ---
->   drivers/ata/ahci_imx.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> V2: Update the value in the comment from 0x7ffffffd to 0x7ffffffe
->
-> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-> index ae2d73f..14227d1 100644
-> --- a/drivers/ata/ahci_imx.c
-> +++ b/drivers/ata/ahci_imx.c
-> @@ -113,7 +113,7 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
->   	/*
->   	 * set PHY Paremeters, two steps to configure the GPR13,
->   	 * one write for rest of parameters, mask of first write
-> -	 * is 0x07fffffd, and the other one write for setting
-> +	 * is 0x07fffffe, and the other one write for setting
+>>       set_handle_irq(gic_handle_irq);
+>>
+>> +     gic->bypass_flag = (bypass_val & 0xf) << 4;
 
-0x07ffffff, d+2 = f,
-bit 1 is IMX6Q_GPR13_SATA_MPLL_CLK_EN, which you just added
-bit 0 is IMX6Q_GPR13_SATA_TX_EDGE_RATE, which is also in your expression
+>Beware, the top 2 bits are reserved on GICv1, and shouldn't be messed with.
 
->   	 * the mpll_clk_en.
->   	 */
->   	regmap_update_bits(imxpriv->gpr, 0x34, IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
-> @@ -125,6 +125,7 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
->   			| IMX6Q_GPR13_SATA_TX_BOOST_MASK
->   			| IMX6Q_GPR13_SATA_TX_LVL_MASK
->   			| IMX6Q_GPR13_SATA_TX_EDGE_RATE
-> +			| IMX6Q_GPR13_SATA_MPLL_CLK_EN
->   			, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
->   			| IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M
->   			| IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F
+The only time those bits are touched are when the dts is modified with the
+bypass flag. Otherwise those bits remain untouched as before.
+
+
+>> -     gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
+>> +     if (of_property_read_u32(node, "bypass-flags", &bypass_val))
+>> +             bypass_val = 0;
+>
+> [adding Mark on Cc, so he can comment on the DT parts]
+>
+> Where's the DT documentation update? Also, as this is an
+> implementation-specific quirk, you should consider using a separate
+> compatible string and move the handling of this issue into some X-Gene
+> specific code.
+
+Yes, the only way to do that nicely would be to add another irq-xgene file.
+Since I see little of gic specific implementation in the irq-gic file. To add
+another irq-xgene file for one change seems excessive at the time. Given
+that in v2 these bypass bits are added, is it better to check for v2 dts
+property before modify the CPU_CTRL register?
+
+>
+>> +     gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, bypass_val, node);
+>>
+>>       if (parent) {
+>>               irq = irq_of_parse_and_map(node, 0);
+>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+>> index 0e5d9ec..999515b 100644
+>> --- a/include/linux/irqchip/arm-gic.h
+>> +++ b/include/linux/irqchip/arm-gic.h
+>> @@ -64,14 +64,14 @@ struct device_node;
+>>  extern struct irq_chip gic_arch_extn;
+>>
+>>  void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+>> -                 u32 offset, struct device_node *);
+>> +                 u32 offset, u32 bypass_val, struct device_node *);
+>>  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+>>  void gic_cpu_if_down(void);
+>>
+>>  static inline void gic_init(unsigned int nr, int start,
+>>                           void __iomem *dist , void __iomem *cpu)
+>>  {
+>> -     gic_init_bases(nr, start, dist, cpu, 0, NULL);
+>> +     gic_init_bases(nr, start, dist, cpu, 0, 0, NULL);
+>>  }
+>>
+>>  #endif /* __ASSEMBLY */
+>>
+>
+> Cheers,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
