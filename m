@@ -1,104 +1,92 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:23:00 +0000
-Subject: [PATCH 23/23] mtd: st_spi_fsm: Supply the N25Qxxx specific read
- configurations
+Date: Fri, 22 Nov 2013 16:22:56 +0000
+Subject: [PATCH 19/23] mtd: st_spi_fsm: Add a check to if the chip can handle
+ an SoC reset
 In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
 References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385137380-28968-20-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The N25Qxxx Serial Flash devices required different sequence
-configurations depending on whether they're running in 24bit (3Byte)
-or 32bit (4Byte) mode. We provide those here.
+Based on information we can obtain though platform specific data and/or
+chip capabilities we are able to determine whether or not we can handle
+a SoC reset or not. To find out why this is important please read the
+comment provided in the patch.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 43 ++++++++++++++++++++++++++++++++++++++++
- drivers/mtd/devices/st_spi_fsm.h | 10 ++++++++++
- 2 files changed, 53 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 38 ++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h |  2 ++
+ 2 files changed, 40 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 2b7df68..c906739 100644
+index 85abf9a..9a66c99 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -57,6 +57,49 @@ static struct seq_rw_config default_write_configs[] = {
- 	{0x00,			 0,			 0, 0, 0, 0x00, 0, 0},
- };
+@@ -128,6 +128,40 @@ static void stfsm_wait_seq(struct stfsm *fsm)
+ 	dev_err(fsm->dev, "timeout on sequence completion\n");
+ }
  
 +/*
-+ * [N25Qxxx] Configuration
-+ */
-+#define N25Q_VCR_DUMMY_CYCLES(x)	(((x) & 0xf) << 4)
-+#define N25Q_VCR_XIP_DISABLED		((uint8_t)0x1 << 3)
-+#define N25Q_VCR_WRAP_CONT		0x3
-+
-+/* N25Q 3-byte Address READ configurations
-+ *	- 'FAST' variants configured for 8 dummy cycles.
++ * SoC reset on 'boot-from-spi' systems
 + *
-+ * Note, the number of dummy cycles used for 'FAST' READ operations is
-+ * configurable and would normally be tuned according to the READ command and
-+ * operating frequency.  However, this applies universally to all 'FAST' READ
-+ * commands, including those used by the SPIBoot controller, and remains in
-+ * force until the device is power-cycled.  Since the SPIBoot controller is
-+ * hard-wired to use 8 dummy cycles, we must configure the device to also use 8
-+ * cycles.
++ * Certain modes of operation cause the Flash device to enter a particular state
++ * for a period of time (e.g. 'Erase Sector', 'Quad Enable', and 'Enter 32-bit
++ * Addr' commands).  On boot-from-spi systems, it is important to consider what
++ * happens if a warm reset occurs during this period.  The SPIBoot controller
++ * assumes that Flash device is in its default reset state, 24-bit address mode,
++ * and ready to accept commands.  This can be achieved using some form of
++ * on-board logic/controller to force a device POR in response to a SoC-level
++ * reset or by making use of the device reset signal if available (limited
++ * number of devices only).
++ *
++ * Failure to take such precautions can cause problems following a warm reset.
++ * For some operations (e.g. ERASE), there is little that can be done.  For
++ * other modes of operation (e.g. 32-bit addressing), options are often
++ * available that can help minimise the window in which a reset could cause a
++ * problem.
++ *
 + */
-+static struct seq_rw_config n25q_read3_configs[] = {
-+	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ_1_4_4,	0, 4, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ_1_1_4,	0, 1, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ_1_2_2,	0, 2, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ_1_1_2,	0, 1, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ_FAST,	0, 1, 1, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ,	        0, 1, 1, 0x00, 0, 0},
-+	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
-+};
++static bool stfsm_can_handle_soc_reset(struct stfsm *fsm)
++{
++	/* Reset signal is available on the board and supported by the device */
++	if (fsm->reset_signal && fsm->info->flags & FLASH_FLAG_RESET)
++		return true;
 +
-+/* N25Q 4-byte Address READ configurations
-+ *	- use special 4-byte address READ commands (reduces overheads, and
-+ *        reduces risk of hitting watchdog reset issues).
-+ *	- 'FAST' variants configured for 8 dummy cycles (see note above.)
-+ */
-+static struct seq_rw_config n25q_read4_configs[] = {
-+	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ4_1_4_4,	0, 4, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ4_1_1_4,	0, 1, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ4_1_2_2,	0, 2, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ4_1_1_2,	0, 1, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ4_FAST,	0, 1, 1, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ4,	0, 1, 1, 0x00, 0, 0},
-+	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
-+};
++	/* Board-level logic forces a power-on-reset */
++	if (fsm->reset_por)
++		return true;
 +
- static struct stfsm_seq stfsm_seq_read_jedec = {
- 	.data_size = TRANSFER_SIZE(8),
- 	.seq_opc[0] = (SEQ_OPC_PADS_1 |
++	/* Reset is not properly handled and may result in failure to reboot */
++	return false;
++}
++
+ /* Configure 'addr_cfg' according to addressing mode */
+ static void stfsm_prepare_erasesec_seq(struct stfsm *fsm,
+ 				       struct stfsm_seq *seq)
+@@ -442,6 +476,10 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+ 		goto boot_device_fail;
+ 	}
+ 
++	fsm->reset_signal = of_property_read_bool(np, "st,reset-signal");
++
++	fsm->reset_por = of_property_read_bool(np, "st,reset-por");
++
+ 	/* Where in the syscon the boot device information lives */
+ 	ret = of_property_read_u32(np, "boot-device-reg", &boot_device_reg);
+ 	if (ret)
 diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
-index 8eb9e20..163c09f 100644
+index 2e12bff..8eb9e20 100644
 --- a/drivers/mtd/devices/st_spi_fsm.h
 +++ b/drivers/mtd/devices/st_spi_fsm.h
-@@ -229,6 +229,15 @@
- #define FLASH_CMD_READ4_1_1_4	0x6c
- #define FLASH_CMD_READ4_1_4_4	0xec
+@@ -239,6 +239,8 @@ struct stfsm {
  
-+/*
-+ * Flags to tweak operation of default read/write/erase routines
-+ */
-+#define CFG_READ_TOGGLE_32BIT_ADDR	0x00000001
-+#define CFG_WRITE_TOGGLE_32BIT_ADDR	0x00000002
-+#define CFG_WRITE_EX_32BIT_ADDR_DELAY	0x00000004
-+#define CFG_ERASESEC_TOGGLE_32BIT_ADDR	0x00000008
-+#define CFG_S25FL_CHECK_ERROR_FLAGS	0x00000010
-+
- struct stfsm {
- 	struct device		*dev;
- 	void __iomem		*base;
-@@ -237,6 +246,7 @@ struct stfsm {
- 	struct mutex		lock;
- 	struct flash_info 	*info;
- 
-+	uint32_t		configuration;
  	uint32_t		fifo_dir_delay;
  	bool			booted_from_spi;
- 	bool			reset_signal;
++	bool			reset_signal;
++	bool			reset_por;
+ };
+ 
+ struct stfsm_seq {
 -- 
 1.8.1.2
