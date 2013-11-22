@@ -1,162 +1,65 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 22 Nov 2013 21:07:39 +0100
-Subject: [PATCH 4/4] ARM: NETGEAR ReadyNAS Duo v2 and RN102 .dts file
- whitespace cleanup
-In-Reply-To: <cover.1385148929.git.arno@natisbad.org>
-References: <cover.1385148929.git.arno@natisbad.org>
-Message-ID: <9211978b60a76b321db0a5a934d9cb9f959519d9.1385148929.git.arno@natisbad.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Nov 2013 21:31:08 +0100
+Subject: ACPI
+In-Reply-To: <528ED801.8040705@jonmasters.org>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <201311220129.54828.arnd@arndb.de> <528ED801.8040705@jonmasters.org>
+Message-ID: <201311222131.08787.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 22 November 2013, Jon Masters wrote:
 
-This patch provides some whitespace cleanup for NETGEAR
-ReadyNAS Duo v2 and 102 .dts files:
+> By 64-bit ARM server, I mean a system conformant with a series of
+> specifications that define what such a server system consists of. It
+> might be a physical system featuring an ARM-based SoC containing a core
+> conformant to the v8 Architecture, along with standardized peripherals,
+> or it might be a virtual platform. The boot architecture would include
+> UEFI (specifically a sequential progression from an initial EL3 reset
+> secure ROM on through to a verified Tiano build), and ACPI being used to
+> convey the platform devices, as well as for runtime event delivery.
 
- - Fixed bad whitespaces
- - Added spaces between nodes to improve readability
+Ok, that narrows it down a little, although not in the way I expected.
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-370-netgear-rn102.dts     |  1 +
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 48 ++++++++++++++--------
- 2 files changed, 32 insertions(+), 17 deletions(-)
+It seems there is a secret spec along the lines of the older PREP, CHRP,
+PAPR. Since the group behind this spec has not yet revealed itself, I will
+refer to them as SPECTRE (maybe that should be SPCTR?) for the sake of
+discussion.
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index 87cd003..1cbd338 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-@@ -64,6 +64,7 @@
- 					marvell,pins = "mpp57";
- 					marvell,function = "gpio";
- 				};
-+
- 				sata1_led_pin: sata1-led-pin {
- 					marvell,pins = "mpp15";
- 					marvell,function = "gpio";
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index 65d0587..0961e80 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -45,34 +45,42 @@
- 				marvell,pins = "mpp47";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_button_backup: pmx-button-backup {
- 				marvell,pins = "mpp45";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_button_reset: pmx-button-reset {
- 				marvell,pins = "mpp13";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_led_blue_power: pmx-led-blue-power {
- 				marvell,pins = "mpp31";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_led_blue_activity: pmx-led-blue-activity {
- 				marvell,pins = "mpp38";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_led_blue_disk1: pmx-led-blue-disk1 {
- 				marvell,pins = "mpp23";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_led_blue_disk2: pmx-led-blue-disk2 {
- 				marvell,pins = "mpp22";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_led_blue_backup: pmx-led-blue-backup {
- 				marvell,pins = "mpp29";
- 				marvell,function = "gpio";
- 			};
-+
- 			pmx_poweroff: pmx-poweroff {
- 				marvell,pins = "mpp30";
- 				marvell,function = "gpio";
-@@ -129,18 +137,22 @@
- 			gpios = <&gpio0 31 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "default-on";
- 		};
-+
- 		activity_led {
- 			label = "status:blue:activity_led";
- 			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
- 		};
-+
- 		disk1_led {
- 			label = "status:blue:disk1_led";
- 			gpios = <&gpio0 23 GPIO_ACTIVE_LOW>;
- 		};
-+
- 		disk2_led {
- 			label = "status:blue:disk2_led";
- 			gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
- 		};
-+
- 		backup_led {
- 			label = "status:blue:backup_led";
- 			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
-@@ -158,11 +170,13 @@
- 			linux,code = <KEY_POWER>;
- 			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
- 		};
-+
- 		reset-button {
- 			label = "Reset Button";
- 			linux,code = <KEY_RESTART>;
- 			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
- 		};
-+
- 		backup-button {
- 			label = "Backup Button";
- 			linux,code = <KEY_COPY>;
-@@ -177,23 +191,23 @@
- 		gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
- 	};
- 
--        regulators {
--                compatible = "simple-bus";
--                #address-cells = <1>;
--                #size-cells = <0>;
--
--                usb_power: regulator at 1 {
--                        compatible = "regulator-fixed";
--                        reg = <1>;
--                        regulator-name = "USB 3.0 Power";
--                        regulator-min-microvolt = <5000000>;
--                        regulator-max-microvolt = <5000000>;
--                        enable-active-high;
--                        regulator-always-on;
--                        regulator-boot-on;
--                        gpio = <&gpio1 14 0>;
--                };
--        };
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usb3_regulator: usb3-regulator {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB 3.0 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
- };
- 
- &nand {
--- 
-1.8.4.4
+>From your description, it sounds like SPECTRE is actually trying to make
+the job easier for the operating system to some degree by defining a
+standard hardware platform. If this actually works out and they hardware
+people don't screw up too much, supporting that platform should be
+a no-brainer, and I see no fundamental problem with adding ACPI support
+for that.
+
+What I also take away from this is that we should not any ACPI support
+for platforms that are not SPECTRE compliant, because that would
+add a long-term maintainance cost without the benefits, especially
+if it ends up implementing an incompatible ACPI dialect. I certainly
+don't want to have to maintain two or more versions of ACPI (e.g.
+one doing power management using AML and one using SoC specific 
+device drivers).
+
+Unfortunately it is impossible to know at this point what work is
+actually relevant for SPECTRE and what is not, so we can't really
+merge anything specific to ARM64+ACPI until we have access to an
+actual spec, or we get a video message by someone with a monocle
+and a lap cat to shed some more light on the actual requirements.
+There is also the danger that either the SPECTRE spec or the
+actual implementations are so screwed up that we still wouldn't
+merge anything, but you can probably judge better how likely that
+worst-case scenario is.
+
+Those people that have inside knowledge of SPECTRE can in the meantime
+work on the patches and get them reviewed (I think this is happening
+anyway), and we can certainly keep working with Intel to enable 
+whatever features they need for embedded x86 with ACPI.
+
+> I expect to see a series of useful announcements soon that will serve to
+> articulate what I am referring to by an ARM v8 server. I will followup
+> then with more thoughts about how this fits together.
+
+Sounds good.
+
+	Arnd
