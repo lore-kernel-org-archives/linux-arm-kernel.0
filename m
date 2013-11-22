@@ -1,21 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 Nov 2013 14:52:24 +0000
-Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
-In-Reply-To: <20131122142231.GA1741@ulmo.nvidia.com>
-References: <20131122142231.GA1741@ulmo.nvidia.com>
-Message-ID: <20131122145224.GO14725@sirena.org.uk>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 22 Nov 2013 15:57:18 +0100
+Subject: [PATCH 1/5] net: MOXA ART: clear TX descriptor length bits between
+ sends
+Message-ID: <1385132242-3204-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 03:22:32PM +0100, Thierry Reding wrote:
+Add TX_DESC1_BUF_SIZE_MASK to bits that are cleared, before the TX buffer
+length is set. Failing to do so can cause the controller to drop dead
+i.e. all TX interrupts stop, resulting in complete communication failure.
 
-> Cc'ing Mark Brown, perhaps he can help figure out what's causing this.
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-The obvious question is what kernel this is being tested on...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131122/12ee085f/attachment.sig>
+Notes:
+    Applies to next-20131122
+
+ drivers/net/ethernet/moxa/moxart_ether.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+index cbd0133..3c14afd 100644
+--- a/drivers/net/ethernet/moxa/moxart_ether.c
++++ b/drivers/net/ethernet/moxa/moxart_ether.c
+@@ -349,7 +349,8 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 
+ 	txdes1 = readl(desc + TX_REG_OFFSET_DESC1);
+ 	txdes1 |= TX_DESC1_LTS | TX_DESC1_FTS;
+-	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE);
++	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE |
++		    TX_DESC1_BUF_SIZE_MASK);
+ 	txdes1 |= (len & TX_DESC1_BUF_SIZE_MASK);
+ 	writel(txdes1, desc + TX_REG_OFFSET_DESC1);
+ 	writel(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
+-- 
+1.8.2.1
