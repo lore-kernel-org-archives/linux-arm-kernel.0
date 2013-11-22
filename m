@@ -1,40 +1,59 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 22 Nov 2013 15:57:22 +0100
-Subject: [PATCH 5/5] net: MOXA ART: use eth_mac_addr()
-In-Reply-To: <1385132242-3204-1-git-send-email-jonas.jensen@gmail.com>
-References: <1385132242-3204-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1385132242-3204-5-git-send-email-jonas.jensen@gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Fri, 22 Nov 2013 15:58:04 +0100
+Subject: [PATCHv2] ARM: mvebu: Add DT entry for ReadyNAS Duo v2 to use
+ gpio-poweroff driver
+Message-ID: <87eh68fpqb.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace boilerplate in moxart_set_mac_address() with eth_mac_addr().
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+Without that fix, at the end of the shutdown process, the board is
+still powered (led glowing, fan running, ...).
+
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
 
-Notes:
-    Applies to next-20131122
+Changes since v1:
+ - use macro instead of value for GPIO voltage level
 
- drivers/net/ethernet/moxa/moxart_ether.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index c02075a..9a11d34 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -56,12 +56,7 @@ static void moxart_update_mac_address(struct net_device *ndev)
+diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+index e6a102c..551bfed 100644
+--- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
++++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+@@ -1,5 +1,6 @@
+ /dts-v1/;
  
- static int moxart_set_mac_address(struct net_device *ndev, void *addr)
- {
--	struct sockaddr *address = addr;
--
--	if (!is_valid_ether_addr(address->sa_data))
--		return -EADDRNOTAVAIL;
--
--	memcpy(ndev->dev_addr, address->sa_data, ndev->addr_len);
-+	eth_mac_addr(ndev, addr);
- 	moxart_update_mac_address(ndev);
++#include <dt-bindings/gpio/gpio.h>
+ #include "kirkwood.dtsi"
+ #include "kirkwood-6282.dtsi"
  
- 	return 0;
+@@ -60,6 +61,10 @@
+ 				marvell,pins = "mpp29";
+ 				marvell,function = "gpio";
+ 			};
++			pmx_poweroff: pmx-poweroff {
++				marvell,pins = "mpp30";
++				marvell,function = "gpio";
++			};
+ 		};
+ 
+ 		clocks {
+@@ -158,6 +163,13 @@
+ 		};
+ 	};
+ 
++	gpio-poweroff {
++		compatible = "gpio-poweroff";
++		pinctrl-0 = <&pmx_poweroff>;
++		pinctrl-names = "default";
++		gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
++	};
++
+         regulators {
+                 compatible = "simple-bus";
+                 #address-cells = <1>;
 -- 
-1.8.2.1
+1.8.4.4
