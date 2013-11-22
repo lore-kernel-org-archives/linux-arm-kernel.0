@@ -1,50 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Nov 2013 20:02:42 +0000
-Subject: [PATCH 7/9] ARM: sa1100: move gpio irq handling to GPIO driver
-In-Reply-To: <CALT56yM1rf7onJNu6L9tG52RrmDXcuWSoa=JfpakZRO+e7vnEQ@mail.gmail.com>
-References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
- <1384505280-25389-8-git-send-email-dbaryshkov@gmail.com>
- <20131122174528.GB16735@n2100.arm.linux.org.uk>
- <CALT56yM1rf7onJNu6L9tG52RrmDXcuWSoa=JfpakZRO+e7vnEQ@mail.gmail.com>
-Message-ID: <20131122200242.GE16735@n2100.arm.linux.org.uk>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Fri, 22 Nov 2013 21:04:21 +0100
+Subject: [PATCH 0/4] ARM: mvebu/kirkwood: NETGEAR ReadyNAS .dts files cleanup
+Message-ID: <cover.1385148929.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 11:46:10PM +0400, Dmitry Eremin-Solenikov wrote:
-> Hello,
-> 
-> On Fri, Nov 22, 2013 at 9:45 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Therefore, if we want to have certain GPIOs triggering wakeups (iow,
-> > those GPIOs which have had enable_irq_wake() called on them) but not
-> > those which haven't, we need to reprogram GRER and GFER with the
-> > GPIOs which can wake the system up.
-> 
-> I thought so. I was puzzled, because that would mean, that we want to wake
-> up from a GPIO, which is masked in GPIO_IRQ_mask, but enabled in PWER.
-> Is that the real scenario/usecase? If we/kernel has disabled IRQ
-> through _mask_irq,
-> I thought, we didn't expect events from that pin (including wakeup), did we?
+Hi,
 
-So, if a device driver decides that it wants to be woken up by a GPIO
-and therefore calls enable_irq_wake() on it, but also calls disable_irq()
-on that same interrupt to avoid _receiving_ the interrupt until it's
-ready, does that mean that the system should _not_ be woken up?
+This series provides some cleanup for all NETGEAR ReadyNAS .dts files
+(Duo v2, 102 and 104). This is mostly based on suggestions from
+Sebastian during RN2120 .dts submission. Jason, two remarks:
 
-I doubt many systems work this way - later PXA devices certainly don't,
-where the wakeup is triggered from the silicon on the pad interface
-rather than the interrupt controller - where the state of the IRQ masks
-have no bearing what so ever on it.
+ - Patch 1/4 applies on top of gpio-poweroff patch for Duo v2 pushed
+   earlier today (more precisely v2 of that patch)
+ - Patch 3/4 applies on NXP PCA 9554 patch for RN104
 
-Please, stop thinking about changing the behaviour of any of the SA11x0
-stuff.  Treat the code as-is as authoritive on the way things should be
-done, and _carefully_ "adjust it" to how you'd like to see it - so we
-can have a higher confidence that stuff isn't being broken or behaviour
-isn't changed.
+As requested, last patch (4/4) contains whitespace cleanups for those
+.dts (in fact, mainly Duo v2 and a single hunk for RN102). 
 
-Such behaviour changes would include looping differently while handling
-interrupts.
+Comments welcome,
 
-And more importantly, treat SA11x0 as a reference implementation for
-IRQ stuff; that's the platform I developed the IRQ handling stuff on
-which became the basis for tglx's IRQ layer in the kernel.
+Cheers,
+
+a+
+
+Arnaud Ebalard (4):
+  ARM: kirkwood: NETGEAR ReadyNAS Duo v2 .dts file cleanup
+  ARM: mvebu: NETGEAR ReadyNAS 102 .dts file cleanup
+  ARM: mvebu: NETGEAR ReadyNAS 104 .dts file cleanup
+  ARM: NETGEAR ReadyNAS Duo v2 and RN102 .dts file whitespace cleanup
+
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 81 +++++++++++-------
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 66 +++++++--------
+ .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 98 +++++++++++++---------
+ 3 files changed, 141 insertions(+), 104 deletions(-)
+
+-- 
+1.8.4.4
