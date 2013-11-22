@@ -1,90 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Nov 2013 11:10:01 -0700
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>	<CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>	<1384766276.14845.155.camel@smile>	<528A5170.3090809@wwwdotorg.org>	<1384862421.14845.222.camel@smile>	<528B9CAE.3040600@wwwdotorg.org>	<CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>	<528BFDD0.3090503@wwwdotorg.org>	<CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>	<528CFE68.6060908@wwwdotorg.org>	<CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>	<528D0C06.9080006@wwwdotorg.org>	<1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>	<528D28A1.2050307@wwwdotorg.org>	<CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>	<528E4F55.9070204@wwwdotorg.org>	<CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>	<528F95A9.2050305@wwwdotorg.org>
- <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
-Message-ID: <528F9DF9.6080706@wwwdotorg.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 22 Nov 2013 19:31:23 +0100
+Subject: [PATCH v2] ARM: at91: sama5d3: reduce TWI internal clock frequency
+In-Reply-To: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20131122183123.GM14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 11:04 AM, Dan Williams wrote:
-> On Fri, Nov 22, 2013 at 9:34 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 11/21/2013 11:54 PM, Dan Williams wrote:
->>> On Thu, Nov 21, 2013 at 10:22 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> On 11/20/2013 08:22 PM, Dan Williams wrote:
->>>>> On Wed, Nov 20, 2013 at 1:24 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>>> On 11/20/2013 01:23 PM, Williams, Dan J wrote:
->>>>>> ...
->>>>>>> Why do the drivers that call dma_request_channel need to convert it to
->>>>>>> an ERR value?  i.e. what's problematic about the below (not compile
->>>>>>> tested)?
->>>>>> ...
->>>>>>> diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
->>>>>> ...
->>>>>>> @@ -22,16 +22,20 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
->>>>>>>                               struct samsung_dma_req *param,
->>>>>>>                               struct device *dev, char *ch_name)
->>>>>> ...
->>>>>>> +     if (dev->of_node) {
->>>>>>> +             chan = dma_request_slave_channel(dev, ch_name);
->>>>>>> +             return IS_ERR(chan) ? (unsigned) NULL : (unsigned) chan;
->>>>>>> +     } else {
->>>>>>>               return (unsigned)dma_request_channel(mask, pl330_filter,
->>>>>>>                                                       (void *)dma_ch);
->>>>>>> +     }
->>>>>>
->>>>>> The argument is that if a function returns errors encoded as an ERR
->>>>>> pointer, then callers must assume that any non-IS_ERR value that the
->>>>>> function returns is valid. NULL is one of those values. As such, callers
->>>>>> can no longer check the value against NULL, but must use IS_ERR().
->>>>>> Converting any IS_ERR() returns to NULL theoretically is the act of
->>>>>> converting one valid return value to some other completely random return
->>>>>> value.
->>>>>
->>>>> You describe how IS_ERR() works, but you didn't address the patch.
->>>>> There's nothing random about the changes to samsung_dmadev_request().
->>>>> It still returns NULL or a valid channel just as before.
->>>>
->>>> I was addressing the patch. I guess I should have explained as follows.
->>>>
->>>> First, the following code is technically buggy:
->>>
->>> No, it's not, but I think we have different implementations in mind.
->>>
->>>>
->>>> +             chan = dma_request_slave_channel(dev, ch_name);
->>>> +             return IS_ERR(chan) ? (unsigned) NULL : (unsigned) chan;
->>>>
->>>> ... since it assumes that dma_request_slave_channel() never returns NULL
->>>> as a valid non-error value. This is specifically prohibited by the fact
->>>> that dma_request_slave_channel() returns either an ERR value or a valid
->>>> value; in that case, NULL is not an ERR value, and hence must be
->>>> considered valid.
->>>
->>> Let's stop there and be clear we are talking about the same proposal.
->>>
->>> The proposal is dma_request_slave_channel only returns errors or valid
->>> pointers, never NULL.
->>
->> OK, so if you make that assumption, I guess it's safe.
+On 17:08 Fri 22 Nov     , ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> I made that assumption because that is what your original patch proposed:
-> 
-> +/**
-> + * dma_request_slave_channel_or_err - try to allocate an exclusive
-> slave channel
-> + * @dev:       pointer to client device structure
-> + * @name:      slave channel name
-> + *
-> + * Returns pointer to appropriate dma channel on success or an error pointer.
-> + */
-> 
-> What's the benefit of leaking NULL values to callers?  If they already
-> need to check for err, why force them to check for NULL too?
+> With some devices, transfer hangs during I2C frame transmission. This issue
+> disappears when reducing the internal frequency of the TWI IP. Even if it is
+> indicated that internal clock max frequency is 66MHz, it seems we have
+> oversampling on I2C signals making TWI believe that a transfer in progress
+> is done.
 
-"Returns pointer to appropriate dma channel on success or an error
-pointer." means that callers only have to check for an ERR value. If the
-function returns NULL, then other DMA-related functions must treat that
-as a valid channel ID. This is case (a) in my previous email.
+so now the IP run a 16MHz
+
+you could also mention that now we save power too
+
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+Best Regards,
+J.
+> 
+> This fix has no impact on the I2C bus frequency.
+> 
+> Cc: <stable@vger.kernel.org> #3.10+
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+> 
+> v2: update commit message
+> 
+>  arch/arm/mach-at91/sama5d3.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
+> index 4012797..4ee0de5 100644
+> --- a/arch/arm/mach-at91/sama5d3.c
+> +++ b/arch/arm/mach-at91/sama5d3.c
+> @@ -95,19 +95,19 @@ static struct clk twi0_clk = {
+>  	.name		= "twi0_clk",
+>  	.pid		= SAMA5D3_ID_TWI0,
+>  	.type		= CLK_TYPE_PERIPHERAL,
+> -	.div		= AT91_PMC_PCR_DIV2,
+> +	.div		= AT91_PMC_PCR_DIV8,
+>  };
+>  static struct clk twi1_clk = {
+>  	.name		= "twi1_clk",
+>  	.pid		= SAMA5D3_ID_TWI1,
+>  	.type		= CLK_TYPE_PERIPHERAL,
+> -	.div		= AT91_PMC_PCR_DIV2,
+> +	.div		= AT91_PMC_PCR_DIV8,
+>  };
+>  static struct clk twi2_clk = {
+>  	.name		= "twi2_clk",
+>  	.pid		= SAMA5D3_ID_TWI2,
+>  	.type		= CLK_TYPE_PERIPHERAL,
+> -	.div		= AT91_PMC_PCR_DIV2,
+> +	.div		= AT91_PMC_PCR_DIV8,
+>  };
+>  static struct clk mmc0_clk = {
+>  	.name		= "mci0_clk",
+> -- 
+> 1.7.9.5
+> 
