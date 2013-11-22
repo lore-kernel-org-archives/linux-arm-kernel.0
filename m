@@ -1,30 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Nov 2013 09:14:21 -0800
-Subject: [PATCH 3/3] ARM: OMAP2+: Fix eMMC on n900 with device tree
-In-Reply-To: <20131122163532.GA32331@earth.universe>
-References: <1385059866-10646-1-git-send-email-tony@atomide.com>
- <1385059866-10646-4-git-send-email-tony@atomide.com>
- <20131121231751.GA9772@earth.universe>
- <20131121235729.GD10023@atomide.com>
- <20131122163532.GA32331@earth.universe>
-Message-ID: <20131122171421.GI10023@atomide.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 22 Nov 2013 21:33:32 +0400
+Subject: [PATCH 0/9] ARM: sa1100: Rework IRQ handling
+In-Reply-To: <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
+References: <1384505280-25389-1-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdZU3_EqhBjV68+okJwh7QONuxWVjKkrUO4PkwJhKrP+mQ@mail.gmail.com>
+ <528B811A.1030501@gmail.com>
+ <CACRpkdbgn22xDX4nJZSDSE9-h+u1j5DQt=8arO7oS-UCBdBMUQ@mail.gmail.com>
+Message-ID: <528F956C.5040107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [131122 08:38]:
-> On Thu, Nov 21, 2013 at 03:57:29PM -0800, Tony Lindgren wrote:
-> > Well let's use just vaux3 then with a comment to the .dts file if that
-> > works also on your 0x2204. It works on my 0x0010 too.
-> > 
-> > I folded in your changes to the updated patch below. Care to reply with
-> > your Signed-off-by too assuming it works also on your 0x2204 n900?
-> 
-> It does work with the 0x2204 phone.
-> 
-> Signed-off-by: Sebastian Reichel <sre@debian.org>
+On 11/20/2013 12:24 AM, Linus Walleij wrote:
+> On Tue, Nov 19, 2013 at 4:17 PM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
+>> On 11/19/2013 05:00 PM, Linus Walleij wrote:
+>
+>>> And that happens before the GPIO driver gets registered -> crash.
+>>
+>> That is not the issue. The real issue is h3xxx using those gpio's without
+>> previously calling gpio_request.
+>
+> Really? But that wasn't done before this patch either.
+>
+> It is basically OK to use the gpio_* functions before or
+> without requesting the GPIOs, it won't look nice but it
+> works.
+>
+>> Unfortunately sa1100 driver doesn't have a
+>> good place to request gpios. When faced this problem during locomo
+>> refactoring, I ended up with the following piece of code:
+> (...)
+>> Russell, Linus, what do you think about the previous solution?
+>
+> That looks OK but is that really the problem?
 
-OK good to hear. I'll update the patch with that.
+I have reworked h3xxx GPIO handling to (hopefully) not to cause the 
+problem. I have sent the patches yesterday.
 
-Thanks,
+Linus, Could you please check if both series work (and make sense to you)?
 
-Tony
+-- 
+With best wishes
+Dmitry
