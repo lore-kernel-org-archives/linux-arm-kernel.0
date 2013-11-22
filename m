@@ -1,73 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Nov 2013 16:22:53 +0000
-Subject: [PATCH 16/23] mtd: st_spi_fsm: Provide the erase one sector sequence
+Date: Fri, 22 Nov 2013 16:22:55 +0000
+Subject: [PATCH 18/23] mtd: st_spi_fsm: Prepare read/write sequences according
+ to configuration
 In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
 References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385137380-28968-17-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385137380-28968-19-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FSM Serial Flash Controller is driven by issuing a standard set of
-register writes we call a message sequence. This patch supplies a method
-to prepare the message sequence responsible for erasing a single sector.
+Firstly we search for our preference read/write configuration based on a
+given chip's capabilities. Then we actually set up the message sequence
+accordingly.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index dec2f83..583a0ab 100644
+index a56fb98..85abf9a 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -44,6 +44,28 @@ static struct stfsm_seq stfsm_seq_read_jedec = {
- 		    SEQ_CFG_STARTSEQ),
- };
- 
-+static struct stfsm_seq stfsm_seq_erase_sector = {
-+	/* 'addr_cfg' configured during initialisation */
-+	.seq_opc = {
-+		(SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		 SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
-+
-+		(SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		 SEQ_OPC_OPCODE(FLASH_CMD_SE)),
-+	},
-+	.seq = {
-+		STFSM_INST_CMD1,
-+		STFSM_INST_CMD2,
-+		STFSM_INST_ADD1,
-+		STFSM_INST_ADD2,
-+		STFSM_INST_STOP,
-+	},
-+	.seq_cfg = (SEQ_CFG_PADS_1 |
-+		    SEQ_CFG_READNOTWRITE |
-+		    SEQ_CFG_CSDEASSERT |
-+		    SEQ_CFG_STARTSEQ),
-+};
-+
- static inline int stfsm_is_idle(struct stfsm *fsm)
- {
- 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
-@@ -84,6 +106,19 @@ static void stfsm_wait_seq(struct stfsm *fsm)
- 	dev_err(fsm->dev, "timeout on sequence completion\n");
+@@ -225,6 +225,23 @@ static void stfsm_prepare_rw_seq(struct stfsm *fsm,
+ 	seq->seq[i++] = STFSM_INST_STOP;
  }
  
-+/* Configure 'addr_cfg' according to addressing mode */
-+static void stfsm_prepare_erasesec_seq(struct stfsm *fsm,
-+				       struct stfsm_seq *seq)
++static int stfsm_search_prepare_rw_seq(struct stfsm *fsm,
++				       struct stfsm_seq *seq,
++				       struct seq_rw_config *cfgs)
 +{
-+	int addr1_cycles = fsm->info->flags & FLASH_FLAG_32BITADDR ? 16 : 8;
++	struct seq_rw_config *config;
 +
-+	seq->addr_cfg = (ADR_CFG_CYCLES_ADD1(addr1_cycles) |
-+			 ADR_CFG_PADS_1_ADD1 |
-+			 ADR_CFG_CYCLES_ADD2(16) |
-+			 ADR_CFG_PADS_1_ADD2 |
-+			 ADR_CFG_CSDEASSERT_ADD2);
++	config = stfsm_search_seq_rw_configs(fsm, cfgs);
++	if (!config) {
++		dev_err(fsm->dev, "failed to find suitable config\n");
++		return -EINVAL;
++	}
++
++	stfsm_prepare_rw_seq(fsm, seq, config);
++
++	return 0;
 +}
 +
- /* Search for preferred configuration based on available flags */
- static struct seq_rw_config *
- stfsm_search_seq_rw_configs(struct stfsm *fsm,
+ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+ 			    const uint32_t size)
+ {
 -- 
 1.8.1.2
