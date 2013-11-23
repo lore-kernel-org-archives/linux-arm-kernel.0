@@ -1,156 +1,864 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 22 Nov 2013 19:22:41 -0600
-Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
- clocksource/clockevent system timers
-In-Reply-To: <529000EA.7090001@ti.com>
-References: <529000EA.7090001@ti.com>
-Message-ID: <52900361.9000805@ti.com>
+From: marc.ceeeee@gmail.com (Marc C)
+Date: Fri, 22 Nov 2013 17:23:39 -0800
+Subject: [PATCH RESEND 1/5] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+Message-ID: <5290039B.2050104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, resending due to an MUA issue.
+The BCM7xxx series of Broadcom SoCs are used primarily in set-top boxes.
 
-Adding Thomas to the thread since discussion is about clocksource, and Mark
-Rutland as discussion is related to timers and DT, thanks.
+This patch adds machine support for the ARM-based Broadcom SoCs.
 
-On 11/22/2013 02:01 PM, Rob Herring wrote:
-> On Fri, Nov 22, 2013 at 10:42 AM, Joel Fernandes <joelf@ti.com> wrote:
->> On 11/22/2013 09:58 AM, Rob Herring wrote:
->>> On Thu, Nov 21, 2013 at 7:56 PM, Joel Fernandes <joelf@ti.com> wrote:
->>>> This work is a migration effort of OMAP system timers to the
->>>> clocksource/clockevent framework. Consider this as a first-pass in this effort.
->>>> There are few cleanups that need to be done first. The HWMOD code is
->>>> intertwined with the timer code. HWMOD code cleanups in the future will
->>>> hopefully make most of this code go away, so till then we separate out the
->>>> power/clocks portion of the code from the actual timer bits.  This will
->>>> facilitate near-future work of adapting the system timer as a clocksource.
->>>>
->>>> New functions for OF-only boot are introduced, and we can soon delete the old
->>>> versions once we migrate all platforms. Currently only AM335x is migrated and
->>>> testedA new omap_generic_timer_init function is introduced for DT platforms.
->>>> Code required earlier for non-DT platforms such as setup of timer IDs and timer
->>>> parent clock is not required.  parent clocks are automatically setup by the mux
->>>> clock driver through DT so they no longer need to be hardcoded.
->>>>
->>>> The init code will try to pick the best timer for clocksource and clockevent
->>>> however bindings are added to force a particular timer as clocksource or
->>>> clockevent through DT.
->>>>
->>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
->>>> ---
->>>>  .../devicetree/bindings/arm/omap/timer.txt         |  12 ++
->>>>  arch/arm/mach-omap2/common.h                       |   1 +
->>>>  arch/arm/mach-omap2/timer.c                        | 235 +++++++++++++++++++++
->>>>  3 files changed, 248 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
->>>> index d02e27c..6cf7a75 100644
->>>> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
->>>> @@ -32,6 +32,18 @@ Optional properties:
->>>>  - ti,timer-secure:     Indicates the timer is reserved on a secure OMAP device
->>>>                         and therefore cannot be used by the kernel.
->>>>
->>>> +- ti,timer-clockevent,
->>>> +  ti,timer-clocksource These properties force the system timer code to choose
->>>> +                       the particular timer as a clockevent or clocksource.
->>>> +                       If these properties are not specified, the timer code
->>>> +                       picks up a "ti,timer-alwon" as the clocksource and a
->>>> +                       timer containing one of the following properties as
->>>> +                       the clockevent in the following order:
->>>> +                               ti,timer-alwon
->>>> +                               ti,timer-dsp
->>>> +                               ti,timer-pwm
->>>> +                               ti,timer-secure
->>>
->>> These properties were added specifically for the reason of avoiding
->>> linux specific properties like these. When is this not sufficient?
->>
->> Some platforms cannot use certain timers as clockevents and clocksource, to keep
->> this code functionally equivalent and working, I added these properties so that
->> its possible to select specific timers as clockevents/sources as was being done
->> in the non-DT case. I'm open to suggestions for doing this in a better way for DT.
-> 
-> There has to be a defined reason why a given timer cannot be used. You
-> are not explaining what that reason is. Define a property or set of
-> properties that describe the h/w feature or quirk.
+Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/Kconfig                   |    2 +
+ arch/arm/Kconfig.debug             |   16 +++-
+ arch/arm/Makefile                  |    1 +
+ arch/arm/configs/brcmstb_defconfig |  126 ++++++++++++++++++++++
+ arch/arm/mach-brcmstb/Kconfig      |   24 ++++
+ arch/arm/mach-brcmstb/Makefile     |   13 +++
+ arch/arm/mach-brcmstb/common.c     |  153 ++++++++++++++++++++++++++
+ arch/arm/mach-brcmstb/common.h     |   74 +++++++++++++
+ arch/arm/mach-brcmstb/headsmp.S    |   33 ++++++
+ arch/arm/mach-brcmstb/hotplug.c    |  208 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-brcmstb/platsmp.c    |   79 ++++++++++++++
+ 11 files changed, 728 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/configs/brcmstb_defconfig
+ create mode 100644 arch/arm/mach-brcmstb/Kconfig
+ create mode 100644 arch/arm/mach-brcmstb/Makefile
+ create mode 100644 arch/arm/mach-brcmstb/common.c
+ create mode 100644 arch/arm/mach-brcmstb/common.h
+ create mode 100644 arch/arm/mach-brcmstb/headsmp.S
+ create mode 100644 arch/arm/mach-brcmstb/hotplug.c
+ create mode 100644 arch/arm/mach-brcmstb/platsmp.c
 
-Reason? There are HW bugs that prevent a timer from being used. See [1]. And
-there may be other reasons, I haven't written this code but I know that there
-are other HW bugs that made authors pick a specific timer such as board issues
-or accuracy.
-
-This is nothing new, just that I'm trying to find a way to do it from DT.
-
-You can see the ifdef'ry below in mach-omap2/timer.c. All I'm trying to do is
-make it simpler and cleaner by adding these properties to DT so that we can
-delete this code entirely.
-
-
-#ifdef CONFIG_ARCH_OMAP2
-OMAP_SYS_32K_TIMER_INIT(2, 1, "timer_32k_ck", "ti,timer-alwon",
-                        2, "timer_sys_ck", NULL);
-#endif /* CONFIG_ARCH_OMAP2 */
-
-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
-OMAP_SYS_32K_TIMER_INIT(3, 1, "timer_32k_ck", "ti,timer-alwon",
-                        2, "timer_sys_ck", NULL);
-OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
-                        2, "timer_sys_ck", NULL);
-#endif /* CONFIG_ARCH_OMAP3 */
-
-etc...
-
->>>
->>> And I agree with the comment to use OF_CLKSRC.
->>>
->>
->> There are difficulties I mentioned in a previous post [1] stating why it may not
->> be possible to use OF_CLKSRC macros, and still keep the code functionally
->> equivalent to when it was non-DT.
-> 
-> Sorry, I don't buy it.
-> 
-
-Ofcourse even I want to use OF_CLOCKSOURCE macros for registering DT
-clocksources, but re-iterating, the selection of timer is not a simple match of
-compatible property as you may see in my patch. Some platforms need specific
-timer as clocksource, all timers have same "compatible" flag. How would you
-differentiate? Refer to ifdef's above to see how timer IDs change across
-platforms in the non-DT code that's being converted.
-
-I think clocksource_of_init has been written such that any timer having a
-matching compatible can be enumerated.
-
-I can change the compatible to something unique in the DT like:
-
-timer1:timer at ... {
-  compatible = "ti,dmtimer-clocksource"
-  ....
-}
-
- and that may make clocksource work. But then such a similar approach to
-clockevent is not possible. What I observed in other platforms is a *single* DT
-node represents both clocksource and clockevent.
-
-For example, in zevio-timer:
-drivers/clocksource/zevio-timer.c
-
-does this:
-CLOCKSOURCE_OF_DECLARE(zevio_timer, "lsi,zevio-timer", zevio_timer_add);
-
-In the body of zevio_timer_add(struct device_node *node), they do this:
-        timer->base = of_iomap(node, 0);
-        timer->timer1 = timer->base + IO_TIMER1; // USED AS CLOCKSOURCE
-        timer->timer2 = timer->base + IO_TIMER2; // USED AS CLOCKEVENT
-
-What's happening here is a single device node (DT node) represents both
-clockevent and source. But for OMAP, we use different timers for clockevent and
-clocksource. They are physically 2 different timer DT nodes. How do we register
-something like this with the CLOCKSOURCE_OF_DECLARE macro?
-
-Looking forward to your suggestions.
-
-thanks,
-
--Joel
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ad6fb6..62338a5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -930,6 +930,8 @@ source "arch/arm/mach-at91/Kconfig"
+  source "arch/arm/mach-bcm/Kconfig"
+ +source "arch/arm/mach-brcmstb/Kconfig"
++
+ source "arch/arm/mach-bcm2835/Kconfig"
+  source "arch/arm/mach-clps711x/Kconfig"
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 9762c84..e381b7a 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -94,6 +94,17 @@ choice
+ 		depends on ARCH_BCM2835
+ 		select DEBUG_UART_PL01X
+ +	config DEBUG_BRCMSTB_UART
++		bool "Use BRCMSTB UART for low-level debug"
++		depends on ARCH_BRCMSTB
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the first serial port on these devices.
++
++		  If you have a Broadcom STB chip and would like early print
++		  messages to appear over the UART, select this option.
++
+ 	config DEBUG_CLPS711X_UART1
+ 		bool "Kernel low-level debugging messages via UART1"
+ 		depends on ARCH_CLPS711X
+@@ -951,6 +962,7 @@ config DEBUG_UART_PHYS
+ 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
+ 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+ 	default 0x20201000 if DEBUG_BCM2835
++	default 0xf0406b00 if DEBUG_BRCMSTB_UART
+ 	default 0x40090000 if ARCH_LPC32XX
+ 	default 0x40100000 if DEBUG_PXA_UART1
+ 	default 0x42000000 if ARCH_GEMINI
+@@ -990,6 +1002,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf0009000 if DEBUG_CNS3XXX
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+ 	default 0xf0201000 if DEBUG_BCM2835
++	default 0xfc406b00 if DEBUG_BRCMSTB_UART
+ 	default 0xf11f1000 if ARCH_VERSATILE
+ 	default 0xf1600000 if ARCH_INTEGRATOR
+ 	default 0xf1c28000 if DEBUG_SUNXI_UART0
+@@ -1052,7 +1065,8 @@ config DEBUG_UART_8250_WORD
+ 	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
+ 		ARCH_KEYSTONE || \
+ 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+-		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_DAVINCI_TNETV107X_UART1
++		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_DAVINCI_TNETV107X_UART1 || \
++		DEBUG_BRCMSTB_UART
+  config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index db50b62..4691de2 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -147,6 +147,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+ machine-$(CONFIG_ARCH_AT91)		+= at91
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+ machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
++machine-$(CONFIG_ARCH_BRCMSTB)		+= brcmstb
+ machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
+ machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
+ machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
+diff --git a/arch/arm/configs/brcmstb_defconfig b/arch/arm/configs/brcmstb_defconfig
+new file mode 100644
+index 0000000..0390e6d
+--- /dev/null
++++ b/arch/arm/configs/brcmstb_defconfig
+@@ -0,0 +1,126 @@
++CONFIG_CROSS_COMPILE="arm-linux-"
++CONFIG_KERNEL_LZO=y
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_SYSFS_DEPRECATED=y
++CONFIG_RELAY=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_EMBEDDED=y
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_FORCE_LOAD=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
++# CONFIG_IOSCHED_DEADLINE is not set
++CONFIG_ARCH_BRCMSTB=y
++# CONFIG_SWP_EMULATE is not set
++CONFIG_PCI=y
++CONFIG_SMP=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_CMA=y
++CONFIG_CMA_DEBUG=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_RUNTIME=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_IP_PNP_RARP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++CONFIG_BRIDGE=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_JEDECPROBE=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_ROM=y
++CONFIG_MTD_ABSENT=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_M25P80=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_UBI=y
++CONFIG_MTD_UBI_GLUEBI=y
++CONFIG_PROC_DEVICETREE=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_ATA=y
++CONFIG_NETDEVICES=y
++CONFIG_USB_PEGASUS=y
++CONFIG_USB_USBNET=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_UINPUT=y
++# CONFIG_SERIO is not set
++# CONFIG_CONSOLE_TRANSLATIONS is not set
++# CONFIG_VT_CONSOLE is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_HW_RANDOM=y
++CONFIG_SPI=y
++# CONFIG_HWMON is not set
++CONFIG_USB=y
++CONFIG_USB_MON=y
++CONFIG_USB_STORAGE=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_EXT4_FS=y
++CONFIG_JBD2_DEBUG=y
++# CONFIG_DNOTIFY is not set
++CONFIG_FUSE_FS=y
++CONFIG_ISO9660_FS=y
++CONFIG_JOLIET=y
++CONFIG_UDF_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_UBIFS_FS=y
++CONFIG_SQUASHFS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
+diff --git a/arch/arm/mach-brcmstb/Kconfig b/arch/arm/mach-brcmstb/Kconfig
+new file mode 100644
+index 0000000..3ed63ef
+--- /dev/null
++++ b/arch/arm/mach-brcmstb/Kconfig
+@@ -0,0 +1,24 @@
++config ARCH_BRCMSTB
++	bool "Broadcom BCM7XXX based boards" if ARCH_MULTI_V7
++	depends on MMU
++	select ARM_ARCH_TIMER
++	select ARM_GIC
++	select BRCMSTB
++	select MIGHT_HAVE_PCI
++	select HAVE_SMP
++	select USE_OF
++	select CPU_V7
++	select GENERIC_CLOCKEVENTS
++	help
++	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
++	  chipset.
++
++	  This enables support for Broadcom ARM-based set-top box chipsets,
++	  including the 7445 family of chips.
++
++####################################################################
++# Hidden options
++#####################################################################
++
++config BCM7445
++	bool
+diff --git a/arch/arm/mach-brcmstb/Makefile b/arch/arm/mach-brcmstb/Makefile
+new file mode 100644
+index 0000000..9297c22
+--- /dev/null
++++ b/arch/arm/mach-brcmstb/Makefile
+@@ -0,0 +1,13 @@
++#
++# Copyright (C) 2013 Broadcom Corporation
++#
++# This program is free software; you can redistribute it and/or
++# modify it under the terms of the GNU General Public License as
++# published by the Free Software Foundation version 2.
++#
++# This program is distributed "as is" WITHOUT ANY WARRANTY of any
++# kind, whether express or implied; without even the implied warranty
++# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++obj-$(CONFIG_ARCH_BRCMSTB) := common.o headsmp.o platsmp.o hotplug.o
+diff --git a/arch/arm/mach-brcmstb/common.c b/arch/arm/mach-brcmstb/common.c
+new file mode 100644
+index 0000000..587eb01
+--- /dev/null
++++ b/arch/arm/mach-brcmstb/common.c
+@@ -0,0 +1,153 @@
++/*
++ * Copyright (C) 2013 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++ */
++
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/init.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/console.h>
++#include <linux/clocksource.h>
++#include <linux/clk-provider.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/time.h>
++
++#include "common.h"
++
++struct platform_regs brcm_plat_regs;
++
++/***********************************************************************
++ * STB CPU (main application processor)
++ ***********************************************************************/
++
++static struct map_desc brcmstb_io_map[] __initdata = {
++	{
++	.virtual = (unsigned long)BRCMSTB_PERIPH_VIRT,
++	.pfn     = __phys_to_pfn(BRCMSTB_PERIPH_PHYS),
++	.length  = BRCMSTB_PERIPH_LENGTH,
++	.type    = MT_DEVICE,
++	},
++};
++
++static const char *brcmstb_match[] __initdata = {
++	"brcm,brcmstb",
++	NULL
++};
++
++static struct node_reg sun_top_ctrl_regs[] __initdata = {
++	{"reset-source-enable-reg", &brcm_plat_regs.reset_source_enable_reg},
++	{"sw-master-reset-reg", &brcm_plat_regs.sw_master_reset_reg},
++	{NULL, NULL}
++};
++
++static struct node_reg cpu_biu_ctrl_regs[] __initdata = {
++	{"cpu-reset-config-reg", &brcm_plat_regs.cpu_reset_config_reg},
++	{"cpu0-pwr-zone-ctrl-reg", &brcm_plat_regs.cpu0_pwr_zone_ctrl_reg},
++	{NULL, NULL}
++};
++
++static struct node_reg hif_continuation_regs[] __initdata = {
++	{"stb-boot-hi-addr0-reg", &brcm_plat_regs.hif_continuation_regs_base},
++	{NULL, NULL}
++};
++
++static struct node_reg_block top_reg_blocks[] __initdata = {
++	{"brcm,brcmstb-sun-top-ctrl", sun_top_ctrl_regs},
++	{"brcm,brcmstb-cpu-biu-ctrl", cpu_biu_ctrl_regs},
++	{"brcm,brcmstb-hif-continuation", hif_continuation_regs},
++	{NULL, NULL}
++};
++
++static void __init brcmstb_map_io(void)
++{
++	iotable_init(brcmstb_io_map, ARRAY_SIZE(brcmstb_io_map));
++}
++
++static void brcmstb_restart(enum reboot_mode mode, const char *cmd)
++{
++	writel_relaxed(1, brcm_plat_regs.reset_source_enable_reg);
++	readl_relaxed(brcm_plat_regs.reset_source_enable_reg);
++
++	writel_relaxed(1, brcm_plat_regs.sw_master_reset_reg);
++	readl_relaxed(brcm_plat_regs.sw_master_reset_reg);
++
++	while (1)
++		;
++}
++
++static void __init brcmstb_init_early(void)
++{
++	void __iomem *addr;
++	struct node_reg_block *block;
++
++	add_preferred_console("ttyS", 0, "115200");
++
++	addr = ioremap(BPHYSADDR(BCHP_IRQ0_IRQEN), sizeof(u32));
++	writel_relaxed(BCHP_IRQ0_IRQEN_uarta_irqen_MASK
++		| BCHP_IRQ0_IRQEN_uartb_irqen_MASK
++		| BCHP_IRQ0_IRQEN_uartc_irqen_MASK, addr);
++	iounmap(addr);
++
++	block = top_reg_blocks;
++	while (block->compatible) {
++		struct device_node *np;
++		struct node_reg *reg;
++
++		np = of_find_compatible_node(NULL, NULL, block->compatible);
++		if (!np)
++			panic("brcmstb: DT missing \"%s\" node\n",
++				block->compatible);
++
++		addr = of_iomap(np, 0);
++		if (!addr)
++			panic("brcmstb: iomap failure\n");
++
++		reg = block->regs;
++		while (reg->prop) {
++			u32 val;
++
++			if (!of_property_read_u32(np, reg->prop, &val))
++				*(reg->addr) = addr + val;
++			else
++				panic("brcmstb: node \"%s\" missing prop \"%s\"\n",
++					block->compatible, reg->prop);
++
++			reg++;
++		}
++
++		of_node_put(np);
++
++		block++;
++	}
++}
++
++static void __init brcmstb_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++DT_MACHINE_START(BRCMSTB, "Broadcom STB (Flattened Device Tree)")
++	.map_io		= brcmstb_map_io,
++	.dt_compat	= brcmstb_match,
++	.restart	= brcmstb_restart,
++	.smp		= smp_ops(brcmstb_smp_ops),
++	.init_early	= brcmstb_init_early,
++	.init_machine	= brcmstb_init
++MACHINE_END
+diff --git a/arch/arm/mach-brcmstb/common.h b/arch/arm/mach-brcmstb/common.h
+new file mode 100644
+index 0000000..f44a10d
+--- /dev/null
++++ b/arch/arm/mach-brcmstb/common.h
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (C) 2013 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++ */
++
++#ifndef __BRCMSTB_COMMON_H__
++#define __BRCMSTB_COMMON_H__
++
++#if !defined(__ASSEMBLY__)
++#include <linux/smp.h>
++#endif
++
++#define BRCMSTB_PERIPH_VIRT				0xfc000000
++#define BRCMSTB_PERIPH_PHYS				0xf0000000
++#define BRCMSTB_PERIPH_LENGTH				0x02000000
++
++#define BVIRTADDR(x)	(BRCMSTB_PERIPH_VIRT + ((x) & 0x0fffffff))
++#define BPHYSADDR(x)	((x) + BRCMSTB_PERIPH_PHYS)
++
++#define BCHP_UARTA_REG_START				0x00406b00
++
++#define BCHP_IRQ0_IRQEN					0x00406780
++#define BCHP_IRQ0_IRQEN_uarta_irqen_MASK		0x00010000
++#define BCHP_IRQ0_IRQEN_uartb_irqen_MASK		0x00020000
++#define BCHP_IRQ0_IRQEN_uartc_irqen_MASK		0x00040000
++
++#if !defined(__ASSEMBLY__)
++
++extern void brcmstb_secondary_startup(void);
++extern void brcmstb_cpu_boot(unsigned int cpu);
++extern void brcmstb_cpu_power_on(unsigned int cpu);
++extern int brcmstb_cpu_get_power_state(unsigned int cpu);
++extern struct smp_operations brcmstb_smp_ops;
++
++#ifdef CONFIG_HOTPLUG_CPU
++extern void brcmstb_cpu_die(unsigned int cpu);
++extern int brcmstb_cpu_kill(unsigned int cpu);
++#endif
++
++struct node_reg {
++	const char *prop;
++	void __iomem **addr;
++};
++
++struct node_reg_block {
++	const char *compatible;
++	struct node_reg *regs;
++};
++
++struct platform_regs {
++	void __iomem *cpu_reset_config_reg;
++	void __iomem *cpu0_pwr_zone_ctrl_reg;
++	void __iomem *hif_continuation_regs_base;
++	void __iomem *reset_source_enable_reg;
++	void __iomem *sw_master_reset_reg;
++};
++
++extern struct platform_regs brcm_plat_regs;
++
++#endif
++
++#endif /* __BRCMSTB_COMMON_H__ */
+diff --git a/arch/arm/mach-brcmstb/headsmp.S b/arch/arm/mach-brcmstb/headsmp.S
+new file mode 100644
+index 0000000..1d01358
+--- /dev/null
++++ b/arch/arm/mach-brcmstb/headsmp.S
+@@ -0,0 +1,33 @@
++/*
++ * SMP boot code for secondary CPUs
++ * Based on arch/arm/mach-tegra/headsmp.S
++ *
++ * Copyright (C) 2010 NVIDIA, Inc.
++ * Copyright (C) 2013 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++ */
++
++#include <linux/linkage.h>
++#include <linux/init.h>
++
++        .section ".text.head", "ax"
++	__CPUINIT
++
++ENTRY(brcmstb_secondary_startup)
++        mov     r0, #0xd3
++        msr     cpsr_fsxc, r0
++        bl      v7_invalidate_l1
++        b       secondary_startup
++ENDPROC(brcmstb_secondary_startup)
+diff --git a/arch/arm/mach-brcmstb/hotplug.c b/arch/arm/mach-brcmstb/hotplug.c
+new file mode 100644
+index 0000000..edfadc2
+--- /dev/null
++++ b/arch/arm/mach-brcmstb/hotplug.c
+@@ -0,0 +1,208 @@
++/*
++ * Broadcom STB CPU hotplug support for ARM
++ *
++ * Copyright (C) 2013 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++ */
++
++#include <linux/init.h>
++#include <linux/errno.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/jiffies.h>
++#include <linux/printk.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++
++#include <asm/cacheflush.h>
++#include <asm/mach-types.h>
++
++#include "common.h"
++
++#define ZONE_PWR_DN_REQ_MASK		0x00000200
++#define ZONE_PWR_UP_REQ_MASK		0x00000400
++#define ZONE_BLK_RST_ASSERT_MASK	0x00001000
++#define ZONE_PWR_OFF_STATE_MASK		0x02000000
++#define ZONE_PWR_ON_STATE_MASK		0x04000000
++#define ZONE_RESET_STATE_MASK		0x80000000
++
++static void __iomem *pwr_zone_ctrl_get_base(unsigned int cpu)
++{
++	void __iomem *base = brcm_plat_regs.cpu0_pwr_zone_ctrl_reg;
++	base += (cpu * 4);
++	return base;
++}
++
++static u32 pwr_zone_ctrl_rd(unsigned int cpu)
++{
++	void __iomem *base = pwr_zone_ctrl_get_base(cpu);
++	return readl_relaxed(base);
++}
++
++static void pwr_zone_ctrl_wr(unsigned int cpu, u32 val)
++{
++	void __iomem *base = pwr_zone_ctrl_get_base(cpu);
++	writel_relaxed(val, base);
++	dsb();
++}
++
++void brcmstb_cpu_boot(unsigned int cpu)
++{
++	unsigned long boot_vector;
++	const int reg_ofs = cpu * 8;
++	u32 val;
++
++	pr_info("SMP: Booting CPU%d...\n", cpu);
++
++	/*
++	* set the reset vector to point to the secondary_startup
++	* routine
++	*/
++	boot_vector = virt_to_phys(brcmstb_secondary_startup);
++	writel_relaxed(0, brcm_plat_regs.hif_continuation_regs_base + reg_ofs);
++	writel_relaxed(boot_vector, brcm_plat_regs.hif_continuation_regs_base
++			+ 4 + reg_ofs);
++
++	smp_wmb();
++	flush_cache_all();
++
++	/* unhalt the cpu */
++	val = readl_relaxed(brcm_plat_regs.cpu_reset_config_reg);
++	val &= ~BIT(cpu);
++	writel_relaxed(val, brcm_plat_regs.cpu_reset_config_reg);
++}
++
++void brcmstb_cpu_power_on(unsigned int cpu)
++{
++	/*
++	 * The secondary cores power was cut, so we must go through
++	 * power-on initialization.
++	 */
++	u32 tmp;
++
++	pr_info("SMP: Powering up CPU%d...\n", cpu);
++
++	/* Request zone power up */
++	pwr_zone_ctrl_wr(cpu, ZONE_PWR_UP_REQ_MASK);
++
++	/* Wait for the power up FSM to complete */
++	do {
++		tmp = pwr_zone_ctrl_rd(cpu);
++	} while (!(tmp & ZONE_PWR_ON_STATE_MASK));
++}
++
++int brcmstb_cpu_get_power_state(unsigned int cpu)
++{
++	int tmp = pwr_zone_ctrl_rd(cpu);
++	return (tmp & ZONE_RESET_STATE_MASK) ? 0 : 1;
++}
++
++void __ref brcmstb_cpu_die(unsigned int cpu)
++{
++	/* Derived from misc_bpcm_arm.c */
++
++	/* Clear SCTLR.C bit */
++	__asm__(
++		"mrc	p15, 0, r0, c1, c0, 0\n"
++		"bic	r0, r0, #(1 << 2)\n"
++		"mcr	p15, 0, r0, c1, c0, 0\n"
++		: /* no output */
++		: /* no input */
++		: "r0"	/* clobber r0 */
++	);
++
++	/*
++	 * Instruction barrier to ensure cache is really disabled before
++	 * cleaning/invalidating the caches
++	 */
++	isb();
++
++	flush_cache_all();
++
++	/* Invalidate all instruction caches to PoU (ICIALLU) */
++	/* Data sync. barrier to ensure caches have emptied out */
++	__asm__("mcr	p15, 0, r0, c7, c5, 0\n" : : : "r0");
++	dsb();
++
++	/*
++	 * Clear ACTLR.SMP bit to prevent broadcast TLB messages from reaching
++	 * this core
++	 */
++	__asm__(
++		"mrc	p15, 0, r0, c1, c0, 1\n"
++		"bic	r0, r0, #(1 << 6)\n"
++		"mcr	p15, 0, r0, c1, c0, 1\n"
++		: /* no output */
++		: /* no input */
++		: "r0"	/* clobber r0 */
++	);
++
++	/* Disable all IRQs for this CPU */
++	arch_local_irq_disable();
++
++	/*
++	 * Final full barrier to ensure everything before this instruction has
++	 * quiesced.
++	 */
++	isb();
++	dsb();
++
++	/* Sit and wait to die */
++	wfi();
++
++	/* We should never get here... */
++	nop();
++	panic("Spurious interrupt on CPU %d received!\n", cpu);
++}
++
++static void busy_wait(int i)
++{
++	while (--i != 0)
++		nop();
++}
++
++int brcmstb_cpu_kill(unsigned int cpu)
++{
++	u32 tmp;
++	u32 val;
++
++	pr_info("SMP: Powering down CPU%d...\n", cpu);
++
++	/* Program zone reset */
++	pwr_zone_ctrl_wr(cpu, ZONE_RESET_STATE_MASK | ZONE_BLK_RST_ASSERT_MASK |
++			      ZONE_PWR_DN_REQ_MASK);
++
++	/* Verify zone reset */
++	tmp = pwr_zone_ctrl_rd(cpu);
++	if (!(tmp & ZONE_RESET_STATE_MASK))
++		pr_err("%s: Zone reset bit for CPU %d not asserted!\n",
++			__func__, cpu);
++
++	/* Wait for power down */
++	do {
++		tmp = pwr_zone_ctrl_rd(cpu);
++	} while (!(tmp & ZONE_PWR_OFF_STATE_MASK));
++
++	/* Magic delay from misc_bpcm_arm.c */
++	busy_wait(10000);
++
++	/* Assert reset on the CPU */
++	val = readl_relaxed(brcm_plat_regs.cpu_reset_config_reg);
++	val |= BIT(cpu);
++	writel_relaxed(val, brcm_plat_regs.cpu_reset_config_reg);
++
++	return 1;
++}
++
+diff --git a/arch/arm/mach-brcmstb/platsmp.c b/arch/arm/mach-brcmstb/platsmp.c
+new file mode 100644
+index 0000000..ea5db15
+--- /dev/null
++++ b/arch/arm/mach-brcmstb/platsmp.c
+@@ -0,0 +1,79 @@
++/*
++ * Broadcom STB SMP support for ARM
++ * Based on arch/arm/mach-tegra/platsmp.c
++ *
++ *  Copyright (C) 2002 ARM Ltd.
++ *  All Rights Reserved
++ *
++ *  Copyright (C) 2009 Palm
++ *  All Rights Reserved
++ *
++ *  Copyright (C) 2013 Broadcom Corporation
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/jiffies.h>
++#include <linux/printk.h>
++#include <linux/smp.h>
++
++#include <asm/cacheflush.h>
++#include <asm/mach-types.h>
++
++#include "common.h"
++
++static DEFINE_SPINLOCK(boot_lock);
++
++/***********************************************************************
++ * SMP boot
++ ***********************************************************************/
++
++static void __cpuinit brcmstb_secondary_init(unsigned int cpu)
++{
++	/*
++	 * Synchronise with the boot thread.
++	 */
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++}
++
++static int __cpuinit brcmstb_boot_secondary(unsigned int cpu,
++					    struct task_struct *idle)
++{
++	/*
++	 * set synchronisation state between this boot processor
++	 * and the secondary one
++	 */
++	spin_lock(&boot_lock);
++
++	/* Bring up power to the core if necessary */
++	if (brcmstb_cpu_get_power_state(cpu) == 0)
++		brcmstb_cpu_power_on(cpu);
++
++	brcmstb_cpu_boot(cpu);
++
++	/*
++	 * now the secondary core is starting up let it run its
++	 * calibrations, then wait for it to finish
++	 */
++	spin_unlock(&boot_lock);
++
++	return 0;
++}
++
++struct smp_operations brcmstb_smp_ops __initdata = {
++	.smp_secondary_init	= brcmstb_secondary_init,
++	.smp_boot_secondary	= brcmstb_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill		= brcmstb_cpu_kill,
++	.cpu_die		= brcmstb_cpu_die,
++#endif
++};
+-- 
+1.7.1
