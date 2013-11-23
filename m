@@ -1,74 +1,136 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 23 Nov 2013 00:40:05 +0000
-Subject: [PATCH 11/31] dma: add channel request API that supports
- deferred probe
-In-Reply-To: <CAPcyv4ig3TWAYWsw5_-MWfKABma9-JCF=Gh-inuxeJF6su-NVw@mail.gmail.com>
-References: <528D0C06.9080006@wwwdotorg.org>
- <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
- <528D28A1.2050307@wwwdotorg.org>
- <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
- <528E4F55.9070204@wwwdotorg.org>
- <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
- <528F95A9.2050305@wwwdotorg.org>
- <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
- <528F9DF9.6080706@wwwdotorg.org>
- <CAPcyv4ig3TWAYWsw5_-MWfKABma9-JCF=Gh-inuxeJF6su-NVw@mail.gmail.com>
-Message-ID: <20131123004005.GI16735@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Nov 2013 16:43:35 -0800
+Subject: [PATCH] of/platform: Fix no irq domain found errors when
+ populating interrupts
+Message-ID: <20131123004334.GJ10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 11:49:55AM -0800, Dan Williams wrote:
-> On Fri, Nov 22, 2013 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >>>> The proposal is dma_request_slave_channel only returns errors or valid
-> >>>> pointers, never NULL.
-> >>>
-> >>> OK, so if you make that assumption, I guess it's safe.
-> >>
-> >> I made that assumption because that is what your original patch proposed:
-> >>
-> >> +/**
-> >> + * dma_request_slave_channel_or_err - try to allocate an exclusive
-> >> slave channel
-> >> + * @dev:       pointer to client device structure
-> >> + * @name:      slave channel name
-> >> + *
-> >> + * Returns pointer to appropriate dma channel on success or an error pointer.
-> >> + */
-> >>
-> >> What's the benefit of leaking NULL values to callers?  If they already
-> >> need to check for err, why force them to check for NULL too?
-> >
-> > "Returns pointer to appropriate dma channel on success or an error
-> > pointer." means that callers only have to check for an ERR value. If the
-> > function returns NULL, then other DMA-related functions must treat that
-> > as a valid channel ID. This is case (a) in my previous email.
-> 
-> How can a channel be "valid" and NULL at the same time?  Without the
-> guarantee that dma_request_channel always returns a non-null-channel
-> pointer or an error pointer you're forcing clients to use or open-code
-> IS_ERR_OR_NULL.  Make the caller's life easier and just turn success
-> or failure like before.
+Currently we get the following kind of errors if we try to use
+interrupt phandles to irqchips that have not yet initialized:
 
-It's absolutely fine for an API to return "valid pointers or an error
-pointer" and not have to care about the NULL condition.  Really.
+irq: no irq domain found for /ocp/pinmux at 48002030 !
+WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
+(show_stack+0x14/0x1c)
+(dump_stack+0x6c/0xa0)
+(warn_slowpath_common+0x64/0x84)
+(warn_slowpath_null+0x1c/0x24)
+(of_device_alloc+0x144/0x184)
+(of_platform_device_create_pdata+0x44/0x9c)
+(of_platform_bus_create+0xd0/0x170)
+(of_platform_bus_create+0x12c/0x170)
+(of_platform_populate+0x60/0x98)
+...
 
-Think about it.
+This is because we're wrongly trying to populate resources that are not
+yet available. It's perfectly valid to create irqchips dynamically,
+so let's fix up the issue by populating the interrupt resources based
+on a notifier call instead.
 
-	chan = dma_request_blah();
-	if (IS_ERR(chan))
-		return PTR_ERR(chan);
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-	dma_do_something(chan);
+---
 
-Now, if the API is defined to be "valid pointers or error pointers" the
-above code is quite sane.  The user is doing everything required to use
-the API safely.
+Rob & Grant, care to merge this for the -rc if this looks OK to you?
 
-However, if dma_request_blah() happens to return NULL, that's a failure
-of dma_request_blah() - not of the user to check for it.  If
-dma_request_blah() is never supposed to return NULL, then there won't be
-any checks done to handle a NULL pointer into dma_do_something(), and we
-get to find out about this failure by a kernel NULL pointer deref oops.
+These happen for example when using interrupts-extended for omap
+wake-up interrupts where the irq domain is created by pinctrl-single.c
+at module_init time.
 
-That's a good thing.  We have a condition which can be debugged and the
-bug which caused the NULL pointer to be returned can be found and fixed.
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -130,6 +130,56 @@ void of_device_make_bus_id(struct device *dev)
+ 	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+ }
+ 
++/*
++ * The device interrupts are not necessarily available for all
++ * irqdomains initially so we need to populate them using a
++ * notifier.
++ */
++static int of_device_resource_notify(struct notifier_block *nb,
++				     unsigned long event, void *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct device_node *np = pdev->dev.of_node;
++	struct resource *res = pdev->resource;
++	struct resource *irqr = NULL;
++	int num_irq, i, found = 0;
++
++	if (event != BUS_NOTIFY_BIND_DRIVER)
++		return 0;
++
++	if (!np)
++		goto out;
++
++	num_irq = of_irq_count(np);
++	if (!num_irq)
++		goto out;
++
++	for (i = 0; i < pdev->num_resources; i++, res++) {
++		if (res->flags != IORESOURCE_IRQ ||
++		    res->start != -EPROBE_DEFER ||
++		    res->end != -EPROBE_DEFER)
++			continue;
++
++		if (!irqr)
++			irqr = res;
++		found++;
++	}
++
++	if (!found)
++		goto out;
++
++	if (found != num_irq) {
++		dev_WARN(dev, "error populating irq resources: %i != %i\n",
++			 found, num_irq);
++		goto out;
++	}
++
++	WARN_ON(of_irq_to_resource_table(np, irqr, num_irq) != num_irq);
++
++out:
++	return NOTIFY_DONE;
++}
++
+ /**
+  * of_device_alloc - Allocate and initialize an of_device
+  * @np: device node to assign to device
+@@ -168,7 +218,13 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 			rc = of_address_to_resource(np, i, res);
+ 			WARN_ON(rc);
+ 		}
+-		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
++
++		/* See of_device_resource_notify for populating interrupts */
++		for (i = 0; i < num_irq; i++, res++) {
++			res->flags = IORESOURCE_IRQ;
++			res->start = -EPROBE_DEFER;
++			res->end = -EPROBE_DEFER;
++		}
+ 	}
+ 
+ 	dev->dev.of_node = of_node_get(np);
+@@ -447,6 +503,8 @@ int of_platform_bus_probe(struct device_node *root,
+ }
+ EXPORT_SYMBOL(of_platform_bus_probe);
+ 
++static struct notifier_block resource_nb;
++
+ /**
+  * of_platform_populate() - Populate platform_devices from device tree data
+  * @root: parent of the first level to probe or NULL for the root of the tree
+@@ -478,6 +536,11 @@ int of_platform_populate(struct device_node *root,
+ 	if (!root)
+ 		return -EINVAL;
+ 
++	if (!resource_nb.notifier_call) {
++		resource_nb.notifier_call = of_device_resource_notify,
++			bus_register_notifier(&platform_bus_type, &resource_nb);
++	}
++
+ 	for_each_child_of_node(root, child) {
+ 		rc = of_platform_bus_create(child, matches, lookup, parent, true);
+ 		if (rc)
