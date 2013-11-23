@@ -1,41 +1,65 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Sat, 23 Nov 2013 11:39:04 -0700
-Subject: ACPI
-In-Reply-To: <201311231011.45892.arnd@arndb.de>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <528FC5C1.1080403@jonmasters.org> <528FCEA6.1060602@jonmasters.org>
- <201311231011.45892.arnd@arndb.de>
-Message-ID: <20131123183904.GB20790@obsidianresearch.com>
+From: marc.ceeeee@gmail.com (Marc C)
+Date: Sat, 23 Nov 2013 12:11:41 -0800
+Subject: [PATCH RESEND 3/5] ARM: brcmstb: add misc. DT bindings for brcm,
+ brcmstb
+In-Reply-To: <201311231937.38235.arnd@arndb.de>
+References: <529003BB.9030604@gmail.com> <201311231937.38235.arnd@arndb.de>
+Message-ID: <52910BFD.2010900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 23, 2013 at 10:11:45AM +0100, Arnd Bergmann wrote:
+Hello Arnd,
 
-> I've talked in the past to people who got your message about ACPI
-> but not the rest and that are now struggling in a very misguided
-> attempt to bring ACPI to systems that are anything but boring and
-> that will cause real headaches for years on both developers and users
-> if they actually end up shipping.
+> Normally the "compatible" string identifies the register layout and
+> you keep the offsets in the device driver. Do you have strong reasons to do it
+> differently here?
 
-I think a strong way to deal with this is to NAK any ACPI related
-changes that are not implementing a published, released spec.
+The register block that contains the reset registers also contains other
+?general purpose? registers, which can potentially scoot the positions
+of both ?sw-master-reset? and ?reset-source-enable?. Although we do
+stress to the H/W designers that consistency between chips is important,
+and that relative offsets of those registers should remain the same
+between chip revisions, there is no guarantee that this will happen.
 
-Forcing ACPI development to go through a multi-vendor standards
-process, while allowing DT to be handled internally to the kernel
-should provide enough incentive to direct people to the correct choice
-:)
+Now, rather than handling N revisions of the ?sun-top-ctrl? register
+block at both the boot loader and kernel levels (N could get very large
+as we continue to port support for more chips), I feel that a more
+flexible solution would be to rely on the self-describing nature of the DT.
 
-However, fundamentally, that would mean that ACPI on the ARM is on-hold
-from a kernel perspective until the first spec is released by the new
-working group - and that would imply initial servers should plan to
-boot using DT, and provide experimental ACPI. Similar to how x86
-introduced ACPI.
+However, I do agree with your suggestion if the registers belong to a
+standard and more-static block of registers, such as those for AHCI,
+EHCI, or a network controller.
 
-The ACPI working group should also hear what kernel folks want to see
-of ACPI eg no clk, regulator, gpio, etc bindings, use DT for that.
+> I would also suggest moving this block into a separate file for the
+> reset controller. Make sure you follow the rules from 
+> Documentation/devicetree/bindings/reset/reset.txt, most importantly
+> adding a "#reset-cells" property so other drivers can refer to this
+> node using the reset API.
 
-First gen servers that can't implement the spec have the DT escape
-hatch while they make changes which should reduce the pressure on
-kernel folks to accept inappropriate patches...
+I will look into this.
 
-Jason
+Thank you for your feedback!
+Marc C
+
+On 11/23/13, 10:37 AM, Arnd Bergmann wrote:
+> On Saturday 23 November 2013, Marc C wrote:
+>> +This node describes the register block which is used for generic reset control.
+>> +
+>> +    - compatible: "brcm,brcmstb-sun-top-ctrl"
+>> +    - properties:
+>> +        o reg = <base_of_sun_top_ctrl_regs length>;
+>> +        o reset-source-enable-reg = <offset_from_base>;
+>> +        o sw-master-reset-reg = <offset_from_base>;
+> 
+> Normally the "compatible" string identifies the register layout and you keep the
+> offsets in the device driver. Do you have strong reasons to do it differently
+> here?
+> 
+> I would also suggest moving this block into a separate file for the reset
+> controller. Make sure you follow the rules from
+> Documentation/devicetree/bindings/reset/reset.txt, most importantly adding
+> a "#reset-cells" property so other drivers can refer to this node using
+> the reset API.
+> 
+> 	Arnd
+> 
