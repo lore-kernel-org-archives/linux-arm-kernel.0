@@ -1,32 +1,58 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 23 Nov 2013 18:28:46 -0500
-Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
-Message-ID: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Sat, 23 Nov 2013 18:34:12 -0500
+Subject: [PATCH 2/3] ARM: mm: Don't allow resizing of memblock data until
+ "low" memory is not mapped
+In-Reply-To: <1385249653-9250-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1385249653-9250-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1385249653-9250-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building ARM with NO_BOOTMEM generates below warning. Using min_t
-to find the correct alignment avoids the warning.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
+If allowed by call to memblock_allow_resize() - The Memblock core will
+try to allocate additional memory and rearrange its internal data in
+case, if there are more then INIT_MEMBLOCK_REGIONS(128) memory regions
+of any type have been allocated. If this happens before Low memory is
+mapped (which is done now by map_lowmem()) the system will hang, because
+the Memblock core will try to operate with virtual addresses which
+aren't mapped yet.
+
+In ARM code, the memblock resizing is allowed (memblock_allow_resize())
+from arm_memblock_init() which is called before map_lowmem(), so
+this may lead to an error as described above.
+
+Hence, allow Memblock resizing later during init, from bootmem_init()
+when all appropriate mappings are ready.
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/nobootmem.c |    2 +-
+ arch/arm/mm/init.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/mm/nobootmem.c b/mm/nobootmem.c
-index 2c254d3..8954e43 100644
---- a/mm/nobootmem.c
-+++ b/mm/nobootmem.c
-@@ -85,7 +85,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
- 	int order;
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 4c7bab4..ea66341 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -384,7 +384,6 @@ void __init arm_memblock_init(struct meminfo *mi,
+ 	dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
  
- 	while (start < end) {
--		order = min(MAX_ORDER - 1UL, __ffs(start));
-+		order = min_t(size_t, MAX_ORDER - 1UL, __ffs(start));
+ 	arm_memblock_steal_permitted = false;
+-	memblock_allow_resize();
+ 	memblock_dump_all();
+ }
  
- 		while (start + (1UL << order) > end)
- 			order--;
+@@ -392,6 +391,7 @@ void __init bootmem_init(void)
+ {
+ 	unsigned long min, max_low, max_high;
+ 
++	memblock_allow_resize();
+ 	max_low = max_high = 0;
+ 
+ 	find_limits(&min, &max_low, &max_high);
 -- 
 1.7.9.5
