@@ -1,42 +1,30 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 23 Nov 2013 18:41:14 -0500
-Subject: [PATCH 3/5] ARM: keystone: Avoid calling of_clk_init() twice
+Date: Sat, 23 Nov 2013 18:41:15 -0500
+Subject: [PATCH 4/5] MAINTAINERS: Add keystone git tree information
 In-Reply-To: <1385250076-9596-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1385250076-9596-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1385250076-9596-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1385250076-9596-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 4178bac4f {ARM: call of_clk_init from default time_init
-handler}, of_clk_init() is always called on machines using default
-time_init handler.
+Update the Keystone entry to add git tree information.
 
-So drop the of_clk_init() from keystone code to avoid below
-boot errors because of double call.
-
-_of_pll_clk_init: error initializing pll mainpllclk
-_of_pll_clk_init: error initializing pll papllclk
-_of_pll_clk_init: error initializing pll ddr3apllclk
-_of_pll_clk_init: error initializing pll ddr3bpllclk
-_of_pll_clk_init: error initializing pll armpllclk
-
-Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-keystone/pm_domain.c |    1 -
- 1 file changed, 1 deletion(-)
+ MAINTAINERS |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-index 065f2e3..ca79dda 100644
---- a/arch/arm/mach-keystone/pm_domain.c
-+++ b/arch/arm/mach-keystone/pm_domain.c
-@@ -74,7 +74,6 @@ int __init keystone_pm_runtime_init(void)
- 	if (!np)
- 		return 0;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8285ed4..25b945b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1013,6 +1013,7 @@ M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-keystone/
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
  
--	of_clk_init(NULL);
- 	pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
- 
- 	return 0;
+ ARM/LOGICPD PXA270 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
 -- 
 1.7.9.5
