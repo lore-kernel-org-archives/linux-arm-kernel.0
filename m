@@ -1,82 +1,174 @@
-From: miloody@gmail.com (loody)
-Date: Sat, 23 Nov 2013 17:12:14 +0800
-Subject: Some question about GIC v1 setting
-In-Reply-To: <9ab50cfbe03ffd667566808166b04573@www.loen.fr>
-References: <CANudz+sg6MiUZaTELF4G=NMfwj--K9j10JrYh1cm2VAjfvq6MA@mail.gmail.com>
- <20131115165939.GO16735@n2100.arm.linux.org.uk>
- <CANudz+uO7s=GdFz64oxFEQefAB=EguUo1NP17AT+3Ft+wK8nNQ@mail.gmail.com>
- <9ab50cfbe03ffd667566808166b04573@www.loen.fr>
-Message-ID: <CANudz+uoJSrM91anu5PpOqQt5gpXBEQeVaqdx25veQ=PL_aP+w@mail.gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Sat, 23 Nov 2013 14:42:32 +0000
+Subject: [PATCH] usb: chipidea: add support for USB OTG controller on
+ TI-NSPIRE
+In-Reply-To: <5290458b.87c5440a.4c57.ffffc9c8@mx.google.com>
+References: <5290458b.87c5440a.4c57.ffffc9c8@mx.google.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411E099@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Marc:
 
-2013/11/16 Marc Zyngier <marc.zyngier@arm.com>:
-> On 2013-11-16 07:23, loody wrote:
->>
->> hi Russel:
->>
->> 2013/11/16 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->>>
->>> On Sat, Nov 16, 2013 at 12:55:11AM +0800, loody wrote:
->>>>
->>>> hi all:
->>>> I use arm cortex A9 smp with GIC v1 system.
->>>> And my kernel is 3.8.13.
->>>>
->>>> I have some questions:
->>>> 1.  From GIc v1 spec, we can modify irq priority.
->>>>      (ICDIPRn, Interrupt Priority Rigisters)
->>>>      how could we do that in kernel? Did kernel provide any API of Irq
->>>> to reach that goal?
->>>
->>>
->>> No.  It's pointless.  The kernel doesn't support interrupting one IRQ
->>> while another is already in progress.
->>
->> in so far kernel, there are impossible
->> 1. dynamically  change irq priority setting in GIC through kernel API
->> 2. get higher interrupt priority when first time register requtest_irq
->
->
-> As Russell said, this is because Linux only models a single interrupt
-> priority.
-> The net result is that all interrupts must have the same priority.
 
-There is some audio device on my embedded system, and they need more
-higher interrupt such that we may not easily hearing audio
-disconnection when system busy.
+ 
+> 
+> From: Daniel Tang <dt.tangr@gmail.com>
+> 
+> The USB controller in TI-NSPIRE calculators are based
+> off either Freescale's USB OTG controller or the USB
+> controller found in the IMX233, both of which are
+> Chipidea compatible.
+> 
+> This patch adds a device tree binding for the controller.
+> 
+> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+> ---
+>  .../devicetree/bindings/usb/ci13xxx-nspire.txt     | 17 +++++
+>  drivers/usb/chipidea/Makefile                      |  1 +
+>  drivers/usb/chipidea/ci_hdrc_nspire.c              | 74
+> ++++++++++++++++++++++
+>  3 files changed, 92 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-
+> nspire.txt
+>  create mode 100644 drivers/usb/chipidea/ci_hdrc_nspire.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
+> b/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
+> new file mode 100644
+> index 0000000..5ba8e90
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
 
-isn't any method to let those interrupt get higher priority?
+We have already renamed ci13xxx to ci_hdrc, please using ci-hdrc as
+prefix.
 
->
->
->>>
->>>> 2. From Gic V1 spec, we can assign 1 irq to multi-core.
->>>>      (ICDIPTRn, Interrupt Processor Targets Registers)
->>>>      Is there similar API in kernel to let 1 irq possibility to be
->>>> handled by multi-cores?
->>>
->>>
->>> No.  All that does is lead to cores being woken up and racing on locks,
->>> and then causing IRQs to be spuriously marked as false (because there's
->>> nothing for the handlers to do on the cores which lost out).
->>
->> In Gic spec, if 1 core service the irq, other cores will read invalid
->> #1023 if accidentally they are waken up by GIC.
->>
->> Why that will let cores racing on locks?
->>
->> if accidentally waken up by GIC, and cores read #1023, cores can
->> return back immediately.
->
->
-> Hence wasting a lot of time and energy on all the other cores.
-> The question is: why do you want to do that?
-We found some interrupt seems cannot be serviced in time.
-Since GIC spec mentioned about supporting multi-core handing
-interrupt, but we see only 1 core handle all irq after kernel boot up.
-So I send a mail to check whether arm kernel support multi-core handle irq.
+> @@ -0,0 +1,17 @@
+> +* TI-Nspire USB OTG Controller
+> +
+> +Required properties:
+> +- compatible: Should be "zevio,nspire-usb"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain controller interrupt
+> +
+> +Recommended properies:
+> +- vbus-supply: regulator for vbus
+> +
+> +Examples:
+> +		usb0: usb at B0000000 {
+> +			reg = <0xB0000000 0x1000>;
+> +			compatible = "zevio,nspire-usb";
+> +			interrupts = <8>;
+> +			vbus-supply = <&vbus_reg>;
+> +		};
 
-appreciate your help,
+No clock information?
+
+> diff --git a/drivers/usb/chipidea/Makefile
+> b/drivers/usb/chipidea/Makefile
+> index a99d980..245ea4d 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+>  # Glue/Bridge layers go here
+> 
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
+> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_nspire.o
+> 
+>  # PCI doesn't provide stubs, need to check
+>  ifneq ($(CONFIG_PCI),)
+> diff --git a/drivers/usb/chipidea/ci_hdrc_nspire.c
+> b/drivers/usb/chipidea/ci_hdrc_nspire.c
+> new file mode 100644
+> index 0000000..318761d
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/ci_hdrc_nspire.c
+> @@ -0,0 +1,74 @@
+> +/*
+> + *	Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * Based off drivers/usb/chipidea/ci_hdrc_msm.c
+> + *
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/usb/gadget.h>
+> +#include <linux/usb/chipidea.h>
+> +
+> +#include "ci.h"
+> +
+> +static struct ci_hdrc_platform_data ci_hdrc_nspire_platdata = {
+> +	.name			= "ci_hdrc_nspire",
+> +	.flags			= CI_HDRC_REGS_SHARED,
+> +	.capoffset              = DEF_CAPOFFSET,
+> +};
+> +
+
+Please keep alignment for the assignment.
+
+> +static int ci_hdrc_nspire_probe(struct platform_device *pdev)
+> +{
+> +	struct platform_device *ci_pdev;
+> +
+> +	dev_dbg(&pdev->dev, "ci_hdrc_nspire_probe\n");
+> +
+> +	ci_pdev = ci_hdrc_add_device(&pdev->dev,
+> +				pdev->resource, pdev->num_resources,
+> +				&ci_hdrc_nspire_platdata);
+> +
+> +	if (IS_ERR(ci_pdev)) {
+> +		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+> +		return PTR_ERR(ci_pdev);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, ci_pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ci_hdrc_nspire_remove(struct platform_device *pdev)
+> +{
+> +	struct platform_device *ci_pdev = platform_get_drvdata(pdev);
+> +
+> +	ci_hdrc_remove_device(ci_pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ci_hdrc_nspire_dt_ids[] = {
+> +	{ .compatible = "zevio,nspire-usb", },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct platform_driver ci_hdrc_nspire_driver = {
+> +	.probe = ci_hdrc_nspire_probe,
+> +	.remove = ci_hdrc_nspire_remove,
+> +	.driver = {
+> +		.name = "nspire_usb",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = ci_hdrc_nspire_dt_ids,
+> +	},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
+> +module_platform_driver(ci_hdrc_nspire_driver);
+> +
+> +MODULE_ALIAS("platform:nspire_usb");
+> +MODULE_ALIAS("platform:ci13xxx_nspire");
+
+ci_hdrc_nspire
+
+Peter
+
+> +MODULE_LICENSE("GPL v2");
+> --
+> 1.8.1.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
