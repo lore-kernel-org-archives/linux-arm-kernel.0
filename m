@@ -1,37 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 23 Nov 2013 21:45:29 +0100
-Subject: [PATCH RESEND 3/5] ARM: brcmstb: add misc. DT bindings for brcm,
- brcmstb
-In-Reply-To: <52910BFD.2010900@gmail.com>
-References: <529003BB.9030604@gmail.com> <201311231937.38235.arnd@arndb.de>
- <52910BFD.2010900@gmail.com>
-Message-ID: <201311232145.30203.arnd@arndb.de>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Sat, 23 Nov 2013 22:09:13 +0100
+Subject: N900 board code in 3.14
+In-Reply-To: <CABxcv==b-Nj4ADT+qN9qLC8bL5raqkRkaLkGG0cMNrZV8njhDg@mail.gmail.com>
+References: <1384562167-14725-1-git-send-email-tony@atomide.com>
+ <20131116120508.GA22335@earth.universe>
+ <20131116141226.GD10317@atomide.com>
+ <20131116155031.GA5104@earth.universe>
+ <20131121185844.GA10023@atomide.com>
+ <20131121235111.GC9772@earth.universe>
+ <CABxcv==b-Nj4ADT+qN9qLC8bL5raqkRkaLkGG0cMNrZV8njhDg@mail.gmail.com>
+Message-ID: <20131123210912.GA29088@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 23 November 2013, Marc C wrote:
-> Hello Arnd,
-> 
-> > Normally the "compatible" string identifies the register layout and
-> > you keep the offsets in the device driver. Do you have strong reasons to do it
-> > differently here?
-> 
-> The register block that contains the reset registers also contains other
-> ?general purpose? registers, which can potentially scoot the positions
-> of both ?sw-master-reset? and ?reset-source-enable?. Although we do
-> stress to the H/W designers that consistency between chips is important,
-> and that relative offsets of those registers should remain the same
-> between chip revisions, there is no guarantee that this will happen.
-> 
-> Now, rather than handling N revisions of the ?sun-top-ctrl? register
-> block at both the boot loader and kernel levels (N could get very large
-> as we continue to port support for more chips), I feel that a more
-> flexible solution would be to rely on the self-describing nature of the DT.
+Hi,
 
-Ok, I see. I guess it's not even a uniform layout within the registers
-then, right? Otherwise you could reference the number of the reset
-register through the reset-api, but it gets kind of ugly when passing
-the wrong value for a reset line touches a completely unrelated register
-rather than "just" resetting the wrong device.
+On Fri, Nov 22, 2013 at 11:41:27AM +0100, Javier Martinez Canillas wrote:
+> I dropped that patch from my series and posted a v2 that just name the
+> VPLL2 regulator as vdds_dsi [1]. That way will be safer for Tony and
+> Benoit to take this series as a fix for the -rc cycle since the
+> changes are contained within IGEP boards DTS.
 
-	Arnd
+I know, but the patch serves as example for me :)
+
+> > My suggestion would be to add something like this pseudocode to
+> > omapdss:
+> >
+> > if(board_is_n900_dt()) {
+> >     vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "V28");
+> > }
+> >
+> > The problem is, that we do not want to name the regulator
+> > "vdds_dsi", since it's not used exclusivly for omapdss.
+> >
+> > In the future it can get the regulator via phandle of course.
+> 
+> For what is worth I think that your suggestion is a good workaround.
+> Please just add a comment specifying that it is a hack and that we
+> have to get rid of these once the DSS DT bindings land on mainline and
+> we can use a phandle to get the regulator.
+
+I just sent a patchset, that adds DT panel support for N900.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131123/c3c30061/attachment.sig>
