@@ -1,174 +1,74 @@
 From: Peter.Chen@freescale.com (Peter Chen)
-Date: Sat, 23 Nov 2013 14:42:32 +0000
-Subject: [PATCH] usb: chipidea: add support for USB OTG controller on
- TI-NSPIRE
-In-Reply-To: <5290458b.87c5440a.4c57.ffffc9c8@mx.google.com>
-References: <5290458b.87c5440a.4c57.ffffc9c8@mx.google.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411E099@039-SN2MPN1-021.039d.mgd.msft.net>
+Date: Sat, 23 Nov 2013 14:48:48 +0000
+Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
+In-Reply-To: <20131122154947.GE24508@pengutronix.de>
+References: <1345852300-2213-1-git-send-email-marex@denx.de>
+ <1345852300-2213-2-git-send-email-marex@denx.de>
+ <20131122154947.GE24508@pengutronix.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411E0AF@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
  
+> >
+> > diff --git a/arch/arm/boot/dts/imx28.dtsi
+> b/arch/arm/boot/dts/imx28.dtsi
+> > index b996c2d..3cba62d 100644
+> > --- a/arch/arm/boot/dts/imx28.dtsi
+> > +++ b/arch/arm/boot/dts/imx28.dtsi
+> > @@ -520,6 +520,36 @@
+> >  					fsl,voltage = <1>;
+> >  					fsl,pull-up = <1>;
+> >  				};
+> > +
+> > +				usbphy0_pins_a: usbphy0 at 0 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <
+> > +						0x2152 /*
+> MX28_PAD_SSP2_SS2__USB0_OVERCURRENT */
+> > +					>;
+> > +					fsl,drive-strength = <2>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
+> > +				usbphy0_pins_b: usbphy0 at 1 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <
+> > +						0x3061 /*
+> MX28_PAD_AUART1_CTS__USB0_OVERCURRENT */
+> > +					>;
+> > +					fsl,drive-strength = <2>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
+> > +				usbphy1_pins_a: usbphy1 at 0 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <
+> > +						0x2142 /*
+> MX28_PAD_SSP2_SS1__USB1_OVERCURRENT */
+> > +					>;
+> > +					fsl,drive-strength = <2>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> >  			};
+> >
+> >  			digctl at 8001c000 {
+> > --
+> > 1.7.10.4
 > 
-> From: Daniel Tang <dt.tangr@gmail.com>
 > 
-> The USB controller in TI-NSPIRE calculators are based
-> off either Freescale's USB OTG controller or the USB
-> controller found in the IMX233, both of which are
-> Chipidea compatible.
+> @Marek: Did you test the overcurrent functionality with the MX28 and this
+> pinmux?
 > 
-> This patch adds a device tree binding for the controller.
+> I currently can not trigger any overcurrent events and also don't
+> see changes in the PORTSC register after pulling the OC pin to 3V3.
 > 
-> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
-> ---
->  .../devicetree/bindings/usb/ci13xxx-nspire.txt     | 17 +++++
->  drivers/usb/chipidea/Makefile                      |  1 +
->  drivers/usb/chipidea/ci_hdrc_nspire.c              | 74
-> ++++++++++++++++++++++
->  3 files changed, 92 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-
-> nspire.txt
->  create mode 100644 drivers/usb/chipidea/ci_hdrc_nspire.c
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
-> b/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
-> new file mode 100644
-> index 0000000..5ba8e90
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
 
-We have already renamed ci13xxx to ci_hdrc, please using ci-hdrc as
-prefix.
-
-> @@ -0,0 +1,17 @@
-> +* TI-Nspire USB OTG Controller
-> +
-> +Required properties:
-> +- compatible: Should be "zevio,nspire-usb"
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain controller interrupt
-> +
-> +Recommended properies:
-> +- vbus-supply: regulator for vbus
-> +
-> +Examples:
-> +		usb0: usb at B0000000 {
-> +			reg = <0xB0000000 0x1000>;
-> +			compatible = "zevio,nspire-usb";
-> +			interrupts = <8>;
-> +			vbus-supply = <&vbus_reg>;
-> +		};
-
-No clock information?
-
-> diff --git a/drivers/usb/chipidea/Makefile
-> b/drivers/usb/chipidea/Makefile
-> index a99d980..245ea4d 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
->  # Glue/Bridge layers go here
-> 
->  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
-> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_nspire.o
-> 
->  # PCI doesn't provide stubs, need to check
->  ifneq ($(CONFIG_PCI),)
-> diff --git a/drivers/usb/chipidea/ci_hdrc_nspire.c
-> b/drivers/usb/chipidea/ci_hdrc_nspire.c
-> new file mode 100644
-> index 0000000..318761d
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/ci_hdrc_nspire.c
-> @@ -0,0 +1,74 @@
-> +/*
-> + *	Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * Based off drivers/usb/chipidea/ci_hdrc_msm.c
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/usb/gadget.h>
-> +#include <linux/usb/chipidea.h>
-> +
-> +#include "ci.h"
-> +
-> +static struct ci_hdrc_platform_data ci_hdrc_nspire_platdata = {
-> +	.name			= "ci_hdrc_nspire",
-> +	.flags			= CI_HDRC_REGS_SHARED,
-> +	.capoffset              = DEF_CAPOFFSET,
-> +};
-> +
-
-Please keep alignment for the assignment.
-
-> +static int ci_hdrc_nspire_probe(struct platform_device *pdev)
-> +{
-> +	struct platform_device *ci_pdev;
-> +
-> +	dev_dbg(&pdev->dev, "ci_hdrc_nspire_probe\n");
-> +
-> +	ci_pdev = ci_hdrc_add_device(&pdev->dev,
-> +				pdev->resource, pdev->num_resources,
-> +				&ci_hdrc_nspire_platdata);
-> +
-> +	if (IS_ERR(ci_pdev)) {
-> +		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
-> +		return PTR_ERR(ci_pdev);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, ci_pdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ci_hdrc_nspire_remove(struct platform_device *pdev)
-> +{
-> +	struct platform_device *ci_pdev = platform_get_drvdata(pdev);
-> +
-> +	ci_hdrc_remove_device(ci_pdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id ci_hdrc_nspire_dt_ids[] = {
-> +	{ .compatible = "zevio,nspire-usb", },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static struct platform_driver ci_hdrc_nspire_driver = {
-> +	.probe = ci_hdrc_nspire_probe,
-> +	.remove = ci_hdrc_nspire_remove,
-> +	.driver = {
-> +		.name = "nspire_usb",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = ci_hdrc_nspire_dt_ids,
-> +	},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
-> +module_platform_driver(ci_hdrc_nspire_driver);
-> +
-> +MODULE_ALIAS("platform:nspire_usb");
-> +MODULE_ALIAS("platform:ci13xxx_nspire");
-
-ci_hdrc_nspire
+I haven't checked pinmux detail, have you enabled oc and
+set oc's polarity (HW_DIGCTL_CTRL - 8001_C000h)?
 
 Peter
-
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.8.1.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
