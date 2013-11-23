@@ -1,117 +1,147 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Nov 2013 17:17:06 -0700
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <CAPcyv4gmo0k3n8==0oEs4NMKbEH4F9xHutRTURE7sVe=M7xwRg@mail.gmail.com>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>	<1384548866-13141-12-git-send-email-swarren@wwwdotorg.org>	<CAPcyv4heN3PFc+n2RDBviA0zvyU4jfi5VLOcQVR6oRPi1woPTA@mail.gmail.com>	<1384766276.14845.155.camel@smile>	<528A5170.3090809@wwwdotorg.org>	<1384862421.14845.222.camel@smile>	<528B9CAE.3040600@wwwdotorg.org>	<CAPcyv4jR2MufF6PqB3cUwNdQZfzGWVdj1UunBkeyMYm-KvkpCQ@mail.gmail.com>	<528BFDD0.3090503@wwwdotorg.org>	<CAPcyv4i7o0RP4ovG1S8RbiV9wqV+VZWX+2vBm3iKnVLCYfrnBQ@mail.gmail.com>	<528CFE68.6060908@wwwdotorg.org>	<CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>	<528D0C06.9080006@wwwdotorg.org>	<1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>	<528D28A1.2050307@wwwdotorg.org>	<CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>	<528E4F55.9070204@wwwdotorg.org>
- <CAPcyv4gmo0k3n8==0oEs4NMKbEH4F9xHutRTURE7sVe=M7xwRg@mail.gmail.com>
-Message-ID: <528FF402.6000503@wwwdotorg.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 22 Nov 2013 18:31:48 -0600
+Subject: [PATCH 6/8] devicetree: doc: Document ti,timer-parent property
+In-Reply-To: <20131122170800.GG10023@atomide.com>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-7-git-send-email-joelf@ti.com>
+ <20131122155838.GF10023@atomide.com> <528F8807.7050803@ti.com>
+ <20131122170800.GG10023@atomide.com>
+Message-ID: <528FF774.4010109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 04:45 PM, Dan Williams wrote:
-> On Thu, Nov 21, 2013 at 10:22 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 11/20/2013 08:22 PM, Dan Williams wrote:
->> 2)
+On 11/22/2013 11:08 AM, Tony Lindgren wrote:
+> * Joel Fernandes <joelf@ti.com> [131122 08:37]:
+>> Hi Tony,
 >>
->>         /* These first 3 lines are part of your patch */
->>         chan = dma_request_slave_channel(dev, ch_name);
->>         if (IS_ERR(chan)
->>                 chan = NULL;
->>         if (!chan) // This test and the above are IS_ERR_OR_NULL
->>                 attempt allocation some other way;
+>> Thanks for your comments, few replies inline below..
+>>
+>> On 11/22/2013 09:58 AM, Tony Lindgren wrote:
+>>> * Joel Fernandes <joelf@ti.com> [131121 18:00]:
+>>>> +Required properties for system timers (clockevents/clocksource):
+>>>> +- ti,timer-parent:	System timer's parent mux clock needs to be setup.
+>>>> +			This is currently hardcoded in code, for DT boot we
+>>>> +			move this to DT.
+>>>> +
+>>>
+>>> This can be replaced with just clk_set_rate, or clk_set_parent if needed.
+>>> Or by having a clocks = <&32k_clk> property in the dmtimer node in the
+>>> .dts file.
+>>>
+>>
+>> Sure, but clock-data is still not available to make this possible in mainline.
+>> We also discussed earlier right that we don't want dependencies as much as
+>> possible to get one chunk in and working at a time. I was thinking like for a
+>> first-pass since there's a lot of unrelated code that doesn't have dependencies,
+>> but needs this to work, we can introduce this property for now and drop it later
+>> as a "cost of migration"?
 > 
-> No it isn't.  IS_ERR_OR_NULL means the api returns 3 states (channel,
-> null, error-pointer).  The client converting error-pointer to NULL
-> after the fact is explicit way to say that the client does not care
-> about the error value.  The client is simply throwing away the error
-> code and converting the result back into a pass fail.
+> I don't think there's a dependency here to the omap clocks as the dmtimer
+> can implement the clocksource separately and internally still use clk_get
+> using the clock alias table.
 
-The client can only translate an ERR value to NULL if it knows that the
-API will never return NULL. If the API could return NULL, then this
-translation uses a valid return value to represent the error case.
-Functions that return an ERR value or a valid value do NOT in general
-say anything either way about a return value of NULL.
+You mean implement clock-tree separately? Sorry I'm confused can you clarify
+what you mean?
 
-While this translation isn't *exactly* the same as an API returning 3
-states, it is almost identical; the translation is only possible if the
-set of numerically possible return values from the function are
-segmented into 3 sets:
+In clock tree data (not upstream), here is the system clock for am335x for example:
+sys_clkin_ck: sys_clkin_ck at 44e10040 {
+        #clock-cells = <0>;
+        compatible = "mux-clock";
 
-a) Valid
-b) An ERR value
-c) NULL (which is never returned)
+It uses the mux-clock driver. Are you saying we duplicate clock-tree stuff? I
+don't think that's a good idea specially since once clock dt data is available,
+we will switch to using it.
 
-I believe the important point in Russell's argument against
-IS_ERR_OR_NULL is that the segmentation should be limited to two sets
-(a, b) or (a, c) and not 3. I don't /think/ it was relevant whether the
-function segmented the return values into 3 sets just so it could
-guarantee that it didn't return one of those sets.
-
-If that's not the case, the following would indeed solve the problem easily:
-
-> /**
->  * dma_request_slave_channel - try to allocate an exclusive slave channel
-...
->  * Returns pointer to appropriate DMA channel on success or an error pointer.
->  * In order to ease compatibility with other DMA request APIs, this function
->  * guarantees NEVER to return NULL.
->  */
-
->>         /*
->>          * This is code elsewhere in a driver where DMA is optional;
->>          * that code must act differently based on whether a DMA
->>          * channel was acquired or not. So, it tests chan against
->>          * NULL.
->>          */
->>         if (!chan) // This test and the above IS_ERR are IS_ERR_OR_NULL
->>                 return -ESOMETHING;
+>>>>  Optional properties:
+>>>>  - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
+>>>
+>>> Hmm this we may not need, this can probably be deciphered from the compatible
+>>> flag already?
+>>
+>> How? Compatible contains the same string, for example for OMAP4:
+>>
+>> timer8 has:
+>>                         compatible = "ti,omap4430-timer";
+>>                         ti,timer-pwm;
+>>                         ti,timer-dsp;
+>>
+>> and timer9 has:
+>>                         compatible = "ti,omap4430-timer";
+>>                         ti,hwmods = "timer9";
+>>                         ti,timer-pwm;
+>>
 > 
-> It's not, because at this point chan will never be an error pointer.
-
-It's the combination of the two. IS_ERR_OR_NULL is two separate tests in
-one macro. Simply separating the two tests into separate lines of code
-doesn't change what the code is doing.
-
-> Sure you could do follow on cleanups to allow this driver to propagate
-> the dma_request_slave_channel error code up and change this to if
-> (IS_ERR(chan)) return PTR_ERR(chan), but that's incremental to the
-> initial conversion.
+> Some of these features are always hardwired certain way and could be mapped to
+> the right timer based on the timer offset and the compatible flag if we want
+> to avoid adding the ti,timer-alwon property. It seems that most omaps have
+> just one always on timer that's the first timer, and only on am33xx it does
+> not exist?
 > 
->> In case (2) above, if the driver /only/ calls a modified
->> dma_request_slave_channel(), all the checks could just be if
->> (IS_ERR(chan)) instead - then problem solved.
-> 
-> It's not solved, you would need to audit the rest of the driver to
-> make sure that everywhere it checks a channel is NULL it checks for
-> IS_ERR instead.  That's a deeper / unnecessary rework for driver's
-> that don't care about the reason they did not get a channel.
+> I'm fine adding ti,timer-alwon if it help to leave out static data in the
+> driver and avoid patching the driver for every new SoC. But sounds like in
+> this case we really have just the am33xx exception to the rule?
 
-I was of course assuming that the auditing would be done, and indeed
-when I first started work on this conversion, it's exactly what I was
-doing. That's why I said *all* checks, not just "the first check".
+ti,timer-alwon may not be needed yes, since on all platforms I've observed first
+timer has this property. However from OMAP3 dt, timer12 has it too. Not sure
+what that implies.
 
->> However, if the driver
->> mixes the new dma_request_slave_channel() and the unconverted
->> dma_request_channel(), it has to either (a) convert an ERR return from
->> dma_request_slave_channel() to match dma_request_channel()'s NULL error
-> 
-> Yes, better to live with this situation and convert existing drivers
-> vs have a subset of drivers call a new
-> dma_request_slave_channel_or_err() API and then *still* need to
-> convert it to NULL.
-> 
->> return, or (b) convert a NULL return from dma_request_channel() to match
->> dma_request_slave_channel()'s ERR return. Without the conversion, all
->> tests would have to use the deprecated IS_ERR_OR_NULL. Either of those
->> conversion options converts an error value from 1 API into a
->> theoretically valid return value from the other API, which is a bug.
-> 
-> Getting an error from dma_request_slave_channel() and converting that
-> value to NULL is a bug because dma_request_channel() would also return
-> NULL if it did not get a channel?  That's normalization, not a bug.
+I think what Jon was trying to do is to find a DT node by property, he had no
+other way of getting a device_node * otherwise.
 
-No, it's a bug because if dma_request_slave_channel() is documented to
-return valid-or-ERR, then assuming that it can never return NULL is
-inconsistent with that. The translation is only possible if it's
-documented to return valid-or-ERR-but-never-NULL.
+But notice this macro used for HS (secure devices):
+OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+                        2, "timer_sys_ck", NULL);
+
+How would you specify in DT that you want a node with the timer-secure property
+as the clocksource if we drop these kind of properties?
+
+>>> Then for the users of a specific dmtimer, they can select the right one using
+>>> the interrupt-parent property:
+>>>
+>>> timer1: timer at 0x4800abcd {
+>>> 	compatible = "ti,omap5430-timer";
+>>> 	#interrupt-cells = <1>;		/* needs irqchip implemented for dmtimer */
+>>> 	interrupt-controller;
+>>> 	#clock-cells = <1>;		/* needs clocksource implemented for dmtimer */
+>>> 	clock-output-names = "32k", "sys_ck";
+>>> 	...
+>>> };
+>>
+>> In reference to my last thread reply, irqchip may not be available early in the
+>> boot process (.init_time) for system timer usage?
+> 
+> Hmm it should be, looks like we have in arch/arm/kernel/irq.c:
+> 
+> void __init init_IRQ(void)
+> {
+> 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+> 		irqchip_init();
+> 	else    
+> 		machine_desc->init_irq();
+> }               
+> 
+> Then in init/main.c has:
+> 	...
+> 	early_irq_init();
+> 	init_IRQ();
+> 	tick_init();
+> 	init_timers();
+> 	hrtimers_init();
+> 	softirq_init();
+> 	timekeeping_init();
+> 	time_init();
+> 	...
+> 
+> So looks like we should have irqchip available?
+
+Right. I think your idea of using irqchip is certainly a clean way. Let me go
+back to the drawing board and try to see if we have all the pieces we need and
+there are no surprises in doing it this way.
+
+Then we can have a general purpose clocksource driver that uses the irqchip
+driver. I still worry about things like hwmod that may be need to be called on
+specific timer, and runtime PM is not available that early in the boot process.
+
+thanks,
+
+-Joel
