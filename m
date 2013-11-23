@@ -1,28 +1,25 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Nov 2013 17:07:13 -0800
+Date: Fri, 22 Nov 2013 17:08:51 -0800
 Subject: [PATCH] of/platform: Fix no irq domain found errors when
  populating interrupts
-In-Reply-To: <20131123004334.GJ10023@atomide.com>
+In-Reply-To: <20131123005509.GJ16735@n2100.arm.linux.org.uk>
 References: <20131123004334.GJ10023@atomide.com>
-Message-ID: <20131123010712.GM10023@atomide.com>
+ <20131123005509.GJ16735@n2100.arm.linux.org.uk>
+Message-ID: <20131123010850.GN10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131122 16:44]:
-> @@ -168,7 +218,13 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  			rc = of_address_to_resource(np, i, res);
->  			WARN_ON(rc);
->  		}
-> -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
-> +
-> +		/* See of_device_resource_notify for populating interrupts */
-> +		for (i = 0; i < num_irq; i++, res++) {
-> +			res->flags = IORESOURCE_IRQ;
-> +			res->start = -EPROBE_DEFER;
-> +			res->end = -EPROBE_DEFER;
-> +		}
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
+> On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
+> > +		/* See of_device_resource_notify for populating interrupts */
+> > +		for (i = 0; i < num_irq; i++, res++) {
+> > +			res->flags = IORESOURCE_IRQ;
+> > +			res->start = -EPROBE_DEFER;
+> > +			res->end = -EPROBE_DEFER;
+> 
+> NAK.  Definitely a bad idea to start introducing magic values other into
+> resources.  Please don't do this.
 
-Hmm actually we want to use some other value here as res->start
-is not an int. Maybe some kind of hwirq_max + EPROBE_DEFER.
+Do you have any better ideas on how to sort out this issue then?
 
 Tony
