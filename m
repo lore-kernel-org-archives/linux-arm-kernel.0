@@ -1,91 +1,142 @@
-From: caesarxuchao@gmail.com (Chao Xu)
-Date: Fri, 22 Nov 2013 21:27:11 -0600
-Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
-In-Reply-To: <20131120183548.GH10317@atomide.com>
-References: <87hab9agjr.fsf@gmail.com>
- <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
- <87wqk3n54l.fsf@gmail.com> <20131120183548.GH10317@atomide.com>
-Message-ID: <CAKZq+rcoC5PLSVVazWcce7V7TcBM8=M2jM56bvk9HO2orKt8fg@mail.gmail.com>
+From: dt.tangr@gmail.com (dt.tangr at gmail.com)
+Date: Sat, 23 Nov 2013 17:04:16 +1100
+Subject: [PATCH] usb: chipidea: add support for USB OTG controller on TI-NSPIRE
+Message-ID: <5290458b.87c5440a.4c57.ffffc9c8@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"I wonder if we also have some dependency to some earlier versions of
-u-boot as u-boot now only muxes the essential pins?"
-This is exactly the problem in my case. I added "#define
-CONFIG_SYS_ENABLE_PADS_ALL" in u-boot/include/configs/omap4_common.h
-and now there is output.
+From: Daniel Tang <dt.tangr@gmail.com>
 
-I guess the reason that the u-boot worked out-of-box for Ben but not
-for me is that I missed some configurations in v3.12 kernel. I image
-there is a config options that tells the kernel to take care of the
-non-essential pins that used to be the responsibility of u-boot. Could
-you confirm my hypothesis? And if so, could you kindly suggest what's
-the name of the config option?
+The USB controller in TI-NSPIRE calculators are based
+off either Freescale's USB OTG controller or the USB
+controller found in the IMX233, both of which are
+Chipidea compatible.
 
-Thank you!
+This patch adds a device tree binding for the controller.
 
-On Wed, Nov 20, 2013 at 12:35 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Ben Gamari <bgamari.foss@gmail.com> [131119 19:07]:
->> Chao Xu <caesarxuchao@gmail.com> writes:
->>
->> > Hi,
->> >
->> > I also try to boot v3.12 on my pandaboard rev A2, but it hangs at
->> > "starting kernel". My SD card is originally loaded with a linaro 12.04
->> > ubuntu-developer image. I have tried with v3.7 and v3.8 uImage and
->> > both of them work normally, but v3.12 hangs. Is there any trick I
->> > missed? Do I need to use the new u-boot as used by Ben?
->> >
->> I've written up some of my experiences bringing up 3.12 on the
->> PandaBoard here[1]. You may find it helpful. Regardless, I would
->> definitely try upgrading u-boot.
->
-> Nice investigative blogging :)
->
-> Care to also update it with the other issues remaining on pandaboard?
-> Sounds like we're pretty close to having things working nicely with
-> mainline kernel on it, so let's just fix those issues ASAP.
->
-> I'm aware of at least two issues:
->
-> 1.  The WLAN not working after a soft reset, or if the interface is
->     reset with ifconfig down. This could be a typo somewhere in the
->     .dts file for the WLAN regulator or something like that.
->
-> 2. Suspend and resume does not wake-up from serial console and spews
->    a bunch of warnings. The wake-up issue can be fixed with the new
->    the new interrupts-extended property to use the wake IRQs, I'll
->    try to update my patches for that today.
->
->> > And here is a separate problem with building u-boot. I cloned the
->> > upstream u-boot repository. The latest commit is
->> > c2e5e802ecb7ab668ce9911b210ed68c804b349f. Then I did:
->> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- omap4_panda_config
->> > make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j8
->> > cp MLO u-boot.img /media/boot/
->> > But when turn on my pandaboard, there is NO output from the serial
->> > console. I didn't change the other file in the boot partition. They
->> > are from linaro 12.04 ubuntu-developer image.
->> >
->> I would check that you have earlyprintk enabled (both in the kernel
->> configuration as well as on the kernel command line). Moreover, ensure
->> that the correct serial devices is selected for low-level debug output
->> (in the kernel configuration).
->
-> I wonder if we also have some dependency to some earlier versions of
-> u-boot as u-boot now only muxes the essential pins?
->
-> Regards,
->
-> Tony
->
->
->> [1] http://bgamari.github.io/posts/2013-11-17-running-modern-kernel-on-pandaboard.html
->
->
+Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+---
+ .../devicetree/bindings/usb/ci13xxx-nspire.txt     | 17 +++++
+ drivers/usb/chipidea/Makefile                      |  1 +
+ drivers/usb/chipidea/ci_hdrc_nspire.c              | 74 ++++++++++++++++++++++
+ 3 files changed, 92 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
+ create mode 100644 drivers/usb/chipidea/ci_hdrc_nspire.c
 
+diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt b/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
+new file mode 100644
+index 0000000..5ba8e90
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ci13xxx-nspire.txt
+@@ -0,0 +1,17 @@
++* TI-Nspire USB OTG Controller
++
++Required properties:
++- compatible: Should be "zevio,nspire-usb"
++- reg: Should contain registers location and length
++- interrupts: Should contain controller interrupt
++
++Recommended properies:
++- vbus-supply: regulator for vbus
++
++Examples:
++		usb0: usb at B0000000 {
++			reg = <0xB0000000 0x1000>;
++			compatible = "zevio,nspire-usb";
++			interrupts = <8>;
++			vbus-supply = <&vbus_reg>;
++		};
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index a99d980..245ea4d 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+ # Glue/Bridge layers go here
 
+ obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
++obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_nspire.o
 
--- 
-Regards,
-Chao Xu
+ # PCI doesn't provide stubs, need to check
+ ifneq ($(CONFIG_PCI),)
+diff --git a/drivers/usb/chipidea/ci_hdrc_nspire.c b/drivers/usb/chipidea/ci_hdrc_nspire.c
+new file mode 100644
+index 0000000..318761d
+--- /dev/null
++++ b/drivers/usb/chipidea/ci_hdrc_nspire.c
+@@ -0,0 +1,74 @@
++/*
++ *	Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Based off drivers/usb/chipidea/ci_hdrc_msm.c
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/usb/gadget.h>
++#include <linux/usb/chipidea.h>
++
++#include "ci.h"
++
++static struct ci_hdrc_platform_data ci_hdrc_nspire_platdata = {
++	.name			= "ci_hdrc_nspire",
++	.flags			= CI_HDRC_REGS_SHARED,
++	.capoffset              = DEF_CAPOFFSET,
++};
++
++static int ci_hdrc_nspire_probe(struct platform_device *pdev)
++{
++	struct platform_device *ci_pdev;
++
++	dev_dbg(&pdev->dev, "ci_hdrc_nspire_probe\n");
++
++	ci_pdev = ci_hdrc_add_device(&pdev->dev,
++				pdev->resource, pdev->num_resources,
++				&ci_hdrc_nspire_platdata);
++
++	if (IS_ERR(ci_pdev)) {
++		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
++		return PTR_ERR(ci_pdev);
++	}
++
++	platform_set_drvdata(pdev, ci_pdev);
++
++	return 0;
++}
++
++static int ci_hdrc_nspire_remove(struct platform_device *pdev)
++{
++	struct platform_device *ci_pdev = platform_get_drvdata(pdev);
++
++	ci_hdrc_remove_device(ci_pdev);
++
++	return 0;
++}
++
++static const struct of_device_id ci_hdrc_nspire_dt_ids[] = {
++	{ .compatible = "zevio,nspire-usb", },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver ci_hdrc_nspire_driver = {
++	.probe = ci_hdrc_nspire_probe,
++	.remove = ci_hdrc_nspire_remove,
++	.driver = {
++		.name = "nspire_usb",
++		.owner = THIS_MODULE,
++		.of_match_table = ci_hdrc_nspire_dt_ids,
++	},
++};
++
++MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
++module_platform_driver(ci_hdrc_nspire_driver);
++
++MODULE_ALIAS("platform:nspire_usb");
++MODULE_ALIAS("platform:ci13xxx_nspire");
++MODULE_LICENSE("GPL v2");
+--
+1.8.1.3
