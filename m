@@ -1,141 +1,158 @@
-From: marc.ceeeee@gmail.com (Marc C)
-Date: Fri, 22 Nov 2013 17:09:32 -0800
-Subject: [PATCH 5/5] ARM: brcmstb: dts: add a reference DTS for Broadcom 7445
-Message-ID: <CAO1A-8Az=g2S-4hUZKu3pNkEsmd421GJWyYzWc6fUEnChQJ31g@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 22 Nov 2013 19:12:10 -0600
+Subject: [PATCH 5/8] ARM: OMAP2+: timer: Introduce OF-friendly
+ clocksource/clockevent system timers
+In-Reply-To: <CAL_JsqJoH_yWP-Aae2REb=qzV6c56=WQoVLV8cFgX+_b+voM5g@mail.gmail.com>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-6-git-send-email-joelf@ti.com>
+ <CAL_JsqKS=cGeAhj+K04SOtA8nJRR3MXxS3ry-kzjQOkZx3yK4g@mail.gmail.com>
+ <528F8959.7080207@ti.com>
+ <CAL_JsqJoH_yWP-Aae2REb=qzV6c56=WQoVLV8cFgX+_b+voM5g@mail.gmail.com>
+Message-ID: <529000EA.7090001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sample DTS which will allow bootup of a board populated
-with the BCM7445 chip.
+Adding Thomas to the thread since discussion is about clocksource, and Mark
+Rutland as discussion is related to timers and DT, thanks.
 
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/brcmstb-7445.dts |  115 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 115 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/brcmstb-7445.dts
+On 11/22/2013 02:01 PM, Rob Herring wrote:
+> On Fri, Nov 22, 2013 at 10:42 AM, Joel Fernandes <joelf@ti.com> wrote:
+>> On 11/22/2013 09:58 AM, Rob Herring wrote:
+>>> On Thu, Nov 21, 2013 at 7:56 PM, Joel Fernandes <joelf@ti.com> wrote:
+>>>> This work is a migration effort of OMAP system timers to the
+>>>> clocksource/clockevent framework. Consider this as a first-pass in this effort.
+>>>> There are few cleanups that need to be done first. The HWMOD code is
+>>>> intertwined with the timer code. HWMOD code cleanups in the future will
+>>>> hopefully make most of this code go away, so till then we separate out the
+>>>> power/clocks portion of the code from the actual timer bits.  This will
+>>>> facilitate near-future work of adapting the system timer as a clocksource.
+>>>>
+>>>> New functions for OF-only boot are introduced, and we can soon delete the old
+>>>> versions once we migrate all platforms. Currently only AM335x is migrated and
+>>>> testedA new omap_generic_timer_init function is introduced for DT platforms.
+>>>> Code required earlier for non-DT platforms such as setup of timer IDs and timer
+>>>> parent clock is not required.  parent clocks are automatically setup by the mux
+>>>> clock driver through DT so they no longer need to be hardcoded.
+>>>>
+>>>> The init code will try to pick the best timer for clocksource and clockevent
+>>>> however bindings are added to force a particular timer as clocksource or
+>>>> clockevent through DT.
+>>>>
+>>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>>> ---
+>>>>  .../devicetree/bindings/arm/omap/timer.txt         |  12 ++
+>>>>  arch/arm/mach-omap2/common.h                       |   1 +
+>>>>  arch/arm/mach-omap2/timer.c                        | 235 +++++++++++++++++++++
+>>>>  3 files changed, 248 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>>>> index d02e27c..6cf7a75 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>>>> @@ -32,6 +32,18 @@ Optional properties:
+>>>>  - ti,timer-secure:     Indicates the timer is reserved on a secure OMAP device
+>>>>                         and therefore cannot be used by the kernel.
+>>>>
+>>>> +- ti,timer-clockevent,
+>>>> +  ti,timer-clocksource These properties force the system timer code to choose
+>>>> +                       the particular timer as a clockevent or clocksource.
+>>>> +                       If these properties are not specified, the timer code
+>>>> +                       picks up a "ti,timer-alwon" as the clocksource and a
+>>>> +                       timer containing one of the following properties as
+>>>> +                       the clockevent in the following order:
+>>>> +                               ti,timer-alwon
+>>>> +                               ti,timer-dsp
+>>>> +                               ti,timer-pwm
+>>>> +                               ti,timer-secure
+>>>
+>>> These properties were added specifically for the reason of avoiding
+>>> linux specific properties like these. When is this not sufficient?
+>>
+>> Some platforms cannot use certain timers as clockevents and clocksource, to keep
+>> this code functionally equivalent and working, I added these properties so that
+>> its possible to select specific timers as clockevents/sources as was being done
+>> in the non-DT case. I'm open to suggestions for doing this in a better way for DT.
+> 
+> There has to be a defined reason why a given timer cannot be used. You
+> are not explaining what that reason is. Define a property or set of
+> properties that describe the h/w feature or quirk.
 
-diff --git a/arch/arm/boot/dts/brcmstb-7445.dts
-b/arch/arm/boot/dts/brcmstb-7445.dts
-new file mode 100644
-index 0000000..a8b74c5
---- /dev/null
-+++ b/arch/arm/boot/dts/brcmstb-7445.dts
-@@ -0,0 +1,115 @@
-+/dts-v1/;
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+ #address-cells = <0x1>;
-+ #size-cells = <0x1>;
-+ model = "Broadcom STB (7445)";
-+ compatible = "brcm,brcmstb";
-+ interrupt-parent = <&gic>;
-+
-+ chosen {
-+ bootargs = "earlyprintk console=ttyS0,115200";
-+ };
-+
-+ memory {
-+ #address-cells = <0x1>;
-+ #size-cells = <0x1>;
-+ device_type = "memory";
-+ reg = <0x0 0x40000000 0x40000000 0x40000000 0x80000000 0x40000000>;
-+ };
-+
-+ cpupll: cpupll at 0 {
-+ compatible = "fixed-clock";
-+ #clock-cells = <0x0>;
-+ clock-frequency = <1500000000>;
-+ };
-+
-+ cpuclk: cpu-clk-div at 0 {
-+ compatible = "brcm,brcmstb-cpu-clk-div";
-+ reg = <0xf03e257c 0x4>;
-+ #clock-cells = <0x0>;
-+ clocks = <&cpupll>;
-+ div-table = <0x0 0x1 0x11 0x2 0x12 0x4 0x13 0x8 0x14 0x10>;
-+ };
-+
-+ cpus {
-+ #address-cells = <0x1>;
-+ #size-cells = <0x0>;
-+
-+ cpu at 0 {
-+ operating-points = <0x16e360 0x0
-+ 0xb71b0 0x0
-+ 0x5b8d8 0x0
-+ 0x2dc6c 0x0
-+ 0x16e36 0x0>;
-+ clocks = <&cpuclk>;
-+ device_type = "cpu";
-+ compatible = "brcm,brahma15";
-+ reg = <0x0>;
-+ clock-frequency = <1500000000>;
-+ };
-+
-+ cpu at 1 {
-+ device_type = "cpu";
-+ compatible = "brcm,brahma15";
-+ reg = <0x1>;
-+ clock-frequency = <1500000000>;
-+ };
-+
-+ cpu at 2 {
-+ device_type = "cpu";
-+ compatible = "brcm,brahma15";
-+ reg = <0x2>;
-+ clock-frequency = <1500000000>;
-+ };
-+
-+ cpu at 3 {
-+ device_type = "cpu";
-+ compatible = "brcm,brahma15";
-+ reg = <0x3>;
-+ clock-frequency = <1500000000>;
-+ };
-+ };
-+
-+ gic: interrupt-controller at ffd00000 {
-+ compatible = "brcm,brahma15-gic", "arm,cortex-a15-gic";
-+ interrupt-controller;
-+ #interrupt-cells = <0x3>;
-+ reg = <0xffd01000 0x1000 0xffd02000 0x2000>;
-+ };
-+
-+ timer {
-+ compatible = "arm,armv7-timer";
-+ interrupts = <0x1 0xd 0xf08 0x1 0xe 0xf08 0x1 0xb 0xf08 0x1 0xa 0xf08>;
-+ };
-+
-+ serial at f0406b00 {
-+ compatible = "ns16550a";
-+ reg = <0xf0406b00 0x20>;
-+ reg-shift = <0x2>;
-+ reg-io-width = <0x4>;
-+ interrupts = <0x0 0x4b 0x4>;
-+ clock-frequency = <0x4d3f640>;
-+ };
-+
-+ sun-top-ctrl at f0404000 {
-+ compatible = "brcm,brcmstb-sun-top-ctrl";
-+ reg = <0xf0404000 0x51c>;
-+ reset-source-enable-reg = <0x304>;
-+ sw-master-reset-reg = <0x308>;
-+ };
-+
-+ cpu-biu-ctrl at f03e2400 {
-+ compatible = "brcm,brcmstb-cpu-biu-ctrl";
-+ reg = <0xf03e2400 0x5b4>;
-+ cpu-reset-config-reg = <0x178>;
-+ cpu0-pwr-zone-ctrl-reg = <0x88>;
-+ };
-+
-+ hif-continuation at f0452000 {
-+ compatible = "brcm,brcmstb-hif-continuation";
-+ reg = <0xf0452000 0x100>;
-+ stb-boot-hi-addr0-reg = <0x0>;
-+ };
-+};
--- 
-1.7.1
+Reason? There are HW bugs that prevent a timer from being used. See [1]. And
+there may be other reasons, I haven't written this code but I know that there
+are other HW bugs that made authors pick a specific timer such as board issues
+or accuracy.
+
+This is nothing new, just that I'm trying to find a way to do it from DT.
+
+You can see the ifdef'ry below in mach-omap2/timer.c. All I'm trying to do is
+make it simpler and cleaner by adding these properties to DT so that we can
+delete this code entirely.
+
+
+#ifdef CONFIG_ARCH_OMAP2
+OMAP_SYS_32K_TIMER_INIT(2, 1, "timer_32k_ck", "ti,timer-alwon",
+                        2, "timer_sys_ck", NULL);
+#endif /* CONFIG_ARCH_OMAP2 */
+
+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
+OMAP_SYS_32K_TIMER_INIT(3, 1, "timer_32k_ck", "ti,timer-alwon",
+                        2, "timer_sys_ck", NULL);
+OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+                        2, "timer_sys_ck", NULL);
+#endif /* CONFIG_ARCH_OMAP3 */
+
+etc...
+
+>>>
+>>> And I agree with the comment to use OF_CLKSRC.
+>>>
+>>
+>> There are difficulties I mentioned in a previous post [1] stating why it may not
+>> be possible to use OF_CLKSRC macros, and still keep the code functionally
+>> equivalent to when it was non-DT.
+> 
+> Sorry, I don't buy it.
+> 
+
+Ofcourse even I want to use OF_CLOCKSOURCE macros for registering DT
+clocksources, but re-iterating, the selection of timer is not a simple match of
+compatible property as you may see in my patch. Some platforms need specific
+timer as clocksource, all timers have same "compatible" flag. How would you
+differentiate? Refer to ifdef's above to see how timer IDs change across
+platforms in the non-DT code that's being converted.
+
+I think clocksource_of_init has been written such that any timer having a
+matching compatible can be enumerated.
+
+I can change the compatible to something unique in the DT like:
+
+timer1:timer at ... {
+  compatible = "ti,dmtimer-clocksource"
+  ....
+}
+
+ and that may make clocksource work. But then such a similar approach to
+clockevent is not possible. What I observed in other platforms is a *single* DT
+node represents both clocksource and clockevent.
+
+For example, in zevio-timer:
+drivers/clocksource/zevio-timer.c
+
+does this:
+CLOCKSOURCE_OF_DECLARE(zevio_timer, "lsi,zevio-timer", zevio_timer_add);
+
+In the body of zevio_timer_add(struct device_node *node), they do this:
+        timer->base = of_iomap(node, 0);
+        timer->timer1 = timer->base + IO_TIMER1; // USED AS CLOCKSOURCE
+        timer->timer2 = timer->base + IO_TIMER2; // USED AS CLOCKEVENT
+
+What's happening here is a single device node (DT node) represents both
+clockevent and source. But for OMAP, we use different timers for clockevent and
+clocksource. They are physically 2 different timer DT nodes. How do we register
+something like this with the CLOCKSOURCE_OF_DECLARE macro?
+
+Looking forward to your suggestions.
+
+thanks,
+
+-Joel
