@@ -1,25 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 23 Nov 2013 10:36:37 -0500
-Subject: [PATCH 0/2] ARM: mvebu: fix DT def. of PCIe units for mv78230
- and mv78260
-In-Reply-To: <cover.1383681717.git.arno@natisbad.org>
-References: <cover.1383681717.git.arno@natisbad.org>
-Message-ID: <20131123153637.GM29241@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 23 Nov 2013 09:42:44 -0600
+Subject: [PATCH] of/platform: Fix no irq domain found errors when
+ populating interrupts
+In-Reply-To: <20131123015034.GP10023@atomide.com>
+References: <20131123004334.GJ10023@atomide.com>
+ <20131123005509.GJ16735@n2100.arm.linux.org.uk>
+ <20131123010850.GN10023@atomide.com>
+ <20131123011515.GO10023@atomide.com>
+ <20131123015034.GP10023@atomide.com>
+Message-ID: <CAL_JsqKV7K+QdLHS+3LtfcVx5Dpc7n6A8UwwNWKBP33Gs19c8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:45:33PM +0100, Arnaud Ebalard wrote:
-> Arnaud Ebalard (2):
->   ARM: mvebu: second PCIe unit of Armada XP mv78230 is only x1 capable
->   ARM: mvebu: fix second and third PCIe units of Armada XP mv78260
-> 
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi |  24 +++----
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 109 ++++++++++++++++++++++++-------
->  2 files changed, 97 insertions(+), 36 deletions(-)
+On Fri, Nov 22, 2013 at 7:50 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [131122 17:16]:
+>> * Tony Lindgren <tony@atomide.com> [131122 17:09]:
+>> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
+>> > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
+>> > > > +               /* See of_device_resource_notify for populating interrupts */
+>> > > > +               for (i = 0; i < num_irq; i++, res++) {
+>> > > > +                       res->flags = IORESOURCE_IRQ;
+>> > > > +                       res->start = -EPROBE_DEFER;
+>> > > > +                       res->end = -EPROBE_DEFER;
+>> > >
+>> > > NAK.  Definitely a bad idea to start introducing magic values other into
+>> > > resources.  Please don't do this.
+>> >
+>> > Do you have any better ideas on how to sort out this issue then?
+>>
+>> I guess we could allocate all the resources lazily here, I'll take a look
+>> at that.
+>
+> Here's a version that allocates the resources lazily with the notifier.
+> Seems to boot, need to play with it a bit more though to make sure we're
+> not overwriting resources for any legacy devices.
 
-Whole series applied to mvebu/dt-fixes with Thomas' Ack and Cc'd to
-stable for v3.10.x and up.
+Have you seen Thierry's series[1]? While your approach is certainly
+more concise, it seems like a work-around for the problem. I don't
+think a notifier is the right long term solution.
 
-thx,
+Rob
 
-Jason.
+[1] http://www.spinics.net/lists/arm-kernel/msg274110.html
