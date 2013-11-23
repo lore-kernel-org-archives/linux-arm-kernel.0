@@ -1,46 +1,32 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Sat, 23 Nov 2013 23:03:03 +0000
-Subject: ACPI
-In-Reply-To: <20131123183904.GB20790@obsidianresearch.com>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <528FC5C1.1080403@jonmasters.org> <528FCEA6.1060602@jonmasters.org>
- <201311231011.45892.arnd@arndb.de>
- <20131123183904.GB20790@obsidianresearch.com>
-Message-ID: <20131123230303.GA5212@srcf.ucam.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 23 Nov 2013 18:28:46 -0500
+Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
+Message-ID: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 23, 2013 at 11:39:04AM -0700, Jason Gunthorpe wrote:
+Building ARM with NO_BOOTMEM generates below warning. Using min_t
+to find the correct alignment avoids the warning.
 
-> However, fundamentally, that would mean that ACPI on the ARM is on-hold
-> from a kernel perspective until the first spec is released by the new
-> working group - and that would imply initial servers should plan to
-> boot using DT, and provide experimental ACPI. Similar to how x86
-> introduced ACPI.
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ mm/nobootmem.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Given a sufficiently well-defined platform (as Jon has hinted might be 
-on the cards), there shouldn't really be any requirement to add any 
-non-standardised ACPI support. Most of the ACPI-on-ARM work we've been 
-talking about has been in order to provide a mechanism for booting a 
-generic kernel on an ill-defined platform.
-
-But, as it stands, the situation is still confusing. Different people 
-who are interested in ACPI on ARM appear to want entirely different 
-things, and it's not helped by this vague suggestion that server vendors 
-want something entirely different from what Linaro have been working on 
-and what we've been discussing at various points during recent 
-conferences.
-
-Jon, I know you're constrained by any number of hilarious NDAs, but this 
-situation is currently fairly unworkable. The interest various people 
-have in ensuring that ACPI on ARM is viable has been spurred on by your 
-constant reassurances that server vendors are going to require it. But 
-if we don't know what server vendors actually want then there's 
-absolutely no guarantee that any of the work we're doing is going to be 
-useful, and wasting time now is going to reduce people's ability to care 
-in future. There's probably more ACPI expertise in the wider Linux 
-community than anywhere else. Figure out a way to make use of it now, 
-rather than relying on them to help you later.
-
+diff --git a/mm/nobootmem.c b/mm/nobootmem.c
+index 2c254d3..8954e43 100644
+--- a/mm/nobootmem.c
++++ b/mm/nobootmem.c
+@@ -85,7 +85,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
+ 	int order;
+ 
+ 	while (start < end) {
+-		order = min(MAX_ORDER - 1UL, __ffs(start));
++		order = min_t(size_t, MAX_ORDER - 1UL, __ffs(start));
+ 
+ 		while (start + (1UL << order) > end)
+ 			order--;
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+1.7.9.5
