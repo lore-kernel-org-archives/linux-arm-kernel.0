@@ -1,60 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 23 Nov 2013 08:32:40 -0800
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <CAL_JsqKV7K+QdLHS+3LtfcVx5Dpc7n6A8UwwNWKBP33Gs19c8g@mail.gmail.com>
-References: <20131123004334.GJ10023@atomide.com>
- <20131123005509.GJ16735@n2100.arm.linux.org.uk>
- <20131123010850.GN10023@atomide.com>
- <20131123011515.GO10023@atomide.com>
- <20131123015034.GP10023@atomide.com>
- <CAL_JsqKV7K+QdLHS+3LtfcVx5Dpc7n6A8UwwNWKBP33Gs19c8g@mail.gmail.com>
-Message-ID: <20131123163240.GW5928@atomide.com>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Sat, 23 Nov 2013 12:23:35 -0500
+Subject: [rtc-linux] Re: [PATCH v4 0/4] pm: Add power off control
+In-Reply-To: <20131122195041.GF18968@localhost>
+References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EAD58C2@DBDE01.ent.ti.com>
+ <CA+Bv8XbUa7xPd8V7LQCmFbbdQvORUK1X0xBPzAhKUFFjjho2jw@mail.gmail.com>
+ <20131122195041.GF18968@localhost>
+Message-ID: <CANacCWxwr7s6ZvjWRbg_JGgc-Q1sJa-KJCLrSCK4BvSrmL5Eug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [131123 07:43]:
-> On Fri, Nov 22, 2013 at 7:50 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
-> >> * Tony Lindgren <tony@atomide.com> [131122 17:09]:
-> >> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
-> >> > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
-> >> > > > +               /* See of_device_resource_notify for populating interrupts */
-> >> > > > +               for (i = 0; i < num_irq; i++, res++) {
-> >> > > > +                       res->flags = IORESOURCE_IRQ;
-> >> > > > +                       res->start = -EPROBE_DEFER;
-> >> > > > +                       res->end = -EPROBE_DEFER;
-> >> > >
-> >> > > NAK.  Definitely a bad idea to start introducing magic values other into
-> >> > > resources.  Please don't do this.
-> >> >
-> >> > Do you have any better ideas on how to sort out this issue then?
-> >>
-> >> I guess we could allocate all the resources lazily here, I'll take a look
-> >> at that.
-> >
-> > Here's a version that allocates the resources lazily with the notifier.
-> > Seems to boot, need to play with it a bit more though to make sure we're
-> > not overwriting resources for any legacy devices.
-> 
-> Have you seen Thierry's series[1]? While your approach is certainly
-> more concise, it seems like a work-around for the problem. I don't
-> think a notifier is the right long term solution.
+On Fri, Nov 22, 2013 at 2:50 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+[...]
+>
+> And why specifically *2* seconds, instead of *1* or *33* ?
+>
+> Sounds a bit like voodoo magic on this side :-)
 
-OK cool. I think we can fix the $Subject bug first without making all
-those changes, then do the rest of the reorg for v3.14.
+Consider the scenario where the actual time is 00:00:01.95 secs.
+Due to the 1 second resolution of the RTC, reading the registers
+would return 00:00:01. By the time we get to updating the
+RTC register for the shutdown by adding 1 sec (theoretically the
+smallest delta) we could end up programming the time that's already
+passed and in such cases the system will never shut down.
 
-The bug is that we try to populate IRQ resources at a wrong time
-when they may not exist.
+2 secs is the smallest delay that we can use to get the system
+to shutdown reliably.
 
-Based on a quick look it seems we could combine Thierry's addition
-of the new function of_platform_probe(struct platform_device *pdev)
-and use that to allocate all resources at driver probe time like my
-patch is doing. And then there's no need for the notifier.
+So it's not voodoo magic after all ;)
 
 Regards,
-
-Tony
-
- 
-> [1] http://www.spinics.net/lists/arm-kernel/msg274110.html
+Vaibhav
