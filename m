@@ -1,147 +1,70 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 22 Nov 2013 18:31:48 -0600
-Subject: [PATCH 6/8] devicetree: doc: Document ti,timer-parent property
-In-Reply-To: <20131122170800.GG10023@atomide.com>
-References: <1385085414-9034-1-git-send-email-joelf@ti.com>
- <1385085414-9034-7-git-send-email-joelf@ti.com>
- <20131122155838.GF10023@atomide.com> <528F8807.7050803@ti.com>
- <20131122170800.GG10023@atomide.com>
-Message-ID: <528FF774.4010109@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 23 Nov 2013 00:34:42 +0000
+Subject: [PATCH 11/31] dma: add channel request API that supports
+ deferred probe
+In-Reply-To: <528F9DF9.6080706@wwwdotorg.org>
+References: <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>
+ <528D0C06.9080006@wwwdotorg.org>
+ <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+ <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+ <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+Message-ID: <20131123003442.GH16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 11:08 AM, Tony Lindgren wrote:
-> * Joel Fernandes <joelf@ti.com> [131122 08:37]:
->> Hi Tony,
->>
->> Thanks for your comments, few replies inline below..
->>
->> On 11/22/2013 09:58 AM, Tony Lindgren wrote:
->>> * Joel Fernandes <joelf@ti.com> [131121 18:00]:
->>>> +Required properties for system timers (clockevents/clocksource):
->>>> +- ti,timer-parent:	System timer's parent mux clock needs to be setup.
->>>> +			This is currently hardcoded in code, for DT boot we
->>>> +			move this to DT.
->>>> +
->>>
->>> This can be replaced with just clk_set_rate, or clk_set_parent if needed.
->>> Or by having a clocks = <&32k_clk> property in the dmtimer node in the
->>> .dts file.
->>>
->>
->> Sure, but clock-data is still not available to make this possible in mainline.
->> We also discussed earlier right that we don't want dependencies as much as
->> possible to get one chunk in and working at a time. I was thinking like for a
->> first-pass since there's a lot of unrelated code that doesn't have dependencies,
->> but needs this to work, we can introduce this property for now and drop it later
->> as a "cost of migration"?
+On Fri, Nov 22, 2013 at 11:10:01AM -0700, Stephen Warren wrote:
+> On 11/22/2013 11:04 AM, Dan Williams wrote:
+> > I made that assumption because that is what your original patch proposed:
+> > 
+> > +/**
+> > + * dma_request_slave_channel_or_err - try to allocate an exclusive
+> > slave channel
+> > + * @dev:       pointer to client device structure
+> > + * @name:      slave channel name
+> > + *
+> > + * Returns pointer to appropriate dma channel on success or an error pointer.
+> > + */
+> > 
+> > What's the benefit of leaking NULL values to callers?  If they already
+> > need to check for err, why force them to check for NULL too?
 > 
-> I don't think there's a dependency here to the omap clocks as the dmtimer
-> can implement the clocksource separately and internally still use clk_get
-> using the clock alias table.
+> "Returns pointer to appropriate dma channel on success or an error
+> pointer." means that callers only have to check for an ERR value. If the
+> function returns NULL, then other DMA-related functions must treat that
+> as a valid channel ID. This is case (a) in my previous email.
 
-You mean implement clock-tree separately? Sorry I'm confused can you clarify
-what you mean?
+Stephen, Dan,
 
-In clock tree data (not upstream), here is the system clock for am335x for example:
-sys_clkin_ck: sys_clkin_ck at 44e10040 {
-        #clock-cells = <0>;
-        compatible = "mux-clock";
+My point (which you quoted) is a fine one - read the definition above.
 
-It uses the mux-clock driver. Are you saying we duplicate clock-tree stuff? I
-don't think that's a good idea specially since once clock dt data is available,
-we will switch to using it.
+"Returns pointer to appropriate DMA channel on success or an error pointer."
 
->>>>  Optional properties:
->>>>  - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
->>>
->>> Hmm this we may not need, this can probably be deciphered from the compatible
->>> flag already?
->>
->> How? Compatible contains the same string, for example for OMAP4:
->>
->> timer8 has:
->>                         compatible = "ti,omap4430-timer";
->>                         ti,timer-pwm;
->>                         ti,timer-dsp;
->>
->> and timer9 has:
->>                         compatible = "ti,omap4430-timer";
->>                         ti,hwmods = "timer9";
->>                         ti,timer-pwm;
->>
-> 
-> Some of these features are always hardwired certain way and could be mapped to
-> the right timer based on the timer offset and the compatible flag if we want
-> to avoid adding the ti,timer-alwon property. It seems that most omaps have
-> just one always on timer that's the first timer, and only on am33xx it does
-> not exist?
-> 
-> I'm fine adding ti,timer-alwon if it help to leave out static data in the
-> driver and avoid patching the driver for every new SoC. But sounds like in
-> this case we really have just the am33xx exception to the rule?
+This defines the range of values which are considered successful, and
+those which are considered to be errors.  Error pointers are defined
+by IS_ERR(ptr) being true (not by IS_ERR_OR_NULL(ptr) being true.
+Conversely, it defines what are considered to be non-errors.
 
-ti,timer-alwon may not be needed yes, since on all platforms I've observed first
-timer has this property. However from OMAP3 dt, timer12 has it too. Not sure
-what that implies.
+Therefore, users of such a function _must_ check the return value using
+IS_ERR() and not the IS_ERR_OR_NULL() abomination.
 
-I think what Jon was trying to do is to find a DT node by property, he had no
-other way of getting a device_node * otherwise.
+The question about NULL is unanswered, but with nothing specified, users
+must assume that if a subsystem returns NULL, it's fine to pass that back
+to the subsystem.  If the subsystem didn't intend for NULL to be valid,
+it shouldn't be returning NULL from such a defined function.
 
-But notice this macro used for HS (secure devices):
-OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
-                        2, "timer_sys_ck", NULL);
+It's not up to the user of the interface to dream up an error code if
+the subsystem happens to return NULL, or do other crap stuff like this:
 
-How would you specify in DT that you want a node with the timer-secure property
-as the clocksource if we drop these kind of properties?
+	if (IS_ERR_OR_NULL(ptr))
+		return PTR_ERR(ptr);
 
->>> Then for the users of a specific dmtimer, they can select the right one using
->>> the interrupt-parent property:
->>>
->>> timer1: timer at 0x4800abcd {
->>> 	compatible = "ti,omap5430-timer";
->>> 	#interrupt-cells = <1>;		/* needs irqchip implemented for dmtimer */
->>> 	interrupt-controller;
->>> 	#clock-cells = <1>;		/* needs clocksource implemented for dmtimer */
->>> 	clock-output-names = "32k", "sys_ck";
->>> 	...
->>> };
->>
->> In reference to my last thread reply, irqchip may not be available early in the
->> boot process (.init_time) for system timer usage?
-> 
-> Hmm it should be, looks like we have in arch/arm/kernel/irq.c:
-> 
-> void __init init_IRQ(void)
-> {
-> 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
-> 		irqchip_init();
-> 	else    
-> 		machine_desc->init_irq();
-> }               
-> 
-> Then in init/main.c has:
-> 	...
-> 	early_irq_init();
-> 	init_IRQ();
-> 	tick_init();
-> 	init_timers();
-> 	hrtimers_init();
-> 	softirq_init();
-> 	timekeeping_init();
-> 	time_init();
-> 	...
-> 
-> So looks like we should have irqchip available?
+which we already see cropping up from time to time.
 
-Right. I think your idea of using irqchip is certainly a clean way. Let me go
-back to the drawing board and try to see if we have all the pieces we need and
-there are no surprises in doing it this way.
-
-Then we can have a general purpose clocksource driver that uses the irqchip
-driver. I still worry about things like hwmod that may be need to be called on
-specific timer, and runtime PM is not available that early in the boot process.
-
-thanks,
-
--Joel
+So, my argument is that if you define an API to be "pointers on success,
+or error pointers" then your API better handle any cookie you return
+which satisfies IS_ERR(ptr) = false - which by definition includes NULL.
