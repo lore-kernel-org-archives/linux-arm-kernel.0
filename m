@@ -1,42 +1,31 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 22 Nov 2013 17:30:59 -0800
-Subject: [PATCH 5/7] clocksource/cadence_ttc: Overhaul clocksource
- frequency adjustment
-In-Reply-To: <52827B11.5040308@linaro.org>
-References: <1383945677-29674-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383945677-29674-6-git-send-email-soren.brinkmann@xilinx.com>
- <52827B11.5040308@linaro.org>
-Message-ID: <8cbd0206-ca30-48ae-8820-7d5c23b6fa3a@CO9EHSMHS022.ehs.local>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 23 Nov 2013 09:39:24 +0800
+Subject: crypto dependency in bit sliced AES
+In-Reply-To: <CA+55aFwRWGdA934GQdo6QpEuxRxeECvrpi9ctJWcVQ5pCyF1iw@mail.gmail.com>
+References: <CAKv+Gu8PESZ3uFZ6Rf+sma9QeRd7xSyrEa=RVCeDR1KtmLKEAA@mail.gmail.com>
+ <20131122225256.GG16735@n2100.arm.linux.org.uk>
+ <CA+55aFwRWGdA934GQdo6QpEuxRxeECvrpi9ctJWcVQ5pCyF1iw@mail.gmail.com>
+Message-ID: <20131123013924.GA16533@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 08:01:37PM +0100, Daniel Lezcano wrote:
-> On 11/08/2013 10:21 PM, Soren Brinkmann wrote:
-> >The currently used method adjusting the clocksource to a changing input
-> >frequency does not work on kernels from 3.11 on.
-> >The new approach is to keep the timer frequency as constant as possible.
-> >I.e.
-> >  - due to the TTC's prescaler limitations, allow frequency changes
-> >    only if the frequency scales by a power of 2
-> >  - adjust the counter's divider on the fly when a frequency change
-> >    occurs
-> >
-> >When suspending though, the driver should not prevent rate changes in
-> >order to allow the system to enter its low power state. For that
-> >reason a PM notifier is added so rate changes can be ignored during
-> >suspend/resume.
-> 
-> It sounds very weird you have to add a PM notifier in this driver.
-> 
-> Have you been facing an issue or do you assume it could happen ?
+On Fri, Nov 22, 2013 at 03:48:24PM -0800, Linus Torvalds wrote:
+>
+> Herbert, any idea why gmail would consider your emails spam? Mind
+> re-sending it once more, and I'll try to see if I get it..
 
-As I said in my other email, we do have some issues related with
-suspend. The construct with the PM notifier seemed to work but since we
-upgraded our vendor tree to 3.12 I see issues with this code.
+Sure I've just done a resend.
 
-So, for now, I'll remove the PM notifier and associated code from this
-patch.
-I have to revisit the suspend case later.
+> I actually see an email from Herbert *replying* to Borislav in my
+> archives, but I do not see the pull request emails themselves.
 
-	Thanks,
-	S?ren
+Based on that perhaps it's because I have too many (4) recipients
+in the pull request?
+
+I'll do another resend and move the receipients into the cc field.
+
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
