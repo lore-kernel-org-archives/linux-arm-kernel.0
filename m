@@ -1,74 +1,25 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Sat, 23 Nov 2013 14:48:48 +0000
-Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
-In-Reply-To: <20131122154947.GE24508@pengutronix.de>
-References: <1345852300-2213-1-git-send-email-marex@denx.de>
- <1345852300-2213-2-git-send-email-marex@denx.de>
- <20131122154947.GE24508@pengutronix.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411E0AF@039-SN2MPN1-021.039d.mgd.msft.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 23 Nov 2013 10:36:37 -0500
+Subject: [PATCH 0/2] ARM: mvebu: fix DT def. of PCIe units for mv78230
+ and mv78260
+In-Reply-To: <cover.1383681717.git.arno@natisbad.org>
+References: <cover.1383681717.git.arno@natisbad.org>
+Message-ID: <20131123153637.GM29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 05, 2013 at 09:45:33PM +0100, Arnaud Ebalard wrote:
+> Arnaud Ebalard (2):
+>   ARM: mvebu: second PCIe unit of Armada XP mv78230 is only x1 capable
+>   ARM: mvebu: fix second and third PCIe units of Armada XP mv78260
+> 
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi |  24 +++----
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 109 ++++++++++++++++++++++++-------
+>  2 files changed, 97 insertions(+), 36 deletions(-)
 
- 
-> >
-> > diff --git a/arch/arm/boot/dts/imx28.dtsi
-> b/arch/arm/boot/dts/imx28.dtsi
-> > index b996c2d..3cba62d 100644
-> > --- a/arch/arm/boot/dts/imx28.dtsi
-> > +++ b/arch/arm/boot/dts/imx28.dtsi
-> > @@ -520,6 +520,36 @@
-> >  					fsl,voltage = <1>;
-> >  					fsl,pull-up = <1>;
-> >  				};
-> > +
-> > +				usbphy0_pins_a: usbphy0 at 0 {
-> > +					reg = <0>;
-> > +					fsl,pinmux-ids = <
-> > +						0x2152 /*
-> MX28_PAD_SSP2_SS2__USB0_OVERCURRENT */
-> > +					>;
-> > +					fsl,drive-strength = <2>;
-> > +					fsl,voltage = <1>;
-> > +					fsl,pull-up = <0>;
-> > +				};
-> > +
-> > +				usbphy0_pins_b: usbphy0 at 1 {
-> > +					reg = <0>;
-> > +					fsl,pinmux-ids = <
-> > +						0x3061 /*
-> MX28_PAD_AUART1_CTS__USB0_OVERCURRENT */
-> > +					>;
-> > +					fsl,drive-strength = <2>;
-> > +					fsl,voltage = <1>;
-> > +					fsl,pull-up = <0>;
-> > +				};
-> > +
-> > +				usbphy1_pins_a: usbphy1 at 0 {
-> > +					reg = <0>;
-> > +					fsl,pinmux-ids = <
-> > +						0x2142 /*
-> MX28_PAD_SSP2_SS1__USB1_OVERCURRENT */
-> > +					>;
-> > +					fsl,drive-strength = <2>;
-> > +					fsl,voltage = <1>;
-> > +					fsl,pull-up = <0>;
-> > +				};
-> >  			};
-> >
-> >  			digctl at 8001c000 {
-> > --
-> > 1.7.10.4
-> 
-> 
-> @Marek: Did you test the overcurrent functionality with the MX28 and this
-> pinmux?
-> 
-> I currently can not trigger any overcurrent events and also don't
-> see changes in the PORTSC register after pulling the OC pin to 3V3.
-> 
+Whole series applied to mvebu/dt-fixes with Thomas' Ack and Cc'd to
+stable for v3.10.x and up.
 
-I haven't checked pinmux detail, have you enabled oc and
-set oc's polarity (HW_DIGCTL_CTRL - 8001_C000h)?
+thx,
 
-Peter
+Jason.
