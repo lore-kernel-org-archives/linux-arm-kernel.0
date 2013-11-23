@@ -1,136 +1,144 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Nov 2013 16:43:35 -0800
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-Message-ID: <20131123004334.GJ10023@atomide.com>
+Date: Fri, 22 Nov 2013 16:52:01 -0800
+Subject: [PATCH 6/8] devicetree: doc: Document ti,timer-parent property
+In-Reply-To: <528FF774.4010109@ti.com>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-7-git-send-email-joelf@ti.com>
+ <20131122155838.GF10023@atomide.com> <528F8807.7050803@ti.com>
+ <20131122170800.GG10023@atomide.com> <528FF774.4010109@ti.com>
+Message-ID: <20131123005201.GK10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we get the following kind of errors if we try to use
-interrupt phandles to irqchips that have not yet initialized:
+* Joel Fernandes <joelf@ti.com> [131122 16:32]:
+> On 11/22/2013 11:08 AM, Tony Lindgren wrote:
+> > 
+> > I don't think there's a dependency here to the omap clocks as the dmtimer
+> > can implement the clocksource separately and internally still use clk_get
+> > using the clock alias table.
+> 
+> You mean implement clock-tree separately? Sorry I'm confused can you clarify
+> what you mean?
 
-irq: no irq domain found for /ocp/pinmux at 48002030 !
-WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
-(show_stack+0x14/0x1c)
-(dump_stack+0x6c/0xa0)
-(warn_slowpath_common+0x64/0x84)
-(warn_slowpath_null+0x1c/0x24)
-(of_device_alloc+0x144/0x184)
-(of_platform_device_create_pdata+0x44/0x9c)
-(of_platform_bus_create+0xd0/0x170)
-(of_platform_bus_create+0x12c/0x170)
-(of_platform_populate+0x60/0x98)
-...
-
-This is because we're wrongly trying to populate resources that are not
-yet available. It's perfectly valid to create irqchips dynamically,
-so let's fix up the issue by populating the interrupt resources based
-on a notifier call instead.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
----
-
-Rob & Grant, care to merge this for the -rc if this looks OK to you?
-
-These happen for example when using interrupts-extended for omap
-wake-up interrupts where the irq domain is created by pinctrl-single.c
-at module_init time.
-
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -130,6 +130,56 @@ void of_device_make_bus_id(struct device *dev)
- 	dev_set_name(dev, "%s.%d", node->name, magic - 1);
- }
+You could implement the needed clocks for client drivers to use in dmtimer.c
+directly if dmtimer.c is the gating those clocks.
  
-+/*
-+ * The device interrupts are not necessarily available for all
-+ * irqdomains initially so we need to populate them using a
-+ * notifier.
-+ */
-+static int of_device_resource_notify(struct notifier_block *nb,
-+				     unsigned long event, void *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct device_node *np = pdev->dev.of_node;
-+	struct resource *res = pdev->resource;
-+	struct resource *irqr = NULL;
-+	int num_irq, i, found = 0;
-+
-+	if (event != BUS_NOTIFY_BIND_DRIVER)
-+		return 0;
-+
-+	if (!np)
-+		goto out;
-+
-+	num_irq = of_irq_count(np);
-+	if (!num_irq)
-+		goto out;
-+
-+	for (i = 0; i < pdev->num_resources; i++, res++) {
-+		if (res->flags != IORESOURCE_IRQ ||
-+		    res->start != -EPROBE_DEFER ||
-+		    res->end != -EPROBE_DEFER)
-+			continue;
-+
-+		if (!irqr)
-+			irqr = res;
-+		found++;
-+	}
-+
-+	if (!found)
-+		goto out;
-+
-+	if (found != num_irq) {
-+		dev_WARN(dev, "error populating irq resources: %i != %i\n",
-+			 found, num_irq);
-+		goto out;
-+	}
-+
-+	WARN_ON(of_irq_to_resource_table(np, irqr, num_irq) != num_irq);
-+
-+out:
-+	return NOTIFY_DONE;
-+}
-+
- /**
-  * of_device_alloc - Allocate and initialize an of_device
-  * @np: device node to assign to device
-@@ -168,7 +218,13 @@ struct platform_device *of_device_alloc(struct device_node *np,
- 			rc = of_address_to_resource(np, i, res);
- 			WARN_ON(rc);
- 		}
--		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
-+
-+		/* See of_device_resource_notify for populating interrupts */
-+		for (i = 0; i < num_irq; i++, res++) {
-+			res->flags = IORESOURCE_IRQ;
-+			res->start = -EPROBE_DEFER;
-+			res->end = -EPROBE_DEFER;
-+		}
- 	}
+> In clock tree data (not upstream), here is the system clock for am335x for example:
+> sys_clkin_ck: sys_clkin_ck at 44e10040 {
+>         #clock-cells = <0>;
+>         compatible = "mux-clock";
+> 
+> It uses the mux-clock driver. Are you saying we duplicate clock-tree stuff? I
+> don't think that's a good idea specially since once clock dt data is available,
+> we will switch to using it.
+
+Oh OK, then that naturally could be used directly too.
  
- 	dev->dev.of_node = of_node_get(np);
-@@ -447,6 +503,8 @@ int of_platform_bus_probe(struct device_node *root,
- }
- EXPORT_SYMBOL(of_platform_bus_probe);
+> >>>>  Optional properties:
+> >>>>  - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
+> >>>
+> >>> Hmm this we may not need, this can probably be deciphered from the compatible
+> >>> flag already?
+> >>
+> >> How? Compatible contains the same string, for example for OMAP4:
+> >>
+> >> timer8 has:
+> >>                         compatible = "ti,omap4430-timer";
+> >>                         ti,timer-pwm;
+> >>                         ti,timer-dsp;
+> >>
+> >> and timer9 has:
+> >>                         compatible = "ti,omap4430-timer";
+> >>                         ti,hwmods = "timer9";
+> >>                         ti,timer-pwm;
+> >>
+> > 
+> > Some of these features are always hardwired certain way and could be mapped to
+> > the right timer based on the timer offset and the compatible flag if we want
+> > to avoid adding the ti,timer-alwon property. It seems that most omaps have
+> > just one always on timer that's the first timer, and only on am33xx it does
+> > not exist?
+> > 
+> > I'm fine adding ti,timer-alwon if it help to leave out static data in the
+> > driver and avoid patching the driver for every new SoC. But sounds like in
+> > this case we really have just the am33xx exception to the rule?
+> 
+> ti,timer-alwon may not be needed yes, since on all platforms I've observed first
+> timer has this property. However from OMAP3 dt, timer12 has it too. Not sure
+> what that implies.
+
+I guess you could mark timer1 and 12 as always on if the compatible flag 
+matches ti,omap3430-timer.
  
-+static struct notifier_block resource_nb;
-+
- /**
-  * of_platform_populate() - Populate platform_devices from device tree data
-  * @root: parent of the first level to probe or NULL for the root of the tree
-@@ -478,6 +536,11 @@ int of_platform_populate(struct device_node *root,
- 	if (!root)
- 		return -EINVAL;
+> I think what Jon was trying to do is to find a DT node by property, he had no
+> other way of getting a device_node * otherwise.
+> 
+> But notice this macro used for HS (secure devices):
+> OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+>                         2, "timer_sys_ck", NULL);
+> 
+> How would you specify in DT that you want a node with the timer-secure property
+> as the clocksource if we drop these kind of properties?
+
+timer {
+	interrupt-parent = <&timer12>;
+	...
+}
+
+Should do the trick I think :)
  
-+	if (!resource_nb.notifier_call) {
-+		resource_nb.notifier_call = of_device_resource_notify,
-+			bus_register_notifier(&platform_bus_type, &resource_nb);
-+	}
-+
- 	for_each_child_of_node(root, child) {
- 		rc = of_platform_bus_create(child, matches, lookup, parent, true);
- 		if (rc)
+> >>> Then for the users of a specific dmtimer, they can select the right one using
+> >>> the interrupt-parent property:
+> >>>
+> >>> timer1: timer at 0x4800abcd {
+> >>> 	compatible = "ti,omap5430-timer";
+> >>> 	#interrupt-cells = <1>;		/* needs irqchip implemented for dmtimer */
+> >>> 	interrupt-controller;
+> >>> 	#clock-cells = <1>;		/* needs clocksource implemented for dmtimer */
+> >>> 	clock-output-names = "32k", "sys_ck";
+> >>> 	...
+> >>> };
+> >>
+> >> In reference to my last thread reply, irqchip may not be available early in the
+> >> boot process (.init_time) for system timer usage?
+> > 
+> > Hmm it should be, looks like we have in arch/arm/kernel/irq.c:
+> > 
+> > void __init init_IRQ(void)
+> > {
+> > 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+> > 		irqchip_init();
+> > 	else    
+> > 		machine_desc->init_irq();
+> > }               
+> > 
+> > Then in init/main.c has:
+> > 	...
+> > 	early_irq_init();
+> > 	init_IRQ();
+> > 	tick_init();
+> > 	init_timers();
+> > 	hrtimers_init();
+> > 	softirq_init();
+> > 	timekeeping_init();
+> > 	time_init();
+> > 	...
+> > 
+> > So looks like we should have irqchip available?
+> 
+> Right. I think your idea of using irqchip is certainly a clean way. Let me go
+> back to the drawing board and try to see if we have all the pieces we need and
+> there are no surprises in doing it this way.
+
+OK cool.
+ 
+> Then we can have a general purpose clocksource driver that uses the irqchip
+> driver. I still worry about things like hwmod that may be need to be called on
+> specific timer, and runtime PM is not available that early in the boot process.
+
+Yeah we may still need a piece of code in mach-omap2 for now if runtime PM is
+not available at that point yet.
+
+Regards,
+
+Tony
