@@ -1,54 +1,36 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 24 Nov 2013 11:54:53 -0500
-Subject: [PATCH] ARM: dove: Fix typo in device_type property of phy node
-In-Reply-To: <1384440899-3622-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1384440899-3622-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20131124165453.GF29241@titan.lakedaemon.net>
+Date: Sun, 24 Nov 2013 11:59:32 -0500
+Subject: [PATCH 1/2] ARM: kirkwood: provide pinctrl default to sdio nodes
+In-Reply-To: <1384525225-591-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384525225-591-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131124165932.GG29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:54:59PM +0000, Srinivas Kandagatla wrote:
-> This patch fixes a typo for device_type property of phy node.
-> This can work as of today but once a checks are added in generic code
-> this typo will stop phy from working.
+On Fri, Nov 15, 2013 at 03:20:24PM +0100, Sebastian Hesselbarth wrote:
+> SDIO controllers found on Marvell Kirkwood 6281/6282 SoCs require
+> pins to be muxed by pinctrl. As there is only one sane pinctrl
+> setting for this, provide default pinctrl properties to the controller
+> nodes.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
->  arch/arm/boot/dts/dove.dtsi |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> I am not sending this two patches to each DT maintainer, as it is a
+> Kirkwood only thing, added the dt list for completeness.
+> 
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/kirkwood-6281.dtsi |    2 ++
+>  arch/arm/boot/dts/kirkwood-6282.dtsi |    2 ++
+>  2 files changed, 4 insertions(+), 0 deletions(-)
 
-Applied to mvebu/dt with Andrew's Ack.  I had to hand add it due to the
-reworking of dove.dtsi last time around.  I've attached my version, let
-me know if it looks amiss.
+Series applied to mvebu/dt
 
 thx,
 
 Jason.
-
------------>8---------------------
-commit 9e52c63992c19b1d2e9a6b6b8ba61aaf35e9fd17
-Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Date:   Sun Nov 24 16:47:51 2013 +0000
-
-    ARM: dove: Fix typo in device_type property of phy node
-    
-    This patch fixes a typo for device_type property of phy node.
-    This can work as of today but once a checks are added in generic code
-    this typo will stop phy from working.
-    
-    Acked-by: Andrew Lunn <andrew@lunn.ch>
-    Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 113a8bc7bee7..abd7a6fd77f1 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -559,7 +559,7 @@
- 				status = "disabled";
- 
- 				ethphy: ethernet-phy {
--					device-type = "ethernet-phy";
-+					device_type = "ethernet-phy";
- 					/* set phy address in board file */
- 				};
- 			};
