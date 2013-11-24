@@ -1,42 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 23 Nov 2013 23:00:26 -0500
-Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
- command bits
-In-Reply-To: <20131124030033.GR29241@titan.lakedaemon.net>
-References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131124030033.GR29241@titan.lakedaemon.net>
-Message-ID: <20131124040026.GA29241@titan.lakedaemon.net>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Sat, 23 Nov 2013 22:05:54 -0600
+Subject: [GIT PULL]clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <52530903.4090709@linaro.org>
+References: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
+ <5252DCB6.3070805@linaro.org> <5252EB22.2050506@linaro.org>
+ <52530903.4090709@linaro.org>
+Message-ID: <52917B22.3040205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 23, 2013 at 10:00:33PM -0500, Jason Cooper wrote:
-> On Thu, Oct 31, 2013 at 05:32:59PM -0600, Jason Gunthorpe wrote:
-> > When PCI_COMMAND_MEMORY/PCI_COMMAND_IO are cleared the bridge should not
-> > allocate windows or even look at the window limit/base registers.
-> > 
-> > Otherwise it can attempt to setup bogus windows that the PCI core code
-> > creates during discovery. The core will leave PCI_COMMAND_IO cleared if
-> > it doesn't need an IO window.
-> > 
-> > Have mvebu_pcie_handle_*_change respect the bits, and call the change
-> > function whenever the bits changes.
-> > 
-> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > ---
-> >  drivers/pci/host/pci-mvebu.c | 14 ++++++++++++--
-> >  1 file changed, 12 insertions(+), 2 deletions(-)
-> 
-> And a small addendum: I currently have the following in mvebu/drivers
+Hi Daniel,
 
-Strike that, they are now in mvebu/pci.
+On 10/7/13 2:18 PM, Daniel Lezcano wrote:
+> On 10/07/2013 07:10 PM, John Stultz wrote:
+>> On 10/07/2013 09:09 AM, Daniel Lezcano wrote:
+>>> On 10/07/2013 05:27 PM, dinguyen at altera.com wrote:
+>>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>>
+>>>> Hi Thomas, John,
+>>>>
+>>>> I am hoping you can pull in these 2 patches. These 2 patches have
+>>>> been floating
+>>>> around for almost 2 months now. They are needed to get the Altera
+>>>> SOCFPGA
+>>>> booting again because of a DTS binding change in 3.12.
+>>>>
+>>>> The other change was correctly return the current clock counter.
+>>>>
+>>>> The discussion thread can be found here:
+>>>>
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198818.html
+>>>>
+>>>>
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198903.html
+>>>>
+>>>>
+>>>>
+>>>> This patch does not attempt or change the behaviour of the ordering
+>>>> of how a
+>>>> clocksource or clockevent is use. These 2 patches only enables a
+>>>> platform to boot.
+>>>
+>>> John,
+>>>
+>>> I agree with Dinh, these patches fixes a boot issue on Altera SOCFPGA
+>>> and should be merged.
+>>>
+>>
+>> Hey Dinh,
+>>      Thanks for persisting here! Sorry this has taken awhile. Just as an
+>> FYI, Daniel is maintaining the drivers/clocksource dir these days.
+>>
+>> So, I've not been following this closely, but if I recall we had a merge
+>> conflict that we backed out, since it seemed that everyone involved in
+>> this driver weren't working together. Then Thomas had some objections,
+>> but it *looks* like that's been resolved. So I don't have any objections
+>> at this point.
+>
+> Yeah, it happens the same to me :)
+>
+>> Daniel: if you want to pull these in to your tree, that's fine by me.
+>
+> Ok, pulled to my tree.
+I did not see these 2 patches in 3.13-rc1. Just wondering what happened
+to them?
 
->   572bd682145f PCI: mvebu - The bridge secondary status register should be 0
->   9503c7fe4d9d PCI: mvebu - Support a bridge with no IO port window
->   058100a08be8 PCI: mvebu: return NULL instead of ERR_PTR(ret)
-> 
-> which means they didn't make it in for v3.13-rc1.  I'll hold them there
-> for reference until you resend.
-
-thx,
-
-Jason.
+Thanks,
+Dinh
+>
+> Thanks !
+>   -- Daniel
+>
+>
