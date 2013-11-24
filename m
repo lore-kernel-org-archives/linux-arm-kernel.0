@@ -1,29 +1,23 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 23 Nov 2013 18:41:16 -0500
-Subject: [PATCH 5/5] MAINTAINERS: Add keystone clock drivers
-In-Reply-To: <1385250076-9596-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1385250076-9596-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1385250076-9596-6-git-send-email-santosh.shilimkar@ti.com>
+Date: Sat, 23 Nov 2013 19:07:44 -0500
+Subject: [PATCH 0/2] ARM: OMAP5: Couple of patches for KVM
+Message-ID: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- MAINTAINERS |    1 +
- 1 file changed, 1 insertion(+)
+Couple of patches for OMAP5 machines towards KVM support.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 25b945b..249651f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1013,6 +1013,7 @@ M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-keystone/
-+F:	drivers/clk/keystone/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
- 
- ARM/LOGICPD PXA270 MACHINE SUPPORT
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
+
+Santosh Shilimkar (2):
+  ARM: dts: OMAP5: Add maintenance interrupt for virtualisation
+  ARM: OMAP5: Add HYP mode entry support for secondary CPUs
+
+ arch/arm/boot/dts/omap5.dtsi       |    1 +
+ arch/arm/mach-omap2/omap-headsmp.S |    7 +++++++
+ 2 files changed, 8 insertions(+)
+
 -- 
 1.7.9.5
