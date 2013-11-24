@@ -1,127 +1,79 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sun, 24 Nov 2013 21:36:51 +0000
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <20131123004334.GJ10023@atomide.com>
-References: <20131123004334.GJ10023@atomide.com>
-Message-ID: <20131124213651.59750C402C3@trevor.secretlab.ca>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 24 Nov 2013 22:53:33 +0100
+Subject: [GIT PULL]clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <52917B22.3040205@gmail.com>
+References: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
+ <5252DCB6.3070805@linaro.org> <5252EB22.2050506@linaro.org>
+ <52530903.4090709@linaro.org> <52917B22.3040205@gmail.com>
+Message-ID: <5292755D.3050000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Nov 2013 16:43:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> Currently we get the following kind of errors if we try to use
-> interrupt phandles to irqchips that have not yet initialized:
-> 
-> irq: no irq domain found for /ocp/pinmux at 48002030 !
-> WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
-> (show_stack+0x14/0x1c)
-> (dump_stack+0x6c/0xa0)
-> (warn_slowpath_common+0x64/0x84)
-> (warn_slowpath_null+0x1c/0x24)
-> (of_device_alloc+0x144/0x184)
-> (of_platform_device_create_pdata+0x44/0x9c)
-> (of_platform_bus_create+0xd0/0x170)
-> (of_platform_bus_create+0x12c/0x170)
-> (of_platform_populate+0x60/0x98)
-> ...
-> 
-> This is because we're wrongly trying to populate resources that are not
-> yet available. It's perfectly valid to create irqchips dynamically,
-> so let's fix up the issue by populating the interrupt resources based
-> on a notifier call instead.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> ---
-> 
-> Rob & Grant, care to merge this for the -rc if this looks OK to you?
-> 
-> These happen for example when using interrupts-extended for omap
-> wake-up interrupts where the irq domain is created by pinctrl-single.c
-> at module_init time.
-> 
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -130,6 +130,56 @@ void of_device_make_bus_id(struct device *dev)
->  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
->  }
->  
-> +/*
-> + * The device interrupts are not necessarily available for all
-> + * irqdomains initially so we need to populate them using a
-> + * notifier.
-> + */
-> +static int of_device_resource_notify(struct notifier_block *nb,
-> +				     unsigned long event, void *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct resource *res = pdev->resource;
-> +	struct resource *irqr = NULL;
-> +	int num_irq, i, found = 0;
-> +
-> +	if (event != BUS_NOTIFY_BIND_DRIVER)
-> +		return 0;
-> +
-> +	if (!np)
-> +		goto out;
-> +
-> +	num_irq = of_irq_count(np);
-> +	if (!num_irq)
-> +		goto out;
-> +
-> +	for (i = 0; i < pdev->num_resources; i++, res++) {
-> +		if (res->flags != IORESOURCE_IRQ ||
-> +		    res->start != -EPROBE_DEFER ||
-> +		    res->end != -EPROBE_DEFER)
-> +			continue;
-> +
-> +		if (!irqr)
-> +			irqr = res;
-> +		found++;
-> +	}
-> +
-> +	if (!found)
-> +		goto out;
-> +
-> +	if (found != num_irq) {
-> +		dev_WARN(dev, "error populating irq resources: %i != %i\n",
-> +			 found, num_irq);
-> +		goto out;
-> +	}
-> +
-> +	WARN_ON(of_irq_to_resource_table(np, irqr, num_irq) != num_irq);
-> +
-> +out:
-> +	return NOTIFY_DONE;
-> +}
-> +
->  /**
->   * of_device_alloc - Allocate and initialize an of_device
->   * @np: device node to assign to device
-> @@ -168,7 +218,13 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  			rc = of_address_to_resource(np, i, res);
->  			WARN_ON(rc);
->  		}
-> -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
-> +
-> +		/* See of_device_resource_notify for populating interrupts */
-> +		for (i = 0; i < num_irq; i++, res++) {
-> +			res->flags = IORESOURCE_IRQ;
-> +			res->start = -EPROBE_DEFER;
-> +			res->end = -EPROBE_DEFER;
-> +		}
+On 11/24/2013 05:05 AM, Dinh Nguyen wrote:
+> Hi Daniel,
+>
+> On 10/7/13 2:18 PM, Daniel Lezcano wrote:
+>> On 10/07/2013 07:10 PM, John Stultz wrote:
+>>> On 10/07/2013 09:09 AM, Daniel Lezcano wrote:
+>>>> On 10/07/2013 05:27 PM, dinguyen at altera.com wrote:
+>>>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>>>
+>>>>> Hi Thomas, John,
+>>>>>
+>>>>> I am hoping you can pull in these 2 patches. These 2 patches have
+>>>>> been floating
+>>>>> around for almost 2 months now. They are needed to get the Altera
+>>>>> SOCFPGA
+>>>>> booting again because of a DTS binding change in 3.12.
+>>>>>
+>>>>> The other change was correctly return the current clock counter.
+>>>>>
+>>>>> The discussion thread can be found here:
+>>>>>
+>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198818.html
+>>>>>
+>>>>>
+>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198903.html
+>>>>>
+>>>>>
+>>>>>
+>>>>> This patch does not attempt or change the behaviour of the ordering
+>>>>> of how a
+>>>>> clocksource or clockevent is use. These 2 patches only enables a
+>>>>> platform to boot.
+>>>>
+>>>> John,
+>>>>
+>>>> I agree with Dinh, these patches fixes a boot issue on Altera SOCFPGA
+>>>> and should be merged.
+>>>>
+>>>
+>>> Hey Dinh,
+>>>       Thanks for persisting here! Sorry this has taken awhile. Just as an
+>>> FYI, Daniel is maintaining the drivers/clocksource dir these days.
+>>>
+>>> So, I've not been following this closely, but if I recall we had a merge
+>>> conflict that we backed out, since it seemed that everyone involved in
+>>> this driver weren't working together. Then Thomas had some objections,
+>>> but it *looks* like that's been resolved. So I don't have any objections
+>>> at this point.
+>>
+>> Yeah, it happens the same to me :)
+>>
+>>> Daniel: if you want to pull these in to your tree, that's fine by me.
+>>
+>> Ok, pulled to my tree.
+> I did not see these 2 patches in 3.13-rc1. Just wondering what happened
+> to them?
 
-I actually like the idea of completely allocating the resource structure
-but leaving some entries empty. However, I agree with rmk that putting
-garbage into a resource structure is a bad idea. What about changing the
-value of flags to 0 or some other value to be obviously an empty
-property and give the follow up parsing some context about which ones it
-needs to attempt to recalculate?
+Me too :/
 
-However, I still don't like the notifier approach of actually triggering
-the fixup. We need something better.
+I will take them for 3.13 fixes.
 
-g.
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
