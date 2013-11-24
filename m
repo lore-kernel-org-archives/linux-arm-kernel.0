@@ -1,80 +1,66 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Sun, 24 Nov 2013 15:30:50 +0900
-Subject: [PATCH v11 5/7] ARM: tegra: split setting of CPU reset handler
+Date: Sun, 24 Nov 2013 15:30:51 +0900
+Subject: [PATCH v11 6/7] ARM: tegra: set CPU reset handler using firmware
 In-Reply-To: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
 References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1385274652-16415-6-git-send-email-acourbot@nvidia.com>
+Message-ID: <1385274652-16415-7-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all Tegra devices can set the CPU reset handler in the same way.
-In particular, devices using a TrustZone secure monitor cannot set it
-up directly and need to ask the firmware to do it.
+Use a firmware operation to set the CPU reset handler and only resort to
+doing it ourselves if there is none defined.
 
-This patch separates the act of setting the reset handler from its
-preparation, so the former can be implemented in a different way.
+This supports the booting of secondary CPUs on devices using a TrustZone
+secure monitor.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/reset.c | 27 +++++++++++++++++----------
- 1 file changed, 17 insertions(+), 10 deletions(-)
+ arch/arm/mach-tegra/reset.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 568f5bb..17c4b6d 100644
+index 17c4b6d..146fe8e 100644
 --- a/arch/arm/mach-tegra/reset.c
 +++ b/arch/arm/mach-tegra/reset.c
-@@ -33,26 +33,18 @@
+@@ -21,6 +21,7 @@
  
- static bool is_enabled;
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/firmware.h>
  
--static void __init tegra_cpu_reset_handler_enable(void)
-+static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
- {
--	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	void __iomem *evp_cpu_reset =
- 		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
- 	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
- 	u32 reg;
+ #include "iomap.h"
+ #include "irammap.h"
+@@ -65,6 +66,7 @@ static void __init tegra_cpu_reset_handler_enable(void)
+ 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+ 	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
+ 						tegra_cpu_reset_handler_offset;
++	int err;
  
--	BUG_ON(is_enabled);
--	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+ 	BUG_ON(is_enabled);
+ 	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+@@ -72,9 +74,18 @@ static void __init tegra_cpu_reset_handler_enable(void)
+ 	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
+ 			tegra_cpu_reset_handler_size);
+ 
+-	tegra_cpu_reset_handler_set(reset_address);
 -
--	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
--			tegra_cpu_reset_handler_size);
--
- 	/*
- 	 * NOTE: This must be the one and only write to the EVP CPU reset
- 	 *       vector in the entire system.
- 	 */
--	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
--			evp_cpu_reset);
-+	writel(reset_address, evp_cpu_reset);
- 	wmb();
- 	reg = readl(evp_cpu_reset);
- 
-@@ -66,6 +58,21 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 		writel(reg, sb_ctrl);
- 		wmb();
- 	}
-+}
-+
-+static void __init tegra_cpu_reset_handler_enable(void)
-+{
-+	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
-+	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
-+						tegra_cpu_reset_handler_offset;
-+
-+	BUG_ON(is_enabled);
-+	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
-+
-+	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
-+			tegra_cpu_reset_handler_size);
-+
-+	tegra_cpu_reset_handler_set(reset_address);
- 
- 	is_enabled = true;
+-	is_enabled = true;
++	err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
++	switch (err) {
++	case -ENOSYS:
++		tegra_cpu_reset_handler_set(reset_address);
++		/* pass-through */
++	case 0:
++		is_enabled = true;
++		break;
++	default:
++		pr_crit("Cannot set CPU reset handler: %d\n", err);
++		BUG();
++	}
  }
+ 
+ void __init tegra_cpu_reset_handler_init(void)
 -- 
 1.8.4.2
