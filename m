@@ -1,22 +1,23 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 24 Nov 2013 11:40:43 -0500
-Subject: [PATCH] bus: mvebu-mbus: Remove deprecated comment
-In-Reply-To: <1384364387-3391-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1384364387-3391-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131124164043.GD29241@titan.lakedaemon.net>
+Date: Sun, 24 Nov 2013 11:44:24 -0500
+Subject: [PATCH] ARM: orion5x: Fix typo in device_type property of phy node
+In-Reply-To: <1384440788-3529-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1384440788-3529-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20131124164424.GE29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 02:39:47PM -0300, Ezequiel Garcia wrote:
-> Remove a comment about the lack of a devicetree binding: this driver's
-> binding is already implemented and in use.
+On Thu, Nov 14, 2013 at 02:53:08PM +0000, Srinivas Kandagatla wrote:
+> This patch fixes a typo for device_type property of phy node.
+> This can work as of today but once a checks are added in generic code
+> this typo will stop phy from working.
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 > ---
->  drivers/bus/mvebu-mbus.c | 6 ------
->  1 file changed, 6 deletions(-)
+>  .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 
-Applied to mvebu/drivers
+Applied to mvebu/dt with Andrew's Ack.
 
 thx,
 
