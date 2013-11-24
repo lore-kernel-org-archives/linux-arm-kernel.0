@@ -1,76 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 24 Nov 2013 18:26:45 -0500 (EST)
-Subject: [PATCH] ARM: pxa: Move iotable mapping inside vmalloc region
-In-Reply-To: <1385296571-23599-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1385296571-23599-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <alpine.LFD.2.10.1311241824380.9667@knanqh.ubzr>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Sun, 24 Nov 2013 18:40:53 -0500
+Subject: ACPI
+In-Reply-To: <BB9F4FCA-78FC-4D44-A98E-1C4CE1CFEA7B@jonmasters.org>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <528FC5C1.1080403@jonmasters.org> <528FCEA6.1060602@jonmasters.org>
+ <201311231011.45892.arnd@arndb.de>
+ <20131123183904.GB20790@obsidianresearch.com>
+ <20131123230303.GA5212@srcf.ucam.org>
+ <2940EDD8-0EE7-4D61-96F7-3D78D5A52644@jonmasters.org>
+ <20131124035651.GA7580@srcf.ucam.org>
+ <BB9F4FCA-78FC-4D44-A98E-1C4CE1CFEA7B@jonmasters.org>
+Message-ID: <c5032c31-7fa2-495b-8882-025c90535379@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Nov 2013, Ezequiel Garcia wrote:
+Jon Masters <jonathan@jonmasters.org> wrote:
+>
+>On Nov 23, 2013, at 10:56 PM, Matthew Garrett <mjg59@srcf.ucam.org>
+>wrote:
+>> That seems to be a very verbose way to say "We have no plans to make 
+>> sure this is going to work for upstream Linux". I'm disappointed to
+>see 
+>> Red Hat play along with this.
+>
+>Matthew, it's a very verbose way to say "this is being worked on". The
+>need to get specifications and standards out into public is acutely
+>understood. It's something I've been pushing on for many many months,
+>and it's something that I expect to see changing soon.  That's really
+>all I'm going to say about it for the moment. Meanwhile, I hope that
+>the ACPI patches being worked on (very very hard, by very awesome
+>people) will be reviewed and considered on their merits.
 
-> In order to remove the following ugly message:
-> 
->   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
-> 
-> the iotable mappings should be re-located inside the vmalloc
-> region. Such move was introduced at commit:
-> 
-> commit 0536bdf33faff4d940ac094c77998cfac368cfff
-> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date:   Thu Aug 25 00:35:59 2011 -0400
-> 
->     ARM: move iotable mappings within the vmalloc region
-> 
-> While at it, let's add some nicer defines to make the code
-> more readable.
-> 
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-pxa/generic.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-> index 4225417..7c01095 100644
-> --- a/arch/arm/mach-pxa/generic.c
-> +++ b/arch/arm/mach-pxa/generic.c
-> @@ -24,6 +24,7 @@
->  #include <mach/hardware.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach-types.h>
-> +#include <asm/pgtable.h>
->  
->  #include <mach/reset.h>
->  #include <mach/smemc.h>
-> @@ -77,6 +78,11 @@ EXPORT_SYMBOL(get_clk_frequency_khz);
->   * Note: virtual 0xfffe0000-0xffffffff is reserved for the vector table
->   *       and cache flush area.
->   */
-> +
-> +#define UNCACHED_PHY	0x00000000
-> +#define UNCACHED_SIZE	SZ_1M
-> +#define UNCACHED_VIRT	(VMALLOC_END - UNCACHED_SIZE)
-> +
->  static struct map_desc common_io_desc[] __initdata = {
->    	{	/* Devs */
->  		.virtual	=  0xf2000000,
-> @@ -84,9 +90,9 @@ static struct map_desc common_io_desc[] __initdata = {
->  		.length		= 0x02000000,
->  		.type		= MT_DEVICE
->  	}, {	/* UNCACHED_PHYS_0 */
-> -		.virtual	= 0xff000000,
-> -		.pfn		= __phys_to_pfn(0x00000000),
-> -		.length		= 0x00100000,
-> +		.virtual	= UNCACHED_VIRT,
-> +		.pfn		= __phys_to_pfn(UNCACHED_PHY),
-> +		.length		= UNCACHED_SIZE,
->  		.type		= MT_DEVICE
->  	}
->  };
+The track record of vendors adopting solutions and then getting them upstream is significantly worse than that of vendors working with the community and then deploying the negotiated solution. Patches aren't going to be rejected out of hand, but if they satisfy a small number of vendors while compromising the wider kernel then there's a real risk that they won't end up upstream in the desired timescale.
 
-You might wish to change the virtual address for this mapping, but 
-nowhere in your patch you are changing users of that virtual mapping.
+If you're OK taking that risk then I don't think there's anything more to discuss - we'll just wait for the hardware/patches/spec to land and see whether they're reasonable or not. But that's really not the Red Hat way, and it's a shame seeing the company move away from its base. 
 
 
-Nicolas
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
