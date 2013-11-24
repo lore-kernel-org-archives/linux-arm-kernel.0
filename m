@@ -1,42 +1,127 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sun, 24 Nov 2013 21:27:57 +0000
+Date: Sun, 24 Nov 2013 21:36:51 +0000
 Subject: [PATCH] of/platform: Fix no irq domain found errors when
  populating interrupts
-In-Reply-To: <20131123015034.GP10023@atomide.com>
-References: <20131123004334.GJ10023@atomide.com> <20131123005509.GJ16735@
- n2100.arm.linux.org.uk> <20131123010850.GN10023@atomide.com> <
- 20131123011515.GO10023@atomide.com> <20131123015034.GP10023@atomide.com>
-Message-ID: <20131124212757.7D224C402A3@trevor.secretlab.ca>
+In-Reply-To: <20131123004334.GJ10023@atomide.com>
+References: <20131123004334.GJ10023@atomide.com>
+Message-ID: <20131124213651.59750C402C3@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Nov 2013 17:50:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> * Tony Lindgren <tony@atomide.com> [131122 17:16]:
-> > * Tony Lindgren <tony@atomide.com> [131122 17:09]:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
-> > > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
-> > > > > +		/* See of_device_resource_notify for populating interrupts */
-> > > > > +		for (i = 0; i < num_irq; i++, res++) {
-> > > > > +			res->flags = IORESOURCE_IRQ;
-> > > > > +			res->start = -EPROBE_DEFER;
-> > > > > +			res->end = -EPROBE_DEFER;
-> > > > 
-> > > > NAK.  Definitely a bad idea to start introducing magic values other into
-> > > > resources.  Please don't do this.
-> > > 
-> > > Do you have any better ideas on how to sort out this issue then?
-> > 
-> > I guess we could allocate all the resources lazily here, I'll take a look
-> > at that.
+On Fri, 22 Nov 2013 16:43:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> Currently we get the following kind of errors if we try to use
+> interrupt phandles to irqchips that have not yet initialized:
 > 
-> Here's a version that allocates the resources lazily with the notifier.
-> Seems to boot, need to play with it a bit more though to make sure we're
-> not overwriting resources for any legacy devices.
+> irq: no irq domain found for /ocp/pinmux at 48002030 !
+> WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
+> (show_stack+0x14/0x1c)
+> (dump_stack+0x6c/0xa0)
+> (warn_slowpath_common+0x64/0x84)
+> (warn_slowpath_null+0x1c/0x24)
+> (of_device_alloc+0x144/0x184)
+> (of_platform_device_create_pdata+0x44/0x9c)
+> (of_platform_bus_create+0xd0/0x170)
+> (of_platform_bus_create+0x12c/0x170)
+> (of_platform_populate+0x60/0x98)
+> ...
+> 
+> This is because we're wrongly trying to populate resources that are not
+> yet available. It's perfectly valid to create irqchips dynamically,
+> so let's fix up the issue by populating the interrupt resources based
+> on a notifier call instead.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> ---
+> 
+> Rob & Grant, care to merge this for the -rc if this looks OK to you?
+> 
+> These happen for example when using interrupts-extended for omap
+> wake-up interrupts where the irq domain is created by pinctrl-single.c
+> at module_init time.
+> 
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -130,6 +130,56 @@ void of_device_make_bus_id(struct device *dev)
+>  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+>  }
+>  
+> +/*
+> + * The device interrupts are not necessarily available for all
+> + * irqdomains initially so we need to populate them using a
+> + * notifier.
+> + */
+> +static int of_device_resource_notify(struct notifier_block *nb,
+> +				     unsigned long event, void *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct resource *res = pdev->resource;
+> +	struct resource *irqr = NULL;
+> +	int num_irq, i, found = 0;
+> +
+> +	if (event != BUS_NOTIFY_BIND_DRIVER)
+> +		return 0;
+> +
+> +	if (!np)
+> +		goto out;
+> +
+> +	num_irq = of_irq_count(np);
+> +	if (!num_irq)
+> +		goto out;
+> +
+> +	for (i = 0; i < pdev->num_resources; i++, res++) {
+> +		if (res->flags != IORESOURCE_IRQ ||
+> +		    res->start != -EPROBE_DEFER ||
+> +		    res->end != -EPROBE_DEFER)
+> +			continue;
+> +
+> +		if (!irqr)
+> +			irqr = res;
+> +		found++;
+> +	}
+> +
+> +	if (!found)
+> +		goto out;
+> +
+> +	if (found != num_irq) {
+> +		dev_WARN(dev, "error populating irq resources: %i != %i\n",
+> +			 found, num_irq);
+> +		goto out;
+> +	}
+> +
+> +	WARN_ON(of_irq_to_resource_table(np, irqr, num_irq) != num_irq);
+> +
+> +out:
+> +	return NOTIFY_DONE;
+> +}
+> +
+>  /**
+>   * of_device_alloc - Allocate and initialize an of_device
+>   * @np: device node to assign to device
+> @@ -168,7 +218,13 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  			rc = of_address_to_resource(np, i, res);
+>  			WARN_ON(rc);
+>  		}
+> -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+> +
+> +		/* See of_device_resource_notify for populating interrupts */
+> +		for (i = 0; i < num_irq; i++, res++) {
+> +			res->flags = IORESOURCE_IRQ;
+> +			res->start = -EPROBE_DEFER;
+> +			res->end = -EPROBE_DEFER;
+> +		}
 
-Blurg. Using a notifier really feels like we don't have a good handle on
-a reasonable solution yet. Basically it means we're hooking into the
-driver core without /looking/ like we're hooking into the driver core. I
-don't think this is any better, but I don't have a better suggestion at
-the moment.   :-(
+I actually like the idea of completely allocating the resource structure
+but leaving some entries empty. However, I agree with rmk that putting
+garbage into a resource structure is a bad idea. What about changing the
+value of flags to 0 or some other value to be obviously an empty
+property and give the follow up parsing some context about which ones it
+needs to attempt to recalculate?
+
+However, I still don't like the notifier approach of actually triggering
+the fixup. We need something better.
 
 g.
