@@ -1,55 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 24 Nov 2013 08:02:03 -0500
-Subject: [PATCHv2] ARM: mvebu: Add Netgear ReadyNAS 2120 board
-In-Reply-To: <87y54e819h.fsf@natisbad.org>
-References: <87ppq5flnb.fsf@natisbad.org>
- <20131124034951.GY29241@titan.lakedaemon.net>
- <87y54e819h.fsf@natisbad.org>
-Message-ID: <20131124130203.GB29241@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 24 Nov 2013 13:31:03 +0000
+Subject: [PATCH] spi: davinci: Fix the build warning with CONFIG_ARM_LPAE=y
+In-Reply-To: <52911B64.3020009@ti.com>
+References: <1380567179-20174-1-git-send-email-santosh.shilimkar@ti.com>
+ <20131001104840.GL19304@sirena.org.uk>
+ <CAOesGMhRoEvsQoSvoCSY=zm71zeZec3MG_FpHOy1zUkYronZcw@mail.gmail.com>
+ <20131113132952.GK878@sirena.org.uk> <52911B64.3020009@ti.com>
+Message-ID: <20131124133103.GS14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 24, 2013 at 12:52:58PM +0100, Arnaud Ebalard wrote:
-> Hi,
-> 
-> Jason Cooper <jason@lakedaemon.net> writes:
-> 
-> > On Tue, Nov 12, 2013 at 08:46:48PM +0100, Arnaud Ebalard wrote:
-> >> 
-> >> All hardware parts of the (mv78230 Armada XP based) NETGEAR ReadyNAS
-> >> 2120 are supported by mainline kernel (USB 3.0 and eSATA rear ports,
-> >> USB 2.0 front port, Gigabit controller and PHYs for the two rear ports,
-> >> serial port, LEDs, Buttons, 88SE9170 SATA controllers, three G762 fan
-> >> controllers, G751 temperature sensor) except for:
-> >> 
-> >>  - the Intersil ISL12057 I2C RTC Chip,
-> >>  - the Armada NAND controller.
-> >> 
-> >> Support for both of those is currently work in progress and does not
-> >> prevent boot.
-> >> 
-> >> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> >> ---
-> > ...
-> >>  arch/arm/boot/dts/Makefile                     |   1 +
-> >>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 288 +++++++++++++++++++++++++
-> >>  2 files changed, 289 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> >
-> > Applied to mvebu/dt
-> 
-> Thanks, Jason. Based on the response to the question raised by Jason
-> Gunthorpe regarding PHY compatible string [1], I'll keep in mind to send
-> you a patch at some point (.dts file for RN2120 also has compatible =
-> "marvell,88e1318s") if needed.
+On Sat, Nov 23, 2013 at 04:17:24PM -0500, Santosh Shilimkar wrote:
+> On Wednesday 13 November 2013 08:29 AM, Mark Brown wrote:
 
-d*mn.  You're right.  I missed that.  I'll drop this from mvebu/dt until
-that's resolved.  I don't want to inadvertently force supporting a
-compatible string we don't want.
+> > Looks lie it never got pushed and nobody looked at the warnings for over
+> > a month.  Oh well, sorry about that.
 
-Please resend this once that's resolved.
+> Are you going to push this one ? The warning is still showing up at
+> 3.13-rc1.
 
-thx,
-
-Jason.
+It's a warning fix only so no, I was going to leave it till the next
+merge window.  It'll appear in -next as soon as Linus releases -rc1.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131124/32bd6646/attachment.sig>
