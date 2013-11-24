@@ -1,55 +1,42 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 24 Nov 2013 19:56:10 -0300
-Subject: [PATCH] ARM: pxa: Move iotable mapping inside vmalloc region
-In-Reply-To: <20131124124125.GM16735@n2100.arm.linux.org.uk>
-References: <1385296571-23599-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131124124125.GM16735@n2100.arm.linux.org.uk>
-Message-ID: <20131124225610.GB2448@localhost>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Sun, 24 Nov 2013 18:21:04 -0500
+Subject: ACPI
+In-Reply-To: <20131124035651.GA7580@srcf.ucam.org>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <528FC5C1.1080403@jonmasters.org> <528FCEA6.1060602@jonmasters.org>
+ <201311231011.45892.arnd@arndb.de>
+ <20131123183904.GB20790@obsidianresearch.com>
+ <20131123230303.GA5212@srcf.ucam.org>
+ <2940EDD8-0EE7-4D61-96F7-3D78D5A52644@jonmasters.org>
+ <20131124035651.GA7580@srcf.ucam.org>
+Message-ID: <BB9F4FCA-78FC-4D44-A98E-1C4CE1CFEA7B@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 24, 2013 at 12:41:25PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Nov 24, 2013 at 09:36:11AM -0300, Ezequiel Garcia wrote:
-> > In order to remove the following ugly message:
-> > 
-> >   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
-> > 
-> > the iotable mappings should be re-located inside the vmalloc
-> > region. Such move was introduced at commit:
-> > 
-> > commit 0536bdf33faff4d940ac094c77998cfac368cfff
-> > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Date:   Thu Aug 25 00:35:59 2011 -0400
-> > 
-> >     ARM: move iotable mappings within the vmalloc region
-> > 
-> > While at it, let's add some nicer defines to make the code
-> > more readable.
-> > 
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+
+On Nov 23, 2013, at 10:56 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+
+> On Sat, Nov 23, 2013 at 10:52:25PM -0500, Jon Masters wrote:
 > 
-> NAK.  I'm guessing that you haven't properly tested this.  Grep for
-> UNCACHED_PHYS_0, and what you'll find is that your change will break
-> standby and suspend on all PXA platforms.
+>> Matthew, good points! Suffice it to say many productive conversations 
+>> have occurred recently with regard to openness. I am constrained 
+>> indeed, and somewhat willingly because that is the only way to engage 
+>> with everyone who might (or might not) be involved in the ARM 
+>> ecosystem in the timeframe that will matter in the medium/longer term 
+>> (this is a decade+ long story). As you know, I'm a huge fan of 
+>> standards (especially openly published ones), and in particular of 
+>> having one way to do things that will work for an entire ecosystem 
+>> (beyond just Linux), because that's how we get to an open platform 
+>> that anyone can target. That's not the natural course things would 
+>> take without steering. In the ARM space, the natural course might be 
+>> to create vertical solutions that, while awesome, are harder to target 
+>> with a general purpose one-size-fits-all OS story. I'll look forward 
+>> to seeing more announcements coming soon.
+> 
+> That seems to be a very verbose way to say "We have no plans to make 
+> sure this is going to work for upstream Linux". I'm disappointed to see 
+> Red Hat play along with this.
 
-Right, I fail to grep about this properly, sorry about that.
-Anyway, after grepping for 'UNCACHED' and doing some testings
-I found a few interesting things.
+Matthew, it's a very verbose way to say "this is being worked on". The need to get specifications and standards out into public is acutely understood. It's something I've been pushing on for many many months, and it's something that I expect to see changing soon.  That's really all I'm going to say about it for the moment. Meanwhile, I hope that the ACPI patches being worked on (very very hard, by very awesome people) will be reviewed and considered on their merits.
 
-First, UNCACHED_PHYS_0 seems to be used by PXA27xx and PXA25xx. The
-board I have here is PXA3xx, so there's no way I can test anything.
-
-Question: Should we add an #ifdef around the mapping, or is that
-just pure churn?
-
-Second, suspend/resume seems broken on my CM-X300 board, or at least
-the wake-up. It enters suspend/standby but then never seem to wake.
-Maybe I'm not pushing the right button, but according to the reference
-guide the SW2 (connected to EXTWAKE#) should do the trick.
-
-Ideas?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Jon.
