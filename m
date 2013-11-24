@@ -1,45 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 23 Nov 2013 22:37:01 -0500
-Subject: [PATCH] CMA: Fix the phys_addr_t print types
-Message-ID: <1385264221-29952-1-git-send-email-santosh.shilimkar@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 23 Nov 2013 22:42:38 -0500
+Subject: [PATCH v4 29/31] ARM: mvebu: Add support for NAND controller
+ in Armada 370/XP
+In-Reply-To: <1383837455-30721-30-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383837455-30721-30-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131124034238.GX29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise prints would truncate the variables on LPAE machines.
+On Thu, Nov 07, 2013 at 12:17:33PM -0300, Ezequiel Garcia wrote:
+> The Armada 370 and Armada XP SoC have a NAND controller (aka NFCv2).
+> This commit adds support for it in Armada 370 and Armada XP SoC
+> common devicetree.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/base/dma-contiguous.c |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Patches 29 (this one), 30 and 31 applied to mvebu/dt
 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index 165c2c2..b303a98 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -201,9 +201,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- 	phys_addr_t alignment;
- 	int ret = 0;
- 
--	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
--		 (unsigned long)size, (unsigned long)base,
--		 (unsigned long)limit);
-+	pr_info("%s(size %pa, base %pa, limit %pa)\n", __func__,
-+		 &size, &base, &limit);
- 
- 	/* Sanity checks */
- 	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
-@@ -250,8 +249,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- 	*res_cma = cma;
- 	cma_area_count++;
- 
--	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
--		(unsigned long)base);
-+	pr_info("CMA: reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
-+		&base);
- 
- 	/* Architecture specific contiguous memory fixup. */
- 	dma_contiguous_early_fixup(base, size);
--- 
-1.7.9.5
+I'll be working on the core-divider clock issue over the next couple of
+days.
+
+thx,
+
+Jason.
