@@ -1,22 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 23 Nov 2013 22:05:43 -0500
-Subject: [PATCH] ARM: orion5x: drop unused include from common.c
-In-Reply-To: <1383557043-18891-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1383557043-18891-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131124030543.GS29241@titan.lakedaemon.net>
+Date: Sat, 23 Nov 2013 22:13:12 -0500
+Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for
+ DT boards
+In-Reply-To: <20131105180931.674625171@rtp-net.org>
+References: <20131105180931.674625171@rtp-net.org>
+Message-ID: <20131124031312.GT29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 10:24:03AM +0100, Uwe Kleine-K?nig wrote:
-> asm/times.h only defines CLOCK_TICK_RATE, cycles_t and get_cycles. All
-> three are not used in this file.
+On Tue, Nov 05, 2013 at 07:09:14PM +0100, Arnaud Patard wrote:
+> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
+> dropped the call to kirkwood_timer_init() when booting with DT.
+> This results in kirkwood_tclk not being set and the boot message is now:
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Kirkwood: MV88F6281-A0, TCLK=0
+> 
+> This patch modifies the message for printing only the kirkwood id,
+> as it allows to detect if we're running A0/A1/... variants with a simple
+> dmesg.
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 > ---
->  arch/arm/mach-orion5x/common.c | 1 -
->  1 file changed, 1 deletion(-)
+> 
+> Index: linux-next/arch/arm/mach-kirkwood/board-dt.c
 
-Applied to mvebu/soc with Andrew's Ack.
+Applied to mvebu/soc with Sebastian and Andrew's Acks.
 
 thx,
 
