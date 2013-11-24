@@ -1,30 +1,40 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Sun, 24 Nov 2013 05:27:07 +0000
-Subject: [PATCH] arm64: reboot driver missing dts entry and ACPI
- support for storm platform.
-In-Reply-To: <1383938010-15296-1-git-send-email-fkan@apm.com>
-References: <1383938010-15296-1-git-send-email-fkan@apm.com>
-Message-ID: <20131124052707.GA7964@srcf.ucam.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sat, 23 Nov 2013 22:36:06 -0700
+Subject: [PATCH] ARM: bcm2835: add missing #xxx-cells to I2C nodes
+Message-ID: <1385271366-28025-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 11:13:30AM -0800, Feng Kan wrote:
-> +#ifdef CONFIG_ACPI
-> +	if (efi_enabled(EFI_BOOT)) {
-> +		unsigned long long value;
-> +		acpi_status status;
-> +		if (acpi_name == NULL)
-> +			return -ENODEV;
-> +		status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
-> +					       acpi_name, NULL, &value);
-> +		if (ACPI_FAILURE(status))
-> +			return -ENODEV;
-> +		*param = value;
-> +		return 0;
+The I2C controller node needs #address-cells and #size-cells properties,
+but these are currently missing. Add them. This allows child nodes to be
+parsed correctly.
 
-The normal way to handle reboots in ACPI is to provide register address 
-and value information in the FADT. The firmware should populate this at 
-init time, and then you don't need this driver at all.
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+ arch/arm/boot/dts/bcm2835.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 1e12aef..aa537ed 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -85,6 +85,8 @@
+ 			reg = <0x7e205000 0x1000>;
+ 			interrupts = <2 21>;
+ 			clocks = <&clk_i2c>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -93,6 +95,8 @@
+ 			reg = <0x7e804000 0x1000>;
+ 			interrupts = <2 21>;
+ 			clocks = <&clk_i2c>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+1.7.10.4
