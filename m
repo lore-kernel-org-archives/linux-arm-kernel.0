@@ -1,37 +1,22 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 23 Nov 2013 22:00:33 -0500
-Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
- command bits
-In-Reply-To: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
-References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <20131124030033.GR29241@titan.lakedaemon.net>
+Date: Sat, 23 Nov 2013 22:05:43 -0500
+Subject: [PATCH] ARM: orion5x: drop unused include from common.c
+In-Reply-To: <1383557043-18891-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1383557043-18891-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131124030543.GS29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 05:32:59PM -0600, Jason Gunthorpe wrote:
-> When PCI_COMMAND_MEMORY/PCI_COMMAND_IO are cleared the bridge should not
-> allocate windows or even look at the window limit/base registers.
+On Mon, Nov 04, 2013 at 10:24:03AM +0100, Uwe Kleine-K?nig wrote:
+> asm/times.h only defines CLOCK_TICK_RATE, cycles_t and get_cycles. All
+> three are not used in this file.
 > 
-> Otherwise it can attempt to setup bogus windows that the PCI core code
-> creates during discovery. The core will leave PCI_COMMAND_IO cleared if
-> it doesn't need an IO window.
-> 
-> Have mvebu_pcie_handle_*_change respect the bits, and call the change
-> function whenever the bits changes.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
->  drivers/pci/host/pci-mvebu.c | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
+>  arch/arm/mach-orion5x/common.c | 1 -
+>  1 file changed, 1 deletion(-)
 
-And a small addendum: I currently have the following in mvebu/drivers
-
-  572bd682145f PCI: mvebu - The bridge secondary status register should be 0
-  9503c7fe4d9d PCI: mvebu - Support a bridge with no IO port window
-  058100a08be8 PCI: mvebu: return NULL instead of ERR_PTR(ret)
-
-which means they didn't make it in for v3.13-rc1.  I'll hold them there
-for reference until you resend.
+Applied to mvebu/soc with Andrew's Ack.
 
 thx,
 
