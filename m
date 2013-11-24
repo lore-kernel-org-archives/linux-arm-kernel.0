@@ -1,40 +1,92 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Sun, 24 Nov 2013 18:40:53 -0500
-Subject: ACPI
-In-Reply-To: <BB9F4FCA-78FC-4D44-A98E-1C4CE1CFEA7B@jonmasters.org>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <528FC5C1.1080403@jonmasters.org> <528FCEA6.1060602@jonmasters.org>
- <201311231011.45892.arnd@arndb.de>
- <20131123183904.GB20790@obsidianresearch.com>
- <20131123230303.GA5212@srcf.ucam.org>
- <2940EDD8-0EE7-4D61-96F7-3D78D5A52644@jonmasters.org>
- <20131124035651.GA7580@srcf.ucam.org>
- <BB9F4FCA-78FC-4D44-A98E-1C4CE1CFEA7B@jonmasters.org>
-Message-ID: <c5032c31-7fa2-495b-8882-025c90535379@email.android.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 25 Nov 2013 00:58:32 +0100
+Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
+In-Reply-To: <20131122154947.GE24508@pengutronix.de>
+References: <1345852300-2213-1-git-send-email-marex@denx.de>
+ <1345852300-2213-2-git-send-email-marex@denx.de>
+ <20131122154947.GE24508@pengutronix.de>
+Message-ID: <201311250058.32881.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Masters <jonathan@jonmasters.org> wrote:
->
->On Nov 23, 2013, at 10:56 PM, Matthew Garrett <mjg59@srcf.ucam.org>
->wrote:
->> That seems to be a very verbose way to say "We have no plans to make 
->> sure this is going to work for upstream Linux". I'm disappointed to
->see 
->> Red Hat play along with this.
->
->Matthew, it's a very verbose way to say "this is being worked on". The
->need to get specifications and standards out into public is acutely
->understood. It's something I've been pushing on for many many months,
->and it's something that I expect to see changing soon.  That's really
->all I'm going to say about it for the moment. Meanwhile, I hope that
->the ACPI patches being worked on (very very hard, by very awesome
->people) will be reviewed and considered on their merits.
+Hello Michael,
 
-The track record of vendors adopting solutions and then getting them upstream is significantly worse than that of vendors working with the community and then deploying the negotiated solution. Patches aren't going to be rejected out of hand, but if they satisfy a small number of vendors while compromising the wider kernel then there's a real risk that they won't end up upstream in the desired timescale.
+> Hi Marek, Peter,
+> 
+> On Sat, Aug 25, 2012 at 01:51:38AM +0200, Marek Vasut wrote:
+> > Add the pinmux settings for USB PHY overcurrent pins.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > 
+> >  arch/arm/boot/dts/imx28.dtsi |   30 ++++++++++++++++++++++++++++++
+> >  1 file changed, 30 insertions(+)
+> > 
+> > V2: This is pulled from the M28EVK and SPS1 board files, put it into
+> > common
+> > 
+> >     file.
+> > 
+> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> > index b996c2d..3cba62d 100644
+> > --- a/arch/arm/boot/dts/imx28.dtsi
+> > +++ b/arch/arm/boot/dts/imx28.dtsi
+> > @@ -520,6 +520,36 @@
+> > 
+> >  					fsl,voltage = <1>;
+> >  					fsl,pull-up = <1>;
+> >  				
+> >  				};
+> > 
+> > +
+> > +				usbphy0_pins_a: usbphy0 at 0 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <
+> > +						0x2152 /* 
+MX28_PAD_SSP2_SS2__USB0_OVERCURRENT */
+> > +					>;
+> > +					fsl,drive-strength = <2>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
+> > +				usbphy0_pins_b: usbphy0 at 1 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <
+> > +						0x3061 /* 
+MX28_PAD_AUART1_CTS__USB0_OVERCURRENT */
+> > +					>;
+> > +					fsl,drive-strength = <2>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
+> > +				usbphy1_pins_a: usbphy1 at 0 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <
+> > +						0x2142 /* 
+MX28_PAD_SSP2_SS1__USB1_OVERCURRENT */
+> > +					>;
+> > +					fsl,drive-strength = <2>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > 
+> >  			};
+> >  			
+> >  			digctl at 8001c000 {
+> 
+> @Marek: Did you test the overcurrent functionality with the MX28 and this
+> pinmux?
+> 
+> I currently can not trigger any overcurrent events and also don't
+> see changes in the PORTSC register after pulling the OC pin to 3V3.
 
-If you're OK taking that risk then I don't think there's anything more to discuss - we'll just wait for the hardware/patches/spec to land and see whether they're reasonable or not. But that's really not the Red Hat way, and it's a shame seeing the company move away from its base. 
+Sorry for the late reply, I see Peter already replied. Do you see the changes if 
+you configure the pin as a GPIO at least ?
 
-
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Best regards,
