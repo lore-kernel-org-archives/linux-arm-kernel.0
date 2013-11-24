@@ -1,38 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 23 Nov 2013 22:47:33 -0500
-Subject: [PATCH 1/2] ARM: mm: Fix the arm_dma_limit calculation
-In-Reply-To: <1385264854-30162-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1385264854-30162-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1385264854-30162-2-git-send-email-santosh.shilimkar@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 23 Nov 2013 22:49:51 -0500
+Subject: [PATCHv2] ARM: mvebu: Add Netgear ReadyNAS 2120 board
+In-Reply-To: <87ppq5flnb.fsf@natisbad.org>
+References: <87ppq5flnb.fsf@natisbad.org>
+Message-ID: <20131124034951.GY29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code is using PHYS_OFFSET to calculate the arm_dma_limit which
-will lead to wrong calculations in cases where PHYS_OFFSET is updated
-runtime.
+On Tue, Nov 12, 2013 at 08:46:48PM +0100, Arnaud Ebalard wrote:
+> 
+> All hardware parts of the (mv78230 Armada XP based) NETGEAR ReadyNAS
+> 2120 are supported by mainline kernel (USB 3.0 and eSATA rear ports,
+> USB 2.0 front port, Gigabit controller and PHYs for the two rear ports,
+> serial port, LEDs, Buttons, 88SE9170 SATA controllers, three G762 fan
+> controllers, G751 temperature sensor) except for:
+> 
+>  - the Intersil ISL12057 I2C RTC Chip,
+>  - the Armada NAND controller.
+> 
+> Support for both of those is currently work in progress and does not
+> prevent boot.
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+...
+>  arch/arm/boot/dts/Makefile                     |   1 +
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 288 +++++++++++++++++++++++++
+>  2 files changed, 289 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
 
-So fix the code by using __pv_phys_offset instead of PHYS_OFFSET.
+Applied to mvebu/dt
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mm/init.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+thx,
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 3e8f106..1f7b19a 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -229,7 +229,7 @@ void __init setup_dma_zone(const struct machine_desc *mdesc)
- #ifdef CONFIG_ZONE_DMA
- 	if (mdesc->dma_zone_size) {
- 		arm_dma_zone_size = mdesc->dma_zone_size;
--		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
-+		arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
- 	} else
- 		arm_dma_limit = 0xffffffff;
- 	arm_dma_pfn_limit = arm_dma_limit >> PAGE_SHIFT;
--- 
-1.7.9.5
+Jason.
