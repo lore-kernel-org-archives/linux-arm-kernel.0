@@ -1,30 +1,24 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 23 Nov 2013 22:13:12 -0500
-Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for
- DT boards
-In-Reply-To: <20131105180931.674625171@rtp-net.org>
-References: <20131105180931.674625171@rtp-net.org>
-Message-ID: <20131124031312.GT29241@titan.lakedaemon.net>
+Date: Sat, 23 Nov 2013 22:26:06 -0500
+Subject: [PATCH] clk: mvebu: staticize of_cpu_clk_setup
+In-Reply-To: <1383814773-5231-1-git-send-email-jszhang@marvell.com>
+References: <1383814773-5231-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20131124032606.GU29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 07:09:14PM +0100, Arnaud Patard wrote:
-> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
-> dropped the call to kirkwood_timer_init() when booting with DT.
-> This results in kirkwood_tclk not being set and the boot message is now:
+On Thu, Nov 07, 2013 at 04:59:33PM +0800, Jisheng Zhang wrote:
+> This symbol is used only in this file. The patch fix the following
+> sparse warning:
+> warning: symbol 'of_cpu_clk_setup' was not declared. Should it be static?
 > 
-> Kirkwood: MV88F6281-A0, TCLK=0
-> 
-> This patch modifies the message for printing only the kirkwood id,
-> as it allows to detect if we're running A0/A1/... variants with a simple
-> dmesg.
-> 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
-> 
-> Index: linux-next/arch/arm/mach-kirkwood/board-dt.c
+>  drivers/clk/mvebu/clk-cpu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied to mvebu/soc with Sebastian and Andrew's Acks.
+Applied to mvebu/clk with Gregory and my Acks destined for the clock
+tree.
 
 thx,
 
