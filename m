@@ -1,40 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sat, 23 Nov 2013 22:36:06 -0700
-Subject: [PATCH] ARM: bcm2835: add missing #xxx-cells to I2C nodes
-Message-ID: <1385271366-28025-1-git-send-email-swarren@wwwdotorg.org>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Sun, 24 Nov 2013 15:30:47 +0900
+Subject: [PATCH v11 2/7] of: add vendor prefix for Trusted Logic Mobility
+In-Reply-To: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
+References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1385274652-16415-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C controller node needs #address-cells and #size-cells properties,
-but these are currently missing. Add them. This allows child nodes to be
-parsed correctly.
+Add the "tlm" prefix for Trusted Logic Mobility.
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/boot/dts/bcm2835.dtsi |    4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 1e12aef..aa537ed 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -85,6 +85,8 @@
- 			reg = <0x7e205000 0x1000>;
- 			interrupts = <2 21>;
- 			clocks = <&clk_i2c>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 			status = "disabled";
- 		};
- 
-@@ -93,6 +95,8 @@
- 			reg = <0x7e804000 0x1000>;
- 			interrupts = <2 21>;
- 			clocks = <&clk_i2c>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 			status = "disabled";
- 		};
- 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index e306917..5aa905e 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -73,6 +73,7 @@ st	STMicroelectronics
+ ste	ST-Ericsson
+ stericsson	ST-Ericsson
+ ti	Texas Instruments
++tlm	Trusted Logic Mobility
+ toshiba	Toshiba Corporation
+ toumaz	Toumaz
+ v3	V3 Semiconductor
 -- 
-1.7.10.4
+1.8.4.2
