@@ -1,54 +1,42 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 24 Nov 2013 21:00:49 +0000
-Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
- gyroscopes
-In-Reply-To: <20131121131402.GF1029@lukather>
-References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
- <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
-Message-ID: <52926901.9080004@kernel.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sun, 24 Nov 2013 21:27:57 +0000
+Subject: [PATCH] of/platform: Fix no irq domain found errors when
+ populating interrupts
+In-Reply-To: <20131123015034.GP10023@atomide.com>
+References: <20131123004334.GJ10023@atomide.com> <20131123005509.GJ16735@
+ n2100.arm.linux.org.uk> <20131123010850.GN10023@atomide.com> <
+ 20131123011515.GO10023@atomide.com> <20131123015034.GP10023@atomide.com>
+Message-ID: <20131124212757.7D224C402A3@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Fri, 22 Nov 2013 17:50:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [131122 17:16]:
+> > * Tony Lindgren <tony@atomide.com> [131122 17:09]:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
+> > > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
+> > > > > +		/* See of_device_resource_notify for populating interrupts */
+> > > > > +		for (i = 0; i < num_irq; i++, res++) {
+> > > > > +			res->flags = IORESOURCE_IRQ;
+> > > > > +			res->start = -EPROBE_DEFER;
+> > > > > +			res->end = -EPROBE_DEFER;
+> > > > 
+> > > > NAK.  Definitely a bad idea to start introducing magic values other into
+> > > > resources.  Please don't do this.
+> > > 
+> > > Do you have any better ideas on how to sort out this issue then?
+> > 
+> > I guess we could allocate all the resources lazily here, I'll take a look
+> > at that.
+> 
+> Here's a version that allocates the resources lazily with the notifier.
+> Seems to boot, need to play with it a bit more though to make sure we're
+> not overwriting resources for any legacy devices.
 
-On 11/21/13 13:14, Maxime Ripard wrote:
-> Hi Denis,
-> 
-> On Thu, Nov 21, 2013 at 12:41:24PM +0100, Denis CIOCCA wrote:
->> only one point: it's possible to use the same names with DT? (using _ instead of -)
-> 
-> Yes, it is, but only for i2c as far as I'm aware, and usually the DT compatibles are with - as a separator (I
-> looked into the ePAPR, but couldn't get any explanations or requirements on this, even though it's used in all of
-> their examples)
-In other discussions, where the defacto i2c device tree bindings have
-been followed, the conclusion has been that to change to a - from _
-would result in userspace ABI changes, so whilst no one wants _
-the discussion has concluded we can't really avoid it.
+Blurg. Using a notifier really feels like we don't have a good handle on
+a reasonable solution yet. Basically it means we're hooking into the
+driver core without /looking/ like we're hooking into the driver core. I
+don't think this is any better, but I don't have a better suggestion at
+the moment.   :-(
 
-
-> 
->> Why only for i2c?
-> 
-> Because I was only interested in i2c :)
-> 
-> Maxime
-> 
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2.0.22 (GNU/Linux)
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iQIcBAEBAgAGBQJSkmkBAAoJEFSFNJnE9BaI9mgP/A0TrsoGuLmu1Zc0R2Y2QkY/
-wE4hrQrB0uGwD6TE+dXCuJVmHLqA7KviGN3l4sJPgo8kGAEsAItow8XoOPZFE8sU
-w9hXVU+0UXOiMmQIf/5bTvVpBV7oL6agYpQQkb8ZIHKZCj5gd588sc+Ag90Uc+lK
-MiI1QsvLbS8O1tZui+4NlkaioUQs5rs0OvD9N1n+aCfSdgsZk1NMR97Xf5Hwpmbj
-ypTokNVAClZd8dyrq9KHXfR6+qPwI9Pr/yA5nqZvpV++SiqlFw5nWAR/URPp/rEE
-czT8ZiC2SR5qRTVb+jRCj4hY8QmLIfeZEqrsZab9CkRkEmeMgQ8FhpBe+a1Zk1YS
-ZojKQS4rJzjuJukuq4vs/R8jPhwAIxguzzC7rA/UNtyYUvqTrIcXBRzFxRp6BHtv
-PO2viO773gvni3C6qzFtLBcYfJUBD6VNi440yHDxMSZY5gJl3auHdIzpTxN30aQG
-P4l347YqfsvrEpiG7gN2B5ScQ3WwGXBpfomke1dkuDElZZ7vgV/MAE7Hjh/uKCfg
-0lLzoBWdO72faznHCm8tOOPAQcSqXAm0F4BHQENeVirieZN2mS4EhS0xmN1fCdOy
-5PeN424FSGw6LUgAZd8R45/usPzzlDKTQ2rf0nBZIRdxYmyocg2ZUCINI6OxJThn
-OJkKZAsuvBdhsqSSAx+C
-=xwmo
------END PGP SIGNATURE-----
+g.
