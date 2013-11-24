@@ -1,79 +1,26 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 24 Nov 2013 22:53:33 +0100
-Subject: [GIT PULL]clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <52917B22.3040205@gmail.com>
-References: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
- <5252DCB6.3070805@linaro.org> <5252EB22.2050506@linaro.org>
- <52530903.4090709@linaro.org> <52917B22.3040205@gmail.com>
-Message-ID: <5292755D.3050000@linaro.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 25 Nov 2013 00:22:47 +0200
+Subject: ARM: v3.13-rc1: USB regression
+Message-ID: <20131124222247.GC24645@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2013 05:05 AM, Dinh Nguyen wrote:
-> Hi Daniel,
->
-> On 10/7/13 2:18 PM, Daniel Lezcano wrote:
->> On 10/07/2013 07:10 PM, John Stultz wrote:
->>> On 10/07/2013 09:09 AM, Daniel Lezcano wrote:
->>>> On 10/07/2013 05:27 PM, dinguyen at altera.com wrote:
->>>>> From: Dinh Nguyen <dinguyen@altera.com>
->>>>>
->>>>> Hi Thomas, John,
->>>>>
->>>>> I am hoping you can pull in these 2 patches. These 2 patches have
->>>>> been floating
->>>>> around for almost 2 months now. They are needed to get the Altera
->>>>> SOCFPGA
->>>>> booting again because of a DTS binding change in 3.12.
->>>>>
->>>>> The other change was correctly return the current clock counter.
->>>>>
->>>>> The discussion thread can be found here:
->>>>>
->>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198818.html
->>>>>
->>>>>
->>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198903.html
->>>>>
->>>>>
->>>>>
->>>>> This patch does not attempt or change the behaviour of the ordering
->>>>> of how a
->>>>> clocksource or clockevent is use. These 2 patches only enables a
->>>>> platform to boot.
->>>>
->>>> John,
->>>>
->>>> I agree with Dinh, these patches fixes a boot issue on Altera SOCFPGA
->>>> and should be merged.
->>>>
->>>
->>> Hey Dinh,
->>>       Thanks for persisting here! Sorry this has taken awhile. Just as an
->>> FYI, Daniel is maintaining the drivers/clocksource dir these days.
->>>
->>> So, I've not been following this closely, but if I recall we had a merge
->>> conflict that we backed out, since it seemed that everyone involved in
->>> this driver weren't working together. Then Thomas had some objections,
->>> but it *looks* like that's been resolved. So I don't have any objections
->>> at this point.
->>
->> Yeah, it happens the same to me :)
->>
->>> Daniel: if you want to pull these in to your tree, that's fine by me.
->>
->> Ok, pulled to my tree.
-> I did not see these 2 patches in 3.13-rc1. Just wondering what happened
-> to them?
+Hi,
 
-Me too :/
+With 3.13-rc1, the USB OHCI probe fails on Amstrad E3 (ARM/OMAP1)
+as follows:
 
-I will take them for 3.13 fixes.
+[   33.814705] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[   33.821482] ohci-omap: OHCI OMAP driver
+[   33.925153] ohci ohci: OMAP OHCI
+[   33.929087] ohci ohci: new USB bus registered, assigned bus number 1
+[   33.967324] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
+[   33.982292] ohci ohci: can't setup: -12
+[   33.987898] ohci ohci: USB bus 1 deregistered
+[   33.992984] ohci: probe of ohci failed with error -12
 
+I bisected this to 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 (ARM: DMA-API:
+better handing of DMA masks for coherent allocations). Reverting that
+commit makes the USB work again fine.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+A.
