@@ -1,73 +1,146 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 24 Nov 2013 16:16:15 +0900
-Subject: [GIT PULL] Renesas ARM based SoC clock updates for v3.13
-In-Reply-To: <1381301313-5938-1-git-send-email-horms+renesas@verge.net.au>
-References: <1381301313-5938-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20131124071615.GA15677@verge.net.au>
+From: dt.tangr@gmail.com (dt.tangr at gmail.com)
+Date: Sun, 24 Nov 2013 18:37:47 +1100
+Subject: [PATCHv2] usb: chipidea: add support for USB OTG controller on
+ TI-NSPIRE
+Message-ID: <1385278667-91856-1-git-send-email-dt.tangr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 03:48:32PM +0900, Simon Horman wrote:
-> Hi Mike,
-> 
-> please consider these Renesas ARM based SoC clock updates for v3.13.
+From: Daniel Tang <dt.tangr@gmail.com>
 
-Hi Mike,
+Changelog v2:
+ * Rename ci13xxx to ci_hdrc
+ * Fixed alignment issues
 
-for some reason I thought you had taken this change but I now
-realise that is not the case. I apologise for not being more attentive.
+The USB controller in TI-NSPIRE calculators are based off either Freescale's
+USB OTG controller or the USB controller found in the IMX233, both of which
+are Chipidea compatible.
 
-I am wondering if you could consider taking it as I have some SoC-side
-changes that depend on it which I would like to queue up for v3.14.
-Actually, I have them queued up and was preparing some branches based on
-v3.13-rc1 for the ARM-SoC maintainers when I noticed this patch
-had not been accepted.
+This patch adds a device tree binding for the controller.
 
-I think that any of the following would work well for me:
-I'm sure there are also other options.
+Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+---
+ .../devicetree/bindings/usb/ci-hdrc-nspire.txt     | 17 +++++
+ drivers/usb/chipidea/Makefile                      |  1 +
+ drivers/usb/chipidea/ci_hdrc_nspire.c              | 74 ++++++++++++++++++++++
+ 3 files changed, 92 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
+ create mode 100644 drivers/usb/chipidea/ci_hdrc_nspire.c
 
-1. You could take this into a branch which won't subsequently
-   be rebased and I can use that as a base for a branch
-   for the SoC-side changes which I intend to have merged into
-   the ARM-SoC tree.
+diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
+new file mode 100644
+index 0000000..5ba8e90
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
+@@ -0,0 +1,17 @@
++* TI-Nspire USB OTG Controller
++
++Required properties:
++- compatible: Should be "zevio,nspire-usb"
++- reg: Should contain registers location and length
++- interrupts: Should contain controller interrupt
++
++Recommended properies:
++- vbus-supply: regulator for vbus
++
++Examples:
++		usb0: usb at B0000000 {
++			reg = <0xB0000000 0x1000>;
++			compatible = "zevio,nspire-usb";
++			interrupts = <8>;
++			vbus-supply = <&vbus_reg>;
++		};
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index a99d980..245ea4d 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+ # Glue/Bridge layers go here
 
-2. You could take this for v3.13. But it is probably far to late for that.
+ obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
++obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_nspire.o
 
-3. I could take this change with the SoC-side changes which I
-   intend to have merged into the ARM-SoC tree.
-
-Another option is for me to drop the SoC-side changes for now.
-But that is not my preferred option.
-
-> 
-> 
-> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
-> 
->   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock-for-v3.13
-> 
-> for you to fetch changes up to f00578d0f860ba63bf28e0261ef489cc9e01ab47:
-> 
->   clk: emev2: Add support for emev2 SMU clocks with DT (2013-10-09 15:39:08 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM based SoC clock updates for v3.13
-> 
-> * Add support for emev2 SMU clocks with DT
-> 
-> ----------------------------------------------------------------
-> Takashi Yoshii (1):
->       clk: emev2: Add support for emev2 SMU clocks with DT
-> 
->  .../devicetree/bindings/clock/emev2-clock.txt      |  98 +++++++++++++++++++
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/shmobile/Makefile                      |   3 +
->  drivers/clk/shmobile/clk-emev2.c                   | 104 +++++++++++++++++++++
->  4 files changed, 206 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/emev2-clock.txt
->  create mode 100644 drivers/clk/shmobile/Makefile
->  create mode 100644 drivers/clk/shmobile/clk-emev2.c
-> 
+ # PCI doesn't provide stubs, need to check
+ ifneq ($(CONFIG_PCI),)
+diff --git a/drivers/usb/chipidea/ci_hdrc_nspire.c b/drivers/usb/chipidea/ci_hdrc_nspire.c
+new file mode 100644
+index 0000000..5d408c3
+--- /dev/null
++++ b/drivers/usb/chipidea/ci_hdrc_nspire.c
+@@ -0,0 +1,74 @@
++/*
++ *	Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Based off drivers/usb/chipidea/ci_hdrc_msm.c
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/usb/gadget.h>
++#include <linux/usb/chipidea.h>
++
++#include "ci.h"
++
++static struct ci_hdrc_platform_data ci_hdrc_nspire_platdata = {
++	.name			= "ci_hdrc_nspire",
++	.flags			= CI_HDRC_REGS_SHARED,
++	.capoffset		= DEF_CAPOFFSET,
++};
++
++static int ci_hdrc_nspire_probe(struct platform_device *pdev)
++{
++	struct platform_device *ci_pdev;
++
++	dev_dbg(&pdev->dev, "ci_hdrc_nspire_probe\n");
++
++	ci_pdev = ci_hdrc_add_device(&pdev->dev,
++				pdev->resource, pdev->num_resources,
++				&ci_hdrc_nspire_platdata);
++
++	if (IS_ERR(ci_pdev)) {
++		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
++		return PTR_ERR(ci_pdev);
++	}
++
++	platform_set_drvdata(pdev, ci_pdev);
++
++	return 0;
++}
++
++static int ci_hdrc_nspire_remove(struct platform_device *pdev)
++{
++	struct platform_device *ci_pdev = platform_get_drvdata(pdev);
++
++	ci_hdrc_remove_device(ci_pdev);
++
++	return 0;
++}
++
++static const struct of_device_id ci_hdrc_nspire_dt_ids[] = {
++	{ .compatible = "zevio,nspire-usb", },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver ci_hdrc_nspire_driver = {
++	.probe = ci_hdrc_nspire_probe,
++	.remove = ci_hdrc_nspire_remove,
++	.driver = {
++		.name = "nspire_usb",
++		.owner = THIS_MODULE,
++		.of_match_table = ci_hdrc_nspire_dt_ids,
++	},
++};
++
++MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
++module_platform_driver(ci_hdrc_nspire_driver);
++
++MODULE_ALIAS("platform:nspire_usb");
++MODULE_ALIAS("platform:ci_hdrc_nspire");
++MODULE_LICENSE("GPL v2");
+--
+1.8.1.3
