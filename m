@@ -1,66 +1,73 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Sun, 24 Nov 2013 15:30:51 +0900
-Subject: [PATCH v11 6/7] ARM: tegra: set CPU reset handler using firmware
-In-Reply-To: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
-References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1385274652-16415-7-git-send-email-acourbot@nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 24 Nov 2013 16:16:15 +0900
+Subject: [GIT PULL] Renesas ARM based SoC clock updates for v3.13
+In-Reply-To: <1381301313-5938-1-git-send-email-horms+renesas@verge.net.au>
+References: <1381301313-5938-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20131124071615.GA15677@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a firmware operation to set the CPU reset handler and only resort to
-doing it ourselves if there is none defined.
+On Wed, Oct 09, 2013 at 03:48:32PM +0900, Simon Horman wrote:
+> Hi Mike,
+> 
+> please consider these Renesas ARM based SoC clock updates for v3.13.
 
-This supports the booting of secondary CPUs on devices using a TrustZone
-secure monitor.
+Hi Mike,
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/reset.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+for some reason I thought you had taken this change but I now
+realise that is not the case. I apologise for not being more attentive.
 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 17c4b6d..146fe8e 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -21,6 +21,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/firmware.h>
- 
- #include "iomap.h"
- #include "irammap.h"
-@@ -65,6 +66,7 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
- 						tegra_cpu_reset_handler_offset;
-+	int err;
- 
- 	BUG_ON(is_enabled);
- 	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
-@@ -72,9 +74,18 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
- 			tegra_cpu_reset_handler_size);
- 
--	tegra_cpu_reset_handler_set(reset_address);
--
--	is_enabled = true;
-+	err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
-+	switch (err) {
-+	case -ENOSYS:
-+		tegra_cpu_reset_handler_set(reset_address);
-+		/* pass-through */
-+	case 0:
-+		is_enabled = true;
-+		break;
-+	default:
-+		pr_crit("Cannot set CPU reset handler: %d\n", err);
-+		BUG();
-+	}
- }
- 
- void __init tegra_cpu_reset_handler_init(void)
--- 
-1.8.4.2
+I am wondering if you could consider taking it as I have some SoC-side
+changes that depend on it which I would like to queue up for v3.14.
+Actually, I have them queued up and was preparing some branches based on
+v3.13-rc1 for the ARM-SoC maintainers when I noticed this patch
+had not been accepted.
+
+I think that any of the following would work well for me:
+I'm sure there are also other options.
+
+1. You could take this into a branch which won't subsequently
+   be rebased and I can use that as a base for a branch
+   for the SoC-side changes which I intend to have merged into
+   the ARM-SoC tree.
+
+2. You could take this for v3.13. But it is probably far to late for that.
+
+3. I could take this change with the SoC-side changes which I
+   intend to have merged into the ARM-SoC tree.
+
+Another option is for me to drop the SoC-side changes for now.
+But that is not my preferred option.
+
+> 
+> 
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+> 
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock-for-v3.13
+> 
+> for you to fetch changes up to f00578d0f860ba63bf28e0261ef489cc9e01ab47:
+> 
+>   clk: emev2: Add support for emev2 SMU clocks with DT (2013-10-09 15:39:08 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM based SoC clock updates for v3.13
+> 
+> * Add support for emev2 SMU clocks with DT
+> 
+> ----------------------------------------------------------------
+> Takashi Yoshii (1):
+>       clk: emev2: Add support for emev2 SMU clocks with DT
+> 
+>  .../devicetree/bindings/clock/emev2-clock.txt      |  98 +++++++++++++++++++
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/shmobile/Makefile                      |   3 +
+>  drivers/clk/shmobile/clk-emev2.c                   | 104 +++++++++++++++++++++
+>  4 files changed, 206 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/emev2-clock.txt
+>  create mode 100644 drivers/clk/shmobile/Makefile
+>  create mode 100644 drivers/clk/shmobile/clk-emev2.c
+> 
