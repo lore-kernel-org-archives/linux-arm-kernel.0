@@ -1,34 +1,35 @@
-From: motobud@gmail.com (Brent Taylor)
-Date: Sun, 24 Nov 2013 12:02:35 -0600
-Subject: [PATCH] fixed unresolved symbol "at91_pm_set_standby" when built
- without CONFIG_PM
-Message-ID: <CAP+RiCDKcBwJunmNF89kh1zoT0xKYRWvaBPHnijRafLU2MHf_g@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Sun, 24 Nov 2013 10:16:32 -0800
+Subject: crypto dependency in bit sliced AES
+In-Reply-To: <20131124075632.GA7807@gondor.apana.org.au>
+References: <CAKv+Gu8PESZ3uFZ6Rf+sma9QeRd7xSyrEa=RVCeDR1KtmLKEAA@mail.gmail.com>
+ <20131122225256.GG16735@n2100.arm.linux.org.uk>
+ <CA+55aFwRWGdA934GQdo6QpEuxRxeECvrpi9ctJWcVQ5pCyF1iw@mail.gmail.com>
+ <20131123013924.GA16533@gondor.apana.org.au>
+ <CAADWXX9CRRZF3Ewt5sXWQuCdKVVpe_-TdT+BW_MRrMUG2h1eGA@mail.gmail.com>
+ <20131124010207.GK16735@n2100.arm.linux.org.uk>
+ <20131124075632.GA7807@gondor.apana.org.au>
+Message-ID: <CA+55aFxN=kbKJmkjSECokqTx+cBP1GOCTpJuRCebfitiiDP5Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_PM is not defined, then arch/arm/mach-at91/pm.c is not
-compiled in.  This patch creates an inline function that does nothing
-if CONFIG_PM is not defined.
+On Sat, Nov 23, 2013 at 11:56 PM, Herbert Xu
+<herbert@gondor.apana.org.au> wrote:
+>
+> OK, I've fixed the EHLO header and added an SPF record.  Hopefully
+> gmail will stop listing my emails as spam now.
 
----
- arch/arm/mach-at91/pm.h | 4 ++++
- 1 file changed, 4 insertions(+)
+Ok, at least this email came through. And I do see the SPF change:
 
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 3ed190c..c5101dc 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -16,7 +16,11 @@
- #include <mach/at91_ramc.h>
- #include <mach/at91rm9200_sdramc.h>
+  Received-SPF: pass (google.com: domain of
+herbert at gondor.apana.org.au designates 178.18.16.133 as permitted
+sender) client-ip=178.18.16.133;
+  Authentication-Results: mx.google.com;
+         spf=pass (google.com: domain of herbert at gondor.apana.org.au
+designates 178.18.16.133 as permitted sender)
+smtp.mail=herbert at gondor.apana.org.au
+  Received: from gondolin.me.apana.org.au ([192.168.0.6])
 
-+#ifdef CONFIG_PM
- extern void at91_pm_set_standby(void (*at91_standby)(void));
-+#else
-+static inline void at91_pm_set_standby(void (*at91_standby)(void)) { }
-+#endif
+so hopefully the success is indeed permanent.
 
- /*
-  * The AT91RM9200 goes into self-refresh mode with this command, and will
---
-1.8.3.2
+              Linus
