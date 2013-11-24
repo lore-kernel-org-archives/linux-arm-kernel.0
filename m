@@ -1,26 +1,40 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 23 Nov 2013 21:48:13 -0500
-Subject: [PATCH 1/3] ARM: Orion: Add missing includes
-In-Reply-To: <1382537572-31472-1-git-send-email-y>
-References: <y>
- <1382537572-31472-1-git-send-email-y>
-Message-ID: <20131124024813.GN29241@titan.lakedaemon.net>
+Date: Sat, 23 Nov 2013 21:51:00 -0500
+Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to
+ cpu node in DT.
+In-Reply-To: <20131101090737.GB26890@lunn.ch>
+References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
+ <1383247111-26834-4-git-send-email-andrew@lunn.ch>
+ <1429743.Nz1AUEe5Hi@vostro.rjw.lan>
+ <CAKohpokTWfBnhWj+bdA9zx-+hyXUdp4ir5BYkZNLe08mcwVwLg@mail.gmail.com>
+ <20131101090737.GB26890@lunn.ch>
+Message-ID: <20131124025100.GO29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 04:12:50PM +0200, y at lunn.ch wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
+On Fri, Nov 01, 2013 at 10:07:37AM +0100, Andrew Lunn wrote:
+> On Fri, Nov 01, 2013 at 05:21:03AM +0530, Viresh Kumar wrote:
+> > On 1 November 2013 03:56, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > > On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
+> > >> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
+> > >> is also an interrupt generated when the DFS hardware completes a
+> > >> change of frequencey. Add these to the cpu node in DT.
+> > >>
+> > >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > >> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > >
+> > > I need someone with DT bindings knowledge to ACK this for me.
+> > 
+> > I can do that
 > 
-> Building with C=1 generates warnings because of missing includes and
-> static keywords. Add them.
+> Thanks.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/plat-orion/common.c | 9 +++++----
->  arch/arm/plat-orion/time.c   | 1 +
->  2 files changed, 6 insertions(+), 4 deletions(-)
+> > , but this set has to be rebased over all the latest developments
+> > in cpufreq core before getting posted again..
+> 
+> I will wait for -rc1 and rebase. 
 
-Whole series applied to mvebu/soc
+ping.
 
 thx,
 
