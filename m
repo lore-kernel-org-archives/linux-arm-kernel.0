@@ -1,94 +1,59 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 24 Nov 2013 15:16:41 +0530
-Subject: [PATCH 10/12] mtd: nand: davinci: don't set timings if AEMIF
- is used
-In-Reply-To: <528F968F.40306@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-11-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D53@DNCE04.ent.ti.com>
- <528307F0.6000805@ti.com> <52838941.4060207@ti.com> <5284ABB9.70608@ti.com>
- <5284DFE7.70308@ti.com> <528E3DD4.7030607@ti.com> <528F968F.40306@ti.com>
-Message-ID: <5291CB01.1010506@ti.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sun, 24 Nov 2013 10:54:07 +0100
+Subject: [GIT PULL] prefetch support for 3.13
+In-Reply-To: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
+References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
+Message-ID: <5291CCBF.8030608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 November 2013 11:08 PM, Santosh Shilimkar wrote:
-> On Thursday 21 November 2013 12:07 PM, Nori, Sekhar wrote:
->> On 11/14/2013 8:06 PM, Santosh Shilimkar wrote:
->>> On Thursday 14 November 2013 05:53 AM, Nori, Sekhar wrote:
->>>> On Wednesday 13 November 2013 07:44 PM, Santosh Shilimkar wrote:
->>>>> On Wednesday 13 November 2013 12:02 AM, Sekhar Nori wrote:
->>>>>> On Monday 11 November 2013 10:40 PM, Khoronzhuk, Ivan wrote:
->>>>>>> If Davinci AEMIF is used we don't need to set timings and bus width.
->>>>>>> It is done by AEMIF driver (drivers/memory/davinci-aemfi.c).
->>>>>>>
->>>>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>>>>> ---
->>>>>>>  drivers/mtd/nand/davinci_nand.c |   22 +++++++++++++++-------
->>>>>>>  1 file changed, 15 insertions(+), 7 deletions(-)
->>>>>>>
->>>>>>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
->>>>>>> index 4705214..879e915 100644
->>>>>>> --- a/drivers/mtd/nand/davinci_nand.c
->>>>>>> +++ b/drivers/mtd/nand/davinci_nand.c
->>>>>>> @@ -742,27 +742,35 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
->>>>>>>                 goto err_clk_enable;
->>>>>>>         }
->>>>>>>
->>>>>>> +#if !IS_ENABLED(CONFIG_TI_DAVINCI_AEMIF)
->>>>>>
->>>>>> This is a hack! Just because AEMIF driver is enabled, it does not
->>>>>> guarantee that the timings have been setup by it. Instead of configuring
->>>>>> timings in two drivers, why not just convert everyone over to use the
->>>>>> new driver. Dont worry about breaking old platforms, I will help test
->>>>>> and ack them.
->>>>>>
->>>>> How about you take a stab at and convert the DaVinci code over to make
->>>>> use of new driver. We are trying to re-use as much as possible from the
->>>>> common drivers and also making an option so that the DaVinci arch can
->>>>> move over to these drivers if they want to.
->>>>
->>>> Sure I could.
->>>>
->>> Thanks
->>>
->>>> Ivan,
->>>>
->>>> The AEMIF driver does not use platfrom_data currently. Is that something
->>>> you can add or you want me to take a stab at that as well?
->>>>
->>> The AEMIF new driver is device tree only and thats the direction. So the
->>> better thing would be to convert Davinci to DT and then make use of this
->>> new driver. Thats how most of the new drivers used on arm socs are
->>> moving. Adding platform data to new driver is a step in backward
->>> direction so I would want to avoid that.
->>
->> Yes, that would be the ideal way. But the reality is that there is close
->> to zero chance of all the DaVinci platforms using AEMIF ever getting
->> converted to DT. This means that we will never be able to get rid of
->> this piece of code.
->>
-> Well that means some of those platforms support will get deprecated
-> soon considering other basic frameworks like irq, timer wheel etc
-> is assuming the DT direction. But its your call because if you
-> want those platforms to live, you need to convert them to DT.
->  
->> I do agree platform data is not the direction you want to take on ARM
->> but at the same time its not really a deprecated mechanism as far as the
->> broader kernel is concerned.
->>
->> So, can we consider adding platform data mechanism to the AEMIF driver?
->>
-> Sorry but answer is "NO". If the above hack is really bothering you,
-> we can actually rip out the above code in question and move it
-> to mach-davinci. Infact thats the best direction to make the
-> mtd nandn driver independent of any platform quirks(dt, pdata etc)
-> 
-> Ivan already has a patch to do that and he is going to post
-> that patch. With that patch, we won't need $subject patch.
-> 
+Am 09.10.2013 19:13, schrieb Will Deacon:
+> Hi Russell,
+>
+> Please pull the following patches for 3.13. They add support for the pldw
+> instruction (prefetch with intent to modify) in ARMv7 SMP cores, which is
+> then used to gain a measurable performance boost for particular atomic
+> sequences.
+>
+> Cheers,
+>
+> Will
+>
+> --->8
+>
+> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+>
+>    Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+>
+> are available in the git repository at:
+>
+>    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/prefetch
+>
+> for you to fetch changes up to d779c07dd72098a7416d907494f958213b7726f3:
+>
+>    ARM: bitops: prefetch the destination word for write prior to strex (2013-09-30 16:42:56 +0100)
+>
+> ----------------------------------------------------------------
+> Will Deacon (6):
+>        ARM: prefetch: remove redundant "cc" clobber
+>        ARM: smp_on_up: move inline asm ALT_SMP patching macro out of spinlock.h
+>        ARM: prefetch: add support for prefetchw using pldw on SMP ARMv7+ CPUs
+>        ARM: locks: prefetch the destination word for write prior to strex
+>        ARM: atomics: prefetch the destination word for write prior to strex
+>        ARM: bitops: prefetch the destination word for write prior to strex
+>
+>   arch/arm/include/asm/atomic.h         |  7 +++++++
+>   arch/arm/include/asm/processor.h      | 33 +++++++++++++++++++++++++--------
+>   arch/arm/include/asm/spinlock.h       | 28 ++++++++++++++--------------
+>   arch/arm/include/asm/spinlock_types.h |  2 +-
+>   arch/arm/include/asm/unified.h        |  4 ++++
+>   arch/arm/lib/bitops.h                 |  5 +++++
+>   6 files changed, 56 insertions(+), 23 deletions(-)
 
-Okay I will wait for the patch.
+Would this patch series be a candidate for the -stable kernels as 
+discussed recently in the "Patches from ARM folks solicited for the 
+-stable tree" thread?
 
-Thanks,
-Sekhar
+Best regards
+
+Dirk
