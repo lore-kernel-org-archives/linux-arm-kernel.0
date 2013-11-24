@@ -1,48 +1,68 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 24 Nov 2013 12:52:58 +0100
-Subject: [PATCHv2] ARM: mvebu: Add Netgear ReadyNAS 2120 board
-References: <87ppq5flnb.fsf@natisbad.org>
- <20131124034951.GY29241@titan.lakedaemon.net>
-Message-ID: <87y54e819h.fsf@natisbad.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sun, 24 Nov 2013 09:36:11 -0300
+Subject: [PATCH] ARM: pxa: Move iotable mapping inside vmalloc region
+Message-ID: <1385296571-23599-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In order to remove the following ugly message:
 
-Jason Cooper <jason@lakedaemon.net> writes:
+  BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
 
-> On Tue, Nov 12, 2013 at 08:46:48PM +0100, Arnaud Ebalard wrote:
->> 
->> All hardware parts of the (mv78230 Armada XP based) NETGEAR ReadyNAS
->> 2120 are supported by mainline kernel (USB 3.0 and eSATA rear ports,
->> USB 2.0 front port, Gigabit controller and PHYs for the two rear ports,
->> serial port, LEDs, Buttons, 88SE9170 SATA controllers, three G762 fan
->> controllers, G751 temperature sensor) except for:
->> 
->>  - the Intersil ISL12057 I2C RTC Chip,
->>  - the Armada NAND controller.
->> 
->> Support for both of those is currently work in progress and does not
->> prevent boot.
->> 
->> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
-> ...
->>  arch/arm/boot/dts/Makefile                     |   1 +
->>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 288 +++++++++++++++++++++++++
->>  2 files changed, 289 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
->
-> Applied to mvebu/dt
+the iotable mappings should be re-located inside the vmalloc
+region. Such move was introduced at commit:
 
-Thanks, Jason. Based on the response to the question raised by Jason
-Gunthorpe regarding PHY compatible string [1], I'll keep in mind to send
-you a patch at some point (.dts file for RN2120 also has compatible =
-"marvell,88e1318s") if needed.
+commit 0536bdf33faff4d940ac094c77998cfac368cfff
+Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date:   Thu Aug 25 00:35:59 2011 -0400
 
-Cheers,
+    ARM: move iotable mappings within the vmalloc region
 
-a+
+While at it, let's add some nicer defines to make the code
+more readable.
 
-[1]: http://www.spinics.net/lists/arm-kernel/msg288496.html
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/mach-pxa/generic.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 4225417..7c01095 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -24,6 +24,7 @@
+ #include <mach/hardware.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach-types.h>
++#include <asm/pgtable.h>
+ 
+ #include <mach/reset.h>
+ #include <mach/smemc.h>
+@@ -77,6 +78,11 @@ EXPORT_SYMBOL(get_clk_frequency_khz);
+  * Note: virtual 0xfffe0000-0xffffffff is reserved for the vector table
+  *       and cache flush area.
+  */
++
++#define UNCACHED_PHY	0x00000000
++#define UNCACHED_SIZE	SZ_1M
++#define UNCACHED_VIRT	(VMALLOC_END - UNCACHED_SIZE)
++
+ static struct map_desc common_io_desc[] __initdata = {
+   	{	/* Devs */
+ 		.virtual	=  0xf2000000,
+@@ -84,9 +90,9 @@ static struct map_desc common_io_desc[] __initdata = {
+ 		.length		= 0x02000000,
+ 		.type		= MT_DEVICE
+ 	}, {	/* UNCACHED_PHYS_0 */
+-		.virtual	= 0xff000000,
+-		.pfn		= __phys_to_pfn(0x00000000),
+-		.length		= 0x00100000,
++		.virtual	= UNCACHED_VIRT,
++		.pfn		= __phys_to_pfn(UNCACHED_PHY),
++		.length		= UNCACHED_SIZE,
+ 		.type		= MT_DEVICE
+ 	}
+ };
+-- 
+1.8.1.5
