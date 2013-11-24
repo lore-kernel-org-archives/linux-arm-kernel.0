@@ -1,35 +1,56 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 24 Nov 2013 12:07:18 -0500
-Subject: [PATCH 3/3] mmc: mvsdio: silence card detect notice
-In-Reply-To: <1384525354-901-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1384525354-901-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1384525354-901-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131124170718.GJ29241@titan.lakedaemon.net>
+Date: Sun, 24 Nov 2013 12:13:19 -0500
+Subject: [PATCH] ARM: Kirkwood: DT board setup for LaPlug
+In-Reply-To: <5288C2B5.7040903@gmail.com>
+References: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
+ <5288C2B5.7040903@gmail.com>
+Message-ID: <20131124171319.GK29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 03:22:34PM +0100, Sebastian Hesselbarth wrote:
-> mvsdio reports method of card detection with dev_notice, while for
-> removable cards it may be sane, for non-removable cards it is not.
-> Also, as the user cannot do anything about it, silence the message
-> by reducing it from dev_notice to dev_dbg.
+On Sun, Nov 17, 2013 at 02:20:53PM +0100, Sebastian Hesselbarth wrote:
+> On 11/16/2013 11:08 PM, Maxime Hadjinlian wrote:
+> >This patch adds DT board setup for the LaCie NAS LaPlug.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/mmc/host/mvsdio.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+> [adding MVEBU maintainers, please do that always from now on]
+> 
+> Maxime,
+> 
+> first of all, thanks for providing this. Anyway, I do have some
+> remarks below.
+> 
+> >Chipset list:
+> >- CPU MARVELL 88FR131 800Mhz
+> >- SDRAM memory: 128MB DDR2-800 400Mhz
+> >- 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
+> >- 1 Mini PCI-Express port
+> >- 1 NAND 512 MB
+> >- 1 push button
+> >- 2 LEDs (red and blue)
+> >- 4 USB Ports
+> >
+> >Signed-off-by: Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
+> >---
+> >  arch/arm/boot/dts/Makefile            |   1 +
+> >  arch/arm/boot/dts/kirkwood-nsplug.dts | 178 ++++++++++++++++++++++++++++++++++
+> >  2 files changed, 179 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/kirkwood-nsplug.dts
+...
+> >+&mdio {
+> >+  status = "okay";
+> >+
+> >+  ethphy0: ethernet-phy at 0 {
+> >+    device_type = "ethernet-phy";
+> 
+> If you know the type of PHY used here, please add
+> a compatible like "marvell,88e1318s"
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Please be aware of the current conversation [1] started by Jason
+Gunthorpe regarding the compatible string choice here.  Once that's
+resolved, please resend.
 
 thx,
 
 Jason.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg288496.html
