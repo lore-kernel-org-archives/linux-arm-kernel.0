@@ -1,27 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 24 Nov 2013 10:11:23 +0000
-Subject: [GIT PULL] prefetch support for 3.13
-In-Reply-To: <5291CCBF.8030608@gmail.com>
-References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
- <5291CCBF.8030608@gmail.com>
-Message-ID: <20131124101123.GL16735@n2100.arm.linux.org.uk>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sun, 24 Nov 2013 18:12:06 +0800
+Subject: [PATCHv2] usb: chipidea: add support for USB OTG controller on
+ TI-NSPIRE
+In-Reply-To: <1385278667-91856-1-git-send-email-dt.tangr@gmail.com>
+References: <1385278667-91856-1-git-send-email-dt.tangr@gmail.com>
+Message-ID: <20131124101205.GA30724@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 24, 2013 at 10:54:07AM +0100, Dirk Behme wrote:
-> Would this patch series be a candidate for the -stable kernels as  
-> discussed recently in the "Patches from ARM folks solicited for the  
-> -stable tree" thread?
+On Sun, Nov 24, 2013 at 06:37:47PM +1100, dt.tangr at gmail.com wrote:
+> From: Daniel Tang <dt.tangr@gmail.com>
+> 
+> Changelog v2:
+>  * Rename ci13xxx to ci_hdrc
+>  * Fixed alignment issues
+> 
+> The USB controller in TI-NSPIRE calculators are based off either Freescale's
+> USB OTG controller or the USB controller found in the IMX233, both of which
+> are Chipidea compatible.
+> 
+> This patch adds a device tree binding for the controller.
+> 
+> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+> ---
 
-I don't think so.
+Please put the "Changelog v2" here, the change log should
+not be in commit log, it is for review purpose.
 
-Firstly, patches suitable for the stable tree are also suitable to be
-pushed in during -rc time.  In other words, they're bug fixes and
-regression fixes.  This is neither.
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
+> +module_platform_driver(ci_hdrc_nspire_driver);
+> +
+> +MODULE_ALIAS("platform:nspire_usb");
+> +MODULE_ALIAS("platform:ci_hdrc_nspire");
 
-Secondly, it has the effect that it raises the bar on the binutils to
-build the kernel, and if we push that into -stable kernels, those kernels
-will fail to build with older binutils - which is itself a regression
-as far as -stable is concerned.
+Just curious, why you need to two alias?
 
-So no, I don't think it's appropriate.
+-- 
+
+Best Regards,
+Peter Chen
