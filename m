@@ -1,37 +1,42 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Sun, 24 Nov 2013 03:56:51 +0000
-Subject: ACPI
-In-Reply-To: <2940EDD8-0EE7-4D61-96F7-3D78D5A52644@jonmasters.org>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <528FC5C1.1080403@jonmasters.org> <528FCEA6.1060602@jonmasters.org>
- <201311231011.45892.arnd@arndb.de>
- <20131123183904.GB20790@obsidianresearch.com>
- <20131123230303.GA5212@srcf.ucam.org>
- <2940EDD8-0EE7-4D61-96F7-3D78D5A52644@jonmasters.org>
-Message-ID: <20131124035651.GA7580@srcf.ucam.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 23 Nov 2013 23:00:26 -0500
+Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
+ command bits
+In-Reply-To: <20131124030033.GR29241@titan.lakedaemon.net>
+References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20131124030033.GR29241@titan.lakedaemon.net>
+Message-ID: <20131124040026.GA29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 23, 2013 at 10:52:25PM -0500, Jon Masters wrote:
+On Sat, Nov 23, 2013 at 10:00:33PM -0500, Jason Cooper wrote:
+> On Thu, Oct 31, 2013 at 05:32:59PM -0600, Jason Gunthorpe wrote:
+> > When PCI_COMMAND_MEMORY/PCI_COMMAND_IO are cleared the bridge should not
+> > allocate windows or even look at the window limit/base registers.
+> > 
+> > Otherwise it can attempt to setup bogus windows that the PCI core code
+> > creates during discovery. The core will leave PCI_COMMAND_IO cleared if
+> > it doesn't need an IO window.
+> > 
+> > Have mvebu_pcie_handle_*_change respect the bits, and call the change
+> > function whenever the bits changes.
+> > 
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > ---
+> >  drivers/pci/host/pci-mvebu.c | 14 ++++++++++++--
+> >  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> And a small addendum: I currently have the following in mvebu/drivers
 
-> Matthew, good points! Suffice it to say many productive conversations 
-> have occurred recently with regard to openness. I am constrained 
-> indeed, and somewhat willingly because that is the only way to engage 
-> with everyone who might (or might not) be involved in the ARM 
-> ecosystem in the timeframe that will matter in the medium/longer term 
-> (this is a decade+ long story). As you know, I'm a huge fan of 
-> standards (especially openly published ones), and in particular of 
-> having one way to do things that will work for an entire ecosystem 
-> (beyond just Linux), because that's how we get to an open platform 
-> that anyone can target. That's not the natural course things would 
-> take without steering. In the ARM space, the natural course might be 
-> to create vertical solutions that, while awesome, are harder to target 
-> with a general purpose one-size-fits-all OS story. I'll look forward 
-> to seeing more announcements coming soon.
+Strike that, they are now in mvebu/pci.
 
-That seems to be a very verbose way to say "We have no plans to make 
-sure this is going to work for upstream Linux". I'm disappointed to see 
-Red Hat play along with this.
+>   572bd682145f PCI: mvebu - The bridge secondary status register should be 0
+>   9503c7fe4d9d PCI: mvebu - Support a bridge with no IO port window
+>   058100a08be8 PCI: mvebu: return NULL instead of ERR_PTR(ret)
+> 
+> which means they didn't make it in for v3.13-rc1.  I'll hold them there
+> for reference until you resend.
 
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+thx,
+
+Jason.
