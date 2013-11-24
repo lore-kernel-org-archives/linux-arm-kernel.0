@@ -1,29 +1,47 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Sat, 23 Nov 2013 22:52:25 -0500
-Subject: ACPI
-In-Reply-To: <20131123230303.GA5212@srcf.ucam.org>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <528FC5C1.1080403@jonmasters.org> <528FCEA6.1060602@jonmasters.org>
- <201311231011.45892.arnd@arndb.de>
- <20131123183904.GB20790@obsidianresearch.com>
- <20131123230303.GA5212@srcf.ucam.org>
-Message-ID: <2940EDD8-0EE7-4D61-96F7-3D78D5A52644@jonmasters.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 23 Nov 2013 22:56:24 -0500
+Subject: [PATCH v2] CMA: Fix the phys_addr_t print types
+Message-ID: <1385265384-30510-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 23, 2013, at 6:03 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
-> 
-> Jon, I know you're constrained by any number of hilarious NDAs, but this 
-> situation is currently fairly unworkable. The interest various people 
-> have in ensuring that ACPI on ARM is viable has been spurred on by your 
-> constant reassurances that server vendors are going to require it. But 
-> if we don't know what server vendors actually want then there's 
-> absolutely no guarantee that any of the work we're doing is going to be 
-> useful, and wasting time now is going to reduce people's ability to care 
-> in future. There's probably more ACPI expertise in the wider Linux 
-> community than anywhere else. Figure out a way to make use of it now, 
-> rather than relying on them to help you later.
+Otherwise prints would truncate the variables on LPAE machines.
 
-Matthew, good points! Suffice it to say many productive conversations have occurred recently with regard to openness. I am constrained indeed, and somewhat willingly because that is the only way to engage with everyone who might (or might not) be involved in the ARM ecosystem in the timeframe that will matter in the medium/longer term (this is a decade+ long story). As you know, I'm a huge fan of standards (especially openly published ones), and in particular of having one way to do things that will work for an entire ecosystem (beyond just Linux), because that's how we get to an open platform that anyone can target. That's not the natural course things would take without steering. In the ARM space, the natural course might be to create vertical solutions that, while awesome, are harder to target with a general purpose one-size-fits-all OS story. I'll look forward to seeing more announcements coming soon.
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+Dropped accidental change pr_debug to pr_info from last version.
 
-Jon.
+ drivers/base/dma-contiguous.c |    9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 165c2c2..b303a98 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -201,9 +201,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 	phys_addr_t alignment;
+ 	int ret = 0;
+ 
+-	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
+-		 (unsigned long)size, (unsigned long)base,
+-		 (unsigned long)limit);
++	pr_debug("%s(size %pa, base %pa, limit %pa)\n", __func__,
++		 &size, &base, &limit);
+ 
+ 	/* Sanity checks */
+ 	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+@@ -250,8 +249,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 	*res_cma = cma;
+ 	cma_area_count++;
+ 
+-	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+-		(unsigned long)base);
++	pr_info("CMA: reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
++		&base);
+ 
+ 	/* Architecture specific contiguous memory fixup. */
+ 	dma_contiguous_early_fixup(base, size);
+-- 
+1.7.9.5
