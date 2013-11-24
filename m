@@ -1,25 +1,26 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 24 Nov 2013 12:16:48 -0500
-Subject: [PATCHv2] ARM: mvebu: Add RN104 SATA LEDs driven via NXP
- PCA9554 I2C to GPIO muxer
-In-Reply-To: <87mwkx4ayr.fsf@natisbad.org>
-References: <87mwkx4ayr.fsf@natisbad.org>
-Message-ID: <20131124171648.GL29241@titan.lakedaemon.net>
+Date: Sun, 24 Nov 2013 12:21:37 -0500
+Subject: [PATCHv2] ARM: mvebu: Add DT entry for ReadyNAS Duo v2 to use
+ gpio-poweroff driver
+In-Reply-To: <87eh68fpqb.fsf@natisbad.org>
+References: <87eh68fpqb.fsf@natisbad.org>
+Message-ID: <20131124172137.GM29241@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 12:00:12AM +0100, Arnaud Ebalard wrote:
+On Fri, Nov 22, 2013 at 03:58:04PM +0100, Arnaud Ebalard wrote:
 > 
-> NETGEAR ReadyNAS 104 has a NXP PCA9554 I2C to GPIO chip. Among the 8 GPIO
-> lines the chip makes available, four are used on the device to control
-> the SATA LEDs (the four remaining ones are used for SATA disk presence).
-> This patch adds DT entries for NXP PCA9554 and the four SATA GPIO LEDs.
+> Without that fix, at the end of the shutdown process, the board is
+> still powered (led glowing, fan running, ...).
 > 
 > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
 > 
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 32 ++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
+> Changes since v1:
+>  - use macro instead of value for GPIO voltage level
+> 
+>  arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 
 Applied to mvebu/dt
 
