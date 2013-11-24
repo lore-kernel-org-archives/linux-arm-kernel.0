@@ -1,56 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 24 Nov 2013 12:13:19 -0500
-Subject: [PATCH] ARM: Kirkwood: DT board setup for LaPlug
-In-Reply-To: <5288C2B5.7040903@gmail.com>
-References: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
- <5288C2B5.7040903@gmail.com>
-Message-ID: <20131124171319.GK29241@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 24 Nov 2013 18:14:07 +0100
+Subject: ACPI
+In-Reply-To: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+Message-ID: <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 17, 2013 at 02:20:53PM +0100, Sebastian Hesselbarth wrote:
-> On 11/16/2013 11:08 PM, Maxime Hadjinlian wrote:
-> >This patch adds DT board setup for the LaCie NAS LaPlug.
-> 
-> [adding MVEBU maintainers, please do that always from now on]
-> 
-> Maxime,
-> 
-> first of all, thanks for providing this. Anyway, I do have some
-> remarks below.
-> 
-> >Chipset list:
-> >- CPU MARVELL 88FR131 800Mhz
-> >- SDRAM memory: 128MB DDR2-800 400Mhz
-> >- 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
-> >- 1 Mini PCI-Express port
-> >- 1 NAND 512 MB
-> >- 1 push button
-> >- 2 LEDs (red and blue)
-> >- 4 USB Ports
-> >
-> >Signed-off-by: Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
-> >---
-> >  arch/arm/boot/dts/Makefile            |   1 +
-> >  arch/arm/boot/dts/kirkwood-nsplug.dts | 178 ++++++++++++++++++++++++++++++++++
-> >  2 files changed, 179 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-nsplug.dts
-...
-> >+&mdio {
-> >+  status = "okay";
-> >+
-> >+  ethphy0: ethernet-phy at 0 {
-> >+    device_type = "ethernet-phy";
-> 
-> If you know the type of PHY used here, please add
-> a compatible like "marvell,88e1318s"
+On Mon, Nov 18, 2013 at 7:42 PM, Jon Masters <jonathan@jonmasters.org> wrote:
 
-Please be aware of the current conversation [1] started by Jason
-Gunthorpe regarding the compatible string choice here.  Once that's
-resolved, please resend.
+> Could we articulate a series of useful asks that would help with moving
+> forward with ACPI? For example, it is clear that there needs to be
+> more involvement in the standardization of ACPI (...)
 
-thx,
+One thing I think a bit about is ontology[1], what is written in that
+spec and under what assumptions. I noticed from DSDT fragments
+here and there that ACPI has no concept of pin control, but instead
+adhere to the old fallacy of mixing this up with GPIO in the examples
+I saw, and this would be good to have clarified, maybe I as a
+subsystem maintainer need to go read some spec and provide
+feedback on it?
 
-Jason.
+For devicetree we have a bit of standardization in
+Documentation/devicetree/bindings/pinctrl and if I'm not mistaken,
+nothing of the sort exist in the ACPI spec.
 
-[1] http://www.spinics.net/lists/arm-kernel/msg288496.html
+The same can probably be said about slave DMA,
+Documentation/devicetree/bindings/pinctrl?
+Or regulators? Clocks? Runtime PM and D-states as
+Arnd mentioned?
+
+In which cases does the ACPI definitions of terms, paradigms and
+ontologies match those if the kernel subsystems, and where will
+we be shoehorned into somebody else's idea of the world, and
+is there something we can do about it (i.e. influcence this).
+
+Yours,
+Linus Walleij
+
+[1] Using this in the exact philosophical sense to be precise with
+the problem I have, not trying to play smart.
+Quote from Wikipedia:
+" ontology deals with questions concerning what entities exist or
+ can be said to exist, and how such entities can be grouped,
+ related within a hierarchy, and subdivided according to similarities
+ and differences"
