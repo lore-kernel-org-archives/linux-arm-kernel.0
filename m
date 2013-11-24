@@ -1,164 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 24 Nov 2013 21:59:04 +0100
-Subject: [PATCH 2/2] clk: versatile: fixup IM-PD1 clock implementation
-Message-ID: <1385326744-16445-1-git-send-email-linus.walleij@linaro.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 24 Nov 2013 21:00:49 +0000
+Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
+ gyroscopes
+In-Reply-To: <20131121131402.GF1029@lukather>
+References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
+ <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
+Message-ID: <52926901.9080004@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register both VCO clocks, give per-logical module unique names
-to the clocks so we can have several IM-PD1's connected (in
-theory). Implement all the fixed-factor clocks as children of
-VCO2.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Tested by using the UARTs and the PL181 MMC block on the IM-PD1,
-works flawlessly.
+On 11/21/13 13:14, Maxime Ripard wrote:
+> Hi Denis,
+> 
+> On Thu, Nov 21, 2013 at 12:41:24PM +0100, Denis CIOCCA wrote:
+>> only one point: it's possible to use the same names with DT? (using _ instead of -)
+> 
+> Yes, it is, but only for i2c as far as I'm aware, and usually the DT compatibles are with - as a separator (I
+> looked into the ePAPR, but couldn't get any explanations or requirements on this, even though it's used in all of
+> their examples)
+In other discussions, where the defacto i2c device tree bindings have
+been followed, the conclusion has been that to change to a - from _
+would result in userspace ABI changes, so whilst no one wants _
+the discussion has concluded we can't really avoid it.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi Mike, if you're happy with this, I'd like an ACK to carry it
-through the ARM SoC tree.
----
- drivers/clk/versatile/clk-impd1.c | 86 ++++++++++++++++++++++++++++++++-------
- 1 file changed, 71 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
-index b693a2bbf25a..844f8d711a12 100644
---- a/drivers/clk/versatile/clk-impd1.c
-+++ b/drivers/clk/versatile/clk-impd1.c
-@@ -1,6 +1,6 @@
- /*
-  * Clock driver for the ARM Integrator/IM-PD1 board
-- * Copyright (C) 2012 Linus Walleij
-+ * Copyright (C) 2012-2013 Linus Walleij
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -18,20 +18,28 @@
- #include "clk-icst.h"
- 
- struct impd1_clk {
--	struct clk *vcoclk;
-+	char *vco1name;
-+	struct clk *vco1clk;
-+	char *vco2name;
-+	struct clk *vco2clk;
-+	struct clk *mmciclk;
-+	char *uartname;
- 	struct clk *uartclk;
--	struct clk_lookup *clks[3];
-+	char *spiname;
-+	struct clk *spiclk;
-+	char *scname;
-+	struct clk *scclk;
-+	struct clk_lookup *clks[6];
- };
- 
-+/* One entry for each connected IM-PD1 LM */
- static struct impd1_clk impd1_clks[4];
- 
- /*
-- * There are two VCO's on the IM-PD1 but only one is used by the
-- * kernel, that is why we are only implementing the control of
-- * IMPD1_OSC1 here.
-+ * There are two VCO's on the IM-PD1
-  */
- 
--static const struct icst_params impd1_vco_params = {
-+static const struct icst_params impd1_vco1_params = {
- 	.ref		= 24000000,	/* 24 MHz */
- 	.vco_max	= ICST525_VCO_MAX_3V,
- 	.vco_min	= ICST525_VCO_MIN,
-@@ -44,11 +52,29 @@ static const struct icst_params impd1_vco_params = {
- };
- 
- static const struct clk_icst_desc impd1_icst1_desc = {
--	.params = &impd1_vco_params,
-+	.params = &impd1_vco1_params,
- 	.vco_offset = IMPD1_OSC1,
- 	.lock_offset = IMPD1_LOCK,
- };
- 
-+static const struct icst_params impd1_vco2_params = {
-+	.ref		= 24000000,	/* 24 MHz */
-+	.vco_max	= ICST525_VCO_MAX_3V,
-+	.vco_min	= ICST525_VCO_MIN,
-+	.vd_min		= 12,
-+	.vd_max		= 519,
-+	.rd_min		= 3,
-+	.rd_max		= 120,
-+	.s2div		= icst525_s2div,
-+	.idx2s		= icst525_idx2s,
-+};
-+
-+static const struct clk_icst_desc impd1_icst2_desc = {
-+	.params = &impd1_vco2_params,
-+	.vco_offset = IMPD1_OSC2,
-+	.lock_offset = IMPD1_LOCK,
-+};
-+
- /**
-  * integrator_impd1_clk_init() - set up the integrator clock tree
-  * @base: base address of the logic module (LM)
-@@ -66,16 +92,39 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
- 	}
- 	imc = &impd1_clks[id];
- 
--	clk = icst_clk_register(NULL, &impd1_icst1_desc, "icst1", base);
-+	imc->vco1name = kasprintf(GFP_KERNEL, "lm%x-vco1", id);
-+	clk = icst_clk_register(NULL, &impd1_icst1_desc, imc->vco1name, base);
- 	imc->vco1clk = clk;
- 	imc->clks[0] = clkdev_alloc(clk, NULL, "lm%x:01000", id);
- 
--	/* UART reference clock */
--	clk = clk_register_fixed_rate(NULL, "uartclk", NULL, CLK_IS_ROOT,
--				14745600);
-+	/* VCO2 is also called "CLK2" */
-+	imc->vco2name = kasprintf(GFP_KERNEL, "lm%x-vco2", id);
-+	clk = icst_clk_register(NULL, &impd1_icst2_desc, imc->vco2name, base);
-+	imc->vco2clk = clk;
-+
-+	/* MMCI uses CLK2 right off */
-+	imc->clks[1] = clkdev_alloc(clk, NULL, "lm%x:00700", id);
-+
-+	/* UART reference clock divides CLK2 by a fixed factor 4 */
-+	imc->uartname = kasprintf(GFP_KERNEL, "lm%x-uartclk", id);
-+	clk = clk_register_fixed_factor(NULL, imc->uartname, imc->vco2name,
-+				   CLK_IGNORE_UNUSED, 1, 4);
- 	imc->uartclk = clk;
--	imc->clks[1] = clkdev_alloc(clk, NULL, "lm%x:00100", id);
--	imc->clks[2] = clkdev_alloc(clk, NULL, "lm%x:00200", id);
-+	imc->clks[2] = clkdev_alloc(clk, NULL, "lm%x:00100", id);
-+	imc->clks[3] = clkdev_alloc(clk, NULL, "lm%x:00200", id);
-+
-+	/* SPI PL022 clock divides CLK2 by a fixed factor 64 */
-+	imc->spiname = kasprintf(GFP_KERNEL, "lm%x-spiclk", id);
-+	clk = clk_register_fixed_factor(NULL, imc->spiname, imc->vco2name,
-+				   CLK_IGNORE_UNUSED, 1, 64);
-+	imc->clks[4] = clkdev_alloc(clk, NULL, "lm%x:00300", id);
-+
-+	/* Smart Card clock divides CLK2 by a fixed factor 4 */
-+	imc->scname = kasprintf(GFP_KERNEL, "lm%x-scclk", id);
-+	clk = clk_register_fixed_factor(NULL, imc->scname, imc->vco2name,
-+				   CLK_IGNORE_UNUSED, 1, 4);
-+	imc->scclk = clk;
-+	imc->clks[5] = clkdev_alloc(clk, NULL, "lm%x:00600", id);
- 
- 	for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
- 		clkdev_add(imc->clks[i]);
-@@ -92,6 +141,13 @@ void integrator_impd1_clk_exit(unsigned int id)
- 
- 	for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
- 		clkdev_drop(imc->clks[i]);
-+	clk_unregister(imc->spiclk);
- 	clk_unregister(imc->uartclk);
--	clk_unregister(imc->vcoclk);
-+	clk_unregister(imc->vco2clk);
-+	clk_unregister(imc->vco1clk);
-+	kfree(imc->scname);
-+	kfree(imc->spiname);
-+	kfree(imc->uartname);
-+	kfree(imc->vco2name);
-+	kfree(imc->vco1name);
- }
--- 
-1.8.3.1
+> 
+>> Why only for i2c?
+> 
+> Because I was only interested in i2c :)
+> 
+> Maxime
+> 
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.22 (GNU/Linux)
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+
+iQIcBAEBAgAGBQJSkmkBAAoJEFSFNJnE9BaI9mgP/A0TrsoGuLmu1Zc0R2Y2QkY/
+wE4hrQrB0uGwD6TE+dXCuJVmHLqA7KviGN3l4sJPgo8kGAEsAItow8XoOPZFE8sU
+w9hXVU+0UXOiMmQIf/5bTvVpBV7oL6agYpQQkb8ZIHKZCj5gd588sc+Ag90Uc+lK
+MiI1QsvLbS8O1tZui+4NlkaioUQs5rs0OvD9N1n+aCfSdgsZk1NMR97Xf5Hwpmbj
+ypTokNVAClZd8dyrq9KHXfR6+qPwI9Pr/yA5nqZvpV++SiqlFw5nWAR/URPp/rEE
+czT8ZiC2SR5qRTVb+jRCj4hY8QmLIfeZEqrsZab9CkRkEmeMgQ8FhpBe+a1Zk1YS
+ZojKQS4rJzjuJukuq4vs/R8jPhwAIxguzzC7rA/UNtyYUvqTrIcXBRzFxRp6BHtv
+PO2viO773gvni3C6qzFtLBcYfJUBD6VNi440yHDxMSZY5gJl3auHdIzpTxN30aQG
+P4l347YqfsvrEpiG7gN2B5ScQ3WwGXBpfomke1dkuDElZZ7vgV/MAE7Hjh/uKCfg
+0lLzoBWdO72faznHCm8tOOPAQcSqXAm0F4BHQENeVirieZN2mS4EhS0xmN1fCdOy
+5PeN424FSGw6LUgAZd8R45/usPzzlDKTQ2rf0nBZIRdxYmyocg2ZUCINI6OxJThn
+OJkKZAsuvBdhsqSSAx+C
+=xwmo
+-----END PGP SIGNATURE-----
