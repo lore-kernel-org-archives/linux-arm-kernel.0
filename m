@@ -1,43 +1,38 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 23 Nov 2013 22:47:34 -0500
-Subject: [PATCH 2/2] ARM: mm: Call setup_dma_zone() post early_paging_init()
+Date: Sat, 23 Nov 2013 22:47:33 -0500
+Subject: [PATCH 1/2] ARM: mm: Fix the arm_dma_limit calculation
 In-Reply-To: <1385264854-30162-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1385264854-30162-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1385264854-30162-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1385264854-30162-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To get updated __pv_phys_offset, setup_dma_zone() needs to be
-called after early_paging_init().
+Current code is using PHYS_OFFSET to calculate the arm_dma_limit which
+will lead to wrong calculations in cases where PHYS_OFFSET is updated
+runtime.
+
+So fix the code by using __pv_phys_offset instead of PHYS_OFFSET.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kernel/setup.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mm/init.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 6a1b8a8..987a7f5 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -873,8 +873,6 @@ void __init setup_arch(char **cmdline_p)
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
- 
--	setup_dma_zone(mdesc);
--
- 	if (mdesc->reboot_mode != REBOOT_HARD)
- 		reboot_mode = mdesc->reboot_mode;
- 
-@@ -892,6 +890,7 @@ void __init setup_arch(char **cmdline_p)
- 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
- 
- 	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
-+	setup_dma_zone(mdesc);
- 	sanity_check_meminfo();
- 	arm_memblock_init(&meminfo, mdesc);
- 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 3e8f106..1f7b19a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -229,7 +229,7 @@ void __init setup_dma_zone(const struct machine_desc *mdesc)
+ #ifdef CONFIG_ZONE_DMA
+ 	if (mdesc->dma_zone_size) {
+ 		arm_dma_zone_size = mdesc->dma_zone_size;
+-		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
++		arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
+ 	} else
+ 		arm_dma_limit = 0xffffffff;
+ 	arm_dma_pfn_limit = arm_dma_limit >> PAGE_SHIFT;
 -- 
 1.7.9.5
