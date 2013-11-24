@@ -1,51 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 24 Nov 2013 22:43:59 +0000
-Subject: ARM: v3.13-rc1: USB regression
-In-Reply-To: <20131124222247.GC24645@blackmetal.musicnaut.iki.fi>
-References: <20131124222247.GC24645@blackmetal.musicnaut.iki.fi>
-Message-ID: <20131124224359.GE25039@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sun, 24 Nov 2013 19:56:10 -0300
+Subject: [PATCH] ARM: pxa: Move iotable mapping inside vmalloc region
+In-Reply-To: <20131124124125.GM16735@n2100.arm.linux.org.uk>
+References: <1385296571-23599-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131124124125.GM16735@n2100.arm.linux.org.uk>
+Message-ID: <20131124225610.GB2448@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 12:22:47AM +0200, Aaro Koskinen wrote:
-> Hi,
+On Sun, Nov 24, 2013 at 12:41:25PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Nov 24, 2013 at 09:36:11AM -0300, Ezequiel Garcia wrote:
+> > In order to remove the following ugly message:
+> > 
+> >   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+> > 
+> > the iotable mappings should be re-located inside the vmalloc
+> > region. Such move was introduced at commit:
+> > 
+> > commit 0536bdf33faff4d940ac094c77998cfac368cfff
+> > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Date:   Thu Aug 25 00:35:59 2011 -0400
+> > 
+> >     ARM: move iotable mappings within the vmalloc region
+> > 
+> > While at it, let's add some nicer defines to make the code
+> > more readable.
+> > 
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> With 3.13-rc1, the USB OHCI probe fails on Amstrad E3 (ARM/OMAP1)
-> as follows:
-> 
-> [   33.814705] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-> [   33.821482] ohci-omap: OHCI OMAP driver
-> [   33.925153] ohci ohci: OMAP OHCI
-> [   33.929087] ohci ohci: new USB bus registered, assigned bus number 1
-> [   33.967324] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
-> [   33.982292] ohci ohci: can't setup: -12
-> [   33.987898] ohci ohci: USB bus 1 deregistered
-> [   33.992984] ohci: probe of ohci failed with error -12
-> 
-> I bisected this to 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 (ARM: DMA-API:
-> better handing of DMA masks for coherent allocations). Reverting that
-> commit makes the USB work again fine.
+> NAK.  I'm guessing that you haven't properly tested this.  Grep for
+> UNCACHED_PHYS_0, and what you'll find is that your change will break
+> standby and suspend on all PXA platforms.
 
-This is because of this:
+Right, I fail to grep about this properly, sorry about that.
+Anyway, after grepping for 'UNCACHED' and doing some testings
+I found a few interesting things.
 
-#define __arch_dma_to_pfn(dev, addr)	\
-	({ dma_addr_t __dma = addr;				\
-	   if (is_lbus_device(dev))				\
-		__dma += PHYS_OFFSET - OMAP1510_LB_OFFSET;	\
-	   __phys_to_pfn(__dma);				\
-	})
+First, UNCACHED_PHYS_0 seems to be used by PXA27xx and PXA25xx. The
+board I have here is PXA3xx, so there's no way I can test anything.
 
-dma_addr_t is 32-bit.  PHYS_OFFSET - OMAP1510_LB_OFFSET is 0xe0000000.
-Consider what the result of passing 0xffffffff as addr into this is.
+Question: Should we add an #ifdef around the mapping, or is that
+just pure churn?
 
-Better would be:
+Second, suspend/resume seems broken on my CM-X300 board, or at least
+the wake-up. It enters suspend/standby but then never seem to wake.
+Maybe I'm not pushing the right button, but according to the reference
+guide the SW2 (connected to EXTWAKE#) should do the trick.
 
-#define __arch_dma_to_pfn(dev, addr)	\
-	({ unsigned long pfn = (addr) >> PAGE_SHIFT;		\
-	   if (is_lbus_device(dev))				\
-		pfn += PHYS_PFN_OFFSET - 			\
-			(OMAP1510_LB_OFFSET >> PAGE_SHIFT);	\
-	   pfn;							\
-	})
-
-Can you try that in arch/arm/mach-omap1/include/mach/memory.h please?
+Ideas?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
