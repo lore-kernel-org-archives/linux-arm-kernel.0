@@ -1,48 +1,40 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Nov 2013 10:45:50 +0100
-Subject: [PATCH 2/8] ASoC: fsl-ssi: Move sysfs stats to debugfs
-In-Reply-To: <20131122183356.GQ14725@sirena.org.uk>
-References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
- <1384938262-20554-3-git-send-email-mpa@pengutronix.de>
- <20131121142208.GU2674@sirena.org.uk>
- <20131122164204.GB5893@pengutronix.de>
- <20131122183356.GQ14725@sirena.org.uk>
-Message-ID: <20131125094550.GA29656@pengutronix.de>
+From: vkale@apm.com (Vinayak Kale)
+Date: Mon, 25 Nov 2013 15:15:51 +0530
+Subject: [PATCH V5 0/2] genirq: arm64: perf: support for percpu pmu interrupt
+Message-ID: <1385372753-7396-1-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch series adds support to handle interrupt registration/deregistration
+in arm64 pmu driver when pmu interrupt type is percpu.
 
-On Fri, Nov 22, 2013 at 06:33:56PM +0000, Mark Brown wrote:
-> On Fri, Nov 22, 2013 at 05:42:04PM +0100, Markus Pargmann wrote:
-> > On Thu, Nov 21, 2013 at 02:22:08PM +0000, Mark Brown wrote:
-> > > On Wed, Nov 20, 2013 at 10:04:16AM +0100, Markus Pargmann wrote:
-> 
-> > > > This patch moves the statistics to debugfs and disables interrupts
-> > > > completely if the kernel is build without DEBUG_FS enabled.
-> 
-> > > We can still see the error counts through /proc/interrupts even without
-> > > the debugfs file.
-> 
-> > The interrupts are visible without the debugfs file when enabled through
-> > SIER register. But it does not show the specific reason for the interrupts.
-> 
-> > I am not sure what you suggest. To remove the stats file completely and
-> > always disable interrupts?
-> 
-> No, I'm suggesting not disabling interrupts completely when debugfs is
-> disabled.  Since we can still see the interrupts happening even if
-> debugfs is not enabled we're still getting diagnostics.
+Changelog:
+V5:
+* In irqdesc.h: Added Chris Smith's sign-off.
+  In arm64 pmu driver: Handle the invalid irq-0 case for platform_get_irq().
 
-Okay, I will change it.
+V4:
+* In arm64 pmu driver: Avoid using irq_to_desc() to check validity of irq.
 
-Thanks,
+V3:
+* Remove validity check for 'desc' from accessor function in irqdesc.h .
+  Instead, check the irq 'desc' validity in arm64 pmu driver.
 
-Markus
+V2:
+* To determine whether an IRQ is percpu or not, added an accessor function in
+  irqdesc.h . This approach was used by Chris Smith here[1] for similar changes
+  in arm pmu driver.
+* In arm64 pmu driver: Got rid of unnecessary pointer typecastings.
 
+[1] http://lkml.indiana.edu/hypermail/linux/kernel/1207.3/02955.html
+
+Vinayak Kale (2):
+  genirq: Add an accessor for IRQ_PER_CPU flag
+  arm64: perf: add support for percpu pmu interrupt
+
+ arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
+ include/linux/irqdesc.h        |    8 +++
+ 2 files changed, 89 insertions(+), 27 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
