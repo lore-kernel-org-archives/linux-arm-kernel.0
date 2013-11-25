@@ -1,34 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 25 Nov 2013 15:15:39 +0000 (UTC)
-Subject: OMAP baseline test results for v3.13-rc1 (toolchain Debian
- 4.7.2-5)
-In-Reply-To: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 25 Nov 2013 16:27:03 +0100
+Subject: [PATCH v2 1/6] net: MOXA ART: clear TX descriptor length bits between
+ sends
+Message-ID: <1385393228-22416-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Nov 2013, Paul Walmsley wrote:
+Add TX_DESC1_BUF_SIZE_MASK to bits that are cleared, before the TX buffer
+length is set. Failing to do so can cause the controller to drop dead
+i.e. all TX interrupts stop, resulting in complete communication failure.
 
-> Boot to userspace:
->     FAIL ( 1/11): 37xxevm
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-An auto-bisect traced this to:
+Notes:
+    Applies to next-20131125
 
-commit 95807689eab8441737572d1a9daaa1025429a908
-Author: Tony Lindgren <tony@atomide.com>
-Date:   Mon Oct 14 11:31:43 2013 -0700
+ drivers/net/ethernet/moxa/moxart_ether.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-    ARM: OMAP2+: Remove legacy booting support for omap3 EVM
-    
-    We now have pretty decent support with the device tree
-    based booting. Patches to add more features are welcome.
-    
-    Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-
-So looks like this is due to the switchover to DT-based booting for 37xx 
-EVM.  Will plug that in here and re-test.
-  
-
-- Paul
+diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+index cbd0133..3c14afd 100644
+--- a/drivers/net/ethernet/moxa/moxart_ether.c
++++ b/drivers/net/ethernet/moxa/moxart_ether.c
+@@ -349,7 +349,8 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 
+ 	txdes1 = readl(desc + TX_REG_OFFSET_DESC1);
+ 	txdes1 |= TX_DESC1_LTS | TX_DESC1_FTS;
+-	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE);
++	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE |
++		    TX_DESC1_BUF_SIZE_MASK);
+ 	txdes1 |= (len & TX_DESC1_BUF_SIZE_MASK);
+ 	writel(txdes1, desc + TX_REG_OFFSET_DESC1);
+ 	writel(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
+-- 
+1.8.2.1
