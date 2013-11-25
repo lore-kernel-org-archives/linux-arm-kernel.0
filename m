@@ -1,46 +1,82 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 25 Nov 2013 06:29:51 -0500
-Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
- command bits
-In-Reply-To: <20131125055222.GA28064@obsidianresearch.com>
-References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131124025808.GQ29241@titan.lakedaemon.net>
- <20131125055222.GA28064@obsidianresearch.com>
-Message-ID: <20131125112951.GO29241@titan.lakedaemon.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 25 Nov 2013 11:33:56 +0000
+Subject: ACPI
+In-Reply-To: <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
+ <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+ <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
+Message-ID: <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 24, 2013 at 10:52:22PM -0700, Jason Gunthorpe wrote:
-> On Sat, Nov 23, 2013 at 09:58:08PM -0500, Jason Cooper wrote:
-> > Jason,
-> > 
-> > On Thu, Oct 31, 2013 at 05:32:59PM -0600, Jason Gunthorpe wrote:
-> > > When PCI_COMMAND_MEMORY/PCI_COMMAND_IO are cleared the bridge should not
-> > > allocate windows or even look at the window limit/base registers.
-> > > 
-> > > Otherwise it can attempt to setup bogus windows that the PCI core code
-> > > creates during discovery. The core will leave PCI_COMMAND_IO cleared if
-> > > it doesn't need an IO window.
-> > > 
-> > > Have mvebu_pcie_handle_*_change respect the bits, and call the change
-> > > function whenever the bits changes.
-> > > 
-> > > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > >  drivers/pci/host/pci-mvebu.c | 14 ++++++++++++--
-> > >  1 file changed, 12 insertions(+), 2 deletions(-)
-> > 
-> > I'd like to get back on track with these small patches being Acked by
-> > mvebu maintainers and then going through Bjorn.  Could you please resend
-> > an updated patchset for this and 2/2?
-> 
-> I recall these two patches are waiting for Thomas to give his Ok. His
-> testing found problems with the prior versions that I cannot detect on
-> my hardware..
-> 
-> Once that happens I can send them on with his ack to Bjorn?
+On Mon, Nov 25, 2013 at 11:07 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Mon, Nov 25, 2013 at 1:42 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On 24 Nov 2013 17:14, "Linus Walleij" <linus.walleij@linaro.org> wrote:
+>
+>>> For devicetree we have a bit of standardization in
+>>> Documentation/devicetree/bindings/pinctrl and if I'm not mistaken,
+>>> nothing of the sort exist in the ACPI spec.
+>>
+>> No, none of that exists in ACPI. We're looking at entirely new
+>> territory for ACPI.
+>>
+>> It seems there are two ways we can approach ACPI. 1) we could treat
+>> ACPI exactly like DT and expect DT bindings to carry over verbatim
+>> into the ACPI namespace. That means everything we've done with DT we
+>> expect to show up in ACPI trees including clocks, regulators, pin
+>> control, etc. Or, 2) assume that if ACPI is being used, then the
+>> intent is to push responsibility for the platform as a whole
+>> (system-wide details as opposed to individual devices) out of the
+>> kernel.
+>
+> Or (3): ACPI redefined on top of each subsystem. But I get
+> from the sound of this that this approach is not liked,
+> because (I assume?) we want to cut some corners.
+>
+> Example from another architecture:
+> drivers/gpio/gpio-lynxpoint.c
+> with infrastructure in:
+> drivers/gpio/gpiolib-acpi.c
+>
+> It is a "pure", embedded ACPI driver of the type that Intel is
+> pushing. They have been very helpful in integrating this
+> deeply with the GPIO subsystem and are now switching all
+> relevant drivers to using decriptors rather than GPIO numbers
+> for embedded x86 which is a big win.
+>
+> So would ARM ACPI systems with GPIO drivers *not* use this
+> nice infrastructure ...? (Maybe not your stance but the
+> sound I hear from some places in this discussion.)
 
-Please do.
+No, that's not my stance. ACPI5 does define a GPIO address space and
+it makes sense to work with that. When I say that the bindings be
+identical between DT and ACPI implementations it is with the
+understanding that DT or ACPI native references are used where
+appropriate. ie. the DT version would use the gpios= property value,
+but the ACPI implementation would use an ACPI native GPIO reference.
 
-thx,
+Regulators, clocks and pincontrol are all brand new areas. There is no
+existing ACPI infrastructure or details in the spec on how to deal
+with them. I honestly don't know what the best approach here is. Not
+knowing enough about ACPI, I am concerned that the DT data model for
+clocks, regulator, etc, bindings will interact badly with the ACPI
+power management model.
 
-Jason.
+> And I cannot see how Intels or anyones pin control, regulator,
+> clock etc drivers would be any different from this code.
+>
+> Well, they have indicated that they would prefer to hide some
+> complex things behind an behind-the-scenes abstraction like
+> D-states or so, but I have my doubts about that approach,
+> they may prove me wrong.
+
+What I'm assuming here is that on ACPI the pinctrl setup and
+management would be performed by the platform in AML methods so that
+the kernel isn't aware of them at all. All it know is that it has a
+(for example) SPI bus and as far as it is concerned the pins are
+correctly attached when the SPI bus is active. My understanding is
+that historically this is how ACPI has been used.
+
+g.
