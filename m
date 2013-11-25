@@ -1,98 +1,69 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Nov 2013 12:13:39 +0100
-Subject: [PATCH v2 3/9] ASoC: fsl-ssi: Add imx50-ssi and of_device_id matching
-In-Reply-To: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
-References: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1385378025-1262-4-git-send-email-mpa@pengutronix.de>
+Date: Mon, 25 Nov 2013 12:13:36 +0100
+Subject: [PATCH v2 0/9] ASoC: fsl-ssi: offline/online configuration and
+ cleanups
+Message-ID: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a small but significant difference between imx21-ssi and
-imx50-ssi and above. imx21-ssi does not allow online reconfiguration of
-some registers. They have to be configured at the beginning.
+Hi,
 
-imx50-ssi has to reconfigure the SSI unit while it is running. Otherwise
-it would not be possible to have two streams in parallel. The new SDMA
-unit in imx50 and above has to be configured before the first DMA
-request arrives. Therefor we need to setup TDMAE/RDMAE just before
-starting the stream.
+This patch series fixes some fsl-ssi code that does not act exactly as it is
+described in the reference manuals.
 
-This patch introduces distinct imx50-ssi as compatible and adds
-of_device_id matching in the probe function.
+The reference manuals before imx50 do mention that some register bits,
+including TDMAE/RDMAE, should not be changed while the SSI unit is enabled
+(SSIEN). At the same time the SDMA unit has a undefined request handling if
+there are DMA requests before the SDMA engine and its channel is configured.
+The reference manual states that SSI DMA requests are sent as soon as the FIFO
+and the DMAE bits are enabled. It does not mention a dependency to SCR's TE/RE
+bit.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 30 ++++++++++++++++++++++--------
- 1 file changed, 22 insertions(+), 8 deletions(-)
+To avoid sending DMA requests before a channel is configured, we have to
+seperate the fsl-ssi behavior into offline and online configuration. SoCs
+before imx50 have to use offline configuration while later SoC versions can use
+online reconfiguration.
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 57e331f..5e95244 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -187,6 +187,20 @@ struct fsl_ssi_private {
- 	char name[1];
- };
- 
-+enum fsl_ssi_type {
-+	FSL_SSI_MCP8610,
-+	FSL_SSI_MX21,
-+	FSL_SSI_MX50,
-+};
-+
-+static const struct of_device_id fsl_ssi_ids[] = {
-+	{ .compatible = "fsl,mpc8610-ssi", .data = (void *) FSL_SSI_MCP8610},
-+	{ .compatible = "fsl,imx50-ssi", .data = (void *) FSL_SSI_MX50},
-+	{ .compatible = "fsl,imx21-ssi", .data = (void *) FSL_SSI_MX21},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
-+
- /**
-  * fsl_ssi_isr: SSI interrupt handler
-  *
-@@ -922,6 +936,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	int ret = 0;
- 	struct device_attribute *dev_attr = NULL;
- 	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *of_id;
-+	enum fsl_ssi_type hw_type;
- 	const char *p, *sprop;
- 	const uint32_t *iprop;
- 	struct resource res;
-@@ -936,6 +952,11 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	if (!of_device_is_available(np))
- 		return -ENODEV;
- 
-+	of_id = of_match_device(fsl_ssi_ids, &pdev->dev);
-+	if (!of_id)
-+		return -EINVAL;
-+	hw_type = (enum fsl_ssi_type) of_id->data;
-+
- 	/* We only support the SSI in "I2S Slave" mode */
- 	sprop = of_get_property(np, "fsl,mode", NULL);
- 	if (!sprop) {
-@@ -1009,7 +1030,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
-                 /* Older 8610 DTs didn't have the fifo-depth property */
- 		ssi_private->fifo_depth = 8;
- 
--	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx21-ssi")) {
-+	if (hw_type == FSL_SSI_MX21 || hw_type == FSL_SSI_MX50) {
- 		u32 dma_events[2];
- 		ssi_private->ssi_on_imx = true;
- 
-@@ -1199,13 +1220,6 @@ static int fsl_ssi_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id fsl_ssi_ids[] = {
--	{ .compatible = "fsl,mpc8610-ssi", },
--	{ .compatible = "fsl,imx21-ssi", },
--	{}
--};
--MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
--
- static struct platform_driver fsl_ssi_driver = {
- 	.driver = {
- 		.name = "fsl-ssi-dai",
+This series adds support for online configuration and cleans up the
+configuration register code especially in fsl_ssi_trigger. At the end we have a
+seperation between enable/disable logic and the actual configuration register
+values used to enable/disable TX/RX.
+
+I tested this series on mx53.
+
+The series is based on Mark Brown's topic/fsl branch.
+
+Regards,
+
+Markus
+
+Changes in v2:
+ - Enable fsl-ssi interrupts independent of CONFIG_DEBUG_FS.
+ - Move irq mapping fix into seperate patch (was in "Move sysfs stats to debugfs")
+ - Rebased on v3.13-rc1 topic/fsl branch.
+
+Changes in v1:
+ - Not removing imx21-ssi from the compatible array in the DTS patch.
+ - Dropped "ASoC: fsl-ssi: Drop AC97 debug register usage" for the moment as I
+   don't have time to setup AC97 hardware for some tests
+
+Markus Pargmann (9):
+  ASoC: fsl-ssi: Move sysfs stats to debugfs
+  ASoC: fsl-ssi: Fix interrupt mapping and release
+  ASoC: fsl-ssi: Add imx50-ssi and of_device_id matching
+  ASoC: fsl-ssi: Add offline_config flag
+  ASoC: fsl-ssi: Add configuration helper functions
+  ASoC: fsl-ssi: Move RX/TX configuration to seperate functions
+  ASoC: fsl-ssi: Drop ac97 specific trigger function
+  ARM: DTS: imx5* imx6*, use imx50-ssi
+  ASoC: fsl-ssi: Drop AC97 debug register usage
+
+ arch/arm/boot/dts/imx51.dtsi   |  10 +-
+ arch/arm/boot/dts/imx53.dtsi   |  10 +-
+ arch/arm/boot/dts/imx6qdl.dtsi |  12 +-
+ arch/arm/boot/dts/imx6sl.dtsi  |  12 +-
+ sound/soc/fsl/fsl_ssi.c        | 521 +++++++++++++++++++++++++++--------------
+ 5 files changed, 371 insertions(+), 194 deletions(-)
+
 -- 
 1.8.4.2
