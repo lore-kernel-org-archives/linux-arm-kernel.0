@@ -1,24 +1,109 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 25 Nov 2013 15:42:05 +0200
-Subject: [PATCH] clk: tegra: add FUSE clock device
-In-Reply-To: <528F8462.4010105@wwwdotorg.org>
-References: <1385001490-18927-1-git-send-email-acourbot@nvidia.com>
- <20131122134140.GE26617@tbergstrom-lnx.Nvidia.com>
- <528F8462.4010105@wwwdotorg.org>
-Message-ID: <20131125134205.GH26617@tbergstrom-lnx.Nvidia.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 25 Nov 2013 15:49:37 +0200
+Subject: [PATCHv6 05/13] iommu/core: add ops->{bound,unbind}_driver()
+In-Reply-To: <1385041249-7705-6-git-send-email-hdoyu@nvidia.com>
+References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com>
+ <1385041249-7705-6-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20131125154937.d6dbe9aedc16aab335d92f99@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 05:20:50PM +0100, Stephen Warren wrote:
-> On 11/22/2013 06:41 AM, Peter De Schrijver wrote:
-> > On Thu, Nov 21, 2013 at 03:38:10AM +0100, Alexandre Courbot wrote:
-> >> This clock is needed to ensure the FUSE registers can be accessed
-> >> without freezing the system.
-> >>
-> >> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> > 
-> > Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> 
-> Aren't you taking this patch through the clock tree?
+Hi Joerg,
 
-Will do.
+Do you have some time to review this patch along with the following ones?
+
+  [PATCHv6 02/13] iommu/of: introduce a global iommu device list
+  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007050.html
+
+  [PATCHv6 03/13] iommu/of: check if dependee iommu is ready or not
+  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007051.html
+
+With those patches, now I'm trying to populate iommu master devices
+after an IOMMU device is populated. Originally [PATCHv6 02/13] was
+proposed by Thierry. I'm a bit afraid of adding new IOMMU API as
+this, but I think that this new {bound,unbind}_driver() is the right
+timiing that depeding devices are populated instead of add_device()
+since, even after add_device, a device won't be populated. I'm not so
+sure how this affects on the existing IOMMUs.
+
+It would be nice if you give some feedback on this.
+
+On Thu, 21 Nov 2013 14:40:41 +0100
+Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+
+> ops->{bound,unbind}_driver() functions are called at
+> BUS_NOTIFY_{BOUND,UNBIND}_DRIVER respectively.
+> 
+> This is necessary to control the device population order. IOMMU master
+> devices depend on an IOMMU device instanciation. IOMMU master devices
+> can be registered to an IOMMU only after it's successfully
+> populated. This IOMMU registration is done via
+> ops->bound_driver(). Currently this population can be deferred if
+> depending IOMMU device hasn't yet been populated in driver core. This
+> cannot be done via ops->add_device() since after add_device() device's
+> population/instanciation can be still deferred via probe().
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+> v6:
+> New for v6.
+> ---
+>  drivers/iommu/iommu.c | 13 +++++++++++--
+>  include/linux/iommu.h |  4 ++++
+>  2 files changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index e5555fc..5469d36 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -540,14 +540,23 @@ static int iommu_bus_notifier(struct notifier_block *nb,
+>  	 * ADD/DEL call into iommu driver ops if provided, which may
+>  	 * result in ADD/DEL notifiers to group->notifier
+>  	 */
+> -	if (action == BUS_NOTIFY_ADD_DEVICE) {
+> +	switch (action) {
+> +	case BUS_NOTIFY_ADD_DEVICE:
+>  		if (ops->add_device)
+>  			return ops->add_device(dev);
+> -	} else if (action == BUS_NOTIFY_DEL_DEVICE) {
+> +	case BUS_NOTIFY_DEL_DEVICE:
+>  		if (ops->remove_device && dev->iommu_group) {
+>  			ops->remove_device(dev);
+>  			return 0;
+>  		}
+> +	case BUS_NOTIFY_BOUND_DRIVER:
+> +		if (ops->bound_driver)
+> +			ops->bound_driver(dev);
+> +		break;
+> +	case BUS_NOTIFY_UNBIND_DRIVER:
+> +		if (ops->unbind_driver)
+> +			ops->unbind_driver(dev);
+> +		break;
+>  	}
+>  
+>  	/*
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index a444c79..a0e92be 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -96,6 +96,8 @@ enum iommu_attr {
+>   * @domain_has_cap: domain capabilities query
+>   * @add_device: add device to iommu grouping
+>   * @remove_device: remove device from iommu grouping
+> + * @bound_driver: called at BUS_NOTIFY_BOUND_DRIVER
+> + * @unbind_driver: called at BUS_NOTIFY_UNBIND_DRIVER
+>   * @domain_get_attr: Query domain attributes
+>   * @domain_set_attr: Change domain attributes
+>   * @pgsize_bitmap: bitmap of supported page sizes
+> @@ -114,6 +116,8 @@ struct iommu_ops {
+>  			      unsigned long cap);
+>  	int (*add_device)(struct device *dev);
+>  	void (*remove_device)(struct device *dev);
+> +	int (*bound_driver)(struct device *dev);
+> +	void (*unbind_driver)(struct device *dev);
+>  	int (*device_group)(struct device *dev, unsigned int *groupid);
+>  	int (*domain_get_attr)(struct iommu_domain *domain,
+>  			       enum iommu_attr attr, void *data);
+> -- 
+> 1.8.1.5
+> 
