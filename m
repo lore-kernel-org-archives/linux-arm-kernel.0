@@ -1,31 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Nov 2013 15:48:37 +0000
-Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
-In-Reply-To: <20131125031029.GC11613@S2101-09.ap.freescale.net>
-References: <20131122142231.GA1741@ulmo.nvidia.com>
- <20131122145224.GO14725@sirena.org.uk>
- <20131125031029.GC11613@S2101-09.ap.freescale.net>
-Message-ID: <20131125154837.GF14725@sirena.org.uk>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 25 Nov 2013 21:19:57 +0530
+Subject: [PATCH 0/2] PSCI system off and reset for KVM ARM/ARM64
+Message-ID: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 11:10:32AM +0800, Shawn Guo wrote:
+The Power State and Coordination Interface (PSCI) specification defines
+SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
 
-> Hmm, I'm seeing this breakage on v3.13-rc1 now with the following line
-> in the kernel log.
+This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
+in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
+KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET exit reasons.
 
->   pwm-backlight backlight.18: dummy supplies not allowed
+To try this patch from guest kernel, we will need PSCI-based restart and
+poweroff support in the guest kenel for both ARM and ARM64.
 
-> What's missing here?
+Rob Herring has already submitted patches for PSCI-based restart and
+poweroff in ARM kernel but these are not merged yet due unstable device
+tree bindings of kernel PSCI support. We will be having similar patches
+for PSCI-based restart and poweroff in ARM64 kernel.
+(Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
+(Refer http://www.spinics.net/lists/devicetree/msg05348.html)
 
-Are you racing with the late initcall to flag that DT is present?  Wei
-Ni was looking at hooking this into DT so that when we pass the DT over
-we flag that we have full constraints (or provide a notifier to let
-subsystems do that) but that ground to a halt.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/729043dc/attachment.sig>
+Anup Patel (2):
+  KVM: Add KVM_EXIT_RESET to user space API header
+  ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and SYSTEM_RESET to user
+    space
+
+ arch/arm/include/asm/kvm_psci.h   |    2 +-
+ arch/arm/include/uapi/asm/kvm.h   |    2 ++
+ arch/arm/kvm/handle_exit.c        |    7 ++++++-
+ arch/arm/kvm/psci.c               |   38 +++++++++++++++++++++++++++++--------
+ arch/arm64/include/asm/kvm_psci.h |    2 +-
+ arch/arm64/include/uapi/asm/kvm.h |    2 ++
+ arch/arm64/kvm/handle_exit.c      |   10 ++++++----
+ include/uapi/linux/kvm.h          |    1 +
+ 8 files changed, 49 insertions(+), 15 deletions(-)
+
+-- 
+1.7.9.5
