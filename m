@@ -1,53 +1,47 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Nov 2013 12:13:38 +0100
-Subject: [PATCH v2 2/9] ASoC: fsl-ssi: Fix interrupt mapping and release
+Date: Mon, 25 Nov 2013 12:13:45 +0100
+Subject: [PATCH v2 9/9] ASoC: fsl-ssi: Drop AC97 debug register usage
 In-Reply-To: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
 References: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1385378025-1262-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1385378025-1262-10-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irqs should only be requested and released with DMA.
+In i.MX27 reference manual the SOR register is listed for debugging
+purpose only. In mx50 and later, this register is not even listed
+anymore. We shouldn't use a debug register for normal operation.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 66ffc58..57e331f 100644
+index cf55da0..befe1ed 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -1064,7 +1064,9 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
- 		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
- 			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
--	} else if (ssi_private->use_dma) {
-+	}
-+
-+	if (ssi_private->use_dma) {
- 		/* The 'name' should not have any slashes in it. */
- 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
- 					fsl_ssi_isr, 0, ssi_private->name,
-@@ -1172,7 +1174,8 @@ error_clk:
- 		clk_disable_unprepare(ssi_private->clk);
- 
- error_irqmap:
--	irq_dispose_mapping(ssi_private->irq);
-+	if (ssi_private->use_dma)
-+		irq_dispose_mapping(ssi_private->irq);
- 
- 	return ret;
+@@ -620,8 +620,6 @@ static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
+ 	 */
+ 	write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_SSIEN |
+ 			CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE);
+-
+-	write_ssi(CCSR_SSI_SOR_WAIT(3), &ssi->sor);
  }
-@@ -1190,7 +1193,8 @@ static int fsl_ssi_remove(struct platform_device *pdev)
- 	snd_soc_unregister_component(&pdev->dev);
- 	if (ssi_private->ssi_on_imx)
- 		clk_disable_unprepare(ssi_private->clk);
--	irq_dispose_mapping(ssi_private->irq);
-+	if (ssi_private->use_dma)
-+		irq_dispose_mapping(ssi_private->irq);
  
+ static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
+@@ -850,13 +848,6 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (ssi_private->imx_ac97) {
+-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-			write_ssi(CCSR_SSI_SOR_TX_CLR, &ssi->sor);
+-		else
+-			write_ssi(CCSR_SSI_SOR_RX_CLR, &ssi->sor);
+-	}
+-
  	return 0;
  }
+ 
 -- 
 1.8.4.2
