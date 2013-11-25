@@ -1,55 +1,47 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 25 Nov 2013 13:16:01 -0500
-Subject: [PATCH v3 3/9] usb: gadget: s3c-hsotg: enable build for other
- platforms
+Date: Mon, 25 Nov 2013 13:16:00 -0500
+Subject: [PATCH v3 2/9] staging: dwc2: update DT binding to add generic
+ clock/phy properties
 In-Reply-To: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
 References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1385403367-18144-4-git-send-email-matt.porter@linaro.org>
+Message-ID: <1385403367-18144-3-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused Samsung-specific machine include and Kconfig
-dependency on S3C.
+dwc2/s3c-hsotg require a single clock to be specified and optionally
+a generic phy. On the s3c-hsotg driver old style USB phy support is
+present as a fallback so the generic phy properties are optional.
 
 Signed-off-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 ---
- drivers/usb/gadget/Kconfig     | 7 +++----
- drivers/usb/gadget/s3c-hsotg.c | 2 --
- 2 files changed, 3 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/staging/dwc2.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-index a91e642..970bd1a 100644
---- a/drivers/usb/gadget/Kconfig
-+++ b/drivers/usb/gadget/Kconfig
-@@ -294,11 +294,10 @@ config USB_PXA27X
- 	   gadget drivers to also be dynamically linked.
+diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt b/Documentation/devicetree/bindings/staging/dwc2.txt
+index 1a1b7cf..b8b42b6 100644
+--- a/Documentation/devicetree/bindings/staging/dwc2.txt
++++ b/Documentation/devicetree/bindings/staging/dwc2.txt
+@@ -5,6 +5,12 @@ Required properties:
+ - compatible : "snps,dwc2"
+ - reg : Should contain 1 register range (address and length)
+ - interrupts : Should contain 1 interrupt
++- clocks: clock provider specifier
++- clock-names: shall be "otg"
++- phys: phy provider specifier
++- phy-names: shall be "device"
++Refer to clk/clock-bindings.txt for generic clock consumer properties
++Refer to phy/phy-bindings.txt for generic phy consumer properties
  
- config USB_S3C_HSOTG
--	tristate "S3C HS/OtG USB Device controller"
--	depends on S3C_DEV_USB_HSOTG
-+	tristate "Designware/S3C HS/OtG USB Device controller"
- 	help
--	  The Samsung S3C64XX USB2.0 high-speed gadget controller
--	  integrated into the S3C64XX series SoC.
-+	  The Designware USB2.0 high-speed gadget controller
-+	  integrated into the S3C64XX and BCM281xx series SoC.
+ Example:
  
- config USB_S3C2410
- 	tristate "S3C2410 USB Device Controller"
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 2d1f560..a8e6c3d 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -37,8 +37,6 @@
- #include <linux/usb/phy.h>
- #include <linux/platform_data/s3c-hsotg.h>
- 
--#include <mach/map.h>
--
- #include "s3c-hsotg.h"
- 
- static const char * const s3c_hsotg_supply_names[] = {
+@@ -12,4 +18,8 @@ Example:
+                 compatible = "ralink,rt3050-usb, snps,dwc2";
+                 reg = <0x101c0000 40000>;
+                 interrupts = <18>;
++		clocks = <&usb_otg_ahb_clk>;
++		clock-names = "otg";
++		phys = <&usbphy>;
++		phy-names = "device";
+         };
 -- 
 1.8.4
