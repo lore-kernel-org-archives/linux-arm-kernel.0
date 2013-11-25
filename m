@@ -1,96 +1,63 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Nov 2013 12:02:32 -0500
-Subject: [PATCH 2/2] ARM: OMAP5: Add HYP mode entry support for secondary
- CPUs
-In-Reply-To: <52937DF8.1070505@arm.com>
-References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
- <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
- <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
- <52937AB4.1060901@ti.com> <52937DF8.1070505@arm.com>
-Message-ID: <529382A8.6070509@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 25 Nov 2013 18:03:57 +0100
+Subject: [PATCH v2] ARM i.MX5: fix "shift" value for lp_apm_sel on i.MX50 and
+ i.MX53
+Message-ID: <1385399037-15487-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 November 2013 11:42 AM, Marc Zyngier wrote:
-> On 25/11/13 16:28, Santosh Shilimkar wrote:
->> On Monday 25 November 2013 10:09 AM, Christoffer Dall wrote:
->>> On 23 November 2013 16:07, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->>>> Boot-CPU entry into the HYP mode is managed in boot-loader but
->>>> the secondary CPUs directly jumps to kernel during boot. Same
->>>> path is also used for CPU hotplug as well during suspend for
->>>> secondary CPU.
->>>>
->>>> Hence patch the secondary CPU boot path for hyp mode etry.
->>>>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> ---
->>>>  arch/arm/mach-omap2/omap-headsmp.S |    7 +++++++
->>>>  1 file changed, 7 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
->>>> index 75e9295..4844dd8 100644
->>>> --- a/arch/arm/mach-omap2/omap-headsmp.S
->>>> +++ b/arch/arm/mach-omap2/omap-headsmp.S
->>>> @@ -22,6 +22,7 @@
->>>>
->>>>  /* Physical address needed since MMU not enabled yet on secondary core */
->>>>  #define AUX_CORE_BOOT0_PA                      0x48281800
->>>> +#define API_HYP_ENTRY                          0x102
->>>>
->>>>  /*
->>>>   * OMAP5 specific entry point for secondary CPU to jump from ROM
->>>> @@ -38,6 +39,12 @@ wait:        ldr     r2, =AUX_CORE_BOOT0_PA  @ read from AuxCoreBoot0
->>>>         and     r4, r4, #0x0f
->>>>         cmp     r0, r4
->>>>         bne     wait
->>>> +#ifdef CONFIG_KVM_ARM_HOST
->>>> +       ldr     r12, =API_HYP_ENTRY
->>>> +       adr     r0, hyp_boot
->>>> +       smc     #0
->>>> +hyp_boot:
->>>> +#endif
->>>>         b       secondary_startup
->>>>  END(omap5_secondary_startup)
->>>>  /*
->>>
->>> hmm, this means that currently running this in a guest will fail to
->>> bring-up SMP, right?
->>>
->> Nope. Because the code under 'KVM_ARM_HOST' macro. Guest build 
->> will not enable CONFIG_KVM_ARM_HOST and things should be fine then.
->> Right ? 
-> 
-> Absolutely not. We're way past the "one image per usage" model, and I
-> fully expect the same kernel to boot both as a guest and a host.
-> Otherwise, multiplatform is just a joke.
-> 
->>> Couldn't you create a little wrapper-pen in U-Boot instead, which
->>> replicates the omap boot protocol and takes care of the hyp-mode
->>> startup there instead, keeping this completely out of the kernel?
->>>
->> Its not just booting but CPU hotplug also follows the same path
->> so we need the mechanism in kernel to switch mode.
->>
->> In general, I think its important to consider the aspect with
->> CPU PM. CPUs are not going to go through the boot-loaders in
->> those paths and hence need of HYP entry in the kernel will
->> be must.
-> 
-> I definitely agree that you need to consider PM as well. But we've
-> decided a long time ago that we wouldn't take that kind of code in the
-> kernel. Your CPU has to reach the kernel in HYP, and that is down to
-> your boot protocol to take care off that.
-> 
-> There are a few options. Christoffer mentioned having a pen, and you
-> also could implement PSCI fairly easily (I've recently posted a u-boot
-> patch series to take care of this, though there is still a fair bit of
-> work required).
-> 
-> Whatever the approach is, the bottom line remains: your CPU enters the
-> kernel in HYP.
-> 
-Our emails crossed. I understand the stand from you guys. Lets
-continue discussion on other thread.
+According to the i.MX50 Rev. 1 and i.MX53 Rev. 2.1 datasheet the lp_apm_sel is
+bit 10 in the CCM_CCSR register not bit 9. On the i.MX51 it's bit 9.
+
+This patch fixes this issue.
+
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+changes since v1:
+* keep bit 9 on i.MX51 (tnx Alexander)
+
+ arch/arm/mach-imx/clk-imx51-imx53.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 3f01df2..e349fd5 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -98,8 +98,6 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", rate_ckih1);
+ 	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", rate_ckih2);
+ 
+-	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
+-						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_PERIPH_APM]	= imx_clk_mux("periph_apm", MXC_CCM_CBCMR, 12, 2,
+ 						periph_apm_sel, ARRAY_SIZE(periph_apm_sel));
+ 	clk[IMX5_CLK_MAIN_BUS]		= imx_clk_mux("main_bus", MXC_CCM_CBCDR, 25, 1,
+@@ -334,6 +332,8 @@ static void __init mx50_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
+ 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
+ 
++	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
++						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_ESDHC1_PER_GATE]	= imx_clk_gate2("esdhc1_per_gate", "esdhc_a_podf", MXC_CCM_CCGR3, 2);
+ 	clk[IMX5_CLK_ESDHC2_PER_GATE]	= imx_clk_gate2("esdhc2_per_gate", "esdhc_c_sel", MXC_CCM_CCGR3, 6);
+ 	clk[IMX5_CLK_ESDHC3_PER_GATE]	= imx_clk_gate2("esdhc3_per_gate", "esdhc_b_podf", MXC_CCM_CCGR3, 10);
+@@ -392,6 +392,8 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX51_DPLL1_BASE);
+ 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX51_DPLL2_BASE);
+ 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX51_DPLL3_BASE);
++	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
++						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
+ 						mx51_ipu_di0_sel, ARRAY_SIZE(mx51_ipu_di0_sel));
+ 	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
+@@ -501,6 +503,8 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
+ 	clk[IMX5_CLK_PLL4_SW]		= imx_clk_pllv2("pll4_sw", "osc", MX53_DPLL4_BASE);
+ 
++	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
++						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_LDB_DI1_DIV_3_5]	= imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1_sel", 2, 7);
+ 	clk[IMX5_CLK_LDB_DI1_DIV]	= imx_clk_divider_flags("ldb_di1_div", "ldb_di1_div_3_5", MXC_CCM_CSCMR2, 11, 1, 0);
+ 	clk[IMX5_CLK_LDB_DI1_SEL]	= imx_clk_mux_flags("ldb_di1_sel", MXC_CCM_CSCMR2, 9, 1,
+-- 
+1.8.4.2
