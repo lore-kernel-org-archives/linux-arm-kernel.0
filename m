@@ -1,185 +1,37 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Mon, 25 Nov 2013 15:36:26 +0000
-Subject: [PATCH v2 3/6] net: MOXA ART: add ethtool support
-In-Reply-To: <1385393228-22416-3-git-send-email-jonas.jensen@gmail.com>
-References: <1385393228-22416-1-git-send-email-jonas.jensen@gmail.com>
- <1385393228-22416-3-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1385393786.1586.29.camel@bwh-desktop.uk.level5networks.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 Nov 2013 15:37:33 +0000
+Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
+In-Reply-To: <CAOMZO5CtNnma8Sv35P3jeNYQiLV=jdmN0Q7w2_LFMOj-nTbPZg@mail.gmail.com>
+References: <20131122142231.GA1741@ulmo.nvidia.com>
+ <20131122145224.GO14725@sirena.org.uk>
+ <20131125031029.GC11613@S2101-09.ap.freescale.net>
+ <CAOMZO5CtNnma8Sv35P3jeNYQiLV=jdmN0Q7w2_LFMOj-nTbPZg@mail.gmail.com>
+Message-ID: <20131125153733.GE14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-11-25 at 16:27 +0100, Jonas Jensen wrote:
-> Add and assign ethtool_ops callback functions.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+On Mon, Nov 25, 2013 at 11:26:53AM -0200, Fabio Estevam wrote:
 
-Reviewed-by: Ben Hutchings <bhutchings@solarflare.com>
+> linux-next 20131120: backlight fails
+> linux-next 20131122: backlight works
+> linux-next 20131125: backlight fails
 
-> ---
-> 
-> Notes:
->     Thanks for reviewing!
->     
->     Changes since v1:
->     
->     1. declare MOXART_NUM_STATS with ARRAY_SIZE macro
->     2. don't initialise info->n_stats in moxart_get_drvinfo()
->     3. remove "if (!priv->phy_dev) return -ENODEV;"
->        moxart_get_settings(), moxart_set_settings(), moxart_nway_reset()
->     
->     Applies to next-20131125
-> 
->  drivers/net/ethernet/moxa/moxart_ether.c | 121 +++++++++++++++++++++++++++++++
->  1 file changed, 121 insertions(+)
-> 
-> diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-> index 1b87034..cd46a23 100644
-> --- a/drivers/net/ethernet/moxa/moxart_ether.c
-> +++ b/drivers/net/ethernet/moxa/moxart_ether.c
-> @@ -32,6 +32,10 @@
->  
->  #include "moxart_ether.h"
->  
-> +#define DRV_NAME		"moxart-ethernet"
-> +#define DRV_VERSION		"0.2"
-> +#define MOXART_NUM_STATS	ARRAY_SIZE(ethtool_stats_keys)
-> +
->  static inline void moxart_emac_write(struct net_device *ndev,
->  				     unsigned int reg, unsigned long value)
->  {
-> @@ -64,6 +68,122 @@ static int moxart_set_mac_address(struct net_device *ndev, void *addr)
->  	return 0;
->  }
->  
-> +static struct {
-> +	const char str[ETH_GSTRING_LEN];
-> +} ethtool_stats_keys[] = {
-> +	{ "tx_ok_mcol_2to15" },
-> +	{ "tx_ok_1col" },
-> +	{ "rx_frame_pause" },
-> +	{ "frame_align_err" },
-> +	{ "err_col_late_16" },
-> +	{ "err_col_16" },
-> +	{ "rx_runt" },
-> +	{ "late_col" },
-> +	{ "crc_err" },
-> +	{ "rx_ftl" },
-> +	{ "rx_fifo_full" },
-> +	{ "rx_col" },
-> +	{ "rx_bcast" },
-> +	{ "rx_mcast" },
-> +	{ "rx_ok" },
-> +	{ "tx_ok" },
-> +};
-> +
-> +static void moxart_get_drvinfo(struct net_device *ndev,
-> +			       struct ethtool_drvinfo *info)
-> +{
-> +	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
-> +	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
-> +	strlcpy(info->bus_info, dev_name(&ndev->dev), sizeof(info->bus_info));
-> +}
-> +
-> +static int moxart_get_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
-> +{
-> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> +
-> +	return phy_ethtool_gset(priv->phy_dev, cmd);
-> +}
-> +
-> +static int moxart_set_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
-> +{
-> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> +
-> +	return phy_ethtool_sset(priv->phy_dev, cmd);
-> +}
-> +
-> +static int moxart_nway_reset(struct net_device *ndev)
-> +{
-> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> +
-> +	return genphy_restart_aneg(priv->phy_dev);
-> +}
-> +
-> +static void moxart_get_ethtool_stats(struct net_device *ndev,
-> +				     struct ethtool_stats *estats,
-> +				     u64 *tmp_stats)
-> +{
-> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> +	u32 s;
-> +	int i = 0;
-> +
-> +	s = readl(priv->base + REG_TX_COL_COUNTER);
-> +	tmp_stats[i++] = s & 0xffff0000;
-> +	tmp_stats[i++] = s & 0x0000ffff;
-> +	s = readl(priv->base + REG_RPF_AEP_COUNTER);
-> +	tmp_stats[i++] = s & 0xffff0000;
-> +	tmp_stats[i++] = s & 0x0000ffff;
-> +	s = readl(priv->base + REG_XM_PG_COUNTER);
-> +	tmp_stats[i++] = s & 0xffff0000;
-> +	tmp_stats[i++] = s & 0x0000ffff;
-> +	s = readl(priv->base + REG_RUNT_TLC_COUNTER);
-> +	tmp_stats[i++] = s & 0xffff0000;
-> +	tmp_stats[i++] = s & 0x0000ffff;
-> +	s = readl(priv->base + REG_CRC_FTL_COUNTER);
-> +	tmp_stats[i++] = s & 0xffff0000;
-> +	tmp_stats[i++] = s & 0x0000ffff;
-> +	s = readl(priv->base + REG_RLC_RCC_COUNTER);
-> +	tmp_stats[i++] = s & 0xffff0000;
-> +	tmp_stats[i++] = s & 0x0000ffff;
-> +	tmp_stats[i++] = readl(priv->base + REG_BROC_COUNTER);
-> +	tmp_stats[i++] = readl(priv->base + REG_MULCA_COUNTER);
-> +	tmp_stats[i++] = readl(priv->base + REG_XP_COUNTER);
-> +	tmp_stats[i++] = readl(priv->base + REG_RP_COUNTER);
-> +}
-> +
-> +static int moxart_get_sset_count(struct net_device *netdev,
-> +					int string_set)
-> +{
-> +	switch (string_set) {
-> +	case ETH_SS_STATS:
-> +		return MOXART_NUM_STATS;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static void moxart_get_strings(struct net_device *dev, u32 stringset, u8 *data)
-> +{
-> +	switch (stringset) {
-> +	case ETH_SS_STATS:
-> +		memcpy(data, &ethtool_stats_keys, sizeof(ethtool_stats_keys));
-> +		break;
-> +	default:
-> +		WARN_ON(1);
-> +		break;
-> +	}
-> +}
-> +
-> +static const struct ethtool_ops moxart_ethtool_ops = {
-> +	.set_settings		= moxart_set_settings,
-> +	.get_settings		= moxart_get_settings,
-> +	.get_drvinfo		= moxart_get_drvinfo,
-> +	.nway_reset		= moxart_nway_reset,
-> +	.get_link		= ethtool_op_get_link,
-> +	.get_ethtool_stats	= moxart_get_ethtool_stats,
-> +	.get_sset_count		= moxart_get_sset_count,
-> +	.get_strings		= moxart_get_strings,
-> +};
-> +
->  static int moxart_do_ioctl(struct net_device *ndev, struct ifreq *ir, int cmd)
->  {
->  	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-> @@ -606,6 +726,7 @@ static int moxart_mac_probe(struct platform_device *pdev)
->  	ndev->irq = irq;
->  
->  	SET_NETDEV_DEV(ndev, &pdev->dev);
-> +	SET_ETHTOOL_OPS(ndev, &moxart_ethtool_ops);
->  
->  	ret = register_netdev(ndev);
->  	if (ret) {
+What are the differences between those kernels?  I'm not aware of any
+regulator core changes at all there and diff isn't showing me any - are
+you sure you used a consistent kernel configuration?  Have you tried to
+look at what happens when we should provide the dummy regulator, and do
+the logs say anything?
 
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+> Looks like we need to apply this one to make sure backlight works:
+> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/281826
+
+Please always provide plain text versions of links and SHA1s...  that
+link is to a patch adding a fixed regulator which you should do but
+ought not to need to do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/dd9cf2a7/attachment-0001.sig>
