@@ -1,177 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Nov 2013 18:52:48 +0000
-Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
-In-Reply-To: <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
-References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
- <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20131125185248.GF28201@mudshark.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Mon, 25 Nov 2013 18:59:25 +0000
+Subject: [PATCH v4 REPOST] ARM: vexpress/TC2: Implement MCPM
+ power_down_finish()
+In-Reply-To: <CAOesGMgVud7hX-wDtywt9_gkCDcuCgyXbm+CQG1kxjfCthLK2w@mail.gmail.com>
+References: <1385396185-15291-1-git-send-email-Dave.Martin@arm.com>
+ <CAOesGMjcNhqUikHhP-Jx5cHUocHQUTPW9p5ikwwQxbMSFM7hvQ@mail.gmail.com>
+ <alpine.LFD.2.10.1311251259400.9667@knanqh.ubzr>
+ <CAOesGMgVud7hX-wDtywt9_gkCDcuCgyXbm+CQG1kxjfCthLK2w@mail.gmail.com>
+Message-ID: <20131125185925.GC2293@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 12:06:57PM +0000, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+On Mon, Nov 25, 2013 at 06:26:46PM +0000, Olof Johansson wrote:
+> On Mon, Nov 25, 2013 at 10:02 AM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+> > On Mon, 25 Nov 2013, Olof Johansson wrote:
+> >
+> >> Hi,
+> >>
+> >> > Since v3.13-rc1, mcpm backends must implement an additional method which
+> >> > the vexpress TC2 implementation doesn't have upstream, resulting in an
+> >> > ugly WARN_ON() during hotplug and kexec operations
+> >>
+> >> Please be more specific here. Which change in the 3.13 merge window caused this?
+> >
+> > Commit 0de0d6467525.
+> >
+> > The corresponding change to tc2-pm.c was initially posted at about the
+> > same time i.e. before the merge window, but it somehow fell into a
+> > crack.
 > 
-> Add KGDB debug support for FP/SIMD processor.This support
-> only debugging of FP/SIMD in kernel mode.
-> With this patch one can view or set FP/SIMD registers in
-> kernel context
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> ---
->  arch/arm64/include/asm/fpsimd.h |    1 +
->  arch/arm64/kernel/fpsimd.c      |    5 ++
->  arch/arm64/kernel/kgdb.c        |  105 +++++++++++++++++++++++++--------------
->  3 files changed, 73 insertions(+), 38 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index 609bc44..5039d6d 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -60,6 +60,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
->  extern void fpsimd_thread_switch(struct task_struct *next);
->  extern void fpsimd_flush_thread(void);
->  extern void fpsimd_reload_fpstate(void);
-> +extern int  fpsimd_thread_state(void);
->  
->  #endif
->  
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 5b13c17..27604c1 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -124,6 +124,11 @@ void fpsimd_flush_thread(void)
->  	set_thread_flag(TIF_FOREIGN_FPSTATE);
->  }
->  
-> +int fpsimd_thread_state(void)
-> +{
-> +	return (current->mm && test_thread_flag(TIF_FOREIGN_FPSTATE)) ? 1 : 0;
-> +}
+> Thanks, I'll add that reference to the patch description when I apply.
 
-Erm...
+The issue here was that the two patches were developed together and to
+some extent validate each other, but one is an arch change and the other
+is not.  Expecting Russell to accept random board changes through his
+tree seemed a bit cheeky at this point, but I was slow sorting this out
+before the merge window opened.
 
-  1. `? 1 : 0' doesn't do anything
-  2. TIF_FOREIGN_FPSTATE doesn't seem to appear in my source tree (3.13-rc1)
-  3. Does it make sense for threads without an mm to have TIF_FOREIGN_FPSTATE set?
+Is there a good way to accelerate synchronisation of dependent patches
+that must be merged through different trees?  It seemed most reliable to
+wait for the mcpm patch to appear in Russell's public tree before posting
+the dependent TC2 patch for merging -- the intent was to avoid grief for
+maintainers, but this can backfire by causing delays.
 
->  void fpsimd_reload_fpstate(void)
->  {
->  	preempt_disable();
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index f10f2ba..5e34852 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -23,6 +23,14 @@
->  #include <linux/kdebug.h>
->  #include <linux/kgdb.h>
->  #include <asm/traps.h>
-> +#include <asm/fpsimd.h>
-> +
-> +#ifdef CONFIG_KERNEL_MODE_NEON
-> +/*
-> + * Structure to hold FP/SIMD register contents
-> + */
-> +struct fpsimd_state kgdb_fpsimd_regs;
-> +#endif
->  
->  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->  	{ "x0", 8, offsetof(struct pt_regs, regs[0])},
-> @@ -59,40 +67,40 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->  	{ "sp", 8, offsetof(struct pt_regs, sp)},
->  	{ "pc", 8, offsetof(struct pt_regs, pc)},
->  	{ "pstate", 4, offsetof(struct pt_regs, pstate)},
-> -	{ "v0", 16, -1 },
-> -	{ "v1", 16, -1 },
-> -	{ "v2", 16, -1 },
-> -	{ "v3", 16, -1 },
-> -	{ "v4", 16, -1 },
-> -	{ "v5", 16, -1 },
-> -	{ "v6", 16, -1 },
-> -	{ "v7", 16, -1 },
-> -	{ "v8", 16, -1 },
-> -	{ "v9", 16, -1 },
-> -	{ "v10", 16, -1 },
-> -	{ "v11", 16, -1 },
-> -	{ "v12", 16, -1 },
-> -	{ "v13", 16, -1 },
-> -	{ "v14", 16, -1 },
-> -	{ "v15", 16, -1 },
-> -	{ "v16", 16, -1 },
-> -	{ "v17", 16, -1 },
-> -	{ "v18", 16, -1 },
-> -	{ "v19", 16, -1 },
-> -	{ "v20", 16, -1 },
-> -	{ "v21", 16, -1 },
-> -	{ "v22", 16, -1 },
-> -	{ "v23", 16, -1 },
-> -	{ "v24", 16, -1 },
-> -	{ "v25", 16, -1 },
-> -	{ "v26", 16, -1 },
-> -	{ "v27", 16, -1 },
-> -	{ "v28", 16, -1 },
-> -	{ "v29", 16, -1 },
-> -	{ "v30", 16, -1 },
-> -	{ "v31", 16, -1 },
-> -	{ "fpsr", 4, -1 },
-> -	{ "fpcr", 4, -1 },
-> +	{ "v0", 16, offsetof(struct fpsimd_state, vregs[0])},
-> +	{ "v1", 16, offsetof(struct fpsimd_state, vregs[1])},
-> +	{ "v2", 16, offsetof(struct fpsimd_state, vregs[2])},
-> +	{ "v3", 16, offsetof(struct fpsimd_state, vregs[3])},
-> +	{ "v4", 16, offsetof(struct fpsimd_state, vregs[4])},
-> +	{ "v5", 16, offsetof(struct fpsimd_state, vregs[5])},
-> +	{ "v6", 16, offsetof(struct fpsimd_state, vregs[6])},
-> +	{ "v7", 16, offsetof(struct fpsimd_state, vregs[7])},
-> +	{ "v8", 16, offsetof(struct fpsimd_state, vregs[8])},
-> +	{ "v9", 16, offsetof(struct fpsimd_state, vregs[9])},
-> +	{ "v10", 16, offsetof(struct fpsimd_state, vregs[10])},
-> +	{ "v11", 16, offsetof(struct fpsimd_state, vregs[11])},
-> +	{ "v12", 16, offsetof(struct fpsimd_state, vregs[12])},
-> +	{ "v13", 16, offsetof(struct fpsimd_state, vregs[13])},
-> +	{ "v14", 16, offsetof(struct fpsimd_state, vregs[14])},
-> +	{ "v15", 16, offsetof(struct fpsimd_state, vregs[15])},
-> +	{ "v16", 16, offsetof(struct fpsimd_state, vregs[16])},
-> +	{ "v17", 16, offsetof(struct fpsimd_state, vregs[17])},
-> +	{ "v18", 16, offsetof(struct fpsimd_state, vregs[18])},
-> +	{ "v19", 16, offsetof(struct fpsimd_state, vregs[19])},
-> +	{ "v20", 16, offsetof(struct fpsimd_state, vregs[20])},
-> +	{ "v21", 16, offsetof(struct fpsimd_state, vregs[21])},
-> +	{ "v22", 16, offsetof(struct fpsimd_state, vregs[22])},
-> +	{ "v23", 16, offsetof(struct fpsimd_state, vregs[23])},
-> +	{ "v24", 16, offsetof(struct fpsimd_state, vregs[24])},
-> +	{ "v25", 16, offsetof(struct fpsimd_state, vregs[25])},
-> +	{ "v26", 16, offsetof(struct fpsimd_state, vregs[26])},
-> +	{ "v27", 16, offsetof(struct fpsimd_state, vregs[27])},
-> +	{ "v28", 16, offsetof(struct fpsimd_state, vregs[28])},
-> +	{ "v29", 16, offsetof(struct fpsimd_state, vregs[29])},
-> +	{ "v30", 16, offsetof(struct fpsimd_state, vregs[30])},
-> +	{ "v31", 16, offsetof(struct fpsimd_state, vregs[31])},
-> +	{ "fpsr", 4, offsetof(struct fpsimd_state, fpsr)},
-> +	{ "fpcr", 4, offsetof(struct fpsimd_state, fpcr)},
->  };
->  
->  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
-> @@ -100,11 +108,22 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->  	if (regno >= DBG_MAX_REG_NUM || regno < 0)
->  		return NULL;
->  
-> -	if (dbg_reg_def[regno].offset != -1)
-> +	if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
->  		memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
->  		       dbg_reg_def[regno].size);
-> -	else
-> +	else {
-> +#ifdef CONFIG_KERNEL_MODE_NEON
-> +		if (fpsimd_thread_state()) {
-> +			fpsimd_save_state(&kgdb_fpsimd_regs);
-> +			memcpy(mem, (void *)&kgdb_fpsimd_regs +
-> +					dbg_reg_def[regno].offset,
-> +					dbg_reg_def[regno].size);
-> +		} else
-> +			memset(mem, 0, dbg_reg_def[regno].size);
-> +#else
->  		memset(mem, 0, dbg_reg_def[regno].size);
+If you can handle patches with a dependency that is in-flight via another
+maintainer, then I'm happy to send such patches earlier in future, before
+the dependency lands (with details about where to watch for it,
+obviously).
 
-Can you use IS_ENABLED to tidy this up?
+> Looks like the MCPM-side patch was posted already back in Oct 1. I'm
+> not going to flame anyone over this, but it'd be nice if we could find
+> out about these things sooner, ideally when breakage hits -next. Dave,
+> next time I think I'd prefer to hear about it even if it is during the
+> merge window. :-)
 
-Will
+OK, noted.  Different people's opinions differ on that sometimes, but
+I'll make sure you get the heads-up if a similar situation arises in
+the future.
+
+> Anyway, obviously it's needed and I'll apply it.
+
+Thanks.  The kernel "works" without it in practice, though theoretically
+it's not 100% safe, and I want to set the right example.
+
+I'll try harder to avoid this kind of huccup another time.
+
+Cheers
+---Dave
