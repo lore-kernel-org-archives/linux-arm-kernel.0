@@ -1,78 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 25 Nov 2013 09:50:55 -0600
-Subject: [PATCH] ARM: dts: omap3-beagle: Fix USB host on beagle boards
- (for 3.13)
-In-Reply-To: <1385387745-7162-1-git-send-email-rogerq@ti.com>
-References: <1385387745-7162-1-git-send-email-rogerq@ti.com>
-Message-ID: <CAGo_u6ryFJvBwd=S9A-nJw+eoGguPj0jMOtgMiZ7mXXAbh4i+w@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 25 Nov 2013 10:56:29 -0500
+Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
+In-Reply-To: <52935762.1080409@ti.com>
+References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
+ <529217C7.6030304@cogentembedded.com> <52935762.1080409@ti.com>
+Message-ID: <20131125155629.GA24344@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 7:55 AM, Roger Quadros <rogerq@ti.com> wrote:
-> Beagle (rev. C4) and Beagle-XM (all revs) need VAUX2 1.8V supply
-> for the USB PHY.
->
-> As the generic PHY driver can't handle more than one supply
-> at the moment, we configure this supply to be always on.
-> This will cause a very small power impact if the USB host subsystem
-> is not in use, about 76.86 micro-W + LDO power.
+On Mon, Nov 25, 2013 at 08:57:54AM -0500, Santosh Shilimkar wrote:
+> On Sunday 24 November 2013 10:14 AM, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 24-11-2013 3:28, Santosh Shilimkar wrote:
+> > 
+> >> Building ARM with NO_BOOTMEM generates below warning. Using min_t
+> > 
+> >    Where is that below? :-)
+> > 
+> Damn.. Posted a wrong version of the patch ;-(
+> Here is the one with warning message included.
+> 
+> From 571dfdf4cf8ac7dfd50bd9b7519717c42824f1c3 Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Sat, 23 Nov 2013 18:16:50 -0500
+> Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
+> 
+> Building ARM with NO_BOOTMEM generates below warning.
+> 
+> mm/nobootmem.c: In function ?__free_pages_memory?:
+> mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
+> 
+> Using min_t to find the correct alignment avoids the warning.
+> 
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
->
-> Older Beagle boards (prior to C4) don't have VAUX2 connected anywhere,
-> so there won't be any functional impact on those boards other than
-> some additional LDO power consumption.
->
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+Acked-by: Tejun Heo <tj@kernel.org>
 
-Tested-by: Nishanth Menon <nm@ti.com>
+Thanks.
 
-I might suggest though that the better alternative might be to get phy
-driver to handle multiple regulators considering that DT is supposed
-to represent the h/w topology.
-
-> ---
->  arch/arm/boot/dts/omap3-beagle-xm.dts | 8 ++++++++
->  arch/arm/boot/dts/omap3-beagle.dts    | 8 ++++++++
->  2 files changed, 16 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> index 31a632f..b39918e 100644
-> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> @@ -215,3 +215,11 @@
->  &usbhsehci {
->         phys = <0 &hsusb2_phy>;
->  };
-> +
-> +&vaux2 {
-> +       regulator-name = "usb_1v8";
-> +       regulator-min-microvolt = <1800000>;
-> +       regulator-max-microvolt = <1800000>;
-> +       regulator-always-on;
-> +};
-> +
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index fa532aa..9764556 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -178,3 +178,11 @@
->         mode = <3>;
->         power = <50>;
->  };
-> +
-> +&vaux2 {
-> +       regulator-name = "vdd_ehci";
-> +       regulator-min-microvolt = <1800000>;
-> +       regulator-max-microvolt = <1800000>;
-> +       regulator-always-on;
-> +};
-> +
-> --
-> 1.8.3.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+tejun
