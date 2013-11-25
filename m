@@ -1,66 +1,58 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 26 Nov 2013 10:33:43 +1100
-Subject: Request inclusion of ARM v7 cache optimization patch into
- linux-next
-In-Reply-To: <20131125112318.GA4179@e102568-lin.cambridge.arm.com>
-References: <20131125112318.GA4179@e102568-lin.cambridge.arm.com>
-Message-ID: <20131126103343.bb5990829d3c0f2c0fc0723d@canb.auug.org.au>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 25 Nov 2013 16:34:58 -0700
+Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
+ p2v and v2p conversions'
+In-Reply-To: <20131125232003.GU16735@n2100.arm.linux.org.uk>
+References: <20131125223636.GA20822@obsidianresearch.com>
+ <20131125232003.GU16735@n2100.arm.linux.org.uk>
+Message-ID: <20131125233458.GA19852@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On Mon, 25 Nov 2013 11:23:18 +0000 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->
-> can I ask you please to include the following branch into linux-next:
+On Mon, Nov 25, 2013 at 11:20:03PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 25, 2013 at 03:36:36PM -0700, Jason Gunthorpe wrote:
+> > Which is after your new inlines..
+> > 
+> > An elegant fix wasn't obvious to me :)
 > 
-> git://linux-arm.org/linux-2.6-lp.git v7-cache-opt
+> Same here... it's all rather complicated because of all those ifdefs.
+> Nothing easy comes to mind about how to fix this one.  I'll look into
+> it at some point.
 > 
-> It contains a patch implementing cache optimizations for ARM 32-bit v7
-> architectures, it was reviewed and tested but -next would give it wider
-> test coverage before it gets merged in the coming cycle, so please
-> include it as soon as you deem fit.
+> If not, it's going to have to be a revert - or we bite the bullet and
+> start killing off some of these Kconfig options such as making
+> ARM_PATCH_PHYS_VIRT mandatory.
 
-Included from today.  Please remember to ask me to remove it when it has
-been merged upstream (since I assume it will no longer be necessary).
+This is enough to fix the build:
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index eaf428c..b886eba 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -239,15 +239,8 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+ 
+ #else
+ 
+-static inline phys_addr_t __virt_to_phys(unsigned long x)
+-{
+-       return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+-}
+-
+-static inline unsigned long __phys_to_virt(phys_addr_t x)
+-{
+-       return x - PHYS_OFFSET + PAGE_OFFSET;
+-}
++#define __virt_to_phys(x)      ((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET)
++#define __phys_to_virt(x)      ((unsigned long)((phys_addr_t)(x) - PHYS_OFFSET + PAGE_OFFSET))
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
+ #endif
+ #endif
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
+I don't seen an obvious major downside to loosing the inline, static
+checking will have to be done with the ARM_PATCH_PHYS_VIRT branch..
 
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
+I'm working on runtime testing this, let me know if you want a proper
+patch.
 
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/38c7ba05/attachment.sig>
+Regards,
+Jason
