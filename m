@@ -1,23 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Nov 2013 14:24:01 -0800
-Subject: [PATCH] ARM: ep93xx: remove deprecated IRQF_DISABLED
-In-Reply-To: <1384816931-3680-1-git-send-email-rmallon@gmail.com>
-References: <1384816931-3680-1-git-send-email-rmallon@gmail.com>
-Message-ID: <20131125222401.GA18365@quad.lixom.net>
+Date: Mon, 25 Nov 2013 14:24:15 -0800
+Subject: [PATCH] arm: ep93xx: use soc bus
+In-Reply-To: <1384816986-3744-1-git-send-email-rmallon@gmail.com>
+References: <1384816986-3744-1-git-send-email-rmallon@gmail.com>
+Message-ID: <20131125222415.GB18365@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 10:22:11AM +1100, Ryan Mallon wrote:
-> From: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+On Tue, Nov 19, 2013 at 10:23:06AM +1100, Ryan Mallon wrote:
+> From: H Hartley Sweeten <hsweeten@visionengravers.com>
 > 
-> This patch proposes to remove the use of the IRQF_DISABLED flag
+> Use the soc bus to report the silicon revision and Maverick Key. Both
+> are not currently exposed to the user. In addition, fill in the SoC
+> family and machine for completeness.
 > 
-> It's a NOOP since 2.6.35 and it will be removed one day.
-> 
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Acked-by: Ryan Mallon <rmallon@gmail.com>
 > Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+> Cc: Alexander Shiyan <shc_work@mail.ru>
 > ---
+>  arch/arm/mach-ep93xx/Kconfig                 |    1 +
+>  arch/arm/mach-ep93xx/core.c                  |  108 +++++++++++++++++++++++++-
+>  arch/arm/mach-ep93xx/include/mach/platform.h |    3 +-
+>  3 files changed, 110 insertions(+), 2 deletions(-)
 
 Applied to next/soc. Thanks!
 
