@@ -1,28 +1,43 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Nov 2013 18:15:49 +0100
-Subject: [PATCH 0/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
-Message-ID: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
+Date: Mon, 25 Nov 2013 18:15:50 +0100
+Subject: [PATCH 1/2] can: flexcan: use correct clock as base for bit rate
+ calculation
+In-Reply-To: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
+References: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1385399751-19109-2-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The flexcan IP core uses the peripheral clock ("per") as basic clock for the
+bit timing calculation. However the driver uses the the wrong clock ("ipg").
+This leads to wrong bit rates if the rates on both clock are different.
 
-this series first fixes a bug in the flexcan driver, using the wrong clock for
-the bit rate calculcation. The next patch switches the peripheral clock on
-i.MX53 to lp_apm, which has a rate of 24 MHz. This is optimal for the CIA
-recommended bit rates.
+This patch fixes the problem by using the correct clock for the bit rate
+calculation.
 
-Tested on TQ's mba53 and mba6x [1].
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ drivers/net/can/flexcan.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Who is taking the series? Due to Lucas' patch:
-
-    0a5b8df clk: imx5: introduce DT includes for clock provider
-
-this series does not yet apply to my upstream (net-next/mastet).
-
-Marc
-
-[1] On i.MX6 the following patch is needed (which is already in Shawn's
-    for-next):
-
-    9b3d423 ARM: i.MX6q: fix the wrong parent of can_root clock
+diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+index ae08cf1..aaed97b 100644
+--- a/drivers/net/can/flexcan.c
++++ b/drivers/net/can/flexcan.c
+@@ -1020,13 +1020,13 @@ static int flexcan_probe(struct platform_device *pdev)
+ 			dev_err(&pdev->dev, "no ipg clock defined\n");
+ 			return PTR_ERR(clk_ipg);
+ 		}
+-		clock_freq = clk_get_rate(clk_ipg);
+ 
+ 		clk_per = devm_clk_get(&pdev->dev, "per");
+ 		if (IS_ERR(clk_per)) {
+ 			dev_err(&pdev->dev, "no per clock defined\n");
+ 			return PTR_ERR(clk_per);
+ 		}
++		clock_freq = clk_get_rate(clk_per);
+ 	}
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-- 
+1.8.4.2
