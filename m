@@ -1,65 +1,28 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 25 Nov 2013 14:41:45 +0200
-Subject: Fwd: [PATCH 7/8] watchdog: davinci: add "clocks" property
-In-Reply-To: <20131125121529.GE32081@e106331-lin.cambridge.arm.com>
-References: <1383680783-12114-8-git-send-email-ivan.khoronzhuk@ti.com>
- <527A28E8.4010204@ti.com> <201311231857.47104.arnd@arndb.de>
- <52932DA1.8040204@ti.com>
- <20131125121529.GE32081@e106331-lin.cambridge.arm.com>
-Message-ID: <52934589.3000502@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 25 Nov 2013 14:42:40 +0200
+Subject: [PATCH] clk: tegra: use pll_ref as the pll_e parent
+In-Reply-To: <20131122134035.GD26617@tbergstrom-lnx.Nvidia.com>
+References: <1383093707-10312-1-git-send-email-pdeschrijver@nvidia.com>
+ <20131122134035.GD26617@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20131125124240.GG26617@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 02:15 PM, Mark Rutland wrote:
-> On Mon, Nov 25, 2013 at 10:59:45AM +0000, ivan.khoronzhuk wrote:
->> On 11/23/2013 07:57 PM, Arnd Bergmann wrote:
->>> On Wednesday 06 November 2013, ivan.khoronzhuk wrote:
->>>> @@ -7,6 +7,10 @@ Required properties:
->>>>
->>>>    - reg : Should contain WDT registers location and length
->>>>
->>>> +- clocks: phandle reference to the controller clock.
->>>> +         Required only for Keystone arch.
->>>> +         See clock-bindings.txt
->>>> +
->>>>    Optional properties:
->>>>
->>>>    - timeout-sec:         Contains the watchdog timeout in seconds
->>>
->>> I think it should really be listed under "Optional properties" and the
->>> reference to Keystone removed. Note how the binding would need
->>> to change otherwise if another platform started to use the clock, which
->>> is a little silly.
->>>
->>> 	Arnd
->>>
->>
->> Ok, I'll move clocks property under "Optional properties" and describe it
->> as following:
->>
->> Optional properties:
->> - timeout-sec : Contains the watchdog timeout in seconds
->> - clocks: phandle reference to the controller clock.
->> 	  Needed if platform uses clocks.
->> 	  See clock-bindings.txt
->
-> Nit: clocks aren't just phandles, they have a clock-specifier too (which
-> might be 0 cells).
->
-> Otherwise this looks fine to me.
->
-> Mark.
->
+On Fri, Nov 22, 2013 at 02:40:35PM +0100, Peter De Schrijver wrote:
+> On Wed, Oct 30, 2013 at 01:41:29AM +0100, Peter De Schrijver wrote:
+> > Use pll_ref instead of pll_re_vco as the pll_e parent on Tegra114 and
+> > Tegra124. Also add a pll_ref table entry for pll_e for Tegra114.
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> 
+> I will squash this into the next tegra-clk-next as the previous pull request
+> has never made it.
+> 
 
-... I will replace it to:
-Optional properties:
-- timeout-sec : Contains the watchdog timeout in seconds
-- clocks: the clock feeding the watchdog timer.
-	  Needed if platform uses clocks.
-	  See clock-bindings.txt
+Looking again at this, I think the Tegra114 and generic PLL part of the patch
+better stays as a separate patch. The Tegra124 bit will be squashed into the
+Tegra124 support patch.
 
-Is it OK?
+Cheers,
 
--- 
-Regards,
-Ivan Khoronzhuk
+Peter.
