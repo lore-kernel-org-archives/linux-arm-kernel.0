@@ -1,60 +1,75 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 Nov 2013 11:50:33 +0900
-Subject: [PATCH v2] ARM: shmobile: Fix r8a7790 GPIO resources in DTS
-In-Reply-To: <20131125024008.GA813@verge.net.au>
-References: <20131121051929.16956.72693.sendpatchset@w520>
- <2488980.PvOPQv8Pxa@avalon> <20131125024008.GA813@verge.net.au>
-Message-ID: <20131125025033.GD2786@verge.net.au>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 25 Nov 2013 11:07:40 +0800
+Subject: [GIT PULL][for 3.14] pull request to enable Hisilicon SoC from pxa
+ git tree
+Message-ID: <5292BEFC.4080403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 11:40:08AM +0900, Simon Horman wrote:
-> On Thu, Nov 21, 2013 at 09:29:49AM +0100, Laurent Pinchart wrote:
-> > Hi Magnus,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Thursday 21 November 2013 14:19:29 Magnus Damm wrote:
-> > > From: Magnus Damm <damm@opensource.se>
-> > > 
-> > > The r8a7790 GPIO resources are currently incorrect. Fix that
-> > > by making them match the English r8a7790 v0.6 data sheet.
-> > > 
-> > > Tested with GPIO LED using Lager DT reference.
-> > > 
-> > > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > 
-> > Just before I go and hide for such an obvious mistake,
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > :-)
-> 
-> Hi, I would like to queue this up as a fix for v3.12 with the following
-> amended changelog.
+Hi Olof & Kevin,
 
-s/12/13/
+Here's the pull request from pxa git tree to enable Hisilicon Hi3620 
+SoC. Please help to merge.
 
-> 
-> I would also like to take this opportunity state that my preferred
-> subject format is: ARM: shmobile: soc or board: description
-> 
-> Could you cook up something similar for the r8a7791 variant of this patch?
-> 
-> 
-> [PATCH v2] ARM: shmobile: r8a7790: Fix GPIO resources in DTS
-> 
-> From: Magnus Damm <damm@opensource.se>
-> 
-> The r8a7790 GPIO resources are currently incorrect. Fix that
-> by making them match the English r8a7790 v0.6 data sheet.
-> 
-> Tested with GPIO LED using Lager DT reference.
-> 
-> This problem has been present since GPIOs were added to the r8a7790 SoC by
-> f98e10c88aa95bf7 ("ARM: shmobile: r8a7790: Add GPIO controller devices to
-> device tree") in v3.12-rc1.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Best Regards
+Haojian
+
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+   http://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git 
+tags/hisilicon-init
+
+for you to fetch changes up to 24e76b00e43f2efcdfa8e32fc3bcf13f7fea1003:
+
+   ARM: hi3xxx: add hotplug support (2013-11-25 11:02:33 +0800)
+
+----------------------------------------------------------------
+Enable Hisilicon Hi3620 SoC platform
+
+----------------------------------------------------------------
+Haojian Zhuang (4):
+       ARM: hi3xxx: add board support with device tree
+       ARM: dts: enable hi4511 with device tree
+       ARM: config: enable hi3xxx in multi_v7_defconfig
+       ARM: config: add defconfig for Hi3xxx
+
+Zhangfei Gao (2):
+       ARM: hi3xxx: add smp support
+       ARM: hi3xxx: add hotplug support
+
+  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  32 ++++
+  arch/arm/Kconfig                                              |   2 +
+  arch/arm/Makefile                                             |   1 +
+  arch/arm/boot/dts/Makefile                                    |   1 +
+  arch/arm/boot/dts/hi3620.dtsi                                 | 556 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/boot/dts/hi4511.dts                                  | 648 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/configs/hi3xxx_defconfig                             |  56 
++++++++
+  arch/arm/configs/multi_v7_defconfig                           |   1 +
+  arch/arm/mach-hi3xxx/Kconfig                                  |  15 ++
+  arch/arm/mach-hi3xxx/Makefile                                 |   7 +
+  arch/arm/mach-hi3xxx/core.h                                   |  15 ++
+  arch/arm/mach-hi3xxx/hi3xxx.c                                 |  94 
+++++++++++++
+  arch/arm/mach-hi3xxx/hotplug.c                                | 200 
++++++++++++++++++++++++++
+  arch/arm/mach-hi3xxx/platsmp.c                                |  89 
++++++++++++
+  14 files changed, 1717 insertions(+)
+  create mode 100644 
+Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
+  create mode 100644 arch/arm/boot/dts/hi4511.dts
+  create mode 100644 arch/arm/configs/hi3xxx_defconfig
+  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+  create mode 100644 arch/arm/mach-hi3xxx/Makefile
+  create mode 100644 arch/arm/mach-hi3xxx/core.h
+  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+  create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
+  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
