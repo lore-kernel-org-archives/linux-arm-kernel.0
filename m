@@ -1,75 +1,25 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 25 Nov 2013 11:07:40 +0800
-Subject: [GIT PULL][for 3.14] pull request to enable Hisilicon SoC from pxa
- git tree
-Message-ID: <5292BEFC.4080403@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 25 Nov 2013 11:10:32 +0800
+Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
+In-Reply-To: <20131122145224.GO14725@sirena.org.uk>
+References: <20131122142231.GA1741@ulmo.nvidia.com>
+ <20131122145224.GO14725@sirena.org.uk>
+Message-ID: <20131125031029.GC11613@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Kevin,
+On Fri, Nov 22, 2013 at 02:52:24PM +0000, Mark Brown wrote:
+> On Fri, Nov 22, 2013 at 03:22:32PM +0100, Thierry Reding wrote:
+> 
+> > Cc'ing Mark Brown, perhaps he can help figure out what's causing this.
+> 
+> The obvious question is what kernel this is being tested on...
 
-Here's the pull request from pxa git tree to enable Hisilicon Hi3620 
-SoC. Please help to merge.
+Hmm, I'm seeing this breakage on v3.13-rc1 now with the following line
+in the kernel log.
 
-Best Regards
-Haojian
+  pwm-backlight backlight.18: dummy supplies not allowed
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+What's missing here?
 
-   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-   http://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git 
-tags/hisilicon-init
-
-for you to fetch changes up to 24e76b00e43f2efcdfa8e32fc3bcf13f7fea1003:
-
-   ARM: hi3xxx: add hotplug support (2013-11-25 11:02:33 +0800)
-
-----------------------------------------------------------------
-Enable Hisilicon Hi3620 SoC platform
-
-----------------------------------------------------------------
-Haojian Zhuang (4):
-       ARM: hi3xxx: add board support with device tree
-       ARM: dts: enable hi4511 with device tree
-       ARM: config: enable hi3xxx in multi_v7_defconfig
-       ARM: config: add defconfig for Hi3xxx
-
-Zhangfei Gao (2):
-       ARM: hi3xxx: add smp support
-       ARM: hi3xxx: add hotplug support
-
-  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  32 ++++
-  arch/arm/Kconfig                                              |   2 +
-  arch/arm/Makefile                                             |   1 +
-  arch/arm/boot/dts/Makefile                                    |   1 +
-  arch/arm/boot/dts/hi3620.dtsi                                 | 556 
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/boot/dts/hi4511.dts                                  | 648 
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/configs/hi3xxx_defconfig                             |  56 
-+++++++
-  arch/arm/configs/multi_v7_defconfig                           |   1 +
-  arch/arm/mach-hi3xxx/Kconfig                                  |  15 ++
-  arch/arm/mach-hi3xxx/Makefile                                 |   7 +
-  arch/arm/mach-hi3xxx/core.h                                   |  15 ++
-  arch/arm/mach-hi3xxx/hi3xxx.c                                 |  94 
-++++++++++++
-  arch/arm/mach-hi3xxx/hotplug.c                                | 200 
-+++++++++++++++++++++++++
-  arch/arm/mach-hi3xxx/platsmp.c                                |  89 
-+++++++++++
-  14 files changed, 1717 insertions(+)
-  create mode 100644 
-Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
-  create mode 100644 arch/arm/boot/dts/hi4511.dts
-  create mode 100644 arch/arm/configs/hi3xxx_defconfig
-  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
-  create mode 100644 arch/arm/mach-hi3xxx/Makefile
-  create mode 100644 arch/arm/mach-hi3xxx/core.h
-  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
-  create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
-  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
+Shawn
