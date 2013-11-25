@@ -1,22 +1,22 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Nov 2013 15:06:00 -0700
-Subject: [PATCH V2 2/3] ARM: tegra: document reset properties in DT bindings
+Date: Mon, 25 Nov 2013 15:05:59 -0700
+Subject: [PATCH V2 1/3] ARM: tegra: add missing clock documentation to DT
+ bindings
 In-Reply-To: <1385417161-5542-1-git-send-email-swarren@wwwdotorg.org>
 References: <1385417161-5542-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1385417161-5542-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1385417161-5542-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Update all the Tegra DT bindings to require resets/reset-names properties
-where the HW module has reset inputs. Remove any entries from clocks or
-clock-names that were only required to identify reset inputs, rather than
-referring to real clocks.
+Many of the Tegra DT binding documents say nothing about the clocks or
+clock-names properties, yet those are present and required in DT files.
+This patch simply updates the documentation file to match the implicit
+definition of the binding, based on real-world DT content.
 
-This is a DT-ABI-incompatible change. It is the first of two changes
-required for me to consider the Tegra DT bindings as stable, the other
-being conversion to the common DMA DT bindings.
+All Tegra bindings that mention clocks are updated to have consistent
+wording and formatting of the clock-related properties.
 
 Cc: treding at nvidia.com
 Cc: pdeschrijver at nvidia.com
@@ -30,708 +30,762 @@ Cc: devicetree at vger.kernel.org
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 Acked-By: Terje Bergstrom <tbergstrom@nvidia.com>
 ---
-v2: No change.
+v2:
+* Removed duplicate documentation for "clocks" property in some nodes.
+* Modified dsi example node to match binding requirements.
+---
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  1 +
+ .../devicetree/bindings/dma/tegra20-apbdma.txt     |  3 ++
+ .../bindings/gpu/nvidia,tegra20-host1x.txt         | 59 ++++++++++++++++++++++
+ .../devicetree/bindings/i2c/nvidia,tegra20-i2c.txt | 14 ++---
+ .../bindings/input/nvidia,tegra20-kbc.txt          |  3 ++
+ .../bindings/mmc/nvidia,tegra20-sdhci.txt          |  3 ++
+ .../devicetree/bindings/nvec/nvidia,nvec.txt       |  8 +++
+ .../bindings/pci/nvidia,tegra20-pcie.txt           | 16 +++---
+ .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt |  3 ++
+ .../devicetree/bindings/rtc/nvidia,tegra20-rtc.txt |  3 ++
+ .../bindings/serial/nvidia,tegra20-hsuart.txt      |  3 ++
+ .../bindings/sound/nvidia,tegra-audio-alc5632.txt  |  7 +--
+ .../bindings/sound/nvidia,tegra-audio-rt5640.txt   |  7 +--
+ .../bindings/sound/nvidia,tegra-audio-wm8753.txt   |  7 +--
+ .../bindings/sound/nvidia,tegra-audio-wm8903.txt   |  7 +--
+ .../bindings/sound/nvidia,tegra-audio-wm9712.txt   |  7 +--
+ .../bindings/sound/nvidia,tegra20-ac97.txt         |  4 ++
+ .../bindings/sound/nvidia,tegra20-i2s.txt          |  3 ++
+ .../bindings/sound/nvidia,tegra30-ahub.txt         | 21 ++++++--
+ .../bindings/sound/nvidia,tegra30-i2s.txt          |  5 +-
+ .../bindings/spi/nvidia,tegra114-spi.txt           |  8 ++-
+ .../bindings/spi/nvidia,tegra20-sflash.txt         |  4 +-
+ .../bindings/spi/nvidia,tegra20-slink.txt          |  4 +-
+ .../bindings/timer/nvidia,tegra20-timer.txt        |  3 ++
+ .../bindings/timer/nvidia,tegra30-timer.txt        |  3 ++
+ .../bindings/usb/nvidia,tegra20-ehci.txt           |  3 +-
+ 26 files changed, 170 insertions(+), 39 deletions(-)
 
- .../bindings/clock/nvidia,tegra114-car.txt         |  4 ++
- .../bindings/clock/nvidia,tegra124-car.txt         |  4 ++
- .../bindings/clock/nvidia,tegra20-car.txt          |  4 ++
- .../bindings/clock/nvidia,tegra30-car.txt          |  4 ++
- .../devicetree/bindings/dma/tegra20-apbdma.txt     |  6 +++
- .../bindings/gpu/nvidia,tegra20-host1x.txt         | 63 ++++++++++++++++++++++
- .../devicetree/bindings/i2c/nvidia,tegra20-i2c.txt |  6 +++
- .../bindings/input/nvidia,tegra20-kbc.txt          |  6 +++
- .../bindings/mmc/nvidia,tegra20-sdhci.txt          |  6 +++
- .../devicetree/bindings/nvec/nvidia,nvec.txt       |  4 ++
- .../bindings/pci/nvidia,tegra20-pcie.txt           | 14 +++--
- .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt |  6 +++
- .../bindings/serial/nvidia,tegra20-hsuart.txt      |  6 +++
- .../bindings/sound/nvidia,tegra20-ac97.txt         |  6 +++
- .../bindings/sound/nvidia,tegra20-i2s.txt          |  6 +++
- .../bindings/sound/nvidia,tegra30-ahub.txt         | 17 ++++--
- .../bindings/sound/nvidia,tegra30-i2s.txt          |  6 +++
- .../bindings/spi/nvidia,tegra114-spi.txt           |  6 +++
- .../bindings/spi/nvidia,tegra20-sflash.txt         |  6 +++
- .../bindings/spi/nvidia,tegra20-slink.txt          |  6 +++
- .../bindings/usb/nvidia,tegra20-ehci.txt           |  4 ++
- 21 files changed, 181 insertions(+), 9 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-index 0c80c2677104..9acea9d93160 100644
---- a/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-@@ -15,6 +15,9 @@ Required properties :
-   In clock consumers, this cell represents the clock ID exposed by the
-   CAR. The assignments may be found in header file
-   <dt-bindings/clock/tegra114-car.h>.
-+- #reset-cells : Should be 1.
-+  In clock consumers, this cell represents the bit number in the CAR's
-+  array of CLK_RST_CONTROLLER_RST_DEVICES_* registers.
- 
- Example SoC include file:
- 
-@@ -23,6 +26,7 @@ Example SoC include file:
- 		compatible = "nvidia,tegra114-car";
- 		reg = <0x60006000 0x1000>;
- 		#clock-cells = <1>;
-+		#reset-cells = <1>;
- 	};
- 
- 	usb at c5004000 {
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
-index 1a91ec60dee5..ded5d6212c84 100644
---- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
-@@ -15,6 +15,9 @@ Required properties :
-   In clock consumers, this cell represents the clock ID exposed by the
-   CAR. The assignments may be found in header file
-   <dt-bindings/clock/tegra124-car.h>.
-+- #reset-cells : Should be 1.
-+  In clock consumers, this cell represents the bit number in the CAR's
-+  array of CLK_RST_CONTROLLER_RST_DEVICES_* registers.
- 
- Example SoC include file:
- 
-@@ -23,6 +26,7 @@ Example SoC include file:
- 		compatible = "nvidia,tegra124-car";
- 		reg = <0x60006000 0x1000>;
- 		#clock-cells = <1>;
-+		#reset-cells = <1>;
- 	};
- 
- 	usb at c5004000 {
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
-index fcfed5bf73fb..6c5901b503d0 100644
---- a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
-@@ -15,6 +15,9 @@ Required properties :
-   In clock consumers, this cell represents the clock ID exposed by the
-   CAR. The assignments may be found in header file
-   <dt-bindings/clock/tegra20-car.h>.
-+- #reset-cells : Should be 1.
-+  In clock consumers, this cell represents the bit number in the CAR's
-+  array of CLK_RST_CONTROLLER_RST_DEVICES_* registers.
- 
- Example SoC include file:
- 
-@@ -23,6 +26,7 @@ Example SoC include file:
- 		compatible = "nvidia,tegra20-car";
- 		reg = <0x60006000 0x1000>;
- 		#clock-cells = <1>;
-+		#reset-cells = <1>;
- 	};
- 
- 	usb at c5004000 {
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
-index 0f714081e986..63618cde12df 100644
---- a/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
-@@ -15,6 +15,9 @@ Required properties :
-   In clock consumers, this cell represents the clock ID exposed by the
-   CAR. The assignments may be found in header file
-   <dt-bindings/clock/tegra30-car.h>.
-+- #reset-cells : Should be 1.
-+  In clock consumers, this cell represents the bit number in the CAR's
-+  array of CLK_RST_CONTROLLER_RST_DEVICES_* registers.
- 
- Example SoC include file:
- 
-@@ -23,6 +26,7 @@ Example SoC include file:
- 		compatible = "nvidia,tegra30-car";
- 		reg = <0x60006000 0x1000>;
- 		#clock-cells = <1>;
-+		#reset-cells = <1>;
- 	};
- 
- 	usb at c5004000 {
+diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+index 1608a54e90e1..68ac65f82a1c 100644
+--- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
++++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+@@ -9,6 +9,7 @@ Required properties:
+ - compatible : Should contain "nvidia,tegra<chip>-pmc".
+ - reg : Offset and length of the register set for the device
+ - clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entries:
+   "pclk" (The Tegra clock of that name),
+   "clk32k_in" (The 32KHz clock input to Tegra).
 diff --git a/Documentation/devicetree/bindings/dma/tegra20-apbdma.txt b/Documentation/devicetree/bindings/dma/tegra20-apbdma.txt
-index 74bfc54bb184..0b1e577ab9d3 100644
+index 90fa7da525b8..74bfc54bb184 100644
 --- a/Documentation/devicetree/bindings/dma/tegra20-apbdma.txt
 +++ b/Documentation/devicetree/bindings/dma/tegra20-apbdma.txt
-@@ -7,6 +7,10 @@ Required properties:
+@@ -5,6 +5,8 @@ Required properties:
+ - reg: Should contain DMA registers location and length. This shuld include
+   all of the per-channel registers.
  - interrupts: Should contain all of the per-channel DMA interrupts.
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - dma
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  Examples:
  
-@@ -30,4 +34,6 @@ apbdma: dma at 6000a000 {
+@@ -27,4 +29,5 @@ apbdma: dma at 6000a000 {
+ 		       0 149 0x04
  		       0 150 0x04
  		       0 151 0x04 >;
- 	clocks = <&tegra_car 34>;
-+	resets = <&tegra_car 34>;
-+	reset-names = "dma";
++	clocks = <&tegra_car 34>;
  };
 diff --git a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt b/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
-index b9a088b7f4da..a2d50c54df3d 100644
+index b4fa934ae3a2..b9a088b7f4da 100644
 --- a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
 +++ b/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
-@@ -11,6 +11,10 @@ Required properties:
+@@ -9,6 +9,8 @@ Required properties:
+ - #size-cells: The number of cells used to represent the size of an address
+   range in the host1x address space. Should be 1.
  - ranges: The mapping of the host1x address space to the CPU address space.
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - host1x
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  The host1x top-level node defines a number of children, each representing one
  of the following host1x client modules:
-@@ -23,6 +27,10 @@ of the following host1x client modules:
+@@ -19,6 +21,8 @@ of the following host1x client modules:
+   - compatible: "nvidia,tegra<chip>-mpe"
+   - reg: Physical base address and length of the controller's registers.
    - interrupts: The interrupt outputs from the controller.
-   - clocks : Must contain one entry, for the module clock.
-     See ../clocks/clock-bindings.txt for details.
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
-+    - mpe
++  - clocks : Must contain one entry, for the module clock.
++    See ../clocks/clock-bindings.txt for details.
  
  - vi: video input
  
-@@ -32,6 +40,10 @@ of the following host1x client modules:
+@@ -26,6 +30,8 @@ of the following host1x client modules:
+   - compatible: "nvidia,tegra<chip>-vi"
+   - reg: Physical base address and length of the controller's registers.
    - interrupts: The interrupt outputs from the controller.
-   - clocks : Must contain one entry, for the module clock.
-     See ../clocks/clock-bindings.txt for details.
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
-+    - vi
++  - clocks : Must contain one entry, for the module clock.
++    See ../clocks/clock-bindings.txt for details.
  
  - epp: encoder pre-processor
  
-@@ -41,6 +53,10 @@ of the following host1x client modules:
+@@ -33,6 +39,8 @@ of the following host1x client modules:
+   - compatible: "nvidia,tegra<chip>-epp"
+   - reg: Physical base address and length of the controller's registers.
    - interrupts: The interrupt outputs from the controller.
-   - clocks : Must contain one entry, for the module clock.
-     See ../clocks/clock-bindings.txt for details.
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
-+    - epp
++  - clocks : Must contain one entry, for the module clock.
++    See ../clocks/clock-bindings.txt for details.
  
  - isp: image signal processor
  
-@@ -50,6 +66,10 @@ of the following host1x client modules:
+@@ -40,6 +48,8 @@ of the following host1x client modules:
+   - compatible: "nvidia,tegra<chip>-isp"
+   - reg: Physical base address and length of the controller's registers.
    - interrupts: The interrupt outputs from the controller.
-   - clocks : Must contain one entry, for the module clock.
-     See ../clocks/clock-bindings.txt for details.
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
-+    - isp
++  - clocks : Must contain one entry, for the module clock.
++    See ../clocks/clock-bindings.txt for details.
  
  - gr2d: 2D graphics engine
  
-@@ -59,6 +79,10 @@ of the following host1x client modules:
+@@ -47,12 +57,21 @@ of the following host1x client modules:
+   - compatible: "nvidia,tegra<chip>-gr2d"
+   - reg: Physical base address and length of the controller's registers.
    - interrupts: The interrupt outputs from the controller.
-   - clocks : Must contain one entry, for the module clock.
-     See ../clocks/clock-bindings.txt for details.
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
-+    - 2d
++  - clocks : Must contain one entry, for the module clock.
++    See ../clocks/clock-bindings.txt for details.
  
  - gr3d: 3D graphics engine
  
-@@ -72,6 +96,11 @@ of the following host1x client modules:
-     - 3d
-       This MUST be the first entry.
-     - 3d2 (Only required on SoCs with two 3D clocks)
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
+   Required properties:
+   - compatible: "nvidia,tegra<chip>-gr3d"
+   - reg: Physical base address and length of the controller's registers.
++  - clocks : Must contain an entry for each entry in clock-names.
++    See ../clocks/clock-bindings.txt for details.
++  - clock-names : Must include the following entries:
++    (This property may be omitted if the only clock in the list is "3d")
 +    - 3d
++      This MUST be the first entry.
 +    - 3d2 (Only required on SoCs with two 3D clocks)
  
  - dc: display controller
  
-@@ -85,6 +114,10 @@ of the following host1x client modules:
-     - disp1 or disp2 (depending on the controller instance)
-       This MUST be the first entry.
-     - parent
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
-+    - dc
+@@ -60,6 +79,12 @@ of the following host1x client modules:
+   - compatible: "nvidia,tegra<chip>-dc"
+   - reg: Physical base address and length of the controller's registers.
+   - interrupts: The interrupt outputs from the controller.
++  - clocks : Must contain an entry for each entry in clock-names.
++    See ../clocks/clock-bindings.txt for details.
++  - clock-names : Must include the following entries:
++    - disp1 or disp2 (depending on the controller instance)
++      This MUST be the first entry.
++    - parent
  
    Each display controller node has a child node, named "rgb", that represents
    the RGB output associated with the controller. It can take the following
-@@ -107,6 +140,10 @@ of the following host1x client modules:
-     - hdmi
-       This MUST be the first entry.
-     - parent
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
+@@ -76,6 +101,12 @@ of the following host1x client modules:
+   - interrupts: The interrupt outputs from the controller.
+   - vdd-supply: regulator for supply voltage
+   - pll-supply: regulator for PLL
++  - clocks : Must contain an entry for each entry in clock-names.
++    See ../clocks/clock-bindings.txt for details.
++  - clock-names : Must include the following entries:
 +    - hdmi
++      This MUST be the first entry.
++    - parent
  
    Optional properties:
    - nvidia,ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
-@@ -133,6 +170,10 @@ of the following host1x client modules:
-     - dsi
-       This MUST be the first entry.
-     - parent
-+  - resets : Must contain an entry for each entry in reset-names.
-+    See ../reset/reset.txt for details.
-+  - reset-names : Must include the following entries:
+@@ -88,12 +119,20 @@ of the following host1x client modules:
+   - compatible: "nvidia,tegra<chip>-tvo"
+   - reg: Physical base address and length of the controller's registers.
+   - interrupts: The interrupt outputs from the controller.
++  - clocks : Must contain one entry, for the module clock.
++    See ../clocks/clock-bindings.txt for details.
+ 
+ - dsi: display serial interface
+ 
+   Required properties:
+   - compatible: "nvidia,tegra<chip>-dsi"
+   - reg: Physical base address and length of the controller's registers.
++  - clocks : Must contain an entry for each entry in clock-names.
++    See ../clocks/clock-bindings.txt for details.
++  - clock-names : Must include the following entries:
 +    - dsi
++      This MUST be the first entry.
++    - parent
  
  Example:
  
-@@ -145,6 +186,8 @@ Example:
+@@ -105,6 +144,7 @@ Example:
+ 		reg = <0x50000000 0x00024000>;
  		interrupts = <0 65 0x04   /* mpcore syncpt */
  			      0 67 0x04>; /* mpcore general */
- 		clocks = <&tegra_car TEGRA20_CLK_HOST1X>;
-+		resets = <&tegra_car 28>;
-+		reset-names = "host1x";
++		clocks = <&tegra_car TEGRA20_CLK_HOST1X>;
  
  		#address-cells = <1>;
  		#size-cells = <1>;
-@@ -156,6 +199,8 @@ Example:
+@@ -115,41 +155,50 @@ Example:
+ 			compatible = "nvidia,tegra20-mpe";
  			reg = <0x54040000 0x00040000>;
  			interrupts = <0 68 0x04>;
- 			clocks = <&tegra_car TEGRA20_CLK_MPE>;
-+			resets = <&tegra_car 60>;
-+			reset-names = "mpe";
++			clocks = <&tegra_car TEGRA20_CLK_MPE>;
  		};
  
  		vi {
-@@ -163,6 +208,8 @@ Example:
+ 			compatible = "nvidia,tegra20-vi";
  			reg = <0x54080000 0x00040000>;
  			interrupts = <0 69 0x04>;
- 			clocks = <&tegra_car TEGRA20_CLK_VI>;
-+			resets = <&tegra_car 100>;
-+			reset-names = "vi";
++			clocks = <&tegra_car TEGRA20_CLK_VI>;
  		};
  
  		epp {
-@@ -170,6 +217,8 @@ Example:
+ 			compatible = "nvidia,tegra20-epp";
  			reg = <0x540c0000 0x00040000>;
  			interrupts = <0 70 0x04>;
- 			clocks = <&tegra_car TEGRA20_CLK_EPP>;
-+			resets = <&tegra_car 19>;
-+			reset-names = "epp";
++			clocks = <&tegra_car TEGRA20_CLK_EPP>;
  		};
  
  		isp {
-@@ -177,6 +226,8 @@ Example:
+ 			compatible = "nvidia,tegra20-isp";
  			reg = <0x54100000 0x00040000>;
  			interrupts = <0 71 0x04>;
- 			clocks = <&tegra_car TEGRA20_CLK_ISP>;
-+			resets = <&tegra_car 23>;
-+			reset-names = "isp";
++			clocks = <&tegra_car TEGRA20_CLK_ISP>;
  		};
  
  		gr2d {
-@@ -184,12 +235,16 @@ Example:
+ 			compatible = "nvidia,tegra20-gr2d";
  			reg = <0x54140000 0x00040000>;
  			interrupts = <0 72 0x04>;
- 			clocks = <&tegra_car TEGRA20_CLK_GR2D>;
-+			resets = <&tegra_car 21>;
-+			reset-names = "2d";
++			clocks = <&tegra_car TEGRA20_CLK_GR2D>;
  		};
  
  		gr3d {
  			compatible = "nvidia,tegra20-gr3d";
  			reg = <0x54180000 0x00040000>;
- 			clocks = <&tegra_car TEGRA20_CLK_GR3D>;
-+			resets = <&tegra_car 24>;
-+			reset-names = "3d";
++			clocks = <&tegra_car TEGRA20_CLK_GR3D>;
  		};
  
  		dc at 54200000 {
-@@ -199,6 +254,8 @@ Example:
- 			clocks = <&tegra_car TEGRA20_CLK_DISP1>,
- 				 <&tegra_car TEGRA20_CLK_PLL_P>;
- 			clock-names = "disp1", "parent";
-+			resets = <&tegra_car 27>;
-+			reset-names = "dc";
+ 			compatible = "nvidia,tegra20-dc";
+ 			reg = <0x54200000 0x00040000>;
+ 			interrupts = <0 73 0x04>;
++			clocks = <&tegra_car TEGRA20_CLK_DISP1>,
++				 <&tegra_car TEGRA20_CLK_PLL_P>;
++			clock-names = "disp1", "parent";
  
  			rgb {
  				status = "disabled";
-@@ -212,6 +269,8 @@ Example:
- 			clocks = <&tegra_car TEGRA20_CLK_DISP2>,
- 				 <&tegra_car TEGRA20_CLK_PLL_P>;
- 			clock-names = "disp2", "parent";
-+			resets = <&tegra_car 26>;
-+			reset-names = "dc";
+@@ -160,6 +209,9 @@ Example:
+ 			compatible = "nvidia,tegra20-dc";
+ 			reg = <0x54240000 0x00040000>;
+ 			interrupts = <0 74 0x04>;
++			clocks = <&tegra_car TEGRA20_CLK_DISP2>,
++				 <&tegra_car TEGRA20_CLK_PLL_P>;
++			clock-names = "disp2", "parent";
  
  			rgb {
  				status = "disabled";
-@@ -225,6 +284,8 @@ Example:
- 			clocks = <&tegra_car TEGRA20_CLK_HDMI>,
- 				 <&tegra_car TEGRA20_CLK_PLL_D_OUT0>;
- 			clock-names = "hdmi", "parent";
-+			resets = <&tegra_car 51>;
-+			reset-names = "hdmi";
+@@ -170,6 +222,9 @@ Example:
+ 			compatible = "nvidia,tegra20-hdmi";
+ 			reg = <0x54280000 0x00040000>;
+ 			interrupts = <0 75 0x04>;
++			clocks = <&tegra_car TEGRA20_CLK_HDMI>,
++				 <&tegra_car TEGRA20_CLK_PLL_D_OUT0>;
++			clock-names = "hdmi", "parent";
  			status = "disabled";
  		};
  
-@@ -242,6 +303,8 @@ Example:
- 			clocks = <&tegra_car TEGRA20_CLK_DSI>,
- 				 <&tegra_car TEGRA20_CLK_PLL_D_OUT0>;
- 			clock-names = "dsi", "parent";
-+			resets = <&tegra_car 48>;
-+			reset-names = "dsi";
+@@ -177,12 +232,16 @@ Example:
+ 			compatible = "nvidia,tegra20-tvo";
+ 			reg = <0x542c0000 0x00040000>;
+ 			interrupts = <0 76 0x04>;
++			clocks = <&tegra_car TEGRA20_CLK_TVO>;
+ 			status = "disabled";
+ 		};
+ 
+ 		dsi {
+ 			compatible = "nvidia,tegra20-dsi";
+ 			reg = <0x54300000 0x00040000>;
++			clocks = <&tegra_car TEGRA20_CLK_DSI>,
++				 <&tegra_car TEGRA20_CLK_PLL_D_OUT0>;
++			clock-names = "dsi", "parent";
  			status = "disabled";
  		};
  	};
 diff --git a/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt b/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt
-index 96ab40131ae1..2b3af72dfb9c 100644
+index ef77cc7a0e46..96ab40131ae1 100644
 --- a/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt
 +++ b/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt
-@@ -47,6 +47,10 @@ Required properties:
-   - fast-clk
-   Tegra114:
-   - div-clk
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - i2c
+@@ -39,12 +39,14 @@ Required properties:
+ - interrupts: Should contain I2C controller interrupts.
+ - address-cells: Address cells for I2C device address.
+ - size-cells: Size of the I2C device address.
+-- clocks: Clock ID as per
+-		Documentation/devicetree/bindings/clock/tegra<chip-id>.txt
+-	for I2C controller.
+-- clock-names: Name of the clock:
+-	Tegra20/Tegra30 I2C controller: "div-clk and "fast-clk".
+-	Tegra114 I2C controller: "div-clk".
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries:
++  Tegra20/Tegra30:
++  - div-clk
++  - fast-clk
++  Tegra114:
++  - div-clk
  
  Example:
  
-@@ -58,5 +62,7 @@ Example:
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 12>, <&tegra_car 124>;
- 		clock-names = "div-clk", "fast-clk";
-+		resets = <&tegra_car 12>;
-+		reset-names = "i2c";
- 		status = "disabled";
- 	};
 diff --git a/Documentation/devicetree/bindings/input/nvidia,tegra20-kbc.txt b/Documentation/devicetree/bindings/input/nvidia,tegra20-kbc.txt
-index cc28d2194c37..83b14b6389fc 100644
+index 2995fae7ee47..cc28d2194c37 100644
 --- a/Documentation/devicetree/bindings/input/nvidia,tegra20-kbc.txt
 +++ b/Documentation/devicetree/bindings/input/nvidia,tegra20-kbc.txt
-@@ -15,6 +15,10 @@ Required properties:
+@@ -13,6 +13,8 @@ Required properties:
+   array of pin numbers which is used as column.
+ - linux,keymap: The keymap for keys as described in the binding document
    devicetree/bindings/input/matrix-keymap.txt.
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - kbc
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  Optional properties, in addition to those specified by the shared
  matrix-keyboard bindings:
-@@ -34,6 +38,8 @@ keyboard: keyboard {
+@@ -31,6 +33,7 @@ keyboard: keyboard {
+ 	compatible = "nvidia,tegra20-kbc";
  	reg = <0x7000e200 0x100>;
  	interrupts = <0 85 0x04>;
- 	clocks = <&tegra_car 36>;
-+	resets = <&tegra_car 36>;
-+	reset-names = "kbc";
++	clocks = <&tegra_car 36>;
  	nvidia,ghost-filter;
  	nvidia,debounce-delay-ms = <640>;
  	nvidia,kbc-row-pins = <0 1 2>;    /* pin 0, 1, 2 as rows */
 diff --git a/Documentation/devicetree/bindings/mmc/nvidia,tegra20-sdhci.txt b/Documentation/devicetree/bindings/mmc/nvidia,tegra20-sdhci.txt
-index f727902a9e8d..f357c16ea815 100644
+index c6d7b11db9eb..f727902a9e8d 100644
 --- a/Documentation/devicetree/bindings/mmc/nvidia,tegra20-sdhci.txt
 +++ b/Documentation/devicetree/bindings/mmc/nvidia,tegra20-sdhci.txt
-@@ -10,6 +10,10 @@ Required properties:
+@@ -8,6 +8,8 @@ by mmc.txt and the properties used by the sdhci-tegra driver.
+ 
+ Required properties:
  - compatible : Should be "nvidia,<chip>-sdhci"
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - sdhci
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  Optional properties:
  - power-gpios : Specify GPIOs for power control
-@@ -21,6 +25,8 @@ sdhci at c8000200 {
+@@ -18,6 +20,7 @@ sdhci at c8000200 {
+ 	compatible = "nvidia,tegra20-sdhci";
  	reg = <0xc8000200 0x200>;
  	interrupts = <47>;
- 	clocks = <&tegra_car 14>;
-+	resets = <&tegra_car 14>;
-+	reset-names = "sdhci";
++	clocks = <&tegra_car 14>;
  	cd-gpios = <&gpio 69 0>; /* gpio PI5 */
  	wp-gpios = <&gpio 57 0>; /* gpio PH1 */
  	power-gpios = <&gpio 155 0>; /* gpio PT3 */
 diff --git a/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt b/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
-index a97fe575ca29..5ae601e7f51f 100644
+index 5aeee53ff9f4..a97fe575ca29 100644
 --- a/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
 +++ b/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
-@@ -15,3 +15,7 @@ Required properties:
-   - fast-clk
-   Tegra114:
-   - div-clk
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - i2c
+@@ -7,3 +7,11 @@ Required properties:
+ - clock-frequency : the frequency of the i2c bus
+ - gpios : the gpio used for ec request
+ - slave-addr: the i2c address of the slave controller
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries:
++  Tegra20/Tegra30:
++  - div-clk
++  - fast-clk
++  Tegra114:
++  - div-clk
 diff --git a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-index ad2eb9804afa..6d91016100b3 100644
+index 6b7510775c50..ad2eb9804afa 100644
 --- a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
 +++ b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-@@ -47,9 +47,14 @@ Required properties:
- - clock-names : Must include the following entries:
-   - pex
-   - afi
--  - pcie_xclk
-   - pll_e
-   - cml (not required for Tegra20)
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
+@@ -42,14 +42,14 @@ Required properties:
+     - 0xc2000000: prefetchable memory region
+   Please refer to the standard PCI bus binding document for a more detailed
+   explanation.
+-- clocks: List of clock inputs of the controller. Must contain an entry for
+-  each entry in the clock-names property.
+-- clock-names: Must include the following entries:
+-  "pex": The Tegra clock of that name
+-  "afi": The Tegra clock of that name
+-  "pcie_xclk": The Tegra clock of that name
+-  "pll_e": The Tegra clock of that name
+-  "cml": The Tegra clock of that name (not required for Tegra20)
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries:
 +  - pex
 +  - afi
-+  - pcie_x
++  - pcie_xclk
++  - pll_e
++  - cml (not required for Tegra20)
  
  Root ports are defined as subnodes of the PCIe controller node.
  
-@@ -91,9 +96,10 @@ SoC DTSI:
- 			  0x82000000 0 0xa0000000 0xa0000000 0 0x10000000   /* non-prefetchable memory */
- 			  0xc2000000 0 0xb0000000 0xb0000000 0 0x10000000>; /* prefetchable memory */
- 
--		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
--			 <&tegra_car 118>;
--		clock-names = "pex", "afi", "pcie_xclk", "pll_e";
-+		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 118>;
-+		clock-names = "pex", "afi", "pll_e";
-+		resets = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>;
-+		reset-names = "pex", "afi", "pcie_x";
- 		status = "disabled";
- 
- 		pci at 1,0 {
 diff --git a/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt b/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
-index 0d608d34fed0..a65d4c3be231 100644
+index c3fc57af8772..0d608d34fed0 100644
 --- a/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
 +++ b/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
-@@ -9,6 +9,10 @@ Required properties:
+@@ -7,6 +7,8 @@ Required properties:
+ - reg: physical base address and length of the controller's registers
+ - #pwm-cells: should be 2. See pwm.txt in this directory for a description of
    the cells format.
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - pwm
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  Example:
  
-@@ -17,4 +21,6 @@ Example:
+@@ -14,4 +16,5 @@ Example:
+ 		compatible = "nvidia,tegra20-pwm";
  		reg = <0x7000a000 0x100>;
  		#pwm-cells = <2>;
- 		clocks = <&tegra_car 17>;
-+		resets = <&tegra_car 17>;
-+		reset-names = "pwm";
++		clocks = <&tegra_car 17>;
  	};
+diff --git a/Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt b/Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt
+index 93f45e9dce7c..652d1ff2e8be 100644
+--- a/Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt
++++ b/Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt
+@@ -9,6 +9,8 @@ Required properties:
+ - compatible : should be "nvidia,tegra20-rtc".
+ - reg : Specifies base physical address and size of the registers.
+ - interrupts : A single interrupt specifier.
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
+ 
+ Example:
+ 
+@@ -16,4 +18,5 @@ timer {
+ 	compatible = "nvidia,tegra20-rtc";
+ 	reg = <0x7000e000 0x100>;
+ 	interrupts = <0 2 0x04>;
++	clocks = <&tegra_car 4>;
+ };
 diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt
-index 39148b6236a1..69ccdbe3760e 100644
+index 392a4493eebd..39148b6236a1 100644
 --- a/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt
 +++ b/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt
-@@ -8,6 +8,10 @@ Required properties:
+@@ -6,6 +6,8 @@ Required properties:
+ - interrupts: Should contain UART controller interrupts.
+ - nvidia,dma-request-selector : The Tegra DMA controller's phandle and
    request selector for this UART controller.
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - serial
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  Optional properties:
  - nvidia,enable-modem-interrupt: Enable modem interrupts. Should be enable
-@@ -23,5 +27,7 @@ serial at 70006000 {
+@@ -20,5 +22,6 @@ serial at 70006000 {
+ 	interrupts = <0 36 0x04>;
  	nvidia,dma-request-selector = <&apbdma 8>;
  	nvidia,enable-modem-interrupt;
- 	clocks = <&tegra_car 6>;
-+	resets = <&tegra_car 6>;
-+	reset-names = "serial";
++	clocks = <&tegra_car 6>;
  	status = "disabled";
  };
+diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-alc5632.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-alc5632.txt
+index 8b8903ef0800..57f40f93453e 100644
+--- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-alc5632.txt
++++ b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-alc5632.txt
+@@ -3,10 +3,11 @@ NVIDIA Tegra audio complex
+ Required properties:
+ - compatible : "nvidia,tegra-audio-alc5632"
+ - clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entries:
+-  "pll_a" (The Tegra clock of that name),
+-  "pll_a_out0" (The Tegra clock of that name),
+-  "mclk" (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
++  - pll_a
++  - pll_a_out0
++  - mclk (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
+ - nvidia,model : The user-visible name of this sound complex.
+ - nvidia,audio-routing : A list of the connections between audio components.
+   Each entry is a pair of strings, the first being the connection's sink,
+diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-rt5640.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-rt5640.txt
+index dc6224994d69..7788808dcd0b 100644
+--- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-rt5640.txt
++++ b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-rt5640.txt
+@@ -3,10 +3,11 @@ NVIDIA Tegra audio complex, with RT5640 CODEC
+ Required properties:
+ - compatible : "nvidia,tegra-audio-rt5640"
+ - clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entries:
+-  "pll_a" (The Tegra clock of that name),
+-  "pll_a_out0" (The Tegra clock of that name),
+-  "mclk" (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
++  - pll_a
++  - pll_a_out0
++  - mclk (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
+ - nvidia,model : The user-visible name of this sound complex.
+ - nvidia,audio-routing : A list of the connections between audio components.
+   Each entry is a pair of strings, the first being the connection's sink,
+diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt
+index aab6ce0ad2fc..96f6a57dd6b4 100644
+--- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt
++++ b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt
+@@ -3,10 +3,11 @@ NVIDIA Tegra audio complex
+ Required properties:
+ - compatible : "nvidia,tegra-audio-wm8753"
+ - clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entries:
+-  "pll_a" (The Tegra clock of that name),
+-  "pll_a_out0" (The Tegra clock of that name),
+-  "mclk" (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
++  - pll_a
++  - pll_a_out0
++  - mclk (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
+ - nvidia,model : The user-visible name of this sound complex.
+ - nvidia,audio-routing : A list of the connections between audio components.
+   Each entry is a pair of strings, the first being the connection's sink,
+diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8903.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8903.txt
+index 4b44dfb6ca0d..b795d282818d 100644
+--- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8903.txt
++++ b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8903.txt
+@@ -3,10 +3,11 @@ NVIDIA Tegra audio complex
+ Required properties:
+ - compatible : "nvidia,tegra-audio-wm8903"
+ - clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entries:
+-  "pll_a" (The Tegra clock of that name),
+-  "pll_a_out0" (The Tegra clock of that name),
+-  "mclk" (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
++  - pll_a
++  - pll_a_out0
++  - mclk (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
+ - nvidia,model : The user-visible name of this sound complex.
+ - nvidia,audio-routing : A list of the connections between audio components.
+   Each entry is a pair of strings, the first being the connection's sink,
+diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
+index ad589b163639..436f6cd9d07c 100644
+--- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
++++ b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
+@@ -3,10 +3,11 @@ NVIDIA Tegra audio complex
+ Required properties:
+ - compatible : "nvidia,tegra-audio-wm9712"
+ - clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entries:
+-  "pll_a" (The Tegra clock of that name),
+-  "pll_a_out0" (The Tegra clock of that name),
+-  "mclk" (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
++  - pll_a
++  - pll_a_out0
++  - mclk (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
+ - nvidia,model : The user-visible name of this sound complex.
+ - nvidia,audio-routing : A list of the connections between audio components.
+   Each entry is a pair of strings, the first being the connection's sink,
 diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
-index 37f4ebf5b184..2b6817f6e40e 100644
+index c1454979c1ef..37f4ebf5b184 100644
 --- a/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
 +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
-@@ -6,6 +6,10 @@ Required properties:
+@@ -4,12 +4,15 @@ Required properties:
+ - compatible : "nvidia,tegra20-ac97"
+ - reg : Should contain AC97 controller registers location and length
  - interrupts : Should contain AC97 interrupt
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - ac97
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  - nvidia,dma-request-selector : The Tegra DMA controller's phandle and
    request selector for the AC97 controller
  - nvidia,codec-reset-gpio : The Tegra GPIO controller's phandle and the number
-@@ -23,4 +27,6 @@ ac97 at 70002000 {
+   of the GPIO used to reset the external AC97 codec
+ - nvidia,codec-sync-gpio : The Tegra GPIO controller's phandle and the number
+   of the GPIO corresponding with the AC97 DAP _FS line
++
+ Example:
+ 
+ ac97 at 70002000 {
+@@ -19,4 +22,5 @@ ac97 at 70002000 {
+ 	nvidia,dma-request-selector = <&apbdma 12>;
  	nvidia,codec-reset-gpio = <&gpio 170 0>;
  	nvidia,codec-sync-gpio = <&gpio 120 0>;
- 	clocks = <&tegra_car 3>;
-+	resets = <&tegra_car 3>;
-+	reset-names = "ac97";
++	clocks = <&tegra_car 3>;
  };
 diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt
-index ba0c9452916d..8b070aeca3db 100644
+index 0df2b5c816e3..ba0c9452916d 100644
 --- a/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt
 +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt
-@@ -6,6 +6,10 @@ Required properties:
+@@ -4,6 +4,8 @@ Required properties:
+ - compatible : "nvidia,tegra20-i2s"
+ - reg : Should contain I2S registers location and length
  - interrupts : Should contain I2S interrupt
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - i2s
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  - nvidia,dma-request-selector : The Tegra DMA controller's phandle and
    request selector for this I2S controller
  
-@@ -17,4 +21,6 @@ i2s at 70002800 {
+@@ -14,4 +16,5 @@ i2s at 70002800 {
+ 	reg = <0x70002800 0x200>;
  	interrupts = < 45 >;
  	nvidia,dma-request-selector = < &apbdma 2 >;
- 	clocks = <&tegra_car 11>;
-+	resets = <&tegra_car 11>;
-+	reset-names = "i2s";
++	clocks = <&tegra_car 11>;
  };
 diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
-index 7299eeadd588..60d59a54ca07 100644
+index 0e5c12c66523..7299eeadd588 100644
 --- a/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
 +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
-@@ -15,6 +15,11 @@ Required properties:
- - clocks : Must contain an entry for each entry in clock-names.
-   See ../clocks/clock-bindings.txt for details.
+@@ -12,11 +12,24 @@ Required properties:
+   If a single entry is present, the request selectors for the channels are
+   assumed to be contiguous, and increment from this value.
+   If multiple values are given, one value must be given per channel.
+-- clocks : Must contain an entry for each required entry in clock-names.
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
  - clock-names : Must include the following entries:
+-  - Tegra30: Requires d_audio, apbif, i2s0, i2s1, i2s2, i2s3, i2s4, dam0,
+-    dam1, dam2, spdif_in.
+-  - Tegra114: Additionally requires amx, adx.
++  Tegra30 and later:
 +  - d_audio
 +  - apbif
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-   Tegra30 and later:
-   - d_audio
-   - apbif
-@@ -26,7 +31,7 @@ Required properties:
-   - dam0
-   - dam1
-   - dam2
--  - spdif_in
-+  - spdif
-   Tegra114 and later additionally require:
-   - amx
-   - adx
-@@ -48,13 +53,15 @@ ahub at 70080000 {
- 	reg = <0x70080000 0x200 0x70080200 0x100>;
- 	interrupts = < 0 103 0x04 >;
- 	nvidia,dma-request-selector = <&apbdma 1>;
--	clocks = <&tegra_car 106>, <&tegra_car 107>, <&tegra_car 30>,
-+	clocks = <&tegra_car 106>, <&tegra_car 107>;
-+	clock-names = "d_audio", "apbif";
-+	resets = <&tegra_car 106>, <&tegra_car 107>, <&tegra_car 30>,
- 		<&tegra_car 11>, <&tegra_car 18>, <&tegra_car 101>,
- 		<&tegra_car 102>, <&tegra_car 108>, <&tegra_car 109>,
--		<&tegra_car 110>, <&tegra_car 162>;
--	clock-names = "d_audio", "apbif", "i2s0", "i2s1", "i2s2",
-+		<&tegra_car 110>, <&tegra_car 10>;
-+	reset-names = "d_audio", "apbif", "i2s0", "i2s1", "i2s2",
- 		"i2s3", "i2s4", "dam0", "dam1", "dam2",
--		"spdif_in";
-+		"spdif";
- 	ranges;
- 	#address-cells = <1>;
- 	#size-cells = <1>;
++  - i2s0
++  - i2s1
++  - i2s2
++  - i2s3
++  - i2s4
++  - dam0
++  - dam1
++  - dam2
++  - spdif_in
++  Tegra114 and later additionally require:
++  - amx
++  - adx
+ - ranges : The bus address mapping for the configlink register bus.
+   Can be empty since the mapping is 1:1.
+ - #address-cells : For the configlink bus. Should be <1>;
 diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra30-i2s.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra30-i2s.txt
-index 7a3112bc135c..0c113ffe3814 100644
+index dfa6c037124a..7a3112bc135c 100644
 --- a/Documentation/devicetree/bindings/sound/nvidia,tegra30-i2s.txt
 +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra30-i2s.txt
-@@ -5,6 +5,10 @@ Required properties:
+@@ -3,13 +3,16 @@ NVIDIA Tegra30 I2S controller
+ Required properties:
+ - compatible : "nvidia,tegra30-i2s"
  - reg : Should contain I2S registers location and length
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - i2s
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  - nvidia,ahub-cif-ids : The list of AHUB CIF IDs for this port, rx (playback)
    first, tx (capture) second. See nvidia,tegra30-ahub.txt for values.
  
-@@ -15,4 +19,6 @@ i2s at 70080300 {
+ Example:
+ 
+-i2s at 70002800 {
++i2s at 70080300 {
+ 	compatible = "nvidia,tegra30-i2s";
  	reg = <0x70080300 0x100>;
  	nvidia,ahub-cif-ids = <4 4>;
- 	clocks = <&tegra_car 11>;
-+	resets = <&tegra_car 11>;
-+	reset-names = "i2s";
++	clocks = <&tegra_car 11>;
  };
 diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
-index d4f2d534934b..fcd9f67999de 100644
+index 91ff771c7e77..d4f2d534934b 100644
 --- a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
 +++ b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
-@@ -10,6 +10,10 @@ Required properties:
-   See ../clocks/clock-bindings.txt for details.
- - clock-names : Must include the following entries:
-   - spi
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
+@@ -6,8 +6,10 @@ Required properties:
+ - interrupts: Should contain SPI interrupts.
+ - nvidia,dma-request-selector : The Tegra DMA controller's phandle and
+   request selector for this SPI controller.
+-- This is also require clock named "spi" as per binding document
+-  Documentation/devicetree/bindings/clock/clock-bindings.txt
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries:
 +  - spi
  
  Recommended properties:
  - spi-max-frequency: Definition as per
-@@ -26,5 +30,7 @@ spi at 7000d600 {
+@@ -22,5 +24,7 @@ spi at 7000d600 {
+ 	spi-max-frequency = <25000000>;
+ 	#address-cells = <1>;
  	#size-cells = <0>;
- 	clocks = <&tegra_car 44>;
- 	clock-names = "spi";
-+	resets = <&tegra_car 44>;
-+	reset-names = "spi";
++	clocks = <&tegra_car 44>;
++	clock-names = "spi";
  	status = "disabled";
  };
 diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
-index 66e16c7f5939..e144f144717f 100644
+index 7b53da5cb75b..66e16c7f5939 100644
 --- a/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
 +++ b/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
-@@ -8,6 +8,10 @@ Required properties:
+@@ -6,6 +6,8 @@ Required properties:
+ - interrupts: Should contain SFLASH interrupts.
+ - nvidia,dma-request-selector : The Tegra DMA controller's phandle and
    request selector for this SFLASH controller.
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - spi
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  Recommended properties:
  - spi-max-frequency: Definition as per
-@@ -24,5 +28,7 @@ spi at 7000c380 {
+@@ -21,6 +23,6 @@ spi at 7000c380 {
+ 	spi-max-frequency = <25000000>;
  	#address-cells = <1>;
  	#size-cells = <0>;
- 	clocks = <&tegra_car 43>;
-+	resets = <&tegra_car 43>;
-+	reset-names = "spi";
++	clocks = <&tegra_car 43>;
  	status = "disabled";
  };
+-
 diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt
-index 0e6e94eb2b2a..9393e28f444b 100644
+index eefe15e3d95e..0e6e94eb2b2a 100644
 --- a/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt
 +++ b/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt
-@@ -8,6 +8,10 @@ Required properties:
+@@ -6,6 +6,8 @@ Required properties:
+ - interrupts: Should contain SLINK interrupts.
+ - nvidia,dma-request-selector : The Tegra DMA controller's phandle and
    request selector for this SLINK controller.
- - clocks : Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - spi
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
  
  Recommended properties:
  - spi-max-frequency: Definition as per
-@@ -24,5 +28,7 @@ spi at 7000d600 {
+@@ -21,6 +23,6 @@ spi at 7000d600 {
+ 	spi-max-frequency = <25000000>;
  	#address-cells = <1>;
  	#size-cells = <0>;
- 	clocks = <&tegra_car 44>;
-+	resets = <&tegra_car 44>;
-+	reset-names = "spi";
++	clocks = <&tegra_car 44>;
  	status = "disabled";
  };
+-
+diff --git a/Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt b/Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt
+index e019fdc38773..4a864bd10d3d 100644
+--- a/Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt
++++ b/Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt
+@@ -8,6 +8,8 @@ Required properties:
+ - compatible : should be "nvidia,tegra20-timer".
+ - reg : Specifies base physical address and size of the registers.
+ - interrupts : A list of 4 interrupts; one per timer channel.
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
+ 
+ Example:
+ 
+@@ -18,4 +20,5 @@ timer {
+ 			0 1 0x04
+ 			0 41 0x04
+ 			0 42 0x04>;
++	clocks = <&tegra_car 132>;
+ };
+diff --git a/Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt b/Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt
+index 906109d4c593..b5082a1cf461 100644
+--- a/Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt
++++ b/Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt
+@@ -10,6 +10,8 @@ Required properties:
+ - reg : Specifies base physical address and size of the registers.
+ - interrupts : A list of 6 interrupts; one per each of timer channels 1
+     through 5, and one for the shared interrupt for the remaining channels.
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
+ 
+ timer {
+ 	compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
+@@ -20,4 +22,5 @@ timer {
+ 		      0 42 0x04
+ 		      0 121 0x04
+ 		      0 122 0x04>;
++	clocks = <&tegra_car 214>;
+ };
 diff --git a/Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt b/Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt
-index b98d0bdfa248..3dc9140e3dfb 100644
+index df0933043a5b..b98d0bdfa248 100644
 --- a/Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt
 +++ b/Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt
-@@ -10,6 +10,10 @@ Required properties :
+@@ -8,7 +8,8 @@ and additions :
+ Required properties :
+  - compatible : Should be "nvidia,tegra20-ehci".
   - nvidia,phy : phandle of the PHY that the controller is connected to.
-  - clocks : Must contain one entry, for the module clock.
-    See ../clocks/clock-bindings.txt for details.
-+ - resets : Must contain an entry for each entry in reset-names.
-+   See ../reset/reset.txt for details.
-+ - reset-names : Must include the following entries:
-+   - usb
+- - clocks : Contains a single entry which defines the USB controller's clock.
++ - clocks : Must contain one entry, for the module clock.
++   See ../clocks/clock-bindings.txt for details.
  
  Optional properties:
   - nvidia,needs-double-reset : boolean is to be set for some of the Tegra20
