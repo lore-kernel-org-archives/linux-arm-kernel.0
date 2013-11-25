@@ -1,28 +1,19 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 25 Nov 2013 15:47:39 -0200
-Subject: [PATCH] ARM: dts: imx28-evk: Run I2C0 at 400kHz
-Message-ID: <1385401659-22751-1-git-send-email-fabio.estevam@freescale.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Mon, 25 Nov 2013 18:50:38 +0100
+Subject: OMAP build failure after this merge window - caused by usb
+ or phy Kconfig krap
+In-Reply-To: <20131125140927.GP16735@n2100.arm.linux.org.uk>
+References: <20131125140927.GP16735@n2100.arm.linux.org.uk>
+Message-ID: <52938DEE.4030905@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is safe to operate I2C0 at 400kHz as SGTL5000 supports this frequency.
+On 11/25/2013 03:09 PM, Russell King - ARM Linux wrote:
+> which just illustrates why "select" in Kconfig is soo fscking bad that
+> it shouldn't be used.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts | 1 +
- 1 file changed, 1 insertion(+)
+The problem is that instinctively people assume that select is the 
+opposite from depends. Unfortunately, it is not and it is a pitfall for 
+many.
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 41a9834..e4cc44c 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -193,6 +193,7 @@
- 			i2c0: i2c at 80058000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&i2c0_pins_a>;
-+				clock-frequency = <400000>;
- 				status = "okay";
- 
- 				sgtl5000: codec at 0a {
--- 
-1.8.1.2
+Gr. AvS
