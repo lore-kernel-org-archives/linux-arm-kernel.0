@@ -1,71 +1,72 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 25 Nov 2013 16:30:27 +0100
-Subject: [PATCH v2 00/11]: add remaining support for IGEP boards
-In-Reply-To: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CABxcv=k+Lk=PFONKLvXab5iHExG7WCJRfE6BzEkv_YtPVwB8Dw@mail.gmail.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Mon, 25 Nov 2013 23:26:00 +0800
+Subject: ARM: nommu: Boot hang after VFS: Mounted root (ext2 filesystem) on
+ device 1:0.
+Message-ID: <1385393160.4753.4.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 2:06 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> In order to make mach-omap2 Device Tree only, the board file for
-> IGEP boards was removed even when support for wifi and display
-> was still not supported by its DTS.
->
-> This is a second version of a patch-set that adds support for
-> these remaining peripherals and also adds support for USB,
-> HDMI and user LED for the am33xx SoC based IGEP Aquila board.
->
-> The patch-set is composed of the following patches:
->
-> Enric Balletbo i Serra (7):
->       ARM: dts: omap3-igep: Fix bus-width for mmc1.
->       ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
->       ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
->       ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
->       ARM: dts: AM33XX BASE0033: add pinmux and user led support.
->       ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
->       ARM: dts: AM33XX IGEP0033: add USB support.
->
-> Javier Martinez Canillas (4):
->       ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
->       ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
->       ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
->       ARM: dts: omap3-igep0020: name twl4030 VPLL2 regulator as vdds_dsi
->
-> Changes since v1:
->
->  Don't add a workaround in drivers/video/omap2/dss/dpi.c to use the
->  VPLL2 regulator from twl4030 if VDDS_DSI regulator is not linked to
->  the DPI device since the used regulator is a per board configuration.
->
->  Instead add a regulator-name = "vdds_dsi" property to the regulator
->  in the IGEPv2 DTS file as suggested by Tony Lindgren.
->
-> Tony,
->
-> Most of these patches are just DTS changes so they have to be picked
-> by Benoit besides the following patch that has to go through your tree
->
-> [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
->
-> Since we have removed the board file for IGEP boards I think these
-> can be considered as regression fixes for 3.13 although I don't mind
-> if you prefer to wait for 3.14.
->
-> Thanks a lot and best regards,
-> Javier
-> --
+Hi,
+I got hangup at boot after "VFS: Mounted root (ext2 filesystem) on device 1:0.".
+I'm using ext2 initrd as root.
+It seems hangup after mount root, but in the progress of mounting devtmpfs.
 
-Hi Benoit and Tony,
+After debug it, I found it hangs at calling page_cache_release.
+Note, I'm testing on an nommu platform (arm7tdmi) using current Linus' tree
+with patches for this SoC.
 
-Now that 3.13-rc1 is out, do you think that it would be possible to
-include this series as a fix for the -rc cycle?
+Breakpoint 3, ext2_inode_by_name (dir=<optimized out>, child=<optimized out>) at fs/ext2/dir.c:452
+452                     ext2_put_page(page);
+(gdb) bt
+#0  ext2_inode_by_name (dir=<optimized out>, child=<optimized out>) at fs/ext2/dir.c:452
+#1  0x000b0218 in ext2_lookup (dir=0x1cbf8e0, dentry=0x161d390, flags=<optimized out>) at fs/ext2/namei.c:66
+#2  0x0006a160 in lookup_real (dir=<optimized out>, dentry=0x161d390, flags=<optimized out>) at fs/namei.c:1317
+#3  0x0006a5fc in __lookup_hash (name=<optimized out>, base=0x161d228, flags=1) at fs/namei.c:1335
+#4  0x0006b828 in lookup_slow (nd=0x1c19e58, path=0x1c19de0) at fs/namei.c:1446
+#5  0x0006c914 in walk_component (follow=1, path=0x1c19dd8, nd=0x1c19e58) at fs/namei.c:1526
+#6  lookup_last (path=0x1c19dd8, nd=0x1c19e58) at fs/namei.c:1904
+#7  path_lookupat (dfd=<optimized out>, name=0x1640010 "dev", flags=<optimized out>, nd=0x1c19e58) at fs/namei.c:1939
+#8  0x0006cf30 in filename_lookup (dfd=-100, name=0x1c19e30, flags=1, nd=0x1c19e58) at fs/namei.c:1981
+#9  0x0006d000 in do_path_lookup (dfd=-100, name=0x1640010 "dev", flags=1, nd=0x1c19e58) at fs/namei.c:1998
+#10 0x0006d218 in kern_path (name=<optimized out>, flags=<optimized out>, path=0x1c19ee0) at fs/namei.c:2027
+#11 0x0007dbd0 in do_mount (dev_name=0x161d380 "devtmpfs", dir_name=0x1640010 "dev", type_page=0x161d340 "devtmpfs", flags=32768,
+    data_page=0x0 <__vectors_start>) at fs/namespace.c:2363
+#12 0x0007e71c in SYSC_mount (data=0x378620 <reset_devices>, flags=32768, type=<optimized out>, dir_name=<optimized out>,
+    dev_name=0x30a0da "devtmpfs") at fs/namespace.c:2608
+#13 SyS_mount (dev_name=<optimized out>, dir_name=<optimized out>, type=<optimized out>, flags=<optimized out>, data=0) at fs/namespace.c:2582
+#14 0x00123444 in devtmpfs_mount (mntdir=<optimized out>) at drivers/base/devtmpfs.c:363
+#15 0x0033a394 in prepare_namespace () at init/do_mounts.c:593
+#16 0x00339cd0 in kernel_init_freeable () at init/main.c:935
+#17 0x0028b7c0 in kernel_init (unused=<optimized out>) at init/main.c:844
+#18 0x00009000 in ret_from_fork () at arch/arm/kernel/entry-common.S:91
+#19 0x00009000 in ret_from_fork () at arch/arm/kernel/entry-common.S:91
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+(gdb) s
+ext2_put_page (page=<optimized out>) at fs/ext2/dir.c:70
+70              page_cache_release(page);
+(gdb) l
+65      }
+66
+67      static inline void ext2_put_page(struct page *page)
+68      {
+69              kunmap(page);
+70              page_cache_release(page);
+71      }
+72
+73      static inline unsigned long dir_pages(struct inode *inode)
+74      {
+(gdb) s
+ext2_inode_by_name (dir=<optimized out>, child=<optimized out>) at fs/ext2/dir.c:451
+451                     res = le32_to_cpu(de->inode);
+(gdb) s
+452                     ext2_put_page(page);
+(gdb) s
+ext2_put_page (page=0xac4e0 <ext2_inode_by_name+12>) at fs/ext2/dir.c:70
+70              page_cache_release(page);
+(gdb) s         <<< HANG UP
 
-Otherwise we will have missing functionality for IGEP boards on 3.13
-due the board file removal. The changes are mostly DT and won't affect
-other boards.
+I have no idea why it hangs@page_cache_release call.
+I appreciate for comments and advices to debug this.
 
-Thanks a lot and best regards,
-Javier
+Thanks,
+Axel
