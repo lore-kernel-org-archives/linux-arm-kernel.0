@@ -1,89 +1,230 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 25 Nov 2013 15:44:31 -0600
-Subject: [PATCH 2/7] ARM: DRA7xx: hwmod: Add hwmod data for DES IP
-In-Reply-To: <1385415876-12387-1-git-send-email-joelf@ti.com>
-References: <1385415876-12387-1-git-send-email-joelf@ti.com>
-Message-ID: <1385415876-12387-3-git-send-email-joelf@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 14:47:19 -0700
+Subject: [PATCH V3] dma: add channel request API that supports deferred probe
+Message-ID: <1385416039-3170-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7xx SoC has a DES module. Add hwmod data for the same.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
+dma_request_slave_channel() simply returns NULL whenever DMA channel
+lookup fails. Lookup could fail for two distinct reasons:
+
+a) No DMA specification exists for the channel name.
+   This includes situations where no DMA specifications exist at all, or
+   other general lookup problems.
+
+b) A DMA specification does exist, yet the driver for that channel is not
+   yet registered.
+
+Case (b) should trigger deferred probe in client drivers. However, since
+they have no way to differentiate the two situations, it cannot.
+
+Implement new function dma_request_slave_channel_or_err(), which performs
+identically to dma_request_slave_channel(), except that it returns an
+error-pointer rather than NULL, which allows callers to detect when
+deferred probe should occur.
+
+Eventually, all drivers should be converted to this new API, the old API
+removed, and the new API renamed to the more desirable name. This patch
+doesn't convert the existing API and all drivers in one go, since some
+drivers call dma_request_slave_channel() then dma_request_channel() if
+that fails. That would require either modifying dma_request_channel() in
+the same way, or adding extra error-handling code to all affected
+drivers, and there are close to 100 drivers using the other API, rather
+than just the 15-20 or so that use dma_request_slave_channel(), which
+might be tenable in a single patch.
+
+acpi_dma_request_slave_chan_by_name() doesn't currently implement
+deferred probe. It should, but this will be addressed later.
+
+Cc: treding at nvidia.com
+Cc: pdeschrijver at nvidia.com
+Cc: linux-tegra at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: dmaengine at vger.kernel.org
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 39 +++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+v3:
+* s/_or_err/_reason/ in the new API name.
+* Simplify changes to of_dma_request_slave_channel() so that the new
+  "bool defer" parameter is not needed.
+* Revert changes to acpi-dma.c and handle the return value conversion
+  in dma_request_slave_channel_reason() instead.
+* Mention that acpi_dma_request_slave_chan_by_name() should implement
+  deferred probe, but that will happen later.
+v2:
+* include <linux/err.h> in <linux/dmaengine.h>
+* Return -ENODATA if slave_id or chan_id out-of-range.
+* Return an error-pointer not NULL if we can't find a matching DMA
+  controller or translate the channel.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index db32d53..efae736 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -561,6 +561,23 @@ static struct omap_hwmod_class dra7xx_gpio_hwmod_class = {
- 	.rev	= 2,
- };
+This patch is a dependency for:
+* A series that reworks many of the Tegra drivers.
+* A series that enhances ASoC's dmaengine code to support deferred probe.
+
+As such, it needs to go into a topic branch on its own, based directly
+on 3.13-rc1. If the DMA maintainers ack the patches I'm happy to create
+this topic branch myself and send a pull request to the DMA tree. Or the
+patches can be applied to a topic branch by the DMA maintainers and I
+will merge their topic branch into the Tegra rework branch that I
+mentioned.
+---
+ drivers/dma/dmaengine.c   | 35 +++++++++++++++++++++++++++++++----
+ drivers/dma/of-dma.c      | 13 ++++++++-----
+ include/linux/dmaengine.h |  8 ++++++++
+ 3 files changed, 47 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index ea806bdc12ef..e17e9b22d85e 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -540,6 +540,8 @@ EXPORT_SYMBOL_GPL(dma_get_slave_channel);
+  * @mask: capabilities that the channel must satisfy
+  * @fn: optional callback to disposition available channels
+  * @fn_param: opaque parameter to pass to dma_filter_fn
++ *
++ * Returns pointer to appropriate DMA channel on success or NULL.
+  */
+ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+ 				       dma_filter_fn fn, void *fn_param)
+@@ -591,18 +593,43 @@ EXPORT_SYMBOL_GPL(__dma_request_channel);
+  * dma_request_slave_channel - try to allocate an exclusive slave channel
+  * @dev:	pointer to client device structure
+  * @name:	slave channel name
++ *
++ * Returns pointer to appropriate DMA channel on success or an error pointer.
+  */
+-struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name)
++struct dma_chan *dma_request_slave_channel_reason(struct device *dev,
++						  const char *name)
+ {
++	struct dma_chan *chan;
++
+ 	/* If device-tree is present get slave info from here */
+ 	if (dev->of_node)
+ 		return of_dma_request_slave_channel(dev->of_node, name);
  
-+static struct omap_hwmod_class_sysconfig dra7xx_des_sysc = {
-+	.rev_offs	= 0x0030,
-+	.sysc_offs	= 0x0034,
-+	.syss_offs	= 0x0038,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE |
-+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-+			   SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
-+	.sysc_fields	= &omap_hwmod_sysc_type4,
-+};
-+
-+static struct omap_hwmod_class dra7xx_des_hwmod_class = {
-+	.name	= "des",
-+	.sysc	= &dra7xx_des_sysc,
-+	.rev	= 2,
-+};
-+
- /* gpio dev_attr */
- static struct omap_gpio_dev_attr gpio_dev_attr = {
- 	.bank_width	= 32,
-@@ -750,6 +767,19 @@ static struct omap_hwmod dra7xx_gpio8_hwmod = {
- 	.dev_attr	= &gpio_dev_attr,
- };
+ 	/* If device was enumerated by ACPI get slave info from here */
+-	if (ACPI_HANDLE(dev))
+-		return acpi_dma_request_slave_chan_by_name(dev, name);
++	if (ACPI_HANDLE(dev)) {
++		chan = acpi_dma_request_slave_chan_by_name(dev, name);
++		if (chan)
++			return chan;
++	}
  
-+static struct omap_hwmod dra7xx_des_hwmod = {
-+	.name		= "des",
-+	.class		= &dra7xx_des_hwmod_class,
-+	.clkdm_name	= "l4sec_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4SEC_DES3DES_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4SEC_DES3DES_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
+-	return NULL;
++	return ERR_PTR(-ENODEV);
++}
++EXPORT_SYMBOL_GPL(dma_request_slave_channel_reason);
 +
- /*
-  * 'gpmc' class
++/**
++ * dma_request_slave_channel - try to allocate an exclusive slave channel
++ * @dev:	pointer to client device structure
++ * @name:	slave channel name
++ *
++ * Returns pointer to appropriate DMA channel on success or NULL.
++ */
++struct dma_chan *dma_request_slave_channel(struct device *dev,
++					   const char *name)
++{
++	struct dma_chan *ch = dma_request_slave_channel_reason(dev, name);
++	if (IS_ERR(ch))
++		return NULL;
++	return ch;
+ }
+ EXPORT_SYMBOL_GPL(dma_request_slave_channel);
+ 
+diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+index 0b88dd3d05f4..f68e25c9af3a 100644
+--- a/drivers/dma/of-dma.c
++++ b/drivers/dma/of-dma.c
+@@ -143,7 +143,7 @@ static int of_dma_match_channel(struct device_node *np, const char *name,
+  * @np:		device node to get DMA request from
+  * @name:	name of desired channel
   *
-@@ -2171,6 +2201,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__gpio8 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
+- * Returns pointer to appropriate dma channel on success or NULL on error.
++ * Returns pointer to appropriate DMA channel on success or an error pointer.
+  */
+ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 					      const char *name)
+@@ -152,17 +152,18 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 	struct of_dma		*ofdma;
+ 	struct dma_chan		*chan;
+ 	int			count, i;
++	int			ret_no_channel = -ENODEV;
  
-+/* l4_per1 -> des */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per1__des = {
-+	.master		= &dra7xx_l4_per1_hwmod,
-+	.slave		= &dra7xx_des_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_addr_space dra7xx_gpmc_addrs[] = {
- 	{
- 		.pa_start	= 0x50000000,
-@@ -2705,6 +2743,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per1__uart4,
- 	&dra7xx_l4_per1__uart5,
- 	&dra7xx_l4_per1__uart6,
-+	&dra7xx_l4_per1__des,
- 	&dra7xx_l4_per3__usb_otg_ss1,
- 	&dra7xx_l4_per3__usb_otg_ss2,
- 	&dra7xx_l4_per3__usb_otg_ss3,
+ 	if (!np || !name) {
+ 		pr_err("%s: not enough information provided\n", __func__);
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 	}
+ 
+ 	count = of_property_count_strings(np, "dma-names");
+ 	if (count < 0) {
+ 		pr_err("%s: dma-names property of node '%s' missing or empty\n",
+ 			__func__, np->full_name);
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 	}
+ 
+ 	for (i = 0; i < count; i++) {
+@@ -174,8 +175,10 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 
+ 		if (ofdma)
+ 			chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
+-		else
++		else {
++			ret_no_channel = -EPROBE_DEFER;
+ 			chan = NULL;
++		}
+ 
+ 		mutex_unlock(&of_dma_lock);
+ 
+@@ -185,7 +188,7 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 			return chan;
+ 	}
+ 
+-	return NULL;
++	return ERR_PTR(ret_no_channel);
+ }
+ 
+ /**
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 41cf0c399288..ed92b30a02fd 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -22,6 +22,7 @@
+ #define LINUX_DMAENGINE_H
+ 
+ #include <linux/device.h>
++#include <linux/err.h>
+ #include <linux/uio.h>
+ #include <linux/bug.h>
+ #include <linux/scatterlist.h>
+@@ -1040,6 +1041,8 @@ enum dma_status dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx);
+ void dma_issue_pending_all(void);
+ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+ 					dma_filter_fn fn, void *fn_param);
++struct dma_chan *dma_request_slave_channel_reason(struct device *dev,
++						  const char *name);
+ struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name);
+ void dma_release_channel(struct dma_chan *chan);
+ #else
+@@ -1063,6 +1066,11 @@ static inline struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
+ {
+ 	return NULL;
+ }
++static inline struct dma_chan *dma_request_slave_channel_reason(
++					struct device *dev, const char *name)
++{
++	return ERR_PTR(-ENODEV);
++}
+ static inline struct dma_chan *dma_request_slave_channel(struct device *dev,
+ 							 const char *name)
+ {
 -- 
-1.8.1.2
+1.8.1.5
