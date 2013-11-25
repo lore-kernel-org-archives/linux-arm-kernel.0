@@ -1,42 +1,134 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Nov 2013 10:26:46 -0800
-Subject: [PATCH v4 REPOST] ARM: vexpress/TC2: Implement MCPM
- power_down_finish()
-In-Reply-To: <alpine.LFD.2.10.1311251259400.9667@knanqh.ubzr>
-References: <1385396185-15291-1-git-send-email-Dave.Martin@arm.com>
- <CAOesGMjcNhqUikHhP-Jx5cHUocHQUTPW9p5ikwwQxbMSFM7hvQ@mail.gmail.com>
- <alpine.LFD.2.10.1311251259400.9667@knanqh.ubzr>
-Message-ID: <CAOesGMgVud7hX-wDtywt9_gkCDcuCgyXbm+CQG1kxjfCthLK2w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Nov 2013 18:41:59 +0000
+Subject: [PATCH V5 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1385372753-7396-3-git-send-email-vkale@apm.com>
+References: <1385372753-7396-1-git-send-email-vkale@apm.com>
+ <1385372753-7396-3-git-send-email-vkale@apm.com>
+Message-ID: <20131125184159.GE28201@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 10:02 AM, Nicolas Pitre
-<nicolas.pitre@linaro.org> wrote:
-> On Mon, 25 Nov 2013, Olof Johansson wrote:
->
->> Hi,
->>
->> > Since v3.13-rc1, mcpm backends must implement an additional method which
->> > the vexpress TC2 implementation doesn't have upstream, resulting in an
->> > ugly WARN_ON() during hotplug and kexec operations
->>
->> Please be more specific here. Which change in the 3.13 merge window caused this?
->
-> Commit 0de0d6467525.
->
-> The corresponding change to tc2-pm.c was initially posted at about the
-> same time i.e. before the merge window, but it somehow fell into a
-> crack.
+On Mon, Nov 25, 2013 at 09:45:53AM +0000, Vinayak Kale wrote:
+> Add support for irq registration when pmu interrupt is percpu.
+> 
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
+>  1 file changed, 81 insertions(+), 27 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index cea1594..a2efab3 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -22,6 +22,7 @@
+>  
+>  #include <linux/bitmap.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/export.h>
+>  #include <linux/perf_event.h>
+> @@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
+>  }
+>  
+>  static void
+> +armpmu_disable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = data;
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +	disable_percpu_irq(irq);
+> +}
+> +
+> +static void
+>  armpmu_release_hardware(struct arm_pmu *armpmu)
+>  {
+>  	int i, irq, irqs;
+>  	struct platform_device *pmu_device = armpmu->plat_device;
+>  
+>  	irqs = min(pmu_device->num_resources, num_possible_cpus());
+> +	if (irqs < 1)
 
-Thanks, I'll add that reference to the patch description when I apply.
+Can you just make irqs unsigned, then do if (!irqs) instead?
 
-Looks like the MCPM-side patch was posted already back in Oct 1. I'm
-not going to flame anyone over this, but it'd be nice if we could find
-out about these things sooner, ideally when breakage hits -next. Dave,
-next time I think I'd prefer to hear about it even if it is during the
-merge window. :-)
+> +		return;
+>  
+> -	for (i = 0; i < irqs; ++i) {
+> -		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+> -			continue;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq >= 0)
+> -			free_irq(irq, armpmu);
+> +	irq = platform_get_irq(pmu_device, 0);
+> +	if (irq <= 0)
+> +		return;
+> +
+> +	if (irq_is_percpu(irq)) {
+> +		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
+> +		free_percpu_irq(irq, &cpu_hw_events);
+> +	} else {
+> +		for (i = 0; i < irqs; ++i) {
+> +			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+> +				continue;
+> +			irq = platform_get_irq(pmu_device, i);
+> +			if (irq > 0)
+> +				free_irq(irq, armpmu);
+> +		}
+>  	}
+>  }
+>  
+> +static void
+> +armpmu_enable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = data;
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	enable_percpu_irq(irq, 0);
 
-Anyway, obviously it's needed and I'll apply it.
+IRQ_TYPE_NONE?
 
+> +	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +}
+> +
+>  static int
+>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  {
+> @@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  		return -ENODEV;
+>  	}
+>  
+> -	for (i = 0; i < irqs; ++i) {
+> -		err = 0;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq < 0)
+> -			continue;
+> +	irq = platform_get_irq(pmu_device, 0);
+> +	if (irq <= 0) {
+> +		pr_err("failed to get valid irq for PMU device\n");
+> +		return -ENODEV;
+> +	}
+>  
+> -		/*
+> -		 * If we have a single PMU interrupt that we can't shift,
+> -		 * assume that we're running on a uniprocessor machine and
+> -		 * continue. Otherwise, continue without this interrupt.
+> -		 */
+> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> -				    irq, i);
+> -			continue;
+> -		}
+> +	if (irq_is_percpu(irq)) {
+> +		err = request_percpu_irq(irq, armpmu->handle_irq,
+> +				"arm-pmu", &cpu_hw_events);
 
--Olof
+This is a bit of a kludge passing in the cpu_hw_events as the per-cpu token,
+but I guess that will do for now. There is potential for something like a
+master-aware L2 PMU which uses PPIs and expects to pass something different
+back to the IRQ handler.
+
+Will
