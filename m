@@ -1,60 +1,23 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 25 Nov 2013 09:38:49 +0100
-Subject: [PATCH RESEND] ASoC: clk: probe defer when clock not yet ready
-Message-ID: <20131125093849.5fadc450@armhf>
+From: denis.ciocca@st.com (Denis CIOCCA)
+Date: Mon, 25 Nov 2013 09:37:26 +0100
+Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
+ gyroscopes
+In-Reply-To: <52926901.9080004@kernel.org>
+References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
+ <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
+ <52926901.9080004@kernel.org>
+Message-ID: <52930C46.801@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At probe time, a clock device may not be ready when some other device
-wants to use it. 
+Hi Jonathan,
+>> Yes, it is, but only for i2c as far as I'm aware, and usually the DT compatibles are with - as a separator (I
+>> looked into the ePAPR, but couldn't get any explanations or requirements on this, even though it's used in all of
+>> their examples)
+> In other discussions, where the defacto i2c device tree bindings have
+> been followed, the conclusion has been that to change to a - from _
+> would result in userspace ABI changes, so whilst no one wants _
+> the discussion has concluded we can't really avoid it.
+Ok, I understood the point. Thanks,
 
-This patch lets the functions clk_get/devm_clk_get return a probe defer
-when the clock is defined in the DT but not yet available.
-
-It also fixes an erroneous call to clk_get_sys() when __clk_get() fails.
-
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-resend: - patch subject change from
-   [PATCH v3 1/2] ASoC: kirkwood: clk: probe defer when clock not yet ready
-	- base kernel 3.13.0-rc1
-v2: fix __clk_get() failure (from Russell King)
----
- drivers/clk/clk.c    | 2 +-
- drivers/clk/clkdev.c | 7 ++++++-
- 2 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2cf2ea6..41361c6 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2187,7 +2187,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
- {
- 	struct of_clk_provider *provider;
--	struct clk *clk = ERR_PTR(-ENOENT);
-+	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
- 
- 	/* Check if we have such a provider in our array */
- 	mutex_lock(&of_clk_lock);
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 442a313..1f402b9 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -157,7 +157,12 @@ struct clk *clk_get(struct device *dev, const char *con_id)
- 
- 	if (dev) {
- 		clk = of_clk_get_by_name(dev->of_node, con_id);
--		if (!IS_ERR(clk) && __clk_get(clk))
-+		if (!IS_ERR(clk)) {
-+			if (!__clk_get(clk))
-+				clk = ERR_PTR(-ENOENT);
-+			return clk;
-+		}
-+		if (PTR_ERR(clk) == -EPROBE_DEFER)
- 			return clk;
- 	}
- 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Denis
