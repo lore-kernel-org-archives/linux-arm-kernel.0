@@ -1,35 +1,110 @@
 From: w-kwok2@ti.com (WingMan Kwok)
-Date: Mon, 25 Nov 2013 15:16:18 -0500
-Subject: [PATCH 0/3] Kesytone II USB support
-Message-ID: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+Date: Mon, 25 Nov 2013 15:16:20 -0500
+Subject: [PATCH 2/3] ARM: dts: keystone: Add usb devicetree bindings
+In-Reply-To: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+Message-ID: <1385410581-12148-3-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Series adds USB host support for Keystone SOCs. Keystone SOCs uses dwc3
-hardware IP implementation.  On Keystone II platforms, we use no-op phy
-driver.
+Added device tree support for TI's Keystone USB driver and updated the
+Documentation with device tree binding information.
 
-All three patches are posted together just for completeness. Only first patch
-is expected to go via usb tree and other two via linux-keystone tree.
-
-Patchset are tested on Keystone II EVM with USB2.0 and USB3.0 flash drives.
+On Keystone II platforms, we use no-op phy driver.
 
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-WingMan Kwok (3):
-  usb: dwc3: Add Keystone specific glue layer
-  ARM: dts: keystone: Add usb devicetree bindings
-  ARM: keystone: defconfig: enable USB host mode support
-
- .../devicetree/bindings/usb/keystone-usb.txt       |   43 ++++
- arch/arm/boot/dts/keystone.dtsi                    |   27 ++
- arch/arm/configs/keystone_defconfig                |   20 +-
- drivers/usb/dwc3/Kconfig                           |    7 +
- drivers/usb/dwc3/Makefile                          |    1 +
- drivers/usb/dwc3/dwc3-keystone.c                   |  272 ++++++++++++++++++++
- 6 files changed, 369 insertions(+), 1 deletion(-)
+Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+---
+ .../devicetree/bindings/usb/keystone-usb.txt       |   43 ++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dtsi                    |   27 ++++++++++++
+ 2 files changed, 70 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/usb/keystone-usb.txt
- create mode 100644 drivers/usb/dwc3/dwc3-keystone.c
 
+diff --git a/Documentation/devicetree/bindings/usb/keystone-usb.txt b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+new file mode 100644
+index 0000000..a67de8f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+@@ -0,0 +1,43 @@
++TI Keystone Soc USB Controller
++
++DWC3 GLUE
++
++Required properties:
++ - compatible: should be "ti,keystone-dwc3".
++ - #address-cells, #size-cells : should be '1' if the device has sub-nodes
++   with 'reg' property.
++ - reg : Address and length of the register set for the device. First pair
++   is the USB subsystem specific register set.  Second pair is the
++   USB subsystem PHY control register set.
++ - interrupts : The irq number of this device that is used to interrupt the
++   MPU.
++ - ranges: allows valid 1:1 translation between child's address space and
++   parent's address space.
++ - clocks: Clock IDs array as required by the controller.
++ - clock-names: names of clocks correseponding to IDs in the clock property.
++
++Sub-nodes:
++The dwc3 core should be added as subnode to Keystone DWC3 glue.
++- dwc3 :
++   The binding details of dwc3 can be found in:
++   Documentation/devicetree/bindings/usb/dwc3.txt
++
++Example:
++	usb: usb at 2680000 {
++		compatible = "ti,keystone-dwc3";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x2680000 0x10000
++		       0x2620738 32>;
++		clocks = <&clkusb>;
++		clock-names = "usb";
++		interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++		ranges;
++
++		dwc3 at 2690000 {
++			compatible = "synopsys,dwc3";
++			reg = <0x2690000 0x70000>;
++			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++			usb-phy = <&usb2_phy>, <&usb3_phy>;
++		};
++	};
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index f6d6d9e..1e1049c 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -181,5 +181,32 @@
+ 			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
+ 			clocks = <&clkspi>;
+ 		};
++
++		usb2_phy: usb2_phy {
++			compatible = "usb-nop-xceiv";
++		};
++
++		usb3_phy: usb3_phy {
++			compatible = "usb-nop-xceiv";
++		};
++
++		usb: usb at 2680000 {
++			compatible = "ti,keystone-dwc3";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x2680000 0x10000
++			       0x2620738 32>;
++			clocks = <&clkusb>;
++			clock-names = "usb";
++			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++			ranges;
++
++			dwc3 at 2690000 {
++				compatible = "synopsys,dwc3";
++				reg = <0x2690000 0x70000>;
++				interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++				usb-phy = <&usb2_phy>, <&usb3_phy>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
