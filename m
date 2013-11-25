@@ -1,179 +1,78 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Nov 2013 10:25:50 +0100
+Date: Mon, 25 Nov 2013 10:34:35 +0100
 Subject: [PATCH] of/platform: Fix no irq domain found errors when
  populating interrupts
-In-Reply-To: <20131124213651.59750C402C3@trevor.secretlab.ca>
+In-Reply-To: <20131123163240.GW5928@atomide.com>
 References: <20131123004334.GJ10023@atomide.com>
- <20131124213651.59750C402C3@trevor.secretlab.ca>
-Message-ID: <20131125092549.GD22043@ulmo.nvidia.com>
+ <20131123005509.GJ16735@n2100.arm.linux.org.uk>
+ <20131123010850.GN10023@atomide.com>
+ <20131123011515.GO10023@atomide.com>
+ <20131123015034.GP10023@atomide.com>
+ <CAL_JsqKV7K+QdLHS+3LtfcVx5Dpc7n6A8UwwNWKBP33Gs19c8g@mail.gmail.com>
+ <20131123163240.GW5928@atomide.com>
+Message-ID: <20131125093434.GE22043@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 24, 2013 at 09:36:51PM +0000, Grant Likely wrote:
-> On Fri, 22 Nov 2013 16:43:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > Currently we get the following kind of errors if we try to use
-> > interrupt phandles to irqchips that have not yet initialized:
+On Sat, Nov 23, 2013 at 08:32:40AM -0800, Tony Lindgren wrote:
+> * Rob Herring <robherring2@gmail.com> [131123 07:43]:
+> > On Fri, Nov 22, 2013 at 7:50 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
+> > >> * Tony Lindgren <tony@atomide.com> [131122 17:09]:
+> > >> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
+> > >> > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
+> > >> > > > +               /* See of_device_resource_notify for populating interrupts */
+> > >> > > > +               for (i = 0; i < num_irq; i++, res++) {
+> > >> > > > +                       res->flags = IORESOURCE_IRQ;
+> > >> > > > +                       res->start = -EPROBE_DEFER;
+> > >> > > > +                       res->end = -EPROBE_DEFER;
+> > >> > >
+> > >> > > NAK.  Definitely a bad idea to start introducing magic values other into
+> > >> > > resources.  Please don't do this.
+> > >> >
+> > >> > Do you have any better ideas on how to sort out this issue then?
+> > >>
+> > >> I guess we could allocate all the resources lazily here, I'll take a look
+> > >> at that.
+> > >
+> > > Here's a version that allocates the resources lazily with the notifier.
+> > > Seems to boot, need to play with it a bit more though to make sure we're
+> > > not overwriting resources for any legacy devices.
 > > 
-> > irq: no irq domain found for /ocp/pinmux at 48002030 !
-> > WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
-> > Modules linked in:
-> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
-> > (show_stack+0x14/0x1c)
-> > (dump_stack+0x6c/0xa0)
-> > (warn_slowpath_common+0x64/0x84)
-> > (warn_slowpath_null+0x1c/0x24)
-> > (of_device_alloc+0x144/0x184)
-> > (of_platform_device_create_pdata+0x44/0x9c)
-> > (of_platform_bus_create+0xd0/0x170)
-> > (of_platform_bus_create+0x12c/0x170)
-> > (of_platform_populate+0x60/0x98)
-> > ...
-> > 
-> > This is because we're wrongly trying to populate resources that are not
-> > yet available. It's perfectly valid to create irqchips dynamically,
-> > so let's fix up the issue by populating the interrupt resources based
-> > on a notifier call instead.
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > ---
-> > 
-> > Rob & Grant, care to merge this for the -rc if this looks OK to you?
-> > 
-> > These happen for example when using interrupts-extended for omap
-> > wake-up interrupts where the irq domain is created by pinctrl-single.c
-> > at module_init time.
-> > 
-> > --- a/drivers/of/platform.c
-> > +++ b/drivers/of/platform.c
-> > @@ -130,6 +130,56 @@ void of_device_make_bus_id(struct device *dev)
-> >  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
-> >  }
-> >  
-> > +/*
-> > + * The device interrupts are not necessarily available for all
-> > + * irqdomains initially so we need to populate them using a
-> > + * notifier.
-> > + */
-> > +static int of_device_resource_notify(struct notifier_block *nb,
-> > +				     unsigned long event, void *dev)
-> > +{
-> > +	struct platform_device *pdev = to_platform_device(dev);
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	struct resource *res = pdev->resource;
-> > +	struct resource *irqr = NULL;
-> > +	int num_irq, i, found = 0;
-> > +
-> > +	if (event != BUS_NOTIFY_BIND_DRIVER)
-> > +		return 0;
-> > +
-> > +	if (!np)
-> > +		goto out;
-> > +
-> > +	num_irq = of_irq_count(np);
-> > +	if (!num_irq)
-> > +		goto out;
-> > +
-> > +	for (i = 0; i < pdev->num_resources; i++, res++) {
-> > +		if (res->flags != IORESOURCE_IRQ ||
-> > +		    res->start != -EPROBE_DEFER ||
-> > +		    res->end != -EPROBE_DEFER)
-> > +			continue;
-> > +
-> > +		if (!irqr)
-> > +			irqr = res;
-> > +		found++;
-> > +	}
-> > +
-> > +	if (!found)
-> > +		goto out;
-> > +
-> > +	if (found != num_irq) {
-> > +		dev_WARN(dev, "error populating irq resources: %i != %i\n",
-> > +			 found, num_irq);
-> > +		goto out;
-> > +	}
-> > +
-> > +	WARN_ON(of_irq_to_resource_table(np, irqr, num_irq) != num_irq);
-> > +
-> > +out:
-> > +	return NOTIFY_DONE;
-> > +}
-> > +
-> >  /**
-> >   * of_device_alloc - Allocate and initialize an of_device
-> >   * @np: device node to assign to device
-> > @@ -168,7 +218,13 @@ struct platform_device *of_device_alloc(struct device_node *np,
-> >  			rc = of_address_to_resource(np, i, res);
-> >  			WARN_ON(rc);
-> >  		}
-> > -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
-> > +
-> > +		/* See of_device_resource_notify for populating interrupts */
-> > +		for (i = 0; i < num_irq; i++, res++) {
-> > +			res->flags = IORESOURCE_IRQ;
-> > +			res->start = -EPROBE_DEFER;
-> > +			res->end = -EPROBE_DEFER;
-> > +		}
+> > Have you seen Thierry's series[1]? While your approach is certainly
+> > more concise, it seems like a work-around for the problem. I don't
+> > think a notifier is the right long term solution.
 > 
-> I actually like the idea of completely allocating the resource structure
-> but leaving some entries empty. However, I agree with rmk that putting
-> garbage into a resource structure is a bad idea. What about changing the
-> value of flags to 0 or some other value to be obviously an empty
-> property and give the follow up parsing some context about which ones it
-> needs to attempt to recalculate?
+> OK cool. I think we can fix the $Subject bug first without making all
+> those changes, then do the rest of the reorg for v3.14.
+> 
+> The bug is that we try to populate IRQ resources at a wrong time
+> when they may not exist.
+> 
+> Based on a quick look it seems we could combine Thierry's addition
+> of the new function of_platform_probe(struct platform_device *pdev)
+> and use that to allocate all resources at driver probe time like my
+> patch is doing. And then there's no need for the notifier.
 
-When I worked on this a while back I came to the same conclusion. It's
-nice to allocate all the resources at once, because the number of them
-doesn't change, only their actually values.
+My series already does the allocation at probe time as well. That was
+the whole point. The reason why I added of_platform_probe() is because I
+think we'll be needing this for other types of resources in the future
+as well, so it could serve as a central place to do all of that.
 
-However it seems to me like there's no way with the way platform_device
-is currently defined to pass along enough context to allow it to obtain
-the correct set of resources that need to be populated.
-
-We can't really set flags to 0 because then we loose all information
-about the type of resource, which is the only thing that could remotely
-be used to track interrupt-type resources and recalculate only those. I
-was looking at perhaps modifying the platform_device struct to use a
-different means of storing the resources that would make this easier.
-One possibility would be to add per-type arrays or lists of resources.
-That way we could simply remove the complete list of interrupts and redo
-them each time probing is deferred.
-
-However it looks like a whole lot of code currently relies on knowing
-the internals of struct platform_device, so that will likely turn into a
-nightmare patchset. coccinelle could possibly be very helpful here,
-though.
-
-Perhaps a backwards-compatible way would be to add some fields that keep
-track of where in the single array of struct resource:s the interrupts
-start and then overwrite the values, while at the same time not having
-to reallocate memory all the time. It's slightly hackish and I fear if
-we don't clean up after that we'll run the risk of cluttering up the
-structure eventually.
-
-I'm wondering if long term (well, really long-term) it might be better
-to move away from platform_device completely, given how various people
-have said that they don't like them and rather have them not exist at
-all. I haven't quite seen anyone explicitly stating why or what an
-alternative would look like, but perhaps someone can educate me.
-
-> However, I still don't like the notifier approach of actually triggering
-> the fixup. We need something better.
-
-I don't either. Notifiers are really not suitable for this in my
-opinion. We've had this discussion before in the context of Hiroshi's
-IOMMU patches, and they don't allow errors to be propagated easily. They
-also are a very decentralized way to do things and therefore better
-suited to do things that are really driver-specific. For something that
-every device requires (such as interrupt reference resolution), a change
-to the core seems like a more desirable approach to me.
+There was also a proposal[0] by Arnd a few weeks ago that solved this in
+a more generic way. I've said it before, and I'll say again that the
+idea scares me somewhat, but it does solve some interesting aspects and
+has the potential to get rid of a whole lot of boilerplate code. While
+the original purpose was to handle all things devm_*(), I suspect that
+same mechanism could be used to resolve DT references at probe time.
 
 Thierry
+
+[0]: http://www.spinics.net/lists/devicetree/msg10684.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/71c1f060/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/dced6001/attachment.sig>
