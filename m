@@ -1,97 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Nov 2013 17:18:53 +0000
-Subject: ARM: v3.13-rc1: USB regression
-In-Reply-To: <20131125163302.GD24645@blackmetal.musicnaut.iki.fi>
-References: <20131124222247.GC24645@blackmetal.musicnaut.iki.fi>
- <20131124224359.GE25039@n2100.arm.linux.org.uk>
- <20131125163302.GD24645@blackmetal.musicnaut.iki.fi>
-Message-ID: <20131125171853.GF25039@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 10:26:18 -0700
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <20131123003442.GH16735@n2100.arm.linux.org.uk>
+References: <CAPcyv4hjJDOq+qEvuCG32PLQcWeHVyeVDCy=5UM8KX445OxY_w@mail.gmail.com>
+ <528D0C06.9080006@wwwdotorg.org>
+ <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+ <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+ <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <20131123003442.GH16735@n2100.arm.linux.org.uk>
+Message-ID: <5293883A.8050808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 06:33:02PM +0200, Aaro Koskinen wrote:
-> Hi,
-> 
-> On Sun, Nov 24, 2013 at 10:43:59PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 25, 2013 at 12:22:47AM +0200, Aaro Koskinen wrote:
-> > > [   33.967324] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
-> > > 
-> > > I bisected this to 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 (ARM: DMA-API:
-> > > better handing of DMA masks for coherent allocations). Reverting that
-> > > commit makes the USB work again fine.
-> 
-> [...]
-> 
-> > Better would be:
-> > 
-> > #define __arch_dma_to_pfn(dev, addr)	\
-> > 	({ unsigned long pfn = (addr) >> PAGE_SHIFT;		\
-> > 	   if (is_lbus_device(dev))				\
-> > 		pfn += PHYS_PFN_OFFSET - 			\
-> > 			(OMAP1510_LB_OFFSET >> PAGE_SHIFT);	\
-> > 	   pfn;							\
-> > 	})
-> > 
-> > Can you try that in arch/arm/mach-omap1/include/mach/memory.h please?
-> 
-> Still doesn't work:
-> 
-> [   33.878790] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xfffe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
-> [   33.894019] ohci ohci: can't setup: -12
+On 11/22/2013 05:34 PM, Russell King - ARM Linux wrote:
+[... various discussions re: IS_ERR, IS_ERR_OR_NULL, etc.]
 
-Well, that looks technically better, rather unfortunate that we end up
-going to negative PFNs though.
+Russell, so if we document dma_request_slave_channel() as follows:
 
-Without that change, could you try this instead please:
+> /*
+>  * dma_request_slave_channel - try to allocate an exclusive slave channel
+> ...
+>  * Returns pointer to appropriate DMA channel on success or an error pointer.
+>  * In order to ease compatibility with other DMA request APIs, this function
+>  * guarantees NEVER to return NULL.
+>  */
 
- arch/arm/mm/dma-mapping.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
+Are you then OK with clients doing either of e.g.:
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index f0ea0134e5a3..a18cfc53f445 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -9,6 +9,7 @@
-  *
-  *  DMA uncached mapping support.
-  */
-+#include <linux/bootmem.h>
- #include <linux/module.h>
- #include <linux/mm.h>
- #include <linux/gfp.h>
-@@ -162,6 +163,8 @@ static u64 get_coherent_dma_mask(struct device *dev)
- 	u64 mask = (u64)DMA_BIT_MASK(32);
- 
- 	if (dev) {
-+		unsigned long max_dma_pfn;
-+
- 		mask = dev->coherent_dma_mask;
- 
- 		/*
-@@ -173,6 +176,8 @@ static u64 get_coherent_dma_mask(struct device *dev)
- 			return 0;
- 		}
- 
-+		max_dma_pfn = min(max_pfn, arm_dma_pfn_limit);
-+
- 		/*
- 		 * If the mask allows for more memory than we can address,
- 		 * and we actually have that much memory, then fail the
-@@ -180,7 +185,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
- 		 */
- 		if (sizeof(mask) != sizeof(dma_addr_t) &&
- 		    mask > (dma_addr_t)~0 &&
--		    dma_to_pfn(dev, ~0) > arm_dma_pfn_limit) {
-+		    dma_to_pfn(dev, ~0) > max_dma_pfn) {
- 			dev_warn(dev, "Coherent DMA mask %#llx is larger than dma_addr_t allows\n",
- 				 mask);
- 			dev_warn(dev, "Driver did not use or check the return value from dma_set_coherent_mask()?\n");
-@@ -192,7 +197,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
- 		 * fits within the allowable addresses which we can
- 		 * allocate.
- 		 */
--		if (dma_to_pfn(dev, mask) < arm_dma_pfn_limit) {
-+		if (dma_to_pfn(dev, mask) < max_dma_pfn) {
- 			dev_warn(dev, "Coherent DMA mask %#llx (pfn %#lx-%#lx) covers a smaller range of system memory than the DMA zone pfn 0x0-%#lx\n",
- 				 mask,
- 				 dma_to_pfn(dev, 0), dma_to_pfn(dev, mask) + 1,
+chan = dma_request_slave_channel(...);
+if (IS_ERR(chan))
+	// This returns NULL or a valid handle/pointer
+	chan = dma_request_channel()
+if (!chan)
+	Here, chan is invalid;
+	return;
+Here, chan is valid
+
+or:
+
+if (xxx) {
+	chan = dma_request_slave_channel(...);
+	// Convert to same error value as else{} block generates
+	if (IS_ERR(chan))
+		chan = NULL
+} else {
+	// This returns NULL or a valid handle/pointer
+	chan = dma_request_channel()
+}
+if (!chan)
+	Here, chan is invalid
+	return;
+Here, chan is valid
