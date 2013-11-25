@@ -1,59 +1,61 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 25 Nov 2013 16:56:43 +0200
-Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <52935BAD.9080908@ti.com>
-References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52935BAD.9080908@ti.com>
-Message-ID: <5293652B.80402@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 25 Nov 2013 07:09:17 -0800
+Subject: [PATCH 2/2] ARM: OMAP5: Add HYP mode entry support for secondary
+ CPUs
+In-Reply-To: <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
+ <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 04:16 PM, Santosh Shilimkar wrote:
-> Ivan,
+On 23 November 2013 16:07, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+> Boot-CPU entry into the HYP mode is managed in boot-loader but
+> the secondary CPUs directly jumps to kernel during boot. Same
+> path is also used for CPU hotplug as well during suspend for
+> secondary CPU.
 >
-> On Monday 25 November 2013 09:04 AM, Ivan Khoronzhuk wrote:
->> To reduce code duplicate and increase code readability use WDT core
->> code to handle WDT interface.
->>
->> Remove io_lock as the WDT core uses mutex to lock each wdt device.
->> Remove wdt_state as the WDT core tracks state with its own variable.
->>
->> The watchdog_init_timeout() can read timeout value from timeout-sec
->> property if the passed value is out of bounds. The heartbeat is
->> initialized in next way. If heartbeat is not set thought module
->> parameter, try to read it's value from WDT node timeout-sec property.
->> If node has no one, use default value.
->>
->> The heartbeat is hold in wdd->timeout by WDT core, so use it in
->> order to set timeout period.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> Hence patch the secondary CPU boot path for hyp mode etry.
 >
-> Minor suggestion regarding the SOB line which applies to
-> rest of the series as well. Typically your SOB line
-> should be the last one like below.
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap-headsmp.S |    7 +++++++
+>  1 file changed, 7 insertions(+)
 >
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+> index 75e9295..4844dd8 100644
+> --- a/arch/arm/mach-omap2/omap-headsmp.S
+> +++ b/arch/arm/mach-omap2/omap-headsmp.S
+> @@ -22,6 +22,7 @@
 >
-> No need to repost the series just for that. The last
-> patch as I commented earlier, needs to be separate
-> patch which will go via linux-keystone tree.
+>  /* Physical address needed since MMU not enabled yet on secondary core */
+>  #define AUX_CORE_BOOT0_PA                      0x48281800
+> +#define API_HYP_ENTRY                          0x102
 >
-> Once the watchdog maintainer is happy with rest of the
-> series and applies it, I will pick last patch.
->
-> Regards,
-> Santosh
->
+>  /*
+>   * OMAP5 specific entry point for secondary CPU to jump from ROM
+> @@ -38,6 +39,12 @@ wait:        ldr     r2, =AUX_CORE_BOOT0_PA  @ read from AuxCoreBoot0
+>         and     r4, r4, #0x0f
+>         cmp     r0, r4
+>         bne     wait
+> +#ifdef CONFIG_KVM_ARM_HOST
+> +       ldr     r12, =API_HYP_ENTRY
+> +       adr     r0, hyp_boot
+> +       smc     #0
+> +hyp_boot:
+> +#endif
+>         b       secondary_startup
+>  END(omap5_secondary_startup)
+>  /*
 
-Thanks, Santosh
-I'll take note.
+hmm, this means that currently running this in a guest will fail to
+bring-up SMP, right?
 
--- 
-Regards,
-Ivan Khoronzhuk
+Couldn't you create a little wrapper-pen in U-Boot instead, which
+replicates the omap boot protocol and takes care of the hyp-mode
+startup there instead, keeping this completely out of the kernel?
+
+-Christoffer
