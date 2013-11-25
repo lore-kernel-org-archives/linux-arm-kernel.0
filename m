@@ -1,42 +1,30 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 25 Nov 2013 21:27:47 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzJdIEFSTSBpLk1YNTogc2V0IENBTiBwZXJpcGhlcmFs?=
- =?UTF-8?B?IGNsb2NrIHRvIDI0IE1IeiBwYXJlbnQ=?=
-In-Reply-To: <1385399751-19109-3-git-send-email-mkl@pengutronix.de>
-References: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
- <1385399751-19109-3-git-send-email-mkl@pengutronix.de>
-Message-ID: <1385400467.906340545@f177.i.mail.ru>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 Nov 2013 17:29:04 +0000
+Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
+In-Reply-To: <CAOMZO5DW3pSxPGe6N0CRiCEc+iVV9X_13JbzAvuFbb4jide+zw@mail.gmail.com>
+References: <20131122142231.GA1741@ulmo.nvidia.com>
+ <20131122145224.GO14725@sirena.org.uk>
+ <20131125031029.GC11613@S2101-09.ap.freescale.net>
+ <CAOMZO5CtNnma8Sv35P3jeNYQiLV=jdmN0Q7w2_LFMOj-nTbPZg@mail.gmail.com>
+ <20131125133659.GA30476@S2101-09.ap.freescale.net>
+ <CAOMZO5DW3pSxPGe6N0CRiCEc+iVV9X_13JbzAvuFbb4jide+zw@mail.gmail.com>
+Message-ID: <20131125172904.GP14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch sets the parent of CAN peripheral clock (a.k.a. CPI clock) to the
-> lp_apm clock, which has a rate of 24 MHz.
-> 
-> In the CAN world a base clock with multiple of 8 MHz is suited best for all CIA
-> recommented bit rates. Without this patch the CAN peripheral clock on i.MX53
-> has a rate of 66.666 MHz which produces quite large bit rate errors.
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index e349fd5..28f7f3f 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -306,6 +306,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	/* move usb phy clk to 24MHz */
->  	clk_set_parent(clk[IMX5_CLK_USB_PHY_SEL], clk[IMX5_CLK_OSC]);
->  
-> +	/* move can bus clk to 24MHz */
-> +	clk_set_parent(clk[IMX5_CLK_CAN_SEL], clk[IMX5_CLK_LP_APM]);
-> +
->  	clk_prepare_enable(clk[IMX5_CLK_GPC_DVFS]);
->  	clk_prepare_enable(clk[IMX5_CLK_AHB_MAX]); /* esdhc3 */
->  	clk_prepare_enable(clk[IMX5_CLK_AIPS_TZ1]);
-> -- 
+On Mon, Nov 25, 2013 at 12:43:58PM -0200, Fabio Estevam wrote:
 
-Again, CAN is missing on i.MX51, so this should be moved from common_init function.
+> What commit provides this regulator core functionality?
 
----
+regulator: core: Provide a dummy regulator with full constraints
+
+> Looks like it has not reached 3.13-rc1.
+
+Yes, it did.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/650b4eb8/attachment.sig>
