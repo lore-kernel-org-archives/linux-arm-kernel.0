@@ -1,66 +1,87 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 25 Nov 2013 16:04:42 +0200
-Subject: [PATCH v3 3/6] watchdog: davinci: add GET_TIMELEFT option support
-In-Reply-To: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1385388285-10553-4-git-send-email-ivan.khoronzhuk@ti.com>
+Date: Mon, 25 Nov 2013 16:08:18 +0200
+Subject: [PATCH v3 5/6] watchdog: davinci: reuse driver for keystone arch
+Message-ID: <1385388498-12448-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the davinci watchdog can be read while counting,
-so we can add ability to report the remaining time before
-the system will reboot.
+The keystone arch uses the same IP watchdog, so add "ti,keystone-wdt"
+compatible and correct identity.
+
+The Keystone arch is using clocks in DT and source clock for watchdog
+has to be specified, so add this to binding.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/watchdog/davinci_wdt.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ .../devicetree/bindings/watchdog/davinci-wdt.txt   |   12 ++++++++++--
+ drivers/watchdog/Kconfig                           |    4 ++--
+ drivers/watchdog/davinci_wdt.c                     |    2 +-
+ 3 files changed, 13 insertions(+), 5 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
+index e450134..4d89317 100644
+--- a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
+@@ -1,11 +1,18 @@
+-DaVinci Watchdog Timer (WDT) Controller
++Texas Instruments DaVinci/Keystone Watchdog Timer (WDT) Controller
+ 
+ Required properties:
+-- compatible : Should be "ti,davinci-wdt"
++- compatible : Should be "ti,davinci-wdt" or "ti,keystone-wdt"
+ - reg : Should contain WDT registers location and length
+ 
+ Optional properties:
+ - timeout-sec : Contains the watchdog timeout in seconds
++- clocks : the clock feeding the watchdog timer.
++	   Needed if platform uses clocks.
++	   See clock-bindings.txt
++
++Documentation:
++Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
++Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
+ 
+ Examples:
+ 
+@@ -13,4 +20,5 @@ wdt: wdt at 2320000 {
+ 	compatible = "ti,davinci-wdt";
+ 	reg = <0x02320000 0x80>;
+ 	timeout-sec = <30>;
++	clocks = <&clkwdtimer0>;
+ };
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index eb8c89d..01f3f81 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -270,12 +270,12 @@ config IOP_WATCHDOG
+ 
+ config DAVINCI_WATCHDOG
+ 	tristate "DaVinci watchdog"
+-	depends on ARCH_DAVINCI
++	depends on ARCH_DAVINCI || ARCH_KEYSTONE
+ 	select WATCHDOG_CORE
+ 	select WATCHDOG_NOWAYOUT
+ 	help
+ 	  Say Y here if to include support for the watchdog timer
+-	  in the DaVinci DM644x/DM646x processors.
++	  in the DaVinci DM644x/DM646x or Keystone processors.
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called davinci_wdt.
+ 
 diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-index 4c3f417..d342fc2 100644
+index d342fc2..9128c74 100644
 --- a/drivers/watchdog/davinci_wdt.c
 +++ b/drivers/watchdog/davinci_wdt.c
-@@ -116,6 +116,31 @@ static int davinci_wdt_ping(struct watchdog_device *wdd)
- 	return 0;
- }
+@@ -143,7 +143,7 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
  
-+static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
-+{
-+	u64 timer_counter;
-+	unsigned long freq;
-+	u32 val;
-+	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
-+
-+	/* if timeout has occured then return 0 */
-+	val = ioread32(davinci_wdt->base + WDTCR);
-+	if (val & WDFLAG)
-+		return 0;
-+
-+	freq = clk_get_rate(davinci_wdt->clk);
-+
-+	if (!freq)
-+		return 0;
-+
-+	timer_counter = ioread32(davinci_wdt->base + TIM12);
-+	timer_counter |= ((u64)ioread32(davinci_wdt->base + TIM34) << 32);
-+
-+	do_div(timer_counter, freq);
-+
-+	return wdd->timeout - timer_counter;
-+}
-+
  static const struct watchdog_info davinci_wdt_info = {
  	.options = WDIOF_KEEPALIVEPING,
- 	.identity = "DaVinci Watchdog",
-@@ -126,6 +151,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
- 	.start		= davinci_wdt_start,
- 	.stop		= davinci_wdt_ping,
- 	.ping		= davinci_wdt_ping,
-+	.get_timeleft	= davinci_wdt_get_timeleft,
+-	.identity = "DaVinci Watchdog",
++	.identity = "DaVinci/Keystone Watchdog",
  };
  
- static int davinci_wdt_probe(struct platform_device *pdev)
+ static const struct watchdog_ops davinci_wdt_ops = {
 -- 
 1.7.9.5
