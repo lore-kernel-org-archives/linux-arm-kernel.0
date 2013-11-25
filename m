@@ -1,184 +1,208 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Mon, 25 Nov 2013 09:49:02 +0100
-Subject: [PATCH v8] videobuf2: Add missing lock held on vb2_fop_relase
-Message-ID: <1385369342-11785-1-git-send-email-ricardo.ribalda@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 25 Nov 2013 09:55:34 +0100
+Subject: [PATCH 24/24] asm-generic: Rename int-ll64.h to types.h
+In-Reply-To: <1385369734-24893-1-git-send-email-geert@linux-m68k.org>
+References: <1385369734-24893-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1385369734-24893-25-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
+Since kernelspace always uses "(unsigned) long long" for 64-bit integer
+values ("u64" and "s64"), rename include/asm-generic/int-ll64.h to
+include/asm-generic/types.h, as suggested by Arnd Bergmann.
 
-vb2_fop_release does not held the lock although it is modifying the
-queue->owner field.
+Userspace still has both include/uapi/asm-generic/int-l64.h and
+include/uapi/asm-generic/int-ll64.h, as int-l64.h may still be used for
+userspace on existing 64-bit platforms (alpha, ia64, mips, and powerpc).
 
-This could lead to race conditions on the vb2_perform_io function
-when multiple applications are accessing the video device via
-read/write API:
+Note: While arch/alpha/include/asm/types.h just includes
+asm-generic/types.h, don't be tempted to use Kbuild logic to provide it!
+arch/*/include/asm/Kbuild applies to both arch/*/include/asm and
+arch/*/include/uapi/asm, while alpha has its own <uapi/asm/types.h>.
 
-[ 308.297741] BUG: unable to handle kernel NULL pointer dereference at
-0000000000000260
-[ 308.297759] IP: [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
-[videobuf2_core]
-[ 308.297794] PGD 159719067 PUD 158119067 PMD 0
-[ 308.297812] Oops: 0000 #1 SMP
-[ 308.297826] Modules linked in: qt5023_video videobuf2_dma_sg
-qtec_xform videobuf2_vmalloc videobuf2_memops videobuf2_core
-qtec_white qtec_mem gpio_xilinx qtec_cmosis qtec_pcie fglrx(PO)
-spi_xilinx spi_bitbang qt5023
-[ 308.297888] CPU: 1 PID: 2189 Comm: java Tainted: P O 3.11.0-qtec-standard #1
-[ 308.297919] Hardware name: QTechnology QT5022/QT5022, BIOS
-PM_2.1.0.309 X64 05/23/2013
-[ 308.297952] task: ffff8801564e1690 ti: ffff88014dc02000 task.ti:
-ffff88014dc02000
-[ 308.297962] RIP: 0010:[<ffffffffa07a9fd2>] [<ffffffffa07a9fd2>]
-vb2_perform_fileio+0x372/0x610 [videobuf2_core]
-[ 308.297985] RSP: 0018:ffff88014dc03df8 EFLAGS: 00010202
-[ 308.297995] RAX: 0000000000000000 RBX: ffff880158a23000 RCX: dead000000100100
-[ 308.298003] RDX: 0000000000000000 RSI: dead000000200200 RDI: 0000000000000000
-[ 308.298012] RBP: ffff88014dc03e58 R08: 0000000000000000 R09: 0000000000000001
-[ 308.298020] R10: ffffea00051e8380 R11: ffff88014dc03fd8 R12: ffff880158a23070
-[ 308.298029] R13: ffff8801549040b8 R14: 0000000000198000 R15: 0000000001887e60
-[ 308.298040] FS: 00007f65130d5700(0000) GS:ffff88015ed00000(0000)
-knlGS:0000000000000000
-[ 308.298049] CS: 0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-[ 308.298057] CR2: 0000000000000260 CR3: 0000000159630000 CR4: 00000000000007e0
-[ 308.298064] Stack:
-[ 308.298071] ffff880156416c00 0000000000198000 0000000000000000
-ffff880100000001
-[ 308.298087] ffff88014dc03f50 00000000810a79ca 0002000000000001
-ffff880154904718
-[ 308.298101] ffff880156416c00 0000000000198000 ffff880154904338
-ffff88014dc03f50
-[ 308.298116] Call Trace:
-[ 308.298143] [<ffffffffa07aa3c4>] vb2_read+0x14/0x20 [videobuf2_core]
-[ 308.298198] [<ffffffffa07aa494>] vb2_fop_read+0xc4/0x120 [videobuf2_core]
-[ 308.298252] [<ffffffff8154ee9e>] v4l2_read+0x7e/0xc0
-[ 308.298296] [<ffffffff8116e639>] vfs_read+0xa9/0x160
-[ 308.298312] [<ffffffff8116e882>] SyS_read+0x52/0xb0
-[ 308.298328] [<ffffffff81784179>] tracesys+0xd0/0xd5
-[ 308.298335] Code: e5 d6 ff ff 83 3d be 24 00 00 04 89 c2 4c 8b 45 b0
-44 8b 4d b8 0f 8f 20 02 00 00 85 d2 75 32 83 83 78 03 00 00 01 4b 8b
-44 c5 48 <8b> 88 60 02 00 00 85 c9 0f 84 b0 00 00 00 8b 40 58 89 c2 41
-89
-[ 308.298487] RIP [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
-[videobuf2_core]
-[ 308.298507] RSP <ffff88014dc03df8>
-[ 308.298514] CR2: 0000000000000260
-[ 308.298526] ---[ end trace e8f01717c96d1e41 ]---
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: linux-alpha at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-ia64 at vger.kernel.org
+Cc: linux-mips at linux-mips.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-s390 at vger.kernel.org
+Cc: linux-sh at vger.kernel.org
+Cc: linux-xtensa at linux-xtensa.org
+Cc: linux-kbuild at vger.kernel.org
 ---
+Question: Is the arch/*/include/asm/Kbuild behavior intentional?
 
-v2: Comments by Sylvester Nawrocki
+ arch/alpha/include/asm/types.h              |    2 +-
+ arch/arm/include/asm/types.h                |    2 +-
+ arch/ia64/include/asm/types.h               |    2 +-
+ arch/mips/include/asm/types.h               |    2 +-
+ arch/powerpc/include/asm/types.h            |    2 +-
+ arch/s390/include/asm/types.h               |    2 +-
+ arch/sh/include/asm/types.h                 |    2 +-
+ arch/xtensa/include/asm/types.h             |    2 +-
+ include/asm-generic/io-64-nonatomic-hi-lo.h |    2 +-
+ include/asm-generic/io-64-nonatomic-lo-hi.h |    2 +-
+ include/asm-generic/{int-ll64.h => types.h} |    8 ++++----
+ 11 files changed, 14 insertions(+), 14 deletions(-)
+ rename include/asm-generic/{int-ll64.h => types.h} (85%)
 
-fimc-capture and fimc-lite where calling vb2_fop_release with the lock held.
-Therefore a new __vb2_fop_release function has been created to be used by
-drivers that overload the release function.
-
-v3: Comments by Sylvester Nawrocki and Mauro Carvalho Chehab
-
-Use vb2_fop_release_locked instead of __vb2_fop_release
-
-v4: Comments by Sylvester Nawrocki
-
-Rename vb2_fop_release_locked to __vb2_fop_release and fix patch format
-
-v5: Comments by Sylvester Nawrocki and Hans Verkuil
-
-Rename __vb2_fop_release to vb2_fop_release_unlock and rearrange
-arguments
-
-v6: Comments by Hans Verkuil
-
-Fix typo on description
-Rename vb2_fop_release_locked to vb2_fop_release_no_lock
-
-v7: Comments by Hans Verkuil and Sylvester Nawrocki
-
-Export _vb2_fop_release instead of using vb2_fop_release_no_lock
-
-v8: Comments by Hans Verkuil and rebase
-
-Missed semicolon
-
-Signed-off-by: Ricardo Ribalda <ricardo.ribalda@gmail.com>
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
- drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
- drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
- drivers/media/v4l2-core/videobuf2-core.c         | 15 ++++++++++++++-
- include/media/videobuf2-core.h                   |  1 +
- 4 files changed, 17 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
-index fb27ff7..8a712ca 100644
---- a/drivers/media/platform/exynos4-is/fimc-capture.c
-+++ b/drivers/media/platform/exynos4-is/fimc-capture.c
-@@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
- 		vc->streaming = false;
- 	}
+diff --git a/arch/alpha/include/asm/types.h b/arch/alpha/include/asm/types.h
+index 4cb4b6d3452c..b86fb65c5b10 100644
+--- a/arch/alpha/include/asm/types.h
++++ b/arch/alpha/include/asm/types.h
+@@ -1,6 +1,6 @@
+ #ifndef _ALPHA_TYPES_H
+ #define _ALPHA_TYPES_H
  
--	ret = vb2_fop_release(file);
-+	ret = _vb2_fop_release(file, NULL);
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
  
- 	if (close) {
- 		clear_bit(ST_CAPT_BUSY, &fimc->state);
-diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
-index e5798f7..d3b32b6 100644
---- a/drivers/media/platform/exynos4-is/fimc-lite.c
-+++ b/drivers/media/platform/exynos4-is/fimc-lite.c
-@@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
- 		mutex_unlock(&entity->parent->graph_mutex);
- 	}
+ #endif /* _ALPHA_TYPES_H */
+diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+index a53cdb8f068c..09e15a8a40b1 100644
+--- a/arch/arm/include/asm/types.h
++++ b/arch/arm/include/asm/types.h
+@@ -1,7 +1,7 @@
+ #ifndef _ASM_TYPES_H
+ #define _ASM_TYPES_H
  
--	vb2_fop_release(file);
-+	_vb2_fop_release(file, NULL);
- 	pm_runtime_put(&fimc->pdev->dev);
- 	clear_bit(ST_FLITE_SUSPENDED, &fimc->state);
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
  
-diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
-index de0e87f..01f1585 100644
---- a/drivers/media/v4l2-core/videobuf2-core.c
-+++ b/drivers/media/v4l2-core/videobuf2-core.c
-@@ -2621,16 +2621,29 @@ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma)
- }
- EXPORT_SYMBOL_GPL(vb2_fop_mmap);
+ /*
+  * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+diff --git a/arch/ia64/include/asm/types.h b/arch/ia64/include/asm/types.h
+index 4c351b169da2..6bc2e8acadd7 100644
+--- a/arch/ia64/include/asm/types.h
++++ b/arch/ia64/include/asm/types.h
+@@ -13,7 +13,7 @@
+ #ifndef _ASM_IA64_TYPES_H
+ #define _ASM_IA64_TYPES_H
  
--int vb2_fop_release(struct file *file)
-+int _vb2_fop_release(struct file *file, struct mutex *lock)
- {
- 	struct video_device *vdev = video_devdata(file);
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
+ #include <uapi/asm/types.h>
  
- 	if (file->private_data == vdev->queue->owner) {
-+		if (lock)
-+			mutex_lock(lock);
- 		vb2_queue_release(vdev->queue);
- 		vdev->queue->owner = NULL;
-+		if (lock)
-+			mutex_unlock(lock);
- 	}
- 	return v4l2_fh_release(file);
- }
-+EXPORT_SYMBOL_GPL(_vb2_fop_release);
-+
-+int vb2_fop_release(struct file *file)
-+{
-+	struct video_device *vdev = video_devdata(file);
-+	struct mutex *lock = vdev->queue->lock ? vdev->queue->lock : vdev->lock;
-+
-+	return _vb2_fop_release(file, lock);
-+}
- EXPORT_SYMBOL_GPL(vb2_fop_release);
+ #ifdef __ASSEMBLY__
+diff --git a/arch/mips/include/asm/types.h b/arch/mips/include/asm/types.h
+index 4d5ce4c9c924..0d6729329a6a 100644
+--- a/arch/mips/include/asm/types.h
++++ b/arch/mips/include/asm/types.h
+@@ -11,7 +11,7 @@
+ #ifndef _ASM_TYPES_H
+ #define _ASM_TYPES_H
  
- ssize_t vb2_fop_write(struct file *file, char __user *buf,
-diff --git a/include/media/videobuf2-core.h b/include/media/videobuf2-core.h
-index 6781258..cc7ab81 100644
---- a/include/media/videobuf2-core.h
-+++ b/include/media/videobuf2-core.h
-@@ -491,6 +491,7 @@ int vb2_ioctl_expbuf(struct file *file, void *priv,
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
  
- int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma);
- int vb2_fop_release(struct file *file);
-+int _vb2_fop_release(struct file *file, struct mutex *lock);
- ssize_t vb2_fop_write(struct file *file, char __user *buf,
- 		size_t count, loff_t *ppos);
- ssize_t vb2_fop_read(struct file *file, char __user *buf,
+ /*
+  * These aren't exported outside the kernel to avoid name space clashes
+diff --git a/arch/powerpc/include/asm/types.h b/arch/powerpc/include/asm/types.h
+index 4b9c3530bb12..69d42a918e0e 100644
+--- a/arch/powerpc/include/asm/types.h
++++ b/arch/powerpc/include/asm/types.h
+@@ -13,7 +13,7 @@
+ #ifndef _ASM_POWERPC_TYPES_H
+ #define _ASM_POWERPC_TYPES_H
+ 
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
+ #include <uapi/asm/types.h>
+ 
+ #ifndef __ASSEMBLY__
+diff --git a/arch/s390/include/asm/types.h b/arch/s390/include/asm/types.h
+index a5c7e829dbc3..abb93c7f0125 100644
+--- a/arch/s390/include/asm/types.h
++++ b/arch/s390/include/asm/types.h
+@@ -6,7 +6,7 @@
+ #ifndef _S390_TYPES_H
+ #define _S390_TYPES_H
+ 
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
+ #include <uapi/asm/types.h>
+ 
+ /*
+diff --git a/arch/sh/include/asm/types.h b/arch/sh/include/asm/types.h
+index 062324be5cd6..ef745dcfd926 100644
+--- a/arch/sh/include/asm/types.h
++++ b/arch/sh/include/asm/types.h
+@@ -1,7 +1,7 @@
+ #ifndef __ASM_SH_TYPES_H
+ #define __ASM_SH_TYPES_H
+ 
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
+ 
+ /*
+  * These aren't exported outside the kernel to avoid name space clashes
+diff --git a/arch/xtensa/include/asm/types.h b/arch/xtensa/include/asm/types.h
+index d873cb17d944..20ffdf440e4f 100644
+--- a/arch/xtensa/include/asm/types.h
++++ b/arch/xtensa/include/asm/types.h
+@@ -10,7 +10,7 @@
+ #ifndef _XTENSA_TYPES_H
+ #define _XTENSA_TYPES_H
+ 
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
+ #include <uapi/asm/types.h>
+ 
+ #endif	/* _XTENSA_TYPES_H */
+diff --git a/include/asm-generic/io-64-nonatomic-hi-lo.h b/include/asm-generic/io-64-nonatomic-hi-lo.h
+index a6806a94250d..414d2c49d53c 100644
+--- a/include/asm-generic/io-64-nonatomic-hi-lo.h
++++ b/include/asm-generic/io-64-nonatomic-hi-lo.h
+@@ -2,7 +2,7 @@
+ #define _ASM_IO_64_NONATOMIC_HI_LO_H_
+ 
+ #include <linux/io.h>
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
+ 
+ #ifndef readq
+ static inline __u64 readq(const volatile void __iomem *addr)
+diff --git a/include/asm-generic/io-64-nonatomic-lo-hi.h b/include/asm-generic/io-64-nonatomic-lo-hi.h
+index ca546b1ff8b5..9bc5a3393ca1 100644
+--- a/include/asm-generic/io-64-nonatomic-lo-hi.h
++++ b/include/asm-generic/io-64-nonatomic-lo-hi.h
+@@ -2,7 +2,7 @@
+ #define _ASM_IO_64_NONATOMIC_LO_HI_H_
+ 
+ #include <linux/io.h>
+-#include <asm-generic/int-ll64.h>
++#include <asm-generic/types.h>
+ 
+ #ifndef readq
+ static inline __u64 readq(const volatile void __iomem *addr)
+diff --git a/include/asm-generic/int-ll64.h b/include/asm-generic/types.h
+similarity index 85%
+rename from include/asm-generic/int-ll64.h
+rename to include/asm-generic/types.h
+index 4cd84855cb46..b9542bb3d991 100644
+--- a/include/asm-generic/int-ll64.h
++++ b/include/asm-generic/types.h
+@@ -1,11 +1,11 @@
+ /*
+- * asm-generic/int-ll64.h
++ * asm-generic/types.h
+  *
+  * Integer declarations for architectures which use "long long"
+  * for 64-bit types.
+  */
+-#ifndef _ASM_GENERIC_INT_LL64_H
+-#define _ASM_GENERIC_INT_LL64_H
++#ifndef _ASM_GENERIC_TYPES_H
++#define _ASM_GENERIC_TYPES_H
+ 
+ #include <uapi/asm-generic/int-ll64.h>
+ 
+@@ -46,4 +46,4 @@ typedef unsigned long long u64;
+ 
+ #endif /* __ASSEMBLY__ */
+ 
+-#endif /* _ASM_GENERIC_INT_LL64_H */
++#endif /* _ASM_GENERIC_TYPES_H */
 -- 
-1.8.4.3
+1.7.9.5
