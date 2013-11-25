@@ -1,54 +1,18 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 Nov 2013 11:31:16 +0900
-Subject: [PATCH] ARM: shmobile: Koelsch DT reference GPIO LED support
-In-Reply-To: <20131121004404.16471.71617.sendpatchset@w520>
-References: <20131121004404.16471.71617.sendpatchset@w520>
-Message-ID: <20131125023114.GE10664@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 25 Nov 2013 10:35:47 +0800
+Subject: [PATCH] ARM: dts: imx6q-sabrelite: Place 'status' as the last node
+In-Reply-To: <1384971648-27056-1-git-send-email-festevam@gmail.com>
+References: <1384971648-27056-1-git-send-email-festevam@gmail.com>
+Message-ID: <20131125023545.GB11613@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 09:44:04AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Wed, Nov 20, 2013 at 04:20:48PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Add led6, led7 and led8 to the Koelsch DT reference board support.
+> In order to follow the standard approach used on other imx dts files, place the
+> 'status' node as the last one.
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Thanks, I have queued this up.
-
-> ---
-> 
->  arch/arm/boot/dts/r8a7791-koelsch-reference.dts |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> --- 0024/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-> +++ work/arch/arm/boot/dts/r8a7791-koelsch-reference.dts	2013-11-20 17:15:02.000000000 +0900
-> @@ -11,6 +11,7 @@
->  
->  /dts-v1/;
->  #include "r8a7791.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  / {
->  	model = "Koelsch";
-> @@ -29,6 +30,19 @@
->  		#address-cells = <1>;
->  		#size-cells = <1>;
->  	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		led6 {
-> +			gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
-> +		};
-> +		led7 {
-> +			gpios = <&gpio2 20 GPIO_ACTIVE_HIGH>;
-> +		};
-> +		led8 {
-> +			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
->  };
->  
->  &pfc {
-> 
+Applied, thanks.
