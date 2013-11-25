@@ -1,109 +1,61 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 25 Nov 2013 15:49:37 +0200
-Subject: [PATCHv6 05/13] iommu/core: add ops->{bound,unbind}_driver()
-In-Reply-To: <1385041249-7705-6-git-send-email-hdoyu@nvidia.com>
-References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com>
- <1385041249-7705-6-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20131125154937.d6dbe9aedc16aab335d92f99@nvidia.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 25 Nov 2013 15:55:45 +0200
+Subject: [PATCH] ARM: dts: omap3-beagle: Fix USB host on beagle boards (for
+ 3.13)
+Message-ID: <1385387745-7162-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Beagle (rev. C4) and Beagle-XM (all revs) need VAUX2 1.8V supply
+for the USB PHY.
 
-Do you have some time to review this patch along with the following ones?
+As the generic PHY driver can't handle more than one supply
+at the moment, we configure this supply to be always on.
+This will cause a very small power impact if the USB host subsystem
+is not in use, about 76.86 micro-W + LDO power.
 
-  [PATCHv6 02/13] iommu/of: introduce a global iommu device list
-  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007050.html
+Older Beagle boards (prior to C4) don't have VAUX2 connected anywhere,
+so there won't be any functional impact on those boards other than
+some additional LDO power consumption.
 
-  [PATCHv6 03/13] iommu/of: check if dependee iommu is ready or not
-  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007051.html
+Reported-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle-xm.dts | 8 ++++++++
+ arch/arm/boot/dts/omap3-beagle.dts    | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-With those patches, now I'm trying to populate iommu master devices
-after an IOMMU device is populated. Originally [PATCHv6 02/13] was
-proposed by Thierry. I'm a bit afraid of adding new IOMMU API as
-this, but I think that this new {bound,unbind}_driver() is the right
-timiing that depeding devices are populated instead of add_device()
-since, even after add_device, a device won't be populated. I'm not so
-sure how this affects on the existing IOMMUs.
-
-It would be nice if you give some feedback on this.
-
-On Thu, 21 Nov 2013 14:40:41 +0100
-Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-
-> ops->{bound,unbind}_driver() functions are called at
-> BUS_NOTIFY_{BOUND,UNBIND}_DRIVER respectively.
-> 
-> This is necessary to control the device population order. IOMMU master
-> devices depend on an IOMMU device instanciation. IOMMU master devices
-> can be registered to an IOMMU only after it's successfully
-> populated. This IOMMU registration is done via
-> ops->bound_driver(). Currently this population can be deferred if
-> depending IOMMU device hasn't yet been populated in driver core. This
-> cannot be done via ops->add_device() since after add_device() device's
-> population/instanciation can be still deferred via probe().
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
-> v6:
-> New for v6.
-> ---
->  drivers/iommu/iommu.c | 13 +++++++++++--
->  include/linux/iommu.h |  4 ++++
->  2 files changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index e5555fc..5469d36 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -540,14 +540,23 @@ static int iommu_bus_notifier(struct notifier_block *nb,
->  	 * ADD/DEL call into iommu driver ops if provided, which may
->  	 * result in ADD/DEL notifiers to group->notifier
->  	 */
-> -	if (action == BUS_NOTIFY_ADD_DEVICE) {
-> +	switch (action) {
-> +	case BUS_NOTIFY_ADD_DEVICE:
->  		if (ops->add_device)
->  			return ops->add_device(dev);
-> -	} else if (action == BUS_NOTIFY_DEL_DEVICE) {
-> +	case BUS_NOTIFY_DEL_DEVICE:
->  		if (ops->remove_device && dev->iommu_group) {
->  			ops->remove_device(dev);
->  			return 0;
->  		}
-> +	case BUS_NOTIFY_BOUND_DRIVER:
-> +		if (ops->bound_driver)
-> +			ops->bound_driver(dev);
-> +		break;
-> +	case BUS_NOTIFY_UNBIND_DRIVER:
-> +		if (ops->unbind_driver)
-> +			ops->unbind_driver(dev);
-> +		break;
->  	}
->  
->  	/*
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index a444c79..a0e92be 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -96,6 +96,8 @@ enum iommu_attr {
->   * @domain_has_cap: domain capabilities query
->   * @add_device: add device to iommu grouping
->   * @remove_device: remove device from iommu grouping
-> + * @bound_driver: called at BUS_NOTIFY_BOUND_DRIVER
-> + * @unbind_driver: called at BUS_NOTIFY_UNBIND_DRIVER
->   * @domain_get_attr: Query domain attributes
->   * @domain_set_attr: Change domain attributes
->   * @pgsize_bitmap: bitmap of supported page sizes
-> @@ -114,6 +116,8 @@ struct iommu_ops {
->  			      unsigned long cap);
->  	int (*add_device)(struct device *dev);
->  	void (*remove_device)(struct device *dev);
-> +	int (*bound_driver)(struct device *dev);
-> +	void (*unbind_driver)(struct device *dev);
->  	int (*device_group)(struct device *dev, unsigned int *groupid);
->  	int (*domain_get_attr)(struct iommu_domain *domain,
->  			       enum iommu_attr attr, void *data);
-> -- 
-> 1.8.1.5
-> 
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 31a632f..b39918e 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -215,3 +215,11 @@
+ &usbhsehci {
+ 	phys = <0 &hsusb2_phy>;
+ };
++
++&vaux2 {
++	regulator-name = "usb_1v8";
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-always-on;
++};
++
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index fa532aa..9764556 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -178,3 +178,11 @@
+ 	mode = <3>;
+ 	power = <50>;
+ };
++
++&vaux2 {
++	regulator-name = "vdd_ehci";
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-always-on;
++};
++
+-- 
+1.8.3.2
