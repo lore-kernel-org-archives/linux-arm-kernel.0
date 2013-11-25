@@ -1,61 +1,78 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 25 Nov 2013 19:47:04 +0100
-Subject: [PATCH RESEND v2] clk: probe defer when clock not yet ready
-Message-ID: <20131125194704.5a5922b7@armhf>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 11:49:47 -0700
+Subject: [PATCH] ARM: tegra: Provide dummy powergate implementation
+Message-ID: <1385405387-27265-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At probe time, a clock device may not be ready when some other device
-wants to use it. 
+From: Thierry Reding <thierry.reding@gmail.com>
 
-This patch lets the functions clk_get/devm_clk_get return a probe defer
-when the clock is defined in the DT but not yet available.
+In order to support increased build test coverage for drivers, implement
+dummies for the powergate implementation. This will allow the drivers to
+be built without requiring support for Tegra to be selected.
 
-It also fixes an erroneous call to clk_get_sys() when __clk_get() fails.
+This patch solves the following build errors, which can be triggered in
+v3.13-rc1 by selecting DRM_TEGRA without ARCH_TEGRA:
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+drivers/built-in.o: In function `gr3d_remove':
+drivers/gpu/drm/tegra/gr3d.c:321: undefined reference to `tegra_powergate_power_off'
+drivers/gpu/drm/tegra/gr3d.c:325: undefined reference to `tegra_powergate_power_off'
+drivers/built-in.o: In function `gr3d_probe':
+drivers/gpu/drm/tegra/gr3d.c:266: undefined reference to `tegra_powergate_sequence_power_up'
+drivers/gpu/drm/tegra/gr3d.c:273: undefined reference to `tegra_powergate_sequence_power_up'
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+[swarren, updated commit description]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-resend v2: remove ASoc from subject (thank you, Mark)
-resend: - patch subject change from
-   [PATCH v3 1/2] ASoC: kirkwood: clk: probe defer when clock not yet ready
-	- base kernel 3.13.0-rc1
-v2: fix __clk_get() failure (from Russell King)
----
- drivers/clk/clk.c    | 2 +-
- drivers/clk/clkdev.c | 7 ++++++-
- 2 files changed, 7 insertions(+), 2 deletions(-)
+This is a fix for 3.13.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2cf2ea6..41361c6 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2187,7 +2187,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
- {
- 	struct of_clk_provider *provider;
--	struct clk *clk = ERR_PTR(-ENOENT);
-+	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
+ include/linux/tegra-powergate.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/include/linux/tegra-powergate.h b/include/linux/tegra-powergate.h
+index c98cfa406952..fd4498329c7c 100644
+--- a/include/linux/tegra-powergate.h
++++ b/include/linux/tegra-powergate.h
+@@ -45,6 +45,7 @@ struct clk;
  
- 	/* Check if we have such a provider in our array */
- 	mutex_lock(&of_clk_lock);
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 442a313..1f402b9 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -157,7 +157,12 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ #define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
  
- 	if (dev) {
- 		clk = of_clk_get_by_name(dev->of_node, con_id);
--		if (!IS_ERR(clk) && __clk_get(clk))
-+		if (!IS_ERR(clk)) {
-+			if (!__clk_get(clk))
-+				clk = ERR_PTR(-ENOENT);
-+			return clk;
-+		}
-+		if (PTR_ERR(clk) == -EPROBE_DEFER)
- 			return clk;
- 	}
++#ifdef CONFIG_ARCH_TEGRA
+ int tegra_powergate_is_powered(int id);
+ int tegra_powergate_power_on(int id);
+ int tegra_powergate_power_off(int id);
+@@ -52,5 +53,31 @@ int tegra_powergate_remove_clamping(int id);
  
+ /* Must be called with clk disabled, and returns with clk enabled */
+ int tegra_powergate_sequence_power_up(int id, struct clk *clk);
++#else
++static inline int tegra_powergate_is_powered(int id)
++{
++	return -ENOSYS;
++}
++
++static inline int tegra_powergate_power_on(int id)
++{
++	return -ENOSYS;
++}
++
++static inline int tegra_powergate_power_off(int id)
++{
++	return -ENOSYS;
++}
++
++static inline int tegra_powergate_remove_clamping(int id)
++{
++	return -ENOSYS;
++}
++
++static inline int tegra_powergate_sequence_power_up(int id, struct clk *clk)
++{
++	return -ENOSYS;
++}
++#endif
+ 
+ #endif /* _MACH_TEGRA_POWERGATE_H_ */
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.1.5
