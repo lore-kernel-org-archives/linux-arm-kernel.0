@@ -1,68 +1,32 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 25 Nov 2013 12:05:28 +0200
-Subject: [PATCH] PM / Clocks: fix pm_clk_resume/suspend if
- CONFIG_PM_RUNTIME is set
-In-Reply-To: <528FAA00.9060801@ti.com>
-References: <1384954307-27094-1-git-send-email-grygorii.strashko@ti.com>
- <528D0296.1070001@codeaurora.org> <528D082C.3040405@ti.com>
- <528D1327.7080205@codeaurora.org> <528D1784.8080704@ti.com>
- <528D1C49.3020301@ti.com> <87ppps6zve.fsf@linaro.org>
- <528FAA00.9060801@ti.com>
-Message-ID: <529320E8.7030703@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 25 Nov 2013 11:31:14 +0100
+Subject: [PATCH] ARM i.MX5: fix "shift" value for lp_apm_sel
+Message-ID: <1385375474-15901-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 09:01 PM, Santosh Shilimkar wrote:
-> On Friday 22 November 2013 01:43 PM, Kevin Hilman wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->> [...]
->>
->>>>> It looks like even if you just remove the locks here, the PM core is
->>>>> free to call this function with irqs disabled if pm_runtime_irq_safe()
->>>>> has been called on the device. Perhaps runtime PM can only do the
->>>>> clk_enable()/clk_disable() part and the clk_unprepare()/clk_prepare()
->>>>> calls should happen in the system suspend callbacks?
->>>>
->>>> Even don't know what to say :( On Keystone clk_unprepare()/clk_prepare() are NOPs.
->>>> But clk_prepare() has to be called at least once before clk_enable() :((
->>>> So, solution with suspend/resume will not fix current problem :( unfortunately.
->>>>
->>>> FYI, Now pm_clk_suspend/pm_clk_resume are called from arch/arm/mach-keystone/pm_domain.c
->>>> (also similar solution is used by Davinci, but issue has not been detected because
->>>> PM runtime hasn't been used by Davinci IP drivers before)
->>>>
->>> One way to deal with this is to have clk_unprepare()/clk_prepare()
->>> called from dev_pm_domain ops before calling pm_clk_[suspend/resume]() if we
->>> can't have that as part of runtime code.
->>
->> That doesn't solve the irq_safe problem that Stephen pointed out without
->> being very careful.  Basically, if you have _any_ potentially sleeping
->> calls in this path, you can never allow devices to use
->> pm_runtime_irq_safe().
->>
-> You are right. I realized that after reading the code.
-> 
->> Also, I don't like having the clk_enable in the PM core but the
->> clk_prepare in the platform-specific pm_domain.  That seems prone for
->> platforms to get wrong.
->>
-> Agree.
-> 
->> I'll need to think about this a little more before having any idea what
->> to do here.
->>
-> Thanks Kevin for looking into it.
+According to the i.MX53 Rev. 2.1 datasheet the lp_apm_sel is bit 10 in the
+CCM_CCSR register not bit 9.
 
-May be it can be solved through CCF by introducing additional flag like
-CLK_SET_NO_PREPARE for cases when clocks perpetration isn't really needed.
-So, when this flag is set CCF will just auto-increment "prepare_count" 
-when clock is registered.
+This patch fixes this issue.
 
-Of Course, this will not solve the case when clock need to be prepared and
-driver wants to use PM Runtime, but for SoCs like Keystone that can be
-fast & simple solution. 
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Regards,
-- grygrorii
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 3f01df2..867d623 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -98,7 +98,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", rate_ckih1);
+ 	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", rate_ckih2);
+ 
+-	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
++	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
+ 						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_PERIPH_APM]	= imx_clk_mux("periph_apm", MXC_CCM_CBCMR, 12, 2,
+ 						periph_apm_sel, ARRAY_SIZE(periph_apm_sel));
+-- 
+1.8.4.2
