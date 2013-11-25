@@ -1,63 +1,71 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Nov 2013 17:26:44 +0100
-Subject: [PATCH 1/4] irqchip: armada-370-xp: fix IPI race condition
+Date: Mon, 25 Nov 2013 17:26:47 +0100
+Subject: [PATCH 4/4] ARM: mvebu: re-enable PCIe on Armada 370 DB
 In-Reply-To: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1385396807-19027-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+Commit 14fd8ed0a7fd19913 ("ARM: mvebu: Relocate Armada 370/XP PCIe
+device tree nodes") relocated the PCIe controller DT nodes one level
+up in the Device Tree, to reflect a more correct representation of the
+hardware introduced by the mvebu-mbus Device Tree binding.
 
-In the Armada 370/XP driver, when we receive an IRQ 0, we read the
-list of doorbells that caused the interrupt from register
-ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS. This gives the list of IPIs that
-were generated. However, instead of acknowledging only the IPIs that
-were generated, we acknowledge *all* the IPIs, by writing
-~IPI_DOORBELL_MASK in the ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS register.
+However, while most of the boards were properly adjusted accordingly,
+the Armada 370 DB board was left unchanged, and therefore, PCIe is
+seen as not enabled on this board. This patch fixes that by moving the
+PCIe controller node one level-up in armada-370-db.dts.
 
-This creates a race condition: if a new IPI that isn't part of the
-ones read into the temporary "ipimask" variable is fired before we
-acknowledge all IPIs, then we will simply loose it. This is causing
-scheduling hangs on SMP intensive workloads.
-
-It is important to mention that this ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS
-register has the following behavior: "A CPU write of 0 clears the bits
-in this field. A CPU write of 1 has no effect". This is what allows us
-to simply write ~ipimask to acknoledge the handled IPIs.
-
-Notice that the same problem is present in the MSI implementation, but
-it will be fixed as a separate patch, so that this IPI fix can be
-pushed to older stable versions as appropriate (all the way to 3.8),
-while the MSI code only appeared in 3.13.
-
-Signed-off-by: Lior Amsalem <alior@marvell.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: stable at vger.kernel.org
-Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
-The problem has been present since 344e873e5657e8dc0 ('arm: mvebu: Add
-IPI support via doorbells'), that is since v3.8. However, notice that
-the IRQ driver was moved from arch/arm/mach-mvebu/ to drivers/irqchip
-in the process, and also that the very line being changed was slightly
-modified in 5ec69017cc944f3ed8 ('irqchip: armada-370-xp: slightly
-cleanup irq controller driver').
+This problem exists since kernel v3.12, and therefore this patch
+should probably be pushed to v3.12 stable.
 ---
- drivers/irqchip/irq-armada-370-xp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-370-db.dts | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 433cc85..f5e49a2 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -407,7 +407,7 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
- 						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
- 				& IPI_DOORBELL_MASK;
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 90ce29d..08a56bc 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -99,22 +99,22 @@
+ 					spi-max-frequency = <50000000>;
+ 				};
+ 			};
++		};
  
--			writel(~IPI_DOORBELL_MASK, per_cpu_int_base +
-+			writel(~ipimask, per_cpu_int_base +
- 				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
- 
- 			/* Handle all pending doorbells */
+-			pcie-controller {
++		pcie-controller {
++			status = "okay";
++			/*
++			 * The two PCIe units are accessible through
++			 * both standard PCIe slots and mini-PCIe
++			 * slots on the board.
++			 */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++			pcie at 2,0 {
++				/* Port 1, Lane 0 */
+ 				status = "okay";
+-				/*
+-				 * The two PCIe units are accessible through
+-				 * both standard PCIe slots and mini-PCIe
+-				 * slots on the board.
+-				 */
+-				pcie at 1,0 {
+-					/* Port 0, Lane 0 */
+-					status = "okay";
+-				};
+-				pcie at 2,0 {
+-					/* Port 1, Lane 0 */
+-					status = "okay";
+-				};
+ 			};
+ 		};
+ 	};
 -- 
 1.8.1.2
