@@ -1,87 +1,46 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 25 Nov 2013 16:08:18 +0200
-Subject: [PATCH v3 5/6] watchdog: davinci: reuse driver for keystone arch
-Message-ID: <1385388498-12448-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Nov 2013 14:09:27 +0000
+Subject: OMAP build failure after this merge window - caused by usb or phy
+ Kconfig krap
+Message-ID: <20131125140927.GP16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keystone arch uses the same IP watchdog, so add "ti,keystone-wdt"
-compatible and correct identity.
+There's no other way to say it, and I've no idea who is responsible for
+this:
 
-The Keystone arch is using clocks in DT and source clock for watchdog
-has to be specified, so add this to binding.
+  LD      init/built-in.o
+drivers/built-in.o: In function `omap_usb2_remove':
+powercap_sys.c:(.text+0x1c60): undefined reference to `usb_remove_phy'
+drivers/built-in.o: In function `omap_usb_power_off':
+powercap_sys.c:(.text+0x1c84): undefined reference to `omap_control_usb_phy_power'
+drivers/built-in.o: In function `omap_usb_power_on':
+powercap_sys.c:(.text+0x1ca8): undefined reference to `omap_control_usb_phy_power'
+drivers/built-in.o: In function `omap_usb2_probe':
+powercap_sys.c:(.text+0x1dac): undefined reference to `omap_control_usb_phy_power'
+powercap_sys.c:(.text+0x1e5c): undefined reference to `usb_add_phy_dev'
+drivers/built-in.o: In function `omap_usb2_suspend':
+powercap_sys.c:(.text+0x1ec8): undefined reference to `omap_control_usb_phy_power'
+powercap_sys.c:(.text+0x1f20): undefined reference to `omap_control_usb_phy_power'
+drivers/built-in.o: In function `omap_usb2_set_comparator':
+powercap_sys.c:(.text+0x1f54): undefined reference to `usb_get_phy'
+arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+dss-common.c:(.text+0xf824): undefined reference to `usb_bind_phy'
+make[1]: *** [vmlinux] Error 1
+make: *** [sub-make] Error 2
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
----
- .../devicetree/bindings/watchdog/davinci-wdt.txt   |   12 ++++++++++--
- drivers/watchdog/Kconfig                           |    4 ++--
- drivers/watchdog/davinci_wdt.c                     |    2 +-
- 3 files changed, 13 insertions(+), 5 deletions(-)
+These warnings probably have something to do with it:
 
-diff --git a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-index e450134..4d89317 100644
---- a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-@@ -1,11 +1,18 @@
--DaVinci Watchdog Timer (WDT) Controller
-+Texas Instruments DaVinci/Keystone Watchdog Timer (WDT) Controller
- 
- Required properties:
--- compatible : Should be "ti,davinci-wdt"
-+- compatible : Should be "ti,davinci-wdt" or "ti,keystone-wdt"
- - reg : Should contain WDT registers location and length
- 
- Optional properties:
- - timeout-sec : Contains the watchdog timeout in seconds
-+- clocks : the clock feeding the watchdog timer.
-+	   Needed if platform uses clocks.
-+	   See clock-bindings.txt
-+
-+Documentation:
-+Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
-+Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
- 
- Examples:
- 
-@@ -13,4 +20,5 @@ wdt: wdt at 2320000 {
- 	compatible = "ti,davinci-wdt";
- 	reg = <0x02320000 0x80>;
- 	timeout-sec = <30>;
-+	clocks = <&clkwdtimer0>;
- };
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index eb8c89d..01f3f81 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -270,12 +270,12 @@ config IOP_WATCHDOG
- 
- config DAVINCI_WATCHDOG
- 	tristate "DaVinci watchdog"
--	depends on ARCH_DAVINCI
-+	depends on ARCH_DAVINCI || ARCH_KEYSTONE
- 	select WATCHDOG_CORE
- 	select WATCHDOG_NOWAYOUT
- 	help
- 	  Say Y here if to include support for the watchdog timer
--	  in the DaVinci DM644x/DM646x processors.
-+	  in the DaVinci DM644x/DM646x or Keystone processors.
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called davinci_wdt.
- 
-diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-index d342fc2..9128c74 100644
---- a/drivers/watchdog/davinci_wdt.c
-+++ b/drivers/watchdog/davinci_wdt.c
-@@ -143,7 +143,7 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
- 
- static const struct watchdog_info davinci_wdt_info = {
- 	.options = WDIOF_KEEPALIVEPING,
--	.identity = "DaVinci Watchdog",
-+	.identity = "DaVinci/Keystone Watchdog",
- };
- 
- static const struct watchdog_ops davinci_wdt_ops = {
--- 
-1.7.9.5
+scripts/kconfig/conf --silentoldconfig Kconfig
+warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+
+which just illustrates why "select" in Kconfig is soo fscking bad that
+it shouldn't be used.
+
+It certainly should not be used without running through a series of
+randconfig builds to make absolutely sure you have the dependencies
+correct... or an allnoconfig with just the options required to select
+the new option enabled.
