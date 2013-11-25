@@ -1,53 +1,75 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Nov 2013 09:56:30 -0600
-Subject: [RESEND PATCH v3 1/4] usb: musb: gadget, stay IDLE without
- gadget driver
-In-Reply-To: <1384790078-15366-2-git-send-email-mpa@pengutronix.de>
-References: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
- <1384790078-15366-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131125155630.GE18046@saruman.home>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 25 Nov 2013 21:27:46 +0530
+Subject: [PATCH 0/2] PSCI system off and reset for KVM ARM/ARM64
+In-Reply-To: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
+References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <CALrVBktOaQz5zbv2xRr8YbfvmRToK-kg3kJMFpNHSVeyuYutAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 25 November 2013 21:19, Anup Patel <anup.patel@linaro.org> wrote:
+> The Power State and Coordination Interface (PSCI) specification defines
+> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
+>
+> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
+> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
+> KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET exit reasons.
+>
+> To try this patch from guest kernel, we will need PSCI-based restart and
+> poweroff support in the guest kenel for both ARM and ARM64.
+>
+> Rob Herring has already submitted patches for PSCI-based restart and
+> poweroff in ARM kernel but these are not merged yet due unstable device
+> tree bindings of kernel PSCI support. We will be having similar patches
+> for PSCI-based restart and poweroff in ARM64 kernel.
+> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
+> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
+>
+> Anup Patel (2):
+>   KVM: Add KVM_EXIT_RESET to user space API header
+>   ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and SYSTEM_RESET to user
+>     space
+>
+>  arch/arm/include/asm/kvm_psci.h   |    2 +-
+>  arch/arm/include/uapi/asm/kvm.h   |    2 ++
+>  arch/arm/kvm/handle_exit.c        |    7 ++++++-
+>  arch/arm/kvm/psci.c               |   38 +++++++++++++++++++++++++++++--------
+>  arch/arm64/include/asm/kvm_psci.h |    2 +-
+>  arch/arm64/include/uapi/asm/kvm.h |    2 ++
+>  arch/arm64/kvm/handle_exit.c      |   10 ++++++----
+>  include/uapi/linux/kvm.h          |    1 +
+>  8 files changed, 49 insertions(+), 15 deletions(-)
+>
+> --
+> 1.7.9.5
+>
 
-On Mon, Nov 18, 2013 at 04:54:35PM +0100, Markus Pargmann wrote:
-> If there is no gadget driver musb should stay in B_IDLE state.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/usb/musb/musb_core.c   |  3 ---
->  drivers/usb/musb/musb_gadget.c | 14 ++++++++++++--
->  2 files changed, 12 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-> index 4db987f..8b7d903 100644
-> --- a/drivers/usb/musb/musb_core.c
-> +++ b/drivers/usb/musb/musb_core.c
-> @@ -831,12 +831,9 @@ b_host:
->  			case OTG_STATE_B_WAIT_ACON:
->  				dev_dbg(musb->controller, "HNP: RESET (%s), to b_peripheral\n",
->  					usb_otg_state_string(musb->xceiv->state));
-> -				musb->xceiv->state = OTG_STATE_B_PERIPHERAL;
->  				musb_g_reset(musb);
->  				break;
->  			case OTG_STATE_B_IDLE:
-> -				musb->xceiv->state = OTG_STATE_B_PERIPHERAL;
-> -				/* FALLTHROUGH */
->  			case OTG_STATE_B_PERIPHERAL:
->  				musb_g_reset(musb);
->  				break;
+Hi All,
 
-this is not the right way to fix it. We in OTG or host-only builds of
-this driver, we should never show up in the USB bus until a gadget
-driver has been probed. That's what we have ->pullup() for.
+If anyone wants to try this patches using KVMTOOL then they
+can find guest kernel side PSCI patches and KVMTOOL patch
+attached here.
 
--- 
-balbi
+Regards,
+Anup
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/bd0c4529/attachment.sig>
+Name: 0006-ARM-psci-Add-support-for-system-reboot-and-poweroff.patch
+Type: text/x-diff
+Size: 2340 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/a3142151/attachment-0003.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0007-ARM64-psci-Add-support-for-system-reboot-and-powerof.patch
+Type: text/x-diff
+Size: 2381 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/a3142151/attachment-0004.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: kvmtool_psci_emulation.patch
+Type: text/x-diff
+Size: 4544 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/a3142151/attachment-0005.bin>
