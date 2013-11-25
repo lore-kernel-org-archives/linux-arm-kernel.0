@@ -1,35 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Nov 2013 14:06:34 -0800
-Subject: [PATCH] ARM: tegra: Provide dummy powergate implementation
-In-Reply-To: <1385405387-27265-1-git-send-email-swarren@wwwdotorg.org>
-References: <1385405387-27265-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131125220634.GA18001@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Nov 2013 23:09:55 +0100
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <2205346.2EJcydzRLA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 11:49:47AM -0700, Stephen Warren wrote:
-> From: Thierry Reding <thierry.reding@gmail.com>
+On Monday 25 November 2013 14:53:36 Stephen Warren wrote:
+> v2: Use of_dma_slave_xlate() rather than of_dma_simple_xlate(), as
+>     suggested by Arnd Bergmann.
 > 
-> In order to support increased build test coverage for drivers, implement
-> dummies for the powergate implementation. This will allow the drivers to
-> be built without requiring support for Tegra to be selected.
-> 
-> This patch solves the following build errors, which can be triggered in
-> v3.13-rc1 by selecting DRM_TEGRA without ARCH_TEGRA:
-> 
-> drivers/built-in.o: In function `gr3d_remove':
-> drivers/gpu/drm/tegra/gr3d.c:321: undefined reference to `tegra_powergate_power_off'
-> drivers/gpu/drm/tegra/gr3d.c:325: undefined reference to `tegra_powergate_power_off'
-> drivers/built-in.o: In function `gr3d_probe':
-> drivers/gpu/drm/tegra/gr3d.c:266: undefined reference to `tegra_powergate_sequence_power_up'
-> drivers/gpu/drm/tegra/gr3d.c:273: undefined reference to `tegra_powergate_sequence_power_up'
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> [swarren, updated commit description]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This is a fix for 3.13.
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
 
-Thanks, applied.
+Did I suggest of_dma_slave_xlate()? I don't think I've actually heard
+of that function, and I can't find anything in the kernel source or
+using google.
 
--Olof
+Why not just use an open-coded xlate function?
+
+	Arnd
