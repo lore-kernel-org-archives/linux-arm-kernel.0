@@ -1,56 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Nov 2013 08:57:54 -0500
-Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
-In-Reply-To: <529217C7.6030304@cogentembedded.com>
-References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
- <529217C7.6030304@cogentembedded.com>
-Message-ID: <52935762.1080409@ti.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 25 Nov 2013 16:04:39 +0200
+Subject: [PATCH v3 0/6] Update Davinci watchdog driver
+Message-ID: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 24 November 2013 10:14 AM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 24-11-2013 3:28, Santosh Shilimkar wrote:
-> 
->> Building ARM with NO_BOOTMEM generates below warning. Using min_t
-> 
->    Where is that below? :-)
-> 
-Damn.. Posted a wrong version of the patch ;-(
-Here is the one with warning message included.
+These patches are intended to update Davinci watchdog to use WDT core
+and reuse driver for keystone arch, because Keystone uses the similar
+IP like Davinci.
 
->From 571dfdf4cf8ac7dfd50bd9b7519717c42824f1c3 Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Sat, 23 Nov 2013 18:16:50 -0500
-Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
+See Documentation:
+Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
+Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
 
-Building ARM with NO_BOOTMEM generates below warning.
+Also:
+ - improved to support GET_TIMELEFT option.
+ - added "clocks" and "timeout-sec" properties to DT.
 
-mm/nobootmem.c: In function ?__free_pages_memory?:
-mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
+Based on
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+keystone/master
 
-Using min_t to find the correct alignment avoids the warning.
+v2..v3:
+- watchdog: davinci: change driver to use WDT core
+	removed "ti,keystone-wdt" compatible from driver
+	renamed wdt device names for mach-davinci from
+		"watchdog" to "davinci-wdt"
 
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- mm/nobootmem.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+- watchdog: davinci: reuse driver for keystone arch
+	moved "clocks" property under "Optional properties"
+	improved decsription of "clocks" property
 
-diff --git a/mm/nobootmem.c b/mm/nobootmem.c
-index 2c254d3..8954e43 100644
---- a/mm/nobootmem.c
-+++ b/mm/nobootmem.c
-@@ -85,7 +85,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
- 	int order;
- 
- 	while (start < end) {
--		order = min(MAX_ORDER - 1UL, __ffs(start));
-+		order = min_t(size_t, MAX_ORDER - 1UL, __ffs(start));
- 
- 		while (start + (1UL << order) > end)
- 			order--;
+- arm: dts: keystone: add watchdog entry
+	replaced "ti,keystone-wdt" compatible on
+		 "ti,keystone-wdt","ti,davinci-wdt"
+
+Ivan Khoronzhuk (6):
+  watchdog: davinci: change driver to use WDT core
+  watchdog: davinci: use davinci_wdt_device structure to hold device
+    data
+  watchdog: davinci: add GET_TIMELEFT option support
+  watchdog: davinci: add "timeout-sec" property
+  watchdog: davinci: reuse driver for keystone arch
+  arm: dts: keystone: add watchdog entry
+
+ .../devicetree/bindings/watchdog/davinci-wdt.txt   |   16 +-
+ arch/arm/boot/dts/keystone.dtsi                    |    6 +
+ arch/arm/mach-davinci/da8xx-dt.c                   |    2 +-
+ arch/arm/mach-davinci/devices-da8xx.c              |    4 +-
+ arch/arm/mach-davinci/devices.c                    |    2 +-
+ drivers/watchdog/Kconfig                           |    6 +-
+ drivers/watchdog/davinci_wdt.c                     |  225 +++++++++-----------
+ 7 files changed, 126 insertions(+), 135 deletions(-)
+
 -- 
 1.7.9.5
