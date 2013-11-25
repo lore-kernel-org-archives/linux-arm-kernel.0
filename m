@@ -1,58 +1,75 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Nov 2013 12:13:40 +0100
-Subject: [PATCH v2 4/9] ASoC: fsl-ssi: Add offline_config flag
-In-Reply-To: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
-References: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1385378025-1262-5-git-send-email-mpa@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Nov 2013 12:17:10 +0100
+Subject: [PATCH 1/5] Documentation: dt: Add kona-pwm binding
+In-Reply-To: <1384800901-21711-2-git-send-email-tim.kryger@linaro.org>
+References: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
+ <1384800901-21711-2-git-send-email-tim.kryger@linaro.org>
+Message-ID: <20131125111709.GJ22043@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx50-ssi and later versions of this IP support online reconfiguration
-of all registers. The reference manual does not list any registers that
-can only be configured while the SSI unit is disabled. This patch
-introduces the flag for later use.
+On Mon, Nov 18, 2013 at 10:54:57AM -0800, Tim Kryger wrote:
+> Add the binding description for the kona-pwm block found on Broadcom's
+> mobile SoCs.
+> 
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Alex Elder <elder@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+>  .../devicetree/bindings/pwm/bcm-kona-pwm.txt       | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+> new file mode 100644
+> index 0000000..5c3ea1b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+> @@ -0,0 +1,24 @@
+> +Broadcom's PWM Controller Device Tree bindings
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+This sounds somewhat strange, like Broadcom owns the bindings... perhaps
+just:
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 5e95244..abe6172 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -151,6 +151,7 @@ struct fsl_ssi_private {
- 	bool ssi_on_imx;
- 	bool imx_ac97;
- 	bool use_dma;
-+	bool offline_config;
- 	struct clk *clk;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
-@@ -1030,6 +1031,24 @@ static int fsl_ssi_probe(struct platform_device *pdev)
-                 /* Older 8610 DTs didn't have the fifo-depth property */
- 		ssi_private->fifo_depth = 8;
- 
-+	/*
-+	 * imx50 and later SoCs have a slightly different IP that allows the
-+	 * SSI configuration while the SSI unit is running.
-+	 *
-+	 * More important, it is necessary on those SoCs to configure the
-+	 * sperate TX/RX DMA bits just before starting the stream
-+	 * (fsl_ssi_trigger). The SDMA unit has to be configured before fsl_ssi
-+	 * sends any DMA requests to the SDMA unit, otherwise it is not defined
-+	 * how the SDMA unit handles the DMA request.
-+	 *
-+	 * SDMA units are present on devices starting at imx35 but the imx35
-+	 * reference manual states that the DMA bits should not be changed
-+	 * while the SSI unit is running (SSIEN). So we support the necessary
-+	 * online configuration of fsl-ssi starting at imx50.
-+	 */
-+	if (hw_type != FSL_SSI_MX50)
-+		ssi_private->offline_config = true;
-+
- 	if (hw_type == FSL_SSI_MX21 || hw_type == FSL_SSI_MX50) {
- 		u32 dma_events[2];
- 		ssi_private->ssi_on_imx = true;
--- 
-1.8.4.2
+	Broadcom PWM controller device tree bindings
+
+Or for consistency:
+
+	Broadcom Kona PWM controller device tree bindings
+
+since apparently there exist other Broadcom PWM controllers.
+
+> +Broadcom's Kona PWM Controller has 6 channels
+
+"controller" and end the sentence with a full stop.
+
+> +
+> +Required Properties :
+> +- compatible: should be "brcm,kona-pwm"
+> +- reg: physical base address and length of the controller's registers
+> +- clocks: clock specifier for the kona pwm external clock
+
+Please use the correct spelling "PWM" in prose here and elsewhere. Also
+you should pick one of "kona", "Kona" or "KONA" and stick with it
+consistently. Might also be useful to mention what Kona is. Doesn't
+necessarily have to be in the document, but if for nothing else, then
+just for my curiosity.
+
+> +- #pwm-cells: should be 2.  The first cell specifies the per-chip index
+> +  of the PWM to use and the second cell is the period in nanoseconds.
+> +
+> +Refer to pwm/pwm.txt for generic pwm controller node properties.
+> +
+> +Refer to clocks/clock-bindings.txt for generic clock consumer
+> +properties
+
+This sentence should also end with a full stop.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/e002f94c/attachment.sig>
