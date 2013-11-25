@@ -1,76 +1,24 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Nov 2013 10:18:15 +0900
-Subject: [RFC 00/17] ARM: shmobile: r8a7779, marzen: multiplatform
-Message-ID: <1385342312-1967-1-git-send-email-horms+renesas@verge.net.au>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Mon, 25 Nov 2013 01:28:06 +0000
+Subject: ACPI
+In-Reply-To: <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
+ <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+Message-ID: <20131125012806.GA20107@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aim of this series is to adding common clock framework and in turn
-multiplatform support to the r8a7779 SoC and marzen-reference.  It
-subsequently removes non-multiplatform support from marzen-reference.  This
-last step is provided to illustrate that it can be done, it may not be
-desirable to do so for some time.
+On Mon, Nov 25, 2013 at 12:42:13AM +0000, Grant Likely wrote:
 
-This is based on work for R-Car Gen2 by Laurent Pinchart and Magnus Damm.
+> The plus side is we do have a lot of influence here. ARM servers are
+> being built to run Linux. I don't know of any Microsoft plans, but
+> even if they plan to release a server OS, Linux is currently in the
+> driver seat.
 
-I expect the R-Car Gen2 work in this area to change and
-I intend to update this series as necessary.
-
-
-This series is based on the clocks/ccf/rcar-gen2 branch
-of Laurent's fbdev tree. I expect that branch to be rebased/changed,
-but it seems to be an adequate base for an RFC.
-
-I have made this series, including its base, available
-in the topic/clocks/ccf/r8a7779-marzen branch of my renesas tree.
-That branch is likely to be rebased/changed in the future.
-
-
-Simon Horman (17):
-  clk: shmobile: r8a7779: Add clocks support
-  clk: shmobile: r8a7779: Add MSTP clock support
-  ARM: shmobile: r8a7779: Add clock index macros for DT sources
-  ARM: shmobile: r8a7779: Add clocks
-  ARM: shmobile: r8a7779: Reference clocks
-  ARM: shmobile: Sync Marzen DTS with Marzen reference DTS
-  ARM: shmobile: r8a7779: Sort headers alphabetically
-  ARM: shmobile: r8a7779: Add helper to read mode pins
-  ARM: shmobile: r8a7779: Move r8a7779_earlytimer_init to
-    clock-r8a7779.c
-  ARM: shmobile: marzen-reference: Move clock and OF device
-    initialisation into board code
-  ARM: shmobile: r8a7779: Do not include sh_clk.h in r8a7779.h
-  ARM: shmobile: r8a7779: Initial multiplatform support
-  ARM: shmobile: marzen-reference: Initialize CPG device
-  ARM: shmobile: marzen-reference: Instantiate clkdevs for SCIF and CMT
-  ARM: shmobile: Remove non-multiplatform Marzen reference support
-  ARM: shmobile: Let Marzen multiplatform boot with Marzen DTB
-  ARM: shmobile: Remove Marzen reference DTS
-
- .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
- .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  22 +++
- arch/arm/boot/dts/Makefile                         |   2 +-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts     | 110 --------------
- arch/arm/boot/dts/r8a7779-marzen.dts               |  82 ++++++++++
- arch/arm/boot/dts/r8a7779.dtsi                     | 132 ++++++++++++++++
- arch/arm/mach-shmobile/Kconfig                     |  21 +--
- arch/arm/mach-shmobile/Makefile                    |   4 +-
- arch/arm/mach-shmobile/Makefile.boot               |   1 -
- arch/arm/mach-shmobile/board-koelsch-reference.c   |   1 +
- arch/arm/mach-shmobile/board-marzen-reference.c    |  44 ++++++
- arch/arm/mach-shmobile/board-marzen.c              |  28 ++--
- arch/arm/mach-shmobile/clock-r8a7779.c             |  22 +--
- arch/arm/mach-shmobile/include/mach/r8a7779.h      |   2 +-
- arch/arm/mach-shmobile/setup-r8a7779.c             |  28 ++--
- drivers/clk/shmobile/Makefile                      |   1 +
- drivers/clk/shmobile/clk-r8a7779.c                 | 166 +++++++++++++++++++++
- include/dt-bindings/clock/r8a7779-clock.h          |  61 ++++++++
- include/linux/clk/shmobile.h                       |   1 +
- 19 files changed, 564 insertions(+), 165 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
- delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
- create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
- create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
+We only have influence if the vendors are talking to us. Regardless of 
+what we do in any standardisation bodies, if the vendors have already 
+made decisions here then we have no influence at all.
 
 -- 
-1.8.4
+Matthew Garrett | mjg59 at srcf.ucam.org
