@@ -1,37 +1,43 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 25 Nov 2013 11:28:39 -0800
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <52939E67.6040300@wwwdotorg.org>
-References: <528D28A1.2050307@wwwdotorg.org>
- <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
- <528E4F55.9070204@wwwdotorg.org>
- <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
- <528F95A9.2050305@wwwdotorg.org>
- <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
- <528F9DF9.6080706@wwwdotorg.org>
- <20131123003442.GH16735@n2100.arm.linux.org.uk>
- <5293883A.8050808@wwwdotorg.org>
- <CAA9_cmfMtp4WjRGVzfTxrwcNWP95+HE7DAYg_GeWfqi=L2K2aw@mail.gmail.com>
- <20131125180000.GR16735@n2100.arm.linux.org.uk>
- <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
- <52939E67.6040300@wwwdotorg.org>
-Message-ID: <CAPcyv4hPy_zddiideTk9HNOZnKzkGqKeT4m6wDyckDmbkoMacA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 25 Nov 2013 19:39:25 +0000
+Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
+Message-ID: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 11:00 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> I suppose an alternative would be to remove that flag, and have the loop
-> in of_dma_request_slave_channel() initially ignore any unregistered DMA
-> controllers, and still continue to look through the property for any
-> alternative controller, and return a channel from one if it is found.
-> Then, at the very end of the function, we could always return
-> -EPROBE_DEFER if any unregistered DMA controllers were found, otherwise
-> return -ENODEV. That would keep compatible behaviour, but it would mean
-> that device probe order would/could influence which dmas entry provided
-> the channel, since some entries might be ignored based simply on
-> timing/ordering of DMA controller registration. Is that acceptable?
->
+The following commit:
 
-Yes, I think this option makes the most sense, and is just as
-susceptible to probe order as the current implementation.
+  54f8d501e842 dmaengine: remove DMA unmap from drivers
+
+removed the last caller to mv_desc_get_dest_addr(), creating the
+warning:
+
+  drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
+  but not used [-Wunused-function]
+
+Remove it.
+
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ drivers/dma/mv_xor.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 7807f0ef4e20..23bcc9158cbc 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -54,12 +54,6 @@ static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
+ 	hw_desc->desc_command = (1 << 31);
+ }
+ 
+-static u32 mv_desc_get_dest_addr(struct mv_xor_desc_slot *desc)
+-{
+-	struct mv_xor_desc *hw_desc = desc->hw_desc;
+-	return hw_desc->phy_dest_addr;
+-}
+-
+ static void mv_desc_set_byte_count(struct mv_xor_desc_slot *desc,
+ 				   u32 byte_count)
+ {
+-- 
+1.8.4.4
