@@ -1,106 +1,31 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon, 25 Nov 2013 23:12:27 +0200
-Subject: ARM: v3.13-rc1: USB regression
-In-Reply-To: <20131125171853.GF25039@n2100.arm.linux.org.uk>
-References: <20131124222247.GC24645@blackmetal.musicnaut.iki.fi>
- <20131124224359.GE25039@n2100.arm.linux.org.uk>
- <20131125163302.GD24645@blackmetal.musicnaut.iki.fi>
- <20131125171853.GF25039@n2100.arm.linux.org.uk>
-Message-ID: <20131125211227.GE24645@blackmetal.musicnaut.iki.fi>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 25 Nov 2013 22:13:47 +0100
+Subject: [PATCH] ARM: u300: fix timekeeping when periodic mode is used
+In-Reply-To: <CACRpkdZrV7fPcyNeBdzhhZHDkm1ZmixwDi=1=vKnFOBiYTQYsw@mail.gmail.com>
+References: <20131105083336.GK14892@pengutronix.de>
+ <1383642199-11473-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdZrV7fPcyNeBdzhhZHDkm1ZmixwDi=1=vKnFOBiYTQYsw@mail.gmail.com>
+Message-ID: <20131125211347.GD28642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Nov 25, 2013 at 05:18:53PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 25, 2013 at 06:33:02PM +0200, Aaro Koskinen wrote:
-> > Hi,
-> > 
-> > On Sun, Nov 24, 2013 at 10:43:59PM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Nov 25, 2013 at 12:22:47AM +0200, Aaro Koskinen wrote:
-> > > > [   33.967324] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
-> > > > 
-> > > > I bisected this to 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 (ARM: DMA-API:
-> > > > better handing of DMA masks for coherent allocations). Reverting that
-> > > > commit makes the USB work again fine.
-> > 
-> > [...]
-> > 
-> > > Better would be:
-> > > 
-> > > #define __arch_dma_to_pfn(dev, addr)	\
-> > > 	({ unsigned long pfn = (addr) >> PAGE_SHIFT;		\
-> > > 	   if (is_lbus_device(dev))				\
-> > > 		pfn += PHYS_PFN_OFFSET - 			\
-> > > 			(OMAP1510_LB_OFFSET >> PAGE_SHIFT);	\
-> > > 	   pfn;							\
-> > > 	})
-> > > 
-> > > Can you try that in arch/arm/mach-omap1/include/mach/memory.h please?
-> > 
-> > Still doesn't work:
-> > 
-> > [   33.878790] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xfffe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
-> > [   33.894019] ohci ohci: can't setup: -12
+On Tue, Nov 05, 2013 at 10:44:58AM +0100, Linus Walleij wrote:
+> On Tue, Nov 5, 2013 at 10:03 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
 > 
-> Well, that looks technically better, rather unfortunate that we end up
-> going to negative PFNs though.
+> > To determine the value to write to the hardware's timer counter register
+> > the symbol CLOCK_TICK_RATE is used. This value is a dummy value on u300
+> > though. So instead use the clock rate that is used for oneshot mode.
+> >
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> Without that change, could you try this instead please:
+> Thanks, patch applied to the u300 branch in the linux-stericsson
+> tree.
+This isn't in next? At least this patch doesn't appear there.
 
-This works, thanks.
+Best regards
+Uwe
 
-A.
-
->  arch/arm/mm/dma-mapping.c |    9 +++++++--
->  1 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index f0ea0134e5a3..a18cfc53f445 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -9,6 +9,7 @@
->   *
->   *  DMA uncached mapping support.
->   */
-> +#include <linux/bootmem.h>
->  #include <linux/module.h>
->  #include <linux/mm.h>
->  #include <linux/gfp.h>
-> @@ -162,6 +163,8 @@ static u64 get_coherent_dma_mask(struct device *dev)
->  	u64 mask = (u64)DMA_BIT_MASK(32);
->  
->  	if (dev) {
-> +		unsigned long max_dma_pfn;
-> +
->  		mask = dev->coherent_dma_mask;
->  
->  		/*
-> @@ -173,6 +176,8 @@ static u64 get_coherent_dma_mask(struct device *dev)
->  			return 0;
->  		}
->  
-> +		max_dma_pfn = min(max_pfn, arm_dma_pfn_limit);
-> +
->  		/*
->  		 * If the mask allows for more memory than we can address,
->  		 * and we actually have that much memory, then fail the
-> @@ -180,7 +185,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
->  		 */
->  		if (sizeof(mask) != sizeof(dma_addr_t) &&
->  		    mask > (dma_addr_t)~0 &&
-> -		    dma_to_pfn(dev, ~0) > arm_dma_pfn_limit) {
-> +		    dma_to_pfn(dev, ~0) > max_dma_pfn) {
->  			dev_warn(dev, "Coherent DMA mask %#llx is larger than dma_addr_t allows\n",
->  				 mask);
->  			dev_warn(dev, "Driver did not use or check the return value from dma_set_coherent_mask()?\n");
-> @@ -192,7 +197,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
->  		 * fits within the allowable addresses which we can
->  		 * allocate.
->  		 */
-> -		if (dma_to_pfn(dev, mask) < arm_dma_pfn_limit) {
-> +		if (dma_to_pfn(dev, mask) < max_dma_pfn) {
->  			dev_warn(dev, "Coherent DMA mask %#llx (pfn %#lx-%#lx) covers a smaller range of system memory than the DMA zone pfn 0x0-%#lx\n",
->  				 mask,
->  				 dma_to_pfn(dev, 0), dma_to_pfn(dev, mask) + 1,
-> 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
