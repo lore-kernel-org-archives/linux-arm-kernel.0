@@ -1,380 +1,95 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 25 Nov 2013 12:49:16 +0800
-Subject: [PATCH v11 2/2] ARM: dts: enable clock binding on Hi3620
-In-Reply-To: <20131117024413.19193.15469@quantum>
-References: <1384306274-27315-1-git-send-email-haojian.zhuang@gmail.com>
- <1384306274-27315-3-git-send-email-haojian.zhuang@gmail.com>
- <20131117024413.19193.15469@quantum>
-Message-ID: <CAN1soZzJXeotw6pdFVVECX2mwUeZieWpjsNok8Kfepi7SS9kQw@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Sun, 24 Nov 2013 20:59:31 -0800
+Subject: [PATCH v4 3/4] ata: Add APM X-Gene SoC SATA host controller driver
+In-Reply-To: <CAPw-ZTkBovLrQEk_CQzuw03t5P2N2ZecQhK8tkZQM0grGwPxSA@mail.gmail.com>
+References: <1385014298-15700-1-git-send-email-lho@apm.com>
+ <201311211401.14836.arnd@arndb.de>
+ <CAPw-ZTnt0QnXxb_dkDpkXbz4xFOcMM2Z-oOVJdH9o9u3S+DuPg@mail.gmail.com>
+ <201311242035.11411.arnd@arndb.de>
+ <CAPw-ZTkBovLrQEk_CQzuw03t5P2N2ZecQhK8tkZQM0grGwPxSA@mail.gmail.com>
+Message-ID: <CAPw-ZTnxu1EFaQzSuq5XwC8m7SQUQz7SP8u0Zva2rvheFzTa-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 17, 2013 at 10:44 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Haojian Zhuang (2013-11-12 17:31:14)
->> Enable clock binding for Hi3620 common clock driver.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->> ---
->>  arch/arm/boot/dts/hi3620.dtsi | 79 ++++++++++++++++++++++++-------------------
->>  arch/arm/boot/dts/hi4511.dts  |  3 +-
->>  2 files changed, 46 insertions(+), 36 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
->> index e311937..ab1116d 100644
->> --- a/arch/arm/boot/dts/hi3620.dtsi
->> +++ b/arch/arm/boot/dts/hi3620.dtsi
->> @@ -11,7 +11,8 @@
->>   * publishhed by the Free Software Foundation.
->>   */
->>
->> -/include/ "skeleton.dtsi"
->> +#include "skeleton.dtsi"
->> +#include <dt-bindings/clock/hi3620-clock.h>
->>
->>  / {
->>         aliases {
->> @@ -63,6 +64,7 @@
->>         };
->>
->>         amba {
->> +
->>                 #address-cells = <1>;
->>                 #size-cells = <1>;
->>                 compatible = "arm,amba-bus";
->> @@ -88,13 +90,20 @@
->>
->>                 sysctrl: system-controller at 802000 {
->>                         compatible = "hisilicon,sysctrl";
->> -                       reg = <0x802000 0x1000>;
->>                         #address-cells = <1>;
->> -                       #size-cells = <0>;
->> +                       #size-cells = <1>;
->> +                       ranges = <0 0x802000 0x1000>;
->> +                       reg = <0x802000 0x1000>;
->>
->>                         smp-offset = <0x31c>;
->>                         resume-offset = <0x308>;
->>                         reboot-offset = <0x4>;
->> +
->> +                       clock: clock at 0 {
->> +                               compatible = "hisilicon,hi3620-clock";
->> +                               reg = <0 0x10000>;
->> +                               #clock-cells = <1>;
->> +                       };
->>                 };
->>
->>                 dual_timer0: dual_timer at 800000 {
->> @@ -102,7 +111,7 @@
->>                         reg = <0x800000 0x1000>;
->>                         /* timer00 & timer01 */
->>                         interrupts = <0 0 4>, <0 1 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_TIMER0_MUX>, <&clock HI3620_TIMER1_MUX>;
->>                         clock-names = "apb_pclk";
->
-> Two clocks are specified in "clocks" but only a single name in
-> clock-names. Is this intentional?
->
+ Hi,
 
-Yes, it's intentional. The amba driver needs this.
+Resend in plain text as mailing list reject HTML format.
 
-> Thanks,
-> Mike
+> > > > +static int xgene_ahci_init_memram(struct xgene_ahci_context *ctx)
+> > > > +{
+> > > > +     void *diagcsr = ctx->csr_base + SATA_DIAG_OFFSET;
+> > > > +     int timeout;
+> > > > +     u32 val;
+> > > > +
+> > > > +     xgene_rd(diagcsr + REGSPEC_CFG_MEM_RAM_SHUTDOWN_ADDR, &val);
+> > > > +     if (val == 0) {
+> > > > +             dev_dbg(ctx->dev, "memory already released from
+> > > shutdown\n");
+> > > > +             return 0;
+> > > > +     }
+> > > > +     dev_dbg(ctx->dev, "Release memory from shutdown\n");
+> > > > +     /* SATA controller memory in shutdown. Remove from shutdown. */
+> > > > +     xgene_wr_flush(diagcsr + REGSPEC_CFG_MEM_RAM_SHUTDOWN_ADDR, 0x00);
+> > > > +     timeout = SATA_RESET_MEM_RAM_TO;
+> > > > +     do {
+> > > > +             xgene_rd(diagcsr + REGSPEC_BLOCK_MEM_RDY_ADDR, &val);
+> > > > +             if (val != 0xFFFFFFFF)
+> > > > +                     udelay(1);
+> > > > +     } while (val != 0xFFFFFFFF && timeout-- > 0);
+> > >
+> > > With SATA_RESET_MEM_RAM_TO == 100000, this is an awfully long busy-loop.
+> > > Can you replace the udelay with usleep_range() providing a reasonable
+> > > wide range, and the replace the retry count with a time_before(jiffies(),
+> > > timeout) comparision?
+> > >
+> > [Loc Ho]
+> > I reduce to 1000. It only takes about one or two reads.
 >
->>                         status = "disabled";
->>                 };
->> @@ -112,7 +121,7 @@
->>                         reg = <0x801000 0x1000>;
->>                         /* timer10 & timer11 */
->>                         interrupts = <0 2 4>, <0 3 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_TIMER2_MUX>, <&clock HI3620_TIMER3_MUX>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -122,7 +131,7 @@
->>                         reg = <0xa01000 0x1000>;
->>                         /* timer20 & timer21 */
->>                         interrupts = <0 4 4>, <0 5 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_TIMER4_MUX>, <&clock HI3620_TIMER5_MUX>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -132,7 +141,7 @@
->>                         reg = <0xa02000 0x1000>;
->>                         /* timer30 & timer31 */
->>                         interrupts = <0 6 4>, <0 7 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_TIMER6_MUX>, <&clock HI3620_TIMER7_MUX>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -142,7 +151,7 @@
->>                         reg = <0xa03000 0x1000>;
->>                         /* timer40 & timer41 */
->>                         interrupts = <0 96 4>, <0 97 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_TIMER8_MUX>, <&clock HI3620_TIMER9_MUX>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -157,7 +166,7 @@
->>                         compatible = "arm,pl011", "arm,primecell";
->>                         reg = <0xb00000 0x1000>;
->>                         interrupts = <0 20 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_UARTCLK0>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -166,7 +175,7 @@
->>                         compatible = "arm,pl011", "arm,primecell";
->>                         reg = <0xb01000 0x1000>;
->>                         interrupts = <0 21 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_UARTCLK1>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -175,7 +184,7 @@
->>                         compatible = "arm,pl011", "arm,primecell";
->>                         reg = <0xb02000 0x1000>;
->>                         interrupts = <0 22 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_UARTCLK2>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -184,7 +193,7 @@
->>                         compatible = "arm,pl011", "arm,primecell";
->>                         reg = <0xb03000 0x1000>;
->>                         interrupts = <0 23 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_UARTCLK3>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -193,7 +202,7 @@
->>                         compatible = "arm,pl011", "arm,primecell";
->>                         reg = <0xb04000 0x1000>;
->>                         interrupts = <0 24 4>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_UARTCLK4>;
->>                         clock-names = "apb_pclk";
->>                         status = "disabled";
->>                 };
->> @@ -208,7 +217,7 @@
->>                                         &pmx0 5 0 1 &pmx0 6 1 1 &pmx0 7 2 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK0>;
->>                         clock-names = "apb_pclk";
->>                 };
+> It's still over two miliseconds for the (unlikely) timeout in that case,
+> plus the time it takes to do the 1000 reads. The important part of my
+> comment was about using usleep_range(), which lets another process run
+> in the meantime rather than blocking the CPU.
+>
+> If you want to keep using a retry count rather than a timeout, don't
+> call it "timeout".
+>
+[Loc Ho]
+I will give usleep_range a try.
+
 >>
->> @@ -223,7 +232,7 @@
->>                                         &pmx0 6 5 1 &pmx0 7 6 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK1>;
->>                         clock-names = "apb_pclk";
->>                 };
+>> > > > +/* Flush the IOB to ensure all SATA controller writes completed before
+>> > > > +   servicing the completed command. This is needed due to the
+>> > > possibility
+>> > > > +   that interrupt serviced before the data actually written to the
+>> > > cache/DDR.
+>> > > > +   Writes from the IP to the CPU domain is not synchronized with the IRQ
+>> > > > +   line or the IP core toggled the CI bits before the data write
+>> > > completed. */
+>> > > > +static int xgene_ahci_iob_flush(struct xgene_ahci_context *ctx)
+>> > > > +{
+>> > > > +     if (ctx->ahbc_io_base)
+>> > > > +             readl(ctx->ahbc_io_base);
+>> > > > +     return 0;
+>> > > > +}
+>> > >
+>> > > Normally the synchronization should be guaranteed by using MSI interrupts
+>> > > rather than edge or level interrupt pins. Do you have MSI support in your
+>> > > hardware? Using that would get rid of this ugly hack and likely improve
+>> > > performance significantly.
+>> > >
+>> > [Loc Ho]
+>> > The SATA IP is built into the chip and NOT on the PCIe bus. The need for
+>> > this is already mentioned above.
 >>
->> @@ -238,7 +247,7 @@
->>                                         &pmx0 6 3 1 &pmx0 7 3 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK2>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -253,7 +262,7 @@
->>                                         &pmx0 6 11 1 &pmx0 7 11 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK3>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -268,7 +277,7 @@
->>                                         &pmx0 6 13 1 &pmx0 7 13 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK4>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -283,7 +292,7 @@
->>                                         &pmx0 6 16 1 &pmx0 7 16 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK5>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -298,7 +307,7 @@
->>                                         &pmx0 6 18 1 &pmx0 7 19 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK6>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -313,7 +322,7 @@
->>                                         &pmx0 6 25 1 &pmx0 7 26 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK7>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -328,7 +337,7 @@
->>                                         &pmx0 6 33 1 &pmx0 7 34 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK8>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -343,7 +352,7 @@
->>                                         &pmx0 6 41 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK9>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -357,7 +366,7 @@
->>                                         &pmx0 5 45 1 &pmx0 6 46 1 &pmx0 7 46 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK10>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -372,7 +381,7 @@
->>                                         &pmx0 6 49 1 &pmx0 7 49 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK11>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -387,7 +396,7 @@
->>                                         &pmx0 6 51 1 &pmx0 7 52 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK12>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -402,7 +411,7 @@
->>                                         &pmx0 6 55 1 &pmx0 7 56 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK13>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -417,7 +426,7 @@
->>                                         &pmx0 6 60 1 &pmx0 7 61 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK14>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -432,7 +441,7 @@
->>                                         &pmx0 6 64 1 &pmx0 7 65 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK15>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -447,7 +456,7 @@
->>                                         &pmx0 6 72 1 &pmx0 7 73 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK16>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -462,7 +471,7 @@
->>                                         &pmx0 6 80 1 &pmx0 7 81 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK17>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -477,7 +486,7 @@
->>                                         &pmx0 6 86 1 &pmx0 7 87 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK18>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -491,7 +500,7 @@
->>                                         &pmx0 3 88 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK19>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -505,7 +514,7 @@
->>                                         &pmx0 3 90 1 &pmx0 4 91 1 &pmx0 5 92 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK20>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> @@ -518,7 +527,7 @@
->>                         gpio-ranges = < &pmx0 3 94 1 &pmx0 7 96 1>;
->>                         interrupt-controller;
->>                         #interrupt-cells = <2>;
->> -                       clocks = <&pclk>;
->> +                       clocks = <&clock HI3620_GPIOCLK21>;
->>                         clock-names = "apb_pclk";
->>                 };
->>
->> diff --git a/arch/arm/boot/dts/hi4511.dts b/arch/arm/boot/dts/hi4511.dts
->> index 96e69ab..fe62392 100644
->> --- a/arch/arm/boot/dts/hi4511.dts
->> +++ b/arch/arm/boot/dts/hi4511.dts
->> @@ -8,7 +8,8 @@
->>   */
->>
->>  /dts-v1/;
->> -/include/ "hi3620.dtsi"
->> +
->> +#include "hi3620.dtsi"
->>
->>  / {
->>         model = "Hisilicon Hi4511 Development Board";
->> --
->> 1.8.3.2
+>> I don't understand the comment about PCIe. MSI should work regardless of
+>> where the device resides in the system, unless you have the MSI controller
+>> integrated into the PCIe host, which would be a bug because it causes the
+>> same problem that you have on this device for any PCIe add-on device
+>> (the MSI would no longer flush the a PCIe bus master DMA transfer
+>> all the way to memory if the message is consumed by the PCIe host).
+>
+[Loc Ho]
+The SATA IP does not support MSI as it is NOT an PCIe interface. The
+interrupt line is just a direct line into the GIC similar to the UART.
+
+-Loc
