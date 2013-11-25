@@ -1,53 +1,85 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 25 Nov 2013 13:09:07 +0200
-Subject: Fwd: [PATCH 6/8] watchdog: davinci: reuse driver for keystone arch
-In-Reply-To: <201311231902.02807.arnd@arndb.de>
-References: <1383680783-12114-7-git-send-email-ivan.khoronzhuk@ti.com>
- <527A28DE.4030906@ti.com> <201311231902.02807.arnd@arndb.de>
-Message-ID: <52932FD3.10508@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 25 Nov 2013 08:11:27 -0300
+Subject: [PATCH] ARM: pxa: Move iotable mapping inside vmalloc region
+In-Reply-To: <alpine.LFD.2.10.1311241824380.9667@knanqh.ubzr>
+References: <1385296571-23599-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <alpine.LFD.2.10.1311241824380.9667@knanqh.ubzr>
+Message-ID: <20131125111126.GB2408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2013 08:02 PM, Arnd Bergmann wrote:
-> On Wednesday 06 November 2013, ivan.khoronzhuk wrote:
+On Sun, Nov 24, 2013 at 06:26:45PM -0500, Nicolas Pitre wrote:
+> On Sun, 24 Nov 2013, Ezequiel Garcia wrote:
 > 
->> @@ -1,13 +1,20 @@
->> -DaVinci Watchdog Timer (WDT) Controller
->> +Texas Instruments DaVinci/Keystone Watchdog Timer (WDT) Controller
->>   
->>   Required properties:
->> -- compatible : Should be "ti,davinci-wdt"
->> +
->> +- compatible:          "ti,davinci-wdt"
->> +                       "ti,keystone-wdt"
->> +
->>   - reg : Should contain WDT registers location and length
->>   
+> > In order to remove the following ugly message:
+> > 
+> >   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+> > 
+> > the iotable mappings should be re-located inside the vmalloc
+> > region. Such move was introduced at commit:
+> > 
+> > commit 0536bdf33faff4d940ac094c77998cfac368cfff
+> > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Date:   Thu Aug 25 00:35:59 2011 -0400
+> > 
+> >     ARM: move iotable mappings within the vmalloc region
+> > 
+> > While at it, let's add some nicer defines to make the code
+> > more readable.
+> > 
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  arch/arm/mach-pxa/generic.c | 12 +++++++++---
+> >  1 file changed, 9 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+> > index 4225417..7c01095 100644
+> > --- a/arch/arm/mach-pxa/generic.c
+> > +++ b/arch/arm/mach-pxa/generic.c
+> > @@ -24,6 +24,7 @@
+> >  #include <mach/hardware.h>
+> >  #include <asm/mach/map.h>
+> >  #include <asm/mach-types.h>
+> > +#include <asm/pgtable.h>
+> >  
+> >  #include <mach/reset.h>
+> >  #include <mach/smemc.h>
+> > @@ -77,6 +78,11 @@ EXPORT_SYMBOL(get_clk_frequency_khz);
+> >   * Note: virtual 0xfffe0000-0xffffffff is reserved for the vector table
+> >   *       and cache flush area.
+> >   */
+> > +
+> > +#define UNCACHED_PHY	0x00000000
+> > +#define UNCACHED_SIZE	SZ_1M
+> > +#define UNCACHED_VIRT	(VMALLOC_END - UNCACHED_SIZE)
+> > +
+> >  static struct map_desc common_io_desc[] __initdata = {
+> >    	{	/* Devs */
+> >  		.virtual	=  0xf2000000,
+> > @@ -84,9 +90,9 @@ static struct map_desc common_io_desc[] __initdata = {
+> >  		.length		= 0x02000000,
+> >  		.type		= MT_DEVICE
+> >  	}, {	/* UNCACHED_PHYS_0 */
+> > -		.virtual	= 0xff000000,
+> > -		.pfn		= __phys_to_pfn(0x00000000),
+> > -		.length		= 0x00100000,
+> > +		.virtual	= UNCACHED_VIRT,
+> > +		.pfn		= __phys_to_pfn(UNCACHED_PHY),
+> > +		.length		= UNCACHED_SIZE,
+> >  		.type		= MT_DEVICE
+> >  	}
+> >  };
 > 
-> ...
-> 
->> @@ -229,6 +229,7 @@ static int davinci_wdt_remove(struct platform_device *pdev)
->>   
->>   static const struct of_device_id davinci_wdt_of_match[] = {
->>          { .compatible = "ti,davinci-wdt", },
->> +       { .compatible = "ti,keystone-wdt", },
->>          {},
->>   };
->>   MODULE_DEVICE_TABLE(of, davinci_wdt_of_match);
-> 
-> You should clarify the compatible list here: It seems that the devices are fully
-> compatible, so the driver should only need to check for "ti,davinci-wdt" as the
-> compatible string, while the dtb files should list both "ti,davinci-wdt" and
-> "ti,keystone-wdt" for keystone, but only the davinci string for davinci.
-> 
-> 	Arnd
+> You might wish to change the virtual address for this mapping, but 
+> nowhere in your patch you are changing users of that virtual mapping.
 > 
 
-Ok, I will remove "ti,keystone-wdt" compatible from driver and for the keystone WDT node
-describe compatible as:
+Yeah, this patch is pure crap. I'll re-work it and submit a new
+(hopefully not stupid) version.
 
-compatible = "ti,keystone-wdt", "ti,davinci-wdt";
-
+Thanks for taking a look!
 -- 
-Regards,
-Ivan Khoronzhuk
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
