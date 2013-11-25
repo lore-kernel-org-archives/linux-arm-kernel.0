@@ -1,126 +1,59 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Nov 2013 14:44:08 -0500
-Subject: HYP Kernel boot requirements
-In-Reply-To: <20131125172825.GD8396@arm.com>
-References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
- <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
- <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
- <52937AB4.1060901@ti.com>
- <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
- <529381E4.3090405@ti.com> <20131125172825.GD8396@arm.com>
-Message-ID: <5293A888.9050500@ti.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 25 Nov 2013 11:45:01 -0800
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <5293A573.2050704@wwwdotorg.org>
+References: <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+ <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <20131123003442.GH16735@n2100.arm.linux.org.uk>
+ <5293883A.8050808@wwwdotorg.org>
+ <CAA9_cmfMtp4WjRGVzfTxrwcNWP95+HE7DAYg_GeWfqi=L2K2aw@mail.gmail.com>
+ <20131125180000.GR16735@n2100.arm.linux.org.uk>
+ <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
+ <52939E67.6040300@wwwdotorg.org>
+ <CAPcyv4hPy_zddiideTk9HNOZnKzkGqKeT4m6wDyckDmbkoMacA@mail.gmail.com>
+ <5293A573.2050704@wwwdotorg.org>
+Message-ID: <CAPcyv4ijv2=Fnp9mVKoAUGL9DLYh=6ZSsUd_PWxZqxQ7yZ61hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 November 2013 12:28 PM, Catalin Marinas wrote:
-> On Mon, Nov 25, 2013 at 04:59:16PM +0000, Santosh Shilimkar wrote:
->> On Monday 25 November 2013 11:33 AM, Christoffer Dall wrote:
->>> On 25 November 2013 08:28, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->>>> On Monday 25 November 2013 10:09 AM, Christoffer Dall wrote:
->>>>> On 23 November 2013 16:07, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->>>>>> Boot-CPU entry into the HYP mode is managed in boot-loader but
->>>>>> the secondary CPUs directly jumps to kernel during boot. Same
->>>>>> path is also used for CPU hotplug as well during suspend for
->>>>>> secondary CPU.
->>>>>>
->>>>>> Hence patch the secondary CPU boot path for hyp mode etry.
->>>>>>
->>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>> Cc: Tony Lindgren <tony@atomide.com>
->>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>> ---
->>>>>>  arch/arm/mach-omap2/omap-headsmp.S |    7 +++++++
->>>>>>  1 file changed, 7 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
->>>>>> index 75e9295..4844dd8 100644
->>>>>> --- a/arch/arm/mach-omap2/omap-headsmp.S
->>>>>> +++ b/arch/arm/mach-omap2/omap-headsmp.S
->>>>>> @@ -22,6 +22,7 @@
->>>>>>
->>>>>>  /* Physical address needed since MMU not enabled yet on secondary core */
->>>>>>  #define AUX_CORE_BOOT0_PA                      0x48281800
->>>>>> +#define API_HYP_ENTRY                          0x102
->>>>>>
->>>>>>  /*
->>>>>>   * OMAP5 specific entry point for secondary CPU to jump from ROM
->>>>>> @@ -38,6 +39,12 @@ wait:        ldr     r2, =AUX_CORE_BOOT0_PA  @ read from AuxCoreBoot0
->>>>>>         and     r4, r4, #0x0f
->>>>>>         cmp     r0, r4
->>>>>>         bne     wait
->>>>>> +#ifdef CONFIG_KVM_ARM_HOST
->>>>>> +       ldr     r12, =API_HYP_ENTRY
->>>>>> +       adr     r0, hyp_boot
->>>>>> +       smc     #0
->>>>>> +hyp_boot:
->>>>>> +#endif
->>>>>>         b       secondary_startup
->>>>>>  END(omap5_secondary_startup)
->>>>>>  /*
->>>>>
->>>>> hmm, this means that currently running this in a guest will fail to
->>>>> bring-up SMP, right?
->>>>>
->>>> Nope. Because the code under 'KVM_ARM_HOST' macro. Guest build
->>>> will not enable CONFIG_KVM_ARM_HOST and things should be fine then.
->>>> Right ?
->>>>
+On Mon, Nov 25, 2013 at 11:30 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/25/2013 12:28 PM, Dan Williams wrote:
+>> On Mon, Nov 25, 2013 at 11:00 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> I suppose an alternative would be to remove that flag, and have the loop
+>>> in of_dma_request_slave_channel() initially ignore any unregistered DMA
+>>> controllers, and still continue to look through the property for any
+>>> alternative controller, and return a channel from one if it is found.
+>>> Then, at the very end of the function, we could always return
+>>> -EPROBE_DEFER if any unregistered DMA controllers were found, otherwise
+>>> return -ENODEV. That would keep compatible behaviour, but it would mean
+>>> that device probe order would/could influence which dmas entry provided
+>>> the channel, since some entries might be ignored based simply on
+>>> timing/ordering of DMA controller registration. Is that acceptable?
 >>>
->>> That really goes against the whole single binary on all platforms
->>> thing. With multi-platform support you really shouldn't have to
->>> compile your kernel any differently for running as a guest as when
->>> you're running on a host.  Someone may even emulate an OMAP5 in QEMU
->>> and you'd certainly want your kvm-enabled kernel to run as both guest
->>> and host.  After all, this is not a paravirtualization solution.
 >>
->> Fair enough.
->>
->>>>> Couldn't you create a little wrapper-pen in U-Boot instead, which
->>>>> replicates the omap boot protocol and takes care of the hyp-mode
->>>>> startup there instead, keeping this completely out of the kernel?
->>>>>
->>>> Its not just booting but CPU hotplug also follows the same path
->>>> so we need the mechanism in kernel to switch mode.
->>>>
->>>> In general, I think its important to consider the aspect with
->>>> CPU PM. CPUs are not going to go through the boot-loaders in
->>>> those paths and hence need of HYP entry in the kernel will
->>>> be must.
->>>>
->>> I agree, and PSCI is the obvious only correct answer to this.
->>>
->>> We have discussed this a bit earlier (I think Will Deacon brought this
->>> up - cc'ed), but I don't think anyone had any bright ideas.
->>>
->>> However, we broadly agreed on the fact that for KVM/hyp support, you
->>> need to boot your kernel in that mode, and this is definitely pulling
->>> in the wrong direction.
->>
->> What I am saying is the platforms like OMAP5 already support PM in
->> mainline kernel and we can't break that for KVM. Boot-loaders
->> would be thrashed after boot so you need something which runs
->> in Kernel or along with Kernel to have equivalent of hyp
->> switching.
->>
->> Am not challenging the agreed direction but we need to solve the
->> PM problem as well before making "all CPU runs boot-loader for
->> HYP kernels" as a must have. At least its is a change in boot
->> strategy from existing kernels.
-> 
-> Of course I recommend PSCI which covers both hotplug and suspend ;), but
-> I guess it's not the case for OMAP5. Since OMAP has its own secondary
-> booting protocol and CPU hotplug re-entry, can you not just use
-> different entry point when the primary CPU was initially started in Hyp
-> mode (e.g. omap5_hyp_secondary_startup)?
-> 
-How will that solve the guest secondary boot failure case when using
-the same kernel binary for guest-boot ? Even for primary CPU which
-will be suspended it needs to resume already in HYP mode and its not
-going to go through boot-loader. So the low power code needs to have
-HYP switch code so that CPU resumes in HYP mode.
+>> Yes, I think this option makes the most sense, and is just as
+>> susceptible to probe order as the current implementation.
+>
+> OK great. Last two questions then:
+>
+> 1) Do you want me to revert the changes to acpi-dma.c, and simply handle
+> the return value conversion inside __dma_request_slave_channel().
 
-I will look at PSCI more closely and see what can be done here.
+Yeah, no need to spread the complexity further than necessary.
 
-Regards,
-Santosh
+> 2) What's the final call on the new API name?
+
+What do you think of _reason?  I just read the existence of
+dma_request_slave_channel_or_err() as an implication that
+dma_request_slave_channel() may not fail.
+
+> Just let me know on both - the changes are simple. Thanks.
+
+Well thanks for hashing this back and forth, we can laugh about it
+over a drink at the next conference.
