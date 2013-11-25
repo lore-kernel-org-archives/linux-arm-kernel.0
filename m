@@ -1,64 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 15:22:45 -0800
-Subject: [PATCH 1/5] mfd: twl-core: Fix passing of platform data in the
- device tree case
-In-Reply-To: <20131121110950.GC23067@lee--X1>
-References: <1384562167-14725-1-git-send-email-tony@atomide.com>
- <1384562167-14725-2-git-send-email-tony@atomide.com>
- <20131118102907.GC13640@lee--X1>
- <20131118172510.GI16038@saruman.home>
- <20131118174638.GQ13640@lee--X1>
- <20131118181110.GM10317@atomide.com>
- <20131118190921.GT13640@lee--X1>
- <20131118192256.GU10317@atomide.com>
- <20131121104654.GA23067@lee--X1> <20131121110950.GC23067@lee--X1>
-Message-ID: <20131125232245.GY10023@atomide.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 26 Nov 2013 08:26:43 +0900
+Subject: [PATCH] ARM: dts: Add max77686 RTC interrupt to cros5250-common
+In-Reply-To: <CAOesGMhfioBLMgmFi7EHrkVys_96KKzBcLp0C8sdLaRs5FMJBw@mail.gmail.com>
+References: <1382533861-12688-1-git-send-email-dianders@chromium.org>
+ <CAD=FV=VHLHL-VxUr_G7CoBQ5UY8t1jbdTCwcGz9BYrR5C3cpAQ@mail.gmail.com>
+ <CAOesGMhfioBLMgmFi7EHrkVys_96KKzBcLp0C8sdLaRs5FMJBw@mail.gmail.com>
+Message-ID: <1ad301ceea35$cd1eb0f0$675c12d0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [131121 03:10]:
-> > Here Tony, you can take this one.
-> > 
-> > I will simply apply my other fixes on top of it.
-> > 
-> > The issue is, I will most likely have to rebase it on top of -rc1 prior
-> > to sending a request to Linus, so in that regard it's not exactly
-> > immutable.
-> > 
+Olof Johansson wrote:
 > 
-> Ignore the above. This is what you want:
+> On Mon, Nov 25, 2013 at 3:11 PM, Doug Anderson <dianders@chromium.org>
+> wrote:
+> > Olof or Kukjin,
+> >
+> > On Wed, Oct 23, 2013 at 6:11 AM, Doug Anderson <dianders@chromium.org>
+> wrote:
+> >> Without the interrupt you'll get problems if you enable
+> >> CONFIG_RTC_DRV_MAX77686.  Setup the interrupt properly in the device
+> >> tree.
+> >>
+> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> >> ---
+> >>  arch/arm/boot/dts/cros5250-common.dtsi | 12 ++++++++++++
+> >>  1 file changed, 12 insertions(+)
+> >
+> > Would one of you be interested in applying this to your tree, with
+> > Marc's "Tested-by"?  I know there are lots more things to fixup in the
+> > dts, but this is one that I know works.  ;)
+> 
+> Yes, I'll apply this to fixes for 3.13, and mark it for stable 3.12 at
+> least.
+> 
+Olof, thanks.
 
-Thanks, I'll use that commit in my omap-for-v3.14/board-removal branch.
+Please add my ack on this if you want.
 
-Regards,
-
-Tony
- 
-> The following changes since commit 5e01dc7b26d9f24f39abace5da98ccbd6a5ceb52:
-> 
->   Linux 3.12 (2013-11-03 15:41:51 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/ljones/mfd.git tags/ib-tony
-> 
-> for you to fetch changes up to f984370913d3ba5d13806cc8ac6fc26f8ebd1694:
-> 
->   mfd: twl-core: Fix passing of platform data in the device tree case (2013-11-21 10:42:36 +0000)
-> 
-> ----------------------------------------------------------------
-> warning: refname 'ib-tony' is ambiguous.
-> Immutable branch for Tony Lindgren
-> 
-> ----------------------------------------------------------------
-> Tony Lindgren (1):
->       mfd: twl-core: Fix passing of platform data in the device tree case
-> 
->  drivers/mfd/twl-core.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+- Kukjin
