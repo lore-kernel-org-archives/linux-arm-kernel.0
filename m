@@ -1,47 +1,62 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 25 Nov 2013 20:06:41 +0100
-Subject: [PATCH v5 08/17] spi: mpc512x: adjust to OF based clock lookup
-In-Reply-To: <20131125173008.GQ14725@sirena.org.uk>
-References: <1384729577-7336-1-git-send-email-gsi@denx.de>
- <1384729577-7336-9-git-send-email-gsi@denx.de>
- <20131125173008.GQ14725@sirena.org.uk>
-Message-ID: <20131125190641.GL2760@book.gsilab.sittig.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Nov 2013 19:09:36 +0000
+Subject: [PATCH 11/31] dma: add channel request API that supports
+ deferred probe
+In-Reply-To: <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
+References: <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <20131123003442.GH16735@n2100.arm.linux.org.uk>
+ <5293883A.8050808@wwwdotorg.org>
+ <CAA9_cmfMtp4WjRGVzfTxrwcNWP95+HE7DAYg_GeWfqi=L2K2aw@mail.gmail.com>
+ <20131125180000.GR16735@n2100.arm.linux.org.uk>
+ <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
+Message-ID: <20131125190935.GS16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 17:30 +0000, Mark Brown wrote:
+On Mon, Nov 25, 2013 at 10:42:52AM -0800, Dan Williams wrote:
+> On Mon, Nov 25, 2013 at 10:00 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Nov 25, 2013 at 09:45:18AM -0800, Dan Williams wrote:
+> >> Regardless of whether the driver was dma_request_channel as a
+> >> fallback, it will currently use NULL to indicate an allocation
+> >> failure.
+> >
+> > At the moment, dma_request_slave_channel()'s return values are valid
+> > pointer or NULL.  I'd suggest as that's how it's been established,
+> > that function is left alone - changing the return values in this kind
+> > of invisible way is Really Bad(tm) because you can't check that it's
+> > right in any future users - unless you're prepared to review every
+> > single new user of this function for the next few years or more.
+> >
+> > Instead, leaving it as is and introducing a new function name with
+> > the different return error method is the right way to do this.
 > 
-> On Mon, Nov 18, 2013 at 12:06:08AM +0100, Gerhard Sittig wrote:
-> > after device tree based clock lookup became available, the peripheral
-> > driver need no longer construct clock names which include the PSC index,
-> > remove the "psc%d_mclk" template and unconditionally use 'mclk'
+> I was attempting to tap the brakes on the number of request_channel
+> apis in circulation.
+> dma_request_channel
+> dma_request_slave_channel
+> dma_request_slave_channel_compat
+> ... and now dma_request_slave_channel_reason
 > 
-> Have there been other changes which make this happen?
+> ...but given we already have things like samsung_dmadev_request() in
+> the wild, tracking correct usage going forward will be an uphill
+> battle.  We can do this the other way round.  Introduce the new api
+> and delete the old one (after some time).
 
-Not yet in mainline.  The patch you respond to is 08/17 within
-the series, and depends on earlier patches in the series (namely
-the introduction of CCF support for the MPC512x platform, making
-the 'mclk' lookup against the PSC's OF node work while keeping
-the global 'pscN_mclk' in place during migration).
+Yes, new and deprecate the old is the right way to do this.
 
-This information was listed in the cover letter, but was not
-duplicated within the individual patches.  Patches were sent to
-individual Cc: lists to not spam too many people, but the cover
-letter was CC'ed to every recipient of any part of the series.
+> Can we make the new api not pass the 'defer' flag.  You mention it is
+> for compat reasons, but since there are no users I'm not seeing how
+> there can be compatibility concerns.  Can you elaborate?
 
-Please note that I will have to re-submit the series, since it no
-longer cleanly applies against v3.13-rc1 (which was not available
-when I sent v5).  This patch won't change in its content, but may
-experience changes in its context (catchup with changes between
-v3.12 and v3.13-rc1).
+Yes, I agree.  I don't think there's a compatibility concern here - with
+the old interface, a non-present resource would be indicated as "does not
+exist".
 
-Thank you for considering the patch, and for your feedback on
-past versions!
-
-
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+If we convert any error pointer including the one representing
+-EPROBE_DEFER to the "does not exist" representation, we're not changing
+the behaviour.
