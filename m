@@ -1,31 +1,36 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 25 Nov 2013 16:25:18 -0600
-Subject: [PATCH 5/7] ARM: OMAP4: hwmod: add hwmod data for DES IP
-In-Reply-To: <20131125221111.GU10023@atomide.com>
-References: <1385415876-12387-1-git-send-email-joelf@ti.com>
- <1385415876-12387-6-git-send-email-joelf@ti.com>
- <20131125221111.GU10023@atomide.com>
-Message-ID: <5293CE4E.3090401@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 15:25:44 -0700
+Subject: [PATCH V2 3/3] ARM: tegra: document use of standard DMA DT
+ bindings
+In-Reply-To: <11843948.6MmkNU7Gku@wuerfel>
+References: <1385417161-5542-1-git-send-email-swarren@wwwdotorg.org>
+ <1385417161-5542-4-git-send-email-swarren@wwwdotorg.org>
+ <11843948.6MmkNU7Gku@wuerfel>
+Message-ID: <5293CE68.3000801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 04:11 PM, Tony Lindgren wrote:
-> * Joel Fernandes <joelf@ti.com> [131125 13:45]:
->> +
->> +static struct omap_hwmod_addr_space omap4_des_addrs[] = {
->> +	{
->> +		.pa_start	= 0x480A4000,
->> +		.pa_end		= 0x481A4000,
->> +		.flags		= ADDR_TYPE_RT
->> +	},
->> +	{ }
->> +};
+On 11/25/2013 03:07 PM, Arnd Bergmann wrote:
+> On Monday 25 November 2013 15:06:01 Stephen Warren wrote:
+>>    See ../reset/reset.txt for details.
+>>  - reset-names : Must include the following entries:
+>>    - dma
+>> +- #iommu-cells : Must be <1>. This dictates the length of DMA specifiers in
+>> +  client nodes' dmas properties. The specifier represents the DMA request
+>> +  select value for the peripheral. For more details, consult the Tegra TRM's
+>> +  documentation of the APB DMA channel control register REQ_SEL field.
+>>  
+>>  Examples:
+>>  
+>> @@ -36,4 +40,5 @@ apbdma: dma at 6000a000 {
+>>         clocks = <&tegra_car 34>;
+>>         resets = <&tegra_car 34>;
+>>         reset-names = "dma";
+>> +       #iommu-cells = <1>;
 > 
-> Let's not add new address space entries. The address
-> space should be already coming from device tree.
-> 
-Sorry, yes. that's true - I'll drop these.
+> s/iommu-cells/dma-cells/
 
-thanks,
+Thanks.
 
--Joel
+Uggh. I know you pointed that out before, and I fixed it. I guess I
+screwed up a rebase somewhere:-(
