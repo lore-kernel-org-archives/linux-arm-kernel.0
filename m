@@ -1,47 +1,73 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon, 25 Nov 2013 09:53:32 -0800
-Subject: [PATCH 1/1] irq-gic: add capability to set bypass flag in GIC
-In-Reply-To: <529316D3.8030301@arm.com>
-References: <1384897358-22940-1-git-send-email-fkan@apm.com>
- <528C95D2.5090200@arm.com>
- <CAAhSdy2e_zmVEBsKLOC0DjHLL=dxDn9g4vV7sfs0jfSmPvEOow@mail.gmail.com>
- <529316D3.8030301@arm.com>
-Message-ID: <CAL85gmCf9EW_fq=oYwL1Zz7CrqK5gD-47PxFA7dCPze1_G0fCQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Nov 2013 17:53:30 +0000
+Subject: [PATCH 11/31] dma: add channel request API that supports
+ deferred probe
+In-Reply-To: <5293883A.8050808@wwwdotorg.org>
+References: <1384979000.2067.5.camel@dwillia2-mobl1.amr.corp.intel.com>
+ <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+ <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <20131123003442.GH16735@n2100.arm.linux.org.uk>
+ <5293883A.8050808@wwwdotorg.org>
+Message-ID: <20131125175330.GQ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->> The Legacy-IRQ bypass disable and Legacy-FIQ bypass disable is a
->> feature of GIC-400 and its not X-Gene specific. The only difference in X-Gene
->> is that we use PPI31 (Legacy-IRQ) for timer and PPI28 (Legacy-FIQ) for perf
->
-> Amazing. Someone managed to push the weird-o-meter one level higher.
-> Were you *that* short on PPIs that you had to use these two?
+On Mon, Nov 25, 2013 at 10:26:18AM -0700, Stephen Warren wrote:
+> On 11/22/2013 05:34 PM, Russell King - ARM Linux wrote:
+> [... various discussions re: IS_ERR, IS_ERR_OR_NULL, etc.]
+> 
+> Russell, so if we document dma_request_slave_channel() as follows:
+> 
+> > /*
+> >  * dma_request_slave_channel - try to allocate an exclusive slave channel
+> > ...
+> >  * Returns pointer to appropriate DMA channel on success or an error pointer.
+> >  * In order to ease compatibility with other DMA request APIs, this function
+> >  * guarantees NEVER to return NULL.
+> >  */
+> 
+> Are you then OK with clients doing either of e.g.:
+> 
+> chan = dma_request_slave_channel(...);
+> if (IS_ERR(chan))
+> 	// This returns NULL or a valid handle/pointer
+> 	chan = dma_request_channel()
+> if (!chan)
+> 	Here, chan is invalid;
+> 	return;
+> Here, chan is valid
+> 
+> or:
+> 
+> if (xxx) {
+> 	chan = dma_request_slave_channel(...);
+> 	// Convert to same error value as else{} block generates
+> 	if (IS_ERR(chan))
+> 		chan = NULL
+> } else {
+> 	// This returns NULL or a valid handle/pointer
+> 	chan = dma_request_channel()
+> }
+> if (!chan)
+> 	Here, chan is invalid
+> 	return;
+> Here, chan is valid
 
-We don't support bypass enable at all, nothing to do with the PPI. It must be
-set to bypass disable always for us. Those two are the unfortunate victims.
+The cleaner way to write this is:
 
->
->> event. The issue is that IRQBypDisGrp0, FIQBypDisGrp0, IRQBypDisGrp1
->> and FIQBypDisGrp1 bits are 0 by default and for X-Gene we need to set
->> these bits to 1 so that GIC-400 does not bypass PPI31 (Legacy-IRQ) and
->> PPI28 (Legacy-FIQ).
->>
->> We should have more cleaner and optional device tree binding for GIC
->> which can help us set IRQBypDisGrp0, FIQBypDisGrp0, IRQBypDisGrp1
->> and FIQBypDisGrp1 bits for X-Gene.
->
-> Well, here's an alternative approach for you. As you said, this is in no
-> way X-Gene specific, so maybe we should address it directly in the GIC
-> code. Just hook something in the irq_mask/irq_unmask methods, so we can
-> detect the use of these two PPIs, and toggle the bypass flags
-> accordingly bits accordingly.
+	chan = dma_request_slave_channel(...);
+	if (IS_ERR(chan)) {
+		chan = dma_request_channel();
+		if (!chan)
+			return;
+	}
 
-Yes, I hope Catalin could comment on this one. I don't think he would like this
-as well since it is our platform specific.
-
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+So, if you make it to this point, chan must be valid according to the
+conditions on the API - you've applied the test individally to each
+return function according to its documented behaviour.  If it does
+happen to be NULL, that's not *your* problem as a user of the API.
