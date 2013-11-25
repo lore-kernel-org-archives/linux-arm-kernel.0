@@ -1,34 +1,129 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 25 Nov 2013 15:41:10 +0000
-Subject: ACPI
-In-Reply-To: <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
- <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
- <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
- <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
-Message-ID: <20131125154110.GB3243@srcf.ucam.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 25 Nov 2013 09:43:48 -0600
+Subject: [PATCH 1/1] irq-gic: add capability to set bypass flag in GIC
+In-Reply-To: <CAAhSdy2e_zmVEBsKLOC0DjHLL=dxDn9g4vV7sfs0jfSmPvEOow@mail.gmail.com>
+References: <1384897358-22940-1-git-send-email-fkan@apm.com>
+ <528C95D2.5090200@arm.com>
+ <CAAhSdy2e_zmVEBsKLOC0DjHLL=dxDn9g4vV7sfs0jfSmPvEOow@mail.gmail.com>
+Message-ID: <CAL_JsqJNY8te3Y7xCd6=Zkb6A5fWC3Lz1YBW6a2nFcTK97p3Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 11:33:56AM +0000, Grant Likely wrote:
+On Sat, Nov 23, 2013 at 2:41 AM, Anup Patel <anup@brainfault.org> wrote:
+> On Wed, Nov 20, 2013 at 4:28 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> [dropping <patches@apm.com> from the CC list, as someone seems to have
+>>  tripped on the config file, and I'm tired of getting bounces]
+>>
+>> Feng,
+>>
+>> On 19/11/13 21:42, Feng Kan wrote:
+>>> The GIC-400 implementation allows for FIQ and IRQ bypass. In the
+>>> X-Gene implementation, the FIQ bypass must be enabled at all time.
+>>> Otherwise, some PPI will appear as FIQ and cause kernel problem.
+>>
+>> How comes? Are only PPIs affected? When you say "some PPIs", can you be
+>> more specific?
+>>
+>>> Signed-off-by: Feng Kan <fkan@apm.com>
+>>> ---
+>>>  drivers/irqchip/irq-gic.c       |   15 +++++++++++----
+>>>  include/linux/irqchip/arm-gic.h |    4 ++--
+>>>  2 files changed, 13 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index d0e9480..aa7342e 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -65,6 +65,7 @@ struct gic_chip_data {
+>>>  #endif
+>>>       struct irq_domain *domain;
+>>>       unsigned int gic_irqs;
+>>> +     unsigned int bypass_flag;
+>>>  #ifdef CONFIG_GIC_NON_BANKED
+>>>       void __iomem *(*get_base)(union gic_base *);
+>>>  #endif
+>>> @@ -450,7 +451,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>>               writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>>>
+>>>       writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+>>> -     writel_relaxed(1, base + GIC_CPU_CTRL);
+>>> +     writel_relaxed(gic->bypass_flag | 1, base + GIC_CPU_CTRL);
+>>>  }
+>>>
+>>>  void gic_cpu_if_down(void)
+>>> @@ -591,7 +592,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>>>               writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>>>
+>>>       writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+>>> -     writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+>>> +     writel_relaxed(gic_data[gic_nr].bypass_flag | 1, cpu_base + GIC_CPU_CTRL);
+>>>  }
+>>>
+>>>  static int gic_notifier(struct notifier_block *self, unsigned long cmd,      void *v)
+>>> @@ -733,7 +734,8 @@ const struct irq_domain_ops gic_irq_domain_ops = {
+>>>
+>>>  void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>                          void __iomem *dist_base, void __iomem *cpu_base,
+>>> -                        u32 percpu_offset, struct device_node *node)
+>>> +                        u32 percpu_offset, u32 bypass_val,
+>>> +                        struct device_node *node)
+>>>  {
+>>>       irq_hw_number_t hwirq_base;
+>>>       struct gic_chip_data *gic;
+>>> @@ -821,6 +823,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>
+>>>       set_handle_irq(gic_handle_irq);
+>>>
+>>> +     gic->bypass_flag = (bypass_val & 0xf) << 4;
+>>
+>> Beware, the top 2 bits are reserved on GICv1, and shouldn't be messed with.
+>>
+>>>       gic_chip.flags |= gic_arch_extn.flags;
+>>>       gic_dist_init(gic);
+>>>       gic_cpu_init(gic);
+>>> @@ -835,6 +838,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>>>       void __iomem *cpu_base;
+>>>       void __iomem *dist_base;
+>>>       u32 percpu_offset;
+>>> +     u32 bypass_val;
+>>>       int irq;
+>>>
+>>>       if (WARN_ON(!node))
+>>> @@ -849,7 +853,10 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>>>       if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+>>>               percpu_offset = 0;
+>>>
+>>> -     gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
+>>> +     if (of_property_read_u32(node, "bypass-flags", &bypass_val))
+>>> +             bypass_val = 0;
+>>
+>> [adding Mark on Cc, so he can comment on the DT parts]
+>>
+>> Where's the DT documentation update? Also, as this is an
+>> implementation-specific quirk, you should consider using a separate
+>> compatible string and move the handling of this issue into some X-Gene
+>> specific code.
+>
+> Adding separate compatible string for X-Gene specific GIC will break
+> VGIC code for X-Gene because VGIC code looks for DT node compatible
+> to "arm,cortex-a15-gic". We don't want to break currently working VGIC
+> code for X-Gene.
+>
+> The Legacy-IRQ bypass disable and Legacy-FIQ bypass disable is a
+> feature of GIC-400 and its not X-Gene specific. The only difference in X-Gene
+> is that we use PPI31 (Legacy-IRQ) for timer and PPI28 (Legacy-FIQ) for perf
+> event. The issue is that IRQBypDisGrp0, FIQBypDisGrp0, IRQBypDisGrp1
+> and FIQBypDisGrp1 bits are 0 by default and for X-Gene we need to set
+> these bits to 1 so that GIC-400 does not bypass PPI31 (Legacy-IRQ) and
+> PPI28 (Legacy-FIQ).
+>
+> We should have more cleaner and optional device tree binding for GIC
+> which can help us set IRQBypDisGrp0, FIQBypDisGrp0, IRQBypDisGrp1
+> and FIQBypDisGrp1 bits for X-Gene.
 
-> What I'm assuming here is that on ACPI the pinctrl setup and
-> management would be performed by the platform in AML methods so that
-> the kernel isn't aware of them at all. All it know is that it has a
-> (for example) SPI bus and as far as it is concerned the pins are
-> correctly attached when the SPI bus is active. My understanding is
-> that historically this is how ACPI has been used.
+IIRC, all these bits are secure mode only (or only a subset are
+banked). Whether an SoC supports secure mode or not, the current
+policy for the kernel is to do any secure mode setup in firmware or
+bootloader.
 
-Pretty much. In the past ACPI implementations handled GPIO by providing 
-methods that accessed hardware registers directly. I've seen DSDTs that 
-implement i2c entirely in ASL. It's *very* common for hwmon devices to 
-be hidden away behind some ACPI methods.
-
-The obvious downside of this approach is that there's no real mechanism 
-for allowing a real driver to access the hardware at the same time as 
-the ACPI code, and as a consequence you're limited to whatever 
-functionality is provided by the ACPI code.
-
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Rob
