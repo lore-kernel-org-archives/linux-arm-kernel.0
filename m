@@ -1,85 +1,167 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 25 Nov 2013 08:11:27 -0300
-Subject: [PATCH] ARM: pxa: Move iotable mapping inside vmalloc region
-In-Reply-To: <alpine.LFD.2.10.1311241824380.9667@knanqh.ubzr>
-References: <1385296571-23599-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <alpine.LFD.2.10.1311241824380.9667@knanqh.ubzr>
-Message-ID: <20131125111126.GB2408@localhost>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 25 Nov 2013 12:13:44 +0100
+Subject: [PATCH v2 8/9] ARM: DTS: imx5* imx6*, use imx50-ssi
+In-Reply-To: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
+References: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1385378025-1262-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 24, 2013 at 06:26:45PM -0500, Nicolas Pitre wrote:
-> On Sun, 24 Nov 2013, Ezequiel Garcia wrote:
-> 
-> > In order to remove the following ugly message:
-> > 
-> >   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
-> > 
-> > the iotable mappings should be re-located inside the vmalloc
-> > region. Such move was introduced at commit:
-> > 
-> > commit 0536bdf33faff4d940ac094c77998cfac368cfff
-> > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Date:   Thu Aug 25 00:35:59 2011 -0400
-> > 
-> >     ARM: move iotable mappings within the vmalloc region
-> > 
-> > While at it, let's add some nicer defines to make the code
-> > more readable.
-> > 
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/mach-pxa/generic.c | 12 +++++++++---
-> >  1 file changed, 9 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-> > index 4225417..7c01095 100644
-> > --- a/arch/arm/mach-pxa/generic.c
-> > +++ b/arch/arm/mach-pxa/generic.c
-> > @@ -24,6 +24,7 @@
-> >  #include <mach/hardware.h>
-> >  #include <asm/mach/map.h>
-> >  #include <asm/mach-types.h>
-> > +#include <asm/pgtable.h>
-> >  
-> >  #include <mach/reset.h>
-> >  #include <mach/smemc.h>
-> > @@ -77,6 +78,11 @@ EXPORT_SYMBOL(get_clk_frequency_khz);
-> >   * Note: virtual 0xfffe0000-0xffffffff is reserved for the vector table
-> >   *       and cache flush area.
-> >   */
-> > +
-> > +#define UNCACHED_PHY	0x00000000
-> > +#define UNCACHED_SIZE	SZ_1M
-> > +#define UNCACHED_VIRT	(VMALLOC_END - UNCACHED_SIZE)
-> > +
-> >  static struct map_desc common_io_desc[] __initdata = {
-> >    	{	/* Devs */
-> >  		.virtual	=  0xf2000000,
-> > @@ -84,9 +90,9 @@ static struct map_desc common_io_desc[] __initdata = {
-> >  		.length		= 0x02000000,
-> >  		.type		= MT_DEVICE
-> >  	}, {	/* UNCACHED_PHYS_0 */
-> > -		.virtual	= 0xff000000,
-> > -		.pfn		= __phys_to_pfn(0x00000000),
-> > -		.length		= 0x00100000,
-> > +		.virtual	= UNCACHED_VIRT,
-> > +		.pfn		= __phys_to_pfn(UNCACHED_PHY),
-> > +		.length		= UNCACHED_SIZE,
-> >  		.type		= MT_DEVICE
-> >  	}
-> >  };
-> 
-> You might wish to change the virtual address for this mapping, but 
-> nowhere in your patch you are changing users of that virtual mapping.
-> 
+imx50-ssi and imx21-ssi are different IPs. imx50-ssi supports online
+reconfiguration and needs this for correct interaction with SDMA. This
+patch adds imx50-ssi before each imx21-ssi for all imx5/imx6 SoCs.
 
-Yeah, this patch is pure crap. I'll re-work it and submit a new
-(hopefully not stupid) version.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/boot/dts/imx51.dtsi   | 10 +++++++---
+ arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
+ arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
+ arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
+ 4 files changed, 32 insertions(+), 12 deletions(-)
 
-Thanks for taking a look!
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 4bcdd3a..5fa0a16 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -155,7 +155,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 70014000 {
+-					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
++					compatible = "fsl,imx51-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x70014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks 49>;
+@@ -440,7 +442,8 @@
+ 			};
+ 
+ 			ssi1: ssi at 83fcc000 {
+-				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx51-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x83fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks 48>;
+@@ -492,7 +495,8 @@
+ 			};
+ 
+ 			ssi3: ssi at 83fe8000 {
+-				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx51-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x83fe8000 0x4000>;
+ 				interrupts = <96>;
+ 				clocks = <&clks 50>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 4307e80..1f5c622 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -149,7 +149,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 50014000 {
+-					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++					compatible = "fsl,imx53-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x50014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks 49>;
+@@ -1049,7 +1051,8 @@
+ 			};
+ 
+ 			ssi1: ssi at 63fcc000 {
+-				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx53-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x63fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks 48>;
+@@ -1076,7 +1079,8 @@
+ 			};
+ 
+ 			ssi3: ssi at 63fe8000 {
+-				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx53-ssi", "fsl,imx50-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x63fe8000 0x4000>;
+ 				interrupts = <96>;
+ 				clocks = <&clks 50>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 59154dc..2e102f5 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -232,7 +232,9 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 0x04>;
+ 					clocks = <&clks 178>;
+@@ -245,7 +247,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 0x04>;
+ 					clocks = <&clks 179>;
+@@ -258,7 +262,9 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 0x04>;
+ 					clocks = <&clks 180>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..d21fa17 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -195,7 +195,9 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI1>;
+@@ -207,7 +209,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI2>;
+@@ -219,7 +223,9 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx50-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI3>;
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.4.2
