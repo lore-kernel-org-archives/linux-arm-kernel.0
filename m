@@ -1,31 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Nov 2013 23:07:55 +0100
-Subject: [PATCH V2 3/3] ARM: tegra: document use of standard DMA DT
- bindings
-In-Reply-To: <1385417161-5542-4-git-send-email-swarren@wwwdotorg.org>
-References: <1385417161-5542-1-git-send-email-swarren@wwwdotorg.org>
- <1385417161-5542-4-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <11843948.6MmkNU7Gku@wuerfel>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 25 Nov 2013 15:08:04 -0700
+Subject: [PATCH 3/4] ARM: mvebu: NETGEAR ReadyNAS 104 .dts file cleanup
+In-Reply-To: <87vbzgf8av.fsf@natisbad.org>
+References: <cover.1385148929.git.arno@natisbad.org>
+ <bd899cfc2b0b3d22a7442d76b3901ca81ca86f11.1385148929.git.arno@natisbad.org>
+ <20131122213610.GC30358@obsidianresearch.com>
+ <878uwg5b6e.fsf@natisbad.org>
+ <20131125194117.GA5413@obsidianresearch.com>
+ <87vbzgf8av.fsf@natisbad.org>
+Message-ID: <20131125220804.GA11260@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 November 2013 15:06:01 Stephen Warren wrote:
->    See ../reset/reset.txt for details.
->  - reset-names : Must include the following entries:
->    - dma
-> +- #iommu-cells : Must be <1>. This dictates the length of DMA specifiers in
-> +  client nodes' dmas properties. The specifier represents the DMA request
-> +  select value for the peripheral. For more details, consult the Tegra TRM's
-> +  documentation of the APB DMA channel control register REQ_SEL field.
->  
->  Examples:
->  
-> @@ -36,4 +40,5 @@ apbdma: dma at 6000a000 {
->         clocks = <&tegra_car 34>;
->         resets = <&tegra_car 34>;
->         reset-names = "dma";
-> +       #iommu-cells = <1>;
+On Mon, Nov 25, 2013 at 11:03:36PM +0100, Arnaud Ebalard wrote:
 
-s/iommu-cells/dma-cells/
+> > Also, check if it is actually an S varient or not, they have the same
+> > phy-id.. ;)
+> 
+> On the chip, I have 88E1318-NNB2 (PNN1230_3JW 1209 A0P TW). I will see
+> if I can find more info.
 
-	Arnd
+That is the standard varient - I expect the S version is rare. NNB2
+indicates the package option. The rest is the lot code.
+
+Jason
