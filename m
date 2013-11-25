@@ -1,78 +1,193 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Nov 2013 12:00:55 -0700
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
-References: <528D28A1.2050307@wwwdotorg.org>	<CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>	<528E4F55.9070204@wwwdotorg.org>	<CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>	<528F95A9.2050305@wwwdotorg.org>	<CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>	<528F9DF9.6080706@wwwdotorg.org>	<20131123003442.GH16735@n2100.arm.linux.org.uk>	<5293883A.8050808@wwwdotorg.org>	<CAA9_cmfMtp4WjRGVzfTxrwcNWP95+HE7DAYg_GeWfqi=L2K2aw@mail.gmail.com>	<20131125180000.GR16735@n2100.arm.linux.org.uk>
- <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
-Message-ID: <52939E67.6040300@wwwdotorg.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 25 Nov 2013 20:03:59 +0100
+Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
+In-Reply-To: <20131125185248.GF28201@mudshark.cambridge.arm.com>
+References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
+ <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
+ <20131125185248.GF28201@mudshark.cambridge.arm.com>
+Message-ID: <CAKv+Gu9hniOxxBLEoCKi57hRUccbj6HPJ6vYTyWxyhqxU1qeaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 11:42 AM, Dan Williams wrote:
-> On Mon, Nov 25, 2013 at 10:00 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Mon, Nov 25, 2013 at 09:45:18AM -0800, Dan Williams wrote:
->>> Regardless of whether the driver was dma_request_channel as a
->>> fallback, it will currently use NULL to indicate an allocation
->>> failure.
+On 25 November 2013 19:52, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 18, 2013 at 12:06:57PM +0000, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 >>
->> At the moment, dma_request_slave_channel()'s return values are valid
->> pointer or NULL.  I'd suggest as that's how it's been established,
->> that function is left alone - changing the return values in this kind
->> of invisible way is Really Bad(tm) because you can't check that it's
->> right in any future users - unless you're prepared to review every
->> single new user of this function for the next few years or more.
+>> Add KGDB debug support for FP/SIMD processor.This support
+>> only debugging of FP/SIMD in kernel mode.
+>> With this patch one can view or set FP/SIMD registers in
+>> kernel context
 >>
->> Instead, leaving it as is and introducing a new function name with
->> the different return error method is the right way to do this.
-> 
-> I was attempting to tap the brakes on the number of request_channel
-> apis in circulation.
-> dma_request_channel
-> dma_request_slave_channel
-> dma_request_slave_channel_compat
-> ... and now dma_request_slave_channel_reason
-> 
-> ...but given we already have things like samsung_dmadev_request() in
-> the wild, tracking correct usage going forward will be an uphill
-> battle.  We can do this the other way round.  Introduce the new api
-> and delete the old one (after some time).
-> 
-> Stephen,
-> 
-> Can we make the new api not pass the 'defer' flag.  You mention it is
-> for compat reasons, but since there are no users I'm not seeing how
-> there can be compatibility concerns.  Can you elaborate?
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>> ---
+>>  arch/arm64/include/asm/fpsimd.h |    1 +
+>>  arch/arm64/kernel/fpsimd.c      |    5 ++
+>>  arch/arm64/kernel/kgdb.c        |  105 +++++++++++++++++++++++++--------------
+>>  3 files changed, 73 insertions(+), 38 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+>> index 609bc44..5039d6d 100644
+>> --- a/arch/arm64/include/asm/fpsimd.h
+>> +++ b/arch/arm64/include/asm/fpsimd.h
+>> @@ -60,6 +60,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
+>>  extern void fpsimd_thread_switch(struct task_struct *next);
+>>  extern void fpsimd_flush_thread(void);
+>>  extern void fpsimd_reload_fpstate(void);
+>> +extern int  fpsimd_thread_state(void);
+>>
+>>  #endif
+>>
+>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> index 5b13c17..27604c1 100644
+>> --- a/arch/arm64/kernel/fpsimd.c
+>> +++ b/arch/arm64/kernel/fpsimd.c
+>> @@ -124,6 +124,11 @@ void fpsimd_flush_thread(void)
+>>       set_thread_flag(TIF_FOREIGN_FPSTATE);
+>>  }
+>>
+>> +int fpsimd_thread_state(void)
+>> +{
+>> +     return (current->mm && test_thread_flag(TIF_FOREIGN_FPSTATE)) ? 1 : 0;
+>> +}
+>
+> Erm...
+>
+>   1. `? 1 : 0' doesn't do anything
+>   2. TIF_FOREIGN_FPSTATE doesn't seem to appear in my source tree (3.13-rc1)
+>   3. Does it make sense for threads without an mm to have TIF_FOREIGN_FPSTATE set?
+>
 
-dma_request_slave_channel_or_err() doesn't have a defer flag. Rather,
-__dma_request_slave_channel_or_err() did, which is the shared
-implementation between the existing existing dma_request_slave_channel()
-and the new dma_request_slave_channel_or_err().
+I think Vijay did mention at some point that his patches depend on my
+patch 'arm64: defer reloading a task's FPSIMD state to userland
+resume' which I posted here
 
-That flag exists so it can be passed to of_dma_request_slave_channel().
-That function needs it because I didn't want to change the existing
-behaviour of dma_request_slave_channel() at all, yet I wanted slightly
-different behaviour from dma_request_slave_channel_or_err().
+http://marc.info/?l=linux-arm-kernel&m=138418879110655&w=2
 
-Specifically, if of_dma_request_slave_channel() finds an entry in the
-dmas DT property for which there is no registered DMA controller, it
-simply ignores that entry and carries on, hoping to find an alternative
-entry that can satisfy the request (since some controllers can be
-supported by multiple DMA controllers). However, to support deferred
-probe, we really need to bail out from the loop early with -EPROBE_DEFER
-if any DMA controller isn't found, in order to wait for it to be registered.
+(with you on cc, IIRC) but which did not evoke any response on the list.
 
-I suppose an alternative would be to remove that flag, and have the loop
-in of_dma_request_slave_channel() initially ignore any unregistered DMA
-controllers, and still continue to look through the property for any
-alternative controller, and return a channel from one if it is found.
-Then, at the very end of the function, we could always return
--EPROBE_DEFER if any unregistered DMA controllers were found, otherwise
-return -ENODEV. That would keep compatible behaviour, but it would mean
-that device probe order would/could influence which dmas entry provided
-the channel, since some entries might be ignored based simply on
-timing/ordering of DMA controller registration. Is that acceptable?
+-- 
+Ard.
 
-Either way, just let me know and I'll adjust the code accordingly; the
-code changes for either option are simple.
+
+
+>>  void fpsimd_reload_fpstate(void)
+>>  {
+>>       preempt_disable();
+>> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+>> index f10f2ba..5e34852 100644
+>> --- a/arch/arm64/kernel/kgdb.c
+>> +++ b/arch/arm64/kernel/kgdb.c
+>> @@ -23,6 +23,14 @@
+>>  #include <linux/kdebug.h>
+>>  #include <linux/kgdb.h>
+>>  #include <asm/traps.h>
+>> +#include <asm/fpsimd.h>
+>> +
+>> +#ifdef CONFIG_KERNEL_MODE_NEON
+>> +/*
+>> + * Structure to hold FP/SIMD register contents
+>> + */
+>> +struct fpsimd_state kgdb_fpsimd_regs;
+>> +#endif
+>>
+>>  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+>>       { "x0", 8, offsetof(struct pt_regs, regs[0])},
+>> @@ -59,40 +67,40 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+>>       { "sp", 8, offsetof(struct pt_regs, sp)},
+>>       { "pc", 8, offsetof(struct pt_regs, pc)},
+>>       { "pstate", 4, offsetof(struct pt_regs, pstate)},
+>> -     { "v0", 16, -1 },
+>> -     { "v1", 16, -1 },
+>> -     { "v2", 16, -1 },
+>> -     { "v3", 16, -1 },
+>> -     { "v4", 16, -1 },
+>> -     { "v5", 16, -1 },
+>> -     { "v6", 16, -1 },
+>> -     { "v7", 16, -1 },
+>> -     { "v8", 16, -1 },
+>> -     { "v9", 16, -1 },
+>> -     { "v10", 16, -1 },
+>> -     { "v11", 16, -1 },
+>> -     { "v12", 16, -1 },
+>> -     { "v13", 16, -1 },
+>> -     { "v14", 16, -1 },
+>> -     { "v15", 16, -1 },
+>> -     { "v16", 16, -1 },
+>> -     { "v17", 16, -1 },
+>> -     { "v18", 16, -1 },
+>> -     { "v19", 16, -1 },
+>> -     { "v20", 16, -1 },
+>> -     { "v21", 16, -1 },
+>> -     { "v22", 16, -1 },
+>> -     { "v23", 16, -1 },
+>> -     { "v24", 16, -1 },
+>> -     { "v25", 16, -1 },
+>> -     { "v26", 16, -1 },
+>> -     { "v27", 16, -1 },
+>> -     { "v28", 16, -1 },
+>> -     { "v29", 16, -1 },
+>> -     { "v30", 16, -1 },
+>> -     { "v31", 16, -1 },
+>> -     { "fpsr", 4, -1 },
+>> -     { "fpcr", 4, -1 },
+>> +     { "v0", 16, offsetof(struct fpsimd_state, vregs[0])},
+>> +     { "v1", 16, offsetof(struct fpsimd_state, vregs[1])},
+>> +     { "v2", 16, offsetof(struct fpsimd_state, vregs[2])},
+>> +     { "v3", 16, offsetof(struct fpsimd_state, vregs[3])},
+>> +     { "v4", 16, offsetof(struct fpsimd_state, vregs[4])},
+>> +     { "v5", 16, offsetof(struct fpsimd_state, vregs[5])},
+>> +     { "v6", 16, offsetof(struct fpsimd_state, vregs[6])},
+>> +     { "v7", 16, offsetof(struct fpsimd_state, vregs[7])},
+>> +     { "v8", 16, offsetof(struct fpsimd_state, vregs[8])},
+>> +     { "v9", 16, offsetof(struct fpsimd_state, vregs[9])},
+>> +     { "v10", 16, offsetof(struct fpsimd_state, vregs[10])},
+>> +     { "v11", 16, offsetof(struct fpsimd_state, vregs[11])},
+>> +     { "v12", 16, offsetof(struct fpsimd_state, vregs[12])},
+>> +     { "v13", 16, offsetof(struct fpsimd_state, vregs[13])},
+>> +     { "v14", 16, offsetof(struct fpsimd_state, vregs[14])},
+>> +     { "v15", 16, offsetof(struct fpsimd_state, vregs[15])},
+>> +     { "v16", 16, offsetof(struct fpsimd_state, vregs[16])},
+>> +     { "v17", 16, offsetof(struct fpsimd_state, vregs[17])},
+>> +     { "v18", 16, offsetof(struct fpsimd_state, vregs[18])},
+>> +     { "v19", 16, offsetof(struct fpsimd_state, vregs[19])},
+>> +     { "v20", 16, offsetof(struct fpsimd_state, vregs[20])},
+>> +     { "v21", 16, offsetof(struct fpsimd_state, vregs[21])},
+>> +     { "v22", 16, offsetof(struct fpsimd_state, vregs[22])},
+>> +     { "v23", 16, offsetof(struct fpsimd_state, vregs[23])},
+>> +     { "v24", 16, offsetof(struct fpsimd_state, vregs[24])},
+>> +     { "v25", 16, offsetof(struct fpsimd_state, vregs[25])},
+>> +     { "v26", 16, offsetof(struct fpsimd_state, vregs[26])},
+>> +     { "v27", 16, offsetof(struct fpsimd_state, vregs[27])},
+>> +     { "v28", 16, offsetof(struct fpsimd_state, vregs[28])},
+>> +     { "v29", 16, offsetof(struct fpsimd_state, vregs[29])},
+>> +     { "v30", 16, offsetof(struct fpsimd_state, vregs[30])},
+>> +     { "v31", 16, offsetof(struct fpsimd_state, vregs[31])},
+>> +     { "fpsr", 4, offsetof(struct fpsimd_state, fpsr)},
+>> +     { "fpcr", 4, offsetof(struct fpsimd_state, fpcr)},
+>>  };
+>>
+>>  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
+>> @@ -100,11 +108,22 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
+>>       if (regno >= DBG_MAX_REG_NUM || regno < 0)
+>>               return NULL;
+>>
+>> -     if (dbg_reg_def[regno].offset != -1)
+>> +     if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
+>>               memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
+>>                      dbg_reg_def[regno].size);
+>> -     else
+>> +     else {
+>> +#ifdef CONFIG_KERNEL_MODE_NEON
+>> +             if (fpsimd_thread_state()) {
+>> +                     fpsimd_save_state(&kgdb_fpsimd_regs);
+>> +                     memcpy(mem, (void *)&kgdb_fpsimd_regs +
+>> +                                     dbg_reg_def[regno].offset,
+>> +                                     dbg_reg_def[regno].size);
+>> +             } else
+>> +                     memset(mem, 0, dbg_reg_def[regno].size);
+>> +#else
+>>               memset(mem, 0, dbg_reg_def[regno].size);
+>
+> Can you use IS_ENABLED to tidy this up?
+>
+> Will
