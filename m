@@ -1,48 +1,96 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Nov 2013 15:32:13 -0600
-Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY's
-In-Reply-To: <5280EB5C.1040001@ti.com>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-2-git-send-email-kishon@ti.com>
- <20131017163828.GH11611@gimli> <5280EB5C.1040001@ti.com>
-Message-ID: <20131125213213.GV18046@saruman.home>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 25 Nov 2013 15:44:33 -0600
+Subject: [PATCH 4/7] ARM: OMAP4: hwmod: Add hwmod data for AES IP
+In-Reply-To: <1385415876-12387-1-git-send-email-joelf@ti.com>
+References: <1385415876-12387-1-git-send-email-joelf@ti.com>
+Message-ID: <1385415876-12387-5-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Crypto modules AES0/1 belong to:
+    PD_L4_PER power domain
+    CD_L4_SEC clock domain
+    On the L3, the AES modules are mapped to
+    L3_CLK2: Peripherals and multimedia sub clock domain
 
-On Mon, Nov 11, 2013 at 08:06:12PM +0530, Kishon Vijay Abraham I wrote:
-> >> diff --git a/drivers/usb/dwc3/platform_data.h b/drivers/usb/dwc3/platform_data.h
-> >> index 7db34f0..49ffa6d 100644
-> >> --- a/drivers/usb/dwc3/platform_data.h
-> >> +++ b/drivers/usb/dwc3/platform_data.h
-> >> @@ -24,4 +24,6 @@ struct dwc3_platform_data {
-> >>  	enum usb_device_speed maximum_speed;
-> >>  	enum usb_dr_mode dr_mode;
-> >>  	bool tx_fifo_resize;
-> >> +	bool usb2_phy;
-> >> +	bool usb3_phy;
-> > 
-> > This would look better as a quirks flag, then we could:
-> > 
-> > unsigned long quirks;
-> > #define DWC3_QUIRK_NO_USB3_PHY	BIT(0)
-> > #define DWC3_QUIRK_NO_USB2_PHY	BIT(1)
-> 
-> Should this quirk be used for dt also? Currently we find if it has usb3 phy or
-> usb2 phy from the dt data only. But if we add a quirk, we'll have to add a
-> property to populate the quirk no?
+We add hwmod data for the same.
 
-either we use the quirk, or use the fact that no <&usb2_phy> phandle is
-defined, would work both ways, no ?
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 54 ++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 1e5b12c..664b2c6 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -4791,6 +4791,59 @@ static struct omap_hwmod_ocp_if omap44xx_mpu__emif2 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/*
++    Crypto modules AES0/1 belong to:
++	PD_L4_PER power domain
++	CD_L4_SEC clock domain
++	On the L3, the AES modules are mapped to
++	L3_CLK2: Peripherals and multimedia sub clock domain
++*/
++
++static struct omap_hwmod_class_sysconfig omap4_aes1_sysc = {
++	.rev_offs	= 0x80,
++	.sysc_offs	= 0x84,
++	.syss_offs	= 0x88,
++	.sysc_flags	= SYSS_HAS_RESET_STATUS,
++	.sysc_fields	= &omap_hwmod_sysc_type4,
++};
++
++static struct omap_hwmod_class omap4_aes1_hwmod_class = {
++	.name		= "aes1",
++	.sysc		= &omap4_aes1_sysc,
++};
++
++static struct omap_hwmod omap4_aes1_hwmod = {
++	.name		= "aes",
++	.class		= &omap4_aes1_hwmod_class,
++	.clkdm_name	= "l4_secure_clkdm",
++	.main_clk	= "aes1_fck",
++	.prcm		= {
++		.omap4	= {
++			.clkctrl_offs = OMAP4_CM_L4SEC_AES1_CLKCTRL_OFFSET,
++			.context_offs = OMAP4_RM_L4SEC_AES1_CONTEXT_OFFSET,
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++/* l3_main_2 -> aes1 */
++static struct omap_hwmod_addr_space omap4_aes1_addrs[] = {
++	{
++		.pa_start	= 0x4B500000,
++		.pa_end		= 0x4B500000 + SZ_1M - 1,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++static struct omap_hwmod_ocp_if omap4_l3_main_2__aes1 = {
++	.master		= &omap44xx_l3_main_2_hwmod,
++	.slave		= &omap4_aes1_hwmod,
++	.clk		= "aes1_fck",
++	.addr		= omap4_aes1_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap44xx_l3_main_1__dmm,
+ 	&omap44xx_mpu__dmm,
+@@ -4945,6 +4998,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap44xx_l4_abe__wd_timer3_dma,
+ 	&omap44xx_mpu__emif1,
+ 	&omap44xx_mpu__emif2,
++	&omap4_l3_main_2__aes1,
+ 	NULL,
+ };
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/4316a399/attachment.sig>
+1.8.1.2
