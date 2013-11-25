@@ -1,61 +1,50 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 25 Nov 2013 20:51:33 +1000
-Subject: [PATCH] ARM: ks8695: delete local <mach/gpio.h> header
-In-Reply-To: <1385037362-24278-1-git-send-email-linus.walleij@linaro.org>
-References: <1385037362-24278-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <52932BB5.5050405@uclinux.org>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Mon, 25 Nov 2013 12:59:45 +0200
+Subject: Fwd: [PATCH 7/8] watchdog: davinci: add "clocks" property
+In-Reply-To: <201311231857.47104.arnd@arndb.de>
+References: <1383680783-12114-8-git-send-email-ivan.khoronzhuk@ti.com>
+ <527A28E8.4010204@ti.com> <201311231857.47104.arnd@arndb.de>
+Message-ID: <52932DA1.8040204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 11/23/2013 07:57 PM, Arnd Bergmann wrote:
+> On Wednesday 06 November 2013, ivan.khoronzhuk wrote:
+>> @@ -7,6 +7,10 @@ Required properties:
+>>   
+>>   - reg : Should contain WDT registers location and length
+>>   
+>> +- clocks: phandle reference to the controller clock.
+>> +         Required only for Keystone arch.
+>> +         See clock-bindings.txt
+>> +
+>>   Optional properties:
+>>   
+>>   - timeout-sec:         Contains the watchdog timeout in seconds
+> 
+> I think it should really be listed under "Optional properties" and the
+> reference to Keystone removed. Note how the binding would need
+> to change otherwise if another platform started to use the clock, which
+> is a little silly.
+> 
+> 	Arnd
+> 
 
-On 21/11/13 22:36, Linus Walleij wrote:
-> This header is not used by anything, and since the arch does
-> not specify NEED_MACH_GPIO_H it is not included into
-> <linux/gpio.h> either. Delete it.
->
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Greg: can you ACK this so I can take it through the GPIO
-> tree?
+Ok, I'll move clocks property under "Optional properties" and describe it
+as following:
 
-Sure thing.
+Optional properties:
+- timeout-sec : Contains the watchdog timeout in seconds
+- clocks: phandle reference to the controller clock.
+	  Needed if platform uses clocks.
+	  See clock-bindings.txt
 
-Acked-by: Greg Ungerer <gerg@uclinux.org>
+FYI:
+The new patch series had been already presented, where the patches
+"watchdog: davinci: add "clocks" property" and
+"watchdog: davinci: reuse driver for keystone arch" were combined.
+http://www.spinics.net/lists/devicetree/msg12542.html
 
-Regards
-Greg
-
-
-> ---
->   arch/arm/mach-ks8695/include/mach/gpio.h | 19 -------------------
->   1 file changed, 19 deletions(-)
->   delete mode 100644 arch/arm/mach-ks8695/include/mach/gpio.h
->
-> diff --git a/arch/arm/mach-ks8695/include/mach/gpio.h b/arch/arm/mach-ks8695/include/mach/gpio.h
-> deleted file mode 100644
-> index f5fda36e4512..000000000000
-> --- a/arch/arm/mach-ks8695/include/mach/gpio.h
-> +++ /dev/null
-> @@ -1,19 +0,0 @@
-> -/*
-> - * arch/arm/mach-ks8695/include/mach/gpio.h
-> - *
-> - * Copyright (C) 2006 Andrew Victor
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef __ASM_ARCH_GPIO_H_
-> -#define __ASM_ARCH_GPIO_H_
-> -
-> -/*
-> - * Map IRQ number to GPIO line.
-> - */
-> -extern int irq_to_gpio(unsigned int irq);
-> -
-> -#endif
->
+-- 
+Regards,
+Ivan Khoronzhuk
