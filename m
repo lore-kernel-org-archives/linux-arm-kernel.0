@@ -1,61 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 25 Nov 2013 21:43:44 +0100
-Subject: [PATCH 2/3] leds/pwm: Don't disable pwm when setting brightness to 0
-In-Reply-To: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1385412225-29740-3-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Nov 2013 20:52:25 +0000
+Subject: [PATCH 11/31] dma: add channel request API that supports
+ deferred probe
+In-Reply-To: <20131125202808.GN2760@book.gsilab.sittig.org>
+References: <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <20131123003442.GH16735@n2100.arm.linux.org.uk>
+ <5293883A.8050808@wwwdotorg.org>
+ <20131125175330.GQ16735@n2100.arm.linux.org.uk>
+ <52938F75.7020108@wwwdotorg.org>
+ <20131125202808.GN2760@book.gsilab.sittig.org>
+Message-ID: <20131125205224.GT16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes disabling the LED on i.MX28. The PWM hardware delays using
-the newly set pwm-config until the beginning of a new period. It's very
-likely that pwm_disable is called before the current period ends. In
-case the LED was on brightness=max before the LED stays on because in
-the disabled PWM block the period never ends.
+On Mon, Nov 25, 2013 at 09:28:08PM +0100, Gerhard Sittig wrote:
+> See 2771399a "fs_enet: cleanup clock API use" or b3bfce2bc "i2c:
+> mpc: cleanup clock API use" for an example.
 
-Also only call pwm_enable only once in the probe call back and the
-matching pwm_disable in .remove(). Moreover the pwm is explicitly
-initialized to off.
+And had I seen that change I'd have commented thusly:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/leds/leds-pwm.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
++       /* make clock lookup non-fatal (the driver is shared among platforms),
++        * but require enable to succeed when a clock was specified/found,
++        * keep a reference to the clock upon successful acquisition
++        */
++       clk = devm_clk_get(&ofdev->dev, "per");
++       if (!IS_ERR(clk)) {
++               err = clk_prepare_enable(clk);
++               if (err) {
++                       ret = err;
++                       goto out_free_fpi;
++               }
++               fpi->clk_per = clk;
++       }
 
-diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-index 2848171..cdc3e4d 100644
---- a/drivers/leds/leds-pwm.c
-+++ b/drivers/leds/leds-pwm.c
-@@ -45,11 +45,6 @@ static void __led_pwm_set(struct led_pwm_data *led_dat)
- 	int new_duty = led_dat->duty;
- 
- 	pwm_config(led_dat->pwm, new_duty, led_dat->period);
--
--	if (new_duty == 0)
--		pwm_disable(led_dat->pwm);
--	else
--		pwm_enable(led_dat->pwm);
- }
- 
- static void led_pwm_work(struct work_struct *work)
-@@ -180,6 +175,10 @@ static int led_pwm_probe(struct platform_device *pdev)
- 			led_dat->cdev.max_brightness = cur_led->max_brightness;
- 			led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
- 
-+			led_dat->duty = 0;
-+			__led_pwm_set(led_dat);
-+			pwm_enable(led_dat->pwm);
-+
- 			led_dat->can_sleep = pwm_can_sleep(led_dat->pwm);
- 			if (led_dat->can_sleep)
- 				INIT_WORK(&led_dat->work, led_pwm_work);
-@@ -215,6 +214,7 @@ static int led_pwm_remove(struct platform_device *pdev)
- 		led_classdev_unregister(&priv->leds[i].cdev);
- 		if (priv->leds[i].can_sleep)
- 			cancel_work_sync(&priv->leds[i].work);
-+		pwm_disable(priv->leds[i].pwm);
- 	}
- 
- 	return 0;
--- 
-1.8.4.2
+ out_put:
+        of_node_put(fpi->phy_node);
++       if (fpi->clk_per)
++               clk_disable_unprepare(fpi->clk_per);
+
+        of_node_put(fep->fpi->phy_node);
++       if (fep->fpi->clk_per)
++               clk_disable_unprepare(fep->fpi->clk_per);
+
+So, lets consider what happens if clk_get() inside devm_clk_get() returns
+NULL.
+
+* devm_clk_get() allocates its tracking structure, and sets the clk pointer
+  to be freed to NULL.
+* !IS_ERR(NULL) is true, so we call clk_prepare_enable(NULL).  This succeeds.
+* We store NULL into fpi->clk_per.
+* The error cleanup/teardown paths check for a NULL pointer, and fail to
+  call the CLK API in that case.
+
+This is not very nice.  Better solution:
+
+	fpi->clk_per = PTR_ERR(-EINVAL);
+	clk = devm_clk_get(&ofdev->dev, "per");
+	if (!IS_ERR(clk)) {
+		err = clk_prepare_enable(clk);
+		if (err) {
+			ret = err;
+			goto out_free_fpi;
+		}
+		fpi->clk_per = clk;
+	}
+
+...
+
+        of_node_put(fpi->phy_node);
+        if (!IS_ERR(fpi->clk_per))
+                clk_disable_unprepare(fpi->clk_per);
