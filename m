@@ -1,83 +1,167 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 25 Nov 2013 13:18:59 +0800
-Subject: [GIT PULL][for 3.14] pull request to enable Hisilicon SoC from
- pxa git tree
-In-Reply-To: <CAOesGMjomMk205LQojzO2-zyjvnxtUh_gkfd74WgB4TWbnxDYg@mail.gmail.com>
-References: <5292BEFC.4080403@gmail.com>
- <CAOesGMjomMk205LQojzO2-zyjvnxtUh_gkfd74WgB4TWbnxDYg@mail.gmail.com>
-Message-ID: <5292DDC3.8060707@gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Mon, 25 Nov 2013 05:32:44 +0000
+Subject: [PATCHv3] usb: chipidea: add support for USB OTG controller on
+ TI-NSPIRE
+In-Reply-To: <1385351617-94118-1-git-send-email-dt.tangr@gmail.com>
+References: <1385351617-94118-1-git-send-email-dt.tangr@gmail.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411E460@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 12:05 PM, Olof Johansson wrote:
-> Hi,
->
->
-> On Sun, Nov 24, 2013 at 7:07 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> Hi Olof & Kevin,
->>
->> Here's the pull request from pxa git tree to enable Hisilicon Hi3620 SoC.
->> Please help to merge.
->>
->> Best Regards
->> Haojian
->>
->> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>
->>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>
->> are available in the git repository at:
->>
->>    http://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
->> tags/hisilicon-init
->
-> Hi,
->
-> Overall this looks good, but I do have a few comments:
->
-> First, I had a comment on one of the patches. It's your choice if you
-> want to address it by respinning or by an incremental patch on top,
-> but please address those.
+ 
+> 
+> From: Daniel Tang <dt.tangr@gmail.com>
+> 
+> The USB controller in TI-NSPIRE calculators are based off either
+> Freescale's
+> USB OTG controller or the USB controller found in the IMX233, both of
+> which
+> are Chipidea compatible.
+> 
+> This patch adds a device tree binding for the controller.
+> 
+> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+> ---
+> 
+> Changelog v3:
+>  * Removed redundant module aliases
+> 
+> Changelog v2:
+>  * Rename ci13xxx to ci_hdrc
+>  * Fixed alignment issues
+> 
+> .../devicetree/bindings/usb/ci-hdrc-nspire.txt     | 17 +++++
+>  drivers/usb/chipidea/Makefile                      |  1 +
+>  drivers/usb/chipidea/ci_hdrc_nspire.c              | 72
+> ++++++++++++++++++++++
+>  3 files changed, 90 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-
+> nspire.txt
+>  create mode 100644 drivers/usb/chipidea/ci_hdrc_nspire.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
+> b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
+> new file mode 100644
+> index 0000000..5ba8e90
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
+> @@ -0,0 +1,17 @@
+> +* TI-Nspire USB OTG Controller
+> +
+> +Required properties:
+> +- compatible: Should be "zevio,nspire-usb"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain controller interrupt
+> +
+> +Recommended properies:
+> +- vbus-supply: regulator for vbus
+> +
+> +Examples:
+> +		usb0: usb at B0000000 {
+> +			reg = <0xB0000000 0x1000>;
+> +			compatible = "zevio,nspire-usb";
+> +			interrupts = <8>;
+> +			vbus-supply = <&vbus_reg>;
+> +		};
+> diff --git a/drivers/usb/chipidea/Makefile
+> b/drivers/usb/chipidea/Makefile
+> index a99d980..245ea4d 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+>  # Glue/Bridge layers go here
+> 
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
+> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_nspire.o
+> 
+>  # PCI doesn't provide stubs, need to check
+>  ifneq ($(CONFIG_PCI),)
+> diff --git a/drivers/usb/chipidea/ci_hdrc_nspire.c
+> b/drivers/usb/chipidea/ci_hdrc_nspire.c
+> new file mode 100644
+> index 0000000..517ce41
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/ci_hdrc_nspire.c
+> @@ -0,0 +1,72 @@
+> +/*
+> + *	Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * Based off drivers/usb/chipidea/ci_hdrc_msm.c
+> + *
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/usb/gadget.h>
+> +#include <linux/usb/chipidea.h>
+> +
+> +#include "ci.h"
+> +
+> +static struct ci_hdrc_platform_data ci_hdrc_nspire_platdata = {
+> +	.name			= "ci_hdrc_nspire",
+> +	.flags			= CI_HDRC_REGS_SHARED,
+> +	.capoffset		= DEF_CAPOFFSET,
+> +};
+> +
+> +static int ci_hdrc_nspire_probe(struct platform_device *pdev)
+> +{
+> +	struct platform_device *ci_pdev;
+> +
+> +	dev_dbg(&pdev->dev, "ci_hdrc_nspire_probe\n");
+> +
+> +	ci_pdev = ci_hdrc_add_device(&pdev->dev,
+> +				pdev->resource, pdev->num_resources,
+> +				&ci_hdrc_nspire_platdata);
+> +
+> +	if (IS_ERR(ci_pdev)) {
+> +		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+> +		return PTR_ERR(ci_pdev);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, ci_pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ci_hdrc_nspire_remove(struct platform_device *pdev)
+> +{
+> +	struct platform_device *ci_pdev = platform_get_drvdata(pdev);
+> +
+> +	ci_hdrc_remove_device(ci_pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ci_hdrc_nspire_dt_ids[] = {
+> +	{ .compatible = "zevio,nspire-usb", },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct platform_driver ci_hdrc_nspire_driver = {
+> +	.probe = ci_hdrc_nspire_probe,
+> +	.remove = ci_hdrc_nspire_remove,
+> +	.driver = {
+> +		.name = "nspire_usb",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = ci_hdrc_nspire_dt_ids,
+> +	},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
+> +module_platform_driver(ci_hdrc_nspire_driver);
+> +
+> +MODULE_LICENSE("GPL v2");
+> --
 
-Let me fix those. And send a second pull request.
+You can decide to add module alias or not.
 
->
-> Second, it seems appropriate for you to start a second git tree for
-> hisilicon, instead of reusing the pxa one -- at least if you expect
-> more activity on that platform over time. You can create new trees on
-> kernel.org as you see fit, so there's no reason not to.
->
+Acked-by: Peter Chen <peter.chen@freescale.com>
+for driver part.
 
-Since hisilicon guys want to maintainer their SoC by themselves. This 
-patch set submitted by me is temporary in my git tree. They'll take over 
-my job in these weeks. So they'll submit pull request instead, and I'll 
-only submit patches.
+I haven't seen your dts patch.
 
-And this git tree will be only used for pxa/mmp since github isn't 
-preferred. I'll update the MAINTAINER document instead.
-
-> Thirdly, I noticed some patches have a Signed-off-by from your linaro
-> address, and a committer ID of your gmail account. Please be
-> consistent in which one you use since last S-o-b and committer should
-> match -- you might want to reconfigure git to use the linaro one but
-> either way is fine with me as long as it is consistent.
->
-OK. Let me make them consistent.
-
-> Finally, you've had a lot of review cycles, but surprisingly not many
-> acked-by's on the final patches. See if you can get some out of the
-> people whose feedback you have addressed.
->
-Let me try.
-
-Best Regards
-Haojian
-
->
-> Since you have to rebuild the branch to fix committer id, you might
-> want to just fold in the changes from my review, but I'll leave that
-> up to you.
->
-> -Olof
->
+Peter
