@@ -1,61 +1,56 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 25 Nov 2013 15:55:45 +0200
-Subject: [PATCH] ARM: dts: omap3-beagle: Fix USB host on beagle boards (for
- 3.13)
-Message-ID: <1385387745-7162-1-git-send-email-rogerq@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Nov 2013 08:57:54 -0500
+Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
+In-Reply-To: <529217C7.6030304@cogentembedded.com>
+References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
+ <529217C7.6030304@cogentembedded.com>
+Message-ID: <52935762.1080409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Beagle (rev. C4) and Beagle-XM (all revs) need VAUX2 1.8V supply
-for the USB PHY.
+On Sunday 24 November 2013 10:14 AM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 24-11-2013 3:28, Santosh Shilimkar wrote:
+> 
+>> Building ARM with NO_BOOTMEM generates below warning. Using min_t
+> 
+>    Where is that below? :-)
+> 
+Damn.. Posted a wrong version of the patch ;-(
+Here is the one with warning message included.
 
-As the generic PHY driver can't handle more than one supply
-at the moment, we configure this supply to be always on.
-This will cause a very small power impact if the USB host subsystem
-is not in use, about 76.86 micro-W + LDO power.
+>From 571dfdf4cf8ac7dfd50bd9b7519717c42824f1c3 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Sat, 23 Nov 2013 18:16:50 -0500
+Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
 
-Older Beagle boards (prior to C4) don't have VAUX2 connected anywhere,
-so there won't be any functional impact on those boards other than
-some additional LDO power consumption.
+Building ARM with NO_BOOTMEM generates below warning.
 
-Reported-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
+mm/nobootmem.c: In function ?__free_pages_memory?:
+mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
+
+Using min_t to find the correct alignment avoids the warning.
+
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/boot/dts/omap3-beagle-xm.dts | 8 ++++++++
- arch/arm/boot/dts/omap3-beagle.dts    | 8 ++++++++
- 2 files changed, 16 insertions(+)
+ mm/nobootmem.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 31a632f..b39918e 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -215,3 +215,11 @@
- &usbhsehci {
- 	phys = <0 &hsusb2_phy>;
- };
-+
-+&vaux2 {
-+	regulator-name = "usb_1v8";
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-always-on;
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index fa532aa..9764556 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -178,3 +178,11 @@
- 	mode = <3>;
- 	power = <50>;
- };
-+
-+&vaux2 {
-+	regulator-name = "vdd_ehci";
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-always-on;
-+};
-+
+diff --git a/mm/nobootmem.c b/mm/nobootmem.c
+index 2c254d3..8954e43 100644
+--- a/mm/nobootmem.c
++++ b/mm/nobootmem.c
+@@ -85,7 +85,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
+ 	int order;
+ 
+ 	while (start < end) {
+-		order = min(MAX_ORDER - 1UL, __ffs(start));
++		order = min_t(size_t, MAX_ORDER - 1UL, __ffs(start));
+ 
+ 		while (start + (1UL << order) > end)
+ 			order--;
 -- 
-1.8.3.2
+1.7.9.5
