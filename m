@@ -1,47 +1,49 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 25 Nov 2013 20:19:05 +0100
-Subject: [PATCH] ASoC: kirkwood: Fix erroneous double output while playing
-Message-ID: <20131125201905.0d009921@armhf>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 25 Nov 2013 11:19:03 -0800
+Subject: Tegra baseline test results for v3.13-rc1
+Message-ID: <5293A2A7.6060100@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the setting of the register KIRKWOOD_PLAYCTL which did
-always streaming on both I2S and SPDIF, ignoring the DAI ID.
+Here are some basic Tegra test results for Linux v3.13-rc1.
+Logs and other details at:
 
-The bug was introduced by the commit 75b9b65ee5a
- "ASoC: kirkwood: add S/PDIF support"
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.13-rc1/20131125105015/
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- sound/soc/kirkwood/kirkwood-i2s.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index d34d917..b27f826 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -244,15 +244,15 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
- 				   ctl);
- 	}
- 
--	if (dai->id == 0)
--		ctl &= ~KIRKWOOD_PLAYCTL_SPDIF_EN;	/* i2s */
--	else
--		ctl &= ~KIRKWOOD_PLAYCTL_I2S_EN;	/* spdif */
--
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
- 		/* configure */
- 		ctl = priv->ctl_play;
-+		if (dai->id == 0)
-+			ctl &= ~KIRKWOOD_PLAYCTL_SPDIF_EN;	/* i2s */
-+		else
-+			ctl &= ~KIRKWOOD_PLAYCTL_I2S_EN;	/* spdif */
-+
- 		value = ctl & ~KIRKWOOD_PLAYCTL_ENABLE_MASK;
- 		writel(value, priv->io + KIRKWOOD_PLAYCTL);
- 
+Test summary
+------------
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.12 (test_v3.12)):
+    text     data      bss    total  kernel
+-458712    +3432    +5624  -449656  multi_v7_defconfig
+-420983     +856    +4564  -415563  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.12 (test_v3.12))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+      416k    -416k        .      -4k tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+      392k    -392k        .       8k tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+      428k    -428k        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+      404k    -404k        .       8k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+
+The large size deltas are due to a toolchain switchover from CodeSourcery 2010.09 to Ubuntu/Linaro 4.6.3-1ubuntu5.
+I'd expect that if the toolchain remained the same, the size deltas would be similar to the OMAP deltas:
+
+     http://www.pwsan.com/omap/testlogs/test_v3.13-rc1/20131124223225/README.txt
+
+This toolchain probably won't stay in use for very long here.
+(Since this is a mainline kernel test, in my view, the primary test toolchain should also be mainline gcc/binutils.)
