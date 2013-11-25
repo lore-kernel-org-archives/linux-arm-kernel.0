@@ -1,46 +1,42 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 25 Nov 2013 14:06:30 +0200
-Subject: [PATCH 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <52933AE4.3070608@ti.com>
-References: <1384795139-19466-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384795139-19466-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52933AE4.3070608@ti.com>
-Message-ID: <52933D46.6090901@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 Nov 2013 12:15:10 +0000
+Subject: [PATCH 3/3] ARM: dts: Rename Exynos5250 ChromeOS common file to have
+ exynos prefix
+In-Reply-To: <1385381710-5212-1-git-send-email-broonie@kernel.org>
+References: <1385381710-5212-1-git-send-email-broonie@kernel.org>
+Message-ID: <1385381710-5212-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 01:56 PM, Sekhar Nori wrote:
-> On Monday 18 November 2013 10:48 PM, Ivan Khoronzhuk wrote:
->> @@ -211,29 +129,34 @@ static int davinci_wdt_probe(struct platform_device *pdev)
->>
->>   	clk_prepare_enable(wdt_clk);
->>
->> -	if (heartbeat < 1 || heartbeat > MAX_HEARTBEAT)
->> -		heartbeat = DEFAULT_HEARTBEAT;
->> +	wdd			= &wdt_wdd;
->> +	wdd->info		= &davinci_wdt_info;
->> +	wdd->ops		= &davinci_wdt_ops;
->> +	wdd->min_timeout 	= 1;
->> +	wdd->max_timeout 	= MAX_HEARTBEAT;
->
-> Some checkpatch warnings. Please fix.
->
-> WARNING: please, no space before tabs
-> #273: FILE: drivers/watchdog/davinci_wdt.c:135:
-> +^Iwdd->min_timeout ^I= 1;$
->
-> WARNING: please, no space before tabs
-> #274: FILE: drivers/watchdog/davinci_wdt.c:136:
-> +^Iwdd->max_timeout ^I= MAX_HEARTBEAT;$
->
-> total: 0 errors, 2 warnings, 0 checks, 249 lines checked
->
-> Thanks,
-> sekhar
->
+From: Mark Brown <broonie@linaro.org>
 
-Thanks, I will
+Make it easier to notice the common file for ChromeOS devices based on
+the Exynos5250 by giving it the exynos5250 prefix that the boards have.
 
+Signed-off-by: Mark Brown <broonie@linaro.org>
+Acked-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/boot/dts/{cros5250-common.dtsi => exynos5250-cros-common.dtsi} | 0
+ arch/arm/boot/dts/exynos5250-snow.dts                                   | 2 +-
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename arch/arm/boot/dts/{cros5250-common.dtsi => exynos5250-cros-common.dtsi} (100%)
+
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+similarity index 100%
+rename from arch/arm/boot/dts/cros5250-common.dtsi
+rename to arch/arm/boot/dts/exynos5250-cros-common.dtsi
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index fd711e245e8d..7e2669c6f7f5 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -10,7 +10,7 @@
+ 
+ /dts-v1/;
+ #include "exynos5250.dtsi"
+-#include "cros5250-common.dtsi"
++#include "exynos5250-cros-common.dtsi"
+ 
+ / {
+ 	model = "Google Snow";
 -- 
-Regards,
-Ivan Khoronzhuk
+1.8.4.4
