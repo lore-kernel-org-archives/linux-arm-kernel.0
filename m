@@ -1,47 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Nov 2013 17:26:43 +0100
-Subject: [PATCH 0/4] ARM: mvebu: misc important fixes
-Message-ID: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 25 Nov 2013 17:26:45 +0100
+Subject: [PATCH 2/4] irqchip: armada-370-xp: fix MSI race condition
+In-Reply-To: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1385396807-19027-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Andrew, Greg, Sebastian,
+From: Lior Amsalem <alior@marvell.com>
 
-Here are four important fixes for Armada 370/XP support:
+In the Armada 370/XP driver, when we receive an IRQ 1, we read the
+list of doorbells that caused the interrupt from register
+ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS. This gives the list of MSIs that
+were generated. However, instead of acknowledging only the MSIs that
+were generated, we acknowledge *all* the MSIs, by writing
+~MSI_DOORBELL_MASK in the ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS register.
 
- * Two fixes for the irqchip driver, fixing a similar problem in the
-   IPI and MSI implementation. I've splitted the patches in two,
-   because the IPI side of the fix should normally be backported all
-   the way to 3.8, while the MSI side of the fix is only needed in
-   3.13, since MSI support didn't exist before. The IPI problem causes
-   some really nasty SMP scheduling problems.
+This creates a race condition: if a new MSI that isn't part of the
+ones read into the temporary "msimask" variable is fired before we
+acknowledge all MSIs, then we will simply loose it.
 
- * One fix for the I/O coherency, which should be backported all the
-   way to 3.8.
+It is important to mention that this ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS
+register has the following behavior: "A CPU write of 0 clears the bits
+in this field. A CPU write of 1 has no effect". This is what allows us
+to simply write ~msimask to acknoledge the handled MSIs.
 
- * One fix for the PCIe controller on Armada 370 DB, which should be
-   backported to 3.12, where the problem was introduced.
+Notice that the same problem is present in the IPI implementation, but
+it is fixed as a separate patch, so that this IPI fix can be pushed to
+older stable versions as appropriate (all the way to 3.8), while the
+MSI code only appeared in 3.13.
 
-Thanks to Lior Amsalem for debugging the IPI issue, and Gregory
-Clement for finding the I/O coherency register address problem.
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
+This is only needed for 3.13, since the MSI support didn't exist in
+earlier kernel versions.
+---
+ drivers/irqchip/irq-armada-370-xp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thomas
-
-Gregory CLEMENT (1):
-  ARM: mvebu: use the virtual CPU registers to access coherency
-    registers
-
-Lior Amsalem (2):
-  irqchip: armada-370-xp: fix IPI race condition
-  irqchip: armada-370-xp: fix MSI race condition
-
-Thomas Petazzoni (1):
-  ARM: mvebu: re-enable PCIe on Armada 370 DB
-
- arch/arm/boot/dts/armada-370-db.dts  | 28 ++++++++++++++--------------
- arch/arm/boot/dts/armada-370-xp.dtsi |  2 +-
- drivers/irqchip/irq-armada-370-xp.c  |  4 ++--
- 3 files changed, 17 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index f5e49a2..3fac063 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -381,7 +381,7 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+ 						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
+ 				& PCI_MSI_DOORBELL_MASK;
+ 
+-			writel(~PCI_MSI_DOORBELL_MASK, per_cpu_int_base +
++			writel(~msimask, per_cpu_int_base +
+ 			       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
+ 
+ 			for (msinr = PCI_MSI_DOORBELL_START;
 -- 
 1.8.1.2
