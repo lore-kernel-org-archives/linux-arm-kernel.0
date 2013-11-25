@@ -1,37 +1,23 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Nov 2013 18:15:51 +0100
-Subject: [PATCH 2/2] ARM i.MX5: set CAN peripheral clock to 24 MHz parent
-In-Reply-To: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
-References: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1385399751-19109-3-git-send-email-mkl@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 Nov 2013 17:17:48 +0000
+Subject: [PATCHv5] ASoC: Add support for BCM2835
+In-Reply-To: <528F7718.5@koalo.de>
+References: <528F7718.5@koalo.de>
+Message-ID: <20131125171748.GN14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets the parent of CAN peripheral clock (a.k.a. CPI clock) to the
-lp_apm clock, which has a rate of 24 MHz.
+On Fri, Nov 22, 2013 at 04:24:08PM +0100, Florian Meier wrote:
+> This driver adds support for digital audio (I2S)
+> for the BCM2835 SoC that is used by the
+> Raspberry Pi. External audio codecs can be
+> connected to the Raspberry Pi via P5 header.
 
-In the CAN world a base clock with multiple of 8 MHz is suited best for all CIA
-recommented bit rates. Without this patch the CAN peripheral clock on i.MX53
-has a rate of 66.666 MHz which produces quite large bit rate errors.
-
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx51-imx53.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index e349fd5..28f7f3f 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -306,6 +306,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	/* move usb phy clk to 24MHz */
- 	clk_set_parent(clk[IMX5_CLK_USB_PHY_SEL], clk[IMX5_CLK_OSC]);
- 
-+	/* move can bus clk to 24MHz */
-+	clk_set_parent(clk[IMX5_CLK_CAN_SEL], clk[IMX5_CLK_LP_APM]);
-+
- 	clk_prepare_enable(clk[IMX5_CLK_GPC_DVFS]);
- 	clk_prepare_enable(clk[IMX5_CLK_AHB_MAX]); /* esdhc3 */
- 	clk_prepare_enable(clk[IMX5_CLK_AIPS_TZ1]);
--- 
-1.8.4.2
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/1bffa875/attachment.sig>
