@@ -1,35 +1,56 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 25 Nov 2013 14:37:27 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNIGkuTVg1OiBmaXggInNoaWZ0IiB2YWx1ZSBmb3Ig?=
- =?UTF-8?B?bHBfYXBtX3NlbA==?=
-In-Reply-To: <1385375474-15901-1-git-send-email-mkl@pengutronix.de>
-References: <1385375474-15901-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1385375847.678349974@f369.i.mail.ru>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 25 Nov 2013 11:46:53 +0100
+Subject: [PATCH] CMA: Fix the phys_addr_t print types
+In-Reply-To: <52918071.10408@ti.com>
+References: <1385264221-29952-1-git-send-email-santosh.shilimkar@ti.com>
+ <20131124034426.GB3873@kroah.com> <52917661.6050005@ti.com>
+ <20131124041056.GA7415@kroah.com> <52918071.10408@ti.com>
+Message-ID: <52932A9D.3050305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> According to the i.MX53 Rev. 2.1 datasheet the lp_apm_sel is bit 10 in the
-> CCM_CCSR register not bit 9.
-> 
-> This patch fixes this issue.
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 3f01df2..867d623 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -98,7 +98,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", rate_ckih1);
->  	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", rate_ckih2);
->  
-> -	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
-> +	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
->  						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+Hi,
 
-This is not valid for i.MX51.
+On 2013-11-24 05:28, Santosh Shilimkar wrote:
+> On Saturday 23 November 2013 11:10 PM, Greg Kroah-Hartman wrote:
+> > On Sat, Nov 23, 2013 at 10:45:37PM -0500, Santosh Shilimkar wrote:
+> >> On Saturday 23 November 2013 10:44 PM, Greg Kroah-Hartman wrote:
+> >>> On Sat, Nov 23, 2013 at 10:37:01PM -0500, Santosh Shilimkar wrote:
+> >>>> @@ -250,8 +249,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+> >>>>  	*res_cma = cma;
+> >>>>  	cma_area_count++;
+> >>>>
+> >>>> -	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+> >>>> -		(unsigned long)base);
+> >>>> +	pr_info("CMA: reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
+> >>>> +		&base);
+> >>>
+> >>> Why is this pr_info() at all?  That's just noise, please move it to
+> >>> pr_debug().
+> >>>
+> >> Marek can comment better but I think its useful print to know CMA
+> >> reserved memory size.
+> >
+> > Useful to who?
+> >
+> Useful to anyone wants to know the CMA usage on a platform.
+> CMA size is configurable and platforms tend to use different sizes
+> based on needs. The info don't appear in /proc/meminfo, so probably
+> dmsg grep is easy enough to know how much CMA memory being used on
+> a platform. That was my point.
+>
+> I don't have strong argument here against not making it pr_debug
+> but was waiting for Marek's opinion on it.
 
----
+If possible I would like to keep pr_info. It already helped me a lot
+while analyzing someone's logs to find why memory allocation failed.
+A simple search for "CMA" messages enabled me to quickly check if CMA
+has been enabled and configured properly or not. It also gives a curious
+user some information about the memory configuration (especially if he
+don't need CMA, he will investigate why kernel has reserved so much
+memory).
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
