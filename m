@@ -1,54 +1,61 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 25 Nov 2013 10:42:52 -0800
-Subject: [PATCH 11/31] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <20131125180000.GR16735@n2100.arm.linux.org.uk>
-References: <528D28A1.2050307@wwwdotorg.org>
- <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
- <528E4F55.9070204@wwwdotorg.org>
- <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
- <528F95A9.2050305@wwwdotorg.org>
- <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
- <528F9DF9.6080706@wwwdotorg.org>
- <20131123003442.GH16735@n2100.arm.linux.org.uk>
- <5293883A.8050808@wwwdotorg.org>
- <CAA9_cmfMtp4WjRGVzfTxrwcNWP95+HE7DAYg_GeWfqi=L2K2aw@mail.gmail.com>
- <20131125180000.GR16735@n2100.arm.linux.org.uk>
-Message-ID: <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 25 Nov 2013 19:47:04 +0100
+Subject: [PATCH RESEND v2] clk: probe defer when clock not yet ready
+Message-ID: <20131125194704.5a5922b7@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 10:00 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 25, 2013 at 09:45:18AM -0800, Dan Williams wrote:
->> Regardless of whether the driver was dma_request_channel as a
->> fallback, it will currently use NULL to indicate an allocation
->> failure.
->
-> At the moment, dma_request_slave_channel()'s return values are valid
-> pointer or NULL.  I'd suggest as that's how it's been established,
-> that function is left alone - changing the return values in this kind
-> of invisible way is Really Bad(tm) because you can't check that it's
-> right in any future users - unless you're prepared to review every
-> single new user of this function for the next few years or more.
->
-> Instead, leaving it as is and introducing a new function name with
-> the different return error method is the right way to do this.
+At probe time, a clock device may not be ready when some other device
+wants to use it. 
 
-I was attempting to tap the brakes on the number of request_channel
-apis in circulation.
-dma_request_channel
-dma_request_slave_channel
-dma_request_slave_channel_compat
-... and now dma_request_slave_channel_reason
+This patch lets the functions clk_get/devm_clk_get return a probe defer
+when the clock is defined in the DT but not yet available.
 
-...but given we already have things like samsung_dmadev_request() in
-the wild, tracking correct usage going forward will be an uphill
-battle.  We can do this the other way round.  Introduce the new api
-and delete the old one (after some time).
+It also fixes an erroneous call to clk_get_sys() when __clk_get() fails.
 
-Stephen,
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+resend v2: remove ASoc from subject (thank you, Mark)
+resend: - patch subject change from
+   [PATCH v3 1/2] ASoC: kirkwood: clk: probe defer when clock not yet ready
+	- base kernel 3.13.0-rc1
+v2: fix __clk_get() failure (from Russell King)
+---
+ drivers/clk/clk.c    | 2 +-
+ drivers/clk/clkdev.c | 7 ++++++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-Can we make the new api not pass the 'defer' flag.  You mention it is
-for compat reasons, but since there are no users I'm not seeing how
-there can be compatibility concerns.  Can you elaborate?
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 2cf2ea6..41361c6 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2187,7 +2187,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+ {
+ 	struct of_clk_provider *provider;
+-	struct clk *clk = ERR_PTR(-ENOENT);
++	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
+ 
+ 	/* Check if we have such a provider in our array */
+ 	mutex_lock(&of_clk_lock);
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 442a313..1f402b9 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -157,7 +157,12 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ 
+ 	if (dev) {
+ 		clk = of_clk_get_by_name(dev->of_node, con_id);
+-		if (!IS_ERR(clk) && __clk_get(clk))
++		if (!IS_ERR(clk)) {
++			if (!__clk_get(clk))
++				clk = ERR_PTR(-ENOENT);
++			return clk;
++		}
++		if (PTR_ERR(clk) == -EPROBE_DEFER)
+ 			return clk;
+ 	}
+ 
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
