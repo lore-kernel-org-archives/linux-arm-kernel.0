@@ -1,41 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 08:30:31 -0800
-Subject: OMAP baseline test results for v3.13-rc1 (toolchain Debian
- 4.7.2-5)
-In-Reply-To: <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
- <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
-Message-ID: <20131125163031.GQ10023@atomide.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 25 Nov 2013 18:33:02 +0200
+Subject: ARM: v3.13-rc1: USB regression
+In-Reply-To: <20131124224359.GE25039@n2100.arm.linux.org.uk>
+References: <20131124222247.GC24645@blackmetal.musicnaut.iki.fi>
+ <20131124224359.GE25039@n2100.arm.linux.org.uk>
+Message-ID: <20131125163302.GD24645@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [131125 07:16]:
-> On Mon, 25 Nov 2013, Paul Walmsley wrote:
-> 
-> > Boot to userspace:
-> >     FAIL ( 1/11): 37xxevm
-> 
-> An auto-bisect traced this to:
-> 
-> commit 95807689eab8441737572d1a9daaa1025429a908
-> Author: Tony Lindgren <tony@atomide.com>
-> Date:   Mon Oct 14 11:31:43 2013 -0700
-> 
->     ARM: OMAP2+: Remove legacy booting support for omap3 EVM
->     
->     We now have pretty decent support with the device tree
->     based booting. Patches to add more features are welcome.
->     
->     Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> 
-> So looks like this is due to the switchover to DT-based booting for 37xx 
-> EVM.  Will plug that in here and re-test.
+Hi,
 
-Yes. Also there's the patch missing to enable wake-up interrupts, but
-that has a dependency to populating IRQ resources dynamically to avoid
-nasty warnings. Both should get fixed during the -rc cycle though.
+On Sun, Nov 24, 2013 at 10:43:59PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 25, 2013 at 12:22:47AM +0200, Aaro Koskinen wrote:
+> > [   33.967324] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
+> > 
+> > I bisected this to 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 (ARM: DMA-API:
+> > better handing of DMA masks for coherent allocations). Reverting that
+> > commit makes the USB work again fine.
 
-Regards,
+[...]
 
-Tony
+> Better would be:
+> 
+> #define __arch_dma_to_pfn(dev, addr)	\
+> 	({ unsigned long pfn = (addr) >> PAGE_SHIFT;		\
+> 	   if (is_lbus_device(dev))				\
+> 		pfn += PHYS_PFN_OFFSET - 			\
+> 			(OMAP1510_LB_OFFSET >> PAGE_SHIFT);	\
+> 	   pfn;							\
+> 	})
+> 
+> Can you try that in arch/arm/mach-omap1/include/mach/memory.h please?
+
+Still doesn't work:
+
+[   33.878790] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xfffe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
+[   33.894019] ohci ohci: can't setup: -12
+
+A.
