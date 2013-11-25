@@ -1,36 +1,25 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Nov 2013 15:25:44 -0700
-Subject: [PATCH V2 3/3] ARM: tegra: document use of standard DMA DT
- bindings
-In-Reply-To: <11843948.6MmkNU7Gku@wuerfel>
-References: <1385417161-5542-1-git-send-email-swarren@wwwdotorg.org>
- <1385417161-5542-4-git-send-email-swarren@wwwdotorg.org>
- <11843948.6MmkNU7Gku@wuerfel>
-Message-ID: <5293CE68.3000801@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 25 Nov 2013 14:24:01 -0800
+Subject: [PATCH] ARM: ep93xx: remove deprecated IRQF_DISABLED
+In-Reply-To: <1384816931-3680-1-git-send-email-rmallon@gmail.com>
+References: <1384816931-3680-1-git-send-email-rmallon@gmail.com>
+Message-ID: <20131125222401.GA18365@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 03:07 PM, Arnd Bergmann wrote:
-> On Monday 25 November 2013 15:06:01 Stephen Warren wrote:
->>    See ../reset/reset.txt for details.
->>  - reset-names : Must include the following entries:
->>    - dma
->> +- #iommu-cells : Must be <1>. This dictates the length of DMA specifiers in
->> +  client nodes' dmas properties. The specifier represents the DMA request
->> +  select value for the peripheral. For more details, consult the Tegra TRM's
->> +  documentation of the APB DMA channel control register REQ_SEL field.
->>  
->>  Examples:
->>  
->> @@ -36,4 +40,5 @@ apbdma: dma at 6000a000 {
->>         clocks = <&tegra_car 34>;
->>         resets = <&tegra_car 34>;
->>         reset-names = "dma";
->> +       #iommu-cells = <1>;
+On Tue, Nov 19, 2013 at 10:22:11AM +1100, Ryan Mallon wrote:
+> From: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 > 
-> s/iommu-cells/dma-cells/
+> This patch proposes to remove the use of the IRQF_DISABLED flag
+> 
+> It's a NOOP since 2.6.35 and it will be removed one day.
+> 
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+> ---
 
-Thanks.
+Applied to next/soc. Thanks!
 
-Uggh. I know you pointed that out before, and I fixed it. I guess I
-screwed up a rebase somewhere:-(
+
+-Olof
