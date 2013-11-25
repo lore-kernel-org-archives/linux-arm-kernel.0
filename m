@@ -1,193 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 25 Nov 2013 20:03:59 +0100
-Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
-In-Reply-To: <20131125185248.GF28201@mudshark.cambridge.arm.com>
-References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
- <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
- <20131125185248.GF28201@mudshark.cambridge.arm.com>
-Message-ID: <CAKv+Gu9hniOxxBLEoCKi57hRUccbj6HPJ6vYTyWxyhqxU1qeaw@mail.gmail.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Mon, 25 Nov 2013 20:06:41 +0100
+Subject: [PATCH v5 08/17] spi: mpc512x: adjust to OF based clock lookup
+In-Reply-To: <20131125173008.GQ14725@sirena.org.uk>
+References: <1384729577-7336-1-git-send-email-gsi@denx.de>
+ <1384729577-7336-9-git-send-email-gsi@denx.de>
+ <20131125173008.GQ14725@sirena.org.uk>
+Message-ID: <20131125190641.GL2760@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2013 19:52, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 18, 2013 at 12:06:57PM +0000, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>
->> Add KGDB debug support for FP/SIMD processor.This support
->> only debugging of FP/SIMD in kernel mode.
->> With this patch one can view or set FP/SIMD registers in
->> kernel context
->>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->> ---
->>  arch/arm64/include/asm/fpsimd.h |    1 +
->>  arch/arm64/kernel/fpsimd.c      |    5 ++
->>  arch/arm64/kernel/kgdb.c        |  105 +++++++++++++++++++++++++--------------
->>  3 files changed, 73 insertions(+), 38 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
->> index 609bc44..5039d6d 100644
->> --- a/arch/arm64/include/asm/fpsimd.h
->> +++ b/arch/arm64/include/asm/fpsimd.h
->> @@ -60,6 +60,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
->>  extern void fpsimd_thread_switch(struct task_struct *next);
->>  extern void fpsimd_flush_thread(void);
->>  extern void fpsimd_reload_fpstate(void);
->> +extern int  fpsimd_thread_state(void);
->>
->>  #endif
->>
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index 5b13c17..27604c1 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -124,6 +124,11 @@ void fpsimd_flush_thread(void)
->>       set_thread_flag(TIF_FOREIGN_FPSTATE);
->>  }
->>
->> +int fpsimd_thread_state(void)
->> +{
->> +     return (current->mm && test_thread_flag(TIF_FOREIGN_FPSTATE)) ? 1 : 0;
->> +}
->
-> Erm...
->
->   1. `? 1 : 0' doesn't do anything
->   2. TIF_FOREIGN_FPSTATE doesn't seem to appear in my source tree (3.13-rc1)
->   3. Does it make sense for threads without an mm to have TIF_FOREIGN_FPSTATE set?
->
+On Mon, Nov 25, 2013 at 17:30 +0000, Mark Brown wrote:
+> 
+> On Mon, Nov 18, 2013 at 12:06:08AM +0100, Gerhard Sittig wrote:
+> > after device tree based clock lookup became available, the peripheral
+> > driver need no longer construct clock names which include the PSC index,
+> > remove the "psc%d_mclk" template and unconditionally use 'mclk'
+> 
+> Have there been other changes which make this happen?
 
-I think Vijay did mention at some point that his patches depend on my
-patch 'arm64: defer reloading a task's FPSIMD state to userland
-resume' which I posted here
+Not yet in mainline.  The patch you respond to is 08/17 within
+the series, and depends on earlier patches in the series (namely
+the introduction of CCF support for the MPC512x platform, making
+the 'mclk' lookup against the PSC's OF node work while keeping
+the global 'pscN_mclk' in place during migration).
 
-http://marc.info/?l=linux-arm-kernel&m=138418879110655&w=2
+This information was listed in the cover letter, but was not
+duplicated within the individual patches.  Patches were sent to
+individual Cc: lists to not spam too many people, but the cover
+letter was CC'ed to every recipient of any part of the series.
 
-(with you on cc, IIRC) but which did not evoke any response on the list.
+Please note that I will have to re-submit the series, since it no
+longer cleanly applies against v3.13-rc1 (which was not available
+when I sent v5).  This patch won't change in its content, but may
+experience changes in its context (catchup with changes between
+v3.12 and v3.13-rc1).
 
+Thank you for considering the patch, and for your feedback on
+past versions!
+
+
+virtually yours
+Gerhard Sittig
 -- 
-Ard.
-
-
-
->>  void fpsimd_reload_fpstate(void)
->>  {
->>       preempt_disable();
->> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
->> index f10f2ba..5e34852 100644
->> --- a/arch/arm64/kernel/kgdb.c
->> +++ b/arch/arm64/kernel/kgdb.c
->> @@ -23,6 +23,14 @@
->>  #include <linux/kdebug.h>
->>  #include <linux/kgdb.h>
->>  #include <asm/traps.h>
->> +#include <asm/fpsimd.h>
->> +
->> +#ifdef CONFIG_KERNEL_MODE_NEON
->> +/*
->> + * Structure to hold FP/SIMD register contents
->> + */
->> +struct fpsimd_state kgdb_fpsimd_regs;
->> +#endif
->>
->>  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->>       { "x0", 8, offsetof(struct pt_regs, regs[0])},
->> @@ -59,40 +67,40 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->>       { "sp", 8, offsetof(struct pt_regs, sp)},
->>       { "pc", 8, offsetof(struct pt_regs, pc)},
->>       { "pstate", 4, offsetof(struct pt_regs, pstate)},
->> -     { "v0", 16, -1 },
->> -     { "v1", 16, -1 },
->> -     { "v2", 16, -1 },
->> -     { "v3", 16, -1 },
->> -     { "v4", 16, -1 },
->> -     { "v5", 16, -1 },
->> -     { "v6", 16, -1 },
->> -     { "v7", 16, -1 },
->> -     { "v8", 16, -1 },
->> -     { "v9", 16, -1 },
->> -     { "v10", 16, -1 },
->> -     { "v11", 16, -1 },
->> -     { "v12", 16, -1 },
->> -     { "v13", 16, -1 },
->> -     { "v14", 16, -1 },
->> -     { "v15", 16, -1 },
->> -     { "v16", 16, -1 },
->> -     { "v17", 16, -1 },
->> -     { "v18", 16, -1 },
->> -     { "v19", 16, -1 },
->> -     { "v20", 16, -1 },
->> -     { "v21", 16, -1 },
->> -     { "v22", 16, -1 },
->> -     { "v23", 16, -1 },
->> -     { "v24", 16, -1 },
->> -     { "v25", 16, -1 },
->> -     { "v26", 16, -1 },
->> -     { "v27", 16, -1 },
->> -     { "v28", 16, -1 },
->> -     { "v29", 16, -1 },
->> -     { "v30", 16, -1 },
->> -     { "v31", 16, -1 },
->> -     { "fpsr", 4, -1 },
->> -     { "fpcr", 4, -1 },
->> +     { "v0", 16, offsetof(struct fpsimd_state, vregs[0])},
->> +     { "v1", 16, offsetof(struct fpsimd_state, vregs[1])},
->> +     { "v2", 16, offsetof(struct fpsimd_state, vregs[2])},
->> +     { "v3", 16, offsetof(struct fpsimd_state, vregs[3])},
->> +     { "v4", 16, offsetof(struct fpsimd_state, vregs[4])},
->> +     { "v5", 16, offsetof(struct fpsimd_state, vregs[5])},
->> +     { "v6", 16, offsetof(struct fpsimd_state, vregs[6])},
->> +     { "v7", 16, offsetof(struct fpsimd_state, vregs[7])},
->> +     { "v8", 16, offsetof(struct fpsimd_state, vregs[8])},
->> +     { "v9", 16, offsetof(struct fpsimd_state, vregs[9])},
->> +     { "v10", 16, offsetof(struct fpsimd_state, vregs[10])},
->> +     { "v11", 16, offsetof(struct fpsimd_state, vregs[11])},
->> +     { "v12", 16, offsetof(struct fpsimd_state, vregs[12])},
->> +     { "v13", 16, offsetof(struct fpsimd_state, vregs[13])},
->> +     { "v14", 16, offsetof(struct fpsimd_state, vregs[14])},
->> +     { "v15", 16, offsetof(struct fpsimd_state, vregs[15])},
->> +     { "v16", 16, offsetof(struct fpsimd_state, vregs[16])},
->> +     { "v17", 16, offsetof(struct fpsimd_state, vregs[17])},
->> +     { "v18", 16, offsetof(struct fpsimd_state, vregs[18])},
->> +     { "v19", 16, offsetof(struct fpsimd_state, vregs[19])},
->> +     { "v20", 16, offsetof(struct fpsimd_state, vregs[20])},
->> +     { "v21", 16, offsetof(struct fpsimd_state, vregs[21])},
->> +     { "v22", 16, offsetof(struct fpsimd_state, vregs[22])},
->> +     { "v23", 16, offsetof(struct fpsimd_state, vregs[23])},
->> +     { "v24", 16, offsetof(struct fpsimd_state, vregs[24])},
->> +     { "v25", 16, offsetof(struct fpsimd_state, vregs[25])},
->> +     { "v26", 16, offsetof(struct fpsimd_state, vregs[26])},
->> +     { "v27", 16, offsetof(struct fpsimd_state, vregs[27])},
->> +     { "v28", 16, offsetof(struct fpsimd_state, vregs[28])},
->> +     { "v29", 16, offsetof(struct fpsimd_state, vregs[29])},
->> +     { "v30", 16, offsetof(struct fpsimd_state, vregs[30])},
->> +     { "v31", 16, offsetof(struct fpsimd_state, vregs[31])},
->> +     { "fpsr", 4, offsetof(struct fpsimd_state, fpsr)},
->> +     { "fpcr", 4, offsetof(struct fpsimd_state, fpcr)},
->>  };
->>
->>  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->> @@ -100,11 +108,22 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->>       if (regno >= DBG_MAX_REG_NUM || regno < 0)
->>               return NULL;
->>
->> -     if (dbg_reg_def[regno].offset != -1)
->> +     if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
->>               memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
->>                      dbg_reg_def[regno].size);
->> -     else
->> +     else {
->> +#ifdef CONFIG_KERNEL_MODE_NEON
->> +             if (fpsimd_thread_state()) {
->> +                     fpsimd_save_state(&kgdb_fpsimd_regs);
->> +                     memcpy(mem, (void *)&kgdb_fpsimd_regs +
->> +                                     dbg_reg_def[regno].offset,
->> +                                     dbg_reg_def[regno].size);
->> +             } else
->> +                     memset(mem, 0, dbg_reg_def[regno].size);
->> +#else
->>               memset(mem, 0, dbg_reg_def[regno].size);
->
-> Can you use IS_ENABLED to tidy this up?
->
-> Will
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
