@@ -1,46 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Nov 2013 14:09:27 +0000
-Subject: OMAP build failure after this merge window - caused by usb or phy
- Kconfig krap
-Message-ID: <20131125140927.GP16735@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Nov 2013 09:16:13 -0500
+Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52935BAD.9080908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no other way to say it, and I've no idea who is responsible for
-this:
+Ivan,
 
-  LD      init/built-in.o
-drivers/built-in.o: In function `omap_usb2_remove':
-powercap_sys.c:(.text+0x1c60): undefined reference to `usb_remove_phy'
-drivers/built-in.o: In function `omap_usb_power_off':
-powercap_sys.c:(.text+0x1c84): undefined reference to `omap_control_usb_phy_power'
-drivers/built-in.o: In function `omap_usb_power_on':
-powercap_sys.c:(.text+0x1ca8): undefined reference to `omap_control_usb_phy_power'
-drivers/built-in.o: In function `omap_usb2_probe':
-powercap_sys.c:(.text+0x1dac): undefined reference to `omap_control_usb_phy_power'
-powercap_sys.c:(.text+0x1e5c): undefined reference to `usb_add_phy_dev'
-drivers/built-in.o: In function `omap_usb2_suspend':
-powercap_sys.c:(.text+0x1ec8): undefined reference to `omap_control_usb_phy_power'
-powercap_sys.c:(.text+0x1f20): undefined reference to `omap_control_usb_phy_power'
-drivers/built-in.o: In function `omap_usb2_set_comparator':
-powercap_sys.c:(.text+0x1f54): undefined reference to `usb_get_phy'
-arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
-dss-common.c:(.text+0xf824): undefined reference to `usb_bind_phy'
-make[1]: *** [vmlinux] Error 1
-make: *** [sub-make] Error 2
+On Monday 25 November 2013 09:04 AM, Ivan Khoronzhuk wrote:
+> To reduce code duplicate and increase code readability use WDT core
+> code to handle WDT interface.
+> 
+> Remove io_lock as the WDT core uses mutex to lock each wdt device.
+> Remove wdt_state as the WDT core tracks state with its own variable.
+> 
+> The watchdog_init_timeout() can read timeout value from timeout-sec
+> property if the passed value is out of bounds. The heartbeat is
+> initialized in next way. If heartbeat is not set thought module
+> parameter, try to read it's value from WDT node timeout-sec property.
+> If node has no one, use default value.
+> 
+> The heartbeat is hold in wdd->timeout by WDT core, so use it in
+> order to set timeout period.
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-These warnings probably have something to do with it:
+Minor suggestion regarding the SOB line which applies to
+rest of the series as well. Typically your SOB line
+should be the last one like below.
 
-scripts/kconfig/conf --silentoldconfig Kconfig
-warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
-warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
-warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
-warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 
-which just illustrates why "select" in Kconfig is soo fscking bad that
-it shouldn't be used.
+No need to repost the series just for that. The last
+patch as I commented earlier, needs to be separate
+patch which will go via linux-keystone tree.
 
-It certainly should not be used without running through a series of
-randconfig builds to make absolutely sure you have the dependencies
-correct... or an allnoconfig with just the options required to select
-the new option enabled.
+Once the watchdog maintainer is happy with rest of the
+series and applies it, I will pick last patch.
+
+Regards,
+Santosh
