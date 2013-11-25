@@ -1,34 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 25 Nov 2013 11:26:53 -0200
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 25 Nov 2013 21:37:02 +0800
 Subject: [PATCH] backlight: pwm_bl: Do not make the regulator mandatory
-In-Reply-To: <20131125031029.GC11613@S2101-09.ap.freescale.net>
+In-Reply-To: <CAOMZO5CtNnma8Sv35P3jeNYQiLV=jdmN0Q7w2_LFMOj-nTbPZg@mail.gmail.com>
 References: <20131122142231.GA1741@ulmo.nvidia.com>
  <20131122145224.GO14725@sirena.org.uk>
  <20131125031029.GC11613@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5CtNnma8Sv35P3jeNYQiLV=jdmN0Q7w2_LFMOj-nTbPZg@mail.gmail.com>
+ <CAOMZO5CtNnma8Sv35P3jeNYQiLV=jdmN0Q7w2_LFMOj-nTbPZg@mail.gmail.com>
+Message-ID: <20131125133659.GA30476@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Nov 25, 2013 at 11:26:53AM -0200, Fabio Estevam wrote:
+> Looks like we need to apply this one to make sure backlight works:
+> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/281826
 
-On Mon, Nov 25, 2013 at 1:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+But per Thierry's comment below, this is the exactly the case that we
+should avoid - patch individual board DTS file to add a dummy/fake
+regulator to get it through.
 
-> Hmm, I'm seeing this breakage on v3.13-rc1 now with the following line
-> in the kernel log.
->
->   pwm-backlight backlight.18: dummy supplies not allowed
->
-> What's missing here?
+| But even so, the regulator core now has functionality to return a dummy
+| regulator if none is specified in DT, specifically so that users don't
+| have to special case the handling of "optional" regulators. That should
+| be enough to keep all boards working even if no power-supply property
+| was given in the DTS. As a matter of fact it's a constellation that I
+| explicitly tested and found to work well.
 
-Yes, this is weird.
-
-linux-next 20131120: backlight fails
-linux-next 20131122: backlight works
-linux-next 20131125: backlight fails
-
-Looks like we need to apply this one to make sure backlight works:
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/281826
-
-Regards,
-
-Fabio Estevam
+Shawn
