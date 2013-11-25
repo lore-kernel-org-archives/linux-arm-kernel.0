@@ -1,72 +1,185 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Mon, 25 Nov 2013 23:26:00 +0800
-Subject: ARM: nommu: Boot hang after VFS: Mounted root (ext2 filesystem) on
- device 1:0.
-Message-ID: <1385393160.4753.4.camel@phoenix>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Mon, 25 Nov 2013 15:36:26 +0000
+Subject: [PATCH v2 3/6] net: MOXA ART: add ethtool support
+In-Reply-To: <1385393228-22416-3-git-send-email-jonas.jensen@gmail.com>
+References: <1385393228-22416-1-git-send-email-jonas.jensen@gmail.com>
+ <1385393228-22416-3-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1385393786.1586.29.camel@bwh-desktop.uk.level5networks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I got hangup at boot after "VFS: Mounted root (ext2 filesystem) on device 1:0.".
-I'm using ext2 initrd as root.
-It seems hangup after mount root, but in the progress of mounting devtmpfs.
+On Mon, 2013-11-25 at 16:27 +0100, Jonas Jensen wrote:
+> Add and assign ethtool_ops callback functions.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
-After debug it, I found it hangs at calling page_cache_release.
-Note, I'm testing on an nommu platform (arm7tdmi) using current Linus' tree
-with patches for this SoC.
+Reviewed-by: Ben Hutchings <bhutchings@solarflare.com>
 
-Breakpoint 3, ext2_inode_by_name (dir=<optimized out>, child=<optimized out>) at fs/ext2/dir.c:452
-452                     ext2_put_page(page);
-(gdb) bt
-#0  ext2_inode_by_name (dir=<optimized out>, child=<optimized out>) at fs/ext2/dir.c:452
-#1  0x000b0218 in ext2_lookup (dir=0x1cbf8e0, dentry=0x161d390, flags=<optimized out>) at fs/ext2/namei.c:66
-#2  0x0006a160 in lookup_real (dir=<optimized out>, dentry=0x161d390, flags=<optimized out>) at fs/namei.c:1317
-#3  0x0006a5fc in __lookup_hash (name=<optimized out>, base=0x161d228, flags=1) at fs/namei.c:1335
-#4  0x0006b828 in lookup_slow (nd=0x1c19e58, path=0x1c19de0) at fs/namei.c:1446
-#5  0x0006c914 in walk_component (follow=1, path=0x1c19dd8, nd=0x1c19e58) at fs/namei.c:1526
-#6  lookup_last (path=0x1c19dd8, nd=0x1c19e58) at fs/namei.c:1904
-#7  path_lookupat (dfd=<optimized out>, name=0x1640010 "dev", flags=<optimized out>, nd=0x1c19e58) at fs/namei.c:1939
-#8  0x0006cf30 in filename_lookup (dfd=-100, name=0x1c19e30, flags=1, nd=0x1c19e58) at fs/namei.c:1981
-#9  0x0006d000 in do_path_lookup (dfd=-100, name=0x1640010 "dev", flags=1, nd=0x1c19e58) at fs/namei.c:1998
-#10 0x0006d218 in kern_path (name=<optimized out>, flags=<optimized out>, path=0x1c19ee0) at fs/namei.c:2027
-#11 0x0007dbd0 in do_mount (dev_name=0x161d380 "devtmpfs", dir_name=0x1640010 "dev", type_page=0x161d340 "devtmpfs", flags=32768,
-    data_page=0x0 <__vectors_start>) at fs/namespace.c:2363
-#12 0x0007e71c in SYSC_mount (data=0x378620 <reset_devices>, flags=32768, type=<optimized out>, dir_name=<optimized out>,
-    dev_name=0x30a0da "devtmpfs") at fs/namespace.c:2608
-#13 SyS_mount (dev_name=<optimized out>, dir_name=<optimized out>, type=<optimized out>, flags=<optimized out>, data=0) at fs/namespace.c:2582
-#14 0x00123444 in devtmpfs_mount (mntdir=<optimized out>) at drivers/base/devtmpfs.c:363
-#15 0x0033a394 in prepare_namespace () at init/do_mounts.c:593
-#16 0x00339cd0 in kernel_init_freeable () at init/main.c:935
-#17 0x0028b7c0 in kernel_init (unused=<optimized out>) at init/main.c:844
-#18 0x00009000 in ret_from_fork () at arch/arm/kernel/entry-common.S:91
-#19 0x00009000 in ret_from_fork () at arch/arm/kernel/entry-common.S:91
-Backtrace stopped: previous frame identical to this frame (corrupt stack?)
-(gdb) s
-ext2_put_page (page=<optimized out>) at fs/ext2/dir.c:70
-70              page_cache_release(page);
-(gdb) l
-65      }
-66
-67      static inline void ext2_put_page(struct page *page)
-68      {
-69              kunmap(page);
-70              page_cache_release(page);
-71      }
-72
-73      static inline unsigned long dir_pages(struct inode *inode)
-74      {
-(gdb) s
-ext2_inode_by_name (dir=<optimized out>, child=<optimized out>) at fs/ext2/dir.c:451
-451                     res = le32_to_cpu(de->inode);
-(gdb) s
-452                     ext2_put_page(page);
-(gdb) s
-ext2_put_page (page=0xac4e0 <ext2_inode_by_name+12>) at fs/ext2/dir.c:70
-70              page_cache_release(page);
-(gdb) s         <<< HANG UP
+> ---
+> 
+> Notes:
+>     Thanks for reviewing!
+>     
+>     Changes since v1:
+>     
+>     1. declare MOXART_NUM_STATS with ARRAY_SIZE macro
+>     2. don't initialise info->n_stats in moxart_get_drvinfo()
+>     3. remove "if (!priv->phy_dev) return -ENODEV;"
+>        moxart_get_settings(), moxart_set_settings(), moxart_nway_reset()
+>     
+>     Applies to next-20131125
+> 
+>  drivers/net/ethernet/moxa/moxart_ether.c | 121 +++++++++++++++++++++++++++++++
+>  1 file changed, 121 insertions(+)
+> 
+> diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+> index 1b87034..cd46a23 100644
+> --- a/drivers/net/ethernet/moxa/moxart_ether.c
+> +++ b/drivers/net/ethernet/moxa/moxart_ether.c
+> @@ -32,6 +32,10 @@
+>  
+>  #include "moxart_ether.h"
+>  
+> +#define DRV_NAME		"moxart-ethernet"
+> +#define DRV_VERSION		"0.2"
+> +#define MOXART_NUM_STATS	ARRAY_SIZE(ethtool_stats_keys)
+> +
+>  static inline void moxart_emac_write(struct net_device *ndev,
+>  				     unsigned int reg, unsigned long value)
+>  {
+> @@ -64,6 +68,122 @@ static int moxart_set_mac_address(struct net_device *ndev, void *addr)
+>  	return 0;
+>  }
+>  
+> +static struct {
+> +	const char str[ETH_GSTRING_LEN];
+> +} ethtool_stats_keys[] = {
+> +	{ "tx_ok_mcol_2to15" },
+> +	{ "tx_ok_1col" },
+> +	{ "rx_frame_pause" },
+> +	{ "frame_align_err" },
+> +	{ "err_col_late_16" },
+> +	{ "err_col_16" },
+> +	{ "rx_runt" },
+> +	{ "late_col" },
+> +	{ "crc_err" },
+> +	{ "rx_ftl" },
+> +	{ "rx_fifo_full" },
+> +	{ "rx_col" },
+> +	{ "rx_bcast" },
+> +	{ "rx_mcast" },
+> +	{ "rx_ok" },
+> +	{ "tx_ok" },
+> +};
+> +
+> +static void moxart_get_drvinfo(struct net_device *ndev,
+> +			       struct ethtool_drvinfo *info)
+> +{
+> +	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
+> +	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+> +	strlcpy(info->bus_info, dev_name(&ndev->dev), sizeof(info->bus_info));
+> +}
+> +
+> +static int moxart_get_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
+> +{
+> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
+> +
+> +	return phy_ethtool_gset(priv->phy_dev, cmd);
+> +}
+> +
+> +static int moxart_set_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
+> +{
+> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
+> +
+> +	return phy_ethtool_sset(priv->phy_dev, cmd);
+> +}
+> +
+> +static int moxart_nway_reset(struct net_device *ndev)
+> +{
+> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
+> +
+> +	return genphy_restart_aneg(priv->phy_dev);
+> +}
+> +
+> +static void moxart_get_ethtool_stats(struct net_device *ndev,
+> +				     struct ethtool_stats *estats,
+> +				     u64 *tmp_stats)
+> +{
+> +	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
+> +	u32 s;
+> +	int i = 0;
+> +
+> +	s = readl(priv->base + REG_TX_COL_COUNTER);
+> +	tmp_stats[i++] = s & 0xffff0000;
+> +	tmp_stats[i++] = s & 0x0000ffff;
+> +	s = readl(priv->base + REG_RPF_AEP_COUNTER);
+> +	tmp_stats[i++] = s & 0xffff0000;
+> +	tmp_stats[i++] = s & 0x0000ffff;
+> +	s = readl(priv->base + REG_XM_PG_COUNTER);
+> +	tmp_stats[i++] = s & 0xffff0000;
+> +	tmp_stats[i++] = s & 0x0000ffff;
+> +	s = readl(priv->base + REG_RUNT_TLC_COUNTER);
+> +	tmp_stats[i++] = s & 0xffff0000;
+> +	tmp_stats[i++] = s & 0x0000ffff;
+> +	s = readl(priv->base + REG_CRC_FTL_COUNTER);
+> +	tmp_stats[i++] = s & 0xffff0000;
+> +	tmp_stats[i++] = s & 0x0000ffff;
+> +	s = readl(priv->base + REG_RLC_RCC_COUNTER);
+> +	tmp_stats[i++] = s & 0xffff0000;
+> +	tmp_stats[i++] = s & 0x0000ffff;
+> +	tmp_stats[i++] = readl(priv->base + REG_BROC_COUNTER);
+> +	tmp_stats[i++] = readl(priv->base + REG_MULCA_COUNTER);
+> +	tmp_stats[i++] = readl(priv->base + REG_XP_COUNTER);
+> +	tmp_stats[i++] = readl(priv->base + REG_RP_COUNTER);
+> +}
+> +
+> +static int moxart_get_sset_count(struct net_device *netdev,
+> +					int string_set)
+> +{
+> +	switch (string_set) {
+> +	case ETH_SS_STATS:
+> +		return MOXART_NUM_STATS;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +}
+> +
+> +static void moxart_get_strings(struct net_device *dev, u32 stringset, u8 *data)
+> +{
+> +	switch (stringset) {
+> +	case ETH_SS_STATS:
+> +		memcpy(data, &ethtool_stats_keys, sizeof(ethtool_stats_keys));
+> +		break;
+> +	default:
+> +		WARN_ON(1);
+> +		break;
+> +	}
+> +}
+> +
+> +static const struct ethtool_ops moxart_ethtool_ops = {
+> +	.set_settings		= moxart_set_settings,
+> +	.get_settings		= moxart_get_settings,
+> +	.get_drvinfo		= moxart_get_drvinfo,
+> +	.nway_reset		= moxart_nway_reset,
+> +	.get_link		= ethtool_op_get_link,
+> +	.get_ethtool_stats	= moxart_get_ethtool_stats,
+> +	.get_sset_count		= moxart_get_sset_count,
+> +	.get_strings		= moxart_get_strings,
+> +};
+> +
+>  static int moxart_do_ioctl(struct net_device *ndev, struct ifreq *ir, int cmd)
+>  {
+>  	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
+> @@ -606,6 +726,7 @@ static int moxart_mac_probe(struct platform_device *pdev)
+>  	ndev->irq = irq;
+>  
+>  	SET_NETDEV_DEV(ndev, &pdev->dev);
+> +	SET_ETHTOOL_OPS(ndev, &moxart_ethtool_ops);
+>  
+>  	ret = register_netdev(ndev);
+>  	if (ret) {
 
-I have no idea why it hangs@page_cache_release call.
-I appreciate for comments and advices to debug this.
-
-Thanks,
-Axel
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
