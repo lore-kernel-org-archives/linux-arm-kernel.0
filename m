@@ -1,48 +1,39 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 24 Nov 2013 22:51:33 -0800 (PST)
-Subject: [RFC 15/17] ARM: shmobile: Remove non-multiplatform Marzen
- reference support
-In-Reply-To: <1385342312-1967-16-git-send-email-horms+renesas@verge.net.au>
+Date: Sun, 24 Nov 2013 22:56:19 -0800 (PST)
+Subject: [RFC 16/17] ARM: shmobile: Let Marzen multiplatform boot with
+ Marzen DTB
+In-Reply-To: <1385342312-1967-17-git-send-email-horms+renesas@verge.net.au>
 References: <1385342312-1967-1-git-send-email-horms+renesas@verge.net.au>
- <1385342312-1967-16-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <87li0dnfda.wl%kuninori.morimoto.gx@renesas.com>
+ <1385342312-1967-17-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <87k3fxnf5c.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi Simon
 
-> Now that r8a7779 has CCF support remove the legacy Marzen reference
-> Kconfig bits CONFIG_MACH_KOELSCH_REFERENCE for the non-multiplatform
-> case.
+> Let the multiplatform Marzen support boot with the legacy DTS for
+> Marzen as well as the Marzen reference DTS.
+> 
+> Based on work for the Koelsch board by Laurent Pinchart.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+(snip)
+> --- a/arch/arm/mach-shmobile/board-koelsch-reference.c
+> +++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+> @@ -38,6 +38,7 @@ static void __init koelsch_add_standard_devices(void)
+>  }
+>  
+>  static const char * const koelsch_boards_compat_dt[] __initconst = {
+> +	"renesas,koelsch",
+>  	"renesas,koelsch-reference",
+>  	NULL,
+>  };
 
-I guess
+You are modifying koelsch file in marzen patch ?
 
- - CONFIG_MACH_KOELSCH_REFERENCE
- + CONFIG_MACH_MARZEN_REFERENCE
-
-> Starting from this commit Marzen board support is always enabled via
-> CONFIG_MACH_KOELSCH, and CONFIG_ARCH_MULTIPLATFORM is used to select
-
-ditto ?
-
-> between board-koelsch.c and board-koelsch-reference.c
-> The file board-koelsch-reference.c can no longer be used together with
-
-koelsch <-> marzen ?
-
-> --- a/arch/arm/mach-shmobile/Makefile
-> +++ b/arch/arm/mach-shmobile/Makefile
-> @@ -69,8 +69,7 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
->  obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
->  obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
->  obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
-> -obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
-> -obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
-> +obj-$(CONFIG_MACH_LAGER)	+= boardo-lager.o
-
-boardo-lager ??
-     ^
 
 Best regards
 ---
