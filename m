@@ -1,69 +1,174 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Nov 2013 12:13:36 +0100
-Subject: [PATCH v2 0/9] ASoC: fsl-ssi: offline/online configuration and
- cleanups
-Message-ID: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
+Date: Mon, 25 Nov 2013 12:13:41 +0100
+Subject: [PATCH v2 5/9] ASoC: fsl-ssi: Add configuration helper functions
+In-Reply-To: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
+References: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1385378025-1262-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds a struct 'fsl_ssi_rxtx_reg_val' which holds register
+values necessary to enable rx/tx. Based on those preset register values,
+the added configuration functions will cleanly enable/disable different
+parts of the SSI IP while supporting online/offline configuration.
+Different operating modes can be setup directly as different register
+values in fsl_ssi_reg_val.
 
-This patch series fixes some fsl-ssi code that does not act exactly as it is
-described in the reference manuals.
+These functions and structs will help to cleanup and simplify the
+trigger function to support many different IP versions (online/offline
+configuration) and different operating modes.
 
-The reference manuals before imx50 do mention that some register bits,
-including TDMAE/RDMAE, should not be changed while the SSI unit is enabled
-(SSIEN). At the same time the SDMA unit has a undefined request handling if
-there are DMA requests before the SDMA engine and its channel is configured.
-The reference manual states that SSI DMA requests are sent as soon as the FIFO
-and the DMAE bits are enabled. It does not mention a dependency to SCR's TE/RE
-bit.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ sound/soc/fsl/fsl_ssi.c | 122 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 122 insertions(+)
 
-To avoid sending DMA requests before a channel is configured, we have to
-seperate the fsl-ssi behavior into offline and online configuration. SoCs
-before imx50 have to use offline configuration while later SoC versions can use
-online reconfiguration.
-
-This series adds support for online configuration and cleans up the
-configuration register code especially in fsl_ssi_trigger. At the end we have a
-seperation between enable/disable logic and the actual configuration register
-values used to enable/disable TX/RX.
-
-I tested this series on mx53.
-
-The series is based on Mark Brown's topic/fsl branch.
-
-Regards,
-
-Markus
-
-Changes in v2:
- - Enable fsl-ssi interrupts independent of CONFIG_DEBUG_FS.
- - Move irq mapping fix into seperate patch (was in "Move sysfs stats to debugfs")
- - Rebased on v3.13-rc1 topic/fsl branch.
-
-Changes in v1:
- - Not removing imx21-ssi from the compatible array in the DTS patch.
- - Dropped "ASoC: fsl-ssi: Drop AC97 debug register usage" for the moment as I
-   don't have time to setup AC97 hardware for some tests
-
-Markus Pargmann (9):
-  ASoC: fsl-ssi: Move sysfs stats to debugfs
-  ASoC: fsl-ssi: Fix interrupt mapping and release
-  ASoC: fsl-ssi: Add imx50-ssi and of_device_id matching
-  ASoC: fsl-ssi: Add offline_config flag
-  ASoC: fsl-ssi: Add configuration helper functions
-  ASoC: fsl-ssi: Move RX/TX configuration to seperate functions
-  ASoC: fsl-ssi: Drop ac97 specific trigger function
-  ARM: DTS: imx5* imx6*, use imx50-ssi
-  ASoC: fsl-ssi: Drop AC97 debug register usage
-
- arch/arm/boot/dts/imx51.dtsi   |  10 +-
- arch/arm/boot/dts/imx53.dtsi   |  10 +-
- arch/arm/boot/dts/imx6qdl.dtsi |  12 +-
- arch/arm/boot/dts/imx6sl.dtsi  |  12 +-
- sound/soc/fsl/fsl_ssi.c        | 521 +++++++++++++++++++++++++++--------------
- 5 files changed, 371 insertions(+), 194 deletions(-)
-
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index abe6172..e0594e9 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -122,6 +122,18 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+ 		CCSR_SSI_SIER_TUE0_EN | CCSR_SSI_SIER_TFRC_EN)
+ #define FSLSSI_SISR_MASK (FSLSSI_SIER_DBG_RX_FLAGS | FSLSSI_SIER_DBG_TX_FLAGS)
+ 
++struct fsl_ssi_reg_val {
++	u32 sier;
++	u32 srcr;
++	u32 stcr;
++	u32 scr;
++};
++
++struct fsl_ssi_rxtx_reg_val {
++	struct fsl_ssi_reg_val rx;
++	struct fsl_ssi_reg_val tx;
++};
++
+ /**
+  * fsl_ssi_private: per-SSI private data
+  *
+@@ -158,6 +170,8 @@ struct fsl_ssi_private {
+ 	struct imx_dma_data filter_data_tx;
+ 	struct imx_dma_data filter_data_rx;
+ 	struct imx_pcm_fiq_params fiq_params;
++	/* Register values for rx/tx configuration */
++	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
+ 
+ 	struct {
+ 		unsigned int rfrc;
+@@ -442,6 +456,114 @@ static void fsl_ssi_debugfs_remove(struct fsl_ssi_private *ssi_private)
+ 
+ #endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
+ 
++/*
++ * Enable/Disable all rx/tx config flags at once.
++ */
++static void fsl_ssi_rxtx_config(struct fsl_ssi_private *ssi_private,
++		bool enable)
++{
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	struct fsl_ssi_rxtx_reg_val *vals = &ssi_private->rxtx_reg_val;
++
++	if (enable) {
++		write_ssi_mask(&ssi->sier, 0, vals->rx.sier | vals->tx.sier);
++		write_ssi_mask(&ssi->srcr, 0, vals->rx.srcr | vals->tx.srcr);
++		write_ssi_mask(&ssi->stcr, 0, vals->rx.stcr | vals->tx.stcr);
++	} else {
++		write_ssi_mask(&ssi->srcr, vals->rx.srcr | vals->tx.srcr, 0);
++		write_ssi_mask(&ssi->stcr, vals->rx.stcr | vals->tx.stcr, 0);
++		write_ssi_mask(&ssi->sier, vals->rx.sier | vals->tx.sier, 0);
++	}
++}
++
++/*
++ * Enable/Disable a ssi configuration. You have to pass either
++ * ssi_private->rxtx_reg_val.rx or tx as vals parameter.
++ */
++static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
++		struct fsl_ssi_reg_val *vals)
++{
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	struct fsl_ssi_reg_val *avals;
++	u32 scr_val = read_ssi(&ssi->scr);
++	int nr_active_streams = !!(scr_val & CCSR_SSI_SCR_TE) +
++				!!(scr_val & CCSR_SSI_SCR_RE);
++
++	/* Find the other direction values rx or tx which we do not want to
++	 * modify */
++	if (&ssi_private->rxtx_reg_val.rx == vals)
++		avals = &ssi_private->rxtx_reg_val.tx;
++	else
++		avals = &ssi_private->rxtx_reg_val.rx;
++
++	/* If vals should be disabled, start with disabling the unit */
++	if (!enable) {
++		u32 scr = vals->scr & (vals->scr ^ avals->scr);
++		write_ssi_mask(&ssi->scr, scr, 0);
++	}
++
++	/*
++	 * We are running on a SoC which does not support online SSI
++	 * reconfiguration, so we have to enable all necessary flags at once
++	 * even if we do not use them later (capture and playback configuration)
++	 */
++	if (ssi_private->offline_config) {
++		if ((enable && !nr_active_streams) ||
++				(!enable && nr_active_streams == 1))
++			fsl_ssi_rxtx_config(ssi_private, enable);
++
++		goto config_done;
++	}
++
++	/*
++	 * Configure single direction units while the SSI unit is running
++	 * (online configuration)
++	 */
++	if (enable) {
++		write_ssi_mask(&ssi->sier, 0, vals->sier);
++		write_ssi_mask(&ssi->srcr, 0, vals->srcr);
++		write_ssi_mask(&ssi->stcr, 0, vals->stcr);
++	} else {
++		u32 sier;
++		u32 srcr;
++		u32 stcr;
++
++		/*
++		 * Disabling the necessary flags for one of rx/tx while the
++		 * other stream is active is a little bit more difficult. We
++		 * have to disable only those flags that differ between both
++		 * streams (rx XOR tx) and that are set in the stream that is
++		 * disabled now. Otherwise we could alter flags of the other
++		 * stream
++		 */
++
++		/* These assignments are simply vals without bits set in avals*/
++		sier = vals->sier & (vals->sier ^ avals->sier);
++		srcr = vals->srcr & (vals->srcr ^ avals->srcr);
++		stcr = vals->stcr & (vals->stcr ^ avals->stcr);
++
++		write_ssi_mask(&ssi->srcr, srcr, 0);
++		write_ssi_mask(&ssi->stcr, stcr, 0);
++		write_ssi_mask(&ssi->sier, sier, 0);
++	}
++
++config_done:
++	/* Enabling of subunits is done after configuration */
++	if (enable)
++		write_ssi_mask(&ssi->scr, 0, vals->scr);
++}
++
++
++static void fsl_ssi_rx_config(struct fsl_ssi_private *ssi_private, bool enable)
++{
++	fsl_ssi_config(ssi_private, enable, &ssi_private->rxtx_reg_val.rx);
++}
++
++static void fsl_ssi_tx_config(struct fsl_ssi_private *ssi_private, bool enable)
++{
++	fsl_ssi_config(ssi_private, enable, &ssi_private->rxtx_reg_val.tx);
++}
++
+ static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
+ {
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
 -- 
 1.8.4.2
