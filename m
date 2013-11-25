@@ -1,38 +1,38 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Nov 2013 17:44:31 +0100
-Subject: [PATCH] ARM: i.MX6q: fix the wrong parent of can_root clock
-In-Reply-To: <20131031073820.GH23549@S2101-09.ap.freescale.net>
-References: <1383132351-32112-1-git-send-email-jiada_wang@mentor.com>
- <20131031073820.GH23549@S2101-09.ap.freescale.net>
-Message-ID: <52937E6F.1020102@pengutronix.de>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Mon, 25 Nov 2013 18:44:02 +0200
+Subject: [PATCH v2 0/6] Update Davinci watchdog driver
+In-Reply-To: <52934E7C.9040102@ti.com>
+References: <1384795139-19466-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <52934B6C.4060308@ti.com> <52934E7C.9040102@ti.com>
+Message-ID: <52937E52.8070502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 08:38 AM, Shawn Guo wrote:
-> On Wed, Oct 30, 2013 at 04:25:51AM -0700, jiada_wang at mentor.com wrote:
->> From: Jiada Wang <jiada_wang@mentor.com>
+On 11/25/2013 03:19 PM, ivan.khoronzhuk wrote:
+> On 11/25/2013 03:06 PM, Sekhar Nori wrote:
+>> On Monday 18 November 2013 10:48 PM, Ivan Khoronzhuk wrote:
+>>> These patches are intended to update Davinci watchdog to use WDT core
+>>> and reuse driver for keystone arch, because Keystone uses the similar
+>>> IP like Davinci.
 >>
->> instead of pll3_usb_otg the parent of can_root clock
->> should be pll3_60m.
+>> This series causes a regression on all DaVinci platforms because after
+>> the series is applied the watchdog device does not get registered at
+>> all. Since you changed the device name please include a patch to fix the
+>> platform references too.
 >>
->> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-> 
-> Applied, thanks.
+>> Thanks,
+>> Sekhar
+>>
+>
+> Ok, I will replace
+>
 
-Can you put stable on Cc?
+Sekhar I have replaced names in new patch seria
+https://lkml.org/lkml/2013/11/25/461
+at watchdog: davinci: change driver to use WDT core
 
-Marc
+Is it OK for you?
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/ff7cd857/attachment.sig>
+Regards,
+Ivan Khoronzhuk
