@@ -1,235 +1,184 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 25 Nov 2013 09:47:01 +0100
-Subject: [PATCH V6 2/3] ahci: imx: Pull out the clock enable/disable calls
-In-Reply-To: <1385369222-5288-1-git-send-email-marex@denx.de>
-References: <1385369222-5288-1-git-send-email-marex@denx.de>
-Message-ID: <1385369222-5288-2-git-send-email-marex@denx.de>
+From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
+Date: Mon, 25 Nov 2013 09:49:02 +0100
+Subject: [PATCH v8] videobuf2: Add missing lock held on vb2_fop_relase
+Message-ID: <1385369342-11785-1-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The same code for enabling and disabling SATA clock was found in multiple
-places in the driver. Implement functions that enable/disable the SATA clock
-and use them in such places instead of duplicating the code.
+From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Linux-IDE <linux-ide@vger.kernel.org>
+vb2_fop_release does not held the lock although it is modifying the
+queue->owner field.
+
+This could lead to race conditions on the vb2_perform_io function
+when multiple applications are accessing the video device via
+read/write API:
+
+[ 308.297741] BUG: unable to handle kernel NULL pointer dereference at
+0000000000000260
+[ 308.297759] IP: [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
+[videobuf2_core]
+[ 308.297794] PGD 159719067 PUD 158119067 PMD 0
+[ 308.297812] Oops: 0000 #1 SMP
+[ 308.297826] Modules linked in: qt5023_video videobuf2_dma_sg
+qtec_xform videobuf2_vmalloc videobuf2_memops videobuf2_core
+qtec_white qtec_mem gpio_xilinx qtec_cmosis qtec_pcie fglrx(PO)
+spi_xilinx spi_bitbang qt5023
+[ 308.297888] CPU: 1 PID: 2189 Comm: java Tainted: P O 3.11.0-qtec-standard #1
+[ 308.297919] Hardware name: QTechnology QT5022/QT5022, BIOS
+PM_2.1.0.309 X64 05/23/2013
+[ 308.297952] task: ffff8801564e1690 ti: ffff88014dc02000 task.ti:
+ffff88014dc02000
+[ 308.297962] RIP: 0010:[<ffffffffa07a9fd2>] [<ffffffffa07a9fd2>]
+vb2_perform_fileio+0x372/0x610 [videobuf2_core]
+[ 308.297985] RSP: 0018:ffff88014dc03df8 EFLAGS: 00010202
+[ 308.297995] RAX: 0000000000000000 RBX: ffff880158a23000 RCX: dead000000100100
+[ 308.298003] RDX: 0000000000000000 RSI: dead000000200200 RDI: 0000000000000000
+[ 308.298012] RBP: ffff88014dc03e58 R08: 0000000000000000 R09: 0000000000000001
+[ 308.298020] R10: ffffea00051e8380 R11: ffff88014dc03fd8 R12: ffff880158a23070
+[ 308.298029] R13: ffff8801549040b8 R14: 0000000000198000 R15: 0000000001887e60
+[ 308.298040] FS: 00007f65130d5700(0000) GS:ffff88015ed00000(0000)
+knlGS:0000000000000000
+[ 308.298049] CS: 0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[ 308.298057] CR2: 0000000000000260 CR3: 0000000159630000 CR4: 00000000000007e0
+[ 308.298064] Stack:
+[ 308.298071] ffff880156416c00 0000000000198000 0000000000000000
+ffff880100000001
+[ 308.298087] ffff88014dc03f50 00000000810a79ca 0002000000000001
+ffff880154904718
+[ 308.298101] ffff880156416c00 0000000000198000 ffff880154904338
+ffff88014dc03f50
+[ 308.298116] Call Trace:
+[ 308.298143] [<ffffffffa07aa3c4>] vb2_read+0x14/0x20 [videobuf2_core]
+[ 308.298198] [<ffffffffa07aa494>] vb2_fop_read+0xc4/0x120 [videobuf2_core]
+[ 308.298252] [<ffffffff8154ee9e>] v4l2_read+0x7e/0xc0
+[ 308.298296] [<ffffffff8116e639>] vfs_read+0xa9/0x160
+[ 308.298312] [<ffffffff8116e882>] SyS_read+0x52/0xb0
+[ 308.298328] [<ffffffff81784179>] tracesys+0xd0/0xd5
+[ 308.298335] Code: e5 d6 ff ff 83 3d be 24 00 00 04 89 c2 4c 8b 45 b0
+44 8b 4d b8 0f 8f 20 02 00 00 85 d2 75 32 83 83 78 03 00 00 01 4b 8b
+44 c5 48 <8b> 88 60 02 00 00 85 c9 0f 84 b0 00 00 00 8b 40 58 89 c2 41
+89
+[ 308.298487] RIP [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
+[videobuf2_core]
+[ 308.298507] RSP <ffff88014dc03df8>
+[ 308.298514] CR2: 0000000000000260
+[ 308.298526] ---[ end trace e8f01717c96d1e41 ]---
 ---
- drivers/ata/ahci_imx.c | 143 ++++++++++++++++++++++++++-----------------------
- 1 file changed, 75 insertions(+), 68 deletions(-)
 
-V2: Move the OR sign from the begining of the line to the end of the line in
-    the regmap_update_bits() call.
-V3: Move the PHY configuration programming out of the clock_enable function
-    and into the probe() function.
-V4: Rebase on top of new 1/6 patch.
-    Remove clk_prepare_enable() being called twice in imx_sata_clock_enable()
-    since it was a rebase artifact.
-V5: Pull out the usleep_range() into imx_sata_clock_enable() as well as a small
-    delay is needed after turning on the clock. Also rebase this on top of the
-    change in comment in 1/6 .
-V6: Rebase this on top of the change in comment in 1/3 .
+v2: Comments by Sylvester Nawrocki
 
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index 3e23e99..6214411 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -47,6 +47,36 @@ static int ahci_imx_hotplug;
- module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
- MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support)");
+fimc-capture and fimc-lite where calling vb2_fop_release with the lock held.
+Therefore a new __vb2_fop_release function has been created to be used by
+drivers that overload the release function.
+
+v3: Comments by Sylvester Nawrocki and Mauro Carvalho Chehab
+
+Use vb2_fop_release_locked instead of __vb2_fop_release
+
+v4: Comments by Sylvester Nawrocki
+
+Rename vb2_fop_release_locked to __vb2_fop_release and fix patch format
+
+v5: Comments by Sylvester Nawrocki and Hans Verkuil
+
+Rename __vb2_fop_release to vb2_fop_release_unlock and rearrange
+arguments
+
+v6: Comments by Hans Verkuil
+
+Fix typo on description
+Rename vb2_fop_release_locked to vb2_fop_release_no_lock
+
+v7: Comments by Hans Verkuil and Sylvester Nawrocki
+
+Export _vb2_fop_release instead of using vb2_fop_release_no_lock
+
+v8: Comments by Hans Verkuil and rebase
+
+Missed semicolon
+
+Signed-off-by: Ricardo Ribalda <ricardo.ribalda@gmail.com>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+ drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
+ drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
+ drivers/media/v4l2-core/videobuf2-core.c         | 15 ++++++++++++++-
+ include/media/videobuf2-core.h                   |  1 +
+ 4 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
+index fb27ff7..8a712ca 100644
+--- a/drivers/media/platform/exynos4-is/fimc-capture.c
++++ b/drivers/media/platform/exynos4-is/fimc-capture.c
+@@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
+ 		vc->streaming = false;
+ 	}
  
-+static int imx_sata_clock_enable(struct device *dev)
+-	ret = vb2_fop_release(file);
++	ret = _vb2_fop_release(file, NULL);
+ 
+ 	if (close) {
+ 		clear_bit(ST_CAPT_BUSY, &fimc->state);
+diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
+index e5798f7..d3b32b6 100644
+--- a/drivers/media/platform/exynos4-is/fimc-lite.c
++++ b/drivers/media/platform/exynos4-is/fimc-lite.c
+@@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
+ 		mutex_unlock(&entity->parent->graph_mutex);
+ 	}
+ 
+-	vb2_fop_release(file);
++	_vb2_fop_release(file, NULL);
+ 	pm_runtime_put(&fimc->pdev->dev);
+ 	clear_bit(ST_FLITE_SUSPENDED, &fimc->state);
+ 
+diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
+index de0e87f..01f1585 100644
+--- a/drivers/media/v4l2-core/videobuf2-core.c
++++ b/drivers/media/v4l2-core/videobuf2-core.c
+@@ -2621,16 +2621,29 @@ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma)
+ }
+ EXPORT_SYMBOL_GPL(vb2_fop_mmap);
+ 
+-int vb2_fop_release(struct file *file)
++int _vb2_fop_release(struct file *file, struct mutex *lock)
+ {
+ 	struct video_device *vdev = video_devdata(file);
+ 
+ 	if (file->private_data == vdev->queue->owner) {
++		if (lock)
++			mutex_lock(lock);
+ 		vb2_queue_release(vdev->queue);
+ 		vdev->queue->owner = NULL;
++		if (lock)
++			mutex_unlock(lock);
+ 	}
+ 	return v4l2_fh_release(file);
+ }
++EXPORT_SYMBOL_GPL(_vb2_fop_release);
++
++int vb2_fop_release(struct file *file)
 +{
-+	struct imx_ahci_priv *imxpriv = dev_get_drvdata(dev->parent);
-+	int ret;
++	struct video_device *vdev = video_devdata(file);
++	struct mutex *lock = vdev->queue->lock ? vdev->queue->lock : vdev->lock;
 +
-+	ret = clk_prepare_enable(imxpriv->sata_ref_clk);
-+	if (ret < 0) {
-+		dev_err(dev, "prepare-enable sata_ref clock err:%d\n", ret);
-+		return ret;
-+	}
-+
-+	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
-+			   IMX6Q_GPR13_SATA_MPLL_CLK_EN,
-+			   IMX6Q_GPR13_SATA_MPLL_CLK_EN);
-+
-+	usleep_range(1000, 2000);
-+
-+	return 0;
++	return _vb2_fop_release(file, lock);
 +}
-+
-+static void imx_sata_clock_disable(struct device *dev)
-+{
-+	struct imx_ahci_priv *imxpriv = dev_get_drvdata(dev->parent);
-+
-+	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
-+			   IMX6Q_GPR13_SATA_MPLL_CLK_EN,
-+			   !IMX6Q_GPR13_SATA_MPLL_CLK_EN);
-+	clk_disable_unprepare(imxpriv->sata_ref_clk);
-+}
-+
- static void ahci_imx_error_handler(struct ata_port *ap)
- {
- 	u32 reg_val;
-@@ -72,10 +102,7 @@ static void ahci_imx_error_handler(struct ata_port *ap)
- 	 */
- 	reg_val = readl(mmio + PORT_PHY_CTL);
- 	writel(reg_val | PORT_PHY_CTL_PDDQ_LOC, mmio + PORT_PHY_CTL);
--	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
--			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
--			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
--	clk_disable_unprepare(imxpriv->sata_ref_clk);
-+	imx_sata_clock_disable(ap->dev);
- 	imxpriv->no_device = true;
- }
+ EXPORT_SYMBOL_GPL(vb2_fop_release);
  
-@@ -97,46 +124,9 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
- 	unsigned int reg_val;
- 	struct imx_ahci_priv *imxpriv = dev_get_drvdata(dev->parent);
+ ssize_t vb2_fop_write(struct file *file, char __user *buf,
+diff --git a/include/media/videobuf2-core.h b/include/media/videobuf2-core.h
+index 6781258..cc7ab81 100644
+--- a/include/media/videobuf2-core.h
++++ b/include/media/videobuf2-core.h
+@@ -491,6 +491,7 @@ int vb2_ioctl_expbuf(struct file *file, void *priv,
  
--	imxpriv->gpr =
--		syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
--	if (IS_ERR(imxpriv->gpr)) {
--		dev_err(dev, "failed to find fsl,imx6q-iomux-gpr regmap\n");
--		return PTR_ERR(imxpriv->gpr);
--	}
--
--	ret = clk_prepare_enable(imxpriv->sata_ref_clk);
--	if (ret < 0) {
--		dev_err(dev, "prepare-enable sata_ref clock err:%d\n", ret);
-+	ret = imx_sata_clock_enable(dev);
-+	if (ret < 0)
- 		return ret;
--	}
--
--	/*
--	 * set PHY Paremeters, two steps to configure the GPR13,
--	 * one write for rest of parameters, mask of first write
--	 * is 0x07ffffff, and the other one write for setting
--	 * the mpll_clk_en.
--	 */
--	regmap_update_bits(imxpriv->gpr, 0x34, IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
--			| IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK
--			| IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK
--			| IMX6Q_GPR13_SATA_SPD_MODE_MASK
--			| IMX6Q_GPR13_SATA_MPLL_SS_EN
--			| IMX6Q_GPR13_SATA_TX_ATTEN_MASK
--			| IMX6Q_GPR13_SATA_TX_BOOST_MASK
--			| IMX6Q_GPR13_SATA_TX_LVL_MASK
--			| IMX6Q_GPR13_SATA_MPLL_CLK_EN
--			| IMX6Q_GPR13_SATA_TX_EDGE_RATE
--			, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB
--			| IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M
--			| IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F
--			| IMX6Q_GPR13_SATA_SPD_MODE_3P0G
--			| IMX6Q_GPR13_SATA_MPLL_SS_EN
--			| IMX6Q_GPR13_SATA_TX_ATTEN_9_16
--			| IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB
--			| IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
--	regmap_update_bits(imxpriv->gpr, 0x34, IMX6Q_GPR13_SATA_MPLL_CLK_EN,
--			IMX6Q_GPR13_SATA_MPLL_CLK_EN);
--	usleep_range(100, 200);
- 
- 	/*
- 	 * Configure the HWINIT bits of the HOST_CAP and HOST_PORTS_IMPL,
-@@ -164,11 +154,7 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
- 
- static void imx6q_sata_exit(struct device *dev)
- {
--	struct imx_ahci_priv *imxpriv =  dev_get_drvdata(dev->parent);
--
--	regmap_update_bits(imxpriv->gpr, 0x34, IMX6Q_GPR13_SATA_MPLL_CLK_EN,
--			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
--	clk_disable_unprepare(imxpriv->sata_ref_clk);
-+	imx_sata_clock_disable(dev);
- }
- 
- static int imx_ahci_suspend(struct device *dev)
-@@ -179,12 +165,8 @@ static int imx_ahci_suspend(struct device *dev)
- 	 * If no_device is set, The CLKs had been gated off in the
- 	 * initialization so don't do it again here.
- 	 */
--	if (!imxpriv->no_device) {
--		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
--				IMX6Q_GPR13_SATA_MPLL_CLK_EN,
--				!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
--		clk_disable_unprepare(imxpriv->sata_ref_clk);
--	}
-+	if (!imxpriv->no_device)
-+		imx_sata_clock_disable(dev);
- 
- 	return 0;
- }
-@@ -192,22 +174,12 @@ static int imx_ahci_suspend(struct device *dev)
- static int imx_ahci_resume(struct device *dev)
- {
- 	struct imx_ahci_priv *imxpriv =  dev_get_drvdata(dev->parent);
--	int ret;
-+	int ret = 0;
- 
--	if (!imxpriv->no_device) {
--		ret = clk_prepare_enable(imxpriv->sata_ref_clk);
--		if (ret < 0) {
--			dev_err(dev, "pre-enable sata_ref clock err:%d\n", ret);
--			return ret;
--		}
--
--		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
--				IMX6Q_GPR13_SATA_MPLL_CLK_EN,
--				IMX6Q_GPR13_SATA_MPLL_CLK_EN);
--		usleep_range(1000, 2000);
--	}
-+	if (!imxpriv->no_device)
-+		ret = imx_sata_clock_enable(dev);
- 
--	return 0;
-+	return ret;
- }
- 
- static struct ahci_platform_data imx6q_sata_pdata = {
-@@ -290,6 +262,41 @@ static int imx_ahci_probe(struct platform_device *pdev)
- 	ahci_dev->dma_mask = &ahci_dev->coherent_dma_mask;
- 	ahci_dev->of_node = dev->of_node;
- 
-+	imxpriv->gpr =
-+		syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-+
-+	if (IS_ERR(imxpriv->gpr)) {
-+		dev_err(dev, "failed to find fsl,imx6q-iomux-gpr regmap\n");
-+		ret = PTR_ERR(imxpriv->gpr);
-+		goto err_out;
-+	}
-+
-+	/*
-+	 * Set PHY Paremeters, two steps to configure the GPR13,
-+	 * one write for rest of parameters, mask of first write
-+	 * is 0x07ffffff, and the other one write for setting
-+	 * the mpll_clk_en happens in imx_sata_clock_enable().
-+	 */
-+	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
-+			   IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK |
-+			   IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK |
-+			   IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK |
-+			   IMX6Q_GPR13_SATA_SPD_MODE_MASK |
-+			   IMX6Q_GPR13_SATA_MPLL_SS_EN |
-+			   IMX6Q_GPR13_SATA_TX_ATTEN_MASK |
-+			   IMX6Q_GPR13_SATA_TX_BOOST_MASK |
-+			   IMX6Q_GPR13_SATA_TX_LVL_MASK |
-+			   IMX6Q_GPR13_SATA_MPLL_CLK_EN |
-+			   IMX6Q_GPR13_SATA_TX_EDGE_RATE,
-+			   IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB |
-+			   IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
-+			   IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
-+			   IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
-+			   IMX6Q_GPR13_SATA_MPLL_SS_EN |
-+			   IMX6Q_GPR13_SATA_TX_ATTEN_9_16 |
-+			   IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB |
-+			   IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
-+
- 	ret = platform_device_add_resources(ahci_pdev, res, 2);
- 	if (ret)
- 		goto err_out;
+ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma);
+ int vb2_fop_release(struct file *file);
++int _vb2_fop_release(struct file *file, struct mutex *lock);
+ ssize_t vb2_fop_write(struct file *file, char __user *buf,
+ 		size_t count, loff_t *ppos);
+ ssize_t vb2_fop_read(struct file *file, char __user *buf,
 -- 
 1.8.4.3
