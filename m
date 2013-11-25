@@ -1,78 +1,100 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Nov 2013 10:34:35 +0100
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <20131123163240.GW5928@atomide.com>
-References: <20131123004334.GJ10023@atomide.com>
- <20131123005509.GJ16735@n2100.arm.linux.org.uk>
- <20131123010850.GN10023@atomide.com>
- <20131123011515.GO10023@atomide.com>
- <20131123015034.GP10023@atomide.com>
- <CAL_JsqKV7K+QdLHS+3LtfcVx5Dpc7n6A8UwwNWKBP33Gs19c8g@mail.gmail.com>
- <20131123163240.GW5928@atomide.com>
-Message-ID: <20131125093434.GE22043@ulmo.nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Nov 2013 09:37:40 +0000
+Subject: Some question about GIC v1 setting
+In-Reply-To: <CANudz+uoJSrM91anu5PpOqQt5gpXBEQeVaqdx25veQ=PL_aP+w@mail.gmail.com>
+References: <CANudz+sg6MiUZaTELF4G=NMfwj--K9j10JrYh1cm2VAjfvq6MA@mail.gmail.com>
+ <20131115165939.GO16735@n2100.arm.linux.org.uk>
+ <CANudz+uO7s=GdFz64oxFEQefAB=EguUo1NP17AT+3Ft+wK8nNQ@mail.gmail.com>
+ <9ab50cfbe03ffd667566808166b04573@www.loen.fr>
+ <CANudz+uoJSrM91anu5PpOqQt5gpXBEQeVaqdx25veQ=PL_aP+w@mail.gmail.com>
+Message-ID: <52931A64.2030804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 23, 2013 at 08:32:40AM -0800, Tony Lindgren wrote:
-> * Rob Herring <robherring2@gmail.com> [131123 07:43]:
-> > On Fri, Nov 22, 2013 at 7:50 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
-> > >> * Tony Lindgren <tony@atomide.com> [131122 17:09]:
-> > >> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
-> > >> > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
-> > >> > > > +               /* See of_device_resource_notify for populating interrupts */
-> > >> > > > +               for (i = 0; i < num_irq; i++, res++) {
-> > >> > > > +                       res->flags = IORESOURCE_IRQ;
-> > >> > > > +                       res->start = -EPROBE_DEFER;
-> > >> > > > +                       res->end = -EPROBE_DEFER;
-> > >> > >
-> > >> > > NAK.  Definitely a bad idea to start introducing magic values other into
-> > >> > > resources.  Please don't do this.
-> > >> >
-> > >> > Do you have any better ideas on how to sort out this issue then?
-> > >>
-> > >> I guess we could allocate all the resources lazily here, I'll take a look
-> > >> at that.
-> > >
-> > > Here's a version that allocates the resources lazily with the notifier.
-> > > Seems to boot, need to play with it a bit more though to make sure we're
-> > > not overwriting resources for any legacy devices.
-> > 
-> > Have you seen Thierry's series[1]? While your approach is certainly
-> > more concise, it seems like a work-around for the problem. I don't
-> > think a notifier is the right long term solution.
+On 23/11/13 09:12, loody wrote:
+> hi Marc:
 > 
-> OK cool. I think we can fix the $Subject bug first without making all
-> those changes, then do the rest of the reorg for v3.14.
+> 2013/11/16 Marc Zyngier <marc.zyngier@arm.com>:
+>> On 2013-11-16 07:23, loody wrote:
+>>>
+>>> hi Russel:
+>>>
+>>> 2013/11/16 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>>>>
+>>>> On Sat, Nov 16, 2013 at 12:55:11AM +0800, loody wrote:
+>>>>>
+>>>>> hi all:
+>>>>> I use arm cortex A9 smp with GIC v1 system.
+>>>>> And my kernel is 3.8.13.
+>>>>>
+>>>>> I have some questions:
+>>>>> 1.  From GIc v1 spec, we can modify irq priority.
+>>>>>      (ICDIPRn, Interrupt Priority Rigisters)
+>>>>>      how could we do that in kernel? Did kernel provide any API of Irq
+>>>>> to reach that goal?
+>>>>
+>>>>
+>>>> No.  It's pointless.  The kernel doesn't support interrupting one IRQ
+>>>> while another is already in progress.
+>>>
+>>> in so far kernel, there are impossible
+>>> 1. dynamically  change irq priority setting in GIC through kernel API
+>>> 2. get higher interrupt priority when first time register requtest_irq
+>>
+>>
+>> As Russell said, this is because Linux only models a single interrupt
+>> priority.
+>> The net result is that all interrupts must have the same priority.
 > 
-> The bug is that we try to populate IRQ resources at a wrong time
-> when they may not exist.
+> There is some audio device on my embedded system, and they need more
+> higher interrupt such that we may not easily hearing audio
+> disconnection when system busy.
 > 
-> Based on a quick look it seems we could combine Thierry's addition
-> of the new function of_platform_probe(struct platform_device *pdev)
-> and use that to allocate all resources at driver probe time like my
-> patch is doing. And then there's no need for the notifier.
+> isn't any method to let those interrupt get higher priority?
 
-My series already does the allocation at probe time as well. That was
-the whole point. The reason why I added of_platform_probe() is because I
-think we'll be needing this for other types of resources in the future
-as well, so it could serve as a central place to do all of that.
+Are you sure your audio drops are due to interrupt latency, and not just
+DMA underruns because another driver is taking too long to handle its
+own interrupts?
 
-There was also a proposal[0] by Arnd a few weeks ago that solved this in
-a more generic way. I've said it before, and I'll say again that the
-idea scares me somewhat, but it does solve some interesting aspects and
-has the potential to get rid of a whole lot of boilerplate code. While
-the original purpose was to handle all things devm_*(), I suspect that
-same mechanism could be used to resolve DT references at probe time.
+Interrupt priorities are not a valid solution to that kind of problem in
+Linux, and you need to look at the root cause of your issue.
 
-Thierry
+>>
+>>
+>>>>
+>>>>> 2. From Gic V1 spec, we can assign 1 irq to multi-core.
+>>>>>      (ICDIPTRn, Interrupt Processor Targets Registers)
+>>>>>      Is there similar API in kernel to let 1 irq possibility to be
+>>>>> handled by multi-cores?
+>>>>
+>>>>
+>>>> No.  All that does is lead to cores being woken up and racing on locks,
+>>>> and then causing IRQs to be spuriously marked as false (because there's
+>>>> nothing for the handlers to do on the cores which lost out).
+>>>
+>>> In Gic spec, if 1 core service the irq, other cores will read invalid
+>>> #1023 if accidentally they are waken up by GIC.
+>>>
+>>> Why that will let cores racing on locks?
+>>>
+>>> if accidentally waken up by GIC, and cores read #1023, cores can
+>>> return back immediately.
+>>
+>>
+>> Hence wasting a lot of time and energy on all the other cores.
+>> The question is: why do you want to do that?
+> We found some interrupt seems cannot be serviced in time.
+> Since GIC spec mentioned about supporting multi-core handing
+> interrupt, but we see only 1 core handle all irq after kernel boot up.
+> So I send a mail to check whether arm kernel support multi-core handle irq.
 
-[0]: http://www.spinics.net/lists/devicetree/msg10684.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/dced6001/attachment.sig>
+You can always redirect an interrupt to another CPU. Just write a
+cpumask to /proc/irq/[irqnr]/smp_affinity. This will cause the GIC
+distributor to be programmed with another CPU as a target.
+
+See if that improves your issue, but my gut feeling is that you would
+simply paper over other issues.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
