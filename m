@@ -1,60 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Nov 2013 18:20:02 +0000
-Subject: [PATCH v2] arm64: enable EDAC on arm64
-In-Reply-To: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
-References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20131125182002.GD28201@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 25 Nov 2013 13:23:28 -0500
+Subject: [PATCH 3/4] ARM: mvebu: use the virtual CPU registers to
+ access coherency registers
+In-Reply-To: <1385396807-19027-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1385396807-19027-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131125182328.GC2879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 09:05:08PM +0000, Rob Herring wrote:
-> diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
-> new file mode 100644
-> index 0000000..6d2d262
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/edac.h
-> @@ -0,0 +1,43 @@
-> +/*
-> + * Copyright 2013 Calxeda, Inc.
-> + * Based on PPC version Copyright 2007 MontaVista Software, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef ASM_EDAC_H
-> +#define ASM_EDAC_H
-> +/*
-> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
-> + * Implements the per arch atomic_scrub() that EDAC use for software
-> + * ECC scrubbing.  It reads memory and then writes back the original
-> + * value, allowing the hardware to detect and correct memory errors.
-> + */
-> +static inline void atomic_scrub(void *va, u32 size)
-> +{
-> +	unsigned int *virt_addr = va;
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
-> +		long result;
-> +		unsigned long tmp;
-> +
-> +		asm volatile("// atomic_scrub\n"
-> +		"1:	ldxr	%w0, %2\n"
-> +		"	stxr	%w1, %w0, %2\n"
-> +		"	cbnz	%w1, 1b"
-> +			: "=&r" (result), "=&r" (tmp), "+Q" (*virt_addr)
-> +			: : "cc");
+On Mon, Nov 25, 2013 at 05:26:46PM +0100, Thomas Petazzoni wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> The Armada XP provides a mechanism called "virtual CPU registers" or
+> "per-CPU register banking", to access the per-CPU registers of the
+> current CPU, without having to worry about finding on which CPU we're
+> running. CPU0 has its registers at 0x21800, CPU1 at 0x21900, CPU2 at
+> 0x21A00 and CPU3 at 0x21B00. The virtual registers accessing the
+> current CPU registers are at 0x21000.
+> 
+> However, in the Device Tree node that provides the register addresses
+> for the coherency unit (which is responsible for ensuring coherency
+> between processors, and I/O coherency between processors and the
+> DMA-capable devices), a mistake was made: the CPU0-specific registers
+> were specified instead of the virtual CPU registers. This means that
+> the coherency barrier needed for I/O coherency was not behaving
+> properly when executed from a CPU different from CPU0. This patch
+> fixes that by using the virtual CPU registers.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: stable at vger.kernel.org
+> ---
+> This bug has been introduced in e60304f8cb7bb5 ("arm: mvebu: Add
+> hardware I/O Coherency support"), merged in v3.8. Therefore this fix
+> should be backported into -stable all the way to 3.8. Due to various
+> reorganizations in the DT file, the patch will certainly not apply as
+> is, but the fix itself is trivial.
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-You still don't need the "cc" clobber (cbnz doesn't update the flags and,
-yes, we have redundant clobbers in our atomic.h which I'll fix...).
+Applied to mvebu/dt-fixes
 
-Will
+thx,
+
+Jason.
