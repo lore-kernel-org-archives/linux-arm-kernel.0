@@ -1,24 +1,22 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 25 Nov 2013 01:28:06 +0000
-Subject: ACPI
-In-Reply-To: <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
- <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
-Message-ID: <20131125012806.GA20107@srcf.ucam.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 25 Nov 2013 10:11:03 +0800
+Subject: [PATCH v7 0/4] Add dual-fifo mode support of i.MX ssi
+In-Reply-To: <20131122163132.GB17344@MrMyself>
+References: <cover.1384352281.git.b42378@freescale.com>
+ <20131122163132.GB17344@MrMyself>
+Message-ID: <20131125021101.GA11613@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 12:42:13AM +0000, Grant Likely wrote:
+On Sat, Nov 23, 2013 at 12:31:32AM +0800, Nicolin Chen wrote:
+> Hi all,
+> 
+>    I'm sorry to push this. But this series has been an orphan for a while.
+>    Could any one please receive and foster it?
 
-> The plus side is we do have a lot of influence here. ARM servers are
-> being built to run Linux. I don't know of any Microsoft plans, but
-> even if they plan to release a server OS, Linux is currently in the
-> driver seat.
+Vinod,
 
-We only have influence if the vendors are talking to us. Regardless of 
-what we do in any standardisation bodies, if the vendors have already 
-made decisions here then we have no influence at all.
+I expect you will pick up the series.  But otherwise, I can apply it via
+IMX tree with your ACKs on the first two patches.
 
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Shawn
