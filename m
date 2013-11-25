@@ -1,75 +1,20 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Nov 2013 12:17:10 +0100
-Subject: [PATCH 1/5] Documentation: dt: Add kona-pwm binding
-In-Reply-To: <1384800901-21711-2-git-send-email-tim.kryger@linaro.org>
-References: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
- <1384800901-21711-2-git-send-email-tim.kryger@linaro.org>
-Message-ID: <20131125111709.GJ22043@ulmo.nvidia.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 25 Nov 2013 11:23:18 +0000
+Subject: Request inclusion of ARM v7 cache optimization patch into linux-next
+Message-ID: <20131125112318.GA4179@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 18, 2013 at 10:54:57AM -0800, Tim Kryger wrote:
-> Add the binding description for the kona-pwm block found on Broadcom's
-> mobile SoCs.
-> 
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Alex Elder <elder@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> ---
->  .../devicetree/bindings/pwm/bcm-kona-pwm.txt       | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-> new file mode 100644
-> index 0000000..5c3ea1b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-> @@ -0,0 +1,24 @@
-> +Broadcom's PWM Controller Device Tree bindings
+Hi Stephen,
 
-This sounds somewhat strange, like Broadcom owns the bindings... perhaps
-just:
+can I ask you please to include the following branch into linux-next:
 
-	Broadcom PWM controller device tree bindings
+git://linux-arm.org/linux-2.6-lp.git v7-cache-opt
 
-Or for consistency:
+It contains a patch implementing cache optimizations for ARM 32-bit v7
+architectures, it was reviewed and tested but -next would give it wider
+test coverage before it gets merged in the coming cycle, so please
+include it as soon as you deem fit.
 
-	Broadcom Kona PWM controller device tree bindings
-
-since apparently there exist other Broadcom PWM controllers.
-
-> +Broadcom's Kona PWM Controller has 6 channels
-
-"controller" and end the sentence with a full stop.
-
-> +
-> +Required Properties :
-> +- compatible: should be "brcm,kona-pwm"
-> +- reg: physical base address and length of the controller's registers
-> +- clocks: clock specifier for the kona pwm external clock
-
-Please use the correct spelling "PWM" in prose here and elsewhere. Also
-you should pick one of "kona", "Kona" or "KONA" and stick with it
-consistently. Might also be useful to mention what Kona is. Doesn't
-necessarily have to be in the document, but if for nothing else, then
-just for my curiosity.
-
-> +- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-> +  of the PWM to use and the second cell is the period in nanoseconds.
-> +
-> +Refer to pwm/pwm.txt for generic pwm controller node properties.
-> +
-> +Refer to clocks/clock-bindings.txt for generic clock consumer
-> +properties
-
-This sentence should also end with a full stop.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/e002f94c/attachment.sig>
+Thank you very much,
+Lorenzo
