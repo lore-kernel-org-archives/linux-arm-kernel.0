@@ -1,78 +1,114 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 25 Nov 2013 17:48:54 +0100
-Subject: [RESEND PATCH v3 2/4] usb: musb: Bugfix of_node assignment
-In-Reply-To: <20131125161421.GH18046@saruman.home>
-References: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
- <1384790078-15366-3-git-send-email-mpa@pengutronix.de>
- <20131125161421.GH18046@saruman.home>
-Message-ID: <52937F76.107@linutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Nov 2013 11:59:16 -0500
+Subject: HYP Kernel boot requirements [Was ...Re: [PATCH 2/2] ARM: OMAP5:
+ Add HYP mode entry support for secondary CPUs]
+In-Reply-To: <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
+References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
+ <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
+ <52937AB4.1060901@ti.com>
+ <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
+Message-ID: <529381E4.3090405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 05:14 PM, Felipe Balbi wrote:
-> Hi,
+On Monday 25 November 2013 11:33 AM, Christoffer Dall wrote:
+> On 25 November 2013 08:28, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+>> On Monday 25 November 2013 10:09 AM, Christoffer Dall wrote:
+>>> On 23 November 2013 16:07, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+>>>> Boot-CPU entry into the HYP mode is managed in boot-loader but
+>>>> the secondary CPUs directly jumps to kernel during boot. Same
+>>>> path is also used for CPU hotplug as well during suspend for
+>>>> secondary CPU.
+>>>>
+>>>> Hence patch the secondary CPU boot path for hyp mode etry.
+>>>>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> ---
+>>>>  arch/arm/mach-omap2/omap-headsmp.S |    7 +++++++
+>>>>  1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+>>>> index 75e9295..4844dd8 100644
+>>>> --- a/arch/arm/mach-omap2/omap-headsmp.S
+>>>> +++ b/arch/arm/mach-omap2/omap-headsmp.S
+>>>> @@ -22,6 +22,7 @@
+>>>>
+>>>>  /* Physical address needed since MMU not enabled yet on secondary core */
+>>>>  #define AUX_CORE_BOOT0_PA                      0x48281800
+>>>> +#define API_HYP_ENTRY                          0x102
+>>>>
+>>>>  /*
+>>>>   * OMAP5 specific entry point for secondary CPU to jump from ROM
+>>>> @@ -38,6 +39,12 @@ wait:        ldr     r2, =AUX_CORE_BOOT0_PA  @ read from AuxCoreBoot0
+>>>>         and     r4, r4, #0x0f
+>>>>         cmp     r0, r4
+>>>>         bne     wait
+>>>> +#ifdef CONFIG_KVM_ARM_HOST
+>>>> +       ldr     r12, =API_HYP_ENTRY
+>>>> +       adr     r0, hyp_boot
+>>>> +       smc     #0
+>>>> +hyp_boot:
+>>>> +#endif
+>>>>         b       secondary_startup
+>>>>  END(omap5_secondary_startup)
+>>>>  /*
+>>>
+>>> hmm, this means that currently running this in a guest will fail to
+>>> bring-up SMP, right?
+>>>
+>> Nope. Because the code under 'KVM_ARM_HOST' macro. Guest build
+>> will not enable CONFIG_KVM_ARM_HOST and things should be fine then.
+>> Right ?
+>>
 > 
-> On Mon, Nov 18, 2013 at 04:54:36PM +0100, Markus Pargmann wrote:
->> It is not safe to assign the of_node to a device without driver.
->> The device is matched against a list of drivers and the of_node
->> could lead to a DT match with the parent driver.
->> 
->> Signed-off-by: Markus Pargmann <mpa@pengutronix.de> --- 
->> drivers/usb/musb/musb_core.c | 12 +++++++++++- 
->> drivers/usb/musb/musb_dsps.c |  1 - 2 files changed, 11
->> insertions(+), 2 deletions(-)
->> 
->> diff --git a/drivers/usb/musb/musb_core.c
->> b/drivers/usb/musb/musb_core.c index 8b7d903..d5ad9db 100644 ---
->> a/drivers/usb/musb/musb_core.c +++
->> b/drivers/usb/musb/musb_core.c @@ -1966,6 +1966,7 @@ static int
->> musb_probe(struct platform_device *pdev) int		irq =
->> platform_get_irq_byname(pdev, "mc"); struct resource	*iomem; void
->> __iomem	*base; +	int ret;
->> 
->> iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0); if
->> (!iomem || irq <= 0) @@ -1975,7 +1976,16 @@ static int
->> musb_probe(struct platform_device *pdev) if (IS_ERR(base)) return
->> PTR_ERR(base);
->> 
->> -	return musb_init_controller(dev, irq, base); +	if
->> (dev->parent)
-
-don't we always have a parent?
-
->> +		dev->of_node = dev->parent->of_node; + +	ret =
->> musb_init_controller(dev, irq, base); +	if (ret) { +
->> dev->of_node = NULL; +		return ret; +	} + +	return 0; }
->> 
->> static int musb_remove(struct platform_device *pdev) diff --git
->> a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c 
->> index 82e1da0..7b36d32 100644 --- a/drivers/usb/musb/musb_dsps.c 
->> +++ b/drivers/usb/musb/musb_dsps.c @@ -485,7 +485,6 @@ static int
->> dsps_create_musb_pdev(struct dsps_glue *glue, musb->dev.parent		=
->> dev; musb->dev.dma_mask		= &musb_dmamask; 
->> musb->dev.coherent_dma_mask	= musb_dmamask; -	musb->dev.of_node
->> = of_node_get(dn);
+> That really goes against the whole single binary on all platforms
+> thing. With multi-platform support you really shouldn't have to
+> compile your kernel any differently for running as a guest as when
+> you're running on a host.  Someone may even emulate an OMAP5 in QEMU
+> and you'd certainly want your kvm-enabled kernel to run as both guest
+> and host.  After all, this is not a paravirtualization solution.
 > 
-> Sebastian, does this look correct to you ?
+Fair enough.
 
-Is this fixing a bug? Commit 4fc4b2 ("usb: musb: dsps: do not bind to
-"musb-hdrc") [0] should fix the problem that is described here.
-ux500 is affected by the same problem as dsps but it is only visible on
-dsps because we DEFER probe for few reasons there test the fail path.
+>>> Couldn't you create a little wrapper-pen in U-Boot instead, which
+>>> replicates the omap boot protocol and takes care of the hyp-mode
+>>> startup there instead, keeping this completely out of the kernel?
+>>>
+>> Its not just booting but CPU hotplug also follows the same path
+>> so we need the mechanism in kernel to switch mode.
+>>
+>> In general, I think its important to consider the aspect with
+>> CPU PM. CPUs are not going to go through the boot-loaders in
+>> those paths and hence need of HYP entry in the kernel will
+>> be must.
+>>
+> I agree, and PSCI is the obvious only correct answer to this.
+> 
+> We have discussed this a bit earlier (I think Will Deacon brought this
+> up - cc'ed), but I don't think anyone had any bright ideas.
+> 
+> However, we broadly agreed on the fact that for KVM/hyp support, you
+> need to boot your kernel in that mode, and this is definitely pulling
+> in the wrong direction.
+> 
+What I am saying is the platforms like OMAP5 already support PM in
+mainline kernel and we can't break that for KVM. Boot-loaders
+would be thrashed after boot so you need something which runs
+in Kernel or along with Kernel to have equivalent of hyp
+switching.
 
-So by just looking at it should fix the same problem as the change I
-cited _but_ it would also cover ux500. Currently I can't think of any
-side effects by assigning of_node if the musb_init_*() did not do it.
-If we take this in I would suggest to remove the check I added (because
-it does no longer serve any purpose) and the description (why we do
-this, what is the problem exactly) is could be taken from my patch
-since I think it is better described (it safe to assign a node to a
-driver, it becomes unsafe if after platform_probe _also_ the DT probe
-is executed which was not to designed to work like this).
+Am not challenging the agreed direction but we need to solve the
+PM problem as well before making "all CPU runs boot-loader for
+HYP kernels" as a must have. At least its is a change in boot
+strategy from existing kernels.
 
-In the long term I would suggest to move the DT probe over to the musb
-core code and we wouldn't need the node assignment anymore?
+CC'ing few more folks and changing the subject line
 
-[0] http://www.spinics.net/lists/linux-usb/msg94701.html
+Regards,
+Santosh
 
-Sebastian
+ 
