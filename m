@@ -1,39 +1,66 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 25 Nov 2013 16:04:43 +0200
-Subject: [PATCH v3 4/6] watchdog: davinci: add "timeout-sec" property
+Date: Mon, 25 Nov 2013 16:04:42 +0200
+Subject: [PATCH v3 3/6] watchdog: davinci: add GET_TIMELEFT option support
 In-Reply-To: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1385388285-10553-5-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1385388285-10553-4-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Davinci WDT has been switched to use WDT core, it became able
-to support timeout-sec property, so add it to it's binding description.
+Currently, the davinci watchdog can be read while counting,
+so we can add ability to report the remaining time before
+the system will reboot.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
- .../devicetree/bindings/watchdog/davinci-wdt.txt   |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/watchdog/davinci_wdt.c |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-index 75558cc..e450134 100644
---- a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-@@ -4,9 +4,13 @@ Required properties:
- - compatible : Should be "ti,davinci-wdt"
- - reg : Should contain WDT registers location and length
+diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+index 4c3f417..d342fc2 100644
+--- a/drivers/watchdog/davinci_wdt.c
++++ b/drivers/watchdog/davinci_wdt.c
+@@ -116,6 +116,31 @@ static int davinci_wdt_ping(struct watchdog_device *wdd)
+ 	return 0;
+ }
  
-+Optional properties:
-+- timeout-sec : Contains the watchdog timeout in seconds
++static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
++{
++	u64 timer_counter;
++	unsigned long freq;
++	u32 val;
++	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
 +
- Examples:
- 
- wdt: wdt at 2320000 {
- 	compatible = "ti,davinci-wdt";
- 	reg = <0x02320000 0x80>;
-+	timeout-sec = <30>;
++	/* if timeout has occured then return 0 */
++	val = ioread32(davinci_wdt->base + WDTCR);
++	if (val & WDFLAG)
++		return 0;
++
++	freq = clk_get_rate(davinci_wdt->clk);
++
++	if (!freq)
++		return 0;
++
++	timer_counter = ioread32(davinci_wdt->base + TIM12);
++	timer_counter |= ((u64)ioread32(davinci_wdt->base + TIM34) << 32);
++
++	do_div(timer_counter, freq);
++
++	return wdd->timeout - timer_counter;
++}
++
+ static const struct watchdog_info davinci_wdt_info = {
+ 	.options = WDIOF_KEEPALIVEPING,
+ 	.identity = "DaVinci Watchdog",
+@@ -126,6 +151,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
+ 	.start		= davinci_wdt_start,
+ 	.stop		= davinci_wdt_ping,
+ 	.ping		= davinci_wdt_ping,
++	.get_timeleft	= davinci_wdt_get_timeleft,
  };
+ 
+ static int davinci_wdt_probe(struct platform_device *pdev)
 -- 
 1.7.9.5
