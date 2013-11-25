@@ -1,23 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Nov 2013 17:11:06 +0000
-Subject: [PATCH RESEND] ASoC: clk: probe defer when clock not yet ready
-In-Reply-To: <20131125093849.5fadc450@armhf>
-References: <20131125093849.5fadc450@armhf>
-Message-ID: <20131125171106.GJ14725@sirena.org.uk>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 25 Nov 2013 18:15:49 +0100
+Subject: [PATCH 0/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
+Message-ID: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 09:38:49AM +0100, Jean-Francois Moine wrote:
-> At probe time, a clock device may not be ready when some other device
-> wants to use it. 
+Hello,
 
-The patch subject starts of "ASoC:" but this is a patch for the clock
-API only (it does then say clk:) - you probably want to fix that, it's
-not going to help get it noticed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/8baff26a/attachment.sig>
+this series first fixes a bug in the flexcan driver, using the wrong clock for
+the bit rate calculcation. The next patch switches the peripheral clock on
+i.MX53 to lp_apm, which has a rate of 24 MHz. This is optimal for the CIA
+recommended bit rates.
+
+Tested on TQ's mba53 and mba6x [1].
+
+Who is taking the series? Due to Lucas' patch:
+
+    0a5b8df clk: imx5: introduce DT includes for clock provider
+
+this series does not yet apply to my upstream (net-next/mastet).
+
+Marc
+
+[1] On i.MX6 the following patch is needed (which is already in Shawn's
+    for-next):
+
+    9b3d423 ARM: i.MX6q: fix the wrong parent of can_root clock
