@@ -1,36 +1,24 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 25 Nov 2013 17:57:30 +0200
-Subject: [PATCH 1/3] mtd: nand: davinci: reuse driver for Keystone arch
-In-Reply-To: <201311231915.29643.arnd@arndb.de>
-References: <1384964699-15134-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384964699-15134-2-git-send-email-ivan.khoronzhuk@ti.com>
- <201311231915.29643.arnd@arndb.de>
-Message-ID: <5293736A.2060108@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 25 Nov 2013 09:58:04 -0600
+Subject: [RESEND PATCH v3 4/4] usb: musb: dsps, use devm_kzalloc
+In-Reply-To: <1384790078-15366-5-git-send-email-mpa@pengutronix.de>
+References: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
+ <1384790078-15366-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131125155804.GG18046@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2013 08:15 PM, Arnd Bergmann wrote:
-> On Wednesday 20 November 2013, Ivan Khoronzhuk wrote:
->> --- a/drivers/mtd/nand/davinci_nand.c
->> +++ b/drivers/mtd/nand/davinci_nand.c
->> @@ -523,6 +523,7 @@ static struct nand_ecclayout hwecc4_2048 __initconst = {
->>   #if defined(CONFIG_OF)
->>   static const struct of_device_id davinci_nand_of_match[] = {
->>          {.compatible = "ti,davinci-nand", },
->> +       {.compatible = "ti,keystone-nand", },
->>          {},
->>   };
->>   MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
->
-> Same comment as for the watchdog driver: when the devices are actually compatible,
-> the driver does not need to know the new string, the preferred method is to
-> set both strings from the .dts file.
->
-> 	Arnd
->
+On Mon, Nov 18, 2013 at 04:54:38PM +0100, Markus Pargmann wrote:
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Thanks. I'll correct it.
+no commit log == no commit. Sorry, but I'll be very pedantic about it.
 
 -- 
-Regards,
-Ivan Khoronzhuk
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/2c30f025/attachment.sig>
