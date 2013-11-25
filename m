@@ -1,41 +1,98 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 25 Nov 2013 23:03:36 +0100
-Subject: [PATCH 3/4] ARM: mvebu: NETGEAR ReadyNAS 104 .dts file cleanup
-In-Reply-To: <20131125194117.GA5413@obsidianresearch.com> (Jason Gunthorpe's
- message of "Mon, 25 Nov 2013 12:41:17 -0700")
-References: <cover.1385148929.git.arno@natisbad.org>
- <bd899cfc2b0b3d22a7442d76b3901ca81ca86f11.1385148929.git.arno@natisbad.org>
- <20131122213610.GC30358@obsidianresearch.com>
- <878uwg5b6e.fsf@natisbad.org>
- <20131125194117.GA5413@obsidianresearch.com>
-Message-ID: <87vbzgf8av.fsf@natisbad.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 15:05:58 -0700
+Subject: [PATCH V2 0/3] ARM: tegra: use common reset and DMA bindings
+Message-ID: <1385417161-5542-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Stephen Warren <swarren@nvidia.com>
 
-Jason Gunthorpe <jgunthorpe@obsidianresearch.com> writes:
+(((
+This is V2 of a small subset of a much larger series. All the driver
+code in the series has been ack'd, so I'm just missing acks for the DT
+bindings changes, which is all I'm reposting here. The changes in V2
+are minor typo-oriented changes. V1 was at:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/211699.html
+)))
 
-> On Fri, Nov 22, 2013 at 11:22:33PM +0100, Arnaud Ebalard wrote:
->
->> and also the fact that *in my case* the kernel does its job
->> auto-detecting the PHY, I now also wonder how the kernel can
->> use that info and what I get by adding the compatible string.
->
-> I think the main rational was to document what chip the phy is to
-> people who don't have the hardware...
->
-> You probably shouldn't delay your patch on this issue, document the
-> phy chip model in a comment?
+This series implements a common reset framework driver for Tegra, and
+updates all relevant Tegra drivers to use it. It also removes the custom
+DMA bindings and replaced them with the standard DMA DT bindings.
 
-Will do that.
+Historically, the Tegra clock driver has exported a custom API for module
+reset. This series removes that API, and transitions DT and drivers to
+the new reset framework.
 
-> Also, check if it is actually an S varient or not, they have the same
-> phy-id.. ;)
+The custom API used a "struct clk" to identify which module to reset, and
+consequently some DT bindings and drivers required clocks to be provided
+where they really needed just a reset identifier instead. Due to this
+known deficiency, I have always considered most Tegra bindings to be
+unstable. This series removes this excuse for instability, although I
+still consider some Tegra bindings unstable due to the need to convert to
+the common DMA bindings.
 
-On the chip, I have 88E1318-NNB2 (PNN1230_3JW 1209 A0P TW). I will see
-if I can find more info.
+Historically, Tegra DMA channels have been represented in DT using a
+custom nvidia,dma-request-selector property. Now that standard DMA DT
+bindings exist, convert all Tegra bindings, DTs, and drivers to use the
+standard instead.
 
-Cheers,
+This series makes a DT-ABI-incompatible change to:
+- Require reset specifiers in DT where relevant.
+- Require standard DMA specifiers.
+- Remove clock specifiers from DT where they were only needed for reset.
+- Remove legacy DMA specifier properties.
 
-a+
+I anticipate merging this whole series into the Tegra and arm-soc trees
+as its own branch, due to internal dependencies. This branch will be
+stable and can then be merged into any other subsystem trees should any
+conflicts arise.
+
+Cc: treding at nvidia.com
+Cc: pdeschrijver at nvidia.com
+Cc: linux-tegra at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+
+Stephen Warren (3):
+  ARM: tegra: add missing clock documentation to DT bindings
+  ARM: tegra: document reset properties in DT bindings
+  ARM: tegra: document use of standard DMA DT bindings
+
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |   1 +
+ .../bindings/clock/nvidia,tegra114-car.txt         |   4 +
+ .../bindings/clock/nvidia,tegra124-car.txt         |   4 +
+ .../bindings/clock/nvidia,tegra20-car.txt          |   4 +
+ .../bindings/clock/nvidia,tegra30-car.txt          |   4 +
+ .../devicetree/bindings/dma/tegra20-apbdma.txt     |  14 +++
+ .../bindings/gpu/nvidia,tegra20-host1x.txt         | 122 +++++++++++++++++++++
+ .../devicetree/bindings/i2c/nvidia,tegra20-i2c.txt |  27 ++++-
+ .../bindings/input/nvidia,tegra20-kbc.txt          |   9 ++
+ .../bindings/mmc/nvidia,tegra20-sdhci.txt          |   9 ++
+ .../devicetree/bindings/nvec/nvidia,nvec.txt       |  12 ++
+ .../bindings/pci/nvidia,tegra20-pcie.txt           |  28 +++--
+ .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt |   9 ++
+ .../devicetree/bindings/rtc/nvidia,tegra20-rtc.txt |   3 +
+ .../bindings/serial/nvidia,tegra20-hsuart.txt      |  19 +++-
+ .../bindings/sound/nvidia,tegra-audio-alc5632.txt  |   7 +-
+ .../bindings/sound/nvidia,tegra-audio-rt5640.txt   |   7 +-
+ .../bindings/sound/nvidia,tegra-audio-wm8753.txt   |   7 +-
+ .../bindings/sound/nvidia,tegra-audio-wm8903.txt   |   7 +-
+ .../bindings/sound/nvidia,tegra-audio-wm9712.txt   |   7 +-
+ .../bindings/sound/nvidia,tegra20-ac97.txt         |  20 +++-
+ .../bindings/sound/nvidia,tegra20-i2s.txt          |  19 +++-
+ .../bindings/sound/nvidia,tegra30-ahub.txt         |  54 ++++++---
+ .../bindings/sound/nvidia,tegra30-i2s.txt          |  11 +-
+ .../bindings/spi/nvidia,tegra114-spi.txt           |  24 +++-
+ .../bindings/spi/nvidia,tegra20-sflash.txt         |  20 +++-
+ .../bindings/spi/nvidia,tegra20-slink.txt          |  20 +++-
+ .../bindings/timer/nvidia,tegra20-timer.txt        |   3 +
+ .../bindings/timer/nvidia,tegra30-timer.txt        |   3 +
+ .../bindings/usb/nvidia,tegra20-ehci.txt           |   7 +-
+ 30 files changed, 416 insertions(+), 69 deletions(-)
+
+-- 
+1.8.1.5
