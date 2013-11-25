@@ -1,29 +1,106 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 25 Nov 2013 13:02:30 -0500 (EST)
-Subject: [PATCH v4 REPOST] ARM: vexpress/TC2: Implement MCPM
- power_down_finish()
-In-Reply-To: <CAOesGMjcNhqUikHhP-Jx5cHUocHQUTPW9p5ikwwQxbMSFM7hvQ@mail.gmail.com>
-References: <1385396185-15291-1-git-send-email-Dave.Martin@arm.com>
- <CAOesGMjcNhqUikHhP-Jx5cHUocHQUTPW9p5ikwwQxbMSFM7hvQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.10.1311251259400.9667@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Nov 2013 18:03:52 +0000
+Subject: Report from 2013 ARM kernel summit
+In-Reply-To: <528E539C.8080603@wwwdotorg.org>
+References: <20131119.114054.663999769447782808.hdoyu@nvidia.com>
+ <20131119173524.GK11778@mudshark.cambridge.arm.com>
+ <528BCDCE.6070006@gmail.com>
+ <20131120.083955.1386179068365424976.hdoyu@nvidia.com>
+ <CAL_Jsq+AxEWhkOhxwAZ=+rpzDZ+yC1b3ZV541UhOu9kiwUhUdQ@mail.gmail.com>
+ <20131121110024.GA8395@mudshark.cambridge.arm.com>
+ <528E539C.8080603@wwwdotorg.org>
+Message-ID: <20131125180352.GC28201@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Nov 2013, Olof Johansson wrote:
+Hi Stephen,
 
-> Hi,
+On Thu, Nov 21, 2013 at 06:40:28PM +0000, Stephen Warren wrote:
+> On 11/21/2013 04:00 AM, Will Deacon wrote:
+> > On Wed, Nov 20, 2013 at 08:02:10PM +0000, Rob Herring wrote:
+> >> For the topology above where you are chaining iommu's, I think
+> >> something like this is more accurately describing the hierarchy:
+> >>
+> >>   smmu_b: iommu at xxxxxxxx {
+> >>         #iommu-cells = <3>;
+> >>          iommus = <&smmu_a param1 param2>;
+> >>        ....
+> >>   };
+> >>   device_a {
+> >>          iommus = <&smmu_b param1 param2 param3>;
+> >>   };
+> >>
+> >> I remember discussing this with Will and seem to recall some issue
+> >> with describing things this way. But looking at it now, I don't see
+> >> what that was.
+> > 
+> > I think it was the usual issue with StreamID remastering. For example, if
+>              ^^^ s/was/had/ I assume
+
+Take your pick!
+
+> > you had a device going into two chained IOMMUs, you need a way to relate the
+> > StreamIDs of the device to the remastered IDs coming out of the first SMMU.
 > 
-> > Since v3.13-rc1, mcpm backends must implement an additional method which
-> > the vexpress TC2 implementation doesn't have upstream, resulting in an
-> > ugly WARN_ON() during hotplug and kexec operations
+> That seems pretty easy to deal with. Am I missing something. Here's how
+> I assume that would work:
 > 
-> Please be more specific here. Which change in the 3.13 merge window caused this?
+> 1)
+> 
+> If the mapping is static in HW, then you simply have a table that
+> describes the remapping. A table representation could be in the DT or
+> the driver itself. Either way, any static mapping is a property of the
+> HW itself, so shouldn't need to leak into the client DT nodes at all, right?
+> 
+> That might look like:
+> 
+> smmu_a: iommu at xxxxxxxx {
+> 	#iommu-cells = <1>;
+> };
+> smmu_b: iommu at xxxxxxxx {
+> 	#iommu-cells = <1>;
+> 
+> 	// a) All stream IDs squashed down to 1 ID
+> 	iommus = <&smmu_a SMMU_B's_STREAM_ID_IN_SMMU_A>;
+> 
+> 	// OR b) stream IDs translated:
+> 	iommus = <&smmu_a 0>,
+> 		 <&smmu_a 1>,
+> 		 <&smmu_a 2> ...;
+> 	// this table could be in the driver instead
+> 	iommu-stream-id-map =
+> 		<DEV_A's_STREAM_ID_IN_SMMU_B 0>,
+> 		<DEV_B's_STREAM_ID_IN_SMMU_B 1>,
+> 		<DEV_C's_STREAM_ID_IN_SMMU_B 2>,
 
-Commit 0de0d6467525.
+Actually, something like this could work. I think we should also support the
+case where a range of IDs are `windowed' (i.e. there is a constant offset
+applied to incoming IDs to get the outgoing IDs) to avoid huge tables in
+some cases.
 
-The corresponding change to tc2-pm.c was initially posted at about the 
-same time i.e. before the merge window, but it somehow fell into a 
-crack.
+> };
+> device_a {
+> 	iommus = <&smmu_b DEV_A's_STREAM_ID_IN_SMMU_B>;
+> };
+> 
+> or 2)
+> 
+> If the remapping is entirely dynamic, then you'd either need a table in
+> the DT to describe how to set it up for the particular use-case (similar
+> to the above), or a function in the driver to manage the mapping at
+> run-time, probably hooked into the of_xlate() of the parent IOMMU, which
+> would call into some function of the source IOMMU.
+> 
+> In other words, of_xlate for smmu_a would do both:
+> 
+> a) Parse the SMMU specifier in the client's iommus property
+> 
+> b) If the parse specifier represents a "dynamic stream ID device/IOMMU",
+> call some function in the client driver to find out which stream ID(s)
+> the parse iommus entry (specifier) represents.
 
+Sure. We just need to get the binding right so we're prepared when these
+platforms turn up. There's also the usual problem of continuing to support
+what we already do for existing SMMU bindings.
 
-Nicolas
+Will
