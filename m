@@ -1,31 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 25 Nov 2013 22:13:47 +0100
-Subject: [PATCH] ARM: u300: fix timekeeping when periodic mode is used
-In-Reply-To: <CACRpkdZrV7fPcyNeBdzhhZHDkm1ZmixwDi=1=vKnFOBiYTQYsw@mail.gmail.com>
-References: <20131105083336.GK14892@pengutronix.de>
- <1383642199-11473-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdZrV7fPcyNeBdzhhZHDkm1ZmixwDi=1=vKnFOBiYTQYsw@mail.gmail.com>
-Message-ID: <20131125211347.GD28642@pengutronix.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 25 Nov 2013 22:15:19 +0100
+Subject: [PATCH v2 1/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
+Message-ID: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 10:44:58AM +0100, Linus Walleij wrote:
-> On Tue, Nov 5, 2013 at 10:03 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > To determine the value to write to the hardware's timer counter register
-> > the symbol CLOCK_TICK_RATE is used. This value is a dummy value on u300
-> > though. So instead use the clock rate that is used for oneshot mode.
-> >
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Thanks, patch applied to the u300 branch in the linux-stericsson
-> tree.
-This isn't in next? At least this patch doesn't appear there.
+Hello,
 
-Best regards
-Uwe
+this series first fixes a bug in the flexcan driver, using the wrong clock for
+the bit rate calculcation. The next patch switches the peripheral clock on
+i.MX53 to lp_apm, which has a rate of 24 MHz. This is optimal for the CIA
+recommended bit rates.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tested on TQ's mba53 and mba6x [1].
+
+Who is taking the series? Due to Lucas' patch:
+
+    0a5b8df clk: imx5: introduce DT includes for clock provider
+
+this series does not yet apply to my upstream (net-next/mastet).
+
+Marc
+
+[1] On i.MX6 the following patch is needed (which is already in Shawn's
+    for-next):
+
+    9b3d423 ARM: i.MX6q: fix the wrong parent of can_root clock
+
+changes since v1:
+* move switch to 24 MHz clock to mx53_clocks_init
+  (tnx Alexander)
