@@ -1,47 +1,81 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 25 Nov 2013 13:16:00 -0500
-Subject: [PATCH v3 2/9] staging: dwc2: update DT binding to add generic
- clock/phy properties
-In-Reply-To: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
-References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1385403367-18144-3-git-send-email-matt.porter@linaro.org>
+Date: Mon, 25 Nov 2013 13:15:58 -0500
+Subject: [PATCH v3 0/9] USB Device Controller support for BCM281xx
+Message-ID: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dwc2/s3c-hsotg require a single clock to be specified and optionally
-a generic phy. On the s3c-hsotg driver old style USB phy support is
-present as a fallback so the generic phy properties are optional.
+Changes since v2:
+	- Rebased on 3.13-rc1
+	- Fix braces in phy_get_bus_width()/phy_set_bus_width()
+	- Drop generic phy conversion to use the same support from
+	  the Exynos generic phy conversion series
+	- Modify dts support to match the "device" phy name required
+	  in the v3 Exynos generic phy conversion
+	- Add s3c-hsotg phy_init/phy_exit support
+	- Fix typo on reg property in kona phy binding
+	- Replace phy driver reg struct with offset defines
+	- Move phy soft reset to phy driver init
+	- Fix dts node names to match ePAPR conventions
 
-Signed-off-by: Matt Porter <matt.porter@linaro.org>
----
- Documentation/devicetree/bindings/staging/dwc2.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Changes since v1:
+	- Convert USB phy driver to generic phy subsystem
+	- Add phy bus width apis
+	- Drop dwc2 phy bus width DT property in favor of querying the
+	  phy provider for bus width
+	- Add generic phy/clock properties to dwc2 DT binding
+	- Add generic phy subsystem support to s3c-hsotg with the
+	  existing usb phy and pdata phy methods as a fallback
+	- Split bindings out to separate patches to match the latest
+	  DT binding review guidelines
 
-diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt b/Documentation/devicetree/bindings/staging/dwc2.txt
-index 1a1b7cf..b8b42b6 100644
---- a/Documentation/devicetree/bindings/staging/dwc2.txt
-+++ b/Documentation/devicetree/bindings/staging/dwc2.txt
-@@ -5,6 +5,12 @@ Required properties:
- - compatible : "snps,dwc2"
- - reg : Should contain 1 register range (address and length)
- - interrupts : Should contain 1 interrupt
-+- clocks: clock provider specifier
-+- clock-names: shall be "otg"
-+- phys: phy provider specifier
-+- phy-names: shall be "device"
-+Refer to clk/clock-bindings.txt for generic clock consumer properties
-+Refer to phy/phy-bindings.txt for generic phy consumer properties
- 
- Example:
- 
-@@ -12,4 +18,8 @@ Example:
-                 compatible = "ralink,rt3050-usb, snps,dwc2";
-                 reg = <0x101c0000 40000>;
-                 interrupts = <18>;
-+		clocks = <&usb_otg_ahb_clk>;
-+		clock-names = "otg";
-+		phys = <&usbphy>;
-+		phy-names = "device";
-         };
+This series adds USB Device Controller support for the Broadcom
+BCM281xx family of parts. BCM281xx contains a DWC2 OTG block and
+s3c-hsotg is used to support UDC operation.
+
+Part 1 adds phy bus width support to the generic phy subsystem
+
+Parts 2-6 allows s3c-hsotg to build on non-Samsung platforms, supports
+the dwc2 binding, adds phy_init/phy_exit support, and supports fetching
+phy bus width using the generic phy layer.
+
+Parts 7-8 add a generic phy binding and driver for the BCM Kona USB PHY.
+
+Part 9 adds the DT nodes to enable UDC support on both BCM281xx boards
+in the kernel.
+
+This series depends on:
+	- "Update Kona drivers to use clocks" series
+	  https://lkml.org/lkml/2013/11/14/450
+	- "Add new Exynos USB 2.0 PHY driver" series
+	  https://lkml.org/lkml/2013/11/5/271
+
+Matt Porter (9):
+  phy: add phy_get_bus_width()/phy_set_bus_width() calls
+  staging: dwc2: update DT binding to add generic clock/phy properties
+  usb: gadget: s3c-hsotg: enable build for other platforms
+  usb: gadget: s3c-hsotg: add snps,dwc2 compatible string
+  usb: gadget: s3c-hsotg: use generic phy_init()/phy_exit() support
+  usb: gadget: s3c-hsotg: get phy bus width from phy subsystem
+  phy: add Broadcom Kona USB2 PHY DT binding
+  phy: add Broadcom Kona USB2 PHY driver
+  ARM: dts: add usb udc support to bcm281xx
+
+ .../devicetree/bindings/phy/bcm-kona-usb2-phy.txt  |  15 ++
+ Documentation/devicetree/bindings/staging/dwc2.txt |  10 ++
+ arch/arm/boot/dts/bcm11351-brt.dts                 |   6 +
+ arch/arm/boot/dts/bcm11351.dtsi                    |  18 +++
+ arch/arm/boot/dts/bcm28155-ap.dts                  |   8 ++
+ drivers/phy/Kconfig                                |   6 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-kona-usb2.c                    | 158 +++++++++++++++++++++
+ drivers/usb/gadget/Kconfig                         |   7 +-
+ drivers/usb/gadget/s3c-hsotg.c                     |  22 ++-
+ drivers/usb/gadget/s3c-hsotg.h                     |   1 +
+ include/linux/phy/phy.h                            |  20 +++
+ 12 files changed, 265 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-kona-usb2.c
+
 -- 
 1.8.4
