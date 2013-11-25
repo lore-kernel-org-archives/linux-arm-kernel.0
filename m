@@ -1,30 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Nov 2013 14:24:15 -0800
-Subject: [PATCH] arm: ep93xx: use soc bus
-In-Reply-To: <1384816986-3744-1-git-send-email-rmallon@gmail.com>
-References: <1384816986-3744-1-git-send-email-rmallon@gmail.com>
-Message-ID: <20131125222415.GB18365@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 15:30:55 -0700
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <2205346.2EJcydzRLA@wuerfel>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+ <2205346.2EJcydzRLA@wuerfel>
+Message-ID: <5293CF9F.6040305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 10:23:06AM +1100, Ryan Mallon wrote:
-> From: H Hartley Sweeten <hsweeten@visionengravers.com>
+On 11/25/2013 03:09 PM, Arnd Bergmann wrote:
+> On Monday 25 November 2013 14:53:36 Stephen Warren wrote:
+>> v2: Use of_dma_slave_xlate() rather than of_dma_simple_xlate(), as
+>>     suggested by Arnd Bergmann.
+>>
+>> This patch is part of a series with strong internal depdendencies. I'm
+>> looking for an ack so that I can take the entire series through the Tegra
+>> and arm-soc trees. The series will be part of a stable branch that can be
+>> merged into other subsystems if needed to avoid/resolve dependencies.
 > 
-> Use the soc bus to report the silicon revision and Maverick Key. Both
-> are not currently exposed to the user. In addition, fill in the SoC
-> family and machine for completeness.
+> Did I suggest of_dma_slave_xlate()? I don't think I've actually heard
+> of that function, and I can't find anything in the kernel source or
+> using google.
 > 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Acked-by: Ryan Mallon <rmallon@gmail.com>
-> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/mach-ep93xx/Kconfig                 |    1 +
->  arch/arm/mach-ep93xx/core.c                  |  108 +++++++++++++++++++++++++-
->  arch/arm/mach-ep93xx/include/mach/platform.h |    3 +-
->  3 files changed, 110 insertions(+), 2 deletions(-)
+> Why not just use an open-coded xlate function?
 
-Applied to next/soc. Thanks!
-
-
--Olof
+Well, you suggested not using of_dma_simple_xlate() since it wasn't
+appropriate. I then started to implement an open-coded xlate function,
+but found that it was 99% identical to the same thing in the mmp driver,
+and hence created a common of_dma_slave_xlate() so as not to just
+cut/paste it everywhere. Unfortunately, I only sent that patch to
+dmaengine at vger.kernel.org and the DMA maintainers, and there's no
+archive of that list:-(
