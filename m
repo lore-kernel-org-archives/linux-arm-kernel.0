@@ -1,41 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 25 Nov 2013 16:04:16 +0530
-Subject: [PATCH v6 1/6] gpio: davinci: use readl/writel instead of __raw_*
-In-Reply-To: <CA+V-a8sjmo2K16m9_6Zf1qwcez+qKm-9JW1Cb=Aj4prtXd=-fA@mail.gmail.com>
-References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
- <1385057731-4348-2-git-send-email-prabhakar.csengg@gmail.com>
- <CAArO44vmfkroE9w4KviOhjkPvg9bTX9pAtr3oxYjD9u_wVZXeg@mail.gmail.com>
- <CA+V-a8sjmo2K16m9_6Zf1qwcez+qKm-9JW1Cb=Aj4prtXd=-fA@mail.gmail.com>
-Message-ID: <529327A8.8080909@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 25 Nov 2013 14:37:27 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNIGkuTVg1OiBmaXggInNoaWZ0IiB2YWx1ZSBmb3Ig?=
+ =?UTF-8?B?bHBfYXBtX3NlbA==?=
+In-Reply-To: <1385375474-15901-1-git-send-email-mkl@pengutronix.de>
+References: <1385375474-15901-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1385375847.678349974@f369.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prabhakar,
-
-On Monday 25 November 2013 09:42 AM, Prabhakar Lad wrote:
-> Hi Taras,
+> According to the i.MX53 Rev. 2.1 datasheet the lp_apm_sel is bit 10 in the
+> CCM_CCSR register not bit 9.
 > 
-> On Fri, Nov 22, 2013 at 3:38 PM, Taras Kondratiuk
-> <taras.kondratiuk@linaro.org> wrote:
->> On 21 November 2013 20:15, Prabhakar Lad <prabhakar.csengg@gmail.com> wrote:
->>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>>
->>> This patch replaces the __raw_readl/writel with
->>> readl and writel, Altough the code runs on ARMv5
->>> based SOCs, changing this will help copying the code
->>> for other uses.
->>
->> This replacement has a functional impact: it adds memory barriers.
->> Please note this in the description.
->> Also please add a bit of explanation on why do you need to add barriers.
->>
-> Agreed this adds memory barriers, I'll add a note about it.
+> This patch fixes this issue.
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index 3f01df2..867d623 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -98,7 +98,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", rate_ckih1);
+>  	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", rate_ckih2);
+>  
+> -	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
+> +	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
+>  						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
 
-Well the barriers certainly make it easier to debug by having both
-device and memory accesses happen in program order. That said, if there
-is no pressing reason to add barriers, you can use
-{readl|writel}_relaxed() instead. That will make the code protable
-across endianess.
+This is not valid for i.MX51.
 
-Thanks,
-Sekhar
+---
