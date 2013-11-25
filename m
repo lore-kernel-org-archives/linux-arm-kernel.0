@@ -1,71 +1,79 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Nov 2013 17:26:47 +0100
-Subject: [PATCH 4/4] ARM: mvebu: re-enable PCIe on Armada 370 DB
-In-Reply-To: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1385396807-19027-5-git-send-email-thomas.petazzoni@free-electrons.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Nov 2013 11:28:36 -0500
+Subject: [PATCH 2/2] ARM: OMAP5: Add HYP mode entry support for secondary
+ CPUs
+In-Reply-To: <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
+References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
+ <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
+Message-ID: <52937AB4.1060901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 14fd8ed0a7fd19913 ("ARM: mvebu: Relocate Armada 370/XP PCIe
-device tree nodes") relocated the PCIe controller DT nodes one level
-up in the Device Tree, to reflect a more correct representation of the
-hardware introduced by the mvebu-mbus Device Tree binding.
+On Monday 25 November 2013 10:09 AM, Christoffer Dall wrote:
+> On 23 November 2013 16:07, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+>> Boot-CPU entry into the HYP mode is managed in boot-loader but
+>> the secondary CPUs directly jumps to kernel during boot. Same
+>> path is also used for CPU hotplug as well during suspend for
+>> secondary CPU.
+>>
+>> Hence patch the secondary CPU boot path for hyp mode etry.
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/omap-headsmp.S |    7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+>> index 75e9295..4844dd8 100644
+>> --- a/arch/arm/mach-omap2/omap-headsmp.S
+>> +++ b/arch/arm/mach-omap2/omap-headsmp.S
+>> @@ -22,6 +22,7 @@
+>>
+>>  /* Physical address needed since MMU not enabled yet on secondary core */
+>>  #define AUX_CORE_BOOT0_PA                      0x48281800
+>> +#define API_HYP_ENTRY                          0x102
+>>
+>>  /*
+>>   * OMAP5 specific entry point for secondary CPU to jump from ROM
+>> @@ -38,6 +39,12 @@ wait:        ldr     r2, =AUX_CORE_BOOT0_PA  @ read from AuxCoreBoot0
+>>         and     r4, r4, #0x0f
+>>         cmp     r0, r4
+>>         bne     wait
+>> +#ifdef CONFIG_KVM_ARM_HOST
+>> +       ldr     r12, =API_HYP_ENTRY
+>> +       adr     r0, hyp_boot
+>> +       smc     #0
+>> +hyp_boot:
+>> +#endif
+>>         b       secondary_startup
+>>  END(omap5_secondary_startup)
+>>  /*
+> 
+> hmm, this means that currently running this in a guest will fail to
+> bring-up SMP, right?
+> 
+Nope. Because the code under 'KVM_ARM_HOST' macro. Guest build 
+will not enable CONFIG_KVM_ARM_HOST and things should be fine then.
+Right ? 
 
-However, while most of the boards were properly adjusted accordingly,
-the Armada 370 DB board was left unchanged, and therefore, PCIe is
-seen as not enabled on this board. This patch fixes that by moving the
-PCIe controller node one level-up in armada-370-db.dts.
+> Couldn't you create a little wrapper-pen in U-Boot instead, which
+> replicates the omap boot protocol and takes care of the hyp-mode
+> startup there instead, keeping this completely out of the kernel?
+> 
+Its not just booting but CPU hotplug also follows the same path
+so we need the mechanism in kernel to switch mode.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: stable at vger.kernel.org
----
-This problem exists since kernel v3.12, and therefore this patch
-should probably be pushed to v3.12 stable.
----
- arch/arm/boot/dts/armada-370-db.dts | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+In general, I think its important to consider the aspect with
+CPU PM. CPUs are not going to go through the boot-loaders in
+those paths and hence need of HYP entry in the kernel will
+be must.
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 90ce29d..08a56bc 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -99,22 +99,22 @@
- 					spi-max-frequency = <50000000>;
- 				};
- 			};
-+		};
- 
--			pcie-controller {
-+		pcie-controller {
-+			status = "okay";
-+			/*
-+			 * The two PCIe units are accessible through
-+			 * both standard PCIe slots and mini-PCIe
-+			 * slots on the board.
-+			 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
- 				status = "okay";
--				/*
--				 * The two PCIe units are accessible through
--				 * both standard PCIe slots and mini-PCIe
--				 * slots on the board.
--				 */
--				pcie at 1,0 {
--					/* Port 0, Lane 0 */
--					status = "okay";
--				};
--				pcie at 2,0 {
--					/* Port 1, Lane 0 */
--					status = "okay";
--				};
- 			};
- 		};
- 	};
--- 
-1.8.1.2
+Regards,
+Santosh
+
+Regards,
+Santosh
