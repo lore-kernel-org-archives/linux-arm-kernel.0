@@ -1,134 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Nov 2013 18:41:59 +0000
-Subject: [PATCH V5 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1385372753-7396-3-git-send-email-vkale@apm.com>
-References: <1385372753-7396-1-git-send-email-vkale@apm.com>
- <1385372753-7396-3-git-send-email-vkale@apm.com>
-Message-ID: <20131125184159.GE28201@mudshark.cambridge.arm.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 25 Nov 2013 10:42:52 -0800
+Subject: [PATCH 11/31] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <20131125180000.GR16735@n2100.arm.linux.org.uk>
+References: <528D28A1.2050307@wwwdotorg.org>
+ <CAPcyv4jRYu7iTOuiXuj9F-t5dpF3ErVHT4X-PKrkJAYfn91a0w@mail.gmail.com>
+ <528E4F55.9070204@wwwdotorg.org>
+ <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <20131123003442.GH16735@n2100.arm.linux.org.uk>
+ <5293883A.8050808@wwwdotorg.org>
+ <CAA9_cmfMtp4WjRGVzfTxrwcNWP95+HE7DAYg_GeWfqi=L2K2aw@mail.gmail.com>
+ <20131125180000.GR16735@n2100.arm.linux.org.uk>
+Message-ID: <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 09:45:53AM +0000, Vinayak Kale wrote:
-> Add support for irq registration when pmu interrupt is percpu.
-> 
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> ---
->  arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
->  1 file changed, 81 insertions(+), 27 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index cea1594..a2efab3 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -22,6 +22,7 @@
->  
->  #include <linux/bitmap.h>
->  #include <linux/interrupt.h>
-> +#include <linux/irq.h>
->  #include <linux/kernel.h>
->  #include <linux/export.h>
->  #include <linux/perf_event.h>
-> @@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
->  }
->  
->  static void
-> +armpmu_disable_percpu_irq(void *data)
-> +{
-> +	struct arm_pmu *armpmu = data;
-> +	struct platform_device *pmu_device = armpmu->plat_device;
-> +	int irq = platform_get_irq(pmu_device, 0);
-> +
-> +	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-> +	disable_percpu_irq(irq);
-> +}
-> +
-> +static void
->  armpmu_release_hardware(struct arm_pmu *armpmu)
->  {
->  	int i, irq, irqs;
->  	struct platform_device *pmu_device = armpmu->plat_device;
->  
->  	irqs = min(pmu_device->num_resources, num_possible_cpus());
-> +	if (irqs < 1)
+On Mon, Nov 25, 2013 at 10:00 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 25, 2013 at 09:45:18AM -0800, Dan Williams wrote:
+>> Regardless of whether the driver was dma_request_channel as a
+>> fallback, it will currently use NULL to indicate an allocation
+>> failure.
+>
+> At the moment, dma_request_slave_channel()'s return values are valid
+> pointer or NULL.  I'd suggest as that's how it's been established,
+> that function is left alone - changing the return values in this kind
+> of invisible way is Really Bad(tm) because you can't check that it's
+> right in any future users - unless you're prepared to review every
+> single new user of this function for the next few years or more.
+>
+> Instead, leaving it as is and introducing a new function name with
+> the different return error method is the right way to do this.
 
-Can you just make irqs unsigned, then do if (!irqs) instead?
+I was attempting to tap the brakes on the number of request_channel
+apis in circulation.
+dma_request_channel
+dma_request_slave_channel
+dma_request_slave_channel_compat
+... and now dma_request_slave_channel_reason
 
-> +		return;
->  
-> -	for (i = 0; i < irqs; ++i) {
-> -		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-> -			continue;
-> -		irq = platform_get_irq(pmu_device, i);
-> -		if (irq >= 0)
-> -			free_irq(irq, armpmu);
-> +	irq = platform_get_irq(pmu_device, 0);
-> +	if (irq <= 0)
-> +		return;
-> +
-> +	if (irq_is_percpu(irq)) {
-> +		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
-> +		free_percpu_irq(irq, &cpu_hw_events);
-> +	} else {
-> +		for (i = 0; i < irqs; ++i) {
-> +			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-> +				continue;
-> +			irq = platform_get_irq(pmu_device, i);
-> +			if (irq > 0)
-> +				free_irq(irq, armpmu);
-> +		}
->  	}
->  }
->  
-> +static void
-> +armpmu_enable_percpu_irq(void *data)
-> +{
-> +	struct arm_pmu *armpmu = data;
-> +	struct platform_device *pmu_device = armpmu->plat_device;
-> +	int irq = platform_get_irq(pmu_device, 0);
-> +
-> +	enable_percpu_irq(irq, 0);
+...but given we already have things like samsung_dmadev_request() in
+the wild, tracking correct usage going forward will be an uphill
+battle.  We can do this the other way round.  Introduce the new api
+and delete the old one (after some time).
 
-IRQ_TYPE_NONE?
+Stephen,
 
-> +	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-> +}
-> +
->  static int
->  armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  {
-> @@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  		return -ENODEV;
->  	}
->  
-> -	for (i = 0; i < irqs; ++i) {
-> -		err = 0;
-> -		irq = platform_get_irq(pmu_device, i);
-> -		if (irq < 0)
-> -			continue;
-> +	irq = platform_get_irq(pmu_device, 0);
-> +	if (irq <= 0) {
-> +		pr_err("failed to get valid irq for PMU device\n");
-> +		return -ENODEV;
-> +	}
->  
-> -		/*
-> -		 * If we have a single PMU interrupt that we can't shift,
-> -		 * assume that we're running on a uniprocessor machine and
-> -		 * continue. Otherwise, continue without this interrupt.
-> -		 */
-> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> -				    irq, i);
-> -			continue;
-> -		}
-> +	if (irq_is_percpu(irq)) {
-> +		err = request_percpu_irq(irq, armpmu->handle_irq,
-> +				"arm-pmu", &cpu_hw_events);
-
-This is a bit of a kludge passing in the cpu_hw_events as the per-cpu token,
-but I guess that will do for now. There is potential for something like a
-master-aware L2 PMU which uses PPIs and expects to pass something different
-back to the IRQ handler.
-
-Will
+Can we make the new api not pass the 'defer' flag.  You mention it is
+for compat reasons, but since there are no users I'm not seeing how
+there can be compatibility concerns.  Can you elaborate?
