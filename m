@@ -1,69 +1,58 @@
-From: w-kwok2@ti.com (WingMan Kwok)
-Date: Mon, 25 Nov 2013 15:16:21 -0500
-Subject: [PATCH 3/3] ARM: keystone: defconfig: enable USB host mode support
-In-Reply-To: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
-References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <1385410581-12148-4-git-send-email-w-kwok2@ti.com>
+From: kevin@bracey.fi (Kevin Bracey)
+Date: Mon, 25 Nov 2013 22:01:42 +0200
+Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
+ pinfunc.
+In-Reply-To: <CACRpkdbyjm0X9RX+8WjqQxBPyRjBOAunkqVcO-0KUd1PTdGavA@mail.gmail.com>
+References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
+ <528BB1F2.4080107@wwwdotorg.org>
+ <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
+ <528BB913.6080409@wwwdotorg.org>
+ <CAH9JG2UjnL5bZzNUuJhWY3GpwPD=rJvR2O4Hcpm33G+prSS=BA@mail.gmail.com>
+ <CACRpkdbyjm0X9RX+8WjqQxBPyRjBOAunkqVcO-0KUd1PTdGavA@mail.gmail.com>
+Message-ID: <5293ACA6.7060403@bracey.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the USB host mode support on TI's Keystone platform.
-It also enables the support of usb mass storage, FAT and Ext4
-filesystems to test rootfs mount over an USB disk.
+On 25/11/2013 16:34, Linus Walleij wrote:
+> On Wed, Nov 20, 2013 at 1:02 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+>> On Wed, Nov 20, 2013 at 4:16 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> I think that last point should be addressed by having a driver that owns
+>>> the GPIO set it to the desired output level, and the implementation of
+>> Some pins are not connected (NC). At that cases, there's no drivers to
+>> handle it. To reduce power leakage, it sets proper configuration with
+>> values instead of reset values.
+> This is correspondant to the PIN_CONFIG_OUTPUT from
+> include/linux/pinctrl/pinconf-generic.h
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
----
- arch/arm/configs/keystone_defconfig |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+Indeed it is - I was waiting for someone to point that out. Now we've 
+got there...
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 9943e5d..686f612 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -115,6 +115,8 @@ CONFIG_MTD_UBI=y
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_EEPROM_AT24=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-@@ -129,10 +131,24 @@ CONFIG_SPI_DAVINCI=y
- CONFIG_SPI_SPIDEV=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_DEBUG=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC3=y
-+CONFIG_USB_DWC3_DEBUG=y
-+CONFIG_USB_DWC3_VERBOSE=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_DMADEVICES=y
- CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_MEMORY=y
-+CONFIG_EXT4_FS=y
-+CONFIG_EXT4_FS_POSIX_ACL=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_NTFS_FS=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_FS_WBUF_VERIFY=y
-@@ -144,6 +160,8 @@ CONFIG_ROOT_NFS=y
- CONFIG_NFSD=y
- CONFIG_NFSD_V3=y
- CONFIG_NFSD_V3_ACL=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_SHIRQ=y
- CONFIG_DEBUG_INFO=y
--- 
-1.7.9.5
+I've been working on extending the shmobile PFC driver to provide 
+"gpio-mode" and implement PIN_CONFIG_OUTPUT as described by 
+Documentation/pinctrl.txt, primarily to handle sleep states, but I have 
+begun to wonder about the initial state problem, as discussed here.
+
+As far as I can see, we can't currently specify "fallback" states for 
+pins, which is one of Tomasz' key requirements.
+
+We can specify "hog" states, and we can specify "default for a driver", 
+but not "default before/in absence of a driver" or "sleep in absence of 
+a driver". Having a hog precludes any finer driver control, AFAICT.
+
+Some of our existing pre-pinconf board files have a "unused pins" table 
+which is used to claim and pull GPIOs. I've converted that to "hog" 
+pinconf, but that only works because the table omits all pins used by 
+drivers. And, unsurprisingly, that's been error-prone; if those tables 
+originally covered all unused pins, they don't any more.
+
+I'd like confidence that we can get every pin into the correct state by 
+having a fully-populated table containing all pins, that can be used 
+regardless of which drivers start. I think what we're lacking is a "weak 
+hog". Whatever you call that. :)
+
+That would also specify the state to fallback to when a group is 
+released (where we currently do pinmux_disable_setting).
+
+Thoughts?
+
+Kevin
