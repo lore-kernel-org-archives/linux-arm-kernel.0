@@ -1,34 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Nov 2013 09:12:18 +0100
-Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
- command bits
-In-Reply-To: <20131125055222.GA28064@obsidianresearch.com>
-References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131124025808.GQ29241@titan.lakedaemon.net>
- <20131125055222.GA28064@obsidianresearch.com>
-Message-ID: <20131125091218.48bad3be@skate>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 25 Nov 2013 09:38:49 +0100
+Subject: [PATCH RESEND] ASoC: clk: probe defer when clock not yet ready
+Message-ID: <20131125093849.5fadc450@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+At probe time, a clock device may not be ready when some other device
+wants to use it. 
 
-On Sun, 24 Nov 2013 22:52:22 -0700, Jason Gunthorpe wrote:
+This patch lets the functions clk_get/devm_clk_get return a probe defer
+when the clock is defined in the DT but not yet available.
 
-> > I'd like to get back on track with these small patches being Acked by
-> > mvebu maintainers and then going through Bjorn.  Could you please resend
-> > an updated patchset for this and 2/2?
-> 
-> I recall these two patches are waiting for Thomas to give his Ok. His
-> testing found problems with the prior versions that I cannot detect on
-> my hardware..
+It also fixes an erroneous call to clk_get_sys() when __clk_get() fails.
 
-Correct. Sorry for the delay, I'll try to test them today. Thanks for
-the reminder!
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+resend: - patch subject change from
+   [PATCH v3 1/2] ASoC: kirkwood: clk: probe defer when clock not yet ready
+	- base kernel 3.13.0-rc1
+v2: fix __clk_get() failure (from Russell King)
+---
+ drivers/clk/clk.c    | 2 +-
+ drivers/clk/clkdev.c | 7 ++++++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-Best regards,
-
-Thomas
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 2cf2ea6..41361c6 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2187,7 +2187,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+ {
+ 	struct of_clk_provider *provider;
+-	struct clk *clk = ERR_PTR(-ENOENT);
++	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
+ 
+ 	/* Check if we have such a provider in our array */
+ 	mutex_lock(&of_clk_lock);
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 442a313..1f402b9 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -157,7 +157,12 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ 
+ 	if (dev) {
+ 		clk = of_clk_get_by_name(dev->of_node, con_id);
+-		if (!IS_ERR(clk) && __clk_get(clk))
++		if (!IS_ERR(clk)) {
++			if (!__clk_get(clk))
++				clk = ERR_PTR(-ENOENT);
++			return clk;
++		}
++		if (PTR_ERR(clk) == -EPROBE_DEFER)
+ 			return clk;
+ 	}
+ 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
