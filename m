@@ -1,31 +1,74 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 25 Nov 2013 13:16:02 -0500
-Subject: [PATCH v3 4/9] usb: gadget: s3c-hsotg: add snps,
- dwc2 compatible string
+Date: Mon, 25 Nov 2013 13:15:59 -0500
+Subject: [PATCH v3 1/9] phy: add phy_get_bus_width()/phy_set_bus_width() calls
 In-Reply-To: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
 References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1385403367-18144-5-git-send-email-matt.porter@linaro.org>
+Message-ID: <1385403367-18144-2-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for the dwc2 binding.
+This adds a pair of APIs that allows the generic PHY subsystem to
+provide information on the PHY bus width. The PHY provider driver may
+use phy_set_bus_width() to set the bus width that the PHY supports.
+The controller driver may then use phy_get_bus_width() to fetch the
+PHY bus width in order to properly configure the controller.
 
 Signed-off-by: Matt Porter <matt.porter@linaro.org>
 ---
- drivers/usb/gadget/s3c-hsotg.c | 1 +
- 1 file changed, 1 insertion(+)
+ include/linux/phy/phy.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index a8e6c3d..da3879b 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -3728,6 +3728,7 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
- #ifdef CONFIG_OF
- static const struct of_device_id s3c_hsotg_of_ids[] = {
- 	{ .compatible = "samsung,s3c6400-hsotg", },
-+	{ .compatible = "snps,dwc2", },
- 	{ /* sentinel */ }
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 6d72269..6ca6c61 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -46,6 +46,7 @@ struct phy_ops {
+  * @mutex: mutex to protect phy_ops
+  * @init_count: used to protect when the PHY is used by multiple consumers
+  * @power_count: used to protect when the PHY is used by multiple consumers
++ * @bus_width: used to specify data width of the PHY bus
+  */
+ struct phy {
+ 	struct device		dev;
+@@ -55,6 +56,7 @@ struct phy {
+ 	struct mutex		mutex;
+ 	int			init_count;
+ 	int			power_count;
++	int			bus_width;
  };
- MODULE_DEVICE_TABLE(of, s3c_hsotg_of_ids);
+ 
+ /**
+@@ -127,6 +129,14 @@ int phy_init(struct phy *phy);
+ int phy_exit(struct phy *phy);
+ int phy_power_on(struct phy *phy);
+ int phy_power_off(struct phy *phy);
++static inline int phy_get_bus_width(struct phy *phy)
++{
++	return phy->bus_width;
++}
++static inline void phy_set_bus_width(struct phy *phy, int bus_width)
++{
++	phy->bus_width = bus_width;
++}
+ struct phy *phy_get(struct device *dev, const char *string);
+ struct phy *devm_phy_get(struct device *dev, const char *string);
+ void phy_put(struct phy *phy);
+@@ -199,6 +209,16 @@ static inline int phy_power_off(struct phy *phy)
+ 	return -ENOSYS;
+ }
+ 
++static inline int phy_get_bus_width(struct phy *phy)
++{
++	return -ENOSYS;
++}
++
++static inline void phy_set_bus_width(struct phy *phy, bus_width)
++{
++	return;
++}
++
+ static inline struct phy *phy_get(struct device *dev, const char *string)
+ {
+ 	return ERR_PTR(-ENOSYS);
 -- 
 1.8.4
