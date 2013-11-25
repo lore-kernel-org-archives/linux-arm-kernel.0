@@ -1,19 +1,18 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Nov 2013 11:59:16 -0500
-Subject: HYP Kernel boot requirements [Was ...Re: [PATCH 2/2] ARM: OMAP5:
- Add HYP mode entry support for secondary CPUs]
-In-Reply-To: <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
+Date: Mon, 25 Nov 2013 12:02:32 -0500
+Subject: [PATCH 2/2] ARM: OMAP5: Add HYP mode entry support for secondary
+ CPUs
+In-Reply-To: <52937DF8.1070505@arm.com>
 References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
  <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
  <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
- <52937AB4.1060901@ti.com>
- <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
-Message-ID: <529381E4.3090405@ti.com>
+ <52937AB4.1060901@ti.com> <52937DF8.1070505@arm.com>
+Message-ID: <529382A8.6070509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 November 2013 11:33 AM, Christoffer Dall wrote:
-> On 25 November 2013 08:28, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+On Monday 25 November 2013 11:42 AM, Marc Zyngier wrote:
+> On 25/11/13 16:28, Santosh Shilimkar wrote:
 >> On Monday 25 November 2013 10:09 AM, Christoffer Dall wrote:
 >>> On 23 November 2013 16:07, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 >>>> Boot-CPU entry into the HYP mode is managed in boot-loader but
@@ -60,20 +59,14 @@ On Monday 25 November 2013 11:33 AM, Christoffer Dall wrote:
 >>> hmm, this means that currently running this in a guest will fail to
 >>> bring-up SMP, right?
 >>>
->> Nope. Because the code under 'KVM_ARM_HOST' macro. Guest build
+>> Nope. Because the code under 'KVM_ARM_HOST' macro. Guest build 
 >> will not enable CONFIG_KVM_ARM_HOST and things should be fine then.
->> Right ?
->>
+>> Right ? 
 > 
-> That really goes against the whole single binary on all platforms
-> thing. With multi-platform support you really shouldn't have to
-> compile your kernel any differently for running as a guest as when
-> you're running on a host.  Someone may even emulate an OMAP5 in QEMU
-> and you'd certainly want your kvm-enabled kernel to run as both guest
-> and host.  After all, this is not a paravirtualization solution.
+> Absolutely not. We're way past the "one image per usage" model, and I
+> fully expect the same kernel to boot both as a guest and a host.
+> Otherwise, multiplatform is just a joke.
 > 
-Fair enough.
-
 >>> Couldn't you create a little wrapper-pen in U-Boot instead, which
 >>> replicates the omap boot protocol and takes care of the hyp-mode
 >>> startup there instead, keeping this completely out of the kernel?
@@ -85,30 +78,19 @@ Fair enough.
 >> CPU PM. CPUs are not going to go through the boot-loaders in
 >> those paths and hence need of HYP entry in the kernel will
 >> be must.
->>
-> I agree, and PSCI is the obvious only correct answer to this.
 > 
-> We have discussed this a bit earlier (I think Will Deacon brought this
-> up - cc'ed), but I don't think anyone had any bright ideas.
+> I definitely agree that you need to consider PM as well. But we've
+> decided a long time ago that we wouldn't take that kind of code in the
+> kernel. Your CPU has to reach the kernel in HYP, and that is down to
+> your boot protocol to take care off that.
 > 
-> However, we broadly agreed on the fact that for KVM/hyp support, you
-> need to boot your kernel in that mode, and this is definitely pulling
-> in the wrong direction.
+> There are a few options. Christoffer mentioned having a pen, and you
+> also could implement PSCI fairly easily (I've recently posted a u-boot
+> patch series to take care of this, though there is still a fair bit of
+> work required).
 > 
-What I am saying is the platforms like OMAP5 already support PM in
-mainline kernel and we can't break that for KVM. Boot-loaders
-would be thrashed after boot so you need something which runs
-in Kernel or along with Kernel to have equivalent of hyp
-switching.
-
-Am not challenging the agreed direction but we need to solve the
-PM problem as well before making "all CPU runs boot-loader for
-HYP kernels" as a must have. At least its is a change in boot
-strategy from existing kernels.
-
-CC'ing few more folks and changing the subject line
-
-Regards,
-Santosh
-
- 
+> Whatever the approach is, the bottom line remains: your CPU enters the
+> kernel in HYP.
+> 
+Our emails crossed. I understand the stand from you guys. Lets
+continue discussion on other thread.
