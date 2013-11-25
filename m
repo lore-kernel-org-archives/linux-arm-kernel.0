@@ -1,38 +1,37 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 25 Nov 2013 16:17:55 -0600
-Subject: [PATCH 6/7] ARM: OMAP: Disable POSTED mode for errata i103 and
- i767
-In-Reply-To: <20131125221437.GW10023@atomide.com>
-References: <1385415876-12387-1-git-send-email-joelf@ti.com>
- <1385415876-12387-7-git-send-email-joelf@ti.com>
- <20131125221437.GW10023@atomide.com>
-Message-ID: <5293CC93.6040603@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 25 Nov 2013 14:18:26 -0800
+Subject: [PATCH V2] serial: tegra: convert to standard DMA DT bindings
+In-Reply-To: <1385416270-3421-1-git-send-email-swarren@wwwdotorg.org>
+References: <1385416270-3421-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131125221826.GA18981@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 04:14 PM, Tony Lindgren wrote:
-> * Joel Fernandes <joelf@ti.com> [131125 13:46]:
->> Enabling of Posted mode is seen to cause problems on dmtimer modules on AM33xx
->> (much like other OMAPs).  Reference discussions on forums [1] [2]. Earlier
->> patch solving this on other OMAPs [3].
->>
->> For OMAP SoCs with this errata, the fix has been to not enable Posted mode.
->> However, on some SoCs (atleast AM33xx) which carry this errata, Posted mode
->> is enabled on reset. So we not only need to ignore enabling of the POSTED bit
->> when the timer is requested, but also disable Posted mode if errata is present.
+On Mon, Nov 25, 2013 at 02:51:10PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> This could explain some occasional lost timers I saw a while back when
-> testing things.. We most likely should merge for the -rc series with cc stable.
-
-Sure, I agree.
-
+> By using dma_request_slave_channel_or_err(), the DMA slave ID can be
+> looked up from standard DT properties, and squirrelled away during
+> channel allocation. Hence, there's no need to use a custom DT property
+> to store the slave ID.
 > 
-> Does this depend on the other patches in this series?
+> Cc: treding at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-serial at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2:
+> * Don't allocate DMA channels inside probe(); the DMA channel setup
+>   relies on some buffers that don't get allocated until startup().
 > 
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
+> 
+> Greg, you'd previously ack'd this, but I had to change the patch to fix
+> some bugs, which was a fair textual change, so I dropped your ack.
 
-No it doesn't depend.
-
-
-thanks,
-
--Joel
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
