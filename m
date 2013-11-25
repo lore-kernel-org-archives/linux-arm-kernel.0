@@ -1,32 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Nov 2013 14:43:24 -0600
-Subject: [PATCH 3/3] ARM: keystone: defconfig: enable USB host mode support
-In-Reply-To: <1385410581-12148-4-git-send-email-w-kwok2@ti.com>
-References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
- <1385410581-12148-4-git-send-email-w-kwok2@ti.com>
-Message-ID: <20131125204323.GK18046@saruman.home>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 25 Nov 2013 21:43:42 +0100
+Subject: [PATCH 0/3] leds/pwm: don't call pwm_disable when setting brightness
+Message-ID: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, Nov 25, 2013 at 03:16:21PM -0500, WingMan Kwok wrote:
-> Enable the USB host mode support on TI's Keystone platform.
-> It also enables the support of usb mass storage, FAT and Ext4
-> filesystems to test rootfs mount over an USB disk.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+some time ago I pointed out a problem with leds-pwm on i.MX28, because
+on this SoC it can happen that after:
 
-no phy driver anywhere ? How will nop-xceiv ever probe if you don't
-enable the driver for it ?
+	pwm_config(pwm, 0, period);
+	pwm_disable(pwm);
+
+the connected LED stays on. The mail thread is available at
+
+	http://thread.gmane.org/gmane.linux.kernel/1381289
+
+This series implements the outcome that didn't get any opposition, i.e.
+the pin state is explicitly undefined after pwm_disable. The first patch
+adds this fact to the general pwm docs, the second patch fixes the
+leds-pwm driver accordingly. The third patch is just a trivial fix that
+I noticed while patching the leds-pwm driver and not really related to
+any problem.
+
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (3):
+  pwm/doc: Clearify that the pin state after pwm_disable is undefined
+  leds/pwm: Don't disable pwm when setting brightness to 0
+  leds/pwm: fix driver description and make license match the header
+
+ Documentation/pwm.txt   |  5 +++++
+ drivers/leds/leds-pwm.c | 14 +++++++-------
+ 2 files changed, 12 insertions(+), 7 deletions(-)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/f58f7ddf/attachment-0001.sig>
+1.8.4.2
