@@ -1,49 +1,60 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 25 Nov 2013 13:18:32 -0500
-Subject: [PATCH 2/4] irqchip: armada-370-xp: fix MSI race condition
-In-Reply-To: <1385396807-19027-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1385396807-19027-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20131125181832.GB2879@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Nov 2013 18:20:02 +0000
+Subject: [PATCH v2] arm64: enable EDAC on arm64
+In-Reply-To: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
+References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20131125182002.GD28201@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 05:26:45PM +0100, Thomas Petazzoni wrote:
-> From: Lior Amsalem <alior@marvell.com>
-> 
-> In the Armada 370/XP driver, when we receive an IRQ 1, we read the
-> list of doorbells that caused the interrupt from register
-> ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS. This gives the list of MSIs that
-> were generated. However, instead of acknowledging only the MSIs that
-> were generated, we acknowledge *all* the MSIs, by writing
-> ~MSI_DOORBELL_MASK in the ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS register.
-> 
-> This creates a race condition: if a new MSI that isn't part of the
-> ones read into the temporary "msimask" variable is fired before we
-> acknowledge all MSIs, then we will simply loose it.
-> 
-> It is important to mention that this ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS
-> register has the following behavior: "A CPU write of 0 clears the bits
-> in this field. A CPU write of 1 has no effect". This is what allows us
-> to simply write ~msimask to acknoledge the handled MSIs.
-> 
-> Notice that the same problem is present in the IPI implementation, but
-> it is fixed as a separate patch, so that this IPI fix can be pushed to
-> older stable versions as appropriate (all the way to 3.8), while the
-> MSI code only appeared in 3.13.
-> 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
-> This is only needed for 3.13, since the MSI support didn't exist in
-> earlier kernel versions.
-> ---
->  drivers/irqchip/irq-armada-370-xp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, Nov 22, 2013 at 09:05:08PM +0000, Rob Herring wrote:
+> diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
+> new file mode 100644
+> index 0000000..6d2d262
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/edac.h
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright 2013 Calxeda, Inc.
+> + * Based on PPC version Copyright 2007 MontaVista Software, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef ASM_EDAC_H
+> +#define ASM_EDAC_H
+> +/*
+> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
+> + * Implements the per arch atomic_scrub() that EDAC use for software
+> + * ECC scrubbing.  It reads memory and then writes back the original
+> + * value, allowing the hardware to detect and correct memory errors.
+> + */
+> +static inline void atomic_scrub(void *va, u32 size)
+> +{
+> +	unsigned int *virt_addr = va;
+> +	unsigned int i;
+> +
+> +	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+> +		long result;
+> +		unsigned long tmp;
+> +
+> +		asm volatile("// atomic_scrub\n"
+> +		"1:	ldxr	%w0, %2\n"
+> +		"	stxr	%w1, %w0, %2\n"
+> +		"	cbnz	%w1, 1b"
+> +			: "=&r" (result), "=&r" (tmp), "+Q" (*virt_addr)
+> +			: : "cc");
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+You still don't need the "cc" clobber (cbnz doesn't update the flags and,
+yes, we have redundant clobbers in our atomic.h which I'll fix...).
 
-thx,
-
-Jason.
+Will
