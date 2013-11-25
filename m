@@ -1,55 +1,55 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 25 Nov 2013 12:08:25 +0530
-Subject: [Patch v4 0/2] Enable all cpus in Exynos5420
-In-Reply-To: <086901cedf9c$4c1ffca0$e45ff5e0$@org>
-References: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
- <CANuQgHEx+pNdaybeJ_dpQ5kWYpA44hrYj4ikW9d60a3hEZZPDA@mail.gmail.com>
- <086901cedf9c$4c1ffca0$e45ff5e0$@org>
-Message-ID: <CANuQgHHJ8=WBY6i0Bg=Amd7-8pDiNkWsJSCMrGJ94RBi-YGeNw@mail.gmail.com>
+Date: Mon, 25 Nov 2013 12:07:49 +0530
+Subject: [PATCH v2] irqchip: exynos-combiner: remove hard-coded irq_base
+ value
+In-Reply-To: <526444E5.5000405@samsung.com>
+References: <1379937815-21746-1-git-send-email-chander.kashyap@linaro.org>
+ <02c701ceba75$f95b1900$ec114b00$@org> <1949846.N3fAUHQ1Nx@flatron>
+ <526444E5.5000405@samsung.com>
+Message-ID: <CANuQgHFSNMV=RF8SHdZf3=gyNoXJWXEcevQ=DAOqUuZXSeugrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi Kikjin,
 
-On 12 November 2013 17:12, Kukjin Kim <kgene@kernel.org> wrote:
-> Chander Kashyap wrote:
+On 21 October 2013 02:32, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 10/18/13 02:53, Tomasz Figa wrote:
 >>
 >> Hi Kukjin,
 >>
->> On 7 October 2013 09:47, Chander Kashyap <chander.kashyap@linaro.org>
->> wrote:
->> > Exynos5420 is an octa-core SoC. This patch series enables the remaining
->> 4 cores.
->> >
->> > Changes in v2:
->> >         - Changed the cpu node @unit-address value to reg property
-> value.
->> > Changes in v3:
->> >         - Removed leading 0x from @unit-address value.
->> > Changes in v4:
->> >         - Fixed typo and patch subject from "arm: dt" to "ARM: dt".
->> >
->> > Chander Kashyap (2):
->> >   clocksource: mct: extend mct to support 8 local interrupts for
->> >     Exynos5420
->> >   arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
->> >
->> >  arch/arm/boot/dts/exynos5420.dtsi |   37
->> +++++++++++++++++++++++++++++++++++--
->> >  drivers/clocksource/exynos_mct.c  |    4 ++++
->> >  2 files changed, 39 insertions(+), 2 deletions(-)
->> >
->> > --
->> > 1.7.9.5
->
-> Looks OK to me, applied.
+>> On Thursday 26 of September 2013 14:05:09 Kukjin Kim wrote:
+>>>
+>>> Chander Kashyap wrote:
+>>>>
+>>>> Replace irq_domain_add_simple with "irq_domain_add_linear" in order to
+>>>> use linear irq domain, and to remove hardcoded irq_base_value.
+>>>>
+>>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+>>>> ---
+>>>>
+>>>> Changes since v1:
+>>>>         - Replaced irq_domain_add_simple with irq_domain_add_linear,
+>>>>
+>>>>           as suggested by Tomasz
+>>>>
+>>>>   drivers/irqchip/exynos-combiner.c |   15 +++------------
+>>>>   1 file changed, 3 insertions(+), 12 deletions(-)
+>>
+>> [snip]
+>>>
+>>>
+>>> Looks nice to me, applied with Tomasz's review.
+>>
+>>
+>> I don't see this patch in your tree. Did you apply it in the end?
+>>
+> Thanks for your gentle reminder.
 
-I cant find these patches in yours tree.
+I still can not see these patches in yours branches ?
 
 >
-> Thanks,
-> Kukjin
->
+> Applied.
+> - Kukjin
 
 
 
