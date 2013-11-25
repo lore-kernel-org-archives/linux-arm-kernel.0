@@ -1,43 +1,94 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Nov 2013 22:15:20 +0100
-Subject: [PATCH v2 1/2] can: flexcan: use correct clock as base for bit rate
- calculation
-In-Reply-To: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
-References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1385414121-21493-2-git-send-email-mkl@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 25 Nov 2013 15:21:01 -0600
+Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
+ platform doesn't have PHY
+In-Reply-To: <1385373690-12170-5-git-send-email-kishon@ti.com>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1385373690-12170-5-git-send-email-kishon@ti.com>
+Message-ID: <20131125212101.GR18046@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flexcan IP core uses the peripheral clock ("per") as basic clock for the
-bit timing calculation. However the driver uses the the wrong clock ("ipg").
-This leads to wrong bit rates if the rates on both clock are different.
+On Mon, Nov 25, 2013 at 03:31:24PM +0530, Kishon Vijay Abraham I wrote:
+> There can be systems which does not have an external phy, so get
+> phy only if no quirks are added that indicates the PHY is not present.
+> Introduced two quirk flags to indicate the *absence* of usb2 phy and
+> usb3 phy. Also remove checking if return value is -ENXIO since it's now
+> changed to always enable usb_phy layer.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/usb/dwc3/Kconfig         |    1 +
+>  drivers/usb/dwc3/core.c          |   93 ++++++++++++++++++++------------------
+>  drivers/usb/dwc3/core.h          |   15 ++++++
+>  drivers/usb/dwc3/platform_data.h |    5 ++
+>  4 files changed, 69 insertions(+), 45 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+> index 70fc430..8e385b4 100644
+> --- a/drivers/usb/dwc3/Kconfig
+> +++ b/drivers/usb/dwc3/Kconfig
+> @@ -1,6 +1,7 @@
+>  config USB_DWC3
+>  	tristate "DesignWare USB3 DRD Core Support"
+>  	depends on (USB || USB_GADGET) && HAS_DMA
+> +	select USB_PHY
 
-This patch fixes the problem by using the correct clock for the bit rate
-calculation.
+no more selects, we've already had too many problems caused by bogus
+usage of select.
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- drivers/net/can/flexcan.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> index 986674f..f20f4a1 100644
+> --- a/drivers/usb/dwc3/core.c
+> +++ b/drivers/usb/dwc3/core.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <linux/usb/ch9.h>
+>  #include <linux/usb/gadget.h>
+> @@ -351,13 +352,28 @@ static void dwc3_core_exit(struct dwc3 *dwc)
+>  
+>  #define DWC3_ALIGN_MASK		(16 - 1)
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id of_dwc3_match[] = {
+> +	{
+> +		.compatible = "snps,dwc3"
+> +	},
+> +	{
+> +		.compatible = "synopsys,dwc3"
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, of_dwc3_match);
+> +#endif
+> +
 
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index ae08cf1..aaed97b 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -1020,13 +1020,13 @@ static int flexcan_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev, "no ipg clock defined\n");
- 			return PTR_ERR(clk_ipg);
- 		}
--		clock_freq = clk_get_rate(clk_ipg);
- 
- 		clk_per = devm_clk_get(&pdev->dev, "per");
- 		if (IS_ERR(clk_per)) {
- 			dev_err(&pdev->dev, "no per clock defined\n");
- 			return PTR_ERR(clk_per);
- 		}
-+		clock_freq = clk_get_rate(clk_per);
- 	}
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+you can split this patch a little bit just to make it easier to review
+because there are a few changes which are really obvious:
+
+a) move of_device_id higher in source code so you can use it from probe.
+	while at that, aso use of_match_device() and return early if it
+	doesn't match anything.
+
+b) introduce struct dwc3_data.
+
+c) initialize of_id->data field.
+
+d) start using struct dwc3_data
+
+this will make to put all obvious changes (a-c) in separate patches so
+review can focus on (d).
+
 -- 
-1.8.4.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/cbe45606/attachment-0001.sig>
