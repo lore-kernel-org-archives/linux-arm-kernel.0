@@ -1,28 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 15:35:46 -0800
-Subject: Status of 1GHz support on am37xx
-In-Reply-To: <20131122230121.GA13440@animalcreek.com>
-References: <20131122230121.GA13440@animalcreek.com>
-Message-ID: <20131125233545.GZ10023@atomide.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 25 Nov 2013 15:36:43 -0800
+Subject: [PATCH v2] watchdog: s3c2410_wdt: Only register for cpufreq on
+ ARM_S3C24XX_CPUFREQ
+In-Reply-To: <1385420137-32725-1-git-send-email-dianders@chromium.org>
+References: <1385420137-32725-1-git-send-email-dianders@chromium.org>
+Message-ID: <1385422603-22684-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark A. Greer <mgreer@animalcreek.com> [131122 15:02]:
-> Hello.
-> 
-> I was wondering what that the status of 1GHz support for the am37xx is.
-> 
-> It looks like smartreflex/avs and ABB drivers are there.  Do they need
-> more work (e.g., DT support)?  What DT nodes and related support need
-> to be added?
-> 
-> What pieces are being worked on and which ones aren't?
-> Is there an ETA for the pieces being worked on?
+On modern SoCs the watchdog timer is parented on a clock that doesn't
+change every time we have a cpufreq change.  That means we don't need
+to constantly adjust the watchdog timer, so avoid registering for and
+dealing with cpufreq transitions unless we've actually got
+CONFIG_ARM_S3C24XX_CPUFREQ defined.
 
-There are still various parts of twl4030 that are only working with
-platform data, so at least those should be fixed now that we're moving
-to DT only based booting for mach-omap2 for v3.14.
+Note that this is more than just an optimization.  The s3c2410
+watchdog driver actually pats the watchdog on every CPU frequency
+change.  On modern systems these happen many times per second (even in
+a system where "nothing" is happening).  That effectively makes any
+userspace watchdog program useless (the watchdog is constantly patted
+by the kernel).  If we need ARM_S3C24XX_CPUFREQ defined on a
+multiplatform kernel we'll need to make sure that kernel supports
+common clock and change this to user common clock framework.
 
-Regards,
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Changes in v2:
+- Use the updated config name.
 
-Tony
+ drivers/watchdog/s3c2410_wdt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index 7d8fd04..c1ada33 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -264,7 +264,7 @@ static irqreturn_t s3c2410wdt_irq(int irqno, void *param)
+ 	return IRQ_HANDLED;
+ }
+ 
+-#ifdef CONFIG_CPU_FREQ
++#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
+ 
+ static int s3c2410wdt_cpufreq_transition(struct notifier_block *nb,
+ 					  unsigned long val, void *data)
+-- 
+1.8.4.1
