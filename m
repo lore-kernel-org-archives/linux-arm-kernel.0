@@ -1,23 +1,20 @@
-From: denis.ciocca@st.com (Denis CIOCCA)
-Date: Mon, 25 Nov 2013 09:37:26 +0100
-Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
- gyroscopes
-In-Reply-To: <52926901.9080004@kernel.org>
-References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
- <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
- <52926901.9080004@kernel.org>
-Message-ID: <52930C46.801@st.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon, 25 Nov 2013 09:39:05 +0100
+Subject: [PATCHv9][ 1/3] Input: tsc2007: Add device tree support.
+In-Reply-To: <20131119211102.GA14888@core.coreip.homeip.net>
+References: <1383916659-9988-1-git-send-email-denis@eukrea.com>
+ <20131119211102.GA14888@core.coreip.homeip.net>
+Message-ID: <52930CA9.4060606@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
->> Yes, it is, but only for i2c as far as I'm aware, and usually the DT compatibles are with - as a separator (I
->> looked into the ePAPR, but couldn't get any explanations or requirements on this, even though it's used in all of
->> their examples)
-> In other discussions, where the defacto i2c device tree bindings have
-> been followed, the conclusion has been that to change to a - from _
-> would result in userspace ABI changes, so whilst no one wants _
-> the discussion has concluded we can't really avoid it.
-Ok, I understood the point. Thanks,
+On 11/19/2013 10:11 PM, Dmitry Torokhov wrote:
+ > Input: tsc2007 misc fixes
+ >
+ > From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+ >
+ > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Denis
+Tested-by: Denis Carikli <denis@eukrea.com>
+
+Denis.
