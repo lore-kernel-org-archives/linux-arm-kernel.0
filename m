@@ -1,61 +1,40 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 25 Nov 2013 15:36:36 -0700
-Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in p2v
- and v2p conversions'
-Message-ID: <20131125223636.GA20822@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 15:36:41 -0700
+Subject: [PATCH 1/3] ARM: tegra: fix DEBUG_LL combined with LPAE
+Message-ID: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Santosh,
+From: Stephen Warren <swarren@nvidia.com>
 
-Testing v3.13-rc1 I see build breakage from this patch:
+The DEBUG_LL UART address is mapped as an MMU section, hence, the
+virtual address must be section-aligned. Sections are 1MB without LPAE
+and 2MB with LPAE. Tegra's virtual address was only aligned to 1MB, and
+hence the mapping was set up incorrectly with LPAE enabled, thus causing
+a hang early during boot. Fix this by picking a different virtual address
+that is aligned to 2MB.
 
-commit ca5a45c06cd4764fb8510740f7fc550d9a0208d4
-Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date:   Wed Jul 31 12:44:41 2013 -0400
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/include/debug/tegra.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-    ARM: mm: use phys_addr_t appropriately in p2v and v2p conversions
-    
-    Fix remainder types used when converting back and forth between
-    physical and virtual addresses.
-    
-    Cc: Russell King <linux@arm.linux.org.uk>
-    
-    Acked-by: Nicolas Pitre <nico@linaro.org>
-    Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-
-In file included from /scratchl/jgg/3.13/linux/arch/arm/include/asm/page.h:163:0,
-                 from /scratchl/jgg/3.13/linux/include/linux/mm_types.h:16,
-                 from /scratchl/jgg/3.13/linux/include/linux/sched.h:24,
-                 from /scratchl/jgg/3.13/linux/arch/arm/kernel/asm-offsets.c:13:
-/scratchl/jgg/3.13/linux/arch/arm/include/asm/memory.h: In function '__virt_to_phys':
-/scratchl/jgg/3.13/linux/arch/arm/include/asm/memory.h:244:40: error: 'PHYS_OFFSET' undeclared (first use in this function)
-/scratchl/jgg/3.13/linux/arch/arm/include/asm/memory.h:244:40: note: each undeclared identifier is reported only once for each function it appears in
-/scratchl/jgg/3.13/linux/arch/arm/include/asm/memory.h: In function '__phys_to_virt':
-/scratchl/jgg/3.13/linux/arch/arm/include/asm/memory.h:249:13: error: 'PHYS_OFFSET' undeclared (first use in this function)
-
-My config doesn't set CONFIG_ARM_PATCH_PHYS_VIRT, which means
-PHYS_OFFSET is not defined at this point:
-
-static inline phys_addr_t __virt_to_phys(unsigned long x)
-{
-        return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-}
-
-The definition my config uses follows this path:
-
-#ifndef PHYS_OFFSET
-#ifdef PLAT_PHYS_OFFSET
-#define PHYS_OFFSET     PLAT_PHYS_OFFSET
-#else
-#define PHYS_OFFSET     UL(CONFIG_PHYS_OFFSET)
-#endif
-#endif
-
-Which is after your new inlines..
-
-An elegant fix wasn't obvious to me :)
-
-Regards,
-Jason
+diff --git a/arch/arm/include/debug/tegra.S b/arch/arm/include/debug/tegra.S
+index be6a720dd183..a7b7cedef1a6 100644
+--- a/arch/arm/include/debug/tegra.S
++++ b/arch/arm/include/debug/tegra.S
+@@ -46,10 +46,10 @@
+ #define TEGRA_APB_MISC_GP_HIDREV	(TEGRA_APB_MISC_BASE + 0x804)
+ 
+ /*
+- * Must be 1MB-aligned since a 1MB mapping is used early on.
++ * Must be section-aligned since a section mapping is used early on.
+  * Must not overlap with regions in mach-tegra/io.c:tegra_io_desc[].
+  */
+-#define UART_VIRTUAL_BASE		0xfe100000
++#define UART_VIRTUAL_BASE		0xfe800000
+ 
+ #define checkuart(rp, rv, lhu, bit, uart) \
+ 		/* Load address of CLK_RST register */ \
+-- 
+1.8.1.5
