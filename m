@@ -1,59 +1,71 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 25 Nov 2013 15:28:43 +0000
-Subject: [PATCH v4] ARM: vexpress/TC2: Implement MCPM power_down_finish()
-In-Reply-To: <1384879457.3381.21.camel@linaro1.home>
-References: <20131108185613.GF2602@localhost.localdomain>
- <1384160080.4495.2.camel@hornet>
- <20131111134030.GA2391@e103592.cambridge.arm.com>
- <1384180911.4495.77.camel@hornet>
- <alpine.LFD.2.10.1311111134200.9667@knanqh.ubzr>
- <1384879457.3381.21.camel@linaro1.home>
-Message-ID: <20131125152837.GA2302@e103592.cambridge.arm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 25 Nov 2013 16:30:27 +0100
+Subject: [PATCH v2 00/11]: add remaining support for IGEP boards
+In-Reply-To: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CABxcv=k+Lk=PFONKLvXab5iHExG7WCJRfE6BzEkv_YtPVwB8Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 19, 2013 at 04:44:17PM +0000, Jon Medhurst (Tixy) wrote:
-> On Mon, 2013-11-11 at 11:35 -0500, Nicolas Pitre wrote:
-> > On Mon, 11 Nov 2013, Pawel Moll wrote:
-> > 
-> > > On Mon, 2013-11-11 at 13:40 +0000, Dave P Martin wrote:
-> > > > On Mon, Nov 11, 2013 at 08:54:40AM +0000, Pawel Moll wrote:
-> > > > > On Fri, 2013-11-08 at 18:56 +0000, Dave Martin wrote:
-> > > > > > Hi Pawel, did you manage to take a look at this?
-> > > > > > 
-> > > > > > I want to have something in place here, otherwise there's a nice WARN_ON
-> > > > > > to look forward to in 3.13 :)
-> > > > > > 
-> > > > > > I don't think I've seen a response from you so far?
-> > > > > 
-> > > > > On Fri, 2013-11-01 at 12:21 +0000, Pawel Moll wrote:
-> > > > > > PS. I actually had a look at the patches after you reminded me last week
-> > > > > > (two weeks ago? ;-)
-> > > > > 
-> > > > > Acked-by: Pawel Moll <pawel.moll@arm.com>
-> > > > 
-> > > > Thanks
-> > > > 
-> > > > What's the best way to send this upstream?
-> > > 
-> > > Through arm-soc, I believe. Generally Nico was pulling this stuff into
-> > > his PM branch (except for the one case of me helping out with the SPC).
-> > > 
-> > > Nevertheless I'm happy to queue it if you want me to.
-> > 
-> > Please do so as I've nothing queued on my side at the moment.
-> 
-> I notice that this isn't in linux-next, has it fallen through the
-> cracks? Its absence produces a rather ugly warning and backtrace on
-> TC2...
+On Wed, Nov 20, 2013 at 2:06 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> In order to make mach-omap2 Device Tree only, the board file for
+> IGEP boards was removed even when support for wifi and display
+> was still not supported by its DTS.
+>
+> This is a second version of a patch-set that adds support for
+> these remaining peripherals and also adds support for USB,
+> HDMI and user LED for the am33xx SoC based IGEP Aquila board.
+>
+> The patch-set is composed of the following patches:
+>
+> Enric Balletbo i Serra (7):
+>       ARM: dts: omap3-igep: Fix bus-width for mmc1.
+>       ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
+>       ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
+>       ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
+>       ARM: dts: AM33XX BASE0033: add pinmux and user led support.
+>       ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
+>       ARM: dts: AM33XX IGEP0033: add USB support.
+>
+> Javier Martinez Canillas (4):
+>       ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
+>       ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
+>       ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
+>       ARM: dts: omap3-igep0020: name twl4030 VPLL2 regulator as vdds_dsi
+>
+> Changes since v1:
+>
+>  Don't add a workaround in drivers/video/omap2/dss/dpi.c to use the
+>  VPLL2 regulator from twl4030 if VDDS_DSI regulator is not linked to
+>  the DPI device since the used regulator is a per board configuration.
+>
+>  Instead add a regulator-name = "vdds_dsi" property to the regulator
+>  in the IGEPv2 DTS file as suggested by Tony Lindgren.
+>
+> Tony,
+>
+> Most of these patches are just DTS changes so they have to be picked
+> by Benoit besides the following patch that has to go through your tree
+>
+> [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
+>
+> Since we have removed the board file for IGEP boards I think these
+> can be considered as regression fixes for 3.13 although I don't mind
+> if you prefer to wait for 3.14.
+>
+> Thanks a lot and best regards,
+> Javier
+> --
 
-There wasn't really agreement on this until the merge window opened, and
-it didn't seem worth bothering people during the deluge, since it's
-localised and pretty orthogonal.
+Hi Benoit and Tony,
 
-However, since TC2 is no longer technically compatible with MCPM and
-this shouldn't break anything else, I will see if I can justify it to
-arm-soc as a fix for 3.13, rather than waiting for the 3.14 cycle.
+Now that 3.13-rc1 is out, do you think that it would be possible to
+include this series as a fix for the -rc cycle?
 
-Cheers
----Dave
+Otherwise we will have missing functionality for IGEP boards on 3.13
+due the board file removal. The changes are mostly DT and won't affect
+other boards.
+
+Thanks a lot and best regards,
+Javier
