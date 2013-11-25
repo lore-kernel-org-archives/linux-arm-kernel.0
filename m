@@ -1,30 +1,22 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 25 Nov 2013 15:19:56 +0200
-Subject: [PATCH v2 0/6] Update Davinci watchdog driver
-In-Reply-To: <52934B6C.4060308@ti.com>
-References: <1384795139-19466-1-git-send-email-ivan.khoronzhuk@ti.com>
- <52934B6C.4060308@ti.com>
-Message-ID: <52934E7C.9040102@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 25 Nov 2013 15:20:21 +0200
+Subject: [PATCH 0/2] Tegra124 clock fixes
+Message-ID: <1385385623-8952-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 03:06 PM, Sekhar Nori wrote:
-> On Monday 18 November 2013 10:48 PM, Ivan Khoronzhuk wrote:
->> These patches are intended to update Davinci watchdog to use WDT core
->> and reuse driver for keystone arch, because Keystone uses the similar
->> IP like Davinci.
->
-> This series causes a regression on all DaVinci platforms because after
-> the series is applied the watchdog device does not get registered at
-> all. Since you changed the device name please include a patch to fix the
-> platform references too.
->
-> Thanks,
-> Sekhar
->
+A few fixes for Tegra124 clocks. These patches will be squashed into the pull
+request I will send out later today, but I wanted to post them here as well
+so the changes are known.
 
-Ok, I will replace
+Peter De Schrijver (2):
+  clk: tegra: fix vi clk for Terga124
+  clk: tegra: fix pllcx pdiv for Tegra124
+
+ drivers/clk/tegra/clk-id.h           |    1 +
+ drivers/clk/tegra/clk-tegra-periph.c |    8 ++++++++
+ drivers/clk/tegra/clk-tegra124.c     |    5 ++++-
+ 3 files changed, 13 insertions(+), 1 deletions(-)
 
 -- 
-Regards,
-Ivan Khoronzhuk
+1.7.7.rc0.72.g4b5ea.dirty
