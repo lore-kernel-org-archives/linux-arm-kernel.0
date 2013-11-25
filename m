@@ -1,115 +1,78 @@
-From: yi.li@linaro.org (Yi Li)
-Date: Tue, 26 Nov 2013 00:44:26 +0800
-Subject: [PATCH 3/3] ARM32:DMI: Add smbios/dmi support on arm32
-In-Reply-To: <1385397866-7524-1-git-send-email-yi.li@linaro.org>
-References: <1385397866-7524-1-git-send-email-yi.li@linaro.org>
-Message-ID: <1385397866-7524-4-git-send-email-yi.li@linaro.org>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 25 Nov 2013 17:48:54 +0100
+Subject: [RESEND PATCH v3 2/4] usb: musb: Bugfix of_node assignment
+In-Reply-To: <20131125161421.GH18046@saruman.home>
+References: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
+ <1384790078-15366-3-git-send-email-mpa@pengutronix.de>
+ <20131125161421.GH18046@saruman.home>
+Message-ID: <52937F76.107@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add smbios/dmi support on arm32 system, it depends on
-EFI boot.
+On 11/25/2013 05:14 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Mon, Nov 18, 2013 at 04:54:36PM +0100, Markus Pargmann wrote:
+>> It is not safe to assign the of_node to a device without driver.
+>> The device is matched against a list of drivers and the of_node
+>> could lead to a DT match with the parent driver.
+>> 
+>> Signed-off-by: Markus Pargmann <mpa@pengutronix.de> --- 
+>> drivers/usb/musb/musb_core.c | 12 +++++++++++- 
+>> drivers/usb/musb/musb_dsps.c |  1 - 2 files changed, 11
+>> insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/drivers/usb/musb/musb_core.c
+>> b/drivers/usb/musb/musb_core.c index 8b7d903..d5ad9db 100644 ---
+>> a/drivers/usb/musb/musb_core.c +++
+>> b/drivers/usb/musb/musb_core.c @@ -1966,6 +1966,7 @@ static int
+>> musb_probe(struct platform_device *pdev) int		irq =
+>> platform_get_irq_byname(pdev, "mc"); struct resource	*iomem; void
+>> __iomem	*base; +	int ret;
+>> 
+>> iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0); if
+>> (!iomem || irq <= 0) @@ -1975,7 +1976,16 @@ static int
+>> musb_probe(struct platform_device *pdev) if (IS_ERR(base)) return
+>> PTR_ERR(base);
+>> 
+>> -	return musb_init_controller(dev, irq, base); +	if
+>> (dev->parent)
 
-Signed-off-by: Yi Li <yi.li@linaro.org>
----
+don't we always have a parent?
 
-efi_lookup_mapped_addr() isn't able to translate the address range
-which is reported as reserved type from UEFI. Following the UEFI
-spec 2.4, it descripts the SMBIOS data should be runtime service
-type. So it depends on a UEFI patch to convert reserved type to 
-runtime service type for SMBIOS and a linux dmi driver patch that
-has been posted for review to x86 and ia64.
+>> +		dev->of_node = dev->parent->of_node; + +	ret =
+>> musb_init_controller(dev, irq, base); +	if (ret) { +
+>> dev->of_node = NULL; +		return ret; +	} + +	return 0; }
+>> 
+>> static int musb_remove(struct platform_device *pdev) diff --git
+>> a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c 
+>> index 82e1da0..7b36d32 100644 --- a/drivers/usb/musb/musb_dsps.c 
+>> +++ b/drivers/usb/musb/musb_dsps.c @@ -485,7 +485,6 @@ static int
+>> dsps_create_musb_pdev(struct dsps_glue *glue, musb->dev.parent		=
+>> dev; musb->dev.dma_mask		= &musb_dmamask; 
+>> musb->dev.coherent_dma_mask	= musb_dmamask; -	musb->dev.of_node
+>> = of_node_get(dn);
+> 
+> Sebastian, does this look correct to you ?
 
- arch/arm/Kconfig           |   13 +++++++++++++
- arch/arm/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c    |    2 ++
- 3 files changed, 43 insertions(+)
- create mode 100644 arch/arm/include/asm/dmi.h
+Is this fixing a bug? Commit 4fc4b2 ("usb: musb: dsps: do not bind to
+"musb-hdrc") [0] should fix the problem that is described here.
+ux500 is affected by the same problem as dsps but it is only visible on
+dsps because we DEFER probe for few reasons there test the fail path.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 11367a4..623c8c5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1910,6 +1910,17 @@ config EFI_STUB
- 	  executed directly by EFI firmware.
- 	  See Documentation/efi-stub.txt for more information.
- 
-+config DMI
-+	bool "Enable support for SMBIOS (DMI) tables"
-+	depends on EFI
-+	default y
-+	help
-+	  This enables SMBIOS/DMI feature for systems.
-+
-+	  This option is only useful on systems that have UEFI firmware.
-+	  However, even with this option, the resultant kernel should
-+	  continue to boot on existing non-UEFI platforms.
-+
- config SECCOMP
- 	bool
- 	prompt "Enable seccomp to safely compute untrusted bytecode"
-@@ -2348,6 +2359,8 @@ source "net/Kconfig"
- 
- source "drivers/Kconfig"
- 
-+source "drivers/firmware/Kconfig"
-+
- source "fs/Kconfig"
- 
- source "arch/arm/Kconfig.debug"
-diff --git a/arch/arm/include/asm/dmi.h b/arch/arm/include/asm/dmi.h
-new file mode 100644
-index 0000000..428f32e
---- /dev/null
-+++ b/arch/arm/include/asm/dmi.h
-@@ -0,0 +1,28 @@
-+/*
-+ * arch/arm/include/asm/dmi.h
-+ *
-+ * Copyright (C) 2013 Linaro Limited.
-+ * Written by: Yi Li (yi.li at linaro.org)
-+ *
-+ * based on arch/ia64/include/asm/dmi.h
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+
-+#ifndef _ASM_DMI_H
-+#define _ASM_DMI_H 1
-+
-+#include <linux/slab.h>
-+#include <asm/io.h>
-+
-+/* Use normal IO mappings for DMI */
-+#define dmi_early_remap(x, l)	efi_lookup_mapped_addr(x)
-+#define dmi_early_unmap(x, l)
-+#define dmi_remap(x, l)			efi_lookup_mapped_addr(x)
-+#define dmi_unmap(x)
-+#define dmi_alloc(l)			kzalloc(l, GFP_ATOMIC)
-+
-+#endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 0bde4e3..c9999ce 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -34,6 +34,7 @@
- #ifdef CONFIG_ACPI
- #include <linux/acpi.h>
- #endif
-+#include <linux/dmi.h>
- 
- #include <asm/unified.h>
- #include <asm/cp15.h>
-@@ -771,6 +772,7 @@ static int __init customize_machine(void)
- 		of_platform_populate(NULL, of_default_bus_match_table,
- 					NULL, NULL);
- #endif
-+	dmi_scan_machine();
- 	return 0;
- }
- arch_initcall(customize_machine);
--- 
-1.7.9.5
+So by just looking at it should fix the same problem as the change I
+cited _but_ it would also cover ux500. Currently I can't think of any
+side effects by assigning of_node if the musb_init_*() did not do it.
+If we take this in I would suggest to remove the check I added (because
+it does no longer serve any purpose) and the description (why we do
+this, what is the problem exactly) is could be taken from my patch
+since I think it is better described (it safe to assign a node to a
+driver, it becomes unsafe if after platform_probe _also_ the DT probe
+is executed which was not to designed to work like this).
+
+In the long term I would suggest to move the DT probe over to the musb
+core code and we wouldn't need the node assignment anymore?
+
+[0] http://www.spinics.net/lists/linux-usb/msg94701.html
+
+Sebastian
