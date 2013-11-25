@@ -1,58 +1,52 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 25 Nov 2013 11:47:34 +0100
-Subject: [PATCH v2] CMA: Fix the phys_addr_t print types
-In-Reply-To: <1385265384-30510-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1385265384-30510-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <52932AC6.4090203@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 25 Nov 2013 11:51:31 +0100
+Subject: [PATCH] ARM i.MX5: fix "shift" value for lp_apm_sel
+In-Reply-To: <1385375847.678349974@f369.i.mail.ru>
+References: <1385375474-15901-1-git-send-email-mkl@pengutronix.de>
+ <1385375847.678349974@f369.i.mail.ru>
+Message-ID: <52932BB3.8020009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 11/25/2013 11:37 AM, Alexander Shiyan wrote:
+>> According to the i.MX53 Rev. 2.1 datasheet the lp_apm_sel is bit 10 in the
+>> CCM_CCSR register not bit 9.
+>>
+>> This patch fixes this issue.
+>>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> ---
+>>  arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+>> index 3f01df2..867d623 100644
+>> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+>> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+>> @@ -98,7 +98,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>>  	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", rate_ckih1);
+>>  	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", rate_ckih2);
+>>  
+>> -	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
+>> +	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
+>>  						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+> 
+> This is not valid for i.MX51.
 
-On 2013-11-24 04:56, Santosh Shilimkar wrote:
-> Otherwise prints would truncate the variables on LPAE machines.
->
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Thanks yes, I'll take this into account.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Marc
 
-> ---
-> Dropped accidental change pr_debug to pr_info from last version.
->
->   drivers/base/dma-contiguous.c |    9 ++++-----
->   1 file changed, 4 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 165c2c2..b303a98 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -201,9 +201,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->   	phys_addr_t alignment;
->   	int ret = 0;
->   
-> -	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
-> -		 (unsigned long)size, (unsigned long)base,
-> -		 (unsigned long)limit);
-> +	pr_debug("%s(size %pa, base %pa, limit %pa)\n", __func__,
-> +		 &size, &base, &limit);
->   
->   	/* Sanity checks */
->   	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
-> @@ -250,8 +249,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->   	*res_cma = cma;
->   	cma_area_count++;
->   
-> -	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
-> -		(unsigned long)base);
-> +	pr_info("CMA: reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
-> +		&base);
->   
->   	/* Architecture specific contiguous memory fixup. */
->   	dma_contiguous_early_fixup(base, size);
-
-Best regards
 -- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/48761c4d/attachment.sig>
