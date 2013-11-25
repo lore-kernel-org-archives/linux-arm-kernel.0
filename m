@@ -1,43 +1,37 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Nov 2013 18:15:50 +0100
-Subject: [PATCH 1/2] can: flexcan: use correct clock as base for bit rate
- calculation
+Date: Mon, 25 Nov 2013 18:15:51 +0100
+Subject: [PATCH 2/2] ARM i.MX5: set CAN peripheral clock to 24 MHz parent
 In-Reply-To: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
 References: <1385399751-19109-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1385399751-19109-2-git-send-email-mkl@pengutronix.de>
+Message-ID: <1385399751-19109-3-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flexcan IP core uses the peripheral clock ("per") as basic clock for the
-bit timing calculation. However the driver uses the the wrong clock ("ipg").
-This leads to wrong bit rates if the rates on both clock are different.
+This patch sets the parent of CAN peripheral clock (a.k.a. CPI clock) to the
+lp_apm clock, which has a rate of 24 MHz.
 
-This patch fixes the problem by using the correct clock for the bit rate
-calculation.
+In the CAN world a base clock with multiple of 8 MHz is suited best for all CIA
+recommented bit rates. Without this patch the CAN peripheral clock on i.MX53
+has a rate of 66.666 MHz which produces quite large bit rate errors.
 
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- drivers/net/can/flexcan.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/clk-imx51-imx53.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index ae08cf1..aaed97b 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -1020,13 +1020,13 @@ static int flexcan_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev, "no ipg clock defined\n");
- 			return PTR_ERR(clk_ipg);
- 		}
--		clock_freq = clk_get_rate(clk_ipg);
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index e349fd5..28f7f3f 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -306,6 +306,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	/* move usb phy clk to 24MHz */
+ 	clk_set_parent(clk[IMX5_CLK_USB_PHY_SEL], clk[IMX5_CLK_OSC]);
  
- 		clk_per = devm_clk_get(&pdev->dev, "per");
- 		if (IS_ERR(clk_per)) {
- 			dev_err(&pdev->dev, "no per clock defined\n");
- 			return PTR_ERR(clk_per);
- 		}
-+		clock_freq = clk_get_rate(clk_per);
- 	}
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	/* move can bus clk to 24MHz */
++	clk_set_parent(clk[IMX5_CLK_CAN_SEL], clk[IMX5_CLK_LP_APM]);
++
+ 	clk_prepare_enable(clk[IMX5_CLK_GPC_DVFS]);
+ 	clk_prepare_enable(clk[IMX5_CLK_AHB_MAX]); /* esdhc3 */
+ 	clk_prepare_enable(clk[IMX5_CLK_AIPS_TZ1]);
 -- 
 1.8.4.2
