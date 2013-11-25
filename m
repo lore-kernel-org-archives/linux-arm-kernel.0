@@ -1,79 +1,43 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 25 Nov 2013 13:16:04 -0500
-Subject: [PATCH v3 6/9] usb: gadget: s3c-hsotg: get phy bus width from phy
- subsystem
+Date: Mon, 25 Nov 2013 13:16:03 -0500
+Subject: [PATCH v3 5/9] usb: gadget: s3c-hsotg: use generic
+ phy_init()/phy_exit() support
 In-Reply-To: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
 References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1385403367-18144-7-git-send-email-matt.porter@linaro.org>
+Message-ID: <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for querying the phy bus width from the generic phy
-subsystem. Configure UTMI bus width in GUSBCFG based on this value.
+If a generic phy is present, call phy_init()/phy_exit(). This supports
+generic phys that must be soft reset before power on.
 
 Signed-off-by: Matt Porter <matt.porter@linaro.org>
 ---
- drivers/usb/gadget/s3c-hsotg.c | 14 +++++++++++++-
- drivers/usb/gadget/s3c-hsotg.h |  1 +
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ drivers/usb/gadget/s3c-hsotg.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 8dfe33f..be41585 100644
+index da3879b..8dfe33f 100644
 --- a/drivers/usb/gadget/s3c-hsotg.c
 +++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -144,6 +144,7 @@ struct s3c_hsotg_ep {
-  * @regs: The memory area mapped for accessing registers.
-  * @irq: The IRQ number we are using
-  * @supplies: Definition of USB power supplies
-+ * @phyif: PHY interface width
-  * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
-  * @num_of_eps: Number of available EPs (excluding EP0)
-  * @debug_root: root directrory for debugfs.
-@@ -171,6 +172,7 @@ struct s3c_hsotg {
- 
- 	struct regulator_bulk_data supplies[ARRAY_SIZE(s3c_hsotg_supply_names)];
- 
-+	u32			phyif;
- 	unsigned int		dedicated_fifos:1;
- 	unsigned char           num_of_eps;
- 
-@@ -2276,7 +2278,7 @@ static void s3c_hsotg_core_init(struct s3c_hsotg *hsotg)
- 	 */
- 
- 	/* set the PLL on, remove the HNP/SRP and set the PHY */
--	writel(GUSBCFG_PHYIf16 | GUSBCFG_TOutCal(7) |
-+	writel(hsotg->phyif | GUSBCFG_TOutCal(7) |
- 	       (0x5 << 10), hsotg->regs + GUSBCFG);
- 
- 	s3c_hsotg_init_fifo(hsotg);
-@@ -3622,6 +3624,16 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+@@ -3622,6 +3622,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
  		goto err_supplies;
  	}
  
-+	/* Set default UTMI width */
-+	hsotg->phyif = GUSBCFG_PHYIf16;
++	if (hsotg->phy)
++		phy_init(hsotg->phy);
 +
-+	/*
-+	 * If using the generic PHY framework, check if the PHY bus
-+	 * width is 8-bit and set the phyif appropriately.
-+	 */
-+	if (hsotg->phy && (phy_get_bus_width(phy) == 8))
-+		hsotg->phyif = GUSBCFG_PHYIf8;
-+
- 	if (hsotg->phy)
- 		phy_init(hsotg->phy);
+ 	/* usb phy enable */
+ 	s3c_hsotg_phy_enable(hsotg);
  
-diff --git a/drivers/usb/gadget/s3c-hsotg.h b/drivers/usb/gadget/s3c-hsotg.h
-index d650b12..85f549f 100644
---- a/drivers/usb/gadget/s3c-hsotg.h
-+++ b/drivers/usb/gadget/s3c-hsotg.h
-@@ -55,6 +55,7 @@
- #define GUSBCFG_HNPCap				(1 << 9)
- #define GUSBCFG_SRPCap				(1 << 8)
- #define GUSBCFG_PHYIf16			(1 << 3)
-+#define GUSBCFG_PHYIf8				(0 << 3)
- #define GUSBCFG_TOutCal_MASK			(0x7 << 0)
- #define GUSBCFG_TOutCal_SHIFT			(0)
- #define GUSBCFG_TOutCal_LIMIT			(0x7)
+@@ -3715,6 +3718,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
+ 	}
+ 
+ 	s3c_hsotg_phy_disable(hsotg);
++	if (hsotg->phy)
++		phy_exit(hsotg->phy);
+ 	clk_disable_unprepare(hsotg->clk);
+ 
+ 	return 0;
 -- 
 1.8.4
