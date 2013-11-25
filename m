@@ -1,43 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 25 Nov 2013 19:39:25 +0000
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-Message-ID: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 25 Nov 2013 12:41:17 -0700
+Subject: [PATCH 3/4] ARM: mvebu: NETGEAR ReadyNAS 104 .dts file cleanup
+In-Reply-To: <878uwg5b6e.fsf@natisbad.org>
+References: <cover.1385148929.git.arno@natisbad.org>
+ <bd899cfc2b0b3d22a7442d76b3901ca81ca86f11.1385148929.git.arno@natisbad.org>
+ <20131122213610.GC30358@obsidianresearch.com>
+ <878uwg5b6e.fsf@natisbad.org>
+Message-ID: <20131125194117.GA5413@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following commit:
+On Fri, Nov 22, 2013 at 11:22:33PM +0100, Arnaud Ebalard wrote:
 
-  54f8d501e842 dmaengine: remove DMA unmap from drivers
+> and also the fact that *in my case* the kernel does its job
+> auto-detecting the PHY, I now also wonder how the kernel can
+> use that info and what I get by adding the compatible string.
 
-removed the last caller to mv_desc_get_dest_addr(), creating the
-warning:
+I think the main rational was to document what chip the phy is to
+people who don't have the hardware...
 
-  drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
-  but not used [-Wunused-function]
+You probably shouldn't delay your patch on this issue, document the
+phy chip model in a comment?
 
-Remove it.
+Also, check if it is actually an S varient or not, they have the same
+phy-id.. ;)
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- drivers/dma/mv_xor.c | 6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 7807f0ef4e20..23bcc9158cbc 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -54,12 +54,6 @@ static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
- 	hw_desc->desc_command = (1 << 31);
- }
- 
--static u32 mv_desc_get_dest_addr(struct mv_xor_desc_slot *desc)
--{
--	struct mv_xor_desc *hw_desc = desc->hw_desc;
--	return hw_desc->phy_dest_addr;
--}
--
- static void mv_desc_set_byte_count(struct mv_xor_desc_slot *desc,
- 				   u32 byte_count)
- {
--- 
-1.8.4.4
+Jason
