@@ -1,142 +1,74 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 25 Nov 2013 11:13:55 -0500
-Subject: [PATCH v2 01/11] Add generic fixmap.h
-In-Reply-To: <1385396045-15852-1-git-send-email-msalter@redhat.com>
-References: <1385396045-15852-1-git-send-email-msalter@redhat.com>
-Message-ID: <1385396045-15852-2-git-send-email-msalter@redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 25 Nov 2013 10:14:21 -0600
+Subject: [RESEND PATCH v3 2/4] usb: musb: Bugfix of_node assignment
+In-Reply-To: <1384790078-15366-3-git-send-email-mpa@pengutronix.de>
+References: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
+ <1384790078-15366-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131125161421.GH18046@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many architectures provide an asm/fixmap.h which defines support for
-compile-time 'special' virtual mappings which need to be made before
-paging_init() has run. This support is also used for early ioremap
-on x86. Much of this support is identical across the architectures.
-This patch consolidates all of the common bits into asm-generic/fixmap.h
-which is intended to be included from arch/*/include/asm/fixmap.h.
+Hi,
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
-CC: linux-arch at vger.kernel.org
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-CC: Richard Kuo <rkuo@codeaurora.org>
-CC: linux-hexagon at vger.kernel.org
-CC: James Hogan <james.hogan@imgtec.com>
-CC: linux-metag at vger.kernel.org
-CC: Michal Simek <monstr@monstr.eu>
-CC: microblaze-uclinux at itee.uq.edu.au
-CC: linux-mips at linux-mips.org
-CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-CC: Paul Mackerras <paulus@samba.org>
-CC: linuxppc-dev at lists.ozlabs.org
----
- include/asm-generic/fixmap.h | 97 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
- create mode 100644 include/asm-generic/fixmap.h
+On Mon, Nov 18, 2013 at 04:54:36PM +0100, Markus Pargmann wrote:
+> It is not safe to assign the of_node to a device without driver. The
+> device is matched against a list of drivers and the of_node could lead
+> to a DT match with the parent driver.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/usb/musb/musb_core.c | 12 +++++++++++-
+>  drivers/usb/musb/musb_dsps.c |  1 -
+>  2 files changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+> index 8b7d903..d5ad9db 100644
+> --- a/drivers/usb/musb/musb_core.c
+> +++ b/drivers/usb/musb/musb_core.c
+> @@ -1966,6 +1966,7 @@ static int musb_probe(struct platform_device *pdev)
+>  	int		irq = platform_get_irq_byname(pdev, "mc");
+>  	struct resource	*iomem;
+>  	void __iomem	*base;
+> +	int ret;
+>  
+>  	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!iomem || irq <= 0)
+> @@ -1975,7 +1976,16 @@ static int musb_probe(struct platform_device *pdev)
+>  	if (IS_ERR(base))
+>  		return PTR_ERR(base);
+>  
+> -	return musb_init_controller(dev, irq, base);
+> +	if (dev->parent)
+> +		dev->of_node = dev->parent->of_node;
+> +
+> +	ret = musb_init_controller(dev, irq, base);
+> +	if (ret) {
+> +		dev->of_node = NULL;
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+>  }
+>  
+>  static int musb_remove(struct platform_device *pdev)
+> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+> index 82e1da0..7b36d32 100644
+> --- a/drivers/usb/musb/musb_dsps.c
+> +++ b/drivers/usb/musb/musb_dsps.c
+> @@ -485,7 +485,6 @@ static int dsps_create_musb_pdev(struct dsps_glue *glue,
+>  	musb->dev.parent		= dev;
+>  	musb->dev.dma_mask		= &musb_dmamask;
+>  	musb->dev.coherent_dma_mask	= musb_dmamask;
+> -	musb->dev.of_node		= of_node_get(dn);
 
-diff --git a/include/asm-generic/fixmap.h b/include/asm-generic/fixmap.h
-new file mode 100644
-index 0000000..5a64ca4
---- /dev/null
-+++ b/include/asm-generic/fixmap.h
-@@ -0,0 +1,97 @@
-+/*
-+ * fixmap.h: compile-time virtual memory allocation
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ *
-+ * Copyright (C) 1998 Ingo Molnar
-+ *
-+ * Support of BIGMEM added by Gerhard Wichert, Siemens AG, July 1999
-+ * x86_32 and x86_64 integration by Gustavo F. Padovan, February 2009
-+ * Break out common bits to asm-generic by Mark Salter, November 2013
-+ */
-+
-+#ifndef __ASM_GENERIC_FIXMAP_H
-+#define __ASM_GENERIC_FIXMAP_H
-+
-+#include <linux/bug.h>
-+
-+#define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))
-+#define __virt_to_fix(x)	((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
-+
-+#ifndef __ASSEMBLY__
-+/*
-+ * 'index to address' translation. If anyone tries to use the idx
-+ * directly without translation, we catch the bug with a NULL-deference
-+ * kernel oops. Illegal ranges of incoming indices are caught too.
-+ */
-+static __always_inline unsigned long fix_to_virt(const unsigned int idx)
-+{
-+	BUILD_BUG_ON(idx >= __end_of_fixed_addresses);
-+	return __fix_to_virt(idx);
-+}
-+
-+static inline unsigned long virt_to_fix(const unsigned long vaddr)
-+{
-+	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
-+	return __virt_to_fix(vaddr);
-+}
-+
-+/*
-+ * Provide some reasonable defaults for page flags.
-+ * Not all architectures use all of these different types and some
-+ * architectures use different names.
-+ */
-+#ifndef FIXMAP_PAGE_NORMAL
-+#define FIXMAP_PAGE_NORMAL PAGE_KERNEL
-+#endif
-+#ifndef FIXMAP_PAGE_NOCACHE
-+#define FIXMAP_PAGE_NOCACHE PAGE_KERNEL_NOCACHE
-+#endif
-+#ifndef FIXMAP_PAGE_IO
-+#define FIXMAP_PAGE_IO PAGE_KERNEL_IO
-+#endif
-+#ifndef FIXMAP_PAGE_CLEAR
-+#define FIXMAP_PAGE_CLEAR __pgprot(0)
-+#endif
-+
-+#ifndef set_fixmap
-+#define set_fixmap(idx, phys)				\
-+	__set_fixmap(idx, phys, FIXMAP_PAGE_NORMAL)
-+#endif
-+
-+#ifndef clear_fixmap
-+#define clear_fixmap(idx)			\
-+	__set_fixmap(idx, 0, FIXMAP_PAGE_CLEAR)
-+#endif
-+
-+/* Return a pointer with offset calculated */
-+#define __set_fixmap_offset(idx, phys, flags)		      \
-+({							      \
-+	unsigned long addr;				      \
-+	__set_fixmap(idx, phys, flags);			      \
-+	addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
-+	addr;						      \
-+})
-+
-+#define set_fixmap_offset(idx, phys) \
-+	__set_fixmap_offset(idx, phys, FIXMAP_PAGE_NORMAL)
-+
-+/*
-+ * Some hardware wants to get fixmapped without caching.
-+ */
-+#define set_fixmap_nocache(idx, phys) \
-+	__set_fixmap(idx, phys, FIXMAP_PAGE_NOCACHE)
-+
-+#define set_fixmap_offset_nocache(idx, phys) \
-+	__set_fixmap_offset(idx, phys, FIXMAP_PAGE_NOCACHE)
-+
-+/*
-+ * Some fixmaps are for IO
-+ */
-+#define set_fixmap_io(idx, phys) \
-+	__set_fixmap(idx, phys, FIXMAP_PAGE_IO)
-+
-+#endif /* __ASSEMBLY__ */
-+#endif /* __ASM_GENERIC_FIXMAP_H */
+Sebastian, does this look correct to you ?
+
 -- 
-1.8.3.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/02ca2fd7/attachment.sig>
