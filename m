@@ -1,80 +1,196 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 25 Nov 2013 13:02:56 -0700
-Subject: PCI: mvebu: return NULL instead of ERR_PTR(ret)
-In-Reply-To: <001001ceb816$5d1aecc0$1750c640$%han@samsung.com>
-Message-ID: <20131125200256.GA7316@obsidianresearch.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Nov 2013 12:11:42 -0800
+Subject: [PATCH] ARM: dts: Fix omap serial wake-up when booted with device tree
+Message-ID: <20131125201142.GT10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 23, 2013 at 10:00:33PM -0500, Jason Cooper wrote:
-> And a small addendum: I currently have the following in mvebu/drivers
->   058100a08be8 PCI: mvebu: return NULL instead of ERR_PTR(ret)
+We've had deeper idle states working on omaps for few years now,
+but only in the legacy mode. When booted with device tree, the
+wake-up events did not have a chance to work until commit
+3e6cee1786a1 (pinctrl: single: Add support for wake-up interrupts)
+that recently got merged. In addition to that we also needed commit
+79d9701559a9 (of/irq: create interrupts-extended property) that's
+now also merged.
 
-Folks, I took a quick look at this, and it looks suspicious (sorry, I
-can't seem to find the thread to followup post)
+So let's fix the wake-up events for some selected omaps so devices
+booted in device tree mode won't just hang if deeper power states
+are enabled, and so systems can wake up from suspend to the serial
+port event.
 
->    PCI: mvebu: return NULL instead of ERR_PTR(ret)
->    
->    Return NULL instead of ERR_PTR(ret) in order to fix the following
->    sparse warning:
->    
->    drivers/pci/host/pci-mvebu.c:744:31: warning: incorrect type in return expression (different address
->    spaces)
->    drivers/pci/host/pci-mvebu.c:744:31:    expected void [noderef] <asn:2>*
->    drivers/pci/host/pci-mvebu.c:744:31:    got void *
->    
->    Signed-off-by: Jingoo Han <jg1.han@samsung.com>
->    Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
->
->--- a/drivers/pci/host/pci-mvebu.c
->+++ b/drivers/pci/host/pci-mvebu.c
->@@ -740,7 +740,7 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-> 
->        ret = of_address_to_resource(np, 0, &regs);
->        if (ret)
->-               return ERR_PTR(ret);
->+               return NULL;
-> 
->        return devm_ioremap_resource(&pdev->dev, &regs);
+Note that there's no longer need to specify the wake-up bit in
+the pinctrl settings, the request_irq on the wake-up pin takes
+care of that.
 
-So we drop the ERR_PTR for that return but 'devm_ioremap_resource'
-returns ERR_PTR too:
+Cc: devicetree at vger.kernel.org
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-/**
- * devm_ioremap_resource() - check, request region, and ioremap resource
- * @dev: generic device to handle the resource for
- * @res: resource to be handled
- *
- * Checks that a resource is a valid memory region, requests the memory region
- * and ioremaps it either as cacheable or as non-cacheable memory depending on
- * the resource's flags. All operations are managed and will be undone on
- * driver detach.
- *
- * Returns a pointer to the remapped memory or an ERR_PTR() encoded error code
- * on failure. Usage example:
- *
- *      res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- *      base = devm_ioremap_resource(&pdev->dev, res);
- *      if (IS_ERR(base))
- *              return PTR_ERR(base);
+---
 
-So this is clearly wrong:
+FYI, this depends on the device resource populating patch posted in
+thread "[PATCH] of/platform: Fix no irq domain found errors when
+populating interrupts" to avoid intoducing nasty warnings.
+
+--- a/arch/arm/boot/dts/omap3-evm-37xx.dts
++++ b/arch/arm/boot/dts/omap3-evm-37xx.dts
+@@ -89,7 +89,16 @@
+ 	status = "disabled";
+ };
  
-> 		port->base = mvebu_pcie_map_registers(pdev, child, port);
->-		if (IS_ERR(port->base)) {
->+		if (!port->base) {
-> 			dev_err(&pdev->dev,
-
-NAK I guess?
-
-This looks like a sparse problem, doesn't it complain for
-devm_ioremap_resource too?
-
-void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
-{
-[..]
-                return ERR_PTR(-EBUSY);
-
-Regards,
-Jason
++&uart1 {
++	interrupts-extended = <&intc 72 &omap3_pmx_core OMAP3_UART1_RX>;
++};
++
++&uart2 {
++	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
++};
++
+ &uart3 {
++	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -495,11 +495,13 @@
+ };
+ 
+ &uart2 {
++	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart2_pins>;
+ };
+ 
+ &uart3 {
++	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -207,7 +207,7 @@
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap3-uart";
+ 			reg = <0x4806a000 0x2000>;
+-			interrupts = <72>;
++			interrupts-extended = <&intc 72>;
+ 			dmas = <&sdma 49 &sdma 50>;
+ 			dma-names = "tx", "rx";
+ 			ti,hwmods = "uart1";
+@@ -217,7 +217,7 @@
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap3-uart";
+ 			reg = <0x4806c000 0x400>;
+-			interrupts = <73>;
++			interrupts-extended = <&intc 73>;
+ 			dmas = <&sdma 51 &sdma 52>;
+ 			dma-names = "tx", "rx";
+ 			ti,hwmods = "uart2";
+@@ -227,7 +227,7 @@
+ 		uart3: serial at 49020000 {
+ 			compatible = "ti,omap3-uart";
+ 			reg = <0x49020000 0x400>;
+-			interrupts = <74>;
++			interrupts-extended = <&intc 74>;
+ 			dmas = <&sdma 53 &sdma 54>;
+ 			dma-names = "tx", "rx";
+ 			ti,hwmods = "uart3";
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -396,6 +396,21 @@
+ 	usb-supply = <&vusb>;
+ };
+ 
++&uart2 {
++	interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART2_RX>;
++};
++
++&uart3 {
++	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART3_RX>;
++};
++
++&uart4 {
++	interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART4_RX>;
++};
++
+ &usb_otg_hs {
+ 	interface-type = <1>;
+ 	mode = <3>;
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -523,16 +523,22 @@
+ };
+ 
+ &uart2 {
++	interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART2_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart2_pins>;
+ };
+ 
+ &uart3 {
++	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART3_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
+ 
+ &uart4 {
++	interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART4_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart4_pins>;
+ };
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -236,7 +236,7 @@
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806c000 0x100>;
+-			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -244,7 +244,7 @@
+ 		uart3: serial at 48020000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48020000 0x100>;
+-			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -252,7 +252,7 @@
+ 		uart4: serial at 4806e000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806e000 0x100>;
+-			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+ 		};
+--- a/include/dt-bindings/pinctrl/omap.h
++++ b/include/dt-bindings/pinctrl/omap.h
+@@ -49,5 +49,17 @@
+ #define PIN_OFF_INPUT_PULLDOWN	(OFF_EN | OFF_PULL_EN)
+ #define PIN_OFF_WAKEUPENABLE	WAKEUP_EN
+ 
++/*
++ * Define some commonly used pins configured by the boards.
++ * Note that some boards use alternative pins, so check
++ * the schematics before using these.
++ */
++#define OMAP3_UART1_RX		0x152
++#define OMAP3_UART2_RX		0x14a
++#define OMAP3_UART3_RX		0x16e
++#define OMAP4_UART2_RX		0xdc
++#define OMAP4_UART3_RX		0x104
++#define OMAP4_UART4_RX		0x11c
++
+ #endif
+ 
