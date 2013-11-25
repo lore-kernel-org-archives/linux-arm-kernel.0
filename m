@@ -1,37 +1,147 @@
 From: yi.li@linaro.org (Yi Li)
-Date: Tue, 26 Nov 2013 00:44:23 +0800
-Subject: [PATCH 0/3] *** Support SMBIOS/DMI on arm32/64 ***
-Message-ID: <1385397866-7524-1-git-send-email-yi.li@linaro.org>
+Date: Tue, 26 Nov 2013 00:44:24 +0800
+Subject: [PATCH 1/3] firmware/dmi_scan: generalize for use by other archs
+In-Reply-To: <1385397866-7524-1-git-send-email-yi.li@linaro.org>
+References: <1385397866-7524-1-git-send-email-yi.li@linaro.org>
+Message-ID: <1385397866-7524-2-git-send-email-yi.li@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patches support SMBIOS/DMI on arm system, it tested by dmidecode
-and lshw tools.
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The first patch is wrapping remap/unmap methond for general archs,
-and has been posted for review to x86 and ia64, waiting the ack.
-The last two patches depend on booting from UEFI and SMBIOS data 
-reported as Runtime Services Data type.
+This patch makes a couple of changes to the SMBIOS/DMI scanning
+code so it can be used on other archs (such as ARM and arm64):
+(a) wrap the calls to ioremap()/iounmap(), this allows the use of a
+    flavor of ioremap() more suitable for random unaligned access;
+(b) allow the non-EFI fallback probe into hardcoded physical address
+    0xF0000 to be disabled.
 
-Ard Biesheuvel (1):
-  firmware/dmi_scan: generalize for use by other archs
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Yi Li <yi.li@linaro.org>
+---
 
-Yi Li (2):
-  ARM64:DMI: Add smbios/dmi support on arm64
-  ARM32:DMI: Add smbios/dmi support on arm32
+Based on original patch from Ard, a minor point is fixed
+in checkpatch.pl.
 
- arch/arm/Kconfig             |   13 +++++++++++++
- arch/arm/include/asm/dmi.h   |   28 ++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c      |    2 ++
- arch/arm64/Kconfig           |   10 ++++++++++
- arch/arm64/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c    |    2 ++
- arch/ia64/include/asm/dmi.h  |   10 +++++++---
- arch/x86/include/asm/dmi.h   |    8 ++++++--
- drivers/firmware/dmi_scan.c  |   20 +++++++++++---------
- 9 files changed, 107 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm/include/asm/dmi.h
- create mode 100644 arch/arm64/include/asm/dmi.h
+ arch/ia64/include/asm/dmi.h |   10 +++++++---
+ arch/x86/include/asm/dmi.h  |    8 ++++++--
+ drivers/firmware/dmi_scan.c |   20 +++++++++++---------
+ 3 files changed, 24 insertions(+), 14 deletions(-)
 
+diff --git a/arch/ia64/include/asm/dmi.h b/arch/ia64/include/asm/dmi.h
+index 185d3d1..f644b98 100644
+--- a/arch/ia64/include/asm/dmi.h
++++ b/arch/ia64/include/asm/dmi.h
+@@ -5,8 +5,12 @@
+ #include <asm/io.h>
+ 
+ /* Use normal IO mappings for DMI */
+-#define dmi_ioremap ioremap
+-#define dmi_iounmap(x,l) iounmap(x)
+-#define dmi_alloc(l) kzalloc(l, GFP_ATOMIC)
++#define dmi_early_remap		ioremap
++#define dmi_early_unmap(x, l)	iounmap(x)
++#define dmi_remap		ioremap
++#define dmi_unmap		iounmap
++#define dmi_alloc(l)		kzalloc(l, GFP_ATOMIC)
++
++#define DMI_SCAN_MACHINE_NON_EFI_FALLBACK	1
+ 
+ #endif
+diff --git a/arch/x86/include/asm/dmi.h b/arch/x86/include/asm/dmi.h
+index fd8f9e2..bb2b572 100644
+--- a/arch/x86/include/asm/dmi.h
++++ b/arch/x86/include/asm/dmi.h
+@@ -13,7 +13,11 @@ static __always_inline __init void *dmi_alloc(unsigned len)
+ }
+ 
+ /* Use early IO mappings for DMI because it's initialized early */
+-#define dmi_ioremap early_ioremap
+-#define dmi_iounmap early_iounmap
++#define dmi_early_remap		early_ioremap
++#define dmi_early_unmap		early_iounmap
++#define dmi_remap		ioremap
++#define dmi_unmap		iounmap
++
++#define DMI_SCAN_MACHINE_NON_EFI_FALLBACK	1
+ 
+ #endif /* _ASM_X86_DMI_H */
+diff --git a/drivers/firmware/dmi_scan.c b/drivers/firmware/dmi_scan.c
+index fa0affb..2c7c793 100644
+--- a/drivers/firmware/dmi_scan.c
++++ b/drivers/firmware/dmi_scan.c
+@@ -108,7 +108,7 @@ static int __init dmi_walk_early(void (*decode)(const struct dmi_header *,
+ {
+ 	u8 *buf;
+ 
+-	buf = dmi_ioremap(dmi_base, dmi_len);
++	buf = dmi_early_remap(dmi_base, dmi_len);
+ 	if (buf == NULL)
+ 		return -1;
+ 
+@@ -116,7 +116,7 @@ static int __init dmi_walk_early(void (*decode)(const struct dmi_header *,
+ 
+ 	add_device_randomness(buf, dmi_len);
+ 
+-	dmi_iounmap(buf, dmi_len);
++	dmi_early_unmap(buf, dmi_len);
+ 	return 0;
+ }
+ 
+@@ -483,18 +483,19 @@ void __init dmi_scan_machine(void)
+ 		 * needed during early boot.  This also means we can
+ 		 * iounmap the space when we're done with it.
+ 		 */
+-		p = dmi_ioremap(efi.smbios, 32);
++		p = dmi_early_remap(efi.smbios, 32);
+ 		if (p == NULL)
+ 			goto error;
+ 		memcpy_fromio(buf, p, 32);
+-		dmi_iounmap(p, 32);
++		dmi_early_unmap(p, 32);
+ 
+ 		if (!dmi_present(buf)) {
+ 			dmi_available = 1;
+ 			goto out;
+ 		}
+ 	} else {
+-		p = dmi_ioremap(0xF0000, 0x10000);
++#ifdef DMI_SCAN_MACHINE_NON_EFI_FALLBACK
++		p = dmi_early_remap(0xF0000, 0x10000);
+ 		if (p == NULL)
+ 			goto error;
+ 
+@@ -510,12 +511,13 @@ void __init dmi_scan_machine(void)
+ 			memcpy_fromio(buf + 16, q, 16);
+ 			if (!dmi_present(buf)) {
+ 				dmi_available = 1;
+-				dmi_iounmap(p, 0x10000);
++				dmi_early_unmap(p, 0x10000);
+ 				goto out;
+ 			}
+ 			memcpy(buf, buf + 16, 16);
+ 		}
+-		dmi_iounmap(p, 0x10000);
++		dmi_early_unmap(p, 0x10000);
++#endif
+ 	}
+  error:
+ 	pr_info("DMI not present or invalid.\n");
+@@ -787,13 +789,13 @@ int dmi_walk(void (*decode)(const struct dmi_header *, void *),
+ 	if (!dmi_available)
+ 		return -1;
+ 
+-	buf = ioremap(dmi_base, dmi_len);
++	buf = dmi_remap(dmi_base, dmi_len);
+ 	if (buf == NULL)
+ 		return -1;
+ 
+ 	dmi_table(buf, dmi_len, dmi_num, decode, private_data);
+ 
+-	iounmap(buf);
++	dmi_unmap(buf);
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(dmi_walk);
 -- 
 1.7.9.5
