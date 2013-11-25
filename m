@@ -1,49 +1,106 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Nov 2013 15:06:57 -0600
-Subject: [PATCH 2/3] ARM: dts: keystone: Add usb devicetree bindings
-In-Reply-To: <5293BB6F.8070803@ti.com>
-References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
- <1385410581-12148-3-git-send-email-w-kwok2@ti.com>
- <20131125204232.GJ18046@saruman.home> <5293BB6F.8070803@ti.com>
-Message-ID: <20131125210657.GQ18046@saruman.home>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 25 Nov 2013 23:12:27 +0200
+Subject: ARM: v3.13-rc1: USB regression
+In-Reply-To: <20131125171853.GF25039@n2100.arm.linux.org.uk>
+References: <20131124222247.GC24645@blackmetal.musicnaut.iki.fi>
+ <20131124224359.GE25039@n2100.arm.linux.org.uk>
+ <20131125163302.GD24645@blackmetal.musicnaut.iki.fi>
+ <20131125171853.GF25039@n2100.arm.linux.org.uk>
+Message-ID: <20131125211227.GE24645@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 04:04:47PM -0500, Santosh Shilimkar wrote:
-> On Monday 25 November 2013 03:42 PM, Felipe Balbi wrote:
+Hi,
+
+On Mon, Nov 25, 2013 at 05:18:53PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 25, 2013 at 06:33:02PM +0200, Aaro Koskinen wrote:
 > > Hi,
 > > 
-> > On Mon, Nov 25, 2013 at 03:16:20PM -0500, WingMan Kwok wrote:
-> >> Added device tree support for TI's Keystone USB driver and updated the
-> >> Documentation with device tree binding information.
-> >>
-> >> On Keystone II platforms, we use no-op phy driver.
-> >>
-> >> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> >> ---
-> 
-> [...]
-> 
-> > BTW, some preliminary TRM coming my way would be cool, so I can better
-> > understand how this HW behaves. A board would also go a long way, so I
-> > could test this myself (we are part of the same company anyway).
+> > On Sun, Nov 24, 2013 at 10:43:59PM +0000, Russell King - ARM Linux wrote:
+> > > On Mon, Nov 25, 2013 at 12:22:47AM +0200, Aaro Koskinen wrote:
+> > > > [   33.967324] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
+> > > > 
+> > > > I bisected this to 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 (ARM: DMA-API:
+> > > > better handing of DMA masks for coherent allocations). Reverting that
+> > > > commit makes the USB work again fine.
 > > 
-> TRM documentation is bit different. There is no single TRM which has all
-> the information but different chapters called user guides. For Keystone
-> USB, the user guide isn't ready yet but there is an internal version for
-> which we will send you a link. 
+> > [...]
+> > 
+> > > Better would be:
+> > > 
+> > > #define __arch_dma_to_pfn(dev, addr)	\
+> > > 	({ unsigned long pfn = (addr) >> PAGE_SHIFT;		\
+> > > 	   if (is_lbus_device(dev))				\
+> > > 		pfn += PHYS_PFN_OFFSET - 			\
+> > > 			(OMAP1510_LB_OFFSET >> PAGE_SHIFT);	\
+> > > 	   pfn;							\
+> > > 	})
+> > > 
+> > > Can you try that in arch/arm/mach-omap1/include/mach/memory.h please?
+> > 
+> > Still doesn't work:
+> > 
+> > [   33.878790] ohci ohci: Coherent DMA mask 0xffffffff (pfn 0xfffe0000-0xe0000) covers a smaller range of system memory than the DMA zone pfn 0x0-0x100000
+> > [   33.894019] ohci ohci: can't setup: -12
 > 
-> Boards are hard to get for now but we can see next year.
+> Well, that looks technically better, rather unfortunate that we end up
+> going to negative PFNs though.
+> 
+> Without that change, could you try this instead please:
 
-fair enough, documentation already helps a lot though.
+This works, thanks.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/8c245baf/attachment.sig>
+A.
+
+>  arch/arm/mm/dma-mapping.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index f0ea0134e5a3..a18cfc53f445 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -9,6 +9,7 @@
+>   *
+>   *  DMA uncached mapping support.
+>   */
+> +#include <linux/bootmem.h>
+>  #include <linux/module.h>
+>  #include <linux/mm.h>
+>  #include <linux/gfp.h>
+> @@ -162,6 +163,8 @@ static u64 get_coherent_dma_mask(struct device *dev)
+>  	u64 mask = (u64)DMA_BIT_MASK(32);
+>  
+>  	if (dev) {
+> +		unsigned long max_dma_pfn;
+> +
+>  		mask = dev->coherent_dma_mask;
+>  
+>  		/*
+> @@ -173,6 +176,8 @@ static u64 get_coherent_dma_mask(struct device *dev)
+>  			return 0;
+>  		}
+>  
+> +		max_dma_pfn = min(max_pfn, arm_dma_pfn_limit);
+> +
+>  		/*
+>  		 * If the mask allows for more memory than we can address,
+>  		 * and we actually have that much memory, then fail the
+> @@ -180,7 +185,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
+>  		 */
+>  		if (sizeof(mask) != sizeof(dma_addr_t) &&
+>  		    mask > (dma_addr_t)~0 &&
+> -		    dma_to_pfn(dev, ~0) > arm_dma_pfn_limit) {
+> +		    dma_to_pfn(dev, ~0) > max_dma_pfn) {
+>  			dev_warn(dev, "Coherent DMA mask %#llx is larger than dma_addr_t allows\n",
+>  				 mask);
+>  			dev_warn(dev, "Driver did not use or check the return value from dma_set_coherent_mask()?\n");
+> @@ -192,7 +197,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
+>  		 * fits within the allowable addresses which we can
+>  		 * allocate.
+>  		 */
+> -		if (dma_to_pfn(dev, mask) < arm_dma_pfn_limit) {
+> +		if (dma_to_pfn(dev, mask) < max_dma_pfn) {
+>  			dev_warn(dev, "Coherent DMA mask %#llx (pfn %#lx-%#lx) covers a smaller range of system memory than the DMA zone pfn 0x0-%#lx\n",
+>  				 mask,
+>  				 dma_to_pfn(dev, 0), dma_to_pfn(dev, mask) + 1,
+> 
