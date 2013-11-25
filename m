@@ -1,50 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Nov 2013 10:40:44 +0100
-Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
- gyroscopes
-In-Reply-To: <52926901.9080004@kernel.org>
-References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
- <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
- <52926901.9080004@kernel.org>
-Message-ID: <20131125094044.GE3176@lukather>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 25 Nov 2013 10:45:50 +0100
+Subject: [PATCH 2/8] ASoC: fsl-ssi: Move sysfs stats to debugfs
+In-Reply-To: <20131122183356.GQ14725@sirena.org.uk>
+References: <1384938262-20554-1-git-send-email-mpa@pengutronix.de>
+ <1384938262-20554-3-git-send-email-mpa@pengutronix.de>
+ <20131121142208.GU2674@sirena.org.uk>
+ <20131122164204.GB5893@pengutronix.de>
+ <20131122183356.GQ14725@sirena.org.uk>
+Message-ID: <20131125094550.GA29656@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Hi,
 
-On Sun, Nov 24, 2013 at 09:00:49PM +0000, Jonathan Cameron wrote:
-> -----BEGIN PGP SIGNED MESSAGE-----
-> Hash: SHA1
+On Fri, Nov 22, 2013 at 06:33:56PM +0000, Mark Brown wrote:
+> On Fri, Nov 22, 2013 at 05:42:04PM +0100, Markus Pargmann wrote:
+> > On Thu, Nov 21, 2013 at 02:22:08PM +0000, Mark Brown wrote:
+> > > On Wed, Nov 20, 2013 at 10:04:16AM +0100, Markus Pargmann wrote:
 > 
-> On 11/21/13 13:14, Maxime Ripard wrote:
-> > Hi Denis,
-> > 
-> > On Thu, Nov 21, 2013 at 12:41:24PM +0100, Denis CIOCCA wrote:
-> > > only one point: it's possible to use the same names with DT?
-> > > (using _ instead of -)
-> > 
-> > Yes, it is, but only for i2c as far as I'm aware, and usually the
-> > DT compatibles are with - as a separator (I looked into the ePAPR,
-> > but couldn't get any explanations or requirements on this, even
-> > though it's used in all of their examples)
+> > > > This patch moves the statistics to debugfs and disables interrupts
+> > > > completely if the kernel is build without DEBUG_FS enabled.
 > 
-> In other discussions, where the defacto i2c device tree bindings have
-> been followed, the conclusion has been that to change to a - from _
-> would result in userspace ABI changes, so whilst no one wants _
-> the discussion has concluded we can't really avoid it.
+> > > We can still see the error counts through /proc/interrupts even without
+> > > the debugfs file.
+> 
+> > The interrupts are visible without the debugfs file when enabled through
+> > SIER register. But it does not show the specific reason for the interrupts.
+> 
+> > I am not sure what you suggest. To remove the stats file completely and
+> > always disable interrupts?
+> 
+> No, I'm suggesting not disabling interrupts completely when debugfs is
+> disabled.  Since we can still see the interrupts happening even if
+> debugfs is not enabled we're still getting diagnostics.
 
-What kind of userspace ABI changes are we talking about?
+Okay, I will change it.
 
-Maxime
+Thanks,
+
+Markus
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/175727d9/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
