@@ -1,63 +1,37 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Nov 2013 18:03:57 +0100
-Subject: [PATCH v2] ARM i.MX5: fix "shift" value for lp_apm_sel on i.MX50 and
- i.MX53
-Message-ID: <1385399037-15487-1-git-send-email-mkl@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 25 Nov 2013 18:09:35 +0100
+Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
+ command bits
+In-Reply-To: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <20131125180935.37ee3222@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the i.MX50 Rev. 1 and i.MX53 Rev. 2.1 datasheet the lp_apm_sel is
-bit 10 in the CCM_CCSR register not bit 9. On the i.MX51 it's bit 9.
+Dear Jason Gunthorpe,
 
-This patch fixes this issue.
+On Thu, 31 Oct 2013 17:32:59 -0600, Jason Gunthorpe wrote:
+> When PCI_COMMAND_MEMORY/PCI_COMMAND_IO are cleared the bridge should not
+> allocate windows or even look at the window limit/base registers.
+> 
+> Otherwise it can attempt to setup bogus windows that the PCI core code
+> creates during discovery. The core will leave PCI_COMMAND_IO cleared if
+> it doesn't need an IO window.
+> 
+> Have mvebu_pcie_handle_*_change respect the bits, and call the change
+> function whenever the bits changes.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/pci/host/pci-mvebu.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
-changes since v1:
-* keep bit 9 on i.MX51 (tnx Alexander)
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
- arch/arm/mach-imx/clk-imx51-imx53.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 3f01df2..e349fd5 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -98,8 +98,6 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", rate_ckih1);
- 	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", rate_ckih2);
- 
--	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
--						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
- 	clk[IMX5_CLK_PERIPH_APM]	= imx_clk_mux("periph_apm", MXC_CCM_CBCMR, 12, 2,
- 						periph_apm_sel, ARRAY_SIZE(periph_apm_sel));
- 	clk[IMX5_CLK_MAIN_BUS]		= imx_clk_mux("main_bus", MXC_CCM_CBCDR, 25, 1,
-@@ -334,6 +332,8 @@ static void __init mx50_clocks_init(struct device_node *np)
- 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
- 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
- 
-+	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
-+						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
- 	clk[IMX5_CLK_ESDHC1_PER_GATE]	= imx_clk_gate2("esdhc1_per_gate", "esdhc_a_podf", MXC_CCM_CCGR3, 2);
- 	clk[IMX5_CLK_ESDHC2_PER_GATE]	= imx_clk_gate2("esdhc2_per_gate", "esdhc_c_sel", MXC_CCM_CCGR3, 6);
- 	clk[IMX5_CLK_ESDHC3_PER_GATE]	= imx_clk_gate2("esdhc3_per_gate", "esdhc_b_podf", MXC_CCM_CCGR3, 10);
-@@ -392,6 +392,8 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX51_DPLL1_BASE);
- 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX51_DPLL2_BASE);
- 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX51_DPLL3_BASE);
-+	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
-+						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
- 	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
- 						mx51_ipu_di0_sel, ARRAY_SIZE(mx51_ipu_di0_sel));
- 	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
-@@ -501,6 +503,8 @@ static void __init mx53_clocks_init(struct device_node *np)
- 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
- 	clk[IMX5_CLK_PLL4_SW]		= imx_clk_pllv2("pll4_sw", "osc", MX53_DPLL4_BASE);
- 
-+	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
-+						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
- 	clk[IMX5_CLK_LDB_DI1_DIV_3_5]	= imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1_sel", 2, 7);
- 	clk[IMX5_CLK_LDB_DI1_DIV]	= imx_clk_divider_flags("ldb_di1_div", "ldb_di1_div_3_5", MXC_CCM_CSCMR2, 11, 1, 0);
- 	clk[IMX5_CLK_LDB_DI1_SEL]	= imx_clk_mux_flags("ldb_di1_sel", MXC_CCM_CSCMR2, 9, 1,
+Thomas
 -- 
-1.8.4.2
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
