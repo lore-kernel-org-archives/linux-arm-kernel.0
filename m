@@ -1,40 +1,52 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 26 Nov 2013 08:26:43 +0900
-Subject: [PATCH] ARM: dts: Add max77686 RTC interrupt to cros5250-common
-In-Reply-To: <CAOesGMhfioBLMgmFi7EHrkVys_96KKzBcLp0C8sdLaRs5FMJBw@mail.gmail.com>
-References: <1382533861-12688-1-git-send-email-dianders@chromium.org>
- <CAD=FV=VHLHL-VxUr_G7CoBQ5UY8t1jbdTCwcGz9BYrR5C3cpAQ@mail.gmail.com>
- <CAOesGMhfioBLMgmFi7EHrkVys_96KKzBcLp0C8sdLaRs5FMJBw@mail.gmail.com>
-Message-ID: <1ad301ceea35$cd1eb0f0$675c12d0$@org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 26 Nov 2013 00:27:41 +0100
+Subject: [PATCH] watchdog: s3c2410_wdt: Only register for cpufreq on
+ CPU_FREQ_S3C24XX
+In-Reply-To: <5293DBEF.3010401@roeck-us.net>
+References: <1385420137-32725-1-git-send-email-dianders@chromium.org>
+ <5293DBEF.3010401@roeck-us.net>
+Message-ID: <1832773.UG2ItueiDl@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Mon, Nov 25, 2013 at 3:11 PM, Doug Anderson <dianders@chromium.org>
-> wrote:
-> > Olof or Kukjin,
+On Monday 25 of November 2013 15:23:27 Guenter Roeck wrote:
+> On 11/25/2013 02:55 PM, Doug Anderson wrote:
+> > On modern SoCs the watchdog timer is parented on a clock that doesn't
+> > change every time we have a cpufreq change.  That means we don't need
+> > to constantly adjust the watchdog timer, so avoid registering for and
+> > dealing with cpufreq transitions unless we've actually got
+> > CPU_FREQ_S3C24XX defined.
 > >
-> > On Wed, Oct 23, 2013 at 6:11 AM, Doug Anderson <dianders@chromium.org>
-> wrote:
-> >> Without the interrupt you'll get problems if you enable
-> >> CONFIG_RTC_DRV_MAX77686.  Setup the interrupt properly in the device
-> >> tree.
-> >>
-> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> >> ---
-> >>  arch/arm/boot/dts/cros5250-common.dtsi | 12 ++++++++++++
-> >>  1 file changed, 12 insertions(+)
+> > Note that this is more than just an optimization.  The s3c2410
+> > watchdog driver actually pats the watchdog on every CPU frequency
+> > change.  On modern systems these happen many times per second (even in
+> > a system where "nothing" is happening).  That effectively makes any
+> > userspace watchdog program useless (the watchdog is constantly patted
+> > by the kernel).  If we need CPU_FREQ_S3C24XX defined on a
+> > multiplatform kernel we'll need to make sure that kernel supports
+> > common clock and change this to user common clock framework.
 > >
-> > Would one of you be interested in applying this to your tree, with
-> > Marc's "Tested-by"?  I know there are lots more things to fixup in the
-> > dts, but this is one that I know works.  ;)
-> 
-> Yes, I'll apply this to fixes for 3.13, and mark it for stable 3.12 at
-> least.
-> 
-Olof, thanks.
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > ---
+> >   drivers/watchdog/s3c2410_wdt.c | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> > index 7d8fd04..4980f84 100644
+> > --- a/drivers/watchdog/s3c2410_wdt.c
+> > +++ b/drivers/watchdog/s3c2410_wdt.c
+> > @@ -264,7 +264,7 @@ static irqreturn_t s3c2410wdt_irq(int irqno, void *param)
+> >   	return IRQ_HANDLED;
+> >   }
+> >
+> > -#ifdef CONFIG_CPU_FREQ
+> > +#ifdef CONFIG_CPU_FREQ_S3C24XX
+> >
+> Where is the CPU_FREQ_S3C24XX configuration option defined ? I don't see it
+> in the current upstream kernel, so it appears that this depends on some
+> out-of-tree changes.
 
-Please add my ack on this if you want.
+Seems like it got renamed to ARM_S3C24XX_CPUFREQ by f023f8dd59.
 
-- Kukjin
+Best regards,
+Tomasz
