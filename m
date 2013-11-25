@@ -1,58 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 25 Nov 2013 15:53:25 +0400
-Subject: [RFC 08/17] ARM: shmobile: r8a7779: Add helper to read mode pins
-In-Reply-To: <1385342312-1967-9-git-send-email-horms+renesas@verge.net.au>
-References: <1385342312-1967-1-git-send-email-horms+renesas@verge.net.au>
- <1385342312-1967-9-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <52933A35.7070206@cogentembedded.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 25 Nov 2013 17:26:20 +0530
+Subject: [PATCH 1/6] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <1384795139-19466-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1384795139-19466-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1384795139-19466-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52933AE4.3070608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Monday 18 November 2013 10:48 PM, Ivan Khoronzhuk wrote:
+> @@ -211,29 +129,34 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+>  
+>  	clk_prepare_enable(wdt_clk);
+>  
+> -	if (heartbeat < 1 || heartbeat > MAX_HEARTBEAT)
+> -		heartbeat = DEFAULT_HEARTBEAT;
+> +	wdd			= &wdt_wdd;
+> +	wdd->info		= &davinci_wdt_info;
+> +	wdd->ops		= &davinci_wdt_ops;
+> +	wdd->min_timeout 	= 1;
+> +	wdd->max_timeout 	= MAX_HEARTBEAT;
 
-On 25-11-2013 5:18, Simon Horman wrote:
+Some checkpatch warnings. Please fix.
 
-> Add and use helper to read mode pins.
-> This will be re-used when moving marzen-reference to
-> the common clock framework.
+WARNING: please, no space before tabs
+#273: FILE: drivers/watchdog/davinci_wdt.c:135:
++^Iwdd->min_timeout ^I= 1;$
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm/mach-shmobile/clock-r8a7779.c        | 11 ++---------
->   arch/arm/mach-shmobile/include/mach/r8a7779.h |  1 +
->   arch/arm/mach-shmobile/setup-r8a7779.c        | 14 ++++++++++++++
->   3 files changed, 17 insertions(+), 9 deletions(-)
+WARNING: please, no space before tabs
+#274: FILE: drivers/watchdog/davinci_wdt.c:136:
++^Iwdd->max_timeout ^I= MAX_HEARTBEAT;$
 
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-> index b7ce0e7..decf122 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-[...]
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-> index 8f94531..4e3fbfb 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> @@ -874,6 +874,20 @@ void __init r8a7779_add_standard_devices_dt(void)
->   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->   }
->
-> +#define MODEMR		0xffcc0020
-> +
-> +u32 __init r8a7779_read_mode_pins(void)
-> +{
-> +	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+total: 0 errors, 2 warnings, 0 checks, 249 lines checked
 
-    Why waste 2 4K pages if you're only interested in 4 bytes (i.e. 1 page)? I 
-remember I've already asked that question...
-
-> +	u32 mode;
-> +
-> +	BUG_ON(!modemr);
-> +	mode = ioread32(modemr);
-> +	iounmap(modemr);
-> +
-> +	return mode;
-> +}
-> +
-
-WBR, Sergei
+Thanks,
+sekhar
