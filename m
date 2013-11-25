@@ -1,62 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Nov 2013 19:09:36 +0000
-Subject: [PATCH 11/31] dma: add channel request API that supports
- deferred probe
-In-Reply-To: <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
-References: <528E4F55.9070204@wwwdotorg.org>
- <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
- <528F95A9.2050305@wwwdotorg.org>
- <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
- <528F9DF9.6080706@wwwdotorg.org>
- <20131123003442.GH16735@n2100.arm.linux.org.uk>
- <5293883A.8050808@wwwdotorg.org>
- <CAA9_cmfMtp4WjRGVzfTxrwcNWP95+HE7DAYg_GeWfqi=L2K2aw@mail.gmail.com>
- <20131125180000.GR16735@n2100.arm.linux.org.uk>
- <CAA9_cmcqO-=7Gf53ygG3oYwC0=fQgF8xPL2Wywgw84Dz1ZKs6g@mail.gmail.com>
-Message-ID: <20131125190935.GS16735@n2100.arm.linux.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 25 Nov 2013 20:19:05 +0100
+Subject: [PATCH] ASoC: kirkwood: Fix erroneous double output while playing
+Message-ID: <20131125201905.0d009921@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 10:42:52AM -0800, Dan Williams wrote:
-> On Mon, Nov 25, 2013 at 10:00 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Nov 25, 2013 at 09:45:18AM -0800, Dan Williams wrote:
-> >> Regardless of whether the driver was dma_request_channel as a
-> >> fallback, it will currently use NULL to indicate an allocation
-> >> failure.
-> >
-> > At the moment, dma_request_slave_channel()'s return values are valid
-> > pointer or NULL.  I'd suggest as that's how it's been established,
-> > that function is left alone - changing the return values in this kind
-> > of invisible way is Really Bad(tm) because you can't check that it's
-> > right in any future users - unless you're prepared to review every
-> > single new user of this function for the next few years or more.
-> >
-> > Instead, leaving it as is and introducing a new function name with
-> > the different return error method is the right way to do this.
-> 
-> I was attempting to tap the brakes on the number of request_channel
-> apis in circulation.
-> dma_request_channel
-> dma_request_slave_channel
-> dma_request_slave_channel_compat
-> ... and now dma_request_slave_channel_reason
-> 
-> ...but given we already have things like samsung_dmadev_request() in
-> the wild, tracking correct usage going forward will be an uphill
-> battle.  We can do this the other way round.  Introduce the new api
-> and delete the old one (after some time).
+This patch fixes the setting of the register KIRKWOOD_PLAYCTL which did
+always streaming on both I2S and SPDIF, ignoring the DAI ID.
 
-Yes, new and deprecate the old is the right way to do this.
+The bug was introduced by the commit 75b9b65ee5a
+ "ASoC: kirkwood: add S/PDIF support"
 
-> Can we make the new api not pass the 'defer' flag.  You mention it is
-> for compat reasons, but since there are no users I'm not seeing how
-> there can be compatibility concerns.  Can you elaborate?
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ sound/soc/kirkwood/kirkwood-i2s.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Yes, I agree.  I don't think there's a compatibility concern here - with
-the old interface, a non-present resource would be indicated as "does not
-exist".
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index d34d917..b27f826 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -244,15 +244,15 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
+ 				   ctl);
+ 	}
+ 
+-	if (dai->id == 0)
+-		ctl &= ~KIRKWOOD_PLAYCTL_SPDIF_EN;	/* i2s */
+-	else
+-		ctl &= ~KIRKWOOD_PLAYCTL_I2S_EN;	/* spdif */
+-
+ 	switch (cmd) {
+ 	case SNDRV_PCM_TRIGGER_START:
+ 		/* configure */
+ 		ctl = priv->ctl_play;
++		if (dai->id == 0)
++			ctl &= ~KIRKWOOD_PLAYCTL_SPDIF_EN;	/* i2s */
++		else
++			ctl &= ~KIRKWOOD_PLAYCTL_I2S_EN;	/* spdif */
++
+ 		value = ctl & ~KIRKWOOD_PLAYCTL_ENABLE_MASK;
+ 		writel(value, priv->io + KIRKWOOD_PLAYCTL);
+ 
 
-If we convert any error pointer including the one representing
--EPROBE_DEFER to the "does not exist" representation, we're not changing
-the behaviour.
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
