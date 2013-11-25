@@ -1,25 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Nov 2013 23:09:55 +0100
-Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
-In-Reply-To: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
-References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <2205346.2EJcydzRLA@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Nov 2013 14:11:11 -0800
+Subject: [PATCH 5/7] ARM: OMAP4: hwmod: add hwmod data for DES IP
+In-Reply-To: <1385415876-12387-6-git-send-email-joelf@ti.com>
+References: <1385415876-12387-1-git-send-email-joelf@ti.com>
+ <1385415876-12387-6-git-send-email-joelf@ti.com>
+Message-ID: <20131125221111.GU10023@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 November 2013 14:53:36 Stephen Warren wrote:
-> v2: Use of_dma_slave_xlate() rather than of_dma_simple_xlate(), as
->     suggested by Arnd Bergmann.
-> 
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
+* Joel Fernandes <joelf@ti.com> [131125 13:45]:
+> +
+> +static struct omap_hwmod_addr_space omap4_des_addrs[] = {
+> +	{
+> +		.pa_start	= 0x480A4000,
+> +		.pa_end		= 0x481A4000,
+> +		.flags		= ADDR_TYPE_RT
+> +	},
+> +	{ }
+> +};
 
-Did I suggest of_dma_slave_xlate()? I don't think I've actually heard
-of that function, and I can't find anything in the kernel source or
-using google.
+Let's not add new address space entries. The address
+space should be already coming from device tree.
 
-Why not just use an open-coded xlate function?
+Regards,
 
-	Arnd
+Tony
