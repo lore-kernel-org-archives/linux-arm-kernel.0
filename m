@@ -1,42 +1,48 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 26 Nov 2013 15:35:35 +0100
-Subject: [PATCH v2 1/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
-In-Reply-To: <20131126143258.GA5685@S2101-09.ap.freescale.net>
-References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
- <20131126045340.GJ30476@S2101-09.ap.freescale.net>
- <52945B40.5020200@pengutronix.de>
- <20131126143258.GA5685@S2101-09.ap.freescale.net>
-Message-ID: <5294B1B7.4030006@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Nov 2013 15:36:02 +0100
+Subject: [PATCH RFC v2 02/17] clk: shmobile: r8a7779: Add MSTP clock
+ support
+In-Reply-To: <1385451139-29686-3-git-send-email-horms+renesas@verge.net.au>
+References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
+ <1385451139-29686-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <4636149.Zfz60YsUpd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 03:33 PM, Shawn Guo wrote:
-> On Tue, Nov 26, 2013 at 09:26:40AM +0100, Marc Kleine-Budde wrote:
->> The problem is, that the wrong clock is being used. An all i.mx, but not
->> on imx6, both clocks are the same, the bug doesn't show up. So before we
->> can use the 24 MHz clock on mx53, we have to fix the driver.
+Hi Simon,
+
+Thank you for the patch.
+
+On Tuesday 26 November 2013 16:32:04 Simon Horman wrote:
+> Add MSTP clock support for the r8a7779 SoC
 > 
-> So it sounds like a more appropriate merging path would be that,
-> you send the driver fix right away to mainline via net tree with
-> v3.13-rc series, and I rebase IMX tree on the -rc that has the fix,
-> and then apply the DTS patch.
-                     ^^^
+> The only change required appears to be to note a new
+> compatibility string in the bindings.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt index
+> 126b17e..f0a4b83 100644
+> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> @@ -12,6 +12,7 @@ Required Properties:
+>    - compatible: Must be one of the following
+>      - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
+>      - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
+> +    - "renesas,r8a7779-mstp-clocks" for R8A7779 (R-Car H1) MSTP gate clocks
 
-Clocktree not Devicetree :)
+Alphabetical order ? :-)
 
-Okay, fine with me.
-
-Marc
+>      - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
+>    - reg: Base address and length of the memory resource used by the MSTP
+>      clocks
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Regards,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/bd077ba2/attachment.sig>
+Laurent Pinchart
