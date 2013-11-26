@@ -1,83 +1,50 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 26 Nov 2013 10:30:37 -0800
-Subject: [PATCH] watchdog: s3c2410_wdt: Handle rounding a little better for
- timeout
-Message-ID: <1385490637-10306-1-git-send-email-dianders@chromium.org>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Tue, 26 Nov 2013 20:30:52 +0200
+Subject: [PATCH 07/12] memory: davinci-aemif: introduce AEMIF driver
+In-Reply-To: <5294E8B6.5000102@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-8-git-send-email-ivan.khoronzhuk@ti.com>
+ <4F5844B3A985794BA902E12C070812375F8D2E@DNCE04.ent.ti.com>
+ <52944BD3.90105@ti.com> <5294DE17.9080900@ti.com> <5294E8B6.5000102@ti.com>
+Message-ID: <5294E8DC.3070404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing watchdog timeout worked OK but didn't deal with
-rounding in an ideal way when dividing out all of its clocks.
+On 11/26/2013 08:30 PM, Santosh Shilimkar wrote:
+> Ivan,
+>
+> On Tuesday 26 November 2013 12:44 PM, ivan.khoronzhuk wrote:
+>> On 11/26/2013 09:20 AM, Sekhar Nori wrote:
+>>> On Monday 11 November 2013 10:36 PM, Khoronzhuk, Ivan wrote:
+>
+>>>> +static struct platform_driver davinci_aemif_driver = {
+>>>> +       .probe = davinci_aemif_probe,
+>>>> +       .remove = davinci_aemif_remove,
+>>>> +       .driver = {
+>>>> +               .name = DRV_NAME,
+>>>> +               .owner = THIS_MODULE,
+>>>> +               .of_match_table = of_match_ptr(davinci_aemif_of_match),
+>>>> +       },
+>>>> +};
+>>>> +
+>>>> +module_platform_driver(davinci_aemif_driver);
+>>>> +
+>>>> +MODULE_AUTHOR("Murali Karicheri <m-karicheri2@ti.com>");
+>>>
+>>> Is this correct? If yes, I would have expected him to sign-off on the
+>>> patch too. If not, please drop this.
+>>
+>> I will add sign-off
+>>
+> Please add you as a MODULE_AUTHOR as well since you re-wrote the
+> downstream driver. Ok to have both of you sign of on it.
+>
+> Regards,
+> Santosh
+>
 
-Specifically if you had a timeout of 32 seconds and an input clock of
-66666666, you'd end up setting a timeout of 31.9998 seconds and
-reporting a timeout of 31 seconds.
+Ok
 
-Specifically DBG printouts showed:
-  s3c2410wdt_set_heartbeat: count=16666656, timeout=32, freq=520833
-  s3c2410wdt_set_heartbeat: timeout=32, divisor=255, count=16666656 (0000ff4f)
-and the final timeout reported to the user was:
-  ((count / divisor) * divisor) / freq
-  (0xff4f * 255) / 520833 = 31 (truncated from 31.9998)
-the technically "correct" value is:
-  (0xff4f * 255) / (66666666.0 / 128) = 31.9998
-
-By using "DIV_ROUND_UP" we can be a little more correct.
-  s3c2410wdt_set_heartbeat: count=16666688, timeout=32, freq=520834
-  s3c2410wdt_set_heartbeat: timeout=32, divisor=255, count=16666688 (0000ff50)
-and the final timeout reported to the user:
-  (0xff50 * 255) / 520834 = 32
-the technically "correct" value is:
-  (0xff50 * 255) / (66666666.0 / 128) = 32.0003
-
-We'll use a DIV_ROUND_UP to solve this, generally erroring on the side
-of reporting shorter values to the user and setting the watchdog to
-slightly longer than requested:
-* Round input frequency up to assume watchdog is counting faster.
-* Round divisions by divisor up to give us extra time.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/watchdog/s3c2410_wdt.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 7d8fd04..fe2322b 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -188,7 +188,7 @@ static int s3c2410wdt_set_heartbeat(struct watchdog_device *wdd, unsigned timeou
- 	if (timeout < 1)
- 		return -EINVAL;
- 
--	freq /= 128;
-+	freq = DIV_ROUND_UP(freq, 128);
- 	count = timeout * freq;
- 
- 	DBG("%s: count=%d, timeout=%d, freq=%lu\n",
-@@ -201,20 +201,20 @@ static int s3c2410wdt_set_heartbeat(struct watchdog_device *wdd, unsigned timeou
- 
- 	if (count >= 0x10000) {
- 		for (divisor = 1; divisor <= 0x100; divisor++) {
--			if ((count / divisor) < 0x10000)
-+			if (DIV_ROUND_UP(count, divisor) < 0x10000)
- 				break;
- 		}
- 
--		if ((count / divisor) >= 0x10000) {
-+		if (divisor > 0x100) {
- 			dev_err(wdt->dev, "timeout %d too big\n", timeout);
- 			return -EINVAL;
- 		}
- 	}
- 
- 	DBG("%s: timeout=%d, divisor=%d, count=%d (%08x)\n",
--	    __func__, timeout, divisor, count, count/divisor);
-+	    __func__, timeout, divisor, count, DIV_ROUND_UP(count, divisor));
- 
--	count /= divisor;
-+	count = DIV_ROUND_UP(count, divisor);
- 	wdt->count = count;
- 
- 	/* update the pre-scaler */
 -- 
-1.8.4.1
+Regards,
+Ivan Khoronzhuk
