@@ -1,16 +1,13 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Nov 2013 22:10:44 +0100
-Subject: [PATCH 3/7] PCI: imx6: Fix waiting for link up
-In-Reply-To: <1385500248-6551-1-git-send-email-marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
-Message-ID: <1385500248-6551-3-git-send-email-marex@denx.de>
+Date: Tue, 26 Nov 2013 22:10:42 +0100
+Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
+Message-ID: <1385500248-6551-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While waiting for the PHY to report the PCIe link is up, we might
-hit a situation where the link training is still in progress, while
-the PHY already reports the link is up. Add additional check for
-this condition.
+Some boards do not have a PCIe reset GPIO. To avoid probe
+failure on these boards, make the reset GPIO optional as
+well.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -29,43 +26,71 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- drivers/pci/host/pci-imx6.c | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+ drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
+ 2 files changed, 16 insertions(+), 15 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+index d5d26d4..b7a2279 100644
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -19,9 +19,9 @@ Required properties:
+ 	to define the mapping of the PCIe interface to interrupt
+ 	numbers.
+ - num-lanes: number of lanes to use
+-- reset-gpio: gpio pin number of power good signal
+ 
+ Optional properties for fsl,imx6q-pcie
++- reset-gpio: gpio pin number of power good signal
+ - power-on-gpio: gpio pin number of power-enable signal
+ - wake-up-gpio: gpio pin number of incoming wakeup signal
+ - disable-gpio: gpio pin number of outgoing rfkill/endpoint disable signal
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 52027ad..4d5be4e 100644
+index bd70af8..52027ad 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -48,6 +48,8 @@ struct imx6_pcie {
- #define PL_OFFSET 0x700
- #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
- #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
-+#define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
-+#define PCIE_PHY_DEBUG_R1_XMLH_LINK_UP		(1 << 4)
+@@ -214,9 +214,12 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
  
- #define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
- #define PCIE_PHY_CTRL_DATA_LOC 0
-@@ -338,10 +340,17 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
- {
- 	u32 rc, ltssm, rx_valid, temp;
+-	gpio_set_value(imx6_pcie->reset_gpio, 0);
+-	msleep(100);
+-	gpio_set_value(imx6_pcie->reset_gpio, 1);
++	/* Some boards don't have PCIe reset GPIO. */
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		gpio_set_value(imx6_pcie->reset_gpio, 0);
++		msleep(100);
++		gpio_set_value(imx6_pcie->reset_gpio, 1);
++	}
  
--	/* link is debug bit 36, debug register 1 starts@bit 32 */
--	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1) & (0x1 << (36 - 32));
--	if (rc)
--		return -EAGAIN;
-+	/*
-+	 * Test if the PHY reports that the link is up and also that
-+	 * the link training finished. It might happen that the PHY
-+	 * reports the link is already up, but the link training bit
-+	 * is still set, so make sure to check the training is done
-+	 * as well here.
-+	 */
-+	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-+	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
-+	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
-+		return 1;
+ 	return 0;
+ }
+@@ -439,17 +442,15 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
  
- 	/*
- 	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
+ 	/* Fetch GPIOs */
+ 	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+-	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		dev_err(&pdev->dev, "no reset-gpio defined\n");
+-		ret = -ENODEV;
+-	}
+-	ret = devm_gpio_request_one(&pdev->dev,
+-				imx6_pcie->reset_gpio,
+-				GPIOF_OUT_INIT_LOW,
+-				"PCIe reset");
+-	if (ret) {
+-		dev_err(&pdev->dev, "unable to get reset gpio\n");
+-		goto err;
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		ret = devm_gpio_request_one(&pdev->dev,
++					imx6_pcie->reset_gpio,
++					GPIOF_OUT_INIT_LOW,
++					"PCIe reset");
++		if (ret) {
++			dev_err(&pdev->dev, "unable to get reset gpio\n");
++			goto err;
++		}
+ 	}
+ 
+ 	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
 -- 
 1.8.4.3
