@@ -1,33 +1,47 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 26 Nov 2013 12:17:52 +0800
-Subject: [PATCH 2/2] ASoC: atmel: sam9x5_wm8731: remove platform_set_drvdata
-In-Reply-To: <1385439472-23352-1-git-send-email-voice.shen@atmel.com>
-References: <1385439472-23352-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1385439472-23352-2-git-send-email-voice.shen@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Nov 2013 12:53:42 +0800
+Subject: [PATCH v2 1/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
+In-Reply-To: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
+References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <20131126045340.GJ30476@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When call snd_soc_register_card, it will set driver data to this
-device through dev_set_drvdata, then in driver, no need to call
-platform_set_drvdata again, so remove it.
+On Mon, Nov 25, 2013 at 10:15:19PM +0100, Marc Kleine-Budde wrote:
+> Hello,
+> 
+> this series first fixes a bug in the flexcan driver, using the wrong clock for
+> the bit rate calculcation. The next patch switches the peripheral clock on
+> i.MX53 to lp_apm, which has a rate of 24 MHz. This is optimal for the CIA
+> recommended bit rates.
+> 
+> Tested on TQ's mba53 and mba6x [1].
+> 
+> Who is taking the series? Due to Lucas' patch:
+> 
+>     0a5b8df clk: imx5: introduce DT includes for clock provider
+> 
+> this series does not yet apply to my upstream (net-next/mastet).
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- sound/soc/atmel/sam9x5_wm8731.c |    2 --
- 1 file changed, 2 deletions(-)
+If the clock setting in flexcan driver is already broken, it shouldn't
+matter to have two patches go different tree?  Otherwise, I can have
+both go via IMX tree with your ACK on the first one?
 
-diff --git a/sound/soc/atmel/sam9x5_wm8731.c b/sound/soc/atmel/sam9x5_wm8731.c
-index 6dc33ac..4af6836 100644
---- a/sound/soc/atmel/sam9x5_wm8731.c
-+++ b/sound/soc/atmel/sam9x5_wm8731.c
-@@ -154,8 +154,6 @@ static int sam9x5_wm8731_driver_probe(struct platform_device *pdev)
- 	of_node_put(codec_np);
- 	of_node_put(cpu_np);
- 
--	platform_set_drvdata(pdev, card);
--
- 	ret = snd_soc_register_card(card);
- 	if (ret) {
- 		dev_err(&pdev->dev,
--- 
-1.7.9.5
+> 
+> Marc
+> 
+> [1] On i.MX6 the following patch is needed (which is already in Shawn's
+>     for-next):
+> 
+>     9b3d423 ARM: i.MX6q: fix the wrong parent of can_root clock
+
+This one already hits mainline.
+
+Shawn
+
+> 
+> changes since v1:
+> * move switch to 24 MHz clock to mx53_clocks_init
+>   (tnx Alexander)
+> 
+> 
