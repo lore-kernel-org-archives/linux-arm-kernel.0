@@ -1,80 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 14:27:48 -0800
-Subject: [PATCH v2 00/11]: add remaining support for IGEP boards
-In-Reply-To: <52948399.7070407@ti.com>
-References: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv=k+Lk=PFONKLvXab5iHExG7WCJRfE6BzEkv_YtPVwB8Dw@mail.gmail.com>
- <52948399.7070407@ti.com>
-Message-ID: <20131126222747.GR26766@atomide.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 26 Nov 2013 14:45:41 -0800
+Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
+ vmalloc
+In-Reply-To: <5285A896.3030204@codeaurora.org>
+References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
+ <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
+ <52850C37.1080506@sr71.net> <5285A896.3030204@codeaurora.org>
+Message-ID: <20131126144541.6b16979b77f927f6d945ab60@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [131126 03:19]:
-> On 2013-11-25 17:30, Javier Martinez Canillas wrote:
-> > On Wed, Nov 20, 2013 at 2:06 AM, Javier Martinez Canillas
-> > <javier.martinez@collabora.co.uk> wrote:
-> >> In order to make mach-omap2 Device Tree only, the board file for
-> >> IGEP boards was removed even when support for wifi and display
-> >> was still not supported by its DTS.
-> >>
-> >> This is a second version of a patch-set that adds support for
-> >> these remaining peripherals and also adds support for USB,
-> >> HDMI and user LED for the am33xx SoC based IGEP Aquila board.
-> >>
-> >> The patch-set is composed of the following patches:
-> >>
-> >> Enric Balletbo i Serra (7):
-> >>       ARM: dts: omap3-igep: Fix bus-width for mmc1.
-> >>       ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
-> >>       ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
-> >>       ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
-> >>       ARM: dts: AM33XX BASE0033: add pinmux and user led support.
-> >>       ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
-> >>       ARM: dts: AM33XX IGEP0033: add USB support.
-> >>
-> >> Javier Martinez Canillas (4):
-> >>       ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
-> >>       ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
-> >>       ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
-> >>       ARM: dts: omap3-igep0020: name twl4030 VPLL2 regulator as vdds_dsi
-> >>
-> >> Changes since v1:
-> >>
-> >>  Don't add a workaround in drivers/video/omap2/dss/dpi.c to use the
-> >>  VPLL2 regulator from twl4030 if VDDS_DSI regulator is not linked to
-> >>  the DPI device since the used regulator is a per board configuration.
-> >>
-> >>  Instead add a regulator-name = "vdds_dsi" property to the regulator
-> >>  in the IGEPv2 DTS file as suggested by Tony Lindgren.
-> >>
-> >> Tony,
-> >>
-> >> Most of these patches are just DTS changes so they have to be picked
-> >> by Benoit besides the following patch that has to go through your tree
-> >>
-> >> [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
-> >>
-> >> Since we have removed the board file for IGEP boards I think these
-> >> can be considered as regression fixes for 3.13 although I don't mind
-> >> if you prefer to wait for 3.14.
-> >>
-> >> Thanks a lot and best regards,
-> >> Javier
-> >> --
-> > 
-> > Hi Benoit and Tony,
-> > 
-> > Now that 3.13-rc1 is out, do you think that it would be possible to
-> > include this series as a fix for the -rc cycle?
-> > 
-> > Otherwise we will have missing functionality for IGEP boards on 3.13
-> > due the board file removal. The changes are mostly DT and won't affect
-> > other boards.
+On Thu, 14 Nov 2013 20:52:38 -0800 Laura Abbott <lauraa@codeaurora.org> wrote:
+
+> If is_vmalloc_addr returned true 
+> the spinlock/tree walk would happen anyway so essentially this is 
+> getting rid of the fast path. This is typically used in the idiom
 > 
-> The DSS related parts look fine to me.
+> alloc(size) {
+> 	if (size > some metric)
+> 		vmalloc
+> 	else
+> 		kmalloc
+> }
 
-Thanks, applying the whole series into omap-for-v3.13/fixes-take4.
+A better form is
 
-Regards,
+	if (kmalloc(..., GFP_NOWARN) == NULL)
+		vmalloc
 
-Tony
+> free (ptr) {
+> 	if (is_vmalloc_addr(ptr)
+> 		vfree
+> 	else
+> 		kfree
+> }
+> 
+> so my hypothesis would be that any path would have to be willing to take 
+> the penalty of vmalloc anyway. The actual cost would depend on the 
+> vmalloc / kmalloc ratio. I haven't had a chance to get profiling data 
+> yet to see the performance difference.
+
+I've resisted adding the above helper functions simply to discourage
+the use of vmalloc() - it *is* slow, and one day we might hit
+vmalloc-arena fragmentation issues.
+
+That being said, I might one day give up, because adding such helpers
+would be a significant cleanup.  And once they are added, their use
+will proliferate and is_vmalloc_addr() will take quite a beating.
+
+So yes, it would be prudent to be worried about is_vmalloc_addr()
+performance at the outset.
+
+Couldn't is_vmalloc_addr() just be done with a plain old bitmap?  It
+would consume 128kbytes to manage a 4G address space, and 1/8th of a meg
+isn't much.
