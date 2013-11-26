@@ -1,77 +1,98 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Nov 2013 16:32:16 +0900
-Subject: [PATCH RFC v2 14/17] ARM: shmobile: marzen-reference: Instantiate
- clkdevs for SCIF and CMT
+Date: Tue, 26 Nov 2013 16:32:10 +0900
+Subject: [PATCH RFC v2 08/17] ARM: shmobile: r8a7779: Add helper to read mode
+ pins
 In-Reply-To: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
 References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1385451139-29686-15-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1385451139-29686-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the common clock framework is supported, the clock lookup
-entries in clock-r8a7779.c are not registered anymore. Devices must
-instead reference their clocks in the device tree. However, SCIF and CMT
-devices are still instantiated through platform code, and thus need a
-clock lookup entry.
+Add and use helper to read mode pins.
+This will be re-used when moving marzen-reference to
+the common clock framework.
 
-Retrieve the SCIF and CMT clock entries by name and register clkdevs for
-the corresponding devices. This will be removed when the SCIF and CMT
-devices will be instantiated from the device tree.
-
-Based on work for the Koelsch board by Laurent Pinchart.
-
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen-reference.c | 28 ++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7779.c        | 11 ++---------
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |  1 +
+ arch/arm/mach-shmobile/setup-r8a7779.c        | 14 ++++++++++++++
+ 3 files changed, 17 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index e261431..1a2fac1 100644
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -19,7 +19,9 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index b7ce0e7..decf122 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -25,6 +25,7 @@
+ #include <linux/clkdev.h>
+ #include <mach/clock.h>
+ #include <mach/common.h>
++#include <mach/r8a7779.h>
+ 
+ /*
+  *		MD1 = 1			MD1 = 0
+@@ -59,9 +60,6 @@
+ #define MSTPCR6		IOMEM(0xffc80058)
+ #define MSTPCR7		IOMEM(0xffc80040)
+ 
+-#define MODEMR		0xffcc0020
+-
+-
+ /* ioremap() through clock mapping mandatory to avoid
+  * collision with ARM coherent DMA virtual memory range.
   */
+@@ -213,14 +211,9 @@ static struct clk_lookup lookups[] = {
  
-+#include <linux/clk.h>
- #include <linux/clk/shmobile.h>
-+#include <linux/clkdev.h>
- #include <linux/clocksource.h>
- #include <linux/of_platform.h>
- #include <mach/r8a7779.h>
-@@ -38,7 +40,31 @@ static void __init marzen_init_timer(void)
- 
- static void __init marzen_init(void)
+ void __init r8a7779_clock_init(void)
  {
--#ifndef CONFIG_COMMON_CLK
-+#ifdef CONFIG_COMMON_CLK
-+	/*
-+	 * This is a really crude hack to provide clkdev support to the SCIF
-+	 * and CMT devices until they get moved to DT.
-+	 */
-+	static const char * const scif_names[] = {
-+		"scif0", "scif1", "scif2", "scif3", "scif4", "scif5",
-+	};
-+	struct clk *clk;
-+	unsigned int i;
+-	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+-	u32 mode;
++	u32 mode = r8a7779_read_mode_pins();
+ 	int k, ret = 0;
+ 
+-	BUG_ON(!modemr);
+-	mode = ioread32(modemr);
+-	iounmap(modemr);
+-
+ 	if (mode & MD(1)) {
+ 		plla_clk.rate = 1500000000;
+ 
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+index 5014145..bd66cd82 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -39,6 +39,7 @@ extern void r8a7779_add_early_devices(void);
+ extern void r8a7779_add_standard_devices(void);
+ extern void r8a7779_add_standard_devices_dt(void);
+ extern void r8a7779_init_late(void);
++extern u32 r8a7779_read_mode_pins(void);
+ extern void r8a7779_clock_init(void);
+ extern void r8a7779_pinmux_init(void);
+ extern void r8a7779_pm_init(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 8f94531..4e3fbfb 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -874,6 +874,20 @@ void __init r8a7779_add_standard_devices_dt(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
++#define MODEMR		0xffcc0020
 +
-+	for (i = 0; i < ARRAY_SIZE(scif_names); i++) {
-+		clk = clk_get(NULL, scif_names[i]);
-+		if (clk) {
-+			clk_register_clkdev(clk, NULL, "sh-sci.%u", i);
-+			clk_put(clk);
-+		}
-+	}
++u32 __init r8a7779_read_mode_pins(void)
++{
++	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
++	u32 mode;
 +
-+	clk = clk_get(NULL, "cmt0");
-+	if (clk) {
-+		clk_register_clkdev(clk, NULL, "sh_cmt.0");
-+		clk_put(clk);
-+	}
-+#else
- 	r8a7779_clock_init();
- #endif
- 	r8a7779_add_standard_devices_dt();
++	BUG_ON(!modemr);
++	mode = ioread32(modemr);
++	iounmap(modemr);
++
++	return mode;
++}
++
+ static const char *r8a7779_compat_dt[] __initdata = {
+ 	"renesas,r8a7779",
+ 	NULL,
 -- 
 1.8.4
