@@ -1,98 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 26 Nov 2013 13:34:20 -0800
-Subject: [PATCH] watchdog: s3c2410_wdt: Handle rounding a little better
- for timeout
-In-Reply-To: <5294ED12.9080700@roeck-us.net>
-References: <1385490637-10306-1-git-send-email-dianders@chromium.org>
- <5294ED12.9080700@roeck-us.net>
-Message-ID: <CAD=FV=UX5gm3Ju8sCd3DSgyo97P6imN_Ay1zvc8yX=qTJ_mbrw@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 26 Nov 2013 16:37:29 -0500
+Subject: [PATCH v2 0/6] mmc: sdhci-esdhc-imx: fix acmd23 unwork and ddr
+ not supported on sabresd issues
+In-Reply-To: <1383142193-24950-1-git-send-email-b29396@freescale.com> (Dong
+ Aisheng's message of "Wed, 30 Oct 2013 22:09:47 +0800")
+References: <1383142193-24950-1-git-send-email-b29396@freescale.com>
+Message-ID: <87siuig7za.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter,
+Hi Dong,
 
-On Tue, Nov 26, 2013 at 10:48 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 11/26/2013 10:30 AM, Doug Anderson wrote:
->>
->> The existing watchdog timeout worked OK but didn't deal with
->> rounding in an ideal way when dividing out all of its clocks.
->>
->> Specifically if you had a timeout of 32 seconds and an input clock of
->> 66666666, you'd end up setting a timeout of 31.9998 seconds and
->> reporting a timeout of 31 seconds.
->>
->> Specifically DBG printouts showed:
->>    s3c2410wdt_set_heartbeat: count=16666656, timeout=32, freq=520833
->>    s3c2410wdt_set_heartbeat: timeout=32, divisor=255, count=16666656
->> (0000ff4f)
->> and the final timeout reported to the user was:
->>    ((count / divisor) * divisor) / freq
->>    (0xff4f * 255) / 520833 = 31 (truncated from 31.9998)
->> the technically "correct" value is:
->>    (0xff4f * 255) / (66666666.0 / 128) = 31.9998
->>
->> By using "DIV_ROUND_UP" we can be a little more correct.
->>    s3c2410wdt_set_heartbeat: count=16666688, timeout=32, freq=520834
->>    s3c2410wdt_set_heartbeat: timeout=32, divisor=255, count=16666688
->> (0000ff50)
->> and the final timeout reported to the user:
->>    (0xff50 * 255) / 520834 = 32
->> the technically "correct" value is:
->>    (0xff50 * 255) / (66666666.0 / 128) = 32.0003
->>
->> We'll use a DIV_ROUND_UP to solve this, generally erroring on the side
->> of reporting shorter values to the user and setting the watchdog to
->> slightly longer than requested:
->> * Round input frequency up to assume watchdog is counting faster.
->> * Round divisions by divisor up to give us extra time.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> ---
->>   drivers/watchdog/s3c2410_wdt.c | 10 +++++-----
->>   1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/watchdog/s3c2410_wdt.c
->> b/drivers/watchdog/s3c2410_wdt.c
->> index 7d8fd04..fe2322b 100644
->> --- a/drivers/watchdog/s3c2410_wdt.c
->> +++ b/drivers/watchdog/s3c2410_wdt.c
->> @@ -188,7 +188,7 @@ static int s3c2410wdt_set_heartbeat(struct
->> watchdog_device *wdd, unsigned timeou
->>         if (timeout < 1)
->>                 return -EINVAL;
->>
->> -       freq /= 128;
->> +       freq = DIV_ROUND_UP(freq, 128);
->>         count = timeout * freq;
->>
->>         DBG("%s: count=%d, timeout=%d, freq=%lu\n",
->> @@ -201,20 +201,20 @@ static int s3c2410wdt_set_heartbeat(struct
->> watchdog_device *wdd, unsigned timeou
->>
->>         if (count >= 0x10000) {
->>                 for (divisor = 1; divisor <= 0x100; divisor++) {
->> -                       if ((count / divisor) < 0x10000)
->> +                       if (DIV_ROUND_UP(count, divisor) < 0x10000)
->>                                 break;
->>                 }
->>
-> Since you are at it,
->         divisor = DIV_ROUND_UP(count + 1, 0x10000);
-> might be faster, simpler, and easier to understand than the loop.
+On Wed, Oct 30 2013, Dong Aisheng wrote:
+> Patch 1~3 fix acmd23 unwork issue.
+> Currently the eMMC chip integrated on i.MX6Q SabreSD boards does not work.
+> (It's easily reproduced once you enable usdhc4 on sabresd, see patch 3)
+> It's caused by acmd setting bits are never cleared once it's been set
+> which cause the next normal commands to work abnormally.
+>
+> Patch 4~6 fix DDR not supported on SabreSD board.
+> The SabreSD board does not have 1.8v signal voltage switch support for uSDHC,
+> thus it can not support UHS_DDR50 mode which can only run at 1.8v signal voltage.
 
-Way to see the forest for the trees!
+Thanks, pushed patches 1-6 to mmc-next for 3.14.
 
-Your math ends up with a slightly different result than the old code,
-though.  One example is when the count is 0x1ffff.  You'll end up with
-a divider of 2 and I'll end up with a divider of 3.
-
-I think we just want:
-
-divisor = DIV_ROUND_UP(count, 0xffff);
-
-...that produces the same result as the old loop, but am curious to
-know why you chose the "count + 1" and "0x10000".
-
-Thanks!
-
--Doug
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
