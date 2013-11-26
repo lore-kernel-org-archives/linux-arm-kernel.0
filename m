@@ -1,87 +1,267 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Nov 2013 09:37:48 -0700
-Subject: [PATCH V3] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <1385474368.1871.6.camel@smile>
-References: <1385416039-3170-1-git-send-email-swarren@wwwdotorg.org>
- <1385474368.1871.6.camel@smile>
-Message-ID: <5294CE5C.1090901@wwwdotorg.org>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Tue, 26 Nov 2013 18:38:23 +0200
+Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
+In-Reply-To: <817E4263-5E61-4471-AED0-5C97FD2B902F@kernel.crashing.org>
+References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <817E4263-5E61-4471-AED0-5C97FD2B902F@kernel.crashing.org>
+Message-ID: <5294CE7F.3060607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 06:59 AM, Shevchenko, Andriy wrote:
-> On Mon, 2013-11-25 at 14:47 -0700, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
+On 11/22/2013 11:04 PM, Kumar Gala wrote:
+>
+> On Nov 20, 2013, at 9:46 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
+>
+>> Add bindings for AEMIF controller drivers/memory/ti-aemif.c
 >>
->> dma_request_slave_channel() simply returns NULL whenever DMA channel
->> lookup fails. Lookup could fail for two distinct reasons:
->>
->> a) No DMA specification exists for the channel name.
->>    This includes situations where no DMA specifications exist at all, or
->>    other general lookup problems.
->>
->> b) A DMA specification does exist, yet the driver for that channel is not
->>    yet registered.
->>
->> Case (b) should trigger deferred probe in client drivers. However, since
->> they have no way to differentiate the two situations, it cannot.
->>
->> Implement new function dma_request_slave_channel_or_err(), which performs
->> identically to dma_request_slave_channel(), except that it returns an
->> error-pointer rather than NULL, which allows callers to detect when
->> deferred probe should occur.
->>
->> Eventually, all drivers should be converted to this new API, the old API
->> removed, and the new API renamed to the more desirable name. This patch
->> doesn't convert the existing API and all drivers in one go, since some
->> drivers call dma_request_slave_channel() then dma_request_channel() if
->> that fails. That would require either modifying dma_request_channel() in
->> the same way, or adding extra error-handling code to all affected
->> drivers, and there are close to 100 drivers using the other API, rather
->> than just the 15-20 or so that use dma_request_slave_channel(), which
->> might be tenable in a single patch.
->>
->> acpi_dma_request_slave_chan_by_name() doesn't currently implement
->> deferred probe. It should, but this will be addressed later.
-> 
-> Couple of comments below.
-> 
-> []
-> 
->> --- a/drivers/dma/of-dma.c
->> +++ b/drivers/dma/of-dma.c
-> 
-> []
-> 
->> @@ -152,17 +152,18 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
->>  	struct of_dma		*ofdma;
->>  	struct dma_chan		*chan;
->>  	int			count, i;
->> +	int			ret_no_channel = -ENODEV;
-> 
-> Could we re-use chan for the error as well?
+>
+> Binding shouldn?t normally refer to code.
+>
+> Just saying something like:
+>
+> Adding binging for TI Async External Memory Interface (AEMIF) controller.
+>
+>
 
-No, because that gets over-written each time ofdma->of_dma_xlate() is
-called, and that could fail and cause the result not to be returned, and
-then we would have lost any -EPROBE_DEFERRED value that was stored there
-to be returned in the nothing-found case.
+Ok
 
->> @@ -174,8 +175,10 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
->>  
->>  		if (ofdma)
-> 
-> if (ofdma) {
-> ...
-> 
->>  			chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
->> -		else
->> +		else {
-> 
-> } else {
-> 
-> to keep style.
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+>> .../bindings/memory-controllers/ti-aemif.txt       |  198 ++++++++++++++++++++
+>> 1 file changed, 198 insertions(+)
+>> create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>> new file mode 100644
+>> index 0000000..be0c0cb
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>> @@ -0,0 +1,198 @@
+>> +* Device tree bindings for Texas instruments AEMIF controller
+>> +
+>> +Th Async External Memory Interface (EMIF16/AEMIF) controller is intended to
+>
+> The?
+>
 
-OK, I've fixed that up locally. I assume it's not worth a repost just
-for that change, although I will repost if the DMA maintainers want to
-create the topic branches rather than me, but there's been no word on
-that yet.
+The
+
+>> +provide a glue-less interface to a variety of asynchronous memory devices like
+>> +ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
+>> +can be accessed at any given time via four chip selects with 64M byte access
+>> +per chip select. Synchronous memories such as DDR1 SD RAM, SDR SDRAM
+>> +and Mobile SDR are not supported.
+>> +
+>> +Documentation:
+>> +Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+>> +OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+>> +Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+>> +
+>> +Required properties:
+>> +
+>> +- compatible:		"ti,davinci-aemif"
+>> +			"ti,keystone-aemif"
+>> +			"ti,omap-L138-aemif"
+>> +
+>> +- #address-cells:	Must be 2. The first cell is the memory partition
+>> +			number. The 0 partition is for chip selects. And the
+>> +			second cell is the offset into the partition, for the 0
+>> +			partition it corresponds to chip select offset.
+>> +
+>
+> Is the first cell just the chip select number?
+>
+> I?m wondering if this is similar to FSL Localbus controller, see the binding:
+>
+> bindings/powerpc/fsl/lbc.txt
+>
+
+No, it is a memory range number
+
+>> +- #size-cells:		Must be set to 1.
+>> +
+>> +- reg:			contains offset/length value for AEMIF control registers
+>> +			space.
+>> +
+>> +- ranges:		Must be set up to reflect the memory layout for 4
+>> +			chipselects and for AEMIF control range.
+>> +
+>> +- clocks:		phandle reference to the controller clock. Required only
+>> +			if clock tree data present in device tree.
+>> +			See clock-bindings.txt
+>> +
+>> +- clock-names:		clock name. It has to be "aemif". Required only if clock
+>> +			tree data present in device tree, in another case don't
+>> +			use it.
+>> +			See clock-bindings.txt
+>> +
+>> +- clock-ranges:		Empty property indicating that child nodes can inherit
+>> +			named clocks. Required only if clock tree data present
+>> +			in device tree.
+>> +			See clock-bindings.txt
+>> +
+>> +
+>> +Child chip-select (cs) nodes contain the memory devices nodes connected to
+>> +such as NOR (e.g. cfi-flash) and NAND (ti,davinci-nand, see davinci-nand.txt).
+>> +There might be board specific devices like FPGAs.
+>> +
+>> +Required child cs node properties:
+>> +
+>> +- compatible:		"ti,aemif-cs"
+>> +
+>> +- #address-cells:	Must be 2. The first cell is the memory partition
+>> +			number. The 0 partition is for chip selects. And the
+>> +			second cell is the offset into the partition, for the 0
+>> +			partition it corresponds to chip select offset.
+>> +
+>> +- #size-cells:		Must be 1.
+>> +
+>> +- ranges:		Empty property indicating that child nodes can inherit
+>> +			memory layout.
+>> +
+>> +- clock-ranges:		Empty property indicating that child nodes can inherit
+>> +			named clocks. Required only if clock tree data present
+>> +			in device tree.
+>> +
+>> +Optional child cs node properties:
+>> +
+>> +
+>> +- ti,bus-width:			width of the asynchronous device's data bus
+>> +				8 or 16 if not preset 8
+>> +
+>> +- ti,cs-ss:		enable/disable select strobe mode
+>> +				In select strobe mode chip select behaves as
+>> +				the strobe and is active only during the strobe
+>> +				period. If present then enable.
+>> +
+>> +- ti,cs-ew:		enable/disable extended wait mode
+>> +				if set, the controller monitors the EMIFWAIT pin
+>> +				mapped to that chip select to determine if the
+>> +				device wants to extend the strobe period. If
+>> +				present then enable.
+>> +
+>> +- ti,cs-ta:		minimum turn around time, ns
+>> +				Time between the end of one asynchronous memory
+>> +				access and the start of another asynchronous
+>> +				memory access. This delay is not incurred
+>> +				between a read followed by read or a write
+>> +				followed by a write to same chip select.
+>> +
+>> +- ti,cs-rsetup:		read setup width, ns
+>> +				Time between the beginning of a memory cycle
+>> +				and the activation of read strobe.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-rstobe:		read strobe width, ns
+>> +				Time between the activation and deactivation of
+>> +				the read strobe.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-rhold:		read hold width, ns
+>> +				Time between the deactivation of the read
+>> +				strobe and the end of the cycle (which may be
+>> +				either an address change or the deactivation of
+>> +				the chip select signal.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-wsetup:		write setup width, ns
+>> +				Time between the beginning of a memory cycle
+>> +				and the activation of write strobe.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-wstrobe:	write strobe width, ns
+>> +				Time between the activation and deactivation of
+>> +				the write strobe.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +- ti,cs-whold:		write hold width, ns
+>> +				Time between the deactivation of the write
+>> +				strobe and the end of the cycle (which may be
+>> +				either an address change or the deactivation of
+>> +				the chip select signal.
+>> +				Minimum value is 1 (0 treated as 1).
+>> +
+>> +If any of the above parameters are absent, current parameter value will be taken
+>> +from the corresponding HW reg.
+>> +
+>> +The name for cs node must be in format csN, where N is the cs number.
+>> +For compatibles "ti,davinci-aemif" and "ti,keystone-aemif" N = [0-3].
+>> +For compatible "ti,omap-L138-aemif" N = [2-5].
+>> +
+>> +Example for aemif, davinci nand and nor flash chip select shown below.
+>> +
+>> +memory-controller at 21000A00 {
+>> +	compatible = "ti,keystone-aemif";
+>> +	#address-cells = <2>;
+>> +	#size-cells = <1>;
+>> +	clocks = <&clkaemif 0>;
+>> +	clock-names = "aemif";
+>> +	clock-ranges;
+>> +	reg = <0x2100A00 0x00000100>;
+>> +	ranges = <0 0 0x70000000 0x10000000
+>> +		  1 0 0x21000A00 0x0000100>;
+>> +
+>> +	nand:cs2 {
+>> +		compatible = "ti,aemif-cs";
+>> +		#address-cells = <2>;
+>> +		#size-cells = <1>;
+>> +		clock-ranges;
+>> +		ranges;
+>> +
+>> +		/* all timings in nanoseconds */
+>> +		ti,cs-ta = <0>;
+>> +		ti,cs-rhold = <7>;
+>> +		ti,cs-rstrobe = <42>;
+>> +		ti,cs-rsetup = <14>;
+>> +		ti,cs-whold = <7>;
+>> +		ti,cs-wstrobe = <42>;
+>> +		ti,cs-wsetup = <14>;
+>> +
+>> +		nand at 0,0x8000000 {
+>> +			compatible = "ti,davinci-nand";
+>> +			reg = <0 0x8000000 0x4000000
+>> +			       1 0x0000000 0x0000100>;
+>> +
+>> +			.. see davinci-nand.txt
+>> +		};
+>> +	};
+>> +
+>> +	nor:cs0 {
+>> +		compatible = "ti,aemif-cs";
+>> +		#address-cells = <2>;
+>> +		#size-cells = <1>;
+>> +		clock-ranges;
+>> +		ranges;
+>> +
+>> +		/* all timings in nanoseconds */
+>> +		ti,cs-ta = <0>;
+>> +		ti,cs-rhold = <8>;
+>> +		ti,cs-rstrobe = <40>;
+>> +		ti,cs-rsetup = <14>;
+>> +		ti,cs-whold = <7>;
+>> +		ti,cs-wstrobe = <40>;
+>> +		ti,cs-wsetup = <14>;
+>> +		ti,cs-asize = <1>;
+>> +
+>> +		flash at 0,0x0000000 {
+>> +			compatible = "cfi-flash";
+>> +			reg = <0 0x0000000 0x4000000>;
+>> +
+>> +			...
+>> +		};
+>> +	};
+>> +};
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
+
+-- 
+Regards,
+Ivan Khoronzhuk
