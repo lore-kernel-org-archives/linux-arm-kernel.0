@@ -1,26 +1,20 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Nov 2013 16:06:08 -0800
-Subject: [PATCH v11 7/7] ARM: tegra: support Trusted Foundations by default
-In-Reply-To: <1385274652-16415-8-git-send-email-acourbot@nvidia.com>
-References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
- <1385274652-16415-8-git-send-email-acourbot@nvidia.com>
-Message-ID: <20131126000608.GA21634@quad.lixom.net>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Tue, 26 Nov 2013 00:08:31 +0000
+Subject: [PATCH] watchdog: s3c2410_wdt: Only register for cpufreq on
+ CPU_FREQ_S3C24XX
+In-Reply-To: <1385420137-32725-1-git-send-email-dianders@chromium.org>
+References: <1385420137-32725-1-git-send-email-dianders@chromium.org>
+Message-ID: <20131126000831.GW12108@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 24, 2013 at 03:30:52PM +0900, Alexandre Courbot wrote:
-> Support for Trusted Foundations is light and allows the kernel to run on
-> a wider range of devices, so enable it by default.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/configs/tegra_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+On Mon, Nov 25, 2013 at 02:55:37PM -0800, Doug Anderson wrote:
+> On modern SoCs the watchdog timer is parented on a clock that doesn't
+> change every time we have a cpufreq change.  That means we don't need
+> to constantly adjust the watchdog timer, so avoid registering for and
+> dealing with cpufreq transitions unless we've actually got
+> CPU_FREQ_S3C24XX defined.
 
-I think we want this enabled on multi_v7_defconfig too? Send a separate
-patch for that once this is merged though.
-
-
--Olof
+The S3C2410 to at-least S3C2440 there is only one PLL/clock-divider
+set so changing any part of that can change frequency supplied to
+the watchdog.
