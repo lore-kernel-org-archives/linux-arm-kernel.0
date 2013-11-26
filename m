@@ -1,44 +1,55 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Tue, 26 Nov 2013 14:43:30 +0100
-Subject: ACPI
-In-Reply-To: <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
- <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
-Message-ID: <201311261443.30784.jbe@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 26 Nov 2013 14:41:17 +0100
+Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
+In-Reply-To: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131126134117.GF28642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 November 2013 13:55:10 Grant Likely wrote:
-> On Tue, Nov 26, 2013 at 12:43 PM, Linus Walleij
->
-> <linus.walleij@linaro.org> wrote:
-> > On Mon, Nov 25, 2013 at 4:41 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
-> >> In the past ACPI implementations handled GPIO by providing
-> >> methods that accessed hardware registers directly. I've seen DSDTs that
-> >> implement i2c entirely in ASL.
-> >
-> > Is that common?
-> >
-> > Since i2c is a slow bus, can be 100kHz or so, how does that
-> > avoid locking the entire CPU while e.g. waiting for transactions on
-> > the external bus to complete?
-> >
-> > In I2C drivers we typically use completion IRQs so that we can
-> > do other stuff when the I2C traffic is busy ...
-> >
-> > I have a feeling we should not recommend ARM implementers
-> > to go and do things like this.
->
-> ACPI5 defines a binding for serial busses (i2c & spi) which allows
-> real device drivers to drive the bus and allows ACPI and the kernel to
-> share the bus safely. Using that binding means some i2c devices can be
-> 'owned' by ACPI and others owned by the kernel.
+On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K?nig wrote:
+> The driver needs the symbol AT91_SLOW_CLOCK which is defined in
+> arch/arm/mach-at91/include/mach/hardware.h. This file is included
+> implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
+> linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
+> linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
+> linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
+> 
+> So better include it explicitly not only because the last link will go
+> away soon.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Ping. Is this patch ok despite Jean-Christophe's objection?
 
-This means bus locking. And Linus' other question about CPU locking while ACPI
-drives the I2C bus?
+Best regards
+Uwe
 
-jbe
+> ---
+>  drivers/rtc/rtc-at91sam9.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index 309b8b3..5963743 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -24,7 +24,7 @@
+>  
+>  #include <mach/at91_rtt.h>
+>  #include <mach/cpu.h>
+> -
+> +#include <mach/hardware.h>
+>  
+>  /*
+>   * This driver uses two configurable hardware resources that live in the
+> -- 
+> 1.8.4.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
