@@ -1,143 +1,393 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 16:14:15 -0800
-Subject: [PATCH 00/12] Drop omap3 board files and make mach-omap2 boot in DT
- only mode
-Message-ID: <1385424867-27243-1-git-send-email-tony@atomide.com>
+Date: Mon, 25 Nov 2013 16:14:19 -0800
+Subject: [PATCH 04/12] ARM: OMAP2+: Remove legacy i2c.c platform init code
+In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
+References: <1385424867-27243-1-git-send-email-tony@atomide.com>
+Message-ID: <1385424867-27243-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+We can now initialize I2C for mach-omap2 using device tree. And we
+can move the remaining code in plat-omap/i2c.c into mach-omap1/i2c.c.
 
-We can finally make mach-omap2 to boot in device tree only mode for v3.14.
+Note that we cannot remove some of the I2C bus reset functions
+as they are being used by hwmod code.
 
-By doing that, we can get rid of about 20000 lines of legacy code for v3.14
-that's no longer needed with device tree :) And that's not counting the
-additional removal of the code that comes with the pending patches to
-move clocks to drivers/clk.
-
-Looks like we still have some legacy boards that don't have a .dts file,
-so if you're using one, please post the .dts file. I've posted some quick
-instructions in the first patch of this series for bringing up omaps with
-device tree.
-
-For most omap2+ boards that are not yet supported with device tree just
-the .dts file is needed. Some boards also may need additional entries to
-pdata-quirks.c. If there are more complicated issues, please let me know
-so we can sort out those issues ASAP.
-
-I don't have all omap boards so I have not been able to do a .dts file
-for those. Some help would be appreciated there if you are using a
-board with no .dts file posted yet. I can naturally help too where
-possible so we get the devices working with device tree as needed :)
-
-These patches need v3.13-rc1 and some of the following patches
-depending on your board:
-
-[PATCH 0/8] Various omap device tree usability fixes for v3.13 merge window
-[PATCH 00/11] Make omap24xx booting device tree based for v3.14 merge window
-[PATCH 0/3] Yet more fixes for booting omaps with device tree
-[PATCH 0/5] Prepare making omap3 device tree only and convert LDP
-
-I've also pushed all the patches into a temporary testing branch:
-
-omap-for-v3.14/tmp-testing-unstable-not-immutable
-
-Regards,
-
-Tony
-
-
-Tony Lindgren (12):
-  ARM: OMAP2+: Remove legacy omap3 board-*.c files and make mach-omap2
-    DT only for booting
-  ARM: OMAP2+: Remove legacy serial.c
-  ARM: OMAP2+: Remove legacy hsmmc.c
-  ARM: OMAP2+: Remove legacy i2c.c platform init code
-  ARM: OMAP2+: Remove legacy PM init
-  ARM: OMAP2+: Remove legacy twl4030 platform init code
-  ARM: OMAP2+: Remove legacy usb-host.c platform init code
-  ARM: OMAP2+: Remove legacy muxing for usb-tusb6010.c
-  ARM: OMAP2+: Remove legacy usb-musb.c platform init code
-  ARM: OMAP2+: Remove legacy hwmod mux code
-  ARM: OMAP2+: Remove legacy mux code
-  ARM: OMAP2+: Remove legacy data from hwmod for omap3
-
- arch/arm/mach-omap1/i2c.c                          |   83 +
- arch/arm/mach-omap2/Kconfig                        |  112 --
- arch/arm/mach-omap2/Makefile                       |   35 +-
- arch/arm/mach-omap2/board-3430sdp.c                |  633 ------
- arch/arm/mach-omap2/board-am3517crane.c            |  150 --
- arch/arm/mach-omap2/board-am3517evm.c              |  379 ----
- arch/arm/mach-omap2/board-cm-t35.c                 |  771 --------
- arch/arm/mach-omap2/board-cm-t3517.c               |  337 ----
- arch/arm/mach-omap2/board-devkit8000.c             |  655 -------
- arch/arm/mach-omap2/board-ldp.c                    |  425 ----
- arch/arm/mach-omap2/board-omap3beagle.c            |  596 ------
- arch/arm/mach-omap2/board-omap3logic.c             |  251 ---
- arch/arm/mach-omap2/board-omap3pandora.c           |  630 ------
- arch/arm/mach-omap2/board-omap3stalker.c           |  438 -----
- arch/arm/mach-omap2/board-omap3touchbook.c         |  396 ----
- arch/arm/mach-omap2/board-overo.c                  |  572 ------
- arch/arm/mach-omap2/board-rx51-peripherals.c       | 1323 -------------
- arch/arm/mach-omap2/board-rx51-video.c             |   67 -
- arch/arm/mach-omap2/board-rx51.c                   |  142 --
- arch/arm/mach-omap2/board-ti8168evm.c              |   62 -
- arch/arm/mach-omap2/common-board-devices.h         |    2 -
- arch/arm/mach-omap2/common.h                       |    9 -
- arch/arm/mach-omap2/devices.c                      |    2 -
- arch/arm/mach-omap2/dss-common.c                   |    1 -
- arch/arm/mach-omap2/hsmmc.c                        |  518 -----
- arch/arm/mach-omap2/i2c.c                          |   97 -
- arch/arm/mach-omap2/io.c                           |    1 -
- arch/arm/mach-omap2/msdi.c                         |    1 -
- arch/arm/mach-omap2/mux.c                          | 1161 -----------
- arch/arm/mach-omap2/mux.h                          |  355 ----
- arch/arm/mach-omap2/mux34xx.c                      | 2061 --------------------
- arch/arm/mach-omap2/mux34xx.h                      |  402 ----
- arch/arm/mach-omap2/omap_hwmod.c                   |  160 +-
- .../omap_hwmod_2xxx_3xxx_interconnect_data.c       |  134 +-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |  201 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  833 +-------
- arch/arm/mach-omap2/omap_twl.c                     |  314 ---
- arch/arm/mach-omap2/pm.c                           |  161 +-
- arch/arm/mach-omap2/serial.c                       |  335 ----
- arch/arm/mach-omap2/twl-common.c                   |  570 ------
- arch/arm/mach-omap2/twl-common.h                   |   66 -
- arch/arm/mach-omap2/usb-host.c                     |  496 -----
- arch/arm/mach-omap2/usb-musb.c                     |  114 --
- arch/arm/mach-omap2/usb-tusb6010.c                 |   21 -
- arch/arm/plat-omap/Makefile                        |    3 -
- arch/arm/plat-omap/i2c.c                           |  116 --
- 46 files changed, 136 insertions(+), 16055 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/board-3430sdp.c
- delete mode 100644 arch/arm/mach-omap2/board-am3517crane.c
- delete mode 100644 arch/arm/mach-omap2/board-am3517evm.c
- delete mode 100644 arch/arm/mach-omap2/board-cm-t35.c
- delete mode 100644 arch/arm/mach-omap2/board-cm-t3517.c
- delete mode 100644 arch/arm/mach-omap2/board-devkit8000.c
- delete mode 100644 arch/arm/mach-omap2/board-ldp.c
- delete mode 100644 arch/arm/mach-omap2/board-omap3beagle.c
- delete mode 100644 arch/arm/mach-omap2/board-omap3logic.c
- delete mode 100644 arch/arm/mach-omap2/board-omap3pandora.c
- delete mode 100644 arch/arm/mach-omap2/board-omap3stalker.c
- delete mode 100644 arch/arm/mach-omap2/board-omap3touchbook.c
- delete mode 100644 arch/arm/mach-omap2/board-overo.c
- delete mode 100644 arch/arm/mach-omap2/board-rx51-peripherals.c
- delete mode 100644 arch/arm/mach-omap2/board-rx51-video.c
- delete mode 100644 arch/arm/mach-omap2/board-rx51.c
- delete mode 100644 arch/arm/mach-omap2/board-ti8168evm.c
- delete mode 100644 arch/arm/mach-omap2/hsmmc.c
- delete mode 100644 arch/arm/mach-omap2/mux.c
- delete mode 100644 arch/arm/mach-omap2/mux.h
- delete mode 100644 arch/arm/mach-omap2/mux34xx.c
- delete mode 100644 arch/arm/mach-omap2/mux34xx.h
- delete mode 100644 arch/arm/mach-omap2/omap_twl.c
- delete mode 100644 arch/arm/mach-omap2/serial.c
- delete mode 100644 arch/arm/mach-omap2/twl-common.c
- delete mode 100644 arch/arm/mach-omap2/twl-common.h
- delete mode 100644 arch/arm/mach-omap2/usb-host.c
- delete mode 100644 arch/arm/mach-omap2/usb-musb.c
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap1/i2c.c        |  83 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/i2c.c        |  97 --------------------------------
+ arch/arm/mach-omap2/twl-common.c |   2 -
+ arch/arm/plat-omap/Makefile      |   3 -
+ arch/arm/plat-omap/i2c.c         | 116 ---------------------------------------
+ 5 files changed, 83 insertions(+), 218 deletions(-)
  delete mode 100644 arch/arm/plat-omap/i2c.c
 
+diff --git a/arch/arm/mach-omap1/i2c.c b/arch/arm/mach-omap1/i2c.c
+index 7f5761c..3f6384e 100644
+--- a/arch/arm/mach-omap1/i2c.c
++++ b/arch/arm/mach-omap1/i2c.c
+@@ -19,6 +19,7 @@
+  *
+  */
+ 
++#include <linux/i2c.h>
+ #include <linux/i2c-omap.h>
+ #include <mach/mux.h>
+ #include "soc.h"
+@@ -92,6 +93,88 @@ int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *pdata,
+ 	return platform_device_register(pdev);
+ }
+ 
++#define OMAP_I2C_MAX_CONTROLLERS 4
++static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
++
++#define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
++
++/**
++ * omap_i2c_bus_setup - Process command line options for the I2C bus speed
++ * @str: String of options
++ *
++ * This function allow to override the default I2C bus speed for given I2C
++ * bus with a command line option.
++ *
++ * Format: i2c_bus=bus_id,clkrate (in kHz)
++ *
++ * Returns 1 on success, 0 otherwise.
++ */
++static int __init omap_i2c_bus_setup(char *str)
++{
++	int ints[3];
++
++	get_options(str, 3, ints);
++	if (ints[0] < 2 || ints[1] < 1 ||
++			ints[1] > OMAP_I2C_MAX_CONTROLLERS)
++		return 0;
++	i2c_pdata[ints[1] - 1].clkrate = ints[2];
++	i2c_pdata[ints[1] - 1].clkrate |= OMAP_I2C_CMDLINE_SETUP;
++
++	return 1;
++}
++__setup("i2c_bus=", omap_i2c_bus_setup);
++
++/*
++ * Register busses defined in command line but that are not registered with
++ * omap_register_i2c_bus from board initialization code.
++ */
++int __init omap_register_i2c_bus_cmdline(void)
++{
++	int i, err = 0;
++
++	for (i = 0; i < ARRAY_SIZE(i2c_pdata); i++)
++		if (i2c_pdata[i].clkrate & OMAP_I2C_CMDLINE_SETUP) {
++			i2c_pdata[i].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
++			err = omap_i2c_add_bus(&i2c_pdata[i], i + 1);
++			if (err)
++				goto out;
++		}
++
++out:
++	return err;
++}
++
++/**
++ * omap_register_i2c_bus - register I2C bus with device descriptors
++ * @bus_id: bus id counting from number 1
++ * @clkrate: clock rate of the bus in kHz
++ * @info: pointer into I2C device descriptor table or NULL
++ * @len: number of descriptors in the table
++ *
++ * Returns 0 on success or an error code.
++ */
++int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
++			  struct i2c_board_info const *info,
++			  unsigned len)
++{
++	int err;
++
++	BUG_ON(bus_id < 1 || bus_id > OMAP_I2C_MAX_CONTROLLERS);
++
++	if (info) {
++		err = i2c_register_board_info(bus_id, info, len);
++		if (err)
++			return err;
++	}
++
++	if (!i2c_pdata[bus_id - 1].clkrate)
++		i2c_pdata[bus_id - 1].clkrate = clkrate;
++
++	i2c_pdata[bus_id - 1].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
++
++	return omap_i2c_add_bus(&i2c_pdata[bus_id - 1], bus_id);
++}
++
+ static  int __init omap_i2c_cmdline(void)
+ {
+ 	return omap_register_i2c_bus_cmdline();
+diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
+index b456b44..2d037e8 100644
+--- a/arch/arm/mach-omap2/i2c.c
++++ b/arch/arm/mach-omap2/i2c.c
+@@ -26,7 +26,6 @@
+ 
+ #include "prm.h"
+ #include "common.h"
+-#include "mux.h"
+ #include "i2c.h"
+ 
+ /* In register I2C_CON, Bit 15 is the I2C enable bit */
+@@ -36,20 +35,6 @@
+ 
+ #define MAX_OMAP_I2C_HWMOD_NAME_LEN	16
+ 
+-static void __init omap2_i2c_mux_pins(int bus_id)
+-{
+-	char mux_name[sizeof("i2c2_scl.i2c2_scl")];
+-
+-	/* First I2C bus is not muxable */
+-	if (bus_id == 1)
+-		return;
+-
+-	sprintf(mux_name, "i2c%i_scl.i2c%i_scl", bus_id, bus_id);
+-	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT);
+-	sprintf(mux_name, "i2c%i_sda.i2c%i_sda", bus_id, bus_id);
+-	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT);
+-}
+-
+ /**
+  * omap_i2c_reset - reset the omap i2c module.
+  * @oh: struct omap_hwmod *
+@@ -107,85 +92,3 @@ int omap_i2c_reset(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
+-
+-static int __init omap_i2c_nr_ports(void)
+-{
+-	int ports = 0;
+-
+-	if (cpu_is_omap24xx())
+-		ports = 2;
+-	else if (cpu_is_omap34xx())
+-		ports = 3;
+-	else if (cpu_is_omap44xx())
+-		ports = 4;
+-	return ports;
+-}
+-
+-/*
+- * XXX This function is a temporary compatibility wrapper - only
+- * needed until the I2C driver can be converted to call
+- * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
+- */
+-static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
+-{
+-	omap_pm_set_max_mpu_wakeup_lat(dev, t);
+-}
+-
+-static const char name[] = "omap_i2c";
+-
+-int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
+-				int bus_id)
+-{
+-	int l;
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-	char oh_name[MAX_OMAP_I2C_HWMOD_NAME_LEN];
+-	struct omap_i2c_bus_platform_data *pdata;
+-	struct omap_i2c_dev_attr *dev_attr;
+-
+-	if (bus_id > omap_i2c_nr_ports())
+-		return -EINVAL;
+-
+-	omap2_i2c_mux_pins(bus_id);
+-
+-	l = snprintf(oh_name, MAX_OMAP_I2C_HWMOD_NAME_LEN, "i2c%d", bus_id);
+-	WARN(l >= MAX_OMAP_I2C_HWMOD_NAME_LEN,
+-		"String buffer overflow in I2C%d device setup\n", bus_id);
+-	oh = omap_hwmod_lookup(oh_name);
+-	if (!oh) {
+-			pr_err("Could not look up %s\n", oh_name);
+-			return -EEXIST;
+-	}
+-
+-	pdata = i2c_pdata;
+-	/*
+-	 * pass the hwmod class's CPU-specific knowledge of I2C IP revision in
+-	 * use, and functionality implementation flags, up to the OMAP I2C
+-	 * driver via platform data
+-	 */
+-	pdata->rev = oh->class->rev;
+-
+-	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
+-	pdata->flags = dev_attr->flags;
+-
+-	/*
+-	 * When waiting for completion of a i2c transfer, we need to
+-	 * set a wake up latency constraint for the MPU. This is to
+-	 * ensure quick enough wakeup from idle, when transfer
+-	 * completes.
+-	 * Only omap3 has support for constraints
+-	 */
+-	if (cpu_is_omap34xx())
+-		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
+-	pdev = omap_device_build(name, bus_id, oh, pdata,
+-				 sizeof(struct omap_i2c_bus_platform_data));
+-	WARN(IS_ERR(pdev), "Could not build omap_device for %s\n", name);
+-
+-	return PTR_ERR_OR_ZERO(pdev);
+-}
+-
+-static  int __init omap_i2c_cmdline(void)
+-{
+-	return omap_register_i2c_bus_cmdline();
+-}
+-omap_subsys_initcall(omap_i2c_cmdline);
+diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+index b0d54da..e816966 100644
+--- a/arch/arm/mach-omap2/twl-common.c
++++ b/arch/arm/mach-omap2/twl-common.c
+@@ -62,8 +62,6 @@ void __init omap_pmic_init(int bus, u32 clkrate,
+ 		sizeof(pmic_i2c_board_info.type));
+ 	pmic_i2c_board_info.irq = pmic_irq;
+ 	pmic_i2c_board_info.platform_data = pmic_data;
+-
+-	omap_register_i2c_bus(bus, clkrate, &pmic_i2c_board_info, 1);
+ }
+ 
+ void __init omap4_pmic_init(const char *pmic_type,
+diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+index 0b01b68..cdf999a 100644
+--- a/arch/arm/plat-omap/Makefile
++++ b/arch/arm/plat-omap/Makefile
+@@ -14,6 +14,3 @@ obj-  :=
+ 
+ obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+ obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
+-i2c-omap-$(CONFIG_I2C_OMAP) := i2c.o
+-obj-y += $(i2c-omap-m) $(i2c-omap-y)
+-
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+deleted file mode 100644
+index 58213d9..0000000
+--- a/arch/arm/plat-omap/i2c.c
++++ /dev/null
+@@ -1,116 +0,0 @@
+-/*
+- * linux/arch/arm/plat-omap/i2c.c
+- *
+- * Helper module for board specific I2C bus registration
+- *
+- * Copyright (C) 2007 Nokia Corporation.
+- *
+- * Contact: Jarkko Nikula <jhnikula@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+- * 02110-1301 USA
+- *
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/platform_device.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c-omap.h>
+-#include <linux/slab.h>
+-#include <linux/err.h>
+-#include <linux/clk.h>
+-
+-#include <plat/i2c.h>
+-
+-#define OMAP_I2C_MAX_CONTROLLERS 4
+-static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
+-
+-#define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
+-
+-/**
+- * omap_i2c_bus_setup - Process command line options for the I2C bus speed
+- * @str: String of options
+- *
+- * This function allow to override the default I2C bus speed for given I2C
+- * bus with a command line option.
+- *
+- * Format: i2c_bus=bus_id,clkrate (in kHz)
+- *
+- * Returns 1 on success, 0 otherwise.
+- */
+-static int __init omap_i2c_bus_setup(char *str)
+-{
+-	int ints[3];
+-
+-	get_options(str, 3, ints);
+-	if (ints[0] < 2 || ints[1] < 1 ||
+-			ints[1] > OMAP_I2C_MAX_CONTROLLERS)
+-		return 0;
+-	i2c_pdata[ints[1] - 1].clkrate = ints[2];
+-	i2c_pdata[ints[1] - 1].clkrate |= OMAP_I2C_CMDLINE_SETUP;
+-
+-	return 1;
+-}
+-__setup("i2c_bus=", omap_i2c_bus_setup);
+-
+-/*
+- * Register busses defined in command line but that are not registered with
+- * omap_register_i2c_bus from board initialization code.
+- */
+-int __init omap_register_i2c_bus_cmdline(void)
+-{
+-	int i, err = 0;
+-
+-	for (i = 0; i < ARRAY_SIZE(i2c_pdata); i++)
+-		if (i2c_pdata[i].clkrate & OMAP_I2C_CMDLINE_SETUP) {
+-			i2c_pdata[i].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
+-			err = omap_i2c_add_bus(&i2c_pdata[i], i + 1);
+-			if (err)
+-				goto out;
+-		}
+-
+-out:
+-	return err;
+-}
+-
+-/**
+- * omap_register_i2c_bus - register I2C bus with device descriptors
+- * @bus_id: bus id counting from number 1
+- * @clkrate: clock rate of the bus in kHz
+- * @info: pointer into I2C device descriptor table or NULL
+- * @len: number of descriptors in the table
+- *
+- * Returns 0 on success or an error code.
+- */
+-int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
+-			  struct i2c_board_info const *info,
+-			  unsigned len)
+-{
+-	int err;
+-
+-	BUG_ON(bus_id < 1 || bus_id > OMAP_I2C_MAX_CONTROLLERS);
+-
+-	if (info) {
+-		err = i2c_register_board_info(bus_id, info, len);
+-		if (err)
+-			return err;
+-	}
+-
+-	if (!i2c_pdata[bus_id - 1].clkrate)
+-		i2c_pdata[bus_id - 1].clkrate = clkrate;
+-
+-	i2c_pdata[bus_id - 1].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
+-
+-	return omap_i2c_add_bus(&i2c_pdata[bus_id - 1], bus_id);
+-}
 -- 
 1.8.1.1
