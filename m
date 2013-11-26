@@ -1,47 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Nov 2013 16:30:32 +0000
-Subject: STOP THE MADNESS
-Message-ID: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Nov 2013 09:31:25 -0700
+Subject: [PATCH 16/31] ASoC: tegra: use reset framework
+In-Reply-To: <20131126131410.GK14725@sirena.org.uk>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-17-git-send-email-swarren@wwwdotorg.org>
+ <20131116095529.GF15393@sirena.org.uk> <528A4C8C.3030200@wwwdotorg.org>
+ <20131118183716.GR2674@sirena.org.uk> <5293C787.1030005@wwwdotorg.org>
+ <20131126131410.GK14725@sirena.org.uk>
+Message-ID: <5294CCDD.30803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Versatile PB926 is currently broken in mainline because of this, and it's
-damn obvious that people are just churning out changes to "update" drivers
-without testing them at all.
+On 11/26/2013 06:14 AM, Mark Brown wrote:
+> On Mon, Nov 25, 2013 at 02:56:23PM -0700, Stephen Warren wrote:
+> 
+>> You didn't ack this one patch; I assume that was just an
+>> oversight?
+> 
+> No, it was because it looked incorrect based on the lack of tie in 
+> between the description and the code.
 
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc1+ #652
-Backtrace: 
-[<c0016f0c>] (dump_backtrace) from [<c00172ac>] (show_stack+0x18/0x1c)
- r6:c798ace0 r5:00000000 r4:c78257e0 r3:00200140
-[<c0017294>] (show_stack) from [<c0329ea0>] (dump_stack+0x20/0x28)
-[<c0329e80>] (dump_stack) from [<c004fa80>] (__lock_acquire+0x1c0/0x1b80)
-[<c004f8c0>] (__lock_acquire) from [<c0051970>] (lock_acquire+0x6c/0x80)
- r10:00000000 r9:c0455234 r8:00000060 r7:c047d798 r6:600000d3 r5:00000000
- r4:c782c000
-[<c0051904>] (lock_acquire) from [<c032e484>] (_raw_spin_lock_irqsave+0x60/0x74)
- r6:c01a1100 r5:800000d3 r4:c798acd0
-[<c032e424>] (_raw_spin_lock_irqsave) from [<c01a1100>] (pl061_irq_type+0x28/0x)
- r6:00000000 r5:00000000 r4:c798acd0
-[<c01a10d8>] (pl061_irq_type) from [<c0059ef4>] (__irq_set_trigger+0x70/0x104)
- r6:00000000 r5:c01a10d8 r4:c046da1c r3:c01a10d8
-[<c0059e84>] (__irq_set_trigger) from [<c005b348>] (irq_set_irq_type+0x40/0x60)
- r10:c043240c r8:00000060 r7:00000000 r6:c046da1c r5:00000060 r4:00000000
-[<c005b308>] (irq_set_irq_type) from [<c01a1208>] (pl061_irq_map+0x40/0x54)
- r6:c79693c0 r5:c798acd0 r4:00000060
-[<c01a11c8>] (pl061_irq_map) from [<c005d27c>] (irq_domain_associate+0xc0/0x190)
- r5:00000060 r4:c046da1c
-[<c005d1bc>] (irq_domain_associate) from [<c005d604>] (irq_domain_associate_man)
- r8:00000008 r7:00000000 r6:c79693c0 r5:00000060 r4:00000000
-[<c005d5d0>] (irq_domain_associate_many) from [<c005d864>] (irq_domain_add_simp)
- r8:c046578c r7:c035b72c r6:c79693c0 r5:00000060 r4:00000008 r3:00000008
-[<c005d814>] (irq_domain_add_simple) from [<c01a1380>] (pl061_probe+0xc4/0x22c)
- r6:00000060 r5:c0464380 r4:c798acd0
-[<c01a12bc>] (pl061_probe) from [<c01c0450>] (amba_probe+0x74/0xe0)
- r10:c043240c r9:c0455234 r8:00000000 r7:c047d7f8 r6:c047d744 r5:00000000
- r4:c0464380
+Hmm. You had asked:
 
-This is caused by the recently introduced irq_domain_add_simple() call
-being placed before the spinlock has been initialised, and guess what
-the side effect of that call is.
+>> @@ -1,6 +1,8 @@ config SND_SOC_TEGRA tristate "SoC Audio for the
+>> Tegra System-on-Chip" depends on (ARCH_TEGRA && TEGRA20_APB_DMA)
+>> || COMPILE_TEST +	depends on COMMON_CLK +	depends on
+>> RESET_CONTROLLER
+> 
+> Do you depend on COMMON_CLK here?  I only noticed reset controller
+> API dependencies here but perhaps I missed this (or it's fixing a
+> dependency that should be there already).
 
-Far from impressed.
+I responded:
+
+> It's fixing a dependency that should already be there, in the 
+> COMPILE_TEST case. In the (ARCH_TEGRA && TEGRA20_APB_DMA) case, 
+> COMMON_CLOCK is always selected.
+> 
+> Do you want me to split this out into a separate patch? If so, I'd 
+> prefer not to apply that separate patch immediately to 3.13 as a
+> fix, since then it'd delay applying this series until after -rc2 is
+> out, unless you can get the fix into -rc1 quickly...
+
+(although at this point in time, the DMA patches which this depend on
+aren't likely to be ready soon enough for the delay to matter, so I
+could send the addition of depends COMMON_CLK as a separate patch for
+-rc2 if you want)
+
+and you said:
+
+> I don't really care, it was just that I was looking for something
+> to do with clocks in the patch and couldn't find anything.  Perhaps
+> a note in the changelog if you need to respin so I don't forget and
+> say the same thing again.
+
+... so, I thought you were OK with that one issue. Were there other
+issues you didn't mention before?
