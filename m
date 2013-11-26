@@ -1,30 +1,34 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 26 Nov 2013 10:14:54 -0800
-Subject: [PATCH v2] watchdog: s3c2410_wdt: Only register for cpufreq on
- ARM_S3C24XX_CPUFREQ
-In-Reply-To: <1385422603-22684-1-git-send-email-dianders@chromium.org>
-References: <1385420137-32725-1-git-send-email-dianders@chromium.org>
- <1385422603-22684-1-git-send-email-dianders@chromium.org>
-Message-ID: <5294E51E.60907@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 10:20:22 -0800
+Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
+In-Reply-To: <CAKZq+rcoC5PLSVVazWcce7V7TcBM8=M2jM56bvk9HO2orKt8fg@mail.gmail.com>
+References: <87hab9agjr.fsf@gmail.com>
+ <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
+ <87wqk3n54l.fsf@gmail.com> <20131120183548.GH10317@atomide.com>
+ <CAKZq+rcoC5PLSVVazWcce7V7TcBM8=M2jM56bvk9HO2orKt8fg@mail.gmail.com>
+Message-ID: <20131126182022.GJ26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 03:36 PM, Doug Anderson wrote:
-> On modern SoCs the watchdog timer is parented on a clock that doesn't
-> change every time we have a cpufreq change.  That means we don't need
-> to constantly adjust the watchdog timer, so avoid registering for and
-> dealing with cpufreq transitions unless we've actually got
-> CONFIG_ARM_S3C24XX_CPUFREQ defined.
->
-> Note that this is more than just an optimization.  The s3c2410
-> watchdog driver actually pats the watchdog on every CPU frequency
-> change.  On modern systems these happen many times per second (even in
-> a system where "nothing" is happening).  That effectively makes any
-> userspace watchdog program useless (the watchdog is constantly patted
-> by the kernel).  If we need ARM_S3C24XX_CPUFREQ defined on a
-> multiplatform kernel we'll need to make sure that kernel supports
-> common clock and change this to user common clock framework.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+* Chao Xu <caesarxuchao@gmail.com> [131122 19:28]:
+> "I wonder if we also have some dependency to some earlier versions of
+> u-boot as u-boot now only muxes the essential pins?"
+> This is exactly the problem in my case. I added "#define
+> CONFIG_SYS_ENABLE_PADS_ALL" in u-boot/include/configs/omap4_common.h
+> and now there is output.
+> 
+> I guess the reason that the u-boot worked out-of-box for Ben but not
+> for me is that I missed some configurations in v3.12 kernel. I image
+> there is a config options that tells the kernel to take care of the
+> non-essential pins that used to be the responsibility of u-boot. Could
+> you confirm my hypothesis? And if so, could you kindly suggest what's
+> the name of the config option?
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+That would be CONFIG_PINCTRL_SINGLE=y for device tree based omaps.
+But if we have the configuration missing for some driver in the
+board specific .dts file, that won't help naturally. We do have
+PINCTRL_SINGLE enabled in omap2plus_defconfig.
+
+Regards,
+
+Tony
