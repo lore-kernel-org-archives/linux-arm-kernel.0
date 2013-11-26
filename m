@@ -1,134 +1,87 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 26 Nov 2013 18:27:56 +0200
-Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <817E4263-5E61-4471-AED0-5C97FD2B902F@kernel.crashing.org>
-References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
- <817E4263-5E61-4471-AED0-5C97FD2B902F@kernel.crashing.org>
-Message-ID: <5294CC0C.9000203@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Nov 2013 09:37:48 -0700
+Subject: [PATCH V3] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <1385474368.1871.6.camel@smile>
+References: <1385416039-3170-1-git-send-email-swarren@wwwdotorg.org>
+ <1385474368.1871.6.camel@smile>
+Message-ID: <5294CE5C.1090901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2013 11:04 PM, Kumar Gala wrote:
-> 
-> On Nov 20, 2013, at 9:46 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
-> 
->> Add bindings for AEMIF controller drivers/memory/ti-aemif.c
+On 11/26/2013 06:59 AM, Shevchenko, Andriy wrote:
+> On Mon, 2013-11-25 at 14:47 -0700, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
 >>
-> 
-> Binding shouldn?t normally refer to code.
-> 
-> Just saying something like:
-> 
-> Adding binging for TI Async External Memory Interface (AEMIF) controller.
-> 
-> 
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> ---
->> .../bindings/memory-controllers/ti-aemif.txt       |  198 ++++++++++++++++++++
->> 1 file changed, 198 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>> dma_request_slave_channel() simply returns NULL whenever DMA channel
+>> lookup fails. Lookup could fail for two distinct reasons:
 >>
->> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->> new file mode 100644
->> index 0000000..be0c0cb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->> @@ -0,0 +1,198 @@
->> +* Device tree bindings for Texas instruments AEMIF controller
->> +
->> +Th Async External Memory Interface (EMIF16/AEMIF) controller is intended to
+>> a) No DMA specification exists for the channel name.
+>>    This includes situations where no DMA specifications exist at all, or
+>>    other general lookup problems.
+>>
+>> b) A DMA specification does exist, yet the driver for that channel is not
+>>    yet registered.
+>>
+>> Case (b) should trigger deferred probe in client drivers. However, since
+>> they have no way to differentiate the two situations, it cannot.
+>>
+>> Implement new function dma_request_slave_channel_or_err(), which performs
+>> identically to dma_request_slave_channel(), except that it returns an
+>> error-pointer rather than NULL, which allows callers to detect when
+>> deferred probe should occur.
+>>
+>> Eventually, all drivers should be converted to this new API, the old API
+>> removed, and the new API renamed to the more desirable name. This patch
+>> doesn't convert the existing API and all drivers in one go, since some
+>> drivers call dma_request_slave_channel() then dma_request_channel() if
+>> that fails. That would require either modifying dma_request_channel() in
+>> the same way, or adding extra error-handling code to all affected
+>> drivers, and there are close to 100 drivers using the other API, rather
+>> than just the 15-20 or so that use dma_request_slave_channel(), which
+>> might be tenable in a single patch.
+>>
+>> acpi_dma_request_slave_chan_by_name() doesn't currently implement
+>> deferred probe. It should, but this will be addressed later.
 > 
-> The?
+> Couple of comments below.
 > 
->> +provide a glue-less interface to a variety of asynchronous memory devices like
->> +ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
->> +can be accessed at any given time via four chip selects with 64M byte access
->> +per chip select. Synchronous memories such as DDR1 SD RAM, SDR SDRAM
->> +and Mobile SDR are not supported.
->> +
->> +Documentation:
->> +Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
->> +OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
->> +Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
->> +
->> +Required properties:
->> +
->> +- compatible:		"ti,davinci-aemif"
->> +			"ti,keystone-aemif"
->> +			"ti,omap-L138-aemif"
->> +
->> +- #address-cells:	Must be 2. The first cell is the memory partition
->> +			number. The 0 partition is for chip selects. And the
->> +			second cell is the offset into the partition, for the 0
->> +			partition it corresponds to chip select offset.
->> +
+> []
 > 
-> Is the first cell just the chip select number?
-
-No. It's rather memory range/partition number. Now there are 2 partitions:
-- control partition which is common for all CS interfaces
-- CS-specific partition/range
-(this one can be splitted according to specific SoC requirement)
-
-As per Keystone TCI6638K2K
- Datasheet http://www.ti.com/lit/ds/sprs836d/sprs836d.pdf:
-
-1) the memory range 0 will be from 0x30000000 size 0x10000000:
-00 3000 0000 - 00 33FF FFFF 64M EMIF16 CE0
-00 3400 0000 - 00 37FF FFFF 64M EMIF16 CE1
-00 3800 0000 - 00 3BFF FFFF 64M EMIF16 CE2
-00 3C00 0000 - 00 3FFF FFFF 64M EMIF16 CE3
-
-2) the memory range 1:
-00 2100 0A00 - 00 2100 0AFF 256 AEMIF Config
-
-And AEMIF node contains definition:
-ranges = <0 0 0x30000000 0x10000000
-	  1 0 0x21000A00 0x0000100>;
-
-
-Child node has (nand):
- reg = <0 0 0x4000000 (cs0)
-        - or - 0 0x4000000 0x4000000 (cs1)
-        - or - 0 0x8000000 0x4000000 (cs2)
-	- or - 0 0xC000000 0x4000000 (cs3)
-	- and -
-        1 0 0x0000100>; (for all cs)
-
-For example for cs2 child node the resulting mem range 0 will be calculated as
-
-from: 0x30000000 + (0 0x8000000 - 0 0)
-size: 0x4000000
-
-We don't encode CS number in reg/ranges, because it will allow simply change 
-AEMIF DT definitions depending on each SoC
-(AEMIF CS memory range can be continuous as above or not, if not - additional
-range/partition can be added and child device can select the proper one).
-
+>> --- a/drivers/dma/of-dma.c
+>> +++ b/drivers/dma/of-dma.c
 > 
-> I?m wondering if this is similar to FSL Localbus controller, see the binding:
+> []
 > 
-> bindings/powerpc/fsl/lbc.txt
-
-Don't think so :) it looks similar just because of using standard bindings
-(gpmc-nand.c mvebu-devbus.txt ti-gpmc.txt and etc.)
-
+>> @@ -152,17 +152,18 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>>  	struct of_dma		*ofdma;
+>>  	struct dma_chan		*chan;
+>>  	int			count, i;
+>> +	int			ret_no_channel = -ENODEV;
 > 
->> +- #size-cells:		Must be set to 1.
->> +
->> +- reg:			contains offset/length value for AEMIF control registers
->> +			space.
->> +
->> +- ranges:		Must be set up to reflect the memory layout for 4
->> +			chipselects and for AEMIF control range.
->> +
->> +- clocks:		phandle reference to the controller clock. Required only
->> +			if clock tree data present in device tree.
->> +			See clock-bindings.txt
-[..]
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Could we re-use chan for the error as well?
 
-Regards,
--grygorii
+No, because that gets over-written each time ofdma->of_dma_xlate() is
+called, and that could fail and cause the result not to be returned, and
+then we would have lost any -EPROBE_DEFERRED value that was stored there
+to be returned in the nothing-found case.
+
+>> @@ -174,8 +175,10 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>>  
+>>  		if (ofdma)
+> 
+> if (ofdma) {
+> ...
+> 
+>>  			chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
+>> -		else
+>> +		else {
+> 
+> } else {
+> 
+> to keep style.
+
+OK, I've fixed that up locally. I assume it's not worth a repost just
+for that change, although I will repost if the DMA maintainers want to
+create the topic branches rather than me, but there's been no word on
+that yet.
