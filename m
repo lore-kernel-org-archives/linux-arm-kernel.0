@@ -1,55 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Nov 2013 14:41:17 +0100
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131126134117.GF28642@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Nov 2013 13:41:55 +0000
+Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
+ p2v and v2p conversions'
+In-Reply-To: <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
+References: <20131125223636.GA20822@obsidianresearch.com>
+ <20131125232003.GU16735@n2100.arm.linux.org.uk>
+ <20131125233654.GV16735@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
+ <20131126095430.GA16735@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
+Message-ID: <20131126134155.GB16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K?nig wrote:
-> The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
+On Tue, Nov 26, 2013 at 08:35:43AM -0500, Nicolas Pitre wrote:
+> On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
 > 
-> So better include it explicitly not only because the last link will go
-> away soon.
+> > On Mon, Nov 25, 2013 at 10:56:25PM -0500, Nicolas Pitre wrote:
+> > > What about simply doing the following instead, which I'm sure used to 
+> > > work properly at some point:
+> > > 
+> > > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> > > index 9ecccc8650..2b8b8d3236 100644
+> > > --- a/arch/arm/include/asm/memory.h
+> > > +++ b/arch/arm/include/asm/memory.h
+> > > @@ -239,6 +239,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+> > >  
+> > >  #else
+> > >  
+> > > +#ifndef PHYS_OFFSET
+> > > +#ifdef PLAT_PHYS_OFFSET
+> > > +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
+> > > +#else
+> > > +#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+> > > +#endif
+> > > +#endif
+> > > +
+> > >  static inline phys_addr_t __virt_to_phys(unsigned long x)
+> > >  {
+> > >  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+> > > @@ -253,14 +261,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+> > >  #endif
+> > >  #endif /* __ASSEMBLY__ */
+> > >  
+> > > -#ifndef PHYS_OFFSET
+> > > -#ifdef PLAT_PHYS_OFFSET
+> > > -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
+> > > -#else
+> > > -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+> > > -#endif
+> > > -#endif
+> > 
+> > And that makes PHYS_OFFSET undefined to assembly code - and we have
+> > references to it from said code.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Ping. Is this patch ok despite Jean-Christophe's objection?
+> Why does the kernel compile properly for me with this change then?
 
-Best regards
-Uwe
+Nicolas,
 
-> ---
->  drivers/rtc/rtc-at91sam9.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> index 309b8b3..5963743 100644
-> --- a/drivers/rtc/rtc-at91sam9.c
-> +++ b/drivers/rtc/rtc-at91sam9.c
-> @@ -24,7 +24,7 @@
->  
->  #include <mach/at91_rtt.h>
->  #include <mach/cpu.h>
-> -
-> +#include <mach/hardware.h>
->  
->  /*
->   * This driver uses two configurable hardware resources that live in the
-> -- 
-> 1.8.4.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Try using grep rather than just typing emails for the hell of it.
+Try looking at the patch I sent to fix this issue.  Either of those
+will give you the appropriate clue necessary to answer your question.
