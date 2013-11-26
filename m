@@ -1,75 +1,66 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 26 Nov 2013 22:43:47 +0100
-Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
- clk_prepare/unprepare
-In-Reply-To: <20131126195422.GJ24310@saruman.home>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2042860.IXZhL6v7c2@avalon> <20131126195422.GJ24310@saruman.home>
-Message-ID: <1896305.mmzrFTZ95a@avalon>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 26 Nov 2013 16:49:10 -0500
+Subject: HYP Kernel boot requirements
+In-Reply-To: <20131126173751.GF2355@e103592.cambridge.arm.com>
+References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
+ <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
+ <52937AB4.1060901@ti.com>
+ <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
+ <529381E4.3090405@ti.com> <20131125172825.GD8396@arm.com>
+ <5293A888.9050500@ti.com> <20131126141346.GA692@arm.com>
+ <5294B471.7020205@ti.com> <20131126173751.GF2355@e103592.cambridge.arm.com>
+Message-ID: <52951756.9000206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On Tuesday 26 November 2013 13:54:22 Felipe Balbi wrote:
-> On Tue, Nov 26, 2013 at 03:16:47AM +0100, Laurent Pinchart wrote:
-> > On Monday 25 November 2013 20:12:39 Felipe Balbi wrote:
-> > > On Tue, Nov 26, 2013 at 02:59:51AM +0100, Laurent Pinchart wrote:
-> > > > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
-> > > > > > > > Turn clk_enable() and clk_disable() calls into
-> > > > > > > > clk_prepare_enable()
-> > > > > > > > and clk_disable_unprepare() to get ready for the migration to
-> > > > > > > > the
-> > > > > > > > common clock framework.
-> > > > > > > > 
-> > > > > > > > Cc: Felipe Balbi <balbi@ti.com>
-> > > > > > > > Cc: linux-usb at vger.kernel.org
-> > > > > > > > Signed-off-by: Laurent Pinchart
-> > > > > > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > > > 
-> > > > > > > Thank you for the patch.
-> > > > > > > 
-> > > > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> > > > > > 
-> > > > > > Could you please pick this patch up ?
-> > > > > 
-> > > > > after -rc1 is out, I don't see why not.
-> > > > 
-> > > > Great then :-)
-> > > > 
-> > > > As this patch is a dependency for other series that will go through
-> > > > different trees, could you please provide a stable branch in your tree
-> > > > with this patch included that you will push to v3.14 ?
-> > > 
-> > > You guys are always killing me with those "stable branch" requests :-)
-> > > 
-> > > I'll get one up tomorrow. I guess I can avoid a topic branch altogether
-> > > if I just make this the first patch in "next" branch. I could push only
-> > > $subject for now until you merge then I'll push other stuff. Is that
-> > > enough for you ? My 'next' is always immutable.
-> > 
-> > That sounds good, thank you. You can already push the other patches
-> > without waiting for me, I can dig the commit ID of the first patch in your
-> > next branch.
+On Tuesday 26 November 2013 12:37 PM, Dave Martin wrote:
+> On Tue, Nov 26, 2013 at 09:47:13AM -0500, Santosh Shilimkar wrote:
+>> On Tuesday 26 November 2013 09:13 AM, Catalin Marinas wrote:
+>>> On Mon, Nov 25, 2013 at 07:44:08PM +0000, Santosh Shilimkar wrote:
+>>>> On Monday 25 November 2013 12:28 PM, Catalin Marinas wrote:
+>>>>> On Mon, Nov 25, 2013 at 04:59:16PM +0000, Santosh Shilimkar wrote:
+>>>>>> What I am saying is the platforms like OMAP5 already support PM in
+>>>>>> mainline kernel and we can't break that for KVM. Boot-loaders
+>>>>>> would be thrashed after boot so you need something which runs
+>>>>>> in Kernel or along with Kernel to have equivalent of hyp
+>>>>>> switching.
+>>>>>>
+>>>>>> Am not challenging the agreed direction but we need to solve the
+>>>>>> PM problem as well before making "all CPU runs boot-loader for
+>>>>>> HYP kernels" as a must have. At least its is a change in boot
+>>>>>> strategy from existing kernels.
+>>>>>
+>>>>> Of course I recommend PSCI which covers both hotplug and suspend ;), but
+>>>>> I guess it's not the case for OMAP5. Since OMAP has its own secondary
+>>>>> booting protocol and CPU hotplug re-entry, can you not just use
+>>>>> different entry point when the primary CPU was initially started in Hyp
+>>>>> mode (e.g. omap5_hyp_secondary_startup)?
+>>>>>
+>>>> How will that solve the guest secondary boot failure case when using
+>>>> the same kernel binary for guest-boot ? Even for primary CPU which
+>>>> will be suspended it needs to resume already in HYP mode and its not
+>>>> going to go through boot-loader. So the low power code needs to have
+>>>> HYP switch code so that CPU resumes in HYP mode.
+>>>
+>>> Is it late to rewrite the OMAP5 firmware?
+>>>
+>> Well its ROM'ed unfortunately so no choice. OMAP5 ROM did implement
+>> a secure API which lets you enter into HYP mode and thats the only
+>> thing can be used.
 > 
-> pushed, btw. you should have received my automatic email.
+> If the ROM is capable of loading some additional signed Secure World
+> firmware after the ROM itself has booted, PSCI could be implemented
+> in the second, resident firmware payload.
+> 
+> Some SoCs ship with boot ROMs that can do that -- is this not the case
+> for OMAP5?
+> 
+On OMAP, the secure devices there is a way to do this but not for 
+general purpose devices. General purpose devices once you
+exit the ROM code, we exit out of security and only way to
+re-enter secure word is via ROM implemented monitor/secure
+APIs.
 
-I have, thank you.
-
-> If you merge my next, you'll get only that commit. I believe tomorrow I'll
-> be able to push more commits into next.
-
-I've asked Simon Horman (the Renesas SoC kernel maintainer) to merge your next 
-branch in his tree.
-
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/b12b2a0e/attachment.sig>
+regards,
+Santosh
