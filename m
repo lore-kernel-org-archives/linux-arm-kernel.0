@@ -1,45 +1,50 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 26 Nov 2013 10:10:41 +0000
-Subject: [RFC] ARM Generic Timer + Interaction with WFI on Cortex-A15
-In-Reply-To: <529442BB.1000006@gmail.com>
-References: <528DBD0C.6040203@gmail.com>
- <20131121120025.GC31695@e102568-lin.cambridge.arm.com>
- <529442BB.1000006@gmail.com>
-Message-ID: <20131126101041.GA12304@e102568-lin.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 26 Nov 2013 15:41:41 +0530
+Subject: [PATCH v3 3/4] ata: Add APM X-Gene SoC SATA host controller driver
+In-Reply-To: <CAPw-ZTn1N7+EFu9L6U+P9=9ii3k1BjycYXdNCdxCVPb8SaJWxA@mail.gmail.com>
+References: <1384465153-29902-1-git-send-email-lho@apm.com>	<1384465153-29902-3-git-send-email-lho@apm.com>	<1384465153-29902-4-git-send-email-lho@apm.com>	<201311151448.16279.arnd@arndb.de>	<CAPw-ZTmaz3nnV3ThRgecT_RaYYW0bmfWvL8Kr-S3z1aKyUWc+w@mail.gmail.com>
+ <CAPw-ZTn1N7+EFu9L6U+P9=9ii3k1BjycYXdNCdxCVPb8SaJWxA@mail.gmail.com>
+Message-ID: <529473DD.1090804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
 
-On Tue, Nov 26, 2013 at 06:42:03AM +0000, Marc C wrote:
-> Hello Lorenzo,
+On Wednesday 20 November 2013 02:52 AM, Loc Ho wrote:
+> Hi Kishon,
 > 
-> > It is an A15 oddity and we should not care, given that this behaviour
-> > is platform specific and likely to fail in most common A15
-> > implementations.
+>>>> +
+>>>> +/* Temporary function until the PHY parameter API */
+>>>> +extern void xgene_ahci_phy_set_pq(struct phy *phy, int chan, int data);
+>>>> +extern void xgene_ahci_phy_set_spd(struct phy *phy, int chan, int gen);
+>>>
+>>> Ah, that should have been mentioned in the changeset text. Do you think you
+>>> can remove these for the final version?
+>> [Loc Ho]
+>> Yes... Krishon, can you provide an patch that allows me to accommodate
+>> this? Or should I come up one? I will trying to get rip of the first
+>> one. But I will need the function to set the PHY speed - for
+>> Gen2/Gen1. Let's plan on add these function:
+>>
+>> a. int (*set_speed)(int gen_speed) where gen_speed is either AUTO,
+>> GEN1, GEN2, or GEN3.
+>> b. Change the PHY init function to take an optional parameter. This
+>> would help my first function in case I can get rip of it.
+>>
+> [Loc Ho]
+> I will provide this patch as part of my next version to include an
+> function as follow:
+
+sure..
 > 
-> I'm supporting a platform where this "oddity" is actually a relied-upon
-> feature. Our ARMv7-compliant MPCore implements the ARM Generic Timer per
-> spec. Our implementation isn't a constituent of a big.LITTLE
-> arrangement, and we'll never completely power-off all cores (we just use
-> WFI).
+> int set_speed(struct *phy, int lane, u64 speed);
 
-So what's the problem then ? Just avoid adding CPUIDLE_FLAG_TIMER_STOP
-to the C-state flags and you are all set, or I am missing something here ?
+it should be phy_set_speed.
+> 
+> where lane indicates the lane of the PHY and speed is the PHY speed in hertz.
 
-> According to the documentation that currently exists, it seems that the
-> behavior of the ARM Generic Timer on cores like the A15 is really just
-> an attribute of that specific implementation. As you've alluded to,
-> there may be other implementations that are also usable when the CPUs
-> enter WFI. That said, do you object to having an optional boolean
-> property in the arch_timer DT binding [1] which allows users to override
-> the C3STOP flag? The default behavior would be as is currently
-> implemented, and for the odd machines we can add the new property to the DT.
+Does lane here means the number of lanes? Is the lane also obtained after the
+training sequence?
 
-Yes I do object. Timer binding is global in the DT and do not want to
-override the flag for all local timers when, as I mentioned, A15 behaviour is
-just an exception. If you really need that, please write an idle driver that
-does not enter broadcast mode on C-state entry (see above).
-
-Thanks,
-Lorenzo
+Thanks
+Kishon
