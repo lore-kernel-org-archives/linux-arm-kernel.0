@@ -1,42 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Nov 2013 19:36:29 +0100
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <20131126134444.GG28642@pengutronix.de>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131126134117.GF28642@pengutronix.de>
- <20131126134444.GG28642@pengutronix.de>
-Message-ID: <20131126183629.GK28642@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Nov 2013 18:37:39 +0000
+Subject: [PATCH 16/31] ASoC: tegra: use reset framework
+In-Reply-To: <5294CCDD.30803@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-17-git-send-email-swarren@wwwdotorg.org>
+ <20131116095529.GF15393@sirena.org.uk>
+ <528A4C8C.3030200@wwwdotorg.org>
+ <20131118183716.GR2674@sirena.org.uk>
+ <5293C787.1030005@wwwdotorg.org>
+ <20131126131410.GK14725@sirena.org.uk>
+ <5294CCDD.30803@wwwdotorg.org>
+Message-ID: <20131126183739.GR14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+On Tue, Nov 26, 2013 at 09:31:25AM -0700, Stephen Warren wrote:
 
-On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K?nig wrote:
-> > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K?nig wrote:
-> > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
-> > > 
-> > > So better include it explicitly not only because the last link will go
-> > > away soon.
-> > > 
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Ping. Is this patch ok despite Jean-Christophe's objection?
-> I saw that akpm already took it into his tree.
-This patch is one of the last few that are needed to drop <mach/timex.h>
-alltogether that I don't have an ack from the respective maintainer yet.
+> ... so, I thought you were OK with that one issue. Were there other
+> issues you didn't mention before?
 
-Can you give your ack instead of sending the patch to Linus, then I'd
-take it with the patch dropping <mach/timex.h> to make it easier to
-merge.
-
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Probably not but I'd need to reread it, I don't think I got that much
+further than noticing that there weren't any clock changes (the fact
+that the clock dependency was getting added in a DMA series set off
+alarm bells).  To be honest given the number of revisions that seem to
+be required I'd been expecting to see a respin of the series, the ASoC
+generic DMA changes did need a respin before they can be merged and I do
+want to get them into the ASoC tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/be688e10/attachment.sig>
