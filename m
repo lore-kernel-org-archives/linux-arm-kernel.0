@@ -1,89 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Nov 2013 14:55:16 +0000
-Subject: [PATCH v5 2/4] Documentation: Add documentation for APM X-Gene
- SoC SATA host controller DTS binding
-In-Reply-To: <1385449285-30764-3-git-send-email-lho@apm.com>
-References: <1385449285-30764-1-git-send-email-lho@apm.com>
- <1385449285-30764-2-git-send-email-lho@apm.com>
- <1385449285-30764-3-git-send-email-lho@apm.com>
-Message-ID: <20131126145515.GD5402@e106331-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Nov 2013 15:58:20 +0100
+Subject: [PATCH -v2] fbdev: sh_mobile_meram: Fix defined but not used
+ compiler warnings
+In-Reply-To: <5294B3B9.3090104@ti.com>
+References: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
+ <5204468.CmggZzW3kO@avalon> <5294B3B9.3090104@ti.com>
+Message-ID: <1510041.WqZSiK0jXs@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 07:01:23AM +0000, Loc Ho wrote:
-> Documentation: Add documentation for APM X-Gene SoC SATA host controller DTS binding
+Hi Tomi,
+
+On Tuesday 26 November 2013 16:44:09 Tomi Valkeinen wrote:
+> On 2013-11-06 13:57, Laurent Pinchart wrote:
+> > On Wednesday 06 November 2013 09:57:27 Geert Uytterhoeven wrote:
+> >> If both CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME are not set:
+> >> 
+> >> drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend?
+> >> defined but not used drivers/video/sh_mobile_meram.c:597: warning:
+> >> ?sh_mobile_meram_resume? defined but not used
+> >> 
+> >> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > 
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > 
+> > and applied to my tree.
 > 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->  .../devicetree/bindings/ata/apm-xgene.txt          |  102 ++++++++++++++++++++
->  1 files changed, 102 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
+> What does that mean? Are you collecting sh_mobile video patches?
 > 
-> diff --git a/Documentation/devicetree/bindings/ata/apm-xgene.txt b/Documentation/devicetree/bindings/ata/apm-xgene.txt
-> new file mode 100644
-> index 0000000..879eee7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/apm-xgene.txt
-> @@ -0,0 +1,102 @@
-> +* APM X-Gene 6.0 Gb/s SATA host controller and clock nodes
-> +
-> +SATA host controller nodes are defined to describe on-chip Serial ATA
-> +controllers. Each SATA controller (pair of ports) have its own node. Its
-> +corresponding clock nodes are shown below.
-> +
-> +Required properties:
-> +- compatible		: Shall be "apm,xgene-ahci-sgmii" if mux'ed with SGMII
-> +			  or "apm,xgene-ahci-pcie" if mux'ed with PCIe.
-> +- reg			: First memory resource shall be the AHCI memory
-> +			  resource.
-> +			  Second memory resource shall be the host controller
-> +			  memory resource.
-> +- interrupt-parent	: Interrupt controller.
+> Or to rephrase, shall I apply this to fbdev fixes tree?
 
-I don't think that's strictly required.
+I was planning to send you a pull request for that, but if you can pick it up 
+that's even easier, thanks.
 
-> +- interrupts		: Interrupt mapping for SATA host controller IRQ.
-> +- clocks		: Reference to the clock entry.
-> +- phys			: PHY reference with parameter 0.
-> +- phy-names		: Name of the PHY. Shall be "sata-6g".
-> +
-> +Optional properties:
-> +- status		: Shall be "ok" if enabled or "na" if disabled.
-> +			  Default is "ok".
+-- 
+Regards,
 
-Why not use the more standard "disabled" string, as I asked you to
-previously?
-
-[...]
-
-> +		sata2: sata at 1a400000 {
-> +			compatible = "apm,xgene-ahci-sgmii";
-> +			reg = <0x0 0x1a400000 0x0 0x1000>,
-> +			      <0x0 0x1f220000 0x0 0x10000>;
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0x0 0x87 0x4>;
-> +			status = "ok";
-> +			clocks = <&sata23clk 0>;
-> +			phys = <&phy2 0>;
-> +			phy-names = "sata-6g";
-> +		};
-> +
-> +		sata3: sata at 1a800000 {
-> +			compatible = "apm,xgene-ahci-pcie";
-> +			reg = <0x0 0x1a800000 0x0 0x1000>,
-> +			      <0x0 0x1f230000 0x0 0x10000>;
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0x0 0x88 0x4>;
-> +			status = "ok";
-> +			clocks = <&sata45clk 0>;
-> +			phys = <&phy3 0>;
-> +			phy-names = "sata-6g";
-> +		};
-
-The example is pointlessly huge. You could trim it down two these last
-two nodes (with a phy node and some fixed clocks). 
-
-Thanks,
-Mark.
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/9a4a3971/attachment.sig>
