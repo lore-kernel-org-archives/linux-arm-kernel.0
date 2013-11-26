@@ -1,58 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 26 Nov 2013 08:35:43 -0500 (EST)
-Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
- p2v and v2p conversions'
-In-Reply-To: <20131126095430.GA16735@n2100.arm.linux.org.uk>
-References: <20131125223636.GA20822@obsidianresearch.com>
- <20131125232003.GU16735@n2100.arm.linux.org.uk>
- <20131125233654.GV16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
- <20131126095430.GA16735@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 26 Nov 2013 14:37:31 +0100
+Subject: [PATCH] rtc: pxa: drop usage of CLOCK_TICK_RATE
+In-Reply-To: <1383942318-12569-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1383942318-12569-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131126133731.GE28642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
+Hello,
 
-> On Mon, Nov 25, 2013 at 10:56:25PM -0500, Nicolas Pitre wrote:
-> > What about simply doing the following instead, which I'm sure used to 
-> > work properly at some point:
-> > 
-> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > index 9ecccc8650..2b8b8d3236 100644
-> > --- a/arch/arm/include/asm/memory.h
-> > +++ b/arch/arm/include/asm/memory.h
-> > @@ -239,6 +239,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> >  
-> >  #else
-> >  
-> > +#ifndef PHYS_OFFSET
-> > +#ifdef PLAT_PHYS_OFFSET
-> > +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > +#else
-> > +#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > +#endif
-> > +#endif
-> > +
-> >  static inline phys_addr_t __virt_to_phys(unsigned long x)
-> >  {
-> >  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> > @@ -253,14 +261,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> >  #endif
-> >  #endif /* __ASSEMBLY__ */
-> >  
-> > -#ifndef PHYS_OFFSET
-> > -#ifdef PLAT_PHYS_OFFSET
-> > -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > -#else
-> > -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > -#endif
-> > -#endif
+[Cc: += akpm]
+
+On Fri, Nov 08, 2013 at 09:25:18PM +0100, Uwe Kleine-K?nig wrote:
+> The symbol CLOCK_TICK_RATE is (at least on ARM) defined in an platform
+> specific header <mach/timex.h>. There are plans to stop using and kill
+> these platform specific headers. So fix the only user of pxa's
+> <mach/timex.h> to not use it.
 > 
-> And that makes PHYS_OFFSET undefined to assembly code - and we have
-> references to it from said code.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Who is looking for this patch?
 
-Why does the kernel compile properly for me with this change then?
+Best regards
+Uwe
 
+> ---
+> It would be nice to use the clk API to find the tick rate, but I didn't
+> find any clk to use.
+> ---
+>  drivers/rtc/rtc-pxa.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+> index a355f2b..0ba07e1 100644
+> --- a/drivers/rtc/rtc-pxa.c
+> +++ b/drivers/rtc/rtc-pxa.c
+> @@ -32,7 +32,7 @@
+>  
+>  #include <mach/hardware.h>
+>  
+> -#define TIMER_FREQ		CLOCK_TICK_RATE
+> +#define TIMER_FREQ		get_clock_tick_rate()
+>  #define RTC_DEF_DIVIDER		(32768 - 1)
+>  #define RTC_DEF_TRIM		0
+>  #define MAXFREQ_PERIODIC	1000
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Nicolas
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
