@@ -1,86 +1,253 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Tue, 26 Nov 2013 23:32:25 +0000
-Subject: ACPI
-In-Reply-To: <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
- <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
- <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
- <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
- <20131125154110.GB3243@srcf.ucam.org>
- <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
- <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
- <20131126183344.GA16074@srcf.ucam.org>
- <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
-Message-ID: <20131126233224.GA21189@srcf.ucam.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 15:33:35 -0800
+Subject: [PATCH 05/12] ARM: OMAP2+: Remove legacy PM init
+In-Reply-To: <CAGo_u6pwOdizyxD8Hy_znQHG0Spk-UTOKYxfj30UMxi7=cUbtw@mail.gmail.com>
+References: <1385424867-27243-1-git-send-email-tony@atomide.com>
+ <1385424867-27243-6-git-send-email-tony@atomide.com>
+ <CAGo_u6pwOdizyxD8Hy_znQHG0Spk-UTOKYxfj30UMxi7=cUbtw@mail.gmail.com>
+Message-ID: <20131126233335.GS26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 05:11:23PM -0600, Matt Sealey wrote:
+* Nishanth Menon <nm@ti.com> [131126 14:14]:
+> On Mon, Nov 25, 2013 at 6:14 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > This is no longer needed when booted with device tree.
+> [...]
+> >  static inline void omap_init_cpufreq(void)
+> >  {
+> >         struct platform_device_info devinfo = { };
+> >
+> > -       if (!of_have_populated_dt())
+> > -               devinfo.name = "omap-cpufreq";
+> > -       else
+> > -               devinfo.name = "cpufreq-cpu0";
+> > +       devinfo.name = "cpufreq-cpu0";
+> 
+> struct platform_device_info devinfo = { .name = "cpufreq-cpu0" };
+> 
+> otherwise, ok with the change.
 
-> Before stabbing around adding ACPI and then having DT-in-ACPI isn't
-> there a use case for an an ARM Linux kernel actually being a good
-> citizen of UEFI?
+OK thanks, updated patch below.
 
-That's work in progress. Patches have been posted and are getting pretty 
-close to being mergeable. You can already run VExpress with UEFI.
+Regards,
 
-> Having UEFI pass along the DT as a configuration table as well as ACPI
-> tables should be the first order of business. It needn't be
-> DT-specific either - there's no reason that specific configuration
-> table can't define a thousand ways to boot Linux on ARM. But one or
-> two might be better for the sanity of the Linux kernel guys. In fact,
-> because UEFI hands information in the early boot process to the
-> 'application' (being the kernel), and has a very well defined API, it
-> would remove the need for weird out of band stuff like /memreserve/
-> entries in the DT and simplify and make the Linux early boot process
-> more robust and debuggable.
+Tony
 
-Passing both is somewhat problematic - if one is supposed to be 
-sufficient, why pass the other? It'd be pretty easy to end up with skew 
-between them, and unless we're clear on what happens in the event of 
-conflicting information then it's going to end badly.
 
-> 1) Existing code is around that drives certain logic common on a bunch
-> of server boards and nobody wants to write drivers for them *again*,
-> especially since there is a distinct advantage to hidin^H^H^H^H^H
-> abstracting the actual implementation from Linux (fan controllers etc.
-> could be done in hundreds of different ways) in terms of product
-> safety, product reliability, and kernel stability for companies like
-> Red Hat.
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 25 Nov 2013 11:37:25 -0800
+Subject: [PATCH] ARM: OMAP2+: Remove legacy PM init
 
-Servers rarely use ACPI for thermal control, but yeah, I take your 
-point.
+This is no longer needed when booted with device tree.
 
-> 2) Because you can do fancy 'scripting' as well as bus and device
-> configuration abstraction on top of description.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Sure.
-
-> 3) Because there seems to be an absolutely moronic assumption that the
-> best way to get an ARMv8 server box on the market is take an existing
-> server design and just drop an ARM SoC into it and the above existing
-> code should "drop in" in that case.
-
-Well, so far we had any indication as to whether or not anyone's 
-planning on doing that. I suspect it could be made to work, the question 
-is how invasive the kernel changes would be.
-
-> But I can't think of a reason why an extension or companion to PSCI
-> couldn't do it, and why you WOULDN'T want to do this as an API
-> implemented via a secure monitor interface which is architecturally
-> defined on ARM where security extensions are present. I can't imagine
-> a reason why it couldn't be done over IPMI to some microcontroller or
-> dedicated external component, for the case of fans and chassis
-> components and tedious other stuff.
-
-Primarily because people want solutions that aren't tied to having an 
-entirely separate computer running its own embedded OS. The likely 
-alternative to doing things in ACPI would be to do them in TrustZone, 
-and let's not encourage that. A significant proportion of the bugs we 
-see on x86 are down to SMM code that we can't see, let alone debug. It's 
-much easier to handle bugs in code that runs in the same context as the 
-OS.
-
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -30,7 +30,6 @@
+ #include "powerdomain.h"
+ #include "clockdomain.h"
+ #include "pm.h"
+-#include "twl-common.h"
+ 
+ /*
+  * omap_pm_suspend: points to a function that does the SoC-specific
+@@ -70,42 +69,6 @@ void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
+ }
+ #endif
+ 
+-static int __init _init_omap_device(char *name)
+-{
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-
+-	oh = omap_hwmod_lookup(name);
+-	if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
+-		 __func__, name))
+-		return -ENODEV;
+-
+-	pdev = omap_device_build(oh->name, 0, oh, NULL, 0);
+-	if (WARN(IS_ERR(pdev), "%s: could not build omap_device for %s\n",
+-		 __func__, name))
+-		return -ENODEV;
+-
+-	return 0;
+-}
+-
+-/*
+- * Build omap_devices for processors and bus.
+- */
+-static void __init omap2_init_processor_devices(void)
+-{
+-	_init_omap_device("mpu");
+-	if (omap3_has_iva())
+-		_init_omap_device("iva");
+-
+-	if (cpu_is_omap44xx()) {
+-		_init_omap_device("l3_main_1");
+-		_init_omap_device("dsp");
+-		_init_omap_device("iva");
+-	} else {
+-		_init_omap_device("l3_main");
+-	}
+-}
+-
+ int __init omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused)
+ {
+ 	/* XXX The usecount test is racy */
+@@ -118,84 +81,6 @@ int __init omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused)
+ 	return 0;
+ }
+ 
+-/*
+- * This API is to be called during init to set the various voltage
+- * domains to the voltage as per the opp table. Typically we boot up
+- * at the nominal voltage. So this function finds out the rate of
+- * the clock associated with the voltage domain, finds out the correct
+- * opp entry and sets the voltage domain to the voltage specified
+- * in the opp entry
+- */
+-static int __init omap2_set_init_voltage(char *vdd_name, char *clk_name,
+-					 const char *oh_name)
+-{
+-	struct voltagedomain *voltdm;
+-	struct clk *clk;
+-	struct dev_pm_opp *opp;
+-	unsigned long freq, bootup_volt;
+-	struct device *dev;
+-
+-	if (!vdd_name || !clk_name || !oh_name) {
+-		pr_err("%s: invalid parameters\n", __func__);
+-		goto exit;
+-	}
+-
+-	if (!strncmp(oh_name, "mpu", 3))
+-		/* 
+-		 * All current OMAPs share voltage rail and clock
+-		 * source, so CPU0 is used to represent the MPU-SS.
+-		 */
+-		dev = get_cpu_device(0);
+-	else
+-		dev = omap_device_get_by_hwmod_name(oh_name);
+-
+-	if (IS_ERR(dev)) {
+-		pr_err("%s: Unable to get dev pointer for hwmod %s\n",
+-			__func__, oh_name);
+-		goto exit;
+-	}
+-
+-	voltdm = voltdm_lookup(vdd_name);
+-	if (!voltdm) {
+-		pr_err("%s: unable to get vdd pointer for vdd_%s\n",
+-			__func__, vdd_name);
+-		goto exit;
+-	}
+-
+-	clk =  clk_get(NULL, clk_name);
+-	if (IS_ERR(clk)) {
+-		pr_err("%s: unable to get clk %s\n", __func__, clk_name);
+-		goto exit;
+-	}
+-
+-	freq = clk_get_rate(clk);
+-	clk_put(clk);
+-
+-	rcu_read_lock();
+-	opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+-	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
+-		pr_err("%s: unable to find boot up OPP for vdd_%s\n",
+-			__func__, vdd_name);
+-		goto exit;
+-	}
+-
+-	bootup_volt = dev_pm_opp_get_voltage(opp);
+-	rcu_read_unlock();
+-	if (!bootup_volt) {
+-		pr_err("%s: unable to find voltage corresponding to the bootup OPP for vdd_%s\n",
+-		       __func__, vdd_name);
+-		goto exit;
+-	}
+-
+-	voltdm_scale(voltdm, bootup_volt);
+-	return 0;
+-
+-exit:
+-	pr_err("%s: unable to set vdd_%s\n", __func__, vdd_name);
+-	return -EINVAL;
+-}
+-
+ #ifdef CONFIG_SUSPEND
+ static int omap_pm_enter(suspend_state_t suspend_state)
+ {
+@@ -245,40 +130,17 @@ static const struct platform_suspend_ops omap_pm_ops = {
+ 
+ #endif /* CONFIG_SUSPEND */
+ 
+-static void __init omap3_init_voltages(void)
+-{
+-	if (!cpu_is_omap34xx())
+-		return;
+-
+-	omap2_set_init_voltage("mpu_iva", "dpll1_ck", "mpu");
+-	omap2_set_init_voltage("core", "l3_ick", "l3_main");
+-}
+-
+-static void __init omap4_init_voltages(void)
+-{
+-	if (!cpu_is_omap44xx())
+-		return;
+-
+-	omap2_set_init_voltage("mpu", "dpll_mpu_ck", "mpu");
+-	omap2_set_init_voltage("core", "l3_div_ck", "l3_main_1");
+-	omap2_set_init_voltage("iva", "dpll_iva_m5x2_ck", "iva");
+-}
+-
+ static inline void omap_init_cpufreq(void)
+ {
+-	struct platform_device_info devinfo = { };
++	struct platform_device_info devinfo = {
++		.name = "cpufreq-cpu0",
++	};
+ 
+-	if (!of_have_populated_dt())
+-		devinfo.name = "omap-cpufreq";
+-	else
+-		devinfo.name = "cpufreq-cpu0";
+ 	platform_device_register_full(&devinfo);
+ }
+ 
+ static int __init omap2_common_pm_init(void)
+ {
+-	if (!of_have_populated_dt())
+-		omap2_init_processor_devices();
+ 	omap_pm_if_init();
+ 
+ 	return 0;
+@@ -287,26 +149,6 @@ omap_postcore_initcall(omap2_common_pm_init);
+ 
+ int __init omap2_common_pm_late_init(void)
+ {
+-	/*
+-	 * In the case of DT, the PMIC and SR initialization will be done using
+-	 * a completely different mechanism.
+-	 * Disable this part if a DT blob is available.
+-	 */
+-	if (!of_have_populated_dt()) {
+-
+-		/* Init the voltage layer */
+-		omap_pmic_late_init();
+-		omap_voltage_late_init();
+-
+-		/* Initialize the voltages */
+-		omap3_init_voltages();
+-		omap4_init_voltages();
+-
+-		/* Smartreflex device init */
+-		omap_devinit_smartreflex();
+-
+-	}
+-
+ 	/* cpufreq dummy device instantiation */
+ 	omap_init_cpufreq();
+ 
