@@ -1,119 +1,63 @@
-From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
-Date: Tue, 26 Nov 2013 13:59:53 +0000
-Subject: [PATCH V3] dma: add channel request API that supports deferred
- probe
-In-Reply-To: <1385416039-3170-1-git-send-email-swarren@wwwdotorg.org>
-References: <1385416039-3170-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1385474368.1871.6.camel@smile>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 26 Nov 2013 15:01:10 +0100
+Subject: [PATCH 1/4] ARM: sa1100: stop using mach/timex.h
+In-Reply-To: <1384292466-31725-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1384292466-31725-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131126140110.GJ28642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-11-25 at 14:47 -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> dma_request_slave_channel() simply returns NULL whenever DMA channel
-> lookup fails. Lookup could fail for two distinct reasons:
-> 
-> a) No DMA specification exists for the channel name.
->    This includes situations where no DMA specifications exist at all, or
->    other general lookup problems.
-> 
-> b) A DMA specification does exist, yet the driver for that channel is not
->    yet registered.
-> 
-> Case (b) should trigger deferred probe in client drivers. However, since
-> they have no way to differentiate the two situations, it cannot.
-> 
-> Implement new function dma_request_slave_channel_or_err(), which performs
-> identically to dma_request_slave_channel(), except that it returns an
-> error-pointer rather than NULL, which allows callers to detect when
-> deferred probe should occur.
-> 
-> Eventually, all drivers should be converted to this new API, the old API
-> removed, and the new API renamed to the more desirable name. This patch
-> doesn't convert the existing API and all drivers in one go, since some
-> drivers call dma_request_slave_channel() then dma_request_channel() if
-> that fails. That would require either modifying dma_request_channel() in
-> the same way, or adding extra error-handling code to all affected
-> drivers, and there are close to 100 drivers using the other API, rather
-> than just the 15-20 or so that use dma_request_slave_channel(), which
-> might be tenable in a single patch.
-> 
-> acpi_dma_request_slave_chan_by_name() doesn't currently implement
-> deferred probe. It should, but this will be addressed later.
+Hello,
 
-Couple of comments below.
+[expanded To: and Cc: to include the people scripts/get_maintainer.pl suggested]
 
-[]
+On Tue, Nov 12, 2013 at 10:41:03PM +0100, Uwe Kleine-K?nig wrote:
+> mach/timex.h is the last remaining header that is unused for multiarch
+> builds but necessary for singlearch builds. To allow to get rid of it
+> for singlearch builds, too, drop its usage in sa1100 arch code by
+> substituting CLOCK_TICK_RATE by a local cpp symbol.
+Who feels responsible to give (a reason for not giving) an Ack here?
 
-> --- a/drivers/dma/of-dma.c
-> +++ b/drivers/dma/of-dma.c
+Thanks
+Uwe
 
-[]
-
-> @@ -152,17 +152,18 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
->  	struct of_dma		*ofdma;
->  	struct dma_chan		*chan;
->  	int			count, i;
-> +	int			ret_no_channel = -ENODEV;
-
-Could we re-use chan for the error as well?
-
->  	if (!np || !name) {
->  		pr_err("%s: not enough information provided\n", __func__);
-> -		return NULL;
-> +		return ERR_PTR(-ENODEV);
->  	}
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-sa1100/time.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
+> index 713c86c..83be0d6 100644
+> --- a/arch/arm/mach-sa1100/time.c
+> +++ b/arch/arm/mach-sa1100/time.c
+> @@ -20,6 +20,8 @@
+>  #include <mach/hardware.h>
+>  #include <mach/irqs.h>
 >  
->  	count = of_property_count_strings(np, "dma-names");
->  	if (count < 0) {
->  		pr_err("%s: dma-names property of node '%s' missing or empty\n",
->  			__func__, np->full_name);
-> -		return NULL;
-> +		return ERR_PTR(-ENODEV);
->  	}
+> +#define SA1100_CLOCK_FREQ 3686400
+> +
+>  static u32 notrace sa1100_read_sched_clock(void)
+>  {
+>  	return readl_relaxed(OSCR);
+> @@ -128,7 +130,7 @@ void __init sa1100_timer_init(void)
 >  
->  	for (i = 0; i < count; i++) {
-> @@ -174,8 +175,10 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>  	setup_irq(IRQ_OST0, &sa1100_timer_irq);
 >  
->  		if (ofdma)
-
-if (ofdma) {
-...
-
->  			chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
-> -		else
-> +		else {
-
-} else {
-
-to keep style.
-
-> +			ret_no_channel = -EPROBE_DEFER;
->  			chan = NULL;
-> +		}
->  
->  		mutex_unlock(&of_dma_lock);
->  
-> @@ -185,7 +188,7 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
->  			return chan;
->  	}
->  
-> -	return NULL;
-> +	return ERR_PTR(ret_no_channel);
->  }
-
+> -	clocksource_mmio_init(OSCR, "oscr", CLOCK_TICK_RATE, 200, 32,
+> +	clocksource_mmio_init(OSCR, "oscr", SA1100_CLOCK_FREQ, 200, 32,
+>  		clocksource_mmio_readl_up);
+>  	clockevents_config_and_register(&ckevt_sa1100_osmr0, 3686400,
+>  					MIN_OSCR_DELTA * 2, 0x7fffffff);
+> -- 
+> 1.8.4.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
----------------------------------------------------------------------
-Intel Finland Oy
-Registered Address: PL 281, 00181 Helsinki 
-Business Identity Code: 0357606 - 4 
-Domiciled in Helsinki 
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
