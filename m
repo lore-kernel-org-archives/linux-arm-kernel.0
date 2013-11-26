@@ -1,42 +1,48 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 26 Nov 2013 09:25:31 +0900
-Subject: [PATCH 1/3] ARM: shmobile: r8a7779: add HSPI clock support for DT
-In-Reply-To: <52931A89.8060905@cogentembedded.com>
-References: <1385341216-27101-1-git-send-email-horms+renesas@verge.net.au>
- <1385341216-27101-2-git-send-email-horms+renesas@verge.net.au>
- <52931A89.8060905@cogentembedded.com>
-Message-ID: <20131126002531.GE15227@verge.net.au>
+Date: Tue, 26 Nov 2013 09:26:45 +0900
+Subject: [RFC 15/17] ARM: shmobile: Remove non-multiplatform Marzen
+ reference support
+In-Reply-To: <87li0dnfda.wl%kuninori.morimoto.gx@renesas.com>
+References: <1385342312-1967-1-git-send-email-horms+renesas@verge.net.au>
+ <1385342312-1967-16-git-send-email-horms+renesas@verge.net.au>
+ <87li0dnfda.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20131126002643.GG15227@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 01:38:17PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Sun, Nov 24, 2013 at 10:51:33PM -0800, Kuninori Morimoto wrote:
 > 
-> On 25-11-2013 5:00, Simon Horman wrote:
+> Hi Simon
 > 
-> >Based on work for the r8a7778 SoC by Kuninori Morimoto.
+> > Now that r8a7779 has CCF support remove the legacy Marzen reference
+> > Kconfig bits CONFIG_MACH_KOELSCH_REFERENCE for the non-multiplatform
+> > case.
 > 
-> >Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/clock-r8a7779.c | 3 +++
-> >  1 file changed, 3 insertions(+)
+> I guess
 > 
-> >diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-> >index b7ce0e7..09ca2ea 100644
-> >--- a/arch/arm/mach-shmobile/clock-r8a7779.c
-> >+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-> >@@ -198,8 +198,11 @@ static struct clk_lookup lookups[] = {
-> >  	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
-> >  	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
-> >  	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
-> >+	CLKDEV_DEV_ID("fffc7000.sh-hspi", &mstp_clks[MSTP007]), /* HSPI0 */
-> >  	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
-> >+	CLKDEV_DEV_ID("fffc8000.sh-hspi", &mstp_clks[MSTP007]), /* HSPI1 */
-> >  	CLKDEV_DEV_ID("sh-hspi.2", &mstp_clks[MSTP007]), /* HSPI2 */
-> >+	CLKDEV_DEV_ID("fffc6000.sh-hspi", &mstp_clks[MSTP007]), /* HSPI2 */
+>  - CONFIG_MACH_KOELSCH_REFERENCE
+>  + CONFIG_MACH_MARZEN_REFERENCE
 > 
->    The device names here don't seem to match to the device names in
-> the .dtsi file.
+> > Starting from this commit Marzen board support is always enabled via
+> > CONFIG_MACH_KOELSCH, and CONFIG_ARCH_MULTIPLATFORM is used to select
+> 
+> ditto ?
+> 
+> > between board-koelsch.c and board-koelsch-reference.c
+> > The file board-koelsch-reference.c can no longer be used together with
+> 
+> koelsch <-> marzen ?
+> 
+> > --- a/arch/arm/mach-shmobile/Makefile
+> > +++ b/arch/arm/mach-shmobile/Makefile
+> > @@ -69,8 +69,7 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
+> >  obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
+> >  obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
+> >  obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+> > -obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+> > -obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+> > +obj-$(CONFIG_MACH_LAGER)	+= boardo-lager.o
+> 
+> boardo-lager ??
 
-Thanks, I will fix that.
+Thanks. Sorry for the silly errors.
