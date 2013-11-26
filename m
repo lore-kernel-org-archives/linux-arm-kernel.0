@@ -1,56 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Nov 2013 13:31:49 +0100
-Subject: [PATCH 1/6] arm: sa1100: h3100: refactor LCD GPIO handling
-In-Reply-To: <CALT56yNzP1=kzK6nxO9VXjZff0-K0jikhPOg9fP90Kqw_Nt+ZQ@mail.gmail.com>
-References: <1385048414-9812-1-git-send-email-dbaryshkov@gmail.com>
- <1385048414-9812-2-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdbmcCNCg-4A1bRTszwE3yQf7BPcFxKE3LiH8eJpJBMezA@mail.gmail.com>
- <CALT56yNzP1=kzK6nxO9VXjZff0-K0jikhPOg9fP90Kqw_Nt+ZQ@mail.gmail.com>
-Message-ID: <CACRpkdYQeXp5A_UZgwwvpV9+XjCYi0K7BArNkOEQ6CeM88A-FQ@mail.gmail.com>
+Date: Tue, 26 Nov 2013 13:32:57 +0100
+Subject: [PATCH] ARM: u300: fix timekeeping when periodic mode is used
+In-Reply-To: <20131125211347.GD28642@pengutronix.de>
+References: <20131105083336.GK14892@pengutronix.de>
+ <1383642199-11473-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdZrV7fPcyNeBdzhhZHDkm1ZmixwDi=1=vKnFOBiYTQYsw@mail.gmail.com>
+ <20131125211347.GD28642@pengutronix.de>
+Message-ID: <CACRpkdY47AR35ndrTvg7inOmF=Gb8oq3XMM_KtDDEifaq339GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 10:07 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> On Tue, Nov 26, 2013 at 12:52 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
->> On Thu, Nov 21, 2013 at 4:40 PM, Dmitry Eremin-Solenikov
->> <dbaryshkov@gmail.com> wrote:
+On Mon, Nov 25, 2013 at 10:13 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Tue, Nov 05, 2013 at 10:44:58AM +0100, Linus Walleij wrote:
+>> On Tue, Nov 5, 2013 at 10:03 AM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
 >>
->>> +static bool h3100_lcd_request(void)
->>> +{
->>> +       static bool h3100_lcd_ok;
->>> +       int rc;
->>> +
->>> +       if (h3100_lcd_ok)
->>> +               return true;
->>> +
->>> +       rc = gpio_request_array(h3100_lcd_gpio, ARRAY_SIZE(h3100_lcd_gpio));
->>> +       if (rc)
->>> +               pr_err("%s: can't request GPIOs\n", __func__);
->>> +       else
->>> +               h3100_lcd_ok = true;
->>> +
->>> +       return h3100_lcd_ok;
->>> +}
+>> > To determine the value to write to the hardware's timer counter register
+>> > the symbol CLOCK_TICK_RATE is used. This value is a dummy value on u300
+>> > though. So instead use the clock rate that is used for oneshot mode.
+>> >
+>> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 >>
->> Hm hm this design pattern is somewhat strange, a run-once
->> construct, but OK then.
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>> Thanks, patch applied to the u300 branch in the linux-stericsson
+>> tree.
 >
-> Another possibility would be to extend sa11x0-fb driver to also
-> provide lcd_init and lcd_shutdown callbacks (to request GPIOs).
-> Would it be better to do so?
->
-> It is really unfortunate that lcd_class drivers are not directly controlled
-> from fbdev drivers. Hopefully CDF can solve that.
+> This isn't in next? At least this patch doesn't appear there.
 
-Hm it looks like there are no good solutions as long as LCDs
-are no separate devices. :-(
+I missed to send it upstream for v3.13, sorry.
 
-Nominally you would use the new gpiod* interface and tie the
-GPIOs to a struct device * in this case the LCD, and since that
-currently has no struct device, this is OK for now...
+It is in my U300 patch queue, I'll send a pull request to ARM SoC
+ASAP.
 
 Yours,
 Linus Walleij
