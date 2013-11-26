@@ -1,34 +1,69 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 26 Nov 2013 10:35:57 +0100
-Subject: [PATCH v2 3/9] ASoC: fsl-ssi: Add imx50-ssi and of_device_id
- matching
-In-Reply-To: <20131126043355.GI30476@S2101-09.ap.freescale.net>
-References: <1385378025-1262-1-git-send-email-mpa@pengutronix.de>
- <1385378025-1262-4-git-send-email-mpa@pengutronix.de>
- <20131126043355.GI30476@S2101-09.ap.freescale.net>
-Message-ID: <20131126093557.GD13532@pengutronix.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 26 Nov 2013 10:41:40 +0100
+Subject: [PATCH] ASoC: kirkwood: Fix invalid SPDIF format
+Message-ID: <20131126104140.16e3eb87@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch removes the 32 bits format which is not supported by S/PDIF
+output.
 
-On Tue, Nov 26, 2013 at 12:33:57PM +0800, Shawn Guo wrote:
-> On Mon, Nov 25, 2013 at 12:13:39PM +0100, Markus Pargmann wrote:
-> > There is a small but significant difference between imx21-ssi and
-> > imx50-ssi and above.
-> 
-> Haven't we already agreed that imx51-ssi should be used in naming and
-> compatible, since imx51 comes to the world earlier than imx50?
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ sound/soc/kirkwood/kirkwood-i2s.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Yes of course, sorry. Seems I have lost those fixups somewhere. I
-will resend this series.
-
-Thanks,
-
-Markus
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index b27f826..0b18f65 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -33,6 +33,10 @@
+ 	 SNDRV_PCM_FMTBIT_S24_LE | \
+ 	 SNDRV_PCM_FMTBIT_S32_LE)
+ 
++#define KIRKWOOD_SPDIF_FORMATS \
++	(SNDRV_PCM_FMTBIT_S16_LE | \
++	 SNDRV_PCM_FMTBIT_S24_LE)
++
+ static int kirkwood_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
+ 		unsigned int fmt)
+ {
+@@ -449,14 +453,14 @@ static struct snd_soc_dai_driver kirkwood_i2s_dai[2] = {
+ 		.channels_max = 2,
+ 		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
+ 				SNDRV_PCM_RATE_96000,
+-		.formats = KIRKWOOD_I2S_FORMATS,
++		.formats = KIRKWOOD_SPDIF_FORMATS,
+ 	},
+ 	.capture = {
+ 		.channels_min = 1,
+ 		.channels_max = 2,
+ 		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
+ 				SNDRV_PCM_RATE_96000,
+-		.formats = KIRKWOOD_I2S_FORMATS,
++		.formats = KIRKWOOD_SPDIF_FORMATS,
+ 	},
+ 	.ops = &kirkwood_i2s_dai_ops,
+     },
+@@ -493,7 +497,7 @@ static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[2] = {
+ 		.rates = SNDRV_PCM_RATE_8000_192000 |
+ 			 SNDRV_PCM_RATE_CONTINUOUS |
+ 			 SNDRV_PCM_RATE_KNOT,
+-		.formats = KIRKWOOD_I2S_FORMATS,
++		.formats = KIRKWOOD_SPDIF_FORMATS,
+ 	},
+ 	.capture = {
+ 		.channels_min = 1,
+@@ -501,7 +505,7 @@ static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[2] = {
+ 		.rates = SNDRV_PCM_RATE_8000_192000 |
+ 			 SNDRV_PCM_RATE_CONTINUOUS |
+ 			 SNDRV_PCM_RATE_KNOT,
+-		.formats = KIRKWOOD_I2S_FORMATS,
++		.formats = KIRKWOOD_SPDIF_FORMATS,
+ 	},
+ 	.ops = &kirkwood_i2s_dai_ops,
+     },
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
