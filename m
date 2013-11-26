@@ -1,84 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Nov 2013 15:04:50 +0100
-Subject: [PATCH 5/4] ARM: at91: don't use <mach/timex.h>
-Message-ID: <1385474690-6483-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Nov 2013 15:08:27 +0100
+Subject: [PATCH 10/12] usb: r8a66597-hcd: Convert to clk_prepare/unprepare
+In-Reply-To: <20131126023608.GA682@kroah.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1900311.xc3BDUDvCy@avalon> <20131126023608.GA682@kroah.com>
+Message-ID: <10742564.mkbtL7U7WC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform specific <mach/timex.h> will be removed in a later patch.
-So move its only still used symbol to its only user. Also add a few
-explicit includes of <mach/hardware.h> that are implicitly available
-through <mach/timex.h>.
+Hi Greg,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+On Monday 25 November 2013 18:36:08 Greg Kroah-Hartman wrote:
+> On Tue, Nov 26, 2013 at 03:00:30AM +0100, Laurent Pinchart wrote:
+> > On Saturday 09 November 2013 08:10:59 Greg Kroah-Hartman wrote:
+> > > On Sat, Nov 09, 2013 at 03:12:05PM +0100, Laurent Pinchart wrote:
+> > > > On Tuesday 29 October 2013 18:47:26 Shimoda, Yoshihiro wrote:
+> > > > > Hi Laurent-san,
+> > > > > 
+> > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
+> > > > > > Turn clk_enable() and clk_disable() calls into
+> > > > > > clk_prepare_enable() and clk_disable_unprepare() to get ready for
+> > > > > > the migration to the common clock framework.
+> > > > > > 
+> > > > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > > > > Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > > > Cc: linux-usb at vger.kernel.org
+> > > > > > Signed-off-by: Laurent Pinchart
+> > > > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > 
+> > > > > Thank you for the patch.
+> > > > > 
+> > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > 
+> > > > Could you please pick this patch up ?
+> > > 
+> > > I'll pick things up after 3.13-rc1 is out, I can't do anything until
+> > > then.
+> > 
+> > Sure.
+> > 
+> > As this patch is a dependency for other series that will go through
+> > different trees, could you please provide a stable branch in your tree
+> > with this patch included that you will push to v3.14 ?
+> 
+> If you need this for other work, feel free to take it in your tree, I
+> have no real need for it to go in mine.
+> 
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-assuming it's OK for you, please only give an ack and don't take that
-patch as I intend to keep it in a series deprecating <mach/timex.h>.
+Sounds good to me, thanks.
 
-Thanks
-Uwe
+Simon, could you please pick this patch then ?
 
- arch/arm/mach-at91/at91rm9200_time.c  | 1 +
- arch/arm/mach-at91/at91sam926x_time.c | 1 +
- arch/arm/mach-at91/at91x40.c          | 3 ++-
- arch/arm/mach-at91/pm.c               | 1 +
- 4 files changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index f607deb..6b68b98 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -31,6 +31,7 @@
- #include <asm/mach/time.h>
- 
- #include <mach/at91_st.h>
-+#include <mach/hardware.h>
- 
- static unsigned long last_crtr;
- static u32 irqmask;
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index bb39232..b9da2b1 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -19,6 +19,7 @@
- #include <linux/of_irq.h>
- 
- #include <asm/mach/time.h>
-+#include <mach/hardware.h>
- 
- #define AT91_PIT_MR		0x00			/* Mode Register */
- #define		AT91_PIT_PITIEN		(1 << 25)		/* Timer Interrupt Enable */
-diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-index bad94b8..c76874e 100644
---- a/arch/arm/mach-at91/at91x40.c
-+++ b/arch/arm/mach-at91/at91x40.c
-@@ -19,11 +19,12 @@
- #include <asm/mach/arch.h>
- #include <mach/at91x40.h>
- #include <mach/at91_st.h>
--#include <mach/timex.h>
- 
- #include "at91_aic.h"
- #include "generic.h"
- 
-+#define AT91X40_MASTER_CLOCK	40000000
-+
- /*
-  * Export the clock functions for the AT91X40. Some external code common
-  * to all AT91 family parts relys on this, like the gpio and serial support.
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 9986542..7afecb8 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -27,6 +27,7 @@
- 
- #include <mach/at91_pmc.h>
- #include <mach/cpu.h>
-+#include <mach/hardware.h>
- 
- #include "at91_aic.h"
- #include "generic.h"
 -- 
-1.8.4.2
+Regards,
+
+Laurent Pinchart
