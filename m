@@ -1,33 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Nov 2013 16:47:09 +0900
-Subject: [PATCH v2 0/3] ARM: shmobile: marzen: enable HSPI0 to DTS
-Message-ID: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 26 Nov 2013 16:47:12 +0900
+Subject: [PATCH v2 3/3] ARM: shmobile: marzen: enable HSPI0 in DTS
+In-Reply-To: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
+References: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1385452032-11544-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Based on work for the bockw board by Kuninori Morimoto.
 
-this short series enables HSPI0 in DTS for the r8a7779 based marzen board.
-It is based on work by Kuninori Morimoto for the r8a7778 based bockw board.
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-This series is based on the renesas-devel-v3.13-rc1-20131124 tag
-of my renesas tree.
-
-v2
-* Correct clock suffixes in
-  "ARM: shmobile: r8a7779: add HSPI clock support for DT".
-  They should be ".spi" to match
-  "ARM: shmobile: r8a7779: add HSPI support to DTSI"
-
-Simon Horman (3):
-  ARM: shmobile: r8a7779: add HSPI clock support for DT
-  ARM: shmobile: r8a7779: add HSPI support to DTSI
-  ARM: shmobile: marzen: enable HSPI0 in DTS
-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 11 ++++++++++
- arch/arm/boot/dts/r8a7779.dtsi                 | 30 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-r8a7779.c         |  3 +++
- 3 files changed, 44 insertions(+)
-
+diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+index 918085c..76f5eef 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+@@ -97,6 +97,11 @@
+ 		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
+ 		renesas,function = "sdhi0";
+ 	};
++
++	hspi0_pins: hspi0 {
++		renesas,groups = "hspi0";
++		renesas,function = "hspi0";
++	};
+ };
+ 
+ &sdhi0 {
+@@ -107,3 +112,9 @@
+ 	bus-width = <4>;
+ 	status = "okay";
+ };
++
++&hspi0 {
++	pinctrl-0 = <&hspi0_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++};
 -- 
 1.8.4
