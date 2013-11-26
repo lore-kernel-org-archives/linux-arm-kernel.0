@@ -1,105 +1,145 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 26 Nov 2013 14:32:53 +0800
-Subject: [PATCH 2/4] mtd: spi-nor: add a new data structrue spi_nor{}
+Date: Tue, 26 Nov 2013 14:32:52 +0800
+Subject: [PATCH 1/4] mtd: spi-nor: move the SPI NOR commands to a new header
+ file
 In-Reply-To: <1385447575-23773-1-git-send-email-b32955@freescale.com>
 References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
-Message-ID: <1385447575-23773-3-git-send-email-b32955@freescale.com>
+Message-ID: <1385447575-23773-2-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi_nor{} is cloned from the m25p{}.
-The spi_nor{} can be used by both the m25p80 and spi-nor controller.
+This patch adds a new header :spi-nor.h,
+and moves all the SPI NOR commands and relative macros into this new header.
 
- 1) Add four hooks:
-    @read_reg: used to read the registers, such as read status register,
-             read ID, read configure register.
-
-    @write_reg: used to write the registers, such as write enable,
-             erase sector.
-
-    @read: use the proper read opcode to read out the data from the NOR.
-
-    @write: use the proper write opcode to write data to the NOR.
-
- 2) Add a new field sst_write_second for the SST NOR write.
-
- 3) change the @command field from pointer to array which makes the code
-    more simple.
+This hearder can be used by the m25p80.c and other spi-nor controller,
+such as Freescale's Quadspi.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/devices/m25p80.c |    6 -----
- include/linux/mtd/spi-nor.h  |   43 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+), 6 deletions(-)
+ drivers/mtd/devices/m25p80.c |   50 +--------------------------------------
+ include/linux/mtd/spi-nor.h  |   53 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+), 49 deletions(-)
+ create mode 100644 include/linux/mtd/spi-nor.h
 
 diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index 4703aa4..13d9864 100644
+index 7dc2c14..4703aa4 100644
 --- a/drivers/mtd/devices/m25p80.c
 +++ b/drivers/mtd/devices/m25p80.c
-@@ -44,12 +44,6 @@
+@@ -34,55 +34,7 @@
  
- /****************************************************************************/
- 
--enum read_type {
--	M25P80_NORMAL = 0,
--	M25P80_FAST,
--	M25P80_QUAD,
--};
+ #include <linux/spi/spi.h>
+ #include <linux/spi/flash.h>
 -
- struct m25p {
- 	struct spi_device	*spi;
- 	struct mutex		lock;
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index ab2ea1e..8da1f69 100644
---- a/include/linux/mtd/spi-nor.h
-+++ b/include/linux/mtd/spi-nor.h
-@@ -50,4 +50,47 @@
- /* Configuration Register bits. */
- #define CR_QUAD_EN_SPAN		0x2     /* Spansion Quad I/O */
+-/* Flash opcodes. */
+-#define	OPCODE_WREN		0x06	/* Write enable */
+-#define	OPCODE_RDSR		0x05	/* Read status register */
+-#define	OPCODE_WRSR		0x01	/* Write status register 1 byte */
+-#define	OPCODE_NORM_READ	0x03	/* Read data bytes (low frequency) */
+-#define	OPCODE_FAST_READ	0x0b	/* Read data bytes (high frequency) */
+-#define	OPCODE_QUAD_READ        0x6b    /* Read data bytes */
+-#define	OPCODE_PP		0x02	/* Page program (up to 256 bytes) */
+-#define	OPCODE_BE_4K		0x20	/* Erase 4KiB block */
+-#define	OPCODE_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
+-#define	OPCODE_BE_32K		0x52	/* Erase 32KiB block */
+-#define	OPCODE_CHIP_ERASE	0xc7	/* Erase whole flash chip */
+-#define	OPCODE_SE		0xd8	/* Sector erase (usually 64KiB) */
+-#define	OPCODE_RDID		0x9f	/* Read JEDEC ID */
+-#define	OPCODE_RDCR             0x35    /* Read configuration register */
+-
+-/* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
+-#define	OPCODE_NORM_READ_4B	0x13	/* Read data bytes (low frequency) */
+-#define	OPCODE_FAST_READ_4B	0x0c	/* Read data bytes (high frequency) */
+-#define	OPCODE_QUAD_READ_4B	0x6c    /* Read data bytes */
+-#define	OPCODE_PP_4B		0x12	/* Page program (up to 256 bytes) */
+-#define	OPCODE_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
+-
+-/* Used for SST flashes only. */
+-#define	OPCODE_BP		0x02	/* Byte program */
+-#define	OPCODE_WRDI		0x04	/* Write disable */
+-#define	OPCODE_AAI_WP		0xad	/* Auto address increment word program */
+-
+-/* Used for Macronix and Winbond flashes. */
+-#define	OPCODE_EN4B		0xb7	/* Enter 4-byte mode */
+-#define	OPCODE_EX4B		0xe9	/* Exit 4-byte mode */
+-
+-/* Used for Spansion flashes only. */
+-#define	OPCODE_BRWR		0x17	/* Bank register write */
+-
+-/* Status Register bits. */
+-#define	SR_WIP			1	/* Write in progress */
+-#define	SR_WEL			2	/* Write enable latch */
+-/* meaning of other SR_* bits may differ between vendors */
+-#define	SR_BP0			4	/* Block protect 0 */
+-#define	SR_BP1			8	/* Block protect 1 */
+-#define	SR_BP2			0x10	/* Block protect 2 */
+-#define	SR_SRWD			0x80	/* SR write protect */
+-
+-#define SR_QUAD_EN_MX           0x40    /* Macronix Quad I/O */
+-
+-/* Configuration Register bits. */
+-#define CR_QUAD_EN_SPAN		0x2     /* Spansion Quad I/O */
++#include <linux/mtd/spi-nor.h>
  
-+#define	MAX_CMD_SIZE		6
+ /* Define max times to check status register before we give up. */
+ #define	MAX_READY_WAIT_JIFFIES	(40 * HZ)	/* M25P16 specs 40s max chip erase */
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+new file mode 100644
+index 0000000..ab2ea1e
+--- /dev/null
++++ b/include/linux/mtd/spi-nor.h
+@@ -0,0 +1,53 @@
++#ifndef __LINUX_MTD_SPI_NOR_H
++#define __LINUX_MTD_SPI_NOR_H
 +
-+enum read_type {
-+	M25P80_NORMAL = 0,
-+	M25P80_FAST,
-+	M25P80_QUAD,
-+};
++/* Flash opcodes. */
++#define	OPCODE_WREN		0x06	/* Write enable */
++#define	OPCODE_RDSR		0x05	/* Read status register */
++#define	OPCODE_WRSR		0x01	/* Write status register 1 byte */
++#define	OPCODE_NORM_READ	0x03	/* Read data bytes (low frequency) */
++#define	OPCODE_FAST_READ	0x0b	/* Read data bytes (high frequency) */
++#define	OPCODE_QUAD_READ        0x6b    /* Read data bytes */
++#define	OPCODE_PP		0x02	/* Page program (up to 256 bytes) */
++#define	OPCODE_BE_4K		0x20	/* Erase 4KiB block */
++#define	OPCODE_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
++#define	OPCODE_BE_32K		0x52	/* Erase 32KiB block */
++#define	OPCODE_CHIP_ERASE	0xc7	/* Erase whole flash chip */
++#define	OPCODE_SE		0xd8	/* Sector erase (usually 64KiB) */
++#define	OPCODE_RDID		0x9f	/* Read JEDEC ID */
++#define	OPCODE_RDCR             0x35    /* Read configuration register */
 +
-+struct spi_nor {
-+	struct mutex		lock;
-+	struct mtd_info		mtd;
-+	struct device		*dev;
-+	u16			page_size;
-+	u16			addr_width;
-+	u8			erase_opcode;
-+	u8			read_opcode;
-+	u8			program_opcode;
-+	u8			command[MAX_CMD_SIZE];
-+	enum read_type		flash_read;
-+	bool			sst_write_second;
++/* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
++#define	OPCODE_NORM_READ_4B	0x13	/* Read data bytes (low frequency) */
++#define	OPCODE_FAST_READ_4B	0x0c	/* Read data bytes (high frequency) */
++#define	OPCODE_QUAD_READ_4B	0x6c    /* Read data bytes */
++#define	OPCODE_PP_4B		0x12	/* Page program (up to 256 bytes) */
++#define	OPCODE_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
 +
-+	/*
-+	 * Read the register:
-+	 *  Read `len` length data from the register specified by the `opcode`,
-+	 *  and store the data to the `buf`.
-+	 */
-+	int (*read_reg)(struct spi_nor *flash, u8 opcode, u8 *buf, int len);
++/* Used for SST flashes only. */
++#define	OPCODE_BP		0x02	/* Byte program */
++#define	OPCODE_WRDI		0x04	/* Write disable */
++#define	OPCODE_AAI_WP		0xad	/* Auto address increment word program */
 +
-+	/*
-+	 * Write the register:
-+	 *  Write the `cmd_len` length data stored in the @command to the NOR,
-+	 *  the command[0] stores the write opcode. `offset` is only used for
-+	 *  erase operation, it should set to zero for other NOR commands.
-+	 */
-+	int (*write_reg)(struct spi_nor *flash, int cmd_len, u32 offset);
++/* Used for Macronix and Winbond flashes. */
++#define	OPCODE_EN4B		0xb7	/* Enter 4-byte mode */
++#define	OPCODE_EX4B		0xe9	/* Exit 4-byte mode */
 +
-+	/* write data */
-+	void (*write)(struct spi_nor *flash, loff_t to, size_t len,
-+			size_t *retlen, const u_char *buf);
-+	/* read data */
-+	int (*read)(struct spi_nor *flash, loff_t from, size_t len,
-+			size_t *retlen, u_char *buf);
-+};
- #endif
++/* Used for Spansion flashes only. */
++#define	OPCODE_BRWR		0x17	/* Bank register write */
++
++/* Status Register bits. */
++#define	SR_WIP			1	/* Write in progress */
++#define	SR_WEL			2	/* Write enable latch */
++/* meaning of other SR_* bits may differ between vendors */
++#define	SR_BP0			4	/* Block protect 0 */
++#define	SR_BP1			8	/* Block protect 1 */
++#define	SR_BP2			0x10	/* Block protect 2 */
++#define	SR_SRWD			0x80	/* SR write protect */
++
++#define SR_QUAD_EN_MX           0x40    /* Macronix Quad I/O */
++
++/* Configuration Register bits. */
++#define CR_QUAD_EN_SPAN		0x2     /* Spansion Quad I/O */
++
++#endif
 -- 
 1.7.2.rc3
