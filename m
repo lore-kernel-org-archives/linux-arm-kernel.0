@@ -1,28 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 26 Nov 2013 01:22:02 +0100
-Subject: [PATCH] clk: exynos: Fix typos in DT bindings documentation
-In-Reply-To: <CAK9yfHzA_0AEK8DkBcWFmCNsZGiHUqThD4cyLPgEYPverOWkYA@mail.gmail.com>
-References: <1384775172-3373-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <CAK9yfHzA_0AEK8DkBcWFmCNsZGiHUqThD4cyLPgEYPverOWkYA@mail.gmail.com>
-Message-ID: <1566145.0GyXC9vG8j@avalon>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Nov 2013 09:25:31 +0900
+Subject: [PATCH 1/3] ARM: shmobile: r8a7779: add HSPI clock support for DT
+In-Reply-To: <52931A89.8060905@cogentembedded.com>
+References: <1385341216-27101-1-git-send-email-horms+renesas@verge.net.au>
+ <1385341216-27101-2-git-send-email-horms+renesas@verge.net.au>
+ <52931A89.8060905@cogentembedded.com>
+Message-ID: <20131126002531.GE15227@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
-
-On Monday 18 November 2013 17:17:39 Sachin Kamat wrote:
-> On 18 November 2013 17:16, Laurent Pinchart wrote:
-> > s/comptible/compatible/
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+On Mon, Nov 25, 2013 at 01:38:17PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Good catch.
+> On 25-11-2013 5:00, Simon Horman wrote:
 > 
-> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+> >Based on work for the r8a7778 SoC by Kuninori Morimoto.
+> 
+> >Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/mach-shmobile/clock-r8a7779.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> 
+> >diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+> >index b7ce0e7..09ca2ea 100644
+> >--- a/arch/arm/mach-shmobile/clock-r8a7779.c
+> >+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+> >@@ -198,8 +198,11 @@ static struct clk_lookup lookups[] = {
+> >  	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
+> >  	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
+> >  	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
+> >+	CLKDEV_DEV_ID("fffc7000.sh-hspi", &mstp_clks[MSTP007]), /* HSPI0 */
+> >  	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
+> >+	CLKDEV_DEV_ID("fffc8000.sh-hspi", &mstp_clks[MSTP007]), /* HSPI1 */
+> >  	CLKDEV_DEV_ID("sh-hspi.2", &mstp_clks[MSTP007]), /* HSPI2 */
+> >+	CLKDEV_DEV_ID("fffc6000.sh-hspi", &mstp_clks[MSTP007]), /* HSPI2 */
+> 
+>    The device names here don't seem to match to the device names in
+> the .dtsi file.
 
-Have you queued up the patch for v3.14 ?
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks, I will fix that.
