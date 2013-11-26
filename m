@@ -1,16 +1,50 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 26 Nov 2013 21:27:22 +0100
-Subject: [alsa-devel] KNOT / CONTINUOUS
-In-Reply-To: <5294F85C.4000105@metafoo.de>
-References: <20131126104140.16e3eb87@armhf> <s5h8uwba2gv.wl%tiwai@suse.de>
- <20131126200916.47a45929@armhf> <5294F85C.4000105@metafoo.de>
-Message-ID: <5295042A.1000302@metafoo.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Nov 2013 21:27:26 +0100
+Subject: [GIT PULL] ux500 defconfig changed for v3.13-rcs
+Message-ID: <CACRpkdZ_EN7OPqfqva2BZr4RQGHKjb+JM0TtK+WwxXOESOLgqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-> In your codec driver you should specify the minimum and maximum supported
-> rate by calling snd_pcm_hw_constraint_minmax() in the DAI startup callback.
+Hi ARM SoC folks,
 
-It is also possible to set the min and max rate directly in the dai_driver
-struct.
+here are two defconfig patches that I think should go into the
+release candidates for v3.13.
+
+Please pull them in!
+
+Yours,
+Linus Walleij
+
+
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-defconfig-v3.13-rcs
+
+for you to fetch changes up to 59b023e9bf62933f7078dec339b110d5785f63f6:
+
+  ARM: ux500: u8500_defconfig: add missing cpuidle option (2013-11-26
+21:01:40 +0100)
+
+----------------------------------------------------------------
+Ux500 defconfig patches for the v3.13 rc series:
+
+- Allow creation and mounting of devtmpfs, which is used
+  by OpenEmbedded root filesystems among others.
+
+- Enable CPUidle for the ux500, it has been accidentally
+  disabled due to a Kconfig change.
+
+----------------------------------------------------------------
+Andi Shyti (1):
+      u8500_defconfig: allow creation and mounting of devtmpfs
+
+Daniel Lezcano (1):
+      ARM: ux500: u8500_defconfig: add missing cpuidle option
+
+ arch/arm/configs/u8500_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
