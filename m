@@ -1,37 +1,83 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Nov 2013 12:13:30 +0100
-Subject: [PATCH 3/3] ARM: tegra: use section-sized static mappings for
- LPAE too
-In-Reply-To: <1385419003-11348-3-git-send-email-swarren@wwwdotorg.org>
-References: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
- <1385419003-11348-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131126111330.GF27752@ulmo.nvidia.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 26 Nov 2013 13:18:49 +0200
+Subject: [PATCH v2 00/11]: add remaining support for IGEP boards
+In-Reply-To: <CABxcv=k+Lk=PFONKLvXab5iHExG7WCJRfE6BzEkv_YtPVwB8Dw@mail.gmail.com>
+References: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv=k+Lk=PFONKLvXab5iHExG7WCJRfE6BzEkv_YtPVwB8Dw@mail.gmail.com>
+Message-ID: <52948399.7070407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 03:36:43PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On 2013-11-25 17:30, Javier Martinez Canillas wrote:
+> On Wed, Nov 20, 2013 at 2:06 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> In order to make mach-omap2 Device Tree only, the board file for
+>> IGEP boards was removed even when support for wifi and display
+>> was still not supported by its DTS.
+>>
+>> This is a second version of a patch-set that adds support for
+>> these remaining peripherals and also adds support for USB,
+>> HDMI and user LED for the am33xx SoC based IGEP Aquila board.
+>>
+>> The patch-set is composed of the following patches:
+>>
+>> Enric Balletbo i Serra (7):
+>>       ARM: dts: omap3-igep: Fix bus-width for mmc1.
+>>       ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
+>>       ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
+>>       ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
+>>       ARM: dts: AM33XX BASE0033: add pinmux and user led support.
+>>       ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
+>>       ARM: dts: AM33XX IGEP0033: add USB support.
+>>
+>> Javier Martinez Canillas (4):
+>>       ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
+>>       ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
+>>       ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
+>>       ARM: dts: omap3-igep0020: name twl4030 VPLL2 regulator as vdds_dsi
+>>
+>> Changes since v1:
+>>
+>>  Don't add a workaround in drivers/video/omap2/dss/dpi.c to use the
+>>  VPLL2 regulator from twl4030 if VDDS_DSI regulator is not linked to
+>>  the DPI device since the used regulator is a per board configuration.
+>>
+>>  Instead add a regulator-name = "vdds_dsi" property to the regulator
+>>  in the IGEPv2 DTS file as suggested by Tony Lindgren.
+>>
+>> Tony,
+>>
+>> Most of these patches are just DTS changes so they have to be picked
+>> by Benoit besides the following patch that has to go through your tree
+>>
+>> [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
+>>
+>> Since we have removed the board file for IGEP boards I think these
+>> can be considered as regression fixes for 3.13 although I don't mind
+>> if you prefer to wait for 3.14.
+>>
+>> Thanks a lot and best regards,
+>> Javier
+>> --
 > 
-> The static mappings for Tegra's PPSB and APB regions were sized at 1MB
-> in order to allow mapping via sections in order to avoid burning RAM for
-> PTEs. On LPAE, sections are 2MB, so the static mappings need to be
-> larger in order to gain the same benefit. Set IO_{PPSB,APB}_SIZE to
-> SECTION_SIZE so this adjusts automatically.
+> Hi Benoit and Tony,
 > 
-> While we're fiddling with iomap.h, compress IO_{IRAM,CPU}_VIRT together
-> to save virtual address space in the vmalloc region; these two regions
-> are mapped using PTEs.
+> Now that 3.13-rc1 is out, do you think that it would be possible to
+> include this series as a fix for the -rc cycle?
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/mach-tegra/iomap.h | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+> Otherwise we will have missing functionality for IGEP boards on 3.13
+> due the board file removal. The changes are mostly DT and won't affect
+> other boards.
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
+The DSS related parts look fine to me.
+
+ Tomi
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/85bf1e67/attachment-0001.sig>
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/2396ccc3/attachment.sig>
