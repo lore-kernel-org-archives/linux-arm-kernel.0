@@ -1,45 +1,187 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Tue, 26 Nov 2013 18:33:44 +0000
-Subject: ACPI
-In-Reply-To: <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
- <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
- <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
- <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
- <20131125154110.GB3243@srcf.ucam.org>
- <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
- <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
-Message-ID: <20131126183344.GA16074@srcf.ucam.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 26 Nov 2013 15:36:00 -0300
+Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
+In-Reply-To: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
+References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <20131126183559.GA18570@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 12:55:10PM +0000, Grant Likely wrote:
-> On Tue, Nov 26, 2013 at 12:43 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
-> > I have a feeling we should not recommend ARM implementers
-> > to go and do things like this.
+Hello,
+
+On Tue, Oct 01, 2013 at 10:18:08AM -0700, Tim Kryger wrote:
+> When configured with UART_16550_COMPATIBLE=NO or in versions prior to
+> the introduction of this option, the Designware UART will ignore writes
+> to the LCR if the UART is busy.  The current workaround saves a copy of
+> the last written LCR and re-writes it in the ISR for a special interrupt
+> that is raised when a write was ignored.
 > 
-> ACPI5 defines a binding for serial busses (i2c & spi) which allows
-> real device drivers to drive the bus and allows ACPI and the kernel to
-> share the bus safely. Using that binding means some i2c devices can be
-> 'owned' by ACPI and others owned by the kernel.
+> Unfortunately, interrupts are typically disabled prior to performing a
+> sequence of register writes that include the LCR so the point at which
+> the retry occurs is too late.  An example is serial8250_do_set_termios()
+> where an ignored LCR write results in the baud divisor not being set and
+> instead a garbage character is sent out the transmitter.
+> 
+> Furthermore, since serial_port_out() offers no way to indicate failure,
+> a serious effort must be made to ensure that the LCR is actually updated
+> before returning back to the caller.  This is difficult, however, as a
+> UART that was busy during the first attempt is likely to still be busy
+> when a subsequent attempt is made unless some extra action is taken.
+> 
+> This updated workaround reads back the LCR after each write to confirm
+> that the new value was accepted by the hardware.  Should the hardware
+> ignore a write, the TX/RX FIFOs are cleared and the receive buffer read
+> before attempting to rewrite the LCR out of the hope that doing so will
+> force the UART into an idle state.  While this may seem unnecessarily
+> aggressive, writes to the LCR are used to change the baud rate, parity,
+> stop bit, or data length so the data that may be lost is likely not
+> important.  Admittedly, this is far from ideal but it seems to be the
+> best that can be done given the hardware limitations.
+> 
+> Lastly, the revised workaround doesn't touch the LCR in the ISR, so it
+> avoids the possibility of a "serial8250: too much work for irq" lock up.
+> This problem is rare in real situations but can be reproduced easily by
+> wiring up two UARTs and running the following commands.
+> 
+>   # stty -F /dev/ttyS1 echo
+>   # stty -F /dev/ttyS2 echo
+>   # cat /dev/ttyS1 &
+>   [1] 375
+>   # echo asdf > /dev/ttyS1
+>   asdf
+> 
+>   [   27.700000] serial8250: too much work for irq96
+>   [   27.700000] serial8250: too much work for irq96
+>   [   27.710000] serial8250: too much work for irq96
+>   [   27.710000] serial8250: too much work for irq96
+>   [   27.720000] serial8250: too much work for irq96
+>   [   27.720000] serial8250: too much work for irq96
+>   [   27.730000] serial8250: too much work for irq96
+>   [   27.730000] serial8250: too much work for irq96
+>   [   27.740000] serial8250: too much work for irq96
+> 
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+> 
+> Changes in v2:
+>   - Rebased on tty-next
+>   - Updated commit messsage to mention UART_16550_COMPATIBLE
+>   - Removed potentially unnecessary read of LSR and MSR
+>   - Only attempt workaround when LCR write is ignored
+> 
+>  drivers/tty/serial/8250/8250_dw.c | 41 ++++++++++++++++++++++++++++++---------
+>  1 file changed, 32 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+> index d04a037..4658e3e 100644
+> --- a/drivers/tty/serial/8250/8250_dw.c
+> +++ b/drivers/tty/serial/8250/8250_dw.c
+> @@ -57,7 +57,6 @@
+>  
+>  struct dw8250_data {
+>  	u8			usr_reg;
+> -	int			last_lcr;
+>  	int			last_mcr;
+>  	int			line;
+>  	struct clk		*clk;
+> @@ -77,17 +76,33 @@ static inline int dw8250_modify_msr(struct uart_port *p, int offset, int value)
+>  	return value;
+>  }
+>  
+> +static void dw8250_force_idle(struct uart_port *p)
+> +{
+> +	serial8250_clear_and_reinit_fifos(container_of
+> +					  (p, struct uart_8250_port, port));
+> +	(void)p->serial_in(p, UART_RX);
+> +}
+> +
+>  static void dw8250_serial_out(struct uart_port *p, int offset, int value)
+>  {
+>  	struct dw8250_data *d = p->private_data;
+>  
+> -	if (offset == UART_LCR)
+> -		d->last_lcr = value;
+> -
+>  	if (offset == UART_MCR)
+>  		d->last_mcr = value;
+>  
+>  	writeb(value, p->membase + (offset << p->regshift));
+> +
+> +	/* Make sure LCR write wasn't ignored */
+> +	if (offset == UART_LCR) {
+> +		int tries = 1000;
+> +		while (tries--) {
+> +			if (value == p->serial_in(p, UART_LCR))
+> +				return;
+> +			dw8250_force_idle(p);
+> +			writeb(value, p->membase + (UART_LCR << p->regshift));
+> +		}
+> +		dev_err(p->dev, "Couldn't set LCR to %d\n", value);
+> +	}
+>  }
+>  
+>  static unsigned int dw8250_serial_in(struct uart_port *p, int offset)
+> @@ -108,13 +123,22 @@ static void dw8250_serial_out32(struct uart_port *p, int offset, int value)
+>  {
+>  	struct dw8250_data *d = p->private_data;
+>  
+> -	if (offset == UART_LCR)
+> -		d->last_lcr = value;
+> -
+>  	if (offset == UART_MCR)
+>  		d->last_mcr = value;
+>  
+>  	writel(value, p->membase + (offset << p->regshift));
+> +
+> +	/* Make sure LCR write wasn't ignored */
+> +	if (offset == UART_LCR) {
+> +		int tries = 1000;
+> +		while (tries--) {
+> +			if (value == p->serial_in(p, UART_LCR))
+> +				return;
+> +			dw8250_force_idle(p);
+> +			writel(value, p->membase + (UART_LCR << p->regshift));
+> +		}
+> +		dev_err(p->dev, "Couldn't set LCR to %d\n", value);
+> +	}
+>  }
+>  
+>  static unsigned int dw8250_serial_in32(struct uart_port *p, int offset)
+> @@ -132,9 +156,8 @@ static int dw8250_handle_irq(struct uart_port *p)
+>  	if (serial8250_handle_irq(p, iir)) {
+>  		return 1;
+>  	} else if ((iir & UART_IIR_BUSY) == UART_IIR_BUSY) {
+> -		/* Clear the USR and write the LCR again. */
+> +		/* Clear the USR */
+>  		(void)p->serial_in(p, d->usr_reg);
+> -		p->serial_out(p, UART_LCR, d->last_lcr);
+>  
+>  		return 1;
+>  	}
 
-Right, we shouldn't see a problem in this specific case. But it does 
-leave a wider philosophical concern - there are still components that 
-can't be exposed to the OS via ACPI in standardised ways, and the 
-traditional way of dealing with that on x86 is to just add the 
-functionality via ASL. It seems that we have three basic options:
+Since v3.13-rc1, this commit seems to have introduced some oddities on
+some of our boards. See this log snippet:
 
-1) Encourage vendors to add functionality to their DSDTs
-2) Encourage vendors to use existing kernel functionality, exposing 
-information via either DT-in-ACPI or some other custom method
-3) Encourage vendors to continue using DT until this functionality is 
-standardised
+Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+????R?console [ttyS0] enabled
+console [ttyS0] enabled
+bootconsole [earlycon0] disabled
+bootconsole [earlycon0] disabled
+dw-apb-uart d0012100.serial: Couldn't set LCR to 191
+dw-apb-uart d0012100.serial: Couldn't set LCR to 191
+dw-apb-uart d0012100.serial: Couldn't set LCR to 224
+dw-apb-uart d0012100.serial: Couldn't set LCR to 224
+d0012100.serial: ttyS1 at MMIO 0xd0012100 (irq = 18, base_baud = 15625000) is a 16550A
 
-Being consistent about our recommendations here would probably be 
-helpful, but it seems like we don't have any kind of thought out story 
-yet. That seems like a problem.
+This behavior appear in at least Armada 370 and Armada XP boxes.
 
+I confirm reverting this commit fixes the issue and things get back to normal.
+Here's the complete kernel log: sprunge.us/gMdL
+
+Ideas?
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
