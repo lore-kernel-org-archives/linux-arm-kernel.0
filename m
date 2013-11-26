@@ -1,36 +1,53 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 26 Nov 2013 16:01:05 +0530
-Subject: [PATCH v3 7/9] phy: add Broadcom Kona USB2 PHY DT binding
-In-Reply-To: <1385403367-18144-8-git-send-email-matt.porter@linaro.org>
-References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
- <1385403367-18144-8-git-send-email-matt.porter@linaro.org>
-Message-ID: <52947869.4040101@ti.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 26 Nov 2013 12:30:10 +0200
+Subject: [PATCH 06/12] mtd: nand: davinci: adjust DT properties to MTD
+ generic
+In-Reply-To: <529447A7.1050605@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-7-git-send-email-ivan.khoronzhuk@ti.com>
+ <4F5844B3A985794BA902E12C070812375F8D20@DNCE04.ent.ti.com>
+ <529447A7.1050605@ti.com>
+Message-ID: <52947832.3080309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
-> Add a binding that describes the Broadcom Kona USB2 PHY found
-> on the BCM281xx family of SoCs.
+On 11/26/2013 09:03 AM, Sekhar Nori wrote:
+> On Monday 11 November 2013 10:31 PM, Khoronzhuk, Ivan wrote:
+>> The properties davinci-ecc-mode, davinci-nand-use-bbt, davinci-nand-buswidth
+>> are MTD generic. Correct names for them are: nand-ecc-mode, nand-on-flash-bbt,
+>> nand-bus-width accordingly. So rename them in dts and documentation.
+>>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+>>   .../devicetree/bindings/mtd/davinci-nand.txt       |   25 ++++++++++++++++----
+>>   drivers/mtd/nand/davinci_nand.c                    |   11 ++++++---
+>>   2 files changed, 28 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+>> index d2a3fc0..befaa5b 100644
+>> --- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+>> +++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+>> @@ -37,7 +37,7 @@ Recommended properties :
+>>   - ti,davinci-mask-chipsel:     mask for chipselect address. Needed to mask
+>>                                  addresses for given chipselect.
+>>
+>> -- ti,davinci-ecc-mode:         operation mode of the NAND ecc mode. ECC mode
+>> +- nand-ecc-mode:               operation mode of the NAND ecc mode. ECC mode
+>>                                  valid values for davinci driver:
+>>                                  - "none"
+>>                                  - "soft"
+>> @@ -45,10 +45,25 @@ Recommended properties :
+>>
+>>   - ti,davinci-ecc-bits:         used ECC bits, currently supported 1 or 4.
+>>
+>> -- ti,davinci-nand-buswidth:    buswidth 8 or 16.
 > 
-> Signed-off-by: Matt Porter <matt.porter@linaro.org>
-> ---
->  .../devicetree/bindings/phy/bcm-kona-usb2-phy.txt         | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
-> new file mode 100644
-> index 0000000..3dc8b3d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
+> Shouldn't we keep the documentation for existing bindings while just
+> marking them as deprecated?
 
-you should name this bcm-phy. Then you can add binding info of all (future) PHY
-IP from broadcom here.
+I haven't found any requirements about this in doc. 
+It's done in both way in other drivers - some keep properties in bindings
+documentation and some are not.
 
-other than that this looks fine..
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-Thanks
-Kishon
+Regards,
+-grygorii
