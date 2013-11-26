@@ -1,60 +1,38 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 26 Nov 2013 14:04:18 -0800
-Subject: [PATCH v5 2/4] Documentation: Add documentation for APM X-Gene
- SoC SATA host controller DTS binding
-In-Reply-To: <20131126145515.GD5402@e106331-lin.cambridge.arm.com>
-References: <1385449285-30764-1-git-send-email-lho@apm.com>
- <1385449285-30764-2-git-send-email-lho@apm.com>
- <1385449285-30764-3-git-send-email-lho@apm.com>
- <20131126145515.GD5402@e106331-lin.cambridge.arm.com>
-Message-ID: <CAPw-ZTm1wS0j2DphK9+Rmmu2UPJniobMUv6MTfMCG5wwKNvJCg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 14:05:43 -0800
+Subject: [PATCH 6/7] ARM: OMAP: Disable POSTED mode for errata i103 and
+ i767
+In-Reply-To: <5293CC93.6040603@ti.com>
+References: <1385415876-12387-1-git-send-email-joelf@ti.com>
+ <1385415876-12387-7-git-send-email-joelf@ti.com>
+ <20131125221437.GW10023@atomide.com> <5293CC93.6040603@ti.com>
+Message-ID: <20131126220543.GP26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Joel Fernandes <joelf@ti.com> [131125 14:18]:
+> On 11/25/2013 04:14 PM, Tony Lindgren wrote:
+> > * Joel Fernandes <joelf@ti.com> [131125 13:46]:
+> >> Enabling of Posted mode is seen to cause problems on dmtimer modules on AM33xx
+> >> (much like other OMAPs).  Reference discussions on forums [1] [2]. Earlier
+> >> patch solving this on other OMAPs [3].
+> >>
+> >> For OMAP SoCs with this errata, the fix has been to not enable Posted mode.
+> >> However, on some SoCs (atleast AM33xx) which carry this errata, Posted mode
+> >> is enabled on reset. So we not only need to ignore enabling of the POSTED bit
+> >> when the timer is requested, but also disable Posted mode if errata is present.
+> > 
+> > This could explain some occasional lost timers I saw a while back when
+> > testing things.. We most likely should merge for the -rc series with cc stable.
+> 
+> Sure, I agree.
+> 
+> > 
+> > Does this depend on the other patches in this series?
+> > 
+> 
+> No it doesn't depend.
 
->> +- interrupt-parent   : Interrupt controller.
->
-> I don't think that's strictly required.
+OK thanks applying into omap-for-v3.13/fixes-take4.
 
-Okay, got rip of it.
-
->> +Optional properties:
->> +- status             : Shall be "ok" if enabled or "na" if disabled.
->> +                       Default is "ok".
->
-> Why not use the more standard "disabled" string, as I asked you to
-> previously?
-
-Missed this one. Fixed.
-
->> +             sata2: sata at 1a400000 {
->> +                     compatible = "apm,xgene-ahci-sgmii";
->> +                     reg = <0x0 0x1a400000 0x0 0x1000>,
->> +                           <0x0 0x1f220000 0x0 0x10000>;
->> +                     interrupt-parent = <&gic>;
->> +                     interrupts = <0x0 0x87 0x4>;
->> +                     status = "ok";
->> +                     clocks = <&sata23clk 0>;
->> +                     phys = <&phy2 0>;
->> +                     phy-names = "sata-6g";
->> +             };
->> +
->> +             sata3: sata at 1a800000 {
->> +                     compatible = "apm,xgene-ahci-pcie";
->> +                     reg = <0x0 0x1a800000 0x0 0x1000>,
->> +                           <0x0 0x1f230000 0x0 0x10000>;
->> +                     interrupt-parent = <&gic>;
->> +                     interrupts = <0x0 0x88 0x4>;
->> +                     status = "ok";
->> +                     clocks = <&sata45clk 0>;
->> +                     phys = <&phy3 0>;
->> +                     phy-names = "sata-6g";
->> +             };
->
-> The example is pointlessly huge. You could trim it down two these last
-> two nodes (with a phy node and some fixed clocks).
-
-I will use dummy fixed clock and added two PHY nodes.
-
--Loc
+Tony
