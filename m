@@ -1,47 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Nov 2013 21:24:55 +0100
-Subject: [GIT PULL] ux500 fixes for v3.13-rcN
-Message-ID: <CACRpkdYi=_9PMuz5hm5cPBjfyTefQjzqZx2KKhS76VVmqYfUEw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 12:26:07 -0800
+Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
+In-Reply-To: <CAKZq+rcpSg02X_xmTzq_fzG6cAWNS+TeXoqZsNFdneqekiaavw@mail.gmail.com>
+References: <87hab9agjr.fsf@gmail.com>
+ <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
+ <87wqk3n54l.fsf@gmail.com> <20131120183548.GH10317@atomide.com>
+ <CAKZq+rcoC5PLSVVazWcce7V7TcBM8=M2jM56bvk9HO2orKt8fg@mail.gmail.com>
+ <20131126182022.GJ26766@atomide.com>
+ <CAKZq+rcpSg02X_xmTzq_fzG6cAWNS+TeXoqZsNFdneqekiaavw@mail.gmail.com>
+Message-ID: <20131126202606.GL26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+* Chao Xu <caesarxuchao@gmail.com> [131126 12:00]:
+> Thanks, Tony. I checked my .config and this option is enabled. FYI, I
+> raised this issue in u-boot mailing-list, too. It seems to be a bug in
+> u-boot and only happens to certain version of pandaboard. The name of
+> the thread is "No single character output after update to latest
+> u-boot on pandaboard"
 
-here are two fixes for the Ux500 v3.13 series making (e)MMC/SD
-cards work again.
+OK thanks for the info.
 
-Please pull them in for fixes!
-
-Yours,
-Linus Walleij
-
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-fixes-v3.13-1
-
-for you to fetch changes up to 5281973012bdcfd93a8f6e0f5b4e04af0038ea99:
-
-  Revert "ARM: ux500: Stop passing MMC's platform data for Device Tree
-boots" (2013-11-26 21:02:20 +0100)
-
-----------------------------------------------------------------
-Ux500 fixes for the v3.13 series:
-
-- Restore platform data for the (e)MMC/SD controllers, so they can
-  pins and special flags properly like before.
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      Revert "ARM: ux500: Remove AUXDATA relating to SDI (MMC)
-clock-name bindings"
-      Revert "ARM: ux500: Stop passing MMC's platform data for Device
-Tree boots"
-
- arch/arm/mach-ux500/cpu-db8500.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Tony
