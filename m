@@ -1,38 +1,19 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Nov 2013 10:57:46 +0800
-Subject: [PATCH] [ARM] imx27-apf27dev: fix display size
-In-Reply-To: <1385365544-70498-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1385365544-70498-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20131126025744.GF30476@S2101-09.ap.freescale.net>
+Date: Tue, 26 Nov 2013 11:03:13 +0800
+Subject: [PATCH v2] ARM i.MX5: fix "shift" value for lp_apm_sel on i.MX50
+ and i.MX53
+In-Reply-To: <1385399037-15487-1-git-send-email-mkl@pengutronix.de>
+References: <1385399037-15487-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <20131126030311.GG30476@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 08:45:44AM +0100, Gwenhael Goavec-Merou wrote:
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-
+On Mon, Nov 25, 2013 at 06:03:57PM +0100, Marc Kleine-Budde wrote:
+> According to the i.MX50 Rev. 1 and i.MX53 Rev. 2.1 datasheet the lp_apm_sel is
+> bit 10 in the CCM_CCSR register not bit 9. On the i.MX51 it's bit 9.
+> 
+> This patch fixes this issue.
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+ 
 Applied, thanks.
-
-> ---
->  arch/arm/boot/dts/imx27-apf27dev.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-> index 7d90877..9197329 100644
-> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
-> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-> @@ -22,10 +22,10 @@
->  		bits-per-pixel = <16>;  /* non-standard but required */
->  		fsl,pcr = <0xfae80083>;	/* non-standard but required */
->  		display-timings {
-> -			timing0: 640x480 {
-> +			timing0: 800x480 {
->  				clock-frequency = <33000033>;
->  				hactive = <800>;
-> -				vactive = <640>;
-> +				vactive = <480>;
->  				hback-porch = <96>;
->  				hfront-porch = <96>;
->  				vback-porch = <20>;
-> -- 
-> 1.8.3.2
-> 
