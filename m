@@ -1,83 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Nov 2013 17:36:59 +0000
-Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
- p2v and v2p conversions'
-In-Reply-To: <alpine.LFD.2.10.1311261205300.9667@knanqh.ubzr>
-References: <20131125223636.GA20822@obsidianresearch.com>
- <20131125232003.GU16735@n2100.arm.linux.org.uk>
- <20131125233654.GV16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
- <20131126095430.GA16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
- <20131126134155.GB16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311261205300.9667@knanqh.ubzr>
-Message-ID: <20131126173659.GE16735@n2100.arm.linux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 26 Nov 2013 17:37:51 +0000
+Subject: HYP Kernel boot requirements
+In-Reply-To: <5294B471.7020205@ti.com>
+References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
+ <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
+ <52937AB4.1060901@ti.com>
+ <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
+ <529381E4.3090405@ti.com> <20131125172825.GD8396@arm.com>
+ <5293A888.9050500@ti.com> <20131126141346.GA692@arm.com>
+ <5294B471.7020205@ti.com>
+Message-ID: <20131126173751.GF2355@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 12:26:49PM -0500, Nicolas Pitre wrote:
-> On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Nov 26, 2013 at 08:35:43AM -0500, Nicolas Pitre wrote:
-> > > On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
-> > > 
-> > > > On Mon, Nov 25, 2013 at 10:56:25PM -0500, Nicolas Pitre wrote:
-> > > > > What about simply doing the following instead, which I'm sure used to 
-> > > > > work properly at some point:
-> > > > > 
-> > > > > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > > > > index 9ecccc8650..2b8b8d3236 100644
-> > > > > --- a/arch/arm/include/asm/memory.h
-> > > > > +++ b/arch/arm/include/asm/memory.h
-> > > > > @@ -239,6 +239,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> > > > >  
-> > > > >  #else
-> > > > >  
-> > > > > +#ifndef PHYS_OFFSET
-> > > > > +#ifdef PLAT_PHYS_OFFSET
-> > > > > +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > > > > +#else
-> > > > > +#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > > > > +#endif
-> > > > > +#endif
-> > > > > +
-> > > > >  static inline phys_addr_t __virt_to_phys(unsigned long x)
-> > > > >  {
-> > > > >  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> > > > > @@ -253,14 +261,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> > > > >  #endif
-> > > > >  #endif /* __ASSEMBLY__ */
-> > > > >  
-> > > > > -#ifndef PHYS_OFFSET
-> > > > > -#ifdef PLAT_PHYS_OFFSET
-> > > > > -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > > > > -#else
-> > > > > -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > > > > -#endif
-> > > > > -#endif
-> > > > 
-> > > > And that makes PHYS_OFFSET undefined to assembly code - and we have
-> > > > references to it from said code.
-> > > 
-> > > Why does the kernel compile properly for me with this change then?
+On Tue, Nov 26, 2013 at 09:47:13AM -0500, Santosh Shilimkar wrote:
+> On Tuesday 26 November 2013 09:13 AM, Catalin Marinas wrote:
+> > On Mon, Nov 25, 2013 at 07:44:08PM +0000, Santosh Shilimkar wrote:
+> >> On Monday 25 November 2013 12:28 PM, Catalin Marinas wrote:
+> >>> On Mon, Nov 25, 2013 at 04:59:16PM +0000, Santosh Shilimkar wrote:
+> >>>> What I am saying is the platforms like OMAP5 already support PM in
+> >>>> mainline kernel and we can't break that for KVM. Boot-loaders
+> >>>> would be thrashed after boot so you need something which runs
+> >>>> in Kernel or along with Kernel to have equivalent of hyp
+> >>>> switching.
+> >>>>
+> >>>> Am not challenging the agreed direction but we need to solve the
+> >>>> PM problem as well before making "all CPU runs boot-loader for
+> >>>> HYP kernels" as a must have. At least its is a change in boot
+> >>>> strategy from existing kernels.
+> >>>
+> >>> Of course I recommend PSCI which covers both hotplug and suspend ;), but
+> >>> I guess it's not the case for OMAP5. Since OMAP has its own secondary
+> >>> booting protocol and CPU hotplug re-entry, can you not just use
+> >>> different entry point when the primary CPU was initially started in Hyp
+> >>> mode (e.g. omap5_hyp_secondary_startup)?
+> >>>
+> >> How will that solve the guest secondary boot failure case when using
+> >> the same kernel binary for guest-boot ? Even for primary CPU which
+> >> will be suspended it needs to resume already in HYP mode and its not
+> >> going to go through boot-loader. So the low power code needs to have
+> >> HYP switch code so that CPU resumes in HYP mode.
 > > 
-> > Nicolas,
+> > Is it late to rewrite the OMAP5 firmware?
 > > 
-> > Try using grep rather than just typing emails for the hell of it.
-> > Try looking at the patch I sent to fix this issue.  Either of those
-> > will give you the appropriate clue necessary to answer your question.
-> 
-> Your patch does s/PHYS_OFFSET/PLAT_PHYS_OFFSET/ in assembly code and 
-> defines PLAT_PHYS_OFFSET with CONFIG_PHYS_OFFSET when needed.
-> 
-> Mine leaves PHYS_OFFSET as is in assembly code and defines PHYS_OFFSET 
-> with PLAT_PHYS_OFFSET or CONFIG_PHYS_OFFSET as appropriate, as it *used* 
-> to work before commit ca5a45c06c.
+> Well its ROM'ed unfortunately so no choice. OMAP5 ROM did implement
+> a secure API which lets you enter into HYP mode and thats the only
+> thing can be used.
 
-If manual inspection fails you, try building a nommu or XIP kernel.
+If the ROM is capable of loading some additional signed Secure World
+firmware after the ROM itself has booted, PSCI could be implemented
+in the second, resident firmware payload.
 
-For crying out loud, you're moving the definition of PHYS_OFFSET to be
-_inside_ a #ifndef __ASSEMBLY__ .. #endif section.  That's fscking
-obvious if you bother to read your own patch, because you move the
-definition to just _before_ some C code, and the assembler won't
-parse C code.
+Some SoCs ship with boot ROMs that can do that -- is this not the case
+for OMAP5?
+
+Cheers
+---Dave
