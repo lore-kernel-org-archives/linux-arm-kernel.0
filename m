@@ -1,51 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 13:04:56 -0800
-Subject: [PATCH v3 09/10] ARM: dts: omap3-beagle-xm: Add USB Host support
-In-Reply-To: <528C8FBC.7020407@ti.com>
-References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
- <1380012836-29900-10-git-send-email-rogerq@ti.com>
- <528BD2AF.2030607@ti.com> <528C8FBC.7020407@ti.com>
-Message-ID: <20131126210456.GN26766@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 26 Nov 2013 22:10:44 +0100
+Subject: [PATCH 3/7] PCI: imx6: Fix waiting for link up
+In-Reply-To: <1385500248-6551-1-git-send-email-marex@denx.de>
+References: <1385500248-6551-1-git-send-email-marex@denx.de>
+Message-ID: <1385500248-6551-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [131120 02:33]:
-> Nishant,
-> 
-> On 11/19/2013 11:05 PM, Nishanth Menon wrote:
-> > 
-> > 
-> > On 09/24/2013 03:53 AM, Roger Quadros wrote:
-> >> Provide RESET GPIO and Power regulator for the USB PHY,
-> >> the USB Host port mode and the PHY device for the controller.
-> >> Also provide pin multiplexer information for USB host pins.
-> >>
-> >> We also relocate omap3_pmx_core pin definations so that they
-> >> are close to omap3_pmx_wkup pin definations.
-> >>
-> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> >> ---
-> > 
-> > just using this thread, but a question ->
-> > 
-> > I am kernel * master                                   dec8e46 Merge
-> > tag 'arc-v3.13-rc1-part2' of
-> > git://git.kernel.org/pub/scm/linux/kernel/git/vgupta/arc
-> > 
-> > and I see that VAUX2 which supplies USB_1V8[1] is not enabled -> I did
-> > a quick patch and it did seem to work (Usb keyboard, networking, mouse
-> > etc on my ehci ports seems to come up good) - any suggestions how we'd
-> > like to handle this?
-> 
-> It worked for me without your patch. It could be that u-boot is enabling
-> that regulator for me. I'm on u-boot-v2013.10.
-> 
-> In any case, your patch seems the right thing to do. We should take it in
-> the rc cycle.
+While waiting for the PHY to report the PCIe link is up, we might
+hit a situation where the link training is still in progress, while
+the PHY already reports the link is up. Add additional check for
+this condition.
 
-Can you guys post a proper fix for this? Meanwhile, I'll mark this
-thread as read to shrink my inbox a bit.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Frank Li <lznuaa@gmail.com>
+Cc: Harro Haan <hrhaan@gmail.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+Cc: Pratyush Anand <pratyush.anand@st.com>
+Cc: Richard Zhu <r65037@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Sean Cross <xobs@kosagi.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+Cc: Tim Harvey <tharvey@gateworks.com>
+Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+Cc: Yinghai Lu <yinghai@kernel.org>
+---
+ drivers/pci/host/pci-imx6.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 52027ad..4d5be4e 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -48,6 +48,8 @@ struct imx6_pcie {
+ #define PL_OFFSET 0x700
+ #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+ #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
++#define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
++#define PCIE_PHY_DEBUG_R1_XMLH_LINK_UP		(1 << 4)
+ 
+ #define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
+ #define PCIE_PHY_CTRL_DATA_LOC 0
+@@ -338,10 +340,17 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+ {
+ 	u32 rc, ltssm, rx_valid, temp;
+ 
+-	/* link is debug bit 36, debug register 1 starts@bit 32 */
+-	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1) & (0x1 << (36 - 32));
+-	if (rc)
+-		return -EAGAIN;
++	/*
++	 * Test if the PHY reports that the link is up and also that
++	 * the link training finished. It might happen that the PHY
++	 * reports the link is already up, but the link training bit
++	 * is still set, so make sure to check the training is done
++	 * as well here.
++	 */
++	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
++	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
++	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
++		return 1;
+ 
+ 	/*
+ 	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
+-- 
+1.8.4.3
