@@ -1,33 +1,38 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 26 Nov 2013 17:24:45 -0500
-Subject: [PATCH] mmc: atmel-mci: fix timeout errors in SDIO mode when
- using DMA
-In-Reply-To: <528E29D0.9080507@atmel.com> (Nicolas Ferre's message of "Thu, 21
- Nov 2013 16:42:08 +0100")
-References: <1384959671-5646-1-git-send-email-ludovic.desroches@atmel.com>
- <528E29D0.9080507@atmel.com>
-Message-ID: <87zjoqer82.fsf@octavius.laptop.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 14:27:03 -0800
+Subject: [PATCH] ARM: dts: omap3-beagle: Fix USB host on beagle boards
+ (for 3.13)
+In-Reply-To: <52946243.70903@ti.com>
+References: <1385387745-7162-1-git-send-email-rogerq@ti.com>
+ <CAGo_u6ryFJvBwd=S9A-nJw+eoGguPj0jMOtgMiZ7mXXAbh4i+w@mail.gmail.com>
+ <52946243.70903@ti.com>
+Message-ID: <20131126222703.GQ26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Roger Quadros <rogerq@ti.com> [131126 00:57]:
+> On 11/25/2013 05:50 PM, Nishanth Menon wrote:
+> > On Mon, Nov 25, 2013 at 7:55 AM, Roger Quadros <rogerq@ti.com> wrote:
+> >> Beagle (rev. C4) and Beagle-XM (all revs) need VAUX2 1.8V supply
+> >> for the USB PHY.
+> >>
+> >> As the generic PHY driver can't handle more than one supply
+> >> at the moment, we configure this supply to be always on.
+> >> This will cause a very small power impact if the USB host subsystem
+> >> is not in use, about 76.86 micro-W + LDO power.
+> > 
+> >>
+> >> Older Beagle boards (prior to C4) don't have VAUX2 connected anywhere,
+> >> so there won't be any functional impact on those boards other than
+> >> some additional LDO power consumption.
+> >>
+> >> Reported-by: Nishanth Menon <nm@ti.com>
+> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> > 
+> > Tested-by: Nishanth Menon <nm@ti.com>
+> 
+> Thanks Nishant.
 
-On Thu, Nov 21 2013, Nicolas Ferre wrote:
-> On 20/11/2013 16:01, ludovic.desroches at atmel.com :
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> With some SDIO devices, timeout errors can happen when reading data. To solve
->> this issue the DMA transfer has to be activated before sending the command to
->> the device. This order is incorrect in PDC mode. So we have to take care if we
->> are using DMA or PDC to know when to send the MMC command.
->>
->> Cc: <stable@vger.kernel.org> #3.2+
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Thanks, applying this into omap-for-v3.13/fixes-take4.
 
-Thanks, pushed to mmc-next for 3.14.
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+Tony
