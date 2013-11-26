@@ -1,152 +1,1022 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 16:14:24 -0800
-Subject: [PATCH 09/12] ARM: OMAP2+: Remove legacy usb-musb.c platform init code
+Date: Mon, 25 Nov 2013 16:14:21 -0800
+Subject: [PATCH 06/12] ARM: OMAP2+: Remove legacy twl4030 platform init code
 In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
 References: <1385424867-27243-1-git-send-email-tony@atomide.com>
-Message-ID: <1385424867-27243-10-git-send-email-tony@atomide.com>
+Message-ID: <1385424867-27243-7-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no longer needed when booted with device tree.
+We can now initialize twl4030 with device tree.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Makefile   |   1 -
- arch/arm/mach-omap2/usb-musb.c | 114 -----------------------------------------
- 2 files changed, 115 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/usb-musb.c
+ arch/arm/mach-omap2/Makefile               |   3 +-
+ arch/arm/mach-omap2/common-board-devices.h |   2 -
+ arch/arm/mach-omap2/omap_twl.c             | 314 ----------------
+ arch/arm/mach-omap2/twl-common.c           | 568 -----------------------------
+ arch/arm/mach-omap2/twl-common.h           |  66 ----
+ 5 files changed, 1 insertion(+), 952 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/omap_twl.c
+ delete mode 100644 arch/arm/mach-omap2/twl-common.c
+ delete mode 100644 arch/arm/mach-omap2/twl-common.h
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index bfc5459..66b7218 100644
+index a5e13c0..1f50fae 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -242,7 +242,6 @@ omap-flash-$(CONFIG_MTD_NAND_OMAP2)	:= board-flash.o
- omap-flash-$(CONFIG_MTD_ONENAND_OMAP2)	:= board-flash.o
- obj-y					+= $(omap-flash-y) $(omap-flash-m)
+@@ -29,7 +29,6 @@ ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
+ obj-y += mcbsp.o
+ endif
  
--obj-y					+= usb-musb.o
- obj-y					+= omap_phy_internal.o
+-obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)	+= sdrc.o
  
- obj-$(CONFIG_MACH_OMAP2_TUSB6010)	+= usb-tusb6010.o
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+ # SMP support ONLY available for OMAP4
+@@ -267,4 +266,4 @@ endif
+ emac-$(CONFIG_TI_DAVINCI_EMAC)		:= am35xx-emac.o
+ obj-y					+= $(emac-m) $(emac-y)
+ 
+-obj-y					+= common-board-devices.o twl-common.o dss-common.o
++obj-y					+= common-board-devices.o dss-common.o
+diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
+index f338177..663dfa3 100644
+--- a/arch/arm/mach-omap2/common-board-devices.h
++++ b/arch/arm/mach-omap2/common-board-devices.h
+@@ -1,8 +1,6 @@
+ #ifndef __OMAP_COMMON_BOARD_DEVICES__
+ #define __OMAP_COMMON_BOARD_DEVICES__
+ 
+-#include "twl-common.h"
+-
+ #define NAND_BLOCK_SIZE	SZ_128K
+ 
+ struct mtd_partition;
+diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
 deleted file mode 100644
-index bc89723..0000000
---- a/arch/arm/mach-omap2/usb-musb.c
+index 615e5b1..0000000
+--- a/arch/arm/mach-omap2/omap_twl.c
 +++ /dev/null
-@@ -1,114 +0,0 @@
--/*
-- * linux/arch/arm/mach-omap2/usb-musb.c
+@@ -1,314 +0,0 @@
+-/**
+- * OMAP and TWL PMIC specific intializations.
 - *
-- * This file will contain the board specific details for the
-- * MENTOR USB OTG controller on OMAP3430
-- *
-- * Copyright (C) 2007-2008 Texas Instruments
-- * Copyright (C) 2008 Nokia Corporation
-- * Author: Vikram Pandita
-- *
-- * Generalization by:
-- * Felipe Balbi <felipe.balbi@nokia.com>
+- * Copyright (C) 2010 Texas Instruments Incorporated.
+- * Thara Gopinath
+- * Copyright (C) 2009 Texas Instruments Incorporated.
+- * Nishanth Menon
+- * Copyright (C) 2009 Nokia Corporation
+- * Paul Walmsley
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 - */
 -
--#include <linux/types.h>
--#include <linux/errno.h>
--#include <linux/delay.h>
--#include <linux/platform_device.h>
--#include <linux/clk.h>
--#include <linux/dma-mapping.h>
+-#include <linux/err.h>
 -#include <linux/io.h>
--#include <linux/usb/musb.h>
+-#include <linux/kernel.h>
+-#include <linux/i2c/twl.h>
 -
--#include "omap_device.h"
 -#include "soc.h"
--#include "mux.h"
--#include "usb.h"
+-#include "voltage.h"
 -
--static struct musb_hdrc_config musb_config = {
--	.multipoint	= 1,
--	.dyn_fifo	= 1,
--	.num_eps	= 16,
--	.ram_bits	= 12,
--};
+-#include "pm.h"
 -
--static struct musb_hdrc_platform_data musb_plat = {
--	.mode		= MUSB_OTG,
+-#define OMAP3_SRI2C_SLAVE_ADDR		0x12
+-#define OMAP3_VDD_MPU_SR_CONTROL_REG	0x00
+-#define OMAP3_VDD_CORE_SR_CONTROL_REG	0x01
+-#define OMAP3_VP_CONFIG_ERROROFFSET	0x00
+-#define OMAP3_VP_VSTEPMIN_VSTEPMIN	0x1
+-#define OMAP3_VP_VSTEPMAX_VSTEPMAX	0x04
+-#define OMAP3_VP_VLIMITTO_TIMEOUT_US	200
 -
--	/* .clock is set dynamically */
--	.config		= &musb_config,
+-#define OMAP4_SRI2C_SLAVE_ADDR		0x12
+-#define OMAP4_VDD_MPU_SR_VOLT_REG	0x55
+-#define OMAP4_VDD_MPU_SR_CMD_REG	0x56
+-#define OMAP4_VDD_IVA_SR_VOLT_REG	0x5B
+-#define OMAP4_VDD_IVA_SR_CMD_REG	0x5C
+-#define OMAP4_VDD_CORE_SR_VOLT_REG	0x61
+-#define OMAP4_VDD_CORE_SR_CMD_REG	0x62
 -
--	/* REVISIT charge pump on TWL4030 can supply up to
--	 * 100 mA ... but this value is board-specific, like
--	 * "mode", and should be passed to usb_musb_init().
--	 */
--	.power		= 50,			/* up to 100 mA */
--};
+-#define OMAP4_VP_CONFIG_ERROROFFSET	0x00
+-#define OMAP4_VP_VSTEPMIN_VSTEPMIN	0x01
+-#define OMAP4_VP_VSTEPMAX_VSTEPMAX	0x04
+-#define OMAP4_VP_VLIMITTO_TIMEOUT_US	200
 -
--static u64 musb_dmamask = DMA_BIT_MASK(32);
+-static bool is_offset_valid;
+-static u8 smps_offset;
+-/*
+- * Flag to ensure Smartreflex bit in TWL
+- * being cleared in board file is not overwritten.
+- */
+-static bool __initdata twl_sr_enable_autoinit;
 -
--static struct omap_musb_board_data musb_default_board_data = {
--	.interface_type		= MUSB_INTERFACE_ULPI,
--	.mode			= MUSB_OTG,
--	.power			= 100,
--};
+-#define TWL4030_DCDC_GLOBAL_CFG        0x06
+-#define REG_SMPS_OFFSET         0xE0
+-#define SMARTREFLEX_ENABLE     BIT(3)
 -
--void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+-static unsigned long twl4030_vsel_to_uv(const u8 vsel)
 -{
--	struct omap_hwmod		*oh;
--	struct platform_device		*pdev;
--	struct device			*dev;
--	int				bus_id = -1;
--	const char			*oh_name, *name;
--	struct omap_musb_board_data	*board_data;
+-	return (((vsel * 125) + 6000)) * 100;
+-}
 -
--	if (musb_board_data)
--		board_data = musb_board_data;
+-static u8 twl4030_uv_to_vsel(unsigned long uv)
+-{
+-	return DIV_ROUND_UP(uv - 600000, 12500);
+-}
+-
+-static unsigned long twl6030_vsel_to_uv(const u8 vsel)
+-{
+-	/*
+-	 * In TWL6030 depending on the value of SMPS_OFFSET
+-	 * efuse register the voltage range supported in
+-	 * standard mode can be either between 0.6V - 1.3V or
+-	 * 0.7V - 1.4V. In TWL6030 ES1.0 SMPS_OFFSET efuse
+-	 * is programmed to all 0's where as starting from
+-	 * TWL6030 ES1.1 the efuse is programmed to 1
+-	 */
+-	if (!is_offset_valid) {
+-		twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset,
+-				REG_SMPS_OFFSET);
+-		is_offset_valid = true;
+-	}
+-
+-	if (!vsel)
+-		return 0;
+-	/*
+-	 * There is no specific formula for voltage to vsel
+-	 * conversion above 1.3V. There are special hardcoded
+-	 * values for voltages above 1.3V. Currently we are
+-	 * hardcoding only for 1.35 V which is used for 1GH OPP for
+-	 * OMAP4430.
+-	 */
+-	if (vsel == 0x3A)
+-		return 1350000;
+-
+-	if (smps_offset & 0x8)
+-		return ((((vsel - 1) * 1266) + 70900)) * 10;
 -	else
--		board_data = &musb_default_board_data;
+-		return ((((vsel - 1) * 1266) + 60770)) * 10;
+-}
+-
+-static u8 twl6030_uv_to_vsel(unsigned long uv)
+-{
+-	/*
+-	 * In TWL6030 depending on the value of SMPS_OFFSET
+-	 * efuse register the voltage range supported in
+-	 * standard mode can be either between 0.6V - 1.3V or
+-	 * 0.7V - 1.4V. In TWL6030 ES1.0 SMPS_OFFSET efuse
+-	 * is programmed to all 0's where as starting from
+-	 * TWL6030 ES1.1 the efuse is programmed to 1
+-	 */
+-	if (!is_offset_valid) {
+-		twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset,
+-				REG_SMPS_OFFSET);
+-		is_offset_valid = true;
+-	}
+-
+-	if (!uv)
+-		return 0x00;
+-	/*
+-	 * There is no specific formula for voltage to vsel
+-	 * conversion above 1.3V. There are special hardcoded
+-	 * values for voltages above 1.3V. Currently we are
+-	 * hardcoding only for 1.35 V which is used for 1GH OPP for
+-	 * OMAP4430.
+-	 */
+-	if (uv > twl6030_vsel_to_uv(0x39)) {
+-		if (uv == 1350000)
+-			return 0x3A;
+-		pr_err("%s:OUT OF RANGE! non mapped vsel for %ld Vs max %ld\n",
+-			__func__, uv, twl6030_vsel_to_uv(0x39));
+-		return 0x3A;
+-	}
+-
+-	if (smps_offset & 0x8)
+-		return DIV_ROUND_UP(uv - 709000, 12660) + 1;
+-	else
+-		return DIV_ROUND_UP(uv - 607700, 12660) + 1;
+-}
+-
+-static struct omap_voltdm_pmic omap3_mpu_pmic = {
+-	.slew_rate		= 4000,
+-	.step_size		= 12500,
+-	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
+-	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
+-	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= 600000,
+-	.vddmax			= 1450000,
+-	.vp_timeout_us		= OMAP3_VP_VLIMITTO_TIMEOUT_US,
+-	.i2c_slave_addr		= OMAP3_SRI2C_SLAVE_ADDR,
+-	.volt_reg_addr		= OMAP3_VDD_MPU_SR_CONTROL_REG,
+-	.i2c_high_speed		= true,
+-	.vsel_to_uv		= twl4030_vsel_to_uv,
+-	.uv_to_vsel		= twl4030_uv_to_vsel,
+-};
+-
+-static struct omap_voltdm_pmic omap3_core_pmic = {
+-	.slew_rate		= 4000,
+-	.step_size		= 12500,
+-	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
+-	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
+-	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= 600000,
+-	.vddmax			= 1450000,
+-	.vp_timeout_us		= OMAP3_VP_VLIMITTO_TIMEOUT_US,
+-	.i2c_slave_addr		= OMAP3_SRI2C_SLAVE_ADDR,
+-	.volt_reg_addr		= OMAP3_VDD_CORE_SR_CONTROL_REG,
+-	.i2c_high_speed		= true,
+-	.vsel_to_uv		= twl4030_vsel_to_uv,
+-	.uv_to_vsel		= twl4030_uv_to_vsel,
+-};
+-
+-static struct omap_voltdm_pmic omap4_mpu_pmic = {
+-	.slew_rate		= 4000,
+-	.step_size		= 12660,
+-	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+-	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+-	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= 0,
+-	.vddmax			= 2100000,
+-	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
+-	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+-	.volt_reg_addr		= OMAP4_VDD_MPU_SR_VOLT_REG,
+-	.cmd_reg_addr		= OMAP4_VDD_MPU_SR_CMD_REG,
+-	.i2c_high_speed		= true,
+-	.i2c_pad_load		= 3,
+-	.vsel_to_uv		= twl6030_vsel_to_uv,
+-	.uv_to_vsel		= twl6030_uv_to_vsel,
+-};
+-
+-static struct omap_voltdm_pmic omap4_iva_pmic = {
+-	.slew_rate		= 4000,
+-	.step_size		= 12660,
+-	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+-	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+-	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= 0,
+-	.vddmax			= 2100000,
+-	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
+-	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+-	.volt_reg_addr		= OMAP4_VDD_IVA_SR_VOLT_REG,
+-	.cmd_reg_addr		= OMAP4_VDD_IVA_SR_CMD_REG,
+-	.i2c_high_speed		= true,
+-	.i2c_pad_load		= 3,
+-	.vsel_to_uv		= twl6030_vsel_to_uv,
+-	.uv_to_vsel		= twl6030_uv_to_vsel,
+-};
+-
+-static struct omap_voltdm_pmic omap4_core_pmic = {
+-	.slew_rate		= 4000,
+-	.step_size		= 12660,
+-	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+-	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+-	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= 0,
+-	.vddmax			= 2100000,
+-	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
+-	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+-	.volt_reg_addr		= OMAP4_VDD_CORE_SR_VOLT_REG,
+-	.cmd_reg_addr		= OMAP4_VDD_CORE_SR_CMD_REG,
+-	.i2c_high_speed		= true,
+-	.i2c_pad_load		= 3,
+-	.vsel_to_uv		= twl6030_vsel_to_uv,
+-	.uv_to_vsel		= twl6030_uv_to_vsel,
+-};
+-
+-int __init omap4_twl_init(void)
+-{
+-	struct voltagedomain *voltdm;
+-
+-	if (!cpu_is_omap44xx())
+-		return -ENODEV;
+-
+-	voltdm = voltdm_lookup("mpu");
+-	omap_voltage_register_pmic(voltdm, &omap4_mpu_pmic);
+-
+-	voltdm = voltdm_lookup("iva");
+-	omap_voltage_register_pmic(voltdm, &omap4_iva_pmic);
+-
+-	voltdm = voltdm_lookup("core");
+-	omap_voltage_register_pmic(voltdm, &omap4_core_pmic);
+-
+-	return 0;
+-}
+-
+-int __init omap3_twl_init(void)
+-{
+-	struct voltagedomain *voltdm;
+-
+-	if (!cpu_is_omap34xx())
+-		return -ENODEV;
 -
 -	/*
--	 * REVISIT: This line can be removed once all the platforms using
--	 * musb_core.c have been converted to use use clkdev.
+-	 * The smartreflex bit on twl4030 specifies if the setting of voltage
+-	 * is done over the I2C_SR path. Since this setting is independent of
+-	 * the actual usage of smartreflex AVS module, we enable TWL SR bit
+-	 * by default irrespective of whether smartreflex AVS module is enabled
+-	 * on the OMAP side or not. This is because without this bit enabled,
+-	 * the voltage scaling through vp forceupdate/bypass mechanism of
+-	 * voltage scaling will not function on TWL over I2C_SR.
 -	 */
--	musb_plat.clock = "ick";
--	musb_plat.board_data = board_data;
--	musb_plat.power = board_data->power >> 1;
--	musb_plat.mode = board_data->mode;
--	musb_plat.extvbus = board_data->extvbus;
+-	if (!twl_sr_enable_autoinit)
+-		omap3_twl_set_sr_bit(true);
 -
--	if (soc_is_am35xx()) {
--		oh_name = "am35x_otg_hs";
--		name = "musb-am35x";
--	} else if (cpu_is_ti81xx()) {
--		oh_name = "usb_otg_hs";
--		name = "musb-ti81xx";
--	} else {
--		oh_name = "usb_otg_hs";
--		name = "musb-omap2430";
--	}
+-	voltdm = voltdm_lookup("mpu_iva");
+-	omap_voltage_register_pmic(voltdm, &omap3_mpu_pmic);
 -
--        oh = omap_hwmod_lookup(oh_name);
--        if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
--                 __func__, oh_name))
--                return;
+-	voltdm = voltdm_lookup("core");
+-	omap_voltage_register_pmic(voltdm, &omap3_core_pmic);
 -
--	pdev = omap_device_build(name, bus_id, oh, &musb_plat,
--				 sizeof(musb_plat));
--	if (IS_ERR(pdev)) {
--		pr_err("Could not build omap_device for %s %s\n",
--						name, oh_name);
--		return;
--	}
--
--	dev = &pdev->dev;
--	get_device(dev);
--	dev->dma_mask = &musb_dmamask;
--	dev->coherent_dma_mask = musb_dmamask;
--	put_device(dev);
+-	return 0;
 -}
+-
+-/**
+- * omap3_twl_set_sr_bit() - Set/Clear SR bit on TWL
+- * @enable: enable SR mode in twl or not
+- *
+- * If 'enable' is true, enables Smartreflex bit on TWL 4030 to make sure
+- * voltage scaling through OMAP SR works. Else, the smartreflex bit
+- * on twl4030 is cleared as there are platforms which use OMAP3 and T2 but
+- * use Synchronized Scaling Hardware Strategy (ENABLE_VMODE=1) and Direct
+- * Strategy Software Scaling Mode (ENABLE_VMODE=0), for setting the voltages,
+- * in those scenarios this bit is to be cleared (enable = false).
+- *
+- * Returns 0 on success, error is returned if I2C read/write fails.
+- */
+-int __init omap3_twl_set_sr_bit(bool enable)
+-{
+-	u8 temp;
+-	int ret;
+-	if (twl_sr_enable_autoinit)
+-		pr_warning("%s: unexpected multiple calls\n", __func__);
+-
+-	ret = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
+-			      TWL4030_DCDC_GLOBAL_CFG);
+-	if (ret)
+-		goto err;
+-
+-	if (enable)
+-		temp |= SMARTREFLEX_ENABLE;
+-	else
+-		temp &= ~SMARTREFLEX_ENABLE;
+-
+-	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
+-			       TWL4030_DCDC_GLOBAL_CFG);
+-	if (!ret) {
+-		twl_sr_enable_autoinit = true;
+-		return 0;
+-	}
+-err:
+-	pr_err("%s: Error access to TWL4030 (%d)\n", __func__, ret);
+-	return ret;
+-}
+diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+deleted file mode 100644
+index e816966..0000000
+--- a/arch/arm/mach-omap2/twl-common.c
++++ /dev/null
+@@ -1,568 +0,0 @@
+-/*
+- * twl-common.c
+- *
+- * Copyright (C) 2011 Texas Instruments, Inc..
+- * Author: Peter Ujfalusi <peter.ujfalusi@ti.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+- * 02110-1301 USA
+- *
+- */
+-
+-#include <linux/i2c.h>
+-#include <linux/i2c/twl.h>
+-#include <linux/gpio.h>
+-#include <linux/string.h>
+-#include <linux/phy/phy.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/regulator/fixed.h>
+-
+-#include "soc.h"
+-#include "twl-common.h"
+-#include "pm.h"
+-#include "voltage.h"
+-#include "mux.h"
+-
+-static struct i2c_board_info __initdata pmic_i2c_board_info = {
+-	.addr		= 0x48,
+-	.flags		= I2C_CLIENT_WAKE,
+-};
+-
+-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+-static int twl_set_voltage(void *data, int target_uV)
+-{
+-	struct voltagedomain *voltdm = (struct voltagedomain *)data;
+-	return voltdm_scale(voltdm, target_uV);
+-}
+-
+-static int twl_get_voltage(void *data)
+-{
+-	struct voltagedomain *voltdm = (struct voltagedomain *)data;
+-	return voltdm_get_voltage(voltdm);
+-}
+-#endif
+-
+-void __init omap_pmic_init(int bus, u32 clkrate,
+-			   const char *pmic_type, int pmic_irq,
+-			   struct twl4030_platform_data *pmic_data)
+-{
+-	omap_mux_init_signal("sys_nirq", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+-	strlcpy(pmic_i2c_board_info.type, pmic_type,
+-		sizeof(pmic_i2c_board_info.type));
+-	pmic_i2c_board_info.irq = pmic_irq;
+-	pmic_i2c_board_info.platform_data = pmic_data;
+-}
+-
+-void __init omap4_pmic_init(const char *pmic_type,
+-		    struct twl4030_platform_data *pmic_data,
+-		    struct i2c_board_info *devices, int nr_devices)
+-{
+-	/* PMIC part*/
+-	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+-	omap_mux_init_signal("fref_clk0_out.sys_drm_msecure", OMAP_PIN_OUTPUT);
+-	omap_pmic_init(1, 400, pmic_type, 7 + OMAP44XX_IRQ_GIC_START, pmic_data);
+-
+-	/* Register additional devices on i2c1 bus if needed */
+-	if (devices)
+-		i2c_register_board_info(1, devices, nr_devices);
+-}
+-
+-void __init omap_pmic_late_init(void)
+-{
+-	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
+-	if (!pmic_i2c_board_info.irq)
+-		return;
+-
+-	omap3_twl_init();
+-	omap4_twl_init();
+-}
+-
+-#if defined(CONFIG_ARCH_OMAP3)
+-struct phy_consumer consumers[] = {
+-	PHY_CONSUMER("musb-hdrc.0", "usb"),
+-};
+-
+-struct phy_init_data init_data = {
+-	.consumers = consumers,
+-	.num_consumers = ARRAY_SIZE(consumers),
+-};
+-
+-static struct twl4030_usb_data omap3_usb_pdata = {
+-	.usb_mode	= T2_USB_MODE_ULPI,
+-	.init_data	= &init_data,
+-};
+-
+-static int omap3_batt_table[] = {
+-/* 0 C */
+-30800, 29500, 28300, 27100,
+-26000, 24900, 23900, 22900, 22000, 21100, 20300, 19400, 18700, 17900,
+-17200, 16500, 15900, 15300, 14700, 14100, 13600, 13100, 12600, 12100,
+-11600, 11200, 10800, 10400, 10000, 9630,  9280,  8950,  8620,  8310,
+-8020,  7730,  7460,  7200,  6950,  6710,  6470,  6250,  6040,  5830,
+-5640,  5450,  5260,  5090,  4920,  4760,  4600,  4450,  4310,  4170,
+-4040,  3910,  3790,  3670,  3550
+-};
+-
+-static struct twl4030_bci_platform_data omap3_bci_pdata = {
+-	.battery_tmp_tbl	= omap3_batt_table,
+-	.tblsize		= ARRAY_SIZE(omap3_batt_table),
+-};
+-
+-static struct twl4030_madc_platform_data omap3_madc_pdata = {
+-	.irq_line	= 1,
+-};
+-
+-static struct twl4030_codec_data omap3_codec;
+-
+-static struct twl4030_audio_data omap3_audio_pdata = {
+-	.audio_mclk = 26000000,
+-	.codec = &omap3_codec,
+-};
+-
+-static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
+-	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
+-};
+-
+-static struct regulator_init_data omap3_vdac_idata = {
+-	.constraints = {
+-		.min_uV			= 1800000,
+-		.max_uV			= 1800000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies	= ARRAY_SIZE(omap3_vdda_dac_supplies),
+-	.consumer_supplies	= omap3_vdda_dac_supplies,
+-};
+-
+-static struct regulator_consumer_supply omap3_vpll2_supplies[] = {
+-	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
+-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dpi.0"),
+-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+-};
+-
+-static struct regulator_init_data omap3_vpll2_idata = {
+-	.constraints = {
+-		.min_uV                 = 1800000,
+-		.max_uV                 = 1800000,
+-		.valid_modes_mask       = REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask         = REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies		= ARRAY_SIZE(omap3_vpll2_supplies),
+-	.consumer_supplies		= omap3_vpll2_supplies,
+-};
+-
+-static struct regulator_consumer_supply omap3_vdd1_supply[] = {
+-	REGULATOR_SUPPLY("vcc", "cpu0"),
+-};
+-
+-static struct regulator_consumer_supply omap3_vdd2_supply[] = {
+-	REGULATOR_SUPPLY("vcc", "l3_main.0"),
+-};
+-
+-static struct regulator_init_data omap3_vdd1 = {
+-	.constraints = {
+-		.name			= "vdd_mpu_iva",
+-		.min_uV			= 600000,
+-		.max_uV			= 1450000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
+-	},
+-	.num_consumer_supplies		= ARRAY_SIZE(omap3_vdd1_supply),
+-	.consumer_supplies		= omap3_vdd1_supply,
+-};
+-
+-static struct regulator_init_data omap3_vdd2 = {
+-	.constraints = {
+-		.name			= "vdd_core",
+-		.min_uV			= 600000,
+-		.max_uV			= 1450000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
+-	},
+-	.num_consumer_supplies		= ARRAY_SIZE(omap3_vdd2_supply),
+-	.consumer_supplies		= omap3_vdd2_supply,
+-};
+-
+-static struct twl_regulator_driver_data omap3_vdd1_drvdata = {
+-	.get_voltage = twl_get_voltage,
+-	.set_voltage = twl_set_voltage,
+-};
+-
+-static struct twl_regulator_driver_data omap3_vdd2_drvdata = {
+-	.get_voltage = twl_get_voltage,
+-	.set_voltage = twl_set_voltage,
+-};
+-
+-void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+-				  u32 pdata_flags, u32 regulators_flags)
+-{
+-	if (!pmic_data->vdd1) {
+-		omap3_vdd1.driver_data = &omap3_vdd1_drvdata;
+-		omap3_vdd1_drvdata.data = voltdm_lookup("mpu_iva");
+-		pmic_data->vdd1 = &omap3_vdd1;
+-	}
+-	if (!pmic_data->vdd2) {
+-		omap3_vdd2.driver_data = &omap3_vdd2_drvdata;
+-		omap3_vdd2_drvdata.data = voltdm_lookup("core");
+-		pmic_data->vdd2 = &omap3_vdd2;
+-	}
+-
+-	/* Common platform data configurations */
+-	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
+-		pmic_data->usb = &omap3_usb_pdata;
+-
+-	if (pdata_flags & TWL_COMMON_PDATA_BCI && !pmic_data->bci)
+-		pmic_data->bci = &omap3_bci_pdata;
+-
+-	if (pdata_flags & TWL_COMMON_PDATA_MADC && !pmic_data->madc)
+-		pmic_data->madc = &omap3_madc_pdata;
+-
+-	if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
+-		pmic_data->audio = &omap3_audio_pdata;
+-
+-	/* Common regulator configurations */
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
+-		pmic_data->vdac = &omap3_vdac_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VPLL2 && !pmic_data->vpll2)
+-		pmic_data->vpll2 = &omap3_vpll2_idata;
+-}
+-#endif /* CONFIG_ARCH_OMAP3 */
+-
+-#if defined(CONFIG_ARCH_OMAP4)
+-static struct twl4030_usb_data omap4_usb_pdata = {
+-};
+-
+-static struct regulator_consumer_supply omap4_vdda_hdmi_dac_supplies[] = {
+-	REGULATOR_SUPPLY("vdda_hdmi_dac", "omapdss_hdmi"),
+-};
+-
+-static struct regulator_init_data omap4_vdac_idata = {
+-	.constraints = {
+-		.min_uV			= 1800000,
+-		.max_uV			= 1800000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies	= ARRAY_SIZE(omap4_vdda_hdmi_dac_supplies),
+-	.consumer_supplies	= omap4_vdda_hdmi_dac_supplies,
+-	.supply_regulator	= "V2V1",
+-};
+-
+-static struct regulator_init_data omap4_vaux2_idata = {
+-	.constraints = {
+-		.min_uV			= 1200000,
+-		.max_uV			= 2800000,
+-		.apply_uV		= true,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+-					| REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-};
+-
+-static struct regulator_init_data omap4_vaux3_idata = {
+-	.constraints = {
+-		.min_uV			= 1000000,
+-		.max_uV			= 3000000,
+-		.apply_uV		= true,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+-					| REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-};
+-
+-static struct regulator_consumer_supply omap4_vmmc_supply[] = {
+-	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+-};
+-
+-/* VMMC1 for MMC1 card */
+-static struct regulator_init_data omap4_vmmc_idata = {
+-	.constraints = {
+-		.min_uV			= 1200000,
+-		.max_uV			= 3000000,
+-		.apply_uV		= true,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+-					| REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies  = ARRAY_SIZE(omap4_vmmc_supply),
+-	.consumer_supplies      = omap4_vmmc_supply,
+-};
+-
+-static struct regulator_init_data omap4_vpp_idata = {
+-	.constraints = {
+-		.min_uV			= 1800000,
+-		.max_uV			= 2500000,
+-		.apply_uV		= true,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+-					| REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-};
+-
+-static struct regulator_init_data omap4_vana_idata = {
+-	.constraints = {
+-		.min_uV			= 2100000,
+-		.max_uV			= 2100000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-};
+-
+-static struct regulator_consumer_supply omap4_vcxio_supply[] = {
+-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
+-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
+-};
+-
+-static struct regulator_init_data omap4_vcxio_idata = {
+-	.constraints = {
+-		.min_uV			= 1800000,
+-		.max_uV			= 1800000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-		.always_on		= true,
+-	},
+-	.num_consumer_supplies	= ARRAY_SIZE(omap4_vcxio_supply),
+-	.consumer_supplies	= omap4_vcxio_supply,
+-	.supply_regulator	= "V2V1",
+-};
+-
+-static struct regulator_init_data omap4_vusb_idata = {
+-	.constraints = {
+-		.min_uV			= 3300000,
+-		.max_uV			= 3300000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-};
+-
+-static struct regulator_init_data omap4_clk32kg_idata = {
+-	.constraints = {
+-		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+-	},
+-};
+-
+-static struct regulator_consumer_supply omap4_vdd1_supply[] = {
+-	REGULATOR_SUPPLY("vcc", "cpu0"),
+-};
+-
+-static struct regulator_consumer_supply omap4_vdd2_supply[] = {
+-	REGULATOR_SUPPLY("vcc", "iva.0"),
+-};
+-
+-static struct regulator_consumer_supply omap4_vdd3_supply[] = {
+-	REGULATOR_SUPPLY("vcc", "l3_main.0"),
+-};
+-
+-static struct regulator_init_data omap4_vdd1 = {
+-	.constraints = {
+-		.name			= "vdd_mpu",
+-		.min_uV			= 500000,
+-		.max_uV			= 1500000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
+-	},
+-	.num_consumer_supplies		= ARRAY_SIZE(omap4_vdd1_supply),
+-	.consumer_supplies		= omap4_vdd1_supply,
+-};
+-
+-static struct regulator_init_data omap4_vdd2 = {
+-	.constraints = {
+-		.name			= "vdd_iva",
+-		.min_uV			= 500000,
+-		.max_uV			= 1500000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
+-	},
+-	.num_consumer_supplies		= ARRAY_SIZE(omap4_vdd2_supply),
+-	.consumer_supplies		= omap4_vdd2_supply,
+-};
+-
+-static struct regulator_init_data omap4_vdd3 = {
+-	.constraints = {
+-		.name			= "vdd_core",
+-		.min_uV			= 500000,
+-		.max_uV			= 1500000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
+-	},
+-	.num_consumer_supplies		= ARRAY_SIZE(omap4_vdd3_supply),
+-	.consumer_supplies		= omap4_vdd3_supply,
+-};
+-
+-
+-static struct twl_regulator_driver_data omap4_vdd1_drvdata = {
+-	.get_voltage = twl_get_voltage,
+-	.set_voltage = twl_set_voltage,
+-};
+-
+-static struct twl_regulator_driver_data omap4_vdd2_drvdata = {
+-	.get_voltage = twl_get_voltage,
+-	.set_voltage = twl_set_voltage,
+-};
+-
+-static struct twl_regulator_driver_data omap4_vdd3_drvdata = {
+-	.get_voltage = twl_get_voltage,
+-	.set_voltage = twl_set_voltage,
+-};
+-
+-static struct regulator_consumer_supply omap4_v1v8_supply[] = {
+-	REGULATOR_SUPPLY("vio", "1-004b"),
+-};
+-
+-static struct regulator_init_data omap4_v1v8_idata = {
+-	.constraints = {
+-		.min_uV			= 1800000,
+-		.max_uV			= 1800000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-		.always_on		= true,
+-	},
+-	.num_consumer_supplies	= ARRAY_SIZE(omap4_v1v8_supply),
+-	.consumer_supplies	= omap4_v1v8_supply,
+-};
+-
+-static struct regulator_consumer_supply omap4_v2v1_supply[] = {
+-	REGULATOR_SUPPLY("v2v1", "1-004b"),
+-};
+-
+-static struct regulator_init_data omap4_v2v1_idata = {
+-	.constraints = {
+-		.min_uV			= 2100000,
+-		.max_uV			= 2100000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies	= ARRAY_SIZE(omap4_v2v1_supply),
+-	.consumer_supplies	= omap4_v2v1_supply,
+-};
+-
+-void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
+-				  u32 pdata_flags, u32 regulators_flags)
+-{
+-	if (!pmic_data->vdd1) {
+-		omap4_vdd1.driver_data = &omap4_vdd1_drvdata;
+-		omap4_vdd1_drvdata.data = voltdm_lookup("mpu");
+-		pmic_data->vdd1 = &omap4_vdd1;
+-	}
+-
+-	if (!pmic_data->vdd2) {
+-		omap4_vdd2.driver_data = &omap4_vdd2_drvdata;
+-		omap4_vdd2_drvdata.data = voltdm_lookup("iva");
+-		pmic_data->vdd2 = &omap4_vdd2;
+-	}
+-
+-	if (!pmic_data->vdd3) {
+-		omap4_vdd3.driver_data = &omap4_vdd3_drvdata;
+-		omap4_vdd3_drvdata.data = voltdm_lookup("core");
+-		pmic_data->vdd3 = &omap4_vdd3;
+-	}
+-
+-	/* Common platform data configurations */
+-	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
+-		pmic_data->usb = &omap4_usb_pdata;
+-
+-	/* Common regulator configurations */
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
+-		pmic_data->vdac = &omap4_vdac_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX2 && !pmic_data->vaux2)
+-		pmic_data->vaux2 = &omap4_vaux2_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX3 && !pmic_data->vaux3)
+-		pmic_data->vaux3 = &omap4_vaux3_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VMMC && !pmic_data->vmmc)
+-		pmic_data->vmmc = &omap4_vmmc_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VPP && !pmic_data->vpp)
+-		pmic_data->vpp = &omap4_vpp_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VANA && !pmic_data->vana)
+-		pmic_data->vana = &omap4_vana_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VCXIO && !pmic_data->vcxio)
+-		pmic_data->vcxio = &omap4_vcxio_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_VUSB && !pmic_data->vusb)
+-		pmic_data->vusb = &omap4_vusb_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_CLK32KG &&
+-	    !pmic_data->clk32kg)
+-		pmic_data->clk32kg = &omap4_clk32kg_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_V1V8 && !pmic_data->v1v8)
+-		pmic_data->v1v8 = &omap4_v1v8_idata;
+-
+-	if (regulators_flags & TWL_COMMON_REGULATOR_V2V1 && !pmic_data->v2v1)
+-		pmic_data->v2v1 = &omap4_v2v1_idata;
+-}
+-#endif /* CONFIG_ARCH_OMAP4 */
+-
+-#if defined(CONFIG_SND_OMAP_SOC_OMAP_TWL4030) || \
+-	defined(CONFIG_SND_OMAP_SOC_OMAP_TWL4030_MODULE)
+-#include <linux/platform_data/omap-twl4030.h>
+-
+-/* Commonly used configuration */
+-static struct omap_tw4030_pdata omap_twl4030_audio_data;
+-
+-static struct platform_device audio_device = {
+-	.name		= "omap-twl4030",
+-	.id		= -1,
+-};
+-
+-void omap_twl4030_audio_init(char *card_name,
+-				    struct omap_tw4030_pdata *pdata)
+-{
+-	if (!pdata)
+-		pdata = &omap_twl4030_audio_data;
+-
+-	pdata->card_name = card_name;
+-
+-	audio_device.dev.platform_data = pdata;
+-	platform_device_register(&audio_device);
+-}
+-
+-#else /* SOC_OMAP_TWL4030 */
+-void omap_twl4030_audio_init(char *card_name,
+-				    struct omap_tw4030_pdata *pdata)
+-{
+-	return;
+-}
+-#endif /* SOC_OMAP_TWL4030 */
+diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
+deleted file mode 100644
+index 24b65d0..0000000
+--- a/arch/arm/mach-omap2/twl-common.h
++++ /dev/null
+@@ -1,66 +0,0 @@
+-#ifndef __OMAP_PMIC_COMMON__
+-#define __OMAP_PMIC_COMMON__
+-
+-#include "common.h"
+-
+-#define TWL_COMMON_PDATA_USB		(1 << 0)
+-#define TWL_COMMON_PDATA_BCI		(1 << 1)
+-#define TWL_COMMON_PDATA_MADC		(1 << 2)
+-#define TWL_COMMON_PDATA_AUDIO		(1 << 3)
+-
+-/* Common LDO regulators for TWL4030/TWL6030 */
+-#define TWL_COMMON_REGULATOR_VDAC	(1 << 0)
+-#define TWL_COMMON_REGULATOR_VAUX1	(1 << 1)
+-#define TWL_COMMON_REGULATOR_VAUX2	(1 << 2)
+-#define TWL_COMMON_REGULATOR_VAUX3	(1 << 3)
+-
+-/* TWL6030 LDO regulators */
+-#define TWL_COMMON_REGULATOR_VMMC	(1 << 4)
+-#define TWL_COMMON_REGULATOR_VPP	(1 << 5)
+-#define TWL_COMMON_REGULATOR_VUSIM	(1 << 6)
+-#define TWL_COMMON_REGULATOR_VANA	(1 << 7)
+-#define TWL_COMMON_REGULATOR_VCXIO	(1 << 8)
+-#define TWL_COMMON_REGULATOR_VUSB	(1 << 9)
+-#define TWL_COMMON_REGULATOR_CLK32KG	(1 << 10)
+-#define TWL_COMMON_REGULATOR_V1V8	(1 << 11)
+-#define TWL_COMMON_REGULATOR_V2V1	(1 << 12)
+-
+-/* TWL4030 LDO regulators */
+-#define TWL_COMMON_REGULATOR_VPLL1	(1 << 4)
+-#define TWL_COMMON_REGULATOR_VPLL2	(1 << 5)
+-
+-
+-struct twl4030_platform_data;
+-struct twl6040_platform_data;
+-struct omap_tw4030_pdata;
+-struct i2c_board_info;
+-
+-void omap_pmic_init(int bus, u32 clkrate, const char *pmic_type, int pmic_irq,
+-		    struct twl4030_platform_data *pmic_data);
+-void omap_pmic_late_init(void);
+-
+-static inline void omap2_pmic_init(const char *pmic_type,
+-				   struct twl4030_platform_data *pmic_data)
+-{
+-	omap_pmic_init(2, 2600, pmic_type, 7 + OMAP_INTC_START, pmic_data);
+-}
+-
+-static inline void omap3_pmic_init(const char *pmic_type,
+-				   struct twl4030_platform_data *pmic_data)
+-{
+-	omap_pmic_init(1, 2600, pmic_type, 7 + OMAP_INTC_START, pmic_data);
+-}
+-
+-void omap4_pmic_init(const char *pmic_type,
+-		    struct twl4030_platform_data *pmic_data,
+-		    struct i2c_board_info *devices, int nr_devices);
+-
+-void omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+-			   u32 pdata_flags, u32 regulators_flags);
+-
+-void omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
+-			   u32 pdata_flags, u32 regulators_flags);
+-
+-void omap_twl4030_audio_init(char *card_name, struct omap_tw4030_pdata *pdata);
+-
+-#endif /* __OMAP_PMIC_COMMON__ */
 -- 
 1.8.1.1
