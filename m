@@ -1,21 +1,45 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Tue, 26 Nov 2013 10:03:08 +0000
-Subject: [PATCH 3/4] mtd: spi-nor: add the framework for SPI NOR
-In-Reply-To: <1385447575-23773-4-git-send-email-b32955@freescale.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <1385447575-23773-4-git-send-email-b32955@freescale.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA4EE42@DBDE04.ent.ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 26 Nov 2013 10:10:41 +0000
+Subject: [RFC] ARM Generic Timer + Interaction with WFI on Cortex-A15
+In-Reply-To: <529442BB.1000006@gmail.com>
+References: <528DBD0C.6040203@gmail.com>
+ <20131121120025.GC31695@e102568-lin.cambridge.arm.com>
+ <529442BB.1000006@gmail.com>
+Message-ID: <20131126101041.GA12304@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Huang Shijie [mailto:b32955 at freescale.com]
-> This patch cloned most of the m25p80.c. In theory, it adds a new spi-nor
-> layer.
-[...]
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
->
-Is there a way we can also original m25p80 contributors' sign-off also?
-David/Brian, can you suggest ?
+Hi Marc,
 
+On Tue, Nov 26, 2013 at 06:42:03AM +0000, Marc C wrote:
+> Hello Lorenzo,
+> 
+> > It is an A15 oddity and we should not care, given that this behaviour
+> > is platform specific and likely to fail in most common A15
+> > implementations.
+> 
+> I'm supporting a platform where this "oddity" is actually a relied-upon
+> feature. Our ARMv7-compliant MPCore implements the ARM Generic Timer per
+> spec. Our implementation isn't a constituent of a big.LITTLE
+> arrangement, and we'll never completely power-off all cores (we just use
+> WFI).
 
-With regards, pekon
+So what's the problem then ? Just avoid adding CPUIDLE_FLAG_TIMER_STOP
+to the C-state flags and you are all set, or I am missing something here ?
+
+> According to the documentation that currently exists, it seems that the
+> behavior of the ARM Generic Timer on cores like the A15 is really just
+> an attribute of that specific implementation. As you've alluded to,
+> there may be other implementations that are also usable when the CPUs
+> enter WFI. That said, do you object to having an optional boolean
+> property in the arch_timer DT binding [1] which allows users to override
+> the C3STOP flag? The default behavior would be as is currently
+> implemented, and for the odd machines we can add the new property to the DT.
+
+Yes I do object. Timer binding is global in the DT and do not want to
+override the flag for all local timers when, as I mentioned, A15 behaviour is
+just an exception. If you really need that, please write an idle driver that
+does not enter broadcast mode on C-state entry (see above).
+
+Thanks,
+Lorenzo
