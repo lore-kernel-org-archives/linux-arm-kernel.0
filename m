@@ -1,30 +1,24 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 26 Nov 2013 10:35:58 +0900
-Subject: [PATCH v11 7/7] ARM: tegra: support Trusted Foundations by default
-In-Reply-To: <20131126000608.GA21634@quad.lixom.net>
-References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
- <1385274652-16415-8-git-send-email-acourbot@nvidia.com>
- <20131126000608.GA21634@quad.lixom.net>
-Message-ID: <CAAVeFu+mMyPhFtVZ09vgYWWCYkPpF3X547ffRAfXXKOOWUUkqg@mail.gmail.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Mon, 25 Nov 2013 17:41:06 -0800
+Subject: [PATCH 1/5] Documentation: dt: Add kona-pwm binding
+In-Reply-To: <20131119135654.GL5914@e106331-lin.cambridge.arm.com>
+References: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
+ <1384800901-21711-2-git-send-email-tim.kryger@linaro.org>
+ <20131119135654.GL5914@e106331-lin.cambridge.arm.com>
+Message-ID: <CAAYSxhr4RVifzxK_AFx9ju+Sp2j_PUsg+Be1xAHQ_HTopbJ8Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 9:06 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Sun, Nov 24, 2013 at 03:30:52PM +0900, Alexandre Courbot wrote:
->> Support for Trusted Foundations is light and allows the kernel to run on
->> a wider range of devices, so enable it by default.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>  arch/arm/configs/tegra_defconfig | 1 +
->>  1 file changed, 1 insertion(+)
+On Tue, Nov 19, 2013 at 5:56 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Nov 18, 2013 at 06:54:57PM +0000, Tim Kryger wrote:
+
+>> +Required Properties :
+>> +- compatible: should be "brcm,kona-pwm"
+>> +- reg: physical base address and length of the controller's registers
+>> +- clocks: clock specifier for the kona pwm external clock
 >
-> I think we want this enabled on multi_v7_defconfig too? Send a separate
-> patch for that once this is merged though.
+> Minor nit: phandle + clock-specifier pair
 
-Will do.
+I will incorporate this change into my next version.  Thanks.
 
-Thanks,
-Alex.
+-Tim
