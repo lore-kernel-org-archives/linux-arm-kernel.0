@@ -1,36 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Nov 2013 23:09:43 +0100
-Subject: STOP THE MADNESS
-In-Reply-To: <CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
-References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
- <CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
-Message-ID: <CACRpkdY9MTUDtDxRKRHCXch98cNiMS-dumQvaTH7gp1OCVUx6w@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 26 Nov 2013 16:13:53 -0600
+Subject: [PATCH 05/12] ARM: OMAP2+: Remove legacy PM init
+In-Reply-To: <1385424867-27243-6-git-send-email-tony@atomide.com>
+References: <1385424867-27243-1-git-send-email-tony@atomide.com>
+ <1385424867-27243-6-git-send-email-tony@atomide.com>
+Message-ID: <CAGo_u6pwOdizyxD8Hy_znQHG0Spk-UTOKYxfj30UMxi7=cUbtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 6:29 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Mon, Nov 25, 2013 at 6:14 PM, Tony Lindgren <tony@atomide.com> wrote:
+> This is no longer needed when booted with device tree.
+[...]
+>  static inline void omap_init_cpufreq(void)
+>  {
+>         struct platform_device_info devinfo = { };
+>
+> -       if (!of_have_populated_dt())
+> -               devinfo.name = "omap-cpufreq";
+> -       else
+> -               devinfo.name = "cpufreq-cpu0";
+> +       devinfo.name = "cpufreq-cpu0";
 
-> IMO, the whole commit causing this problem should be reverted for
-> additional reasons. Irq generic chp and irqdomains are orthogonal
-> features/infrastructure and should not be mutually exclusive. We need
-> to fix irq generic chip.
+struct platform_device_info devinfo = { .name = "cpufreq-cpu0" };
 
-This cannot be easily reverted due to a lot of code and fixes building
-on top of it, and even if it could I guess it will also break device tree
-use on these: git grep pl061 arch/arm/boot/dts
-
-As DT mandates that the irqdomain be used, or it cannot translate
-the IRQs as before this patch it uses an hard-coded base from
-platform data. This is one of those odd drivers that don't need
-one line of DT-specific code in it to work with device tree, yet
-it works.
-
-I guess what I have to do is take out the very board Russell has
-and that I happen to have also and just get to the bottom of this
-bug and fix it and test it.
-
-A pointer to an "ideal" GPIO chip + irq_chip driver would be highly
-appreciated ...
-
-Yours,
-Linus Walleij
+otherwise, ok with the change.
+Thanks and Regards,
+Nishanth Menon
