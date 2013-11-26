@@ -1,63 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 26 Nov 2013 14:23:44 +0100
-Subject: [PATCH 2/4] ARM: netx: stop using mach/timex.h
-In-Reply-To: <1384292466-31725-3-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1384292466-31725-3-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131126132343.GL17135@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 26 Nov 2013 14:29:26 +0100
+Subject: [PATCH v2 4/4] ARM: ep93xx: stop using mach/timex.h
+In-Reply-To: <1384292466-31725-5-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384292466-31725-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1385472566-20950-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 12, 2013 at 10:41:04PM +0100, Uwe Kleine-K?nig wrote:
-> mach/timex.h is the last remaining header that is unused for multiarch
-> builds but necessary for singlearch builds. To allow to get rid of it
-> for singlearch builds, too, drop its usage in netx arch code by
-> substituting CLOCK_TICK_RATE by a local cpp symbol.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+mach/timex.h is the last remaining header that is unused for multiarch
+builds but necessary for singlearch builds. To allow to get rid of it
+for singlearch builds, too, drop its usage in ep93xx arch code by
+substituting CLOCK_TICK_RATE by an already defined local cpp symbol.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+---
+Changes since (implicit) v1, sent with
+Message-Id: 1384292466-31725-5-git-send-email-u.kleine-koenig at pengutronix.de:
+ - ack by H Hartley Sweeten
+ - use already existing symbol instead of introducing a new one
 
-Sascha
+ arch/arm/mach-ep93xx/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> ---
->  arch/arm/mach-netx/time.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-netx/time.c b/arch/arm/mach-netx/time.c
-> index 6df42e6..0e29902 100644
-> --- a/arch/arm/mach-netx/time.c
-> +++ b/arch/arm/mach-netx/time.c
-> @@ -28,6 +28,8 @@
->  #include <asm/mach/time.h>
->  #include <mach/netx-regs.h>
->  
-> +#define NETX_CLOCK_FREQ 100000000
-> +
->  #define TIMER_CLOCKEVENT 0
->  #define TIMER_CLOCKSOURCE 1
->  
-> @@ -137,11 +139,11 @@ void __init netx_timer_init(void)
->  			NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKSOURCE));
->  
->  	clocksource_mmio_init(NETX_GPIO_COUNTER_CURRENT(TIMER_CLOCKSOURCE),
-> -		"netx_timer", CLOCK_TICK_RATE, 200, 32, clocksource_mmio_readl_up);
-> +		"netx_timer", NETX_CLOCK_FREQ, 200, 32, clocksource_mmio_readl_up);
->  
->  	/* with max_delta_ns >= delta2ns(0x800) the system currently runs fine.
->  	 * Adding some safety ... */
->  	netx_clockevent.cpumask = cpumask_of(0);
-> -	clockevents_config_and_register(&netx_clockevent, CLOCK_TICK_RATE,
-> +	clockevents_config_and_register(&netx_clockevent, NETX_CLOCK_FREQ,
->  					0xa00, 0xfffffffe);
->  }
-> -- 
-> 1.8.4.2
-> 
-> 
-
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index d95ee28a..94b141f 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -115,7 +115,7 @@ void __init ep93xx_map_io(void)
+ #define EP93XX_TIMER4_CLOCK		983040
+ 
+ #define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
+-#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
++#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(EP93XX_TIMER4_CLOCK, HZ)
+ 
+ static unsigned int last_jiffy_time;
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.4.2
