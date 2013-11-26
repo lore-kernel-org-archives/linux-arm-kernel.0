@@ -1,31 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Nov 2013 19:44:18 +0000
-Subject: [PATCH] Versatile LEDs initialise to off state
-Message-ID: <20131126194418.GI16735@n2100.arm.linux.org.uk>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 26 Nov 2013 21:40:50 +0200
+Subject: [PATCH v3 0/6] Update Davinci watchdog driver
+In-Reply-To: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <5294F942.8070401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There really is no excuse to turn on all 8 LEDs at boot time, such
-that on the Versatile PB/926 we end up with 6 LEDs on continuously
-and forever.  We're not a christmas decoration!
+Hi Sekhar,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/plat-versatile/leds.c |    4 +-
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On 11/25/2013 04:04 PM, Ivan Khoronzhuk wrote:
+> These patches are intended to update Davinci watchdog to use WDT core
+> and reuse driver for keystone arch, because Keystone uses the similar
+> IP like Davinci.
+> 
+> See Documentation:
+> Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
+> Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
+> 
+> Also:
+>   - improved to support GET_TIMELEFT option.
+>   - added "clocks" and "timeout-sec" properties to DT.
+> 
+> Based on
+> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+> keystone/master
+> 
 
-diff --git a/arch/arm/plat-versatile/leds.c b/arch/arm/plat-versatile/leds.c
-index d2490d00b46c..c74aa5707dab 100644
---- a/arch/arm/plat-versatile/leds.c
-+++ b/arch/arm/plat-versatile/leds.c
-@@ -73,7 +73,7 @@ static int __init versatile_leds_init(void)
- {
- 	int i;
- 
--	/* All ON */
--	writel(0xff, LEDREG);
-+	/* All off */
-+	writel(0, LEDREG);
- 	for (i = 0; i < ARRAY_SIZE(versatile_leds); i++) {
- 		struct versatile_led *led;
- 
+Could you confirm that regression detected in v2 of series is gone?
+
+Also would it be acceptable if this series will go via WDT tree?
+- The first patch patch in series contains changes in both
+ Davinci platform & wdt driver.
+
+> v2..v3:
+> - watchdog: davinci: change driver to use WDT core
+> 	removed "ti,keystone-wdt" compatible from driver
+> 	renamed wdt device names for mach-davinci from
+> 		"watchdog" to "davinci-wdt"
+> 
+> - watchdog: davinci: reuse driver for keystone arch
+> 	moved "clocks" property under "Optional properties"
+> 	improved decsription of "clocks" property
+> 
+> - arm: dts: keystone: add watchdog entry
+> 	replaced "ti,keystone-wdt" compatible on
+> 		 "ti,keystone-wdt","ti,davinci-wdt"
+> 
+> Ivan Khoronzhuk (6):
+>    watchdog: davinci: change driver to use WDT core
+>    watchdog: davinci: use davinci_wdt_device structure to hold device
+>      data
+>    watchdog: davinci: add GET_TIMELEFT option support
+>    watchdog: davinci: add "timeout-sec" property
+>    watchdog: davinci: reuse driver for keystone arch
+>    arm: dts: keystone: add watchdog entry
+> 
+>   .../devicetree/bindings/watchdog/davinci-wdt.txt   |   16 +-
+>   arch/arm/boot/dts/keystone.dtsi                    |    6 +
+>   arch/arm/mach-davinci/da8xx-dt.c                   |    2 +-
+>   arch/arm/mach-davinci/devices-da8xx.c              |    4 +-
+>   arch/arm/mach-davinci/devices.c                    |    2 +-
+>   drivers/watchdog/Kconfig                           |    6 +-
+>   drivers/watchdog/davinci_wdt.c                     |  225 +++++++++-----------
+>   7 files changed, 126 insertions(+), 135 deletions(-)
+> 
+
+Thanks,
+- grygorii
