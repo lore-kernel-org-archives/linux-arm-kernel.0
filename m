@@ -1,197 +1,39 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Tue, 26 Nov 2013 17:27:53 +0530
-Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
-In-Reply-To: <20131125185248.GF28201@mudshark.cambridge.arm.com>
-References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
- <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
- <20131125185248.GF28201@mudshark.cambridge.arm.com>
-Message-ID: <CALicx6vY9Lm5BP4ukC83+93A0tQazgSjaZFuQ_HTC6+4-iu_Zg@mail.gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Tue, 26 Nov 2013 12:08:03 +0000
+Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
+In-Reply-To: <20131125134248.GA28906@pengutronix.de>
+References: <1345852300-2213-1-git-send-email-marex@denx.de>
+ <1345852300-2213-2-git-send-email-marex@denx.de>
+ <20131122154947.GE24508@pengutronix.de> <201311250058.32881.marex@denx.de>
+ <20131125134248.GA28906@pengutronix.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411F14C@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 12:22 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 18, 2013 at 12:06:57PM +0000, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>
->> Add KGDB debug support for FP/SIMD processor.This support
->> only debugging of FP/SIMD in kernel mode.
->> With this patch one can view or set FP/SIMD registers in
->> kernel context
->>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->> ---
->>  arch/arm64/include/asm/fpsimd.h |    1 +
->>  arch/arm64/kernel/fpsimd.c      |    5 ++
->>  arch/arm64/kernel/kgdb.c        |  105 +++++++++++++++++++++++++--------------
->>  3 files changed, 73 insertions(+), 38 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
->> index 609bc44..5039d6d 100644
->> --- a/arch/arm64/include/asm/fpsimd.h
->> +++ b/arch/arm64/include/asm/fpsimd.h
->> @@ -60,6 +60,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
->>  extern void fpsimd_thread_switch(struct task_struct *next);
->>  extern void fpsimd_flush_thread(void);
->>  extern void fpsimd_reload_fpstate(void);
->> +extern int  fpsimd_thread_state(void);
->>
->>  #endif
->>
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index 5b13c17..27604c1 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -124,6 +124,11 @@ void fpsimd_flush_thread(void)
->>       set_thread_flag(TIF_FOREIGN_FPSTATE);
->>  }
->>
->> +int fpsimd_thread_state(void)
->> +{
->> +     return (current->mm && test_thread_flag(TIF_FOREIGN_FPSTATE)) ? 1 : 0;
->> +}
->
-> Erm...
->
->   1. `? 1 : 0' doesn't do anything
-     it worked for me. on true condition it returned 1 else 0. Any
-thing specific?
 
->   2. TIF_FOREIGN_FPSTATE doesn't seem to appear in my source tree (3.13-rc1)
-     As mentioned in cover patch, it is based on Ard's patch. I can
-include his patch
-     if required.
 
->   3. Does it make sense for threads without an mm to have TIF_FOREIGN_FPSTATE set?
+ 
+> 
+> The GPIO is working for this pin. But also the DIGCTL register bits
+> helped here.  Now the OC event triggers if the pin gets pulled to 3V3.
+> 
+> I am currently looking for a good place to enable the DIGCTL bits.
+> I suggest to enable them per default.  As we don't have USBMISC registers
+> in MX28, the bits should be toggled in ci_hdrc_imx.c if the of property
+> "disable-overcurrent" is not found.  I will use the syscon interface to
+> reach them with the regmap interface.
+> 
 
-      As per Ard's patch, this flag is set only if threads has mm. So
-mm check would be
-      redundant here.  Ard might have more inputs
+Hi Michael,
 
-      How about allowing to view FP/SIMD registers irrespective of
-FP/SIMD is used
-      by kernel & user-space?. it will help user to view FP registers
-for debugging
+usbmisc register doesn't stand for the register needs to be in usb controller.
+Any registers which are related to USB function can be considered as usbmisc
+registers. You will see FSL-style SoC, the over-current or other related setting
+are at controller base + 0x800 (0x600), but Sigmatel-style SoC (mx28/mx23), the usb
+register are not at controller register region.
 
->>  void fpsimd_reload_fpstate(void)
->>  {
->>       preempt_disable();
->> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
->> index f10f2ba..5e34852 100644
->> --- a/arch/arm64/kernel/kgdb.c
->> +++ b/arch/arm64/kernel/kgdb.c
->> @@ -23,6 +23,14 @@
->>  #include <linux/kdebug.h>
->>  #include <linux/kgdb.h>
->>  #include <asm/traps.h>
->> +#include <asm/fpsimd.h>
->> +
->> +#ifdef CONFIG_KERNEL_MODE_NEON
->> +/*
->> + * Structure to hold FP/SIMD register contents
->> + */
->> +struct fpsimd_state kgdb_fpsimd_regs;
->> +#endif
->>
->>  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->>       { "x0", 8, offsetof(struct pt_regs, regs[0])},
->> @@ -59,40 +67,40 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->>       { "sp", 8, offsetof(struct pt_regs, sp)},
->>       { "pc", 8, offsetof(struct pt_regs, pc)},
->>       { "pstate", 4, offsetof(struct pt_regs, pstate)},
->> -     { "v0", 16, -1 },
->> -     { "v1", 16, -1 },
->> -     { "v2", 16, -1 },
->> -     { "v3", 16, -1 },
->> -     { "v4", 16, -1 },
->> -     { "v5", 16, -1 },
->> -     { "v6", 16, -1 },
->> -     { "v7", 16, -1 },
->> -     { "v8", 16, -1 },
->> -     { "v9", 16, -1 },
->> -     { "v10", 16, -1 },
->> -     { "v11", 16, -1 },
->> -     { "v12", 16, -1 },
->> -     { "v13", 16, -1 },
->> -     { "v14", 16, -1 },
->> -     { "v15", 16, -1 },
->> -     { "v16", 16, -1 },
->> -     { "v17", 16, -1 },
->> -     { "v18", 16, -1 },
->> -     { "v19", 16, -1 },
->> -     { "v20", 16, -1 },
->> -     { "v21", 16, -1 },
->> -     { "v22", 16, -1 },
->> -     { "v23", 16, -1 },
->> -     { "v24", 16, -1 },
->> -     { "v25", 16, -1 },
->> -     { "v26", 16, -1 },
->> -     { "v27", 16, -1 },
->> -     { "v28", 16, -1 },
->> -     { "v29", 16, -1 },
->> -     { "v30", 16, -1 },
->> -     { "v31", 16, -1 },
->> -     { "fpsr", 4, -1 },
->> -     { "fpcr", 4, -1 },
->> +     { "v0", 16, offsetof(struct fpsimd_state, vregs[0])},
->> +     { "v1", 16, offsetof(struct fpsimd_state, vregs[1])},
->> +     { "v2", 16, offsetof(struct fpsimd_state, vregs[2])},
->> +     { "v3", 16, offsetof(struct fpsimd_state, vregs[3])},
->> +     { "v4", 16, offsetof(struct fpsimd_state, vregs[4])},
->> +     { "v5", 16, offsetof(struct fpsimd_state, vregs[5])},
->> +     { "v6", 16, offsetof(struct fpsimd_state, vregs[6])},
->> +     { "v7", 16, offsetof(struct fpsimd_state, vregs[7])},
->> +     { "v8", 16, offsetof(struct fpsimd_state, vregs[8])},
->> +     { "v9", 16, offsetof(struct fpsimd_state, vregs[9])},
->> +     { "v10", 16, offsetof(struct fpsimd_state, vregs[10])},
->> +     { "v11", 16, offsetof(struct fpsimd_state, vregs[11])},
->> +     { "v12", 16, offsetof(struct fpsimd_state, vregs[12])},
->> +     { "v13", 16, offsetof(struct fpsimd_state, vregs[13])},
->> +     { "v14", 16, offsetof(struct fpsimd_state, vregs[14])},
->> +     { "v15", 16, offsetof(struct fpsimd_state, vregs[15])},
->> +     { "v16", 16, offsetof(struct fpsimd_state, vregs[16])},
->> +     { "v17", 16, offsetof(struct fpsimd_state, vregs[17])},
->> +     { "v18", 16, offsetof(struct fpsimd_state, vregs[18])},
->> +     { "v19", 16, offsetof(struct fpsimd_state, vregs[19])},
->> +     { "v20", 16, offsetof(struct fpsimd_state, vregs[20])},
->> +     { "v21", 16, offsetof(struct fpsimd_state, vregs[21])},
->> +     { "v22", 16, offsetof(struct fpsimd_state, vregs[22])},
->> +     { "v23", 16, offsetof(struct fpsimd_state, vregs[23])},
->> +     { "v24", 16, offsetof(struct fpsimd_state, vregs[24])},
->> +     { "v25", 16, offsetof(struct fpsimd_state, vregs[25])},
->> +     { "v26", 16, offsetof(struct fpsimd_state, vregs[26])},
->> +     { "v27", 16, offsetof(struct fpsimd_state, vregs[27])},
->> +     { "v28", 16, offsetof(struct fpsimd_state, vregs[28])},
->> +     { "v29", 16, offsetof(struct fpsimd_state, vregs[29])},
->> +     { "v30", 16, offsetof(struct fpsimd_state, vregs[30])},
->> +     { "v31", 16, offsetof(struct fpsimd_state, vregs[31])},
->> +     { "fpsr", 4, offsetof(struct fpsimd_state, fpsr)},
->> +     { "fpcr", 4, offsetof(struct fpsimd_state, fpcr)},
->>  };
->>
->>  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->> @@ -100,11 +108,22 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->>       if (regno >= DBG_MAX_REG_NUM || regno < 0)
->>               return NULL;
->>
->> -     if (dbg_reg_def[regno].offset != -1)
->> +     if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
->>               memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
->>                      dbg_reg_def[regno].size);
->> -     else
->> +     else {
->> +#ifdef CONFIG_KERNEL_MODE_NEON
->> +             if (fpsimd_thread_state()) {
->> +                     fpsimd_save_state(&kgdb_fpsimd_regs);
->> +                     memcpy(mem, (void *)&kgdb_fpsimd_regs +
->> +                                     dbg_reg_def[regno].offset,
->> +                                     dbg_reg_def[regno].size);
->> +             } else
->> +                     memset(mem, 0, dbg_reg_def[regno].size);
->> +#else
->>               memset(mem, 0, dbg_reg_def[regno].size);
->
-> Can you use IS_ENABLED to tidy this up?
-Yes, will take care in next version
+My suggestion is: create usbmisc node for mx28, and put oc setting at there, it can
+keep ci_hdrc_imx.c clean.
+Besides, you may need two dts user setting for oc enable and oc polarity.
 
->
-> Will
+Peter
