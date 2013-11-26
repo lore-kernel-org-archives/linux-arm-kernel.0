@@ -1,393 +1,558 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 16:14:19 -0800
-Subject: [PATCH 04/12] ARM: OMAP2+: Remove legacy i2c.c platform init code
+Date: Mon, 25 Nov 2013 16:14:18 -0800
+Subject: [PATCH 03/12] ARM: OMAP2+: Remove legacy hsmmc.c
 In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
 References: <1385424867-27243-1-git-send-email-tony@atomide.com>
-Message-ID: <1385424867-27243-5-git-send-email-tony@atomide.com>
+Message-ID: <1385424867-27243-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now initialize I2C for mach-omap2 using device tree. And we
-can move the remaining code in plat-omap/i2c.c into mach-omap1/i2c.c.
-
-Note that we cannot remove some of the I2C bus reset functions
-as they are being used by hwmod code.
+We can now initialize the hsmmc using devicetree
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/i2c.c        |  83 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/i2c.c        |  97 --------------------------------
- arch/arm/mach-omap2/twl-common.c |   2 -
- arch/arm/plat-omap/Makefile      |   3 -
- arch/arm/plat-omap/i2c.c         | 116 ---------------------------------------
- 5 files changed, 83 insertions(+), 218 deletions(-)
- delete mode 100644 arch/arm/plat-omap/i2c.c
+ arch/arm/mach-omap2/Makefile |   3 -
+ arch/arm/mach-omap2/hsmmc.c  | 518 -------------------------------------------
+ 2 files changed, 521 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/hsmmc.c
 
-diff --git a/arch/arm/mach-omap1/i2c.c b/arch/arm/mach-omap1/i2c.c
-index 7f5761c..3f6384e 100644
---- a/arch/arm/mach-omap1/i2c.c
-+++ b/arch/arm/mach-omap1/i2c.c
-@@ -19,6 +19,7 @@
-  *
-  */
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index bb9629e..a5e13c0 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -243,9 +243,6 @@ omap-flash-$(CONFIG_MTD_NAND_OMAP2)	:= board-flash.o
+ omap-flash-$(CONFIG_MTD_ONENAND_OMAP2)	:= board-flash.o
+ obj-y					+= $(omap-flash-y) $(omap-flash-m)
  
-+#include <linux/i2c.h>
- #include <linux/i2c-omap.h>
- #include <mach/mux.h>
- #include "soc.h"
-@@ -92,6 +93,88 @@ int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *pdata,
- 	return platform_device_register(pdev);
- }
+-omap-hsmmc-$(CONFIG_MMC_OMAP_HS)	:= hsmmc.o
+-obj-y					+= $(omap-hsmmc-m) $(omap-hsmmc-y)
+-
+ obj-y					+= usb-musb.o
+ obj-y					+= omap_phy_internal.o
  
-+#define OMAP_I2C_MAX_CONTROLLERS 4
-+static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
-+
-+#define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
-+
-+/**
-+ * omap_i2c_bus_setup - Process command line options for the I2C bus speed
-+ * @str: String of options
-+ *
-+ * This function allow to override the default I2C bus speed for given I2C
-+ * bus with a command line option.
-+ *
-+ * Format: i2c_bus=bus_id,clkrate (in kHz)
-+ *
-+ * Returns 1 on success, 0 otherwise.
-+ */
-+static int __init omap_i2c_bus_setup(char *str)
-+{
-+	int ints[3];
-+
-+	get_options(str, 3, ints);
-+	if (ints[0] < 2 || ints[1] < 1 ||
-+			ints[1] > OMAP_I2C_MAX_CONTROLLERS)
-+		return 0;
-+	i2c_pdata[ints[1] - 1].clkrate = ints[2];
-+	i2c_pdata[ints[1] - 1].clkrate |= OMAP_I2C_CMDLINE_SETUP;
-+
-+	return 1;
-+}
-+__setup("i2c_bus=", omap_i2c_bus_setup);
-+
-+/*
-+ * Register busses defined in command line but that are not registered with
-+ * omap_register_i2c_bus from board initialization code.
-+ */
-+int __init omap_register_i2c_bus_cmdline(void)
-+{
-+	int i, err = 0;
-+
-+	for (i = 0; i < ARRAY_SIZE(i2c_pdata); i++)
-+		if (i2c_pdata[i].clkrate & OMAP_I2C_CMDLINE_SETUP) {
-+			i2c_pdata[i].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
-+			err = omap_i2c_add_bus(&i2c_pdata[i], i + 1);
-+			if (err)
-+				goto out;
-+		}
-+
-+out:
-+	return err;
-+}
-+
-+/**
-+ * omap_register_i2c_bus - register I2C bus with device descriptors
-+ * @bus_id: bus id counting from number 1
-+ * @clkrate: clock rate of the bus in kHz
-+ * @info: pointer into I2C device descriptor table or NULL
-+ * @len: number of descriptors in the table
-+ *
-+ * Returns 0 on success or an error code.
-+ */
-+int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
-+			  struct i2c_board_info const *info,
-+			  unsigned len)
-+{
-+	int err;
-+
-+	BUG_ON(bus_id < 1 || bus_id > OMAP_I2C_MAX_CONTROLLERS);
-+
-+	if (info) {
-+		err = i2c_register_board_info(bus_id, info, len);
-+		if (err)
-+			return err;
-+	}
-+
-+	if (!i2c_pdata[bus_id - 1].clkrate)
-+		i2c_pdata[bus_id - 1].clkrate = clkrate;
-+
-+	i2c_pdata[bus_id - 1].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
-+
-+	return omap_i2c_add_bus(&i2c_pdata[bus_id - 1], bus_id);
-+}
-+
- static  int __init omap_i2c_cmdline(void)
- {
- 	return omap_register_i2c_bus_cmdline();
-diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
-index b456b44..2d037e8 100644
---- a/arch/arm/mach-omap2/i2c.c
-+++ b/arch/arm/mach-omap2/i2c.c
-@@ -26,7 +26,6 @@
- 
- #include "prm.h"
- #include "common.h"
--#include "mux.h"
- #include "i2c.h"
- 
- /* In register I2C_CON, Bit 15 is the I2C enable bit */
-@@ -36,20 +35,6 @@
- 
- #define MAX_OMAP_I2C_HWMOD_NAME_LEN	16
- 
--static void __init omap2_i2c_mux_pins(int bus_id)
--{
--	char mux_name[sizeof("i2c2_scl.i2c2_scl")];
--
--	/* First I2C bus is not muxable */
--	if (bus_id == 1)
--		return;
--
--	sprintf(mux_name, "i2c%i_scl.i2c%i_scl", bus_id, bus_id);
--	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT);
--	sprintf(mux_name, "i2c%i_sda.i2c%i_sda", bus_id, bus_id);
--	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT);
--}
--
- /**
-  * omap_i2c_reset - reset the omap i2c module.
-  * @oh: struct omap_hwmod *
-@@ -107,85 +92,3 @@ int omap_i2c_reset(struct omap_hwmod *oh)
- 
- 	return 0;
- }
--
--static int __init omap_i2c_nr_ports(void)
--{
--	int ports = 0;
--
--	if (cpu_is_omap24xx())
--		ports = 2;
--	else if (cpu_is_omap34xx())
--		ports = 3;
--	else if (cpu_is_omap44xx())
--		ports = 4;
--	return ports;
--}
--
--/*
-- * XXX This function is a temporary compatibility wrapper - only
-- * needed until the I2C driver can be converted to call
-- * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
-- */
--static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
--{
--	omap_pm_set_max_mpu_wakeup_lat(dev, t);
--}
--
--static const char name[] = "omap_i2c";
--
--int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
--				int bus_id)
--{
--	int l;
--	struct omap_hwmod *oh;
--	struct platform_device *pdev;
--	char oh_name[MAX_OMAP_I2C_HWMOD_NAME_LEN];
--	struct omap_i2c_bus_platform_data *pdata;
--	struct omap_i2c_dev_attr *dev_attr;
--
--	if (bus_id > omap_i2c_nr_ports())
--		return -EINVAL;
--
--	omap2_i2c_mux_pins(bus_id);
--
--	l = snprintf(oh_name, MAX_OMAP_I2C_HWMOD_NAME_LEN, "i2c%d", bus_id);
--	WARN(l >= MAX_OMAP_I2C_HWMOD_NAME_LEN,
--		"String buffer overflow in I2C%d device setup\n", bus_id);
--	oh = omap_hwmod_lookup(oh_name);
--	if (!oh) {
--			pr_err("Could not look up %s\n", oh_name);
--			return -EEXIST;
--	}
--
--	pdata = i2c_pdata;
--	/*
--	 * pass the hwmod class's CPU-specific knowledge of I2C IP revision in
--	 * use, and functionality implementation flags, up to the OMAP I2C
--	 * driver via platform data
--	 */
--	pdata->rev = oh->class->rev;
--
--	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
--	pdata->flags = dev_attr->flags;
--
--	/*
--	 * When waiting for completion of a i2c transfer, we need to
--	 * set a wake up latency constraint for the MPU. This is to
--	 * ensure quick enough wakeup from idle, when transfer
--	 * completes.
--	 * Only omap3 has support for constraints
--	 */
--	if (cpu_is_omap34xx())
--		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
--	pdev = omap_device_build(name, bus_id, oh, pdata,
--				 sizeof(struct omap_i2c_bus_platform_data));
--	WARN(IS_ERR(pdev), "Could not build omap_device for %s\n", name);
--
--	return PTR_ERR_OR_ZERO(pdev);
--}
--
--static  int __init omap_i2c_cmdline(void)
--{
--	return omap_register_i2c_bus_cmdline();
--}
--omap_subsys_initcall(omap_i2c_cmdline);
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index b0d54da..e816966 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -62,8 +62,6 @@ void __init omap_pmic_init(int bus, u32 clkrate,
- 		sizeof(pmic_i2c_board_info.type));
- 	pmic_i2c_board_info.irq = pmic_irq;
- 	pmic_i2c_board_info.platform_data = pmic_data;
--
--	omap_register_i2c_bus(bus, clkrate, &pmic_i2c_board_info, 1);
- }
- 
- void __init omap4_pmic_init(const char *pmic_type,
-diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-index 0b01b68..cdf999a 100644
---- a/arch/arm/plat-omap/Makefile
-+++ b/arch/arm/plat-omap/Makefile
-@@ -14,6 +14,3 @@ obj-  :=
- 
- obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
- obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
--i2c-omap-$(CONFIG_I2C_OMAP) := i2c.o
--obj-y += $(i2c-omap-m) $(i2c-omap-y)
--
-diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
 deleted file mode 100644
-index 58213d9..0000000
---- a/arch/arm/plat-omap/i2c.c
+index 07d4c7b..0000000
+--- a/arch/arm/mach-omap2/hsmmc.c
 +++ /dev/null
-@@ -1,116 +0,0 @@
+@@ -1,518 +0,0 @@
 -/*
-- * linux/arch/arm/plat-omap/i2c.c
+- * linux/arch/arm/mach-omap2/hsmmc.c
 - *
-- * Helper module for board specific I2C bus registration
+- * Copyright (C) 2007-2008 Texas Instruments
+- * Copyright (C) 2008 Nokia Corporation
+- * Author: Texas Instruments
 - *
-- * Copyright (C) 2007 Nokia Corporation.
-- *
-- * Contact: Jarkko Nikula <jhnikula@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-- * 02110-1301 USA
-- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 - */
--
 -#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/i2c.h>
--#include <linux/i2c-omap.h>
 -#include <linux/slab.h>
--#include <linux/err.h>
--#include <linux/clk.h>
+-#include <linux/string.h>
+-#include <linux/delay.h>
+-#include <linux/gpio.h>
+-#include <linux/platform_data/gpio-omap.h>
 -
--#include <plat/i2c.h>
+-#include "soc.h"
+-#include "omap_device.h"
+-#include "omap-pm.h"
 -
--#define OMAP_I2C_MAX_CONTROLLERS 4
--static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
+-#include "mux.h"
+-#include "mmc.h"
+-#include "hsmmc.h"
+-#include "control.h"
 -
--#define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
+-#if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
 -
--/**
-- * omap_i2c_bus_setup - Process command line options for the I2C bus speed
-- * @str: String of options
-- *
-- * This function allow to override the default I2C bus speed for given I2C
-- * bus with a command line option.
-- *
-- * Format: i2c_bus=bus_id,clkrate (in kHz)
-- *
-- * Returns 1 on success, 0 otherwise.
-- */
--static int __init omap_i2c_bus_setup(char *str)
+-static u16 control_pbias_offset;
+-static u16 control_devconf1_offset;
+-
+-#define HSMMC_NAME_LEN	9
+-
+-#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+-
+-static int hsmmc_get_context_loss(struct device *dev)
 -{
--	int ints[3];
--
--	get_options(str, 3, ints);
--	if (ints[0] < 2 || ints[1] < 1 ||
--			ints[1] > OMAP_I2C_MAX_CONTROLLERS)
--		return 0;
--	i2c_pdata[ints[1] - 1].clkrate = ints[2];
--	i2c_pdata[ints[1] - 1].clkrate |= OMAP_I2C_CMDLINE_SETUP;
--
--	return 1;
+-	return omap_pm_get_dev_context_loss_count(dev);
 -}
--__setup("i2c_bus=", omap_i2c_bus_setup);
 -
--/*
-- * Register busses defined in command line but that are not registered with
-- * omap_register_i2c_bus from board initialization code.
-- */
--int __init omap_register_i2c_bus_cmdline(void)
+-#else
+-#define hsmmc_get_context_loss NULL
+-#endif
+-
+-static void omap_hsmmc1_before_set_reg(struct device *dev, int slot,
+-				  int power_on, int vdd)
 -{
--	int i, err = 0;
+-	u32 reg, prog_io;
+-	struct omap_mmc_platform_data *mmc = dev->platform_data;
 -
--	for (i = 0; i < ARRAY_SIZE(i2c_pdata); i++)
--		if (i2c_pdata[i].clkrate & OMAP_I2C_CMDLINE_SETUP) {
--			i2c_pdata[i].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
--			err = omap_i2c_add_bus(&i2c_pdata[i], i + 1);
--			if (err)
--				goto out;
+-	if (mmc->slots[0].remux)
+-		mmc->slots[0].remux(dev, slot, power_on);
+-
+-	/*
+-	 * Assume we power both OMAP VMMC1 (for CMD, CLK, DAT0..3) and the
+-	 * card with Vcc regulator (from twl4030 or whatever).  OMAP has both
+-	 * 1.8V and 3.0V modes, controlled by the PBIAS register.
+-	 *
+-	 * In 8-bit modes, OMAP VMMC1A (for DAT4..7) needs a supply, which
+-	 * is most naturally TWL VSIM; those pins also use PBIAS.
+-	 *
+-	 * FIXME handle VMMC1A as needed ...
+-	 */
+-	if (power_on) {
+-		if (cpu_is_omap2430()) {
+-			reg = omap_ctrl_readl(OMAP243X_CONTROL_DEVCONF1);
+-			if ((1 << vdd) >= MMC_VDD_30_31)
+-				reg |= OMAP243X_MMC1_ACTIVE_OVERWRITE;
+-			else
+-				reg &= ~OMAP243X_MMC1_ACTIVE_OVERWRITE;
+-			omap_ctrl_writel(reg, OMAP243X_CONTROL_DEVCONF1);
 -		}
 -
--out:
--	return err;
+-		if (mmc->slots[0].internal_clock) {
+-			reg = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
+-			reg |= OMAP2_MMCSDIO1ADPCLKISEL;
+-			omap_ctrl_writel(reg, OMAP2_CONTROL_DEVCONF0);
+-		}
+-
+-		reg = omap_ctrl_readl(control_pbias_offset);
+-		if (cpu_is_omap3630()) {
+-			/* Set MMC I/O to 52Mhz */
+-			prog_io = omap_ctrl_readl(OMAP343X_CONTROL_PROG_IO1);
+-			prog_io |= OMAP3630_PRG_SDMMC1_SPEEDCTRL;
+-			omap_ctrl_writel(prog_io, OMAP343X_CONTROL_PROG_IO1);
+-		} else {
+-			reg |= OMAP2_PBIASSPEEDCTRL0;
+-		}
+-		reg &= ~OMAP2_PBIASLITEPWRDNZ0;
+-		omap_ctrl_writel(reg, control_pbias_offset);
+-	} else {
+-		reg = omap_ctrl_readl(control_pbias_offset);
+-		reg &= ~OMAP2_PBIASLITEPWRDNZ0;
+-		omap_ctrl_writel(reg, control_pbias_offset);
+-	}
 -}
 -
--/**
-- * omap_register_i2c_bus - register I2C bus with device descriptors
-- * @bus_id: bus id counting from number 1
-- * @clkrate: clock rate of the bus in kHz
-- * @info: pointer into I2C device descriptor table or NULL
-- * @len: number of descriptors in the table
-- *
-- * Returns 0 on success or an error code.
-- */
--int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
--			  struct i2c_board_info const *info,
--			  unsigned len)
+-static void omap_hsmmc1_after_set_reg(struct device *dev, int slot,
+-				 int power_on, int vdd)
 -{
--	int err;
+-	u32 reg;
 -
--	BUG_ON(bus_id < 1 || bus_id > OMAP_I2C_MAX_CONTROLLERS);
+-	/* 100ms delay required for PBIAS configuration */
+-	msleep(100);
 -
--	if (info) {
--		err = i2c_register_board_info(bus_id, info, len);
--		if (err)
--			return err;
+-	if (power_on) {
+-		reg = omap_ctrl_readl(control_pbias_offset);
+-		reg |= (OMAP2_PBIASLITEPWRDNZ0 | OMAP2_PBIASSPEEDCTRL0);
+-		if ((1 << vdd) <= MMC_VDD_165_195)
+-			reg &= ~OMAP2_PBIASLITEVMODE0;
+-		else
+-			reg |= OMAP2_PBIASLITEVMODE0;
+-		omap_ctrl_writel(reg, control_pbias_offset);
+-	} else {
+-		reg = omap_ctrl_readl(control_pbias_offset);
+-		reg |= (OMAP2_PBIASSPEEDCTRL0 | OMAP2_PBIASLITEPWRDNZ0 |
+-			OMAP2_PBIASLITEVMODE0);
+-		omap_ctrl_writel(reg, control_pbias_offset);
+-	}
+-}
+-
+-static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
+-{
+-	u32 reg;
+-
+-	reg = omap_ctrl_readl(control_devconf1_offset);
+-	if (mmc->slots[0].internal_clock)
+-		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
+-	else
+-		reg &= ~OMAP2_MMCSDIO2ADPCLKISEL;
+-	omap_ctrl_writel(reg, control_devconf1_offset);
+-}
+-
+-static void hsmmc2_before_set_reg(struct device *dev, int slot,
+-				   int power_on, int vdd)
+-{
+-	struct omap_mmc_platform_data *mmc = dev->platform_data;
+-
+-	if (mmc->slots[0].remux)
+-		mmc->slots[0].remux(dev, slot, power_on);
+-
+-	if (power_on)
+-		hsmmc2_select_input_clk_src(mmc);
+-}
+-
+-static int am35x_hsmmc2_set_power(struct device *dev, int slot,
+-				  int power_on, int vdd)
+-{
+-	struct omap_mmc_platform_data *mmc = dev->platform_data;
+-
+-	if (power_on)
+-		hsmmc2_select_input_clk_src(mmc);
+-
+-	return 0;
+-}
+-
+-static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
+-							int vdd)
+-{
+-	return 0;
+-}
+-
+-static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
+-			int controller_nr)
+-{
+-	if (gpio_is_valid(mmc_controller->slots[0].switch_pin) &&
+-		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
+-					OMAP_PIN_INPUT_PULLUP);
+-	if (gpio_is_valid(mmc_controller->slots[0].gpio_wp) &&
+-		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+-					OMAP_PIN_INPUT_PULLUP);
+-	if (cpu_is_omap34xx()) {
+-		if (controller_nr == 0) {
+-			omap_mux_init_signal("sdmmc1_clk",
+-				OMAP_PIN_INPUT_PULLUP);
+-			omap_mux_init_signal("sdmmc1_cmd",
+-				OMAP_PIN_INPUT_PULLUP);
+-			omap_mux_init_signal("sdmmc1_dat0",
+-				OMAP_PIN_INPUT_PULLUP);
+-			if (mmc_controller->slots[0].caps &
+-				(MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)) {
+-				omap_mux_init_signal("sdmmc1_dat1",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc1_dat2",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc1_dat3",
+-					OMAP_PIN_INPUT_PULLUP);
+-			}
+-			if (mmc_controller->slots[0].caps &
+-						MMC_CAP_8_BIT_DATA) {
+-				omap_mux_init_signal("sdmmc1_dat4",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc1_dat5",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc1_dat6",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc1_dat7",
+-					OMAP_PIN_INPUT_PULLUP);
+-			}
+-		}
+-		if (controller_nr == 1) {
+-			/* MMC2 */
+-			omap_mux_init_signal("sdmmc2_clk",
+-				OMAP_PIN_INPUT_PULLUP);
+-			omap_mux_init_signal("sdmmc2_cmd",
+-				OMAP_PIN_INPUT_PULLUP);
+-			omap_mux_init_signal("sdmmc2_dat0",
+-				OMAP_PIN_INPUT_PULLUP);
+-
+-			/*
+-			 * For 8 wire configurations, Lines DAT4, 5, 6 and 7
+-			 * need to be muxed in the board-*.c files
+-			 */
+-			if (mmc_controller->slots[0].caps &
+-				(MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)) {
+-				omap_mux_init_signal("sdmmc2_dat1",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc2_dat2",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc2_dat3",
+-					OMAP_PIN_INPUT_PULLUP);
+-			}
+-			if (mmc_controller->slots[0].caps &
+-							MMC_CAP_8_BIT_DATA) {
+-				omap_mux_init_signal("sdmmc2_dat4.sdmmc2_dat4",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc2_dat5.sdmmc2_dat5",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc2_dat6.sdmmc2_dat6",
+-					OMAP_PIN_INPUT_PULLUP);
+-				omap_mux_init_signal("sdmmc2_dat7.sdmmc2_dat7",
+-					OMAP_PIN_INPUT_PULLUP);
+-			}
+-		}
+-
+-		/*
+-		 * For MMC3 the pins need to be muxed in the board-*.c files
+-		 */
+-	}
+-}
+-
+-static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+-					struct omap_mmc_platform_data *mmc)
+-{
+-	char *hc_name;
+-
+-	hc_name = kzalloc(sizeof(char) * (HSMMC_NAME_LEN + 1), GFP_KERNEL);
+-	if (!hc_name) {
+-		pr_err("Cannot allocate memory for controller slot name\n");
+-		kfree(hc_name);
+-		return -ENOMEM;
 -	}
 -
--	if (!i2c_pdata[bus_id - 1].clkrate)
--		i2c_pdata[bus_id - 1].clkrate = clkrate;
+-	if (c->name)
+-		strncpy(hc_name, c->name, HSMMC_NAME_LEN);
+-	else
+-		snprintf(hc_name, (HSMMC_NAME_LEN + 1), "mmc%islot%i",
+-								c->mmc, 1);
+-	mmc->slots[0].name = hc_name;
+-	mmc->nr_slots = 1;
+-	mmc->slots[0].caps = c->caps;
+-	mmc->slots[0].pm_caps = c->pm_caps;
+-	mmc->slots[0].internal_clock = !c->ext_clock;
+-	mmc->max_freq = c->max_freq;
+-	mmc->reg_offset = 0;
+-	mmc->get_context_loss_count = hsmmc_get_context_loss;
 -
--	i2c_pdata[bus_id - 1].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
+-	mmc->slots[0].switch_pin = c->gpio_cd;
+-	mmc->slots[0].gpio_wp = c->gpio_wp;
 -
--	return omap_i2c_add_bus(&i2c_pdata[bus_id - 1], bus_id);
+-	mmc->slots[0].remux = c->remux;
+-	mmc->slots[0].init_card = c->init_card;
+-
+-	if (c->cover_only)
+-		mmc->slots[0].cover = 1;
+-
+-	if (c->nonremovable)
+-		mmc->slots[0].nonremovable = 1;
+-
+-	if (c->power_saving)
+-		mmc->slots[0].power_saving = 1;
+-
+-	if (c->no_off)
+-		mmc->slots[0].no_off = 1;
+-
+-	if (c->no_off_init)
+-		mmc->slots[0].no_regulator_off_init = c->no_off_init;
+-
+-	if (c->vcc_aux_disable_is_sleep)
+-		mmc->slots[0].vcc_aux_disable_is_sleep = 1;
+-
+-	/*
+-	 * NOTE:  MMC slots should have a Vcc regulator set up.
+-	 * This may be from a TWL4030-family chip, another
+-	 * controllable regulator, or a fixed supply.
+-	 *
+-	 * temporary HACK: ocr_mask instead of fixed supply
+-	 */
+-	if (soc_is_am35xx())
+-		mmc->slots[0].ocr_mask = MMC_VDD_165_195 |
+-					 MMC_VDD_26_27 |
+-					 MMC_VDD_27_28 |
+-					 MMC_VDD_29_30 |
+-					 MMC_VDD_30_31 |
+-					 MMC_VDD_31_32;
+-	else
+-		mmc->slots[0].ocr_mask = c->ocr_mask;
+-
+-	if (!soc_is_am35xx())
+-		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
+-
+-	switch (c->mmc) {
+-	case 1:
+-		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
+-			/* on-chip level shifting via PBIAS0/PBIAS1 */
+-			mmc->slots[0].before_set_reg =
+-					omap_hsmmc1_before_set_reg;
+-			mmc->slots[0].after_set_reg =
+-					omap_hsmmc1_after_set_reg;
+-		}
+-
+-		if (soc_is_am35xx())
+-			mmc->slots[0].set_power = nop_mmc_set_power;
+-
+-		/* OMAP3630 HSMMC1 supports only 4-bit */
+-		if (cpu_is_omap3630() &&
+-				(c->caps & MMC_CAP_8_BIT_DATA)) {
+-			c->caps &= ~MMC_CAP_8_BIT_DATA;
+-			c->caps |= MMC_CAP_4_BIT_DATA;
+-			mmc->slots[0].caps = c->caps;
+-		}
+-		break;
+-	case 2:
+-		if (soc_is_am35xx())
+-			mmc->slots[0].set_power = am35x_hsmmc2_set_power;
+-
+-		if (c->ext_clock)
+-			c->transceiver = 1;
+-		if (c->transceiver && (c->caps & MMC_CAP_8_BIT_DATA)) {
+-			c->caps &= ~MMC_CAP_8_BIT_DATA;
+-			c->caps |= MMC_CAP_4_BIT_DATA;
+-		}
+-		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
+-			/* off-chip level shifting, or none */
+-			mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
+-			mmc->slots[0].after_set_reg = NULL;
+-		}
+-		break;
+-	case 3:
+-	case 4:
+-	case 5:
+-		mmc->slots[0].before_set_reg = NULL;
+-		mmc->slots[0].after_set_reg = NULL;
+-		break;
+-	default:
+-		pr_err("MMC%d configuration not supported!\n", c->mmc);
+-		kfree(hc_name);
+-		return -ENODEV;
+-	}
+-	return 0;
 -}
+-
+-static int omap_hsmmc_done;
+-
+-void omap_hsmmc_late_init(struct omap2_hsmmc_info *c)
+-{
+-	struct platform_device *pdev;
+-	struct omap_mmc_platform_data *mmc_pdata;
+-	int res;
+-
+-	if (omap_hsmmc_done != 1)
+-		return;
+-
+-	omap_hsmmc_done++;
+-
+-	for (; c->mmc; c++) {
+-		if (!c->deferred)
+-			continue;
+-
+-		pdev = c->pdev;
+-		if (!pdev)
+-			continue;
+-
+-		mmc_pdata = pdev->dev.platform_data;
+-		if (!mmc_pdata)
+-			continue;
+-
+-		mmc_pdata->slots[0].switch_pin = c->gpio_cd;
+-		mmc_pdata->slots[0].gpio_wp = c->gpio_wp;
+-
+-		res = omap_device_register(pdev);
+-		if (res)
+-			pr_err("Could not late init MMC %s\n",
+-			       c->name);
+-	}
+-}
+-
+-#define MAX_OMAP_MMC_HWMOD_NAME_LEN		16
+-
+-static void __init omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
+-					int ctrl_nr)
+-{
+-	struct omap_hwmod *oh;
+-	struct omap_hwmod *ohs[1];
+-	struct omap_device *od;
+-	struct platform_device *pdev;
+-	char oh_name[MAX_OMAP_MMC_HWMOD_NAME_LEN];
+-	struct omap_mmc_platform_data *mmc_data;
+-	struct omap_mmc_dev_attr *mmc_dev_attr;
+-	char *name;
+-	int res;
+-
+-	mmc_data = kzalloc(sizeof(struct omap_mmc_platform_data), GFP_KERNEL);
+-	if (!mmc_data) {
+-		pr_err("Cannot allocate memory for mmc device!\n");
+-		return;
+-	}
+-
+-	res = omap_hsmmc_pdata_init(hsmmcinfo, mmc_data);
+-	if (res < 0)
+-		goto free_mmc;
+-
+-	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
+-
+-	name = "omap_hsmmc";
+-	res = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
+-		     "mmc%d", ctrl_nr);
+-	WARN(res >= MAX_OMAP_MMC_HWMOD_NAME_LEN,
+-	     "String buffer overflow in MMC%d device setup\n", ctrl_nr);
+-
+-	oh = omap_hwmod_lookup(oh_name);
+-	if (!oh) {
+-		pr_err("Could not look up %s\n", oh_name);
+-		goto free_name;
+-	}
+-	ohs[0] = oh;
+-	if (oh->dev_attr != NULL) {
+-		mmc_dev_attr = oh->dev_attr;
+-		mmc_data->controller_flags = mmc_dev_attr->flags;
+-		/*
+-		 * erratum 2.1.1.128 doesn't apply if board has
+-		 * a transceiver is attached
+-		 */
+-		if (hsmmcinfo->transceiver)
+-			mmc_data->controller_flags &=
+-				~OMAP_HSMMC_BROKEN_MULTIBLOCK_READ;
+-	}
+-
+-	pdev = platform_device_alloc(name, ctrl_nr - 1);
+-	if (!pdev) {
+-		pr_err("Could not allocate pdev for %s\n", name);
+-		goto free_name;
+-	}
+-	dev_set_name(&pdev->dev, "%s.%d", pdev->name, pdev->id);
+-
+-	od = omap_device_alloc(pdev, ohs, 1);
+-	if (IS_ERR(od)) {
+-		pr_err("Could not allocate od for %s\n", name);
+-		goto put_pdev;
+-	}
+-
+-	res = platform_device_add_data(pdev, mmc_data,
+-			      sizeof(struct omap_mmc_platform_data));
+-	if (res) {
+-		pr_err("Could not add pdata for %s\n", name);
+-		goto put_pdev;
+-	}
+-
+-	hsmmcinfo->pdev = pdev;
+-
+-	if (hsmmcinfo->deferred)
+-		goto free_mmc;
+-
+-	res = omap_device_register(pdev);
+-	if (res) {
+-		pr_err("Could not register od for %s\n", name);
+-		goto free_od;
+-	}
+-
+-	goto free_mmc;
+-
+-free_od:
+-	omap_device_delete(od);
+-
+-put_pdev:
+-	platform_device_put(pdev);
+-
+-free_name:
+-	kfree(mmc_data->slots[0].name);
+-
+-free_mmc:
+-	kfree(mmc_data);
+-}
+-
+-void __init omap_hsmmc_init(struct omap2_hsmmc_info *controllers)
+-{
+-	if (omap_hsmmc_done)
+-		return;
+-
+-	omap_hsmmc_done = 1;
+-
+-	if (cpu_is_omap2430()) {
+-		control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
+-		control_devconf1_offset = OMAP243X_CONTROL_DEVCONF1;
+-	} else {
+-		control_pbias_offset = OMAP343X_CONTROL_PBIAS_LITE;
+-		control_devconf1_offset = OMAP343X_CONTROL_DEVCONF1;
+-	}
+-
+-	for (; controllers->mmc; controllers++)
+-		omap_hsmmc_init_one(controllers, controllers->mmc);
+-
+-}
+-
+-#endif
 -- 
 1.8.1.1
