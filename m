@@ -1,90 +1,174 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Nov 2013 16:32:05 +0900
-Subject: [PATCH RFC v2 03/17] ARM: shmobile: r8a7779: Add clock index macros
- for DT sources
+Date: Tue, 26 Nov 2013 16:32:06 +0900
+Subject: [PATCH RFC v2 04/17] ARM: shmobile: r8a7779: Add clocks
 In-Reply-To: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
 References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1385451139-29686-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1385451139-29686-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macros usable by device tree sources to reference r8a7779 clocks by index.
+Declare all core and MSTP clocks currently used by r8a7779-based boards.
 
-Based on work for the r8a7790 and r8a7791 SoCs by Laurent Pinchart.
+Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
 
 Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- include/dt-bindings/clock/r8a7779-clock.h | 61 +++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
+ arch/arm/boot/dts/r8a7779-marzen.dts |   1 +
+ arch/arm/boot/dts/r8a7779.dtsi       | 124 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 125 insertions(+)
 
-diff --git a/include/dt-bindings/clock/r8a7779-clock.h b/include/dt-bindings/clock/r8a7779-clock.h
-new file mode 100644
-index 0000000..b05fa8b
---- /dev/null
-+++ b/include/dt-bindings/clock/r8a7779-clock.h
-@@ -0,0 +1,61 @@
-+/*
-+ * Copyright (C) 2013  Horms Solutions Ltd.
-+ *
-+ * Contact: Simon Horman <horms@verge.net.au>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
+diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
+index a7af2c2..ee3fb60 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+@@ -11,6 +11,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7779.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "marzen";
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index b2b418a..d524b3f 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -10,6 +10,7 @@
+  */
+ 
+ /include/ "skeleton.dtsi"
++#include <dt-bindings/clock/r8a7779-clock.h>
+ 
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+@@ -248,4 +249,127 @@
+ 		cap-sdio-irq;
+ 		status = "disabled";
+ 	};
 +
-+#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
-+#define __DT_BINDINGS_CLOCK_R8A7779_H__
++	clocks {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
-+/* CPG */
-+#define R8A7779_CLK_PLLA	0
-+#define R8A7779_CLK_Z		1
-+#define R8A7779_CLK_ZS		2
-+#define R8A7779_CLK_S		3
-+#define R8A7779_CLK_S1		4
-+#define R8A7779_CLK_P		5
-+#define R8A7779_CLK_OUT		6
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at 0xe6150000 {
++			compatible = "renesas,r8a7779-cpg-clocks";
++			reg = <0 0xe6150000 0 0x1000>;
++			#clock-cells = <1>;
++			clock-output-names = "plla", "z", "zs", "s", "s1",
++					     "p", "out";
++		};
 +
-+/* MSTP 0 */
-+#define R8A7779_CLK_HSPI0	7
-+#define R8A7779_CLK_HSPI1	7
-+#define R8A7779_CLK_HSPI2	7
-+#define R8A7779_CLK_TMU0	16
-+#define R8A7779_CLK_TMU1	16
-+#define R8A7779_CLK_TMU2	16
-+#define R8A7779_CLK_SCIF6	21
-+#define R8A7779_CLK_SCIF4	22
-+#define R8A7779_CLK_SCIF3	23
-+#define R8A7779_CLK_SCIF2	24
-+#define R8A7779_CLK_SCIF1	25
-+#define R8A7779_CLK_SCIF0	26
-+#define R8A7779_CLK_I2C3	27
-+#define R8A7779_CLK_I2C2	28
-+#define R8A7779_CLK_I2C1	29
-+#define R8A7779_CLK_I2C0	30
++		/* Fixed factor clocks */
++		i_clk: i_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clock-output-names = "i";
++		};
++		s3_clk: s3_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <8>;
++			clock-mult = <1>;
++			clock-output-names = "s3";
++		};
++		s4_clk: s4_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <16>;
++			clock-mult = <1>;
++			clock-output-names = "s4";
++		};
++		g_clk: g_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <24>;
++			clock-mult = <1>;
++			clock-output-names = "g";
++		};
 +
-+/* MSTP 1 */
-+#define R8A7779_CLK_EHCI0	0
-+#define R8A7779_CLK_OHCI0	0
-+#define R8A7779_CLK_EHCI1	1
-+#define R8A7779_CLK_OHCI1	1
-+#define R8A7779_CLK_DU		3
-+#define R8A7779_CLK_VIN2	8
-+#define R8A7779_CLK_VIN1	9
-+#define R8A7779_CLK_VIN0	10
-+#define R8A7779_CLK_SATA	15
-+#define R8A7779_CLK_VIN3	20
-+
-+/* MSTP 3 */
-+#define R8A7779_CLK_SDHI3	20
-+#define R8A7779_CLK_SDHI2	21
-+#define R8A7779_CLK_SDHI1	22
-+#define R8A7779_CLK_SDHI0	23
-+
-+
-+#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
++		/* Gate clocks */
++		mstp0_clks: mstp0_clks {
++			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc80030 0 4>, <0 0xffc80034 0 4>;
++			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_HSPI0 R8A7779_CLK_HSPI1 R8A7779_CLK_HSPI2
++				R8A7779_CLK_TMU0 R8A7779_CLK_TMU1 R8A7779_CLK_TMU2
++				R8A7779_CLK_SCIF6 R8A7779_CLK_SCIF4 R8A7779_CLK_SCIF3
++				R8A7779_CLK_SCIF2 R8A7779_CLK_SCIF1 R8A7779_CLK_SCIF0
++				R8A7779_CLK_I2C3 R8A7779_CLK_I2C2 R8A7779_CLK_I2C1
++				R8A7779_CLK_I2C0
++			>;
++			clock-output-names =
++				"hspi0", "hspi1", "hspi2",
++				"tmu0", "tmu1", "tmu2",
++				"scif6", "scif4", "scif3",
++				"scif2", "scif1", "scif0",
++				"i2c3", "i2c2", "i2c1",
++				"i2c0";
++		};
++		mstp1_clks: mstp1_clks {
++			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc80034 0 4>, <0 0xffc80038 0 4>;
++			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_EHCI0 R8A7779_CLK_OHCI0
++				R8A7779_CLK_EHCI1 R8A7779_CLK_OHCI1
++				R8A7779_CLK_DU R8A7779_CLK_VIN2
++				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
++				R8A7779_CLK_SATA R8A7779_CLK_VIN3
++			>;
++			clock-output-names =
++				"ehci0", "ohci0",
++				"ehci1", "ohci1",
++				"du", "vin2",
++				"vin1", "vin0",
++				"sata", "vin3";
++		};
++		mstp3_clks: mstp3_clks {
++			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc8003c 0 4>, <0 0xffc80040 0 4>;
++			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_EHCI0 R8A7779_CLK_OHCI0
++				R8A7779_CLK_EHCI1 R8A7779_CLK_OHCI1
++				R8A7779_CLK_DU R8A7779_CLK_VIN2
++				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
++				R8A7779_CLK_SATA R8A7779_CLK_VIN3
++			>;
++			clock-output-names =
++				"ehci0", "ohci0",
++				"ehci1", "ohci1",
++				"du", "vin2",
++				"vin1", "vin0",
++				"sata", "vin3";
++		};
++	};
+ };
 -- 
 1.8.4
