@@ -1,49 +1,64 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 26 Nov 2013 13:13:15 +0100
-Subject: [PATCH] clk: exynos: Fix typos in DT bindings documentation
-In-Reply-To: <CAK9yfHxL8DnN8BE94-L3_MK+dBO0exEq7YAamXRHQ7Abo3jYyQ@mail.gmail.com>
-References: <1384775172-3373-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1566145.0GyXC9vG8j@avalon>
- <CAK9yfHxL8DnN8BE94-L3_MK+dBO0exEq7YAamXRHQ7Abo3jYyQ@mail.gmail.com>
-Message-ID: <1538452.UuDUTCGYER@amdc1227>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 26 Nov 2013 07:27:10 -0500
+Subject: PCI: mvebu: return NULL instead of ERR_PTR(ret)
+In-Reply-To: <001101ceea68$cb486220$61d92660$%han@samsung.com>
+References: <001001ceb816$5d1aecc0$1750c640$%han@samsung.com>
+ <20131125200256.GA7316@obsidianresearch.com>
+ <001101ceea68$cb486220$61d92660$%han@samsung.com>
+Message-ID: <20131126122710.GG2879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 of November 2013 11:23:49 Sachin Kamat wrote:
-> +CC Mike and removed a few from the list.
+On Tue, Nov 26, 2013 at 02:31:44PM +0900, Jingoo Han wrote:
 > 
-> Hi Laurent,
+> On Tuesday, November 26, 2013 5:03 AM, Jason Gunthorpe wrote:
+> > On Sat, Nov 23, 2013 at 10:00:33PM -0500, Jason Cooper wrote:
+> > > And a small addendum: I currently have the following in mvebu/drivers
+> > >   058100a08be8 PCI: mvebu: return NULL instead of ERR_PTR(ret)
+> > 
+> > Folks, I took a quick look at this, and it looks suspicious (sorry, I
+> > can't seem to find the thread to followup post)
+> > 
+> > >    PCI: mvebu: return NULL instead of ERR_PTR(ret)
+> > >
+> > >    Return NULL instead of ERR_PTR(ret) in order to fix the following
+> > >    sparse warning:
+> > >
+> > >    drivers/pci/host/pci-mvebu.c:744:31: warning: incorrect type in return expression (different
+> > address
+> > >    spaces)
+> > >    drivers/pci/host/pci-mvebu.c:744:31:    expected void [noderef] <asn:2>*
+> > >    drivers/pci/host/pci-mvebu.c:744:31:    got void *
+> > >
+> > >    Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > >    Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > >    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> > >
+> > >--- a/drivers/pci/host/pci-mvebu.c
+> > >+++ b/drivers/pci/host/pci-mvebu.c
+> > >@@ -740,7 +740,7 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+> > >
+> > >        ret = of_address_to_resource(np, 0, &regs);
+> > >        if (ret)
+> > >-               return ERR_PTR(ret);
+> > >+               return NULL;
+> > >
+> > >        return devm_ioremap_resource(&pdev->dev, &regs);
+> > 
+> > So we drop the ERR_PTR for that return but 'devm_ioremap_resource'
+> > returns ERR_PTR too:
 > 
-> On 26 November 2013 05:52, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> > Hi Sachin,
-> >
-> > On Monday 18 November 2013 17:17:39 Sachin Kamat wrote:
-> >> On 18 November 2013 17:16, Laurent Pinchart wrote:
-> >> > s/comptible/compatible/
-> >> >
-> >> > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >>
-> >> Good catch.
-> >>
-> >> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
-> >
-> > Have you queued up the patch for v3.14 ?
-> 
-> No, I haven't. This should either go through DT tree or else Tomasz Figa can
-> pick this up and send it to Mike as per the new workflow for 3.14.
-> 
-> 
+> Yes, you're right.
+> It makes the problem.
+> Thus, this commit "PCI: mvebu: return NULL instead of ERR_PTR(ret)"
+> should be reverted.
 
-Well, since this is purely a fix for the documentation, without any
-dependencies on clk tree, I see no reason to send it in any other way than
-through DT tree directly.
+It hasn't gone to mainline yet and I haven't sent a pull request for it
+yet.  So I can just drop it.
 
-As for clk-samsung tree, I'm currently in process of preparing a tree on
-kernel.org so I should start picking up Samsung clock patches soon.
+Since we have the discussion on all three of those patches re-ignited,
+I'll just drop the branch and Ack the resends for going through Bjorn.
 
-By the way, the patch adding me to MAINTAINERS file has not been merged
-yet. Mike, are there any issues?
+thx,
 
-Best regards,
-Tomasz
+Jason.
