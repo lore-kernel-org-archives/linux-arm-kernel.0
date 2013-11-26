@@ -1,34 +1,33 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 26 Nov 2013 11:38:34 -0700
-Subject: [PATCH] PCI: mvebu - The bridge secondary status register should
- be 0
-In-Reply-To: <20131126182328.GP2879@titan.lakedaemon.net>
-References: <1385488975-27694-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131126182328.GP2879@titan.lakedaemon.net>
-Message-ID: <20131126183834.GA12152@google.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Nov 2013 11:45:50 -0700
+Subject: [PATCH 16/31] ASoC: tegra: use reset framework
+In-Reply-To: <20131126183739.GR14725@sirena.org.uk>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-17-git-send-email-swarren@wwwdotorg.org>
+ <20131116095529.GF15393@sirena.org.uk> <528A4C8C.3030200@wwwdotorg.org>
+ <20131118183716.GR2674@sirena.org.uk> <5293C787.1030005@wwwdotorg.org>
+ <20131126131410.GK14725@sirena.org.uk> <5294CCDD.30803@wwwdotorg.org>
+ <20131126183739.GR14725@sirena.org.uk>
+Message-ID: <5294EC5E.3050207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 01:23:28PM -0500, Jason Cooper wrote:
-> On Tue, Nov 26, 2013 at 11:02:52AM -0700, Jason Gunthorpe wrote:
-> > There are no writable bits in the secondary status register, only
-> > write 1 to clear bits. The driver never sets any of the write 1 to
-> > clear bits so the status register should always be 0, just remove
-> > the set from the write path.
-> > 
-> > Someday the write 1 to clear bits should be copied/cleared directly
-> > from registers in the HW.
-> > 
-> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > ---
-> >  drivers/pci/host/pci-mvebu.c | 1 -
-> >  1 file changed, 1 deletion(-)
+On 11/26/2013 11:37 AM, Mark Brown wrote:
+> On Tue, Nov 26, 2013 at 09:31:25AM -0700, Stephen Warren wrote:
 > 
-> Whole series
+>> ... so, I thought you were OK with that one issue. Were there
+>> other issues you didn't mention before?
 > 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Probably not but I'd need to reread it, I don't think I got that
+> much further than noticing that there weren't any clock changes
+> (the fact that the clock dependency was getting added in a DMA
+> series set off alarm bells).  To be honest given the number of
+> revisions that seem to be required I'd been expecting to see a
+> respin of the series, the ASoC generic DMA changes did need a
+> respin before they can be merged and I do want to get them into the
+> ASoC tree.
 
-Thanks, I applied the Interrupt Line/Pin change to for-linus for v3.13, and
-the others to pci/host-mvebu for v3.14.
+OK, I'll repost.
 
-Bjorn
+I'm waiting to repost the ASoC core changes until the dmaengine API
+change settles. Hopefully very soon.
