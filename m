@@ -1,49 +1,69 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 26 Nov 2013 15:53:32 +0530
-Subject: [PATCH v3 5/9] usb: gadget: s3c-hsotg: use generic
- phy_init()/phy_exit() support
-In-Reply-To: <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
+Date: Tue, 26 Nov 2013 15:58:45 +0530
+Subject: [PATCH v3 6/9] usb: gadget: s3c-hsotg: get phy bus width from
+ phy subsystem
+In-Reply-To: <1385403367-18144-7-git-send-email-matt.porter@linaro.org>
 References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
- <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
-Message-ID: <529476A4.8080600@ti.com>
+ <1385403367-18144-7-git-send-email-matt.porter@linaro.org>
+Message-ID: <529477DD.8000906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
-> If a generic phy is present, call phy_init()/phy_exit(). This supports
-> generic phys that must be soft reset before power on.
+> Adds support for querying the phy bus width from the generic phy
+> subsystem. Configure UTMI bus width in GUSBCFG based on this value.
 > 
 > Signed-off-by: Matt Porter <matt.porter@linaro.org>
 > ---
->  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
->  1 file changed, 5 insertions(+)
+>  drivers/usb/gadget/s3c-hsotg.c | 14 +++++++++++++-
+>  drivers/usb/gadget/s3c-hsotg.h |  1 +
+>  2 files changed, 14 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-> index da3879b..8dfe33f 100644
+> index 8dfe33f..be41585 100644
 > --- a/drivers/usb/gadget/s3c-hsotg.c
 > +++ b/drivers/usb/gadget/s3c-hsotg.c
-> @@ -3622,6 +3622,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+> @@ -144,6 +144,7 @@ struct s3c_hsotg_ep {
+>   * @regs: The memory area mapped for accessing registers.
+>   * @irq: The IRQ number we are using
+>   * @supplies: Definition of USB power supplies
+> + * @phyif: PHY interface width
+>   * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
+>   * @num_of_eps: Number of available EPs (excluding EP0)
+>   * @debug_root: root directrory for debugfs.
+> @@ -171,6 +172,7 @@ struct s3c_hsotg {
+>  
+>  	struct regulator_bulk_data supplies[ARRAY_SIZE(s3c_hsotg_supply_names)];
+>  
+> +	u32			phyif;
+>  	unsigned int		dedicated_fifos:1;
+>  	unsigned char           num_of_eps;
+>  
+> @@ -2276,7 +2278,7 @@ static void s3c_hsotg_core_init(struct s3c_hsotg *hsotg)
+>  	 */
+>  
+>  	/* set the PLL on, remove the HNP/SRP and set the PHY */
+> -	writel(GUSBCFG_PHYIf16 | GUSBCFG_TOutCal(7) |
+> +	writel(hsotg->phyif | GUSBCFG_TOutCal(7) |
+>  	       (0x5 << 10), hsotg->regs + GUSBCFG);
+>  
+>  	s3c_hsotg_init_fifo(hsotg);
+> @@ -3622,6 +3624,16 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
 >  		goto err_supplies;
 >  	}
 >  
-> +	if (hsotg->phy)
-
-IS_ERR? If your phy_get fails *phy* will have a error value..
-
-> +		phy_init(hsotg->phy);
+> +	/* Set default UTMI width */
+> +	hsotg->phyif = GUSBCFG_PHYIf16;
 > +
->  	/* usb phy enable */
->  	s3c_hsotg_phy_enable(hsotg);
->  
-> @@ -3715,6 +3718,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
->  	}
->  
->  	s3c_hsotg_phy_disable(hsotg);
-> +	if (hsotg->phy)
+> +	/*
+> +	 * If using the generic PHY framework, check if the PHY bus
+> +	 * width is 8-bit and set the phyif appropriately.
+> +	 */
+> +	if (hsotg->phy && (phy_get_bus_width(phy) == 8))
 
-same here.
+what if the phy has error value here?
 
 Thanks
 Kishon
