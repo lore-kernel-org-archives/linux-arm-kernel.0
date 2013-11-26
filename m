@@ -1,57 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Nov 2013 14:37:31 +0100
-Subject: [PATCH] rtc: pxa: drop usage of CLOCK_TICK_RATE
-In-Reply-To: <1383942318-12569-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1383942318-12569-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131126133731.GE28642@pengutronix.de>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Tue, 26 Nov 2013 14:43:30 +0100
+Subject: ACPI
+In-Reply-To: <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+ <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
+Message-ID: <201311261443.30784.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tuesday 26 November 2013 13:55:10 Grant Likely wrote:
+> On Tue, Nov 26, 2013 at 12:43 PM, Linus Walleij
+>
+> <linus.walleij@linaro.org> wrote:
+> > On Mon, Nov 25, 2013 at 4:41 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+> >> In the past ACPI implementations handled GPIO by providing
+> >> methods that accessed hardware registers directly. I've seen DSDTs that
+> >> implement i2c entirely in ASL.
+> >
+> > Is that common?
+> >
+> > Since i2c is a slow bus, can be 100kHz or so, how does that
+> > avoid locking the entire CPU while e.g. waiting for transactions on
+> > the external bus to complete?
+> >
+> > In I2C drivers we typically use completion IRQs so that we can
+> > do other stuff when the I2C traffic is busy ...
+> >
+> > I have a feeling we should not recommend ARM implementers
+> > to go and do things like this.
+>
+> ACPI5 defines a binding for serial busses (i2c & spi) which allows
+> real device drivers to drive the bus and allows ACPI and the kernel to
+> share the bus safely. Using that binding means some i2c devices can be
+> 'owned' by ACPI and others owned by the kernel.
 
-[Cc: += akpm]
+This means bus locking. And Linus' other question about CPU locking while ACPI
+drives the I2C bus?
 
-On Fri, Nov 08, 2013 at 09:25:18PM +0100, Uwe Kleine-K?nig wrote:
-> The symbol CLOCK_TICK_RATE is (at least on ARM) defined in an platform
-> specific header <mach/timex.h>. There are plans to stop using and kill
-> these platform specific headers. So fix the only user of pxa's
-> <mach/timex.h> to not use it.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Who is looking for this patch?
-
-Best regards
-Uwe
-
-> ---
-> It would be nice to use the clk API to find the tick rate, but I didn't
-> find any clk to use.
-> ---
->  drivers/rtc/rtc-pxa.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
-> index a355f2b..0ba07e1 100644
-> --- a/drivers/rtc/rtc-pxa.c
-> +++ b/drivers/rtc/rtc-pxa.c
-> @@ -32,7 +32,7 @@
->  
->  #include <mach/hardware.h>
->  
-> -#define TIMER_FREQ		CLOCK_TICK_RATE
-> +#define TIMER_FREQ		get_clock_tick_rate()
->  #define RTC_DEF_DIVIDER		(32768 - 1)
->  #define RTC_DEF_TRIM		0
->  #define MAXFREQ_PERIODIC	1000
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+jbe
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
