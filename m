@@ -1,88 +1,157 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 26 Nov 2013 10:56:35 +0200
-Subject: [PATCH] ARM: dts: omap3-beagle: Fix USB host on beagle boards
- (for 3.13)
-In-Reply-To: <CAGo_u6ryFJvBwd=S9A-nJw+eoGguPj0jMOtgMiZ7mXXAbh4i+w@mail.gmail.com>
-References: <1385387745-7162-1-git-send-email-rogerq@ti.com>
- <CAGo_u6ryFJvBwd=S9A-nJw+eoGguPj0jMOtgMiZ7mXXAbh4i+w@mail.gmail.com>
-Message-ID: <52946243.70903@ti.com>
+From: v.tyrtov@samsung.com (Vyacheslav Tyrtov)
+Date: Tue, 26 Nov 2013 12:58:05 +0400
+Subject: [PATCH v4 1/4] ARM: EXYNOS: Add support for EXYNOS5410 SoC
+In-Reply-To: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
+References: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <1385456288-20398-2-git-send-email-v.tyrtov@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 05:50 PM, Nishanth Menon wrote:
-> On Mon, Nov 25, 2013 at 7:55 AM, Roger Quadros <rogerq@ti.com> wrote:
->> Beagle (rev. C4) and Beagle-XM (all revs) need VAUX2 1.8V supply
->> for the USB PHY.
->>
->> As the generic PHY driver can't handle more than one supply
->> at the moment, we configure this supply to be always on.
->> This will cause a very small power impact if the USB host subsystem
->> is not in use, about 76.86 micro-W + LDO power.
-> 
->>
->> Older Beagle boards (prior to C4) don't have VAUX2 connected anywhere,
->> so there won't be any functional impact on those boards other than
->> some additional LDO power consumption.
->>
->> Reported-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> 
-> Tested-by: Nishanth Menon <nm@ti.com>
+From: Tarek Dakhran <t.dakhran@samsung.com>
 
-Thanks Nishant.
-> 
-> I might suggest though that the better alternative might be to get phy
-> driver to handle multiple regulators considering that DT is supposed
-> to represent the h/w topology.
+EXYNOS5410 is SoC in Samsung's Exynos5 SoC series.
+Add initial support for this SoC.
 
-Noted. I will work on this for 3.14.
+Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+---
+ arch/arm/mach-exynos/Kconfig             | 12 ++++++++++++
+ arch/arm/mach-exynos/common.c            | 18 ++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h  |  1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c   |  1 +
+ arch/arm/plat-samsung/include/plat/cpu.h |  8 ++++++++
+ 5 files changed, 40 insertions(+)
 
-cheers,
--roger
-
-> 
->> ---
->>  arch/arm/boot/dts/omap3-beagle-xm.dts | 8 ++++++++
->>  arch/arm/boot/dts/omap3-beagle.dts    | 8 ++++++++
->>  2 files changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> index 31a632f..b39918e 100644
->> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> @@ -215,3 +215,11 @@
->>  &usbhsehci {
->>         phys = <0 &hsusb2_phy>;
->>  };
->> +
->> +&vaux2 {
->> +       regulator-name = "usb_1v8";
->> +       regulator-min-microvolt = <1800000>;
->> +       regulator-max-microvolt = <1800000>;
->> +       regulator-always-on;
->> +};
->> +
->> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
->> index fa532aa..9764556 100644
->> --- a/arch/arm/boot/dts/omap3-beagle.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle.dts
->> @@ -178,3 +178,11 @@
->>         mode = <3>;
->>         power = <50>;
->>  };
->> +
->> +&vaux2 {
->> +       regulator-name = "vdd_ehci";
->> +       regulator-min-microvolt = <1800000>;
->> +       regulator-max-microvolt = <1800000>;
->> +       regulator-always-on;
->> +};
->> +
->> --
->> 1.8.3.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index f9d67a0..ae03ebb 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -93,6 +93,18 @@ config SOC_EXYNOS5250
+ 	help
+ 	  Enable EXYNOS5250 SoC support
+ 
++config SOC_EXYNOS5410
++	bool "SAMSUNG EXYNOS5410"
++	default y
++	depends on ARCH_EXYNOS5
++	select ARM_CCI
++	select MCPM
++	select PM_GENERIC_DOMAINS if PM_RUNTIME
++	select S5P_PM if PM_SLEEP
++	select S5P_SLEEP if PM_SLEEP
++	help
++	  Enable EXYNOS5410 SoC support
++
+ config SOC_EXYNOS5420
+ 	bool "SAMSUNG EXYNOS5420"
+ 	default y
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 61d2906..4768608 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -52,6 +52,7 @@ static const char name_exynos4210[] = "EXYNOS4210";
+ static const char name_exynos4212[] = "EXYNOS4212";
+ static const char name_exynos4412[] = "EXYNOS4412";
+ static const char name_exynos5250[] = "EXYNOS5250";
++static const char name_exynos5410[] = "EXYNOS5410";
+ static const char name_exynos5420[] = "EXYNOS5420";
+ static const char name_exynos5440[] = "EXYNOS5440";
+ 
+@@ -85,6 +86,12 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.init		= exynos_init,
+ 		.name		= name_exynos5250,
+ 	}, {
++		.idcode		= EXYNOS5410_SOC_ID,
++		.idmask		= EXYNOS5_SOC_MASK,
++		.map_io		= exynos5_map_io,
++		.init		= exynos_init,
++		.name		= name_exynos5410,
++	}, {
+ 		.idcode		= EXYNOS5420_SOC_ID,
+ 		.idmask		= EXYNOS5_SOC_MASK,
+ 		.map_io		= exynos5_map_io,
+@@ -215,6 +222,15 @@ static struct map_desc exynos4x12_iodesc[] __initdata = {
+ 	},
+ };
+ 
++static struct map_desc exynos5410_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS5410_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
+ static struct map_desc exynos5250_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+@@ -374,6 +390,8 @@ static void __init exynos5_map_io(void)
+ 
+ 	if (soc_is_exynos5250())
+ 		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
++	if (soc_is_exynos5410())
++		iotable_init(exynos5410_iodesc, ARRAY_SIZE(exynos5410_iodesc));
+ }
+ 
+ struct bus_type exynos_subsys = {
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 7b046b5..894f431 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -29,6 +29,7 @@
+ #define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
+ #define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
+ #define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
++#define EXYNOS5410_PA_SYSRAM_NS		0x02073000
+ 
+ #define EXYNOS_PA_CHIPID		0x10000000
+ 
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index 1fe075a..7f78f66 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -50,6 +50,7 @@ static void __init exynos5_dt_machine_init(void)
+ 
+ static char const *exynos5_dt_compat[] __initdata = {
+ 	"samsung,exynos5250",
++	"samsung,exynos5410",
+ 	"samsung,exynos5420",
+ 	"samsung,exynos5440",
+ 	NULL
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 335beb3..8f09488 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -46,6 +46,7 @@ extern unsigned long samsung_cpu_id;
+ #define EXYNOS4_CPU_MASK	0xFFFE0000
+ 
+ #define EXYNOS5250_SOC_ID	0x43520000
++#define EXYNOS5410_SOC_ID	0xE5410000
+ #define EXYNOS5420_SOC_ID	0xE5420000
+ #define EXYNOS5440_SOC_ID	0xE5440000
+ #define EXYNOS5_SOC_MASK	0xFFFFF000
+@@ -68,6 +69,7 @@ IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+ IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+ IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+ IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
++IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
+ IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
+ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+ 
+@@ -148,6 +150,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+ # define soc_is_exynos5250()	0
+ #endif
+ 
++#if defined(CONFIG_SOC_EXYNOS5410)
++# define soc_is_exynos5410()	is_samsung_exynos5410()
++#else
++# define soc_is_exynos5410()	0
++#endif
++
+ #if defined(CONFIG_SOC_EXYNOS5420)
+ # define soc_is_exynos5420()	is_samsung_exynos5420()
+ #else
+-- 
+1.8.1.5
