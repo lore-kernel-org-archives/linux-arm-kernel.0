@@ -1,61 +1,173 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 26 Nov 2013 10:06:07 +0200
-Subject: [PATCHv10 26/41] ARM: dts: DRA7: Add PCIe related clock nodes
+Date: Tue, 26 Nov 2013 10:05:51 +0200
+Subject: [PATCHv10 10/41] CLK: TI: add support for clockdomain binding
 In-Reply-To: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
 References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1385453182-24421-27-git-send-email-t-kristo@ti.com>
+Message-ID: <1385453182-24421-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: J Keerthy <j-keerthy@ti.com>
+Some OMAP clocks require knowledge about their parent clockdomain for
+book keeping purposes. This patch creates a new DT binding for TI
+clockdomains, which act as a collection of device clocks.
 
-This patch adds optfclk_pciephy_clk and optfclk_pciephy_div_clk
-which are used by PCIe phy. It also adds a mux clock to choose
-the source of optfclk_pciephy_div_clk clock.
-
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Tested-by: Nishanth Menon <nm@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ .../devicetree/bindings/clock/ti/clockdomain.txt   |   21 ++++++
+ arch/arm/mach-omap2/clock.h                        |    1 -
+ drivers/clk/ti/Makefile                            |    3 +-
+ drivers/clk/ti/clockdomain.c                       |   70 ++++++++++++++++++++
+ include/linux/clk/ti.h                             |    3 +
+ 5 files changed, 96 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/clockdomain.txt
+ create mode 100644 drivers/clk/ti/clockdomain.c
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 7708d84..aebbc5a 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1165,6 +1165,31 @@
- 		reg = <0x021c>, <0x0220>;
- 	};
+diff --git a/Documentation/devicetree/bindings/clock/ti/clockdomain.txt b/Documentation/devicetree/bindings/clock/ti/clockdomain.txt
+new file mode 100644
+index 0000000..45e6f7c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti/clockdomain.txt
+@@ -0,0 +1,21 @@
++Binding for Texas Instruments clockdomain.
++
++Binding status: Unstable - ABI compatibility may be broken in the future
++
++This binding uses the common clock binding[1]. Every clock on
++TI SoC belongs to one clockdomain, but software only needs this
++information for specific clocks which require their parent
++clockdomain to be controlled when the clock is enabled/disabled.
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be "ti,clockdomain"
++- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : link phandles of clocks within this domain
++
++Examples:
++	dss_clkdm: dss_clkdm {
++		compatible = "ti,clockdomain";
++		clocks = <&dss1_alwon_fck_3430es2>, <&dss_ick_3430es2>;
++	};
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index bc0f9fc..6bd72b5 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -38,7 +38,6 @@ struct omap_clk {
+ 	}
  
-+	optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
-+		compatible = "ti,divider-clock";
-+		clocks = <&apll_pcie_ck>;
-+		#clock-cells = <0>;
-+		reg = <0x021c>;
-+		ti,bit-shift = <8>;
-+		ti,max-div = <2>;
-+	};
+ struct clockdomain;
+-#define to_clk_hw_omap(_hw) container_of(_hw, struct clk_hw_omap, hw)
+ 
+ #define DEFINE_STRUCT_CLK(_name, _parent_array_name, _clkops_name)	\
+ 	static struct clk _name = {				\
+diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+index 7cba389..67056fb 100644
+--- a/drivers/clk/ti/Makefile
++++ b/drivers/clk/ti/Makefile
+@@ -1,4 +1,5 @@
+ ifneq ($(CONFIG_OF),)
+ obj-y					+= clk.o dpll.o autoidle.o divider.o \
+-					   fixed-factor.o gate.o composite.o
++					   fixed-factor.o gate.o clockdomain.o \
++					   composite.o
+ endif
+diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
+new file mode 100644
+index 0000000..f1e0038
+--- /dev/null
++++ b/drivers/clk/ti/clockdomain.c
+@@ -0,0 +1,70 @@
++/*
++ * OMAP clockdomain support
++ *
++ * Copyright (C) 2013 Texas Instruments, Inc.
++ *
++ * Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+	optfclk_pciephy_clk: optfclk_pciephy_clk at 4a0093b0 {
-+		compatible = "ti,gate-clock";
-+		clocks = <&apll_pcie_ck>;
-+		#clock-cells = <0>;
-+		reg = <0x13b0>;
-+		ti,bit-shift = <9>;
-+	};
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/clk/ti.h>
 +
-+	optfclk_pciephy_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
-+		compatible = "ti,gate-clock";
-+		clocks = <&optfclk_pciephy_div>;
-+		#clock-cells = <0>;
-+		reg = <0x13b0>;
-+		ti,bit-shift = <10>;
-+	};
++#undef pr_fmt
++#define pr_fmt(fmt) "%s: " fmt, __func__
 +
- 	apll_pcie_clkvcoldo: apll_pcie_clkvcoldo {
- 		#clock-cells = <0>;
- 		compatible = "fixed-factor-clock";
++static void __init of_ti_clockdomain_setup(struct device_node *node)
++{
++	struct clk *clk;
++	struct clk_hw *clk_hw;
++	const char *clkdm_name = node->name;
++	int i;
++	int num_clks;
++
++	num_clks = of_count_phandle_with_args(node, "clocks", "#clock-cells");
++
++	for (i = 0; i < num_clks; i++) {
++		clk = of_clk_get(node, i);
++		if (__clk_get_flags(clk) & CLK_IS_BASIC) {
++			pr_warn("can't setup clkdm for basic clk %s\n",
++				__clk_get_name(clk));
++			continue;
++		}
++		clk_hw = __clk_get_hw(clk);
++		to_clk_hw_omap(clk_hw)->clkdm_name = clkdm_name;
++		omap2_init_clk_clkdm(clk_hw);
++	}
++}
++
++static struct of_device_id ti_clkdm_match_table[] __initdata = {
++	{ .compatible = "ti,clockdomain" },
++	{ }
++};
++
++/**
++ * ti_dt_clockdomains_setup - setup device tree clockdomains
++ *
++ * Initializes clockdomain nodes for a SoC. This parses through all the
++ * nodes with compatible = "ti,clockdomain", and add the clockdomain
++ * info for all the clocks listed under these. This function shall be
++ * called after rest of the DT clock init has completed and all
++ * clock nodes have been registered.
++ */
++void __init ti_dt_clockdomains_setup(void)
++{
++	struct device_node *np;
++	for_each_matching_node(np, ti_clkdm_match_table) {
++		of_ti_clockdomain_setup(np);
++	}
++}
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 872ff2a..231b071 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -204,6 +204,8 @@ struct clk_omap_reg {
+ 	u16 index;
+ };
+ 
++#define to_clk_hw_omap(_hw) container_of(_hw, struct clk_hw_omap, hw)
++
+ void omap2_init_clk_hw_omap_clocks(struct clk *clk);
+ int omap3_noncore_dpll_enable(struct clk_hw *hw);
+ void omap3_noncore_dpll_disable(struct clk_hw *hw);
+@@ -232,6 +234,7 @@ int omap2_dflt_clk_is_enabled(struct clk_hw *hw);
+ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
+ void ti_dt_clocks_register(struct ti_dt_clk *oclks);
+ void ti_dt_clk_init_provider(struct device_node *np, int index);
++void ti_dt_clockdomains_setup(void);
+ int of_ti_clk_autoidle_setup(struct device_node *node);
+ int ti_clk_add_component(struct device_node *node, struct clk_hw *hw, int type);
+ 
 -- 
 1.7.9.5
