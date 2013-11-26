@@ -1,63 +1,84 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Nov 2013 15:01:10 +0100
-Subject: [PATCH 1/4] ARM: sa1100: stop using mach/timex.h
-In-Reply-To: <1384292466-31725-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1384292466-31725-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131126140110.GJ28642@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 26 Nov 2013 15:04:50 +0100
+Subject: [PATCH 5/4] ARM: at91: don't use <mach/timex.h>
+Message-ID: <1385474690-6483-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The platform specific <mach/timex.h> will be removed in a later patch.
+So move its only still used symbol to its only user. Also add a few
+explicit includes of <mach/hardware.h> that are implicitly available
+through <mach/timex.h>.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
 Hello,
 
-[expanded To: and Cc: to include the people scripts/get_maintainer.pl suggested]
-
-On Tue, Nov 12, 2013 at 10:41:03PM +0100, Uwe Kleine-K?nig wrote:
-> mach/timex.h is the last remaining header that is unused for multiarch
-> builds but necessary for singlearch builds. To allow to get rid of it
-> for singlearch builds, too, drop its usage in sa1100 arch code by
-> substituting CLOCK_TICK_RATE by a local cpp symbol.
-Who feels responsible to give (a reason for not giving) an Ack here?
+assuming it's OK for you, please only give an ack and don't take that
+patch as I intend to keep it in a series deprecating <mach/timex.h>.
 
 Thanks
 Uwe
 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-sa1100/time.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
-> index 713c86c..83be0d6 100644
-> --- a/arch/arm/mach-sa1100/time.c
-> +++ b/arch/arm/mach-sa1100/time.c
-> @@ -20,6 +20,8 @@
->  #include <mach/hardware.h>
->  #include <mach/irqs.h>
->  
-> +#define SA1100_CLOCK_FREQ 3686400
-> +
->  static u32 notrace sa1100_read_sched_clock(void)
->  {
->  	return readl_relaxed(OSCR);
-> @@ -128,7 +130,7 @@ void __init sa1100_timer_init(void)
->  
->  	setup_irq(IRQ_OST0, &sa1100_timer_irq);
->  
-> -	clocksource_mmio_init(OSCR, "oscr", CLOCK_TICK_RATE, 200, 32,
-> +	clocksource_mmio_init(OSCR, "oscr", SA1100_CLOCK_FREQ, 200, 32,
->  		clocksource_mmio_readl_up);
->  	clockevents_config_and_register(&ckevt_sa1100_osmr0, 3686400,
->  					MIN_OSCR_DELTA * 2, 0x7fffffff);
-> -- 
-> 1.8.4.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm/mach-at91/at91rm9200_time.c  | 1 +
+ arch/arm/mach-at91/at91sam926x_time.c | 1 +
+ arch/arm/mach-at91/at91x40.c          | 3 ++-
+ arch/arm/mach-at91/pm.c               | 1 +
+ 4 files changed, 5 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
+index f607deb..6b68b98 100644
+--- a/arch/arm/mach-at91/at91rm9200_time.c
++++ b/arch/arm/mach-at91/at91rm9200_time.c
+@@ -31,6 +31,7 @@
+ #include <asm/mach/time.h>
+ 
+ #include <mach/at91_st.h>
++#include <mach/hardware.h>
+ 
+ static unsigned long last_crtr;
+ static u32 irqmask;
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index bb39232..b9da2b1 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -19,6 +19,7 @@
+ #include <linux/of_irq.h>
+ 
+ #include <asm/mach/time.h>
++#include <mach/hardware.h>
+ 
+ #define AT91_PIT_MR		0x00			/* Mode Register */
+ #define		AT91_PIT_PITIEN		(1 << 25)		/* Timer Interrupt Enable */
+diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+index bad94b8..c76874e 100644
+--- a/arch/arm/mach-at91/at91x40.c
++++ b/arch/arm/mach-at91/at91x40.c
+@@ -19,11 +19,12 @@
+ #include <asm/mach/arch.h>
+ #include <mach/at91x40.h>
+ #include <mach/at91_st.h>
+-#include <mach/timex.h>
+ 
+ #include "at91_aic.h"
+ #include "generic.h"
+ 
++#define AT91X40_MASTER_CLOCK	40000000
++
+ /*
+  * Export the clock functions for the AT91X40. Some external code common
+  * to all AT91 family parts relys on this, like the gpio and serial support.
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 9986542..7afecb8 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -27,6 +27,7 @@
+ 
+ #include <mach/at91_pmc.h>
+ #include <mach/cpu.h>
++#include <mach/hardware.h>
+ 
+ #include "at91_aic.h"
+ #include "generic.h"
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.4.2
