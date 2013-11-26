@@ -1,52 +1,63 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 26 Nov 2013 09:34:45 +0900
-Subject: [RFC 08/17] ARM: shmobile: r8a7779: Add helper to read mode pins
-In-Reply-To: <52933A35.7070206@cogentembedded.com>
+Date: Tue, 26 Nov 2013 09:35:08 +0900
+Subject: [RFC 13/17] ARM: shmobile: marzen-reference: Initialize CPG device
+In-Reply-To: <52933F60.8090208@cogentembedded.com>
 References: <1385342312-1967-1-git-send-email-horms+renesas@verge.net.au>
- <1385342312-1967-9-git-send-email-horms+renesas@verge.net.au>
- <52933A35.7070206@cogentembedded.com>
-Message-ID: <20131126003445.GI15227@verge.net.au>
+ <1385342312-1967-14-git-send-email-horms+renesas@verge.net.au>
+ <52933F60.8090208@cogentembedded.com>
+Message-ID: <20131126003508.GJ15227@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 03:53:25PM +0400, Sergei Shtylyov wrote:
+On Mon, Nov 25, 2013 at 04:15:28PM +0400, Sergei Shtylyov wrote:
 > Hello.
 > 
 > On 25-11-2013 5:18, Simon Horman wrote:
 > 
-> >Add and use helper to read mode pins.
-> >This will be re-used when moving marzen-reference to
-> >the common clock framework.
+> >On multiplatform kernels clocks are handled by the CCF CPG driver. It
+> >must be explicitly initialized by a call to rcar_gen2_clocks_init() with
 > 
+>    You meant r8a7779_clocks_init() instead?
+
+Yes, thanks. I will fix that.
+
+> 
+> >the value of the boot mode pins.
+> 
+> >Based on similar work for the Koelsch board by Laurent Pinchart.
+> 
+> >Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > >---
-> >  arch/arm/mach-shmobile/clock-r8a7779.c        | 11 ++---------
-> >  arch/arm/mach-shmobile/include/mach/r8a7779.h |  1 +
-> >  arch/arm/mach-shmobile/setup-r8a7779.c        | 14 ++++++++++++++
-> >  3 files changed, 17 insertions(+), 9 deletions(-)
+> >  arch/arm/mach-shmobile/board-marzen-reference.c | 16 ++++++++++++----
+> >  1 file changed, 12 insertions(+), 4 deletions(-)
 > 
-> >diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-> >index b7ce0e7..decf122 100644
-> >--- a/arch/arm/mach-shmobile/clock-r8a7779.c
-> >+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+> >diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+> >index 782907f..3a7c0fc 100644
+> >--- a/arch/arm/mach-shmobile/board-marzen-reference.c
+> >+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
 > [...]
-> >diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >index 8f94531..4e3fbfb 100644
-> >--- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> >+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >@@ -874,6 +874,20 @@ void __init r8a7779_add_standard_devices_dt(void)
-> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >  }
+> >@@ -28,11 +29,17 @@
+> >  #include <asm/mach/arch.h>
 > >
-> >+#define MODEMR		0xffcc0020
+> >
+> >-static void __init marzen_init(void)
+> >+static void __init marzen_init_timer(void)
+> >  {
+> >  #ifdef CONFIG_COMMON_CLK
+> >-	of_clk_init(NULL);
+> >-#else
+> >+	r8a7779_clocks_init(r8a7779_read_mode_pins());
+> >+#endif
+> >+	clocksource_of_init();
+> >+}
 > >+
-> >+u32 __init r8a7779_read_mode_pins(void)
+> >+static void __init marzen_init(void)
 > >+{
-> >+	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+> >+#ifndef CONFIG_COMMON_CLK
+> >  	r8a7779_clock_init();
+> >  #endif
+> >  	r8a7779_add_standard_devices_dt();
 > 
->    Why waste 2 4K pages if you're only interested in 4 bytes (i.e. 1
-> page)? I remember I've already asked that question...
-
-I don't recall if there was a conclusion to that discussion.
-
-In any case, this patch just shuffles code around.
+> WBR, Sergei
+> 
