@@ -1,45 +1,39 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 26 Nov 2013 16:44:09 +0200
-Subject: [PATCH -v2] fbdev: sh_mobile_meram: Fix defined but not used
- compiler warnings
-In-Reply-To: <5204468.CmggZzW3kO@avalon>
-References: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
- <5204468.CmggZzW3kO@avalon>
-Message-ID: <5294B3B9.3090104@ti.com>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Tue, 26 Nov 2013 14:45:32 +0000
+Subject: ACPI
+In-Reply-To: <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
+ <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+ <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
+ <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
+ <20131125154110.GB3243@srcf.ucam.org>
+ <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+Message-ID: <20131126144532.GA10641@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On 2013-11-06 13:57, Laurent Pinchart wrote:
-> Hi Geert,
+On Tue, Nov 26, 2013 at 01:43:40PM +0100, Linus Walleij wrote:
+> On Mon, Nov 25, 2013 at 4:41 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
 > 
-> Thank you for the patch.
+> > In the past ACPI implementations handled GPIO by providing
+> > methods that accessed hardware registers directly. I've seen DSDTs that
+> > implement i2c entirely in ASL.
 > 
-> On Wednesday 06 November 2013 09:57:27 Geert Uytterhoeven wrote:
->> If both CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME are not set:
->>
->> drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend?
->> defined but not used drivers/video/sh_mobile_meram.c:597: warning:
->> ?sh_mobile_meram_resume? defined but not used
->>
->> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> and applied to my tree.
+> Is that common?
 
-What does that mean? Are you collecting sh_mobile video patches?
+No, thankfully.
 
-Or to rephrase, shall I apply this to fbdev fixes tree?
+> Since i2c is a slow bus, can be 100kHz or so, how does that
+> avoid locking the entire CPU while e.g. waiting for transactions on
+> the external bus to complete?
 
- Tomi
+Check status register, interruptible sleep, repeat until done.
 
+> I have a feeling we should not recommend ARM implementers
+> to go and do things like this.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/32fe24be/attachment.sig>
+Oh, absolutely.
+
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
