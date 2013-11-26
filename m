@@ -1,91 +1,63 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 26 Nov 2013 11:07:26 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.13-rc
-Message-ID: <20131126190726.GA28631@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Nov 2013 19:25:43 +0000
+Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
+ p2v and v2p conversions'
+In-Reply-To: <alpine.LFD.2.10.1311261323280.9667@knanqh.ubzr>
+References: <20131125223636.GA20822@obsidianresearch.com>
+ <20131125232003.GU16735@n2100.arm.linux.org.uk>
+ <20131125233654.GV16735@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
+ <20131126095430.GA16735@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
+ <20131126134155.GB16735@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.10.1311261205300.9667@knanqh.ubzr>
+ <20131126173659.GE16735@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.10.1311261323280.9667@knanqh.ubzr>
+Message-ID: <20131126192543.GG16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Nov 26, 2013 at 01:41:08PM -0500, Nicolas Pitre wrote:
+> On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
+> > If manual inspection fails you, try building a nommu or XIP kernel.
+> 
+> All right.  I did a build test of course.  What failed me is the 
+> difficulty nowdays to have the desired config symbols enabled (or 
+> left disabled for that matter) without other rules overriding manual 
+> choices.
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+This is precisely why reading and understanding the file (as I did) is
+much more important than chucking out emails on a mailing list.  I'd
+already taken the time to see that there were _three_ levels if ifdef
+there and the problem case was buried in the depths of that.
 
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> I think your patch is therefore the best solution.  However, I'd suggest 
+> you include this as well to enforce configuration validity:
+> 
+> #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+> #undef PLAT_PHYS_OFFSET
+> #endif
+> 
+> The idea as I explained in my previous email is to prevent wrong usage.
 
-are available in the git repository at:
+I don't believe it's necessary.  Why?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+PLAT_PHYS_OFFSET gets defined in one of two ways:
 
-for you to fetch changes up to a31ab44ef5d07c6707df4a9ad2c8affd2d62ff4b:
+1. We have a mach/memory.h
+2. We have CONFIG_PHYS_OFFSET defined
 
-  ARM: bcm2835: add missing #xxx-cells to I2C nodes (2013-11-25 21:56:00 -0800)
+CONFIG_PHYS_OFFSET will only be defined if ARM_PATCH_PHYS_OFFSET has been
+disabled.  So that leaves us with needing a mach/memory.h to define it.
 
-----------------------------------------------------------------
-ARM: SoC fixes for 3.13-rc
+Now, if you consider that the majority of builds today use multiplatform
+which requires there that there be no mach/memory.h, and that requires
+the phys offset patching, we've already got way more than enough build
+coverage to find mis-uses, especially with the amount of building that
+Olof and myself do on the ARM kernel.
 
-Mostly bugfixes and a few small code removals. Worth pointing out is:
+Moreover, this is no different from what it is today.  It hasn't suddenly
+become more visible.
 
-- A handful of more fixes to get DT enablement working properly on OMAP,
-  finding new breakage of things that don't work quite right yet without
-  the traditional board files. I expect a bit more of this to come in this
-  release as people test on their hardware.
-- Implementation of power_down_finish() on vexpress, to make kexec work and
-  to stop the MCPM core to produce a warning (the warning was new to 3.13-rc1).
-- A handful of minor fixes for various platforms.
-
-----------------------------------------------------------------
-Dave Martin (1):
-      ARM: vexpress/TC2: Implement MCPM power_down_finish()
-
-Doug Anderson (1):
-      ARM: dts: Add max77686 RTC interrupt to cros5250-common
-
-Kevin Hilman (1):
-      Merge tag 'imx-fixes-3.13-2' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-
-Olof Johansson (2):
-      ARM: omap: fix warning with LPAE build
-      Merge tag 'omap-for-v3.13/more-fixes-for-merge-window-take2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Shawn Guo (1):
-      ARM: dts: imx6qdl: disable spdif "rxtx5" clock option
-
-Stephen Warren (1):
-      ARM: bcm2835: add missing #xxx-cells to I2C nodes
-
-Thierry Reding (1):
-      ARM: tegra: Provide dummy powergate implementation
-
-Tony Lindgren (9):
-      i2c: omap: Fix missing device tree flags for omap2
-      ARM: OMAP2+: Fix GPMC and simplify bootloader timings for 8250 and smc91x
-      ARM: dts: Fix omap2 specific dtsi files by adding the missing entries
-      ARM: OMAP2+: More randconfig fixes for reconfigure_io_chain
-      gpio: twl4030: Fix regression for twl gpio output
-      gpio: twl4030: Fix passing of pdata in the device tree case
-      ARM: OMAP2+: Fix undefined reference to set_cntfreq
-      ARM: OMAP2+: Remove legacy mux code for display.c
-      ARM: OMAP2+: Remove legacy omap4_twl6030_hsmmc_init
-
- Documentation/devicetree/bindings/i2c/i2c-omap.txt |  3 +-
- arch/arm/boot/dts/bcm2835.dtsi                     |  4 +
- arch/arm/boot/dts/cros5250-common.dtsi             | 12 +++
- arch/arm/boot/dts/imx6qdl.dtsi                     |  2 +-
- arch/arm/boot/dts/omap-zoom-common.dtsi            |  2 +-
- arch/arm/boot/dts/omap2.dtsi                       | 96 ++++++++++++++++++++++
- arch/arm/boot/dts/omap2420.dtsi                    | 23 ++++++
- arch/arm/boot/dts/omap2430.dtsi                    | 49 +++++++++++
- arch/arm/mach-omap2/Makefile                       |  6 +-
- arch/arm/mach-omap2/common.h                       |  1 -
- arch/arm/mach-omap2/display.c                      | 78 ------------------
- arch/arm/mach-omap2/gpmc.c                         | 58 +++++--------
- arch/arm/mach-omap2/omap-secure.h                  |  7 ++
- arch/arm/mach-omap2/omap4-common.c                 | 57 -------------
- arch/arm/mach-omap2/pm34xx.c                       |  2 +-
- arch/arm/mach-omap2/prm44xx_54xx.h                 |  2 +-
- arch/arm/mach-vexpress/spc.c                       | 40 +++++++++
- arch/arm/mach-vexpress/spc.h                       |  1 +
- arch/arm/mach-vexpress/tc2_pm.c                    | 66 +++++++++++++--
- drivers/gpio/gpio-twl4030.c                        | 13 ++-
- drivers/i2c/busses/i2c-omap.c                      | 22 +++++
- include/linux/tegra-powergate.h                    | 27 ++++++
- 22 files changed, 379 insertions(+), 192 deletions(-)
+Hence, no matter what, such a change should not be part of fixing up
+the original breakage.
