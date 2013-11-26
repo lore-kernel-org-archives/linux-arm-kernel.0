@@ -1,34 +1,48 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 26 Nov 2013 08:41:00 -0800
-Subject: [PATCH v3 3/4] ata: Add APM X-Gene SoC SATA host controller driver
-In-Reply-To: <529473DD.1090804@ti.com>
-References: <1384465153-29902-1-git-send-email-lho@apm.com>
- <1384465153-29902-3-git-send-email-lho@apm.com>
- <1384465153-29902-4-git-send-email-lho@apm.com>
- <201311151448.16279.arnd@arndb.de>
- <CAPw-ZTmaz3nnV3ThRgecT_RaYYW0bmfWvL8Kr-S3z1aKyUWc+w@mail.gmail.com>
- <CAPw-ZTn1N7+EFu9L6U+P9=9ii3k1BjycYXdNCdxCVPb8SaJWxA@mail.gmail.com>
- <529473DD.1090804@ti.com>
-Message-ID: <CAPw-ZTmPgYA+saJPVvB17VOPouDGvR0rd0nrZWi0j3zE7cc2rg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 Nov 2013 10:40:55 -0600
+Subject: [RESEND PATCH v3 3/4] usb: musb: dsps, debugfs files
+In-Reply-To: <20131126092526.GA13532@pengutronix.de>
+References: <1384790078-15366-1-git-send-email-mpa@pengutronix.de>
+ <1384790078-15366-4-git-send-email-mpa@pengutronix.de>
+ <20131125155739.GF18046@saruman.home>
+ <20131126092526.GA13532@pengutronix.de>
+Message-ID: <20131126164055.GG24310@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
->> int set_speed(struct *phy, int lane, u64 speed);
->
-> it should be phy_set_speed.
-[Loc Ho]
-But your other functions don't repeat the prefix "phy"?
+On Tue, Nov 26, 2013 at 10:25:26AM +0100, Markus Pargmann wrote:
+> > On Mon, Nov 18, 2013 at 04:54:37PM +0100, Markus Pargmann wrote:
+> > > @@ -350,6 +373,30 @@ out:
+> > >  	return ret;
+> > >  }
+> > >  
+> > > +static int dsps_musb_dbg_init(struct musb *musb, struct dsps_glue *glue)
+> > > +{
+> > > +	struct dentry *root;
+> > > +	struct dentry *file;
+> > > +	char buf[128];
+> > > +
+> > > +	sprintf(buf, "%s.dsps", dev_name(musb->controller));
+> > 
+> > why ? just use the glue's device
+> 
+> I used this to have a more obvious relationship between musb-core
+> debugfs and musb-dsps debugfs. Otherwise we would have '47401400.usb'
+> for dsps and 'musb-hdrc.0.auto' for musb core.
+> 
+> But I can change it if you want.
 
->>
->> where lane indicates the lane of the PHY and speed is the PHY speed in hertz.
->
-> Does lane here means the number of lanes? Is the lane also obtained after the
-> training sequence?
-[Loc Ho]
-Lane here is the lane with you are changing the speed. If there are
-two lanes, then 0 parameter would change lane 0. 1 would change lane
-1.
+yeah, I guess it's best to use the device name on this one, even though
+it'll look at bit weird. At least it'll be guaranteed to be unique.
 
--Loc
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/2f2112b6/attachment.sig>
