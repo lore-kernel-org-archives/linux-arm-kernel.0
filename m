@@ -1,50 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Nov 2013 09:54:30 +0000
-Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
- p2v and v2p conversions'
-In-Reply-To: <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
-References: <20131125223636.GA20822@obsidianresearch.com>
- <20131125232003.GU16735@n2100.arm.linux.org.uk>
- <20131125233654.GV16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
-Message-ID: <20131126095430.GA16735@n2100.arm.linux.org.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 26 Nov 2013 15:31:55 +0530
+Subject: [PATCH] phy: kconfig: add depends on "USB_SUPPORT" to OMAP_USB2 and
+ TWL4030_USB
+Message-ID: <1385460115-31194-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 10:56:25PM -0500, Nicolas Pitre wrote:
-> What about simply doing the following instead, which I'm sure used to 
-> work properly at some point:
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 9ecccc8650..2b8b8d3236 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -239,6 +239,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  
->  #else
->  
-> +#ifndef PHYS_OFFSET
-> +#ifdef PLAT_PHYS_OFFSET
-> +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> +#else
-> +#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> +#endif
-> +#endif
-> +
->  static inline phys_addr_t __virt_to_phys(unsigned long x)
->  {
->  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> @@ -253,14 +261,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  #endif
->  #endif /* __ASSEMBLY__ */
->  
-> -#ifndef PHYS_OFFSET
-> -#ifdef PLAT_PHYS_OFFSET
-> -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> -#else
-> -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> -#endif
-> -#endif
+Fixes
+warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet
+direct dependencies (USB_SUPPORT)
+that shows up while disabling USB_SUPPORT from menuconfig.
 
-And that makes PHYS_OFFSET undefined to assembly code - and we have
-references to it from said code.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/phy/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index a344f3d..0c87e4c 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -24,6 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
+ config OMAP_USB2
+ 	tristate "OMAP USB2 PHY Driver"
+ 	depends on ARCH_OMAP2PLUS
++	depends on USB_SUPPORT
+ 	select GENERIC_PHY
+ 	select USB_PHY
+ 	select OMAP_CONTROL_USB
+@@ -36,6 +37,7 @@ config OMAP_USB2
+ config TWL4030_USB
+ 	tristate "TWL4030 USB Transceiver Driver"
+ 	depends on TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS
++	depends on USB_SUPPORT
+ 	select GENERIC_PHY
+ 	select USB_PHY
+ 	help
+-- 
+1.7.10.4
