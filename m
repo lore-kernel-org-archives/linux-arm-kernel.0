@@ -1,51 +1,67 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 Nov 2013 11:16:35 -0600
-Subject: [PATCH 1/3] usb: dwc3: Add Keystone specific glue layer
-In-Reply-To: <5293EFFD.9000508@ti.com>
-References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
- <1385410581-12148-2-git-send-email-w-kwok2@ti.com>
- <20131125203956.GI18046@saruman.home> <5293EFFD.9000508@ti.com>
-Message-ID: <20131126171635.GP24310@saruman.home>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 26 Nov 2013 22:51:49 +0530
+Subject: [PATCH 07/12] memory: davinci-aemif: introduce AEMIF driver
+In-Reply-To: <5294B8C4.6040803@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-8-git-send-email-ivan.khoronzhuk@ti.com>
+ <4F5844B3A985794BA902E12C070812375F8D2E@DNCE04.ent.ti.com>
+ <52944BD3.90105@ti.com> <5294B8C4.6040803@ti.com>
+Message-ID: <5294D8AD.5030106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 07:49:01PM -0500, Santosh Shilimkar wrote:
-> On Monday 25 November 2013 03:39 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
+On 11/26/2013 8:35 PM, Santosh Shilimkar wrote:
+> On Tuesday 26 November 2013 02:20 AM, Sekhar Nori wrote:
+>> On Monday 11 November 2013 10:36 PM, Khoronzhuk, Ivan wrote:
+>>> Add new AEMIF driver for EMIF16 davinci controller. The EMIF16 module
+>>> is intended to provide a glue-less interface to a variety of
+>>> asynchronous memory devices like ASRA M, NOR and NAND memory. A total
+>>> of 256M bytes of any of these memories can be accessed at any given
+>>> time via four chip selects with 64M byte access per chip select.
+>>>
+>>> Synchronous memories such as DDR1 SD RAM, SDR SDRAM and Mobile SDR
+>>> are not supported.
+>>>
+>>> See http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+>>>
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> ---
 > 
 > [...]
 > 
-> > 
-> >> +	kdwc3_dma_mask = dma_get_mask(dev);
-> >> +	dev->dma_mask = &kdwc3_dma_mask;
-> >> +
-> >> +	error = kdwc3_enable(kdwc);
-> > 
-> > I would drop this function and just add your clk_prepare() here, then
-> > move clk_enable()/clk_disable() to ->runtime_resume/->runtime_suspend()
-> > respectively. Then you could just call pm_runtime_get_sync() when you
-> > need to access your registers and pm_runtime_put() when you want to drop
-> > the clock reference.
-> > 
-> > this will even make PM implementation a lot easier for you going
-> > forward.
-> > 
-> Just to make the PM runtime part clear, there are few issues with PM
-> core clock layer [1], hence drivers is using clock layer. Its trivial
-> to update the driver though once the issue is sorted out.
+>>> +static int davinci_aemif_probe(struct platform_device *pdev)
+>>> +{
+>>> +       int ret  = -ENODEV, i;
+>>> +       struct resource *res;
+>>> +       struct device *dev = &pdev->dev;
+>>> +       struct device_node *np = dev->of_node;
+>>> +
+>>> +       if (np == NULL)
+>>> +               return 0;
+>>> +
+>>> +       if (aemif) {
+>>> +               dev_err(dev, "davinci_aemif driver is in use currently\n");
+>>> +               return -EBUSY;
+>>> +       }
+>>
+>> Why expressly prevent multiple AEMIF devices? Its entirely conceivable
+>> to have two memories like NAND and NOR flash connect to two different
+>> AEMIF interfaces.
+>>
+> Ivan wanted me to clarify the Keystone hardware which supports
+> 1 instance of controller with 4 CS. That allows already four
+> devices to be connected. Currently NAND and NOR are connected on it
+> and two more slots are free.
 > 
-> Meanwhile driver development continue to be with clock calls. 
+> Since driver support what hardware is, lets not build a driver for
+> hardware which don't exist. And if at all such a support would be
+> needed in future, we can always add it.
 
-I don't mind having those clock calls, just suggested a different
-placement for them.
+I understand the lack of hardware part, but its common to write the
+driver such that it can handle multiple instances. Is there any gain on
+current hardware because of this check? From what I am hearing, the code
+in question wont be exercised at all. So why go all the way and add it
+in first place?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/d5fef4bc/attachment.sig>
+Thanks,
+Sekhar
