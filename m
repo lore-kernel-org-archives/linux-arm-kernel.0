@@ -1,28 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Nov 2013 22:43:41 +0100
-Subject: STOP THE MADNESS
-In-Reply-To: <20131126163031.GC16735@n2100.arm.linux.org.uk>
-References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdaEH532sE+mK-buh891zZP+uOqX4jjPUGO-sbGDKSgQVQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Nov 2013 22:43:47 +0100
+Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <20131126195422.GJ24310@saruman.home>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2042860.IXZhL6v7c2@avalon> <20131126195422.GJ24310@saruman.home>
+Message-ID: <1896305.mmzrFTZ95a@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 5:30 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Felipe,
 
-> Versatile PB926 is currently broken in mainline because of this, and it's
-> damn obvious that people are just churning out changes to "update" drivers
-> without testing them at all.
+On Tuesday 26 November 2013 13:54:22 Felipe Balbi wrote:
+> On Tue, Nov 26, 2013 at 03:16:47AM +0100, Laurent Pinchart wrote:
+> > On Monday 25 November 2013 20:12:39 Felipe Balbi wrote:
+> > > On Tue, Nov 26, 2013 at 02:59:51AM +0100, Laurent Pinchart wrote:
+> > > > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
+> > > > > > > > Turn clk_enable() and clk_disable() calls into
+> > > > > > > > clk_prepare_enable()
+> > > > > > > > and clk_disable_unprepare() to get ready for the migration to
+> > > > > > > > the
+> > > > > > > > common clock framework.
+> > > > > > > > 
+> > > > > > > > Cc: Felipe Balbi <balbi@ti.com>
+> > > > > > > > Cc: linux-usb at vger.kernel.org
+> > > > > > > > Signed-off-by: Laurent Pinchart
+> > > > > > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > > > 
+> > > > > > > Thank you for the patch.
+> > > > > > > 
+> > > > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > > > 
+> > > > > > Could you please pick this patch up ?
+> > > > > 
+> > > > > after -rc1 is out, I don't see why not.
+> > > > 
+> > > > Great then :-)
+> > > > 
+> > > > As this patch is a dependency for other series that will go through
+> > > > different trees, could you please provide a stable branch in your tree
+> > > > with this patch included that you will push to v3.14 ?
+> > > 
+> > > You guys are always killing me with those "stable branch" requests :-)
+> > > 
+> > > I'll get one up tomorrow. I guess I can avoid a topic branch altogether
+> > > if I just make this the first patch in "next" branch. I could push only
+> > > $subject for now until you merge then I'll push other stuff. Is that
+> > > enough for you ? My 'next' is always immutable.
+> > 
+> > That sounds good, thank you. You can already push the other patches
+> > without waiting for me, I can dig the commit ID of the first patch in your
+> > next branch.
+> 
+> pushed, btw. you should have received my automatic email.
 
-Incidentally I was actually testing this driver today for the other pl061
-patches I sent - on the Integrator/AP with the IM-PD1 board.
+I have, thank you.
 
-Strangely I don't get this crash.
+> If you merge my next, you'll get only that commit. I believe tomorrow I'll
+> be able to push more commits into next.
 
-But I was wondering why my interrupts didn't fire properly and
-now I'm starting to suspect it has something to do with this.
+I've asked Simon Horman (the Renesas SoC kernel maintainer) to merge your next 
+branch in his tree.
 
-I'll revert and see if this fixes it...
+-- 
+Regards,
 
-Yours,
-Linus Walleij
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/b12b2a0e/attachment.sig>
