@@ -1,128 +1,51 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 26 Nov 2013 22:42:50 +0530
-Subject: [PATCH v6 4/6] gpio: davinci: add OF support
-In-Reply-To: <5294950A.9070007@ti.com>
-References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
- <1385057731-4348-5-git-send-email-prabhakar.csengg@gmail.com>
- <52932DB9.4090805@ti.com> <5294950A.9070007@ti.com>
-Message-ID: <5294D692.3080100@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 Nov 2013 11:16:35 -0600
+Subject: [PATCH 1/3] usb: dwc3: Add Keystone specific glue layer
+In-Reply-To: <5293EFFD.9000508@ti.com>
+References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+ <1385410581-12148-2-git-send-email-w-kwok2@ti.com>
+ <20131125203956.GI18046@saruman.home> <5293EFFD.9000508@ti.com>
+Message-ID: <20131126171635.GP24310@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 November 2013 06:03 PM, Grygorii Strashko wrote:
-> On 11/25/2013 01:00 PM, Sekhar Nori wrote:
->> On Thursday 21 November 2013 11:45 PM, Prabhakar Lad wrote:
->>> From: KV Sujith <sujithkv@ti.com>
->>>
->>> This patch adds OF parser support for davinci gpio
->>> driver and also appropriate documentation in gpio-davinci.txt
->>> located at Documentation/devicetree/bindings/gpio/.
->>>
->>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>> Acked-by: Rob Herring <rob.herring@calxeda.com>
->>> Signed-off-by: KV Sujith <sujithkv@ti.com>
->>> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
->>> [prabhakar.csengg at gmail.com: simplified the OF code, removed
->>> 		unnecessary DT property and also simplified
->>> 		the commit message]
->>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>> ---
->>>   .../devicetree/bindings/gpio/gpio-davinci.txt      |   41 ++++++++++++++
->>>   drivers/gpio/gpio-davinci.c                        |   57 ++++++++++++++++++--
->>>   2 files changed, 95 insertions(+), 3 deletions(-)
->>>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->>> new file mode 100644
->>> index 0000000..a2e839d
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->>> @@ -0,0 +1,41 @@
->>> +Davinci GPIO controller bindings
->>> +
->>> +Required Properties:
->>> +- compatible: should be "ti,dm6441-gpio"
->>> +
->>> +- reg: Physical base address of the controller and the size of memory mapped
->>> +       registers.
->>> +
->>> +- gpio-controller : Marks the device node as a gpio controller.
->>> +
->>> +- interrupt-parent: phandle of the parent interrupt controller.
->>> +
->>> +- interrupts: Array of GPIO interrupt number. Only banked or unbanked IRQs are
->>> +	      supported at a time.
->>
->> If this is true..
->>
->>> +
->>> +- ti,ngpio: The number of GPIO pins supported.
->>> +
->>> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt
->>> +		             line to processor.
->>
->> .. then why do you need to maintain this separately? Number of elements
->> in interrupts property should give you this answer, no?
->>
->> There can certainly be devices (past and future) which use a mixture of
->> banked and unbanked IRQs. So a binding which does not take care of this
->> is likely to change in future and that is a problem since it brings in
->> backward compatibility of the binding into picture.
->>
->> The right thing would be to define the DT node per-bank similar to what
->> is done on OMAP rather than for all banks together. That way there can
->> be a separate property which determines whether that bank supports
->> direct-mapped or banked IRQs (or that could be inferred if the number of
->> tuples in the interrupts property is more than one).
+On Mon, Nov 25, 2013 at 07:49:01PM -0500, Santosh Shilimkar wrote:
+> On Monday 25 November 2013 03:39 PM, Felipe Balbi wrote:
+> > Hi,
+> > 
 > 
-> Number of IRQ can't be simply used to determine type of IRQ - need to handle IRQ names,
-> because each bank(32 gpios) may have up to 2 banked IRQs (one per 16 GPIO).
-
-Okay. That's why I inserted that comment in parenthesis :)
-
+> [...]
 > 
-> Few things here:
-> - The mixed banked/unbanked functionality has never been supported before. 
-
-True. I actually misread the driver before.
-
-> - The Davinci GPIO IP is different from OMAP and has common
->   control registers for all banks.
-
-Well the only common register I can see is BINTEN - bank interrupt
-enable. This register can simply be initialized to enable interrupts
-from all banks possible as until the rising and falling edge triggers
-are programmed, there wont be any actual interrupts generated.
-
-> - The proposed approach is more less easy to implement for DT case, but for not-DT
->   case - the platform data will need to be changed significantly (.
->   So, from this point of view, that would be a big change (actually the total driver rewriting).
-
-Well, I certainly don't think its a complete driver re-write. It will
-take a bit of effort agreed, but I think the driver will also come out a
-lot cleaner.
-
-Honestly, I am not so much worried about the kernel code here. Its the
-bindings I am worried about. Once the bindings go in assuming there will
-never be banked and unbanked GPIO IRQs on the same SoC, changing them to
-do something else will be very painful with the need to keep backward
-compatibility and support for both semantics.
-
-That said, because there is no present hardware which needs both banked
-and unbanked at the same time, I wont press for this to be done endlessly.
-
-> Do you have any thoughts about how it can be done in a simpler way?
-
-I don't know if there is a "simpler" way, but I don't think there is too
-much effort too. I leave it to those implementing it though.
-
+> > 
+> >> +	kdwc3_dma_mask = dma_get_mask(dev);
+> >> +	dev->dma_mask = &kdwc3_dma_mask;
+> >> +
+> >> +	error = kdwc3_enable(kdwc);
+> > 
+> > I would drop this function and just add your clk_prepare() here, then
+> > move clk_enable()/clk_disable() to ->runtime_resume/->runtime_suspend()
+> > respectively. Then you could just call pm_runtime_get_sync() when you
+> > need to access your registers and pm_runtime_put() when you want to drop
+> > the clock reference.
+> > 
+> > this will even make PM implementation a lot easier for you going
+> > forward.
+> > 
+> Just to make the PM runtime part clear, there are few issues with PM
+> core clock layer [1], hence drivers is using clock layer. Its trivial
+> to update the driver though once the issue is sorted out.
 > 
-> Actually, the same was proposed by Linus, but we've tried avoid such huge rework -
-> by switching to one irq_domain per all banks for example.
+> Meanwhile driver development continue to be with clock calls. 
 
-I didn't really read that proposal from Linus so if two people
-independently suggested the same thing, there must be something worth
-considering there :)
+I don't mind having those clock calls, just suggested a different
+placement for them.
 
-Thanks,
-Sekhar
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/d5fef4bc/attachment.sig>
