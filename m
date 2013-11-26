@@ -1,154 +1,22 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 26 Nov 2013 14:14:24 +0530
-Subject: [PATCH V5 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131125184159.GE28201@mudshark.cambridge.arm.com>
-References: <1385372753-7396-1-git-send-email-vkale@apm.com>
- <1385372753-7396-3-git-send-email-vkale@apm.com>
- <20131125184159.GE28201@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkfThbf4GoPrWB=CrnY6SfnaksxiDwqgqevYXdnrH-ynjg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Nov 2013 09:49:15 +0100
+Subject: [PATCH 0/6] arm: sa1100: refactor h3xxx GPIO handling
+In-Reply-To: <1385048414-9812-1-git-send-email-dbaryshkov@gmail.com>
+References: <1385048414-9812-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CACRpkdbNSMGWPjFVRNBmUfL2i=LEwv7kLSbo09SM-gP0JZ3Ppg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 12:11 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 25, 2013 at 09:45:53AM +0000, Vinayak Kale wrote:
->> Add support for irq registration when pmu interrupt is percpu.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> ---
->>  arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
->>  1 file changed, 81 insertions(+), 27 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index cea1594..a2efab3 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -22,6 +22,7 @@
->>
->>  #include <linux/bitmap.h>
->>  #include <linux/interrupt.h>
->> +#include <linux/irq.h>
->>  #include <linux/kernel.h>
->>  #include <linux/export.h>
->>  #include <linux/perf_event.h>
->> @@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
->>  }
->>
->>  static void
->> +armpmu_disable_percpu_irq(void *data)
->> +{
->> +     struct arm_pmu *armpmu = data;
->> +     struct platform_device *pmu_device = armpmu->plat_device;
->> +     int irq = platform_get_irq(pmu_device, 0);
->> +
->> +     cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
->> +     disable_percpu_irq(irq);
->> +}
->> +
->> +static void
->>  armpmu_release_hardware(struct arm_pmu *armpmu)
->>  {
->>       int i, irq, irqs;
->>       struct platform_device *pmu_device = armpmu->plat_device;
->>
->>       irqs = min(pmu_device->num_resources, num_possible_cpus());
->> +     if (irqs < 1)
->
-> Can you just make irqs unsigned, then do if (!irqs) instead?
+On Thu, Nov 21, 2013 at 4:40 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
 
-Okay. I will also modify already existing similar check in function
-'armpmu_reserve_hardware'.
+> I have been thinking abbout h3100/h3600 and GPIO issues.Could you please
+> review and test these patches. It is an attempt to cleanup and refactor GPIO
+> handling not to call gpio_request at init_machine time.
 
->
->> +             return;
->>
->> -     for (i = 0; i < irqs; ++i) {
->> -             if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> -                     continue;
->> -             irq = platform_get_irq(pmu_device, i);
->> -             if (irq >= 0)
->> -                     free_irq(irq, armpmu);
->> +     irq = platform_get_irq(pmu_device, 0);
->> +     if (irq <= 0)
->> +             return;
->> +
->> +     if (irq_is_percpu(irq)) {
->> +             on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
->> +             free_percpu_irq(irq, &cpu_hw_events);
->> +     } else {
->> +             for (i = 0; i < irqs; ++i) {
->> +                     if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> +                             continue;
->> +                     irq = platform_get_irq(pmu_device, i);
->> +                     if (irq > 0)
->> +                             free_irq(irq, armpmu);
->> +             }
->>       }
->>  }
->>
->> +static void
->> +armpmu_enable_percpu_irq(void *data)
->> +{
->> +     struct arm_pmu *armpmu = data;
->> +     struct platform_device *pmu_device = armpmu->plat_device;
->> +     int irq = platform_get_irq(pmu_device, 0);
->> +
->> +     enable_percpu_irq(irq, 0);
->
-> IRQ_TYPE_NONE?
+Tested on the h3600 and works flawlessly!
 
-Did you mean to use macro instead or 0? If yes, I will modify.
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
-Or, are you asking why are we using 0? For this part here is my comment:
-Inside GIC it's 'implementation specific' whether to allow
-configuration of level/edge type for PPIs.
-So maybe we should leave it to boot-loader to do such config if any
-such explicit config is needed.
-Passing 0 (=IRQ_TYPE_NONE) to 'enable_percpu_irq' ensures that kernel
-doesn't touch the existing configuration.
-
-I observed that arm arch timer code also passes 0 (IRQ_TYPE_NONE) to
-'enable_percpu_irq'.
-
->
->> +     cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
->> +}
->> +
->>  static int
->>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>  {
->> @@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>               return -ENODEV;
->>       }
->>
->> -     for (i = 0; i < irqs; ++i) {
->> -             err = 0;
->> -             irq = platform_get_irq(pmu_device, i);
->> -             if (irq < 0)
->> -                     continue;
->> +     irq = platform_get_irq(pmu_device, 0);
->> +     if (irq <= 0) {
->> +             pr_err("failed to get valid irq for PMU device\n");
->> +             return -ENODEV;
->> +     }
->>
->> -             /*
->> -              * If we have a single PMU interrupt that we can't shift,
->> -              * assume that we're running on a uniprocessor machine and
->> -              * continue. Otherwise, continue without this interrupt.
->> -              */
->> -             if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
->> -                     pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
->> -                                 irq, i);
->> -                     continue;
->> -             }
->> +     if (irq_is_percpu(irq)) {
->> +             err = request_percpu_irq(irq, armpmu->handle_irq,
->> +                             "arm-pmu", &cpu_hw_events);
->
-> This is a bit of a kludge passing in the cpu_hw_events as the per-cpu token,
-> but I guess that will do for now. There is potential for something like a
-> master-aware L2 PMU which uses PPIs and expects to pass something different
-> back to the IRQ handler.
->
-> Will
+Yours,
+Linus Walleij
