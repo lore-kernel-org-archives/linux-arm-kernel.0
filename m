@@ -1,39 +1,27 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Tue, 26 Nov 2013 13:05:53 +0000
-Subject: [PATCH] I2C: BCM2835: Linking platform nodes to adapter nodes
-In-Reply-To: <527D1870.8080302@wwwdotorg.org>
-References: <527CB3A1.7050808@koalo.de> <527D1870.8080302@wwwdotorg.org>
-Message-ID: <20131126130553.GF25130@opensource.wolfsonmicro.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Nov 2013 13:14:10 +0000
+Subject: [PATCH 16/31] ASoC: tegra: use reset framework
+In-Reply-To: <5293C787.1030005@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-17-git-send-email-swarren@wwwdotorg.org>
+ <20131116095529.GF15393@sirena.org.uk>
+ <528A4C8C.3030200@wwwdotorg.org>
+ <20131118183716.GR2674@sirena.org.uk>
+ <5293C787.1030005@wwwdotorg.org>
+Message-ID: <20131126131410.GK14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 09:59:28AM -0700, Stephen Warren wrote:
-> On 11/08/2013 02:49 AM, Florian Meier wrote:
-> > In order to find I2C devices in the device tree, the platform nodes
-> > have to be known by the I2C core. Analogous to the i2c-omap driver
-> > this requires setting the dev.of_node parameter of the adapter.
-> 
-> (CCing the I2C maintainers...)
-> 
-> > diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-> 
-> > @@ -299,6 +299,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
-> >  	strlcpy(adap->name, "bcm2835 I2C adapter", sizeof(adap->name));
-> >  	adap->algo = &bcm2835_i2c_algo;
-> >  	adap->dev.parent = &pdev->dev;
-> > +	adap->dev.of_node = pdev->dev.of_node;
-> 
-> Ah, that makes sense. Thinking about it now, I'd only ever used i2cget
-> etc. to access I2C devices, rather than instantiating drivers from DT.
-> 
-> That all said, I wonder if the I2C core shouldn't do something like the
-> following inside i2c_add_adapter():
-> 
-> if (!adap->dev.of_node && adap->dev.parent)
-> 	adap->dev.of_node = adap->dev.parent->of_node;
+On Mon, Nov 25, 2013 at 02:56:23PM -0700, Stephen Warren wrote:
 
-Should this not also have an of_node_get to increment the ref
-count on the node?
+> You didn't ack this one patch; I assume that was just an oversight?
 
-Thanks,
-Charles
+No, it was because it looked incorrect based on the lack of tie in
+between the description and the code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/237c35b4/attachment.sig>
