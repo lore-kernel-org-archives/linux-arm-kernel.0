@@ -1,52 +1,93 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Nov 2013 19:48:11 +0100
-Subject: [PATCH 6/4] ARM: ixp4xx: stop using <mach/timex.h>
-In-Reply-To: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1385491691-26002-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 26 Nov 2013 10:48:50 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Handle rounding a little better
+ for timeout
+In-Reply-To: <1385490637-10306-1-git-send-email-dianders@chromium.org>
+References: <1385490637-10306-1-git-send-email-dianders@chromium.org>
+Message-ID: <5294ED12.9080700@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only user of symbols defined in ixp4xx's <mach/timex.h> is common.c.
-Fix that one up by moving the used #define into common.c directly. This
-makes ixp4xx not to be a bar to dropping support for <mach/timex.h>.
+On 11/26/2013 10:30 AM, Doug Anderson wrote:
+> The existing watchdog timeout worked OK but didn't deal with
+> rounding in an ideal way when dividing out all of its clocks.
+>
+> Specifically if you had a timeout of 32 seconds and an input clock of
+> 66666666, you'd end up setting a timeout of 31.9998 seconds and
+> reporting a timeout of 31 seconds.
+>
+> Specifically DBG printouts showed:
+>    s3c2410wdt_set_heartbeat: count=16666656, timeout=32, freq=520833
+>    s3c2410wdt_set_heartbeat: timeout=32, divisor=255, count=16666656 (0000ff4f)
+> and the final timeout reported to the user was:
+>    ((count / divisor) * divisor) / freq
+>    (0xff4f * 255) / 520833 = 31 (truncated from 31.9998)
+> the technically "correct" value is:
+>    (0xff4f * 255) / (66666666.0 / 128) = 31.9998
+>
+> By using "DIV_ROUND_UP" we can be a little more correct.
+>    s3c2410wdt_set_heartbeat: count=16666688, timeout=32, freq=520834
+>    s3c2410wdt_set_heartbeat: timeout=32, divisor=255, count=16666688 (0000ff50)
+> and the final timeout reported to the user:
+>    (0xff50 * 255) / 520834 = 32
+> the technically "correct" value is:
+>    (0xff50 * 255) / (66666666.0 / 128) = 32.0003
+>
+> We'll use a DIV_ROUND_UP to solve this, generally erroring on the side
+> of reporting shorter values to the user and setting the watchdog to
+> slightly longer than requested:
+> * Round input frequency up to assume watchdog is counting faster.
+> * Round divisions by divisor up to give us extra time.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>   drivers/watchdog/s3c2410_wdt.c | 10 +++++-----
+>   1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> index 7d8fd04..fe2322b 100644
+> --- a/drivers/watchdog/s3c2410_wdt.c
+> +++ b/drivers/watchdog/s3c2410_wdt.c
+> @@ -188,7 +188,7 @@ static int s3c2410wdt_set_heartbeat(struct watchdog_device *wdd, unsigned timeou
+>   	if (timeout < 1)
+>   		return -EINVAL;
+>
+> -	freq /= 128;
+> +	freq = DIV_ROUND_UP(freq, 128);
+>   	count = timeout * freq;
+>
+>   	DBG("%s: count=%d, timeout=%d, freq=%lu\n",
+> @@ -201,20 +201,20 @@ static int s3c2410wdt_set_heartbeat(struct watchdog_device *wdd, unsigned timeou
+>
+>   	if (count >= 0x10000) {
+>   		for (divisor = 1; divisor <= 0x100; divisor++) {
+> -			if ((count / divisor) < 0x10000)
+> +			if (DIV_ROUND_UP(count, divisor) < 0x10000)
+>   				break;
+>   		}
+>
+Since you are at it,
+	divisor = DIV_ROUND_UP(count + 1, 0x10000);
+might be faster, simpler, and easier to understand than the loop.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
+Otherwise looks good to me.
 
-Hello,
+Guenter
 
-Similar to the ixp4xx-beeper patch I target to take this one as part of a pull
-request to drop <mach/timex.h>. So dear maintainers, I'd prefer you to give
-your ack to allow me to forward this patch to the arm-soc people instead of you
-taking it directly.
-
-Thanks
-Uwe
-
- arch/arm/mach-ixp4xx/common.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 9edaf47..967ddc2 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -23,7 +23,6 @@
- #include <linux/interrupt.h>
- #include <linux/bitops.h>
- #include <linux/time.h>
--#include <linux/timex.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
- #include <linux/io.h>
-@@ -45,6 +44,8 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- 
-+#define IXP4XX_TIMER_FREQ 66666000
-+
- static void __init ixp4xx_clocksource_init(void);
- static void __init ixp4xx_clockevent_init(void);
- static struct clock_event_device clockevent_ixp4xx;
--- 
-1.8.4.2
+> -		if ((count / divisor) >= 0x10000) {
+> +		if (divisor > 0x100) {
+>   			dev_err(wdt->dev, "timeout %d too big\n", timeout);
+>   			return -EINVAL;
+>   		}
+>   	}
+>
+>   	DBG("%s: timeout=%d, divisor=%d, count=%d (%08x)\n",
+> -	    __func__, timeout, divisor, count, count/divisor);
+> +	    __func__, timeout, divisor, count, DIV_ROUND_UP(count, divisor));
+>
+> -	count /= divisor;
+> +	count = DIV_ROUND_UP(count, divisor);
+>   	wdt->count = count;
+>
+>   	/* update the pre-scaler */
+>
