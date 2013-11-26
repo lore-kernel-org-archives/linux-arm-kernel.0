@@ -1,32 +1,49 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Nov 2013 11:21:11 +0100
-Subject: [PATCH 1/3] ARM: tegra: fix DEBUG_LL combined with LPAE
-In-Reply-To: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
-References: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131126102111.GD27752@ulmo.nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 26 Nov 2013 15:53:32 +0530
+Subject: [PATCH v3 5/9] usb: gadget: s3c-hsotg: use generic
+ phy_init()/phy_exit() support
+In-Reply-To: <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
+References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
+ <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
+Message-ID: <529476A4.8080600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 03:36:41PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> The DEBUG_LL UART address is mapped as an MMU section, hence, the
-> virtual address must be section-aligned. Sections are 1MB without LPAE
-> and 2MB with LPAE. Tegra's virtual address was only aligned to 1MB, and
-> hence the mapping was set up incorrectly with LPAE enabled, thus causing
-> a hang early during boot. Fix this by picking a different virtual address
-> that is aligned to 2MB.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/include/debug/tegra.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Hi,
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/fb608f99/attachment-0001.sig>
+On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
+> If a generic phy is present, call phy_init()/phy_exit(). This supports
+> generic phys that must be soft reset before power on.
+> 
+> Signed-off-by: Matt Porter <matt.porter@linaro.org>
+> ---
+>  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+> index da3879b..8dfe33f 100644
+> --- a/drivers/usb/gadget/s3c-hsotg.c
+> +++ b/drivers/usb/gadget/s3c-hsotg.c
+> @@ -3622,6 +3622,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+>  		goto err_supplies;
+>  	}
+>  
+> +	if (hsotg->phy)
+
+IS_ERR? If your phy_get fails *phy* will have a error value..
+
+> +		phy_init(hsotg->phy);
+> +
+>  	/* usb phy enable */
+>  	s3c_hsotg_phy_enable(hsotg);
+>  
+> @@ -3715,6 +3718,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
+>  	}
+>  
+>  	s3c_hsotg_phy_disable(hsotg);
+> +	if (hsotg->phy)
+
+same here.
+
+Thanks
+Kishon
