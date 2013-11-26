@@ -1,39 +1,43 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Nov 2013 20:31:29 -0700
-Subject: [PATCH] I2C: BCM2835: Linking platform nodes to adapter nodes
-In-Reply-To: <527D1870.8080302@wwwdotorg.org>
-References: <527CB3A1.7050808@koalo.de> <527D1870.8080302@wwwdotorg.org>
-Message-ID: <52941611.8070509@wwwdotorg.org>
+Date: Mon, 25 Nov 2013 20:35:42 -0700
+Subject: [PATCH] ARM: bcm2835: add missing #xxx-cells to I2C nodes
+Message-ID: <1385436942-6283-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 09:59 AM, Stephen Warren wrote:
-> On 11/08/2013 02:49 AM, Florian Meier wrote:
->> In order to find I2C devices in the device tree, the platform nodes
->> have to be known by the I2C core. Analogous to the i2c-omap driver
->> this requires setting the dev.of_node parameter of the adapter.
-> 
-> (CCing the I2C maintainers...)
-> 
->> diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-> 
->> @@ -299,6 +299,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
->>  	strlcpy(adap->name, "bcm2835 I2C adapter", sizeof(adap->name));
->>  	adap->algo = &bcm2835_i2c_algo;
->>  	adap->dev.parent = &pdev->dev;
->> +	adap->dev.of_node = pdev->dev.of_node;
-> 
-> Ah, that makes sense. Thinking about it now, I'd only ever used i2cget
-> etc. to access I2C devices, rather than instantiating drivers from DT.
-> 
-> That all said, I wonder if the I2C core shouldn't do something like the
-> following inside i2c_add_adapter():
-> 
-> if (!adap->dev.of_node && adap->dev.parent)
-> 	adap->dev.of_node = adap->dev.parent->of_node;
-> 
-> That would save every single I2C driver from having to set up this field
-> manually.
+The I2C controller node needs #address-cells and #size-cells properties,
+but these are currently missing. Add them. This allows child nodes to be
+parsed correctly.
 
-BTW, this should probably be:
 Cc: stable at vger.kernel.org
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+This is a patch for 3.13-rc.
+
+ arch/arm/boot/dts/bcm2835.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 1e12aef..aa537ed 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -85,6 +85,8 @@
+ 			reg = <0x7e205000 0x1000>;
+ 			interrupts = <2 21>;
+ 			clocks = <&clk_i2c>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -93,6 +95,8 @@
+ 			reg = <0x7e804000 0x1000>;
+ 			interrupts = <2 21>;
+ 			clocks = <&clk_i2c>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
+ 
+-- 
+1.7.10.4
