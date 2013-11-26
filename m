@@ -1,59 +1,119 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Nov 2013 14:55:13 +0100
-Subject: [PATCH] clocksource: sirf/marco+prima2: drop usage of
- CLOCK_TICK_RATE
-In-Reply-To: <20131114090705.GX14892@pengutronix.de>
-References: <1384201236-8689-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5283DA74.9080402@linaro.org>
- <20131114090705.GX14892@pengutronix.de>
-Message-ID: <20131126135513.GI28642@pengutronix.de>
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Tue, 26 Nov 2013 13:59:53 +0000
+Subject: [PATCH V3] dma: add channel request API that supports deferred
+ probe
+In-Reply-To: <1385416039-3170-1-git-send-email-swarren@wwwdotorg.org>
+References: <1385416039-3170-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1385474368.1871.6.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Danial,
+On Mon, 2013-11-25 at 14:47 -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> dma_request_slave_channel() simply returns NULL whenever DMA channel
+> lookup fails. Lookup could fail for two distinct reasons:
+> 
+> a) No DMA specification exists for the channel name.
+>    This includes situations where no DMA specifications exist at all, or
+>    other general lookup problems.
+> 
+> b) A DMA specification does exist, yet the driver for that channel is not
+>    yet registered.
+> 
+> Case (b) should trigger deferred probe in client drivers. However, since
+> they have no way to differentiate the two situations, it cannot.
+> 
+> Implement new function dma_request_slave_channel_or_err(), which performs
+> identically to dma_request_slave_channel(), except that it returns an
+> error-pointer rather than NULL, which allows callers to detect when
+> deferred probe should occur.
+> 
+> Eventually, all drivers should be converted to this new API, the old API
+> removed, and the new API renamed to the more desirable name. This patch
+> doesn't convert the existing API and all drivers in one go, since some
+> drivers call dma_request_slave_channel() then dma_request_channel() if
+> that fails. That would require either modifying dma_request_channel() in
+> the same way, or adding extra error-handling code to all affected
+> drivers, and there are close to 100 drivers using the other API, rather
+> than just the 15-20 or so that use dma_request_slave_channel(), which
+> might be tenable in a single patch.
+> 
+> acpi_dma_request_slave_chan_by_name() doesn't currently implement
+> deferred probe. It should, but this will be addressed later.
 
-On Thu, Nov 14, 2013 at 10:07:05AM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Nov 13, 2013 at 09:00:52PM +0100, Daniel Lezcano wrote:
-> > On 11/11/2013 09:20 PM, Uwe Kleine-K?nig wrote:
-> > >As CSR SiRF is converted to multi platform CLOCK_TICK_RATE is a dummy
-> > >value that seems to match the right value is used.
-> > >(arch/arm/mach-prima2/include/mach/timex.h which defined CLOCK_TICK_RATE
-> > >to 1000000 was removed in commit cf82e0e (ARM: sirf: enable
-> > >multiplatform support); marco used the same file.)
-> > >
-> > >To not depend on that dummy value use a local #define instead.
-> > 
-> > I don't get this patch. It is to fix a compilation error ?
-> No, the problem is that CLOCK_TICK_RATE used to be defined in a platform
-> specific header <mach/timex.h>. For the ARM multiplatform stuff, this
-> was dropped and now all multiplatform kernels use 1000000. For some
-> platform (like SiRF) this happens to be correct, but actually it's pure
-> luck. Further down the road I'd like to drop defining CLOCK_TICK_RATE
-> for all platforms, so this is a preparing patch. But even independant
-> from that it feels wrong to use a dummy value that was only introduced
-> to prevent compile breakage.
-> 
-> Would this change log be better:
-> 
-> 	Since CSR SiRF was converted to multi platform in cf82e0e (ARM:
-> 	sirf: enable multiplatform support) the symbol CLOCK_TICK_RATE
-> 	isn't the platform specific definition any more, but a global
-> 	dummy value. There was no harm introduced in cf82e0e because the
-> 	global value happens to match the old platform specific one,
-> 	still this dummy value isn't intended to be used and will
-> 	hopefully disappear soon, so introduce a local #define and use
-> 	that instead.
-> 
-> So it's not urgent, but would be a nice cleanup for 3.14-rc1.
-I'd like to depend on this patch to drop CLOCK_TICK_RATE for
-mach-prima2. Would it be ok for you when I include it in a pull request
-to the arm-soc people? If not, do you intend to take that patch, or do
-you still have objections? In that case I'd back out mach-prima2 from my
-CLOCK_TICK_RATE change.
+Couple of comments below.
 
-Best regards
-Uwe
+[]
+
+> --- a/drivers/dma/of-dma.c
+> +++ b/drivers/dma/of-dma.c
+
+[]
+
+> @@ -152,17 +152,18 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>  	struct of_dma		*ofdma;
+>  	struct dma_chan		*chan;
+>  	int			count, i;
+> +	int			ret_no_channel = -ENODEV;
+
+Could we re-use chan for the error as well?
+
+>  	if (!np || !name) {
+>  		pr_err("%s: not enough information provided\n", __func__);
+> -		return NULL;
+> +		return ERR_PTR(-ENODEV);
+>  	}
+>  
+>  	count = of_property_count_strings(np, "dma-names");
+>  	if (count < 0) {
+>  		pr_err("%s: dma-names property of node '%s' missing or empty\n",
+>  			__func__, np->full_name);
+> -		return NULL;
+> +		return ERR_PTR(-ENODEV);
+>  	}
+>  
+>  	for (i = 0; i < count; i++) {
+> @@ -174,8 +175,10 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>  
+>  		if (ofdma)
+
+if (ofdma) {
+...
+
+>  			chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
+> -		else
+> +		else {
+
+} else {
+
+to keep style.
+
+> +			ret_no_channel = -EPROBE_DEFER;
+>  			chan = NULL;
+> +		}
+>  
+>  		mutex_unlock(&of_dma_lock);
+>  
+> @@ -185,7 +188,7 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>  			return chan;
+>  	}
+>  
+> -	return NULL;
+> +	return ERR_PTR(ret_no_channel);
+>  }
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
