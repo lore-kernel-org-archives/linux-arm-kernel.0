@@ -1,61 +1,55 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Mon, 25 Nov 2013 17:50:38 -0800
-Subject: [PATCH 1/5] Documentation: dt: Add kona-pwm binding
-In-Reply-To: <20131125111709.GJ22043@ulmo.nvidia.com>
-References: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
- <1384800901-21711-2-git-send-email-tim.kryger@linaro.org>
- <20131125111709.GJ22043@ulmo.nvidia.com>
-Message-ID: <CAAYSxho=vJ0svnsg4KkD7tU9JMekEwef3if2jJD=d5pwWwndMw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Nov 2013 02:59:51 +0100
+Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <20131111195330.GE19212@saruman.home>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1930202.N3RGv6418i@avalon> <20131111195330.GE19212@saruman.home>
+Message-ID: <2503238.g4sCZxTpb5@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 3:17 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Mon, Nov 18, 2013 at 10:54:57AM -0800, Tim Kryger wrote:
+Hi Felipe,
 
->> +++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
->> @@ -0,0 +1,24 @@
->> +Broadcom's PWM Controller Device Tree bindings
->
-> This sounds somewhat strange, like Broadcom owns the bindings... perhaps
-> just:
->
->         Broadcom PWM controller device tree bindings
->
-> Or for consistency:
->
->         Broadcom Kona PWM controller device tree bindings
+On Monday 11 November 2013 13:53:31 Felipe Balbi wrote:
+> On Sat, Nov 09, 2013 at 03:09:33PM +0100, Laurent Pinchart wrote:
+> > Hi Felipe,
+> > 
+> > On Tuesday 29 October 2013 18:47:19 Shimoda, Yoshihiro wrote:
+> > > Hi Laurent-san,
+> > > 
+> > > (2013/10/29 7:49), Laurent Pinchart wrote:
+> > > > Turn clk_enable() and clk_disable() calls into clk_prepare_enable()
+> > > > and clk_disable_unprepare() to get ready for the migration to the
+> > > > common clock framework.
+> > > > 
+> > > > Cc: Felipe Balbi <balbi@ti.com>
+> > > > Cc: linux-usb at vger.kernel.org
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > 
+> > > Thank you for the patch.
+> > > 
+> > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > 
+> > Could you please pick this patch up ?
+> 
+> after -rc1 is out, I don't see why not.
 
-Yes that sounds better.
+Great then :-)
 
->> +Broadcom's Kona PWM Controller has 6 channels
->
-> "controller" and end the sentence with a full stop.
+As this patch is a dependency for other series that will go through different 
+trees, could you please provide a stable branch in your tree with this patch 
+included that you will push to v3.14 ?
 
-Sure.
+-- 
+Regards,
 
->> +- clocks: clock specifier for the kona pwm external clock
->
-> Please use the correct spelling "PWM" in prose here and elsewhere. Also
-> you should pick one of "kona", "Kona" or "KONA" and stick with it
-> consistently. Might also be useful to mention what Kona is. Doesn't
-> necessarily have to be in the document, but if for nothing else, then
-> just for my curiosity.
-
-Agreed.  It should be "Kona" here.
-
-Kona roughly defines the set of common IP used on multiple mobile SoCs.
-
->> +- #pwm-cells: should be 2.  The first cell specifies the per-chip index
->> +  of the PWM to use and the second cell is the period in nanoseconds.
->> +
->> +Refer to pwm/pwm.txt for generic pwm controller node properties.
->> +
->> +Refer to clocks/clock-bindings.txt for generic clock consumer
->> +properties
->
-> This sentence should also end with a full stop.
-
-Sure thing.  Thanks again.
-
--Tim
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/48349950/attachment.sig>
