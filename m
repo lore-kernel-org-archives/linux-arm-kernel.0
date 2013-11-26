@@ -1,48 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 26 Nov 2013 13:21:50 -0500
-Subject: [PATCH 1/3] usb: dwc3: Add Keystone specific glue layer
-In-Reply-To: <20131126171635.GP24310@saruman.home>
-References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
- <1385410581-12148-2-git-send-email-w-kwok2@ti.com>
- <20131125203956.GI18046@saruman.home> <5293EFFD.9000508@ti.com>
- <20131126171635.GP24310@saruman.home>
-Message-ID: <5294E6BE.3020308@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 26 Nov 2013 13:23:28 -0500
+Subject: [PATCH] PCI: mvebu - The bridge secondary status register
+ should be 0
+In-Reply-To: <1385488975-27694-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1385488975-27694-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <20131126182328.GP2879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 November 2013 12:16 PM, Felipe Balbi wrote:
-> On Mon, Nov 25, 2013 at 07:49:01PM -0500, Santosh Shilimkar wrote:
->> On Monday 25 November 2013 03:39 PM, Felipe Balbi wrote:
->>> Hi,
->>>
->>
->> [...]
->>
->>>
->>>> +	kdwc3_dma_mask = dma_get_mask(dev);
->>>> +	dev->dma_mask = &kdwc3_dma_mask;
->>>> +
->>>> +	error = kdwc3_enable(kdwc);
->>>
->>> I would drop this function and just add your clk_prepare() here, then
->>> move clk_enable()/clk_disable() to ->runtime_resume/->runtime_suspend()
->>> respectively. Then you could just call pm_runtime_get_sync() when you
->>> need to access your registers and pm_runtime_put() when you want to drop
->>> the clock reference.
->>>
->>> this will even make PM implementation a lot easier for you going
->>> forward.
->>>
->> Just to make the PM runtime part clear, there are few issues with PM
->> core clock layer [1], hence drivers is using clock layer. Its trivial
->> to update the driver though once the issue is sorted out.
->>
->> Meanwhile driver development continue to be with clock calls. 
+On Tue, Nov 26, 2013 at 11:02:52AM -0700, Jason Gunthorpe wrote:
+> There are no writable bits in the secondary status register, only
+> write 1 to clear bits. The driver never sets any of the write 1 to
+> clear bits so the status register should always be 0, just remove
+> the set from the write path.
 > 
-> I don't mind having those clock calls, just suggested a different
-> placement for them.
+> Someday the write 1 to clear bits should be copied/cleared directly
+> from registers in the HW.
 > 
-I got that part. Just wanted to clear the runtime PM part.
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/pci/host/pci-mvebu.c | 1 -
+>  1 file changed, 1 deletion(-)
 
-Regards,
-Santosh
+Whole series
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
