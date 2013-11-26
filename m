@@ -1,68 +1,48 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 Nov 2013 13:54:22 -0600
-Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
- clk_prepare/unprepare
-In-Reply-To: <2042860.IXZhL6v7c2@avalon>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2503238.g4sCZxTpb5@avalon> <20131126021239.GA22213@saruman.home>
- <2042860.IXZhL6v7c2@avalon>
-Message-ID: <20131126195422.GJ24310@saruman.home>
+From: caesarxuchao@gmail.com (Chao Xu)
+Date: Tue, 26 Nov 2013 13:59:17 -0600
+Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
+In-Reply-To: <20131126182022.GJ26766@atomide.com>
+References: <87hab9agjr.fsf@gmail.com>
+ <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
+ <87wqk3n54l.fsf@gmail.com> <20131120183548.GH10317@atomide.com>
+ <CAKZq+rcoC5PLSVVazWcce7V7TcBM8=M2jM56bvk9HO2orKt8fg@mail.gmail.com>
+ <20131126182022.GJ26766@atomide.com>
+Message-ID: <CAKZq+rcpSg02X_xmTzq_fzG6cAWNS+TeXoqZsNFdneqekiaavw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 03:16:47AM +0100, Laurent Pinchart wrote:
-> Hi Felipe,
-> 
-> On Monday 25 November 2013 20:12:39 Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Tue, Nov 26, 2013 at 02:59:51AM +0100, Laurent Pinchart wrote:
-> > > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
-> > > > > > > Turn clk_enable() and clk_disable() calls into
-> > > > > > > clk_prepare_enable()
-> > > > > > > and clk_disable_unprepare() to get ready for the migration to the
-> > > > > > > common clock framework.
-> > > > > > > 
-> > > > > > > Cc: Felipe Balbi <balbi@ti.com>
-> > > > > > > Cc: linux-usb at vger.kernel.org
-> > > > > > > Signed-off-by: Laurent Pinchart
-> > > > > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > > 
-> > > > > > Thank you for the patch.
-> > > > > > 
-> > > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> > > > > 
-> > > > > Could you please pick this patch up ?
-> > > > 
-> > > > after -rc1 is out, I don't see why not.
-> > > 
-> > > Great then :-)
-> > > 
-> > > As this patch is a dependency for other series that will go through
-> > > different trees, could you please provide a stable branch in your tree
-> > > with this patch included that you will push to v3.14 ?
-> > 
-> > You guys are always killing me with those "stable branch" requests :-)
-> > 
-> > I'll get one up tomorrow. I guess I can avoid a topic branch altogether
-> > if I just make this the first patch in "next" branch. I could push only
-> > $subject for now until you merge then I'll push other stuff. Is that
-> > enough for you ? My 'next' is always immutable.
-> 
-> That sounds good, thank you. You can already push the other patches without 
-> waiting for me, I can dig the commit ID of the first patch in your next 
-> branch.
+Thanks, Tony. I checked my .config and this option is enabled. FYI, I
+raised this issue in u-boot mailing-list, too. It seems to be a bug in
+u-boot and only happens to certain version of pandaboard. The name of
+the thread is "No single character output after update to latest
+u-boot on pandaboard"
 
-pushed, btw. you should have received my automatic email. If you merge
-my next, you'll get only that commit. I believe tomorrow I'll be able to
-push more commits into next.
+On Tue, Nov 26, 2013 at 12:20 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Chao Xu <caesarxuchao@gmail.com> [131122 19:28]:
+>> "I wonder if we also have some dependency to some earlier versions of
+>> u-boot as u-boot now only muxes the essential pins?"
+>> This is exactly the problem in my case. I added "#define
+>> CONFIG_SYS_ENABLE_PADS_ALL" in u-boot/include/configs/omap4_common.h
+>> and now there is output.
+>>
+>> I guess the reason that the u-boot worked out-of-box for Ben but not
+>> for me is that I missed some configurations in v3.12 kernel. I image
+>> there is a config options that tells the kernel to take care of the
+>> non-essential pins that used to be the responsibility of u-boot. Could
+>> you confirm my hypothesis? And if so, could you kindly suggest what's
+>> the name of the config option?
+>
+> That would be CONFIG_PINCTRL_SINGLE=y for device tree based omaps.
+> But if we have the configuration missing for some driver in the
+> board specific .dts file, that won't help naturally. We do have
+> PINCTRL_SINGLE enabled in omap2plus_defconfig.
+>
+> Regards,
+>
+> Tony
+
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/e3f14858/attachment.sig>
+Regards,
+Chao Xu
