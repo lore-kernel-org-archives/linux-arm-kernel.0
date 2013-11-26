@@ -1,63 +1,30 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Tue, 26 Nov 2013 09:30:16 +0530
-Subject: [PATCH 0/2] PSCI system off and reset for KVM ARM/ARM64
-In-Reply-To: <CALrVBktOaQz5zbv2xRr8YbfvmRToK-kg3kJMFpNHSVeyuYutAA@mail.gmail.com>
-References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
- <CALrVBktOaQz5zbv2xRr8YbfvmRToK-kg3kJMFpNHSVeyuYutAA@mail.gmail.com>
-Message-ID: <CAAhSdy0N7rbJprkGtip3UvcrxUjYemaxhYsBLd_VjzB2FEAxdQ@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 26 Nov 2013 12:17:51 +0800
+Subject: [PATCH 1/2] ASoC: atmel: sam9x5_wm8731: fix oops when unload module
+Message-ID: <1385439472-23352-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Adding Christoffer, forgot to add him to CC)
+As the priv is not assigned to card->drvdata, it is NULL, so when
+unload module, it will cause NULL pointer oops.
+Assign priv to card->drvdata to fix this issue.
 
-On Mon, Nov 25, 2013 at 9:27 PM, Anup Patel <anup.patel@linaro.org> wrote:
-> On 25 November 2013 21:19, Anup Patel <anup.patel@linaro.org> wrote:
->> The Power State and Coordination Interface (PSCI) specification defines
->> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
->>
->> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
->> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
->> KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET exit reasons.
->>
->> To try this patch from guest kernel, we will need PSCI-based restart and
->> poweroff support in the guest kenel for both ARM and ARM64.
->>
->> Rob Herring has already submitted patches for PSCI-based restart and
->> poweroff in ARM kernel but these are not merged yet due unstable device
->> tree bindings of kernel PSCI support. We will be having similar patches
->> for PSCI-based restart and poweroff in ARM64 kernel.
->> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
->> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
->>
->> Anup Patel (2):
->>   KVM: Add KVM_EXIT_RESET to user space API header
->>   ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and SYSTEM_RESET to user
->>     space
->>
->>  arch/arm/include/asm/kvm_psci.h   |    2 +-
->>  arch/arm/include/uapi/asm/kvm.h   |    2 ++
->>  arch/arm/kvm/handle_exit.c        |    7 ++++++-
->>  arch/arm/kvm/psci.c               |   38 +++++++++++++++++++++++++++++--------
->>  arch/arm64/include/asm/kvm_psci.h |    2 +-
->>  arch/arm64/include/uapi/asm/kvm.h |    2 ++
->>  arch/arm64/kvm/handle_exit.c      |   10 ++++++----
->>  include/uapi/linux/kvm.h          |    1 +
->>  8 files changed, 49 insertions(+), 15 deletions(-)
->>
->> --
->> 1.7.9.5
->>
->
-> Hi All,
->
-> If anyone wants to try this patches using KVMTOOL then they
-> can find guest kernel side PSCI patches and KVMTOOL patch
-> attached here.
->
-> Regards,
-> Anup
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ sound/soc/atmel/sam9x5_wm8731.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sound/soc/atmel/sam9x5_wm8731.c b/sound/soc/atmel/sam9x5_wm8731.c
+index 992ae38..6dc33ac 100644
+--- a/sound/soc/atmel/sam9x5_wm8731.c
++++ b/sound/soc/atmel/sam9x5_wm8731.c
+@@ -99,6 +99,7 @@ static int sam9x5_wm8731_driver_probe(struct platform_device *pdev)
+ 
+ 	card->dev = &pdev->dev;
+ 	card->owner = THIS_MODULE;
++	card->drvdata = priv;
+ 	card->dai_link = dai;
+ 	card->num_links = 1;
+ 	card->dapm_widgets = sam9x5_dapm_widgets;
+-- 
+1.7.9.5
