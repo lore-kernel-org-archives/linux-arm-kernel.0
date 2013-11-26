@@ -1,20 +1,47 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Tue, 26 Nov 2013 00:08:31 +0000
-Subject: [PATCH] watchdog: s3c2410_wdt: Only register for cpufreq on
- CPU_FREQ_S3C24XX
-In-Reply-To: <1385420137-32725-1-git-send-email-dianders@chromium.org>
-References: <1385420137-32725-1-git-send-email-dianders@chromium.org>
-Message-ID: <20131126000831.GW12108@trinity.fluff.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 25 Nov 2013 16:10:33 -0800
+Subject: [PATCH v11 0/7] ARM: support for the Trusted Foundations secure
+ monitor
+In-Reply-To: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
+References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <20131126001033.GB21634@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 02:55:37PM -0800, Doug Anderson wrote:
-> On modern SoCs the watchdog timer is parented on a clock that doesn't
-> change every time we have a cpufreq change.  That means we don't need
-> to constantly adjust the watchdog timer, so avoid registering for and
-> dealing with cpufreq transitions unless we've actually got
-> CPU_FREQ_S3C24XX defined.
+On Sun, Nov 24, 2013 at 03:30:45PM +0900, Alexandre Courbot wrote:
+> New rebase that should be ready-to-apply on the latest Tegra tree. The last
+> remaining blocker is Russell's approval for this series and it is my hope to
+> obtain it with this version.
+> 
+> There has been quite some debate around this series, notably about the SMC
+> calling conventions and whether the firmware interface should be moved out of
+> arch/arm. I hope that all the questions have been answered and that we can move
+> forward with this series that enables NVIDIA-branded retail Tegra devices to run
+> mainline.
+> 
+> Changes since v10:
+> - Rebased on top of more recent sources since some files have been renamed in
+>   mach-tegra.
+> - Gave a final proof-read and extensive testing.
+> 
+> Alexandre Courbot (7):
+>   ARM: add basic support for Trusted Foundations
+>   of: add vendor prefix for Trusted Logic Mobility
+>   of: add Trusted Foundations bindings documentation
+>   ARM: tegra: add support for Trusted Foundations
+>   ARM: tegra: split setting of CPU reset handler
+>   ARM: tegra: set CPU reset handler using firmware
+>   ARM: tegra: support Trusted Foundations by default
 
-The S3C2410 to at-least S3C2440 there is only one PLL/clock-divider
-set so changing any part of that can change frequency supplied to
-the watchdog.
+Ok, this looks good to me. Russell, do you want the first patch in your
+tree or are you ok with acking that and we can take everything through
+arm-soc?
+
+The alternative is that we can have Stephen provide a stable branch with
+the first patch on it and we both merge that, then the rest goes on top
+of that through arm-soc.
+
+
+Thanks!
+
+-Olof
