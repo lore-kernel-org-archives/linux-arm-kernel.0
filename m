@@ -1,98 +1,116 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Nov 2013 16:32:10 +0900
-Subject: [PATCH RFC v2 08/17] ARM: shmobile: r8a7779: Add helper to read mode
- pins
+Date: Tue, 26 Nov 2013 16:32:08 +0900
+Subject: [PATCH RFC v2 06/17] ARM: shmobile: Sync Marzen DTS with Marzen
+ reference DTS
 In-Reply-To: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
 References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1385451139-29686-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1385451139-29686-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add and use helper to read mode pins.
-This will be re-used when moving marzen-reference to
-the common clock framework.
+Copy the device nodes from Marzen reference into the Marzen device tree
+file. This will allow us to use a single DTS file regarless of kernel
+configuration. In case of legacy C board code the device nodes may or
+may not be used, but in the multiplatform case all the DT device nodes
+are used.
 
+Based on a similar change for the Lager board by Laurent Pinchart.
+
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c        | 11 ++---------
- arch/arm/mach-shmobile/include/mach/r8a7779.h |  1 +
- arch/arm/mach-shmobile/setup-r8a7779.c        | 14 ++++++++++++++
- 3 files changed, 17 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/r8a7779-marzen.dts | 81 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index b7ce0e7..decf122 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -25,6 +25,7 @@
- #include <linux/clkdev.h>
- #include <mach/clock.h>
- #include <mach/common.h>
-+#include <mach/r8a7779.h>
- 
- /*
-  *		MD1 = 1			MD1 = 0
-@@ -59,9 +60,6 @@
- #define MSTPCR6		IOMEM(0xffc80058)
- #define MSTPCR7		IOMEM(0xffc80040)
- 
--#define MODEMR		0xffcc0020
--
--
- /* ioremap() through clock mapping mandatory to avoid
-  * collision with ARM coherent DMA virtual memory range.
-  */
-@@ -213,14 +211,9 @@ static struct clk_lookup lookups[] = {
- 
- void __init r8a7779_clock_init(void)
- {
--	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
--	u32 mode;
-+	u32 mode = r8a7779_read_mode_pins();
- 	int k, ret = 0;
- 
--	BUG_ON(!modemr);
--	mode = ioread32(modemr);
--	iounmap(modemr);
--
- 	if (mode & MD(1)) {
- 		plla_clk.rate = 1500000000;
- 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-index 5014145..bd66cd82 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -39,6 +39,7 @@ extern void r8a7779_add_early_devices(void);
- extern void r8a7779_add_standard_devices(void);
- extern void r8a7779_add_standard_devices_dt(void);
- extern void r8a7779_init_late(void);
-+extern u32 r8a7779_read_mode_pins(void);
- extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
- extern void r8a7779_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 8f94531..4e3fbfb 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -874,6 +874,20 @@ void __init r8a7779_add_standard_devices_dt(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-+#define MODEMR		0xffcc0020
+diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
+index ee3fb60..4e1a871 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+@@ -25,4 +25,85 @@
+ 		device_type = "memory";
+ 		reg = <0x60000000 0x40000000>;
+ 	};
 +
-+u32 __init r8a7779_read_mode_pins(void)
-+{
-+	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
-+	u32 mode;
++	fixedregulator3v3: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
 +
-+	BUG_ON(!modemr);
-+	mode = ioread32(modemr);
-+	iounmap(modemr);
++	lan0 at 18000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0x18000000 0x100>;
++		pinctrl-0 = <&lan0_pins>;
++		pinctrl-names = "default";
 +
-+	return mode;
-+}
++		phy-mode = "mii";
++		interrupt-parent = <&irqpin0>;
++		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++		reg-io-width = <4>;
++		vddvario-supply = <&fixedregulator3v3>;
++		vdd33a-supply = <&fixedregulator3v3>;
++	};
 +
- static const char *r8a7779_compat_dt[] __initdata = {
- 	"renesas,r8a7779",
- 	NULL,
++	leds {
++		compatible = "gpio-leds";
++		led2 {
++			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
++		};
++		led3 {
++			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
++		};
++		led4 {
++			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
++
++&irqpin0 {
++	status = "okay";
++};
++
++&pfc {
++	pinctrl-0 = <&scif2_pins &scif4_pins>;
++	pinctrl-names = "default";
++
++	lan0_pins: lan0 {
++		intc {
++			renesas,groups = "intc_irq1_b";
++			renesas,function = "intc";
++		};
++		lbsc {
++			renesas,groups = "lbsc_ex_cs0";
++			renesas,function = "lbsc";
++		};
++	};
++
++	scif2_pins: serial2 {
++		renesas,groups = "scif2_data_c";
++		renesas,function = "scif2";
++	};
++
++	scif4_pins: serial4 {
++		renesas,groups = "scif4_data";
++		renesas,function = "scif4";
++	};
++
++	sdhi0_pins: sd0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd",
++				 "sdhi0_wp";
++		renesas,function = "sdhi0";
++	};
++};
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&fixedregulator3v3>;
++	bus-width = <4>;
++	status = "okay";
+ };
 -- 
 1.8.4
