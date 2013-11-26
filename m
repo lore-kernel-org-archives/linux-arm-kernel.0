@@ -1,187 +1,42 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 26 Nov 2013 15:36:00 -0300
-Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
-In-Reply-To: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
-References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <20131126183559.GA18570@localhost>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 26 Nov 2013 19:36:29 +0100
+Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
+In-Reply-To: <20131126134444.GG28642@pengutronix.de>
+References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131126134117.GF28642@pengutronix.de>
+ <20131126134444.GG28642@pengutronix.de>
+Message-ID: <20131126183629.GK28642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Andrew,
 
-On Tue, Oct 01, 2013 at 10:18:08AM -0700, Tim Kryger wrote:
-> When configured with UART_16550_COMPATIBLE=NO or in versions prior to
-> the introduction of this option, the Designware UART will ignore writes
-> to the LCR if the UART is busy.  The current workaround saves a copy of
-> the last written LCR and re-writes it in the ISR for a special interrupt
-> that is raised when a write was ignored.
-> 
-> Unfortunately, interrupts are typically disabled prior to performing a
-> sequence of register writes that include the LCR so the point at which
-> the retry occurs is too late.  An example is serial8250_do_set_termios()
-> where an ignored LCR write results in the baud divisor not being set and
-> instead a garbage character is sent out the transmitter.
-> 
-> Furthermore, since serial_port_out() offers no way to indicate failure,
-> a serious effort must be made to ensure that the LCR is actually updated
-> before returning back to the caller.  This is difficult, however, as a
-> UART that was busy during the first attempt is likely to still be busy
-> when a subsequent attempt is made unless some extra action is taken.
-> 
-> This updated workaround reads back the LCR after each write to confirm
-> that the new value was accepted by the hardware.  Should the hardware
-> ignore a write, the TX/RX FIFOs are cleared and the receive buffer read
-> before attempting to rewrite the LCR out of the hope that doing so will
-> force the UART into an idle state.  While this may seem unnecessarily
-> aggressive, writes to the LCR are used to change the baud rate, parity,
-> stop bit, or data length so the data that may be lost is likely not
-> important.  Admittedly, this is far from ideal but it seems to be the
-> best that can be done given the hardware limitations.
-> 
-> Lastly, the revised workaround doesn't touch the LCR in the ISR, so it
-> avoids the possibility of a "serial8250: too much work for irq" lock up.
-> This problem is rare in real situations but can be reproduced easily by
-> wiring up two UARTs and running the following commands.
-> 
->   # stty -F /dev/ttyS1 echo
->   # stty -F /dev/ttyS2 echo
->   # cat /dev/ttyS1 &
->   [1] 375
->   # echo asdf > /dev/ttyS1
->   asdf
-> 
->   [   27.700000] serial8250: too much work for irq96
->   [   27.700000] serial8250: too much work for irq96
->   [   27.710000] serial8250: too much work for irq96
->   [   27.710000] serial8250: too much work for irq96
->   [   27.720000] serial8250: too much work for irq96
->   [   27.720000] serial8250: too much work for irq96
->   [   27.730000] serial8250: too much work for irq96
->   [   27.730000] serial8250: too much work for irq96
->   [   27.740000] serial8250: too much work for irq96
-> 
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> ---
-> 
-> Changes in v2:
->   - Rebased on tty-next
->   - Updated commit messsage to mention UART_16550_COMPATIBLE
->   - Removed potentially unnecessary read of LSR and MSR
->   - Only attempt workaround when LCR write is ignored
-> 
->  drivers/tty/serial/8250/8250_dw.c | 41 ++++++++++++++++++++++++++++++---------
->  1 file changed, 32 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-> index d04a037..4658e3e 100644
-> --- a/drivers/tty/serial/8250/8250_dw.c
-> +++ b/drivers/tty/serial/8250/8250_dw.c
-> @@ -57,7 +57,6 @@
->  
->  struct dw8250_data {
->  	u8			usr_reg;
-> -	int			last_lcr;
->  	int			last_mcr;
->  	int			line;
->  	struct clk		*clk;
-> @@ -77,17 +76,33 @@ static inline int dw8250_modify_msr(struct uart_port *p, int offset, int value)
->  	return value;
->  }
->  
-> +static void dw8250_force_idle(struct uart_port *p)
-> +{
-> +	serial8250_clear_and_reinit_fifos(container_of
-> +					  (p, struct uart_8250_port, port));
-> +	(void)p->serial_in(p, UART_RX);
-> +}
-> +
->  static void dw8250_serial_out(struct uart_port *p, int offset, int value)
->  {
->  	struct dw8250_data *d = p->private_data;
->  
-> -	if (offset == UART_LCR)
-> -		d->last_lcr = value;
-> -
->  	if (offset == UART_MCR)
->  		d->last_mcr = value;
->  
->  	writeb(value, p->membase + (offset << p->regshift));
-> +
-> +	/* Make sure LCR write wasn't ignored */
-> +	if (offset == UART_LCR) {
-> +		int tries = 1000;
-> +		while (tries--) {
-> +			if (value == p->serial_in(p, UART_LCR))
-> +				return;
-> +			dw8250_force_idle(p);
-> +			writeb(value, p->membase + (UART_LCR << p->regshift));
-> +		}
-> +		dev_err(p->dev, "Couldn't set LCR to %d\n", value);
-> +	}
->  }
->  
->  static unsigned int dw8250_serial_in(struct uart_port *p, int offset)
-> @@ -108,13 +123,22 @@ static void dw8250_serial_out32(struct uart_port *p, int offset, int value)
->  {
->  	struct dw8250_data *d = p->private_data;
->  
-> -	if (offset == UART_LCR)
-> -		d->last_lcr = value;
-> -
->  	if (offset == UART_MCR)
->  		d->last_mcr = value;
->  
->  	writel(value, p->membase + (offset << p->regshift));
-> +
-> +	/* Make sure LCR write wasn't ignored */
-> +	if (offset == UART_LCR) {
-> +		int tries = 1000;
-> +		while (tries--) {
-> +			if (value == p->serial_in(p, UART_LCR))
-> +				return;
-> +			dw8250_force_idle(p);
-> +			writel(value, p->membase + (UART_LCR << p->regshift));
-> +		}
-> +		dev_err(p->dev, "Couldn't set LCR to %d\n", value);
-> +	}
->  }
->  
->  static unsigned int dw8250_serial_in32(struct uart_port *p, int offset)
-> @@ -132,9 +156,8 @@ static int dw8250_handle_irq(struct uart_port *p)
->  	if (serial8250_handle_irq(p, iir)) {
->  		return 1;
->  	} else if ((iir & UART_IIR_BUSY) == UART_IIR_BUSY) {
-> -		/* Clear the USR and write the LCR again. */
-> +		/* Clear the USR */
->  		(void)p->serial_in(p, d->usr_reg);
-> -		p->serial_out(p, UART_LCR, d->last_lcr);
->  
->  		return 1;
->  	}
+On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K?nig wrote:
+> > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K?nig wrote:
+> > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
+> > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
+> > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
+> > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
+> > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
+> > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
+> > > 
+> > > So better include it explicitly not only because the last link will go
+> > > away soon.
+> > > 
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Ping. Is this patch ok despite Jean-Christophe's objection?
+> I saw that akpm already took it into his tree.
+This patch is one of the last few that are needed to drop <mach/timex.h>
+alltogether that I don't have an ack from the respective maintainer yet.
 
-Since v3.13-rc1, this commit seems to have introduced some oddities on
-some of our boards. See this log snippet:
+Can you give your ack instead of sending the patch to Linus, then I'd
+take it with the patch dropping <mach/timex.h> to make it easier to
+merge.
 
-Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-????R?console [ttyS0] enabled
-console [ttyS0] enabled
-bootconsole [earlycon0] disabled
-bootconsole [earlycon0] disabled
-dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-d0012100.serial: ttyS1 at MMIO 0xd0012100 (irq = 18, base_baud = 15625000) is a 16550A
+Thanks
+Uwe
 
-This behavior appear in at least Armada 370 and Armada XP boxes.
-
-I confirm reverting this commit fixes the issue and things get back to normal.
-Here's the complete kernel log: sprunge.us/gMdL
-
-Ideas?
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
