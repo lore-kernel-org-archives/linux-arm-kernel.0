@@ -1,14 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Nov 2013 22:10:45 +0100
-Subject: [PATCH 4/7] PCI: imx6: Split away the PHY reset
+Date: Tue, 26 Nov 2013 22:10:46 +0100
+Subject: [PATCH 5/7] PCI: imx6: Split away the link up wait loop
 In-Reply-To: <1385500248-6551-1-git-send-email-marex@denx.de>
 References: <1385500248-6551-1-git-send-email-marex@denx.de>
-Message-ID: <1385500248-6551-4-git-send-email-marex@denx.de>
+Message-ID: <1385500248-6551-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the PCIe PHY reset from the link up function to make
-the code a little more structured.
+Split the function that waits for the PCIe link to come up from the
+rest if the host init function. We will find this change useful in
+the subsequent patch, since this will be called twice then.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -27,59 +28,58 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- drivers/pci/host/pci-imx6.c | 33 ++++++++++++++++++---------------
- 1 file changed, 18 insertions(+), 15 deletions(-)
+ drivers/pci/host/pci-imx6.c | 32 ++++++++++++++++++++------------
+ 1 file changed, 20 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 4d5be4e..a9781e7 100644
+index a9781e7..5d85fc2 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -336,6 +336,23 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
- 	return;
+@@ -304,6 +304,25 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
+ 			IMX6Q_GPR8_TX_SWING_LOW, 127 << 25);
  }
  
-+static void imx6_pcie_reset_phy(struct pcie_port *pp)
++static int imx6_pcie_wait_for_link(struct pcie_port *pp)
 +{
-+	uint32_t temp;
++	int count = 200;
 +
-+	pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
-+	temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN |
-+		 PHY_RX_OVRD_IN_LO_RX_PLL_EN);
-+	pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
++	while (!dw_pcie_link_up(pp)) {
++		usleep_range(100, 1000);
++		if (--count)
++			continue;
 +
-+	usleep_range(2000, 3000);
++		dev_err(pp->dev, "phy link never came up\n");
++		dev_dbg(pp->dev, "DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
++			readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
++			readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
++		return -EINVAL;
++	}
 +
-+	pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
-+	temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN |
-+		  PHY_RX_OVRD_IN_LO_RX_PLL_EN);
-+	pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
++	return 0;
 +}
 +
- static int imx6_pcie_link_up(struct pcie_port *pp)
+ static void imx6_pcie_host_init(struct pcie_port *pp)
  {
- 	u32 rc, ltssm, rx_valid, temp;
-@@ -370,21 +387,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+ 	int count = 0;
+@@ -320,18 +339,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+ 			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
  
- 	dev_err(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
+-	while (!dw_pcie_link_up(pp)) {
+-		usleep_range(100, 1000);
+-		count++;
+-		if (count >= 200) {
+-			dev_err(pp->dev, "phy link never came up\n");
+-			dev_dbg(pp->dev,
+-				"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
+-				readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
+-				readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
+-			break;
+-		}
+-	}
++	imx6_pcie_wait_for_link(pp);
  
--	pcie_phy_read(pp->dbi_base,
--		PHY_RX_OVRD_IN_LO, &temp);
--	temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN
--		| PHY_RX_OVRD_IN_LO_RX_PLL_EN);
--	pcie_phy_write(pp->dbi_base,
--		PHY_RX_OVRD_IN_LO, temp);
--
--	usleep_range(2000, 3000);
--
--	pcie_phy_read(pp->dbi_base,
--		PHY_RX_OVRD_IN_LO, &temp);
--	temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN
--		| PHY_RX_OVRD_IN_LO_RX_PLL_EN);
--	pcie_phy_write(pp->dbi_base,
--		PHY_RX_OVRD_IN_LO, temp);
-+	imx6_pcie_reset_phy(pp);
- 
- 	return 0;
+ 	return;
  }
 -- 
 1.8.4.3
