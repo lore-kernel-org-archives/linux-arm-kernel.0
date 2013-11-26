@@ -1,75 +1,91 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 26 Nov 2013 20:09:16 +0100
-Subject: KNOT / CONTINUOUS (was: [PATCH] ASoC: kirkwood: Fix invalid
- SPDIF format)
-In-Reply-To: <s5h8uwba2gv.wl%tiwai@suse.de>
-References: <20131126104140.16e3eb87@armhf>
- <s5h8uwba2gv.wl%tiwai@suse.de>
-Message-ID: <20131126200916.47a45929@armhf>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 26 Nov 2013 11:07:26 -0800
+Subject: [GIT PULL] ARM: SoC fixes for 3.13-rc
+Message-ID: <20131126190726.GA28631@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013 11:20:48 +0100
-Takashi Iwai <tiwai@suse.de> wrote:
+Hi Linus,
 
-> Not against the patch itself, but just found looking through it:
-> 
-> > @@ -493,7 +497,7 @@ static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[2] = {
-> >  		.rates = SNDRV_PCM_RATE_8000_192000 |
-> >  			 SNDRV_PCM_RATE_CONTINUOUS |
-> >  			 SNDRV_PCM_RATE_KNOT,
-> 
-> Setting both CONTINUOUS and KNOT doesn't make sense.
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-Hi Takashi,
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-I understand 'continuous', but I could not find any clear definition of
-'knot'. May you explain what is its purpose?
+are available in the git repository at:
 
-BTW, if you may help me, while looking for SNDRV_PCM_RATE_KNOT,
-I found this sequence in soc-pcm.c:
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-	if (codec_stream->rates
-		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
-		hw->rates |= cpu_stream->rates;
-	if (cpu_stream->rates
-		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
-		hw->rates |= codec_stream->rates;
+for you to fetch changes up to a31ab44ef5d07c6707df4a9ad2c8affd2d62ff4b:
 
-and it seems related to the problem I have:
+  ARM: bcm2835: add missing #xxx-cells to I2C nodes (2013-11-25 21:56:00 -0800)
 
-- the cpu dai (kirkwood i2s) may generate any continuous rate
-  8000..192000 as shown in the patch.
+----------------------------------------------------------------
+ARM: SoC fixes for 3.13-rc
 
-- the HDMI transmitter (tda998x) accepts either i2s or s/pdif audio
-  input at any continuous rate, but when getting audio from s/pdif, the
-  lowest rate is 22.06kHz.
+Mostly bugfixes and a few small code removals. Worth pointing out is:
 
-In the associated codec, if I define:
+- A handful of more fixes to get DT enablement working properly on OMAP,
+  finding new breakage of things that don't work quite right yet without
+  the traditional board files. I expect a bit more of this to come in this
+  release as people test on their hardware.
+- Implementation of power_down_finish() on vexpress, to make kexec work and
+  to stop the MCPM core to produce a warning (the warning was new to 3.13-rc1).
+- A handful of minor fixes for various platforms.
 
-	.rates = SNDRV_PCM_RATE_22050 |
-		SNDRV_PCM_RATE_32000 |
-		...
-		SNDRV_PCM_RATE_192000 |
-		SNDRV_PCM_RATE_CONTINUOUS,
+----------------------------------------------------------------
+Dave Martin (1):
+      ARM: vexpress/TC2: Implement MCPM power_down_finish()
 
-audio works fine with streams at 33.075kHz (the kirkwood clock is
-exactly 33.075kHz). But when I want a stream at 7850Hz, the kirkwood
-i2s driver gets a clock at 8000Hz and the tda998x cannot do audio
-output.
+Doug Anderson (1):
+      ARM: dts: Add max77686 RTC interrupt to cros5250-common
 
-Otherwise, removing SNDRV_PCM_RATE_CONTINUOUS in the codec, I can hear
-the 7850Hz stream which is converted to 22.05 kHz by vlc, but when I
-want a stream at 33.075kHz, vlc converts it to 32kHz.
+Kevin Hilman (1):
+      Merge tag 'imx-fixes-3.13-2' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
 
-So, with the commit d9ad6296ec3b4a55b "ASoC: PCM_RATE: Check for KNOT
-and CONTINUOUS flags", I cannot get the exact clock I want.
+Olof Johansson (2):
+      ARM: omap: fix warning with LPAE build
+      Merge tag 'omap-for-v3.13/more-fixes-for-merge-window-take2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
 
-Do you know the reason of this patch, and, if it must stay, is there
-any possible bypass?
+Shawn Guo (1):
+      ARM: dts: imx6qdl: disable spdif "rxtx5" clock option
 
-Thanks.
+Stephen Warren (1):
+      ARM: bcm2835: add missing #xxx-cells to I2C nodes
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thierry Reding (1):
+      ARM: tegra: Provide dummy powergate implementation
+
+Tony Lindgren (9):
+      i2c: omap: Fix missing device tree flags for omap2
+      ARM: OMAP2+: Fix GPMC and simplify bootloader timings for 8250 and smc91x
+      ARM: dts: Fix omap2 specific dtsi files by adding the missing entries
+      ARM: OMAP2+: More randconfig fixes for reconfigure_io_chain
+      gpio: twl4030: Fix regression for twl gpio output
+      gpio: twl4030: Fix passing of pdata in the device tree case
+      ARM: OMAP2+: Fix undefined reference to set_cntfreq
+      ARM: OMAP2+: Remove legacy mux code for display.c
+      ARM: OMAP2+: Remove legacy omap4_twl6030_hsmmc_init
+
+ Documentation/devicetree/bindings/i2c/i2c-omap.txt |  3 +-
+ arch/arm/boot/dts/bcm2835.dtsi                     |  4 +
+ arch/arm/boot/dts/cros5250-common.dtsi             | 12 +++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  2 +-
+ arch/arm/boot/dts/omap-zoom-common.dtsi            |  2 +-
+ arch/arm/boot/dts/omap2.dtsi                       | 96 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap2420.dtsi                    | 23 ++++++
+ arch/arm/boot/dts/omap2430.dtsi                    | 49 +++++++++++
+ arch/arm/mach-omap2/Makefile                       |  6 +-
+ arch/arm/mach-omap2/common.h                       |  1 -
+ arch/arm/mach-omap2/display.c                      | 78 ------------------
+ arch/arm/mach-omap2/gpmc.c                         | 58 +++++--------
+ arch/arm/mach-omap2/omap-secure.h                  |  7 ++
+ arch/arm/mach-omap2/omap4-common.c                 | 57 -------------
+ arch/arm/mach-omap2/pm34xx.c                       |  2 +-
+ arch/arm/mach-omap2/prm44xx_54xx.h                 |  2 +-
+ arch/arm/mach-vexpress/spc.c                       | 40 +++++++++
+ arch/arm/mach-vexpress/spc.h                       |  1 +
+ arch/arm/mach-vexpress/tc2_pm.c                    | 66 +++++++++++++--
+ drivers/gpio/gpio-twl4030.c                        | 13 ++-
+ drivers/i2c/busses/i2c-omap.c                      | 22 +++++
+ include/linux/tegra-powergate.h                    | 27 ++++++
+ 22 files changed, 379 insertions(+), 192 deletions(-)
