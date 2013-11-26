@@ -1,50 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Nov 2013 21:27:26 +0100
-Subject: [GIT PULL] ux500 defconfig changed for v3.13-rcs
-Message-ID: <CACRpkdZ_EN7OPqfqva2BZr4RQGHKjb+JM0TtK+WwxXOESOLgqA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 12:32:18 -0800
+Subject: [PATCH 1/8] ARM: OMAP: Move public portion of dmtimer.h to
+ include/linux/omap-timer.h
+In-Reply-To: <5294FC09.2080604@ti.com>
+References: <1385085414-9034-1-git-send-email-joelf@ti.com>
+ <1385085414-9034-2-git-send-email-joelf@ti.com>
+ <20131122153334.GE10023@atomide.com> <52940F32.3000006@ti.com>
+ <20131126182908.GK26766@atomide.com> <5294FC09.2080604@ti.com>
+Message-ID: <20131126203217.GM26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+* Joel Fernandes <joelf@ti.com> [131126 11:53]:
+> On 11/26/2013 12:29 PM, Tony Lindgren wrote:
+> [..]
+> >>> We can implement an irqchip and a clocksource in the dmtimer code for the
+> >>> client drivers to use, and after that we only have a couple of dmtimer
+> >>> specific functions left to export.
+> >>>
+> >>> I'm thinkging some thing like this for the public API:
+> >>>
+> >>> omap_dm_timer_request			request_irq
+> >>> omap_dm_timer_request_specific		request_irq
+> >>> omap_dm_timer_get_irq			request_irq
+> >>> omap_dm_timer_set_source		clk_set_rate
+> >>
+> >> For clk_set_rate, how would one directly access the timer node if we've hidden
+> >> it behind an irq chip abstraction?
+> >>
+> >> per your suggestion, one would have something like:
+> >>
+> >> dsp {
+> >>     interrupt-parent = <&timer1>;
+> >> }
+> >>
+> >> so how do you clk_set_rate rate something like this given the dsp node?
+> > 
+> > All you have to do is implement a clocksource driver in dmtimer.c code.
+> >  
+> >> If the suggestion is to get the timer1 node from the interrupt-parent property,
+> >> if I may say- that's a bit ugly because now you're breaking the irq chip
+> >> abstraction just to access the timer node..
+> > 
+> > Hmm sorry I don't follow you here.
+> 
+> I assumed above that you were suggesting implementing interrupt chaining like
+> gpio-omap driver.
+> 
+> Can you give an example workflow to explain your suggestion?
+> 
+> I'll tell you how I understand what you were suggesting and then you can correct
+> me, and maybe we can meet somewhere:
+> 
+> Typically *without* irqchip or chaining what you suggested, we would  have
+> something like (purely an example):
+> dsp {
+>     timer = <&timer1>;
+> }
+> 
+> There is an API:
+> omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np); that one
+> would use.
+> 
+> Now moving to your suggestion, the dts would look like:
+> dsp {
+>     interrupt-parrent = <&timer1>;
+>     interrupts = <1>;
+> }
 
-here are two defconfig patches that I think should go into the
-release candidates for v3.13.
+Yes something like that.
+ 
+> Naturally some APIs will not fit into the IRQ framework, so these subset of
+> dmtimer API may need to be exposed as you pointed. To use the API, the timer has
+> to first be retrieved from interrupt-parent property of "dsp" here to get a
+> device_node, and then the timer has to be requested and subset API used on it.
+> This is "hack" that's not acceptable according to me...
 
-Please pull them in!
+Well it's really the same story with the GPIO framework if you follow the
+request_irq analogy for a GPIO pin. You may still need to configure some things
+manually that don't fit into the IRQ framework using let's say pinctrl framework.
+Sure some of that can be automated eventually for GPIO and also for hardware
+timers when we eventually have some generic hardware timer framework,
+but the request_irq and clock_set_rate parts will stay valid.
 
-Yours,
-Linus Walleij
+Regards,
 
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-defconfig-v3.13-rcs
-
-for you to fetch changes up to 59b023e9bf62933f7078dec339b110d5785f63f6:
-
-  ARM: ux500: u8500_defconfig: add missing cpuidle option (2013-11-26
-21:01:40 +0100)
-
-----------------------------------------------------------------
-Ux500 defconfig patches for the v3.13 rc series:
-
-- Allow creation and mounting of devtmpfs, which is used
-  by OpenEmbedded root filesystems among others.
-
-- Enable CPUidle for the ux500, it has been accidentally
-  disabled due to a Kconfig change.
-
-----------------------------------------------------------------
-Andi Shyti (1):
-      u8500_defconfig: allow creation and mounting of devtmpfs
-
-Daniel Lezcano (1):
-      ARM: ux500: u8500_defconfig: add missing cpuidle option
-
- arch/arm/configs/u8500_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Tony
