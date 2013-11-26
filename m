@@ -1,51 +1,33 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 26 Nov 2013 16:15:10 -0600
-Subject: [PATCH v3 09/10] ARM: dts: omap3-beagle-xm: Add USB Host support
-In-Reply-To: <20131126210456.GN26766@atomide.com>
-References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
- <1380012836-29900-10-git-send-email-rogerq@ti.com>
- <528BD2AF.2030607@ti.com> <528C8FBC.7020407@ti.com>
- <20131126210456.GN26766@atomide.com>
-Message-ID: <CAGo_u6r63oQ0tKrB4G_CK7Vpd5XOsVE+N-HEdiRYP41U5FsEhw@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 26 Nov 2013 17:24:45 -0500
+Subject: [PATCH] mmc: atmel-mci: fix timeout errors in SDIO mode when
+ using DMA
+In-Reply-To: <528E29D0.9080507@atmel.com> (Nicolas Ferre's message of "Thu, 21
+ Nov 2013 16:42:08 +0100")
+References: <1384959671-5646-1-git-send-email-ludovic.desroches@atmel.com>
+ <528E29D0.9080507@atmel.com>
+Message-ID: <87zjoqer82.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 3:04 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Roger Quadros <rogerq@ti.com> [131120 02:33]:
->> Nishant,
+Hi,
+
+On Thu, Nov 21 2013, Nicolas Ferre wrote:
+> On 20/11/2013 16:01, ludovic.desroches at atmel.com :
+>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 >>
->> On 11/19/2013 11:05 PM, Nishanth Menon wrote:
->> >
->> >
->> > On 09/24/2013 03:53 AM, Roger Quadros wrote:
->> >> Provide RESET GPIO and Power regulator for the USB PHY,
->> >> the USB Host port mode and the PHY device for the controller.
->> >> Also provide pin multiplexer information for USB host pins.
->> >>
->> >> We also relocate omap3_pmx_core pin definations so that they
->> >> are close to omap3_pmx_wkup pin definations.
->> >>
->> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> >> ---
->> >
->> > just using this thread, but a question ->
->> >
->> > I am kernel * master                                   dec8e46 Merge
->> > tag 'arc-v3.13-rc1-part2' of
->> > git://git.kernel.org/pub/scm/linux/kernel/git/vgupta/arc
->> >
->> > and I see that VAUX2 which supplies USB_1V8[1] is not enabled -> I did
->> > a quick patch and it did seem to work (Usb keyboard, networking, mouse
->> > etc on my ehci ports seems to come up good) - any suggestions how we'd
->> > like to handle this?
+>> With some SDIO devices, timeout errors can happen when reading data. To solve
+>> this issue the DMA transfer has to be activated before sending the command to
+>> the device. This order is incorrect in PDC mode. So we have to take care if we
+>> are using DMA or PDC to know when to send the MMC command.
 >>
->> It worked for me without your patch. It could be that u-boot is enabling
->> that regulator for me. I'm on u-boot-v2013.10.
->>
->> In any case, your patch seems the right thing to do. We should take it in
->> the rc cycle.
+>> Cc: <stable@vger.kernel.org> #3.2+
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 >
-> Can you guys post a proper fix for this? Meanwhile, I'll mark this
-> thread as read to shrink my inbox a bit.
-already done:
-https://patchwork.kernel.org/patch/3231151/
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks, pushed to mmc-next for 3.14.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
