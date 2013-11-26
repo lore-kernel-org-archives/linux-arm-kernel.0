@@ -1,34 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 10:20:22 -0800
-Subject: [BUG] PandaBoard hangs before starting init while booting v3.12
-In-Reply-To: <CAKZq+rcoC5PLSVVazWcce7V7TcBM8=M2jM56bvk9HO2orKt8fg@mail.gmail.com>
-References: <87hab9agjr.fsf@gmail.com>
- <CAKZq+rdQLrNE43aGaPtnDfaO6CHsq_ePLu+oRgWNs25OrdCtdw@mail.gmail.com>
- <87wqk3n54l.fsf@gmail.com> <20131120183548.GH10317@atomide.com>
- <CAKZq+rcoC5PLSVVazWcce7V7TcBM8=M2jM56bvk9HO2orKt8fg@mail.gmail.com>
-Message-ID: <20131126182022.GJ26766@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 26 Nov 2013 13:21:50 -0500
+Subject: [PATCH 1/3] usb: dwc3: Add Keystone specific glue layer
+In-Reply-To: <20131126171635.GP24310@saruman.home>
+References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+ <1385410581-12148-2-git-send-email-w-kwok2@ti.com>
+ <20131125203956.GI18046@saruman.home> <5293EFFD.9000508@ti.com>
+ <20131126171635.GP24310@saruman.home>
+Message-ID: <5294E6BE.3020308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chao Xu <caesarxuchao@gmail.com> [131122 19:28]:
-> "I wonder if we also have some dependency to some earlier versions of
-> u-boot as u-boot now only muxes the essential pins?"
-> This is exactly the problem in my case. I added "#define
-> CONFIG_SYS_ENABLE_PADS_ALL" in u-boot/include/configs/omap4_common.h
-> and now there is output.
+On Tuesday 26 November 2013 12:16 PM, Felipe Balbi wrote:
+> On Mon, Nov 25, 2013 at 07:49:01PM -0500, Santosh Shilimkar wrote:
+>> On Monday 25 November 2013 03:39 PM, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>
+>> [...]
+>>
+>>>
+>>>> +	kdwc3_dma_mask = dma_get_mask(dev);
+>>>> +	dev->dma_mask = &kdwc3_dma_mask;
+>>>> +
+>>>> +	error = kdwc3_enable(kdwc);
+>>>
+>>> I would drop this function and just add your clk_prepare() here, then
+>>> move clk_enable()/clk_disable() to ->runtime_resume/->runtime_suspend()
+>>> respectively. Then you could just call pm_runtime_get_sync() when you
+>>> need to access your registers and pm_runtime_put() when you want to drop
+>>> the clock reference.
+>>>
+>>> this will even make PM implementation a lot easier for you going
+>>> forward.
+>>>
+>> Just to make the PM runtime part clear, there are few issues with PM
+>> core clock layer [1], hence drivers is using clock layer. Its trivial
+>> to update the driver though once the issue is sorted out.
+>>
+>> Meanwhile driver development continue to be with clock calls. 
 > 
-> I guess the reason that the u-boot worked out-of-box for Ben but not
-> for me is that I missed some configurations in v3.12 kernel. I image
-> there is a config options that tells the kernel to take care of the
-> non-essential pins that used to be the responsibility of u-boot. Could
-> you confirm my hypothesis? And if so, could you kindly suggest what's
-> the name of the config option?
-
-That would be CONFIG_PINCTRL_SINGLE=y for device tree based omaps.
-But if we have the configuration missing for some driver in the
-board specific .dts file, that won't help naturally. We do have
-PINCTRL_SINGLE enabled in omap2plus_defconfig.
+> I don't mind having those clock calls, just suggested a different
+> placement for them.
+> 
+I got that part. Just wanted to clear the runtime PM part.
 
 Regards,
-
-Tony
+Santosh
