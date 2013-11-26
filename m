@@ -1,55 +1,64 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Nov 2013 20:12:39 -0600
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Nov 2013 03:16:47 +0100
 Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
  clk_prepare/unprepare
-In-Reply-To: <2503238.g4sCZxTpb5@avalon>
+In-Reply-To: <20131126021239.GA22213@saruman.home>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1930202.N3RGv6418i@avalon> <20131111195330.GE19212@saruman.home>
- <2503238.g4sCZxTpb5@avalon>
-Message-ID: <20131126021239.GA22213@saruman.home>
+ <2503238.g4sCZxTpb5@avalon> <20131126021239.GA22213@saruman.home>
+Message-ID: <2042860.IXZhL6v7c2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Felipe,
 
-On Tue, Nov 26, 2013 at 02:59:51AM +0100, Laurent Pinchart wrote:
-> > > > (2013/10/29 7:49), Laurent Pinchart wrote:
-> > > > > Turn clk_enable() and clk_disable() calls into clk_prepare_enable()
-> > > > > and clk_disable_unprepare() to get ready for the migration to the
-> > > > > common clock framework.
+On Monday 25 November 2013 20:12:39 Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Nov 26, 2013 at 02:59:51AM +0100, Laurent Pinchart wrote:
+> > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
+> > > > > > Turn clk_enable() and clk_disable() calls into
+> > > > > > clk_prepare_enable()
+> > > > > > and clk_disable_unprepare() to get ready for the migration to the
+> > > > > > common clock framework.
+> > > > > > 
+> > > > > > Cc: Felipe Balbi <balbi@ti.com>
+> > > > > > Cc: linux-usb at vger.kernel.org
+> > > > > > Signed-off-by: Laurent Pinchart
+> > > > > > <laurent.pinchart+renesas@ideasonboard.com>
 > > > > > 
-> > > > > Cc: Felipe Balbi <balbi@ti.com>
-> > > > > Cc: linux-usb at vger.kernel.org
-> > > > > Signed-off-by: Laurent Pinchart
-> > > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > Thank you for the patch.
+> > > > > 
+> > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 > > > > 
-> > > > Thank you for the patch.
-> > > > 
-> > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > Could you please pick this patch up ?
 > > > 
-> > > Could you please pick this patch up ?
+> > > after -rc1 is out, I don't see why not.
 > > 
-> > after -rc1 is out, I don't see why not.
+> > Great then :-)
+> > 
+> > As this patch is a dependency for other series that will go through
+> > different trees, could you please provide a stable branch in your tree
+> > with this patch included that you will push to v3.14 ?
 > 
-> Great then :-)
+> You guys are always killing me with those "stable branch" requests :-)
 > 
-> As this patch is a dependency for other series that will go through
-> different trees, could you please provide a stable branch in your tree
-> with this patch included that you will push to v3.14 ?
+> I'll get one up tomorrow. I guess I can avoid a topic branch altogether
+> if I just make this the first patch in "next" branch. I could push only
+> $subject for now until you merge then I'll push other stuff. Is that
+> enough for you ? My 'next' is always immutable.
 
-You guys are always killing me with those "stable branch" requests :-)
-
-I'll get one up tomorrow. I guess I can avoid a topic branch altogether
-if I just make this the first patch in "next" branch. I could push only
-$subject for now until you merge then I'll push other stuff. Is that
-enough for you ? My 'next' is always immutable.
+That sounds good, thank you. You can already push the other patches without 
+waiting for me, I can dig the commit ID of the first patch in your next 
+branch.
 
 -- 
-balbi
+Regards,
+
+Laurent Pinchart
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/c950acae/attachment.sig>
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/98b503eb/attachment.sig>
