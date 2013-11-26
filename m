@@ -1,131 +1,158 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 26 Nov 2013 10:05:42 +0200
-Subject: [PATCHv10 01/41] clk: add support for platform specific clock I/O
- wrapper functions
+Date: Tue, 26 Nov 2013 10:05:43 +0200
+Subject: [PATCHv10 02/41] CLK: TI: add DT alias clock registration mechanism
 In-Reply-To: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
 References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1385453182-24421-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1385453182-24421-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current clock wrappers assume simple and direct mapped hardware register
-access. Improve this support by adding functionality for registering
-platform specific clock I/O wrappers, which can be used to support
-various features needed like endianess conversions, indexed regmap support,
-etc. Default I/O wrapper provided also which uses the existing direct
-I/O mapped behavior.
+Some devices require their clocks to be available with a specific
+dev-id con-id mapping. With DT, the clocks can be found by default
+only with their name, or alternatively through the device node of
+the consumer. With drivers, that don't support DT fully yet, add
+mechanism to register specific clock names.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk.c            |   68 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |   15 +++++-----
- 2 files changed, 75 insertions(+), 8 deletions(-)
+ drivers/clk/Makefile    |    1 +
+ drivers/clk/ti/Makefile |    3 +++
+ drivers/clk/ti/clk.c    |   55 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/ti.h  |   42 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 101 insertions(+)
+ create mode 100644 drivers/clk/ti/Makefile
+ create mode 100644 drivers/clk/ti/clk.c
+ create mode 100644 include/linux/clk/ti.h
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2cf2ea6..c331386 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -34,6 +34,74 @@ static HLIST_HEAD(clk_root_list);
- static HLIST_HEAD(clk_orphan_list);
- static LIST_HEAD(clk_notifier_list);
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 7a10bc9..c61f768 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+ obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_COMMON_CLK_XGENE)  += clk-xgene.o
+ obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
++obj-$(CONFIG_ARCH_OMAP)		+= ti/
  
-+/**
-+ * clk_readl_default - default clock register read support function
-+ * @reg: register to read
+ obj-$(CONFIG_X86)		+= x86/
+ 
+diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+new file mode 100644
+index 0000000..1825f7f
+--- /dev/null
++++ b/drivers/clk/ti/Makefile
+@@ -0,0 +1,3 @@
++ifneq ($(CONFIG_OF),)
++obj-y					+= clk.o
++endif
+diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+new file mode 100644
+index 0000000..ef1a7cd
+--- /dev/null
++++ b/drivers/clk/ti/clk.c
+@@ -0,0 +1,55 @@
++/*
++ * TI clock support
 + *
-+ * Default implementation for reading a clock register.
++ * Copyright (C) 2013 Texas Instruments, Inc.
++ *
++ * Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+static u32 clk_readl_default(u32 __iomem *reg)
-+{
-+	return readl(reg);
-+}
++
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/ti.h>
++#include <linux/of.h>
++
++#undef pr_fmt
++#define pr_fmt(fmt) "%s: " fmt, __func__
 +
 +/**
-+ * clk_writel_default - default clock register write support function
-+ * @val: value to write
-+ * @reg: register to write to
++ * ti_dt_clocks_register - register DT alias clocks during boot
++ * @oclks: list of clocks to register
 + *
-+ * Default implementation for writing a clock register.
++ * Register alias or non-standard DT clock entries during boot. By
++ * default, DT clocks are found based on their node name. If any
++ * additional con-id / dev-id -> clock mapping is required, use this
++ * function to list these.
 + */
-+static void clk_writel_default(u32 val, u32 __iomem *reg)
++void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
 +{
-+	writel(val, reg);
-+}
++	struct ti_dt_clk *c;
++	struct device_node *node;
++	struct clk *clk;
++	struct of_phandle_args clkspec;
 +
-+struct clk_reg_ops clk_reg_ops_default = {
-+	.clk_readl = clk_readl_default,
-+	.clk_writel = clk_writel_default
++	for (c = oclks; c->node_name != NULL; c++) {
++		node = of_find_node_by_name(NULL, c->node_name);
++		clkspec.np = node;
++		clk = of_clk_get_from_provider(&clkspec);
++
++		if (!IS_ERR(clk)) {
++			c->lk.clk = clk;
++			clkdev_add(&c->lk);
++		} else {
++			pr_warn("failed to lookup clock node %s\n",
++				c->node_name);
++		}
++	}
++}
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+new file mode 100644
+index 0000000..df94c24
+--- /dev/null
++++ b/include/linux/clk/ti.h
+@@ -0,0 +1,42 @@
++/*
++ * TI clock drivers support
++ *
++ * Copyright (C) 2013 Texas Instruments, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __LINUX_CLK_TI_H__
++#define __LINUX_CLK_TI_H__
++
++#include <linux/clkdev.h>
++
++/**
++ * struct ti_dt_clk - OMAP DT clock alias declarations
++ * @lk: clock lookup definition
++ * @node_name: clock DT node to map to
++ */
++struct ti_dt_clk {
++	struct clk_lookup		lk;
++	char				*node_name;
 +};
 +
-+static struct clk_reg_ops *clk_reg_ops = &clk_reg_ops_default;
++#define DT_CLK(dev, con, name)		\
++	{				\
++		.lk = {			\
++			.dev_id = dev,	\
++			.con_id = con,	\
++		},			\
++		.node_name = name,	\
++	}
 +
-+/**
-+ * clk_register_reg_ops - register access functions for clock registers
-+ * @ops: register level ops
-+ *
-+ * Registers platform or SoC specific operations for reading / writing
-+ * clock registers.
-+ */
-+int clk_register_reg_ops(struct clk_reg_ops *ops)
-+{
-+	if (!ops)
-+		return -EINVAL;
-+	clk_reg_ops = ops;
-+	return 0;
-+}
 +
-+/**
-+ * clk_readl - read a clock register value from hardware
-+ * @reg: register to read
-+ *
-+ * Uses the registered clk_reg_ops to read a hardware clock register value.
-+ */
-+u32 clk_readl(u32 __iomem *reg)
-+{
-+	return clk_reg_ops->clk_readl(reg);
-+}
++void ti_dt_clocks_register(struct ti_dt_clk *oclks);
 +
-+/**
-+ * clk_writel - write a clock register value to hardware
-+ * @val: value to write
-+ * @reg: register to write
-+ *
-+ * Uses the registered clk_reg_ops to write a hardware clock register value.
-+ */
-+void clk_writel(u32 val, u32 __iomem *reg)
-+{
-+	clk_reg_ops->clk_writel(val, reg);
-+}
-+
- /***           locking             ***/
- static void clk_prepare_lock(void)
- {
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 7e59253..16e4df2 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -512,15 +512,14 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
-  * for improved portability across platforms
-  */
- 
--static inline u32 clk_readl(u32 __iomem *reg)
--{
--	return readl(reg);
--}
-+struct clk_reg_ops {
-+	u32 (*clk_readl)(u32 __iomem *reg);
-+	void (*clk_writel)(u32 val, u32 __iomem *reg);
-+};
- 
--static inline void clk_writel(u32 val, u32 __iomem *reg)
--{
--	writel(val, reg);
--}
-+u32 clk_readl(u32 __iomem *reg);
-+void clk_writel(u32 val, u32 __iomem *reg);
-+int clk_register_reg_ops(struct clk_reg_ops *ops);
- 
- #endif /* CONFIG_COMMON_CLK */
- #endif /* CLK_PROVIDER_H */
++#endif
 -- 
 1.7.9.5
