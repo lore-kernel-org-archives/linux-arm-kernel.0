@@ -1,118 +1,36 @@
-From: alex.aring@gmail.com (Alexander Aring)
-Date: Tue, 26 Nov 2013 09:51:29 +0100
-Subject: [PATCHv10 15/41] CLK: TI: DRA7: Add APLL support
-In-Reply-To: <1385453182-24421-16-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-16-git-send-email-t-kristo@ti.com>
-Message-ID: <20131126085128.GA19357@omega>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Nov 2013 09:52:19 +0100
+Subject: [PATCH 1/6] arm: sa1100: h3100: refactor LCD GPIO handling
+In-Reply-To: <1385048414-9812-2-git-send-email-dbaryshkov@gmail.com>
+References: <1385048414-9812-1-git-send-email-dbaryshkov@gmail.com>
+ <1385048414-9812-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CACRpkdbmcCNCg-4A1bRTszwE3yQf7BPcFxKE3LiH8eJpJBMezA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 21, 2013 at 4:40 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
 
-On Tue, Nov 26, 2013 at 10:05:56AM +0200, Tero Kristo wrote:
-> From: J Keerthy <j-keerthy@ti.com>
-> 
-> The patch adds support for DRA7 PCIe APLL. The APLL
-> sources the optional functional clocks for PCIe module.
-> 
-> APLL stands for Analog PLL. This is different when comapred
-> with DPLL meaning Digital PLL, the phase detection is done
-> using an analog circuit.
-> 
-> Signed-off-by: J Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  .../devicetree/bindings/clock/ti/apll.txt          |   31 +++
->  drivers/clk/ti/Makefile                            |    2 +-
->  drivers/clk/ti/apll.c                              |  239 ++++++++++++++++++++
->  3 files changed, 271 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/apll.txt
->  create mode 100644 drivers/clk/ti/apll.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/ti/apll.txt b/Documentation/devicetree/bindings/clock/ti/apll.txt
-> new file mode 100644
-> index 0000000..7faf5a6
-...
-> +
-> +static int __init of_dra7_apll_setup(struct device_node *node)
+> +static bool h3100_lcd_request(void)
 > +{
-> +	const struct clk_ops *ops;
-> +	struct clk *clk;
-> +	const char *clk_name = node->name;
-> +	int num_parents;
-> +	const char **parent_names = NULL;
-> +	u8 apll_flags = 0;
-> +	struct dpll_data *ad;
-> +	u32 idlest_mask = 0x1;
-> +	u32 autoidle_mask = 0x3;
-> +	int i;
-> +	int ret;
+> +       static bool h3100_lcd_ok;
+> +       int rc;
 > +
-> +	ops = &apll_ck_ops;
-> +	ad = kzalloc(sizeof(*ad), GFP_KERNEL);
-> +	if (!ad)
-> +		return -ENOMEM;
+> +       if (h3100_lcd_ok)
+> +               return true;
 > +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
+> +       rc = gpio_request_array(h3100_lcd_gpio, ARRAY_SIZE(h3100_lcd_gpio));
+> +       if (rc)
+> +               pr_err("%s: can't request GPIOs\n", __func__);
+> +       else
+> +               h3100_lcd_ok = true;
 > +
-> +	num_parents = of_clk_get_parent_count(node);
-> +	if (num_parents < 1) {
-> +		pr_err("dra7 apll %s must have parent(s)\n", node->name);
-> +		ret = -EINVAL;
-> +		goto cleanup;
-> +	}
-> +
-> +	parent_names = kzalloc(sizeof(char *) * num_parents, GFP_KERNEL);
-> +
-> +	for (i = 0; i < num_parents; i++)
-> +		parent_names[i] = of_clk_get_parent_name(node, i);
-> +
-> +	ad->clk_ref = of_clk_get(node, 0);
-> +	ad->clk_bypass = of_clk_get(node, 1);
-> +
-> +	if (IS_ERR(ad->clk_ref)) {
-> +		pr_debug("ti,clk-ref for %s not found\n", clk_name);
-> +		ret = -EAGAIN;
-> +		goto cleanup;
-> +	}
-> +
-> +	if (IS_ERR(ad->clk_bypass)) {
-> +		pr_debug("ti,clk-bypass for %s not found\n", clk_name);
-> +		ret = -EAGAIN;
-> +		goto cleanup;
-> +	}
-> +
-> +	ad->control_reg = ti_clk_get_reg_addr(node, 0);
-> +	ad->idlest_reg = ti_clk_get_reg_addr(node, 1);
-> +
-> +	if (!ad->control_reg || !ad->idlest_reg) {
-> +		ret = -EINVAL;
-> +		goto cleanup;
-> +	}
-> +
-> +	ad->idlest_mask = idlest_mask;
-> +	ad->enable_mask = autoidle_mask;
-> +
-> +	clk = omap_clk_register_apll(NULL, clk_name, parent_names,
-> +				num_parents, apll_flags, ad,
-> +				NULL, ops);
-> +
-> +	if (!IS_ERR(clk)) {
-> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +		return 0;
-> +	}
-> +
-
-Should we not also here do a cleanup for allocated memory?
-
-> +	return PTR_ERR(clk);
-> +
-> +cleanup:
-> +	kfree(parent_names);
-> +	kfree(ad);
-> +	return ret;
+> +       return h3100_lcd_ok;
 > +}
-> +CLK_OF_DECLARE(dra7_apll_clock, "ti,dra7-apll-clock", of_dra7_apll_setup);
 
-- Alex
+Hm hm this design pattern is somewhat strange, a run-once
+construct, but OK then.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
