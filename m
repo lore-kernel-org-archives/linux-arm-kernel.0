@@ -1,44 +1,63 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 26 Nov 2013 10:22:46 -0300
-Subject: [rtc-linux] Re: [PATCH v4 0/4] pm: Add power off control
-In-Reply-To: <CANacCWxwr7s6ZvjWRbg_JGgc-Q1sJa-KJCLrSCK4BvSrmL5Eug@mail.gmail.com>
-References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EAD58C2@DBDE01.ent.ti.com>
- <CA+Bv8XbUa7xPd8V7LQCmFbbdQvORUK1X0xBPzAhKUFFjjho2jw@mail.gmail.com>
- <20131122195041.GF18968@localhost>
- <CANacCWxwr7s6ZvjWRbg_JGgc-Q1sJa-KJCLrSCK4BvSrmL5Eug@mail.gmail.com>
-Message-ID: <20131126132245.GD2344@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 26 Nov 2013 14:23:44 +0100
+Subject: [PATCH 2/4] ARM: netx: stop using mach/timex.h
+In-Reply-To: <1384292466-31725-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1384292466-31725-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131126132343.GL17135@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 23, 2013 at 12:23:35PM -0500, Vaibhav Bedia wrote:
-> On Fri, Nov 22, 2013 at 2:50 PM, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
-> [...]
-> >
-> > And why specifically *2* seconds, instead of *1* or *33* ?
-> >
-> > Sounds a bit like voodoo magic on this side :-)
+On Tue, Nov 12, 2013 at 10:41:04PM +0100, Uwe Kleine-K?nig wrote:
+> mach/timex.h is the last remaining header that is unused for multiarch
+> builds but necessary for singlearch builds. To allow to get rid of it
+> for singlearch builds, too, drop its usage in netx arch code by
+> substituting CLOCK_TICK_RATE by a local cpp symbol.
 > 
-> Consider the scenario where the actual time is 00:00:01.95 secs.
-> Due to the 1 second resolution of the RTC, reading the registers
-> would return 00:00:01. By the time we get to updating the
-> RTC register for the shutdown by adding 1 sec (theoretically the
-> smallest delta) we could end up programming the time that's already
-> passed and in such cases the system will never shut down.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
+
+> ---
+>  arch/arm/mach-netx/time.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> 2 secs is the smallest delay that we can use to get the system
-> to shutdown reliably.
+> diff --git a/arch/arm/mach-netx/time.c b/arch/arm/mach-netx/time.c
+> index 6df42e6..0e29902 100644
+> --- a/arch/arm/mach-netx/time.c
+> +++ b/arch/arm/mach-netx/time.c
+> @@ -28,6 +28,8 @@
+>  #include <asm/mach/time.h>
+>  #include <mach/netx-regs.h>
+>  
+> +#define NETX_CLOCK_FREQ 100000000
+> +
+>  #define TIMER_CLOCKEVENT 0
+>  #define TIMER_CLOCKSOURCE 1
+>  
+> @@ -137,11 +139,11 @@ void __init netx_timer_init(void)
+>  			NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKSOURCE));
+>  
+>  	clocksource_mmio_init(NETX_GPIO_COUNTER_CURRENT(TIMER_CLOCKSOURCE),
+> -		"netx_timer", CLOCK_TICK_RATE, 200, 32, clocksource_mmio_readl_up);
+> +		"netx_timer", NETX_CLOCK_FREQ, 200, 32, clocksource_mmio_readl_up);
+>  
+>  	/* with max_delta_ns >= delta2ns(0x800) the system currently runs fine.
+>  	 * Adding some safety ... */
+>  	netx_clockevent.cpumask = cpumask_of(0);
+> -	clockevents_config_and_register(&netx_clockevent, CLOCK_TICK_RATE,
+> +	clockevents_config_and_register(&netx_clockevent, NETX_CLOCK_FREQ,
+>  					0xa00, 0xfffffffe);
+>  }
+> -- 
+> 1.8.4.2
 > 
-> So it's not voodoo magic after all ;)
 > 
 
-Right, thanks for the details.
-
-Care to add the above explanation to a comment inside the driver?
-
-That way, people won't ask this same question again :-)
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
