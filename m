@@ -1,100 +1,39 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 25 Nov 2013 21:02:10 -0600
-Subject: [PATCH 1/8] ARM: OMAP: Move public portion of dmtimer.h to
- include/linux/omap-timer.h
-In-Reply-To: <20131122153334.GE10023@atomide.com>
-References: <1385085414-9034-1-git-send-email-joelf@ti.com>
- <1385085414-9034-2-git-send-email-joelf@ti.com>
- <20131122153334.GE10023@atomide.com>
-Message-ID: <52940F32.3000006@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Nov 2013 20:31:29 -0700
+Subject: [PATCH] I2C: BCM2835: Linking platform nodes to adapter nodes
+In-Reply-To: <527D1870.8080302@wwwdotorg.org>
+References: <527CB3A1.7050808@koalo.de> <527D1870.8080302@wwwdotorg.org>
+Message-ID: <52941611.8070509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-Few replies inline below. Adding Suman as well who is planning to use dmtimer
-directly for his work with DSP.
-
-On 11/22/2013 09:33 AM, Tony Lindgren wrote:
-> Hi,
+On 11/08/2013 09:59 AM, Stephen Warren wrote:
+> On 11/08/2013 02:49 AM, Florian Meier wrote:
+>> In order to find I2C devices in the device tree, the platform nodes
+>> have to be known by the I2C core. Analogous to the i2c-omap driver
+>> this requires setting the dev.of_node parameter of the adapter.
 > 
-> * Joel Fernandes <joelf@ti.com> [131121 18:00]:
->> Multiplatform support has made arch/arm/plat-omap/include/plat/ inaccessible to
->> drivers outside the plat-omap directory [1]. Due to this the following drivers
->> are disabled with !CONFIG_ARCH_MULTIPLATFORM:
->> CONFIG_IR_RX51 (drivers/media/rc/ir-rx51.c)
->> CONFIG_TIDSPBRIDGE (drivers/staging/tidspbridge/core/dsp-clock.c)
->>
->> We move the portion of the dmtimer "API" that should be accessible to the
->> drivers, into include/linux/omap-timer.h
+> (CCing the I2C maintainers...)
 > 
-> As we chatted earlier, we don't have to expose all these hardware specific
-> functions and use existing Linux generic frameworks instead.
-
-I thought over this, and strongly feel that in this case moving to a generic
-framework is not the right approach. I mentioned reasons in last post, but
-summarizing all of them below:
-
-1. It is not immediately intuitive or obvious unlike GPIO that a timer can be an
-irqchip.
-
-2. There are only 1-2 users of the dmtimer directly so moving to linux generic
-framework is bit overkill I feel. Further there is already a framework-
-clockevents/hrtimer which everyone should be using. For the 1-2 direct dmtimer
-users, they should just use the dmtimer public API.
-
-More reasons below...
-
+>> diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
 > 
-> We can implement an irqchip and a clocksource in the dmtimer code for the
-> client drivers to use, and after that we only have a couple of dmtimer
-> specific functions left to export.
+>> @@ -299,6 +299,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
+>>  	strlcpy(adap->name, "bcm2835 I2C adapter", sizeof(adap->name));
+>>  	adap->algo = &bcm2835_i2c_algo;
+>>  	adap->dev.parent = &pdev->dev;
+>> +	adap->dev.of_node = pdev->dev.of_node;
 > 
-> I'm thinkging some thing like this for the public API:
+> Ah, that makes sense. Thinking about it now, I'd only ever used i2cget
+> etc. to access I2C devices, rather than instantiating drivers from DT.
 > 
-> omap_dm_timer_request			request_irq
-> omap_dm_timer_request_specific		request_irq
-> omap_dm_timer_get_irq			request_irq
-> omap_dm_timer_set_source		clk_set_rate
-
-For clk_set_rate, how would one directly access the timer node if we've hidden
-it behind an irq chip abstraction?
-
-per your suggestion, one would have something like:
-
-dsp {
-    interrupt-parent = <&timer1>;
-}
-
-so how do you clk_set_rate rate something like this given the dsp node?
-
-If the suggestion is to get the timer1 node from the interrupt-parent property,
-if I may say- that's a bit ugly because now you're breaking the irq chip
-abstraction just to access the timer node..
-
-> omap_dm_timer_stop			disable_irq
-> omap_dm_timer_start			enable_irq
-> omap_dm_timer_disable			disable_irq
-> omap_dm_timer_free			free_irq
-> omap_dm_timer_set_int_enable		enable_irq
+> That all said, I wonder if the I2C core shouldn't do something like the
+> following inside i2c_add_adapter():
 > 
-> After that, what's left to export are some functions to configure
-> the hardware timer:
+> if (!adap->dev.of_node && adap->dev.parent)
+> 	adap->dev.of_node = adap->dev.parent->of_node;
 > 
-> omap_dm_timer_write_counter
-> omap_dm_timer_set_match
-> omap_dm_timer_read_counter
-> omap_dm_timer_read_status
-> omap_dm_timer_write_status
+> That would save every single I2C driver from having to set up this field
+> manually.
 
-Same comment for clk_set_rate applies here, we've to access interrupt-parent
-property to get timer node and call dmtimer API which breaks the abstraction.
-
-Usually I've seen frameworks come up because there is code duplication etc. In
-this case there is no duplication as such, and the number of users of the API is
-also few. What is the problem with exposing a small set of API to timer users in
-drivers/ specially when they are prefixed by a unique name (omap_dm_timer)?
-
-thanks,
-
--Joel
+BTW, this should probably be:
+Cc: stable at vger.kernel.org
