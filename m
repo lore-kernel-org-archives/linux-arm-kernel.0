@@ -1,99 +1,71 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 26 Nov 2013 12:26:49 -0500 (EST)
-Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
- p2v and v2p conversions'
-In-Reply-To: <20131126134155.GB16735@n2100.arm.linux.org.uk>
-References: <20131125223636.GA20822@obsidianresearch.com>
- <20131125232003.GU16735@n2100.arm.linux.org.uk>
- <20131125233654.GV16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
- <20131126095430.GA16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
- <20131126134155.GB16735@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.10.1311261205300.9667@knanqh.ubzr>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 26 Nov 2013 11:29:12 -0600
+Subject: STOP THE MADNESS
+In-Reply-To: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
+On Tue, Nov 26, 2013 at 10:30 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Versatile PB926 is currently broken in mainline because of this, and it's
+> damn obvious that people are just churning out changes to "update" drivers
+> without testing them at all.
+>
+> CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc1+ #652
+> Backtrace:
+> [<c0016f0c>] (dump_backtrace) from [<c00172ac>] (show_stack+0x18/0x1c)
+>  r6:c798ace0 r5:00000000 r4:c78257e0 r3:00200140
+> [<c0017294>] (show_stack) from [<c0329ea0>] (dump_stack+0x20/0x28)
+> [<c0329e80>] (dump_stack) from [<c004fa80>] (__lock_acquire+0x1c0/0x1b80)
+> [<c004f8c0>] (__lock_acquire) from [<c0051970>] (lock_acquire+0x6c/0x80)
+>  r10:00000000 r9:c0455234 r8:00000060 r7:c047d798 r6:600000d3 r5:00000000
+>  r4:c782c000
+> [<c0051904>] (lock_acquire) from [<c032e484>] (_raw_spin_lock_irqsave+0x60/0x74)
+>  r6:c01a1100 r5:800000d3 r4:c798acd0
+> [<c032e424>] (_raw_spin_lock_irqsave) from [<c01a1100>] (pl061_irq_type+0x28/0x)
+>  r6:00000000 r5:00000000 r4:c798acd0
+> [<c01a10d8>] (pl061_irq_type) from [<c0059ef4>] (__irq_set_trigger+0x70/0x104)
+>  r6:00000000 r5:c01a10d8 r4:c046da1c r3:c01a10d8
+> [<c0059e84>] (__irq_set_trigger) from [<c005b348>] (irq_set_irq_type+0x40/0x60)
+>  r10:c043240c r8:00000060 r7:00000000 r6:c046da1c r5:00000060 r4:00000000
+> [<c005b308>] (irq_set_irq_type) from [<c01a1208>] (pl061_irq_map+0x40/0x54)
+>  r6:c79693c0 r5:c798acd0 r4:00000060
+> [<c01a11c8>] (pl061_irq_map) from [<c005d27c>] (irq_domain_associate+0xc0/0x190)
+>  r5:00000060 r4:c046da1c
+> [<c005d1bc>] (irq_domain_associate) from [<c005d604>] (irq_domain_associate_man)
+>  r8:00000008 r7:00000000 r6:c79693c0 r5:00000060 r4:00000000
+> [<c005d5d0>] (irq_domain_associate_many) from [<c005d864>] (irq_domain_add_simp)
+>  r8:c046578c r7:c035b72c r6:c79693c0 r5:00000060 r4:00000008 r3:00000008
+> [<c005d814>] (irq_domain_add_simple) from [<c01a1380>] (pl061_probe+0xc4/0x22c)
+>  r6:00000060 r5:c0464380 r4:c798acd0
+> [<c01a12bc>] (pl061_probe) from [<c01c0450>] (amba_probe+0x74/0xe0)
+>  r10:c043240c r9:c0455234 r8:00000000 r7:c047d7f8 r6:c047d744 r5:00000000
+>  r4:c0464380
+>
+> This is caused by the recently introduced irq_domain_add_simple() call
+> being placed before the spinlock has been initialised, and guess what
+> the side effect of that call is.
 
-> On Tue, Nov 26, 2013 at 08:35:43AM -0500, Nicolas Pitre wrote:
-> > On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
-> > 
-> > > On Mon, Nov 25, 2013 at 10:56:25PM -0500, Nicolas Pitre wrote:
-> > > > What about simply doing the following instead, which I'm sure used to 
-> > > > work properly at some point:
-> > > > 
-> > > > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > > > index 9ecccc8650..2b8b8d3236 100644
-> > > > --- a/arch/arm/include/asm/memory.h
-> > > > +++ b/arch/arm/include/asm/memory.h
-> > > > @@ -239,6 +239,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> > > >  
-> > > >  #else
-> > > >  
-> > > > +#ifndef PHYS_OFFSET
-> > > > +#ifdef PLAT_PHYS_OFFSET
-> > > > +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > > > +#else
-> > > > +#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > > > +#endif
-> > > > +#endif
-> > > > +
-> > > >  static inline phys_addr_t __virt_to_phys(unsigned long x)
-> > > >  {
-> > > >  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> > > > @@ -253,14 +261,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> > > >  #endif
-> > > >  #endif /* __ASSEMBLY__ */
-> > > >  
-> > > > -#ifndef PHYS_OFFSET
-> > > > -#ifdef PLAT_PHYS_OFFSET
-> > > > -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > > > -#else
-> > > > -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > > > -#endif
-> > > > -#endif
-> > > 
-> > > And that makes PHYS_OFFSET undefined to assembly code - and we have
-> > > references to it from said code.
-> > 
-> > Why does the kernel compile properly for me with this change then?
-> 
-> Nicolas,
-> 
-> Try using grep rather than just typing emails for the hell of it.
-> Try looking at the patch I sent to fix this issue.  Either of those
-> will give you the appropriate clue necessary to answer your question.
+IMO, the whole commit causing this problem should be reverted for
+additional reasons. Irq generic chp and irqdomains are orthogonal
+features/infrastructure and should not be mutually exclusive. We need
+to fix irq generic chip.
 
-Your patch does s/PHYS_OFFSET/PLAT_PHYS_OFFSET/ in assembly code and 
-defines PLAT_PHYS_OFFSET with CONFIG_PHYS_OFFSET when needed.
+commit f1f70479e999217ecbf619d71837fc5d77c680fb
+Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+Date:   Sun Feb 17 19:42:49 2013 +0800
 
-Mine leaves PHYS_OFFSET as is in assembly code and defines PHYS_OFFSET 
-with PLAT_PHYS_OFFSET or CONFIG_PHYS_OFFSET as appropriate, as it *used* 
-to work before commit ca5a45c06c.
+    gpio: pl061: support irqdomain
 
-The reason this commit broke things is because it moved __virt_to_phys() 
-and __phys_to_virt() from macros to static inline.  The macro version 
-didn't need PHYS_OFFSET to be defined beforehand, which is not the case 
-for static inline definitions.  Hence my fix which is to simply move 
-(one of) the definition of PHYS_OFFSET above its use by the mentioned 
-static inline code.
+    Drop the support of irq generic chip. Now support irqdomain instead.
 
-I also think it is a good thing _not_ to use PLAT_PHYS_OFFSET in 
-assembly code.  This was in fact done on purpose.  The simple fact that 
-PHYS_OFFSET, with some configuration, expands to something unappropriate 
-for assembly code is a perfect mechanism to identify that something is 
-wrong with that configuration.  The reason is that no assembly code 
-should be using PHYS_OFFSET when CONFIG_PATCH_PHYS_VIRT is defined.  If 
-it does then this is wrong.
+    Although set_wake() is defined in irq generic chip & it is not really
+    used in pl061 gpio driver. Drop it at the same time.
 
-By moving that assembly code to PLAT_PHYS_OFFSET you are basically 
-removing that sanity check mechanism since it might be possible for a 
-platform to still define PLAT_PHYS_OFFSET in its mach/memory.h even if 
-CONFIG_PATCH_PHYS_VIRT is defined.
-
-So, unless you identify a problem with the patch I sent, I still stand 
-by my suggested fix.
+    Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
 
-Nicolas
+Rob
