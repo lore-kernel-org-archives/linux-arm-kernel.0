@@ -1,74 +1,213 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 26 Nov 2013 09:47:13 -0500
-Subject: HYP Kernel boot requirements
-In-Reply-To: <20131126141346.GA692@arm.com>
-References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
- <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
- <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
- <52937AB4.1060901@ti.com>
- <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
- <529381E4.3090405@ti.com> <20131125172825.GD8396@arm.com>
- <5293A888.9050500@ti.com> <20131126141346.GA692@arm.com>
-Message-ID: <5294B471.7020205@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Nov 2013 15:48:45 +0100
+Subject: [PATCH RFC v2 04/17] ARM: shmobile: r8a7779: Add clocks
+In-Reply-To: <1385451139-29686-5-git-send-email-horms+renesas@verge.net.au>
+References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
+ <1385451139-29686-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <2582481.JJAGzpNFcA@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 November 2013 09:13 AM, Catalin Marinas wrote:
-> On Mon, Nov 25, 2013 at 07:44:08PM +0000, Santosh Shilimkar wrote:
->> On Monday 25 November 2013 12:28 PM, Catalin Marinas wrote:
->>> On Mon, Nov 25, 2013 at 04:59:16PM +0000, Santosh Shilimkar wrote:
->>>> What I am saying is the platforms like OMAP5 already support PM in
->>>> mainline kernel and we can't break that for KVM. Boot-loaders
->>>> would be thrashed after boot so you need something which runs
->>>> in Kernel or along with Kernel to have equivalent of hyp
->>>> switching.
->>>>
->>>> Am not challenging the agreed direction but we need to solve the
->>>> PM problem as well before making "all CPU runs boot-loader for
->>>> HYP kernels" as a must have. At least its is a change in boot
->>>> strategy from existing kernels.
->>>
->>> Of course I recommend PSCI which covers both hotplug and suspend ;), but
->>> I guess it's not the case for OMAP5. Since OMAP has its own secondary
->>> booting protocol and CPU hotplug re-entry, can you not just use
->>> different entry point when the primary CPU was initially started in Hyp
->>> mode (e.g. omap5_hyp_secondary_startup)?
->>>
->> How will that solve the guest secondary boot failure case when using
->> the same kernel binary for guest-boot ? Even for primary CPU which
->> will be suspended it needs to resume already in HYP mode and its not
->> going to go through boot-loader. So the low power code needs to have
->> HYP switch code so that CPU resumes in HYP mode.
-> 
-> Is it late to rewrite the OMAP5 firmware?
-> 
-Well its ROM'ed unfortunately so no choice. OMAP5 ROM did implement
-a secure API which lets you enter into HYP mode and thats the only
-thing can be used.
+Hi Simon,
 
-> What I meant is that you have the same kernel binary but with two sets
-> of entry points, or maybe a single set of entry points and some global
-> variable that you set during cold boot if the primary CPU is entered in
-> Hyp mode. So you change the boot loader to switch to Hyp before it
-> starts the kernel and leave the additional switching to be done by the
-> secondary entry points (or PM code) based on the variable you set during
-> cold boot. But I would recommend rewriting the firmware.
-> 
->> I will look at PSCI more closely and see what can be done here.
-> 
-> PSCI has a different secondary start-up and hotplug/suspend protocol and
-> CPUs wake up in Hyp if available. But this requires changing your
-> firmware, PSCI is not a kernel-only thing. Do you need to support both
-> older and newer kernels with the OMAP5 firmware (and possibly same DT)?
->
-Hmmm.. So thats rules out PSCI for OMAP5 then.
+Thanks for the patch.
 
-Keystone actually has nice way to deal with the problem since the
-boot-monitor code can be patched up and hence I had no trouble
-implementing the "CPU starts in HYP mode" requirement on it.
+On Tuesday 26 November 2013 16:32:06 Simon Horman wrote:
+> Declare all core and MSTP clocks currently used by r8a7779-based boards.
+> 
+> Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7779-marzen.dts |   1 +
+>  arch/arm/boot/dts/r8a7779.dtsi       | 124 ++++++++++++++++++++++++++++++++
+>  2 files changed, 125 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts
+> b/arch/arm/boot/dts/r8a7779-marzen.dts index a7af2c2..ee3fb60 100644
+> --- a/arch/arm/boot/dts/r8a7779-marzen.dts
+> +++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+> @@ -11,6 +11,7 @@
+> 
+>  /dts-v1/;
+>  #include "r8a7779.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> 
+>  / {
+>  	model = "marzen";
+> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> index b2b418a..d524b3f 100644
+> --- a/arch/arm/boot/dts/r8a7779.dtsi
+> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> @@ -10,6 +10,7 @@
+>   */
+> 
+>  /include/ "skeleton.dtsi"
+> +#include <dt-bindings/clock/r8a7779-clock.h>
+> 
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> 
+> @@ -248,4 +249,127 @@
+>  		cap-sdio-irq;
+>  		status = "disabled";
+>  	};
+> +
+> +	clocks {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		/* Special CPG clocks */
+> +		cpg_clocks: cpg_clocks at 0xe6150000 {
+> +			compatible = "renesas,r8a7779-cpg-clocks";
+> +			reg = <0 0xe6150000 0 0x1000>;
+> +			#clock-cells = <1>;
+> +			clock-output-names = "plla", "z", "zs", "s", "s1",
+> +					     "p", "out";
+> +		};
+> +
+> +		/* Fixed factor clocks */
+> +		i_clk: i_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <2>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "i";
+> +		};
+> +		s3_clk: s3_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <8>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "s3";
+> +		};
+> +		s4_clk: s4_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <16>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "s4";
+> +		};
+> +		g_clk: g_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <24>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "g";
+> +		};
 
+clks2 is missing, either as a fixed-factor-clock in DT, or as a CPG special 
+clock.
+
+> +		/* Gate clocks */
+> +		mstp0_clks: mstp0_clks {
+> +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0 0xffc80030 0 4>, <0 0xffc80034 0 4>;
+
+There's no status register for MSTP0.
+
+> +			clocks = <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				<&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>;
+> +			#clock-cells = <1>;
+> +			renesas,clock-indices = <
+> +				R8A7779_CLK_HSPI0 R8A7779_CLK_HSPI1 R8A7779_CLK_HSPI2
+> +				R8A7779_CLK_TMU0 R8A7779_CLK_TMU1 R8A7779_CLK_TMU2
+> +				R8A7779_CLK_SCIF6 R8A7779_CLK_SCIF4 R8A7779_CLK_SCIF3
+
+s/SCIF6/SCIF5/ (and in 04/17 as well) ?
+
+> +				R8A7779_CLK_SCIF2 R8A7779_CLK_SCIF1 R8A7779_CLK_SCIF0
+> +				R8A7779_CLK_I2C3 R8A7779_CLK_I2C2 R8A7779_CLK_I2C1
+> +				R8A7779_CLK_I2C0
+> +			>;
+> +			clock-output-names =
+> +				"hspi0", "hspi1", "hspi2",
+> +				"tmu0", "tmu1", "tmu2",
+> +				"scif6", "scif4", "scif3",
+
+Here too.
+
+> +				"scif2", "scif1", "scif0",
+> +				"i2c3", "i2c2", "i2c1",
+> +				"i2c0";
+> +		};
+> +		mstp1_clks: mstp1_clks {
+> +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0 0xffc80034 0 4>, <0 0xffc80038 0 4>;
+
+The status register is at 0xffc80044.
+
+> +			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks 
+R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
+> +			#clock-cells = <1>;
+> +			renesas,clock-indices = <
+> +				R8A7779_CLK_EHCI0 R8A7779_CLK_OHCI0
+> +				R8A7779_CLK_EHCI1 R8A7779_CLK_OHCI1
+> +				R8A7779_CLK_DU R8A7779_CLK_VIN2
+> +				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
+> +				R8A7779_CLK_SATA R8A7779_CLK_VIN3
+> +			>;
+> +			clock-output-names =
+> +				"ehci0", "ohci0",
+> +				"ehci1", "ohci1",
+> +				"du", "vin2",
+> +				"vin1", "vin0",
+> +				"sata", "vin3";
+> +		};
+> +		mstp3_clks: mstp3_clks {
+> +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0 0xffc8003c 0 4>, <0 0xffc80040 0 4>;
+
+There's no status register for MSTP3.
+
+> +			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks 
+R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
+> +			#clock-cells = <1>;
+> +			renesas,clock-indices = <
+> +				R8A7779_CLK_EHCI0 R8A7779_CLK_OHCI0
+> +				R8A7779_CLK_EHCI1 R8A7779_CLK_OHCI1
+> +				R8A7779_CLK_DU R8A7779_CLK_VIN2
+> +				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
+> +				R8A7779_CLK_SATA R8A7779_CLK_VIN3
+
+That's for MSTP1, not MSTP3.
+
+> +			>;
+> +			clock-output-names =
+> +				"ehci0", "ohci0",
+> +				"ehci1", "ohci1",
+> +				"du", "vin2",
+> +				"vin1", "vin0",
+> +				"sata", "vin3";
+> +		};
+> +	};
+>  };
+-- 
 Regards,
-Santosh
 
-
- 
+Laurent Pinchart
