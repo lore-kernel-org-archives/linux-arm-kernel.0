@@ -1,27 +1,39 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 25 Nov 2013 16:03:06 -0800
-Subject: clk: clk_round_rate() should return 0, not negative numbers,
- upon error
-In-Reply-To: <20131126000153.GY16735@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1311251553080.23090@tamien>
- <20131126000153.GY16735@n2100.arm.linux.org.uk>
-Message-ID: <5293E53A.5050103@nvidia.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 26 Nov 2013 01:03:49 +0100
+Subject: [PATCH v2] watchdog: s3c2410_wdt: Only register for cpufreq on
+ ARM_S3C24XX_CPUFREQ
+In-Reply-To: <1385422603-22684-1-git-send-email-dianders@chromium.org>
+References: <1385420137-32725-1-git-send-email-dianders@chromium.org>
+ <1385422603-22684-1-git-send-email-dianders@chromium.org>
+Message-ID: <12609399.rlV8OtdFZt@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 04:01 PM, Russell King - ARM Linux wrote:
-> On Mon, Nov 25, 2013 at 03:55:33PM -0800, Paul Walmsley wrote:
->> Update the documentation for clk_round_rate() to state that it should
->> return 0 rather than a negative error code when it encounters an
->> error.  This describes how the common clock framework currently works;
->> howeever, some clock code does not yet align to this.
->>
->> This change is to prepare for returning unsigned values from
->> clk_round_rate().
-> You really ought to document why this is being changed here, to help
-> sell the change to parties who are not aware of the background.
-> Otherwise, it just looks like a gratuitous API change.
+On Monday 25 of November 2013 15:36:43 Doug Anderson wrote:
+> On modern SoCs the watchdog timer is parented on a clock that doesn't
+> change every time we have a cpufreq change.  That means we don't need
+> to constantly adjust the watchdog timer, so avoid registering for and
+> dealing with cpufreq transitions unless we've actually got
+> CONFIG_ARM_S3C24XX_CPUFREQ defined.
+> 
+> Note that this is more than just an optimization.  The s3c2410
+> watchdog driver actually pats the watchdog on every CPU frequency
+> change.  On modern systems these happen many times per second (even in
+> a system where "nothing" is happening).  That effectively makes any
+> userspace watchdog program useless (the watchdog is constantly patted
+> by the kernel).  If we need ARM_S3C24XX_CPUFREQ defined on a
+> multiplatform kernel we'll need to make sure that kernel supports
+> common clock and change this to user common clock framework.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v2:
+> - Use the updated config name.
+> 
+>  drivers/watchdog/s3c2410_wdt.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Will do and resend.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-- Paul
+Best regards,
+Tomasz
