@@ -1,37 +1,40 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Tue, 26 Nov 2013 07:42:21 +0000
-Subject: [PATCH 1/4] mtd: spi-nor: move the SPI NOR commands to a new
- header file
-In-Reply-To: <1385447575-23773-2-git-send-email-b32955@freescale.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <1385447575-23773-2-git-send-email-b32955@freescale.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA4EC81@DBDE04.ent.ti.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 26 Nov 2013 16:44:08 +0900
+Subject: [GIT PULL] extcon fixes for 3.13-rc2
+Message-ID: <52945148.2020205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shijie,
+Hi Greg,
 
-Few feedbacks inline.. 
+This is extcon fixes pull request for 3.13-rc2. I add detailed description of
+this pull request on below. Please pull extcon fixes with following updates.
 
-> From: Huang Shijie [mailto:b32955 at freescale.com]
-> This patch adds a new header :spi-nor.h,
-> and moves all the SPI NOR commands and relative macros into this new
-> header.
-> 
-(1)
-It's better to take all Flash vendor specific opcodes from DT.. 
-With new framework we should do away with macros for each vendor,
-instead let each board file provide this information based on flash device
-which is mounted on it.
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-(2)
-And also, I suggest not to touch m25p80 in anyway, bcoz it stable driver
-used by many. So unless spi-nor framework is accepted and is stable we
-m25p80 should continue working as it is.
-Thus your patches should be independent of any existing driver or other
-frameworks. This way it might get accepted fast. Then later you can provide
-a way to attach m25p80 to spi-nor framework.
-Thoughts ?
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
+are available in the git repository at:
 
-with regards, pekon
+  git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git tags/extcon-linus-for-3.13-rc2
+
+for you to fetch changes up to 7585ca0dc950583be7fc62099ca43a0c9551a875:
+
+  extcon: remove freed groups caused the panic or warning in unregister flow (2013-11-26 15:17:23 +0900)
+
+----------------------------------------------------------------
+Update extcon for 3.13-rc2
+
+This patchset fix NULL pointer error of extcon-arizona driver and fix issue
+about memory of device groups when calling extcon_dev_unregister function.
+
+----------------------------------------------------------------
+Charles Keepax (1):
+      extcon: arizona: Get pdata from arizona structure not device
+
+Wang, Xiaoming (1):
+      extcon: remove freed groups caused the panic or warning in unregister flow
+
+ drivers/extcon/extcon-arizona.c | 4 +---
+ drivers/extcon/extcon-class.c   | 3 ++-
+ 2 files changed, 3 insertions(+), 4 deletions(-)
