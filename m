@@ -1,38 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 14:05:43 -0800
-Subject: [PATCH 6/7] ARM: OMAP: Disable POSTED mode for errata i103 and
- i767
-In-Reply-To: <5293CC93.6040603@ti.com>
-References: <1385415876-12387-1-git-send-email-joelf@ti.com>
- <1385415876-12387-7-git-send-email-joelf@ti.com>
- <20131125221437.GW10023@atomide.com> <5293CC93.6040603@ti.com>
-Message-ID: <20131126220543.GP26766@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Nov 2013 23:09:43 +0100
+Subject: STOP THE MADNESS
+In-Reply-To: <CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
+References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+ <CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
+Message-ID: <CACRpkdY9MTUDtDxRKRHCXch98cNiMS-dumQvaTH7gp1OCVUx6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joel Fernandes <joelf@ti.com> [131125 14:18]:
-> On 11/25/2013 04:14 PM, Tony Lindgren wrote:
-> > * Joel Fernandes <joelf@ti.com> [131125 13:46]:
-> >> Enabling of Posted mode is seen to cause problems on dmtimer modules on AM33xx
-> >> (much like other OMAPs).  Reference discussions on forums [1] [2]. Earlier
-> >> patch solving this on other OMAPs [3].
-> >>
-> >> For OMAP SoCs with this errata, the fix has been to not enable Posted mode.
-> >> However, on some SoCs (atleast AM33xx) which carry this errata, Posted mode
-> >> is enabled on reset. So we not only need to ignore enabling of the POSTED bit
-> >> when the timer is requested, but also disable Posted mode if errata is present.
-> > 
-> > This could explain some occasional lost timers I saw a while back when
-> > testing things.. We most likely should merge for the -rc series with cc stable.
-> 
-> Sure, I agree.
-> 
-> > 
-> > Does this depend on the other patches in this series?
-> > 
-> 
-> No it doesn't depend.
+On Tue, Nov 26, 2013 at 6:29 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-OK thanks applying into omap-for-v3.13/fixes-take4.
+> IMO, the whole commit causing this problem should be reverted for
+> additional reasons. Irq generic chp and irqdomains are orthogonal
+> features/infrastructure and should not be mutually exclusive. We need
+> to fix irq generic chip.
 
-Tony
+This cannot be easily reverted due to a lot of code and fixes building
+on top of it, and even if it could I guess it will also break device tree
+use on these: git grep pl061 arch/arm/boot/dts
+
+As DT mandates that the irqdomain be used, or it cannot translate
+the IRQs as before this patch it uses an hard-coded base from
+platform data. This is one of those odd drivers that don't need
+one line of DT-specific code in it to work with device tree, yet
+it works.
+
+I guess what I have to do is take out the very board Russell has
+and that I happen to have also and just get to the bottom of this
+bug and fix it and test it.
+
+A pointer to an "ideal" GPIO chip + irq_chip driver would be highly
+appreciated ...
+
+Yours,
+Linus Walleij
