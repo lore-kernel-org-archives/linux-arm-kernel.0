@@ -1,22 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Nov 2013 13:22:44 +0000
-Subject: [PATCH 1/2] ASoC: atmel: sam9x5_wm8731: fix oops when unload
- module
-In-Reply-To: <1385439472-23352-1-git-send-email-voice.shen@atmel.com>
-References: <1385439472-23352-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20131126132244.GP14725@sirena.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 26 Nov 2013 10:22:46 -0300
+Subject: [rtc-linux] Re: [PATCH v4 0/4] pm: Add power off control
+In-Reply-To: <CANacCWxwr7s6ZvjWRbg_JGgc-Q1sJa-KJCLrSCK4BvSrmL5Eug@mail.gmail.com>
+References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EAD58C2@DBDE01.ent.ti.com>
+ <CA+Bv8XbUa7xPd8V7LQCmFbbdQvORUK1X0xBPzAhKUFFjjho2jw@mail.gmail.com>
+ <20131122195041.GF18968@localhost>
+ <CANacCWxwr7s6ZvjWRbg_JGgc-Q1sJa-KJCLrSCK4BvSrmL5Eug@mail.gmail.com>
+Message-ID: <20131126132245.GD2344@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 12:17:51PM +0800, Bo Shen wrote:
+On Sat, Nov 23, 2013 at 12:23:35PM -0500, Vaibhav Bedia wrote:
+> On Fri, Nov 22, 2013 at 2:50 PM, Ezequiel Garcia
+> <ezequiel.garcia@free-electrons.com> wrote:
+> [...]
+> >
+> > And why specifically *2* seconds, instead of *1* or *33* ?
+> >
+> > Sounds a bit like voodoo magic on this side :-)
+> 
+> Consider the scenario where the actual time is 00:00:01.95 secs.
+> Due to the 1 second resolution of the RTC, reading the registers
+> would return 00:00:01. By the time we get to updating the
+> RTC register for the shutdown by adding 1 sec (theoretically the
+> smallest delta) we could end up programming the time that's already
+> passed and in such cases the system will never shut down.
+> 
+> 2 secs is the smallest delay that we can use to get the system
+> to shutdown reliably.
+> 
+> So it's not voodoo magic after all ;)
+> 
 
-> +	card->drvdata = priv;
+Right, thanks for the details.
 
-You should use snd_soc_card_set_drvdata() for this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/60359891/attachment.sig>
+Care to add the above explanation to a comment inside the driver?
+
+That way, people won't ask this same question again :-)
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
