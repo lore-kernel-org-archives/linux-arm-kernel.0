@@ -1,48 +1,49 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 26 Nov 2013 04:10:16 -0800
-Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <52948184.50604@ti.com>
-References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52948184.50604@ti.com>
-Message-ID: <52948FA8.7000609@roeck-us.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 26 Nov 2013 13:13:15 +0100
+Subject: [PATCH] clk: exynos: Fix typos in DT bindings documentation
+In-Reply-To: <CAK9yfHxL8DnN8BE94-L3_MK+dBO0exEq7YAamXRHQ7Abo3jYyQ@mail.gmail.com>
+References: <1384775172-3373-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1566145.0GyXC9vG8j@avalon>
+ <CAK9yfHxL8DnN8BE94-L3_MK+dBO0exEq7YAamXRHQ7Abo3jYyQ@mail.gmail.com>
+Message-ID: <1538452.UuDUTCGYER@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 03:09 AM, Grygorii Strashko wrote:
-> On 11/25/2013 04:04 PM, Ivan Khoronzhuk wrote:
->> To reduce code duplicate and increase code readability use WDT core
->> code to handle WDT interface.
->>
->> Remove io_lock as the WDT core uses mutex to lock each wdt device.
->> Remove wdt_state as the WDT core tracks state with its own variable.
->>
->> The watchdog_init_timeout() can read timeout value from timeout-sec
->> property if the passed value is out of bounds. The heartbeat is
->> initialized in next way. If heartbeat is not set thought module
->> parameter, try to read it's value from WDT node timeout-sec property.
->> If node has no one, use default value.
->>
->> The heartbeat is hold in wdd->timeout by WDT core, so use it in
->> order to set timeout period.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>   arch/arm/mach-davinci/da8xx-dt.c      |    2 +-
->>   arch/arm/mach-davinci/devices-da8xx.c |    4 +-
->>   arch/arm/mach-davinci/devices.c       |    2 +-
->>   drivers/watchdog/Kconfig              |    2 +
->>   drivers/watchdog/davinci_wdt.c        |  151 ++++++++-------------------------
->>   5 files changed, 43 insertions(+), 118 deletions(-)
->
-> Pls note, that this patch contains both changes in platform and driver code to fix regression reported by Sekhar Nori on v2 of this series and caused by driver name changing.
->
-> Is it ok?
->
-> It can be splitted, but then both patches will introduce regression by itself and thing will work only if both of them will be applied together.
->
-Splitting it would break bisect, even if applied together, so I don't think this would be a good idea.
+On Tuesday 26 of November 2013 11:23:49 Sachin Kamat wrote:
+> +CC Mike and removed a few from the list.
+> 
+> Hi Laurent,
+> 
+> On 26 November 2013 05:52, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+> > Hi Sachin,
+> >
+> > On Monday 18 November 2013 17:17:39 Sachin Kamat wrote:
+> >> On 18 November 2013 17:16, Laurent Pinchart wrote:
+> >> > s/comptible/compatible/
+> >> >
+> >> > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> >>
+> >> Good catch.
+> >>
+> >> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+> >
+> > Have you queued up the patch for v3.14 ?
+> 
+> No, I haven't. This should either go through DT tree or else Tomasz Figa can
+> pick this up and send it to Mike as per the new workflow for 3.14.
+> 
+> 
 
-Guenter
+Well, since this is purely a fix for the documentation, without any
+dependencies on clk tree, I see no reason to send it in any other way than
+through DT tree directly.
+
+As for clk-samsung tree, I'm currently in process of preparing a tree on
+kernel.org so I should start picking up Samsung clock patches soon.
+
+By the way, the patch adding me to MAINTAINERS file has not been merged
+yet. Mike, are there any issues?
+
+Best regards,
+Tomasz
