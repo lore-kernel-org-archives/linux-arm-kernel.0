@@ -1,69 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 09:57:59 -0800
-Subject: [PATCHv10 00/41] ARM: TI SoC clock DT conversion
-In-Reply-To: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20131126175758.GG26766@atomide.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 26 Nov 2013 11:02:52 -0700
+Subject: [PATCH] PCI: mvebu - The bridge secondary status register should be 0
+Message-ID: <1385488975-27694-1-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [131126 00:09]:
-> Hi,
-> 
-> Changes compared to v9:
-> - rebased on top of 3.13-rc1
-> - modified the low level clk register API to provide SoC specific clk_readl
->   and clk_writel support which can be registered during boot, TI SoC variant
->   uses regmap on low level
-> - dropped regmap parameter from clock init calls, instead a helper is used
->   for getting regmap index along with the register offset from DT
-> - dropped regmap parameter from clock structs, instead platform specific
->   clk_readl / clk_writel are used to parse reg parameter according to
->   platform, for TI SoC:s, this is encoded as:
->   struct clk_omap_reg {
->     u16 offset; /* register offset */
->     u16 index; /* regmap index */
->   }
-> - Nishanth's comments to v9 mostly addressed, except for the CLK_OF_DECLARE
->   tweak which I would actually want some feedback upon, basically the problem
->   is I need to return status from the clk init functions so I can see if
->   -EAGAIN is passed, in which case init will be retried later, maybe some of
->   this can be made generic, like converting all the CLK_OF_DECLARE type
->   functions to return status
-> 
-> Testing done:
-> - omap3-beagle : boot + suspend/resume
-> - omap3-beagle-xm : boot (thanks to Nishanth)
-> - omap4-panda-es : boot + suspend/resume
-> - omap5-uevm : boot
-> - dra7-evm : boot
-> - am335x-bone : boot
-> 
-> Separate branches available at https://github.com/t-kristo/linux-pm.git
-> 
-> - full: 3.13-rc1-dt-clks-v10 (should be merged last, contains everything)
+There are no writable bits in the secondary status register, only
+write 1 to clear bits. The driver never sets any of the write 1 to
+clear bits so the status register should always be 0, just remove
+the set from the write path.
 
-FYI, I noticed you still have few hack pathces in this branch that you
-should drop before it's pullable.
+Someday the write 1 to clear bits should be copied/cleared directly
+from registers in the HW.
 
-You can drop "HACK: force enable uart3 rx iochain wakeup" and replace it
-with "ARM: dts: Fix omap serial wake-up when booted with device tree" I
-posted few days ago. You may also want to use the latest attempt of patch
-"of/platform: Fix no irq domain found errors when populating interrupts"
-to avoid some new warnings. That way you can test off-idle on omap3 with
-DT, but it's best to keep those out of your branch.
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/pci/host/pci-mvebu.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Then the "HACK: Makefile: Build a uImage with dtb already appended" you
-can just replace with a shell script to leave that one out :)
+Thomas: This was the last patch in my set that you haven't reviewed. Thanks
 
-> - clk driver only: 3.13-rc1-dt-clks-v10-for-mike
-> - DT data only: 3.13-rc1-dt-clks-v10-for-benoit
-
-I pulled these on top of my patches to make mach-omap2 boot in DT only
-mode, and there's just a trivial merge conflict with the DT data which
-is no problem.
-
-And looks like off-idle keeps working for me on omap3 :) So for the
-patches that don't have it yet, please feel free to add:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index c269e43..6f5a20f 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -500,7 +500,6 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 		 */
+ 		bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
+ 		bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
+-		bridge->secondary_status = value >> 16;
+ 		mvebu_pcie_handle_iobase_change(port);
+ 		break;
+ 
+-- 
+1.8.1.2
