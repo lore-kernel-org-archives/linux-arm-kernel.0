@@ -1,70 +1,45 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 26 Nov 2013 13:37:24 +0530
-Subject: [PATCH v2] clk: exynos5420: fix cpll clock register offsets
-In-Reply-To: <CANuQgHEMsNMyjvwoZ6we8dz-X+T0XdQYyYwCHGCPk0iuH8W=8A@mail.gmail.com>
-References: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
- <CANuQgHFPB4C69C1sDFPVx6E8XjMhbqs-75R9xq1LP0=yO9C4zg@mail.gmail.com>
- <CANuQgHEMsNMyjvwoZ6we8dz-X+T0XdQYyYwCHGCPk0iuH8W=8A@mail.gmail.com>
-Message-ID: <CANuQgHEPxYZPPQsx9VgnGfaN=VetphEnoEp8YkCuyfnPLCKEZQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 26 Nov 2013 10:05:41 +0200
+Subject: [PATCHv10 00/41] ARM: TI SoC clock DT conversion
+Message-ID: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi,
 
-On 22 October 2013 11:20, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> On 16 October 2013 11:10, Chander Kashyap <chander.kashyap@linaro.org> wrote:
->> On 26 September 2013 14:36, Chander Kashyap <chander.kashyap@linaro.org> wrote:
->>> Fixes cpll control and lock register offset values for Exynos5420 SoC.
->>>
->>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->>> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->>> ---
->>> Changes Since v1:
->>>         - Fixed patch subject as per Kukgin suggestion.
->>>
->>>  drivers/clk/samsung/clk-exynos5420.c |    4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
->>> index 86dfc64..892aac0 100644
->>> --- a/drivers/clk/samsung/clk-exynos5420.c
->>> +++ b/drivers/clk/samsung/clk-exynos5420.c
->>> @@ -730,8 +730,8 @@ struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
->>>  struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
->>>         [apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
->>>                 APLL_CON0, NULL),
->>> -       [cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
->>> -               MPLL_CON0, NULL),
->>> +       [cpll] = PLL(pll_2550, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
->>> +               CPLL_CON0, NULL),
->>>         [dpll] = PLL(pll_2550, fout_dpll, "fout_dpll", "fin_pll", DPLL_LOCK,
->>>                 DPLL_CON0, NULL),
->>>         [epll] = PLL(pll_2650, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
->>> --
->>> 1.7.9.5
->>>
->>
->>
->> Mike, can you please take this patch.
->
-> Can this patch be merged?
+Changes compared to v9:
+- rebased on top of 3.13-rc1
+- modified the low level clk register API to provide SoC specific clk_readl
+  and clk_writel support which can be registered during boot, TI SoC variant
+  uses regmap on low level
+- dropped regmap parameter from clock init calls, instead a helper is used
+  for getting regmap index along with the register offset from DT
+- dropped regmap parameter from clock structs, instead platform specific
+  clk_readl / clk_writel are used to parse reg parameter according to
+  platform, for TI SoC:s, this is encoded as:
+  struct clk_omap_reg {
+    u16 offset; /* register offset */
+    u16 index; /* regmap index */
+  }
+- Nishanth's comments to v9 mostly addressed, except for the CLK_OF_DECLARE
+  tweak which I would actually want some feedback upon, basically the problem
+  is I need to return status from the clk init functions so I can see if
+  -EAGAIN is passed, in which case init will be retried later, maybe some of
+  this can be made generic, like converting all the CLK_OF_DECLARE type
+  functions to return status
 
-Any update on this patch ?
+Testing done:
+- omap3-beagle : boot + suspend/resume
+- omap3-beagle-xm : boot (thanks to Nishanth)
+- omap4-panda-es : boot + suspend/resume
+- omap5-uevm : boot
+- dra7-evm : boot
+- am335x-bone : boot
 
->
->>
->> --
->> with warm regards,
->> Chander Kashyap
->
->
->
-> --
-> with warm regards,
-> Chander Kashyap
+Separate branches available at https://github.com/t-kristo/linux-pm.git
 
+- full: 3.13-rc1-dt-clks-v10 (should be merged last, contains everything)
+- clk driver only: 3.13-rc1-dt-clks-v10-for-mike
+- DT data only: 3.13-rc1-dt-clks-v10-for-benoit
 
-
--- 
-with warm regards,
-Chander Kashyap
+-Tero
