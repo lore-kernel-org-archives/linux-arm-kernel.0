@@ -1,94 +1,101 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 26 Nov 2013 14:33:14 +0200
-Subject: [PATCH v6 4/6] gpio: davinci: add OF support
-In-Reply-To: <52932DB9.4090805@ti.com>
-References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
- <1385057731-4348-5-git-send-email-prabhakar.csengg@gmail.com>
- <52932DB9.4090805@ti.com>
-Message-ID: <5294950A.9070007@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 26 Nov 2013 09:40:04 -0300
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <87r4a4f5gr.fsf@natisbad.org>
+References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <87d2lp28pd.fsf@natisbad.org> <20131125120335.GD2408@localhost>
+ <87r4a4f5gr.fsf@natisbad.org>
+Message-ID: <20131126124003.GA2344@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 01:00 PM, Sekhar Nori wrote:
-> On Thursday 21 November 2013 11:45 PM, Prabhakar Lad wrote:
->> From: KV Sujith <sujithkv@ti.com>
->>
->> This patch adds OF parser support for davinci gpio
->> driver and also appropriate documentation in gpio-davinci.txt
->> located at Documentation/devicetree/bindings/gpio/.
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: KV Sujith <sujithkv@ti.com>
->> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
->> [prabhakar.csengg at gmail.com: simplified the OF code, removed
->> 		unnecessary DT property and also simplified
->> 		the commit message]
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> ---
->>   .../devicetree/bindings/gpio/gpio-davinci.txt      |   41 ++++++++++++++
->>   drivers/gpio/gpio-davinci.c                        |   57 ++++++++++++++++++--
->>   2 files changed, 95 insertions(+), 3 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> new file mode 100644
->> index 0000000..a2e839d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> @@ -0,0 +1,41 @@
->> +Davinci GPIO controller bindings
->> +
->> +Required Properties:
->> +- compatible: should be "ti,dm6441-gpio"
->> +
->> +- reg: Physical base address of the controller and the size of memory mapped
->> +       registers.
->> +
->> +- gpio-controller : Marks the device node as a gpio controller.
->> +
->> +- interrupt-parent: phandle of the parent interrupt controller.
->> +
->> +- interrupts: Array of GPIO interrupt number. Only banked or unbanked IRQs are
->> +	      supported at a time.
-> 
-> If this is true..
-> 
->> +
->> +- ti,ngpio: The number of GPIO pins supported.
->> +
->> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt
->> +		             line to processor.
-> 
-> .. then why do you need to maintain this separately? Number of elements
-> in interrupts property should give you this answer, no?
-> 
-> There can certainly be devices (past and future) which use a mixture of
-> banked and unbanked IRQs. So a binding which does not take care of this
-> is likely to change in future and that is a problem since it brings in
-> backward compatibility of the binding into picture.
-> 
-> The right thing would be to define the DT node per-bank similar to what
-> is done on OMAP rather than for all banks together. That way there can
-> be a separate property which determines whether that bank supports
-> direct-mapped or banked IRQs (or that could be inferred if the number of
-> tuples in the interrupts property is more than one).
+Arnaud,
 
-Number of IRQ can't be simply used to determine type of IRQ - need to handle IRQ names,
-because each bank(32 gpios) may have up to 2 banked IRQs (one per 16 GPIO).
+On Tue, Nov 26, 2013 at 12:04:52AM +0100, Arnaud Ebalard wrote:
+> 
+> And \o/ i.e. here is what I get:
+> 
+> root at mood:~# dmesg
+> ...
+> pxa3xx-nand d00d0000.nand: This platform can't do DMA on this device
+> NAND device: Manufacturer ID: 0xad, Chip ID: 0xf1 (Hynix H27U1G8F2BTR-BC)
+> NAND device: 128MiB, SLC, page size: 2048, OOB size: 64
+> Bad block table found at page 65472, version 0x01
+> Bad block table found at page 65408, version 0x01
+> 5 ofpart partitions found on MTD device pxa3xx_nand-0
+> Creating 5 MTD partitions on "pxa3xx_nand-0":
+> 0x000000000000-0x000000180000 : "u-boot"
+> 0x000000180000-0x0000001a0000 : "u-boot-env"
+> 0x000000200000-0x000000800000 : "uImage"
+> 0x000000800000-0x000001800000 : "minirootfs"
+> 0x000001800000-0x000008000000 : "jffs2"
+> ...
+> 
+> root at mood:~# ls /dev/mtd
+> mtd0       mtd1ro     mtd3       mtd4ro     mtdblock2  
+> mtd0ro     mtd2       mtd3ro     mtdblock0  mtdblock3  
+> mtd1       mtd2ro     mtd4       mtdblock1  mtdblock4  
+> 
+> root at mood:~# dd if=/dev/mtd2ro of=/tmp/foo
+> 12288+0 records in
+> 12288+0 records out
+> 6291456 bytes (6.3 MB) copied, 1.98731 s, 3.2 MB/s
+> 
+> root at mood:~# file /tmp/foo 
+> /tmp/foo: u-boot legacy uImage, Linux-3.12.0.rn102-00048-gbe408c, Linux/ARM, OS Kernel Image (Not compressed), 3740317 bytes, Tue Nov  5 22:24:01 2013, Load Address: 0x00008000, Entry Point: 0x00008000, Header CRC: 0xD84586E1, Data CRC: 0xC4357CED
 
-Few things here:
-- The mixed banked/unbanked functionality has never been supported before. 
-- The Davinci GPIO IP is different from OMAP and has common
-  control registers for all banks.
-- The proposed approach is more less easy to implement for DT case, but for not-DT
-  case - the platform data will need to be changed significantly (.
-  So, from this point of view, that would be a big change (actually the total driver rewriting).
+Good!
 
-Do you have any thoughts about how it can be done in a simpler way?
+> 
+> But then /o\ i.e. write does not seem to work out of the box ;-)
+> 
+> root at mood:~# flash_erase /dev/mtd2 0 0 
+> Erasing 128 Kibyte @ 5e0000 -- 100 % complete 
+> root at mood:~# nand
+> nanddump   nandtest   nandwrite  
+> root at mood:~# nandwrite -p /dev/mtd2 /tmp/uImage
+> Writing data to block 0 at offset 0x0
+> [ 1456.154142] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1456.354143] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1456.554144] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1456.754141] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1456.954140] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1457.154140] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1457.354140] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1457.554140] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1457.754140] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1457.954197] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> [ 1458.154140] pxa3xx-nand d00d0000.nand: Wait time out!!!
+> 
 
-Actually, the same was proposed by Linus, but we've tried avoid such huge rework -
-by switching to one irq_domain per all banks for example.
+Yes, this behavior was expected, and it is the reason I wanted to try with
+the 'pxa3xx' compatible.
 
-Regards,
-- grygorii
+> But I guess this gives you some hints on possible directions.
+> 
+
+Indeed! Thanks a lot for such detailed testings. Can you test this
+branch instead (you will have to add the DTS for your board)?
+
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/pxa3xx-armada-nand-new-ecc
+
+It's basically v3.13-rc1, plus latest NAND patches (cherry-picked
+from l2-mtd.git), plus a couple more patches to support 2048 pages.
+
+Using this branch you should be able to have detect the device
+and test read/write without any issues. You previous DT node should work:
+
+nand at d0000 {
+	status = "okay";
+	num-cs = <1>;
+	marvell,nand-keep-config;
+	marvell,nand-enable-arbiter;
+	nand-on-flash-bbt;
+};
+
+
+Thanks a lot!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
