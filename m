@@ -1,72 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 26 Nov 2013 18:20:14 -0300
-Subject: [PATCH] clocksource: armada-370-xp: Register sched_clock after the
- counter reset
-Message-ID: <1385500814-15058-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 26 Nov 2013 22:25:43 +0100
+Subject: [PATCH 6/7] PCI: imx6: Fix link start operation
+In-Reply-To: <1385500248-6551-6-git-send-email-marex@denx.de>
+References: <1385500248-6551-1-git-send-email-marex@denx.de>
+ <1385500248-6551-6-git-send-email-marex@denx.de>
+Message-ID: <201311262225.43711.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit registers the sched_clock _after_ the counter reset
-(instead of before). This removes the timestamp 'jump' in kernel
-log messages.
+Dear Marek Vasut,
 
-Before this change:
+> This patch first forces the link into Gen1 mode before starting up
+> the link and only after the link is up requests the link to start
+> negotiating possible Gen2 mode operation. This is because without
+> such sequence, some PCIe switches are not detected at all.
 
-[    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
-[    0.000000] Initializing Coherency fabric
-[    0.000000] Aurora cache controller enabled
-[    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
-[  163.507447] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
-[  163.521419] pid_max: default: 32768 minimum: 301
-[  163.526185] Mount-cache hash table entries: 512
-[  163.531095] CPU: Testing write buffer coherency: ok
+[...]
 
-After this change:
+> +	/* Make sure link training is finished as well! */
+> +	if (count)
+> +		ret = imx6_pcie_wait_for_link(pp);
+> +	else
+> +		ret = -EINVAL;
+> 
+> +	if (ret) {
+> +		dev_err(pp->dev, "Failed to bring link up!\n");
+> +	} else {
+> +		tmp = readl(pp->dbi_base + 0x80);
+> +		dev_err(pp->dev, "Link up, Gen=%i\n", (tmp >> 16) & 0xf);
 
-[    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
-[    0.000000] Initializing Coherency fabric
-[    0.000000] Aurora cache controller enabled
-[    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
-[    0.016849] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
-[    0.030820] pid_max: default: 32768 minimum: 301
-[    0.035588] Mount-cache hash table entries: 512
-[    0.040500] CPU: Testing write buffer coherency: ok
+Hm meh, this dev_err() shouldn't be here of course. But I'd be interested if you 
+people now get stable Gen2 link up properly all the time. Please test. Thanks!
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-Nobody has ever complained about the 'jump' in the timestamp, so maybe
-this is a stupid and useless change.
-
- drivers/clocksource/time-armada-370-xp.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index d8e47e5..4e7f680 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -256,11 +256,6 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	ticks_per_jiffy = (timer_clk + HZ / 2) / HZ;
- 
- 	/*
--	 * Set scale and timer for sched_clock.
--	 */
--	sched_clock_register(armada_370_xp_read_sched_clock, 32, timer_clk);
--
--	/*
- 	 * Setup free-running clocksource timer (interrupts
- 	 * disabled).
- 	 */
-@@ -270,6 +265,11 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
- 			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
- 
-+	/*
-+	 * Set scale and timer for sched_clock.
-+	 */
-+	sched_clock_register(armada_370_xp_read_sched_clock, 32, timer_clk);
-+
- 	clocksource_mmio_init(timer_base + TIMER0_VAL_OFF,
- 			      "armada_370_xp_clocksource",
- 			      timer_clk, 300, 32, clocksource_mmio_readl_down);
--- 
-1.8.1.5
+[...]
+Best regards,
+Marek Vasut
