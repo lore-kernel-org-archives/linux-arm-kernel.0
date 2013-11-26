@@ -1,53 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Nov 2013 19:55:57 -0500
-Subject: [PATCH 10/12] mtd: nand: davinci: don't set timings if AEMIF
- is used
-In-Reply-To: <5291CB01.1010506@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-11-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D53@DNCE04.ent.ti.com>
- <528307F0.6000805@ti.com> <52838941.4060207@ti.com> <5284ABB9.70608@ti.com>
- <5284DFE7.70308@ti.com> <528E3DD4.7030607@ti.com> <528F968F.40306@ti.com>
- <5291CB01.1010506@ti.com>
-Message-ID: <5293F19D.70901@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 25 Nov 2013 19:09:22 -0600
+Subject: [PATCH 00/12] Drop omap3 board files and make mach-omap2 boot in
+ DT only mode
+In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
+References: <1385424867-27243-1-git-send-email-tony@atomide.com>
+Message-ID: <20131126010922.GA21580@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 24 November 2013 04:46 AM, Sekhar Nori wrote:
-> On Friday 22 November 2013 11:08 PM, Santosh Shilimkar wrote:
->> On Thursday 21 November 2013 12:07 PM, Nori, Sekhar wrote:
->>> On 11/14/2013 8:06 PM, Santosh Shilimkar wrote:
+Hi,
 
-[..]
-
->>> Yes, that would be the ideal way. But the reality is that there is close
->>> to zero chance of all the DaVinci platforms using AEMIF ever getting
->>> converted to DT. This means that we will never be able to get rid of
->>> this piece of code.
->>>
->> Well that means some of those platforms support will get deprecated
->> soon considering other basic frameworks like irq, timer wheel etc
->> is assuming the DT direction. But its your call because if you
->> want those platforms to live, you need to convert them to DT.
->>  
->>> I do agree platform data is not the direction you want to take on ARM
->>> but at the same time its not really a deprecated mechanism as far as the
->>> broader kernel is concerned.
->>>
->>> So, can we consider adding platform data mechanism to the AEMIF driver?
->>>
->> Sorry but answer is "NO". If the above hack is really bothering you,
->> we can actually rip out the above code in question and move it
->> to mach-davinci. Infact thats the best direction to make the
->> mtd nandn driver independent of any platform quirks(dt, pdata etc)
->>
->> Ivan already has a patch to do that and he is going to post
->> that patch. With that patch, we won't need $subject patch.
->>
+On Mon, Nov 25, 2013 at 04:14:15PM -0800, Tony Lindgren wrote:
+> Hi all,
 > 
-> Okay I will wait for the patch.
+> We can finally make mach-omap2 to boot in device tree only mode for v3.14.
 > 
-Ivan has posted a patch already and you are copied on it.
+> By doing that, we can get rid of about 20000 lines of legacy code for v3.14
+> that's no longer needed with device tree :) And that's not counting the
+> additional removal of the code that comes with the pending patches to
+> move clocks to drivers/clk.
+> 
+> Looks like we still have some legacy boards that don't have a .dts file,
+> so if you're using one, please post the .dts file. I've posted some quick
+> instructions in the first patch of this series for bringing up omaps with
+> device tree.
+> 
+> For most omap2+ boards that are not yet supported with device tree just
+> the .dts file is needed. Some boards also may need additional entries to
+> pdata-quirks.c. If there are more complicated issues, please let me know
+> so we can sort out those issues ASAP.
+> 
+> I don't have all omap boards so I have not been able to do a .dts file
+> for those. Some help would be appreciated there if you are using a
+> board with no .dts file posted yet. I can naturally help too where
+> possible so we get the devices working with device tree as needed :)
+> 
+> These patches need v3.13-rc1 and some of the following patches
+> depending on your board:
+> 
+> [PATCH 0/8] Various omap device tree usability fixes for v3.13 merge window
+> [PATCH 00/11] Make omap24xx booting device tree based for v3.14 merge window
+> [PATCH 0/3] Yet more fixes for booting omaps with device tree
+> [PATCH 0/5] Prepare making omap3 device tree only and convert LDP
+> 
+> I've also pushed all the patches into a temporary testing branch:
+> 
+> omap-for-v3.14/tmp-testing-unstable-not-immutable
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> Tony Lindgren (12):
+>   ARM: OMAP2+: Remove legacy omap3 board-*.c files and make mach-omap2
+>     DT only for booting
 
-Regards,
-Santosh
+looks like this patch didn't make it to the list, maybe it's too large ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/e481c047/attachment-0001.sig>
