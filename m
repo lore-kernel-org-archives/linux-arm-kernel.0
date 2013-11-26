@@ -1,42 +1,47 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Tue, 26 Nov 2013 16:30:00 +0000
-Subject: [PATCH v2 4/4] ARM: ep93xx: stop using mach/timex.h
-In-Reply-To: <1385472566-20950-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384292466-31725-5-git-send-email-u.kleine-koenig@pengutronix.de>
- <1385472566-20950-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817E073F0@P3PWEX4MB008.ex4.secureserver.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Nov 2013 16:30:32 +0000
+Subject: STOP THE MADNESS
+Message-ID: <20131126163031.GC16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 26, 2013 6:29 AM, Uwe Kleine-K?nig wrote:
-> mach/timex.h is the last remaining header that is unused for multiarch
-> builds but necessary for singlearch builds. To allow to get rid of it
-> for singlearch builds, too, drop its usage in ep93xx arch code by
-> substituting CLOCK_TICK_RATE by an already defined local cpp symbol.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> ---
-> Changes since (implicit) v1, sent with
-> Message-Id: 1384292466-31725-5-git-send-email-u.kleine-koenig at pengutronix.de:
->  - ack by H Hartley Sweeten
->  - use already existing symbol instead of introducing a new one
->
->  arch/arm/mach-ep93xx/core.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index d95ee28a..94b141f 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -115,7 +115,7 @@ void __init ep93xx_map_io(void)
->  #define EP93XX_TIMER4_CLOCK		983040
->  
->  #define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
-> -#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
-> +#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(EP93XX_TIMER4_CLOCK, HZ)
->  
->  static unsigned int last_jiffy_time;
+Versatile PB926 is currently broken in mainline because of this, and it's
+damn obvious that people are just churning out changes to "update" drivers
+without testing them at all.
 
-Thanks,
-Hartley
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc1+ #652
+Backtrace: 
+[<c0016f0c>] (dump_backtrace) from [<c00172ac>] (show_stack+0x18/0x1c)
+ r6:c798ace0 r5:00000000 r4:c78257e0 r3:00200140
+[<c0017294>] (show_stack) from [<c0329ea0>] (dump_stack+0x20/0x28)
+[<c0329e80>] (dump_stack) from [<c004fa80>] (__lock_acquire+0x1c0/0x1b80)
+[<c004f8c0>] (__lock_acquire) from [<c0051970>] (lock_acquire+0x6c/0x80)
+ r10:00000000 r9:c0455234 r8:00000060 r7:c047d798 r6:600000d3 r5:00000000
+ r4:c782c000
+[<c0051904>] (lock_acquire) from [<c032e484>] (_raw_spin_lock_irqsave+0x60/0x74)
+ r6:c01a1100 r5:800000d3 r4:c798acd0
+[<c032e424>] (_raw_spin_lock_irqsave) from [<c01a1100>] (pl061_irq_type+0x28/0x)
+ r6:00000000 r5:00000000 r4:c798acd0
+[<c01a10d8>] (pl061_irq_type) from [<c0059ef4>] (__irq_set_trigger+0x70/0x104)
+ r6:00000000 r5:c01a10d8 r4:c046da1c r3:c01a10d8
+[<c0059e84>] (__irq_set_trigger) from [<c005b348>] (irq_set_irq_type+0x40/0x60)
+ r10:c043240c r8:00000060 r7:00000000 r6:c046da1c r5:00000060 r4:00000000
+[<c005b308>] (irq_set_irq_type) from [<c01a1208>] (pl061_irq_map+0x40/0x54)
+ r6:c79693c0 r5:c798acd0 r4:00000060
+[<c01a11c8>] (pl061_irq_map) from [<c005d27c>] (irq_domain_associate+0xc0/0x190)
+ r5:00000060 r4:c046da1c
+[<c005d1bc>] (irq_domain_associate) from [<c005d604>] (irq_domain_associate_man)
+ r8:00000008 r7:00000000 r6:c79693c0 r5:00000060 r4:00000000
+[<c005d5d0>] (irq_domain_associate_many) from [<c005d864>] (irq_domain_add_simp)
+ r8:c046578c r7:c035b72c r6:c79693c0 r5:00000060 r4:00000008 r3:00000008
+[<c005d814>] (irq_domain_add_simple) from [<c01a1380>] (pl061_probe+0xc4/0x22c)
+ r6:00000060 r5:c0464380 r4:c798acd0
+[<c01a12bc>] (pl061_probe) from [<c01c0450>] (amba_probe+0x74/0xe0)
+ r10:c043240c r9:c0455234 r8:00000000 r7:c047d7f8 r6:c047d744 r5:00000000
+ r4:c0464380
+
+This is caused by the recently introduced irq_domain_add_simple() call
+being placed before the spinlock has been initialised, and guess what
+the side effect of that call is.
+
+Far from impressed.
