@@ -1,28 +1,26 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Tue, 26 Nov 2013 16:37:29 -0500
-Subject: [PATCH v2 0/6] mmc: sdhci-esdhc-imx: fix acmd23 unwork and ddr
- not supported on sabresd issues
-In-Reply-To: <1383142193-24950-1-git-send-email-b29396@freescale.com> (Dong
- Aisheng's message of "Wed, 30 Oct 2013 22:09:47 +0800")
-References: <1383142193-24950-1-git-send-email-b29396@freescale.com>
-Message-ID: <87siuig7za.fsf@octavius.laptop.org>
+Date: Tue, 26 Nov 2013 16:39:43 -0500
+Subject: [PATCH 0/2] mmc: sdhci-esdhc-imx: adding eMMC HS200 mode support
+In-Reply-To: <1383142242-24989-1-git-send-email-b29396@freescale.com> (Dong
+ Aisheng's message of "Wed, 30 Oct 2013 22:10:40 +0800")
+References: <1383142242-24989-1-git-send-email-b29396@freescale.com>
+Message-ID: <87ob56g7vk.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Dong,
 
 On Wed, Oct 30 2013, Dong Aisheng wrote:
-> Patch 1~3 fix acmd23 unwork issue.
-> Currently the eMMC chip integrated on i.MX6Q SabreSD boards does not work.
-> (It's easily reproduced once you enable usdhc4 on sabresd, see patch 3)
-> It's caused by acmd setting bits are never cleared once it's been set
-> which cause the next normal commands to work abnormally.
+> Dong Aisheng (2):
+>   mmc: sdhci: replace msleep with mdelay for tuning
+>   mmc: sdhci-esdhc-imx: add eMMC HS200 mode support
 >
-> Patch 4~6 fix DDR not supported on SabreSD board.
-> The SabreSD board does not have 1.8v signal voltage switch support for uSDHC,
-> thus it can not support UHS_DDR50 mode which can only run at 1.8v signal voltage.
+>  drivers/mmc/host/sdhci-esdhc-imx.c |    2 ++
+>  drivers/mmc/host/sdhci.c           |    2 +-
+>  2 files changed, 3 insertions(+), 1 deletions(-)
 
-Thanks, pushed patches 1-6 to mmc-next for 3.14.
+Patch 1 is no longer required, applied patch 2 to mmc-next for 3.14,
+thanks.
 
 - Chris.
 -- 
