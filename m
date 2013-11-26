@@ -1,55 +1,37 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 26 Nov 2013 13:09:56 +0200
-Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <52948184.50604@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Nov 2013 12:13:30 +0100
+Subject: [PATCH 3/3] ARM: tegra: use section-sized static mappings for
+ LPAE too
+In-Reply-To: <1385419003-11348-3-git-send-email-swarren@wwwdotorg.org>
+References: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
+ <1385419003-11348-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131126111330.GF27752@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 04:04 PM, Ivan Khoronzhuk wrote:
-> To reduce code duplicate and increase code readability use WDT core
-> code to handle WDT interface.
->
-> Remove io_lock as the WDT core uses mutex to lock each wdt device.
-> Remove wdt_state as the WDT core tracks state with its own variable.
->
-> The watchdog_init_timeout() can read timeout value from timeout-sec
-> property if the passed value is out of bounds. The heartbeat is
-> initialized in next way. If heartbeat is not set thought module
-> parameter, try to read it's value from WDT node timeout-sec property.
-> If node has no one, use default value.
->
-> The heartbeat is hold in wdd->timeout by WDT core, so use it in
-> order to set timeout period.
->
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+On Mon, Nov 25, 2013 at 03:36:43PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> The static mappings for Tegra's PPSB and APB regions were sized at 1MB
+> in order to allow mapping via sections in order to avoid burning RAM for
+> PTEs. On LPAE, sections are 2MB, so the static mappings need to be
+> larger in order to gain the same benefit. Set IO_{PPSB,APB}_SIZE to
+> SECTION_SIZE so this adjusts automatically.
+> 
+> While we're fiddling with iomap.h, compress IO_{IRAM,CPU}_VIRT together
+> to save virtual address space in the vmalloc region; these two regions
+> are mapped using PTEs.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->   arch/arm/mach-davinci/da8xx-dt.c      |    2 +-
->   arch/arm/mach-davinci/devices-da8xx.c |    4 +-
->   arch/arm/mach-davinci/devices.c       |    2 +-
->   drivers/watchdog/Kconfig              |    2 +
->   drivers/watchdog/davinci_wdt.c        |  151 ++++++++-------------------------
->   5 files changed, 43 insertions(+), 118 deletions(-)
+>  arch/arm/mach-tegra/iomap.h | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 
-Pls note, that this patch contains both changes in platform and driver 
-code to fix regression reported by Sekhar Nori on v2 of this series and 
-caused by driver name changing.
-
-Is it ok?
-
-It can be splitted, but then both patches will introduce regression by 
-itself and thing will work only if both of them will be applied together.
-
->
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index d2bc574..ed19287 100644
-[...]
-> -MODULE_ALIAS("platform:watchdog");
-> +MODULE_ALIAS("platform:davinci-wdt");
->
-Regards,
--Grygorii
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/85bf1e67/attachment-0001.sig>
