@@ -1,97 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 26 Nov 2013 13:41:08 -0500 (EST)
-Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
- p2v and v2p conversions'
-In-Reply-To: <20131126173659.GE16735@n2100.arm.linux.org.uk>
-References: <20131125223636.GA20822@obsidianresearch.com>
- <20131125232003.GU16735@n2100.arm.linux.org.uk>
- <20131125233654.GV16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
- <20131126095430.GA16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
- <20131126134155.GB16735@n2100.arm.linux.org.uk>
- <alpine.LFD.2.10.1311261205300.9667@knanqh.ubzr>
- <20131126173659.GE16735@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.10.1311261323280.9667@knanqh.ubzr>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 26 Nov 2013 11:38:34 -0700
+Subject: [PATCH] PCI: mvebu - The bridge secondary status register should
+ be 0
+In-Reply-To: <20131126182328.GP2879@titan.lakedaemon.net>
+References: <1385488975-27694-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20131126182328.GP2879@titan.lakedaemon.net>
+Message-ID: <20131126183834.GA12152@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
-
-> On Tue, Nov 26, 2013 at 12:26:49PM -0500, Nicolas Pitre wrote:
-> > On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
+On Tue, Nov 26, 2013 at 01:23:28PM -0500, Jason Cooper wrote:
+> On Tue, Nov 26, 2013 at 11:02:52AM -0700, Jason Gunthorpe wrote:
+> > There are no writable bits in the secondary status register, only
+> > write 1 to clear bits. The driver never sets any of the write 1 to
+> > clear bits so the status register should always be 0, just remove
+> > the set from the write path.
 > > 
-> > > On Tue, Nov 26, 2013 at 08:35:43AM -0500, Nicolas Pitre wrote:
-> > > > On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
-> > > > 
-> > > > > On Mon, Nov 25, 2013 at 10:56:25PM -0500, Nicolas Pitre wrote:
-> > > > > > What about simply doing the following instead, which I'm sure used to 
-> > > > > > work properly at some point:
-> > > > > > 
-> > > > > > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > > > > > index 9ecccc8650..2b8b8d3236 100644
-> > > > > > --- a/arch/arm/include/asm/memory.h
-> > > > > > +++ b/arch/arm/include/asm/memory.h
-> > > > > > @@ -239,6 +239,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> > > > > >  
-> > > > > >  #else
-> > > > > >  
-> > > > > > +#ifndef PHYS_OFFSET
-> > > > > > +#ifdef PLAT_PHYS_OFFSET
-> > > > > > +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > > > > > +#else
-> > > > > > +#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > > > > > +#endif
-> > > > > > +#endif
-> > > > > > +
-> > > > > >  static inline phys_addr_t __virt_to_phys(unsigned long x)
-> > > > > >  {
-> > > > > >  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> > > > > > @@ -253,14 +261,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-> > > > > >  #endif
-> > > > > >  #endif /* __ASSEMBLY__ */
-> > > > > >  
-> > > > > > -#ifndef PHYS_OFFSET
-> > > > > > -#ifdef PLAT_PHYS_OFFSET
-> > > > > > -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> > > > > > -#else
-> > > > > > -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> > > > > > -#endif
-> > > > > > -#endif
-> > > > > 
-> > > > > And that makes PHYS_OFFSET undefined to assembly code - and we have
-> > > > > references to it from said code.
-> > > > 
-> > > > Why does the kernel compile properly for me with this change then?
-> > > 
-> > > Nicolas,
-> > > 
-> > > Try using grep rather than just typing emails for the hell of it.
-> > > Try looking at the patch I sent to fix this issue.  Either of those
-> > > will give you the appropriate clue necessary to answer your question.
+> > Someday the write 1 to clear bits should be copied/cleared directly
+> > from registers in the HW.
 > > 
-> > Your patch does s/PHYS_OFFSET/PLAT_PHYS_OFFSET/ in assembly code and 
-> > defines PLAT_PHYS_OFFSET with CONFIG_PHYS_OFFSET when needed.
-> > 
-> > Mine leaves PHYS_OFFSET as is in assembly code and defines PHYS_OFFSET 
-> > with PLAT_PHYS_OFFSET or CONFIG_PHYS_OFFSET as appropriate, as it *used* 
-> > to work before commit ca5a45c06c.
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > ---
+> >  drivers/pci/host/pci-mvebu.c | 1 -
+> >  1 file changed, 1 deletion(-)
 > 
-> If manual inspection fails you, try building a nommu or XIP kernel.
+> Whole series
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-All right.  I did a build test of course.  What failed me is the 
-difficulty nowdays to have the desired config symbols enabled (or 
-left disabled for that matter) without other rules overriding manual 
-choices.
+Thanks, I applied the Interrupt Line/Pin change to for-linus for v3.13, and
+the others to pci/host-mvebu for v3.14.
 
-I think your patch is therefore the best solution.  However, I'd suggest 
-you include this as well to enforce configuration validity:
-
-#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
-#undef PLAT_PHYS_OFFSET
-#endif
-
-The idea as I explained in my previous email is to prevent wrong usage.
-
-
-Nicolas
+Bjorn
