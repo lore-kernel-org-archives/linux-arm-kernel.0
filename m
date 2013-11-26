@@ -1,51 +1,41 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 26 Nov 2013 13:44:00 +0100
-Subject: [PATCH 00/12] Drop omap3 board files and make mach-omap2 boot
- in DT only mode
-In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
-References: <1385424867-27243-1-git-send-email-tony@atomide.com>
-Message-ID: <52949790.1010900@epfl.ch>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 26 Nov 2013 12:55:10 +0000
+Subject: ACPI
+In-Reply-To: <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
+ <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+ <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
+ <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
+ <20131125154110.GB3243@srcf.ucam.org>
+ <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+Message-ID: <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+On Tue, Nov 26, 2013 at 12:43 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Mon, Nov 25, 2013 at 4:41 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+>
+>> In the past ACPI implementations handled GPIO by providing
+>> methods that accessed hardware registers directly. I've seen DSDTs that
+>> implement i2c entirely in ASL.
+>
+> Is that common?
+>
+> Since i2c is a slow bus, can be 100kHz or so, how does that
+> avoid locking the entire CPU while e.g. waiting for transactions on
+> the external bus to complete?
+>
+> In I2C drivers we typically use completion IRQs so that we can
+> do other stuff when the I2C traffic is busy ...
+>
+> I have a feeling we should not recommend ARM implementers
+> to go and do things like this.
 
-On 11/26/2013 01:14 AM, Tony Lindgren wrote:
-> Hi all,
-> 
-> We can finally make mach-omap2 to boot in device tree only mode for v3.14.
-> 
-> By doing that, we can get rid of about 20000 lines of legacy code for v3.14
-> that's no longer needed with device tree :) And that's not counting the
-> additional removal of the code that comes with the pending patches to
-> move clocks to drivers/clk.
-> 
+ACPI5 defines a binding for serial busses (i2c & spi) which allows
+real device drivers to drive the bus and allows ACPI and the kernel to
+share the bus safely. Using that binding means some i2c devices can be
+'owned' by ACPI and others owned by the kernel.
 
-Great news :)
-
-> Looks like we still have some legacy boards that don't have a .dts file,
-> so if you're using one, please post the .dts file. I've posted some quick
-> instructions in the first patch of this series for bringing up omaps with
-> device tree.
-> 
-> For most omap2+ boards that are not yet supported with device tree just
-> the .dts file is needed. Some boards also may need additional entries to
-> pdata-quirks.c. If there are more complicated issues, please let me know
-> so we can sort out those issues ASAP.
-> 
-
-I just tested your tree with my custom Overo-based board (OMAP3630). I
-see some new warnings popping up, nothing dramatic at first glance. I
-will continue testing to see if I lost something in the transition.
-
-IMHO one remaining issue is the missing binding for the camera interface
-(ISP). I saw recently an RFC from Sebastian Reichel to add the necessary
-binding [1], but this work will probably take some time. So probably a
-quirk is necessary here to bring up this IP.
-
-Best regards,
-
-Florian
-
-[1]
-http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/70533
+g.
