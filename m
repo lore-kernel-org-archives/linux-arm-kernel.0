@@ -1,78 +1,68 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 26 Nov 2013 13:52:41 -0600
-Subject: [PATCH 1/8] ARM: OMAP: Move public portion of dmtimer.h to
- include/linux/omap-timer.h
-In-Reply-To: <20131126182908.GK26766@atomide.com>
-References: <1385085414-9034-1-git-send-email-joelf@ti.com>
- <1385085414-9034-2-git-send-email-joelf@ti.com>
- <20131122153334.GE10023@atomide.com> <52940F32.3000006@ti.com>
- <20131126182908.GK26766@atomide.com>
-Message-ID: <5294FC09.2080604@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 Nov 2013 13:54:22 -0600
+Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <2042860.IXZhL6v7c2@avalon>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2503238.g4sCZxTpb5@avalon> <20131126021239.GA22213@saruman.home>
+ <2042860.IXZhL6v7c2@avalon>
+Message-ID: <20131126195422.GJ24310@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 12:29 PM, Tony Lindgren wrote:
-[..]
->>> We can implement an irqchip and a clocksource in the dmtimer code for the
->>> client drivers to use, and after that we only have a couple of dmtimer
->>> specific functions left to export.
->>>
->>> I'm thinkging some thing like this for the public API:
->>>
->>> omap_dm_timer_request			request_irq
->>> omap_dm_timer_request_specific		request_irq
->>> omap_dm_timer_get_irq			request_irq
->>> omap_dm_timer_set_source		clk_set_rate
->>
->> For clk_set_rate, how would one directly access the timer node if we've hidden
->> it behind an irq chip abstraction?
->>
->> per your suggestion, one would have something like:
->>
->> dsp {
->>     interrupt-parent = <&timer1>;
->> }
->>
->> so how do you clk_set_rate rate something like this given the dsp node?
+On Tue, Nov 26, 2013 at 03:16:47AM +0100, Laurent Pinchart wrote:
+> Hi Felipe,
 > 
-> All you have to do is implement a clocksource driver in dmtimer.c code.
->  
->> If the suggestion is to get the timer1 node from the interrupt-parent property,
->> if I may say- that's a bit ugly because now you're breaking the irq chip
->> abstraction just to access the timer node..
+> On Monday 25 November 2013 20:12:39 Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Tue, Nov 26, 2013 at 02:59:51AM +0100, Laurent Pinchart wrote:
+> > > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
+> > > > > > > Turn clk_enable() and clk_disable() calls into
+> > > > > > > clk_prepare_enable()
+> > > > > > > and clk_disable_unprepare() to get ready for the migration to the
+> > > > > > > common clock framework.
+> > > > > > > 
+> > > > > > > Cc: Felipe Balbi <balbi@ti.com>
+> > > > > > > Cc: linux-usb at vger.kernel.org
+> > > > > > > Signed-off-by: Laurent Pinchart
+> > > > > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > > 
+> > > > > > Thank you for the patch.
+> > > > > > 
+> > > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > > 
+> > > > > Could you please pick this patch up ?
+> > > > 
+> > > > after -rc1 is out, I don't see why not.
+> > > 
+> > > Great then :-)
+> > > 
+> > > As this patch is a dependency for other series that will go through
+> > > different trees, could you please provide a stable branch in your tree
+> > > with this patch included that you will push to v3.14 ?
+> > 
+> > You guys are always killing me with those "stable branch" requests :-)
+> > 
+> > I'll get one up tomorrow. I guess I can avoid a topic branch altogether
+> > if I just make this the first patch in "next" branch. I could push only
+> > $subject for now until you merge then I'll push other stuff. Is that
+> > enough for you ? My 'next' is always immutable.
 > 
-> Hmm sorry I don't follow you here.
+> That sounds good, thank you. You can already push the other patches without 
+> waiting for me, I can dig the commit ID of the first patch in your next 
+> branch.
 
-I assumed above that you were suggesting implementing interrupt chaining like
-gpio-omap driver.
+pushed, btw. you should have received my automatic email. If you merge
+my next, you'll get only that commit. I believe tomorrow I'll be able to
+push more commits into next.
 
-Can you give an example workflow to explain your suggestion?
-
-I'll tell you how I understand what you were suggesting and then you can correct
-me, and maybe we can meet somewhere:
-
-Typically *without* irqchip or chaining what you suggested, we would  have
-something like (purely an example):
-dsp {
-    timer = <&timer1>;
-}
-
-There is an API:
-omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np); that one
-would use.
-
-Now moving to your suggestion, the dts would look like:
-dsp {
-    interrupt-parrent = <&timer1>;
-    interrupts = <1>;
-}
-
-Naturally some APIs will not fit into the IRQ framework, so these subset of
-dmtimer API may need to be exposed as you pointed. To use the API, the timer has
-to first be retrieved from interrupt-parent property of "dsp" here to get a
-device_node, and then the timer has to be requested and subset API used on it.
-This is "hack" that's not acceptable according to me...
-
-thanks,
-
--Joel
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/e3f14858/attachment.sig>
