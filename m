@@ -1,30 +1,41 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 26 Nov 2013 15:08:06 +0400
-Subject: [PATCH v2 0/5]
-In-Reply-To: <1384639650-3919-1-git-send-email-dbaryshkov@gmail.com>
-References: <1384639650-3919-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CALT56yN5XkQhKENHwg56+B8-oirQ0k-dL7_Vx=RQHQsgcyNhaA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Nov 2013 12:08:49 +0100
+Subject: [PATCH 2/3] ARM: tegra: don't hard-code DEBUG_LL baud rate
+In-Reply-To: <1385419003-11348-2-git-send-email-swarren@wwwdotorg.org>
+References: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
+ <1385419003-11348-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131126110848.GE27752@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 17, 2013 at 2:07 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> Please apply the following patches that fix the sa1100 framebuffer and PCMCIA
-> timings calculation if CPU frequency driver is not available.
->
-> Changes since V1:
-> * Corrected patch adding sa1111 pcmcia device - offset was wrong.
->
-> ----------------------------------------------------------------
-> Dmitry Eremin-Solenikov (5):
->       arm: sa1100: add cpu clock
->       fbdev: sa1100fb: make use of device clock
->       pcmcia: sa1100: make use of device clock
->       arm: sa1100: add a clock alias for sa1111 pcmcia device
->       pcmcia: sa1111: make use of device clock
+On Mon, Nov 25, 2013 at 03:36:42PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Stop writing to the UART clock divider registers in the Tegra DEBUG_LL
+> code. This allows the DEBUG_LL output to use whatever baud rate was set
+> up by the bootloader. Some users are using higher rates than 115200.
+> 
+> This removes the only usage of tegra_uart_config[3], so reduce the size
+> allocated for that array.
+> 
+> Finally, fix busyuart() so that it only waits for THRE and not TEMT. For
+> some reason, TEMT doesn't get asserted (at least on Tegra30 Beaver) at
+> 9600 baud, even though it does at 115200 baud. This sounds like a HW bug,
+> but I haven't investigated. For reference, U-Boot's serial code has
+> always only checked THRE, and not checked TEMT.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Tested-by: Paul Walmsley <pwalmsley@nvidia.com>
+> ---
+>  arch/arm/include/debug/tegra.S | 30 +++---------------------------
+>  arch/arm/mach-tegra/tegra.c    |  4 +---
+>  2 files changed, 4 insertions(+), 30 deletions(-)
 
-Ping. Tested on collie (except sa1111).
-
--- 
-With best wishes
-Dmitry
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/1b7ac321/attachment.sig>
