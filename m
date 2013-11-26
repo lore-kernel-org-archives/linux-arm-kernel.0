@@ -1,40 +1,21 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 26 Nov 2013 15:31:55 +0530
-Subject: [PATCH] phy: kconfig: add depends on "USB_SUPPORT" to OMAP_USB2 and
- TWL4030_USB
-Message-ID: <1385460115-31194-1-git-send-email-kishon@ti.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Tue, 26 Nov 2013 10:03:08 +0000
+Subject: [PATCH 3/4] mtd: spi-nor: add the framework for SPI NOR
+In-Reply-To: <1385447575-23773-4-git-send-email-b32955@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <1385447575-23773-4-git-send-email-b32955@freescale.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA4EE42@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes
-warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet
-direct dependencies (USB_SUPPORT)
-that shows up while disabling USB_SUPPORT from menuconfig.
+> From: Huang Shijie [mailto:b32955 at freescale.com]
+> This patch cloned most of the m25p80.c. In theory, it adds a new spi-nor
+> layer.
+[...]
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+>
+Is there a way we can also original m25p80 contributors' sign-off also?
+David/Brian, can you suggest ?
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/phy/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index a344f3d..0c87e4c 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -24,6 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
- config OMAP_USB2
- 	tristate "OMAP USB2 PHY Driver"
- 	depends on ARCH_OMAP2PLUS
-+	depends on USB_SUPPORT
- 	select GENERIC_PHY
- 	select USB_PHY
- 	select OMAP_CONTROL_USB
-@@ -36,6 +37,7 @@ config OMAP_USB2
- config TWL4030_USB
- 	tristate "TWL4030 USB Transceiver Driver"
- 	depends on TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS
-+	depends on USB_SUPPORT
- 	select GENERIC_PHY
- 	select USB_PHY
- 	help
--- 
-1.7.10.4
+With regards, pekon
