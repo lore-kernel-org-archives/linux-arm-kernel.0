@@ -1,56 +1,48 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 26 Nov 2013 14:45:41 -0800
-Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
- vmalloc
-In-Reply-To: <5285A896.3030204@codeaurora.org>
-References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>
- <1384212412-21236-4-git-send-email-lauraa@codeaurora.org>
- <52850C37.1080506@sr71.net> <5285A896.3030204@codeaurora.org>
-Message-ID: <20131126144541.6b16979b77f927f6d945ab60@linux-foundation.org>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Tue, 26 Nov 2013 15:03:03 -0800
+Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
+In-Reply-To: <20131126183559.GA18570@localhost>
+References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
+ <20131126183559.GA18570@localhost>
+Message-ID: <CAAYSxhqU9GZdaoTjoCAeyQ4h-KPVzU0BH0D1eLYJoFZ+s8tPgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Nov 2013 20:52:38 -0800 Laura Abbott <lauraa@codeaurora.org> wrote:
+On Tue, Nov 26, 2013 at 10:36 AM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
 
-> If is_vmalloc_addr returned true 
-> the spinlock/tree walk would happen anyway so essentially this is 
-> getting rid of the fast path. This is typically used in the idiom
-> 
-> alloc(size) {
-> 	if (size > some metric)
-> 		vmalloc
-> 	else
-> 		kmalloc
-> }
+> Since v3.13-rc1, this commit seems to have introduced some oddities on
+> some of our boards. See this log snippet:
+>
+> Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+> ????R?console [ttyS0] enabled
+> console [ttyS0] enabled
+> bootconsole [earlycon0] disabled
+> bootconsole [earlycon0] disabled
+> dw-apb-uart d0012100.serial: Couldn't set LCR to 191
+> dw-apb-uart d0012100.serial: Couldn't set LCR to 191
+> dw-apb-uart d0012100.serial: Couldn't set LCR to 224
+> dw-apb-uart d0012100.serial: Couldn't set LCR to 224
+> d0012100.serial: ttyS1 at MMIO 0xd0012100 (irq = 18, base_baud = 15625000) is a 16550A
+>
+> This behavior appear in at least Armada 370 and Armada XP boxes.
+>
+> I confirm reverting this commit fixes the issue and things get back to normal.
+> Here's the complete kernel log: sprunge.us/gMdL
+>
+> Ideas?
 
-A better form is
+Hi Ezequiel,
 
-	if (kmalloc(..., GFP_NOWARN) == NULL)
-		vmalloc
+An external device may be keeping the UART busy and preventing LCR
+from being written.
 
-> free (ptr) {
-> 	if (is_vmalloc_addr(ptr)
-> 		vfree
-> 	else
-> 		kfree
-> }
-> 
-> so my hypothesis would be that any path would have to be willing to take 
-> the penalty of vmalloc anyway. The actual cost would depend on the 
-> vmalloc / kmalloc ratio. I haven't had a chance to get profiling data 
-> yet to see the performance difference.
+What device is attached to ttyS1?  Also, do you know the version of
+the Synopsys IP?
 
-I've resisted adding the above helper functions simply to discourage
-the use of vmalloc() - it *is* slow, and one day we might hit
-vmalloc-arena fragmentation issues.
+If built with ADDITIONAL_FEATURES=YES, the version can be read from
+the hardware:
 
-That being said, I might one day give up, because adding such helpers
-would be a significant cleanup.  And once they are added, their use
-will proliferate and is_vmalloc_addr() will take quite a beating.
+# busybox devmem 0xd00121f8 32
 
-So yes, it would be prudent to be worried about is_vmalloc_addr()
-performance at the outset.
-
-Couldn't is_vmalloc_addr() just be done with a plain old bitmap?  It
-would consume 128kbytes to manage a 4G address space, and 1/8th of a meg
-isn't much.
+-Tim
