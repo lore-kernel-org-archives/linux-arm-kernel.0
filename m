@@ -1,83 +1,70 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 26 Nov 2013 13:18:49 +0200
-Subject: [PATCH v2 00/11]: add remaining support for IGEP boards
-In-Reply-To: <CABxcv=k+Lk=PFONKLvXab5iHExG7WCJRfE6BzEkv_YtPVwB8Dw@mail.gmail.com>
-References: <1384909575-19108-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv=k+Lk=PFONKLvXab5iHExG7WCJRfE6BzEkv_YtPVwB8Dw@mail.gmail.com>
-Message-ID: <52948399.7070407@ti.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 26 Nov 2013 12:19:08 +0100
+Subject: [PATCH] use -fstack-protector-strong
+In-Reply-To: <alpine.LFD.2.10.1311252310080.9667@knanqh.ubzr>
+References: <20131125221400.GA11041@www.outflux.net>
+ <5293DA66.6050902@zytor.com>
+ <CAGXu5j+QpAhifwjTdmsvk+i1Yq3Qk2CkzNgfFnttmfMh_B3buQ@mail.gmail.com>
+ <alpine.LFD.2.10.1311252310080.9667@knanqh.ubzr>
+Message-ID: <20131126111908.GB2410@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-25 17:30, Javier Martinez Canillas wrote:
-> On Wed, Nov 20, 2013 at 2:06 AM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> In order to make mach-omap2 Device Tree only, the board file for
->> IGEP boards was removed even when support for wifi and display
->> was still not supported by its DTS.
->>
->> This is a second version of a patch-set that adds support for
->> these remaining peripherals and also adds support for USB,
->> HDMI and user LED for the am33xx SoC based IGEP Aquila board.
->>
->> The patch-set is composed of the following patches:
->>
->> Enric Balletbo i Serra (7):
->>       ARM: dts: omap3-igep: Fix bus-width for mmc1.
->>       ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO.
->>       ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor.
->>       ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
->>       ARM: dts: AM33XX BASE0033: add pinmux and user led support.
->>       ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support.
->>       ARM: dts: AM33XX IGEP0033: add USB support.
->>
->> Javier Martinez Canillas (4):
->>       ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
->>       ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
->>       ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
->>       ARM: dts: omap3-igep0020: name twl4030 VPLL2 regulator as vdds_dsi
->>
->> Changes since v1:
->>
->>  Don't add a workaround in drivers/video/omap2/dss/dpi.c to use the
->>  VPLL2 regulator from twl4030 if VDDS_DSI regulator is not linked to
->>  the DPI device since the used regulator is a per board configuration.
->>
->>  Instead add a regulator-name = "vdds_dsi" property to the regulator
->>  in the IGEPv2 DTS file as suggested by Tony Lindgren.
->>
->> Tony,
->>
->> Most of these patches are just DTS changes so they have to be picked
->> by Benoit besides the following patch that has to go through your tree
->>
->> [PATCH 10/11] ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
->>
->> Since we have removed the board file for IGEP boards I think these
->> can be considered as regression fixes for 3.13 although I don't mind
->> if you prefer to wait for 3.14.
->>
->> Thanks a lot and best regards,
->> Javier
->> --
+
+* Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+
+> On Mon, 25 Nov 2013, Kees Cook wrote:
 > 
-> Hi Benoit and Tony,
+> > On Mon, Nov 25, 2013 at 3:16 PM, H. Peter Anvin <hpa@zytor.com> wrote:
+> > > On 11/25/2013 02:14 PM, Kees Cook wrote:
+> > >> Build the kernel with -fstack-protector-strong when it is available
+> > >> (gcc 4.9 and later). This increases the coverage of the stack protector
+> > >> without the heavy performance hit of -fstack-protector-all.
+> > >
+> > > What is the difference between the various options?
+> > 
+> > -fstack-protector-all:
+> > Adds the stack-canary saving prefix and stack-canary checking suffix
+> > to _all_ function entry and exit. Results in substantial use of stack
+> > space for saving the canary for deep stack users (e.g. historically
+> > xfs), and measurable (though shockingly still low) performance hit due
+> > to all the saving/checking. Really not suitable for sane systems, and
+> > was entirely removed as an option from the kernel many years ago.
+> > 
+> > -fstack-protector:
+> > Adds the canary save/check to functions that define an 8
+> > (--param=ssp-buffer-size=N, N=8 by default) or more byte local char
+> > array. Traditionally, stack overflows happened with string-based
+> > manipulations, so this was a way to find those functions. Very few
+> > total functions actually get the canary; no measurable performance or
+> > size overhead.
+> > 
+> > -fstack-protector-strong
+> > Adds the canary for a wider set of functions, since it's not just
+> > those with strings that have ultimately been vulnerable to
+> > stack-busting. With this superset, more functions end up with a
+> > canary, but it still remains small compared to all functions with no
+> > measurable change in performance. Based on the original design
+> > document, a function gets the canary when it contains any of:
+> > - local variable's address used as part of the RHS of an assignment or
+> > function argument
+> > - local variable is an array (or union containing an array),
+> > regardless of array type or length
+> > - uses register local variables
+> > https://docs.google.com/a/google.com/document/d/1xXBH6rRZue4f296vGt9YQcuLVQHeE516stHwt8M9xyU
+> > 
+> > Chrome OS has been using -fstack-protector-strong for its kernel
+> > builds for the last 8 months with no problems.
 > 
-> Now that 3.13-rc1 is out, do you think that it would be possible to
-> include this series as a fix for the -rc cycle?
-> 
-> Otherwise we will have missing functionality for IGEP boards on 3.13
-> due the board file removal. The changes are mostly DT and won't affect
-> other boards.
+> Could you get this information inside the commit log for your patch 
+> please?  This is very valuable info to have right next to the change 
+> in the repository without having to dig into the gcc manual or 
+> finding the relevant email thread.
 
-The DSS related parts look fine to me.
+Another piece of information we need for the changelog is a vmlinux 
+kernel size comparison, with/without the patch, for a defconfig build 
+(or a Ubuntu distro config build).
 
- Tomi
+Thanks,
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/2396ccc3/attachment.sig>
+	Ingo
