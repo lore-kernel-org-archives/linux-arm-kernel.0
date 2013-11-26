@@ -1,63 +1,29 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 26 Nov 2013 09:35:08 +0900
-Subject: [RFC 13/17] ARM: shmobile: marzen-reference: Initialize CPG device
-In-Reply-To: <52933F60.8090208@cogentembedded.com>
-References: <1385342312-1967-1-git-send-email-horms+renesas@verge.net.au>
- <1385342312-1967-14-git-send-email-horms+renesas@verge.net.au>
- <52933F60.8090208@cogentembedded.com>
-Message-ID: <20131126003508.GJ15227@verge.net.au>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Tue, 26 Nov 2013 08:46:09 +0800
+Subject: ARM: nommu: Boot hang after VFS: Mounted root (ext2 filesystem)
+ on device 1:0.
+In-Reply-To: <20131125194256.GC28642@pengutronix.de>
+References: <1385393160.4753.4.camel@phoenix>
+ <20131125194256.GC28642@pengutronix.de>
+Message-ID: <CAFRkauD4ottp=O5AwkKM+mf8JJL3c7m-MUu1AmpKLtQ5ucah6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 04:15:28PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 25-11-2013 5:18, Simon Horman wrote:
-> 
-> >On multiplatform kernels clocks are handled by the CCF CPG driver. It
-> >must be explicitly initialized by a call to rcar_gen2_clocks_init() with
-> 
->    You meant r8a7779_clocks_init() instead?
+2013/11/26 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> On Mon, Nov 25, 2013 at 11:26:00PM +0800, Axel Lin wrote:
+>> I got hangup at boot after "VFS: Mounted root (ext2 filesystem) on device 1:0.".
+>> I'm using ext2 initrd as root.
+> which mainline version are you using? I don't know your problem, and I'm
+> not using ext2 on my nommu target. So the only thing I can offer you is
+> testing the same version.
 
-Yes, thanks. I will fix that.
+Hi Uwe,
+My patches for this SoC is on top of current Linus' tree.
+I have devtmpfs enabled:
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
 
-> 
-> >the value of the boot mode pins.
-> 
-> >Based on similar work for the Koelsch board by Laurent Pinchart.
-> 
-> >Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/board-marzen-reference.c | 16 ++++++++++++----
-> >  1 file changed, 12 insertions(+), 4 deletions(-)
-> 
-> >diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-> >index 782907f..3a7c0fc 100644
-> >--- a/arch/arm/mach-shmobile/board-marzen-reference.c
-> >+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-> [...]
-> >@@ -28,11 +29,17 @@
-> >  #include <asm/mach/arch.h>
-> >
-> >
-> >-static void __init marzen_init(void)
-> >+static void __init marzen_init_timer(void)
-> >  {
-> >  #ifdef CONFIG_COMMON_CLK
-> >-	of_clk_init(NULL);
-> >-#else
-> >+	r8a7779_clocks_init(r8a7779_read_mode_pins());
-> >+#endif
-> >+	clocksource_of_init();
-> >+}
-> >+
-> >+static void __init marzen_init(void)
-> >+{
-> >+#ifndef CONFIG_COMMON_CLK
-> >  	r8a7779_clock_init();
-> >  #endif
-> >  	r8a7779_add_standard_devices_dt();
-> 
-> WBR, Sergei
-> 
+Thanks,
+Axel
