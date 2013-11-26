@@ -1,47 +1,86 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Nov 2013 12:53:42 +0800
-Subject: [PATCH v2 1/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
-In-Reply-To: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
-References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <20131126045340.GJ30476@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 26 Nov 2013 14:31:44 +0900
+Subject: PCI: mvebu: return NULL instead of ERR_PTR(ret)
+In-Reply-To: <20131125200256.GA7316@obsidianresearch.com>
+References: <001001ceb816$5d1aecc0$1750c640$%han@samsung.com>
+ <20131125200256.GA7316@obsidianresearch.com>
+Message-ID: <001101ceea68$cb486220$61d92660$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 10:15:19PM +0100, Marc Kleine-Budde wrote:
-> Hello,
-> 
-> this series first fixes a bug in the flexcan driver, using the wrong clock for
-> the bit rate calculcation. The next patch switches the peripheral clock on
-> i.MX53 to lp_apm, which has a rate of 24 MHz. This is optimal for the CIA
-> recommended bit rates.
-> 
-> Tested on TQ's mba53 and mba6x [1].
-> 
-> Who is taking the series? Due to Lucas' patch:
-> 
->     0a5b8df clk: imx5: introduce DT includes for clock provider
-> 
-> this series does not yet apply to my upstream (net-next/mastet).
 
-If the clock setting in flexcan driver is already broken, it shouldn't
-matter to have two patches go different tree?  Otherwise, I can have
-both go via IMX tree with your ACK on the first one?
+On Tuesday, November 26, 2013 5:03 AM, Jason Gunthorpe wrote:
+> On Sat, Nov 23, 2013 at 10:00:33PM -0500, Jason Cooper wrote:
+> > And a small addendum: I currently have the following in mvebu/drivers
+> >   058100a08be8 PCI: mvebu: return NULL instead of ERR_PTR(ret)
+> 
+> Folks, I took a quick look at this, and it looks suspicious (sorry, I
+> can't seem to find the thread to followup post)
+> 
+> >    PCI: mvebu: return NULL instead of ERR_PTR(ret)
+> >
+> >    Return NULL instead of ERR_PTR(ret) in order to fix the following
+> >    sparse warning:
+> >
+> >    drivers/pci/host/pci-mvebu.c:744:31: warning: incorrect type in return expression (different
+> address
+> >    spaces)
+> >    drivers/pci/host/pci-mvebu.c:744:31:    expected void [noderef] <asn:2>*
+> >    drivers/pci/host/pci-mvebu.c:744:31:    got void *
+> >
+> >    Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> >    Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> >    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> >
+> >--- a/drivers/pci/host/pci-mvebu.c
+> >+++ b/drivers/pci/host/pci-mvebu.c
+> >@@ -740,7 +740,7 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+> >
+> >        ret = of_address_to_resource(np, 0, &regs);
+> >        if (ret)
+> >-               return ERR_PTR(ret);
+> >+               return NULL;
+> >
+> >        return devm_ioremap_resource(&pdev->dev, &regs);
+> 
+> So we drop the ERR_PTR for that return but 'devm_ioremap_resource'
+> returns ERR_PTR too:
 
-> 
-> Marc
-> 
-> [1] On i.MX6 the following patch is needed (which is already in Shawn's
->     for-next):
-> 
->     9b3d423 ARM: i.MX6q: fix the wrong parent of can_root clock
+Yes, you're right.
+It makes the problem.
+Thus, this commit "PCI: mvebu: return NULL instead of ERR_PTR(ret)"
+should be reverted.
 
-This one already hits mainline.
 
-Shawn
+Previously, I sent the patch in order to fix sparse warning as below:
+How about this?
 
-> 
-> changes since v1:
-> * move switch to 24 MHz clock to mx53_clocks_init
->   (tnx Alexander)
-> 
-> 
+static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+			struct device_node *np, struct mvebu_pcie_port *port)
+{
+	struct resource regs;
+	int ret = 0;
+
+	ret = of_address_to_resource(np, 0, &regs);
+	if (ret)
+-		return ERR_PTR(ret);
++		return (void __iomem *)ERR_PTR(ret);
+
+	return devm_ioremap_resource(&pdev->dev, &regs);
+}
+
+static int mvebu_pcie_probe(struct platform_device *pdev)
+{
+		.....
+		port->base = mvebu_pcie_map_registers(pdev, child, port);
+		if (IS_ERR(port->base)) {
+			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
+				port->port, port->lane);
+			port->base = NULL;
+			clk_disable_unprepare(port->clk);
+			continue;
+		}
+
+
+Best regards,
+Jingoo Han
