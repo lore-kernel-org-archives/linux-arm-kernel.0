@@ -1,86 +1,156 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 26 Nov 2013 10:06:10 +0200
-Subject: [PATCHv10 29/41] ARM: dts: AM35xx: use DT clock data
+Date: Tue, 26 Nov 2013 10:06:17 +0200
+Subject: [PATCHv10 36/41] ARM: OMAP2+: io: use new clock init API
 In-Reply-To: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
 References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1385453182-24421-30-git-send-email-t-kristo@ti.com>
+Message-ID: <1385453182-24421-37-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM35xx now uses the clock data from device tree. Most of the data is
-shared with OMAP3xxx, but as there is some delta, a new base .dtsi
-file is also created for the SoC.
+clk_init is now separated to a common function which gets called for all
+SoC:s, which initializes the DT clocks and calls the SoC specific clock init.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/am3517-evm.dts        |    2 +-
- arch/arm/boot/dts/am3517.dtsi           |   31 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am3517_mt_ventoux.dts |    2 +-
- 3 files changed, 33 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/am3517.dtsi
+ arch/arm/mach-omap2/common.h |    2 +-
+ arch/arm/mach-omap2/io.c     |   32 +++++++++++++++++++++++---------
+ arch/arm/mach-omap2/timer.c  |    6 ++----
+ 3 files changed, 26 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am3517-evm.dts b/arch/arm/boot/dts/am3517-evm.dts
-index e99dfaf..9ff51d7 100644
---- a/arch/arm/boot/dts/am3517-evm.dts
-+++ b/arch/arm/boot/dts/am3517-evm.dts
-@@ -7,7 +7,7 @@
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index f7644fe..5b44bcc 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -306,7 +306,7 @@ struct omap_hwmod;
+ extern int omap_dss_reset(struct omap_hwmod *);
+ 
+ /* SoC specific clock initializer */
+-extern int (*omap_clk_init)(void);
++int omap_clk_init(void);
+ 
+ #endif /* __ASSEMBLER__ */
+ #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 3d9b3fc..7a394d7 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -55,10 +55,10 @@
+ #include "prm44xx.h"
+ 
+ /*
+- * omap_clk_init: points to a function that does the SoC-specific
++ * omap_clk_soc_init: points to a function that does the SoC-specific
+  * clock initializations
   */
- /dts-v1/;
+-int (*omap_clk_init)(void);
++int (*omap_clk_soc_init)(void);
  
--#include "omap34xx.dtsi"
-+#include "am3517.dtsi"
+ /*
+  * The machine specific code may provide the extra mapping besides the
+@@ -419,7 +419,7 @@ void __init omap2420_init_early(void)
+ 	omap242x_clockdomains_init();
+ 	omap2420_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap2420_clk_init;
++	omap_clk_soc_init = omap2420_clk_init;
+ }
  
- / {
- 	model = "TI AM3517 EVM (AM3517/05)";
-diff --git a/arch/arm/boot/dts/am3517.dtsi b/arch/arm/boot/dts/am3517.dtsi
-new file mode 100644
-index 0000000..6e8157c
---- /dev/null
-+++ b/arch/arm/boot/dts/am3517.dtsi
-@@ -0,0 +1,31 @@
-+/*
-+ * Device Tree Source for AM3517 SoC
-+ *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+ void __init omap2420_init_late(void)
+@@ -448,7 +448,7 @@ void __init omap2430_init_early(void)
+ 	omap243x_clockdomains_init();
+ 	omap2430_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap2430_clk_init;
++	omap_clk_soc_init = omap2430_clk_init;
+ }
+ 
+ void __init omap2430_init_late(void)
+@@ -482,7 +482,7 @@ void __init omap3_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap3xxx_clk_init;
++	omap_clk_soc_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3430_init_early(void)
+@@ -520,7 +520,7 @@ void __init ti81xx_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap3xxx_clk_init;
++	omap_clk_soc_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3_init_late(void)
+@@ -581,7 +581,7 @@ void __init am33xx_init_early(void)
+ 	am33xx_clockdomains_init();
+ 	am33xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = am33xx_clk_init;
++	omap_clk_soc_init = am33xx_clk_init;
+ }
+ 
+ void __init am33xx_init_late(void)
+@@ -635,7 +635,7 @@ void __init omap4430_init_early(void)
+ 	omap44xx_clockdomains_init();
+ 	omap44xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap4xxx_clk_init;
++	omap_clk_soc_init = omap4xxx_clk_init;
+ }
+ 
+ void __init omap4430_init_late(void)
+@@ -666,7 +666,7 @@ void __init omap5_init_early(void)
+ 	omap54xx_clockdomains_init();
+ 	omap54xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap5xxx_dt_clk_init;
++	omap_clk_soc_init = omap5xxx_dt_clk_init;
+ }
+ 
+ void __init omap5_init_late(void)
+@@ -711,3 +711,17 @@ void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ 		_omap2_init_reprogram_sdrc();
+ 	}
+ }
 +
-+#include "omap3.dtsi"
++int __init omap_clk_init(void)
++{
++	int ret = 0;
 +
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			/* AM35xx variants OPP1-5 */
-+			operating-points = <
-+				/* kHz    uV */
-+				125000   975000
-+				250000  1075000
-+				500000  1200000
-+				550000  1270000
-+				600000  1350000
-+			>;
-+			clock-latency = <300000>; /* From legacy driver */
-+		};
-+	};
-+};
++	if (!omap_clk_soc_init)
++		return 0;
 +
-+/include/ "am35xx-clocks.dtsi"
-+/include/ "omap36xx-am35xx-omap3430es2plus-clocks.dtsi"
-diff --git a/arch/arm/boot/dts/am3517_mt_ventoux.dts b/arch/arm/boot/dts/am3517_mt_ventoux.dts
-index fdf5ce6..d00e934 100644
---- a/arch/arm/boot/dts/am3517_mt_ventoux.dts
-+++ b/arch/arm/boot/dts/am3517_mt_ventoux.dts
-@@ -7,7 +7,7 @@
-  */
- /dts-v1/;
- 
--#include "omap34xx.dtsi"
-+#include "am3517.dtsi"
- 
- / {
- 	model = "TeeJet Mt.Ventoux";
++	ret = of_prcm_init();
++	if (!ret)
++		ret = omap_clk_soc_init();
++
++	return ret;
++}
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 3ca81e0..60e5fc9 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -570,8 +570,7 @@ static inline void __init realtime_counter_init(void)
+ 			       clksrc_nr, clksrc_src, clksrc_prop)	\
+ void __init omap##name##_gptimer_timer_init(void)			\
+ {									\
+-	if (omap_clk_init)						\
+-		omap_clk_init();					\
++	omap_clk_init();					\
+ 	omap_dmtimer_init();						\
+ 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+ 	omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src,		\
+@@ -582,8 +581,7 @@ void __init omap##name##_gptimer_timer_init(void)			\
+ 				clksrc_nr, clksrc_src, clksrc_prop)	\
+ void __init omap##name##_sync32k_timer_init(void)		\
+ {									\
+-	if (omap_clk_init)						\
+-		omap_clk_init();					\
++	omap_clk_init();					\
+ 	omap_dmtimer_init();						\
+ 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+ 	/* Enable the use of clocksource="gp_timer" kernel parameter */	\
 -- 
 1.7.9.5
