@@ -1,63 +1,154 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 26 Nov 2013 12:40:33 +0400
-Subject: [PATCH v3 4/4] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose
- PHY DTS entries
-In-Reply-To: <1385444818-29682-5-git-send-email-lho@apm.com>
-References: <1385444818-29682-1-git-send-email-lho@apm.com>
- <1385444818-29682-2-git-send-email-lho@apm.com>
- <1385444818-29682-3-git-send-email-lho@apm.com>
- <1385444818-29682-4-git-send-email-lho@apm.com>
- <1385444818-29682-5-git-send-email-lho@apm.com>
-Message-ID: <52945E81.3010708@cogentembedded.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Tue, 26 Nov 2013 14:14:24 +0530
+Subject: [PATCH V5 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <20131125184159.GE28201@mudshark.cambridge.arm.com>
+References: <1385372753-7396-1-git-send-email-vkale@apm.com>
+ <1385372753-7396-3-git-send-email-vkale@apm.com>
+ <20131125184159.GE28201@mudshark.cambridge.arm.com>
+Message-ID: <CAPrCYkfThbf4GoPrWB=CrnY6SfnaksxiDwqgqevYXdnrH-ynjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Nov 26, 2013 at 12:11 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 25, 2013 at 09:45:53AM +0000, Vinayak Kale wrote:
+>> Add support for irq registration when pmu interrupt is percpu.
+>>
+>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>> Signed-off-by: Tuan Phan <tphan@apm.com>
+>> ---
+>>  arch/arm64/kernel/perf_event.c |  108 ++++++++++++++++++++++++++++++----------
+>>  1 file changed, 81 insertions(+), 27 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index cea1594..a2efab3 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -22,6 +22,7 @@
+>>
+>>  #include <linux/bitmap.h>
+>>  #include <linux/interrupt.h>
+>> +#include <linux/irq.h>
+>>  #include <linux/kernel.h>
+>>  #include <linux/export.h>
+>>  #include <linux/perf_event.h>
+>> @@ -363,22 +364,55 @@ validate_group(struct perf_event *event)
+>>  }
+>>
+>>  static void
+>> +armpmu_disable_percpu_irq(void *data)
+>> +{
+>> +     struct arm_pmu *armpmu = data;
+>> +     struct platform_device *pmu_device = armpmu->plat_device;
+>> +     int irq = platform_get_irq(pmu_device, 0);
+>> +
+>> +     cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
+>> +     disable_percpu_irq(irq);
+>> +}
+>> +
+>> +static void
+>>  armpmu_release_hardware(struct arm_pmu *armpmu)
+>>  {
+>>       int i, irq, irqs;
+>>       struct platform_device *pmu_device = armpmu->plat_device;
+>>
+>>       irqs = min(pmu_device->num_resources, num_possible_cpus());
+>> +     if (irqs < 1)
+>
+> Can you just make irqs unsigned, then do if (!irqs) instead?
 
-On 26-11-2013 9:46, Loc Ho wrote:
+Okay. I will also modify already existing similar check in function
+'armpmu_reserve_hardware'.
 
-> arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY DTS entries
+>
+>> +             return;
+>>
+>> -     for (i = 0; i < irqs; ++i) {
+>> -             if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+>> -                     continue;
+>> -             irq = platform_get_irq(pmu_device, i);
+>> -             if (irq >= 0)
+>> -                     free_irq(irq, armpmu);
+>> +     irq = platform_get_irq(pmu_device, 0);
+>> +     if (irq <= 0)
+>> +             return;
+>> +
+>> +     if (irq_is_percpu(irq)) {
+>> +             on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
+>> +             free_percpu_irq(irq, &cpu_hw_events);
+>> +     } else {
+>> +             for (i = 0; i < irqs; ++i) {
+>> +                     if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+>> +                             continue;
+>> +                     irq = platform_get_irq(pmu_device, i);
+>> +                     if (irq > 0)
+>> +                             free_irq(irq, armpmu);
+>> +             }
+>>       }
+>>  }
+>>
+>> +static void
+>> +armpmu_enable_percpu_irq(void *data)
+>> +{
+>> +     struct arm_pmu *armpmu = data;
+>> +     struct platform_device *pmu_device = armpmu->plat_device;
+>> +     int irq = platform_get_irq(pmu_device, 0);
+>> +
+>> +     enable_percpu_irq(irq, 0);
+>
+> IRQ_TYPE_NONE?
 
-    As I already said, there's no need to repeat the patch summary line (the 
-mail subject) in the changelog verbatim.
+Did you mean to use macro instead or 0? If yes, I will modify.
 
-> This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
-> PHY driver. The PHY for SATA controller 0 and 1 are enabled by default.
+Or, are you asking why are we using 0? For this part here is my comment:
+Inside GIC it's 'implementation specific' whether to allow
+configuration of level/edge type for PPIs.
+So maybe we should leave it to boot-loader to do such config if any
+such explicit config is needed.
+Passing 0 (=IRQ_TYPE_NONE) to 'enable_percpu_irq' ensures that kernel
+doesn't touch the existing configuration.
 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->   arch/arm64/boot/dts/apm-storm.dtsi |   31 +++++++++++++++++++++++++++++++
->   1 files changed, 31 insertions(+), 0 deletions(-)
+I observed that arm arch timer code also passes 0 (IRQ_TYPE_NONE) to
+'enable_percpu_irq'.
 
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> index 359d7b6..f74c26a 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -193,5 +193,36 @@
->   			reg = <0x0 0x17000014 0x0 0x100>;
->   			mask = <0x1>;
->   		};
-> +
-> +		phy1: phy at 1f210000 {
-
-    Shouldn't the address part of the node name correspond to the first 
-address specifier in the "reg" prop?
-
-> +			compatible = "apm,xgene-phy";
-> +			reg = <0x0 0x1f21a000 0x0 0x100>,
-> +			      <0x0 0x1f21c000 0x0 0x100>;
-> +			#phy-cells = <1>;
-> +			status = "disabled";
-> +			apm-tx-boost-gain = <0x2 0x2 0x2 0x2 0x2 0x2>;
-> +			apm-tx-eye-tuning = <0xa 0xa 0xa 0xa 0xa 0xa>;
-
-    The vendor name should be separated by comma in the vendor specific prop 
-names.
-
-> +		};
-
-    Same comments about the other 2 PHY nodes.
-
-WBR, Sergei
+>
+>> +     cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
+>> +}
+>> +
+>>  static int
+>>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>>  {
+>> @@ -396,34 +430,54 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>>               return -ENODEV;
+>>       }
+>>
+>> -     for (i = 0; i < irqs; ++i) {
+>> -             err = 0;
+>> -             irq = platform_get_irq(pmu_device, i);
+>> -             if (irq < 0)
+>> -                     continue;
+>> +     irq = platform_get_irq(pmu_device, 0);
+>> +     if (irq <= 0) {
+>> +             pr_err("failed to get valid irq for PMU device\n");
+>> +             return -ENODEV;
+>> +     }
+>>
+>> -             /*
+>> -              * If we have a single PMU interrupt that we can't shift,
+>> -              * assume that we're running on a uniprocessor machine and
+>> -              * continue. Otherwise, continue without this interrupt.
+>> -              */
+>> -             if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+>> -                     pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+>> -                                 irq, i);
+>> -                     continue;
+>> -             }
+>> +     if (irq_is_percpu(irq)) {
+>> +             err = request_percpu_irq(irq, armpmu->handle_irq,
+>> +                             "arm-pmu", &cpu_hw_events);
+>
+> This is a bit of a kludge passing in the cpu_hw_events as the per-cpu token,
+> but I guess that will do for now. There is potential for something like a
+> master-aware L2 PMU which uses PPIs and expects to pass something different
+> back to the IRQ handler.
+>
+> Will
