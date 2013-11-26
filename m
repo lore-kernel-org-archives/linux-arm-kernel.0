@@ -1,58 +1,60 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 26 Nov 2013 15:08:27 +0100
-Subject: [PATCH 10/12] usb: r8a66597-hcd: Convert to clk_prepare/unprepare
-In-Reply-To: <20131126023608.GA682@kroah.com>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1900311.xc3BDUDvCy@avalon> <20131126023608.GA682@kroah.com>
-Message-ID: <10742564.mkbtL7U7WC@avalon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Nov 2013 14:13:47 +0000
+Subject: HYP Kernel boot requirements
+In-Reply-To: <5293A888.9050500@ti.com>
+References: <1385251666-27532-1-git-send-email-santosh.shilimkar@ti.com>
+ <1385251666-27532-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
+ <52937AB4.1060901@ti.com>
+ <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
+ <529381E4.3090405@ti.com> <20131125172825.GD8396@arm.com>
+ <5293A888.9050500@ti.com>
+Message-ID: <20131126141346.GA692@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On Monday 25 November 2013 18:36:08 Greg Kroah-Hartman wrote:
-> On Tue, Nov 26, 2013 at 03:00:30AM +0100, Laurent Pinchart wrote:
-> > On Saturday 09 November 2013 08:10:59 Greg Kroah-Hartman wrote:
-> > > On Sat, Nov 09, 2013 at 03:12:05PM +0100, Laurent Pinchart wrote:
-> > > > On Tuesday 29 October 2013 18:47:26 Shimoda, Yoshihiro wrote:
-> > > > > Hi Laurent-san,
-> > > > > 
-> > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
-> > > > > > Turn clk_enable() and clk_disable() calls into
-> > > > > > clk_prepare_enable() and clk_disable_unprepare() to get ready for
-> > > > > > the migration to the common clock framework.
-> > > > > > 
-> > > > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > > > > Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> > > > > > Cc: linux-usb at vger.kernel.org
-> > > > > > Signed-off-by: Laurent Pinchart
-> > > > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > 
-> > > > > Thank you for the patch.
-> > > > > 
-> > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> > > > 
-> > > > Could you please pick this patch up ?
-> > > 
-> > > I'll pick things up after 3.13-rc1 is out, I can't do anything until
-> > > then.
+On Mon, Nov 25, 2013 at 07:44:08PM +0000, Santosh Shilimkar wrote:
+> On Monday 25 November 2013 12:28 PM, Catalin Marinas wrote:
+> > On Mon, Nov 25, 2013 at 04:59:16PM +0000, Santosh Shilimkar wrote:
+> >> What I am saying is the platforms like OMAP5 already support PM in
+> >> mainline kernel and we can't break that for KVM. Boot-loaders
+> >> would be thrashed after boot so you need something which runs
+> >> in Kernel or along with Kernel to have equivalent of hyp
+> >> switching.
+> >>
+> >> Am not challenging the agreed direction but we need to solve the
+> >> PM problem as well before making "all CPU runs boot-loader for
+> >> HYP kernels" as a must have. At least its is a change in boot
+> >> strategy from existing kernels.
 > > 
-> > Sure.
+> > Of course I recommend PSCI which covers both hotplug and suspend ;), but
+> > I guess it's not the case for OMAP5. Since OMAP has its own secondary
+> > booting protocol and CPU hotplug re-entry, can you not just use
+> > different entry point when the primary CPU was initially started in Hyp
+> > mode (e.g. omap5_hyp_secondary_startup)?
 > > 
-> > As this patch is a dependency for other series that will go through
-> > different trees, could you please provide a stable branch in your tree
-> > with this patch included that you will push to v3.14 ?
-> 
-> If you need this for other work, feel free to take it in your tree, I
-> have no real need for it to go in mine.
-> 
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> How will that solve the guest secondary boot failure case when using
+> the same kernel binary for guest-boot ? Even for primary CPU which
+> will be suspended it needs to resume already in HYP mode and its not
+> going to go through boot-loader. So the low power code needs to have
+> HYP switch code so that CPU resumes in HYP mode.
 
-Sounds good to me, thanks.
+Is it late to rewrite the OMAP5 firmware?
 
-Simon, could you please pick this patch then ?
+What I meant is that you have the same kernel binary but with two sets
+of entry points, or maybe a single set of entry points and some global
+variable that you set during cold boot if the primary CPU is entered in
+Hyp mode. So you change the boot loader to switch to Hyp before it
+starts the kernel and leave the additional switching to be done by the
+secondary entry points (or PM code) based on the variable you set during
+cold boot. But I would recommend rewriting the firmware.
+
+> I will look at PSCI more closely and see what can be done here.
+
+PSCI has a different secondary start-up and hotplug/suspend protocol and
+CPUs wake up in Hyp if available. But this requires changing your
+firmware, PSCI is not a kernel-only thing. Do you need to support both
+older and newer kernels with the OMAP5 firmware (and possibly same DT)?
 
 -- 
-Regards,
-
-Laurent Pinchart
+Catalin
