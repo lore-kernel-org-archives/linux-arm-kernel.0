@@ -1,86 +1,55 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 26 Nov 2013 14:31:44 +0900
-Subject: PCI: mvebu: return NULL instead of ERR_PTR(ret)
-In-Reply-To: <20131125200256.GA7316@obsidianresearch.com>
-References: <001001ceb816$5d1aecc0$1750c640$%han@samsung.com>
- <20131125200256.GA7316@obsidianresearch.com>
-Message-ID: <001101ceea68$cb486220$61d92660$%han@samsung.com>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 25 Nov 2013 22:46:54 -0700
+Subject: [PATCH v3 0/4] PHY: Add APM X-Gene SoC 15Gbps Multi-purpose PHY
+ support
+Message-ID: <1385444818-29682-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+PHY: Add APM X-Gene SoC 15Gbps Multi-purpose PHY support
 
-On Tuesday, November 26, 2013 5:03 AM, Jason Gunthorpe wrote:
-> On Sat, Nov 23, 2013 at 10:00:33PM -0500, Jason Cooper wrote:
-> > And a small addendum: I currently have the following in mvebu/drivers
-> >   058100a08be8 PCI: mvebu: return NULL instead of ERR_PTR(ret)
-> 
-> Folks, I took a quick look at this, and it looks suspicious (sorry, I
-> can't seem to find the thread to followup post)
-> 
-> >    PCI: mvebu: return NULL instead of ERR_PTR(ret)
-> >
-> >    Return NULL instead of ERR_PTR(ret) in order to fix the following
-> >    sparse warning:
-> >
-> >    drivers/pci/host/pci-mvebu.c:744:31: warning: incorrect type in return expression (different
-> address
-> >    spaces)
-> >    drivers/pci/host/pci-mvebu.c:744:31:    expected void [noderef] <asn:2>*
-> >    drivers/pci/host/pci-mvebu.c:744:31:    got void *
-> >
-> >    Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> >    Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> >
-> >--- a/drivers/pci/host/pci-mvebu.c
-> >+++ b/drivers/pci/host/pci-mvebu.c
-> >@@ -740,7 +740,7 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-> >
-> >        ret = of_address_to_resource(np, 0, &regs);
-> >        if (ret)
-> >-               return ERR_PTR(ret);
-> >+               return NULL;
-> >
-> >        return devm_ioremap_resource(&pdev->dev, &regs);
-> 
-> So we drop the ERR_PTR for that return but 'devm_ioremap_resource'
-> returns ERR_PTR too:
+This patch adds support for APM X-Gene SoC 15Gbps Multi-purpose PHY. This
+is the physical layer interface for the corresponding host controller. This
+driver uses the new PHY generic framework posted by Kishon Vijay Abrahm.
+In addition, the new PHY generic framework is patched to provide an
+function to set the speed of the PHY.
 
-Yes, you're right.
-It makes the problem.
-Thus, this commit "PCI: mvebu: return NULL instead of ERR_PTR(ret)"
-should be reverted.
+v3
+* Major re-write of the code based on various review comments
+* Support external clock only at the moment
+* Support SATA mode only at the moment
+* No UEFI support at the moment
 
+v2
+* Remove port knowledge from functions
+* Make all functions static
+* Remove ID completely
+* Make resource requirement based on compatible type
+* Rename override PHY parameters with more descriptive name
+* Add override PHY parameter for per controller, per port, and per speed
+* Patch the generic PHY frame to expose set_speed operation
 
-Previously, I sent the patch in order to fix sparse warning as below:
-How about this?
+v1
+* Initial version
 
-static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-			struct device_node *np, struct mvebu_pcie_port *port)
-{
-	struct resource regs;
-	int ret = 0;
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+Loc Ho (4):
+  PHY: Add function set_speed to generic PHY framework
+  Documentation: Add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+    binding documentation
+  PHY: add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+  arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY DTS entries
 
-	ret = of_address_to_resource(np, 0, &regs);
-	if (ret)
--		return ERR_PTR(ret);
-+		return (void __iomem *)ERR_PTR(ret);
-
-	return devm_ioremap_resource(&pdev->dev, &regs);
-}
-
-static int mvebu_pcie_probe(struct platform_device *pdev)
-{
-		.....
-		port->base = mvebu_pcie_map_registers(pdev, child, port);
-		if (IS_ERR(port->base)) {
-			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
-				port->port, port->lane);
-			port->base = NULL;
-			clk_disable_unprepare(port->clk);
-			continue;
-		}
-
-
-Best regards,
-Jingoo Han
+ .../devicetree/bindings/ata/apm-xgene-phy.txt      |   89 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   31 +
+ drivers/phy/Kconfig                                |    6 +
+ drivers/phy/Makefile                               |    2 +
+ drivers/phy/phy-core.c                             |   21 +
+ drivers/phy/phy-xgene.c                            | 1838 ++++++++++++++++++++
+ include/linux/phy/phy.h                            |    8 +
+ 7 files changed, 1995 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene-phy.txt
+ create mode 100644 drivers/phy/phy-xgene.c
