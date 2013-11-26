@@ -1,33 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 15:52:02 -0800
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
- device id
-In-Reply-To: <87ioveeo0x.fsf@octavius.laptop.org>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-3-git-send-email-tony@atomide.com>
- <20131118184723.GR10317@atomide.com>
- <87ioveeo0x.fsf@octavius.laptop.org>
-Message-ID: <20131126235201.GV26766@atomide.com>
+From: lisovy@gmail.com (Rostislav Lisovy)
+Date: Wed, 27 Nov 2013 00:53:15 +0100
+Subject: [PATCH 1/2] ARM: i.MX53: dts: NAND flash controller
+In-Reply-To: <1385509996-17769-1-git-send-email-lisovy@gmail.com>
+References: <1385509996-17769-1-git-send-email-lisovy@gmail.com>
+Message-ID: <1385509996-17769-2-git-send-email-lisovy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chris Ball <cjb@laptop.org> [131126 15:35]:
-> Hi Tony,
-> 
-> On Mon, Nov 18 2013, Tony Lindgren wrote:
-> > We are wrongly relying on device id for the DMA configuration
-> > which can lead to wrong DMA channel being selected.
-> >
-> > Fix the issue by using the standard resources like we should.
-> >
-> > Cc: Chris Ball <cjb@laptop.org>
-> > Cc: linux-mmc at vger.kernel.org
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> Feel free to merge via your tree:
-> 
-> Acked-by: Chris Ball <cjb@laptop.org>
+Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
 
-OK thanks will merge both mmc fixes.
-
-Tony
+diff --git a/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+index 9304d0a..fa7309f5 100644
+--- a/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
++++ b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+@@ -72,6 +72,10 @@
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <MX53_UART1_PINGRP2>;
+ 		};
++
++		pinctrl_nand: nandgrp {
++			fsl,pins = <MX53_NAND_PINGRP1>;
++		};
+ 	};
+ };
+ 
+@@ -205,6 +209,14 @@
+ 	};
+ };
+ 
++&nfc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_nand>;
++	nand-bus-width = <8>;
++	nand-ecc-mode = "hw";
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+-- 
+1.8.3.2
