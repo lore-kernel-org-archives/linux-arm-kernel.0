@@ -1,40 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 13:55:37 -0800
-Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
- wl12xx
-In-Reply-To: <528E4295.2040109@ti.com>
-References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
- <1385041804-19115-2-git-send-email-balajitk@ti.com>
- <20131121165823.GM10317@atomide.com> <528E4295.2040109@ti.com>
-Message-ID: <20131126215537.GO26766@atomide.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 26 Nov 2013 17:02:20 -0500
+Subject: [PATCH v2 0/5] mmc: sdhci-esdhc-imx: add runtime pm support
+In-Reply-To: <1383554309-29065-1-git-send-email-b29396@freescale.com> (Dong
+ Aisheng's message of "Mon, 4 Nov 2013 16:38:24 +0800")
+References: <1383554309-29065-1-git-send-email-b29396@freescale.com>
+Message-ID: <87k3fug6tv.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dan Murphy <dmurphy@ti.com> [131121 09:28]:
-> On 11/21/2013 10:58 AM, Tony Lindgren wrote:
-> > * Balaji T K <balajitk@ti.com> [131121 05:51]:
-> >> pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
-> >> and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
-> >>
-> >> Fix the following error message:
-> >> pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
-> >> pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
-> 
-> Why is the led pins moved then?
+Hi Dong,
 
-Heh the patch just looks that way, looking at the curly brackets
-thing do get moved properly.
- 
-> >> SDIO card is not detected after moving pin mux to omap4_pmx_core since
-> >> sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
-> > Cool, does this fix the issue with the WLAN not coming up after a warm reset
-> > on panda?
+On Mon, Nov 04 2013, Dong Aisheng wrote:
+> We disable root clock in runtime pm to save power.
+>
+> Patch 2~4 are some fixes needed for enable runtime pm or it may
+> break the UHS cards(SD3.0/eMMC4.5).
+>
+> Below are some tests result i ran which passed mmc_test tool after enable rpm:
+> SDHC UHS1 on imx6q sabreauto
+> eMMC 4.5 on imx6sl evk
+> SDXC UHS1 on imx6sl evk
+> eMMC DDR on imx6q sabresd
+> SDHC on imx6q sabresd
+>
+> ChangeLog:
+> v1->v2: only patch 5 changed. Add pm_runtime_set_active
+> 	based on Ulf's comments.
+>
+> Dong Aisheng (5):
+>   mmc: sdhci-pltfm: export pltfm suspend/resume api
+>   mmc: sdhci-esdhc-imx: tuning bits should not be cleared during reset
+>   mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING should not affect
+>     other bits
+>   mmc: sdhci-esdhc-imx: fix runtime pm unblance issue
+>   mmc: sdhci-esdhc-imx: add runtime pm support
 
-Also commit f446043f1aa7 (regulator: fixed: fix regulator_list_voltage() for
-regression) is needed that recently got merged. But with v3.13-rc1 +
-f446043f1aa7 + this patch no luck whatsoever bringing up the wl12xx so there
-must be also some regression somewhere from v3.12 on that?
+Thanks, all pushed to mmc-next for 3.14.
 
-Regards,
-
-Tony
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
