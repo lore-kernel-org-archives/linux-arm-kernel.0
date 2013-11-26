@@ -1,40 +1,33 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 26 Nov 2013 16:44:08 +0900
-Subject: [GIT PULL] extcon fixes for 3.13-rc2
-Message-ID: <52945148.2020205@samsung.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 26 Nov 2013 16:47:09 +0900
+Subject: [PATCH v2 0/3] ARM: shmobile: marzen: enable HSPI0 to DTS
+Message-ID: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi,
 
-This is extcon fixes pull request for 3.13-rc2. I add detailed description of
-this pull request on below. Please pull extcon fixes with following updates.
+this short series enables HSPI0 in DTS for the r8a7779 based marzen board.
+It is based on work by Kuninori Morimoto for the r8a7778 based bockw board.
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+This series is based on the renesas-devel-v3.13-rc1-20131124 tag
+of my renesas tree.
 
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+v2
+* Correct clock suffixes in
+  "ARM: shmobile: r8a7779: add HSPI clock support for DT".
+  They should be ".spi" to match
+  "ARM: shmobile: r8a7779: add HSPI support to DTSI"
 
-are available in the git repository at:
+Simon Horman (3):
+  ARM: shmobile: r8a7779: add HSPI clock support for DT
+  ARM: shmobile: r8a7779: add HSPI support to DTSI
+  ARM: shmobile: marzen: enable HSPI0 in DTS
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git tags/extcon-linus-for-3.13-rc2
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts | 11 ++++++++++
+ arch/arm/boot/dts/r8a7779.dtsi                 | 30 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-r8a7779.c         |  3 +++
+ 3 files changed, 44 insertions(+)
 
-for you to fetch changes up to 7585ca0dc950583be7fc62099ca43a0c9551a875:
-
-  extcon: remove freed groups caused the panic or warning in unregister flow (2013-11-26 15:17:23 +0900)
-
-----------------------------------------------------------------
-Update extcon for 3.13-rc2
-
-This patchset fix NULL pointer error of extcon-arizona driver and fix issue
-about memory of device groups when calling extcon_dev_unregister function.
-
-----------------------------------------------------------------
-Charles Keepax (1):
-      extcon: arizona: Get pdata from arizona structure not device
-
-Wang, Xiaoming (1):
-      extcon: remove freed groups caused the panic or warning in unregister flow
-
- drivers/extcon/extcon-arizona.c | 4 +---
- drivers/extcon/extcon-class.c   | 3 ++-
- 2 files changed, 3 insertions(+), 4 deletions(-)
+-- 
+1.8.4
