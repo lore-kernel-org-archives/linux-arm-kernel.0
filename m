@@ -1,40 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Nov 2013 14:29:26 +0100
-Subject: [PATCH v2 4/4] ARM: ep93xx: stop using mach/timex.h
-In-Reply-To: <1384292466-31725-5-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1384292466-31725-5-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1385472566-20950-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 26 Nov 2013 08:35:43 -0500 (EST)
+Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
+ p2v and v2p conversions'
+In-Reply-To: <20131126095430.GA16735@n2100.arm.linux.org.uk>
+References: <20131125223636.GA20822@obsidianresearch.com>
+ <20131125232003.GU16735@n2100.arm.linux.org.uk>
+ <20131125233654.GV16735@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.10.1311252254200.9667@knanqh.ubzr>
+ <20131126095430.GA16735@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.10.1311260834520.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach/timex.h is the last remaining header that is unused for multiarch
-builds but necessary for singlearch builds. To allow to get rid of it
-for singlearch builds, too, drop its usage in ep93xx arch code by
-substituting CLOCK_TICK_RATE by an already defined local cpp symbol.
+On Tue, 26 Nov 2013, Russell King - ARM Linux wrote:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
----
-Changes since (implicit) v1, sent with
-Message-Id: 1384292466-31725-5-git-send-email-u.kleine-koenig at pengutronix.de:
- - ack by H Hartley Sweeten
- - use already existing symbol instead of introducing a new one
+> On Mon, Nov 25, 2013 at 10:56:25PM -0500, Nicolas Pitre wrote:
+> > What about simply doing the following instead, which I'm sure used to 
+> > work properly at some point:
+> > 
+> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> > index 9ecccc8650..2b8b8d3236 100644
+> > --- a/arch/arm/include/asm/memory.h
+> > +++ b/arch/arm/include/asm/memory.h
+> > @@ -239,6 +239,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+> >  
+> >  #else
+> >  
+> > +#ifndef PHYS_OFFSET
+> > +#ifdef PLAT_PHYS_OFFSET
+> > +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
+> > +#else
+> > +#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+> > +#endif
+> > +#endif
+> > +
+> >  static inline phys_addr_t __virt_to_phys(unsigned long x)
+> >  {
+> >  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+> > @@ -253,14 +261,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+> >  #endif
+> >  #endif /* __ASSEMBLY__ */
+> >  
+> > -#ifndef PHYS_OFFSET
+> > -#ifdef PLAT_PHYS_OFFSET
+> > -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
+> > -#else
+> > -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+> > -#endif
+> > -#endif
+> 
+> And that makes PHYS_OFFSET undefined to assembly code - and we have
+> references to it from said code.
 
- arch/arm/mach-ep93xx/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Why does the kernel compile properly for me with this change then?
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index d95ee28a..94b141f 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -115,7 +115,7 @@ void __init ep93xx_map_io(void)
- #define EP93XX_TIMER4_CLOCK		983040
- 
- #define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
--#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
-+#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(EP93XX_TIMER4_CLOCK, HZ)
- 
- static unsigned int last_jiffy_time;
- 
--- 
-1.8.4.2
+
+Nicolas
