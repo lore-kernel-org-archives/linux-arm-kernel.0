@@ -1,46 +1,72 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Nov 2013 22:10:48 +0100
-Subject: [PATCH 7/7] ARM: dts: imx6q-sabrelite: Enable PCI express
-In-Reply-To: <1385500248-6551-1-git-send-email-marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
-Message-ID: <1385500248-6551-7-git-send-email-marex@denx.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 26 Nov 2013 18:20:14 -0300
+Subject: [PATCH] clocksource: armada-370-xp: Register sched_clock after the
+ counter reset
+Message-ID: <1385500814-15058-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Frank Li <lznuaa@gmail.com>
-Cc: Harro Haan <hrhaan@gmail.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-Cc: Pratyush Anand <pratyush.anand@st.com>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Sean Cross <xobs@kosagi.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-Cc: Tim Harvey <tharvey@gateworks.com>
-Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-Cc: Yinghai Lu <yinghai@kernel.org>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+This commit registers the sched_clock _after_ the counter reset
+(instead of before). This removes the timestamp 'jump' in kernel
+log messages.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 0f003d0..73d7e7e 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -191,6 +191,10 @@
- 	};
- };
+Before this change:
+
+[    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
+[    0.000000] Initializing Coherency fabric
+[    0.000000] Aurora cache controller enabled
+[    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
+[  163.507447] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
+[  163.521419] pid_max: default: 32768 minimum: 301
+[  163.526185] Mount-cache hash table entries: 512
+[  163.531095] CPU: Testing write buffer coherency: ok
+
+After this change:
+
+[    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
+[    0.000000] Initializing Coherency fabric
+[    0.000000] Aurora cache controller enabled
+[    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
+[    0.016849] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
+[    0.030820] pid_max: default: 32768 minimum: 301
+[    0.035588] Mount-cache hash table entries: 512
+[    0.040500] CPU: Testing write buffer coherency: ok
+
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+Nobody has ever complained about the 'jump' in the timestamp, so maybe
+this is a stupid and useless change.
+
+ drivers/clocksource/time-armada-370-xp.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index d8e47e5..4e7f680 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -256,11 +256,6 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	ticks_per_jiffy = (timer_clk + HZ / 2) / HZ;
  
-+&pcie {
-+	status = "okay";
-+};
+ 	/*
+-	 * Set scale and timer for sched_clock.
+-	 */
+-	sched_clock_register(armada_370_xp_read_sched_clock, 32, timer_clk);
+-
+-	/*
+ 	 * Setup free-running clocksource timer (interrupts
+ 	 * disabled).
+ 	 */
+@@ -270,6 +265,11 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
+ 			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
+ 
++	/*
++	 * Set scale and timer for sched_clock.
++	 */
++	sched_clock_register(armada_370_xp_read_sched_clock, 32, timer_clk);
 +
- &sata {
- 	status = "okay";
- };
+ 	clocksource_mmio_init(timer_base + TIMER0_VAL_OFF,
+ 			      "armada_370_xp_clocksource",
+ 			      timer_clk, 300, 32, clocksource_mmio_readl_down);
 -- 
-1.8.4.3
+1.8.1.5
