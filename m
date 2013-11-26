@@ -1,283 +1,534 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 16:14:25 -0800
-Subject: [PATCH 10/12] ARM: OMAP2+: Remove legacy hwmod mux code
+Date: Mon, 25 Nov 2013 16:14:22 -0800
+Subject: [PATCH 07/12] ARM: OMAP2+: Remove legacy usb-host.c platform init code
 In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
 References: <1385424867-27243-1-git-send-email-tony@atomide.com>
-Message-ID: <1385424867-27243-11-git-send-email-tony@atomide.com>
+Message-ID: <1385424867-27243-8-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is no longer needed when booted with device tree.
 
-Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/devices.c    |   2 -
- arch/arm/mach-omap2/omap_hwmod.c | 160 +--------------------------------------
- 2 files changed, 1 insertion(+), 161 deletions(-)
+ arch/arm/mach-omap2/Makefile   |   1 -
+ arch/arm/mach-omap2/usb-host.c | 496 -----------------------------------------
+ 2 files changed, 497 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/usb-host.c
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 0dd6398..8e85fa0 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -33,7 +33,6 @@
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 1f50fae..bfc5459 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -246,7 +246,6 @@ obj-y					+= usb-musb.o
+ obj-y					+= omap_phy_internal.o
  
- #include "soc.h"
- #include "common.h"
--#include "mux.h"
- #include "control.h"
- #include "devices.h"
- #include "display.h"
-@@ -278,7 +277,6 @@ int __init omap4_keyboard_init(struct omap4_keypad_platform_data
- 						name, oh->name);
- 		return PTR_ERR(pdev);
- 	}
--	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
+ obj-$(CONFIG_MACH_OMAP2_TUSB6010)	+= usb-tusb6010.o
+-obj-y					+= usb-host.o
  
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index ee655da..b21449f 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -160,7 +160,6 @@
- #include "prm44xx.h"
- #include "prm33xx.h"
- #include "prminst44xx.h"
--#include "mux.h"
- #include "pm.h"
- 
- /* Name of the OMAP hwmod for the MPU */
-@@ -205,9 +204,6 @@ static LIST_HEAD(omap_hwmod_list);
- /* mpu_oh: used to add/remove MPU initiator from sleepdep list */
- static struct omap_hwmod *mpu_oh;
- 
--/* io_chain_lock: used to serialize reconfigurations of the I/O chain */
--static DEFINE_SPINLOCK(io_chain_lock);
--
- /*
-  * linkspace: ptr to a buffer that struct omap_hwmod_link records are
-  * allocated from - used to reduce the number of small memory
-@@ -539,51 +535,6 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
- }
- 
- /**
-- * _set_idle_ioring_wakeup - enable/disable IO pad wakeup on hwmod idle for mux
-- * @oh: struct omap_hwmod *
-- * @set_wake: bool value indicating to set (true) or clear (false) wakeup enable
+ onenand-$(CONFIG_MTD_ONENAND_OMAP2)	:= gpmc-onenand.o
+ obj-y					+= $(onenand-m) $(onenand-y)
+diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+deleted file mode 100644
+index 10855eb..0000000
+--- a/arch/arm/mach-omap2/usb-host.c
++++ /dev/null
+@@ -1,496 +0,0 @@
+-/*
+- * usb-host.c - OMAP USB Host
 - *
-- * Set or clear the I/O pad wakeup flag in the mux entries for the
-- * hwmod @oh.  This function changes the @oh->mux->pads_dynamic array
-- * in memory.  If the hwmod is currently idled, and the new idle
-- * values don't match the previous ones, this function will also
-- * update the SCM PADCTRL registers.  Otherwise, if the hwmod is not
-- * currently idled, this function won't touch the hardware: the new
-- * mux settings are written to the SCM PADCTRL registers when the
-- * hwmod is idled.  No return value.
+- * This file will contain the board specific details for the
+- * Synopsys EHCI/OHCI host controller on OMAP3430 and onwards
+- *
+- * Copyright (C) 2007-2011 Texas Instruments
+- * Author: Vikram Pandita <vikram.pandita@ti.com>
+- * Author: Keshava Munegowda <keshava_mgowda@ti.com>
+- *
+- * Generalization by:
+- * Felipe Balbi <balbi@ti.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 - */
--static void _set_idle_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
+-
+-#include <linux/types.h>
+-#include <linux/errno.h>
+-#include <linux/delay.h>
+-#include <linux/platform_device.h>
+-#include <linux/slab.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/regulator/fixed.h>
+-#include <linux/string.h>
+-#include <linux/io.h>
+-#include <linux/gpio.h>
+-#include <linux/usb/phy.h>
+-#include <linux/usb/usb_phy_gen_xceiv.h>
+-
+-#include "soc.h"
+-#include "omap_device.h"
+-#include "mux.h"
+-#include "usb.h"
+-
+-#ifdef CONFIG_MFD_OMAP_USB_HOST
+-
+-#define OMAP_USBHS_DEVICE	"usbhs_omap"
+-#define OMAP_USBTLL_DEVICE	"usbhs_tll"
+-#define	USBHS_UHH_HWMODNAME	"usb_host_hs"
+-#define USBHS_TLL_HWMODNAME	"usb_tll_hs"
+-
+-/* MUX settings for EHCI pins */
+-/*
+- * setup_ehci_io_mux - initialize IO pad mux for USBHOST
+- */
+-static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 -{
--	struct omap_device_pad *pad;
--	bool change = false;
--	u16 prev_idle;
--	int j;
+-	switch (port_mode[0]) {
+-	case OMAP_EHCI_PORT_MODE_PHY:
+-		omap_mux_init_signal("hsusb1_stp", OMAP_PIN_OUTPUT);
+-		omap_mux_init_signal("hsusb1_clk", OMAP_PIN_OUTPUT);
+-		omap_mux_init_signal("hsusb1_dir", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_nxt", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data0", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data1", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data2", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data3", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data4", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data5", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data6", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_data7", OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_EHCI_PORT_MODE_TLL:
+-		omap_mux_init_signal("hsusb1_tll_stp",
+-			OMAP_PIN_INPUT_PULLUP);
+-		omap_mux_init_signal("hsusb1_tll_clk",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_dir",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_nxt",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data0",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data1",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data2",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data3",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data4",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data5",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data6",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb1_tll_data7",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_USBHS_PORT_MODE_UNUSED:
+-		/* FALLTHROUGH */
+-	default:
+-		break;
+-	}
 -
--	if (!oh->mux || !oh->mux->enabled)
+-	switch (port_mode[1]) {
+-	case OMAP_EHCI_PORT_MODE_PHY:
+-		omap_mux_init_signal("hsusb2_stp", OMAP_PIN_OUTPUT);
+-		omap_mux_init_signal("hsusb2_clk", OMAP_PIN_OUTPUT);
+-		omap_mux_init_signal("hsusb2_dir", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_nxt", OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data0",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data1",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data2",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data3",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data4",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data5",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data6",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_data7",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_EHCI_PORT_MODE_TLL:
+-		omap_mux_init_signal("hsusb2_tll_stp",
+-			OMAP_PIN_INPUT_PULLUP);
+-		omap_mux_init_signal("hsusb2_tll_clk",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_dir",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_nxt",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data0",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data1",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data2",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data3",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data4",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data5",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data6",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb2_tll_data7",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_USBHS_PORT_MODE_UNUSED:
+-		/* FALLTHROUGH */
+-	default:
+-		break;
+-	}
+-
+-	switch (port_mode[2]) {
+-	case OMAP_EHCI_PORT_MODE_PHY:
+-		printk(KERN_WARNING "Port3 can't be used in PHY mode\n");
+-		break;
+-	case OMAP_EHCI_PORT_MODE_TLL:
+-		omap_mux_init_signal("hsusb3_tll_stp",
+-			OMAP_PIN_INPUT_PULLUP);
+-		omap_mux_init_signal("hsusb3_tll_clk",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_dir",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_nxt",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data0",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data1",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data2",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data3",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data4",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data5",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data6",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("hsusb3_tll_data7",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_USBHS_PORT_MODE_UNUSED:
+-		/* FALLTHROUGH */
+-	default:
+-		break;
+-	}
+-
+-	return;
+-}
+-
+-static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+-{
+-	switch (port_mode[0]) {
+-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+-		omap_mux_init_signal("mm1_rxdp",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("mm1_rxdm",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+-	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+-		omap_mux_init_signal("mm1_rxrcv",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+-		omap_mux_init_signal("mm1_txen_n", OMAP_PIN_OUTPUT);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+-		omap_mux_init_signal("mm1_txse0",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("mm1_txdat",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_USBHS_PORT_MODE_UNUSED:
+-		/* FALLTHROUGH */
+-	default:
+-		break;
+-	}
+-	switch (port_mode[1]) {
+-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+-		omap_mux_init_signal("mm2_rxdp",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("mm2_rxdm",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+-	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+-		omap_mux_init_signal("mm2_rxrcv",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+-		omap_mux_init_signal("mm2_txen_n", OMAP_PIN_OUTPUT);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+-		omap_mux_init_signal("mm2_txse0",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("mm2_txdat",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_USBHS_PORT_MODE_UNUSED:
+-		/* FALLTHROUGH */
+-	default:
+-		break;
+-	}
+-	switch (port_mode[2]) {
+-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+-		omap_mux_init_signal("mm3_rxdp",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("mm3_rxdm",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+-	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+-		omap_mux_init_signal("mm3_rxrcv",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+-		omap_mux_init_signal("mm3_txen_n", OMAP_PIN_OUTPUT);
+-		/* FALLTHROUGH */
+-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+-		omap_mux_init_signal("mm3_txse0",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		omap_mux_init_signal("mm3_txdat",
+-			OMAP_PIN_INPUT_PULLDOWN);
+-		break;
+-	case OMAP_USBHS_PORT_MODE_UNUSED:
+-		/* FALLTHROUGH */
+-	default:
+-		break;
+-	}
+-}
+-
+-void __init usbhs_init(struct usbhs_omap_platform_data *pdata)
+-{
+-	struct omap_hwmod	*uhh_hwm, *tll_hwm;
+-	struct platform_device	*pdev;
+-	int			bus_id = -1;
+-
+-	if (cpu_is_omap34xx()) {
+-		setup_ehci_io_mux(pdata->port_mode);
+-		setup_ohci_io_mux(pdata->port_mode);
+-
+-		if (omap_rev() <= OMAP3430_REV_ES2_1)
+-			pdata->single_ulpi_bypass = true;
+-
+-	}
+-
+-	uhh_hwm = omap_hwmod_lookup(USBHS_UHH_HWMODNAME);
+-	if (!uhh_hwm) {
+-		pr_err("Could not look up %s\n", USBHS_UHH_HWMODNAME);
 -		return;
+-	}
 -
--	for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
--		pad = oh->mux->pads_dynamic[j];
+-	tll_hwm = omap_hwmod_lookup(USBHS_TLL_HWMODNAME);
+-	if (!tll_hwm) {
+-		pr_err("Could not look up %s\n", USBHS_TLL_HWMODNAME);
+-		return;
+-	}
 -
--		if (!(pad->flags & OMAP_DEVICE_PAD_WAKEUP))
+-	pdev = omap_device_build(OMAP_USBTLL_DEVICE, bus_id, tll_hwm,
+-				pdata, sizeof(*pdata));
+-	if (IS_ERR(pdev)) {
+-		pr_err("Could not build hwmod device %s\n",
+-		       USBHS_TLL_HWMODNAME);
+-		return;
+-	}
+-
+-	pdev = omap_device_build(OMAP_USBHS_DEVICE, bus_id, uhh_hwm,
+-				pdata, sizeof(*pdata));
+-	if (IS_ERR(pdev)) {
+-		pr_err("Could not build hwmod devices %s\n",
+-		       USBHS_UHH_HWMODNAME);
+-		return;
+-	}
+-}
+-
+-#else
+-
+-void __init usbhs_init(struct usbhs_omap_platform_data *pdata)
+-{
+-}
+-
+-#endif
+-
+-/* Template for PHY regulators */
+-static struct fixed_voltage_config hsusb_reg_config = {
+-	/* .supply_name filled later */
+-	.microvolts = 3300000,
+-	.gpio = -1,		/* updated later */
+-	.startup_delay = 70000, /* 70msec */
+-	.enable_high = 1,	/* updated later */
+-	.enabled_at_boot = 0,	/* keep in RESET */
+-	/* .init_data filled later */
+-};
+-
+-static const char *nop_name = "usb_phy_gen_xceiv"; /* NOP PHY driver */
+-static const char *reg_name = "reg-fixed-voltage"; /* Regulator driver */
+-
+-/**
+- * usbhs_add_regulator - Add a gpio based fixed voltage regulator device
+- * @name: name for the regulator
+- * @dev_id: device id of the device this regulator supplies power to
+- * @dev_supply: supply name that the device expects
+- * @gpio: GPIO number
+- * @polarity: 1 - Active high, 0 - Active low
+- */
+-static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+-						int gpio, int polarity)
+-{
+-	struct regulator_consumer_supply *supplies;
+-	struct regulator_init_data *reg_data;
+-	struct fixed_voltage_config *config;
+-	struct platform_device *pdev;
+-	struct platform_device_info pdevinfo;
+-	int ret = -ENOMEM;
+-
+-	supplies = kzalloc(sizeof(*supplies), GFP_KERNEL);
+-	if (!supplies)
+-		return -ENOMEM;
+-
+-	supplies->supply = dev_supply;
+-	supplies->dev_name = dev_id;
+-
+-	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
+-	if (!reg_data)
+-		goto err_data;
+-
+-	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
+-	reg_data->consumer_supplies = supplies;
+-	reg_data->num_consumer_supplies = 1;
+-
+-	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
+-			GFP_KERNEL);
+-	if (!config)
+-		goto err_config;
+-
+-	config->supply_name = kstrdup(name, GFP_KERNEL);
+-	if (!config->supply_name)
+-		goto err_supplyname;
+-
+-	config->gpio = gpio;
+-	config->enable_high = polarity;
+-	config->init_data = reg_data;
+-
+-	/* create a regulator device */
+-	memset(&pdevinfo, 0, sizeof(pdevinfo));
+-	pdevinfo.name = reg_name;
+-	pdevinfo.id = PLATFORM_DEVID_AUTO;
+-	pdevinfo.data = config;
+-	pdevinfo.size_data = sizeof(*config);
+-
+-	pdev = platform_device_register_full(&pdevinfo);
+-	if (IS_ERR(pdev)) {
+-		ret = PTR_ERR(pdev);
+-		pr_err("%s: Failed registering regulator %s for %s : %d\n",
+-				__func__, name, dev_id, ret);
+-		goto err_register;
+-	}
+-
+-	return 0;
+-
+-err_register:
+-	kfree(config->supply_name);
+-err_supplyname:
+-	kfree(config);
+-err_config:
+-	kfree(reg_data);
+-err_data:
+-	kfree(supplies);
+-	return ret;
+-}
+-
+-#define MAX_STR 20
+-
+-int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
+-{
+-	char rail_name[MAX_STR];
+-	int i;
+-	struct platform_device *pdev;
+-	char *phy_id;
+-	struct platform_device_info pdevinfo;
+-	struct usb_phy_gen_xceiv_platform_data nop_pdata;
+-
+-	for (i = 0; i < num_phys; i++) {
+-
+-		if (!phy->port) {
+-			pr_err("%s: Invalid port 0. Must start from 1\n",
+-						__func__);
+-			continue;
+-		}
+-
+-		/* do we need a NOP PHY device ? */
+-		if (!gpio_is_valid(phy->reset_gpio) &&
+-			!gpio_is_valid(phy->vcc_gpio))
 -			continue;
 -
--		prev_idle = pad->idle;
--
--		if (set_wake)
--			pad->idle |= OMAP_WAKEUP_EN;
--		else
--			pad->idle &= ~OMAP_WAKEUP_EN;
--
--		if (prev_idle != pad->idle)
--			change = true;
--	}
--
--	if (change && oh->_state == _HWMOD_STATE_IDLE)
--		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
--}
--
--/**
-  * _enable_wakeup: set OCP_SYSCONFIG.ENAWAKEUP bit in the hardware
-  * @oh: struct omap_hwmod *
-  *
-@@ -2006,32 +1957,6 @@ static int _reset(struct omap_hwmod *oh)
- }
- 
- /**
-- * _reconfigure_io_chain - clear any I/O chain wakeups and reconfigure chain
-- *
-- * Call the appropriate PRM function to clear any logged I/O chain
-- * wakeups and to reconfigure the chain.  This apparently needs to be
-- * done upon every mux change.  Since hwmods can be concurrently
-- * enabled and idled, hold a spinlock around the I/O chain
-- * reconfiguration sequence.  No return value.
-- *
-- * XXX When the PRM code is moved to drivers, this function can be removed,
-- * as the PRM infrastructure should abstract this.
-- */
--static void _reconfigure_io_chain(void)
--{
--	unsigned long flags;
--
--	spin_lock_irqsave(&io_chain_lock, flags);
--
--	if (cpu_is_omap34xx() && omap3_has_io_chain_ctrl())
--		omap3xxx_prm_reconfigure_io_chain();
--	else if (cpu_is_omap44xx())
--		omap44xx_prm_reconfigure_io_chain();
--
--	spin_unlock_irqrestore(&io_chain_lock, flags);
--}
--
--/**
-  * _omap4_update_context_lost - increment hwmod context loss counter if
-  * hwmod context was lost, and clear hardware context loss reg
-  * @oh: hwmod to check for context loss
-@@ -2101,18 +2026,9 @@ static int _enable(struct omap_hwmod *oh)
- 
- 	/*
- 	 * hwmods with HWMOD_INIT_NO_IDLE flag set are left in enabled
--	 * state at init.  Now that someone is really trying to enable
--	 * them, just ensure that the hwmod mux is set.
-+	 * state at init.
- 	 */
- 	if (oh->_int_flags & _HWMOD_SKIP_ENABLE) {
--		/*
--		 * If the caller has mux data populated, do the mux'ing
--		 * which wouldn't have been done as part of the _enable()
--		 * done during setup.
--		 */
--		if (oh->mux)
--			omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
--
- 		oh->_int_flags &= ~_HWMOD_SKIP_ENABLE;
- 		return 0;
- 	}
-@@ -2137,14 +2053,6 @@ static int _enable(struct omap_hwmod *oh)
- 	if (_are_all_hardreset_lines_asserted(oh))
- 		return 0;
- 
--	/* Mux pins for device runtime if populated */
--	if (oh->mux && (!oh->mux->enabled ||
--			((oh->_state == _HWMOD_STATE_IDLE) &&
--			 oh->mux->pads_dynamic))) {
--		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
--		_reconfigure_io_chain();
--	}
--
- 	_add_initiator_dep(oh, mpu_oh);
- 
- 	if (oh->clkdm) {
-@@ -2245,12 +2153,6 @@ static int _idle(struct omap_hwmod *oh)
- 	if (oh->clkdm)
- 		clkdm_hwmod_disable(oh->clkdm, oh);
- 
--	/* Mux pins for device idle if populated */
--	if (oh->mux && oh->mux->pads_dynamic) {
--		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
--		_reconfigure_io_chain();
--	}
--
- 	oh->_state = _HWMOD_STATE_IDLE;
- 
- 	return 0;
-@@ -2317,10 +2219,6 @@ static int _shutdown(struct omap_hwmod *oh)
- 	for (i = 0; i < oh->rst_lines_cnt; i++)
- 		_assert_hardreset(oh, oh->rst_lines[i].name);
- 
--	/* Mux pins to safe mode or use populated off mode values */
--	if (oh->mux)
--		omap_hwmod_mux(oh->mux, _HWMOD_STATE_DISABLED);
--
- 	oh->_state = _HWMOD_STATE_DISABLED;
- 
- 	return 0;
-@@ -3864,7 +3762,6 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- 		_write_sysconfig(v, oh);
- 	}
- 
--	_set_idle_ioring_wakeup(oh, true);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
-@@ -3897,7 +3794,6 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 		_write_sysconfig(v, oh);
- 	}
- 
--	_set_idle_ioring_wakeup(oh, false);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
-@@ -4120,60 +4016,6 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
- }
- 
- /**
-- * omap_hwmod_pad_route_irq - route an I/O pad wakeup to a particular MPU IRQ
-- * @oh: struct omap_hwmod * containing hwmod mux entries
-- * @pad_idx: array index in oh->mux of the hwmod mux entry to route wakeup
-- * @irq_idx: the hwmod mpu_irqs array index of the IRQ to trigger on wakeup
-- *
-- * When an I/O pad wakeup arrives for the dynamic or wakeup hwmod mux
-- * entry number @pad_idx for the hwmod @oh, trigger the interrupt
-- * service routine for the hwmod's mpu_irqs array index @irq_idx.  If
-- * this function is not called for a given pad_idx, then the ISR
-- * associated with @oh's first MPU IRQ will be triggered when an I/O
-- * pad wakeup occurs on that pad.  Note that @pad_idx is the index of
-- * the _dynamic or wakeup_ entry: if there are other entries not
-- * marked with OMAP_DEVICE_PAD_WAKEUP or OMAP_DEVICE_PAD_REMUX, these
-- * entries are NOT COUNTED in the dynamic pad index.  This function
-- * must be called separately for each pad that requires its interrupt
-- * to be re-routed this way.  Returns -EINVAL if there is an argument
-- * problem or if @oh does not have hwmod mux entries or MPU IRQs;
-- * returns -ENOMEM if memory cannot be allocated; or 0 upon success.
-- *
-- * XXX This function interface is fragile.  Rather than using array
-- * indexes, which are subject to unpredictable change, it should be
-- * using hwmod IRQ names, and some other stable key for the hwmod mux
-- * pad records.
-- */
--int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx)
--{
--	int nr_irqs;
--
--	might_sleep();
--
--	if (!oh || !oh->mux || !oh->mpu_irqs || pad_idx < 0 ||
--	    pad_idx >= oh->mux->nr_pads_dynamic)
--		return -EINVAL;
--
--	/* Check the number of available mpu_irqs */
--	for (nr_irqs = 0; oh->mpu_irqs[nr_irqs].irq >= 0; nr_irqs++)
--		;
--
--	if (irq_idx >= nr_irqs)
--		return -EINVAL;
--
--	if (!oh->mux->irqs) {
--		/* XXX What frees this? */
--		oh->mux->irqs = kzalloc(sizeof(int) * oh->mux->nr_pads_dynamic,
--			GFP_KERNEL);
--		if (!oh->mux->irqs)
+-		phy_id = kmalloc(MAX_STR, GFP_KERNEL);
+-		if (!phy_id) {
+-			pr_err("%s: kmalloc() failed\n", __func__);
 -			return -ENOMEM;
+-		}
+-
+-		/* set platform data */
+-		memset(&nop_pdata, 0, sizeof(nop_pdata));
+-		if (gpio_is_valid(phy->vcc_gpio))
+-			nop_pdata.needs_vcc = true;
+-		nop_pdata.gpio_reset = phy->reset_gpio;
+-		nop_pdata.type = USB_PHY_TYPE_USB2;
+-
+-		/* create a NOP PHY device */
+-		memset(&pdevinfo, 0, sizeof(pdevinfo));
+-		pdevinfo.name = nop_name;
+-		pdevinfo.id = phy->port;
+-		pdevinfo.data = &nop_pdata;
+-		pdevinfo.size_data =
+-			sizeof(struct usb_phy_gen_xceiv_platform_data);
+-		scnprintf(phy_id, MAX_STR, "usb_phy_gen_xceiv.%d",
+-					phy->port);
+-		pdev = platform_device_register_full(&pdevinfo);
+-		if (IS_ERR(pdev)) {
+-			pr_err("%s: Failed to register device %s : %ld\n",
+-				__func__,  phy_id, PTR_ERR(pdev));
+-			kfree(phy_id);
+-			continue;
+-		}
+-
+-		usb_bind_phy("ehci-omap.0", phy->port - 1, phy_id);
+-
+-		/* Do we need VCC regulator ? */
+-		if (gpio_is_valid(phy->vcc_gpio)) {
+-			scnprintf(rail_name, MAX_STR, "hsusb%d_vcc", phy->port);
+-			usbhs_add_regulator(rail_name, phy_id, "vcc",
+-					phy->vcc_gpio, phy->vcc_polarity);
+-		}
+-
+-		phy++;
 -	}
--	oh->mux->irqs[pad_idx] = irq_idx;
 -
 -	return 0;
 -}
--
--/**
-  * omap_hwmod_init - initialize the hwmod code
-  *
-  * Sets up some function pointers needed by the hwmod code to operate on the
 -- 
 1.8.1.1
