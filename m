@@ -1,10 +1,11 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 26 Nov 2013 15:50:16 +0100
-Subject: [PATCH RFC v2 05/17] ARM: shmobile: r8a7779: Reference clocks
-In-Reply-To: <1385451139-29686-6-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 26 Nov 2013 15:52:54 +0100
+Subject: [PATCH RFC v2 15/17] ARM: shmobile: Remove non-multiplatform
+ Marzen reference support
+In-Reply-To: <1385451139-29686-16-git-send-email-horms+renesas@verge.net.au>
 References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
- <1385451139-29686-6-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1531673.6AgJX0AzD4@avalon>
+ <1385451139-29686-16-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1902966.4sLBPLdrZF@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,88 +13,97 @@ Hi Simon,
 
 Thank you for the patch.
 
-On Tuesday 26 November 2013 16:32:07 Simon Horman wrote:
-> Reference clocks using a "clocks" property in all nodes corresponding to
-> devices that require a clock.
+On Tuesday 26 November 2013 16:32:17 Simon Horman wrote:
+> Now that r8a7779 has CCF support remove the legacy Marzen reference
+> Kconfig bits CONFIG_MACH_MARZEN_REFERENCE for the non-multiplatform
+> case.
+> 
+> Starting from this commit Marzen board support is always enabled via
+> CONFIG_MACH_MARZEN, and CONFIG_ARCH_MULTIPLATFORM is used to select
+> between board-marzen.c and board-marzen-reference.c
+> 
+> The file board-marzen-reference.c can no longer be used together with
+> the legacy sh-clk clock framework, instead CCF is used.
 
-There's a sata node in your latest devel branch that you're missing.
+You should then modify it to remove the #ifdef CONFIG_COMMON_CLK conditional 
+compilation.
 
-> Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
+> Based on work for the Koelsch board by Laurent Pinchart.
 > 
 > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
 > ---
->  arch/arm/boot/dts/r8a7779.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> v2
+> * Correct changelog to refer to marzen instead of koelsch
+> * Do not add typo to Makefile
+> ---
+>  arch/arm/boot/dts/Makefile           |  1 -
+>  arch/arm/mach-shmobile/Kconfig       | 13 -------------
+>  arch/arm/mach-shmobile/Makefile      |  1 -
+>  arch/arm/mach-shmobile/Makefile.boot |  1 -
+>  4 files changed, 16 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> index d524b3f..623dd39 100644
-> --- a/arch/arm/boot/dts/r8a7779.dtsi
-> +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> @@ -160,6 +160,7 @@
->  		reg = <0xffc70000 0x1000>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 79 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp0_clks R8A7779_CLK_I2C0>;
->  		status = "disabled";
->  	};
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 723fe71..166e3dd 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -205,7 +205,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
+>  	r8a7778-bockw-reference.dtb \
+>  	r8a7740-armadillo800eva-reference.dtb \
+>  	r8a7779-marzen.dtb \
+> -	r8a7779-marzen-reference.dtb \
+>  	r8a7791-koelsch.dtb \
+>  	r8a7791-koelsch-reference.dtb \
+>  	r8a7790-lager.dtb \
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index 4216baa..a27d60c 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -239,19 +239,6 @@ config MACH_MARZEN
+>  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+>  	select USE_OF
 > 
-> @@ -170,6 +171,7 @@
->  		reg = <0xffc71000 0x1000>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp0_clks R8A7779_CLK_I2C1>;
->  		status = "disabled";
->  	};
+> -config MACH_MARZEN_REFERENCE
+> -	bool "MARZEN board - Reference Device Tree Implementation"
+> -	depends on ARCH_R8A7779
+> -	select ARCH_REQUIRE_GPIOLIB
+> -	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+> -	select USE_OF
+> -	---help---
+> -	   Use reference implementation of Marzen board support
+> -	   which makes use of device tree at the expense
+> -	   of not supporting a number of devices.
+> -
+> -	   This is intended to aid developers
+> -
+>  config MACH_LAGER
+>  	bool "Lager board"
+>  	depends on ARCH_R8A7790
+> diff --git a/arch/arm/mach-shmobile/Makefile
+> b/arch/arm/mach-shmobile/Makefile index 6d75ae8..e7f586c 100644
+> --- a/arch/arm/mach-shmobile/Makefile
+> +++ b/arch/arm/mach-shmobile/Makefile
+> @@ -69,7 +69,6 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+=
+> board-bockw-reference.o obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
+>  obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
+>  obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+> -obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+>  obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+>  obj-$(CONFIG_MACH_LAGER_REFERENCE)	+= board-lager-reference.o
+>  obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+> diff --git a/arch/arm/mach-shmobile/Makefile.boot
+> b/arch/arm/mach-shmobile/Makefile.boot index 759e4f8f..6f761b4 100644
+> --- a/arch/arm/mach-shmobile/Makefile.boot
+> +++ b/arch/arm/mach-shmobile/Makefile.boot
+> @@ -16,7 +16,6 @@ loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
+>  loadaddr-$(CONFIG_MACH_LAGER_REFERENCE) += 0x40008000
+>  loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
+>  loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
+> -loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
 > 
-> @@ -180,6 +182,7 @@
->  		reg = <0xffc72000 0x1000>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp0_clks R8A7779_CLK_I2C2>;
->  		status = "disabled";
->  	};
-> 
-> @@ -190,6 +193,7 @@
->  		reg = <0xffc73000 0x1000>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp0_clks R8A7779_CLK_I2C3>;
->  		status = "disabled";
->  	};
-> 
-> @@ -215,6 +219,7 @@
->  		reg = <0xffe4c000 0x100>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7779_CLK_SDHI0>;
->  		cap-sd-highspeed;
->  		cap-sdio-irq;
->  		status = "disabled";
-> @@ -225,6 +230,7 @@
->  		reg = <0xffe4d000 0x100>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7779_CLK_SDHI1>;
->  		cap-sd-highspeed;
->  		cap-sdio-irq;
->  		status = "disabled";
-> @@ -235,6 +241,7 @@
->  		reg = <0xffe4e000 0x100>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7779_CLK_SDHI2>;
->  		cap-sd-highspeed;
->  		cap-sdio-irq;
->  		status = "disabled";
-> @@ -245,6 +252,7 @@
->  		reg = <0xffe4f000 0x100>;
->  		interrupt-parent = <&gic>;
->  		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7779_CLK_SDHI3>;
->  		cap-sd-highspeed;
->  		cap-sdio-irq;
->  		status = "disabled";
+>  __ZRELADDR	:= $(sort $(loadaddr-y))
+>     zreladdr-y   += $(__ZRELADDR)
 -- 
 Regards,
 
