@@ -1,39 +1,48 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Tue, 26 Nov 2013 12:08:03 +0000
-Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
-In-Reply-To: <20131125134248.GA28906@pengutronix.de>
-References: <1345852300-2213-1-git-send-email-marex@denx.de>
- <1345852300-2213-2-git-send-email-marex@denx.de>
- <20131122154947.GE24508@pengutronix.de> <201311250058.32881.marex@denx.de>
- <20131125134248.GA28906@pengutronix.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980411F14C@039-SN2MPN1-021.039d.mgd.msft.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 26 Nov 2013 04:10:16 -0800
+Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <52948184.50604@ti.com>
+References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <52948184.50604@ti.com>
+Message-ID: <52948FA8.7000609@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/26/2013 03:09 AM, Grygorii Strashko wrote:
+> On 11/25/2013 04:04 PM, Ivan Khoronzhuk wrote:
+>> To reduce code duplicate and increase code readability use WDT core
+>> code to handle WDT interface.
+>>
+>> Remove io_lock as the WDT core uses mutex to lock each wdt device.
+>> Remove wdt_state as the WDT core tracks state with its own variable.
+>>
+>> The watchdog_init_timeout() can read timeout value from timeout-sec
+>> property if the passed value is out of bounds. The heartbeat is
+>> initialized in next way. If heartbeat is not set thought module
+>> parameter, try to read it's value from WDT node timeout-sec property.
+>> If node has no one, use default value.
+>>
+>> The heartbeat is hold in wdd->timeout by WDT core, so use it in
+>> order to set timeout period.
+>>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>   arch/arm/mach-davinci/da8xx-dt.c      |    2 +-
+>>   arch/arm/mach-davinci/devices-da8xx.c |    4 +-
+>>   arch/arm/mach-davinci/devices.c       |    2 +-
+>>   drivers/watchdog/Kconfig              |    2 +
+>>   drivers/watchdog/davinci_wdt.c        |  151 ++++++++-------------------------
+>>   5 files changed, 43 insertions(+), 118 deletions(-)
+>
+> Pls note, that this patch contains both changes in platform and driver code to fix regression reported by Sekhar Nori on v2 of this series and caused by driver name changing.
+>
+> Is it ok?
+>
+> It can be splitted, but then both patches will introduce regression by itself and thing will work only if both of them will be applied together.
+>
+Splitting it would break bisect, even if applied together, so I don't think this would be a good idea.
 
-
- 
-> 
-> The GPIO is working for this pin. But also the DIGCTL register bits
-> helped here.  Now the OC event triggers if the pin gets pulled to 3V3.
-> 
-> I am currently looking for a good place to enable the DIGCTL bits.
-> I suggest to enable them per default.  As we don't have USBMISC registers
-> in MX28, the bits should be toggled in ci_hdrc_imx.c if the of property
-> "disable-overcurrent" is not found.  I will use the syscon interface to
-> reach them with the regmap interface.
-> 
-
-Hi Michael,
-
-usbmisc register doesn't stand for the register needs to be in usb controller.
-Any registers which are related to USB function can be considered as usbmisc
-registers. You will see FSL-style SoC, the over-current or other related setting
-are at controller base + 0x800 (0x600), but Sigmatel-style SoC (mx28/mx23), the usb
-register are not at controller register region.
-
-My suggestion is: create usbmisc node for mx28, and put oc setting at there, it can
-keep ci_hdrc_imx.c clean.
-Besides, you may need two dts user setting for oc enable and oc polarity.
-
-Peter
+Guenter
