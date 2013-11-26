@@ -1,37 +1,52 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Nov 2013 22:25:43 +0100
-Subject: [PATCH 6/7] PCI: imx6: Fix link start operation
-In-Reply-To: <1385500248-6551-6-git-send-email-marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <1385500248-6551-6-git-send-email-marex@denx.de>
-Message-ID: <201311262225.43711.marex@denx.de>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Tue, 26 Nov 2013 13:32:13 -0800
+Subject: [PATCH 2/5] pwm: kona: Introduce Kona PWM controller support
+In-Reply-To: <20131126094505.GC27752@ulmo.nvidia.com>
+References: <1384800901-21711-1-git-send-email-tim.kryger@linaro.org>
+ <1384800901-21711-3-git-send-email-tim.kryger@linaro.org>
+ <20131125110854.GI22043@ulmo.nvidia.com>
+ <CAAYSxhr7=Pa8RdnEsD2MGTR4hvfHCcHQCP77GRjx1Fqb-=kRrA@mail.gmail.com>
+ <20131126094505.GC27752@ulmo.nvidia.com>
+Message-ID: <CAAYSxhqquF87NEJj8n3M7E8LWNgQGQdTqQmHPX9sdmvtBiSBTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut,
+On Tue, Nov 26, 2013 at 1:45 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Mon, Nov 25, 2013 at 05:38:44PM -0800, Tim Kryger wrote:
 
-> This patch first forces the link into Gen1 mode before starting up
-> the link and only after the link is up requests the link to start
-> negotiating possible Gen2 mode operation. This is because without
-> such sequence, some PCIe switches are not detected at all.
+> Okay, that's fine then. Do you have a pointer to that documentation?
 
-[...]
+Unfortunately the documentation is not publicly available at the moment.
 
-> +	/* Make sure link training is finished as well! */
-> +	if (count)
-> +		ret = imx6_pcie_wait_for_link(pp);
-> +	else
-> +		ret = -EINVAL;
-> 
-> +	if (ret) {
-> +		dev_err(pp->dev, "Failed to bring link up!\n");
-> +	} else {
-> +		tmp = readl(pp->dbi_base + 0x80);
-> +		dev_err(pp->dev, "Link up, Gen=%i\n", (tmp >> 16) & 0xf);
+>> The hardware is always enabled and at best can be be configured to
+>> operate at zero duty.
+>
+> What good are the PWMOUT_ENABLE bits then? Is that really only used for
+> triggering updates? That's what another comment suggests, but if so, can
+> the comment in kona_pwmc_apply_settings() be extended to mention that?
 
-Hm meh, this dev_err() shouldn't be here of course. But I'd be interested if you 
-people now get stable Gen2 link up properly all the time. Please test. Thanks!
+The guidance from the documentation is to treat the enable bits as a trigger.
 
-[...]
-Best regards,
-Marek Vasut
+Sure I can expand the comment to try and make this more clear.
+
+>> The settings in HW may have already been triggered and might not be
+>> what you want.
+>>
+>> For example:
+>>
+>> /sys/class/pwm/pwmchip0/pwm1# echo 1 > enable
+>> /sys/class/pwm/pwmchip0/pwm1# echo 5000 > period
+>> /sys/class/pwm/pwmchip0/pwm1# echo 2000 > duty_cycle
+>> /sys/class/pwm/pwmchip0/pwm1# echo 0 > enable
+>> /sys/class/pwm/pwmchip0/pwm1# echo 1 > enable
+>
+> I'm not exactly sure what this is supposed to demonstrate.
+
+The computation has to be performed for every operation except the disable.
+
+> All of that said, I wasn't able to dig up a normative policy and either
+> of your proposed alternatives do exist in the kernel, so I withdraw any
+> objections regarding MODULE_AUTHOR. Take your pick.
+
+Thanks
