@@ -1,67 +1,116 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 26 Nov 2013 22:51:49 +0530
-Subject: [PATCH 07/12] memory: davinci-aemif: introduce AEMIF driver
-In-Reply-To: <5294B8C4.6040803@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-8-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D2E@DNCE04.ent.ti.com>
- <52944BD3.90105@ti.com> <5294B8C4.6040803@ti.com>
-Message-ID: <5294D8AD.5030106@ti.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Tue, 26 Nov 2013 19:23:00 +0200
+Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
+In-Reply-To: <C0B815B0-E394-494C-88A2-78A0DBFA23DA@kernel.crashing.org>
+References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131120182102.GK14627@ns203013.ovh.net> <528D076A.8070806@ti.com>
+ <C0B815B0-E394-494C-88A2-78A0DBFA23DA@kernel.crashing.org>
+Message-ID: <5294D8F4.6040409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 8:35 PM, Santosh Shilimkar wrote:
-> On Tuesday 26 November 2013 02:20 AM, Sekhar Nori wrote:
->> On Monday 11 November 2013 10:36 PM, Khoronzhuk, Ivan wrote:
->>> Add new AEMIF driver for EMIF16 davinci controller. The EMIF16 module
->>> is intended to provide a glue-less interface to a variety of
->>> asynchronous memory devices like ASRA M, NOR and NAND memory. A total
->>> of 256M bytes of any of these memories can be accessed at any given
->>> time via four chip selects with 64M byte access per chip select.
+On 11/22/2013 11:06 PM, Kumar Gala wrote:
+>
+> On Nov 20, 2013, at 1:03 PM, ivan.khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
+>
+>> On 11/20/2013 08:21 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>> +				the chip select signal.
+>>>> +				Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-wsetup:		write setup width, ns
+>>>> +				Time between the beginning of a memory cycle
+>>>> +				and the activation of write strobe.
+>>>> +				Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-wstrobe:	write strobe width, ns
+>>>> +				Time between the activation and deactivation of
+>>>> +				the write strobe.
+>>>> +				Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-whold:		write hold width, ns
+>>>> +				Time between the deactivation of the write
+>>>> +				strobe and the end of the cycle (which may be
+>>>> +				either an address change or the deactivation of
+>>>> +				the chip select signal.
+>>>> +				Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +If any of the above parameters are absent, current parameter value will be taken
+>>>> +from the corresponding HW reg.
+>>>> +
+>>>> +The name for cs node must be in format csN, where N is the cs number.
 >>>
->>> Synchronous memories such as DDR1 SD RAM, SDR SDRAM and Mobile SDR
->>> are not supported.
+>>> this is wired we should use reg instead to represent the cs as done for SPI
+>>> or a an other property
 >>>
->>> See http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+>>> Best Regards,
+>>> J.
 >>>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
-> 
-> [...]
-> 
->>> +static int davinci_aemif_probe(struct platform_device *pdev)
->>> +{
->>> +       int ret  = -ENODEV, i;
->>> +       struct resource *res;
->>> +       struct device *dev = &pdev->dev;
->>> +       struct device_node *np = dev->of_node;
->>> +
->>> +       if (np == NULL)
->>> +               return 0;
->>> +
->>> +       if (aemif) {
->>> +               dev_err(dev, "davinci_aemif driver is in use currently\n");
->>> +               return -EBUSY;
->>> +       }
 >>
->> Why expressly prevent multiple AEMIF devices? Its entirely conceivable
->> to have two memories like NAND and NOR flash connect to two different
->> AEMIF interfaces.
+>> Ok, I will add new property cs-chipselect like following :
 >>
-> Ivan wanted me to clarify the Keystone hardware which supports
-> 1 instance of controller with 4 CS. That allows already four
-> devices to be connected. Currently NAND and NOR are connected on it
-> and two more slots are free.
-> 
-> Since driver support what hardware is, lets not build a driver for
-> hardware which don't exist. And if at all such a support would be
-> needed in future, we can always add it.
+>> ti,cs-chipselect:	number of chipselect. Indicates on the
+>> 			aemif driver which chipselect is used
+>> 			for accessing the memory.
+>> 			For compatibles "ti,davinci-aemif" and
+>> 			"ti,keystone-aemif" it can be in range [0-3].
+>> 			For compatible "ti,omap-L138-aemif" range is [2-5].
+>>
+>> Is it OK?
+>
+> Why do you need this? As it was mentioned just use reg:
+>
+> So you?d have something like:
+>
+> memory-controller at 21000A00 {
+> 	?
+> 	nand:cs2 at 2 {
+> 		reg = <2 0 0>;
+> 		ranges;
+> 		...
+>
+> 	}:
+> };
+>
+> However, I?m confused by the example in which you have:
+>
+> +		nand at 0,0x8000000 {
+> +			compatible = "ti,davinci-nand";
+> +			reg = <0 0x8000000 0x4000000
+It means, use memory of 0 AEMIF range beginning from 0x800000 (started 
+from beginning of this range) and with size 0x4000000
+> +			       1 0x0000000 0x0000100>;
+It means, use memory of 1 AEMIF range + 0x0000000 and with size 0x0000100
+> +
+> +			.. see davinci-nand.txt
+> +		};
+>
+> What chipselects is this on 0 & 1?
+Any of them is not cs number. 0 - is just a memory range number.
+>
+> - k
+>
 
-I understand the lack of hardware part, but its common to write the
-driver such that it can handle multiple instances. Is there any gain on
-current hardware because of this check? From what I am hearing, the code
-in question wont be exercised at all. So why go all the way and add it
-in first place?
+The ranges property provides a means of defining a mapping or 
+translation between the address space of the AEMIF and the address space 
+of the cs nodes.
 
-Thanks,
-Sekhar
+The reg property describes the address of the cs's resources within the 
+address space defined by AEMIF. The reg is the memory range, not cs number.
+
+See Grygorii Starshko comment on it, he described it very well.
+			
+>>
+>> --
+>> Regards,
+>> Ivan Khoronzhuk
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
+
+-- 
+Regards,
+Ivan Khoronzhuk
