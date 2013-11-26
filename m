@@ -1,49 +1,60 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 26 Nov 2013 17:00:31 +0200
-Subject: [PATCH -v2] fbdev: sh_mobile_meram: Fix defined but not used
- compiler warnings
-In-Reply-To: <1510041.WqZSiK0jXs@avalon>
-References: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
- <5204468.CmggZzW3kO@avalon> <5294B3B9.3090104@ti.com>
- <1510041.WqZSiK0jXs@avalon>
-Message-ID: <5294B78F.3010903@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 26 Nov 2013 10:05:40 -0500
+Subject: [PATCH 07/12] memory: davinci-aemif: introduce AEMIF driver
+In-Reply-To: <52944BD3.90105@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-8-git-send-email-ivan.khoronzhuk@ti.com>
+ <4F5844B3A985794BA902E12C070812375F8D2E@DNCE04.ent.ti.com>
+ <52944BD3.90105@ti.com>
+Message-ID: <5294B8C4.6040803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-26 16:58, Laurent Pinchart wrote:
-> Hi Tomi,
-> 
-> On Tuesday 26 November 2013 16:44:09 Tomi Valkeinen wrote:
->> On 2013-11-06 13:57, Laurent Pinchart wrote:
->>> On Wednesday 06 November 2013 09:57:27 Geert Uytterhoeven wrote:
->>>> If both CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME are not set:
->>>>
->>>> drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend?
->>>> defined but not used drivers/video/sh_mobile_meram.c:597: warning:
->>>> ?sh_mobile_meram_resume? defined but not used
->>>>
->>>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
->>>
->>> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->>>
->>> and applied to my tree.
+On Tuesday 26 November 2013 02:20 AM, Sekhar Nori wrote:
+> On Monday 11 November 2013 10:36 PM, Khoronzhuk, Ivan wrote:
+>> Add new AEMIF driver for EMIF16 davinci controller. The EMIF16 module
+>> is intended to provide a glue-less interface to a variety of
+>> asynchronous memory devices like ASRA M, NOR and NAND memory. A total
+>> of 256M bytes of any of these memories can be accessed at any given
+>> time via four chip selects with 64M byte access per chip select.
 >>
->> What does that mean? Are you collecting sh_mobile video patches?
+>> Synchronous memories such as DDR1 SD RAM, SDR SDRAM and Mobile SDR
+>> are not supported.
 >>
->> Or to rephrase, shall I apply this to fbdev fixes tree?
+>> See http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+>>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+
+[...]
+
+>> +static int davinci_aemif_probe(struct platform_device *pdev)
+>> +{
+>> +       int ret  = -ENODEV, i;
+>> +       struct resource *res;
+>> +       struct device *dev = &pdev->dev;
+>> +       struct device_node *np = dev->of_node;
+>> +
+>> +       if (np == NULL)
+>> +               return 0;
+>> +
+>> +       if (aemif) {
+>> +               dev_err(dev, "davinci_aemif driver is in use currently\n");
+>> +               return -EBUSY;
+>> +       }
 > 
-> I was planning to send you a pull request for that, but if you can pick it up 
-> that's even easier, thanks.
+> Why expressly prevent multiple AEMIF devices? Its entirely conceivable
+> to have two memories like NAND and NOR flash connect to two different
+> AEMIF interfaces.
+> 
+Ivan wanted me to clarify the Keystone hardware which supports
+1 instance of controller with 4 CS. That allows already four
+devices to be connected. Currently NAND and NOR are connected on it
+and two more slots are free.
 
-Ok. Applied, then, to fbdev =).
+Since driver support what hardware is, lets not build a driver for
+hardware which don't exist. And if at all such a support would be
+needed in future, we can always add it.
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/89bb7bcc/attachment.sig>
+Regards,
+Santosh
