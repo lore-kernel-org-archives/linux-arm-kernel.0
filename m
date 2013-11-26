@@ -1,69 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Nov 2013 19:09:22 -0600
-Subject: [PATCH 00/12] Drop omap3 board files and make mach-omap2 boot in
- DT only mode
-In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
-References: <1385424867-27243-1-git-send-email-tony@atomide.com>
-Message-ID: <20131126010922.GA21580@saruman.home>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 25 Nov 2013 17:13:41 -0800
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <5293D9EB.9070900@wwwdotorg.org>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+ <2205346.2EJcydzRLA@wuerfel> <5293CF9F.6040305@wwwdotorg.org>
+ <CAPcyv4jLh6cyaP2DmnOkc11xeKsB0QtbXQ9VV3BBmHVVt2iHXA@mail.gmail.com>
+ <5293D9EB.9070900@wwwdotorg.org>
+Message-ID: <CAPcyv4g5jGmk4Kf1nDLxLhKSrYCYwQby31-fyBOGLbNuBFkceg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Nov 25, 2013 at 3:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/25/2013 04:09 PM, Dan Williams wrote:
+>> On Mon, Nov 25, 2013 at 2:30 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 11/25/2013 03:09 PM, Arnd Bergmann wrote:
+>>>> On Monday 25 November 2013 14:53:36 Stephen Warren wrote:
+>>>>> v2: Use of_dma_slave_xlate() rather than of_dma_simple_xlate(), as
+>>>>>     suggested by Arnd Bergmann.
+>>>>>
+>>>>> This patch is part of a series with strong internal depdendencies. I'm
+>>>>> looking for an ack so that I can take the entire series through the Tegra
+>>>>> and arm-soc trees. The series will be part of a stable branch that can be
+>>>>> merged into other subsystems if needed to avoid/resolve dependencies.
+>>>>
+>>>> Did I suggest of_dma_slave_xlate()? I don't think I've actually heard
+>>>> of that function, and I can't find anything in the kernel source or
+>>>> using google.
+>>>>
+>>>> Why not just use an open-coded xlate function?
+>>>
+>>> Well, you suggested not using of_dma_simple_xlate() since it wasn't
+>>> appropriate. I then started to implement an open-coded xlate function,
+>>> but found that it was 99% identical to the same thing in the mmp driver,
+>>> and hence created a common of_dma_slave_xlate() so as not to just
+>>> cut/paste it everywhere. Unfortunately, I only sent that patch to
+>>> dmaengine at vger.kernel.org and the DMA maintainers, and there's no
+>>> archive of that list:-(
+>>
+>> There is, however, an archive of the patches:
+>>
+>> dma: add common of_dma_slave_xlate()
+>> https://patchwork.kernel.org/patch/3234751/
+>>
+>> dma: mmp_pdma: use of_dma_slave_xlate()
+>> https://patchwork.kernel.org/patch/3234761/
+>
+> Ah, that's useful.
+>
+>> ..btw I think we should squash those two together.
+>
+> Isn't it more typical to do core work in one patch, then port each
+> driver individually? That keeps the patches small and logically
+> distinct, which could help bisect in some cases. But I guess I can go
+> either way.
 
-On Mon, Nov 25, 2013 at 04:14:15PM -0800, Tony Lindgren wrote:
-> Hi all,
-> 
-> We can finally make mach-omap2 to boot in device tree only mode for v3.14.
-> 
-> By doing that, we can get rid of about 20000 lines of legacy code for v3.14
-> that's no longer needed with device tree :) And that's not counting the
-> additional removal of the code that comes with the pending patches to
-> move clocks to drivers/clk.
-> 
-> Looks like we still have some legacy boards that don't have a .dts file,
-> so if you're using one, please post the .dts file. I've posted some quick
-> instructions in the first patch of this series for bringing up omaps with
-> device tree.
-> 
-> For most omap2+ boards that are not yet supported with device tree just
-> the .dts file is needed. Some boards also may need additional entries to
-> pdata-quirks.c. If there are more complicated issues, please let me know
-> so we can sort out those issues ASAP.
-> 
-> I don't have all omap boards so I have not been able to do a .dts file
-> for those. Some help would be appreciated there if you are using a
-> board with no .dts file posted yet. I can naturally help too where
-> possible so we get the devices working with device tree as needed :)
-> 
-> These patches need v3.13-rc1 and some of the following patches
-> depending on your board:
-> 
-> [PATCH 0/8] Various omap device tree usability fixes for v3.13 merge window
-> [PATCH 00/11] Make omap24xx booting device tree based for v3.14 merge window
-> [PATCH 0/3] Yet more fixes for booting omaps with device tree
-> [PATCH 0/5] Prepare making omap3 device tree only and convert LDP
-> 
-> I've also pushed all the patches into a temporary testing branch:
-> 
-> omap-for-v3.14/tmp-testing-unstable-not-immutable
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> Tony Lindgren (12):
->   ARM: OMAP2+: Remove legacy omap3 board-*.c files and make mach-omap2
->     DT only for booting
-
-looks like this patch didn't make it to the list, maybe it's too large ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131125/e481c047/attachment-0001.sig>
+Including a user conversion in the same patch that introduces the api
+change makes it clear what is going on...  for example a reviewer
+could see that the code comes from mmp_pdma unmolested.  Inevitably
+the first question is always "show me the user".  The bisect case is
+also a good example.  Since the api change by itself dead code if we
+revert the only user we implicitly want to revert the core change.
