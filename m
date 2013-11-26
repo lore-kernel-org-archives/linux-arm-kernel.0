@@ -1,40 +1,29 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 26 Nov 2013 09:34:07 +0100
-Subject: [PATCH] ARM: i.MX6q: fix the wrong parent of can_root clock
-In-Reply-To: <20131126021946.GC30476@S2101-09.ap.freescale.net>
-References: <1383132351-32112-1-git-send-email-jiada_wang@mentor.com>
- <20131031073820.GH23549@S2101-09.ap.freescale.net>
- <52937E6F.1020102@pengutronix.de>
- <20131126021946.GC30476@S2101-09.ap.freescale.net>
-Message-ID: <52945CFF.8000008@pengutronix.de>
+Date: Tue, 26 Nov 2013 09:35:01 +0100
+Subject: [PATCH v2 1/2] can: flexcan: use correct clock as base for bit
+ rate calculation
+In-Reply-To: <52945B5A.9070601@pengutronix.de>
+References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
+ <1385414121-21493-2-git-send-email-mkl@pengutronix.de>
+ <52945B5A.9070601@pengutronix.de>
+Message-ID: <52945D35.70103@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 03:19 AM, Shawn Guo wrote:
-> On Mon, Nov 25, 2013 at 05:44:31PM +0100, Marc Kleine-Budde wrote:
->> On 10/31/2013 08:38 AM, Shawn Guo wrote:
->>> On Wed, Oct 30, 2013 at 04:25:51AM -0700, jiada_wang at mentor.com wrote:
->>>> From: Jiada Wang <jiada_wang@mentor.com>
->>>>
->>>> instead of pll3_usb_otg the parent of can_root clock
->>>> should be pll3_60m.
->>>>
->>>> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
->>>
->>> Applied, thanks.
+On 11/26/2013 09:27 AM, Marc Kleine-Budde wrote:
+> On 11/25/2013 10:15 PM, Marc Kleine-Budde wrote:
+>> The flexcan IP core uses the peripheral clock ("per") as basic clock for the
+>> bit timing calculation. However the driver uses the the wrong clock ("ipg").
+>> This leads to wrong bit rates if the rates on both clock are different.
 >>
->> Can you put stable on Cc?
-> 
-> Sorry, it already hits mainline.
+>> This patch fixes the problem by using the correct clock for the bit rate
+>> calculation.
+>>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+If you take the patch, please add:
 
-No problem, I'll write stable and Greg directly.
-
-> I generally do not judge if a patch is suitable for stable tree, and
-> rely on patch sender to explicitly request by marking stable and the
-> prerequisite commits if any.
-
-Together with the Flexcan clock (can: flexcan: use correct clock as base
-for bit rate calculation) this fixes the CAN on imx6.
+Cc: linux-stable <stable@vger.kernel.org>
 
 Marc
 
@@ -50,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 259 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/5ba0f0f8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/5b10d1fc/attachment.sig>
