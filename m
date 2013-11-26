@@ -1,47 +1,53 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 26 Nov 2013 13:59:16 +0530
-Subject: [PATCH v6 1/6] gpio: davinci: use readl/writel instead of __raw_*
-In-Reply-To: <529327A8.8080909@ti.com>
-References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
- <1385057731-4348-2-git-send-email-prabhakar.csengg@gmail.com>
- <CAArO44vmfkroE9w4KviOhjkPvg9bTX9pAtr3oxYjD9u_wVZXeg@mail.gmail.com>
- <CA+V-a8sjmo2K16m9_6Zf1qwcez+qKm-9JW1Cb=Aj4prtXd=-fA@mail.gmail.com>
- <529327A8.8080909@ti.com>
-Message-ID: <CA+V-a8skgRAZFezzv3Tzi5Z1S4rMFt_sZ-RxH_UmpAQuTwifzA@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 26 Nov 2013 09:34:07 +0100
+Subject: [PATCH] ARM: i.MX6q: fix the wrong parent of can_root clock
+In-Reply-To: <20131126021946.GC30476@S2101-09.ap.freescale.net>
+References: <1383132351-32112-1-git-send-email-jiada_wang@mentor.com>
+ <20131031073820.GH23549@S2101-09.ap.freescale.net>
+ <52937E6F.1020102@pengutronix.de>
+ <20131126021946.GC30476@S2101-09.ap.freescale.net>
+Message-ID: <52945CFF.8000008@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
-On Mon, Nov 25, 2013 at 4:04 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Prabhakar,
->
-> On Monday 25 November 2013 09:42 AM, Prabhakar Lad wrote:
->> Hi Taras,
->>
->> On Fri, Nov 22, 2013 at 3:38 PM, Taras Kondratiuk
->> <taras.kondratiuk@linaro.org> wrote:
->>> On 21 November 2013 20:15, Prabhakar Lad <prabhakar.csengg@gmail.com> wrote:
->>>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+On 11/26/2013 03:19 AM, Shawn Guo wrote:
+> On Mon, Nov 25, 2013 at 05:44:31PM +0100, Marc Kleine-Budde wrote:
+>> On 10/31/2013 08:38 AM, Shawn Guo wrote:
+>>> On Wed, Oct 30, 2013 at 04:25:51AM -0700, jiada_wang at mentor.com wrote:
+>>>> From: Jiada Wang <jiada_wang@mentor.com>
 >>>>
->>>> This patch replaces the __raw_readl/writel with
->>>> readl and writel, Altough the code runs on ARMv5
->>>> based SOCs, changing this will help copying the code
->>>> for other uses.
+>>>> instead of pll3_usb_otg the parent of can_root clock
+>>>> should be pll3_60m.
+>>>>
+>>>> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
 >>>
->>> This replacement has a functional impact: it adds memory barriers.
->>> Please note this in the description.
->>> Also please add a bit of explanation on why do you need to add barriers.
->>>
->> Agreed this adds memory barriers, I'll add a note about it.
->
-> Well the barriers certainly make it easier to debug by having both
-> device and memory accesses happen in program order. That said, if there
-> is no pressing reason to add barriers, you can use
-> {readl|writel}_relaxed() instead. That will make the code protable
-> across endianess.
->
-OK will use {readl|writel}_relaxed() instead.
+>>> Applied, thanks.
+>>
+>> Can you put stable on Cc?
+> 
+> Sorry, it already hits mainline.
 
-Regards,
---Prabhakar Lad
+No problem, I'll write stable and Greg directly.
+
+> I generally do not judge if a patch is suitable for stable tree, and
+> rely on patch sender to explicitly request by marking stable and the
+> prerequisite commits if any.
+
+Together with the Flexcan clock (can: flexcan: use correct clock as base
+for bit rate calculation) this fixes the CAN on imx6.
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131126/5ba0f0f8/attachment.sig>
