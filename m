@@ -1,558 +1,374 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Nov 2013 16:14:18 -0800
-Subject: [PATCH 03/12] ARM: OMAP2+: Remove legacy hsmmc.c
+Date: Mon, 25 Nov 2013 16:14:17 -0800
+Subject: [PATCH 02/12] ARM: OMAP2+: Remove legacy serial.c
 In-Reply-To: <1385424867-27243-1-git-send-email-tony@atomide.com>
 References: <1385424867-27243-1-git-send-email-tony@atomide.com>
-Message-ID: <1385424867-27243-4-git-send-email-tony@atomide.com>
+Message-ID: <1385424867-27243-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now initialize the hsmmc using devicetree
+We can now initialize the UARTs using device tree.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Makefile |   3 -
- arch/arm/mach-omap2/hsmmc.c  | 518 -------------------------------------------
- 2 files changed, 521 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/hsmmc.c
+ arch/arm/mach-omap2/Makefile |   2 +-
+ arch/arm/mach-omap2/serial.c | 335 -------------------------------------------
+ 2 files changed, 1 insertion(+), 336 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/serial.c
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index bb9629e..a5e13c0 100644
+index 914256e..bb9629e 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -243,9 +243,6 @@ omap-flash-$(CONFIG_MTD_NAND_OMAP2)	:= board-flash.o
- omap-flash-$(CONFIG_MTD_ONENAND_OMAP2)	:= board-flash.o
- obj-y					+= $(omap-flash-y) $(omap-flash-m)
+@@ -6,7 +6,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-omap/include
  
--omap-hsmmc-$(CONFIG_MMC_OMAP_HS)	:= hsmmc.o
--obj-y					+= $(omap-hsmmc-m) $(omap-hsmmc-y)
--
- obj-y					+= usb-musb.o
- obj-y					+= omap_phy_internal.o
+ # Common support
+-obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
++obj-y := id.o io.o control.o mux.o devices.o fb.o gpmc.o timer.o pm.o \
+ 	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
+ 	 omap_device.o sram.o drm.o
  
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
 deleted file mode 100644
-index 07d4c7b..0000000
---- a/arch/arm/mach-omap2/hsmmc.c
+index a388f8c..0000000
+--- a/arch/arm/mach-omap2/serial.c
 +++ /dev/null
-@@ -1,518 +0,0 @@
+@@ -1,335 +0,0 @@
 -/*
-- * linux/arch/arm/mach-omap2/hsmmc.c
+- * arch/arm/mach-omap2/serial.c
 - *
-- * Copyright (C) 2007-2008 Texas Instruments
-- * Copyright (C) 2008 Nokia Corporation
-- * Author: Texas Instruments
+- * OMAP2 serial support.
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
+- * Copyright (C) 2005-2008 Nokia Corporation
+- * Author: Paul Mundt <paul.mundt@nokia.com>
+- *
+- * Major rework for PM support by Kevin Hilman
+- *
+- * Based off of arch/arm/mach-omap/omap1/serial.c
+- *
+- * Copyright (C) 2009 Texas Instruments
+- * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com
+- *
+- * This file is subject to the terms and conditions of the GNU General Public
+- * License. See the file "COPYING" in the main directory of this archive
+- * for more details.
 - */
 -#include <linux/kernel.h>
--#include <linux/slab.h>
--#include <linux/string.h>
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/io.h>
 -#include <linux/delay.h>
--#include <linux/gpio.h>
--#include <linux/platform_data/gpio-omap.h>
+-#include <linux/platform_device.h>
+-#include <linux/slab.h>
+-#include <linux/pm_runtime.h>
+-#include <linux/console.h>
+-#include <linux/omap-dma.h>
+-#include <linux/platform_data/serial-omap.h>
 -
--#include "soc.h"
+-#include "common.h"
+-#include "omap_hwmod.h"
 -#include "omap_device.h"
 -#include "omap-pm.h"
--
--#include "mux.h"
--#include "mmc.h"
--#include "hsmmc.h"
+-#include "soc.h"
+-#include "prm2xxx_3xxx.h"
+-#include "pm.h"
+-#include "cm2xxx_3xxx.h"
+-#include "prm-regbits-34xx.h"
 -#include "control.h"
+-#include "mux.h"
+-#include "serial.h"
 -
--#if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
+-/*
+- * NOTE: By default the serial auto_suspend timeout is disabled as it causes
+- * lost characters over the serial ports. This means that the UART clocks will
+- * stay on until power/autosuspend_delay is set for the uart from sysfs.
+- * This also causes that any deeper omap sleep states are blocked.
+- */
+-#define DEFAULT_AUTOSUSPEND_DELAY	-1
 -
--static u16 control_pbias_offset;
--static u16 control_devconf1_offset;
+-#define MAX_UART_HWMOD_NAME_LEN		16
 -
--#define HSMMC_NAME_LEN	9
+-struct omap_uart_state {
+-	int num;
 -
--#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+-	struct list_head node;
+-	struct omap_hwmod *oh;
+-	struct omap_device_pad default_omap_uart_pads[2];
+-};
 -
--static int hsmmc_get_context_loss(struct device *dev)
+-static LIST_HEAD(uart_list);
+-static u8 num_uarts;
+-static u8 console_uart_id = -1;
+-static u8 uart_debug;
+-
+-#define DEFAULT_RXDMA_POLLRATE		1	/* RX DMA polling rate (us) */
+-#define DEFAULT_RXDMA_BUFSIZE		4096	/* RX DMA buffer size */
+-#define DEFAULT_RXDMA_TIMEOUT		(3 * HZ)/* RX DMA timeout (jiffies) */
+-
+-static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
+-	{
+-		.dma_enabled	= false,
+-		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
+-		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
+-		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
+-		.autosuspend_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+-	},
+-};
+-
+-#ifdef CONFIG_PM
+-static void omap_uart_enable_wakeup(struct device *dev, bool enable)
 -{
--	return omap_pm_get_dev_context_loss_count(dev);
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap_device *od = to_omap_device(pdev);
+-
+-	if (!od)
+-		return;
+-
+-	if (enable)
+-		omap_hwmod_enable_wakeup(od->hwmods[0]);
+-	else
+-		omap_hwmod_disable_wakeup(od->hwmods[0]);
 -}
 -
 -#else
--#define hsmmc_get_context_loss NULL
--#endif
+-static void omap_uart_enable_wakeup(struct device *dev, bool enable)
+-{}
+-#endif /* CONFIG_PM */
 -
--static void omap_hsmmc1_before_set_reg(struct device *dev, int slot,
--				  int power_on, int vdd)
+-#ifdef CONFIG_OMAP_MUX
+-
+-#define OMAP_UART_DEFAULT_PAD_NAME_LEN	28
+-static char rx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN],
+-		tx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN] __initdata;
+-
+-static void  __init
+-omap_serial_fill_uart_tx_rx_pads(struct omap_board_data *bdata,
+-				struct omap_uart_state *uart)
 -{
--	u32 reg, prog_io;
--	struct omap_mmc_platform_data *mmc = dev->platform_data;
+-	uart->default_omap_uart_pads[0].name = rx_pad_name;
+-	uart->default_omap_uart_pads[0].flags = OMAP_DEVICE_PAD_REMUX |
+-							OMAP_DEVICE_PAD_WAKEUP;
+-	uart->default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
+-							OMAP_MUX_MODE0;
+-	uart->default_omap_uart_pads[0].idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0;
+-	uart->default_omap_uart_pads[1].name = tx_pad_name;
+-	uart->default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
+-							OMAP_MUX_MODE0;
+-	bdata->pads = uart->default_omap_uart_pads;
+-	bdata->pads_cnt = ARRAY_SIZE(uart->default_omap_uart_pads);
+-}
 -
--	if (mmc->slots[0].remux)
--		mmc->slots[0].remux(dev, slot, power_on);
+-static void  __init omap_serial_check_wakeup(struct omap_board_data *bdata,
+-						struct omap_uart_state *uart)
+-{
+-	struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
+-	struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
+-	char *rx_fmt, *tx_fmt;
+-	int uart_nr = bdata->id + 1;
 -
--	/*
--	 * Assume we power both OMAP VMMC1 (for CMD, CLK, DAT0..3) and the
--	 * card with Vcc regulator (from twl4030 or whatever).  OMAP has both
--	 * 1.8V and 3.0V modes, controlled by the PBIAS register.
--	 *
--	 * In 8-bit modes, OMAP VMMC1A (for DAT4..7) needs a supply, which
--	 * is most naturally TWL VSIM; those pins also use PBIAS.
--	 *
--	 * FIXME handle VMMC1A as needed ...
--	 */
--	if (power_on) {
--		if (cpu_is_omap2430()) {
--			reg = omap_ctrl_readl(OMAP243X_CONTROL_DEVCONF1);
--			if ((1 << vdd) >= MMC_VDD_30_31)
--				reg |= OMAP243X_MMC1_ACTIVE_OVERWRITE;
--			else
--				reg &= ~OMAP243X_MMC1_ACTIVE_OVERWRITE;
--			omap_ctrl_writel(reg, OMAP243X_CONTROL_DEVCONF1);
--		}
--
--		if (mmc->slots[0].internal_clock) {
--			reg = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
--			reg |= OMAP2_MMCSDIO1ADPCLKISEL;
--			omap_ctrl_writel(reg, OMAP2_CONTROL_DEVCONF0);
--		}
--
--		reg = omap_ctrl_readl(control_pbias_offset);
--		if (cpu_is_omap3630()) {
--			/* Set MMC I/O to 52Mhz */
--			prog_io = omap_ctrl_readl(OMAP343X_CONTROL_PROG_IO1);
--			prog_io |= OMAP3630_PRG_SDMMC1_SPEEDCTRL;
--			omap_ctrl_writel(prog_io, OMAP343X_CONTROL_PROG_IO1);
--		} else {
--			reg |= OMAP2_PBIASSPEEDCTRL0;
--		}
--		reg &= ~OMAP2_PBIASLITEPWRDNZ0;
--		omap_ctrl_writel(reg, control_pbias_offset);
+-	if (bdata->id != 2) {
+-		rx_fmt = "uart%d_rx.uart%d_rx";
+-		tx_fmt = "uart%d_tx.uart%d_tx";
 -	} else {
--		reg = omap_ctrl_readl(control_pbias_offset);
--		reg &= ~OMAP2_PBIASLITEPWRDNZ0;
--		omap_ctrl_writel(reg, control_pbias_offset);
+-		rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
+-		tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
 -	}
--}
 -
--static void omap_hsmmc1_after_set_reg(struct device *dev, int slot,
--				 int power_on, int vdd)
--{
--	u32 reg;
+-	snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
+-			uart_nr, uart_nr);
+-	snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
+-			uart_nr, uart_nr);
 -
--	/* 100ms delay required for PBIAS configuration */
--	msleep(100);
+-	if (omap_mux_get_by_name(rx_pad_name, &rx_partition, &rx_mux) >= 0 &&
+-			omap_mux_get_by_name
+-				(tx_pad_name, &tx_partition, &tx_mux) >= 0) {
+-		u16 tx_mode, rx_mode;
 -
--	if (power_on) {
--		reg = omap_ctrl_readl(control_pbias_offset);
--		reg |= (OMAP2_PBIASLITEPWRDNZ0 | OMAP2_PBIASSPEEDCTRL0);
--		if ((1 << vdd) <= MMC_VDD_165_195)
--			reg &= ~OMAP2_PBIASLITEVMODE0;
--		else
--			reg |= OMAP2_PBIASLITEVMODE0;
--		omap_ctrl_writel(reg, control_pbias_offset);
--	} else {
--		reg = omap_ctrl_readl(control_pbias_offset);
--		reg |= (OMAP2_PBIASSPEEDCTRL0 | OMAP2_PBIASLITEPWRDNZ0 |
--			OMAP2_PBIASLITEVMODE0);
--		omap_ctrl_writel(reg, control_pbias_offset);
--	}
--}
--
--static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
--{
--	u32 reg;
--
--	reg = omap_ctrl_readl(control_devconf1_offset);
--	if (mmc->slots[0].internal_clock)
--		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
--	else
--		reg &= ~OMAP2_MMCSDIO2ADPCLKISEL;
--	omap_ctrl_writel(reg, control_devconf1_offset);
--}
--
--static void hsmmc2_before_set_reg(struct device *dev, int slot,
--				   int power_on, int vdd)
--{
--	struct omap_mmc_platform_data *mmc = dev->platform_data;
--
--	if (mmc->slots[0].remux)
--		mmc->slots[0].remux(dev, slot, power_on);
--
--	if (power_on)
--		hsmmc2_select_input_clk_src(mmc);
--}
--
--static int am35x_hsmmc2_set_power(struct device *dev, int slot,
--				  int power_on, int vdd)
--{
--	struct omap_mmc_platform_data *mmc = dev->platform_data;
--
--	if (power_on)
--		hsmmc2_select_input_clk_src(mmc);
--
--	return 0;
--}
--
--static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
--							int vdd)
--{
--	return 0;
--}
--
--static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
--			int controller_nr)
--{
--	if (gpio_is_valid(mmc_controller->slots[0].switch_pin) &&
--		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
--		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
--					OMAP_PIN_INPUT_PULLUP);
--	if (gpio_is_valid(mmc_controller->slots[0].gpio_wp) &&
--		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
--		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
--					OMAP_PIN_INPUT_PULLUP);
--	if (cpu_is_omap34xx()) {
--		if (controller_nr == 0) {
--			omap_mux_init_signal("sdmmc1_clk",
--				OMAP_PIN_INPUT_PULLUP);
--			omap_mux_init_signal("sdmmc1_cmd",
--				OMAP_PIN_INPUT_PULLUP);
--			omap_mux_init_signal("sdmmc1_dat0",
--				OMAP_PIN_INPUT_PULLUP);
--			if (mmc_controller->slots[0].caps &
--				(MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)) {
--				omap_mux_init_signal("sdmmc1_dat1",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc1_dat2",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc1_dat3",
--					OMAP_PIN_INPUT_PULLUP);
--			}
--			if (mmc_controller->slots[0].caps &
--						MMC_CAP_8_BIT_DATA) {
--				omap_mux_init_signal("sdmmc1_dat4",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc1_dat5",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc1_dat6",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc1_dat7",
--					OMAP_PIN_INPUT_PULLUP);
--			}
--		}
--		if (controller_nr == 1) {
--			/* MMC2 */
--			omap_mux_init_signal("sdmmc2_clk",
--				OMAP_PIN_INPUT_PULLUP);
--			omap_mux_init_signal("sdmmc2_cmd",
--				OMAP_PIN_INPUT_PULLUP);
--			omap_mux_init_signal("sdmmc2_dat0",
--				OMAP_PIN_INPUT_PULLUP);
--
--			/*
--			 * For 8 wire configurations, Lines DAT4, 5, 6 and 7
--			 * need to be muxed in the board-*.c files
--			 */
--			if (mmc_controller->slots[0].caps &
--				(MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)) {
--				omap_mux_init_signal("sdmmc2_dat1",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc2_dat2",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc2_dat3",
--					OMAP_PIN_INPUT_PULLUP);
--			}
--			if (mmc_controller->slots[0].caps &
--							MMC_CAP_8_BIT_DATA) {
--				omap_mux_init_signal("sdmmc2_dat4.sdmmc2_dat4",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc2_dat5.sdmmc2_dat5",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc2_dat6.sdmmc2_dat6",
--					OMAP_PIN_INPUT_PULLUP);
--				omap_mux_init_signal("sdmmc2_dat7.sdmmc2_dat7",
--					OMAP_PIN_INPUT_PULLUP);
--			}
--		}
+-		tx_mode = omap_mux_read(tx_partition, tx_mux->reg_offset);
+-		rx_mode = omap_mux_read(rx_partition, rx_mux->reg_offset);
 -
 -		/*
--		 * For MMC3 the pins need to be muxed in the board-*.c files
+-		 * Check if uart is used in default tx/rx mode i.e. in mux mode0
+-		 * if yes then configure rx pin for wake up capability
 -		 */
+-		if (OMAP_MODE_UART(rx_mode) && OMAP_MODE_UART(tx_mode))
+-			omap_serial_fill_uart_tx_rx_pads(bdata, uart);
 -	}
 -}
--
--static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
--					struct omap_mmc_platform_data *mmc)
+-#else
+-static void __init omap_serial_check_wakeup(struct omap_board_data *bdata,
+-		struct omap_uart_state *uart)
 -{
--	char *hc_name;
+-}
+-#endif
 -
--	hc_name = kzalloc(sizeof(char) * (HSMMC_NAME_LEN + 1), GFP_KERNEL);
--	if (!hc_name) {
--		pr_err("Cannot allocate memory for controller slot name\n");
--		kfree(hc_name);
--		return -ENOMEM;
--	}
+-static char *cmdline_find_option(char *str)
+-{
+-	extern char *saved_command_line;
 -
--	if (c->name)
--		strncpy(hc_name, c->name, HSMMC_NAME_LEN);
--	else
--		snprintf(hc_name, (HSMMC_NAME_LEN + 1), "mmc%islot%i",
--								c->mmc, 1);
--	mmc->slots[0].name = hc_name;
--	mmc->nr_slots = 1;
--	mmc->slots[0].caps = c->caps;
--	mmc->slots[0].pm_caps = c->pm_caps;
--	mmc->slots[0].internal_clock = !c->ext_clock;
--	mmc->max_freq = c->max_freq;
--	mmc->reg_offset = 0;
--	mmc->get_context_loss_count = hsmmc_get_context_loss;
+-	return strstr(saved_command_line, str);
+-}
 -
--	mmc->slots[0].switch_pin = c->gpio_cd;
--	mmc->slots[0].gpio_wp = c->gpio_wp;
--
--	mmc->slots[0].remux = c->remux;
--	mmc->slots[0].init_card = c->init_card;
--
--	if (c->cover_only)
--		mmc->slots[0].cover = 1;
--
--	if (c->nonremovable)
--		mmc->slots[0].nonremovable = 1;
--
--	if (c->power_saving)
--		mmc->slots[0].power_saving = 1;
--
--	if (c->no_off)
--		mmc->slots[0].no_off = 1;
--
--	if (c->no_off_init)
--		mmc->slots[0].no_regulator_off_init = c->no_off_init;
--
--	if (c->vcc_aux_disable_is_sleep)
--		mmc->slots[0].vcc_aux_disable_is_sleep = 1;
--
--	/*
--	 * NOTE:  MMC slots should have a Vcc regulator set up.
--	 * This may be from a TWL4030-family chip, another
--	 * controllable regulator, or a fixed supply.
--	 *
--	 * temporary HACK: ocr_mask instead of fixed supply
--	 */
--	if (soc_is_am35xx())
--		mmc->slots[0].ocr_mask = MMC_VDD_165_195 |
--					 MMC_VDD_26_27 |
--					 MMC_VDD_27_28 |
--					 MMC_VDD_29_30 |
--					 MMC_VDD_30_31 |
--					 MMC_VDD_31_32;
--	else
--		mmc->slots[0].ocr_mask = c->ocr_mask;
--
--	if (!soc_is_am35xx())
--		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
--
--	switch (c->mmc) {
--	case 1:
--		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
--			/* on-chip level shifting via PBIAS0/PBIAS1 */
--			mmc->slots[0].before_set_reg =
--					omap_hsmmc1_before_set_reg;
--			mmc->slots[0].after_set_reg =
--					omap_hsmmc1_after_set_reg;
--		}
--
--		if (soc_is_am35xx())
--			mmc->slots[0].set_power = nop_mmc_set_power;
--
--		/* OMAP3630 HSMMC1 supports only 4-bit */
--		if (cpu_is_omap3630() &&
--				(c->caps & MMC_CAP_8_BIT_DATA)) {
--			c->caps &= ~MMC_CAP_8_BIT_DATA;
--			c->caps |= MMC_CAP_4_BIT_DATA;
--			mmc->slots[0].caps = c->caps;
--		}
--		break;
--	case 2:
--		if (soc_is_am35xx())
--			mmc->slots[0].set_power = am35x_hsmmc2_set_power;
--
--		if (c->ext_clock)
--			c->transceiver = 1;
--		if (c->transceiver && (c->caps & MMC_CAP_8_BIT_DATA)) {
--			c->caps &= ~MMC_CAP_8_BIT_DATA;
--			c->caps |= MMC_CAP_4_BIT_DATA;
--		}
--		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
--			/* off-chip level shifting, or none */
--			mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
--			mmc->slots[0].after_set_reg = NULL;
--		}
--		break;
--	case 3:
--	case 4:
--	case 5:
--		mmc->slots[0].before_set_reg = NULL;
--		mmc->slots[0].after_set_reg = NULL;
--		break;
--	default:
--		pr_err("MMC%d configuration not supported!\n", c->mmc);
--		kfree(hc_name);
+-static int __init omap_serial_early_init(void)
+-{
+-	if (of_have_populated_dt())
 -		return -ENODEV;
--	}
+-
+-	do {
+-		char oh_name[MAX_UART_HWMOD_NAME_LEN];
+-		struct omap_hwmod *oh;
+-		struct omap_uart_state *uart;
+-		char uart_name[MAX_UART_HWMOD_NAME_LEN];
+-
+-		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN,
+-			 "uart%d", num_uarts + 1);
+-		oh = omap_hwmod_lookup(oh_name);
+-		if (!oh)
+-			break;
+-
+-		uart = kzalloc(sizeof(struct omap_uart_state), GFP_KERNEL);
+-		if (WARN_ON(!uart))
+-			return -ENODEV;
+-
+-		uart->oh = oh;
+-		uart->num = num_uarts++;
+-		list_add_tail(&uart->node, &uart_list);
+-		snprintf(uart_name, MAX_UART_HWMOD_NAME_LEN,
+-				"%s%d", OMAP_SERIAL_NAME, uart->num);
+-
+-		if (cmdline_find_option(uart_name)) {
+-			console_uart_id = uart->num;
+-
+-			if (console_loglevel >= 10) {
+-				uart_debug = true;
+-				pr_info("%s used as console in debug mode: uart%d clocks will not be gated",
+-					uart_name, uart->num);
+-			}
+-		}
+-	} while (1);
+-
 -	return 0;
 -}
+-omap_core_initcall(omap_serial_early_init);
 -
--static int omap_hsmmc_done;
--
--void omap_hsmmc_late_init(struct omap2_hsmmc_info *c)
+-/**
+- * omap_serial_init_port() - initialize single serial port
+- * @bdata: port specific board data pointer
+- * @info: platform specific data pointer
+- *
+- * This function initialies serial driver for given port only.
+- * Platforms can call this function instead of omap_serial_init()
+- * if they don't plan to use all available UARTs as serial ports.
+- *
+- * Don't mix calls to omap_serial_init_port() and omap_serial_init(),
+- * use only one of the two.
+- */
+-void __init omap_serial_init_port(struct omap_board_data *bdata,
+-			struct omap_uart_port_info *info)
 -{
--	struct platform_device *pdev;
--	struct omap_mmc_platform_data *mmc_pdata;
--	int res;
--
--	if (omap_hsmmc_done != 1)
--		return;
--
--	omap_hsmmc_done++;
--
--	for (; c->mmc; c++) {
--		if (!c->deferred)
--			continue;
--
--		pdev = c->pdev;
--		if (!pdev)
--			continue;
--
--		mmc_pdata = pdev->dev.platform_data;
--		if (!mmc_pdata)
--			continue;
--
--		mmc_pdata->slots[0].switch_pin = c->gpio_cd;
--		mmc_pdata->slots[0].gpio_wp = c->gpio_wp;
--
--		res = omap_device_register(pdev);
--		if (res)
--			pr_err("Could not late init MMC %s\n",
--			       c->name);
--	}
--}
--
--#define MAX_OMAP_MMC_HWMOD_NAME_LEN		16
--
--static void __init omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
--					int ctrl_nr)
--{
+-	struct omap_uart_state *uart;
 -	struct omap_hwmod *oh;
--	struct omap_hwmod *ohs[1];
--	struct omap_device *od;
 -	struct platform_device *pdev;
--	char oh_name[MAX_OMAP_MMC_HWMOD_NAME_LEN];
--	struct omap_mmc_platform_data *mmc_data;
--	struct omap_mmc_dev_attr *mmc_dev_attr;
+-	void *pdata = NULL;
+-	u32 pdata_size = 0;
 -	char *name;
--	int res;
+-	struct omap_uart_port_info omap_up;
 -
--	mmc_data = kzalloc(sizeof(struct omap_mmc_platform_data), GFP_KERNEL);
--	if (!mmc_data) {
--		pr_err("Cannot allocate memory for mmc device!\n");
+-	if (WARN_ON(!bdata))
+-		return;
+-	if (WARN_ON(bdata->id < 0))
+-		return;
+-	if (WARN_ON(bdata->id >= num_uarts))
+-		return;
+-
+-	list_for_each_entry(uart, &uart_list, node)
+-		if (bdata->id == uart->num)
+-			break;
+-	if (!info)
+-		info = omap_serial_default_info;
+-
+-	oh = uart->oh;
+-	name = DRIVER_NAME;
+-
+-	omap_up.dma_enabled = info->dma_enabled;
+-	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
+-	omap_up.flags = UPF_BOOT_AUTOCONF;
+-	omap_up.get_context_loss_count = omap_pm_get_dev_context_loss_count;
+-	omap_up.enable_wakeup = omap_uart_enable_wakeup;
+-	omap_up.dma_rx_buf_size = info->dma_rx_buf_size;
+-	omap_up.dma_rx_timeout = info->dma_rx_timeout;
+-	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
+-	omap_up.autosuspend_timeout = info->autosuspend_timeout;
+-	omap_up.DTR_gpio = info->DTR_gpio;
+-	omap_up.DTR_inverted = info->DTR_inverted;
+-	omap_up.DTR_present = info->DTR_present;
+-
+-	pdata = &omap_up;
+-	pdata_size = sizeof(struct omap_uart_port_info);
+-
+-	if (WARN_ON(!oh))
+-		return;
+-
+-	pdev = omap_device_build(name, uart->num, oh, pdata, pdata_size);
+-	if (IS_ERR(pdev)) {
+-		WARN(1, "Could not build omap_device for %s: %s.\n", name,
+-		     oh->name);
 -		return;
 -	}
 -
--	res = omap_hsmmc_pdata_init(hsmmcinfo, mmc_data);
--	if (res < 0)
--		goto free_mmc;
+-	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
 -
--	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
--
--	name = "omap_hsmmc";
--	res = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
--		     "mmc%d", ctrl_nr);
--	WARN(res >= MAX_OMAP_MMC_HWMOD_NAME_LEN,
--	     "String buffer overflow in MMC%d device setup\n", ctrl_nr);
--
--	oh = omap_hwmod_lookup(oh_name);
--	if (!oh) {
--		pr_err("Could not look up %s\n", oh_name);
--		goto free_name;
--	}
--	ohs[0] = oh;
--	if (oh->dev_attr != NULL) {
--		mmc_dev_attr = oh->dev_attr;
--		mmc_data->controller_flags = mmc_dev_attr->flags;
--		/*
--		 * erratum 2.1.1.128 doesn't apply if board has
--		 * a transceiver is attached
--		 */
--		if (hsmmcinfo->transceiver)
--			mmc_data->controller_flags &=
--				~OMAP_HSMMC_BROKEN_MULTIBLOCK_READ;
+-	if (console_uart_id == bdata->id) {
+-		omap_device_enable(pdev);
+-		pm_runtime_set_active(&pdev->dev);
 -	}
 -
--	pdev = platform_device_alloc(name, ctrl_nr - 1);
--	if (!pdev) {
--		pr_err("Could not allocate pdev for %s\n", name);
--		goto free_name;
--	}
--	dev_set_name(&pdev->dev, "%s.%d", pdev->name, pdev->id);
+-	oh->dev_attr = uart;
 -
--	od = omap_device_alloc(pdev, ohs, 1);
--	if (IS_ERR(od)) {
--		pr_err("Could not allocate od for %s\n", name);
--		goto put_pdev;
--	}
--
--	res = platform_device_add_data(pdev, mmc_data,
--			      sizeof(struct omap_mmc_platform_data));
--	if (res) {
--		pr_err("Could not add pdata for %s\n", name);
--		goto put_pdev;
--	}
--
--	hsmmcinfo->pdev = pdev;
--
--	if (hsmmcinfo->deferred)
--		goto free_mmc;
--
--	res = omap_device_register(pdev);
--	if (res) {
--		pr_err("Could not register od for %s\n", name);
--		goto free_od;
--	}
--
--	goto free_mmc;
--
--free_od:
--	omap_device_delete(od);
--
--put_pdev:
--	platform_device_put(pdev);
--
--free_name:
--	kfree(mmc_data->slots[0].name);
--
--free_mmc:
--	kfree(mmc_data);
+-	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
+-			&& !uart_debug)
+-		device_init_wakeup(&pdev->dev, true);
 -}
 -
--void __init omap_hsmmc_init(struct omap2_hsmmc_info *controllers)
+-/**
+- * omap_serial_board_init() - initialize all supported serial ports
+- * @info: platform specific data pointer
+- *
+- * Initializes all available UARTs as serial ports. Platforms
+- * can call this function when they want to have default behaviour
+- * for serial ports (e.g initialize them all as serial ports).
+- */
+-void __init omap_serial_board_init(struct omap_uart_port_info *info)
 -{
--	if (omap_hsmmc_done)
--		return;
+-	struct omap_uart_state *uart;
+-	struct omap_board_data bdata;
 -
--	omap_hsmmc_done = 1;
+-	list_for_each_entry(uart, &uart_list, node) {
+-		bdata.id = uart->num;
+-		bdata.flags = 0;
+-		bdata.pads = NULL;
+-		bdata.pads_cnt = 0;
 -
--	if (cpu_is_omap2430()) {
--		control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
--		control_devconf1_offset = OMAP243X_CONTROL_DEVCONF1;
--	} else {
--		control_pbias_offset = OMAP343X_CONTROL_PBIAS_LITE;
--		control_devconf1_offset = OMAP343X_CONTROL_DEVCONF1;
+-		omap_serial_check_wakeup(&bdata, uart);
+-
+-		if (!info)
+-			omap_serial_init_port(&bdata, NULL);
+-		else
+-			omap_serial_init_port(&bdata, &info[uart->num]);
 -	}
--
--	for (; controllers->mmc; controllers++)
--		omap_hsmmc_init_one(controllers, controllers->mmc);
--
 -}
 -
--#endif
+-/**
+- * omap_serial_init() - initialize all supported serial ports
+- *
+- * Initializes all available UARTs.
+- * Platforms can call this function when they want to have default behaviour
+- * for serial ports (e.g initialize them all as serial ports).
+- */
+-void __init omap_serial_init(void)
+-{
+-	omap_serial_board_init(NULL);
+-}
 -- 
 1.8.1.1
