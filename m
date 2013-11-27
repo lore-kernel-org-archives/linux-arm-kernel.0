@@ -1,35 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Nov 2013 11:02:43 +0100
-Subject: [PATCH] tty: atmel_serial: include <mach/hardware.h> explicitly
-In-Reply-To: <5295BFE3.5070700@atmel.com>
-References: <1385545111-1256-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5295BFE3.5070700@atmel.com>
-Message-ID: <20131127100243.GQ28642@pengutronix.de>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Wed, 27 Nov 2013 12:03:01 +0200
+Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <52959966.7000509@roeck-us.net>
+References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <5295758C.2030907@ti.com> <52959966.7000509@roeck-us.net>
+Message-ID: <5295C355.6000604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 10:48:19AM +0100, Nicolas Ferre wrote:
-> On 27/11/2013 10:38, Uwe Kleine-K?nig :
-> >When compiled for at91rm9200 (i.e. ARM) the driver needs among others
-> >the symbol AT91RM9200_BASE_US0 which is defined in
-> >arch/arm/mach-at91/include/mach/at91rm9200.h. This file is included
-> >implicitly via several steps. As ARM's <asm/timex.h> will stop including
-> ><mach/hardware.h> later in this series explicitly include
-> ><mach/hardware.h>
-> >
-> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Uwe, this AT91RM9200_BASE_US0 value is supposed to disappear in 3.14
-> tanks to a patch from Linus W. ([PATCH v4] ARM/serial: at91: switch
-> atmel serial to use gpiolib) (not in linux-next yet).
-> 
-> So I think that this patch is not needed for 3.14.
-So I'll keep this patch in my queue for now, but keep an eye on this
-one. The other symbols were dropped, too?
+On 11/27/2013 09:04 AM, Guenter Roeck wrote:
+> On 11/26/2013 08:31 PM, Sekhar Nori wrote:
+>> On Monday 25 November 2013 07:34 PM, Ivan Khoronzhuk wrote:
+>>> To reduce code duplicate and increase code readability use WDT core
+>>> code to handle WDT interface.
+>>>
+>>> Remove io_lock as the WDT core uses mutex to lock each wdt device.
+>>> Remove wdt_state as the WDT core tracks state with its own variable.
+>>>
+>>> The watchdog_init_timeout() can read timeout value from timeout-sec
+>>> property if the passed value is out of bounds. The heartbeat is
+>>> initialized in next way. If heartbeat is not set thought module
+>>> parameter, try to read it's value from WDT node timeout-sec property.
+>>> If node has no one, use default value.
+>>>
+>>> The heartbeat is hold in wdd->timeout by WDT core, so use it in
+>>> order to set timeout period.
+>>>
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>
+>> So this still causes a regression because the clk_get()
+>> fails due to the changed device name. Please fold this
+>> patch in (tested on DM365, compiled on rest).
+>>
+>> Also, the change in device name (while needed) does not seem
+>> to be related to usage of wdt core. Can you may be split
+>> that change into a separate patch?
+>>
+>
+> Given all the trouble with it, I think that would be a good idea.
+>
+> Guenter
+>
 
-Thanks
-Uwe
+Ok, I'll split it for convenience.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Ivan Khoronzhuk
