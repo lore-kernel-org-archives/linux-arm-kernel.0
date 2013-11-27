@@ -1,55 +1,22 @@
-From: list-09_linux_arm@tqsc.de (Markus Niebel)
-Date: Wed, 27 Nov 2013 15:09:28 +0100
-Subject: [PATCH] ARM: DT: imx6qdl: fix can clocks
-In-Reply-To: <1385557709.4272.1.camel@weser.hi.pengutronix.de>
-References: <1385558060-20314-1-git-send-email-list-09_linux_arm@tqsc.de>
- <1385557709.4272.1.camel@weser.hi.pengutronix.de>
-Message-ID: <5295FD18.1010501@tqsc.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 27 Nov 2013 19:30:46 +0530
+Subject: [PATCH] watchdog: davinci: rename platform driver to davinci-wdt
+In-Reply-To: <1385559113-4354-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1385559113-4354-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <5295FB0E.4070406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.11.2013 14:08, wrote Lucas Stach:
-> Am Mittwoch, den 27.11.2013, 14:14 +0100 schrieb Markus Niebel:
->> From: Markus Niebel <Markus.Niebel@tqs.de>
->>
->> per and ipg clock numbers are exchanged. This leads to
->> wrong bitrate calculation.
->>
-> NACK
+On Wednesday 27 November 2013 07:01 PM, Ivan Khoronzhuk wrote:
+> As we switch to use the watchdog core which permits more than one
+> active watchdog in the system, rename platform driver to
+> "davinci-wdt" to be identifiable.
 > 
-> According to the clock driver clock numbers are IPG->PER.
-> I think this is the same problem we encountered on i.MX5 and is fixed
-> with commit "can: flexcan: use correct clock as base for bit rate
-> calculation"
-> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 
-Sorry for the noise, was not aware of this patch. You are right.
+Looks good to me. Since bulk of this patch touches mach-davinci, I would
+like to take this through my tree to avoid conflicts with other
+mach-davinci patches I accept.
 
->> Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
->> ---
->>  arch/arm/boot/dts/imx6qdl.dtsi |    4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
->> index 59154dc..797f007 100644
->> --- a/arch/arm/boot/dts/imx6qdl.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
->> @@ -329,7 +329,7 @@
->>  				compatible = "fsl,imx6q-flexcan";
->>  				reg = <0x02090000 0x4000>;
->>  				interrupts = <0 110 0x04>;
->> -				clocks = <&clks 108>, <&clks 109>;
->> +				clocks = <&clks 109>, <&clks 108>;
->>  				clock-names = "ipg", "per";
->>  			};
->>  
->> @@ -337,7 +337,7 @@
->>  				compatible = "fsl,imx6q-flexcan";
->>  				reg = <0x02094000 0x4000>;
->>  				interrupts = <0 111 0x04>;
->> -				clocks = <&clks 110>, <&clks 111>;
->> +				clocks = <&clks 111>, <&clks 110>;
->>  				clock-names = "ipg", "per";
->>  			};
->>  
-> 
+Thanks,
+Sekhar
