@@ -1,90 +1,57 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Nov 2013 16:34:57 +0100
-Subject: [PATCH 2/5] PM / Runtime: Implement the pm_generic_runtime functions
- for CONFIG_PM
+Date: Wed, 27 Nov 2013 16:34:58 +0100
+Subject: [PATCH 3/5] PM / Runtime: Add second macro for definition of runtime
+ PM callbacks
 In-Reply-To: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
 References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1385566500-7666-3-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1385566500-7666-4-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm_generic_runtime_suspend|resume functions were implemented within
-CONFIG_PM_RUNTIME.
+It is allowed and will in many cases make sense to have the runtime PM
+callbacks to be defined for CONFIG_PM instead of CONFIG_PM_RUNTIME.
 
-As we also may use runtime PM callbacks during system suspend, to put
-devices into low power state, we need to move the implementation of
-pm_generic_runtime_suspend|resume to CONFIG_PM.
+Since the PM core disables runtime PM during system suspend, before the
+.suspend_late callbacks are invoked, drivers could at this point
+directly invoke it's runtime PM callbacks or even walk through it's bus
+or power domain, to put it's device into low power state.
 
-This change prevents the platform bus from by-passing driver's runtime
-PM callbacks while only CONFIG_PM_SLEEP and not CONFIG_PM_RUNTIME is
-being used.
+Use the new macro SET_PM_RUNTIME_PM_OPS in cases were the above makes
+sense. Make sure the callbacks are encapsulated within CONFIG_PM
+instead of CONFIG_PM_RUNTIME.
+
+Do note that the old macro SET_RUNTIME_PM_OPS, which is being quite
+widely used right now, requires the callbacks to be defined for
+CONFIG_PM_RUNTIME. In many cases it will certainly be convenient to
+convert to the new macro above, but still some cases are optimal for
+only CONFIG_PM_RUNTIME.
 
 Cc: Kevin Hilman <khilman@linaro.org>
 Cc: Alan Stern <stern@rowland.harvard.edu>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/generic_ops.c |    4 ++--
- include/linux/pm_runtime.h       |   12 ++++++++----
- 2 files changed, 10 insertions(+), 6 deletions(-)
+ include/linux/pm.h |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/base/power/generic_ops.c b/drivers/base/power/generic_ops.c
-index 8e78ad1..a4c6cb0 100644
---- a/drivers/base/power/generic_ops.c
-+++ b/drivers/base/power/generic_ops.c
-@@ -10,7 +10,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/export.h>
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- /**
-  * pm_generic_runtime_suspend - Generic runtime suspend callback for subsystems.
-  * @dev: Device to suspend.
-@@ -48,7 +48,7 @@ int pm_generic_runtime_resume(struct device *dev)
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(pm_generic_runtime_resume);
--#endif /* CONFIG_PM_RUNTIME */
-+#endif /* CONFIG_PM */
- 
- #ifdef CONFIG_PM_SLEEP
- /**
-diff --git a/include/linux/pm_runtime.h b/include/linux/pm_runtime.h
-index 6fa7cea..16c9a62 100644
---- a/include/linux/pm_runtime.h
-+++ b/include/linux/pm_runtime.h
-@@ -23,6 +23,14 @@
- 					    usage_count */
- #define RPM_AUTO		0x08	/* Use autosuspend_delay */
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index 5bce0d4..529657c 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -320,6 +320,15 @@ struct dev_pm_ops {
+ #define SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn)
+ #endif
  
 +#ifdef CONFIG_PM
-+extern int pm_generic_runtime_suspend(struct device *dev);
-+extern int pm_generic_runtime_resume(struct device *dev);
++#define SET_PM_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn) \
++	.runtime_suspend = suspend_fn, \
++	.runtime_resume = resume_fn, \
++	.runtime_idle = idle_fn,
 +#else
-+static inline int pm_generic_runtime_suspend(struct device *dev) { return 0; }
-+static inline int pm_generic_runtime_resume(struct device *dev) { return 0; }
++#define SET_PM_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn)
 +#endif
 +
- #ifdef CONFIG_PM_RUNTIME
- 
- extern struct workqueue_struct *pm_wq;
-@@ -37,8 +45,6 @@ extern void pm_runtime_enable(struct device *dev);
- extern void __pm_runtime_disable(struct device *dev, bool check_resume);
- extern void pm_runtime_allow(struct device *dev);
- extern void pm_runtime_forbid(struct device *dev);
--extern int pm_generic_runtime_suspend(struct device *dev);
--extern int pm_generic_runtime_resume(struct device *dev);
- extern void pm_runtime_no_callbacks(struct device *dev);
- extern void pm_runtime_irq_safe(struct device *dev);
- extern void __pm_runtime_use_autosuspend(struct device *dev, bool use);
-@@ -142,8 +148,6 @@ static inline bool pm_runtime_active(struct device *dev) { return true; }
- static inline bool pm_runtime_status_suspended(struct device *dev) { return false; }
- static inline bool pm_runtime_enabled(struct device *dev) { return false; }
- 
--static inline int pm_generic_runtime_suspend(struct device *dev) { return 0; }
--static inline int pm_generic_runtime_resume(struct device *dev) { return 0; }
- static inline void pm_runtime_no_callbacks(struct device *dev) {}
- static inline void pm_runtime_irq_safe(struct device *dev) {}
- 
+ /*
+  * Use this if you want to use the same suspend and resume callbacks for suspend
+  * to RAM and hibernation.
 -- 
 1.7.9.5
