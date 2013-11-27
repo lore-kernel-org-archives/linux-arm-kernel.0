@@ -1,132 +1,104 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Nov 2013 14:16:11 +0900
-Subject: [PATCH RFC v2 03/17] ARM: shmobile: r8a7779: Add clock index
- macros for DT sources
-In-Reply-To: <4880889.L9mnDQNK1l@avalon>
+Date: Wed, 27 Nov 2013 14:17:20 +0900
+Subject: [PATCH RFC v2 05/17] ARM: shmobile: r8a7779: Reference clocks
+In-Reply-To: <1531673.6AgJX0AzD4@avalon>
 References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
- <1385451139-29686-4-git-send-email-horms+renesas@verge.net.au>
- <4880889.L9mnDQNK1l@avalon>
-Message-ID: <20131127051610.GG27704@verge.net.au>
+ <1385451139-29686-6-git-send-email-horms+renesas@verge.net.au>
+ <1531673.6AgJX0AzD4@avalon>
+Message-ID: <20131127051719.GH27704@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 03:43:26PM +0100, Laurent Pinchart wrote:
+On Tue, Nov 26, 2013 at 03:50:16PM +0100, Laurent Pinchart wrote:
 > Hi Simon,
 > 
 > Thank you for the patch.
 > 
-> On Tuesday 26 November 2013 16:32:05 Simon Horman wrote:
-> > Add macros usable by device tree sources to reference r8a7779 clocks by
-> > index.
-> > 
-> > Based on work for the r8a7790 and r8a7791 SoCs by Laurent Pinchart.
+> On Tuesday 26 November 2013 16:32:07 Simon Horman wrote:
+> > Reference clocks using a "clocks" property in all nodes corresponding to
+> > devices that require a clock.
+> 
+> There's a sata node in your latest devel branch that you're missing.
+
+Thanks, I must have made this patch using an older version
+of the devel branch. I'll fix this up.
+
+> > Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
 > > 
 > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > > ---
-> >  include/dt-bindings/clock/r8a7779-clock.h | 61 ++++++++++++++++++++++++++++
-> >  1 file changed, 61 insertions(+)
-> >  create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
+> >  arch/arm/boot/dts/r8a7779.dtsi | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
 > > 
-> > diff --git a/include/dt-bindings/clock/r8a7779-clock.h
-> > b/include/dt-bindings/clock/r8a7779-clock.h new file mode 100644
-> > index 0000000..b05fa8b
-> > --- /dev/null
-> > +++ b/include/dt-bindings/clock/r8a7779-clock.h
-> > @@ -0,0 +1,61 @@
-> > +/*
-> > + * Copyright (C) 2013  Horms Solutions Ltd.
-> > + *
-> > + * Contact: Simon Horman <horms@verge.net.au>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
-> > +#define __DT_BINDINGS_CLOCK_R8A7779_H__
-> > +
-> > +/* CPG */
-> > +#define R8A7779_CLK_PLLA	0
-> > +#define R8A7779_CLK_Z		1
-> > +#define R8A7779_CLK_ZS		2
-> > +#define R8A7779_CLK_S		3
-> > +#define R8A7779_CLK_S1		4
-> > +#define R8A7779_CLK_P		5
-> > +#define R8A7779_CLK_OUT		6
-> > +
-> > +/* MSTP 0 */
-> > +#define R8A7779_CLK_HSPI0	7
-> > +#define R8A7779_CLK_HSPI1	7
-> > +#define R8A7779_CLK_HSPI2	7
-> 
-> I would create a single clock named R8A7779_CLK_HSPI and reference it from the 
-> 3 HSPI instances.
-
-Sure, will do.
-
-> 
-> > +#define R8A7779_CLK_TMU0	16
-> > +#define R8A7779_CLK_TMU1	16
-> > +#define R8A7779_CLK_TMU2	16
-> 
-> Indices for TMU1 and TMU2 should be 15 and 14.
-
-Thanks, I will fix that.
-
-
-> 
-> Shouldn't you add the HSCIF clocks ?
-> 
-> > +#define R8A7779_CLK_SCIF6	21
-> > +#define R8A7779_CLK_SCIF4	22
-> > +#define R8A7779_CLK_SCIF3	23
-> > +#define R8A7779_CLK_SCIF2	24
-> > +#define R8A7779_CLK_SCIF1	25
-> > +#define R8A7779_CLK_SCIF0	26
-> > +#define R8A7779_CLK_I2C3	27
-> > +#define R8A7779_CLK_I2C2	28
-> > +#define R8A7779_CLK_I2C1	29
-> > +#define R8A7779_CLK_I2C0	30
-> > +
-> > +/* MSTP 1 */
-> > +#define R8A7779_CLK_EHCI0	0
-> > +#define R8A7779_CLK_OHCI0	0
-> > +#define R8A7779_CLK_EHCI1	1
-> > +#define R8A7779_CLK_OHCI1	1
-> 
-> What about naming those USB01 and USB2 instead ?
-
-Sure, sounds good.
-
-> 
-> > +#define R8A7779_CLK_DU		3
-> > +#define R8A7779_CLK_VIN2	8
-> > +#define R8A7779_CLK_VIN1	9
-> > +#define R8A7779_CLK_VIN0	10
-> 
-> Could you add the ethernet clock as well ? We'll need it soon.
-
-Will do.
-
-> > +#define R8A7779_CLK_SATA	15
-> > +#define R8A7779_CLK_VIN3	20
-> > +
-> > +/* MSTP 3 */
-> 
-> Could you please add the MMC0 and MMC1 clocks as well ?
-
-Will do.
-
-> > +#define R8A7779_CLK_SDHI3	20
-> > +#define R8A7779_CLK_SDHI2	21
-> > +#define R8A7779_CLK_SDHI1	22
-> > +#define R8A7779_CLK_SDHI0	23
-> > +
-> > +
-> > +#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
+> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> > index d524b3f..623dd39 100644
+> > --- a/arch/arm/boot/dts/r8a7779.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> > @@ -160,6 +160,7 @@
+> >  		reg = <0xffc70000 0x1000>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 79 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp0_clks R8A7779_CLK_I2C0>;
+> >  		status = "disabled";
+> >  	};
+> > 
+> > @@ -170,6 +171,7 @@
+> >  		reg = <0xffc71000 0x1000>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp0_clks R8A7779_CLK_I2C1>;
+> >  		status = "disabled";
+> >  	};
+> > 
+> > @@ -180,6 +182,7 @@
+> >  		reg = <0xffc72000 0x1000>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp0_clks R8A7779_CLK_I2C2>;
+> >  		status = "disabled";
+> >  	};
+> > 
+> > @@ -190,6 +193,7 @@
+> >  		reg = <0xffc73000 0x1000>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp0_clks R8A7779_CLK_I2C3>;
+> >  		status = "disabled";
+> >  	};
+> > 
+> > @@ -215,6 +219,7 @@
+> >  		reg = <0xffe4c000 0x100>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp3_clks R8A7779_CLK_SDHI0>;
+> >  		cap-sd-highspeed;
+> >  		cap-sdio-irq;
+> >  		status = "disabled";
+> > @@ -225,6 +230,7 @@
+> >  		reg = <0xffe4d000 0x100>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp3_clks R8A7779_CLK_SDHI1>;
+> >  		cap-sd-highspeed;
+> >  		cap-sdio-irq;
+> >  		status = "disabled";
+> > @@ -235,6 +241,7 @@
+> >  		reg = <0xffe4e000 0x100>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp3_clks R8A7779_CLK_SDHI2>;
+> >  		cap-sd-highspeed;
+> >  		cap-sdio-irq;
+> >  		status = "disabled";
+> > @@ -245,6 +252,7 @@
+> >  		reg = <0xffe4f000 0x100>;
+> >  		interrupt-parent = <&gic>;
+> >  		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp3_clks R8A7779_CLK_SDHI3>;
+> >  		cap-sd-highspeed;
+> >  		cap-sdio-irq;
+> >  		status = "disabled";
 > -- 
 > Regards,
 > 
