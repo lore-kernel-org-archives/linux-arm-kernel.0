@@ -1,31 +1,40 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 27 Nov 2013 14:54:39 +0530
-Subject: [PATCH] ARM: davinci: clock: return 0 upon error from
- clk_round_rate()
-In-Reply-To: <alpine.DEB.2.02.1311261653510.11450@tamien>
-References: <alpine.DEB.2.02.1311261653510.11450@tamien>
-Message-ID: <5295BA57.7000708@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 27 Nov 2013 10:27:46 +0100
+Subject: [PATCH 5/4] ARM: at91: don't use <mach/timex.h>
+In-Reply-To: <5294BB7C.6030307@atmel.com>
+References: <1385474690-6483-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5294BB7C.6030307@atmel.com>
+Message-ID: <20131127092746.GP28642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 November 2013 06:26 AM, Paul Walmsley wrote:
+On Tue, Nov 26, 2013 at 04:17:16PM +0100, Nicolas Ferre wrote:
+> On 26/11/2013 15:04, Uwe Kleine-K?nig :
+> >The platform specific <mach/timex.h> will be removed in a later patch.
+> >So move its only still used symbol to its only user. Also add a few
+> >explicit includes of <mach/hardware.h> that are implicitly available
+> >through <mach/timex.h>.
+> >
+> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> clk_round_rate() should return 0 now upon an error, rather than
-> returning a negative error code.  This is because clk_round_rate() is
-> being changed to return an unsigned return type rather than a signed
-> type, since some clock sources can generate rates higher than (2^31)-1 Hz.
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Philip Avinash <avinashphilip@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> >---
+> >Hello,
+> >
+> >assuming it's OK for you, please only give an ack and don't take that
+> >patch as I intend to keep it in a series deprecating <mach/timex.h>.
+> 
+> Okay, I let you take this one.
+> 
+> Thanks a lot. bye,
 
-I applied this to my v3.14/soc[1] branch. For some reason I could not
-apply the patch to v3.11-rc1 (patch command returns error). Nothing is
-obviously worng. Anyway, the change is minor so I made the change manually.
+Build testing showed that I have to add several more #include
+<mach/hardware.h>, I will send a v2.
 
-Thanks,
-Sekhar
+Thanks
+Uwe
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.14/soc
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
