@@ -1,49 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Nov 2013 17:59:41 +0000
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
- <5295D1A5.5090403@arm.com>
- <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
-Message-ID: <5296330D.9010801@arm.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 27 Nov 2013 18:54:42 +0100
+Subject: [PATCH v2] use -fstack-protector-strong
+In-Reply-To: <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
+References: <20131126203727.GA352@www.outflux.net>
+ <20131127112731.GA10435@gmail.com>
+ <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
+Message-ID: <20131127175442.GA28088@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/13 15:33, Radha Mohan wrote:
-> On Wed, Nov 27, 2013 at 4:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> [CC-ing the maintainers - seems odd they were not cc-ed the first place]
->>
->> On 27/11/13 07:34, mohun106 at gmail.com wrote:
->>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>>
->>> This patch series provides an implementation of supporting 48-bit
->>> Physical Addresses for ARMv8 platforms. It is the maximum width that
->>> any ARMv8 based processor can support.
->>>
->>> The implementation extends the existing support of 40-bit PA.The kernel
->>> and user space will now be able to access 128TB each. With 4KB page size
->>> the Linux now will be using 4 levels of page tables by making use of
->>> 'pud'. And with 64KB page size the Linux will be using 3 levels of page
->>> tables.
->>>
->>> The code has been tested with LTP.
->>
->> Aside from finding out whether or not this is a useful change, this
->> breaks KVM, more specifically the way kernel pages are mapped into HYP.
->> Also, guests will still be limited to 40-bit IPAs, and the stage-2
->> output range needs to be addressed as well.
+
+* Kees Cook <keescook@chromium.org> wrote:
+
+> On Wed, Nov 27, 2013 at 3:27 AM, Ingo Molnar <mingo@kernel.org> wrote:
+> >
+> > * Kees Cook <keescook@chromium.org> wrote:
+> >
+> >> On a defconfig x86_64 build (with CONFIG_CC_STACKPROTECTOR enabled), the
+> >> delta in size is just under 9% larger:
+> >>
+> >>  -rwxrwxr-x 1 kees kees  22134340 Nov 26 10:28 vmlinux.gcc-4.8
+> >>  -rwxrwxr-x 1 kees kees  22123870 Nov 26 10:40 vmlinux.gcc-4.9
+> >>  -rwxrwxr-x 1 kees kees  24225118 Nov 26 10:42 vmlinux.gcc-4.9+strong
+> >
+> > Please run it through 'size' so that we know the real text size
+> > increases.
 > 
-> This is useful for platforms (like ours) that will use 48-bit PAs.
-> Sooner or later there will
-> be such processors.
+>    text    data     bss     dec     hex filename
+> 11407474        1453792 1191936 14053202         d66f52 vmlinux.gcc-4.8
+> 11458837        1457504 1191936 14108277         d74675 vmlinux.gcc-4.9
+> 11682929        1457504 1191936 14332369         dab1d1 vmlinux.gcc-4.9+strong
+> 
+> Looks to be 2% for defconfig. That's way better. Shall I send a v3?
 
-So should the 4-level page table cost be unconditionally forced onto all
-implementations?
+Well, it's better than 9%, but still almost an order of magnitude 
+higher than the cost is today, and a lot of distros have 
+CONFIG_CC_STACKPROTECTOR=y.
 
-> And yes, I haven't checked on KVM.
+So it would be nice to measure how much the instruction count goes up 
+in some realistic system-bound test. How much does something like 
+kernel/built-in.o increase, as per 'size' output?
 
-Yeah, tiny detail... ;-)
+Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Ingo
