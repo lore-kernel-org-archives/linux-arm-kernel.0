@@ -1,22 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Nov 2013 16:35:32 +0000
-Subject: [PATCH 14/15] spi: sh-msiof: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <1385515117-23664-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131127163532.GH14725@sirena.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 27 Nov 2013 17:38:43 +0100 (CET)
+Subject: [Q] PL011 DMA Rx, using ste_dma40
+Message-ID: <Pine.LNX.4.64.1311271646070.8821@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 02:18:36AM +0100, Laurent Pinchart wrote:
-> This helps increasing build testing coverage.
+Hi
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/1357bad4/attachment.sig>
+I'm trying to get a PL011 UART to work in DMA mode with an alternative 
+DMAC. Transmission works, reception is more problematic. I can receive a 
+complete page of data (4096 bytes), but nothing below that triggers a 
+reception. Is this expected if no polling is used, as configured by the 
+dma_rx_poll_timeout platform parameter, or should it work, triggered by 
+the Rx timeout UART interrupt?
+
+Looking at the amba-pl011 UART driver it seems, that it expects an Rx FIFO 
+timeout IRQ to trigger if fewer than a full Rx DMA buffer bytes of data 
+are received along the lines of pl011_dma_rx_irq(). Such an Rx FIFO 
+timeout interrupt should be raised by the UART if a timeout occurs after 
+fewer that an Rx threshold bytes are received in the UART FIFO. However, 
+as soon as any data is received by the UART the DMA request line is 
+toggled, which causes the DMAC to immediately read the bytes out of the 
+UART, so, no timeout is occurring.
+
+How is it working in the original set up with ste_dma40 compatible DMACs? 
+Or is reception of < 4096 bytes of data, using DMA only working with 
+polling, for which there's currently no DT binding?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
