@@ -1,38 +1,29 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 27 Nov 2013 21:47:17 +0000
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
- device id
-In-Reply-To: <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com> (Jarkko
- Nikula's message of "Wed, 27 Nov 2013 22:57:04 +0200")
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-3-git-send-email-tony@atomide.com>
- <20131118184723.GR10317@atomide.com>
- <87ioveeo0x.fsf@octavius.laptop.org>
- <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
-Message-ID: <86fvqhjz4q.fsf@void.printf.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 27 Nov 2013 13:48:43 -0800
+Subject: [PATCH v5 06/17] clk: at91: add PMC pll clocks
+In-Reply-To: <1384293439-4525-1-git-send-email-b.brezillon@overkiz.com>
+References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
+ <1384293439-4525-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131127214843.16819.59481@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting Boris BREZILLON (2013-11-12 13:57:19)
+> +static const struct clk_ops pll_ops = {
+> +       .prepare = clk_pll_prepare,
+> +       .is_prepared = clk_pll_is_ready,
+> +       .disable = clk_pll_disable,
+> +       .is_enabled = clk_pll_is_ready,
+> +       .recalc_rate = clk_pll_recalc_rate,
+> +       .round_rate = clk_pll_round_rate,
+> +       .set_rate = clk_pll_set_rate,
+> +};
 
-On Wed, Nov 27 2013, Jarkko Nikula wrote:
-> Can you enlighten me what's the proper way to get patches to mmc since
-> I cannot figure out working methodology from MAINTAINERS file?
+Hi Boris,
 
-Sorry about this, Jarkko.
+It is a bit strange to see only a .prepare and .disable callback
+populated. What happens if a driver calls clk_disable and then
+clk_enable? You clock will still be disabled in hardware.
 
-Since I don't have omap.c hardware, I'm generally going to wait for
-a Tested-by/Acked-by from someone else on patches like these.  We
-actually have a maintainer already listed for the driver, Jarkko
-Lavinen <jarkko.lavinen@nokia.com>.
-
-So, maybe the MAINTAINERS section for drivers/mmc/host/omap.c needs
-an update?  Feel free to send me patches to it.  Either way, I'll
-start treating Aaro and Jarkko (Nikula) as maintainers for this
-driver.
-
-Thanks!
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+Regards,
+Mike
