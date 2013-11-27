@@ -1,42 +1,43 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 26 Nov 2013 17:04:47 -0800
-Subject: [PATCH v2 0/9] arm: zynq: Add support for cpufreq
-Message-ID: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Tue, 26 Nov 2013 17:04:48 -0800
+Subject: [PATCH v2 1/9] arm: dt: zynq: Remove 'clock-ranges' from TTC nodes
+In-Reply-To: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1385514296-26702-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I revised this series and rebased on top of Linus' tree. Patch specific
-changes are tracked in the respective email with their patch. On the
-level of the whole series, this changed:
+The bindings for the TTC changed in commit 'arm: zynq: Use standard
+timer binding' (e932900a3279b5dbb6d8f43c7b369003620e137c). That change
+removed possible subnodes from this driver rendering the 'clock-ranges'
+property invalid for this node.
 
-v2:
- - added 'clocksource/cadence_ttc: Use enable/disable_irq'. I hope that
-   is more appropriate to avoid races of the timer with its interrupt
-   handler.
- - added 'arm: zynq: Don't use arm_global_timer with cpufreq'. In the
-   3.13 merge window we enabled the arm_global_timer for Zynq. That
-   timer is clocked by the CPU clock and hence does not provide a stable
-   clocksource when cpufreq is enabled. That patch makes the selection of
-   the GT driver depend on !CPU_FREQ for Zynq.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/boot/dts/zynq-7000.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
-	S?ren
-
-Soren Brinkmann (9):
-  arm: dt: zynq: Remove 'clock-ranges' from TTC nodes
-  arm: dt: zynq: Add 'cpus' node
-  clocksource/cadence_ttc: Store timer frequency in driver data
-  clocksource/cadence_ttc: Use enable/disable_irq
-  clocksource/cadence_ttc: Adjust interval in clock notifier
-  clocksource/cadence_ttc: Overhaul clocksource frequency adjustment
-  clocksource/cadence_ttc: Use only one counter
-  arm: zynq: Don't use arm_global_timer with cpufreq
-  arm: zynq: Add support for cpufreq
-
- arch/arm/boot/dts/zynq-7000.dtsi        |  27 +++-
- arch/arm/mach-zynq/Kconfig              |   4 +-
- arch/arm/mach-zynq/common.c             |   3 +
- drivers/clocksource/cadence_ttc_timer.c | 235 +++++++++++++++++++-------------
- 4 files changed, 174 insertions(+), 95 deletions(-)
-
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index e7f73b2e4550..605a2d0a39fc 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -106,7 +106,6 @@
+ 			compatible = "cdns,ttc";
+ 			clocks = <&clkc 6>;
+ 			reg = <0xF8001000 0x1000>;
+-			clock-ranges;
+ 		};
+ 
+ 		ttc1: ttc1 at f8002000 {
+@@ -115,7 +114,6 @@
+ 			compatible = "cdns,ttc";
+ 			clocks = <&clkc 6>;
+ 			reg = <0xF8002000 0x1000>;
+-			clock-ranges;
+ 		};
+ 		scutimer: scutimer at f8f00600 {
+ 			interrupt-parent = <&intc>;
 -- 
 1.8.4.4
