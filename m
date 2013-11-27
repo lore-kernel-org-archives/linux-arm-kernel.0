@@ -1,46 +1,72 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 27 Nov 2013 18:54:42 +0100
-Subject: [PATCH v2] use -fstack-protector-strong
-In-Reply-To: <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
-References: <20131126203727.GA352@www.outflux.net>
- <20131127112731.GA10435@gmail.com>
- <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
-Message-ID: <20131127175442.GA28088@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Nov 2013 13:00:33 -0500 (EST)
+Subject: [PATCH v4 4/4] ARM: EXYNOS: add Exynos Dual Cluster Support
+In-Reply-To: <1385456288-20398-5-git-send-email-v.tyrtov@samsung.com>
+References: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
+ <1385456288-20398-5-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <alpine.LFD.2.10.1311271246010.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 26 Nov 2013, Vyacheslav Tyrtov wrote:
 
-* Kees Cook <keescook@chromium.org> wrote:
-
-> On Wed, Nov 27, 2013 at 3:27 AM, Ingo Molnar <mingo@kernel.org> wrote:
-> >
-> > * Kees Cook <keescook@chromium.org> wrote:
-> >
-> >> On a defconfig x86_64 build (with CONFIG_CC_STACKPROTECTOR enabled), the
-> >> delta in size is just under 9% larger:
-> >>
-> >>  -rwxrwxr-x 1 kees kees  22134340 Nov 26 10:28 vmlinux.gcc-4.8
-> >>  -rwxrwxr-x 1 kees kees  22123870 Nov 26 10:40 vmlinux.gcc-4.9
-> >>  -rwxrwxr-x 1 kees kees  24225118 Nov 26 10:42 vmlinux.gcc-4.9+strong
-> >
-> > Please run it through 'size' so that we know the real text size
-> > increases.
+> From: Tarek Dakhran <t.dakhran@samsung.com>
 > 
->    text    data     bss     dec     hex filename
-> 11407474        1453792 1191936 14053202         d66f52 vmlinux.gcc-4.8
-> 11458837        1457504 1191936 14108277         d74675 vmlinux.gcc-4.9
-> 11682929        1457504 1191936 14332369         dab1d1 vmlinux.gcc-4.9+strong
+> Add EDCS(Exynos Dual Cluster Support) for Samsung Exynos5410 SoC.
+> This enables all 8 cores, 4 x A7 and 4 x A15 run at the same time.
 > 
-> Looks to be 2% for defconfig. That's way better. Shall I send a v3?
+> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
 
-Well, it's better than 9%, but still almost an order of magnitude 
-higher than the cost is today, and a lot of distros have 
-CONFIG_CC_STACKPROTECTOR=y.
+Just some minor comments in addition to those Dave already provided.
 
-So it would be nice to measure how much the instruction count goes up 
-in some realistic system-bound test. How much does something like 
-kernel/built-in.o increase, as per 'size' output?
+[...]
+> +/*
+> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+> + */
+> +static void __naked edcs_power_up_setup(unsigned int affinity_level)
+> +{
+> +	asm volatile ("\n"
+> +	"b	cci_enable_port_for_self");
+> +}
 
-Thanks,
+You should need to turn on the CCI port only for the first CPU to power 
+up a cluster.  This is indicated by the affinity level passed into r0.  
+See tc2_pm_power_up_setup for example.
 
-	Ingo
+> +static int __init edcs_init(void)
+> +{
+> +	int ret;
+> +	struct device_node *node;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "samsung,exynos5410");
+> +	if (!node)
+> +		return -ENODEV;
+> +
+> +	if (!cci_probed())
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * Future entries into the kernel can now go
+> +	 * through the cluster entry vectors.
+> +	 */
+> +	writel_relaxed(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
+> +
+> +	edcs_data_init();
+> +	mcpm_smp_set_ops();
+> +
+> +	ret = mcpm_platform_register(&edcs_power_ops);
+> +	if (!ret) {
+> +		mcpm_sync_init(edcs_power_up_setup);
+> +		pr_info("EDCS power management initialized\n");
+> +	}
+> +	return ret;
+> +}
+
+Here I'd suggest initializing EG_ENTRY_ADDR only after mcpm_sync_init() 
+is done.  If ever a secondary CPU, seeing that the address is no longer 
+zero, decides to enter the kernel while the state machine is not 
+initialized yet, might lead to all sorts of funny behaviors.
+
+
+Nicolas
