@@ -1,143 +1,63 @@
-From: marc.ceeeee@gmail.com (Marc Carino)
-Date: Tue, 26 Nov 2013 16:22:28 -0800
-Subject: [PATCH v2 6/6] ARM: brcmstb: dts: add a reference DTS for Broadcom
- 7445
-In-Reply-To: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
-References: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <1385511748-27869-7-git-send-email-marc.ceeeee@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 26 Nov 2013 16:37:07 -0800
+Subject: [PATCH 07/12] memory: davinci-aemif: introduce AEMIF driver
+In-Reply-To: <5294E7E4.3060600@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1384187188-5776-8-git-send-email-ivan.khoronzhuk@ti.com>
+ <4F5844B3A985794BA902E12C070812375F8D2E@DNCE04.ent.ti.com>
+ <52944BD3.90105@ti.com> <5294B8C4.6040803@ti.com>
+ <5294D8AD.5030106@ti.com> <5294E7E4.3060600@ti.com>
+Message-ID: <20131127003707.GQ9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sample DTS which will allow bootup of a board populated
-with the BCM7445 chip.
+On Tue, Nov 26, 2013 at 01:26:44PM -0500, Santosh Shilimkar wrote:
+> On Tuesday 26 November 2013 12:21 PM, Sekhar Nori wrote:
+> > On 11/26/2013 8:35 PM, Santosh Shilimkar wrote:
+> >> On Tuesday 26 November 2013 02:20 AM, Sekhar Nori wrote:
+> >>> On Monday 11 November 2013 10:36 PM, Khoronzhuk, Ivan wrote:
+> >>>> +static int davinci_aemif_probe(struct platform_device *pdev)
+> >>>> +{
+> >>>> +       int ret  = -ENODEV, i;
+> >>>> +       struct resource *res;
+> >>>> +       struct device *dev = &pdev->dev;
+> >>>> +       struct device_node *np = dev->of_node;
+> >>>> +
+> >>>> +       if (np == NULL)
+> >>>> +               return 0;
+> >>>> +
+> >>>> +       if (aemif) {
+> >>>> +               dev_err(dev, "davinci_aemif driver is in use currently\n");
+> >>>> +               return -EBUSY;
+> >>>> +       }
+> >>>
+> >>> Why expressly prevent multiple AEMIF devices? Its entirely conceivable
+> >>> to have two memories like NAND and NOR flash connect to two different
+> >>> AEMIF interfaces.
+> >>>
+> >> Ivan wanted me to clarify the Keystone hardware which supports
+> >> 1 instance of controller with 4 CS. That allows already four
+> >> devices to be connected. Currently NAND and NOR are connected on it
+> >> and two more slots are free.
+> >>
+> >> Since driver support what hardware is, lets not build a driver for
+> >> hardware which don't exist. And if at all such a support would be
+> >> needed in future, we can always add it.
+> > 
+> > I understand the lack of hardware part, but its common to write the
+> > driver such that it can handle multiple instances. Is there any gain on
+> > current hardware because of this check? From what I am hearing, the code
+> > in question wont be exercised at all. So why go all the way and add it
+> > in first place?
+> > 
+> Fair enough. The check can be dropped.
 
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/brcmstb-7445.dts |  115 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 115 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/brcmstb-7445.dts
+Hmm, while the sentiment expressed by Sekhar is noble (to avoid
+unnecessarily constraining the driver), removing the check is not
+enough. You're still using a global static variable 'aemif', and it is
+important not to accidentally re-use this struct if a second device ever
+becomes available. So for the current implementation, the check is
+necessary IMO. If instead, you were to make 'aemif' a per-device struct
+(like with platform_set_drvdata()), then you would not have this issue.
 
-diff --git a/arch/arm/boot/dts/brcmstb-7445.dts b/arch/arm/boot/dts/brcmstb-7445.dts
-new file mode 100644
-index 0000000..a8b74c5
---- /dev/null
-+++ b/arch/arm/boot/dts/brcmstb-7445.dts
-@@ -0,0 +1,115 @@
-+/dts-v1/;
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	#address-cells = <0x1>;
-+	#size-cells = <0x1>;
-+	model = "Broadcom STB (7445)";
-+	compatible = "brcm,brcmstb";
-+	interrupt-parent = <&gic>;
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x1>;
-+		device_type = "memory";
-+		reg = <0x0 0x40000000 0x40000000 0x40000000 0x80000000 0x40000000>;
-+	};
-+
-+	cpupll: cpupll at 0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0x0>;
-+		clock-frequency = <1500000000>;
-+	};
-+
-+	cpuclk: cpu-clk-div at 0 {
-+		compatible = "brcm,brcmstb-cpu-clk-div";
-+		reg = <0xf03e257c 0x4>;
-+		#clock-cells = <0x0>;
-+		clocks = <&cpupll>;
-+		div-table = <0x0 0x1 0x11 0x2 0x12 0x4 0x13 0x8 0x14 0x10>;
-+	};
-+
-+	cpus {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x0>;
-+
-+		cpu at 0 {
-+			operating-points = <0x16e360 0x0
-+								0xb71b0 0x0
-+								0x5b8d8 0x0
-+								0x2dc6c 0x0
-+								0x16e36 0x0>;
-+			clocks = <&cpuclk>;
-+			device_type = "cpu";
-+			compatible = "brcm,brahma15";
-+			reg = <0x0>;
-+			clock-frequency = <1500000000>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "brcm,brahma15";
-+			reg = <0x1>;
-+			clock-frequency = <1500000000>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "brcm,brahma15";
-+			reg = <0x2>;
-+			clock-frequency = <1500000000>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "brcm,brahma15";
-+			reg = <0x3>;
-+			clock-frequency = <1500000000>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at ffd00000 {
-+		compatible = "brcm,brahma15-gic", "arm,cortex-a15-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <0x3>;
-+		reg = <0xffd01000 0x1000 0xffd02000 0x2000>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <0x1 0xd 0xf08 0x1 0xe 0xf08 0x1 0xb 0xf08 0x1 0xa 0xf08>;
-+	};
-+
-+	serial at f0406b00 {
-+		compatible = "ns16550a";
-+		reg = <0xf0406b00 0x20>;
-+		reg-shift = <0x2>;
-+		reg-io-width = <0x4>;
-+		interrupts = <0x0 0x4b 0x4>;
-+		clock-frequency = <0x4d3f640>;
-+	};
-+
-+	sun-top-ctrl at f0404000 {
-+		compatible = "brcm,brcmstb-sun-top-ctrl";
-+		reg = <0xf0404000 0x51c>;
-+		reset-source-enable-reg = <0x304>;
-+		sw-master-reset-reg = <0x308>;
-+	};
-+
-+	cpu-biu-ctrl at f03e2400 {
-+		compatible = "brcm,brcmstb-cpu-biu-ctrl";
-+		reg = <0xf03e2400 0x5b4>;
-+		cpu-reset-config-reg = <0x178>;
-+		cpu0-pwr-zone-ctrl-reg = <0x88>;
-+	};
-+
-+	hif-continuation at f0452000 {
-+		compatible = "brcm,brcmstb-hif-continuation";
-+		reg = <0xf0452000 0x100>;
-+		stb-boot-hi-addr0-reg = <0x0>;
-+	};
-+};
--- 
-1.7.1
+Brian
