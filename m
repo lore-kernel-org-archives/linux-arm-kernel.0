@@ -1,46 +1,34 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 27 Nov 2013 11:06:09 +0100
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <5295BFB3.5020109@ti.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <201311271027.06982.marex@denx.de> <5295BFB3.5020109@ti.com>
-Message-ID: <201311271106.09624.marex@denx.de>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 27 Nov 2013 18:05:09 +0800
+Subject: [Patch v2 1/2] ASoC: atmel: sam9x5_wm8731: fix oops when unload module
+Message-ID: <1385546710-11308-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sourav Poddar,
+As the priv is not assigned to card->drvdata, it is NULL, so when
+unload module, it will cause NULL pointer oops.
+Assign priv to card->drvdata to fix this issue.
 
-> Dear Marek Vasut, Huang,
-> 
-> On Wednesday 27 November 2013 02:57 PM, Marek Vasut wrote:
-> > Dear Huang Shijie,
-> > 
-> >> 1.) Why add a new framework for SPI NOR?
-> >> 
-> >>    The SPI-NOR controller such as Freescale's Quadspi controller is
-> >>    working in a different way from the SPI bus. It should knows the NOR
-> >>    commands to find the right LUT sequence. Unfortunately, the current
-> >>    code can not meet this requirement.
-> > 
-> > Is there any kind of documentation for this controller available? I
-> > cannot quite understand how this controller works and why can it not be
-> > used with our current infrastructure.
-> 
-> I do have a similar requirement where my controller need to be configured
-> from slave info. I have submiited a series in the mtd list adding that
-> portion
-> of handling such cases. Here, is the patch which specific to m25p80 part.
-> http://patchwork.ozlabs.org/patch/294285/
-> 
-> The whole series can be found here:
-> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg98691.html
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+Change in v2: 
+  - using snd_soc_card_set_drvdata()
+---
+ sound/soc/atmel/sam9x5_wm8731.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Is this TI QSPI the same thing as the Altera QSPI controller please ?
-
-Otherwise, I seriously believe you and Huang should work on a common 
-infrastructure. I would first like to understand how is the controller in DRA7xx 
-different from regular SPI controller though. Is there any kind of documentation 
-I could study please?
-
-Best regards,
-Marek Vasut
+diff --git a/sound/soc/atmel/sam9x5_wm8731.c b/sound/soc/atmel/sam9x5_wm8731.c
+index 992ae38..1b37228 100644
+--- a/sound/soc/atmel/sam9x5_wm8731.c
++++ b/sound/soc/atmel/sam9x5_wm8731.c
+@@ -97,6 +97,8 @@ static int sam9x5_wm8731_driver_probe(struct platform_device *pdev)
+ 		goto out;
+ 	}
+ 
++	snd_soc_card_set_drvdata(card, priv);
++
+ 	card->dev = &pdev->dev;
+ 	card->owner = THIS_MODULE;
+ 	card->dai_link = dai;
+-- 
+1.7.9.5
