@@ -1,36 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Nov 2013 12:20:54 +0000
-Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <527671E9.8040704@gmail.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-3-git-send-email-liuj97@gmail.com>
- <20131030001245.GB25346@mudshark.cambridge.arm.com>
- <527671E9.8040704@gmail.com>
-Message-ID: <20131127122053.GG9032@mudshark.cambridge.arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 27 Nov 2013 12:25:43 +0000
+Subject: ACPI
+In-Reply-To: <201311261443.30784.jbe@pengutronix.de>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org> <
+ CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com> <
+ CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com> <
+ 201311261443.30784.jbe@pengutronix.de>
+Message-ID: <20131127122543.5DEE2C404EC@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiang Liu,
+On Tue, 26 Nov 2013 14:43:30 +0100, J??rgen Beisert <jbe@pengutronix.de> wrote:
+> On Tuesday 26 November 2013 13:55:10 Grant Likely wrote:
+> > On Tue, Nov 26, 2013 at 12:43 PM, Linus Walleij
+> >
+> > <linus.walleij@linaro.org> wrote:
+> > > On Mon, Nov 25, 2013 at 4:41 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+> > >> In the past ACPI implementations handled GPIO by providing
+> > >> methods that accessed hardware registers directly. I've seen DSDTs that
+> > >> implement i2c entirely in ASL.
+> > >
+> > > Is that common?
+> > >
+> > > Since i2c is a slow bus, can be 100kHz or so, how does that
+> > > avoid locking the entire CPU while e.g. waiting for transactions on
+> > > the external bus to complete?
+> > >
+> > > In I2C drivers we typically use completion IRQs so that we can
+> > > do other stuff when the I2C traffic is busy ...
+> > >
+> > > I have a feeling we should not recommend ARM implementers
+> > > to go and do things like this.
+> >
+> > ACPI5 defines a binding for serial busses (i2c & spi) which allows
+> > real device drivers to drive the bus and allows ACPI and the kernel to
+> > share the bus safely. Using that binding means some i2c devices can be
+> > 'owned' by ACPI and others owned by the kernel.
+> 
+> This means bus locking. And Linus' other question about CPU locking while ACPI
+> drives the I2C bus?
 
-On Sun, Nov 03, 2013 at 03:55:21PM +0000, Jiang Liu wrote:
-> On 10/30/2013 08:12 AM, Will Deacon wrote:
-> > If I try and email you at your Huawei address, I get a bounce from the mail
-> > server. Is that expected? If so, it's not very helpful from a commit log
-> > perspective if you use that address as the author on your patches.
-> > 
-> Hi Will,
-> 	Sorry for the inconvenience. I have left Huawei recently and
-> have had a vacation last two weeks. I will use my gmail account next
-> time.
+It means Linux owns the I2C bus and AML methods request the OS to
+perform a transaction on its behalf.
 
-I appreciate that you're probably not being paid to look at this anymore,
-but have you had a chance to address the comments I made on version 5 of
-this series? As far as I'm concerned, this is almost ready for merging and
-I'd love to see it get in for 3.14!
-
-It would be a real shame if this ended up getting dropped...
-
-Cheers,
-
-Will
+g.
