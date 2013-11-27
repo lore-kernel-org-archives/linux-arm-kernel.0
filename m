@@ -1,33 +1,59 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 27 Nov 2013 15:17:31 +0530
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <201311271027.06982.marex@denx.de>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <201311271027.06982.marex@denx.de>
-Message-ID: <5295BFB3.5020109@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Nov 2013 10:48:19 +0100
+Subject: [PATCH] tty: atmel_serial: include <mach/hardware.h> explicitly
+In-Reply-To: <1385545111-1256-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1385545111-1256-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <5295BFE3.5070700@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut, Huang,
-On Wednesday 27 November 2013 02:57 PM, Marek Vasut wrote:
-> Dear Huang Shijie,
+On 27/11/2013 10:38, Uwe Kleine-K?nig :
+> When compiled for at91rm9200 (i.e. ARM) the driver needs among others
+> the symbol AT91RM9200_BASE_US0 which is defined in
+> arch/arm/mach-at91/include/mach/at91rm9200.h. This file is included
+> implicitly via several steps. As ARM's <asm/timex.h> will stop including
+> <mach/hardware.h> later in this series explicitly include
+> <mach/hardware.h>
 >
->> 1.) Why add a new framework for SPI NOR?
->>    The SPI-NOR controller such as Freescale's Quadspi controller is working
->>    in a different way from the SPI bus. It should knows the NOR commands to
->>    find the right LUT sequence. Unfortunately, the current code can not meet
->>    this requirement.
-> Is there any kind of documentation for this controller available? I cannot quite
-> understand how this controller works and why can it not be used with our current
-> infrastructure.
->
-I do have a similar requirement where my controller need to be configured
-from slave info. I have submiited a series in the mtd list adding that 
-portion
-of handling such cases. Here, is the patch which specific to m25p80 part.
-http://patchwork.ozlabs.org/patch/294285/
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-The whole series can be found here:
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg98691.html
-> Best regards,
-> Marek Vasut
+Uwe, this AT91RM9200_BASE_US0 value is supposed to disappear in 3.14 
+tanks to a patch from Linus W. ([PATCH v4] ARM/serial: at91: switch 
+atmel serial to use gpiolib) (not in linux-next yet).
+
+So I think that this patch is not needed for 3.14.
+
+Bye,
+
+> ---
+>
+> Notes:
+>      Hello,
+>
+>      I want to send this patch as part of a series dropping <mach/timex.h>
+>      altogether. So please don't take this patch but only give your Ack if
+>      you're OK with me sending this patch via arm-soc.
+>
+>      Thanks
+>      Uwe
+>
+>   drivers/tty/serial/atmel_serial.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index c7d99af..de51964 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -47,6 +47,7 @@
+>
+>   #ifdef CONFIG_ARM
+>   #include <mach/cpu.h>
+> +#include <mach/hardware.h>
+>   #include <asm/gpio.h>
+>   #endif
+>
+>
+
+
+-- 
+Nicolas Ferre
