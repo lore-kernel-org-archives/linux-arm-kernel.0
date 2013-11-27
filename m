@@ -1,26 +1,33 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 27 Nov 2013 07:57:25 -0800
-Subject: [PATCH] watchdog: davinci: rename platform driver to davinci-wdt
-In-Reply-To: <5295FB0E.4070406@ti.com>
-References: <1385559113-4354-1-git-send-email-ivan.khoronzhuk@ti.com>
- <5295FB0E.4070406@ti.com>
-Message-ID: <52961665.3060309@roeck-us.net>
+From: philippe.retornaz@gmail.com (=?UTF-8?B?UGhpbGlwcGUgUsOpdG9ybmF6?=)
+Date: Wed, 27 Nov 2013 16:58:33 +0100
+Subject: [PATCH 1/3] pwm: Add mc13xxx pwm driver.
+In-Reply-To: <1385566771-366-1-git-send-email-denis@eukrea.com>
+References: <1385566771-366-1-git-send-email-denis@eukrea.com>
+Message-ID: <529616A9.2090909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2013 06:00 AM, Sekhar Nori wrote:
-> On Wednesday 27 November 2013 07:01 PM, Ivan Khoronzhuk wrote:
->> As we switch to use the watchdog core which permits more than one
->> active watchdog in the system, rename platform driver to
->> "davinci-wdt" to be identifiable.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->
-> Looks good to me. Since bulk of this patch touches mach-davinci, I would
-> like to take this through my tree to avoid conflicts with other
-> mach-davinci patches I accept.
->
+Hi
 
-Good idea, and makes sense.
+> +struct mc13xxx *get_mc13xxx(void)
+> +{
+> +	return mc13xxx_data;
+> +}
+> +EXPORT_SYMBOL_GPL(get_mc13xxx);
+> +
+>   int mc13xxx_common_init(struct mc13xxx *mc13xxx,
+>   		struct mc13xxx_platform_data *pdata, int irq)
+>   {
+> @@ -706,6 +714,9 @@ err_revision:
+>   		mc13xxx_add_subdevice(mc13xxx, "%s-pwrbutton");
+>   	}
+>
+> +	/* Linux will not have to handle more than one mc13xxx pmic. */
+> +	mc13xxx_data = mc13xxx;
+> +
 
-Guenter
+Why using a such hack instead of an MFD subdevice ?
+
+Regards,
+
+Philippe
