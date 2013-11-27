@@ -1,59 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Nov 2013 12:16:45 +0100
-Subject: [PATCH 02/04] ARM: shmobile: Genmai LED1 and LED2 support
-In-Reply-To: <20131127082755.20015.95975.sendpatchset@w520>
-References: <20131127082736.20015.21303.sendpatchset@w520>
- <20131127082755.20015.95975.sendpatchset@w520>
-Message-ID: <1698428.WpE2zkcoKU@avalon>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 27 Nov 2013 12:27:32 +0100
+Subject: [PATCH v2] use -fstack-protector-strong
+In-Reply-To: <20131126203727.GA352@www.outflux.net>
+References: <20131126203727.GA352@www.outflux.net>
+Message-ID: <20131127112731.GA10435@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
 
-Thank you for the patch.
+* Kees Cook <keescook@chromium.org> wrote:
 
-On Wednesday 27 November 2013 17:27:55 Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+> On a defconfig x86_64 build (with CONFIG_CC_STACKPROTECTOR enabled), the
+> delta in size is just under 9% larger:
 > 
-> Add support for Genmai board LED1 and LED2 via gpio-leds.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+>  -rwxrwxr-x 1 kees kees  22134340 Nov 26 10:28 vmlinux.gcc-4.8
+>  -rwxrwxr-x 1 kees kees  22123870 Nov 26 10:40 vmlinux.gcc-4.9
+>  -rwxrwxr-x 1 kees kees  24225118 Nov 26 10:42 vmlinux.gcc-4.9+strong
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Please run it through 'size' so that we know the real text size 
+increases.
 
-> ---
-> 
->  arch/arm/boot/dts/r7s72100-genmai-reference.dts |   13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> --- 0001/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> +++ work/arch/arm/boot/dts/r7s72100-genmai-reference.dts	2013-11-27
-> 15:49:27.000000000 +0900 @@ -9,7 +9,8 @@
->   */
-> 
->  /dts-v1/;
-> -/include/ "r7s72100.dtsi"
-> +#include "r7s72100.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> 
->  / {
->  	model = "Genmai";
-> @@ -28,4 +29,14 @@
->  		#address-cells = <1>;
->  		#size-cells = <1>;
->  	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		led1 {
-> +			gpios = <&port4 10 GPIO_ACTIVE_LOW>;
-> +		};
-> +		led2 {
-> +			gpios = <&port4 11 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
->  };
--- 
-Regards,
+If the cost of -fstack-protector-strong is really +9% in kernel text 
+size then that's rather significant!
 
-Laurent Pinchart
+If this option blows up our performance critical codepaths as well 
+then this will likely cause a runtime slowdown as well, in addition to 
+the increase in I$ footprint. That needs to be measured.
+
+CONFIG_CC_STACKPROTECTOR=y is relatively cheap today. For example on 
+x86-64 defconfig:
+
+      text    data    bss     dec       filename
+  11378972    1455056 1191936 14025964  vmlinux  # CONFIG_CC_STACKPROTECTOR is not set
+  11420243    1455056 1191936 14067235  vmlinux  CONFIG_CC_STACKPROTECTOR=y
+
+that's a +0.3% cost currently.
+
+Thanks,
+
+	Ingo
