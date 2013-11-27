@@ -1,113 +1,43 @@
-From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
-Date: Wed, 27 Nov 2013 16:45:42 +0800
-Subject: [PATCH] pinctrl: imx1-core populate subdevices
-In-Reply-To: <20131127073152.GA28465@pengutronix.de>
-References: <CACRpkda2dO6DvurEhaTVGJv8nDyEGOEeLCap-_+1e1mHtD0XyQ@mail.gmail.com>
- <1384193987-20740-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdaQcY43wnfD_phsi6rCo3oUmOUcei+gb9phyGT7F1iZyA@mail.gmail.com>
- <529567FB.5090501@gtsys.com.hk> <20131127073152.GA28465@pengutronix.de>
-Message-ID: <5295B136.8040607@gtsys.com.hk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Nov 2013 09:49:33 +0100
+Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
+In-Reply-To: <20131115145554.GC19318@pengutronix.de>
+References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131115142327.GQ28304@ns203013.ovh.net>
+ <20131115145554.GC19318@pengutronix.de>
+Message-ID: <5295B21D.5020308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 27, 2013 03:31 PM, Markus Pargmann wrote:
-> Hi,
+On 15/11/2013 15:55, Uwe Kleine-K?nig :
+> Hello,
 >
-> On Wed, Nov 27, 2013 at 11:33:15AM +0800, Chris Ruehl wrote:
->> On Wednesday, November 20, 2013 04:01 AM, Linus Walleij wrote:
->>> On Mon, Nov 11, 2013 at 7:19 PM, Markus Pargmann<mpa@pengutronix.de>   wrote:
+> On Fri, Nov 15, 2013 at 03:23:27PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 15:00 Fri 15 Nov     , Uwe Kleine-K??nig wrote:
+>>> The driver needs the symbol AT91_SLOW_CLOCK which is defined in
+>>> arch/arm/mach-at91/include/mach/hardware.h. This file is included
+>>> implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
+>>> linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
+>>> linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
+>>> linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
 >>>
->>>> Support gpio devicetree subnodes to allow a more detailed DT hardware
->>>> description.
->>>>
->>>> Signed-off-by: Markus Pargmann<mpa@pengutronix.de>
+>>> So better include it explicitly not only because the last link will go
+>>> away soon.
 >>>
->>> Looks good to me.
->>>
->>> Tentatively applied this, the DT people may want to say something
->>> about this.
->>>
->>> Yours,
->>> Linus Walleij
->>> --
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 >>
->> Hi,
->>
->> I tried the new configuration but the kernel oops when probing the
->> dm9000 caused by insufficient resources more likely the real reason
->> that somehow the gpio6: triggers a problem
->>
->>
->> [    0.115718] irq: no irq domain found for
->> /soc/aipi at 10000000/iomuxc at 10015000/gpio at 10015500 !
->> [    0.115768] ------------[ cut here ]------------
->> [    0.115853] WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171
->> of_device_alloc+0x110/0x15c()
->> [    0.117824] ---[ end trace 0e10ae727e6e0ab1 ]---
->> [    0.121236] Failed to request board ext/int gpios
->> [    0.152712] imx27-pinctrl 10015000.iomuxc: initialized IMX pinctrl driver
->
-> The imx27-pinctrl driver seems to be initialized after the irq is
-> requested. So this issue should be the same as in [1].
->
-> Regards,
->
-> Markus
+>> we should never use this symbol you need to request the clock clk32k
+> IMHO this should be addressed in another patch. My intent is to get rid
+> of <mach/timex.h>. So I let someone else take this patch opportunity.
 
-Markus,
+I understand the objective of this patch.
 
-Thank you for point this out!  I patched the Linux-next and
-my problems went away. I will test now a bit more..
+So, in the meantime, you have my:
 
-Cheers
-Chris
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
->
-> [1] [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
-> http://archive.arm.linux.org.uk/lurker/message/20131123.004335.61d5c21b.en.html
->
->>
->>
->> iomuxc: iomuxc at 10015000 {
->>          compatible = "fsl,imx27-iomuxc";
->>          reg =<0x10015000 0x600>;
->>          #address-cells =<1>;
->>          #size-cells =<1>;
->>          ranges;
->>
->>          gpio1: gpio at 10015000 {
->>               compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
->>               reg =<0x10015000 0x100>;
->>               interrupts =<8>;
->>               gpio-controller;
->>               #gpio-cells =<2>;
->>               interrupt-controller;
->>               #interrupt-cells =<2>;
->>          };
->> ...
->>          gpio6: gpio at 10015500 {
->>               compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
->>               reg =<0x10015500 0x100>;
->>               interrupts =<8>;
->>               gpio-controller;
->>               #gpio-cells =<2>;
->>               interrupt-controller;
->>               #interrupt-cells =<2>;
->>          };
->> };
->>
->> Kernel Linux version 3.13.0-rc1-next-20131125-dirty
->>
->> With kind regards
->> Chris
->>
->>
->
+(if it is not too late, Uwe).
 
+Thanks for addressing that, bye,
 -- 
-GTSYS Limited RFID Technology
-A01 24/F Gold King Industrial Bld
-35-41 Tai Lin Pai Road, Kwai Chung, Hong Kong
-Fax (852) 8167 4060 - Tel (852) 3598 9488
-
-Disclaimer: http://www.gtsys.com.hk/email/classified.html
+Nicolas Ferre
