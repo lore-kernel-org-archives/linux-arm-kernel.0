@@ -1,59 +1,24 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Wed, 27 Nov 2013 12:13:25 -0500
-Subject: [PATCH v3 5/9] usb: gadget: s3c-hsotg: use generic
- phy_init()/phy_exit() support
-In-Reply-To: <529476A4.8080600@ti.com>
-References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
- <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
- <529476A4.8080600@ti.com>
-Message-ID: <20131127171325.GD31091@beef>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 Nov 2013 17:14:39 +0000
+Subject: [PATCH V2] ASoC: tegra: use reset framework
+In-Reply-To: <1385496767-8307-1-git-send-email-swarren@wwwdotorg.org>
+References: <1385496767-8307-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131127171439.GM14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 03:53:32PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
+On Tue, Nov 26, 2013 at 01:12:47PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
-> > If a generic phy is present, call phy_init()/phy_exit(). This supports
-> > generic phys that must be soft reset before power on.
-> > 
-> > Signed-off-by: Matt Porter <matt.porter@linaro.org>
-> > ---
-> >  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-> > index da3879b..8dfe33f 100644
-> > --- a/drivers/usb/gadget/s3c-hsotg.c
-> > +++ b/drivers/usb/gadget/s3c-hsotg.c
-> > @@ -3622,6 +3622,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
-> >  		goto err_supplies;
-> >  	}
-> >  
-> > +	if (hsotg->phy)
-> 
-> IS_ERR? If your phy_get fails *phy* will have a error value..
+> Tegra's clock driver now provides an implementation of the common
+> reset API (include/linux/reset.h). Use this instead of the old Tegra-
+> specific API; that will soon be removed.
 
-Yes, thanks. I'll fix these and also note that the same issue exists in
-Kamil's patch for these same hsotg->phy conditional uses. I'll work with
-Kamil to either get those addressed there or in a follow on fix.
-
-> 
-> > +		phy_init(hsotg->phy);
-> > +
-> >  	/* usb phy enable */
-> >  	s3c_hsotg_phy_enable(hsotg);
-> >  
-> > @@ -3715,6 +3718,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
-> >  	}
-> >  
-> >  	s3c_hsotg_phy_disable(hsotg);
-> > +	if (hsotg->phy)
-> 
-> same here.
-
-Ok.
-
-> 
-> Thanks
-> Kishon
+Acked-by: Mark Brown <broonie@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/2d82c946/attachment.sig>
