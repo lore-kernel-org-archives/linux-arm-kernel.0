@@ -1,89 +1,91 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Nov 2013 11:27:34 -0800
-Subject: [PATCH] Documentation: devicetree: arm: add lpae property to
- cpus/cpu bindings
-In-Reply-To: <20131127094911.GE5402@e106331-lin.cambridge.arm.com>
-References: <1385517172-803-1-git-send-email-olof@lixom.net>
- <20131127094911.GE5402@e106331-lin.cambridge.arm.com>
-Message-ID: <CAOesGMh9aQEtqha3gt80q4RmLjXtFTc+Xt39M0m+geTk_betzQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 27 Nov 2013 13:39:44 -0600
+Subject: [PATCH 1/3] usb: dwc3: Add Keystone specific glue layer
+In-Reply-To: <52963AA4.6030007@ti.com>
+References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+ <1385410581-12148-2-git-send-email-w-kwok2@ti.com>
+ <5295B93A.3040400@ti.com> <20131127174140.GE8123@saruman.home>
+ <52963AA4.6030007@ti.com>
+Message-ID: <20131127193944.GA20344@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 1:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Olof,
->
-> On Wed, Nov 27, 2013 at 01:52:52AM +0000, Olof Johansson wrote:
->> While the LPAE capability is determined by the kernel today, it is still
->> useful to be able to specify the feature in the device tree. There is
->> precedence from other architectures for this.
->>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->>
->> My personal motive for this is to be able to tell which boards are
->> work even trying to boot an LPAE kernel on, since we don't disable the
->> platforms that are based on A8/A9 when LPAE is turned on. I'll add dtsi
->> patches for A7/A15-based platforms once the binding is settled.
->
-> It would be nice to have this description of why you want to add this in
-> the commit message proper.
+On Wed, Nov 27, 2013 at 01:32:04PM -0500, Santosh Shilimkar wrote:
+> On Wednesday 27 November 2013 12:41 PM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Wed, Nov 27, 2013 at 02:49:54PM +0530, George Cherian wrote:
+> >>> +	error = of_platform_populate(node, NULL, NULL, dev);
+> >>> +	if (error) {
+> >>> +		dev_err(&pdev->dev, "failed to create dwc3 core\n");
+> >>> +		goto err_core;
+> >>> +	}
+> >>> +
+> >>> +	return 0;
+> >>> +
+> >>> +err_core:
+> >>> +	kdwc3_disable_irqs(kdwc);
+> >>> +err_irq:
+> >>> +	kdwc3_disable(kdwc);
+> >>> +
+> >>> +	return error;
+> >>> +}
+> >>> +
+> >>> +static int kdwc3_remove(struct platform_device *pdev)
+> >>> +{
+> >>> +	struct dwc3_keystone *kdwc = platform_get_drvdata(pdev);
+> >>> +
+> >>> +	if (kdwc) {
+> >>> +		kdwc3_disable_irqs(kdwc);
+> >>> +		kdwc3_disable(kdwc);
+> >>> +		platform_set_drvdata(pdev, NULL);
+> >>> +	}
+> >>> +	return 0;
+> >>> +}
+> >>> +
+> >>
+> >> You need to unregister the child nodes in remove.
+> >> Also why can't the dwc3-omap driver be reused, Felipe??
+> >> I believe the TI wrapper for Keystone is similar to that of AM437x or
+> >> OMAP5.
+> > 
+> > it is very similar indeed, if it can be easily re-use that glue, I'd
+> > rather not add another.
+> > 
+> Initial idea was actually to use same driver but the integration IP
+> is quite different on Keystone vs OMAP which lead to have a separate
+> glue layer. They look similar but there are differences in terms of phys,
+> interrupts, register space. And also non OTG support, runtime PM
+> vs clock etc for now.
 
-Sure.
+All of those can be easily taken care of:
 
-> I don't see much point in this. If we're going to add this to the DTSIs
-> for all platforms that have CPUs with LPAE support, why not just check
-> if a given DT contains one of those CPUs to find out if it has LPAE
-> support?
+a) PHY -> different phy driver
+b) non-OTG -> there's a register on dwc3 which we can use
+c) runtime vs clock -> we can add optional clock support on dwc3-omap.c
 
-Because it's awkward to have to do a table with each cpu compatible
-value that is known to support LPAE everywhere it's needed.
+what *really* prevents us from using the same, is register layout and
+the fact that on OMAP, nobody wants drivers accessing SYS* registers (a
+mistake IMO). That would be a lot more difficult to make generic.
 
-Alternatively we could have a common compatible field for shared
-features, but that also won't scale (we don't have a compatible field
-today to indicate architecture version, and this would be an
-incremental part on top of that).
+BTW, OMAP isn't OTG either, it doesn't support the OTG specification
+even though it can act in both roles. Same applies for keystone, if I'm
+reading my docs correctly.
 
-> The information this flag describes is at best redundant, but could also
-> be missing or present erroneously.
+> After all the glue is really a very small code describes the integration
+> details thanks to nice abstracted dwc3 core layer. So as discussed
+> over irc, keeping the separate glue is preferred but do let us know
+> if you think otherwise.
 
-That is true for many other device tree properties too.
+yeah, let's keep it separate. Keystone is, in general, an entire new SoC
+architecture anyway.
 
-> It's also of no use to any OS actually running on the hardware, as it's
-> easier for an OS to check ID_MMFR0[3:0] than to parse a DTB. Likewise
-> for bootloaders.
-
-Compare this to the PowerPC processor binding from IEEE1275, and
-you'll see that there are some similarities, for example when it comes
-to properties describing support of certain instructions (which could
-be probed by inserting illegal instruction handlers and attempting to
-execute them). They also have properties for cpu-version and a few
-other similar things that can be read from registers.
-
->> I don't think it's worth trying to add those dependencies in Kconfig,
->> by the way -- it'd be pretty verbose and churny.
->
-> I think if we want an early warning that a particular platform is not
-> going to support LPAE, this would be a better place to put it.
-
-It's problematic because you really need to annotate every platform
-that _doesn't_ support LPAE to get something that works. Otherwise, if
-you have one platform that selects something like CONFIG_HAVE_LPAE,
-then just enabling that platform together with the rest of them means
-you can turn it on, even if the older platforms can't boot any more.
-
-So, you'd need every non-A15/A7 platform select a CONFIG_NO_LPAE of
-whatnot, which doesn't scale.
-
-Alternatively we'll need to add a config option per cpu, and have
-CONFIG_ARM_LPAE depend on !CORTEX_A8 && !CORTEX_A9 && !<qualcomm v7
-cpus> && !<marvell v7 cpus>. That's also ugly.
-
-> It's a shame we don't have a standard header in the Linux Image. If we
-> did, we could add a "uses LPAE" flag to the Linux Image that bootloaders
-> could check and refuse to run the Image or print a warning if the HW had
-> no LPAE support.
-
-Yep, unfortunate.
-
-
--Olof
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/2cf1b300/attachment.sig>
