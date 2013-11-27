@@ -1,26 +1,27 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 27 Nov 2013 09:17:08 -0500
-Subject: [PATCH] watchdog: davinci: rename platform driver to davinci-wdt
-In-Reply-To: <5295FB0E.4070406@ti.com>
-References: <1385559113-4354-1-git-send-email-ivan.khoronzhuk@ti.com>
- <5295FB0E.4070406@ti.com>
-Message-ID: <5295FEE4.8090108@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Nov 2013 14:18:53 +0000
+Subject: [PATCH] Versatile LEDs initialise to off state
+In-Reply-To: <CACRpkdaj_CVj8E6UQWgA7-en8xuhfaVtoBy9nXOHfJ_Fu=2qOw@mail.gmail.com>
+References: <20131126194418.GI16735@n2100.arm.linux.org.uk>
+ <CACRpkdaj_CVj8E6UQWgA7-en8xuhfaVtoBy9nXOHfJ_Fu=2qOw@mail.gmail.com>
+Message-ID: <20131127141853.GP16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 November 2013 09:00 AM, Sekhar Nori wrote:
-> On Wednesday 27 November 2013 07:01 PM, Ivan Khoronzhuk wrote:
->> As we switch to use the watchdog core which permits more than one
->> active watchdog in the system, rename platform driver to
->> "davinci-wdt" to be identifiable.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+On Wed, Nov 27, 2013 at 12:23:32AM +0100, Linus Walleij wrote:
+> On Tue, Nov 26, 2013 at 8:44 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
 > 
-> Looks good to me. Since bulk of this patch touches mach-davinci, I would
-> like to take this through my tree to avoid conflicts with other
-> mach-davinci patches I accept.
+> > There really is no excuse to turn on all 8 LEDs at boot time, such
+> > that on the Versatile PB/926 we end up with 6 LEDs on continuously
+> > and forever.  We're not a christmas decoration!
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-Sounds good. Thanks Sekhar !!
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Do you want me to queue this patch thru ARM SoC or are you
+> taking it through your tree?
 
-Regards,
-Santosh
+I don't mind.  If you want to queue it please use rmk+kernel in the
+author address, thanks.
