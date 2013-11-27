@@ -1,50 +1,41 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Wed, 27 Nov 2013 12:24:58 -0500
-Subject: [PATCH v3 9/9] ARM: dts: add usb udc support to bcm281xx
-In-Reply-To: <5295B3EF.8010602@ti.com>
-References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
- <1385403367-18144-10-git-send-email-matt.porter@linaro.org>
- <5295B3EF.8010602@ti.com>
-Message-ID: <20131127172458.GH31091@beef>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 27 Nov 2013 17:28:06 +0000
+Subject: [RFC PATCH] Documentation: devicetree: add description for generic
+ bus properties
+Message-ID: <20131127172806.GC2291@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 02:27:19PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
-> > Adds USB OTG/PHY and clock support to BCM281xx and enables
-> > UDC support on the bcm11351-brt and bcm28155-ap boards.
-> > 
-> > Signed-off-by: Matt Porter <matt.porter@linaro.org>
-> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/bcm11351-brt.dts |  6 ++++++
-> >  arch/arm/boot/dts/bcm11351.dtsi    | 18 ++++++++++++++++++
-> >  arch/arm/boot/dts/bcm28155-ap.dts  |  8 ++++++++
-> >  3 files changed, 32 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
-> > index 23cd16d..396b704 100644
-> > --- a/arch/arm/boot/dts/bcm11351-brt.dts
-> > +++ b/arch/arm/boot/dts/bcm11351-brt.dts
-> > @@ -44,5 +44,11 @@
-> >  		status = "okay";
-> >  	};
-> >  
-> > +	usbotg: usb at 3f120000 {
-> > +		status = "okay";
-> > +	};
-> 
-> using &usbotg could have been better. I mean if you have something like
-> &usbotg, you realise that the node has been created somewhere and we are just
-> referencing it here to add more properties.
+Hi all,
 
-That's normally my preference, but Christian owns this file and doesn't
-like that syntax. Instead, I'm conforming with the rest of the .dts
-entries. He and I discussed moving to &label references a while back and
-that's a no go.
+SoC architectures are getting increasingly complex in ways that are not
+transparent to software.
 
-Thanks,
-Matt
+A particular emerging issue is that of multi-master SoCs, which may have
+different address views, IOMMUs, and coherency behaviour from one master
+to the next.
+
+DT can't describe multi-master systems today except for PCI DMA and
+similar.  This comes with constraints and assumptions that won't work
+for emerging SoC bus architectures.  On-SoC, a device's interface to the
+system can't be described in terms of a single interface to a single
+"bus".
+
+Different masters may have different views of the system too.  Software
+needs to understand the true topology in order to do address mapping,
+coherency management etc., in any generic way.
+
+One piece of the puzzle is to define how to describe these topologies in
+DT.
+
+The other is how to get the right abstractions in the kernel to drive
+these systems in a generic way.
+
+The following proposal (originally from Will) begins to address the DT
+part.
+
+Comments encouraged -- I anticipate it may take some discussion to
+reach a consensus here.
+
+Cheers
+---Dave
