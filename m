@@ -1,55 +1,61 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 27 Nov 2013 14:08:29 +0100
-Subject: [PATCH] ARM: DT: imx6qdl: fix can clocks
-In-Reply-To: <1385558060-20314-1-git-send-email-list-09_linux_arm@tqsc.de>
-References: <1385558060-20314-1-git-send-email-list-09_linux_arm@tqsc.de>
-Message-ID: <1385557709.4272.1.camel@weser.hi.pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 27 Nov 2013 13:16:26 +0000
+Subject: [PATCH v4 4/5] regulator: max14577: Add regulator driver for
+ Maxim 14577
+In-Reply-To: <1385135469-27044-5-git-send-email-k.kozlowski@samsung.com>
+References: <1385135469-27044-1-git-send-email-k.kozlowski@samsung.com>
+ <1385135469-27044-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20131127131626.GH3296@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 27.11.2013, 14:14 +0100 schrieb Markus Niebel:
-> From: Markus Niebel <Markus.Niebel@tqs.de>
+> MAX14577 chip is a multi-function device which includes MUIC,
+> charger and voltage regulator. The driver is located in drivers/mfd.
 > 
-> per and ipg clock numbers are exchanged. This leads to
-> wrong bitrate calculation.
+> This patch adds regulator driver for MAX14577 chip. There are two
+> regulators in this chip:
+> 1. Safeout LDO with constant voltage output of 4.9V. It can be only
+>    enabled or disabled.
+> 2. Current regulator for the charger. It provides current from 90mA up
+>    to 950mA.
+> Driver supports Device Tree.
 > 
-NACK
-
-According to the clock driver clock numbers are IPG->PER.
-I think this is the same problem we encountered on i.MX5 and is fixed
-with commit "can: flexcan: use correct clock as base for bit rate
-calculation"
-
-> Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/imx6qdl.dtsi |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/mfd/max14577.c       |    3 +-
+>  drivers/regulator/Kconfig    |    7 ++
+>  drivers/regulator/Makefile   |    1 +
+>  drivers/regulator/max14577.c |  268 ++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 278 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/regulator/max14577.c
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 59154dc..797f007 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -329,7 +329,7 @@
->  				compatible = "fsl,imx6q-flexcan";
->  				reg = <0x02090000 0x4000>;
->  				interrupts = <0 110 0x04>;
-> -				clocks = <&clks 108>, <&clks 109>;
-> +				clocks = <&clks 109>, <&clks 108>;
->  				clock-names = "ipg", "per";
->  			};
+> diff --git a/drivers/mfd/max14577.c b/drivers/mfd/max14577.c
+> index 94b766d..d841f2a 100644
+> --- a/drivers/mfd/max14577.c
+> +++ b/drivers/mfd/max14577.c
+> @@ -26,7 +26,8 @@
 >  
-> @@ -337,7 +337,7 @@
->  				compatible = "fsl,imx6q-flexcan";
->  				reg = <0x02094000 0x4000>;
->  				interrupts = <0 111 0x04>;
-> -				clocks = <&clks 110>, <&clks 111>;
-> +				clocks = <&clks 111>, <&clks 110>;
->  				clock-names = "ipg", "per";
->  			};
->  
+>  static struct mfd_cell max14577_devs[] = {
+>  	{ .name = "max14577-muic", },
+> -	{ .name = "max14577-regulator", },
+> +	{ .name = "max14577-regulator",
+> +		.of_compatible = "maxim,max14577-regulator", },
+>  	{ .name = "max14577-charger", },
+>  };
+
+If you separate this patch out and make it look 'normal' i.e. sort out
+the indenting, I'll apply it. Instead of this randomness, I expect to
+see something like: 
+
+> +	 {
+> +	        .name = "max14577-regulator",
+> +	        .of_compatible = "maxim,max14577-regulator", 
+> +	 },
+
 
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
