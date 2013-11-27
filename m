@@ -1,128 +1,99 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 27 Nov 2013 14:26:02 +0000
-Subject: [PATCH 2/3] ARM64:DMI: Add smbios/dmi support on arm64
-In-Reply-To: <20131127142437.19264C404EC@trevor.secretlab.ca>
-References: <1385397866-7524-1-git-send-email-yi.li@linaro.org>
- <1385397866-7524-3-git-send-email-yi.li@linaro.org>
- <20131127142437.19264C404EC@trevor.secretlab.ca>
-Message-ID: <CACxGe6sQUsMOhZ7xBEoZiYhtiKMLwPXh_fBoA2JuTdEgDbT55g@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Nov 2013 15:34:41 +0100
+Subject: [PATCH] clocksource: armada-370-xp: Enable timer divider only
+ when needed
+In-Reply-To: <1385562701-18976-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1385562701-18976-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <52960301.8050202@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 2:24 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Tue, 26 Nov 2013 00:44:25 +0800, Yi Li <yi.li@linaro.org> wrote:
->> Add smbios/dmi support on arm64 system, it depends on
->> EFI boot.
->>
->> Signed-off-by: Yi Li <yi.li@linaro.org>
->> ---
->>
->> efi_lookup_mapped_addr() isn't able to translate the address range
->> which is reported as reserved type from UEFI. Following the UEFI
->> spec 2.4, it descripts the SMBIOS data should be runtime service
->> type. So it depends on a UEFI patch to convert reserved type to
->> runtime service type for SMBIOS and a linux dmi driver patch that
->> has been posted for review to x86 and ia64.
->>
->>  arch/arm64/Kconfig           |   10 ++++++++++
->>  arch/arm64/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
->>  arch/arm64/kernel/setup.c    |    2 ++
->>  3 files changed, 40 insertions(+)
->>  create mode 100644 arch/arm64/include/asm/dmi.h
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index d5aaddf..84204b0 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -292,6 +292,16 @@ config EFI_STUB
->>         by EFI firmware without the use of a bootloader.
->>         See Documentation/efi-stub.txt for more information.
->>
->> +config DMI
->> +     bool "Enable support for SMBIOS (DMI) tables"
->> +     depends on EFI
->> +     default y
->> +     help
->> +       This enables SMBIOS/DMI feature for systems.
->> +
->> +       This option is only useful on systems that have UEFI firmware.
->> +       However, even with this option, the resultant kernel should
->> +       continue to boot on existing non-UEFI platforms.
->>  endmenu
->>
->>  menu "Userspace binary formats"
->> diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
->> new file mode 100644
->> index 0000000..f6e6004
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/dmi.h
->> @@ -0,0 +1,28 @@
->> +/*
->> + * arch/arm64/include/asm/dmi.h
->> + *
->> + * Copyright (C) 2013 Linaro Limited.
->> + * Written by: Yi Li (yi.li at linaro.org)
->> + *
->> + * based on arch/ia64/include/asm/dmi.h
->> + *
->> + * This file is subject to the terms and conditions of the GNU General Public
->> + * License.  See the file "COPYING" in the main directory of this archive
->> + * for more details.
->> + */
->> +
->> +
->> +#ifndef _ASM_DMI_H
->> +#define _ASM_DMI_H 1
->> +
->> +#include <linux/slab.h>
->> +#include <asm/io.h>
->> +
->> +/* Use normal IO mappings for DMI */
->> +#define dmi_early_remap(x, l)        efi_lookup_mapped_addr(x)
->> +#define dmi_early_unmap(x, l)
->> +#define dmi_remap(x, l)                      efi_lookup_mapped_addr(x)
->> +#define dmi_unmap(x)
->> +#define dmi_alloc(l)                 kzalloc(l, GFP_ATOMIC)
->> +
->> +#endif
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 1aeaaf5..1480843 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -45,6 +45,7 @@
->>  #ifdef CONFIG_ACPI
->>  #include <linux/acpi.h>
->>  #endif
->> +#include <linux/dmi.h>
->>
->>  #include <asm/fixmap.h>
->>  #include <asm/cputype.h>
->
-> Nitpick: You dropped a blank line in this hunk. I suspect that was
-> unintentional, but it looks sloppy.
+Hi Ezequiel,
 
-Oops, nevermind. You haven't made a mistake here. My mailer did
-something silly and it looked like there was a '-' tag on the blank
-line.
+On 27/11/2013 15:31, Ezequiel Garcia wrote:
+> The current code sets the timer divider bits always. However, when
+> the 25 MHz timer is enabled, this is not needed and has no effect.
+> As this causes some confusion, rework the code so the divider is
+> set only when needed, i.e. when the 25 MHz timer is not in use.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-Sorry for the noise.
 
-g.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
->
-> Otherwise:
->
-> Acked-by: Grant Likely <grant.likely@linaro.org>
->
->> @@ -312,6 +313,7 @@ static int __init arm64_device_init(void)
->>  {
->>       of_clk_init(NULL);
->>       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->> +     dmi_scan_machine();
->>       return 0;
->>  }
->>  arch_initcall(arm64_device_init);
->> --
->> 1.7.9.5
->>
->
+
+Thanks,
+
+Gregory
+
+> ---
+>  drivers/clocksource/time-armada-370-xp.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+> index 4e7f680..ee8691b 100644
+> --- a/drivers/clocksource/time-armada-370-xp.c
+> +++ b/drivers/clocksource/time-armada-370-xp.c
+> @@ -76,6 +76,7 @@
+>  static void __iomem *timer_base, *local_base;
+>  static unsigned int timer_clk;
+>  static bool timer25Mhz = true;
+> +static u32 enable_mask;
+>  
+>  /*
+>   * Number of timer ticks per jiffy.
+> @@ -121,8 +122,7 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
+>  	/*
+>  	 * Enable the timer.
+>  	 */
+> -	local_timer_ctrl_clrset(TIMER0_RELOAD_EN,
+> -				TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT));
+> +	local_timer_ctrl_clrset(TIMER0_RELOAD_EN, enable_mask);
+>  	return 0;
+>  }
+>  
+> @@ -141,9 +141,7 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
+>  		/*
+>  		 * Enable timer.
+>  		 */
+> -		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN |
+> -					   TIMER0_EN |
+> -					   TIMER0_DIV(TIMER_DIVIDER_SHIFT));
+> +		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+>  	} else {
+>  		/*
+>  		 * Disable timer.
+> @@ -240,10 +238,13 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+>  	WARN_ON(!timer_base);
+>  	local_base = of_iomap(np, 1);
+>  
+> -	if (timer25Mhz)
+> +	if (timer25Mhz) {
+>  		set = TIMER0_25MHZ;		
+> -	else
+> +		enable_mask = TIMER0_EN;
+> +	} else {
+>  		clr = TIMER0_25MHZ;
+> +		enable_mask = TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT);
+> +	}
+>  	timer_ctrl_clrset(clr, set);
+>  	local_timer_ctrl_clrset(clr, set);
+>  
+> @@ -262,8 +263,7 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+>  	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
+>  	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
+>  
+> -	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
+> -			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
+> +	timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+>  
+>  	/*
+>  	 * Set scale and timer for sched_clock.
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
