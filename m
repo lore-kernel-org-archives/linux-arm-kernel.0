@@ -1,36 +1,36 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Nov 2013 02:18:32 +0100
-Subject: [PATCH 10/15] irda: sh_irda: Enable driver compilation with
+Date: Wed, 27 Nov 2013 02:18:34 +0100
+Subject: [PATCH 12/15] thermal: rcar-thermal: Enable driver compilation with
  COMPILE_TEST
 In-Reply-To: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1385515117-23664-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1385515117-23664-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This helps increasing build testing coverage.
 
-Cc: Samuel Ortiz <samuel@sortiz.org>
-Cc: netdev at vger.kernel.org
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: linux-pm at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Simon Horman <horms@verge.net.au>
 ---
- drivers/net/irda/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/thermal/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
-index 2a30193..cae5ee2 100644
---- a/drivers/net/irda/Kconfig
-+++ b/drivers/net/irda/Kconfig
-@@ -403,7 +403,8 @@ config MCS_FIR
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index f35a1f7..661cafc 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -121,7 +121,7 @@ config SPEAR_THERMAL
  
- config SH_IRDA
- 	tristate "SuperH IrDA driver"
--	depends on IRDA && ARCH_SHMOBILE
-+	depends on IRDA
+ config RCAR_THERMAL
+ 	tristate "Renesas R-Car thermal driver"
+-	depends on ARCH_SHMOBILE
 +	depends on ARCH_SHMOBILE || COMPILE_TEST
  	help
- 	  Say Y here if your want to enable SuperH IrDA devices.
- 
+ 	  Enable this to plug the R-Car thermal sensor driver into the Linux
+ 	  thermal framework.
 -- 
 1.8.3.2
