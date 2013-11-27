@@ -1,41 +1,28 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 27 Nov 2013 15:55:46 +0400
-Subject: [PATCH 2/2] ARM: dts: imx51-babbage: Define FEC reset pin
-In-Reply-To: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
-References: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1385553346-20642-2-git-send-email-shc_work@mail.ru>
+Date: Wed, 27 Nov 2013 15:55:45 +0400
+Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix chipselect level for
+ dataflash on spi0.1
+Message-ID: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx51-babbage.dts | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx51-babbage.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index ee0deb3..483178a 100644
+index bbe899f..ee0deb3 100644
 --- a/arch/arm/boot/dts/imx51-babbage.dts
 +++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -299,7 +299,10 @@
- 		};
- 
- 		pinctrl_fec: fecgrp {
--			fsl,pins = <MX51_FEC_PINGRP1>;
-+			fsl,pins = <
-+				MX51_FEC_PINGRP1
-+				MX51_PAD_EIM_A20__GPIO2_14 0x85 /* Reset */
-+			>;
- 		};
- 
- 		pinctrl_i2c2: i2c2grp {
-@@ -377,6 +380,8 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_fec>;
- 	phy-mode = "mii";
-+	phy-reset-gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
-+	phy-reset-duration = <1>;
+@@ -138,7 +138,7 @@
+ 	pinctrl-0 = <&pinctrl_ecspi1>;
+ 	fsl,spi-num-chipselects = <2>;
+ 	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>,
+-		   <&gpio4 25 GPIO_ACTIVE_HIGH>;
++		   <&gpio4 25 GPIO_ACTIVE_LOW>;
  	status = "okay";
- };
  
+ 	pmic: mc13892 at 0 {
 -- 
 1.8.3.2
