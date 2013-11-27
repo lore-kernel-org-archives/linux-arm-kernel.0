@@ -1,79 +1,74 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 27 Nov 2013 15:54:49 -0300
-Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
-In-Reply-To: <CAAYSxhqU9GZdaoTjoCAeyQ4h-KPVzU0BH0D1eLYJoFZ+s8tPgQ@mail.gmail.com>
-References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
- <20131126183559.GA18570@localhost>
- <CAAYSxhqU9GZdaoTjoCAeyQ4h-KPVzU0BH0D1eLYJoFZ+s8tPgQ@mail.gmail.com>
-Message-ID: <20131127185448.GA21422@localhost>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 27 Nov 2013 20:06:41 +0100
+Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <CAB5oZtDD_KV+QJPUiCxU3on_x5pFd=rZOK0fzYb+meojCJisiA@mail.gmail.com>
+References: <0E83723C55F66F43A6041464FE31119D40FC99@039-SN2MPN1-011.039d.mgd.msft.net>
+ <20131126072557.GA6113@S2101-09.ap.freescale.net>
+ <CAB5oZtDD_KV+QJPUiCxU3on_x5pFd=rZOK0fzYb+meojCJisiA@mail.gmail.com>
+Message-ID: <201311272006.41202.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 03:03:03PM -0800, Tim Kryger wrote:
-> On Tue, Nov 26, 2013 at 10:36 AM, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
-> 
-> > Since v3.13-rc1, this commit seems to have introduced some oddities on
-> > some of our boards. See this log snippet:
-> >
-> > Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-> > ????R?console [ttyS0] enabled
-> > console [ttyS0] enabled
-> > bootconsole [earlycon0] disabled
-> > bootconsole [earlycon0] disabled
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-> > d0012100.serial: ttyS1 at MMIO 0xd0012100 (irq = 18, base_baud = 15625000) is a 16550A
-> >
-> > This behavior appear in at least Armada 370 and Armada XP boxes.
-> >
-> > I confirm reverting this commit fixes the issue and things get back to normal.
-> > Here's the complete kernel log: sprunge.us/gMdL
-> >
-> > Ideas?
-> 
-> Hi Ezequiel,
-> 
-> An external device may be keeping the UART busy and preventing LCR
-> from being written.
-> 
-> What device is attached to ttyS1?
+Hey Harro,
 
-There's no device attached at ttyS1. I've just tested this in another
-box and it seems the same error is obtained on each unused port:
-
-[...]
-dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-d0012100.serial: ttyS1 at MMIO 0xd0012100 (irq = 18, base_baud = 15625000) is a 16550A
-dw-apb-uart d0012200.serial: Couldn't set LCR to 191
-dw-apb-uart d0012200.serial: Couldn't set LCR to 191
-dw-apb-uart d0012200.serial: Couldn't set LCR to 224
-dw-apb-uart d0012200.serial: Couldn't set LCR to 224
-d0012200.serial: ttyS2 at MMIO 0xd0012200 (irq = 31, base_baud = 15625000) is a 16550A
-dw-apb-uart d0012300.serial: Couldn't set LCR to 191
-dw-apb-uart d0012300.serial: Couldn't set LCR to 191
-dw-apb-uart d0012300.serial: Couldn't set LCR to 224
-dw-apb-uart d0012300.serial: Couldn't set LCR to 224
-d0012300.serial: ttyS3 at MMIO 0xd0012300 (irq = 32, base_baud = 15625000) is a 16550A
-
-In this board, I only have ttyS0 (console) connected.
-
-> Also, do you know the version of the Synopsys IP?
-> If built with ADDITIONAL_FEATURES=YES, the version can be read from
-> the hardware:
+> On 26 November 2013 08:26, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Tue, Nov 26, 2013 at 06:04:16AM +0000, Richard Zhu wrote:
+> >> [Richard] Based on the tag " pci-v3.13-fixes-1" on pci git-repos, imx6
+> >> pcie had been tested on imx6 sabresd board.
+> >> 
+> >> The pcie works after enable pcie support in imx6qdl-sabresd.dtsi file.
+> > 
+> > Great, thanks, Richard.
+> > 
+> > Shawn
 > 
-> # busybox devmem 0xd00121f8 32
+> Thanks Richard,
 > 
+> TC1: The following does NOT work with the mainline Linux tree on my
+> SabreSD with PCIe e1000e network card:
+> $ git reset --hard v3.13-rc1
+> $ git apply enable_pcie_on_imx6qdl_sabresd_board.patch # patch
+> supplied by Richard Zhu
+> result: "phy link never came up"
+> 
+> TC2: But the following does work with the mainline Linux tree:
+> $ git reset --hard d95d3d53c7ef85ec0dc87db63aece18212c337b0 # HEAD is
+> now at d95d3d5 Merge branch 'pci/host-imx6' into next (just a few
+> commits after v3.12-rc2)
+> $ git cherry-pick 1c4bfb9bd842f09318bc2fa37c1ee0d68bb4e8cb # [master
+> f283273] PCI: imx6: Remove redundant dev_err() in imx6_pcie_probe()
+> $ git cherry-pick 01ee0c70b5b935135dbe7fbf48115d9f16348474 # [master
+> 5c93c84] PCI: imx6: Fix imprecise abort handler
+> $ git cherry-pick 5dcb7c402409f4b1ecb279d5e846bdb1dff9bbe0 # [master
+> c3cc5c5] PCI: imx6: Increase link startup timeout
+> $ git cherry-pick 832f3ca20743911508e0cc1909415080a3128532 # [master
+> b4a81be] PCI: imx6: Remove redundant of_match_ptr
+> $ git cherry-pick ca6457dc1fbcc1f5ed1f8311e7fcf7ff129cda55 # [master
+> 45aa4ab] PCI: imx6: Probe the PCIe in fs_initcall()
+> $ git cherry-pick 212555bde33eeae0bec16d41bd4045fbebc0cfab # [master
+> 4db342b] ARM: dts: imx6qdl: add pcie device node
+> $ git cherry-pick 64990a431469a58b2949aca5be9d69e220d53892 # [master
+> 7c29353] ARM: imx6q: Add pll4_audio_div to clock tree
+> $ git cherry-pick bf22172158cd6dcc5be6dc286ff5c33794dd0ae8 # [master
+> 5e5852f] ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
+> $ git cherry-pick 74b8031307c5d33d36742c26dd0921991bd5a255 # [master
+> 05ae48c] ARM: imx6q: clock and Kconfig update for PCIe support
+> $ git apply enable_pcie_on_imx6qdl_sabresd_board.patch # patch
+> supplied by Richard Zhu
+> result: lspci detects network card
+> 
+> I have also tested both test cases (TC1 + TC2) with the patches
+> supplied by Marek Vasut on 26-11-2013:
+> $ git apply 17_pci_imx6_make_reset-gpio_optional.patch
+> $ git apply 37_pci_imx6_fix_waiting_for_link_up.patch
+> $ git apply 47_pci_imx6_split_away_the_phy_reset.patch
+> $ git apply 57_pci_imx6_split_away_the_link_up_wait_loop.patch
+> $ git apply 67_pci_imx6_fix_link_start_operation.patch
+> same results:
+> TC1: "phy link never came up"
+> TC2: lspci detects network card
 
-No, I don't know this IP version and ADDITIONAL_FEATURES seems not built.
+A quick remark: try not to top-post replies in the ML, it's frowned upon.
 
-Thanks for taking a look at this!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+btw. with my latest patches, do you see the link in Gen=1 or Gen=2 mode ? You 
+will see a line in dmesg, eventually you can try 'dmesg | grep Gen' to find it.
