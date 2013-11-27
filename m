@@ -1,85 +1,31 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Wed, 27 Nov 2013 14:49:54 +0530
-Subject: [PATCH 1/3] usb: dwc3: Add Keystone specific glue layer
-In-Reply-To: <1385410581-12148-2-git-send-email-w-kwok2@ti.com>
-References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
- <1385410581-12148-2-git-send-email-w-kwok2@ti.com>
-Message-ID: <5295B93A.3040400@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 27 Nov 2013 14:54:39 +0530
+Subject: [PATCH] ARM: davinci: clock: return 0 upon error from
+ clk_round_rate()
+In-Reply-To: <alpine.DEB.2.02.1311261653510.11450@tamien>
+References: <alpine.DEB.2.02.1311261653510.11450@tamien>
+Message-ID: <5295BA57.7000708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 1:46 AM, WingMan Kwok wrote:
-> Add Keystone platform specific glue layer to support
-> USB3 Host mode.
->
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> ---
->   drivers/usb/dwc3/Kconfig         |    7 +
->   drivers/usb/dwc3/Makefile        |    1 +
->   drivers/usb/dwc3/dwc3-keystone.c |  272 ++++++++++++++++++++++++++++++++++++++
->   3 files changed, 280 insertions(+)
->   create mode 100644 drivers/usb/dwc3/dwc3-keystone.c
+On Wednesday 27 November 2013 06:26 AM, Paul Walmsley wrote:
+> 
+> clk_round_rate() should return 0 now upon an error, rather than
+> returning a negative error code.  This is because clk_round_rate() is
+> being changed to return an unsigned return type rather than a signed
+> type, since some clock sources can generate rates higher than (2^31)-1 Hz.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Philip Avinash <avinashphilip@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
 
-<snip>
-> +	error = of_platform_populate(node, NULL, NULL, dev);
-> +	if (error) {
-> +		dev_err(&pdev->dev, "failed to create dwc3 core\n");
-> +		goto err_core;
-> +	}
-> +
-> +	return 0;
-> +
-> +err_core:
-> +	kdwc3_disable_irqs(kdwc);
-> +err_irq:
-> +	kdwc3_disable(kdwc);
-> +
-> +	return error;
-> +}
-> +
-> +static int kdwc3_remove(struct platform_device *pdev)
-> +{
-> +	struct dwc3_keystone *kdwc = platform_get_drvdata(pdev);
-> +
-> +	if (kdwc) {
-> +		kdwc3_disable_irqs(kdwc);
-> +		kdwc3_disable(kdwc);
-> +		platform_set_drvdata(pdev, NULL);
-> +	}
-> +	return 0;
-> +}
-> +
+I applied this to my v3.14/soc[1] branch. For some reason I could not
+apply the patch to v3.11-rc1 (patch command returns error). Nothing is
+obviously worng. Anyway, the change is minor so I made the change manually.
 
-You need to unregister the child nodes in remove.
-Also why can't the dwc3-omap driver be reused, Felipe??
-I believe the TI wrapper for Keystone is similar to that of AM437x or 
-OMAP5.
-> +static const struct of_device_id kdwc3_of_match[] = {
-> +	{ .compatible = "ti,keystone-dwc3", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, kdwc3_of_match);
-> +
-> +static struct platform_driver kdwc3_driver = {
-> +	.probe		= kdwc3_probe,
-> +	.remove		= kdwc3_remove,
-> +	.driver		= {
-> +		.name	= "keystone-dwc3",
-> +		.owner	        = THIS_MODULE,
-> +		.of_match_table	= kdwc3_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(kdwc3_driver);
-> +
-> +MODULE_ALIAS("platform:keystone-dwc3");
-> +MODULE_AUTHOR("WingMan Kwok <w-kwok2@ti.com>");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("DesignWare USB3 KEYSTONE Glue Layer");
+Thanks,
+Sekhar
 
-
--- 
--George
+[1]
+https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.14/soc
