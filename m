@@ -1,45 +1,43 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Wed, 27 Nov 2013 09:39:49 -0600
-Subject: [PATCH RESEND AGAIN] clk: clean up everything on debugfs error
-Message-ID: <52961245.4010504@linaro.org>
+From: balajitk@ti.com (Balaji T K)
+Date: Wed, 27 Nov 2013 21:34:31 +0530
+Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
+ wl12xx
+In-Reply-To: <528E4295.2040109@ti.com>
+References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
+ <1385041804-19115-2-git-send-email-balajitk@ti.com>
+ <20131121165823.GM10317@atomide.com> <528E4295.2040109@ti.com>
+Message-ID: <5296180F.7040104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Maybe the third time will be the charm. -Alex]
+On Thursday 21 November 2013 10:57 PM, Dan Murphy wrote:
+> On 11/21/2013 10:58 AM, Tony Lindgren wrote:
+>> * Balaji T K <balajitk@ti.com> [131121 05:51]:
+>>> pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
+>>> and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
+>>>
+>>> Fix the following error message:
+>>> pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
+>>> pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
+>
+> Why is the led pins moved then?
+Hi Dan,
 
-If CONFIG_COMMON_CLK_DEBUG is defined, clk_debug_create_one() is
-called to populate a debugfs directory with a few entries that are
-common for all clock types.
+I just moved 27 lines (wl12xx_pins, wl12xx_gpio) up, git diff generated smaller
+diff stat by moving 10 line of code (led_wkgpio_pins) further down :-)
 
-If an error happens after creating the first one debugfs_remove() is
-called on the clock's directory.  The problem with this is that no
-cleanup is done on the debugfs files already created in that
-directory, so the directory never actually gets removed.   This
-problem is silently ignored.
-
-Fix this by calling debugfs_remove_recursive() instead.  Reset the
-clk->dentry field to null afterward, to ensure it can't be mistaken
-as a valid pointer.
-
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- drivers/clk/clk.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2cf2ea6..77fcd06 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -272,7 +272,8 @@ static int clk_debug_create_one(struct clk *clk,
-struct dentry *pdentry)
- 	goto out;
-
- err_out:
--	debugfs_remove(clk->dentry);
-+	debugfs_remove_recursive(clk->dentry);
-+	clk->dentry = NULL;
- out:
- 	return ret;
- }
--- 
-1.7.9.5
+>
+>>> SDIO card is not detected after moving pin mux to omap4_pmx_core since
+>>> sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
+>> Cool, does this fix the issue with the WLAN not coming up after a warm reset
+>> on panda?
+>>
+>> Regards,
+>>
+>> Tony
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
