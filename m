@@ -1,119 +1,94 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 27 Nov 2013 10:59:18 +0900
-Subject: PCI: mvebu: return NULL instead of ERR_PTR(ret)
-In-Reply-To: <20131126180930.GC19852@obsidianresearch.com>
+From: josh@joshtriplett.org (Josh Triplett)
+Date: Tue, 26 Nov 2013 18:17:30 -0800
+Subject: [PATCH] linux/err.h: Provide an ERR_PTR_IO that returns an __iomem
+ pointer
+In-Reply-To: <000101ceeb14$480fee80$d82fcb80$%han@samsung.com>
 References: <001001ceb816$5d1aecc0$1750c640$%han@samsung.com>
  <20131125200256.GA7316@obsidianresearch.com>
  <001101ceea68$cb486220$61d92660$%han@samsung.com>
  <20131126180930.GC19852@obsidianresearch.com>
-Message-ID: <000101ceeb14$480fee80$d82fcb80$%han@samsung.com>
+ <000101ceeb14$480fee80$d82fcb80$%han@samsung.com>
+Message-ID: <20131127021730.GA14138@leaf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 27, 2013 3:10 AM, Jason Gunthorpe wrote:
-> On Tue, Nov 26, 2013 at 02:31:44PM +0900, Jingoo Han wrote:
-> > Previously, I sent the patch in order to fix sparse warning as below:
-> > How about this?
-> >
-> > static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-> > 			struct device_node *np, struct mvebu_pcie_port *port)
-> > {
-> > 	struct resource regs;
-> > 	int ret = 0;
-> >
-> > 	ret = of_address_to_resource(np, 0, &regs);
-> > 	if (ret)
-> > -		return ERR_PTR(ret);
-> > +		return (void __iomem *)ERR_PTR(ret);
+On Wed, Nov 27, 2013 at 10:59:18AM +0900, Jingoo Han wrote:
+> On Wednesday, November 27, 2013 3:10 AM, Jason Gunthorpe wrote:
+> > On Tue, Nov 26, 2013 at 02:31:44PM +0900, Jingoo Han wrote:
+> > > Previously, I sent the patch in order to fix sparse warning as below:
+> > > How about this?
+> > >
+> > > static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+> > > 			struct device_node *np, struct mvebu_pcie_port *port)
+> > > {
+> > > 	struct resource regs;
+> > > 	int ret = 0;
+> > >
+> > > 	ret = of_address_to_resource(np, 0, &regs);
+> > > 	if (ret)
+> > > -		return ERR_PTR(ret);
+> > > +		return (void __iomem *)ERR_PTR(ret);
+> > 
+> > You should probably ask the sparse folks for guidance 'git grep
+> > iomem.*ERR_PTR' returns nothing, so this isn't an established pattern.
+> > 
+> > It seems like sparse should know that ERR_PTR functions can work with
+> > any pointer no matter the type? IS_ERR_PTR will have the same problem
+> > with implicitly dropping the iomem tag.
 > 
-> You should probably ask the sparse folks for guidance 'git grep
-> iomem.*ERR_PTR' returns nothing, so this isn't an established pattern.
+> +cc Christopher Li, sparse mailing-list, Joe Perches, Dan Carpenter,
+>      Axel Lin, Julia Lawall,
 > 
-> It seems like sparse should know that ERR_PTR functions can work with
-> any pointer no matter the type? IS_ERR_PTR will have the same problem
-> with implicitly dropping the iomem tag.
+> Hi All,
+> 
+> I have some questions about handling sparse warning.
+> 
+> Currently, the following sparse warning happens
+> at Marvell Armada PCIe driver.
+> 
+> drivers/pci/host/pci-mvebu.c:743:31: warning: incorrect type in return expression (different address spaces)
+> drivers/pci/host/pci-mvebu.c:743:31:    expected void [noderef] <asn:2>*
+> drivers/pci/host/pci-mvebu.c:743:31:    got void *
+> 
+> mvebu_pcie_map_registers() returns ERR_PTR(ret),
+> however ERR_PTR() returns (void *), not (void __iomem *).
 
-+cc Christopher Li, sparse mailing-list, Joe Perches, Dan Carpenter,
-     Axel Lin, Julia Lawall,
+Given that PTR_ERR, IS_ERR, and IS_ERR_OR_NULL currently accept any kind
+of pointer (by using __force), it does make sense for ERR_PTR to return
+any kind of pointer.  There's no built-in way to do this, but we could
+add an ERR_PTR_iomem that has the appropriate return type.  Here's a
+possible patch; please test in your particular use case and see if it
+works for you.  (You can apply this patch from this mail via git am
+--scissors.)
 
-Hi All,
+---8<---
+From: Josh Triplett <josh@joshtriplett.org>
+Subject: [PATCH] linux/err.h: Provide an ERR_PTR_IO that returns an __iomem pointer
 
-I have some questions about handling sparse warning.
+PTR_ERR, IS_ERR, and IS_ERR_OR_NULL already accept any type of pointer
+by using __force; ERR_PTR should similarly be able to return any type of
+pointer.  Provide an ERR_PTR_IO to return an error pointer in __iomem.
 
-Currently, the following sparse warning happens
-at Marvell Armada PCIe driver.
+Signed-off-by: Josh Triplett <josh@joshtriplett.org>
+---
+ include/linux/err.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-drivers/pci/host/pci-mvebu.c:743:31: warning: incorrect type in return expression (different address spaces)
-drivers/pci/host/pci-mvebu.c:743:31:    expected void [noderef] <asn:2>*
-drivers/pci/host/pci-mvebu.c:743:31:    got void *
-
-mvebu_pcie_map_registers() returns ERR_PTR(ret),
-however ERR_PTR() returns (void *), not (void __iomem *).
-
-./drivers/pci/host/pci-mvebu.c
-static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-		struct device_node *np, struct mvebu_pcie_port *port)
-{
-	struct resource regs;
-	int ret = 0;
-
-	ret = of_address_to_resource(np, 0, &regs);
-	if (ret)
-		return ERR_PTR(ret);
-
-	return devm_ioremap_resource(&pdev->dev, &regs);
-}
-./include/linux/err.h
-static inline void * __must_check ERR_PTR(long error)
-{
-	return (void *) error;
-}
-
-
-Previously, I submitted the following patch, that adds
-(void __iomem *) cast.
-
-./drivers/pci/host/pci-mvebu.c
-static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-		struct device_node *np, struct mvebu_pcie_port *port)
-{
-	.....
-
-	ret = of_address_to_resource(np, 0, &regs);
-	if (ret)
--		return ERR_PTR(ret);
-+		return (void __iomem *)ERR_PTR(ret);
-
-However, other engineers said that "(void __iomem *)ERR_PTR(ret)"
-is not a general pattern. I cannot find the proper method to resolve
-this sparse warning.
-
-In this case, how can I resolve this sparse warning?
-
-Then, how about the following?
-
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -740,7 +740,7 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-
-	ret = of_address_to_resource(np, 0, &regs);
-	if (ret)
--		return ERR_PTR(ret);
-+		return NULL;
-
-	return devm_ioremap_resource(&pdev->dev, &regs);
+diff --git a/include/linux/err.h b/include/linux/err.h
+index 15f92e0..d64215b 100644
+--- a/include/linux/err.h
++++ b/include/linux/err.h
+@@ -24,6 +24,11 @@ static inline void * __must_check ERR_PTR(long error)
+ 	return (void *) error;
  }
-@@ -939,7 +939,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-		continue;
-
-		port->base = mvebu_pcie_map_registers(pdev, child, port);
--		if (IS_ERR(port->base)) {
-+		if (IS_ERR_OR_NULL(port->base)) {
-			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
-				port->port, port->lane);
-			port->base = NULL;
-
-Thank you for reading this. :-)
-
-Best regards,
-Jingoo Han
+ 
++static inline __iomem void * __must_check ERR_PTR_IO(long error)
++{
++	return (__force __iomem void *) error;
++}
++
+ static inline long __must_check PTR_ERR(__force const void *ptr)
+ {
+ 	return (long) ptr;
+-- 
+1.8.4.4
