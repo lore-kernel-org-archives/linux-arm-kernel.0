@@ -1,32 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Nov 2013 10:13:00 -0700
-Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
-In-Reply-To: <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
-References: <cover.1385508112.git.stefan@agner.ch>
- <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
-Message-ID: <5296281C.1060403@wwwdotorg.org>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Wed, 27 Nov 2013 12:13:25 -0500
+Subject: [PATCH v3 5/9] usb: gadget: s3c-hsotg: use generic
+ phy_init()/phy_exit() support
+In-Reply-To: <529476A4.8080600@ti.com>
+References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
+ <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
+ <529476A4.8080600@ti.com>
+Message-ID: <20131127171325.GD31091@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 04:45 PM, Stefan Agner wrote:
-> Set the requested SM2 voltage to the correct value of 1.8V. The value
-> before used to work on TPS658623 since the driver applied a wrong
-> voltage table too. However, the TPS658643 used on newer devices uses
-> yet another voltage table and those broke that compatibility. The
-> regulator driver now has the correct voltage table for both regulator
-> versions and those the correct voltage can be used in this device
-> tree.
+On Tue, Nov 26, 2013 at 03:53:32PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
+> > If a generic phy is present, call phy_init()/phy_exit(). This supports
+> > generic phys that must be soft reset before power on.
+> > 
+> > Signed-off-by: Matt Porter <matt.porter@linaro.org>
+> > ---
+> >  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+> > index da3879b..8dfe33f 100644
+> > --- a/drivers/usb/gadget/s3c-hsotg.c
+> > +++ b/drivers/usb/gadget/s3c-hsotg.c
+> > @@ -3622,6 +3622,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+> >  		goto err_supplies;
+> >  	}
+> >  
+> > +	if (hsotg->phy)
+> 
+> IS_ERR? If your phy_get fails *phy* will have a error value..
 
-One thing you haven't called out explicitly here is that this series is
-an incompatible change to the DT, since the old buggy driver used to
-allow old buggy DT content to accidentally work.
+Yes, thanks. I'll fix these and also note that the same issue exists in
+Kamil's patch for these same hsotg->phy conditional uses. I'll work with
+Kamil to either get those addressed there or in a follow on fix.
 
-I'm not too familiar with who's using mainline on the Colibri boards.
-Hopefully everyone doing that is using in-kernel DTs, so this
-incompatible change won't be any issue for anyone.
+> 
+> > +		phy_init(hsotg->phy);
+> > +
+> >  	/* usb phy enable */
+> >  	s3c_hsotg_phy_enable(hsotg);
+> >  
+> > @@ -3715,6 +3718,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
+> >  	}
+> >  
+> >  	s3c_hsotg_phy_disable(hsotg);
+> > +	if (hsotg->phy)
+> 
+> same here.
 
-This patch needs to be rolled into patch 2/3 so that "git bisect" isn't
-broken.
+Ok.
 
-You mention there's yet another PMIC version used on later boards. Do we
-need a new DT for that specfic version of the Colibri board?
+> 
+> Thanks
+> Kishon
