@@ -1,89 +1,41 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 27 Nov 2013 14:48:28 +0200
-Subject: [PATCH v4 5/5] watchdog: davinci: reuse driver for keystone arch
-In-Reply-To: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1385556508-3935-6-git-send-email-ivan.khoronzhuk@ti.com>
+From: list-09_linux_arm@tqsc.de (Markus Niebel)
+Date: Wed, 27 Nov 2013 14:14:20 +0100
+Subject: [PATCH] ARM: DT: imx6qdl: fix can clocks
+Message-ID: <1385558060-20314-1-git-send-email-list-09_linux_arm@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keystone arch uses the same IP watchdog, so add "ti,keystone-wdt"
-compatible and correct identity.
+From: Markus Niebel <Markus.Niebel@tqs.de>
 
-The Keystone arch is using clocks in DT and source clock for watchdog
-has to be specified, so add this to binding.
+per and ipg clock numbers are exchanged. This leads to
+wrong bitrate calculation.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
 ---
- .../devicetree/bindings/watchdog/davinci-wdt.txt   |   12 ++++++++++--
- drivers/watchdog/Kconfig                           |    4 ++--
- drivers/watchdog/davinci_wdt.c                     |    2 +-
- 3 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-index e450134..e60b9a1 100644
---- a/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/davinci-wdt.txt
-@@ -1,11 +1,18 @@
--DaVinci Watchdog Timer (WDT) Controller
-+Texas Instruments DaVinci/Keystone Watchdog Timer (WDT) Controller
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 59154dc..797f007 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -329,7 +329,7 @@
+ 				compatible = "fsl,imx6q-flexcan";
+ 				reg = <0x02090000 0x4000>;
+ 				interrupts = <0 110 0x04>;
+-				clocks = <&clks 108>, <&clks 109>;
++				clocks = <&clks 109>, <&clks 108>;
+ 				clock-names = "ipg", "per";
+ 			};
  
- Required properties:
--- compatible : Should be "ti,davinci-wdt"
-+- compatible : Should be "ti,davinci-wdt", "ti,keystone-wdt"
- - reg : Should contain WDT registers location and length
+@@ -337,7 +337,7 @@
+ 				compatible = "fsl,imx6q-flexcan";
+ 				reg = <0x02094000 0x4000>;
+ 				interrupts = <0 111 0x04>;
+-				clocks = <&clks 110>, <&clks 111>;
++				clocks = <&clks 111>, <&clks 110>;
+ 				clock-names = "ipg", "per";
+ 			};
  
- Optional properties:
- - timeout-sec : Contains the watchdog timeout in seconds
-+- clocks : the clock feeding the watchdog timer.
-+	   Needed if platform uses clocks.
-+	   See clock-bindings.txt
-+
-+Documentation:
-+Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
-+Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
- 
- Examples:
- 
-@@ -13,4 +20,5 @@ wdt: wdt at 2320000 {
- 	compatible = "ti,davinci-wdt";
- 	reg = <0x02320000 0x80>;
- 	timeout-sec = <30>;
-+	clocks = <&clkwdtimer0>;
- };
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index eb8c89d..01f3f81 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -270,12 +270,12 @@ config IOP_WATCHDOG
- 
- config DAVINCI_WATCHDOG
- 	tristate "DaVinci watchdog"
--	depends on ARCH_DAVINCI
-+	depends on ARCH_DAVINCI || ARCH_KEYSTONE
- 	select WATCHDOG_CORE
- 	select WATCHDOG_NOWAYOUT
- 	help
- 	  Say Y here if to include support for the watchdog timer
--	  in the DaVinci DM644x/DM646x processors.
-+	  in the DaVinci DM644x/DM646x or Keystone processors.
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called davinci_wdt.
- 
-diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-index 0eb2189..884f696 100644
---- a/drivers/watchdog/davinci_wdt.c
-+++ b/drivers/watchdog/davinci_wdt.c
-@@ -143,7 +143,7 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
- 
- static const struct watchdog_info davinci_wdt_info = {
- 	.options = WDIOF_KEEPALIVEPING,
--	.identity = "DaVinci Watchdog",
-+	.identity = "DaVinci/Keystone Watchdog",
- };
- 
- static const struct watchdog_ops davinci_wdt_ops = {
 -- 
 1.7.9.5
