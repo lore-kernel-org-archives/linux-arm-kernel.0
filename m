@@ -1,161 +1,86 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 27 Nov 2013 13:44:45 +0100
-Subject: [PATCH v2 2/2] clk: add accuracy support for fixed clock
-In-Reply-To: <1385556285-19180-1-git-send-email-b.brezillon@overkiz.com>
-References: <1385556285-19180-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1385556285-19180-3-git-send-email-b.brezillon@overkiz.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 27 Nov 2013 14:48:23 +0200
+Subject: [PATCH v4 0/5] Update Davinci watchdog driver
+Message-ID: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for accuracy retrieval on fixed clocks.
-It also adds a new dt property called 'clock-accuracy' to define the clock
-accuracy.
+These patches are intended to update Davinci watchdog to use WDT core
+and reuse driver for keystone arch, because Keystone uses the similar
+IP like Davinci.
 
-This can be usefull for oscillator (RC, crystal, ...) definitions which are
-always given an accuracy characteristic.
+See Documentation:
+Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
+Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- .../devicetree/bindings/clock/fixed-clock.txt      |    3 ++
- drivers/clk/clk-fixed-rate.c                       |   43 +++++++++++++++++---
- include/linux/clk-provider.h                       |    4 ++
- 3 files changed, 44 insertions(+), 6 deletions(-)
+Also:
+ - improved to support GET_TIMELEFT option.
+ - added "clocks" and "timeout-sec" properties to DT.
 
-diff --git a/Documentation/devicetree/bindings/clock/fixed-clock.txt b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-index 0b1fe78..48ea0ad 100644
---- a/Documentation/devicetree/bindings/clock/fixed-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-@@ -10,6 +10,8 @@ Required properties:
- - clock-frequency : frequency of clock in Hz. Should be a single cell.
- 
- Optional properties:
-+- clock-accuracy : accuracy of clock in ppb (parts per billion).
-+		   Should be a single cell.
- - gpios : From common gpio binding; gpio connection to clock enable pin.
- - clock-output-names : From common clock binding.
- 
-@@ -18,4 +20,5 @@ Example:
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <1000000000>;
-+		clock-accuracy = <100>;
- 	};
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index 1ed591a..0fc56ab 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -34,22 +34,31 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
- 	return to_clk_fixed_rate(hw)->fixed_rate;
- }
- 
-+static unsigned long clk_fixed_rate_recalc_accuracy(struct clk_hw *hw,
-+		unsigned long parent_accuracy)
-+{
-+	return to_clk_fixed_rate(hw)->fixed_accuracy;
-+}
-+
- const struct clk_ops clk_fixed_rate_ops = {
- 	.recalc_rate = clk_fixed_rate_recalc_rate,
-+	.recalc_accuracy = clk_fixed_rate_recalc_accuracy,
- };
- EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
- 
- /**
-- * clk_register_fixed_rate - register fixed-rate clock with the clock framework
-+ * clk_register_fixed_rate_with_accuracy - register fixed-rate clock with the
-+ *					   clock framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of clock's parent
-  * @flags: framework-specific flags
-  * @fixed_rate: non-adjustable clock rate
-+ * @fixed_accuracy: non-adjustable clock rate
-  */
--struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
--		const char *parent_name, unsigned long flags,
--		unsigned long fixed_rate)
-+struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy)
- {
- 	struct clk_fixed_rate *fixed;
- 	struct clk *clk;
-@@ -70,16 +79,33 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 
- 	/* struct clk_fixed_rate assignments */
- 	fixed->fixed_rate = fixed_rate;
-+	fixed->fixed_accuracy = fixed_accuracy;
- 	fixed->hw.init = &init;
- 
- 	/* register the clock */
- 	clk = clk_register(dev, &fixed->hw);
--
- 	if (IS_ERR(clk))
- 		kfree(fixed);
- 
- 	return clk;
- }
-+EXPORT_SYMBOL_GPL(clk_register_fixed_rate_with_accuracy);
-+
-+/**
-+ * clk_register_fixed_rate - register fixed-rate clock with the clock framework
-+ * @dev: device that is registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @flags: framework-specific flags
-+ * @fixed_rate: non-adjustable clock rate
-+ */
-+struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate)
-+{
-+	return clk_register_fixed_rate_with_accuracy(dev, name, parent_name,
-+						     flags, fixed_rate, 0);
-+}
- EXPORT_SYMBOL_GPL(clk_register_fixed_rate);
- 
- #ifdef CONFIG_OF
-@@ -91,13 +117,18 @@ void of_fixed_clk_setup(struct device_node *node)
- 	struct clk *clk;
- 	const char *clk_name = node->name;
- 	u32 rate;
-+	u32 accuracy = 0;
- 
- 	if (of_property_read_u32(node, "clock-frequency", &rate))
- 		return;
- 
-+	of_property_read_u32(node, "clock-accuracy", &accuracy);
-+
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
--	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
-+	clk = clk_register_fixed_rate_with_accuracy(NULL, clk_name, NULL,
-+						    CLK_IS_ROOT, rate,
-+						    accuracy);
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- }
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 16d182c..5429f5d 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -204,6 +204,7 @@ struct clk_hw {
- struct clk_fixed_rate {
- 	struct		clk_hw hw;
- 	unsigned long	fixed_rate;
-+	unsigned long	fixed_accuracy;
- 	u8		flags;
- };
- 
-@@ -211,6 +212,9 @@ extern const struct clk_ops clk_fixed_rate_ops;
- struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate);
-+struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy);
- 
- void of_fixed_clk_setup(struct device_node *np);
- 
+Based on
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+keystone/master
+
+v3..v4:
+- watchdog: davinci: change driver to use WDT core
+	reverted rename of platform driver to "davinci-wdt"
+	as it causes a regression on Davinci platforms.
+
+- arm: dts: keystone: add watchdog entry
+	The patch will be sent separately after series is ready.
+
+v2..v3:
+- watchdog: davinci: change driver to use WDT core
+	removed "ti,keystone-wdt" compatible from driver
+	renamed wdt device names for mach-davinci from
+		"watchdog" to "davinci-wdt"
+
+- watchdog: davinci: reuse driver for keystone arch
+	moved "clocks" property under "Optional properties"
+	improved description of "clocks" property
+
+- arm: dts: keystone: add watchdog entry
+	replaced "ti,keystone-wdt" compatible on
+		 "ti,keystone-wdt","ti,davinci-wdt"
+
+v1..v2:
+- watchdog: davinci: change driver to use WDT core
+	corrected 2011 -> 2006-2013
+	removed useless function comment
+	corrected initialization of heartbeat
+	switched on CONFIG_WATCHDOG_NOWAYOUT option
+
+- watchdog: davinci: use davinci_wdt_device structure to hold device data
+	substituted wdd to watchdog device in commit message
+
+- watchdog: davinci: add GET_TIMELEFT option support
+	corrected comment (is -> has)
+	removed redundant error message "clock freq is not set"
+
+- watchdog: davinci: add GET_STATUS option support
+	dropped
+
+- watchdog: davinci: add "timeout-sec" property
+	use consistent formatting
+
+- watchdog: davinci: reuse driver for keystone arch
+	use consistent formatting
+
+- watchdog: davinci: add "clocks" property
+	merged with above patch
+
+Ivan Khoronzhuk (5):
+  watchdog: davinci: change driver to use WDT core
+  watchdog: davinci: use davinci_wdt_device structure to hold device
+    data
+  watchdog: davinci: add GET_TIMELEFT option support
+  watchdog: davinci: add "timeout-sec" property
+  watchdog: davinci: reuse driver for keystone arch
+
+ .../devicetree/bindings/watchdog/davinci-wdt.txt   |   16 +-
+ drivers/watchdog/Kconfig                           |    6 +-
+ drivers/watchdog/davinci_wdt.c                     |  221 +++++++++-----------
+ 3 files changed, 114 insertions(+), 129 deletions(-)
+
 -- 
 1.7.9.5
