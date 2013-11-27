@@ -1,121 +1,118 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 27 Nov 2013 14:11:49 -0600
-Subject: [PATCH 00/13] mfd: menelaus: a few cleanups
-In-Reply-To: <20131127200247.GH24645@blackmetal.musicnaut.iki.fi>
-References: <1385579217-20127-1-git-send-email-balbi@ti.com>
- <20131127200247.GH24645@blackmetal.musicnaut.iki.fi>
-Message-ID: <20131127201149.GB20734@saruman.home>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Wed, 27 Nov 2013 12:16:23 -0800
+Subject: [PATCH v4 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
+Message-ID: <1385583384-28870-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In some use cases Zynq's FPGA clocks are used as static clock
+generators for IP in the FPGA part of the SOC for which no Linux driver
+exists and would control those clocks. To avoid automatic
+gating of these clocks in such cases a new property - fclk-enable - is
+added to the clock controller's DT description to accomodate such use
+cases. It's value is a bitmask, where a set bit results in enabling
+the corresponding FCLK through the clkc.
 
-On Wed, Nov 27, 2013 at 10:02:47PM +0200, Aaro Koskinen wrote:
-> On Wed, Nov 27, 2013 at 01:06:44PM -0600, Felipe Balbi wrote:
-> > few cleanups on the old menelaus driver. I don't have
-> > HW to test these patches, maybe Aaro can help here ?
-> 
-> Hmm, I got:
-> 
-> [    1.330000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> [    1.340000] pgd = c0004000
-> [    1.340000] [00000000] *pgd=00000000
-> [    1.350000] Internal error: Oops: 17 [#1] ARM
-> [    1.350000] CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc1-n8x0_tiny-los.git-729021f-00018-g74a0f39 #2
-> [    1.350000] task: c782c000 ti: c782e000 task.ti: c782e000
-> [    1.350000] PC is at mutex_lock+0x0/0x20
-> [    1.350000] LR is at __irq_get_desc_lock+0x6c/0x88
-> [    1.350000] pc : [<c016745c>]    lr : [<c00509ac>]    psr: a0000013
-> [    1.350000] sp : c782fe10  ip : fffffffa  fp : 00000000
-> [    1.350000] r10: c01e0268  r9 : 00000000  r8 : c7903e20
-> [    1.350000] r7 : 00000001  r6 : c782fe2c  r5 : 00000000  r4 : c7147080
-> [    1.350000] r3 : c013eab0  r2 : 00000000  r1 : 000000f2  r0 : 00000000
-> [    1.350000] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> [    1.350000] Control: 00c5387d  Table: 8704c000  DAC: 00000017
-> [    1.350000] Process swapper (pid: 1, stack limit = 0xc782e1b8)
-> [    1.350000] Stack: (0xc782fe10 to 0xc7830000)
-> [    1.350000] fe00:                                     00000000 000000f2 c0053034 00000000
-> [    1.350000] fe20: 00000000 c0053518 c016b798 00000000 000000f2 c711ea10 00000102 c7903e00
-> [    1.350000] fe20: 00000000 c0053518 c016b798 00000000 000000f2 c711ea10 00000102 c7903e00
-> [    1.350000] fe40: c7903e20 c013ec80 c016b798 c711ea10 c7903e20 c013ebc4 c7903e00 00000000
-> [    1.350000] fe60: c046ae74 00000000 00000015 c0140ab8 c7903e20 c0498b10 c0498b18 c0131194
-> [    1.350000] fe80: c7903e20 c046ae74 c7903e54 00000000 c01da8fc c0131338 00000000 c046ae74
-> [    1.350000] fea0: c01312ac c012fa00 c784e64c c78e7f90 c046ae74 c70b6420 c046b1e0 c01301a8
-> [    1.350000] fec0: c01b1130 c00ce2fc c046ae74 c046ae74 c01dce14 c01e24d0 c01c6484 c01316cc
-> [    1.350000] fee0: c046b1e0 c046ae50 c01dce14 c0141bc8 c782e000 00000006 c01dce14 c01c6ad0
-> [    1.350000] ff00: c04907e4 c784d3c0 c016b7a8 0000006f 00000000 00000000 00000000 c00c488c
-> [    1.350000] ff20: c05998c0 c0170258 00000015 c003ff84 c0466030 00000000 c01b1204 c01b4358
-> [    1.350000] ff40: 00000006 00000006 00000000 00000006 00000006 c01dce14 c01e24d0 c01c6484
-> [    1.350000] ff60: c01dce20 c046c460 00000015 c01c6c70 00000006 00000006 c01c6484 ffffffff
-> [    1.350000] ff80: ffffffff ffffffff 00000000 c01634e0 00000000 00000000 00000000 00000000
-> [    1.350000] ffa0: 00000000 c01634e8 00000000 c000e0f8 00000000 00000000 00000000 00000000
-> [    1.350000] ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> [    1.350000] ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 ffffffff ffffffff
-> [    1.350000] [<c016745c>] (mutex_lock+0x0/0x20) from [<c00509ac>] (__irq_get_desc_lock+0x6c/0x88)
-> [    1.350000] [<c00509ac>] (__irq_get_desc_lock+0x6c/0x88) from [<c0053518>] (__irq_set_handler+0x24/0x128)
-> [    1.350000] [<c0053518>] (__irq_set_handler+0x24/0x128) from [<c013ec80>] (menelaus_probe+0xbc/0x280)
-> [    1.350000] [<c013ec80>] (menelaus_probe+0xbc/0x280) from [<c0140ab8>] (i2c_device_probe+0x98/0xc0)
-> [    1.350000] [<c0140ab8>] (i2c_device_probe+0x98/0xc0) from [<c0131194>] (driver_probe_device+0x110/0x228)
-> [    1.350000] [<c0131194>] (driver_probe_device+0x110/0x228) from [<c0131338>] (__driver_attach+0x8c/0x90)
-> [    1.350000] [<c0131338>] (__driver_attach+0x8c/0x90) from [<c012fa00>] (bus_for_each_dev+0x54/0x88)
-> [    1.350000] [<c012fa00>] (bus_for_each_dev+0x54/0x88) from [<c01301a8>] (bus_add_driver+0xd4/0x1c8)
-> [    1.350000] [<c01301a8>] (bus_add_driver+0xd4/0x1c8) from [<c01316cc>] (driver_register+0x78/0xf4)
-> [    1.350000] [<c01316cc>] (driver_register+0x78/0xf4) from [<c0141bc8>] (i2c_register_driver+0x2c/0xb8)
-> [    1.350000] [<c0141bc8>] (i2c_register_driver+0x2c/0xb8) from [<c01c6ad0>] (do_one_initcall+0x94/0x150)
-> [    1.350000] [<c01c6ad0>] (do_one_initcall+0x94/0x150) from [<c01c6c70>] (kernel_init_freeable+0xe4/0x1b0)
-> [    1.350000] [<c01c6c70>] (kernel_init_freeable+0xe4/0x1b0) from [<c01634e8>] (kernel_init+0x8/0x110)
-> [    1.350000] [<c01634e8>] (kernel_init+0x8/0x110) from [<c000e0f8>] (ret_from_fork+0x14/0x3c)
-> [    1.350000] Code: 03a03000 05843000 e28dd010 e8bd81f0 (e1902f9f)
-> [    1.360000] ---[ end trace 75cc9e337407e765 ]---
-> [    1.360000] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+FPGA clocks are handled following the rules below:
 
-hmm, irq_set_chip_and_handler() will call back into the irq_chip we just
-registered, so my ->irq_bus_lock needs to have everything setup
-(chip_data my mutex), this should solve it:
+If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
+Linux. Drivers can enable and control it through the CCF as usual.
 
-diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-index 376f01d..c9bd2fb 100644
---- a/drivers/mfd/menelaus.c
-+++ b/drivers/mfd/menelaus.c
-@@ -1232,6 +1232,7 @@ static int menelaus_probe(struct i2c_client *client,
- 
- 	the_menelaus = m;
- 	m->client = client;
-+	mutex_init(&m->lock);
- 
- 	irq_base = irq_alloc_descs(-1, 0, MENELAUS_NR_IRQS, 0);
- 	if (irq_base < 0) {
-@@ -1245,10 +1246,10 @@ static int menelaus_probe(struct i2c_client *client,
- 	m->irq_base = irq_base;
- 
- 	for (i = irq_base; i < irq_base + MENELAUS_NR_IRQS; i++) {
-+		irq_set_chip_data(i, m);
- 		irq_set_chip_and_handler(i, &menelaus_irq_chip,
- 				handle_simple_irq);
- 		irq_set_nested_thread(i, 1);
--		irq_set_chip_data(i, m);
- 		set_irq_flags(i, IRQF_VALID);
- 	}
- 
-@@ -1280,8 +1281,6 @@ static int menelaus_probe(struct i2c_client *client,
- 		}
- 	}
- 
--	mutex_init(&m->lock);
--
- 	pr_info("Menelaus rev %d.%d\n", rev >> 4, rev & 0x0f);
- 
- 	val = menelaus_read_reg(m, MENELAUS_VCORE_CTRL1);
+If an FCLK is enabled by bootloaders AND the corresponding bit in the
+'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
+resulting in an off by one reference count for that clock. Ensuring it
+will always be running.
 
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Acked-by: Michal Simek <michal.simek@xilinx.com>
+---
+v4:
+ - replace bitwise with logical AND
+v3:
+ - documentation stated the default for fclk-enable is 0xf. This changed
+   in v2 => remove that note
+v2:
+ - change default value for fclk-enable to '0'
+---
+ Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
+ drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
+ 2 files changed, 19 insertions(+), 3 deletions(-)
 
-let me know when you can, and I'll meld these hunks to proper patch.
-
+diff --git a/Documentation/devicetree/bindings/clock/zynq-7000.txt b/Documentation/devicetree/bindings/clock/zynq-7000.txt
+index d99af878f5d7..17b4a94916d6 100644
+--- a/Documentation/devicetree/bindings/clock/zynq-7000.txt
++++ b/Documentation/devicetree/bindings/clock/zynq-7000.txt
+@@ -22,6 +22,10 @@ Required properties:
+ Optional properties:
+  - clocks : as described in the clock bindings
+  - clock-names : as described in the clock bindings
++ - fclk-enable : Bit mask to enable FCLKs statically at boot time.
++		 Bit [0..3] correspond to FCLK0..FCLK3. The corresponding
++		 FCLK will only be enabled if it is actually running at
++		 boot time.
+ 
+ Clock inputs:
+ The following strings are optional parameters to the 'clock-names' property in
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index 10772aa72e4e..09dd0173ea0a 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -102,9 +102,10 @@ static const char *swdt_ext_clk_input_names[] __initdata = {"swdt_ext_clk"};
+ 
+ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+ 		const char *clk_name, void __iomem *fclk_ctrl_reg,
+-		const char **parents)
++		const char **parents, int enable)
+ {
+ 	struct clk *clk;
++	u32 enable_reg;
+ 	char *mux_name;
+ 	char *div0_name;
+ 	char *div1_name;
+@@ -147,6 +148,12 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+ 	clks[fclk] = clk_register_gate(NULL, clk_name,
+ 			div1_name, CLK_SET_RATE_PARENT, fclk_gate_reg,
+ 			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
++	enable_reg = readl(fclk_gate_reg) & 1;
++	if (enable && !enable_reg) {
++		if (clk_prepare_enable(clks[fclk]))
++			pr_warn("%s: FCLK%u enable failed\n", __func__,
++					fclk - fclk0);
++	}
+ 	kfree(mux_name);
+ 	kfree(div0_name);
+ 	kfree(div1_name);
+@@ -213,6 +220,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	int ret;
+ 	struct clk *clk;
+ 	char *clk_name;
++	unsigned int fclk_enable = 0;
+ 	const char *clk_output_name[clk_max];
+ 	const char *cpu_parents[4];
+ 	const char *periph_parents[4];
+@@ -238,6 +246,8 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	periph_parents[2] = clk_output_name[armpll];
+ 	periph_parents[3] = clk_output_name[ddrpll];
+ 
++	of_property_read_u32(np, "fclk-enable", &fclk_enable);
++
+ 	/* ps_clk */
+ 	ret = of_property_read_u32(np, "ps-clk-frequency", &tmp);
+ 	if (ret) {
+@@ -340,10 +350,12 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	clk_prepare_enable(clks[dci]);
+ 
+ 	/* Peripheral clocks */
+-	for (i = fclk0; i <= fclk3; i++)
++	for (i = fclk0; i <= fclk3; i++) {
++		int enable = !!(fclk_enable & BIT(i - fclk0));
+ 		zynq_clk_register_fclk(i, clk_output_name[i],
+ 				SLCR_FPGA0_CLK_CTRL + 0x10 * (i - fclk0),
+-				periph_parents);
++				periph_parents, enable);
++	}
+ 
+ 	zynq_clk_register_periph_clk(lqspi, 0, clk_output_name[lqspi], NULL,
+ 			SLCR_LQSPI_CLK_CTRL, periph_parents, 0);
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/46af05fb/attachment-0001.sig>
+1.8.4.4
