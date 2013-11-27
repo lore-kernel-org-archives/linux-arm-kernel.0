@@ -1,65 +1,63 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 27 Nov 2013 13:32:04 -0500
-Subject: [PATCH 1/3] usb: dwc3: Add Keystone specific glue layer
-In-Reply-To: <20131127174140.GE8123@saruman.home>
-References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
- <1385410581-12148-2-git-send-email-w-kwok2@ti.com> <5295B93A.3040400@ti.com>
- <20131127174140.GE8123@saruman.home>
-Message-ID: <52963AA4.6030007@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Nov 2013 10:36:30 -0800
+Subject: [PATCH 1/8] net: smc91x: Fix device tree based configuration
+ so it's usable
+In-Reply-To: <20131116151640.GJ10317@atomide.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-2-git-send-email-tony@atomide.com>
+ <20131114110324.GC16396@e106331-lin.cambridge.arm.com>
+ <20131114160813.GC10317@atomide.com>
+ <20131116151640.GJ10317@atomide.com>
+Message-ID: <20131127183629.GZ26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 November 2013 12:41 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Wed, Nov 27, 2013 at 02:49:54PM +0530, George Cherian wrote:
->>> +	error = of_platform_populate(node, NULL, NULL, dev);
->>> +	if (error) {
->>> +		dev_err(&pdev->dev, "failed to create dwc3 core\n");
->>> +		goto err_core;
->>> +	}
->>> +
->>> +	return 0;
->>> +
->>> +err_core:
->>> +	kdwc3_disable_irqs(kdwc);
->>> +err_irq:
->>> +	kdwc3_disable(kdwc);
->>> +
->>> +	return error;
->>> +}
->>> +
->>> +static int kdwc3_remove(struct platform_device *pdev)
->>> +{
->>> +	struct dwc3_keystone *kdwc = platform_get_drvdata(pdev);
->>> +
->>> +	if (kdwc) {
->>> +		kdwc3_disable_irqs(kdwc);
->>> +		kdwc3_disable(kdwc);
->>> +		platform_set_drvdata(pdev, NULL);
->>> +	}
->>> +	return 0;
->>> +}
->>> +
->>
->> You need to unregister the child nodes in remove.
->> Also why can't the dwc3-omap driver be reused, Felipe??
->> I believe the TI wrapper for Keystone is similar to that of AM437x or
->> OMAP5.
-> 
-> it is very similar indeed, if it can be easily re-use that glue, I'd
-> rather not add another.
-> 
-Initial idea was actually to use same driver but the integration IP
-is quite different on Keystone vs OMAP which lead to have a separate
-glue layer. They look similar but there are differences in terms of phys,
-interrupts, register space. And also non OTG support, runtime PM
-vs clock etc for now.
+* Tony Lindgren <tony@atomide.com> [131116 07:17]:
+>
+> Here's what I was thinking with the reg-io-width-mask. Anybody
+> have comments on using reg-io-width vs reg-io-width-mask?
+...
 
-After all the glue is really a very small code describes the integration
-details thanks to nice abstracted dwc3 core layer. So as discussed
-over irc, keeping the separate glue is preferred but do let us know
-if you think otherwise.
+> --- a/drivers/net/ethernet/smsc/smc91x.c
+> +++ b/drivers/net/ethernet/smsc/smc91x.c
+> @@ -2222,11 +2234,31 @@ static int smc_drv_probe(struct platform_device *pdev)
+>  	 */
+>  
+>  	lp = netdev_priv(ndev);
+> +	lp->cfg.flags = 0;
+>  
+>  	if (pd) {
+>  		memcpy(&lp->cfg, pd, sizeof(lp->cfg));
+>  		lp->io_shift = SMC91X_IO_SHIFT(lp->cfg.flags);
+> -	} else {
+> +	}
+> +
+> +#if IS_BUILTIN(CONFIG_OF)
+> +	match = of_match_device(of_match_ptr(smc91x_match), &pdev->dev);
+> +	if (match) {
+> +		u32 val;
+> +
+> +		of_property_read_u32(np, "reg-io-width", &val);
+> +		if (val == 0)
+> +			lp->cfg.flags |= SMC91X_USE_16BIT;
+> +		if (val & 1)
+> +			lp->cfg.flags |= SMC91X_USE_8BIT;
+> +		if (val & 2)
+> +			lp->cfg.flags |= SMC91X_USE_16BIT;
+> +		if (val & 4)
+> +			lp->cfg.flags |= SMC91X_USE_32BIT;
+> +	}
+> +#endif
+> +
+> +	if (!pd && !match) {
+>  		lp->cfg.flags |= (SMC_CAN_USE_8BIT)  ? SMC91X_USE_8BIT  : 0;
+>  		lp->cfg.flags |= (SMC_CAN_USE_16BIT) ? SMC91X_USE_16BIT : 0;
+>  		lp->cfg.flags |= (SMC_CAN_USE_32BIT) ? SMC91X_USE_32BIT : 0;
+
+Looks this patch is missing the check for the return value for
+of_property_read_u32(), will repost this patch separately as the
+others in this series are out of the way now.
 
 Regards,
-Santosh
+
+Tony
