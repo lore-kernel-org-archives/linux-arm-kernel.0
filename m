@@ -1,50 +1,38 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 27 Nov 2013 22:44:52 +0100
-Subject: [PATCH 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <529624CA.6030604@wwwdotorg.org>
-References: <cover.1385508112.git.stefan@agner.ch>
- <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
- <529624CA.6030604@wwwdotorg.org>
-Message-ID: <ddd65b4d645cb99c3288960ea2dbe7a3@agner.ch>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 27 Nov 2013 21:47:17 +0000
+Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
+ device id
+In-Reply-To: <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com> (Jarkko
+ Nikula's message of "Wed, 27 Nov 2013 22:57:04 +0200")
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-3-git-send-email-tony@atomide.com>
+ <20131118184723.GR10317@atomide.com>
+ <87ioveeo0x.fsf@octavius.laptop.org>
+ <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
+Message-ID: <86fvqhjz4q.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2013-11-27 17:58, schrieb Stephen Warren:
-<snip>
->> +	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
->> +	if (tps6586x == NULL) {
->> +		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
->> +		return -ENOMEM;
->> +	}
-> 
->> +	tps6586x->version = (enum tps6586x_version)ret;
-> 
-> Why not make the version variable an integer of some kind. Then, the
-> cast wouldn't be required. The values like TPS658621A can be #defines or
-> const u32.
-> 
-Yep this would work too. Whatever is preferred, maybe define would be
-more consistent since SLEW_RATE are defines too (both, the VERSIONCRC
-and SLEW_RATE values are possible content of registers).
+Hi,
 
->> +	switch (ret) {
-> 
-> That should switch on tps6586x->version since that's been assigned;
-> it'll make the purpose a bit clearer.
-> 
->> +	default:
->> +		name = "TPS6586X";
->> +		break;
->>  	}
-> 
-> I hope the rest of the code deals with unknown values of
-> tps6586x->version OK.
->
-Well, the tps6586x->version is not completly unknown, its something
-valid which is returned by i2c_smbus_read_byte_data. According to the
-data sheet this should be a 8-Bit value.
+On Wed, Nov 27 2013, Jarkko Nikula wrote:
+> Can you enlighten me what's the proper way to get patches to mmc since
+> I cannot figure out working methodology from MAINTAINERS file?
 
-However, the patch should handle every version, since I tried to make
-the change backward compatible: The driver now and then supports every
-device version, just the default voltage table are applied if there are
-no specific tables available.
+Sorry about this, Jarkko.
+
+Since I don't have omap.c hardware, I'm generally going to wait for
+a Tested-by/Acked-by from someone else on patches like these.  We
+actually have a maintainer already listed for the driver, Jarkko
+Lavinen <jarkko.lavinen@nokia.com>.
+
+So, maybe the MAINTAINERS section for drivers/mmc/host/omap.c needs
+an update?  Feel free to send me patches to it.  Either way, I'll
+start treating Aaro and Jarkko (Nikula) as maintainers for this
+driver.
+
+Thanks!
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
