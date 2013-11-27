@@ -1,69 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Nov 2013 13:37:26 -0800
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
- device id
-In-Reply-To: <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-3-git-send-email-tony@atomide.com>
- <20131118184723.GR10317@atomide.com>
- <87ioveeo0x.fsf@octavius.laptop.org>
- <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
-Message-ID: <20131127213726.GB26766@atomide.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 27 Nov 2013 22:44:52 +0100
+Subject: [PATCH 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <529624CA.6030604@wwwdotorg.org>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
+ <529624CA.6030604@wwwdotorg.org>
+Message-ID: <ddd65b4d645cb99c3288960ea2dbe7a3@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jarkko.nikula@bitmer.com> [131127 12:55]:
-> Hi Chris
+Am 2013-11-27 17:58, schrieb Stephen Warren:
+<snip>
+>> +	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
+>> +	if (tps6586x == NULL) {
+>> +		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
+>> +		return -ENOMEM;
+>> +	}
 > 
-> On Tue, 26 Nov 2013 18:33:50 -0500
-> Chris Ball <cjb@laptop.org> wrote:
+>> +	tps6586x->version = (enum tps6586x_version)ret;
 > 
-> > Hi Tony,
-> > 
-> > On Mon, Nov 18 2013, Tony Lindgren wrote:
-> > > We are wrongly relying on device id for the DMA configuration
-> > > which can lead to wrong DMA channel being selected.
-> > >
-> > > Fix the issue by using the standard resources like we should.
-> > >
-> > > Cc: Chris Ball <cjb@laptop.org>
-> > > Cc: linux-mmc at vger.kernel.org
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > Feel free to merge via your tree:
-> > 
-> > Acked-by: Chris Ball <cjb@laptop.org>
-> > 
-> Can you enlighten me what's the proper way to get patches to mmc since
-> I cannot figure out working methodology from MAINTAINERS file?
+> Why not make the version variable an integer of some kind. Then, the
+> cast wouldn't be required. The values like TPS658621A can be #defines or
+> const u32.
 > 
-> I happened to notice that Tony had this similar patch in linux-omap
-> list I sent first time already September to you and linux-mmc (sorry
-> linux-omap folks, I didn't want to spam multiple lists):
-> 
-> http://www.spinics.net/lists/linux-mmc/msg22137.html
-> 
-> After that I've resend the set a few times including a fix to
-> user triggable NULL pointer dereference:
-> 
-> http://www.spinics.net/lists/linux-mmc/msg22610.html
-> 
-> I'm fine if mmc patches should go through other subsystems but at least
-> it should be documented in MAINTAINERS file.
+Yep this would work too. Whatever is preferred, maybe define would be
+more consistent since SLEW_RATE are defines too (both, the VERSIONCRC
+and SLEW_RATE values are possible content of registers).
 
-Bummer, sounds like some duplicate work could have been avoided :(
-I suggest resend to Chris and linux-mmc one more time as Chris should
-pick up the MMC patches in general.
+>> +	switch (ret) {
+> 
+> That should switch on tps6586x->version since that's been assigned;
+> it'll make the purpose a bit clearer.
+> 
+>> +	default:
+>> +		name = "TPS6586X";
+>> +		break;
+>>  	}
+> 
+> I hope the rest of the code deals with unknown values of
+> tps6586x->version OK.
+>
+Well, the tps6586x->version is not completly unknown, its something
+valid which is returned by i2c_smbus_read_byte_data. According to the
+data sheet this should be a 8-Bit value.
 
-I've been just trying to get things working in general for v3.13-rc
-series for omaps with device tree based booting and patching all over
-the place. This is to make it easy for us to just drop the legacy
-platform based booting for v3.14 while keeping things working.
-
-Chris, as far as I'm concerned, Aaro and Jarkko are good people to
-review and ack the drivers/mmc/omap.c patches, so adding Aaro to
-Cc as well.
-
-Regards,
-
-Tony
+However, the patch should handle every version, since I tried to make
+the change backward compatible: The driver now and then supports every
+device version, just the default voltage table are applied if there are
+no specific tables available.
