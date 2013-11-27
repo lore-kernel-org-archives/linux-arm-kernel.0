@@ -1,34 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Nov 2013 08:41:17 +0100
-Subject: STOP THE MADNESS
-In-Reply-To: <CAL_JsqK-=btaXtFeg6BNpOqYKUHDBxzTHU5x+AOSe4hvyM4CRg@mail.gmail.com>
-References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
- <CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
- <CACRpkdY9MTUDtDxRKRHCXch98cNiMS-dumQvaTH7gp1OCVUx6w@mail.gmail.com>
- <CAL_JsqK-=btaXtFeg6BNpOqYKUHDBxzTHU5x+AOSe4hvyM4CRg@mail.gmail.com>
-Message-ID: <CACRpkdb=iRGOEtwJhYygfXYuTZ-5hNUdAgL7dXaDBsfkUaPeeA@mail.gmail.com>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Wed, 27 Nov 2013 07:42:22 +0000
+Subject: [PATCH RFC] PCI: imx6: remove outbound io/mem ATU region mapping
+In-Reply-To: <20131127035056.GA12773@pratyush-vbox>
+References: <1382504143-27915-1-git-send-email-tharvey@gateworks.com>
+ <20131023064051.GA7646@pratyush-vbox> <201311262146.09780.marex@denx.de>
+ <20131127035056.GA12773@pratyush-vbox>
+Message-ID: <0E83723C55F66F43A6041464FE31119D466C99@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 4:54 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Nov 26, 2013 at 4:09 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>
->> A pointer to an "ideal" GPIO chip + irq_chip driver would be highly
->> appreciated ...
->
-> I'm not sure if one exists. Shouldn't be too hard to find if anything
-> uses generic chip and irq domains together. I had done some work to
-> address generic chip issues with irq domains and pl061 support[1], but
-> Grant was never really happy with it and I never got back to looking
-> at it. I think the conclusion was we don't want to add irqdomains into
-> generic chip as my series did, but we need to at least make them
-> coexist.
+Hi Pratyush:
 
-Hm I also had the idea of embedding a struct irq_chip into the
-struct gpio_chip (w/some config symbol like
-GPIOLIB_PROVIDE_IRQCHIP) and use that for all GPIO drivers
-doing IRQchips. Embedding a generic chip could be the way
-forward.
+> -----Original Message-----
+> From: Pratyush Anand [mailto:pratyush.anand at st.com]
+> Sent: Wednesday, November 27, 2013 11:51 AM
+> To: Marek Vasut
+> Cc: Tim Harvey; Kishon Vijay Abraham I; linux-pci at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Bjorn Helgaas; Frank Li; Jingoo Han; Mohit KUMAR
+> DCG; Zhu Richard-R65037; Sascha Hauer; Sean Cross; Shawn Guo; Siva Reddy
+> Kallam; Srikanth T Shivanand; Troy Kisky; Yinghai Lu
+> Subject: Re: [PATCH RFC] PCI: imx6: remove outbound io/mem ATU region mapping
+> 
+> On Wed, Nov 27, 2013 at 04:46:09AM +0800, Marek Vasut wrote:
+> > Dear Pratyush Anand,
+> >
+> > > Hi,
+> > >
+> > > On Wed, Oct 23, 2013 at 12:55:43PM +0800, Tim Harvey wrote:
+> > > > The IMX6 iATU is used for address translation between the AXI bus
+> > > > address space and PCI address space.  This is used for type0 and
+> > > > type1 config cycles but is not necessary for outbound io/mem regions.
+> > > >
+> > > > This patch removes the calls that inappropriately re-configures
+> > > > the ATU viewport for outbound memory and IO after config cycles
+> > > > and removes them altogether as they are not necessary.
+> > > >
+> > > > This resolves issues with PCI devices behind switches and has been
+> > > > tested with a Gige device behind a PLX PEX860x switch.  More
+> > > > testing is needed for other configurations.
+> > >
+> > > It seems to me that in your controller you have only one view port.
+> > > Also mem_base and mem_bus_addr is same. Thats why it works in your
+> > > case.
+> >
+> > MX6 has 4 In/4 Out viewports AFAICT.
+> 
+> Then if I do not miss anything, MX6 should work even without this patch.
 
-Yours,
-Linus Walleij
+[Richard] Regarding to the commit message, and tests at my side, 
+the switch wouldn't work well on imx6 platforms, if "the calls that inappropriately re-configures
+ the ATU viewport for outbound memory and IO after config cycles " are not removed.
+
+> 
+> Regards
+> Pratyush
+> >
+> > Best regards,
+> > Marek Vasut
+
+Best Regards
+Richard Zhu
