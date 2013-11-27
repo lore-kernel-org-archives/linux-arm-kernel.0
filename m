@@ -1,93 +1,170 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 Nov 2013 17:42:04 +0000
-Subject: [PATCH] ARM: l2x0: add prefetch and power ctrl registers
- configuration support
-In-Reply-To: <1383800872-7982-1-git-send-email-jszhang@marvell.com>
-References: <1383800872-7982-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20131127174204.GD27879@e106331-lin.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Nov 2013 12:44:21 -0500 (EST)
+Subject: [PATCH v4 4/4] ARM: EXYNOS: add Exynos Dual Cluster Support
+In-Reply-To: <20131126164033.GD2355@e103592.cambridge.arm.com>
+References: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
+ <1385456288-20398-5-git-send-email-v.tyrtov@samsung.com>
+ <20131126164033.GD2355@e103592.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.10.1311271227320.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 07, 2013 at 05:07:52AM +0000, Jisheng Zhang wrote:
-> PL310 supports Prefetch offset/control register from r2p0 and Power
-> control register from r3p0. This patch adds the support to configure
-> these two registers if there are. The dt binding document is also updated.
+On Tue, 26 Nov 2013, Dave Martin wrote:
 
-I'd like to see a reasoning as to _why_ these should be in the DT.
-
-While we have tag and data RAM latency information, those are hardware
-properties that we cannot probe. I'm not so clear on the filter-ranges
-property.
-
-These bits seem to be configuration rather than a hardware description.
-If there are some portions of this that we can describe with higher
-level properties, I'd prefer to do that.
-
-But primarily, the question to answer is do we need these, and if so do
-they belong in the DT?
-
+> [Resending to to a mail snafu on my end -- apologies for any duplicates
+> of this message received]
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
->  arch/arm/mm/cache-l2x0.c                       | 19 +++++++++++++++++++
->  2 files changed, 23 insertions(+)
+> On Tue, Nov 26, 2013 at 12:58:08PM +0400, Vyacheslav Tyrtov wrote:
+> > From: Tarek Dakhran <t.dakhran@samsung.com>
+> > 
+> > Add EDCS(Exynos Dual Cluster Support) for Samsung Exynos5410 SoC.
+> > This enables all 8 cores, 4 x A7 and 4 x A15 run at the same time.
+> > 
+> > Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> > Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/Makefile |   2 +
+> >  arch/arm/mach-exynos/edcs.c   | 297 ++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 299 insertions(+)
+> >  create mode 100644 arch/arm/mach-exynos/edcs.c
+> > 
+> > diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> > index 8930b66..bc1f7f9 100644
+> > --- a/arch/arm/mach-exynos/Makefile
+> > +++ b/arch/arm/mach-exynos/Makefile
+> > @@ -34,3 +34,5 @@ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+> >  
+> >  obj-$(CONFIG_ARCH_EXYNOS4)	+= mach-exynos4-dt.o
+> >  obj-$(CONFIG_ARCH_EXYNOS5)	+= mach-exynos5-dt.o
+> > +
+> > +obj-$(CONFIG_SOC_EXYNOS5410)	+= edcs.o
+> > diff --git a/arch/arm/mach-exynos/edcs.c b/arch/arm/mach-exynos/edcs.c
+> > new file mode 100644
+> > index 0000000..29f0bdd
+> > --- /dev/null
+> > +++ b/arch/arm/mach-exynos/edcs.c
+> > @@ -0,0 +1,297 @@
+> > +/*
+> > + * arch/arm/mach-exynos/edcs.c - exynos dual cluster power management support
+> > + *
+> > + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> > + * Author: Tarek Dakhran <t.dakhran@samsung.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * EDCS(exynos dual cluster support) for Exynos5410 SoC.
+> > + */
+> > +
+> > +#define pr_fmt(fmt)	"%s: " fmt, __func__
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/spinlock.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/irqchip/arm-gic.h>
+> > +#include <linux/delay.h>
+> > +
+> > +#include <asm/mcpm.h>
+> > +#include <asm/proc-fns.h>
+> > +#include <asm/cacheflush.h>
+> > +#include <asm/cputype.h>
+> > +#include <asm/cp15.h>
+> > +
+> > +#include <linux/arm-cci.h>
+> > +#include <mach/regs-pmu.h>
+> > +
+> > +#define EDCS_CPUS_PER_CLUSTER		4
+> > +#define EDCS_CLUSTERS			2
+> > +
+> > +/* Exynos5410 power management registers */
+> > +#define EDCS_CORE_CONFIGURATION(_nr)	(S5P_ARM_CORE0_CONFIGURATION	\
+> > +						+ ((_nr) * 0x80))
+> > +#define EDCS_CORE_STATUS(_nr)		(EDCS_CORE_CONFIGURATION(_nr) + 0x4)
+> > +#define EDCS_CORE_OPTION(_nr)		(EDCS_CORE_CONFIGURATION(_nr) + 0x8)
+> > +
+> > +#define REG_CPU_STATE_ADDR0		(S5P_VA_SYSRAM_NS + 0x28)
+> > +#define REG_CPU_STATE_ADDR(_nr)		(REG_CPU_STATE_ADDR0 +	\
+> > +						 (_nr) * EDCS_CPUS_PER_CLUSTER)
+> > +
+> > +#define SECONDARY_RESET			(1 << 1)
+> > +#define REG_ENTRY_ADDR			(S5P_VA_SYSRAM_NS + 0x1c)
+> > +
+> > +#define EDCS_CORE_PWR_ON		0x3
+> > +#define EDCS_CORE_PWR_OFF		0x0
+> > +#define CORE_PWR_STATE_MASK		0x3
+> > +
+> > +static arch_spinlock_t edcs_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> > +
+> > +static int edcs_use_count[EDCS_CPUS_PER_CLUSTER][EDCS_CLUSTERS];
+> > +static int core_count[EDCS_CLUSTERS];
+> > +
+> > +/*
+> > + * this_core_to_pcpu reads mpidr and defines cluster and cpu.
+> > + */
+> > +static void this_core_to_pcpu(unsigned int *pcpu, unsigned int *pcluster)
+> > +{
+> > +	unsigned int mpidr;
+> > +
+> > +	mpidr = read_cpuid_mpidr();
+> > +	*pcpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > +	*pcluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> > +}
+> > +
+> > +/*
+> > + * core_power_state is used to get core power state.
+> > + * returns:
+> > + *        0x0 - powered off;
+> > + *        0x3 - powered on;
+> > + *        other values - in process;
+> > + */
+> > +static int core_power_state(unsigned int cpu, unsigned int cluster)
+> > +{
+> > +	unsigned int offset = cluster * EDCS_CPUS_PER_CLUSTER + cpu;
+> > +	int status = readl_relaxed(EDCS_CORE_STATUS(offset));
+> > +
+> > +	return status & CORE_PWR_STATE_MASK;
+> > +}
+> > +
+> > +static void edcs_core_power_up(unsigned int cpu, unsigned int cluster)
+> > +{
+> > +	unsigned int offset = cluster * EDCS_CPUS_PER_CLUSTER + cpu;
+> > +	if (core_power_state(cpu, cluster) == EDCS_CORE_PWR_OFF) {
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index c0c7626..32cd08c 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -39,6 +39,10 @@ Optional properties:
->  - arm,filter-ranges : <start length> Starting address and length of window to
->    filter. Addresses in the filter window are directed to the M1 port. Other
->    addresses will go to the M0 port.
-> +- arm,prefetch-ctrl : The value for Prefetch Offset/Control Register if there
-> +  is. This is a single cell.
-> +- arm,pwr-ctrl : The value for Power Control Register if there is. This is a
-> +  single cell.
->  - interrupts : 1 combined interrupt.
->  - cache-id-part: cache id part number to be used if it is not present
->    on hardware
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 447da6f..8f536ea 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -704,6 +704,8 @@ static void __init pl310_of_setup(const struct device_node *np,
->  	u32 data[3] = { 0, 0, 0 };
->  	u32 tag[3] = { 0, 0, 0 };
->  	u32 filter[2] = { 0, 0 };
-> +	u32 l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-> +		L2X0_CACHE_ID_RTL_MASK;
->  
->  	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
->  	if (tag[0] && tag[1] && tag[2])
-> @@ -730,6 +732,23 @@ static void __init pl310_of_setup(const struct device_node *np,
->  		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
->  			       l2x0_base + L2X0_ADDR_FILTER_START);
->  	}
-> +
-> +	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R2P0) {
-> +		u32 prefetch_ctrl = 0;
-> +
-> +		of_property_read_u32(np, "arm,prefetch-ctrl",
-> +				     &prefetch_ctrl);
-> +		if (prefetch_ctrl)
-> +			writel_relaxed(prefetch_ctrl, l2x0_base +
-> +					L2X0_PREFETCH_CTRL);
+> This still looks racy.
+> 
+> edcs_core_power_up and edcs_core_power_down are both called with
+> edcs_lock held, and cluster/cpu ref counting is done before we
+> get here.  So we know that the power state *change* is really supposed
+> to happen.
+> 
+> *If* my assumption is correct that there is a delay between requesting a
+> new power state, and the change being reported as completed in
+> EDCS_CORE_STATUS:
+> 
+> 
+> For edcs_core_power_up(), there may be a pending power-down
+> request which is not visible in the EDCS_CORE_STATUS registers yet.
+> 
+> I think this may mean that a power-up request will simply be missed
+> if the core status does not read as EDCS_CORE_PWR_OFF yet.  If that
+> can happen, then you need to wait -- calling the power_down_finish
+> method may be the right thing to do.
 
-Some of the prefetch control regsiter bits are reserved, and the
-prefetch offset may only take a subset of possible values. I wouldn't
-want to poke the hardware without performing some sanity checking on
-these values.
+I agree with your analysis so far.  However there is a fundamental 
+question that the hardware designers need to answer:
 
-> +		if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
-> +			u32 pwr_ctrl = 0;
-> +			of_property_read_u32(np, "arm,pwr-ctrl", &pwr_ctrl);
-> +			if (pwr_ctrl)
-> +				writel_relaxed(pwr_ctrl, l2x0_base +
-> +						L2X0_POWER_CTRL);
+What happens if EDCS_CORE_PWR_OFF and then EDCS_CORE_PWR_ON is written 
+to the EDCS_CORE_CONFIGURATION register without waiting for the status 
+to become EDCS_CORE_PWR_OFF in between the two writes?  In other words, 
+will the PWR_ON be lost or will it be honored even if the PWR_OFF 
+request has not yet completed?
 
-Similarly, all but the lower 2 bits are reserved...
+If the PWR_ON request is always honored then there is no need for a 
+status check here.  Otherwise this is a bit more complicated as 
+outlined by Dave.
 
-Thanks,
-Mark.
+
+Nicolas
