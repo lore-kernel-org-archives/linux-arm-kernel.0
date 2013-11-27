@@ -1,48 +1,39 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 27 Nov 2013 23:40:34 +0800
-Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <20131127122053.GG9032@mudshark.cambridge.arm.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-3-git-send-email-liuj97@gmail.com>
- <20131030001245.GB25346@mudshark.cambridge.arm.com>
- <527671E9.8040704@gmail.com>
- <20131127122053.GG9032@mudshark.cambridge.arm.com>
-Message-ID: <52961272.7010400@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 27 Nov 2013 16:52:39 +0100
+Subject: [PATCH 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <20131127153019.GR3296@lee--X1>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
+ <20131127130954.GF3296@lee--X1> <cd69295e946b48451f449eacc02efa4a@agner.ch>
+ <20131127135547.GK3296@lee--X1> <cfb203a896eda67c106794d89e668d56@agner.ch>
+ <20131127143429.GN3296@lee--X1> <20131127143641.GO3296@lee--X1>
+ <c26ecd550e9940ead950f3874d27a5b0@agner.ch> <20131127153019.GR3296@lee--X1>
+Message-ID: <89dbf704d8617c77259e04753e4380c9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2013 08:20 PM, Will Deacon wrote:
-> Hi Jiang Liu,
+Am 2013-11-27 16:30, schrieb Lee Jones:
+> On Wed, 27 Nov 2013, Stefan Agner wrote:
 > 
-> On Sun, Nov 03, 2013 at 03:55:21PM +0000, Jiang Liu wrote:
->> On 10/30/2013 08:12 AM, Will Deacon wrote:
->>> If I try and email you at your Huawei address, I get a bounce from the mail
->>> server. Is that expected? If so, it's not very helpful from a commit log
->>> perspective if you use that address as the author on your patches.
->>>
->> Hi Will,
->> 	Sorry for the inconvenience. I have left Huawei recently and
->> have had a vacation last two weeks. I will use my gmail account next
->> time.
+>> Am 2013-11-27 15:36, schrieb Lee Jones:
+>> <snip>
+>> >> Perhaps I should suggest to make TPS6586X_ANY a positive number then,
+>> >> as a negative value to me indicates more of an error than a generic
+>> >> parameter.
+>> I see, its especially confusing since the version is filled using the
+>> i2c_smbus_read_byte_data functions return value. The version field is a
+>> 8-Bit value according to the data sheet, I could use 0x100 as
+>> TPS6586X_ANY identifier.
 > 
-> I appreciate that you're probably not being paid to look at this anymore,
-> but have you had a chance to address the comments I made on version 5 of
-> this series? As far as I'm concerned, this is almost ready for merging and
-> I'd love to see it get in for 3.14!
+> How far are we away from using 0xFF?
 > 
-> It would be a real shame if this ended up getting dropped...
-Hi Will,
-	Thanks for reminder!
-	I have changed the code according to review comments,
-but I'm having troubles to find a real hardware platform to test
-the new code since I left Huawei. I will try to figure out a way
-to test the code by contacting ex-teammember at Huawei.
-	Hope it could catch the of 3.14 merging window.
-Cheers,
-Gerry
+> I'd be happy to use that and change it _if_ we ever get close.
 > 
-> Cheers,
-> 
-> Will
-> 
+> If it's likely that it'll be used, then sure 0x100 sounds okay too.
+
+Yes, I thought about 0xFF too. The latest device we support is TPS658643
+(according to data sheet release dates), which has the smallest version
+number (03). Since it seems to be a CRC (hence VERSIONCRC) the number is
+quite random. Also, 0xFF sounds like a bitmask which can mask all
+versions, but the versions can't be used bitwise... So I would prefer to
+go with 0x100.
