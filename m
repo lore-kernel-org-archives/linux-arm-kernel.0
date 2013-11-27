@@ -1,33 +1,182 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 27 Nov 2013 13:06:57 -0600
-Subject: [PATCH 13/13] mfd: menelaus: remove unnecessary definition
+Date: Wed, 27 Nov 2013 13:06:55 -0600
+Subject: [PATCH 11/13] mfd: menelaus: start to use irqdomain
 In-Reply-To: <1385579217-20127-1-git-send-email-balbi@ti.com>
 References: <1385579217-20127-1-git-send-email-balbi@ti.com>
-Message-ID: <1385579217-20127-14-git-send-email-balbi@ti.com>
+Message-ID: <1385579217-20127-12-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-menelaus_i2c_driver isn't referenced on probe,
-just remove that unnecessary line. No functional
-changes.
+introduce an irq_chip and irq_domain for
+menelaus driver. Following patches will
+convert uses to traditional request_threaded_irq().
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/mfd/menelaus.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/mfd/menelaus.c | 109 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
 
 diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-index e7006e4..376f01d 100644
+index aa3c579..295fe84 100644
 --- a/drivers/mfd/menelaus.c
 +++ b/drivers/mfd/menelaus.c
-@@ -1206,8 +1206,6 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
+@@ -34,6 +34,7 @@
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+ #include <linux/interrupt.h>
++#include <linux/irqdomain.h>
+ #include <linux/sched.h>
+ #include <linux/mutex.h>
+ #include <linux/delay.h>
+@@ -47,6 +48,7 @@
+ #include <asm/gpio.h>
  
- /*-----------------------------------------------------------------------*/
+ #define DRIVER_NAME			"menelaus"
++#define MENELAUS_NR_IRQS		16
  
--static struct i2c_driver menelaus_i2c_driver;
--
- static int menelaus_probe(struct i2c_client *client,
+ #define MENELAUS_I2C_ADDRESS		0x72
+ 
+@@ -168,11 +170,19 @@ struct menelaus_chip {
+ 	u8			rtc_control;
+ 	unsigned		uie:1;
+ #endif
++	int			irq_base;
+ 	unsigned		vcore_hw_mode:1;
+ 	u8			mask1, mask2;
++	u8			ack1, ack2;
++
+ 	void			(*handlers[16])(struct menelaus_chip *);
+ 	void			(*mmc_callback)(void *data, u8 mask);
+ 	void			*mmc_callback_data;
++
++	unsigned		mask1_pending:1;
++	unsigned		mask2_pending:1;
++	unsigned		ack1_pending:1;
++	unsigned		ack2_pending:1;
+ };
+ 
+ static struct menelaus_chip *the_menelaus;
+@@ -235,6 +245,83 @@ static int menelaus_ack_irq(struct menelaus_chip *m, int irq)
+ 		return menelaus_write_reg(m, MENELAUS_INT_ACK1, 1 << irq);
+ }
+ 
++static void menelaus_irq_ack(struct irq_data *data)
++{
++	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
++	int irq = data->irq - m->irq_base;
++
++	if (irq > 7) {
++		m->ack2 |= BIT(irq);
++		m->ack2_pending = true;
++	} else {
++		m->ack1 |= BIT(irq);
++		m->ack1_pending = true;
++	}
++}
++
++static void menelaus_irq_mask(struct irq_data *data)
++{
++	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
++	int irq = data->irq - m->irq_base;
++
++	if (irq > 7) {
++		m->mask2 |= BIT(irq);
++		m->mask2_pending = true;
++	} else {
++		m->mask1 |= BIT(irq);
++		m->mask1_pending = true;
++	}
++}
++
++static void menelaus_irq_unmask(struct irq_data *data)
++{
++	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
++	int irq = data->irq - m->irq_base;
++
++	if (irq > 7) {
++		m->mask2 &= ~BIT(irq);
++		m->mask2_pending = true;
++	} else {
++		m->mask1 &= ~BIT(irq);
++		m->mask1_pending = true;
++	}
++}
++
++static void menelaus_irq_bus_lock(struct irq_data *data)
++{
++	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
++
++	mutex_lock(&m->lock);
++}
++
++static void menelaus_irq_bus_sync_unlock(struct irq_data *data)
++{
++	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
++
++	if (m->ack1_pending)
++		menelaus_write_reg(m, MENELAUS_INT_ACK1, m->ack1);
++
++	if (m->ack2_pending)
++		menelaus_write_reg(m, MENELAUS_INT_ACK2, m->ack2);
++
++	if (m->mask1_pending)
++		menelaus_write_reg(m, MENELAUS_INT_MASK1, m->mask1);
++
++	if (m->mask2_pending)
++		menelaus_write_reg(m, MENELAUS_INT_MASK2, m->mask2);
++
++	mutex_unlock(&m->lock);
++}
++
++static struct irq_chip menelaus_irq_chip = {
++	.name		= "menelaus",
++	.irq_ack	= menelaus_irq_ack,
++	.irq_mask	= menelaus_irq_mask,
++	.irq_unmask	= menelaus_irq_unmask,
++	.irq_bus_lock	= menelaus_irq_bus_lock,
++	.irq_bus_sync_unlock = menelaus_irq_bus_sync_unlock,
++};
++
+ /* Adds a handler for an interrupt. Does not run in interrupt context */
+ static int menelaus_add_irq_work(struct menelaus_chip *m, int irq,
+ 		void (*handler)(struct menelaus_chip *))
+@@ -1186,8 +1273,11 @@ static int menelaus_probe(struct i2c_client *client,
  			  const struct i2c_device_id *id)
  {
+ 	struct menelaus_chip	*m;
++	struct device_node	*node = client->dev.of_node;
+ 	int			rev = 0, val;
+ 	int			err = 0;
++	int			irq_base;
++	int			i;
+ 	struct menelaus_platform_data *menelaus_pdata =
+ 					dev_get_platdata(&client->dev);
+ 
+@@ -1206,6 +1296,25 @@ static int menelaus_probe(struct i2c_client *client,
+ 	the_menelaus = m;
+ 	m->client = client;
+ 
++	irq_base = irq_alloc_descs(-1, 0, MENELAUS_NR_IRQS, 0);
++	if (irq_base < 0) {
++		dev_err(&client->dev, "failed to allocate irq descs\n");
++		return irq_base;
++	}
++
++	irq_domain_add_legacy(node, MENELAUS_NR_IRQS, irq_base, 0,
++			&irq_domain_simple_ops, m);
++
++	m->irq_base = irq_base;
++
++	for (i = irq_base; i < irq_base + MENELAUS_NR_IRQS; i++) {
++		irq_set_chip_and_handler(i, &menelaus_irq_chip,
++				handle_simple_irq);
++		irq_set_nested_thread(i, 1);
++		irq_set_chip_data(i, m);
++		set_irq_flags(i, IRQF_VALID);
++	}
++
+ 	/* If a true probe check the device */
+ 	rev = menelaus_read_reg(m, MENELAUS_REV);
+ 	if (rev < 0) {
 -- 
 1.8.4.GIT
