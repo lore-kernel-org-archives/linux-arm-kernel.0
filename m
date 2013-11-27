@@ -1,309 +1,89 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 27 Nov 2013 13:06:56 -0600
-Subject: [PATCH 12/13] mfd: menelaus: switch all children to threaded_irq
-In-Reply-To: <1385579217-20127-1-git-send-email-balbi@ti.com>
-References: <1385579217-20127-1-git-send-email-balbi@ti.com>
-Message-ID: <1385579217-20127-13-git-send-email-balbi@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 27 Nov 2013 11:27:34 -0800
+Subject: [PATCH] Documentation: devicetree: arm: add lpae property to
+ cpus/cpu bindings
+In-Reply-To: <20131127094911.GE5402@e106331-lin.cambridge.arm.com>
+References: <1385517172-803-1-git-send-email-olof@lixom.net>
+ <20131127094911.GE5402@e106331-lin.cambridge.arm.com>
+Message-ID: <CAOesGMh9aQEtqha3gt80q4RmLjXtFTc+Xt39M0m+geTk_betzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-now that we have our own irq_chip, all children
-can use traditional request_threaded_irq().
+On Wed, Nov 27, 2013 at 1:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Olof,
+>
+> On Wed, Nov 27, 2013 at 01:52:52AM +0000, Olof Johansson wrote:
+>> While the LPAE capability is determined by the kernel today, it is still
+>> useful to be able to specify the feature in the device tree. There is
+>> precedence from other architectures for this.
+>>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>> ---
+>>
+>> My personal motive for this is to be able to tell which boards are
+>> work even trying to boot an LPAE kernel on, since we don't disable the
+>> platforms that are based on A8/A9 when LPAE is turned on. I'll add dtsi
+>> patches for A7/A15-based platforms once the binding is settled.
+>
+> It would be nice to have this description of why you want to add this in
+> the commit message proper.
 
-While at that, also remove so functions which
-became unused.
+Sure.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/mfd/menelaus.c | 161 +++++++++++++++----------------------------------
- 1 file changed, 50 insertions(+), 111 deletions(-)
+> I don't see much point in this. If we're going to add this to the DTSIs
+> for all platforms that have CPUs with LPAE support, why not just check
+> if a given DT contains one of those CPUs to find out if it has LPAE
+> support?
 
-diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-index 295fe84..e7006e4 100644
---- a/drivers/mfd/menelaus.c
-+++ b/drivers/mfd/menelaus.c
-@@ -175,7 +175,6 @@ struct menelaus_chip {
- 	u8			mask1, mask2;
- 	u8			ack1, ack2;
- 
--	void			(*handlers[16])(struct menelaus_chip *);
- 	void			(*mmc_callback)(void *data, u8 mask);
- 	void			*mmc_callback_data;
- 
-@@ -209,42 +208,6 @@ static int menelaus_read_reg(struct menelaus_chip *m, int reg)
- 	return val;
- }
- 
--static int menelaus_enable_irq(struct menelaus_chip *m, int irq)
--{
--	if (irq > 7) {
--		irq -= 8;
--		m->mask2 &= ~(1 << irq);
--		return menelaus_write_reg(m, MENELAUS_INT_MASK2,
--				m->mask2);
--	} else {
--		m->mask1 &= ~(1 << irq);
--		return menelaus_write_reg(m, MENELAUS_INT_MASK1,
--				m->mask1);
--	}
--}
--
--static int menelaus_disable_irq(struct menelaus_chip *m, int irq)
--{
--	if (irq > 7) {
--		irq -= 8;
--		m->mask2 |= (1 << irq);
--		return menelaus_write_reg(m, MENELAUS_INT_MASK2,
--				m->mask2);
--	} else {
--		m->mask1 |= (1 << irq);
--		return menelaus_write_reg(m, MENELAUS_INT_MASK1,
--				m->mask1);
--	}
--}
--
--static int menelaus_ack_irq(struct menelaus_chip *m, int irq)
--{
--	if (irq > 7)
--		return menelaus_write_reg(m, MENELAUS_INT_ACK2, 1 << (irq - 8));
--	else
--		return menelaus_write_reg(m, MENELAUS_INT_ACK1, 1 << irq);
--}
--
- static void menelaus_irq_ack(struct irq_data *data)
- {
- 	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
-@@ -322,47 +285,15 @@ static struct irq_chip menelaus_irq_chip = {
- 	.irq_bus_sync_unlock = menelaus_irq_bus_sync_unlock,
- };
- 
--/* Adds a handler for an interrupt. Does not run in interrupt context */
--static int menelaus_add_irq_work(struct menelaus_chip *m, int irq,
--		void (*handler)(struct menelaus_chip *))
--{
--	int ret = 0;
--
--	mutex_lock(&m->lock);
--	m->handlers[irq] = handler;
--	ret = menelaus_enable_irq(m, irq);
--	mutex_unlock(&m->lock);
--
--	return ret;
--}
--
--/* Removes handler for an interrupt */
--static int menelaus_remove_irq_work(struct menelaus_chip *m, int irq)
--{
--	int ret = 0;
--
--	mutex_lock(&m->lock);
--	ret = menelaus_disable_irq(m, irq);
--	m->handlers[irq] = NULL;
--	mutex_unlock(&m->lock);
--
--	return ret;
--}
--
--/*
-- * Gets scheduled when a card detect interrupt happens. Note that in some cases
-- * this line is wired to card cover switch rather than the card detect switch
-- * in each slot. In this case the cards are not seen by menelaus.
-- * FIXME: Add handling for D1 too
-- */
--static void menelaus_mmc_cd_work(struct menelaus_chip *m)
-+static irqreturn_t menelaus_mmc_cd_irq(int irq, void *_m)
- {
--	int reg;
-+	struct menelaus_chip *m = _m;
- 	unsigned char card_mask = 0;
-+	int reg;
- 
- 	reg = menelaus_read_reg(m, MENELAUS_MCT_PIN_ST);
- 	if (reg < 0)
--		return;
-+		return IRQ_NONE;
- 
- 	if (!(reg & 0x1))
- 		card_mask |= MCT_PIN_ST_S1_CD_ST;
-@@ -373,6 +304,8 @@ static void menelaus_mmc_cd_work(struct menelaus_chip *m)
- 	if (m->mmc_callback)
- 		m->mmc_callback(m->mmc_callback_data,
- 					  card_mask);
-+
-+	return IRQ_HANDLED;
- }
- 
- /*
-@@ -504,20 +437,25 @@ int menelaus_register_mmc_callback(void (*callback)(void *data, u8 card_mask),
- 
- 	m->mmc_callback_data = data;
- 	m->mmc_callback = callback;
--	ret = menelaus_add_irq_work(m, MENELAUS_MMC_S1CD_IRQ,
--				    menelaus_mmc_cd_work);
-+
-+	ret = request_threaded_irq(MENELAUS_MMC_S1CD_IRQ + m->irq_base,
-+			NULL, menelaus_mmc_cd_irq, IRQF_ONESHOT,
-+			"mmc_s1cd", m);
- 	if (ret < 0)
- 		return ret;
--	ret = menelaus_add_irq_work(m, MENELAUS_MMC_S2CD_IRQ,
--				    menelaus_mmc_cd_work);
-+	ret = request_threaded_irq(MENELAUS_MMC_S2CD_IRQ + m->irq_base,
-+			NULL, menelaus_mmc_cd_irq, IRQF_ONESHOT,
-+			"mmc_s2cd", m);
- 	if (ret < 0)
- 		return ret;
--	ret = menelaus_add_irq_work(m, MENELAUS_MMC_S1D1_IRQ,
--				    menelaus_mmc_cd_work);
-+	ret = request_threaded_irq(MENELAUS_MMC_S1D1_IRQ + m->irq_base,
-+			NULL, menelaus_mmc_cd_irq, IRQF_ONESHOT,
-+			"mmc_s1d1", m);
- 	if (ret < 0)
- 		return ret;
--	ret = menelaus_add_irq_work(m, MENELAUS_MMC_S2D1_IRQ,
--				    menelaus_mmc_cd_work);
-+	ret = request_threaded_irq(MENELAUS_MMC_S2D1_IRQ + m->irq_base,
-+			NULL, menelaus_mmc_cd_irq, IRQF_ONESHOT,
-+			"mmc_s2d1", m);
- 
- 	return ret;
- }
-@@ -527,10 +465,10 @@ void menelaus_unregister_mmc_callback(void)
- {
- 	struct menelaus_chip *m = the_menelaus;
- 
--	menelaus_remove_irq_work(m, MENELAUS_MMC_S1CD_IRQ);
--	menelaus_remove_irq_work(m, MENELAUS_MMC_S2CD_IRQ);
--	menelaus_remove_irq_work(m, MENELAUS_MMC_S1D1_IRQ);
--	menelaus_remove_irq_work(m, MENELAUS_MMC_S2D1_IRQ);
-+	free_irq(MENELAUS_MMC_S1CD_IRQ + m->irq_base, m);
-+	free_irq(MENELAUS_MMC_S2CD_IRQ + m->irq_base, m);
-+	free_irq(MENELAUS_MMC_S1D1_IRQ + m->irq_base, m);
-+	free_irq(MENELAUS_MMC_S2D1_IRQ + m->irq_base, m);
- 
- 	m->mmc_callback = NULL;
- 	m->mmc_callback_data = NULL;
-@@ -899,7 +837,6 @@ out:
- static irqreturn_t menelaus_irq(int irq, void *_menelaus)
- {
- 	struct menelaus_chip *m = _menelaus;
--	void (*handler)(struct menelaus_chip *m);
- 	unsigned long isr;
- 	unsigned long i;
- 
-@@ -909,14 +846,9 @@ static irqreturn_t menelaus_irq(int irq, void *_menelaus)
- 		& ~m->mask1;
- 
- 	for_each_set_bit(i, &isr, 16) {
--		mutex_lock(&m->lock);
--		menelaus_disable_irq(m, i);
--		menelaus_ack_irq(m, i);
--		handler = m->handlers[i];
--		if (handler)
--			handler(m);
--		menelaus_enable_irq(m, i);
--		mutex_unlock(&m->lock);
-+		int irq = i + m->irq_base;
-+
-+		handle_nested_irq(irq);
- 	}
- 
- 	return IRQ_HANDLED;
-@@ -1131,18 +1063,19 @@ static int menelaus_set_alarm(struct device *dev, struct rtc_wkalrm *w)
- 
- #ifdef CONFIG_RTC_INTF_DEV
- 
--static void menelaus_rtc_update_work(struct menelaus_chip *m)
-+static irqreturn_t menelaus_rtc_update_irq(int irq, void *_m)
- {
--	/* report 1/sec update */
--	local_irq_disable();
-+	struct menelaus_chip *m = _m;
-+
- 	rtc_update_irq(m->rtc, 1, RTC_IRQF | RTC_UF);
--	local_irq_enable();
-+
-+	return IRQ_HANDLED;
- }
- 
- static int menelaus_ioctl(struct device *dev, unsigned cmd, unsigned long arg)
- {
- 	struct menelaus_chip *m = dev_get_drvdata(dev);
--	int	status;
-+	int	status = 0;
- 
- 	if (m->client->irq <= 0)
- 		return -ENOIOCTLCMD;
-@@ -1163,18 +1096,18 @@ static int menelaus_ioctl(struct device *dev, unsigned cmd, unsigned long arg)
- 	case RTC_UIE_ON:
- 		if (m->uie)
- 			return 0;
--		status = menelaus_remove_irq_work(m, MENELAUS_RTCTMR_IRQ);
--		status = menelaus_add_irq_work(m, MENELAUS_RTCTMR_IRQ,
--				menelaus_rtc_update_work);
-+		free_irq(MENELAUS_RTCTMR_IRQ + m->irq_base, m);
-+		status = request_threaded_irq(MENELAUS_RTCTMR_IRQ + m->irq_base,
-+				NULL, menelaus_rtc_update_irq, IRQF_ONESHOT,
-+				"rtc-timer", m);
- 		if (status == 0)
- 			m->uie = 1;
- 		return status;
- 	case RTC_UIE_OFF:
- 		if (!m->uie)
- 			return 0;
--		status = menelaus_remove_irq_work(m, MENELAUS_RTCTMR_IRQ);
--		if (status == 0)
--			m->uie = 0;
-+		free_irq(MENELAUS_RTCTMR_IRQ + m->irq_base, m);
-+		m->uie = 0;
- 		return status;
- 	default:
- 		return -ENOIOCTLCMD;
-@@ -1196,16 +1129,18 @@ static const struct rtc_class_ops menelaus_rtc_ops = {
- 	.set_alarm		= menelaus_set_alarm,
- };
- 
--static void menelaus_rtc_alarm_work(struct menelaus_chip *m)
-+static irqreturn_t menelaus_rtc_alarm_irq(int irq, void *_m)
- {
-+	struct menelaus_chip *m = _m;
-+
- 	/* report alarm */
--	local_irq_disable();
- 	rtc_update_irq(m->rtc, 1, RTC_IRQF | RTC_AF);
--	local_irq_enable();
- 
- 	/* then disable it; alarms are oneshot */
- 	m->rtc_control &= ~RTC_CTRL_AL_EN;
- 	menelaus_write_reg(m, MENELAUS_RTC_CTRL, m->rtc_control);
-+
-+	return IRQ_HANDLED;
- }
- 
- static inline void menelaus_rtc_init(struct menelaus_chip *m)
-@@ -1220,8 +1155,12 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
- 
- 	/* support RTC alarm; it can issue wakeups */
- 	if (alarm) {
--		if (menelaus_add_irq_work(m, MENELAUS_RTCALM_IRQ,
--				menelaus_rtc_alarm_work) < 0) {
-+		int ret;
-+
-+		ret = request_threaded_irq(MENELAUS_RTCALM_IRQ + m->irq_base,
-+				NULL, menelaus_rtc_alarm_irq, IRQF_ONESHOT,
-+				"rtc-alarm", m);
-+		if (ret < 0) {
- 			dev_err(&m->client->dev, "can't handle RTC alarm\n");
- 			return;
- 		}
-@@ -1247,7 +1186,7 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
- 			&menelaus_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(m->rtc)) {
- 		if (alarm) {
--			menelaus_remove_irq_work(m, MENELAUS_RTCALM_IRQ);
-+			free_irq(MENELAUS_RTCALM_IRQ + m->irq_base, m);
- 			device_init_wakeup(&m->client->dev, 0);
- 		}
- 		dev_err(&m->client->dev, "can't register RTC: %d\n",
--- 
-1.8.4.GIT
+Because it's awkward to have to do a table with each cpu compatible
+value that is known to support LPAE everywhere it's needed.
+
+Alternatively we could have a common compatible field for shared
+features, but that also won't scale (we don't have a compatible field
+today to indicate architecture version, and this would be an
+incremental part on top of that).
+
+> The information this flag describes is at best redundant, but could also
+> be missing or present erroneously.
+
+That is true for many other device tree properties too.
+
+> It's also of no use to any OS actually running on the hardware, as it's
+> easier for an OS to check ID_MMFR0[3:0] than to parse a DTB. Likewise
+> for bootloaders.
+
+Compare this to the PowerPC processor binding from IEEE1275, and
+you'll see that there are some similarities, for example when it comes
+to properties describing support of certain instructions (which could
+be probed by inserting illegal instruction handlers and attempting to
+execute them). They also have properties for cpu-version and a few
+other similar things that can be read from registers.
+
+>> I don't think it's worth trying to add those dependencies in Kconfig,
+>> by the way -- it'd be pretty verbose and churny.
+>
+> I think if we want an early warning that a particular platform is not
+> going to support LPAE, this would be a better place to put it.
+
+It's problematic because you really need to annotate every platform
+that _doesn't_ support LPAE to get something that works. Otherwise, if
+you have one platform that selects something like CONFIG_HAVE_LPAE,
+then just enabling that platform together with the rest of them means
+you can turn it on, even if the older platforms can't boot any more.
+
+So, you'd need every non-A15/A7 platform select a CONFIG_NO_LPAE of
+whatnot, which doesn't scale.
+
+Alternatively we'll need to add a config option per cpu, and have
+CONFIG_ARM_LPAE depend on !CORTEX_A8 && !CORTEX_A9 && !<qualcomm v7
+cpus> && !<marvell v7 cpus>. That's also ugly.
+
+> It's a shame we don't have a standard header in the Linux Image. If we
+> did, we could add a "uses LPAE" flag to the Linux Image that bootloaders
+> could check and refuse to run the Image or print a warning if the HW had
+> no LPAE support.
+
+Yep, unfortunate.
+
+
+-Olof
