@@ -1,52 +1,61 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Wed, 27 Nov 2013 12:03:01 +0200
-Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <52959966.7000509@roeck-us.net>
-References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
- <5295758C.2030907@ti.com> <52959966.7000509@roeck-us.net>
-Message-ID: <5295C355.6000604@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 27 Nov 2013 10:59:47 +0100
+Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
+In-Reply-To: <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
+Message-ID: <1385546387.4270.11.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2013 09:04 AM, Guenter Roeck wrote:
-> On 11/26/2013 08:31 PM, Sekhar Nori wrote:
->> On Monday 25 November 2013 07:34 PM, Ivan Khoronzhuk wrote:
->>> To reduce code duplicate and increase code readability use WDT core
->>> code to handle WDT interface.
->>>
->>> Remove io_lock as the WDT core uses mutex to lock each wdt device.
->>> Remove wdt_state as the WDT core tracks state with its own variable.
->>>
->>> The watchdog_init_timeout() can read timeout value from timeout-sec
->>> property if the passed value is out of bounds. The heartbeat is
->>> initialized in next way. If heartbeat is not set thought module
->>> parameter, try to read it's value from WDT node timeout-sec property.
->>> If node has no one, use default value.
->>>
->>> The heartbeat is hold in wdd->timeout by WDT core, so use it in
->>> order to set timeout period.
->>>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>
->> So this still causes a regression because the clk_get()
->> fails due to the changed device name. Please fold this
->> patch in (tested on DM365, compiled on rest).
->>
->> Also, the change in device name (while needed) does not seem
->> to be related to usage of wdt core. Can you may be split
->> that change into a separate patch?
->>
->
-> Given all the trouble with it, I think that would be a good idea.
->
-> Guenter
->
+Hi Stefan,
 
-Ok, I'll split it for convenience.
+Am Mittwoch, den 27.11.2013, 00:45 +0100 schrieb Stefan Agner:
+> Set the requested SM2 voltage to the correct value of 1.8V. The value
+> before used to work on TPS658623 since the driver applied a wrong
+> voltage table too. However, the TPS658643 used on newer devices uses
+> yet another voltage table and those broke that compatibility. The
+> regulator driver now has the correct voltage table for both regulator
+> versions and those the correct voltage can be used in this device
+> tree.
+
+This isn't a global Tegra change, but very specific to the Colibri, so
+please reword your commit headline to reflect that.
+
+Also there are other issues with the regulator setup on Colibri, I sent
+a patch for this a good while ago, but didn't come around to revise it
+until now. So if you are going to touch things here, please look up that
+patch and fold it into this one.
+
+I'll take a look at the other patches later today.
+
+Regards,
+Lucas
+
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/tegra20-colibri-512.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+> index d5c9bca..cbe89ff 100644
+> --- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+> +++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+> @@ -268,8 +268,8 @@
+>  					reg = <3>;
+>  					regulator-compatible = "sm2";
+>  					regulator-name = "vdd_sm2,vin_ldo*";
+> -					regulator-min-microvolt = <3700000>;
+> -					regulator-max-microvolt = <3700000>;
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+>  					regulator-always-on;
+>  				};
+>  
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
