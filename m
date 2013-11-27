@@ -1,51 +1,51 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 27 Nov 2013 23:03:43 +0100
-Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
-In-Reply-To: <5296281C.1060403@wwwdotorg.org>
-References: <cover.1385508112.git.stefan@agner.ch>
- <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
- <5296281C.1060403@wwwdotorg.org>
-Message-ID: <da3ea685e652f3ce33ebbe660312ed01@agner.ch>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 27 Nov 2013 14:05:29 -0800
+Subject: [PATCH v5 08/17] clk: at91: add PMC system clocks
+In-Reply-To: <1384293935-4755-1-git-send-email-b.brezillon@overkiz.com>
+References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
+ <1384293935-4755-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131127220529.16819.42204@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2013-11-27 18:13, schrieb Stephen Warren:
-> On 11/26/2013 04:45 PM, Stefan Agner wrote:
->> Set the requested SM2 voltage to the correct value of 1.8V. The value
->> before used to work on TPS658623 since the driver applied a wrong
->> voltage table too. However, the TPS658643 used on newer devices uses
->> yet another voltage table and those broke that compatibility. The
->> regulator driver now has the correct voltage table for both regulator
->> versions and those the correct voltage can be used in this device
->> tree.
+Quoting Boris BREZILLON (2013-11-12 14:05:35)
+> This patch adds new at91 system clock implementation using common clk
+> framework.
 > 
-> One thing you haven't called out explicitly here is that this series is
-> an incompatible change to the DT, since the old buggy driver used to
-> allow old buggy DT content to accidentally work.
+> Some peripherals need to enable a "system" clock in order to work properly.
+> Each system clock is given an id based on the bit position in SCER/SCDR
+> registers.
 > 
-> I'm not too familiar with who's using mainline on the Colibri boards.
-> Hopefully everyone doing that is using in-kernel DTs, so this
-> incompatible change won't be any issue for anyone.
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/clk/at91/Makefile     |    1 +
+>  drivers/clk/at91/clk-system.c |  137 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/at91/pmc.c        |    5 ++
+>  drivers/clk/at91/pmc.h        |    3 +
+>  4 files changed, 146 insertions(+)
+>  create mode 100644 drivers/clk/at91/clk-system.c
 > 
+> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+> index e28fb2b..c2b7068 100644
+> --- a/drivers/clk/at91/Makefile
+> +++ b/drivers/clk/at91/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-y += pmc.o
+>  obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
+> +obj-y += clk-system.o
+> diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+> new file mode 100644
+> index 0000000..1c086f4
+> --- /dev/null
+> +++ b/drivers/clk/at91/clk-system.c
+> @@ -0,0 +1,137 @@
+> +/*
+> + * drivers/clk/at91/clk-system.c
 
-I don't think there are a lot of users since Toradex ships the NVidia
-downstream kernel. Two users for sure, Lucas and me.
+Nitpick: it's better to not put file paths in a comment block in case
+the file name or path is changed.
 
-> This patch needs to be rolled into patch 2/3 so that "git bisect" isn't
-> broken.
-
-Will do
-
- 
-> You mention there's yet another PMIC version used on later boards. Do we
-> need a new DT for that specfic version of the Colibri board?
-
-The newer device is the TPS658643, which uses a different voltage table,
-but this change is already in the driver. Maybe I should reword that
-commit a bit. I just tried to point out why the change is really needed
-(since we have two regulators with different voltage tables). But there
-is nothing beyond those two that... 
-
-Because the DT now states the real, required voltage, a new device
-(version) would need an appropriate driver change and things should
-work.
+Regards,
+Mike
