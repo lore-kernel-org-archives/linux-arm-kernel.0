@@ -1,77 +1,177 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 27 Nov 2013 13:55:47 +0000
-Subject: [PATCH 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <cd69295e946b48451f449eacc02efa4a@agner.ch>
-References: <cover.1385508112.git.stefan@agner.ch>
- <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
- <20131127130954.GF3296@lee--X1>
- <cd69295e946b48451f449eacc02efa4a@agner.ch>
-Message-ID: <20131127135547.GK3296@lee--X1>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 27 Nov 2013 14:56:11 +0100
+Subject: [PATCH v7] ARM: omap: edma: add suspend suspend/resume hooks
+Message-ID: <1385560571-3939-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>  	if (ret < 0) {
-> >>  		dev_err(&client->dev, "Chip ID read failed: %d\n", ret);
-> >>  		return -EIO;
-> > 
-> > Why are you returning an error here when you have a valid enum of:
-> >   TPS6586X_ANY	= -1,
-> > 
-> Hm, when the device is not answering on that request, the probe method
-> should fail I would say. This means that the device is missing most
-> likely. However, I should set the device version to TPS6586X_ANY if I
-> happen to end up in the default case.
+This patch makes the edma driver resume correctly after suspend. Tested
+on an AM33xx platform with cyclic audio streams and omap_hsmmc.
 
-I would say that returning an error is the sound thing to do, but I'm
-missing the point of TPS6586X_ANY, as it doesn't appear to be used in
-this context.
+All information can be reconstructed by already known runtime
+information.
 
-> >>  	}
-> >>
-> >> -	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
-> >> -
-> >> -	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
-> >> -	if (tps6586x == NULL) {
-> >> -		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
-> >> -		return -ENOMEM;
-> >> +	tps6586x->version = (enum tps6586x_version)ret;
-> >> +	switch (ret) {
-> >> +	case TPS658621A:
-> >> +		name = "TPS658621A";
-> >> +		break;
-> >> +	case TPS658621CD:
-> >> +		name = "TPS658621C/D";
-> >> +		break;
-> >> +	case TPS658623:
-> >> +		name = "TPS658623";
-> >> +		break;
-> >> +	case TPS658643:
-> >> +		name = "TPS658643";
-> >> +		break;
-> >> +	default:
-> >> +		name = "TPS6586X";
-> >> +		break;
-> >>  	}
-> >>
-> >> +	dev_info(&client->dev, "Found %s, VERSIONCRC is %02x\n", name, ret);
-> >> +
-> > 
-> > I'd suggest pulling this out of probe() and into a separate subroutine.
-> > 
-> > <snip>
-> Since I will alter the version when I end up in the default case in my
-> next patch, would you still do a separate subroutine? I think its
-> somewhat heavily coupled to the probe function.
-> 
-> Sorry missing you on the CC, will do next time :-)
+As we now use some functions that were previously only used from __init
+context, annotations had to be dropped.
 
-It's not that it's unrelated, it's just a whole bulk of code which is
-essentially featureless. 17 lines of code just to have the name of the
-device in the bootlog. For that reason I'd like to see this abstracted
-from (the useful stuff in) probe() please.
+[nm at ti.com: added error handling for runtime + suspend_late/early_resume]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Tested-by: Joel Fernandes <joelf@ti.com>
+Acked-by: Joel Fernandes <joelf@ti.com>
+---
+v6 -> v7:
 
+ * Addressed comments from Sekhar Nori:
+
+   * pm_runtime_get_sync() returns negative errors, so do not use
+     IS_ERR_VALUE()
+   * Several style fixes
+
+
+ arch/arm/common/edma.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 92 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 41bca32..dece66d 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -239,6 +239,8 @@ struct edma {
+ 	/* list of channels with no even trigger; terminated by "-1" */
+ 	const s8	*noevent;
+ 
++	struct edma_soc_info *info;
++
+ 	/* The edma_inuse bit for each PaRAM slot is clear unless the
+ 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
+ 	 */
+@@ -290,13 +292,13 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
+ 			~(0x7 << bit), queue_no << bit);
+ }
+ 
+-static void __init map_queue_tc(unsigned ctlr, int queue_no, int tc_no)
++static void map_queue_tc(unsigned ctlr, int queue_no, int tc_no)
+ {
+ 	int bit = queue_no * 4;
+ 	edma_modify(ctlr, EDMA_QUETCMAP, ~(0x7 << bit), ((tc_no & 0x7) << bit));
+ }
+ 
+-static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
++static void assign_priority_to_queue(unsigned ctlr, int queue_no,
+ 		int priority)
+ {
+ 	int bit = queue_no * 4;
+@@ -315,7 +317,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
+  * included in that particular EDMA variant (Eg : dm646x)
+  *
+  */
+-static void __init map_dmach_param(unsigned ctlr)
++static void map_dmach_param(unsigned ctlr)
+ {
+ 	int i;
+ 	for (i = 0; i < EDMA_MAX_DMACH; i++)
+@@ -1785,15 +1787,102 @@ static int edma_probe(struct platform_device *pdev)
+ 			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+ 			edma_write_array(j, EDMA_QRAE, i, 0x0);
+ 		}
++		edma_cc[j]->info = info[j];
+ 		arch_num_cc++;
+ 	}
+ 
+ 	return 0;
+ }
+ 
++static int edma_pm_suspend(struct device *dev)
++{
++	int j, r;
++
++	r = pm_runtime_get_sync(dev);
++	if (r < 0) {
++		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
++		return r;
++	}
++
++	for (j = 0; j < arch_num_cc; j++) {
++		struct edma *ecc = edma_cc[j];
++
++		disable_irq(ecc->irq_res_start);
++		disable_irq(ecc->irq_res_end);
++	}
++
++	pm_runtime_put_sync(dev);
++
++	return 0;
++}
++
++static int edma_pm_resume(struct device *dev)
++{
++	int i, j, r;
++
++	r = pm_runtime_get_sync(dev);
++	if (r < 0) {
++		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
++		return r;
++	}
++
++	for (j = 0; j < arch_num_cc; j++) {
++		struct edma *cc = edma_cc[j];
++
++		s8 (*queue_priority_mapping)[2];
++		s8 (*queue_tc_mapping)[2];
++
++		queue_tc_mapping = cc->info->queue_tc_mapping;
++		queue_priority_mapping = cc->info->queue_priority_mapping;
++
++		/* Event queue to TC mapping */
++		for (i = 0; queue_tc_mapping[i][0] != -1; i++)
++			map_queue_tc(j, queue_tc_mapping[i][0],
++				     queue_tc_mapping[i][1]);
++
++		/* Event queue priority mapping */
++		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
++			assign_priority_to_queue(j,
++						 queue_priority_mapping[i][0],
++						 queue_priority_mapping[i][1]);
++
++		/*
++		 * Map the channel to param entry if channel mapping logic
++		 * exist
++		 */
++		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
++			map_dmach_param(j);
++
++		for (i = 0; i < cc->num_channels; i++) {
++			if (test_bit(i, cc->edma_inuse)) {
++				/* ensure access through shadow region 0 */
++				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
++					       BIT(i & 0x1f));
++
++				setup_dma_interrupt(i,
++						    cc->intr_data[i].callback,
++						    cc->intr_data[i].data);
++			}
++		}
++
++		enable_irq(cc->irq_res_start);
++		enable_irq(cc->irq_res_end);
++	}
++
++	pm_runtime_put_sync(dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops edma_pm_ops = {
++	.suspend_late	= edma_pm_suspend,
++	.resume_early	= edma_pm_resume,
++};
++
+ static struct platform_driver edma_driver = {
+ 	.driver = {
+ 		.name	= "edma",
++		.pm	= &edma_pm_ops,
+ 		.of_match_table = edma_of_ids,
+ 	},
+ 	.probe = edma_probe,
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.4.2
