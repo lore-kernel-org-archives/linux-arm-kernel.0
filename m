@@ -1,34 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Nov 2013 13:53:10 -0800
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <20131124213651.59750C402C3@trevor.secretlab.ca>
-References: <20131123004334.GJ10023@atomide.com>
- <20131124213651.59750C402C3@trevor.secretlab.ca>
-Message-ID: <20131127215310.GC26766@atomide.com>
+Date: Wed, 27 Nov 2013 13:59:19 -0800
+Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
+ device id
+In-Reply-To: <86fvqhjz4q.fsf@void.printf.net>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-3-git-send-email-tony@atomide.com>
+ <20131118184723.GR10317@atomide.com>
+ <87ioveeo0x.fsf@octavius.laptop.org>
+ <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
+ <86fvqhjz4q.fsf@void.printf.net>
+Message-ID: <20131127215918.GD26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@linaro.org> [131124 13:37]:
+* Chris Ball <cjb@laptop.org> [131127 13:48]:
+> Hi,
 > 
-> I actually like the idea of completely allocating the resource structure
-> but leaving some entries empty. However, I agree with rmk that putting
-> garbage into a resource structure is a bad idea. What about changing the
-> value of flags to 0 or some other value to be obviously an empty
-> property and give the follow up parsing some context about which ones it
-> needs to attempt to recalculate?
+> On Wed, Nov 27 2013, Jarkko Nikula wrote:
+> > Can you enlighten me what's the proper way to get patches to mmc since
+> > I cannot figure out working methodology from MAINTAINERS file?
+> 
+> Sorry about this, Jarkko.
+> 
+> Since I don't have omap.c hardware, I'm generally going to wait for
+> a Tested-by/Acked-by from someone else on patches like these.  We
+> actually have a maintainer already listed for the driver, Jarkko
+> Lavinen <jarkko.lavinen@nokia.com>.
+> 
+> So, maybe the MAINTAINERS section for drivers/mmc/host/omap.c needs
+> an update?  Feel free to send me patches to it.  Either way, I'll
+> start treating Aaro and Jarkko (Nikula) as maintainers for this
+> driver.
 
-If we want to play it safe, we should probably introduce something like
-this to ioport.h:
+Hmm looks like here's a reasonably recent update that we've missed
+from Jarkko Lavinen to update his email address:
 
-+#define IORESOURCE_IRQ_DEFERRED	(1<<6)
+http://lkml.org/lkml/2013/10/4/142
 
-Then we can populate IRQ resources initially with that. And later on
-during the driver probe, we know it's safe to populate the resource
-if res->flags & IORESOURCE_IRQ_DEFERRED.
-
-That fixes the $Subject bug, and gets us a little bit further for
-making more changes later on.
+I've updated Jarkko Lavinen's address in this mail, we should
+probably also patch the MAINTAINERS file for that, and then see if
+Aaro and Jarkko Nikula are interested to be listed there as well.
 
 Regards,
 
