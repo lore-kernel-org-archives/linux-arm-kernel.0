@@ -1,52 +1,56 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Nov 2013 09:58:50 -0700
-Subject: [PATCH 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
+Date: Wed, 27 Nov 2013 10:09:16 -0700
+Subject: [PATCH 2/3] regulator: tps6586x: add voltage table for tps658643
+In-Reply-To: <8be2fe8560cc19f03d5be40ad3dc21d5979c8358.1385508112.git.stefan@agner.ch>
 References: <cover.1385508112.git.stefan@agner.ch>
- <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
-Message-ID: <529624CA.6030604@wwwdotorg.org>
+ <8be2fe8560cc19f03d5be40ad3dc21d5979c8358.1385508112.git.stefan@agner.ch>
+Message-ID: <5296273C.1000705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/26/2013 04:45 PM, Stefan Agner wrote:
-> Use the VERSIONCRC to determine the exact device version. According to
-> the datasheet this register can be used as device identifier. The
-> identification is needed since some tps6586x regulators use a different
+> Depending on version, the voltage table might be different. Add version
+> compatibility to the regulator information in order to select correct
 > voltage table.
 
-> diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
+> diff --git a/drivers/regulator/tps6586x-regulator.c b/drivers/regulator/tps6586x-regulator.c
 
-> @@ -477,6 +486,7 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
->  {
->  	struct tps6586x_platform_data *pdata = dev_get_platdata(&client->dev);
->  	struct tps6586x *tps6586x;
-> +	const char *name = "";
+> -static const unsigned int tps6586x_ldo4_voltages[] = {
+> +static const unsigned int tps6586x_ldo4_sm2_voltages[] = {
 
-There's no need to assign any value here; the switch below always
-assigns something over the top of the variable, so it doesn't need to be
-pre-initialized.
+> +static const unsigned int tps658643_sm2_voltages[] = {
 
-> +	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
-> +	if (tps6586x == NULL) {
-> +		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
-> +		return -ENOMEM;
-> +	}
+What's the logic behind the "ldo4_sm2" v.s. "sm2" naming? Does it match
+the data sheet in some way? If not, it might be better to name this
+something like "tps6586x_ldo4_voltages" and "tps65863_ldo4_voltages".
 
-> +	tps6586x->version = (enum tps6586x_version)ret;
+> -#define TPS6586X_REGULATOR(_id, _pin_name, vdata, vreg, shift, nbits,	\
+> -			   ereg0, ebit0, ereg1, ebit1, goreg, gobit)	\
+> +#define TPS6586X_REG(_ver, _id, _pin_name, vdata, vreg, shift,	nbits,	\
+> +		     ereg0, ebit0, ereg1, ebit1, goreg, gobit)		\
 
-Why not make the version variable an integer of some kind. Then, the
-cast wouldn't be required. The values like TPS658621A can be #defines or
-const u32.
+Why rename the macro?
 
-> +	switch (ret) {
+There's an embedded TAB before "nbits".
 
-That should switch on tps6586x->version since that's been assigned;
-it'll make the purpose a bit clearer.
+> +/* Add version specific entries before any */
+>  static struct tps6586x_regulator tps6586x_regulator[] = {
+>  	TPS6586X_SYS_REGULATOR(),
+> -	TPS6586X_LDO(LDO_0, "vinldo01", ldo0, SUPPLYV1, 5, 3, ENC, 0, END, 0),
+...
+> +	TPS6586X_LDO(TPS6586X_ANY, LDO_0, "vinldo01", tps6586x_ldo0, SUPPLYV1,
+> +			5, 3, ENC, 0, END, 0),
 
-> +	default:
-> +		name = "TPS6586X";
-> +		break;
->  	}
+Rather than changing all the macros and table entries, wouldn't it be
+much simpler to:
 
-I hope the rest of the code deals with unknown values of
-tps6586x->version OK.
+1) Make tps6586x_regulator[] only contain all the common regulator
+definitions.
+
+2) Add new version-specific tables for each version of regulator, so
+tps6586x_other_regulator[] and tps65863_regulator[].
+
+3) Have probe() walk multiple tables of regulators, selecting which
+tables to walk based on version.
+
+That would result in a much smaller and less invasive diff.
