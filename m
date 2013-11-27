@@ -1,96 +1,45 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 27 Nov 2013 16:26:36 +0530
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <201311271106.09624.marex@denx.de>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <201311271027.06982.marex@denx.de> <5295BFB3.5020109@ti.com>
- <201311271106.09624.marex@denx.de>
-Message-ID: <5295CFE4.70404@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Nov 2013 11:00:55 +0000
+Subject: ACPI
+In-Reply-To: <20131126233224.GA21189@srcf.ucam.org>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
+ <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+ <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
+ <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
+ <20131125154110.GB3243@srcf.ucam.org>
+ <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+ <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
+ <20131126183344.GA16074@srcf.ucam.org>
+ <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
+ <20131126233224.GA21189@srcf.ucam.org>
+Message-ID: <CAHkRjk4_hee1v=GvS=fDCw4AE8bFWfQ1ATXVNXHQBNsyO7s=RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut,
-On Wednesday 27 November 2013 03:36 PM, Marek Vasut wrote:
-> Dear Sourav Poddar,
+On 26 November 2013 23:32, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+> On Tue, Nov 26, 2013 at 05:11:23PM -0600, Matt Sealey wrote:
+>> But I can't think of a reason why an extension or companion to PSCI
+>> couldn't do it, and why you WOULDN'T want to do this as an API
+>> implemented via a secure monitor interface which is architecturally
+>> defined on ARM where security extensions are present. I can't imagine
+>> a reason why it couldn't be done over IPMI to some microcontroller or
+>> dedicated external component, for the case of fans and chassis
+>> components and tedious other stuff.
 >
->> Dear Marek Vasut, Huang,
->>
->> On Wednesday 27 November 2013 02:57 PM, Marek Vasut wrote:
->>> Dear Huang Shijie,
->>>
->>>> 1.) Why add a new framework for SPI NOR?
->>>>
->>>>     The SPI-NOR controller such as Freescale's Quadspi controller is
->>>>     working in a different way from the SPI bus. It should knows the NOR
->>>>     commands to find the right LUT sequence. Unfortunately, the current
->>>>     code can not meet this requirement.
->>> Is there any kind of documentation for this controller available? I
->>> cannot quite understand how this controller works and why can it not be
->>> used with our current infrastructure.
->> I do have a similar requirement where my controller need to be configured
->> from slave info. I have submiited a series in the mtd list adding that
->> portion
->> of handling such cases. Here, is the patch which specific to m25p80 part.
->> http://patchwork.ozlabs.org/patch/294285/
->>
->> The whole series can be found here:
->> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg98691.html
-> Is this TI QSPI the same thing as the Altera QSPI controller please ?
->
-No, its differenet.
-> Otherwise, I seriously believe you and Huang should work on a common
-> infrastructure. I would first like to understand how is the controller in DRA7xx
-> different from regular SPI controller though. Is there any kind of documentation
-> I could study please?
->
-Sorry, we dont have a public document yet.
+> Primarily because people want solutions that aren't tied to having an
+> entirely separate computer running its own embedded OS. The likely
+> alternative to doing things in ACPI would be to do them in TrustZone,
+> and let's not encourage that. A significant proportion of the bugs we
+> see on x86 are down to SMM code that we can't see, let alone debug. It's
+> much easier to handle bugs in code that runs in the same context as the
+> OS.
 
-Though, this is what ti qspi contoller has
+I agree. While I'm pushing for standard firmware interfaces like PSCI
+on ARMv8 (Power State Coordination Interface for those who haven't
+heard of it yet), I would limit it to things that can only be done
+(safely) in secure monitor mode (EL3) like CPU power management (and
+that's hotplug/idle, not DVFS).
 
-It supports two modes of operation, one is SPI mode(normal), other is
-the memory mapped read mode.
-
-For SPI mode, the state machine remains the same as it is with other spi 
-controller
-available.
-
-For memory mapped, there is something more which we need to do around ..
-
-1. There is a qspi "set up" register available, which needs to be filled 
-with
-      information like flash opcode, dummy bytes etc. In short, flash 
-specific
-      details.
-2   if the above register is configured with the required opcodes, then 
-whenever
-      we need to use memory mapped operations, we need to do is to 
-switch our
-      qspi controller to memory mapped mode.
-     Switching of this mode to memory mapped needs
-      a )  write to a particular qspi register
-      b)   write to control module(optional based on SOC).
-
-3. Once the above steps are configured, then the flash data will be 
-mapped to a
-     particular memory address(SOC specific) from where the flash data  
-can be read.
-
-The series 
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg98691.html
-tries to work on the above features, and tries to add a support for the 
-same in the
-spi framework and m25p80 code.
-
-As you see in my patches, once we take care of the above points and add 
-support
-for memory mapped in m25p80 and qspi, then while doing a read in m25p80 
-we can
-do memcpy at the beginning of m25p80_read and can bypass the entire SPI
-framework for memory mapped read operation. Throughput almost gets 
-doubles with this,
-as compared to normal SPI operations.
-
-Please get back, if you need more info on this concept.
-
-> Best regards,
-> Marek Vasut
+-- 
+Catalin
