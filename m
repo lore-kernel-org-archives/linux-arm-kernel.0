@@ -1,44 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 27 Nov 2013 10:38:31 +0100
-Subject: [PATCH] tty: atmel_serial: include <mach/hardware.h> explicitly
-Message-ID: <1385545111-1256-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 27 Nov 2013 10:39:45 +0100
+Subject: [PATCH 3/4] mtd: spi-nor: add the framework for SPI NOR
+In-Reply-To: <1385447575-23773-4-git-send-email-b32955@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <1385447575-23773-4-git-send-email-b32955@freescale.com>
+Message-ID: <201311271039.45463.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiled for at91rm9200 (i.e. ARM) the driver needs among others
-the symbol AT91RM9200_BASE_US0 which is defined in
-arch/arm/mach-at91/include/mach/at91rm9200.h. This file is included
-implicitly via several steps. As ARM's <asm/timex.h> will stop including
-<mach/hardware.h> later in this series explicitly include
-<mach/hardware.h>
+Dear Huang Shijie,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
+> This patch cloned most of the m25p80.c. In theory, it adds a new spi-nor
+> layer.
+> 
+> Before this patch, the layer is like:
+> 
+>                    MTD
+>          ------------------------
+>                   m25p80
+>          ------------------------
+> 	       spi bus driver
+>          ------------------------
+> 	        SPI NOR chip
+> 
+> After this patch, the layer is like:
+>                    MTD
+>          ------------------------
+>                   spi-nor
+>          ------------------------
+>                   m25p80
+>          ------------------------
+> 	       spi bus driver
+>          ------------------------
+> 	       SPI NOR chip
+> 
+> With the spi-nor controller driver(Freescale Quadspi), it looks like:
+>                    MTD
+>          ------------------------
+>                   spi-nor
+>          ------------------------
+>                 fsl-quadspi
+>          ------------------------
+> 	       SPI NOR chip
+> 
+> New APIs:
+>    spi_nor_register: used to register a spi-nor flash.
+>    spi_nor_unregister: used to unregister a spi-nor flash.
+> 
+> The m25p80 and spi-nor controller driver should implement the hooks
+>    @read_reg, @write_reg, @write, @read.
 
-Notes:
-    Hello,
-    
-    I want to send this patch as part of a series dropping <mach/timex.h>
-    altogether. So please don't take this patch but only give your Ack if
-    you're OK with me sending this patch via arm-soc.
-    
-    Thanks
-    Uwe
+I would approach this the other way around -- first I'd split the common code 
+out from m25p80 driver and then I'd add my own driver which uses the common 
+code. Then we won't have to review the common code (or such a large chunk of it 
+anyway) again.
 
- drivers/tty/serial/atmel_serial.c | 1 +
- 1 file changed, 1 insertion(+)
+But I am still not too sure we need this new framework at all, I will wait for 
+your reply on 0/4 .
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index c7d99af..de51964 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -47,6 +47,7 @@
- 
- #ifdef CONFIG_ARM
- #include <mach/cpu.h>
-+#include <mach/hardware.h>
- #include <asm/gpio.h>
- #endif
- 
--- 
-1.8.4.2
+Cheers!
+
+Best regards,
+Marek Vasut
