@@ -1,40 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Nov 2013 10:27:46 +0100
-Subject: [PATCH 5/4] ARM: at91: don't use <mach/timex.h>
-In-Reply-To: <5294BB7C.6030307@atmel.com>
-References: <1385474690-6483-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5294BB7C.6030307@atmel.com>
-Message-ID: <20131127092746.GP28642@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 27 Nov 2013 10:27:06 +0100
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+Message-ID: <201311271027.06982.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 04:17:16PM +0100, Nicolas Ferre wrote:
-> On 26/11/2013 15:04, Uwe Kleine-K?nig :
-> >The platform specific <mach/timex.h> will be removed in a later patch.
-> >So move its only still used symbol to its only user. Also add a few
-> >explicit includes of <mach/hardware.h> that are implicitly available
-> >through <mach/timex.h>.
-> >
-> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> >---
-> >Hello,
-> >
-> >assuming it's OK for you, please only give an ack and don't take that
-> >patch as I intend to keep it in a series deprecating <mach/timex.h>.
-> 
-> Okay, I let you take this one.
-> 
-> Thanks a lot. bye,
+Dear Huang Shijie,
 
-Build testing showed that I have to add several more #include
-<mach/hardware.h>, I will send a v2.
+> 1.) Why add a new framework for SPI NOR?
+>   The SPI-NOR controller such as Freescale's Quadspi controller is working
+>   in a different way from the SPI bus. It should knows the NOR commands to
+>   find the right LUT sequence. Unfortunately, the current code can not meet
+>   this requirement.
 
-Thanks
-Uwe
+Is there any kind of documentation for this controller available? I cannot quite 
+understand how this controller works and why can it not be used with our current 
+infrastructure.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+Marek Vasut
