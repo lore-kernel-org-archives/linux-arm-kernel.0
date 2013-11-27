@@ -1,109 +1,73 @@
-From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
-Date: Wed, 27 Nov 2013 13:19:19 +0800
-Subject: [PATCH] pinctrl: imx1-core populate subdevices
-In-Reply-To: <529567FB.5090501@gtsys.com.hk>
-References: <CACRpkda2dO6DvurEhaTVGJv8nDyEGOEeLCap-_+1e1mHtD0XyQ@mail.gmail.com>	<1384193987-20740-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdaQcY43wnfD_phsi6rCo3oUmOUcei+gb9phyGT7F1iZyA@mail.gmail.com>
- <529567FB.5090501@gtsys.com.hk>
-Message-ID: <529580D7.1030505@gtsys.com.hk>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 27 Nov 2013 06:28:05 +0100
+Subject: [PATCH v2 1/2] mmc: arasan: Add driver for Arasan SDHCI
+In-Reply-To: <9e92f3b2-5434-4fcf-b7f5-3f634175193c@CO1EHSMHS024.ehs.local>
+References: <1383151090-13885-1-git-send-email-soren.brinkmann@xilinx.com>
+ <87mwkqeojd.fsf@octavius.laptop.org>
+ <9e92f3b2-5434-4fcf-b7f5-3f634175193c@CO1EHSMHS024.ehs.local>
+Message-ID: <529582E5.4010809@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chris,
 
-
-On Wednesday, November 27, 2013 11:33 AM, Chris Ruehl wrote:
-> On Wednesday, November 20, 2013 04:01 AM, Linus Walleij wrote:
->> On Mon, Nov 11, 2013 at 7:19 PM, Markus Pargmann<mpa@pengutronix.de>
->> wrote:
+On 11/27/2013 12:39 AM, S?ren Brinkmann wrote:
+> Hi Chris,
+> 
+> On Tue, Nov 26, 2013 at 06:22:46PM -0500, Chris Ball wrote:
+>> Hi Soren, sorry for the late review, just trivial changes:
+> No problem. Thanks for looking at it.
+> 
 >>
->>> Support gpio devicetree subnodes to allow a more detailed DT hardware
->>> description.
->>>
->>> Signed-off-by: Markus Pargmann<mpa@pengutronix.de>
+>> On Wed, Oct 30 2013, Soren Brinkmann wrote:
+>>> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+>>> new file mode 100644
+>>> index 000000000000..ef4c5ac753e8
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+>>> @@ -0,0 +1,27 @@
+>>> +Device Tree Bindings for the Arasan SDCHI Controller
 >>
->> Looks good to me.
+>> SDHCI
+> Oops. Will be fixed.
+> 
 >>
->> Tentatively applied this, the DT people may want to say something
->> about this.
+>>> +
+>>> +  The bindings follow the mmc[1], clock[2] and interrupt[3] bindings. Only
+>>> +  deviations are documented here.
+>>> +
+>>> +  [1] Documentation/devicetree/bindings/mmc/mmc.txt
+>>> +  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>> +  [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>>> +
+>>> +Required Properties:
+>>> +  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a'
+>>> +  - reg: From mmc bindings: Register location and length.
 >>
->> Yours,
->> Linus Walleij
->> --
->
-> Hi,
->
-> I tried the new configuration but the kernel oops when probing the
-> dm9000 caused by insufficient resources more likely the real reason
-> that somehow the gpio6: triggers a problem
->
->
-> [ 0.115718] irq: no irq domain found for
-> /soc/aipi at 10000000/iomuxc at 10015000/gpio at 10015500 !
-> [ 0.115768] ------------[ cut here ]------------
-> [ 0.115853] WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171
-> of_device_alloc+0x110/0x15c()
-> [ 0.117824] ---[ end trace 0e10ae727e6e0ab1 ]---
-> [ 0.121236] Failed to request board ext/int gpios
-> [ 0.152712] imx27-pinctrl 10015000.iomuxc: initialized IMX pinctrl driver
->
->
-> iomuxc: iomuxc at 10015000 {
-> compatible = "fsl,imx27-iomuxc";
-> reg = <0x10015000 0x600>;
-> #address-cells = <1>;
-> #size-cells = <1>;
-> ranges;
->
-> gpio1: gpio at 10015000 {
-> compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-> reg = <0x10015000 0x100>;
-> interrupts = <8>;
-> gpio-controller;
-> #gpio-cells = <2>;
-> interrupt-controller;
-> #interrupt-cells = <2>;
-> };
-> ...
-> gpio6: gpio at 10015500 {
-> compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-> reg = <0x10015500 0x100>;
-> interrupts = <8>;
-> gpio-controller;
-> #gpio-cells = <2>;
-> interrupt-controller;
-> #interrupt-cells = <2>;
-> };
-> };
->
+>> Actually, reg/interrupts are from the OF core.  There's no need to
+>> mention them here.
+> Tomasz complained when I left those parts out so I added them in v2.
+> Since it's there now, I don't mind either way. Let's just agree on one
+> way or the other.
+> 
 
-More info
-board-dts-definition for the dm9000 which trigger the oops
+Binding was Acked-by Rob and that's why I believe this should be fine.
 
-/ {
-         model = "GTSYS IR module";
-         compatible = "gtsys,mx27gtsir","fsl,imx27";
+Thanks,
+Michal
 
-         memory {
-                 reg = <0xa0000000 0x10000000>;
-         };
-
-         enet1: ethernet at d4000000 {
-                         compatible = "davicom,dm9000";
-                         #address-cells = <1>;
-                         #size-cells = <1>;
-                         reg = <0xd4000000 0x2
-                                0xd4000004 0x2>;
-                         interrupt-parent = <&gpio6>;
-                         interrupts = <18 2>;   /* DM9000IRQ IMX_GPIO_NR(6,18) 2 
-= high edge trigger */
-                         local-mac-address = [00 00 00 00 00 00];
-                         davicom,no-eeprom;
-                         status = "okay";
-         };
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
 
-> Kernel Linux version 3.13.0-rc1-next-20131125-dirty
->
-> With kind regards
-> Chris
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/1bc82d6f/attachment.sig>
