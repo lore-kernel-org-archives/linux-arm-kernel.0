@@ -1,63 +1,68 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 26 Nov 2013 16:37:07 -0800
-Subject: [PATCH 07/12] memory: davinci-aemif: introduce AEMIF driver
-In-Reply-To: <5294E7E4.3060600@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384187188-5776-8-git-send-email-ivan.khoronzhuk@ti.com>
- <4F5844B3A985794BA902E12C070812375F8D2E@DNCE04.ent.ti.com>
- <52944BD3.90105@ti.com> <5294B8C4.6040803@ti.com>
- <5294D8AD.5030106@ti.com> <5294E7E4.3060600@ti.com>
-Message-ID: <20131127003707.GQ9468@ld-irv-0074.broadcom.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 26 Nov 2013 16:44:17 -0800
+Subject: ARM: nommu: Unable to allocate RAM for process text/data, errno 12
+In-Reply-To: <1385458169.6721.2.camel@phoenix>
+References: <1385458169.6721.2.camel@phoenix>
+Message-ID: <20131126164417.9df88075f9ad394679bb60cb@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 01:26:44PM -0500, Santosh Shilimkar wrote:
-> On Tuesday 26 November 2013 12:21 PM, Sekhar Nori wrote:
-> > On 11/26/2013 8:35 PM, Santosh Shilimkar wrote:
-> >> On Tuesday 26 November 2013 02:20 AM, Sekhar Nori wrote:
-> >>> On Monday 11 November 2013 10:36 PM, Khoronzhuk, Ivan wrote:
-> >>>> +static int davinci_aemif_probe(struct platform_device *pdev)
-> >>>> +{
-> >>>> +       int ret  = -ENODEV, i;
-> >>>> +       struct resource *res;
-> >>>> +       struct device *dev = &pdev->dev;
-> >>>> +       struct device_node *np = dev->of_node;
-> >>>> +
-> >>>> +       if (np == NULL)
-> >>>> +               return 0;
-> >>>> +
-> >>>> +       if (aemif) {
-> >>>> +               dev_err(dev, "davinci_aemif driver is in use currently\n");
-> >>>> +               return -EBUSY;
-> >>>> +       }
-> >>>
-> >>> Why expressly prevent multiple AEMIF devices? Its entirely conceivable
-> >>> to have two memories like NAND and NOR flash connect to two different
-> >>> AEMIF interfaces.
-> >>>
-> >> Ivan wanted me to clarify the Keystone hardware which supports
-> >> 1 instance of controller with 4 CS. That allows already four
-> >> devices to be connected. Currently NAND and NOR are connected on it
-> >> and two more slots are free.
-> >>
-> >> Since driver support what hardware is, lets not build a driver for
-> >> hardware which don't exist. And if at all such a support would be
-> >> needed in future, we can always add it.
-> > 
-> > I understand the lack of hardware part, but its common to write the
-> > driver such that it can handle multiple instances. Is there any gain on
-> > current hardware because of this check? From what I am hearing, the code
-> > in question wont be exercised at all. So why go all the way and add it
-> > in first place?
-> > 
-> Fair enough. The check can be dropped.
+On Tue, 26 Nov 2013 17:29:29 +0800 Axel Lin <axel.lin@ingics.com> wrote:
 
-Hmm, while the sentiment expressed by Sekhar is noble (to avoid
-unnecessarily constraining the driver), removing the check is not
-enough. You're still using a global static variable 'aemif', and it is
-important not to accidentally re-use this struct if a second device ever
-becomes available. So for the current implementation, the check is
-necessary IMO. If instead, you were to make 'aemif' a per-device struct
-(like with platform_set_drvdata()), then you would not have this issue.
+> Hi,
+> I got below error messages while starting mdev (busybox).
+> 
+> ...
+>
+> [  108.537109] chmod: page allocation failure: order:8, mode:0xd0
 
-Brian
+It wants to allocate 2^8 physically contiguous pages!
+
+> [  108.543945] CPU: 0 PID: 47 Comm: chmod Not tainted 3.13.0-rc1-00170-g1bab531-dirty #1940
+> [  108.580078] [<0000c430>] (unwind_backtrace+0x0/0xe0) from [<0000ae58>] (show_stack+0x10/0x14)
+> [  108.592773] [<0000ae58>] (show_stack+0x10/0x14) from [<00050010>] (warn_alloc_failed+0xf8/0x128)
+> [  108.605468] [<00050010>] (warn_alloc_failed+0xf8/0x128) from [<00052030>] (__alloc_pages_nodemask+0x64c/0x6c4)
+> [  108.620117] [<00052030>] (__alloc_pages_nodemask+0x64c/0x6c4) from [<0005f028>] (do_mmap_pgoff+0x5d0/0x9b0)
+> [  108.633789] [<0005f028>] (do_mmap_pgoff+0x5d0/0x9b0) from [<0005ac04>] (vm_mmap_pgoff+0x64/0x7c)
+> [  108.647460] [<0005ac04>] (vm_mmap_pgoff+0x64/0x7c) from [<0009e6e8>] (load_flat_binary+0x38c/0xa0c)
+> [  108.660156] [<0009e6e8>] (load_flat_binary+0x38c/0xa0c) from [<0006bc40>] (search_binary_handler+0x4c/0xa4)
+> [  108.676757] [<0006bc40>] (search_binary_handler+0x4c/0xa4) from [<0006bfc8>] (do_execve+0x330/0x4e8)
+> [  108.689453] [<0006bfc8>] (do_execve+0x330/0x4e8) from [<0006c3c4>] (SyS_execve+0x30/0x44)
+> [  108.701171] [<0006c3c4>] (SyS_execve+0x30/0x44) from [<00008f40>] (ret_fast_syscall+0x0/0x44)
+
+So the binfmt_flat driver is allocating memory into which to load
+mdev's text (I assume it's the text).
+
+> Why it got page allocation failure?
+
+Because 256 physically contiguous free pages were not available.
+
+> Does that mean it run into OOM?
+
+Nope.
+
+> Seem the system still has enough memory available.
+
+Sure, but it is too fragmented.  Get an MMU ;)
+
+
+otoh, memory reclaim *should* have at least reclaimed non-mmapped
+pagecache.  Shooting down lots of pagecache is preferable to failing
+exec().  But I expect the PAGE_ALLOC_COSTLY_ORDER logic prevents the kernel
+from trying to do this.
+
+If it's repeatable then something like this:
+
+--- a/mm/nommu.c~a
++++ a/mm/nommu.c
+@@ -1173,7 +1173,7 @@ static int do_mmap_private(struct vm_are
+ 	order = get_order(len);
+ 	kdebug("alloc order %d for %lx", order, len);
+ 
+-	pages = alloc_pages(GFP_KERNEL, order);
++	pages = alloc_pages(GFP_KERNEL|__GFP_REPEAT, order);
+ 	if (!pages)
+ 		goto enomem;
+ 
+
+*might* help.
