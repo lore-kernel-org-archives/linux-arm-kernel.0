@@ -1,103 +1,49 @@
-From: hrhaan@gmail.com (Harro Haan)
-Date: Wed, 27 Nov 2013 17:23:37 +0100
-Subject: [PATCH 4/7] PCI: imx6: Split away the PHY reset
-In-Reply-To: <1385500248-6551-4-git-send-email-marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <1385500248-6551-4-git-send-email-marex@denx.de>
-Message-ID: <CAB5oZtCTDJEWFxr-f1YJg7ihw0aCuiJiYvrHV597oNb6cZz92Q@mail.gmail.com>
+From: balajitk@ti.com (Balaji T K)
+Date: Wed, 27 Nov 2013 21:59:38 +0530
+Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
+ wl12xx
+In-Reply-To: <20131126215537.GO26766@atomide.com>
+References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
+ <1385041804-19115-2-git-send-email-balajitk@ti.com>
+ <20131121165823.GM10317@atomide.com> <528E4295.2040109@ti.com>
+ <20131126215537.GO26766@atomide.com>
+Message-ID: <52961DF2.8080507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2013 22:10, Marek Vasut <marex@denx.de> wrote:
-> Split the PCIe PHY reset from the link up function to make
-> the code a little more structured.
+On Wednesday 27 November 2013 03:25 AM, Tony Lindgren wrote:
+> * Dan Murphy <dmurphy@ti.com> [131121 09:28]:
+>> On 11/21/2013 10:58 AM, Tony Lindgren wrote:
+>>> * Balaji T K <balajitk@ti.com> [131121 05:51]:
+>>>> pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
+>>>> and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
+>>>>
+>>>> Fix the following error message:
+>>>> pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
+>>>> pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
+>>
+>> Why is the led pins moved then?
 >
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Frank Li <lznuaa@gmail.com>
-> Cc: Harro Haan <hrhaan@gmail.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> Cc: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
-> ---
->  drivers/pci/host/pci-imx6.c | 33 ++++++++++++++++++---------------
->  1 file changed, 18 insertions(+), 15 deletions(-)
+> Heh the patch just looks that way, looking at the curly brackets
+> thing do get moved properly.
 >
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 4d5be4e..a9781e7 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -336,6 +336,23 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
->         return;
->  }
+>>>> SDIO card is not detected after moving pin mux to omap4_pmx_core since
+>>>> sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
+>>> Cool, does this fix the issue with the WLAN not coming up after a warm reset
+>>> on panda?
 >
-> +static void imx6_pcie_reset_phy(struct pcie_port *pp)
-> +{
-> +       uint32_t temp;
-> +
-> +       pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
-> +       temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN |
-> +                PHY_RX_OVRD_IN_LO_RX_PLL_EN);
-> +       pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
-> +
-> +       usleep_range(2000, 3000);
-> +
-> +       pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
-> +       temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN |
-> +                 PHY_RX_OVRD_IN_LO_RX_PLL_EN);
-> +       pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
-> +}
-> +
->  static int imx6_pcie_link_up(struct pcie_port *pp)
->  {
->         u32 rc, ltssm, rx_valid, temp;
-> @@ -370,21 +387,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+> Also commit f446043f1aa7 (regulator: fixed: fix regulator_list_voltage() for
+> regression) is needed that recently got merged. But with v3.13-rc1 +
+> f446043f1aa7 + this patch no luck whatsoever bringing up the wl12xx so there
+> must be also some regression somewhere from v3.12 on that?
 >
->         dev_err(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
->
-> -       pcie_phy_read(pp->dbi_base,
-> -               PHY_RX_OVRD_IN_LO, &temp);
-> -       temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN
-> -               | PHY_RX_OVRD_IN_LO_RX_PLL_EN);
-> -       pcie_phy_write(pp->dbi_base,
-> -               PHY_RX_OVRD_IN_LO, temp);
-> -
-> -       usleep_range(2000, 3000);
-> -
-> -       pcie_phy_read(pp->dbi_base,
-> -               PHY_RX_OVRD_IN_LO, &temp);
-> -       temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN
-> -               | PHY_RX_OVRD_IN_LO_RX_PLL_EN);
-> -       pcie_phy_write(pp->dbi_base,
-> -               PHY_RX_OVRD_IN_LO, temp);
-> +       imx6_pcie_reset_phy(pp);
->
->         return 0;
->  }
-> --
-> 1.8.4.3
->
+Hi Tony,
 
-Thanks Marek,
+I tried loading wl12xx as modules on latest base as yours with
+ti-connectivity/wl127x-fw-5-sr.bin firmware in place and I could connect
+and run iperf.
 
-A minor:
-drivers/pci/host/pci-imx6.c: In function 'imx6_pcie_link_up':
-drivers/pci/host/pci-imx6.c:353:27: warning: unused variable 'temp'
-[-Wunused-variable]
-
-See the following mail for more info which tests I did with patch 1/7,
-3/7, 4/7, 5/7 and 6/7:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/214640.html
-
-Regards,
-
-Harro
+> Regards,
+>
+> Tony
+>
