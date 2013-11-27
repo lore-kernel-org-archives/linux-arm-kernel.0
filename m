@@ -1,51 +1,51 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Nov 2013 14:05:29 -0800
-Subject: [PATCH v5 08/17] clk: at91: add PMC system clocks
-In-Reply-To: <1384293935-4755-1-git-send-email-b.brezillon@overkiz.com>
-References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
- <1384293935-4755-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131127220529.16819.42204@quantum>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Nov 2013 17:12:50 -0500 (EST)
+Subject: ACPI
+In-Reply-To: <CAHkRjk4_hee1v=GvS=fDCw4AE8bFWfQ1ATXVNXHQBNsyO7s=RQ@mail.gmail.com>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
+ <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+ <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
+ <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
+ <20131125154110.GB3243@srcf.ucam.org>
+ <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+ <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
+ <20131126183344.GA16074@srcf.ucam.org>
+ <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
+ <20131126233224.GA21189@srcf.ucam.org>
+ <CAHkRjk4_hee1v=GvS=fDCw4AE8bFWfQ1ATXVNXHQBNsyO7s=RQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.10.1311271710170.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2013-11-12 14:05:35)
-> This patch adds new at91 system clock implementation using common clk
-> framework.
-> 
-> Some peripherals need to enable a "system" clock in order to work properly.
-> Each system clock is given an id based on the bit position in SCER/SCDR
-> registers.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/clk/at91/Makefile     |    1 +
->  drivers/clk/at91/clk-system.c |  137 +++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/at91/pmc.c        |    5 ++
->  drivers/clk/at91/pmc.h        |    3 +
->  4 files changed, 146 insertions(+)
->  create mode 100644 drivers/clk/at91/clk-system.c
-> 
-> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-> index e28fb2b..c2b7068 100644
-> --- a/drivers/clk/at91/Makefile
-> +++ b/drivers/clk/at91/Makefile
-> @@ -4,3 +4,4 @@
->  
->  obj-y += pmc.o
->  obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
-> +obj-y += clk-system.o
-> diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
-> new file mode 100644
-> index 0000000..1c086f4
-> --- /dev/null
-> +++ b/drivers/clk/at91/clk-system.c
-> @@ -0,0 +1,137 @@
-> +/*
-> + * drivers/clk/at91/clk-system.c
+On Wed, 27 Nov 2013, Catalin Marinas wrote:
 
-Nitpick: it's better to not put file paths in a comment block in case
-the file name or path is changed.
+> On 26 November 2013 23:32, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+> > On Tue, Nov 26, 2013 at 05:11:23PM -0600, Matt Sealey wrote:
+> >> But I can't think of a reason why an extension or companion to PSCI
+> >> couldn't do it, and why you WOULDN'T want to do this as an API
+> >> implemented via a secure monitor interface which is architecturally
+> >> defined on ARM where security extensions are present. I can't imagine
+> >> a reason why it couldn't be done over IPMI to some microcontroller or
+> >> dedicated external component, for the case of fans and chassis
+> >> components and tedious other stuff.
+> >
+> > Primarily because people want solutions that aren't tied to having an
+> > entirely separate computer running its own embedded OS. The likely
+> > alternative to doing things in ACPI would be to do them in TrustZone,
+> > and let's not encourage that. A significant proportion of the bugs we
+> > see on x86 are down to SMM code that we can't see, let alone debug. It's
+> > much easier to handle bugs in code that runs in the same context as the
+> > OS.
+> 
+> I agree. While I'm pushing for standard firmware interfaces like PSCI
+> on ARMv8 (Power State Coordination Interface for those who haven't
+> heard of it yet), I would limit it to things that can only be done
+> (safely) in secure monitor mode (EL3) like CPU power management (and
+> that's hotplug/idle, not DVFS).
 
-Regards,
-Mike
+And as we both know, even hotplug/idle may get quite complicated and bug 
+prone in some circumstances.
+
+
+Nicolas
