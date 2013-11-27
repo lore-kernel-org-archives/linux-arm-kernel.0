@@ -1,82 +1,49 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 26 Nov 2013 20:32:53 -0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <1385447575-23773-1-git-send-email-b32955@freescale.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
-Message-ID: <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+From: panchaxari.prasannamurthy@linaro.org (panchaxari)
+Date: Wed, 27 Nov 2013 09:58:05 +0530
+Subject: [PATCH] ARM:EXYNOS:Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR by
+ default
+In-Reply-To: <1385526485-23758-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+References: <1385526485-23758-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+Message-ID: <1385526485-23758-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Lee Jones, others
+ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR is enabled by default for Exynos
+platforms.
 
-I'd like to keep a similar CC list for the various conversations going
-on about SPI NOR frameworks.
+Introduction of this config as default will enable phy-to-virt and
+virt-to-phy translation function at boot and module loading time
+and enforce dynamic reallocation of memory.
 
-On Tue, Nov 26, 2013 at 02:32:51PM +0800, Huang Shijie wrote:
-> 1.) Why add a new framework for SPI NOR?
->   The SPI-NOR controller such as Freescale's Quadspi controller is working
->   in a different way from the SPI bus. It should knows the NOR commands to
->   find the right LUT sequence. Unfortunately, the current code can not meet
->   this requirement.
-> 
-> 2.) How does this patch set do?
->    This patch set adds a new spi-nor layer.
->    Before this patch, the layer is like:
-> 
->                    MTD
->          ------------------------
->                   m25p80
->          ------------------------
-> 	       spi bus driver
->          ------------------------
-> 	        SPI NOR chip
-> 
->    After this patch, the layer is like:
->                    MTD
->          ------------------------
->                   spi-nor
->          ------------------------
->                   m25p80
->          ------------------------
-> 	       spi bus driver
->          ------------------------
-> 	       SPI NOR chip
-> 
->   With the spi-nor controller driver(Freescale Quadspi), it looks like:
->                    MTD
->          ------------------------
->                   spi-nor
->          ------------------------
->                 fsl-quadspi
->          ------------------------
-> 	       SPI NOR chip
-> 
-> 3.) more details
->    This patch set adds a new data structrue spi_nor{}, clones most the common
->   code to spi-nor.c. Make the m25p80.c use the new APIs.
-> 
-> 4.) TODO list:
->    3.1) add the new spi_nor_device{} for the spi-nor controller's device.
->    3.2) add the Freescale Quadspi driver.
-> 
-> 	       
-> Huang Shijie (4):
->   mtd: spi-nor: move the SPI NOR commands to a new header file
->   mtd: spi-nor: add a new data structrue spi_nor{}
->   mtd: spi-nor: add the framework for SPI NOR
->   mtd: m25p80: use the new spi-nor APIs
-> 
->  drivers/mtd/Kconfig           |    2 +
->  drivers/mtd/Makefile          |    1 +
->  drivers/mtd/devices/Kconfig   |    2 +-
->  drivers/mtd/devices/m25p80.c  | 1249 +++--------------------------------------
->  drivers/mtd/spi-nor/Kconfig   |    6 +
->  drivers/mtd/spi-nor/Makefile  |    1 +
->  drivers/mtd/spi-nor/spi-nor.c | 1057 ++++++++++++++++++++++++++++++++++
->  include/linux/mtd/spi-nor.h   |  101 ++++
->  8 files changed, 1239 insertions(+), 1180 deletions(-)
->  create mode 100644 drivers/mtd/spi-nor/Kconfig
->  create mode 100644 drivers/mtd/spi-nor/Makefile
->  create mode 100644 drivers/mtd/spi-nor/spi-nor.c
->  create mode 100644 include/linux/mtd/spi-nor.h
-> 
+This config is mutually exclusive to XIP_KERNEL, which is used in
+systems with NOR flash devices
+
+Requesting Exynos maintainers to evaluate the changes on the
+board and comment, as I dont have the board for testing
+I am seeking an ACK from Exynos maintainers.
+
+Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+---
+ arch/arm/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 214b698..28d84f3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -807,6 +807,8 @@ config ARCH_EXYNOS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select ARM_GIC
++	select ARM_PATCH_PHYS_VIRT
++	select AUTO_ZRELADDR
+ 	select COMMON_CLK
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+-- 
+1.7.10.4
