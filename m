@@ -1,153 +1,120 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 27 Nov 2013 12:35:28 +0800
-Subject: [PATCH 2/4] mtd: spi-nor: add a new data structrue spi_nor{}
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA4EEF0@DBDE04.ent.ti.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <1385447575-23773-3-git-send-email-b32955@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA4EEF0@DBDE04.ent.ti.com>
-Message-ID: <52957690.60102@freescale.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 27 Nov 2013 10:01:08 +0530
+Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <5295758C.2030907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?11?26? 19:42, Gupta, Pekon ??:
->> From: Huang Shijie [mailto:b32955 at freescale.com]
-> [...]
->> +#define	MAX_CMD_SIZE		6
->> +
->> +enum read_type {
->> +	M25P80_NORMAL = 0,
->> +	M25P80_FAST,
->> +	M25P80_QUAD,
->> +};
-> Sorry. no 'M25P80' suffix here this is spi-nor.h :-)
->
->
-ok. thanks. :)
->> +
->> +struct spi_nor {
->> +	struct mutex		lock;
->> +	struct mtd_info		mtd;
->>
-> mtd_info should not be present here. Rather it should be other way round
-> 'mtd_info->priv = (struct spi_nor *) spi_nor;
->
->
-put the mtd here can make code simple,
+On Monday 25 November 2013 07:34 PM, Ivan Khoronzhuk wrote:
+> To reduce code duplicate and increase code readability use WDT core
+> code to handle WDT interface.
+> 
+> Remove io_lock as the WDT core uses mutex to lock each wdt device.
+> Remove wdt_state as the WDT core tracks state with its own variable.
+> 
+> The watchdog_init_timeout() can read timeout value from timeout-sec
+> property if the passed value is out of bounds. The heartbeat is
+> initialized in next way. If heartbeat is not set thought module
+> parameter, try to read it's value from WDT node timeout-sec property.
+> If node has no one, use default value.
+> 
+> The heartbeat is hold in wdd->timeout by WDT core, so use it in
+> order to set timeout period.
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-do David/Brian have any comment about this?
-If all object to put the mtd here, i will change it.
+So this still causes a regression because the clk_get()
+fails due to the changed device name. Please fold this
+patch in (tested on DM365, compiled on rest).
 
+Also, the change in device name (while needed) does not seem
+to be related to usage of wdt core. Can you may be split
+that change into a separate patch?
 
->> +	struct device		*dev;
-> Again, spi_nor would be a MTD device, not a new type of device on its own.
-> Thus you should use, mtd_info->dev.
->
->
-this dev pointer is not from the mtd_info->dev, it from the spi_device 
-or other spi nor device .
->> +	u16			page_size;
->> +	u16			addr_width;
->> +	u8			erase_opcode;
->> +	u8			read_opcode;
-> s/read_opcode/read_flash_opcode
-why not keep the legacy name?
-should we also rename the erase_opcode to erase_flash_opcode? :)
-> How about '+  u8  read_reg_opcode' ??
->
->
->> +	u8			program_opcode;
-> + How about '+  u8  write_reg_opcode' ??
->
->
->> +	u8			command[MAX_CMD_SIZE];
->> +	enum read_type		flash_read;
-> s/read_type/read_mode
-> (agree .. there is nothing in the name, but it matches SPI generic framework)
->
-> Other missing fields I can think of are..
-> + u8 read_dummy_cycles;
-I was wondering if other SPI NOR driver needs this field.
-current dummy is 8 clock cycles for quad-read/fast-read, but for DDR 
-QUAD read, the dummy is not 8 clock cycles.
-so i did not add this field to spi-nor{}.
+Thanks,
+Sekhar
 
-I do not know how the m25p80 handle the non-8 clock cycles cases...
-
-But it's okay to me to add this field to spi-nor{}.
-
-
-
-
-> + u8 write_dummy_cycles;
->
->
-do the write need a dummy?
-
-I check the s25fl128s's quad page program, it does not need a dummy.
->> +	bool			sst_write_second;
->> +
->> +	/*
->> +	 * Read the register:
->> +	 *  Read `len` length data from the register specified by the `opcode`,
->> +	 *  and store the data to the `buf`.
->> +	 */
->> +	int (*read_reg)(struct spi_nor *flash, u8 opcode, u8 *buf, int len);
->>
-> Do you need 'opcode' passed in argument here ?
-> Can you add it as 'read_reg_opcode' field in struct spi_nor ?
-> 'read_reg_opcode' should be fixed for a device like a 'read_flash_opcode'.
->
->
-the @read_reg can be used to read id, read status and so on.
-so the opcode here is not a fixed value.
-
-but i do not object to add the read_reg_opcode/write_reg_opcode to 
-spi_nor{}.
-
-
-
->> +
->> +	/*
->> +	 * Write the register:
->> +	 *  Write the `cmd_len` length data stored in the @command to the
->> NOR,
->> +	 *  the command[0] stores the write opcode. `offset` is only used for
->> +	 *  erase operation, it should set to zero for other NOR commands.
->> +	 */
->> +	int (*write_reg)(struct spi_nor *flash, int cmd_len, u32 offset);
->>
-> Instead of having actual 'command[]' array in struct spi_nor, and pass its
-> valid length here.. shouldn't you pass the command as u8[] here..
-> int (*write_reg)(struct spi_nor *flash, u8 *cmd, u32 cmd_len);
-> where
-> 	cmd[0] == command_opcode
-> 	cmd[1] == command argument 1 (like offset for erase)
-> 	cmd[2] == command argument 2
-> 	...
->
-is there any benefit of your code?
-you will use a local array in the stack.
-
-why not use the spi_nor->command which has used for a long time.
-
-
->> +
->> +	/* write data */
->> +	void (*write)(struct spi_nor *flash, loff_t to, size_t len,
->> +			size_t *retlen, const u_char *buf);
->> +	/* read data */
->> +	int (*read)(struct spi_nor *flash, loff_t from, size_t len,
->> +			size_t *retlen, u_char *buf);
->> +};
->>   #endif
->> --
->> 1.7.2.rc3
->>
-> Sorry for bit intrusive feedback. But I think it would help you to
-> refine it better. Also some reference below
-> http://lists.infradead.org/pipermail/linux-mtd/2013-October/049307.html
->
-thanks. I referenced it when i wrote this patch.
-
-thanks
-Huang Shijie
+---8<---
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 0813b51..82c6013 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -385,7 +385,7 @@ static struct clk_lookup da830_clks[] = {
+ 	CLK(NULL,		"pll0_sysclk7",	&pll0_sysclk7),
+ 	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
+ 	CLK(NULL,		"timer0",	&timerp64_0_clk),
+-	CLK("watchdog",		NULL,		&timerp64_1_clk),
++	CLK("davinci-wdt",	NULL,		&timerp64_1_clk),
+ 	CLK(NULL,		"arm_rom",	&arm_rom_clk),
+ 	CLK(NULL,		"scr0_ss",	&scr0_ss_clk),
+ 	CLK(NULL,		"scr1_ss",	&scr1_ss_clk),
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 352984e..ccb2f58 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -443,7 +443,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"pll1_sysclk3",	&pll1_sysclk3),
+ 	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
+ 	CLK(NULL,		"timer0",	&timerp64_0_clk),
+-	CLK("watchdog",		NULL,		&timerp64_1_clk),
++	CLK("davinci-wdt",	NULL,		&timerp64_1_clk),
+ 	CLK(NULL,		"arm_rom",	&arm_rom_clk),
+ 	CLK(NULL,		"tpcc0",	&tpcc0_clk),
+ 	CLK(NULL,		"tptc0",	&tptc0_clk),
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index ef9ff1f..4bb8132 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -375,7 +375,7 @@ static struct clk_lookup dm355_clks[] = {
+ 	CLK(NULL, "pwm3", &pwm3_clk),
+ 	CLK(NULL, "timer0", &timer0_clk),
+ 	CLK(NULL, "timer1", &timer1_clk),
+-	CLK("watchdog", NULL, &timer2_clk),
++	CLK("davinci-wdt", NULL, &timer2_clk),
+ 	CLK(NULL, "timer3", &timer3_clk),
+ 	CLK(NULL, "rto", &rto_clk),
+ 	CLK(NULL, "usb", &usb_clk),
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 1511a06..b0e8df3 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -473,7 +473,7 @@ static struct clk_lookup dm365_clks[] = {
+ 	CLK(NULL, "pwm3", &pwm3_clk),
+ 	CLK(NULL, "timer0", &timer0_clk),
+ 	CLK(NULL, "timer1", &timer1_clk),
+-	CLK("watchdog", NULL, &timer2_clk),
++	CLK("davinci-wdt", NULL, &timer2_clk),
+ 	CLK(NULL, "timer3", &timer3_clk),
+ 	CLK(NULL, "usb", &usb_clk),
+ 	CLK("davinci_emac.1", NULL, &emac_clk),
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 143a321..aeaad95 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -322,7 +322,7 @@ static struct clk_lookup dm644x_clks[] = {
+ 	CLK(NULL, "pwm2", &pwm2_clk),
+ 	CLK(NULL, "timer0", &timer0_clk),
+ 	CLK(NULL, "timer1", &timer1_clk),
+-	CLK("watchdog", NULL, &timer2_clk),
++	CLK("davinci-wdt", NULL, &timer2_clk),
+ 	CLK(NULL, NULL, NULL),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 2a73f29..a56779b 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -356,7 +356,7 @@ static struct clk_lookup dm646x_clks[] = {
+ 	CLK(NULL, "pwm1", &pwm1_clk),
+ 	CLK(NULL, "timer0", &timer0_clk),
+ 	CLK(NULL, "timer1", &timer1_clk),
+-	CLK("watchdog", NULL, &timer2_clk),
++	CLK("davinci-wdt", NULL, &timer2_clk),
+ 	CLK("palm_bk3710", NULL, &ide_clk),
+ 	CLK(NULL, "vpif0", &vpif0_clk),
+ 	CLK(NULL, "vpif1", &vpif1_clk),
