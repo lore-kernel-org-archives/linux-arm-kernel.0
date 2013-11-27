@@ -1,34 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Nov 2013 11:04:05 +0000
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
-Message-ID: <5295D1A5.5090403@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 27 Nov 2013 12:04:13 +0100
+Subject: [PATCH 03/04] ARM: shmobile: Genmai I2C-over-GPIO support
+In-Reply-To: <20131127082805.20015.82680.sendpatchset@w520>
+References: <20131127082736.20015.21303.sendpatchset@w520>
+ <20131127082805.20015.82680.sendpatchset@w520>
+Message-ID: <20131127110413.GA2603@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC-ing the maintainers - seems odd they were not cc-ed the first place]
 
-On 27/11/13 07:34, mohun106 at gmail.com wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> 
-> This patch series provides an implementation of supporting 48-bit
-> Physical Addresses for ARMv8 platforms. It is the maximum width that
-> any ARMv8 based processor can support. 
-> 
-> The implementation extends the existing support of 40-bit PA.The kernel
-> and user space will now be able to access 128TB each. With 4KB page size
-> the Linux now will be using 4 levels of page tables by making use of
-> 'pud'. And with 64KB page size the Linux will be using 3 levels of page
-> tables.
-> 
-> The code has been tested with LTP.
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		eeprom: 24c128 at 50 {
+> +			compatible = "at,24c128";
 
-Aside from finding out whether or not this is a useful change, this
-breaks KVM, more specifically the way kernel pages are mapped into HYP.
-Also, guests will still be limited to 40-bit IPAs, and the stage-2
-output range needs to be addressed as well.
+Minor nit: Should be a vendor name, not the name of the driver
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +			reg = <0x50>;
+> +		};
+> +	};
+> +
+>  };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/0fa420d3/attachment.sig>
