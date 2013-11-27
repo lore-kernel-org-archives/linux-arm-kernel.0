@@ -1,60 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Nov 2013 15:47:59 -0800
-Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
- wl12xx
-In-Reply-To: <20131127164823.GX26766@atomide.com>
-References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
- <1385041804-19115-2-git-send-email-balajitk@ti.com>
- <20131121165823.GM10317@atomide.com> <528E4295.2040109@ti.com>
- <20131126215537.GO26766@atomide.com> <52961DF2.8080507@ti.com>
- <20131127164823.GX26766@atomide.com>
-Message-ID: <20131127234759.GF26766@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 27 Nov 2013 18:58:51 -0500
+Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
+In-Reply-To: <CAOesGMhRYg4L72v8XCCSwSnLhYuZ6+aBTxPGNvVn=n=xpVm71A@mail.gmail.com>
+References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
+ <20131125194631.GE2879@titan.lakedaemon.net>
+ <CAOesGMhRYg4L72v8XCCSwSnLhYuZ6+aBTxPGNvVn=n=xpVm71A@mail.gmail.com>
+Message-ID: <20131127235851.GS2879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131127 08:49]:
-> * Balaji T K <balajitk@ti.com> [131127 08:30]:
-> > On Wednesday 27 November 2013 03:25 AM, Tony Lindgren wrote:
-> > >* Dan Murphy <dmurphy@ti.com> [131121 09:28]:
-> > >>On 11/21/2013 10:58 AM, Tony Lindgren wrote:
-> > >>>* Balaji T K <balajitk@ti.com> [131121 05:51]:
-> > >>>>pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
-> > >>>>and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
-> > >>>>
-> > >>>>Fix the following error message:
-> > >>>>pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
-> > >>>>pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
-> > >>
-> > >>Why is the led pins moved then?
-> > >
-> > >Heh the patch just looks that way, looking at the curly brackets
-> > >thing do get moved properly.
-> > >
-> > >>>>SDIO card is not detected after moving pin mux to omap4_pmx_core since
-> > >>>>sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
-> > >>>Cool, does this fix the issue with the WLAN not coming up after a warm reset
-> > >>>on panda?
-> > >
-> > >Also commit f446043f1aa7 (regulator: fixed: fix regulator_list_voltage() for
-> > >regression) is needed that recently got merged. But with v3.13-rc1 +
-> > >f446043f1aa7 + this patch no luck whatsoever bringing up the wl12xx so there
-> > >must be also some regression somewhere from v3.12 on that?
-> > >
-> > Hi Tony,
-> > 
-> > I tried loading wl12xx as modules on latest base as yours with
-> > ti-connectivity/wl127x-fw-5-sr.bin firmware in place and I could connect
-> > and run iperf.
+On Wed, Nov 27, 2013 at 11:45:24AM -0800, Olof Johansson wrote:
+> On Mon, Nov 25, 2013 at 11:46 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
+> >> The following commit:
+> >>
+> >>   54f8d501e842 dmaengine: remove DMA unmap from drivers
+> >>
+> >> removed the last caller to mv_desc_get_dest_addr(), creating the
+> >> warning:
+> >>
+> >>   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
+> >>   but not used [-Wunused-function]
+> >>
+> >> Remove it.
+> >>
+> >> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> >> ---
+> >>  drivers/dma/mv_xor.c | 6 ------
+> >>  1 file changed, 6 deletions(-)
+> >
+> > Gah!  I sent too fast.  I meant to mention that I have this in my
+> > mvebu/fixes branch, which gets merged into -next each night.  (The
+> > warning was bugging me :) )
+> >
+> > Just let me know when you take it and I'll drop it from my branches.
 > 
-> Oh OK I must have missed something then.
-> 
-> Does it now work after a warm reboot too? And after bringing the interface
-> down with "ifconfig wlan0 down" followed by "ifconfig wlan0 up"?
+> Hmm. Please don't add patches for other subsystems into your -next
+> tree, since then there is no indication for those of us who follow
+> -next that the patch is not yet merged by the appropriate maintainer.
 
-Yes great, I can confirm that v3.13-rc1 + f446043f1aa7 (regulator: fixed: fix
-regulator_list_voltage() for regression) + this patch works even after a
-warm reset :) Will apply both to omap-for-v3.13/fixes-take4 with Cc stable.
+Ack.  Dropped.  Sorry for the confusion and thanks for setting me
+straight.
 
-Regards,
+thx,
 
-Tony
+Jason.
