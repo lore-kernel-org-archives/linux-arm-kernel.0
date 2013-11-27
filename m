@@ -1,43 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Nov 2013 15:50:42 +0000
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
- <5295D1A5.5090403@arm.com>
- <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
-Message-ID: <20131127155042.GK9032@mudshark.cambridge.arm.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 27 Nov 2013 19:54:24 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzNdIHB3bTogQWRkIG1jMTN4eHggcHdtIGRyaXZlci4=?=
+In-Reply-To: <1385566771-366-1-git-send-email-denis@eukrea.com>
+References: <1385566771-366-1-git-send-email-denis@eukrea.com>
+Message-ID: <1385567664.228570055@f131.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 03:33:45PM +0000, Radha Mohan wrote:
-> On Wed, Nov 27, 2013 at 4:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > [CC-ing the maintainers - seems odd they were not cc-ed the first place]
-> >
-> > On 27/11/13 07:34, mohun106 at gmail.com wrote:
-> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> >>
-> >> This patch series provides an implementation of supporting 48-bit
-> >> Physical Addresses for ARMv8 platforms. It is the maximum width that
-> >> any ARMv8 based processor can support.
-> >>
-> >> The implementation extends the existing support of 40-bit PA.The kernel
-> >> and user space will now be able to access 128TB each. With 4KB page size
-> >> the Linux now will be using 4 levels of page tables by making use of
-> >> 'pud'. And with 64KB page size the Linux will be using 3 levels of page
-> >> tables.
-> >>
-> >> The code has been tested with LTP.
-> >
-> > Aside from finding out whether or not this is a useful change, this
-> > breaks KVM, more specifically the way kernel pages are mapped into HYP.
-> > Also, guests will still be limited to 40-bit IPAs, and the stage-2
-> > output range needs to be addressed as well.
+Hello.
+
+...
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  .../devicetree/bindings/pwm/fsl,mc13xxx-pwm.txt    |   19 ++
+>  drivers/mfd/mc13xxx-core.c                         |   11 ++
+>  drivers/pwm/Kconfig                                |    6 +
+>  drivers/pwm/Makefile                               |    1 +
+>  drivers/pwm/pwm-mc13xxx.c                          |  205 ++++++++++++++++++++
+>  include/linux/mfd/mc13783.h                        |    2 +
+>  6 files changed, 244 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/fsl,mc13xxx-pwm.txt
+>  create mode 100644 drivers/pwm/pwm-mc13xxx.c
 > 
-> This is useful for platforms (like ours) that will use 48-bit PAs.
-> Sooner or later there will
-> be such processors.
-> And yes, I haven't checked on KVM.
+> diff --git a/Documentation/devicetree/bindings/pwm/fsl,mc13xxx-pwm.txt b/Documentation/devicetree/bindings/pwm/fsl,mc13xxx-pwm.txt
+> new file mode 100644
+> index 0000000..a1394d0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/fsl,mc13xxx-pwm.txt
+> @@ -0,0 +1,19 @@
+> +Freescale mc13xxx series PWM drivers.
+> +
+> +Supported PWMs:
+> +mc13892 series
+> +mc34708 series
 
-It may well break the ARM SMMU driver without further changes there, too.
+MC13892 does not have a dedicated PWM.
+You can probably use the existing driver mc13xxx-led driver.
 
-Will
+---
