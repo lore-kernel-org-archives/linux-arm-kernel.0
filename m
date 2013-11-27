@@ -1,23 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Nov 2013 15:50:23 +0000
-Subject: [Patch v2 1/2] ASoC: atmel: sam9x5_wm8731: fix oops when unload
- module
-In-Reply-To: <1385546710-11308-1-git-send-email-voice.shen@atmel.com>
-References: <1385546710-11308-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20131127155023.GB14725@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Nov 2013 15:50:42 +0000
+Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
+In-Reply-To: <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
+References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
+ <5295D1A5.5090403@arm.com>
+ <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
+Message-ID: <20131127155042.GK9032@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 06:05:09PM +0800, Bo Shen wrote:
-> As the priv is not assigned to card->drvdata, it is NULL, so when
-> unload module, it will cause NULL pointer oops.
-> Assign priv to card->drvdata to fix this issue.
+On Wed, Nov 27, 2013 at 03:33:45PM +0000, Radha Mohan wrote:
+> On Wed, Nov 27, 2013 at 4:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > [CC-ing the maintainers - seems odd they were not cc-ed the first place]
+> >
+> > On 27/11/13 07:34, mohun106 at gmail.com wrote:
+> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> >>
+> >> This patch series provides an implementation of supporting 48-bit
+> >> Physical Addresses for ARMv8 platforms. It is the maximum width that
+> >> any ARMv8 based processor can support.
+> >>
+> >> The implementation extends the existing support of 40-bit PA.The kernel
+> >> and user space will now be able to access 128TB each. With 4KB page size
+> >> the Linux now will be using 4 levels of page tables by making use of
+> >> 'pud'. And with 64KB page size the Linux will be using 3 levels of page
+> >> tables.
+> >>
+> >> The code has been tested with LTP.
+> >
+> > Aside from finding out whether or not this is a useful change, this
+> > breaks KVM, more specifically the way kernel pages are mapped into HYP.
+> > Also, guests will still be limited to 40-bit IPAs, and the stage-2
+> > output range needs to be addressed as well.
+> 
+> This is useful for platforms (like ours) that will use 48-bit PAs.
+> Sooner or later there will
+> be such processors.
+> And yes, I haven't checked on KVM.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/4222d259/attachment.sig>
+It may well break the ARM SMMU driver without further changes there, too.
+
+Will
