@@ -1,39 +1,23 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 27 Nov 2013 16:52:39 +0100
-Subject: [PATCH 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <20131127153019.GR3296@lee--X1>
-References: <cover.1385508112.git.stefan@agner.ch>
- <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
- <20131127130954.GF3296@lee--X1> <cd69295e946b48451f449eacc02efa4a@agner.ch>
- <20131127135547.GK3296@lee--X1> <cfb203a896eda67c106794d89e668d56@agner.ch>
- <20131127143429.GN3296@lee--X1> <20131127143641.GO3296@lee--X1>
- <c26ecd550e9940ead950f3874d27a5b0@agner.ch> <20131127153019.GR3296@lee--X1>
-Message-ID: <89dbf704d8617c77259e04753e4380c9@agner.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 Nov 2013 15:50:23 +0000
+Subject: [Patch v2 1/2] ASoC: atmel: sam9x5_wm8731: fix oops when unload
+ module
+In-Reply-To: <1385546710-11308-1-git-send-email-voice.shen@atmel.com>
+References: <1385546710-11308-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20131127155023.GB14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2013-11-27 16:30, schrieb Lee Jones:
-> On Wed, 27 Nov 2013, Stefan Agner wrote:
-> 
->> Am 2013-11-27 15:36, schrieb Lee Jones:
->> <snip>
->> >> Perhaps I should suggest to make TPS6586X_ANY a positive number then,
->> >> as a negative value to me indicates more of an error than a generic
->> >> parameter.
->> I see, its especially confusing since the version is filled using the
->> i2c_smbus_read_byte_data functions return value. The version field is a
->> 8-Bit value according to the data sheet, I could use 0x100 as
->> TPS6586X_ANY identifier.
-> 
-> How far are we away from using 0xFF?
-> 
-> I'd be happy to use that and change it _if_ we ever get close.
-> 
-> If it's likely that it'll be used, then sure 0x100 sounds okay too.
+On Wed, Nov 27, 2013 at 06:05:09PM +0800, Bo Shen wrote:
+> As the priv is not assigned to card->drvdata, it is NULL, so when
+> unload module, it will cause NULL pointer oops.
+> Assign priv to card->drvdata to fix this issue.
 
-Yes, I thought about 0xFF too. The latest device we support is TPS658643
-(according to data sheet release dates), which has the smallest version
-number (03). Since it seems to be a CRC (hence VERSIONCRC) the number is
-quite random. Also, 0xFF sounds like a bitmask which can mask all
-versions, but the versions can't be used bitwise... So I would prefer to
-go with 0x100.
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/4222d259/attachment.sig>
