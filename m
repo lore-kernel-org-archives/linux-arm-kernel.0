@@ -1,49 +1,22 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Wed, 27 Nov 2013 21:59:38 +0530
-Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
- wl12xx
-In-Reply-To: <20131126215537.GO26766@atomide.com>
-References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
- <1385041804-19115-2-git-send-email-balajitk@ti.com>
- <20131121165823.GM10317@atomide.com> <528E4295.2040109@ti.com>
- <20131126215537.GO26766@atomide.com>
-Message-ID: <52961DF2.8080507@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 Nov 2013 16:35:32 +0000
+Subject: [PATCH 14/15] spi: sh-msiof: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <1385515117-23664-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131127163532.GH14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 November 2013 03:25 AM, Tony Lindgren wrote:
-> * Dan Murphy <dmurphy@ti.com> [131121 09:28]:
->> On 11/21/2013 10:58 AM, Tony Lindgren wrote:
->>> * Balaji T K <balajitk@ti.com> [131121 05:51]:
->>>> pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
->>>> and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
->>>>
->>>> Fix the following error message:
->>>> pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
->>>> pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
->>
->> Why is the led pins moved then?
->
-> Heh the patch just looks that way, looking at the curly brackets
-> thing do get moved properly.
->
->>>> SDIO card is not detected after moving pin mux to omap4_pmx_core since
->>>> sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
->>> Cool, does this fix the issue with the WLAN not coming up after a warm reset
->>> on panda?
->
-> Also commit f446043f1aa7 (regulator: fixed: fix regulator_list_voltage() for
-> regression) is needed that recently got merged. But with v3.13-rc1 +
-> f446043f1aa7 + this patch no luck whatsoever bringing up the wl12xx so there
-> must be also some regression somewhere from v3.12 on that?
->
-Hi Tony,
+On Wed, Nov 27, 2013 at 02:18:36AM +0100, Laurent Pinchart wrote:
+> This helps increasing build testing coverage.
 
-I tried loading wl12xx as modules on latest base as yours with
-ti-connectivity/wl127x-fw-5-sr.bin firmware in place and I could connect
-and run iperf.
-
-> Regards,
->
-> Tony
->
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/1357bad4/attachment.sig>
