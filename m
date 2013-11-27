@@ -1,58 +1,52 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Wed, 27 Nov 2013 11:56:08 -0500
-Subject: [PATCH v3 2/9] staging: dwc2: update DT binding to add generic
- clock/phy properties
-In-Reply-To: <529475B2.9070202@ti.com>
-References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
- <1385403367-18144-3-git-send-email-matt.porter@linaro.org>
- <529475B2.9070202@ti.com>
-Message-ID: <20131127165608.GC31091@beef>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Nov 2013 09:58:50 -0700
+Subject: [PATCH 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
+Message-ID: <529624CA.6030604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 03:49:30PM +0530, Kishon Vijay Abraham I wrote:
-> On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
-> > dwc2/s3c-hsotg require a single clock to be specified and optionally
-> > a generic phy. On the s3c-hsotg driver old style USB phy support is
-> > present as a fallback so the generic phy properties are optional.
-> > 
-> > Signed-off-by: Matt Porter <matt.porter@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/staging/dwc2.txt | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt b/Documentation/devicetree/bindings/staging/dwc2.txt
-> > index 1a1b7cf..b8b42b6 100644
-> > --- a/Documentation/devicetree/bindings/staging/dwc2.txt
-> > +++ b/Documentation/devicetree/bindings/staging/dwc2.txt
-> > @@ -5,6 +5,12 @@ Required properties:
-> >  - compatible : "snps,dwc2"
-> >  - reg : Should contain 1 register range (address and length)
-> >  - interrupts : Should contain 1 interrupt
-> > +- clocks: clock provider specifier
-> > +- clock-names: shall be "otg"
-> > +- phys: phy provider specifier
-> > +- phy-names: shall be "device"
-> 
-> lets mention in the Documentation too that the phy properties are optional.
-> apart from that..
+On 11/26/2013 04:45 PM, Stefan Agner wrote:
+> Use the VERSIONCRC to determine the exact device version. According to
+> the datasheet this register can be used as device identifier. The
+> identification is needed since some tps6586x regulators use a different
+> voltage table.
 
-Good point, will do so.
+> diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
 
-> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > +Refer to clk/clock-bindings.txt for generic clock consumer properties
-> > +Refer to phy/phy-bindings.txt for generic phy consumer properties
-> >  
-> >  Example:
-> >  
-> > @@ -12,4 +18,8 @@ Example:
-> >                  compatible = "ralink,rt3050-usb, snps,dwc2";
-> >                  reg = <0x101c0000 40000>;
-> >                  interrupts = <18>;
-> > +		clocks = <&usb_otg_ahb_clk>;
-> > +		clock-names = "otg";
-> > +		phys = <&usbphy>;
-> > +		phy-names = "device";
-> >          };
-> > 
-> 
+> @@ -477,6 +486,7 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
+>  {
+>  	struct tps6586x_platform_data *pdata = dev_get_platdata(&client->dev);
+>  	struct tps6586x *tps6586x;
+> +	const char *name = "";
+
+There's no need to assign any value here; the switch below always
+assigns something over the top of the variable, so it doesn't need to be
+pre-initialized.
+
+> +	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
+> +	if (tps6586x == NULL) {
+> +		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
+> +		return -ENOMEM;
+> +	}
+
+> +	tps6586x->version = (enum tps6586x_version)ret;
+
+Why not make the version variable an integer of some kind. Then, the
+cast wouldn't be required. The values like TPS658621A can be #defines or
+const u32.
+
+> +	switch (ret) {
+
+That should switch on tps6586x->version since that's been assigned;
+it'll make the purpose a bit clearer.
+
+> +	default:
+> +		name = "TPS6586X";
+> +		break;
+>  	}
+
+I hope the rest of the code deals with unknown values of
+tps6586x->version OK.
