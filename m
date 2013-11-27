@@ -1,59 +1,108 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 27 Nov 2013 10:32:13 +0100
-Subject: [PATCH 2/4] mtd: spi-nor: add a new data structrue spi_nor{}
-In-Reply-To: <52957690.60102@freescale.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA4EEF0@DBDE04.ent.ti.com>
- <52957690.60102@freescale.com>
-Message-ID: <201311271032.13259.marex@denx.de>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Wed, 27 Nov 2013 09:38:02 +0000
+Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20131118111451.GA30853@e106331-lin.cambridge.arm.com>
+References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
+ <20131114104620.GB16396@e106331-lin.cambridge.arm.com>
+ <B56CDBE15CE27145A4B77D2D24263E852409CE@039-SN1MPN1-003.039d.mgd.msft.net>
+ <20131118111451.GA30853@e106331-lin.cambridge.arm.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E852497D5@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
 
-> ? 2013?11?26? 19:42, Gupta, Pekon ??:
-> >> From: Huang Shijie [mailto:b32955 at freescale.com]
-> > 
+
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Monday, November 18, 2013 7:15 PM
+> To: Lu Jingchang-B35083
+> Cc: vinod.koul at intel.com; devicetree at vger.kernel.org; Wang Huan-B18965;
+> linux-kernel at vger.kernel.org; shawn.guo at linaro.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+> 
+> On Fri, Nov 15, 2013 at 07:43:04AM +0000, Jingchang Lu wrote:
+> >
+> >
+> > > -----Original Message-----
+> > > From: Mark Rutland [mailto:mark.rutland at arm.com]
+> > > Sent: Thursday, November 14, 2013 6:46 PM
+> > > To: Lu Jingchang-B35083
+> > > Cc: vinod.koul at intel.com; devicetree at vger.kernel.org; Wang Huan-
+> B18965;
+> > > linux-kernel at vger.kernel.org; shawn.guo at linaro.org; linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: Re: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver
+> support
+> > >
+> > > On Wed, Sep 18, 2013 at 10:57:59AM +0100, Jingchang Lu wrote:
+> > > > Add Freescale enhanced direct memory(eDMA) controller support.
+> > > > The eDMA controller deploys DMAMUXs routing DMA request
+> sources(slot)
+> > > > to eDMA channels.
+> > > > This module can be found on Vybrid and LS-1 SoCs.
+> > > >
+> > > > Signed-off-by: Alison Wang <b18965@freescale.com>
+> > > > Signed-off-by: Jingchang Lu <b35083@freescale.com>
 > > [...]
-> > 
-> >> +#define	MAX_CMD_SIZE		6
-> >> +
-> >> +enum read_type {
-> >> +	M25P80_NORMAL = 0,
-> >> +	M25P80_FAST,
-> >> +	M25P80_QUAD,
-> >> +};
-> > 
-> > Sorry. no 'M25P80' suffix here this is spi-nor.h :-)
+> > > > +* DMAMUX
+> > > > +Required properties:
+> > >
+> > > No compatible?
+> > >
+> > > Where are DMAMUX nodes expected to live?
+> > >
+> > > How to they relate to the eDMA controller in HW? Are they a
+> > > subcomponent, or a logically separate unit that happens to be
+> connected?
+> > [Lu Jingchang-b35083]
+> > DMAMUX is a multiplexer between dma controller channels and peripheral
+> deivces,
+> > each DMAMUX provides 16 independently selectable DMA channel routers,
+> and each
+> > channel router can be assigned to one of the possible peripheral DMA
+> slots.
+> > So it's not a standalone device, it's just required by the DMA
+> controller to
+> > connect the channels and slaves, So it's got by DMA controller's
+> "fsl,dma-mux" property.
+> > Thanks!
 > 
-> ok. thanks. :)
+> Ok.
 > 
-> >> +
-> >> +struct spi_nor {
-> >> +	struct mutex		lock;
-> >> +	struct mtd_info		mtd;
-> > 
-> > mtd_info should not be present here. Rather it should be other way round
-> > 'mtd_info->priv = (struct spi_nor *) spi_nor;
+> I'm not so sure on the way this is described, from the point of view of
+> the device, its DMA channel is wired to the MUX, not to the DMA engine
+> directly:
 > 
-> put the mtd here can make code simple,
+>                        +-------+
+>              /---------|DEVICE0|
+>              |         +-------+
+> +-----+   +------+
+> | DMA |===|DMAMUX|
+> +-----+   +------+
+>              |         +-------+
+>              \---------|DEVICE1|
+>                        +-------+
+> 
+> If that's the case, I'd expect the DMAMUX to have a #dma-cells and
+> describe each device as being wired to the mux, and then the mux as
+> being wired to the DMA. If the MUXes are sub-blocks of the DMA, then I'm
+> not sure why they need to be described at all.
+> 
+> Currently, the DMA code is handling information that's specific to the
+> MUX (i.e. the channel ID that's specific to the MUX), and that feels odd
+> unless the MUX is a component of the DMA (which if true I'd expect it to
+> be described differently).
+> 
+Yes, the connection is as your imagination, except for each DMA has two MUX. 
+The DMA helper looks the registered DMA engineer for DMA channel binding,
+and the registered DMA engineer is the eDMA node, if binding to DMAMUX,
+the helper will not find out the dma engineer.
+The only DMAMUX configuration is programming the slave id into its
+corresponding register, so its code is handled by the eDMA driver,
+the DMAMUX is not optional.
+Thanks!
 
-The MTD API functions will pass you the struct mtd_info anyway, so you will need 
-to implement mtdinfo_to_yourdriverdata() function, no need for duplication.
 
-> do David/Brian have any comment about this?
-> If all object to put the mtd here, i will change it.
-> 
-> >> +	struct device		*dev;
-> > 
-> > Again, spi_nor would be a MTD device, not a new type of device on its
-> > own. Thus you should use, mtd_info->dev.
-> 
-> this dev pointer is not from the mtd_info->dev, it from the spi_device
-> or other spi nor device .
-
-So this is your own device pointer or ... what kind of device pointer?
-[...]
-
-Best regards,
-Marek Vasut
+Best Regards,
+Jingchang
