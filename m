@@ -1,71 +1,90 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 27 Nov 2013 19:16:26 +0900
-Subject: [PATCH v3 06/15] ARM: Disable jprobes test when built into
- thumb-mode kernel
-In-Reply-To: <1385520814-10663-7-git-send-email-dave.long@linaro.org>
-References: <1385520814-10663-1-git-send-email-dave.long@linaro.org>
- <1385520814-10663-7-git-send-email-dave.long@linaro.org>
-Message-ID: <5295C67A.3070308@hitachi.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 27 Nov 2013 11:20:09 +0100
+Subject: [PATCH RFC v2 07/17] ARM: shmobile: r8a7779: Sort headers
+ alphabetically
+In-Reply-To: <20131127050958.GE27704@verge.net.au>
+References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
+ <52946AEA.2010500@cogentembedded.com> <20131127050958.GE27704@verge.net.au>
+Message-ID: <1615505.ZFJ3Lvc46h@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/11/27 11:53), David Long wrote:
-> From: "Jon Medhurst (Tixy)" <tixy@linaro.org>
-> 
-> For now the jprobes tests fail on ARM for when built into a kernel compiled
-> in thumb mode. They work fine for ARM kernels, and when built as a loadable
-> module.
-> 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+Hi Simon,
 
-You'd better add Jon's signed-off-by here.
-
-Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-
-> ---
->  arch/arm/kernel/kprobes-test.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+On Wednesday 27 November 2013 14:09:58 Simon Horman wrote:
+> On Tue, Nov 26, 2013 at 01:33:30PM +0400, Sergei Shtylyov wrote:
+> > On 26-11-2013 11:32, Simon Horman wrote:
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > >---
+> > >
+> > >  arch/arm/mach-shmobile/board-marzen.c | 28 ++++++++++++++--------------
+> > >  1 file changed, 14 insertions(+), 14 deletions(-)
+> > >
+> > >diff --git a/arch/arm/mach-shmobile/board-marzen.c
+> > >b/arch/arm/mach-shmobile/board-marzen.c index 4f9e3ec..e202c64 100644
+> > >--- a/arch/arm/mach-shmobile/board-marzen.c
+> > >+++ b/arch/arm/mach-shmobile/board-marzen.c
+> > >@@ -19,35 +19,35 @@
+> > >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 
+> > >   02110-1301  USA */
+> > >
+> > >-#include <linux/kernel.h>
+> > >+#include <asm/mach-types.h>
+> > >+#include <asm/mach/arch.h>
+> > >+#include <asm/traps.h>
+> > >+#include <linux/delay.h>
+> > >+#include <linux/dma-mapping.h>
+> > > #include <linux/init.h>
+> > > #include <linux/interrupt.h>
+> > >-#include <linux/irq.h>
+> > >-#include <linux/platform_device.h>
+> > >-#include <linux/delay.h>
+> > > #include <linux/io.h>
+> > >+#include <linux/irq.h>
+> > >+#include <linux/kernel.h>
+> > > #include <linux/leds.h>
+> > >-#include <linux/dma-mapping.h>
+> > >+#include <linux/mfd/tmio.h>
+> > >+#include <linux/mmc/host.h>
+> > >+#include <linux/mmc/sh_mobile_sdhi.h>
+> > > #include <linux/pinctrl/machine.h>
+> > > #include <linux/platform_data/camera-rcar.h>
+> > > #include <linux/platform_data/gpio-rcar.h>
+> > > #include <linux/platform_data/rcar-du.h>
+> > > #include <linux/platform_data/usb-rcar-phy.h>
+> > >+#include <linux/platform_device.h>
+> > > #include <linux/regulator/fixed.h>
+> > > #include <linux/regulator/machine.h>
+> > > #include <linux/smsc911x.h>
+> > >-#include <linux/spi/spi.h>
+> > > #include <linux/spi/sh_hspi.h>
+> > >-#include <linux/mmc/host.h>
+> > >-#include <linux/mmc/sh_mobile_sdhi.h>
+> > >-#include <linux/mfd/tmio.h>
+> > >-#include <media/soc_camera.h>
+> > >-#include <mach/r8a7779.h>
+> > >+#include <linux/spi/spi.h>
+> > > #include <mach/common.h>
+> > > #include <mach/irqs.h>
+> > >-#include <asm/mach-types.h>
+> > >-#include <asm/mach/arch.h>
+> > >-#include <asm/traps.h>
+> > >+#include <mach/r8a7779.h>
+> > >+#include <media/soc_camera.h>
+> > >
+> >    I thought it was a good idea to keep the #include's in the order
+> > 
+> > of the most generic to most machine specific ones: <linux/*.h>
+> > first, then <asm/*.h>, then <mach/*.h>, only with empty lines
+> > between groups (which weren't used here) with each group kept
+> > sorted...
 > 
-> diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-> index 0cd63d0..65230b2 100644
-> --- a/arch/arm/kernel/kprobes-test.c
-> +++ b/arch/arm/kernel/kprobes-test.c
-> @@ -221,6 +221,7 @@ static int pre_handler_called;
->  static int post_handler_called;
->  static int jprobe_func_called;
->  static int kretprobe_handler_called;
-> +static int tests_failed;
->  
->  #define FUNC_ARG1 0x12345678
->  #define FUNC_ARG2 0xabcdef
-> @@ -457,6 +458,13 @@ static int run_api_tests(long (*func)(long, long))
->  
->  	pr_info("    jprobe\n");
->  	ret = test_jprobe(func);
-> +#if defined(CONFIG_THUMB2_KERNEL) && !defined(MODULE)
-> +	if (ret == -EINVAL) {
-> +		pr_err("FAIL: Known longtime bug with jprobe on Thumb kernels");
-> +		tests_failed = ret;
-> +		ret = 0;
-> +	}
-> +#endif
->  	if (ret < 0)
->  		return ret;
->  
-> @@ -1667,6 +1675,8 @@ static int __init run_all_tests(void)
->  
->  out:
->  	if (ret == 0)
-> +		ret = tests_failed;
-> +	if (ret == 0)
->  		pr_info("Finished kprobe tests OK\n");
->  	else
->  		pr_err("kprobe tests failed\n");
-> 
+> That sounds reasonable to me.
+> Laurent, do you have an opinion on this?
 
+That's fine with me.
 
 -- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Regards,
+
+Laurent Pinchart
