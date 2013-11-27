@@ -1,76 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 27 Nov 2013 14:38:54 +0000
-Subject: HYP Kernel boot requirements
-In-Reply-To: <52951756.9000206@ti.com>
-References: <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
- <52937AB4.1060901@ti.com>
- <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
- <529381E4.3090405@ti.com> <20131125172825.GD8396@arm.com>
- <5293A888.9050500@ti.com> <20131126141346.GA692@arm.com>
- <5294B471.7020205@ti.com>
- <20131126173751.GF2355@e103592.cambridge.arm.com>
- <52951756.9000206@ti.com>
-Message-ID: <20131127143854.GB10411@e102568-lin.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 27 Nov 2013 09:56:20 -0500
+Subject: [PATCH v2 2/2] clk: add accuracy support for fixed clock
+In-Reply-To: <1385556285-19180-3-git-send-email-b.brezillon@overkiz.com>
+References: <1385556285-19180-1-git-send-email-b.brezillon@overkiz.com>
+ <1385556285-19180-3-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131127145620.GR2879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 09:49:10PM +0000, Santosh Shilimkar wrote:
-> On Tuesday 26 November 2013 12:37 PM, Dave Martin wrote:
-> > On Tue, Nov 26, 2013 at 09:47:13AM -0500, Santosh Shilimkar wrote:
-> >> On Tuesday 26 November 2013 09:13 AM, Catalin Marinas wrote:
-> >>> On Mon, Nov 25, 2013 at 07:44:08PM +0000, Santosh Shilimkar wrote:
-> >>>> On Monday 25 November 2013 12:28 PM, Catalin Marinas wrote:
-> >>>>> On Mon, Nov 25, 2013 at 04:59:16PM +0000, Santosh Shilimkar wrote:
-> >>>>>> What I am saying is the platforms like OMAP5 already support PM in
-> >>>>>> mainline kernel and we can't break that for KVM. Boot-loaders
-> >>>>>> would be thrashed after boot so you need something which runs
-> >>>>>> in Kernel or along with Kernel to have equivalent of hyp
-> >>>>>> switching.
-> >>>>>>
-> >>>>>> Am not challenging the agreed direction but we need to solve the
-> >>>>>> PM problem as well before making "all CPU runs boot-loader for
-> >>>>>> HYP kernels" as a must have. At least its is a change in boot
-> >>>>>> strategy from existing kernels.
-> >>>>>
-> >>>>> Of course I recommend PSCI which covers both hotplug and suspend ;), but
-> >>>>> I guess it's not the case for OMAP5. Since OMAP has its own secondary
-> >>>>> booting protocol and CPU hotplug re-entry, can you not just use
-> >>>>> different entry point when the primary CPU was initially started in Hyp
-> >>>>> mode (e.g. omap5_hyp_secondary_startup)?
-> >>>>>
-> >>>> How will that solve the guest secondary boot failure case when using
-> >>>> the same kernel binary for guest-boot ? Even for primary CPU which
-> >>>> will be suspended it needs to resume already in HYP mode and its not
-> >>>> going to go through boot-loader. So the low power code needs to have
-> >>>> HYP switch code so that CPU resumes in HYP mode.
-> >>>
-> >>> Is it late to rewrite the OMAP5 firmware?
-> >>>
-> >> Well its ROM'ed unfortunately so no choice. OMAP5 ROM did implement
-> >> a secure API which lets you enter into HYP mode and thats the only
-> >> thing can be used.
-> > 
-> > If the ROM is capable of loading some additional signed Secure World
-> > firmware after the ROM itself has booted, PSCI could be implemented
-> > in the second, resident firmware payload.
-> > 
-> > Some SoCs ship with boot ROMs that can do that -- is this not the case
-> > for OMAP5?
-> > 
-> On OMAP, the secure devices there is a way to do this but not for 
-> general purpose devices. General purpose devices once you
-> exit the ROM code, we exit out of security and only way to
-> re-enter secure word is via ROM implemented monitor/secure
-> APIs.
+Boris,
 
-As last resort, you can still write a bunch of instructions acting as
-warm-bootloader, reserve a page and add them there. Code required is just
-a shim layer and should not require more than few bytes, after all
-it has just to check some variables and jump accordingly (+ calling
-smc if required).
+Thanks for posting this series.  Bear with me as I'm attempting to give
+MikeT a hand.  Don't be afraid to tell me a question is stupid :-)
 
-Not pretty, agreed, but still better than patching the kernel IMHO
-(basically you will end up patching the bootloader - and possibly the
-dtb - instead, to install the shim mentioned above).
+On Wed, Nov 27, 2013 at 01:44:45PM +0100, Boris BREZILLON wrote:
+> This patch adds support for accuracy retrieval on fixed clocks.
+> It also adds a new dt property called 'clock-accuracy' to define the clock
+> accuracy.
+> 
+> This can be usefull for oscillator (RC, crystal, ...) definitions which are
+> always given an accuracy characteristic.
 
-Lorenzo
+I think we need to be more explicit in the binding and the API,
+especially when providing a method to recalculate the accuracy.  I
+presume this recalculated value would be relative against the root
+clock?
+
+There really needs to be two attributes here:  the rated accuracy from
+the manufacturer, and the calculated accuracy wrt another clock in the
+system.  We only need a binding for the manufacturer rating since the
+calculated accuracy is determined at runtime.
+
+I would also prefer to see an unknown accuracy be -1.  There are already
+clocks on the market (PPS reference clocks) with accuracies of
+0.1ppb/day [1].  Obviously, these aren't system clocks.  So the limit on
+accuracy may be a non-issue.  However, it may be worth changing the
+binding property to express the units.
+
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>  .../devicetree/bindings/clock/fixed-clock.txt      |    3 ++
+>  drivers/clk/clk-fixed-rate.c                       |   43 +++++++++++++++++---
+>  include/linux/clk-provider.h                       |    4 ++
+>  3 files changed, 44 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/fixed-clock.txt b/Documentation/devicetree/bindings/clock/fixed-clock.txt
+> index 0b1fe78..48ea0ad 100644
+> --- a/Documentation/devicetree/bindings/clock/fixed-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/fixed-clock.txt
+> @@ -10,6 +10,8 @@ Required properties:
+>  - clock-frequency : frequency of clock in Hz. Should be a single cell.
+>  
+>  Optional properties:
+> +- clock-accuracy : accuracy of clock in ppb (parts per billion).
+> +		   Should be a single cell.
+
+I would prefer to call this property 'clock-rated-ppb'.
+
+>  - gpios : From common gpio binding; gpio connection to clock enable pin.
+>  - clock-output-names : From common clock binding.
+>  
+> @@ -18,4 +20,5 @@ Example:
+>  		compatible = "fixed-clock";
+>  		#clock-cells = <0>;
+>  		clock-frequency = <1000000000>;
+> +		clock-accuracy = <100>;
+>  	};
+
+thx,
+
+Jason.
+
+[1] http://www.vectron.com/products/modules/md-010.htm
