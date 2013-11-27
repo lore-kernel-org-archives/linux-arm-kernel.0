@@ -1,41 +1,52 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 27 Nov 2013 12:27:32 +0100
-Subject: [PATCH v2] use -fstack-protector-strong
-In-Reply-To: <20131126203727.GA352@www.outflux.net>
-References: <20131126203727.GA352@www.outflux.net>
-Message-ID: <20131127112731.GA10435@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 27 Nov 2013 12:29:19 +0100
+Subject: [PATCH RFC v2 15/17] ARM: shmobile: Remove non-multiplatform
+ Marzen reference support
+In-Reply-To: <CANqRtoSNDC7+qnu5Nf-UTHXNDf680o8Ex9_XQJWAUqVfjKbi0g@mail.gmail.com>
+References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
+ <1385451139-29686-16-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoSNDC7+qnu5Nf-UTHXNDf680o8Ex9_XQJWAUqVfjKbi0g@mail.gmail.com>
+Message-ID: <5414839.e4PRTtIDTx@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Magnus,
 
-* Kees Cook <keescook@chromium.org> wrote:
-
-> On a defconfig x86_64 build (with CONFIG_CC_STACKPROTECTOR enabled), the
-> delta in size is just under 9% larger:
+On Wednesday 27 November 2013 17:51:16 Magnus Damm wrote:
+> On Tue, Nov 26, 2013 at 4:32 PM, Simon Horman wrote:
+> > Now that r8a7779 has CCF support remove the legacy Marzen reference
+> > Kconfig bits CONFIG_MACH_MARZEN_REFERENCE for the non-multiplatform
+> > case.
+> > 
+> > Starting from this commit Marzen board support is always enabled via
+> > CONFIG_MACH_MARZEN, and CONFIG_ARCH_MULTIPLATFORM is used to select
+> > between board-marzen.c and board-marzen-reference.c
+> > 
+> > The file board-marzen-reference.c can no longer be used together with
+> > the legacy sh-clk clock framework, instead CCF is used.
+> > 
+> > Based on work for the Koelsch board by Laurent Pinchart.
+> > 
+> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > ---
+> > v2
+> > * Correct changelog to refer to marzen instead of koelsch
+> > * Do not add typo to Makefile
 > 
->  -rwxrwxr-x 1 kees kees  22134340 Nov 26 10:28 vmlinux.gcc-4.8
->  -rwxrwxr-x 1 kees kees  22123870 Nov 26 10:40 vmlinux.gcc-4.9
->  -rwxrwxr-x 1 kees kees  24225118 Nov 26 10:42 vmlinux.gcc-4.9+strong
+> I think we need to discuss _when_ to do this in more detail. I know
+> this follows the same style as Laurent's patches, but I don't think
+> we're ready to flip the switch yet. I propose that we let DT reference
+> coexist with multiplatform and non-multiplatform cases for a while to
+> make testing easier and give time to migrate.
 
-Please run it through 'size' so that we know the real text size 
-increases.
+I understand your point, but as I've stated in a private e-mail, I believe 
+that having three platforms (DT reference with and without multiplatform, and 
+legacy) for each board is a step backward. It will be error-prone and time 
+consuming.
 
-If the cost of -fstack-protector-strong is really +9% in kernel text 
-size then that's rather significant!
+-- 
+Regards,
 
-If this option blows up our performance critical codepaths as well 
-then this will likely cause a runtime slowdown as well, in addition to 
-the increase in I$ footprint. That needs to be measured.
-
-CONFIG_CC_STACKPROTECTOR=y is relatively cheap today. For example on 
-x86-64 defconfig:
-
-      text    data    bss     dec       filename
-  11378972    1455056 1191936 14025964  vmlinux  # CONFIG_CC_STACKPROTECTOR is not set
-  11420243    1455056 1191936 14067235  vmlinux  CONFIG_CC_STACKPROTECTOR=y
-
-that's a +0.3% cost currently.
-
-Thanks,
-
-	Ingo
+Laurent Pinchart
