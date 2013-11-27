@@ -1,68 +1,68 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 27 Nov 2013 19:50:16 +0000
-Subject: [RFC PATCH] arm: SIGBUS on unsupported ARMv6 unaligned accesses
-Message-ID: <1385581816-23379-1-git-send-email-robin.murphy@arm.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 27 Nov 2013 22:02:47 +0200
+Subject: [PATCH 00/13] mfd: menelaus: a few cleanups
+In-Reply-To: <1385579217-20127-1-git-send-email-balbi@ti.com>
+References: <1385579217-20127-1-git-send-email-balbi@ti.com>
+Message-ID: <20131127200247.GH24645@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the default behaviour for userspace alignment faults
-on v6 from silent fixup to SIGBUS. This only affects code that violates
-the v6 unaligned access model - bad assembly/JIT code or high-level
-language code in violation of the relevant language spec - which should
-be corrected rather than unwittingly relying on performance-degrading
-fixups. Fixup behaviour can still be controlled from boot parameters or
-at runtime for compatibility with existing incorrect software.
+On Wed, Nov 27, 2013 at 01:06:44PM -0600, Felipe Balbi wrote:
+> few cleanups on the old menelaus driver. I don't have
+> HW to test these patches, maybe Aaro can help here ?
 
-There will be no impact for v5 and earlier.
+Hmm, I got:
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+[    1.330000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+[    1.340000] pgd = c0004000
+[    1.340000] [00000000] *pgd=00000000
+[    1.350000] Internal error: Oops: 17 [#1] ARM
+[    1.350000] CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc1-n8x0_tiny-los.git-729021f-00018-g74a0f39 #2
+[    1.350000] task: c782c000 ti: c782e000 task.ti: c782e000
+[    1.350000] PC is at mutex_lock+0x0/0x20
+[    1.350000] LR is at __irq_get_desc_lock+0x6c/0x88
+[    1.350000] pc : [<c016745c>]    lr : [<c00509ac>]    psr: a0000013
+[    1.350000] sp : c782fe10  ip : fffffffa  fp : 00000000
+[    1.350000] r10: c01e0268  r9 : 00000000  r8 : c7903e20
+[    1.350000] r7 : 00000001  r6 : c782fe2c  r5 : 00000000  r4 : c7147080
+[    1.350000] r3 : c013eab0  r2 : 00000000  r1 : 000000f2  r0 : 00000000
+[    1.350000] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    1.350000] Control: 00c5387d  Table: 8704c000  DAC: 00000017
+[    1.350000] Process swapper (pid: 1, stack limit = 0xc782e1b8)
+[    1.350000] Stack: (0xc782fe10 to 0xc7830000)
+[    1.350000] fe00:                                     00000000 000000f2 c0053034 00000000
+[    1.350000] fe20: 00000000 c0053518 c016b798 00000000 000000f2 c711ea10 00000102 c7903e00
+[    1.350000] fe20: 00000000 c0053518 c016b798 00000000 000000f2 c711ea10 00000102 c7903e00
+[    1.350000] fe40: c7903e20 c013ec80 c016b798 c711ea10 c7903e20 c013ebc4 c7903e00 00000000
+[    1.350000] fe60: c046ae74 00000000 00000015 c0140ab8 c7903e20 c0498b10 c0498b18 c0131194
+[    1.350000] fe80: c7903e20 c046ae74 c7903e54 00000000 c01da8fc c0131338 00000000 c046ae74
+[    1.350000] fea0: c01312ac c012fa00 c784e64c c78e7f90 c046ae74 c70b6420 c046b1e0 c01301a8
+[    1.350000] fec0: c01b1130 c00ce2fc c046ae74 c046ae74 c01dce14 c01e24d0 c01c6484 c01316cc
+[    1.350000] fee0: c046b1e0 c046ae50 c01dce14 c0141bc8 c782e000 00000006 c01dce14 c01c6ad0
+[    1.350000] ff00: c04907e4 c784d3c0 c016b7a8 0000006f 00000000 00000000 00000000 c00c488c
+[    1.350000] ff20: c05998c0 c0170258 00000015 c003ff84 c0466030 00000000 c01b1204 c01b4358
+[    1.350000] ff40: 00000006 00000006 00000000 00000006 00000006 c01dce14 c01e24d0 c01c6484
+[    1.350000] ff60: c01dce20 c046c460 00000015 c01c6c70 00000006 00000006 c01c6484 ffffffff
+[    1.350000] ff80: ffffffff ffffffff 00000000 c01634e0 00000000 00000000 00000000 00000000
+[    1.350000] ffa0: 00000000 c01634e8 00000000 c000e0f8 00000000 00000000 00000000 00000000
+[    1.350000] ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    1.350000] ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 ffffffff ffffffff
+[    1.350000] [<c016745c>] (mutex_lock+0x0/0x20) from [<c00509ac>] (__irq_get_desc_lock+0x6c/0x88)
+[    1.350000] [<c00509ac>] (__irq_get_desc_lock+0x6c/0x88) from [<c0053518>] (__irq_set_handler+0x24/0x128)
+[    1.350000] [<c0053518>] (__irq_set_handler+0x24/0x128) from [<c013ec80>] (menelaus_probe+0xbc/0x280)
+[    1.350000] [<c013ec80>] (menelaus_probe+0xbc/0x280) from [<c0140ab8>] (i2c_device_probe+0x98/0xc0)
+[    1.350000] [<c0140ab8>] (i2c_device_probe+0x98/0xc0) from [<c0131194>] (driver_probe_device+0x110/0x228)
+[    1.350000] [<c0131194>] (driver_probe_device+0x110/0x228) from [<c0131338>] (__driver_attach+0x8c/0x90)
+[    1.350000] [<c0131338>] (__driver_attach+0x8c/0x90) from [<c012fa00>] (bus_for_each_dev+0x54/0x88)
+[    1.350000] [<c012fa00>] (bus_for_each_dev+0x54/0x88) from [<c01301a8>] (bus_add_driver+0xd4/0x1c8)
+[    1.350000] [<c01301a8>] (bus_add_driver+0xd4/0x1c8) from [<c01316cc>] (driver_register+0x78/0xf4)
+[    1.350000] [<c01316cc>] (driver_register+0x78/0xf4) from [<c0141bc8>] (i2c_register_driver+0x2c/0xb8)
+[    1.350000] [<c0141bc8>] (i2c_register_driver+0x2c/0xb8) from [<c01c6ad0>] (do_one_initcall+0x94/0x150)
+[    1.350000] [<c01c6ad0>] (do_one_initcall+0x94/0x150) from [<c01c6c70>] (kernel_init_freeable+0xe4/0x1b0)
+[    1.350000] [<c01c6c70>] (kernel_init_freeable+0xe4/0x1b0) from [<c01634e8>] (kernel_init+0x8/0x110)
+[    1.350000] [<c01634e8>] (kernel_init+0x8/0x110) from [<c000e0f8>] (ret_from_fork+0x14/0x3c)
+[    1.350000] Code: 03a03000 05843000 e28dd010 e8bd81f0 (e1902f9f)
+[    1.360000] ---[ end trace 75cc9e337407e765 ]---
+[    1.360000] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-This is very much the hard-line approach to the issue, but userspace
-really shouldn't be depending on the ability to execute architecturally
-invalid code; ultimately this is an ABI that deserves to be broken.
-The only trouble with going in softly and just turning on the warning
-alone is that it should already be rare enough to be easily missed.
-"Break everything AND scream about it" as the default isn't going to
-make any friends, but does make bad code as visible as possible.
-
-Anyone is of course free to turn warnings off, and/or fixups back on -
-defaulting to UM_SIGNAL on UM_IGNORE is to ensure fixup has to be
-explicitly requested, by which point they should be well aware of what
-they're doing and why.
-
-It would be useful to know if people are actually running v6+ userspaces
-that would be non-trivially impacted by this before considering
-progressing beyond RFC.
-
- arch/arm/mm/alignment.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 9240364..9a93315 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -106,10 +106,10 @@ static int safe_usermode(int new_usermode, bool warn)
- 	 * making any progress.
- 	 */
- 	if (cpu_is_v6_unaligned() && !(new_usermode & (UM_FIXUP | UM_SIGNAL))) {
--		new_usermode |= UM_FIXUP;
-+		new_usermode |= UM_SIGNAL;
- 
- 		if (warn)
--			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to fixup mode.\n");
-+			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to signal mode.\n");
- 	}
- 
- 	return new_usermode;
-@@ -971,7 +971,7 @@ static int __init alignment_init(void)
- 		cr_alignment &= ~CR_A;
- 		cr_no_alignment &= ~CR_A;
- 		set_cr(cr_alignment);
--		ai_usermode = safe_usermode(ai_usermode, false);
-+		ai_usermode = safe_usermode(ai_usermode | UM_WARN, false);
- 	}
- #endif
- 
--- 
-1.7.9.5
+A.
