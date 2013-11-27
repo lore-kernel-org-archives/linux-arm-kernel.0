@@ -1,249 +1,93 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Nov 2013 02:30:03 +0100
-Subject: [PATCH v3 3/8] clk: shmobile: Add MSTP clock support
-In-Reply-To: <2936776.W2YYB2sEWe@avalon>
-References: <1384872347-11724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131119181936.GR5914@e106331-lin.cambridge.arm.com>
- <2936776.W2YYB2sEWe@avalon>
-Message-ID: <1446370.Z0Dk5p9vtm@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 17:30:58 -0800
+Subject: [GIT PULL] omap fixes against v3.13-rc1
+Message-ID: <pull-1385515858-455528>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-I'd like to send v4 of this series soon, hopefully for the last time. Would 
-you be able to reply to the two issues that are still left and discussed below 
-? That would be really appreciated.
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-On Wednesday 20 November 2013 22:54:58 Laurent Pinchart wrote:
-> On Tuesday 19 November 2013 18:19:36 Mark Rutland wrote:
-> > On Tue, Nov 19, 2013 at 05:00:40PM +0000, Laurent Pinchart wrote:
-> > > On Tuesday 19 November 2013 16:28:21 Mark Rutland wrote:
-> > > > On Tue, Nov 19, 2013 at 02:45:42PM +0000, Laurent Pinchart wrote:
-> > > > > MSTP clocks are gate clocks controlled through a register that
-> > > > > handles up to 32 clocks. The register is often sparsely populated.
-> > > > 
-> > > > Does that mean some clocks aren't wired up, or that some clocks don't
-> > > > exist at all?
-> > > 
-> > > It means that some of the bits don't control anything.
-> > > 
-> > > > What is the behaviour of the unpopulated bits?
-> > > 
-> > > According to the datasheet they're reserved, read-only, and read an
-> > > unspecified value that is to be written back without modification when
-> > > writing the register.
-> > 
-> > Ok.
-> > 
-> > > > > Those clocks are found on Renesas ARM SoCs.
-> > > > > 
-> > > > > Cc: devicetree at vger.kernel.org
-> > > > > Signed-off-by: Laurent Pinchart
-> > > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > ---
-> > > > > 
-> > > > >  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  48 +++++
-> > > > >  drivers/clk/shmobile/Makefile                      |   1 +
-> > > > >  drivers/clk/shmobile/clk-mstp.c                    | 229 ++++++++++
-> > > > >  3 files changed, 278 insertions(+)
-> > > > >  create mode 100644
-> > > > >  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> > > > >  create mode 100644 drivers/clk/shmobile/clk-mstp.c
-> > > > > 
-> > > > > diff --git
-> > > > > a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-
-> > > > > clocks.txt
-> > > > > b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-
-> > > > > clocks.txt
-> > > > > new file mode 100644
-> > > > > index 0000000..126b17e
-> > > > > --- /dev/null
-> > > > > +++
-> > > > > b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-
-> > > > > clocks.txt
-> > > > > @@ -0,0 +1,48 @@
-> > > > > +* Renesas CPG Module Stop (MSTP) Clocks
-> > > > > +
-> > > > > +The CPG can gate SoC device clocks. The gates are organized in
-> > > > > groups of up to
-> > > > > +32 gates.
-> > > > > +
-> > > > > +This device tree binding describes a single 32 gate clocks group
-> > > > > per node.
-> > > > > +Clocks are referenced by user nodes by the MSTP node phandle and
-> > > > > the clock
-> > > > > +index in the group, from 0 to 31.
-> > > > > +
-> > > > > +Required Properties:
-> > > > > +
-> > > > > +  - compatible: Must be one of the following
-> > > > > +    - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP
-> > > > > gate clocks
-> > > > > +    - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP
-> > > > > gate clocks
-> > > > > +    - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
-> > > > > +  - reg: Base address and length of the memory resource used by the
-> > > > > MSTP
-> > > > > +    clocks
-> > > > 
-> > > > There are two entries in the example, the code seems to assume they
-> > > > are particular registers, but this implies one.
-> > > 
-> > > There can be one or two registers, depending on the hardware. The first
-> > > register is always required and controls the clocks, the second register
-> > > is optional (in the sense that it's not implemented for some of the MSTP
-> > > instances) and reports the clock status.
-> > 
-> > Ok. The documentation should note this.
-> 
-> What about
-> 
->   - reg: Base address and length of the I/O mapped registers used by the
-> MSTP clocks. The first register is the clock control register and is
-> mandatory. The second register is the clock status register and is optional
-> when not implemented in hardware.
-> 
-> > > > Are these not part of a larger bank of registers?
-> > > 
-> > > They are. Here's the memory map for the r8a7791 for instance.
-> > > 
-> > > MSTPSR0		H'E615 0030
-> > > MSTPSR1		H'E615 0038
-> > > MSTPSR2		H'E615 0040
-> > > MSTPSR3		H'E615 0048
-> > > MSTPSR4		H'E615 004C
-> > > MSTPSR5		H'E615 003C
-> > > MSTPSR6		H'E615 01C0
-> > > MSTPSR7		H'E615 01C4
-> > > MSTPSR8		H'E615 09A0
-> > > MSTPSR9		H'E615 09A4
-> > > MSTPSR10		H'E615 09A8
-> > > MSTPSR11		H'E615 09AC
-> > > 
-> > > SMSTPCR0		H'E615 0130
-> > > SMSTPCR1		H'E615 0134
-> > > SMSTPCR2		H'E615 0138
-> > > SMSTPCR3		H'E615 013C
-> > > SMSTPCR4		H'E615 0140
-> > > SMSTPCR5		H'E615 0144
-> > > SMSTPCR6		H'E615 0148
-> > > SMSTPCR7		H'E615 014C
-> > > SMSTPCR8		H'E615 0990
-> > > SMSTPCR9		H'E615 0994
-> > > SMSTPCR10		H'E615 0998
-> > > SMSTPCR11		H'E615 099C
-> > > 
-> > > I've pondered whether we should use a single device node for all the
-> > > MSTP clocks, but I don't think it would be very practical. Not only
-> > > would we need to encode all bit positions, we also would have to encode
-> > > register offsets in DT. This would become pretty messy in a single node.
-> > > 
-> > > > > +  - clocks: Reference to the parent clocks
-> > > > 
-> > > > How many, and what do they correspond to?
-> > > 
-> > > What about
-> > > 
-> > > - clocks: Reference to the parent clocks, one per output clock. The
-> > > parents must appear in the same order as the output clocks.
-> > 
-> > That sounds reasonable.
-> > 
-> > > > > +  - #clock-cells: Must be 1
-> > > > > +  - clock-output-names: The name of the clocks as free-form strings
-> > > > > +  - renesas,indices: Indices of the gate clocks into the group (0
-> > > > > to 31)
-> > > > 
-> > > > The description of this property doesn't describe half of what it
-> > > > means. I believe something like the below does:
-> > > > 
-> > > > - renesas,indices: A list of clock IDs (single cells), one for each
-> > > >   clock present. Each entry may correspond to a clock-output-names
-> > > >   entry at the same index, and its location in the list defines the
-> > > >   corresponding clock-specifier for the entry.
-> > > 
-> > > I might be mistaken, but doesn't "its location in the list defines the
-> > > corresponding clock-specifier for the entry" imply that clock specifiers
-> > > use the location in the list as the clock ID instead of the numerical
-> > > value of the indices entry ? Each entry in the renesas,indices list
-> > > corresponds to one clocks entry and one clock-output-names entry, and
-> > > clock users reference an MSTP clock using the value of its indices
-> > > entry, not the position of the entry.
-> > 
-> > Sorry, the code confused me. Having read over it again, I'm even more
-> > confused.
-> > 
-> > You said the registers were sparesly populated, but the code assumes
-> > that the bits start at 0 and the set of populated bits are contiguous,
-> > which is not what I would describe that as sparse. Are the bits always
-> > contiguous?
-> 
-> They're not, and the code doesn't assume so. The driver loops over all the
-> clocks using the position in the renesas,indices array as the loop counter
-> i. It then retrieves the output name, the parent and the index and
-> registers the clock. When registration succeeds, the clock is stored in the
-> clks array at the index corresponding to the renesas,indices value. The
-> clks array is thus sparsely populated, exactly as the MSTP register.
-> 
-> > I thought the bits in the register were truly sparse (i.e. you could
-> > have two bits which were at either end of the register), and the indices
-> > property allowed you to define the set of bits which were valid.
-> > 
-> > As far as I can see from cpg_mstp_clocks_init and
-> > cpg_mstp_clock_register, the indices property assings the set of IDs for
-> > consumers to use, and I don't see what the point of that is if we
-> > already have a well-defined linear index (the bit position in the
-> > register) which we could use instead, which also makes the binding and
-> > code simpler.
-> > 
-> > > > I'd imagine we have a few sparse clocks by now, and we might be able
-> > > > to make this more uniform. But I may be mistaken.
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > +static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
-> > > > > +{
-> > > > > +	struct mstp_clock *clock = to_mstp_clock(hw);
-> > > > > +	struct mstp_clock_group *group = clock->group;
-> > > > > +	u32 bitmask = BIT(clock->bit_index);
-> > > > > +	unsigned long flags;
-> > > > > +	unsigned int i;
-> > > > > +	u32 value;
-> > > > > +
-> > > > > +	spin_lock_irqsave(&group->lock, flags);
-> > > > > +
-> > > > > +	value = clk_readl(group->smstpcr);
-> > > > > +	if (enable)
-> > > > > +		value &= ~bitmask;
-> > > > > +	else
-> > > > > +		value |= bitmask;
-> > > > > +	clk_writel(value, group->smstpcr);
-> > > > > +
-> > > > > +	spin_unlock_irqrestore(&group->lock, flags);
-> > > > > +
-> > > > > +	if (!enable || !group->mstpsr)
-> > > > > +		return 0;
-> > > > > +
-> > > > > +	for (i = 1000; i > 0; --i) {
-> > > > > +		if (!(clk_readl(group->mstpsr) & bitmask))
-> > > > > +			break;
-> > > > > +		cpu_relax();
-> > > > > +	}
-> > > > 
-> > > > Any particular reason for 1000 times? Is there a known minimum time to
-> > > > switch a clock between disabled and enabled? A comment would be nice.
-> > > 
-> > > There's no particular reason, the datasheet doesn't provide any useful
-> > > information. I've just copied that value from existing C code.
-> > 
-> > Any chance it might work without?
-> 
-> Yes, with roughly a 75% chance :-) Without this look I get a crash around
-> once every four times with the video processing devices. Other devices are
-> affected as well, but delays in their respective drivers hide the problem.
+are available in the git repository at:
 
--- 
-Regards,
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/fixes-against-rc1-take2
 
-Laurent Pinchart
+for you to fetch changes up to 9cb238c00ba5c1ddfff2c2ed6aa66c15b962e4c3:
+
+  mmc: omap: Fix I2C dependency and make driver usable with device tree (2013-11-26 15:51:16 -0800)
+
+----------------------------------------------------------------
+Some omap related fixes that have come up with people moving to device
+tree only based booting for omap2+.
+
+The series contains a handful of fixes for the igep boards as they were
+one of the first omap3 boards to jump over completely to device tree
+based booting. So these can be considered regressions compared to
+booting igep in legacy mode with board files in v3.12.
+
+Also included are few other device tree vs legacy booting regressions:
+
+- yet more missing omap3 .dtsi entries that have showed up booting
+  various boards with device tree only
+
+- n900 eMMC device tree fix
+
+- fixes for beagle USB EHCI
+
+- two fixes to make omap2420 MMC work
+
+As we're moving omap2+ to be device tree only for v3.14, I'd like to
+have v3.13 work equally well for legacy based booting and device tree
+based booting. So there will be likely few more device tree related
+booting patches trickling in.
+
+This series also includes a regression fix for the omap timer posted
+mode that may wrongly stay on from the bootloader for some SoCs.
+
+----------------------------------------------------------------
+Enric Balletbo i Serra (7):
+      ARM: dts: omap3-igep: Fix bus-width for mmc1
+      ARM: dts: omap3-igep: Add support for LBEE1USJYC WiFi connected to SDIO
+      ARM: dts: omap3-igep: Update to use the TI AM/DM37x processor
+      ARM: dts: AM33XX BASE0033: add pinmux and hdmi node to enable display
+      ARM: dts: AM33XX BASE0033: add pinmux and user led support
+      ARM: dts: AM33XX BASE0033: add 32KBit EEPROM support
+      ARM: dts: AM33XX IGEP0033: add USB support
+
+Javier Martinez Canillas (4):
+      ARM: OMAP2+: dss-common: change IGEP's DVI DDC i2c bus
+      ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
+      ARM: dts: omap3-igep0020: Add pinmuxing for DVI output
+      ARM: dts: omap3-igep0020: name twl4030 VPLL2 regulator as vdds_dsi
+
+Joel Fernandes (1):
+      ARM: OMAP2+: Disable POSTED mode for errata i103 and i767
+
+Roger Quadros (1):
+      ARM: dts: omap3-beagle: Fix USB host on beagle boards (for 3.13)
+
+Tony Lindgren (5):
+      ARM: OMAP2+: Fix more missing data for omap3.dtsi file
+      ARM: OMAP2+: Add fixed regulator to omap2plus_defconfig
+      ARM: OMAP2+: Fix eMMC on n900 with device tree
+      mmc: omap: Fix DMA configuration to not rely on device id
+      mmc: omap: Fix I2C dependency and make driver usable with device tree
+
+ Documentation/devicetree/bindings/mmc/ti-omap.txt | 54 ++++++++++++++
+ arch/arm/boot/dts/am335x-base0033.dts             | 79 +++++++++++++++++++++
+ arch/arm/boot/dts/am335x-igep0033.dtsi            | 29 ++++++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts             |  7 ++
+ arch/arm/boot/dts/omap3-beagle.dts                |  7 ++
+ arch/arm/boot/dts/omap3-igep.dtsi                 | 85 ++++++++++++++++++++---
+ arch/arm/boot/dts/omap3-igep0020.dts              | 50 ++++++++++++-
+ arch/arm/boot/dts/omap3-igep0030.dts              |  4 +-
+ arch/arm/boot/dts/omap3-n900.dts                  | 23 +++++-
+ arch/arm/boot/dts/omap3.dtsi                      | 42 +++++++++++
+ arch/arm/configs/omap2plus_defconfig              |  1 +
+ arch/arm/mach-omap2/dss-common.c                  |  2 +-
+ arch/arm/mach-omap2/pdata-quirks.c                |  1 +
+ arch/arm/plat-omap/include/plat/dmtimer.h         |  5 +-
+ drivers/mmc/host/omap.c                           | 45 ++++++------
+ 15 files changed, 396 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap.txt
