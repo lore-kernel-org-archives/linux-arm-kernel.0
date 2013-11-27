@@ -1,46 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Nov 2013 13:59:19 -0800
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
- device id
-In-Reply-To: <86fvqhjz4q.fsf@void.printf.net>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-3-git-send-email-tony@atomide.com>
- <20131118184723.GR10317@atomide.com>
- <87ioveeo0x.fsf@octavius.laptop.org>
- <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
- <86fvqhjz4q.fsf@void.printf.net>
-Message-ID: <20131127215918.GD26766@atomide.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 27 Nov 2013 23:03:43 +0100
+Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
+In-Reply-To: <5296281C.1060403@wwwdotorg.org>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
+ <5296281C.1060403@wwwdotorg.org>
+Message-ID: <da3ea685e652f3ce33ebbe660312ed01@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chris Ball <cjb@laptop.org> [131127 13:48]:
-> Hi,
+Am 2013-11-27 18:13, schrieb Stephen Warren:
+> On 11/26/2013 04:45 PM, Stefan Agner wrote:
+>> Set the requested SM2 voltage to the correct value of 1.8V. The value
+>> before used to work on TPS658623 since the driver applied a wrong
+>> voltage table too. However, the TPS658643 used on newer devices uses
+>> yet another voltage table and those broke that compatibility. The
+>> regulator driver now has the correct voltage table for both regulator
+>> versions and those the correct voltage can be used in this device
+>> tree.
 > 
-> On Wed, Nov 27 2013, Jarkko Nikula wrote:
-> > Can you enlighten me what's the proper way to get patches to mmc since
-> > I cannot figure out working methodology from MAINTAINERS file?
+> One thing you haven't called out explicitly here is that this series is
+> an incompatible change to the DT, since the old buggy driver used to
+> allow old buggy DT content to accidentally work.
 > 
-> Sorry about this, Jarkko.
+> I'm not too familiar with who's using mainline on the Colibri boards.
+> Hopefully everyone doing that is using in-kernel DTs, so this
+> incompatible change won't be any issue for anyone.
 > 
-> Since I don't have omap.c hardware, I'm generally going to wait for
-> a Tested-by/Acked-by from someone else on patches like these.  We
-> actually have a maintainer already listed for the driver, Jarkko
-> Lavinen <jarkko.lavinen@nokia.com>.
-> 
-> So, maybe the MAINTAINERS section for drivers/mmc/host/omap.c needs
-> an update?  Feel free to send me patches to it.  Either way, I'll
-> start treating Aaro and Jarkko (Nikula) as maintainers for this
-> driver.
 
-Hmm looks like here's a reasonably recent update that we've missed
-from Jarkko Lavinen to update his email address:
+I don't think there are a lot of users since Toradex ships the NVidia
+downstream kernel. Two users for sure, Lucas and me.
 
-http://lkml.org/lkml/2013/10/4/142
+> This patch needs to be rolled into patch 2/3 so that "git bisect" isn't
+> broken.
 
-I've updated Jarkko Lavinen's address in this mail, we should
-probably also patch the MAINTAINERS file for that, and then see if
-Aaro and Jarkko Nikula are interested to be listed there as well.
+Will do
 
-Regards,
+ 
+> You mention there's yet another PMIC version used on later boards. Do we
+> need a new DT for that specfic version of the Colibri board?
 
-Tony
+The newer device is the TPS658643, which uses a different voltage table,
+but this change is already in the driver. Maybe I should reword that
+commit a bit. I just tried to point out why the change is really needed
+(since we have two regulators with different voltage tables). But there
+is nothing beyond those two that... 
+
+Because the DT now states the real, required voltage, a new device
+(version) would need an appropriate driver change and things should
+work.
