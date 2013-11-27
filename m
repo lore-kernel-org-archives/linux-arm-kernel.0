@@ -1,43 +1,168 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 26 Nov 2013 20:07:23 -0800
-Subject: [PATCH 00/23] mtd: st_spi_fsm: Add new device
-In-Reply-To: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131127040723.GZ9468@ld-irv-0074.broadcom.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Wed, 27 Nov 2013 10:00:09 +0530
+Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
+ mapping
+In-Reply-To: <1385500248-6551-2-git-send-email-marex@denx.de>
+References: <1385500248-6551-1-git-send-email-marex@denx.de>
+ <1385500248-6551-2-git-send-email-marex@denx.de>
+Message-ID: <20131127043009.GB12773@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Huang, Mark, SPI list
+Dear Marek Vasut,
 
-There seem to be multiple efforts going on that are vaguely related. I'd
-like to see more of the same people appearing on the CC list, to keep
-better coordinated.
+Please replace imx6 with designware in subject line  of this patch.
 
-On that topic, is the SPI dev list relevant, or would anybody working on
-the intersection of SPI and MTD be on the MTD list?
+On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
+> From: Tim Harvey <tharvey@gateworks.com>
+> 
+> The IMX6 iATU is used for address translation between the AXI bus
+> address space and PCI address space.  This is used for type0 and type1
+> config cycles but is not necessary for outbound io/mem regions.
+> 
+> This patch removes the calls that inappropriately re-configures the ATU
+> viewport for outbound memory and IO after config cycles and removes them
+> altogether as they are not necessary.
 
-On Fri, Nov 22, 2013 at 04:22:37PM +0000, Lee Jones wrote:
-> The first bunch of these patches have been on the MLs before, but 
-> didn't receive a great deal of attention for the most part. We are
-> a little more featureful this time however. We can now successfully
-> setup and configure the N25Q256. We still can't read/write/erase
-> it though. I'll start work on that next week and will provide it in
-> the next instalment.
+Yes, they are not necessary for all the cases where translation is one
+to one. So so for sure all the platform till now introduced should
+work.
+But, what about a platform where memory translation is not one to one?
 
-What happened to integrating a SPI NOR framework? I see you copied some
-of the m25p80 commands, but you don't share them with m25p80. I also
-understand your argument (from the first version of this patch series)
-that much of the actual controller operation is not shared with m25p80,
-but you'd be surprised how this might evolve. There are several others
-with QSPI hardware that are trying to get patches merged, some of whom
-(Huang, at least) are actively submitting patches to help with this
-abstraction.
+Existing code should work with all sort of memory translation on a
+platform having atleast two viewports capable of programming any type
+of outbound transaction.
 
-Now, I haven't had a lot of time yet to look at both yours and Huang's
-work and see what, if anything, can be shared (will do soon). But I
-think you need to be aware.
+> 
+> This resolves issues with PCI devices behind switches and has been tested with
+> a Gige device behind a PLX PEX860x switch.  More testing is needed for other
+> configurations.
 
-BTW, can you include version markers (i.e., [PATCH v2 X/Y]) in the
-subject from now on?
+I do not understand if MX6 has 4 Outbound Viewport then how this patch
+helps?
+-- PCI devices behind switches would not have been working because
+CFG1 transaction would not have been correct.
+-- It works with this patch. This patch changes viewport for CFG1 from
+1 to 0.
+-- Can it be possible that MX6 has some restriction on viewport
+programming capability. I mean,like only viewport0 can be programmed
+for CFG0/1?
 
-Brian
+Otherwise I do not find any convincing reason that why this patch
+helps in resolving issues with PCI devices behind switches.
+
+
+Regards
+Pratyush
+
+> 
+> From: Tim Harvey <tharvey@gateworks.com>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Frank Li <lznuaa@gmail.com>
+> Cc: Harro Haan <hrhaan@gmail.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+> Cc: Pratyush Anand <pratyush.anand@st.com>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Sean Cross <xobs@kosagi.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+> Cc: Tim Harvey <tharvey@gateworks.com>
+> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> Cc: Yinghai Lu <yinghai@kernel.org>
+> ---
+>  drivers/pci/host/pcie-designware.c | 41 +++-----------------------------------
+>  1 file changed, 3 insertions(+), 38 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index ed9b11b..01d76ad 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -46,7 +46,6 @@
+>  #define PCIE_ATU_VIEWPORT		0x900
+>  #define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
+>  #define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
+> -#define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
+>  #define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
+>  #define PCIE_ATU_CR1			0x904
+>  #define PCIE_ATU_TYPE_MEM		(0x0 << 0)
+> @@ -494,8 +493,8 @@ static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+>  
+>  static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
+>  {
+> -	/* Program viewport 1 : OUTBOUND : CFG1 */
+> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
+> +	/* Program viewport 0 : OUTBOUND : CFG1 */
+> +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+>  			  PCIE_ATU_VIEWPORT);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> @@ -505,38 +504,8 @@ static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
+> -}
+> -
+> -static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
+> -{
+> -	/* Program viewport 0 : OUTBOUND : MEM */
+> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+> -			  PCIE_ATU_VIEWPORT);
+> -	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
+> -	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> -	dw_pcie_writel_rc(pp, pp->mem_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->mem_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->mem_base + pp->config.mem_size - 1,
+> -			  PCIE_ATU_LIMIT);
+> -	dw_pcie_writel_rc(pp, pp->config.mem_bus_addr, PCIE_ATU_LOWER_TARGET);
+> -	dw_pcie_writel_rc(pp, upper_32_bits(pp->config.mem_bus_addr),
+> -			  PCIE_ATU_UPPER_TARGET);
+> -}
+> -
+> -static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
+> -{
+> -	/* Program viewport 1 : OUTBOUND : IO */
+> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
+> -			  PCIE_ATU_VIEWPORT);
+> -	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
+> +	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> -	dw_pcie_writel_rc(pp, pp->io_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->io_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->io_base + pp->config.io_size - 1,
+> -			  PCIE_ATU_LIMIT);
+> -	dw_pcie_writel_rc(pp, pp->config.io_bus_addr, PCIE_ATU_LOWER_TARGET);
+> -	dw_pcie_writel_rc(pp, upper_32_bits(pp->config.io_bus_addr),
+> -			  PCIE_ATU_UPPER_TARGET);
+>  }
+>  
+>  static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+> @@ -552,11 +521,9 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>  	if (bus->parent->number == pp->root_bus_nr) {
+>  		dw_pcie_prog_viewport_cfg0(pp, busdev);
+>  		ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
+> -		dw_pcie_prog_viewport_mem_outbound(pp);
+>  	} else {
+>  		dw_pcie_prog_viewport_cfg1(pp, busdev);
+>  		ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
+> -		dw_pcie_prog_viewport_io_outbound(pp);
+>  	}
+>  
+>  	return ret;
+> @@ -575,11 +542,9 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>  	if (bus->parent->number == pp->root_bus_nr) {
+>  		dw_pcie_prog_viewport_cfg0(pp, busdev);
+>  		ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
+> -		dw_pcie_prog_viewport_mem_outbound(pp);
+>  	} else {
+>  		dw_pcie_prog_viewport_cfg1(pp, busdev);
+>  		ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
+> -		dw_pcie_prog_viewport_io_outbound(pp);
+>  	}
+>  
+>  	return ret;
+> -- 
+> 1.8.4.3
