@@ -1,56 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 26 Nov 2013 19:33:06 -0800
-Subject: [GIT PULL] omap fixes against v3.13-rc1
-In-Reply-To: <52954b58.8659420a.7af3.ffffeeabSMTPIN_ADDED_BROKEN@mx.google.com>
-References: <52954b58.8659420a.7af3.ffffeeabSMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <CAOesGMh8hq5UbL5ion=fgAecfkMLw3E5+2m8T2LbdqgYafFK8Q@mail.gmail.com>
+From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
+Date: Wed, 27 Nov 2013 11:33:15 +0800
+Subject: [PATCH] pinctrl: imx1-core populate subdevices
+In-Reply-To: <CACRpkdaQcY43wnfD_phsi6rCo3oUmOUcei+gb9phyGT7F1iZyA@mail.gmail.com>
+References: <CACRpkda2dO6DvurEhaTVGJv8nDyEGOEeLCap-_+1e1mHtD0XyQ@mail.gmail.com>	<1384193987-20740-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdaQcY43wnfD_phsi6rCo3oUmOUcei+gb9phyGT7F1iZyA@mail.gmail.com>
+Message-ID: <529567FB.5090501@gtsys.com.hk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 5:30 PM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+On Wednesday, November 20, 2013 04:01 AM, Linus Walleij wrote:
+> On Mon, Nov 11, 2013 at 7:19 PM, Markus Pargmann<mpa@pengutronix.de>  wrote:
 >
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>> Support gpio devicetree subnodes to allow a more detailed DT hardware
+>> description.
+>>
+>> Signed-off-by: Markus Pargmann<mpa@pengutronix.de>
 >
-> are available in the git repository at:
+> Looks good to me.
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/fixes-against-rc1-take2
+> Tentatively applied this, the DT people may want to say something
+> about this.
 >
-> for you to fetch changes up to 9cb238c00ba5c1ddfff2c2ed6aa66c15b962e4c3:
->
->   mmc: omap: Fix I2C dependency and make driver usable with device tree (2013-11-26 15:51:16 -0800)
->
-> ----------------------------------------------------------------
-> Some omap related fixes that have come up with people moving to device
-> tree only based booting for omap2+.
->
-> The series contains a handful of fixes for the igep boards as they were
-> one of the first omap3 boards to jump over completely to device tree
-> based booting. So these can be considered regressions compared to
-> booting igep in legacy mode with board files in v3.12.
->
-> Also included are few other device tree vs legacy booting regressions:
->
-> - yet more missing omap3 .dtsi entries that have showed up booting
->   various boards with device tree only
->
-> - n900 eMMC device tree fix
->
-> - fixes for beagle USB EHCI
->
-> - two fixes to make omap2420 MMC work
->
-> As we're moving omap2+ to be device tree only for v3.14, I'd like to
-> have v3.13 work equally well for legacy based booting and device tree
-> based booting. So there will be likely few more device tree related
-> booting patches trickling in.
->
-> This series also includes a regression fix for the omap timer posted
-> mode that may wrongly stay on from the bootloader for some SoCs.
+> Yours,
+> Linus Walleij
+> --
 
-Pulled, thanks. Do you have a feel for how much more of DT-vs-legacy
-patches you expect for 3.13? I'm not saying no to them at this point
-but it'd be good to know roughly what to expect.
+Hi,
+
+I tried the new configuration but the kernel oops when probing the
+dm9000 caused by insufficient resources more likely the real reason
+that somehow the gpio6: triggers a problem
 
 
--Olof
+[    0.115718] irq: no irq domain found for 
+/soc/aipi at 10000000/iomuxc at 10015000/gpio at 10015500 !
+[    0.115768] ------------[ cut here ]------------
+[    0.115853] WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 
+of_device_alloc+0x110/0x15c()
+[    0.117824] ---[ end trace 0e10ae727e6e0ab1 ]---
+[    0.121236] Failed to request board ext/int gpios
+[    0.152712] imx27-pinctrl 10015000.iomuxc: initialized IMX pinctrl driver
+
+
+iomuxc: iomuxc at 10015000 {
+         compatible = "fsl,imx27-iomuxc";
+         reg = <0x10015000 0x600>;
+         #address-cells = <1>;
+         #size-cells = <1>;
+         ranges;
+
+         gpio1: gpio at 10015000 {
+              compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+              reg = <0x10015000 0x100>;
+              interrupts = <8>;
+              gpio-controller;
+              #gpio-cells = <2>;
+              interrupt-controller;
+              #interrupt-cells = <2>;
+         };
+...
+         gpio6: gpio at 10015500 {
+              compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+              reg = <0x10015500 0x100>;
+              interrupts = <8>;
+              gpio-controller;
+              #gpio-cells = <2>;
+              interrupt-controller;
+              #interrupt-cells = <2>;
+         };
+};
+
+Kernel Linux version 3.13.0-rc1-next-20131125-dirty
+
+With kind regards
+Chris
