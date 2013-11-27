@@ -1,47 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 27 Nov 2013 14:36:41 +0000
-Subject: [PATCH 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <20131127143429.GN3296@lee--X1>
-References: <cover.1385508112.git.stefan@agner.ch>
- <ef881d39f78b75b4badeebb5be0264edc3906d86.1385508112.git.stefan@agner.ch>
- <20131127130954.GF3296@lee--X1>
- <cd69295e946b48451f449eacc02efa4a@agner.ch>
- <20131127135547.GK3296@lee--X1>
- <cfb203a896eda67c106794d89e668d56@agner.ch>
- <20131127143429.GN3296@lee--X1>
-Message-ID: <20131127143641.GO3296@lee--X1>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 27 Nov 2013 14:38:54 +0000
+Subject: HYP Kernel boot requirements
+In-Reply-To: <52951756.9000206@ti.com>
+References: <CAMJs5B8XX-93YcRyTiQ1JRcKUB5oer8cV7FLtMPP6SeqeB3RwQ@mail.gmail.com>
+ <52937AB4.1060901@ti.com>
+ <CAMJs5B9nnpqjSmT7vi9cvC4e9Fx2Bft4rRGxmVKyLP7JbGMPAg@mail.gmail.com>
+ <529381E4.3090405@ti.com> <20131125172825.GD8396@arm.com>
+ <5293A888.9050500@ti.com> <20131126141346.GA692@arm.com>
+ <5294B471.7020205@ti.com>
+ <20131126173751.GF2355@e103592.cambridge.arm.com>
+ <52951756.9000206@ti.com>
+Message-ID: <20131127143854.GB10411@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-adding the list.
-
-Please remember to 'reply to all' when discussing patches.
-
-> > >> Hm, when the device is not answering on that request, the probe method
-> > >> should fail I would say. This means that the device is missing most
-> > >> likely. However, I should set the device version to TPS6586X_ANY if I
-> > >> happen to end up in the default case.
-> > > 
-> > > I would say that returning an error is the sound thing to do, but I'm
-> > > missing the point of TPS6586X_ANY, as it doesn't appear to be used in
-> > > this context.
-> > > 
+On Tue, Nov 26, 2013 at 09:49:10PM +0000, Santosh Shilimkar wrote:
+> On Tuesday 26 November 2013 12:37 PM, Dave Martin wrote:
+> > On Tue, Nov 26, 2013 at 09:47:13AM -0500, Santosh Shilimkar wrote:
+> >> On Tuesday 26 November 2013 09:13 AM, Catalin Marinas wrote:
+> >>> On Mon, Nov 25, 2013 at 07:44:08PM +0000, Santosh Shilimkar wrote:
+> >>>> On Monday 25 November 2013 12:28 PM, Catalin Marinas wrote:
+> >>>>> On Mon, Nov 25, 2013 at 04:59:16PM +0000, Santosh Shilimkar wrote:
+> >>>>>> What I am saying is the platforms like OMAP5 already support PM in
+> >>>>>> mainline kernel and we can't break that for KVM. Boot-loaders
+> >>>>>> would be thrashed after boot so you need something which runs
+> >>>>>> in Kernel or along with Kernel to have equivalent of hyp
+> >>>>>> switching.
+> >>>>>>
+> >>>>>> Am not challenging the agreed direction but we need to solve the
+> >>>>>> PM problem as well before making "all CPU runs boot-loader for
+> >>>>>> HYP kernels" as a must have. At least its is a change in boot
+> >>>>>> strategy from existing kernels.
+> >>>>>
+> >>>>> Of course I recommend PSCI which covers both hotplug and suspend ;), but
+> >>>>> I guess it's not the case for OMAP5. Since OMAP has its own secondary
+> >>>>> booting protocol and CPU hotplug re-entry, can you not just use
+> >>>>> different entry point when the primary CPU was initially started in Hyp
+> >>>>> mode (e.g. omap5_hyp_secondary_startup)?
+> >>>>>
+> >>>> How will that solve the guest secondary boot failure case when using
+> >>>> the same kernel binary for guest-boot ? Even for primary CPU which
+> >>>> will be suspended it needs to resume already in HYP mode and its not
+> >>>> going to go through boot-loader. So the low power code needs to have
+> >>>> HYP switch code so that CPU resumes in HYP mode.
+> >>>
+> >>> Is it late to rewrite the OMAP5 firmware?
+> >>>
+> >> Well its ROM'ed unfortunately so no choice. OMAP5 ROM did implement
+> >> a secure API which lets you enter into HYP mode and thats the only
+> >> thing can be used.
 > > 
-> > Yes, its mainly used in the regulator code later on. I do assign voltage
-> > table to TPS6586X_ANY, if its the appropriate table for any version of
-> > the device. 
-> 
-> <snip>
-> 
-> > Ok, will change this. Setting the version to TPS6586X_ANY in the default
-> > case is anyway not a good idea since it would suppress unknown versions.
-> 
-> Perhaps I should suggest to make TPS6586X_ANY a positive number then,
-> as a negative value to me indicates more of an error than a generic
-> parameter.
+> > If the ROM is capable of loading some additional signed Secure World
+> > firmware after the ROM itself has booted, PSCI could be implemented
+> > in the second, resident firmware payload.
+> > 
+> > Some SoCs ship with boot ROMs that can do that -- is this not the case
+> > for OMAP5?
+> > 
+> On OMAP, the secure devices there is a way to do this but not for 
+> general purpose devices. General purpose devices once you
+> exit the ROM code, we exit out of security and only way to
+> re-enter secure word is via ROM implemented monitor/secure
+> APIs.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+As last resort, you can still write a bunch of instructions acting as
+warm-bootloader, reserve a page and add them there. Code required is just
+a shim layer and should not require more than few bytes, after all
+it has just to check some variables and jump accordingly (+ calling
+smc if required).
+
+Not pretty, agreed, but still better than patching the kernel IMHO
+(basically you will end up patching the bootloader - and possibly the
+dtb - instead, to install the shim mentioned above).
+
+Lorenzo
