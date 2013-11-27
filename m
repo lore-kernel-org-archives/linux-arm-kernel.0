@@ -1,42 +1,41 @@
-From: amit.virdi@st.com (Amit Virdi)
-Date: Wed, 27 Nov 2013 17:24:04 +0530
-Subject: [PATCH] ARM: asm: Configure caches as per the defconfig
-Message-ID: <1385553244-1513-1-git-send-email-amit.virdi@st.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 27 Nov 2013 15:55:46 +0400
+Subject: [PATCH 2/2] ARM: dts: imx51-babbage: Define FEC reset pin
+In-Reply-To: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
+References: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1385553346-20642-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Amit VIRDI <Amit.VIRDI@st.com>
-
-In the current implementation of the decompression code, the caches are enabled
-irrespective of their configuration in the deconfig. This makes setting the
-ICACHE and DCACHE disable options from the menuconfig irrelevant. Change this
-implementation to enable caches only if specified in the defconfig.
-
-Signed-off-by: Amit Virdi <amit.virdi@st.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/compressed/head.S | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx51-babbage.dts | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 066b034..1ec87cf 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -721,8 +721,14 @@ __armv7_mmu_cache_on:
- #endif
- 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
- 		bic	r0, r0, #1 << 28	@ clear SCTLR.TRE
--		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
--		orr	r0, r0, #0x003c		@ write buffer
-+#ifndef CONFIG_CPU_ICACHE_DISABLE
-+		orr	r0, r0, #0x1000		@ I-cache enable
-+#endif
-+#ifndef CONFIG_CPU_DCACHE_DISABLE
-+		orr	r0, r0, #0x0004		@ D-cache enable
-+#endif
-+		orr	r0, r0, #0x4000		@ RR cache replacement
-+		orr	r0, r0, #0x0038		@ write buffer
- 		bic	r0, r0, #2		@ A (no unaligned access fault)
- 		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
- 						@ (needed for ARM1176)
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index ee0deb3..483178a 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -299,7 +299,10 @@
+ 		};
+ 
+ 		pinctrl_fec: fecgrp {
+-			fsl,pins = <MX51_FEC_PINGRP1>;
++			fsl,pins = <
++				MX51_FEC_PINGRP1
++				MX51_PAD_EIM_A20__GPIO2_14 0x85 /* Reset */
++			>;
+ 		};
+ 
+ 		pinctrl_i2c2: i2c2grp {
+@@ -377,6 +380,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "mii";
++	phy-reset-gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
++	phy-reset-duration = <1>;
+ 	status = "okay";
+ };
+ 
 -- 
-1.8.0
+1.8.3.2
