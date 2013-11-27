@@ -1,45 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 27 Nov 2013 09:24:47 +0100
-Subject: [PATCH RFC] PCI: imx6: remove outbound io/mem ATU region mapping
-In-Reply-To: <20131127035056.GA12773@pratyush-vbox>
-References: <1382504143-27915-1-git-send-email-tharvey@gateworks.com>
- <201311262146.09780.marex@denx.de> <20131127035056.GA12773@pratyush-vbox>
-Message-ID: <201311270924.47277.marex@denx.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 27 Nov 2013 17:27:36 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r7s72100 and Genmai GPIO / PINCTRL
+ support
+Message-ID: <20131127082736.20015.21303.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Pratyush Anand,
+ARM: shmobile: r7s72100 and Genmai GPIO / PINCTRL support
 
-> On Wed, Nov 27, 2013 at 04:46:09AM +0800, Marek Vasut wrote:
-> > Dear Pratyush Anand,
-> > 
-> > > Hi,
-> > > 
-> > > On Wed, Oct 23, 2013 at 12:55:43PM +0800, Tim Harvey wrote:
-> > > > The IMX6 iATU is used for address translation between the AXI bus
-> > > > address space and PCI address space.  This is used for type0 and
-> > > > type1 config cycles but is not necessary for outbound io/mem
-> > > > regions.
-> > > > 
-> > > > This patch removes the calls that inappropriately re-configures the
-> > > > ATU viewport for outbound memory and IO after config cycles and
-> > > > removes them altogether as they are not necessary.
-> > > > 
-> > > > This resolves issues with PCI devices behind switches and has been
-> > > > tested with a Gige device behind a PLX PEX860x switch.  More testing
-> > > > is needed for other configurations.
-> > > 
-> > > It seems to me that in your controller you have only one view port.
-> > > Also mem_base and mem_bus_addr is same. Thats why it works in your
-> > > case.
-> > 
-> > MX6 has 4 In/4 Out viewports AFAICT.
-> 
-> Then if I do not miss anything, MX6 should work even without this patch.
+[PATCH 01/04] ARM: shmobile: r7s72100 GPIO and PINCTRL device nodes
+[PATCH 02/04] ARM: shmobile: Genmai LED1 and LED2 support
+[PATCH 03/04] ARM: shmobile: Genmai I2C-over-GPIO support
+[PATCH 04/04] ARM: shmobile: Genmai SCIF2 PINCTRL configuration
 
-Yes, yet, it does not. On the other hand, this defect is only problematic if you 
-use the devices behind a switch. Do you use a PCIe switch on your platform 
-please?
+Add various device nodes to the r7s72100 SoC and the Genmai board,
+nothing special just basic support for LEDs and I2C-over-GPIO.
 
-Best regards,
-Marek Vasut
+Patch 4/4 depends on the r7s72100 PINCTRL pin grouping, but 1-3
+depends on the GPIO driver.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas.git tag renesas-devel-v3.13-rc1-20131125 and
+ [PATCH] pinctrl: sh-pfc: Initial r7s72100 support
+ [PATCH v3] gpio: Renesas RZ GPIO driver V3 
+
+ The following patches are needed for 4/4:
+ [PATCH 00/03] pinctrl: sh-pfc: r7s72100 SCIF2 support
+ [PATCH 01/03] pinctrl: sh-pfc: r7s72100 SCIF2 port3 support
+ [PATCH 02/03] pinctrl: sh-pfc: r7s72100 SCIF2 macro conversion
+ [PATCH 03/03] pinctrl: sh-pfc: r7s72100 SCIF2 port4, 6 and 8 support
+
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts |   41 +++++-
+ arch/arm/boot/dts/r7s72100.dtsi                 |  154 +++++++++++++++++++++++
+ 2 files changed, 194 insertions(+), 1 deletion(-)
