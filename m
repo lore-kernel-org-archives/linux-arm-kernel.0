@@ -1,81 +1,100 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Wed, 27 Nov 2013 08:16:41 +0100
-Subject: [alsa-devel] KNOT / CONTINUOUS
-In-Reply-To: <5294F85C.4000105@metafoo.de>
-References: <20131126104140.16e3eb87@armhf> <s5h8uwba2gv.wl%tiwai@suse.de>
- <20131126200916.47a45929@armhf> <5294F85C.4000105@metafoo.de>
-Message-ID: <s5h61rewbza.wl%tiwai@suse.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 27 Nov 2013 08:31:52 +0100
+Subject: [PATCH] pinctrl: imx1-core populate subdevices
+In-Reply-To: <529567FB.5090501@gtsys.com.hk>
+References: <CACRpkda2dO6DvurEhaTVGJv8nDyEGOEeLCap-_+1e1mHtD0XyQ@mail.gmail.com>
+ <1384193987-20740-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdaQcY43wnfD_phsi6rCo3oUmOUcei+gb9phyGT7F1iZyA@mail.gmail.com>
+ <529567FB.5090501@gtsys.com.hk>
+Message-ID: <20131127073152.GA28465@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Tue, 26 Nov 2013 20:37:00 +0100,
-Lars-Peter Clausen wrote:
-> 
-> On 11/26/2013 08:09 PM, Jean-Francois Moine wrote:
-> > On Tue, 26 Nov 2013 11:20:48 +0100
-> > Takashi Iwai <tiwai@suse.de> wrote:
-> > 
-> >> Not against the patch itself, but just found looking through it:
+Hi,
+
+On Wed, Nov 27, 2013 at 11:33:15AM +0800, Chris Ruehl wrote:
+> On Wednesday, November 20, 2013 04:01 AM, Linus Walleij wrote:
+> >On Mon, Nov 11, 2013 at 7:19 PM, Markus Pargmann<mpa@pengutronix.de>  wrote:
+> >
+> >>Support gpio devicetree subnodes to allow a more detailed DT hardware
+> >>description.
 > >>
-> >>> @@ -493,7 +497,7 @@ static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[2] = {
-> >>>  		.rates = SNDRV_PCM_RATE_8000_192000 |
-> >>>  			 SNDRV_PCM_RATE_CONTINUOUS |
-> >>>  			 SNDRV_PCM_RATE_KNOT,
-> >>
-> >> Setting both CONTINUOUS and KNOT doesn't make sense.
-> > 
-> > Hi Takashi,
-> > 
-> > I understand 'continuous', but I could not find any clear definition of
-> > 'knot'. May you explain what is its purpose?
+> >>Signed-off-by: Markus Pargmann<mpa@pengutronix.de>
+> >
+> >Looks good to me.
+> >
+> >Tentatively applied this, the DT people may want to say something
+> >about this.
+> >
+> >Yours,
+> >Linus Walleij
+> >--
 > 
-> CONTINUOUS means that any rate between the specified min and max is fine, if
-> no min or max is specified any rate is fine. KNOT means there are rates
-> supported other than the standard rates defines by ALSA, but the other rates
-> are enumerable. You'd typically specify them by explicitly listing them all
-> and use a list constraint or you'd use one of the ratio constraints.
+> Hi,
 > 
-> > 
-> > BTW, if you may help me, while looking for SNDRV_PCM_RATE_KNOT,
-> > I found this sequence in soc-pcm.c:
-> > 
-> > 	if (codec_stream->rates
-> > 		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
-> > 		hw->rates |= cpu_stream->rates;
-> > 	if (cpu_stream->rates
-> > 		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
-> > 		hw->rates |= codec_stream->rates;
+> I tried the new configuration but the kernel oops when probing the
+> dm9000 caused by insufficient resources more likely the real reason
+> that somehow the gpio6: triggers a problem
 > 
-> I think this code is wrong, but I don't think it is related to your problem.
+> 
+> [    0.115718] irq: no irq domain found for
+> /soc/aipi at 10000000/iomuxc at 10015000/gpio at 10015500 !
+> [    0.115768] ------------[ cut here ]------------
+> [    0.115853] WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171
+> of_device_alloc+0x110/0x15c()
+> [    0.117824] ---[ end trace 0e10ae727e6e0ab1 ]---
+> [    0.121236] Failed to request board ext/int gpios
+> [    0.152712] imx27-pinctrl 10015000.iomuxc: initialized IMX pinctrl driver
 
-It's not completely wrong, but imperfect, indeed.
+The imx27-pinctrl driver seems to be initialized after the irq is
+requested. So this issue should be the same as in [1].
 
-Essentially, the rates bits are set by a line above the code snippet:
-	hw->rates = codec_stream->rates & cpu_stream->rates;
+Regards,
 
-And, the code above handles exceptional rules for CONTINUOUS and
-KNOT.  It would work if either codec or cpu DAI has KNOT or CONTINUOUS
-flag and another doesn't but only explicit rate bits, because
-CONTINUOUS does allow any rates and KNOW may allow any rates.
-(So, basically you need no other SNDRV_PCM_RATE_*bits if you have
-CONTINUOUS or KNOT bit.)  And the actual rates are limited by rate_min
-and rate_max values.
+Markus
 
-It won't work properly, however, if one side has KNOT and another has
-CONTINUOUS.  Then it'd end up with CONTINUOUS|KNOT, which is wrong.
+[1] [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+http://archive.arm.linux.org.uk/lurker/message/20131123.004335.61d5c21b.en.html
 
-Instead, the following should work (if I counted all possible cases
-properly):
+> 
+> 
+> iomuxc: iomuxc at 10015000 {
+>         compatible = "fsl,imx27-iomuxc";
+>         reg = <0x10015000 0x600>;
+>         #address-cells = <1>;
+>         #size-cells = <1>;
+>         ranges;
+> 
+>         gpio1: gpio at 10015000 {
+>              compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+>              reg = <0x10015000 0x100>;
+>              interrupts = <8>;
+>              gpio-controller;
+>              #gpio-cells = <2>;
+>              interrupt-controller;
+>              #interrupt-cells = <2>;
+>         };
+> ...
+>         gpio6: gpio at 10015500 {
+>              compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+>              reg = <0x10015500 0x100>;
+>              interrupts = <8>;
+>              gpio-controller;
+>              #gpio-cells = <2>;
+>              interrupt-controller;
+>              #interrupt-cells = <2>;
+>         };
+> };
+> 
+> Kernel Linux version 3.13.0-rc1-next-20131125-dirty
+> 
+> With kind regards
+> Chris
+> 
+> 
 
-	hw->rates = codec_stream->rates & cpu_stream->rates;
-	if (codec_stream->rates
-		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
-		hw->rates |= cpu_stream->rates & ~SNDRV_PCM_RATE_CONTINUOUS;
-	if (cpu_stream->rates
-		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
-		hw->rates |= codec_stream->rates & ~SNDRV_PCM_RATE_CONTINUOUS;
-
-The code looks tricky, so a proper comment should be added there.
-
-
-Takashi
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
