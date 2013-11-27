@@ -1,61 +1,33 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Nov 2013 02:32:24 +0100
-Subject: [PATCH] ARM: shmobile: mackerel: clk_round_rate() can return a
- zero to indicate an error
-In-Reply-To: <alpine.DEB.2.02.1311261647550.11450@tamien>
-References: <alpine.DEB.2.02.1311261647550.11450@tamien>
-Message-ID: <2330816.mMAIUNnmhK@avalon>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 26 Nov 2013 17:33:09 -0800
+Subject: [PATCH v2 00/10] Reuse davinci-nand driver for Keystone arch
+In-Reply-To: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20131127013309.GT9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Ivan,
 
-Thank you for the patch.
+On Thu, Nov 21, 2013 at 01:28:15PM +0200, Ivan Khoronzhuk wrote:
+> This series contains fixes and updates of Davinci nand driver in
+> order to reuse it for Keystone platform.
+> 
+> The series is combination of two following series:
+> - Davinci nand driver fixes and updates:
+>   https://lkml.org/lkml/2013/11/20/271
+> - Reuse davinci-nand driver for Keystone arch
+>   https://lkml.org/lkml/2013/11/20/315
 
-On Tuesday 26 November 2013 16:49:38 Paul Walmsley wrote:
-> Treat both negative and zero return values from clk_round_rate() as
-> errors.  This is needed since subsequent patches will convert
-> clk_round_rate()'s return value to be an unsigned type, rather than a
-> signed type, since some clock sources can generate rates higher than
-> (2^31)-1 Hz.
-> 
-> Eventually, when calling clk_round_rate(), only a return value of zero
-> will be considered a error.  All other values will be considered valid
-> rates.  The comparison against values less than 0 is kept to preserve
-> the correct behavior in the meantime.
-> 
-> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
+Can you make sure to consistently change the email $subject for your
+patch series? For each of the above, it looks like they are actually
+version 2, yet they still just say "[PATCH X/Y]" (not "[PATCH v2 X/Y]").
+This makes it harder to parse the history of each series. (And the
+combining of two un-versioned patch series adds to the confusion.)
 
-Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Now, this combined series has a good v2 marking (although at this point,
+is it really v3? ...whatever, it doesn't matter). Please continue to
+write appropriate $subjects for this and future patch series.
 
-> ---
-> Applies on v3.13-rc1.  See also:
-> 
->      http://marc.info/?l=linux-arm-kernel&m=138542591313620&w=2
-> 
->   arch/arm/mach-shmobile/board-mackerel.c |    4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-mackerel.c
-> b/arch/arm/mach-shmobile/board-mackerel.c index af06753eb809..d90d2f11071b
-> 100644
-> --- a/arch/arm/mach-shmobile/board-mackerel.c
-> +++ b/arch/arm/mach-shmobile/board-mackerel.c
-> @@ -548,9 +548,9 @@ static void __init hdmi_init_pm_clock(void)
->   		 clk_get_rate(&sh7372_pllc2_clk));
-> 
->   	rate = clk_round_rate(&sh7372_pllc2_clk, 594000000);
-> -	if (rate < 0) {
-> +	if (rate <= 0) {
->   		pr_err("Cannot get suitable rate: %ld\n", rate);
-> -		ret = rate;
-> +		ret = -EINVAL;
->   		goto out;
->   	}
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Brian
