@@ -1,59 +1,32 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 28 Nov 2013 08:15:04 +0900
-Subject: [PATCH 02/04] ARM: shmobile: Use r8a7740 suffix for INTC compat string
+Date: Thu, 28 Nov 2013 08:15:11 +0900
+Subject: [PATCH 03/04] ARM: shmobile: Use r8a7778 suffix for INTC compat string
 In-Reply-To: <20131127231450.29081.98054.sendpatchset@w520>
 References: <20131127231450.29081.98054.sendpatchset@w520>
-Message-ID: <20131127231504.29081.74299.sendpatchset@w520>
+Message-ID: <20131127231511.29081.46719.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add "renesas,intc-irqpin-r8a7740" to the compatible string for the
-IRQ pins in case of r8a7740 INTC. This makes the INTC irqpin follow
+Add "renesas,intc-irqpin-r8a7778" to the compatible string for the
+IRQ pins in case of r8a7778 INTC. This makes the INTC irqpin follow
 the same style as the other devices and also makes it more future proof.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/r8a7740.dtsi |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7778.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- 0001/arch/arm/boot/dts/r8a7740.dtsi
-+++ work/arch/arm/boot/dts/r8a7740.dtsi	2013-11-28 07:35:58.000000000 +0900
-@@ -41,7 +41,7 @@
+--- 0001/arch/arm/boot/dts/r8a7778.dtsi
++++ work/arch/arm/boot/dts/r8a7778.dtsi	2013-11-28 07:41:06.000000000 +0900
+@@ -43,7 +43,7 @@
  
- 	/* irqpin0: IRQ0 - IRQ7 */
- 	irqpin0: irqpin at e6900000 {
+ 	/* irqpin: IRQ0 - IRQ3 */
+ 	irqpin: irqpin at fe78001c {
 -		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
++		compatible = "renesas,intc-irqpin-r8a7778", "renesas,intc-irqpin";
  		#interrupt-cells = <2>;
  		interrupt-controller;
- 		reg = <0xe6900000 4>,
-@@ -62,7 +62,7 @@
- 
- 	/* irqpin1: IRQ8 - IRQ15 */
- 	irqpin1: irqpin at e6900004 {
--		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0xe6900004 4>,
-@@ -83,7 +83,7 @@
- 
- 	/* irqpin2: IRQ16 - IRQ23 */
- 	irqpin2: irqpin at e6900008 {
--		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0xe6900008 4>,
-@@ -104,7 +104,7 @@
- 
- 	/* irqpin3: IRQ24 - IRQ31 */
- 	irqpin3: irqpin at e690000c {
--		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0xe690000c 4>,
+ 		status = "disabled"; /* default off */
