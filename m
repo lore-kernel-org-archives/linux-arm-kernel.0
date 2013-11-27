@@ -1,44 +1,81 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 26 Nov 2013 23:04:06 -0800
-Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <5295758C.2030907@ti.com>
-References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
- <5295758C.2030907@ti.com>
-Message-ID: <52959966.7000509@roeck-us.net>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Wed, 27 Nov 2013 08:16:41 +0100
+Subject: [alsa-devel] KNOT / CONTINUOUS
+In-Reply-To: <5294F85C.4000105@metafoo.de>
+References: <20131126104140.16e3eb87@armhf> <s5h8uwba2gv.wl%tiwai@suse.de>
+ <20131126200916.47a45929@armhf> <5294F85C.4000105@metafoo.de>
+Message-ID: <s5h61rewbza.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2013 08:31 PM, Sekhar Nori wrote:
-> On Monday 25 November 2013 07:34 PM, Ivan Khoronzhuk wrote:
->> To reduce code duplicate and increase code readability use WDT core
->> code to handle WDT interface.
->>
->> Remove io_lock as the WDT core uses mutex to lock each wdt device.
->> Remove wdt_state as the WDT core tracks state with its own variable.
->>
->> The watchdog_init_timeout() can read timeout value from timeout-sec
->> property if the passed value is out of bounds. The heartbeat is
->> initialized in next way. If heartbeat is not set thought module
->> parameter, try to read it's value from WDT node timeout-sec property.
->> If node has no one, use default value.
->>
->> The heartbeat is hold in wdd->timeout by WDT core, so use it in
->> order to set timeout period.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->
-> So this still causes a regression because the clk_get()
-> fails due to the changed device name. Please fold this
-> patch in (tested on DM365, compiled on rest).
->
-> Also, the change in device name (while needed) does not seem
-> to be related to usage of wdt core. Can you may be split
-> that change into a separate patch?
->
+At Tue, 26 Nov 2013 20:37:00 +0100,
+Lars-Peter Clausen wrote:
+> 
+> On 11/26/2013 08:09 PM, Jean-Francois Moine wrote:
+> > On Tue, 26 Nov 2013 11:20:48 +0100
+> > Takashi Iwai <tiwai@suse.de> wrote:
+> > 
+> >> Not against the patch itself, but just found looking through it:
+> >>
+> >>> @@ -493,7 +497,7 @@ static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[2] = {
+> >>>  		.rates = SNDRV_PCM_RATE_8000_192000 |
+> >>>  			 SNDRV_PCM_RATE_CONTINUOUS |
+> >>>  			 SNDRV_PCM_RATE_KNOT,
+> >>
+> >> Setting both CONTINUOUS and KNOT doesn't make sense.
+> > 
+> > Hi Takashi,
+> > 
+> > I understand 'continuous', but I could not find any clear definition of
+> > 'knot'. May you explain what is its purpose?
+> 
+> CONTINUOUS means that any rate between the specified min and max is fine, if
+> no min or max is specified any rate is fine. KNOT means there are rates
+> supported other than the standard rates defines by ALSA, but the other rates
+> are enumerable. You'd typically specify them by explicitly listing them all
+> and use a list constraint or you'd use one of the ratio constraints.
+> 
+> > 
+> > BTW, if you may help me, while looking for SNDRV_PCM_RATE_KNOT,
+> > I found this sequence in soc-pcm.c:
+> > 
+> > 	if (codec_stream->rates
+> > 		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
+> > 		hw->rates |= cpu_stream->rates;
+> > 	if (cpu_stream->rates
+> > 		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
+> > 		hw->rates |= codec_stream->rates;
+> 
+> I think this code is wrong, but I don't think it is related to your problem.
 
-Given all the trouble with it, I think that would be a good idea.
+It's not completely wrong, but imperfect, indeed.
 
-Guenter
+Essentially, the rates bits are set by a line above the code snippet:
+	hw->rates = codec_stream->rates & cpu_stream->rates;
+
+And, the code above handles exceptional rules for CONTINUOUS and
+KNOT.  It would work if either codec or cpu DAI has KNOT or CONTINUOUS
+flag and another doesn't but only explicit rate bits, because
+CONTINUOUS does allow any rates and KNOW may allow any rates.
+(So, basically you need no other SNDRV_PCM_RATE_*bits if you have
+CONTINUOUS or KNOT bit.)  And the actual rates are limited by rate_min
+and rate_max values.
+
+It won't work properly, however, if one side has KNOT and another has
+CONTINUOUS.  Then it'd end up with CONTINUOUS|KNOT, which is wrong.
+
+Instead, the following should work (if I counted all possible cases
+properly):
+
+	hw->rates = codec_stream->rates & cpu_stream->rates;
+	if (codec_stream->rates
+		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
+		hw->rates |= cpu_stream->rates & ~SNDRV_PCM_RATE_CONTINUOUS;
+	if (cpu_stream->rates
+		& (SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_CONTINUOUS))
+		hw->rates |= codec_stream->rates & ~SNDRV_PCM_RATE_CONTINUOUS;
+
+The code looks tricky, so a proper comment should be added there.
+
+
+Takashi
