@@ -1,120 +1,82 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 27 Nov 2013 10:01:08 +0530
-Subject: [PATCH v3 1/6] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385388285-10553-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385388285-10553-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <5295758C.2030907@ti.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 26 Nov 2013 20:32:53 -0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+Message-ID: <20131127043253.GA9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 November 2013 07:34 PM, Ivan Khoronzhuk wrote:
-> To reduce code duplicate and increase code readability use WDT core
-> code to handle WDT interface.
-> 
-> Remove io_lock as the WDT core uses mutex to lock each wdt device.
-> Remove wdt_state as the WDT core tracks state with its own variable.
-> 
-> The watchdog_init_timeout() can read timeout value from timeout-sec
-> property if the passed value is out of bounds. The heartbeat is
-> initialized in next way. If heartbeat is not set thought module
-> parameter, try to read it's value from WDT node timeout-sec property.
-> If node has no one, use default value.
-> 
-> The heartbeat is hold in wdd->timeout by WDT core, so use it in
-> order to set timeout period.
-> 
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
++ Lee Jones, others
 
-So this still causes a regression because the clk_get()
-fails due to the changed device name. Please fold this
-patch in (tested on DM365, compiled on rest).
+I'd like to keep a similar CC list for the various conversations going
+on about SPI NOR frameworks.
 
-Also, the change in device name (while needed) does not seem
-to be related to usage of wdt core. Can you may be split
-that change into a separate patch?
-
-Thanks,
-Sekhar
-
----8<---
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 0813b51..82c6013 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -385,7 +385,7 @@ static struct clk_lookup da830_clks[] = {
- 	CLK(NULL,		"pll0_sysclk7",	&pll0_sysclk7),
- 	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
- 	CLK(NULL,		"timer0",	&timerp64_0_clk),
--	CLK("watchdog",		NULL,		&timerp64_1_clk),
-+	CLK("davinci-wdt",	NULL,		&timerp64_1_clk),
- 	CLK(NULL,		"arm_rom",	&arm_rom_clk),
- 	CLK(NULL,		"scr0_ss",	&scr0_ss_clk),
- 	CLK(NULL,		"scr1_ss",	&scr1_ss_clk),
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 352984e..ccb2f58 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -443,7 +443,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK(NULL,		"pll1_sysclk3",	&pll1_sysclk3),
- 	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
- 	CLK(NULL,		"timer0",	&timerp64_0_clk),
--	CLK("watchdog",		NULL,		&timerp64_1_clk),
-+	CLK("davinci-wdt",	NULL,		&timerp64_1_clk),
- 	CLK(NULL,		"arm_rom",	&arm_rom_clk),
- 	CLK(NULL,		"tpcc0",	&tpcc0_clk),
- 	CLK(NULL,		"tptc0",	&tptc0_clk),
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index ef9ff1f..4bb8132 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -375,7 +375,7 @@ static struct clk_lookup dm355_clks[] = {
- 	CLK(NULL, "pwm3", &pwm3_clk),
- 	CLK(NULL, "timer0", &timer0_clk),
- 	CLK(NULL, "timer1", &timer1_clk),
--	CLK("watchdog", NULL, &timer2_clk),
-+	CLK("davinci-wdt", NULL, &timer2_clk),
- 	CLK(NULL, "timer3", &timer3_clk),
- 	CLK(NULL, "rto", &rto_clk),
- 	CLK(NULL, "usb", &usb_clk),
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 1511a06..b0e8df3 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -473,7 +473,7 @@ static struct clk_lookup dm365_clks[] = {
- 	CLK(NULL, "pwm3", &pwm3_clk),
- 	CLK(NULL, "timer0", &timer0_clk),
- 	CLK(NULL, "timer1", &timer1_clk),
--	CLK("watchdog", NULL, &timer2_clk),
-+	CLK("davinci-wdt", NULL, &timer2_clk),
- 	CLK(NULL, "timer3", &timer3_clk),
- 	CLK(NULL, "usb", &usb_clk),
- 	CLK("davinci_emac.1", NULL, &emac_clk),
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 143a321..aeaad95 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -322,7 +322,7 @@ static struct clk_lookup dm644x_clks[] = {
- 	CLK(NULL, "pwm2", &pwm2_clk),
- 	CLK(NULL, "timer0", &timer0_clk),
- 	CLK(NULL, "timer1", &timer1_clk),
--	CLK("watchdog", NULL, &timer2_clk),
-+	CLK("davinci-wdt", NULL, &timer2_clk),
- 	CLK(NULL, NULL, NULL),
- };
- 
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 2a73f29..a56779b 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -356,7 +356,7 @@ static struct clk_lookup dm646x_clks[] = {
- 	CLK(NULL, "pwm1", &pwm1_clk),
- 	CLK(NULL, "timer0", &timer0_clk),
- 	CLK(NULL, "timer1", &timer1_clk),
--	CLK("watchdog", NULL, &timer2_clk),
-+	CLK("davinci-wdt", NULL, &timer2_clk),
- 	CLK("palm_bk3710", NULL, &ide_clk),
- 	CLK(NULL, "vpif0", &vpif0_clk),
- 	CLK(NULL, "vpif1", &vpif1_clk),
+On Tue, Nov 26, 2013 at 02:32:51PM +0800, Huang Shijie wrote:
+> 1.) Why add a new framework for SPI NOR?
+>   The SPI-NOR controller such as Freescale's Quadspi controller is working
+>   in a different way from the SPI bus. It should knows the NOR commands to
+>   find the right LUT sequence. Unfortunately, the current code can not meet
+>   this requirement.
+> 
+> 2.) How does this patch set do?
+>    This patch set adds a new spi-nor layer.
+>    Before this patch, the layer is like:
+> 
+>                    MTD
+>          ------------------------
+>                   m25p80
+>          ------------------------
+> 	       spi bus driver
+>          ------------------------
+> 	        SPI NOR chip
+> 
+>    After this patch, the layer is like:
+>                    MTD
+>          ------------------------
+>                   spi-nor
+>          ------------------------
+>                   m25p80
+>          ------------------------
+> 	       spi bus driver
+>          ------------------------
+> 	       SPI NOR chip
+> 
+>   With the spi-nor controller driver(Freescale Quadspi), it looks like:
+>                    MTD
+>          ------------------------
+>                   spi-nor
+>          ------------------------
+>                 fsl-quadspi
+>          ------------------------
+> 	       SPI NOR chip
+> 
+> 3.) more details
+>    This patch set adds a new data structrue spi_nor{}, clones most the common
+>   code to spi-nor.c. Make the m25p80.c use the new APIs.
+> 
+> 4.) TODO list:
+>    3.1) add the new spi_nor_device{} for the spi-nor controller's device.
+>    3.2) add the Freescale Quadspi driver.
+> 
+> 	       
+> Huang Shijie (4):
+>   mtd: spi-nor: move the SPI NOR commands to a new header file
+>   mtd: spi-nor: add a new data structrue spi_nor{}
+>   mtd: spi-nor: add the framework for SPI NOR
+>   mtd: m25p80: use the new spi-nor APIs
+> 
+>  drivers/mtd/Kconfig           |    2 +
+>  drivers/mtd/Makefile          |    1 +
+>  drivers/mtd/devices/Kconfig   |    2 +-
+>  drivers/mtd/devices/m25p80.c  | 1249 +++--------------------------------------
+>  drivers/mtd/spi-nor/Kconfig   |    6 +
+>  drivers/mtd/spi-nor/Makefile  |    1 +
+>  drivers/mtd/spi-nor/spi-nor.c | 1057 ++++++++++++++++++++++++++++++++++
+>  include/linux/mtd/spi-nor.h   |  101 ++++
+>  8 files changed, 1239 insertions(+), 1180 deletions(-)
+>  create mode 100644 drivers/mtd/spi-nor/Kconfig
+>  create mode 100644 drivers/mtd/spi-nor/Makefile
+>  create mode 100644 drivers/mtd/spi-nor/spi-nor.c
+>  create mode 100644 include/linux/mtd/spi-nor.h
+> 
