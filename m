@@ -1,26 +1,53 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 27 Nov 2013 15:19:30 -0800
-Subject: [GIT PULL] extcon fixes for 3.13-rc2
-In-Reply-To: <52945148.2020205@samsung.com>
-References: <52945148.2020205@samsung.com>
-Message-ID: <20131127231930.GA9337@kroah.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Wed, 27 Nov 2013 15:31:52 -0800
+Subject: [PATCH V5 3/6] Add strstr to compressed string.c for ARM.
+In-Reply-To: <1385595115-21488-1-git-send-email-roy.franz@linaro.org>
+References: <1385595115-21488-1-git-send-email-roy.franz@linaro.org>
+Message-ID: <1385595115-21488-4-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 04:44:08PM +0900, Chanwoo Choi wrote:
-> Hi Greg,
-> 
-> This is extcon fixes pull request for 3.13-rc2. I add detailed description of
-> this pull request on below. Please pull extcon fixes with following updates.
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git tags/extcon-linus-for-3.13-rc2
+The shared efi-stub-helper.c functions require a strstr
+implementation.
+Implementation copied from arch/x86/boot/string.c
 
-Pulled and pushed out, thanks.
+Signed-off-by: Roy Franz <roy.franz@linaro.org>
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
+---
+ arch/arm/boot/compressed/string.c |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-greg k-h
+diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
+index 36e53ef..5397792 100644
+--- a/arch/arm/boot/compressed/string.c
++++ b/arch/arm/boot/compressed/string.c
+@@ -111,6 +111,27 @@ char *strchr(const char *s, int c)
+ 	return (char *)s;
+ }
+ 
++/**
++ * strstr - Find the first substring in a %NUL terminated string
++ * @s1: The string to be searched
++ * @s2: The string to search for
++ */
++char *strstr(const char *s1, const char *s2)
++{
++	size_t l1, l2;
++
++	l2 = strlen(s2);
++	if (!l2)
++		return (char *)s1;
++	l1 = strlen(s1);
++	while (l1 >= l2) {
++		l1--;
++		if (!memcmp(s1, s2, l2))
++			return (char *)s1;
++		s1++;
++	}
++	return NULL;
++}
+ #undef memset
+ 
+ void *memset(void *s, int c, size_t count)
+-- 
+1.7.10.4
