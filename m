@@ -1,42 +1,37 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Wed, 27 Nov 2013 09:20:56 +0530
-Subject: [PATCH RFC] PCI: imx6: remove outbound io/mem ATU region mapping
-In-Reply-To: <201311262146.09780.marex@denx.de>
-References: <1382504143-27915-1-git-send-email-tharvey@gateworks.com>
- <20131023064051.GA7646@pratyush-vbox>
- <201311262146.09780.marex@denx.de>
-Message-ID: <20131127035056.GA12773@pratyush-vbox>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Nov 2013 19:52:17 -0800
+Subject: [GIT PULL] omap fixes against v3.13-rc1
+In-Reply-To: <CAOesGMh8hq5UbL5ion=fgAecfkMLw3E5+2m8T2LbdqgYafFK8Q@mail.gmail.com>
+References: <52954b58.8659420a.7af3.ffffeeabSMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAOesGMh8hq5UbL5ion=fgAecfkMLw3E5+2m8T2LbdqgYafFK8Q@mail.gmail.com>
+Message-ID: <20131127035216.GW26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 04:46:09AM +0800, Marek Vasut wrote:
-> Dear Pratyush Anand,
+* Olof Johansson <olof@lixom.net> [131126 19:34]:
+> On Tue, Nov 26, 2013 at 5:30 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > As we're moving omap2+ to be device tree only for v3.14, I'd like to
+> > have v3.13 work equally well for legacy based booting and device tree
+> > based booting. So there will be likely few more device tree related
+> > booting patches trickling in.
 > 
-> > Hi,
-> > 
-> > On Wed, Oct 23, 2013 at 12:55:43PM +0800, Tim Harvey wrote:
-> > > The IMX6 iATU is used for address translation between the AXI bus
-> > > address space and PCI address space.  This is used for type0 and type1
-> > > config cycles but is not necessary for outbound io/mem regions.
-> > > 
-> > > This patch removes the calls that inappropriately re-configures the ATU
-> > > viewport for outbound memory and IO after config cycles and removes them
-> > > altogether as they are not necessary.
-> > > 
-> > > This resolves issues with PCI devices behind switches and has been tested
-> > > with a Gige device behind a PLX PEX860x switch.  More testing is needed
-> > > for other configurations.
-> > 
-> > It seems to me that in your controller you have only one view port.
-> > Also mem_base and mem_bus_addr is same. Thats why it works in your
-> > case.
-> 
-> MX6 has 4 In/4 Out viewports AFAICT.
+> Pulled, thanks. Do you have a feel for how much more of DT-vs-legacy
+> patches you expect for 3.13? I'm not saying no to them at this point
+> but it'd be good to know roughly what to expect.
 
-Then if I do not miss anything, MX6 should work even without this patch.
+Thanks, I currently only have four more coming but these still need
+testing and acks:
 
-Regards
-Pratyush
-> 
-> Best regards,
-> Marek Vasut
+net: smc91x: Fix device tree based configuration so it's usable
+of/platform: Fix no irq domain found errors when populating interrupts
+ARM: dts: Fix omap serial wake-up when booted with device tree
+ARM: OMAP2+: Fix overwriting hwmod data with data from device tree
+
+Then there will probably be few patches from other people but the
+four above are currently the only ones that I'm aware of that can be
+show stoppers for booting omaps (and also other SoCs) with device tree.
+
+Regards,
+
+Tony
