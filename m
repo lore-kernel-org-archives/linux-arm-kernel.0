@@ -1,47 +1,119 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 26 Nov 2013 17:52:52 -0800
-Subject: [PATCH] Documentation: devicetree: arm: add lpae property to cpus/cpu
- bindings
-Message-ID: <1385517172-803-1-git-send-email-olof@lixom.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 27 Nov 2013 10:59:18 +0900
+Subject: PCI: mvebu: return NULL instead of ERR_PTR(ret)
+In-Reply-To: <20131126180930.GC19852@obsidianresearch.com>
+References: <001001ceb816$5d1aecc0$1750c640$%han@samsung.com>
+ <20131125200256.GA7316@obsidianresearch.com>
+ <001101ceea68$cb486220$61d92660$%han@samsung.com>
+ <20131126180930.GC19852@obsidianresearch.com>
+Message-ID: <000101ceeb14$480fee80$d82fcb80$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the LPAE capability is determined by the kernel today, it is still
-useful to be able to specify the feature in the device tree. There is
-precedence from other architectures for this.
+On Wednesday, November 27, 2013 3:10 AM, Jason Gunthorpe wrote:
+> On Tue, Nov 26, 2013 at 02:31:44PM +0900, Jingoo Han wrote:
+> > Previously, I sent the patch in order to fix sparse warning as below:
+> > How about this?
+> >
+> > static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+> > 			struct device_node *np, struct mvebu_pcie_port *port)
+> > {
+> > 	struct resource regs;
+> > 	int ret = 0;
+> >
+> > 	ret = of_address_to_resource(np, 0, &regs);
+> > 	if (ret)
+> > -		return ERR_PTR(ret);
+> > +		return (void __iomem *)ERR_PTR(ret);
+> 
+> You should probably ask the sparse folks for guidance 'git grep
+> iomem.*ERR_PTR' returns nothing, so this isn't an established pattern.
+> 
+> It seems like sparse should know that ERR_PTR functions can work with
+> any pointer no matter the type? IS_ERR_PTR will have the same problem
+> with implicitly dropping the iomem tag.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
++cc Christopher Li, sparse mailing-list, Joe Perches, Dan Carpenter,
+     Axel Lin, Julia Lawall,
 
-My personal motive for this is to be able to tell which boards are
-work even trying to boot an LPAE kernel on, since we don't disable the
-platforms that are based on A8/A9 when LPAE is turned on. I'll add dtsi
-patches for A7/A15-based platforms once the binding is settled.
+Hi All,
 
-I don't think it's worth trying to add those dependencies in Kconfig,
-by the way -- it'd be pretty verbose and churny.
+I have some questions about handling sparse warning.
 
- Documentation/devicetree/bindings/arm/cpus.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Currently, the following sparse warning happens
+at Marvell Armada PCIe driver.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 91304353eea4..632015f8314f 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -191,6 +191,14 @@ nodes to be present and contain the properties described below.
- 			  property identifying a 64-bit zero-initialised
- 			  memory location.
- 
-+	- lpae
-+		Usage: Indicates that the CPU can use the LPAE extensions to
-+		       address more than 32 bit physical memory.
-+		Value type: <empty>
-+		Definition:
-+			# On ARMv7 systems this boolean property is used
-+			  to indicate LPAE feature capability.
-+
- Example 1 (dual-cluster big.LITTLE system 32-bit):
- 
- 	cpus {
--- 
-1.8.4.1.601.g02b3b1d
+drivers/pci/host/pci-mvebu.c:743:31: warning: incorrect type in return expression (different address spaces)
+drivers/pci/host/pci-mvebu.c:743:31:    expected void [noderef] <asn:2>*
+drivers/pci/host/pci-mvebu.c:743:31:    got void *
+
+mvebu_pcie_map_registers() returns ERR_PTR(ret),
+however ERR_PTR() returns (void *), not (void __iomem *).
+
+./drivers/pci/host/pci-mvebu.c
+static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+		struct device_node *np, struct mvebu_pcie_port *port)
+{
+	struct resource regs;
+	int ret = 0;
+
+	ret = of_address_to_resource(np, 0, &regs);
+	if (ret)
+		return ERR_PTR(ret);
+
+	return devm_ioremap_resource(&pdev->dev, &regs);
+}
+./include/linux/err.h
+static inline void * __must_check ERR_PTR(long error)
+{
+	return (void *) error;
+}
+
+
+Previously, I submitted the following patch, that adds
+(void __iomem *) cast.
+
+./drivers/pci/host/pci-mvebu.c
+static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+		struct device_node *np, struct mvebu_pcie_port *port)
+{
+	.....
+
+	ret = of_address_to_resource(np, 0, &regs);
+	if (ret)
+-		return ERR_PTR(ret);
++		return (void __iomem *)ERR_PTR(ret);
+
+However, other engineers said that "(void __iomem *)ERR_PTR(ret)"
+is not a general pattern. I cannot find the proper method to resolve
+this sparse warning.
+
+In this case, how can I resolve this sparse warning?
+
+Then, how about the following?
+
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -740,7 +740,7 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+
+	ret = of_address_to_resource(np, 0, &regs);
+	if (ret)
+-		return ERR_PTR(ret);
++		return NULL;
+
+	return devm_ioremap_resource(&pdev->dev, &regs);
+ }
+@@ -939,7 +939,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+		continue;
+
+		port->base = mvebu_pcie_map_registers(pdev, child, port);
+-		if (IS_ERR(port->base)) {
++		if (IS_ERR_OR_NULL(port->base)) {
+			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
+				port->port, port->lane);
+			port->base = NULL;
+
+Thank you for reading this. :-)
+
+Best regards,
+Jingoo Han
