@@ -1,41 +1,48 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 27 Nov 2013 16:39:31 +0100
-Subject: [PATCH 3/3] ARM: imx_v6_v7_defconfig: Enable mc13xxx-pwm support.
-In-Reply-To: <1385566771-366-1-git-send-email-denis@eukrea.com>
-References: <1385566771-366-1-git-send-email-denis@eukrea.com>
-Message-ID: <1385566771-366-3-git-send-email-denis@eukrea.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 27 Nov 2013 23:40:34 +0800
+Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <20131127122053.GG9032@mudshark.cambridge.arm.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-3-git-send-email-liuj97@gmail.com>
+ <20131030001245.GB25346@mudshark.cambridge.arm.com>
+ <527671E9.8040704@gmail.com>
+ <20131127122053.GG9032@mudshark.cambridge.arm.com>
+Message-ID: <52961272.7010400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea mbimx53sd has its display backlighgt
-  connected to the pwm of its mc13xxx, so we turn
-  it on.
-
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-pwm at vger.kernel.org
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index d479049..4bd1b13 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -241,6 +241,7 @@ CONFIG_COMMON_CLK_DEBUG=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_PWM=y
- CONFIG_PWM_IMX=y
-+CONFIG_PWM_MC13XXX=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
--- 
-1.7.9.5
+On 11/27/2013 08:20 PM, Will Deacon wrote:
+> Hi Jiang Liu,
+> 
+> On Sun, Nov 03, 2013 at 03:55:21PM +0000, Jiang Liu wrote:
+>> On 10/30/2013 08:12 AM, Will Deacon wrote:
+>>> If I try and email you at your Huawei address, I get a bounce from the mail
+>>> server. Is that expected? If so, it's not very helpful from a commit log
+>>> perspective if you use that address as the author on your patches.
+>>>
+>> Hi Will,
+>> 	Sorry for the inconvenience. I have left Huawei recently and
+>> have had a vacation last two weeks. I will use my gmail account next
+>> time.
+> 
+> I appreciate that you're probably not being paid to look at this anymore,
+> but have you had a chance to address the comments I made on version 5 of
+> this series? As far as I'm concerned, this is almost ready for merging and
+> I'd love to see it get in for 3.14!
+> 
+> It would be a real shame if this ended up getting dropped...
+Hi Will,
+	Thanks for reminder!
+	I have changed the code according to review comments,
+but I'm having troubles to find a real hardware platform to test
+the new code since I left Huawei. I will try to figure out a way
+to test the code by contacting ex-teammember at Huawei.
+	Hope it could catch the of 3.14 merging window.
+Cheers,
+Gerry
+> 
+> Cheers,
+> 
+> Will
+> 
