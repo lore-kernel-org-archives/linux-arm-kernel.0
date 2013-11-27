@@ -1,70 +1,60 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Wed, 27 Nov 2013 15:31:50 -0800
-Subject: [PATCH V5 1/6] efi-stub.txt updates for ARM
-In-Reply-To: <1385595115-21488-1-git-send-email-roy.franz@linaro.org>
-References: <1385595115-21488-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <1385595115-21488-2-git-send-email-roy.franz@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Nov 2013 15:47:59 -0800
+Subject: [PATCH 1/2] ARM: dts: omap4-panda-common: Fix pin muxing for
+ wl12xx
+In-Reply-To: <20131127164823.GX26766@atomide.com>
+References: <1385041804-19115-1-git-send-email-balajitk@ti.com>
+ <1385041804-19115-2-git-send-email-balajitk@ti.com>
+ <20131121165823.GM10317@atomide.com> <528E4295.2040109@ti.com>
+ <20131126215537.GO26766@atomide.com> <52961DF2.8080507@ti.com>
+ <20131127164823.GX26766@atomide.com>
+Message-ID: <20131127234759.GF26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update efi-stub.txt documentation to be more general
-and not x86 specific.  Add ARM only "dtb=" command
-line option description.
+* Tony Lindgren <tony@atomide.com> [131127 08:49]:
+> * Balaji T K <balajitk@ti.com> [131127 08:30]:
+> > On Wednesday 27 November 2013 03:25 AM, Tony Lindgren wrote:
+> > >* Dan Murphy <dmurphy@ti.com> [131121 09:28]:
+> > >>On 11/21/2013 10:58 AM, Tony Lindgren wrote:
+> > >>>* Balaji T K <balajitk@ti.com> [131121 05:51]:
+> > >>>>pin mux wl12xx_gpio and wl12xx_pins should be part of omap4_pmx_core
+> > >>>>and not omap4_pmx_wkup. So, move wl12xx_* to omap4_pmx_core.
+> > >>>>
+> > >>>>Fix the following error message:
+> > >>>>pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
+> > >>>>pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
+> > >>
+> > >>Why is the led pins moved then?
+> > >
+> > >Heh the patch just looks that way, looking at the curly brackets
+> > >thing do get moved properly.
+> > >
+> > >>>>SDIO card is not detected after moving pin mux to omap4_pmx_core since
+> > >>>>sdmmc5_clk pull is disabled. Enable Pull up on sdmmc5_clk to detect SDIO card.
+> > >>>Cool, does this fix the issue with the WLAN not coming up after a warm reset
+> > >>>on panda?
+> > >
+> > >Also commit f446043f1aa7 (regulator: fixed: fix regulator_list_voltage() for
+> > >regression) is needed that recently got merged. But with v3.13-rc1 +
+> > >f446043f1aa7 + this patch no luck whatsoever bringing up the wl12xx so there
+> > >must be also some regression somewhere from v3.12 on that?
+> > >
+> > Hi Tony,
+> > 
+> > I tried loading wl12xx as modules on latest base as yours with
+> > ti-connectivity/wl127x-fw-5-sr.bin firmware in place and I could connect
+> > and run iperf.
+> 
+> Oh OK I must have missed something then.
+> 
+> Does it now work after a warm reboot too? And after bringing the interface
+> down with "ifconfig wlan0 down" followed by "ifconfig wlan0 up"?
 
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
----
- Documentation/efi-stub.txt |   27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+Yes great, I can confirm that v3.13-rc1 + f446043f1aa7 (regulator: fixed: fix
+regulator_list_voltage() for regression) + this patch works even after a
+warm reset :) Will apply both to omap-for-v3.13/fixes-take4 with Cc stable.
 
-diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
-index 44e6bb6..19e897c 100644
---- a/Documentation/efi-stub.txt
-+++ b/Documentation/efi-stub.txt
-@@ -1,13 +1,16 @@
- 			  The EFI Boot Stub
- 		     ---------------------------
- 
--On the x86 platform, a bzImage can masquerade as a PE/COFF image,
--thereby convincing EFI firmware loaders to load it as an EFI
--executable. The code that modifies the bzImage header, along with the
--EFI-specific entry point that the firmware loader jumps to are
--collectively known as the "EFI boot stub", and live in
-+On the x86 and ARM platforms, a kernel zImage/bzImage can masquerade
-+as a PE/COFF image, thereby convincing EFI firmware loaders to load
-+it as an EFI executable. The code that modifies the bzImage header,
-+along with the EFI-specific entry point that the firmware loader
-+jumps to are collectively known as the "EFI boot stub", and live in
- arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
--respectively.
-+respectively.  For ARM the EFI stub is implemented in
-+arch/arm/boot/compressed/efi-header.S and
-+arch/arm/boot/compressed/efi-stub.c.  EFI stub code that is shared
-+between architectures is in drivers/firmware/efi/efi-stub-helper.c.
- 
- By using the EFI boot stub it's possible to boot a Linux kernel
- without the use of a conventional EFI boot loader, such as grub or
-@@ -23,7 +26,9 @@ The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
- System Partiion (ESP) and renamed with the extension ".efi". Without
- the extension the EFI firmware loader will refuse to execute it. It's
- not possible to execute bzImage.efi from the usual Linux file systems
--because EFI firmware doesn't have support for them.
-+because EFI firmware doesn't have support for them.  For ARM the
-+arch/arm/boot/zImage should be copied to the system partition, and it
-+may not need to be renamed.
- 
- 
- **** Passing kernel parameters from the EFI shell
-@@ -63,3 +68,11 @@ Notice how bzImage.efi can be specified with a relative path. That's
- because the image we're executing is interpreted by the EFI shell,
- which understands relative paths, whereas the rest of the command line
- is passed to bzImage.efi.
-+
-+
-+**** The "dtb=" option
-+
-+For the ARM architecture, we also need to be able to provide a device
-+tree to the kernel.  This is done with the "dtb=" command line option,
-+and is process in the same manner as the "initrd=" option that is described
-+above.
--- 
-1.7.10.4
+Regards,
+
+Tony
