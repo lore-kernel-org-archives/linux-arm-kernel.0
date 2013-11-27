@@ -1,9 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 27 Nov 2013 16:54:22 +0100
-Subject: [PATCHv8][ 3/5] ARM: dts: mbimxsd35: Add sound support.
+Date: Wed, 27 Nov 2013 16:54:23 +0100
+Subject: [PATCHv8][ 4/5] ARM: dts: mbimxsd51: Add sound support.
 In-Reply-To: <1385567664-758-1-git-send-email-denis@eukrea.com>
 References: <1385567664-758-1-git-send-email-denis@eukrea.com>
-Message-ID: <1385567664-758-3-git-send-email-denis@eukrea.com>
+Message-ID: <1385567664-758-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,32 +23,32 @@ Signed-off-by: Denis Carikli <denis@eukrea.com>
 ChangeLog v7->v8:
 - Ajusted to match the driver changes.
 ---
- .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |    9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-index fe0f3fa..71a80d3 100644
---- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-@@ -39,6 +39,14 @@
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+index cf2e0d8..6774c66 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -48,6 +48,14 @@
  			linux,default-trigger = "heartbeat";
  		};
  	};
 +
 +	sound {
 +		compatible = "eukrea,asoc-tlv320";
-+		eukrea,model = "imx35-eukrea-tlv320aic23";
-+		ssi-controller = <&ssi1>;
-+		fsl,mux-int-port = <1>;
-+		fsl,mux-ext-port = <4>;
++		eukrea,model = "imx51-eukrea-tlv320aic23";
++		ssi-controller = <&ssi2>;
++		fsl,mux-int-port = <2>;
++		fsl,mux-ext-port = <3>;
 +	};
  };
  
  &audmux {
-@@ -105,6 +113,7 @@
+@@ -125,6 +133,7 @@
  };
  
- &ssi1 {
+ &ssi2 {
 +	codec-handle = <&tlv320aic23>;
  	fsl,mode = "i2s-slave";
  	status = "okay";
