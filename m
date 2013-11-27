@@ -1,177 +1,55 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 27 Nov 2013 14:56:11 +0100
-Subject: [PATCH v7] ARM: omap: edma: add suspend suspend/resume hooks
-Message-ID: <1385560571-3939-1-git-send-email-zonque@gmail.com>
+From: list-09_linux_arm@tqsc.de (Markus Niebel)
+Date: Wed, 27 Nov 2013 15:09:28 +0100
+Subject: [PATCH] ARM: DT: imx6qdl: fix can clocks
+In-Reply-To: <1385557709.4272.1.camel@weser.hi.pengutronix.de>
+References: <1385558060-20314-1-git-send-email-list-09_linux_arm@tqsc.de>
+ <1385557709.4272.1.camel@weser.hi.pengutronix.de>
+Message-ID: <5295FD18.1010501@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the edma driver resume correctly after suspend. Tested
-on an AM33xx platform with cyclic audio streams and omap_hsmmc.
+Am 27.11.2013 14:08, wrote Lucas Stach:
+> Am Mittwoch, den 27.11.2013, 14:14 +0100 schrieb Markus Niebel:
+>> From: Markus Niebel <Markus.Niebel@tqs.de>
+>>
+>> per and ipg clock numbers are exchanged. This leads to
+>> wrong bitrate calculation.
+>>
+> NACK
+> 
+> According to the clock driver clock numbers are IPG->PER.
+> I think this is the same problem we encountered on i.MX5 and is fixed
+> with commit "can: flexcan: use correct clock as base for bit rate
+> calculation"
+> 
 
-All information can be reconstructed by already known runtime
-information.
+Sorry for the noise, was not aware of this patch. You are right.
 
-As we now use some functions that were previously only used from __init
-context, annotations had to be dropped.
-
-[nm at ti.com: added error handling for runtime + suspend_late/early_resume]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Tested-by: Joel Fernandes <joelf@ti.com>
-Acked-by: Joel Fernandes <joelf@ti.com>
----
-v6 -> v7:
-
- * Addressed comments from Sekhar Nori:
-
-   * pm_runtime_get_sync() returns negative errors, so do not use
-     IS_ERR_VALUE()
-   * Several style fixes
-
-
- arch/arm/common/edma.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 92 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 41bca32..dece66d 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -239,6 +239,8 @@ struct edma {
- 	/* list of channels with no even trigger; terminated by "-1" */
- 	const s8	*noevent;
- 
-+	struct edma_soc_info *info;
-+
- 	/* The edma_inuse bit for each PaRAM slot is clear unless the
- 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
- 	 */
-@@ -290,13 +292,13 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
- 			~(0x7 << bit), queue_no << bit);
- }
- 
--static void __init map_queue_tc(unsigned ctlr, int queue_no, int tc_no)
-+static void map_queue_tc(unsigned ctlr, int queue_no, int tc_no)
- {
- 	int bit = queue_no * 4;
- 	edma_modify(ctlr, EDMA_QUETCMAP, ~(0x7 << bit), ((tc_no & 0x7) << bit));
- }
- 
--static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-+static void assign_priority_to_queue(unsigned ctlr, int queue_no,
- 		int priority)
- {
- 	int bit = queue_no * 4;
-@@ -315,7 +317,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-  * included in that particular EDMA variant (Eg : dm646x)
-  *
-  */
--static void __init map_dmach_param(unsigned ctlr)
-+static void map_dmach_param(unsigned ctlr)
- {
- 	int i;
- 	for (i = 0; i < EDMA_MAX_DMACH; i++)
-@@ -1785,15 +1787,102 @@ static int edma_probe(struct platform_device *pdev)
- 			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
- 			edma_write_array(j, EDMA_QRAE, i, 0x0);
- 		}
-+		edma_cc[j]->info = info[j];
- 		arch_num_cc++;
- 	}
- 
- 	return 0;
- }
- 
-+static int edma_pm_suspend(struct device *dev)
-+{
-+	int j, r;
-+
-+	r = pm_runtime_get_sync(dev);
-+	if (r < 0) {
-+		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-+		return r;
-+	}
-+
-+	for (j = 0; j < arch_num_cc; j++) {
-+		struct edma *ecc = edma_cc[j];
-+
-+		disable_irq(ecc->irq_res_start);
-+		disable_irq(ecc->irq_res_end);
-+	}
-+
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
-+
-+static int edma_pm_resume(struct device *dev)
-+{
-+	int i, j, r;
-+
-+	r = pm_runtime_get_sync(dev);
-+	if (r < 0) {
-+		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-+		return r;
-+	}
-+
-+	for (j = 0; j < arch_num_cc; j++) {
-+		struct edma *cc = edma_cc[j];
-+
-+		s8 (*queue_priority_mapping)[2];
-+		s8 (*queue_tc_mapping)[2];
-+
-+		queue_tc_mapping = cc->info->queue_tc_mapping;
-+		queue_priority_mapping = cc->info->queue_priority_mapping;
-+
-+		/* Event queue to TC mapping */
-+		for (i = 0; queue_tc_mapping[i][0] != -1; i++)
-+			map_queue_tc(j, queue_tc_mapping[i][0],
-+				     queue_tc_mapping[i][1]);
-+
-+		/* Event queue priority mapping */
-+		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
-+			assign_priority_to_queue(j,
-+						 queue_priority_mapping[i][0],
-+						 queue_priority_mapping[i][1]);
-+
-+		/*
-+		 * Map the channel to param entry if channel mapping logic
-+		 * exist
-+		 */
-+		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
-+			map_dmach_param(j);
-+
-+		for (i = 0; i < cc->num_channels; i++) {
-+			if (test_bit(i, cc->edma_inuse)) {
-+				/* ensure access through shadow region 0 */
-+				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
-+					       BIT(i & 0x1f));
-+
-+				setup_dma_interrupt(i,
-+						    cc->intr_data[i].callback,
-+						    cc->intr_data[i].data);
-+			}
-+		}
-+
-+		enable_irq(cc->irq_res_start);
-+		enable_irq(cc->irq_res_end);
-+	}
-+
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops edma_pm_ops = {
-+	.suspend_late	= edma_pm_suspend,
-+	.resume_early	= edma_pm_resume,
-+};
-+
- static struct platform_driver edma_driver = {
- 	.driver = {
- 		.name	= "edma",
-+		.pm	= &edma_pm_ops,
- 		.of_match_table = edma_of_ids,
- 	},
- 	.probe = edma_probe,
--- 
-1.8.4.2
+>> Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl.dtsi |    4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+>> index 59154dc..797f007 100644
+>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>> @@ -329,7 +329,7 @@
+>>  				compatible = "fsl,imx6q-flexcan";
+>>  				reg = <0x02090000 0x4000>;
+>>  				interrupts = <0 110 0x04>;
+>> -				clocks = <&clks 108>, <&clks 109>;
+>> +				clocks = <&clks 109>, <&clks 108>;
+>>  				clock-names = "ipg", "per";
+>>  			};
+>>  
+>> @@ -337,7 +337,7 @@
+>>  				compatible = "fsl,imx6q-flexcan";
+>>  				reg = <0x02094000 0x4000>;
+>>  				interrupts = <0 111 0x04>;
+>> -				clocks = <&clks 110>, <&clks 111>;
+>> +				clocks = <&clks 111>, <&clks 110>;
+>>  				clock-names = "ipg", "per";
+>>  			};
+>>  
+> 
