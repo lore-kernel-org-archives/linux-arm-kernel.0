@@ -1,37 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Nov 2013 19:52:17 -0800
-Subject: [GIT PULL] omap fixes against v3.13-rc1
-In-Reply-To: <CAOesGMh8hq5UbL5ion=fgAecfkMLw3E5+2m8T2LbdqgYafFK8Q@mail.gmail.com>
-References: <52954b58.8659420a.7af3.ffffeeabSMTPIN_ADDED_BROKEN@mx.google.com>
- <CAOesGMh8hq5UbL5ion=fgAecfkMLw3E5+2m8T2LbdqgYafFK8Q@mail.gmail.com>
-Message-ID: <20131127035216.GW26766@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 26 Nov 2013 21:54:31 -0600
+Subject: STOP THE MADNESS
+In-Reply-To: <CACRpkdY9MTUDtDxRKRHCXch98cNiMS-dumQvaTH7gp1OCVUx6w@mail.gmail.com>
+References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+ <CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
+ <CACRpkdY9MTUDtDxRKRHCXch98cNiMS-dumQvaTH7gp1OCVUx6w@mail.gmail.com>
+Message-ID: <CAL_JsqK-=btaXtFeg6BNpOqYKUHDBxzTHU5x+AOSe4hvyM4CRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [131126 19:34]:
-> On Tue, Nov 26, 2013 at 5:30 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > As we're moving omap2+ to be device tree only for v3.14, I'd like to
-> > have v3.13 work equally well for legacy based booting and device tree
-> > based booting. So there will be likely few more device tree related
-> > booting patches trickling in.
-> 
-> Pulled, thanks. Do you have a feel for how much more of DT-vs-legacy
-> patches you expect for 3.13? I'm not saying no to them at this point
-> but it'd be good to know roughly what to expect.
+On Tue, Nov 26, 2013 at 4:09 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Nov 26, 2013 at 6:29 PM, Rob Herring <robherring2@gmail.com> wrote:
+>
+>> IMO, the whole commit causing this problem should be reverted for
+>> additional reasons. Irq generic chp and irqdomains are orthogonal
+>> features/infrastructure and should not be mutually exclusive. We need
+>> to fix irq generic chip.
+>
+> This cannot be easily reverted due to a lot of code and fixes building
+> on top of it, and even if it could I guess it will also break device tree
+> use on these: git grep pl061 arch/arm/boot/dts
+>
+> As DT mandates that the irqdomain be used, or it cannot translate
+> the IRQs as before this patch it uses an hard-coded base from
+> platform data. This is one of those odd drivers that don't need
+> one line of DT-specific code in it to work with device tree, yet
+> it works.
 
-Thanks, I currently only have four more coming but these still need
-testing and acks:
+Correct, interrupts did not work with DT before this. It is needed
+functionality, but it is how it was implemented that I have issue
+with.
 
-net: smc91x: Fix device tree based configuration so it's usable
-of/platform: Fix no irq domain found errors when populating interrupts
-ARM: dts: Fix omap serial wake-up when booted with device tree
-ARM: OMAP2+: Fix overwriting hwmod data with data from device tree
+> I guess what I have to do is take out the very board Russell has
+> and that I happen to have also and just get to the bottom of this
+> bug and fix it and test it.
+>
+> A pointer to an "ideal" GPIO chip + irq_chip driver would be highly
+> appreciated ...
 
-Then there will probably be few patches from other people but the
-four above are currently the only ones that I'm aware of that can be
-show stoppers for booting omaps (and also other SoCs) with device tree.
+I'm not sure if one exists. Shouldn't be too hard to find if anything
+uses generic chip and irq domains together. I had done some work to
+address generic chip issues with irq domains and pl061 support[1], but
+Grant was never really happy with it and I never got back to looking
+at it. I think the conclusion was we don't want to add irqdomains into
+generic chip as my series did, but we need to at least make them
+coexist.
 
-Regards,
+Rob
 
-Tony
+[1]  git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+irqdomain-for-grant
