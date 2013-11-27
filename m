@@ -1,232 +1,118 @@
-From: dante.ferrari@gmail.com (=?ISO-8859-1?Q?Ferrari_Dante_L=E1szl=F3?=)
-Date: Wed, 27 Nov 2013 10:50:53 +0100
-Subject: MP11 port
-In-Reply-To: <CAMou_+cUwNaVNZ_QZM-UiNDKg+n=D6DSnYgcxFfeSV6prZ1Lag@mail.gmail.com>
-References: <CAMou_+dOdmxfsB9Xx1Kbci_uSoPpy-dBf9Ct7Ku+sJ1gE=r0mA@mail.gmail.com>
- <20131126144035.GA2355@e103592.cambridge.arm.com>
- <CAMou_+cUwNaVNZ_QZM-UiNDKg+n=D6DSnYgcxFfeSV6prZ1Lag@mail.gmail.com>
-Message-ID: <CAMou_+fKsxC7O_Xmjup+icgKpU8oG+60j7h7GPt0=CNChyJM=A@mail.gmail.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Wed, 27 Nov 2013 15:29:26 +0530
+Subject: [PATCH 2/3] ARM: dts: keystone: Add usb devicetree bindings
+In-Reply-To: <1385410581-12148-3-git-send-email-w-kwok2@ti.com>
+References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+ <1385410581-12148-3-git-send-email-w-kwok2@ti.com>
+Message-ID: <5295C27E.3010805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On 11/26/2013 1:46 AM, WingMan Kwok wrote:
+> Added device tree support for TI's Keystone USB driver and updated the
+> Documentation with device tree binding information.
+>
+> On Keystone II platforms, we use no-op phy driver.
+>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> ---
+>   .../devicetree/bindings/usb/keystone-usb.txt       |   43 ++++++++++++++++++++
+>   arch/arm/boot/dts/keystone.dtsi                    |   27 ++++++++++++
+>   2 files changed, 70 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/usb/keystone-usb.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/keystone-usb.txt b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+> new file mode 100644
+> index 0000000..a67de8f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+> @@ -0,0 +1,43 @@
+> +TI Keystone Soc USB Controller
+> +
+> +DWC3 GLUE
+> +
+> +Required properties:
+> + - compatible: should be "ti,keystone-dwc3".
+> + - #address-cells, #size-cells : should be '1' if the device has sub-nodes
+> +   with 'reg' property.
+> + - reg : Address and length of the register set for the device. First pair
+> +   is the USB subsystem specific register set.  Second pair is the
+> +   USB subsystem PHY control register set.
+> + - interrupts : The irq number of this device that is used to interrupt the
+> +   MPU.
+> + - ranges: allows valid 1:1 translation between child's address space and
+> +   parent's address space.
+> + - clocks: Clock IDs array as required by the controller.
+> + - clock-names: names of clocks correseponding to IDs in the clock property.
+> +
+> +Sub-nodes:
+> +The dwc3 core should be added as subnode to Keystone DWC3 glue.
+> +- dwc3 :
+> +   The binding details of dwc3 can be found in:
+> +   Documentation/devicetree/bindings/usb/dwc3.txt
+> +
+> +Example:
+> +	usb: usb at 2680000 {
+> +		compatible = "ti,keystone-dwc3";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x2680000 0x10000
+> +		       0x2620738 32>;
+> +		clocks = <&clkusb>;
+> +		clock-names = "usb";
+> +		interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
+> +		ranges;
+> +
+> +		dwc3 at 2690000 {
+> +			compatible = "synopsys,dwc3";
+> +			reg = <0x2690000 0x70000>;
+> +			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
+> +			usb-phy = <&usb2_phy>, <&usb3_phy>;
+> +		};
+> +	};
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index f6d6d9e..1e1049c 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -181,5 +181,32 @@
+>   			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
+>   			clocks = <&clkspi>;
+>   		};
+> +
+> +		usb2_phy: usb2_phy {
+> +			compatible = "usb-nop-xceiv";
+> +		};
+> +
+> +		usb3_phy: usb3_phy {
+> +			compatible = "usb-nop-xceiv";
+> +		};
+> +
+> +		usb: usb at 2680000 {
+> +			compatible = "ti,keystone-dwc3";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x2680000 0x10000
+> +			       0x2620738 32>;
+> +			clocks = <&clkusb>;
+> +			clock-names = "usb";
+> +			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
+
+You don't have seperate interrrupt for wrapper and core?
+Is it the same interrupt shared between XHCI,DWC3 and wrapper?
+
+> +			ranges;
+> +
+> +			dwc3 at 2690000 {
+> +				compatible = "synopsys,dwc3";
+> +				reg = <0x2690000 0x70000>;
+> +				interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
+> +				usb-phy = <&usb2_phy>, <&usb3_phy>;
+> +			};
+> +		};
+>   	};
+>   };
 
 
-Please find my asnswers inline.
-
-
-
-It's not clear what you're trying to do here.
-
-Which board are you using?  Is it definitely RealView PB11MPCore?  Or is
-that just a similar platform you're using as a starting point?
-
-               It is only a similar  board with the exact same
-processor. When other platforms are set, init stops in head.S
-
-What config are you using?  Did you start with realview-smp_defconfig or
-realview_defconfig?
-
-                I modified the latter, I can send you the .config file!
-
-If you're using a standard board, why do you need to modify the code, and
-why would you have different addresses?
-
-                Its an unreleased eval board, hence addresses are different.
-
-Dante
-
-
-On Wed, Nov 27, 2013 at 10:47 AM, Ferrari Dante L?szl?
-<dante.ferrari@gmail.com> wrote:
->
-> On Sun, Nov 24, 2013 at 07:36:18PM +0100, Ferrari Dante L?szl? wrote:
-> > Dear Developers,
-> >
-> > I am quite new to the ARM world, and hope that you will have the
-> > patience to help me out with my question. I would like to start a
-> > basic kernel on an MP11 platform with only 6MB of RAM. Short term goal
-> > would be to initialize a basic serial console. For booting i use the
-> > ATAG method, initrd and cosole is not set. I have a problem when the
-> > GIC is switched on, from __log_buf I can get some info about the state
-> > of the booting procedure.
-> >
-> >
-> > Booting Linux on physical CPU 0x0
-> > Linux version 3.12.0-01915-g6c86ae2-dirty (dante at dante-Latitude-D620)
-> > (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) ) #9 Thu Nov 21
-> > 16:29:14 CET 2013
-> > CPU: ARMv6-compatible processor [410fb026] revision 6 (ARMv7), cr=08c5387d
-> > CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> > Machine: ARM-RealView PB11MPCore
-> > Memory policy: ECC disabled, Data cache writeback
-> > On node 0 totalpages: 1280
-> > free_area_init_node: node 0, pgdat c033025c, node_mem_map c034c000
-> >   Normal zone: 10 pages used for memmap
-> >   Normal zone: 0 pages reserved
-> >   Normal zone: 1280 pages, LIFO batch:0
-> > sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
-> > pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
-> > pcpu-alloc: [0] 0
-> > Built 1 zonelists in Zone order, mobility grouping off.  Total pages: 1270
-> > Kernel command line:
-> > PID hash table entries: 32 (order: -5, 128 bytes)
-> > Dentry cache hash table entries: 1024 (order: 0, 4096 bytes)
-> > Inode-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> > Memory: 1612K/5120K available (2327K kernel code, 146K rwdata, 652K
-> > rodata, 105K init, 108K bss, 3508K reserved)
-> > Virtual kernel memory layout:
-> >     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> >     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-> >     vmalloc : 0xc0800000 - 0xff000000   (1000 MB)
-> >     lowmem  : 0xc0000000 - 0xc0500000   (   5 MB)
-> >     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-> >       .text : 0xc0008000 - 0xc02f0f34   (2980 kB)
-> >       .init : 0xc02f1000 - 0xc030b460   ( 106 kB)
-> >       .data : 0xc030c000 - 0xc0330980   ( 147 kB)
-> >        .bss : 0xc0330980 - 0xc034b9bc   ( 109 kB)
-> > NR_IRQS:160
-> > GIC CPU mask not found - kernel will fail to boot.
-> > GIC CPU mask not found - kernel will fail to boot.
-> > ------------[ cut here ]------------
-> > WARNING: CPU: 0 PID: 0 at drivers/irqchip/irq-gic.c:809
-> > gic_init_bases+0x120/0x348()
-> > Cannot allocate irq_descs @ IRQ64, assuming pre-allocated
-> >
-> >
-> >
-> > Then I realized I need to modify
-> >
-> > gic_init_irq
-> >
-> >   at arch/arm/mach-realview/realview_pb11mp.c
-> >
-> > so that the GIC distributor and CPU interface address maps statically
-> > from virtual address using the
-> >
-> > realview_pb11mp_map_io
-> >
-> >  function but with my boards CPUs address.
-> >
-> >  However it prints: ' BUG not creating mapping for 0x0c001000 at 0x0c001000
-> >  in user region. This is the location of my mach specific GIC
-> > distributor. What am I doing wrong?
->
->
-> Hi Dave,
->
->
-> Please find my asnswers inline.
->
->
->
->
-> It's not clear what you're trying to do here.
->
-> Which board are you using?  Is it definitely RealView PB11MPCore?  Or is
-> that just a similar platform you're using as a starting point?
->
-> It is only a similar  board with the exact same processor. When other platforms are set, init stops in head.S
->
-> What config are you using?  Did you start with realview-smp_defconfig or
-> realview_defconfig?
->
-> I modified the latter, I can send you the .config file!
->
-> If you're using a standard board, why do you need to modify the code, and
-> why would you have different addresses?
->
-> Its an unreleased eval board, hence addresses are different.
->
-> Dante
->
->
-> On Tue, Nov 26, 2013 at 3:40 PM, Dave Martin <Dave.Martin@arm.com> wrote:
->>
->> On Sun, Nov 24, 2013 at 07:36:18PM +0100, Ferrari Dante L?szl? wrote:
->> > Dear Developers,
->> >
->> > I am quite new to the ARM world, and hope that you will have the
->> > patience to help me out with my question. I would like to start a
->> > basic kernel on an MP11 platform with only 6MB of RAM. Short term goal
->> > would be to initialize a basic serial console. For booting i use the
->> > ATAG method, initrd and cosole is not set. I have a problem when the
->> > GIC is switched on, from __log_buf I can get some info about the state
->> > of the booting procedure.
->> >
->> >
->> > Booting Linux on physical CPU 0x0
->> > Linux version 3.12.0-01915-g6c86ae2-dirty (dante at dante-Latitude-D620)
->> > (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) ) #9 Thu Nov 21
->> > 16:29:14 CET 2013
->> > CPU: ARMv6-compatible processor [410fb026] revision 6 (ARMv7), cr=08c5387d
->> > CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
->> > Machine: ARM-RealView PB11MPCore
->> > Memory policy: ECC disabled, Data cache writeback
->> > On node 0 totalpages: 1280
->> > free_area_init_node: node 0, pgdat c033025c, node_mem_map c034c000
->> >   Normal zone: 10 pages used for memmap
->> >   Normal zone: 0 pages reserved
->> >   Normal zone: 1280 pages, LIFO batch:0
->> > sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
->> > pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
->> > pcpu-alloc: [0] 0
->> > Built 1 zonelists in Zone order, mobility grouping off.  Total pages: 1270
->> > Kernel command line:
->> > PID hash table entries: 32 (order: -5, 128 bytes)
->> > Dentry cache hash table entries: 1024 (order: 0, 4096 bytes)
->> > Inode-cache hash table entries: 1024 (order: 0, 4096 bytes)
->> > Memory: 1612K/5120K available (2327K kernel code, 146K rwdata, 652K
->> > rodata, 105K init, 108K bss, 3508K reserved)
->> > Virtual kernel memory layout:
->> >     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
->> >     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
->> >     vmalloc : 0xc0800000 - 0xff000000   (1000 MB)
->> >     lowmem  : 0xc0000000 - 0xc0500000   (   5 MB)
->> >     modules : 0xbf000000 - 0xc0000000   (  16 MB)
->> >       .text : 0xc0008000 - 0xc02f0f34   (2980 kB)
->> >       .init : 0xc02f1000 - 0xc030b460   ( 106 kB)
->> >       .data : 0xc030c000 - 0xc0330980   ( 147 kB)
->> >        .bss : 0xc0330980 - 0xc034b9bc   ( 109 kB)
->> > NR_IRQS:160
->> > GIC CPU mask not found - kernel will fail to boot.
->> > GIC CPU mask not found - kernel will fail to boot.
->> > ------------[ cut here ]------------
->> > WARNING: CPU: 0 PID: 0 at drivers/irqchip/irq-gic.c:809
->> > gic_init_bases+0x120/0x348()
->> > Cannot allocate irq_descs @ IRQ64, assuming pre-allocated
->> >
->> >
->> >
->> > Then I realized I need to modify
->> >
->> > gic_init_irq
->> >
->> >   at arch/arm/mach-realview/realview_pb11mp.c
->> >
->> > so that the GIC distributor and CPU interface address maps statically
->> > from virtual address using the
->> >
->> > realview_pb11mp_map_io
->> >
->> >  function but with my boards CPUs address.
->> >
->> >  However it prints: ' BUG not creating mapping for 0x0c001000 at 0x0c001000
->> >  in user region. This is the location of my mach specific GIC
->> > distributor. What am I doing wrong?
->>
->> It's not clear what you're trying to do here.
->>
->> Which board are you using?  Is it definitely RealView PB11MPCore?  Or is
->> that just a similar platform you're using as a starting point?
->>
->> What config are you using?  Did you start with realview-smp_defconfig or
->> realview_defconfig?
->>
->> If you're using a standard board, why do you need to modify the code, and
->> why would you have different addresses?
->>
->> Cheers
->> ---Dave
->
->
+-- 
+-George
