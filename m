@@ -1,44 +1,70 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 27 Nov 2013 16:33:11 -0700
-Subject: Status of 1GHz support on am37xx
-In-Reply-To: <5294C307.1080703@ti.com>
-References: <20131122230121.GA13440@animalcreek.com>
- <20131125233545.GZ10023@atomide.com> <5294C307.1080703@ti.com>
-Message-ID: <20131127233311.GA31335@animalcreek.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Wed, 27 Nov 2013 15:31:50 -0800
+Subject: [PATCH V5 1/6] efi-stub.txt updates for ARM
+In-Reply-To: <1385595115-21488-1-git-send-email-roy.franz@linaro.org>
+References: <1385595115-21488-1-git-send-email-roy.franz@linaro.org>
+Message-ID: <1385595115-21488-2-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 09:49:27AM -0600, Nishanth Menon wrote:
-> On 11/25/2013 05:35 PM, Tony Lindgren wrote:
-> > * Mark A. Greer <mgreer@animalcreek.com> [131122 15:02]:
-> >> Hello.
-> >>
-> >> I was wondering what that the status of 1GHz support for the am37xx is.
-> >>
-> >> It looks like smartreflex/avs and ABB drivers are there.  Do they need
-> >> more work (e.g., DT support)?  What DT nodes and related support need
-> >> to be added?
-> >>
-> >> What pieces are being worked on and which ones aren't?
-> >> Is there an ETA for the pieces being worked on?
-> > 
-> > There are still various parts of twl4030 that are only working with
-> > platform data, so at least those should be fixed now that we're moving
-> > to DT only based booting for mach-omap2 for v3.14.
-> > 
-> 
-> For 3630/DM3730 1GHz support the following needs to be done:
-> a) clock nodes[1] without which cpufreq-cpu0 will never scale frequencies
-> The following includes conversion to device tree enabled support.
-> b) VC-vp regulator
-> c) ABB dt nodes
-> d) AVS class 1.5 support
-> e) voltage regulator notifier around clock node for mpu so that avs
-> and abb can be sequenced around voltage and frequency changes.
-> 
-> So, to answer your question, we are a little farther away beyond the
-> first step of DT only boot to being able to exercise 1GHz properly.
-> 
-> [1] http://marc.info/?l=linux-omap&m=138545331825036&w=2
+Update efi-stub.txt documentation to be more general
+and not x86 specific.  Add ARM only "dtb=" command
+line option description.
 
-Thanks guys.
+Signed-off-by: Roy Franz <roy.franz@linaro.org>
+---
+ Documentation/efi-stub.txt |   27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
+
+diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+index 44e6bb6..19e897c 100644
+--- a/Documentation/efi-stub.txt
++++ b/Documentation/efi-stub.txt
+@@ -1,13 +1,16 @@
+ 			  The EFI Boot Stub
+ 		     ---------------------------
+ 
+-On the x86 platform, a bzImage can masquerade as a PE/COFF image,
+-thereby convincing EFI firmware loaders to load it as an EFI
+-executable. The code that modifies the bzImage header, along with the
+-EFI-specific entry point that the firmware loader jumps to are
+-collectively known as the "EFI boot stub", and live in
++On the x86 and ARM platforms, a kernel zImage/bzImage can masquerade
++as a PE/COFF image, thereby convincing EFI firmware loaders to load
++it as an EFI executable. The code that modifies the bzImage header,
++along with the EFI-specific entry point that the firmware loader
++jumps to are collectively known as the "EFI boot stub", and live in
+ arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
+-respectively.
++respectively.  For ARM the EFI stub is implemented in
++arch/arm/boot/compressed/efi-header.S and
++arch/arm/boot/compressed/efi-stub.c.  EFI stub code that is shared
++between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+ 
+ By using the EFI boot stub it's possible to boot a Linux kernel
+ without the use of a conventional EFI boot loader, such as grub or
+@@ -23,7 +26,9 @@ The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
+ System Partiion (ESP) and renamed with the extension ".efi". Without
+ the extension the EFI firmware loader will refuse to execute it. It's
+ not possible to execute bzImage.efi from the usual Linux file systems
+-because EFI firmware doesn't have support for them.
++because EFI firmware doesn't have support for them.  For ARM the
++arch/arm/boot/zImage should be copied to the system partition, and it
++may not need to be renamed.
+ 
+ 
+ **** Passing kernel parameters from the EFI shell
+@@ -63,3 +68,11 @@ Notice how bzImage.efi can be specified with a relative path. That's
+ because the image we're executing is interpreted by the EFI shell,
+ which understands relative paths, whereas the rest of the command line
+ is passed to bzImage.efi.
++
++
++**** The "dtb=" option
++
++For the ARM architecture, we also need to be able to provide a device
++tree to the kernel.  This is done with the "dtb=" command line option,
++and is process in the same manner as the "initrd=" option that is described
++above.
+-- 
+1.7.10.4
