@@ -1,36 +1,35 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Nov 2013 02:18:26 +0100
-Subject: [PATCH 04/15] iommu: shmobile: Enable driver compilation with
- COMPILE_TEST
+Date: Wed, 27 Nov 2013 02:18:27 +0100
+Subject: [PATCH 05/15] DMA: shdma: Enable driver compilation with COMPILE_TEST
 In-Reply-To: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1385515117-23664-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1385515117-23664-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This helps increasing build testing coverage.
 
-The driver doesn't compile on non-ARM platforms due to usage of the ARM
-DMA IOMMU API, restrict compilation to ARM.
-
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: iommu at lists.linux-foundation.org
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: dmaengine at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Simon Horman <horms@verge.net.au>
 ---
- drivers/iommu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/dma/sh/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 3e7fdbb..79bbc21 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -207,6 +207,7 @@ config SHMOBILE_IOMMU
- 	bool "IOMMU for Renesas IPMMU/IPMMUI"
- 	default n
- 	depends on ARM
-+	depends on SH_MOBILE || COMPILE_TEST
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
- 	select SHMOBILE_IPMMU
+diff --git a/drivers/dma/sh/Kconfig b/drivers/dma/sh/Kconfig
+index dadd9e01..dc0fe03 100644
+--- a/drivers/dma/sh/Kconfig
++++ b/drivers/dma/sh/Kconfig
+@@ -4,7 +4,7 @@
+ 
+ config SH_DMAE_BASE
+ 	bool "Renesas SuperH DMA Engine support"
+-	depends on (SUPERH && SH_DMA) || (ARM && ARCH_SHMOBILE)
++	depends on (SUPERH && SH_DMA) || ARCH_SHMOBILE || COMPILE_TEST
+ 	depends on !SH_DMA_API
+ 	default y
+ 	select DMA_ENGINE
 -- 
 1.8.3.2
