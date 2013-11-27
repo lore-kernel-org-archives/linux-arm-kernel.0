@@ -1,24 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Nov 2013 17:14:39 +0000
-Subject: [PATCH V2] ASoC: tegra: use reset framework
-In-Reply-To: <1385496767-8307-1-git-send-email-swarren@wwwdotorg.org>
-References: <1385496767-8307-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131127171439.GM14725@sirena.org.uk>
+Date: Wed, 27 Nov 2013 17:16:48 +0000
+Subject: [PATCH] ASoC: kirkwood: Fix erroneous double output while playing
+In-Reply-To: <20131125201905.0d009921@armhf>
+References: <20131125201905.0d009921@armhf>
+Message-ID: <20131127171648.GN14725@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 01:12:47PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Tegra's clock driver now provides an implementation of the common
-> reset API (include/linux/reset.h). Use this instead of the old Tegra-
-> specific API; that will soon be removed.
+On Mon, Nov 25, 2013 at 08:19:05PM +0100, Jean-Francois Moine wrote:
+> This patch fixes the setting of the register KIRKWOOD_PLAYCTL which did
+> always streaming on both I2S and SPDIF, ignoring the DAI ID.
 
-Acked-by: Mark Brown <broonie@linaro.org>
+Applied, thanks.
+
+> The bug was introduced by the commit 75b9b65ee5a
+>  "ASoC: kirkwood: add S/PDIF support"
+
+There's the "Fixes:" tag for that now.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/2d82c946/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131127/23ccc50d/attachment.sig>
