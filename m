@@ -1,94 +1,43 @@
-From: josh@joshtriplett.org (Josh Triplett)
-Date: Tue, 26 Nov 2013 18:17:30 -0800
-Subject: [PATCH] linux/err.h: Provide an ERR_PTR_IO that returns an __iomem
- pointer
-In-Reply-To: <000101ceeb14$480fee80$d82fcb80$%han@samsung.com>
-References: <001001ceb816$5d1aecc0$1750c640$%han@samsung.com>
- <20131125200256.GA7316@obsidianresearch.com>
- <001101ceea68$cb486220$61d92660$%han@samsung.com>
- <20131126180930.GC19852@obsidianresearch.com>
- <000101ceeb14$480fee80$d82fcb80$%han@samsung.com>
-Message-ID: <20131127021730.GA14138@leaf>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 27 Nov 2013 09:22:46 +0800
+Subject: STOP THE MADNESS
+In-Reply-To: <CACRpkdY9MTUDtDxRKRHCXch98cNiMS-dumQvaTH7gp1OCVUx6w@mail.gmail.com>
+References: <20131126163031.GC16735@n2100.arm.linux.org.uk>	<CAL_Jsq+AYEN2GQxgkN5a+eJsC-80n9y6Y9JngpZN7FzbLGdENw@mail.gmail.com>
+ <CACRpkdY9MTUDtDxRKRHCXch98cNiMS-dumQvaTH7gp1OCVUx6w@mail.gmail.com>
+Message-ID: <52954966.8030706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 10:59:18AM +0900, Jingoo Han wrote:
-> On Wednesday, November 27, 2013 3:10 AM, Jason Gunthorpe wrote:
-> > On Tue, Nov 26, 2013 at 02:31:44PM +0900, Jingoo Han wrote:
-> > > Previously, I sent the patch in order to fix sparse warning as below:
-> > > How about this?
-> > >
-> > > static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-> > > 			struct device_node *np, struct mvebu_pcie_port *port)
-> > > {
-> > > 	struct resource regs;
-> > > 	int ret = 0;
-> > >
-> > > 	ret = of_address_to_resource(np, 0, &regs);
-> > > 	if (ret)
-> > > -		return ERR_PTR(ret);
-> > > +		return (void __iomem *)ERR_PTR(ret);
-> > 
-> > You should probably ask the sparse folks for guidance 'git grep
-> > iomem.*ERR_PTR' returns nothing, so this isn't an established pattern.
-> > 
-> > It seems like sparse should know that ERR_PTR functions can work with
-> > any pointer no matter the type? IS_ERR_PTR will have the same problem
-> > with implicitly dropping the iomem tag.
-> 
-> +cc Christopher Li, sparse mailing-list, Joe Perches, Dan Carpenter,
->      Axel Lin, Julia Lawall,
-> 
-> Hi All,
-> 
-> I have some questions about handling sparse warning.
-> 
-> Currently, the following sparse warning happens
-> at Marvell Armada PCIe driver.
-> 
-> drivers/pci/host/pci-mvebu.c:743:31: warning: incorrect type in return expression (different address spaces)
-> drivers/pci/host/pci-mvebu.c:743:31:    expected void [noderef] <asn:2>*
-> drivers/pci/host/pci-mvebu.c:743:31:    got void *
-> 
-> mvebu_pcie_map_registers() returns ERR_PTR(ret),
-> however ERR_PTR() returns (void *), not (void __iomem *).
 
-Given that PTR_ERR, IS_ERR, and IS_ERR_OR_NULL currently accept any kind
-of pointer (by using __force), it does make sense for ERR_PTR to return
-any kind of pointer.  There's no built-in way to do this, but we could
-add an ERR_PTR_iomem that has the appropriate return type.  Here's a
-possible patch; please test in your particular use case and see if it
-works for you.  (You can apply this patch from this mail via git am
---scissors.)
+On 11/27/2013 06:09 AM, Linus Walleij wrote:
+> On Tue, Nov 26, 2013 at 6:29 PM, Rob Herring <robherring2@gmail.com> wrote:
+>
+>> IMO, the whole commit causing this problem should be reverted for
+>> additional reasons. Irq generic chp and irqdomains are orthogonal
+>> features/infrastructure and should not be mutually exclusive. We need
+>> to fix irq generic chip.
+> This cannot be easily reverted due to a lot of code and fixes building
+> on top of it, and even if it could I guess it will also break device tree
+> use on these: git grep pl061 arch/arm/boot/dts
+>
+> As DT mandates that the irqdomain be used, or it cannot translate
+> the IRQs as before this patch it uses an hard-coded base from
+> platform data. This is one of those odd drivers that don't need
+> one line of DT-specific code in it to work with device tree, yet
+> it works.
+>
+> I guess what I have to do is take out the very board Russell has
+> and that I happen to have also and just get to the bottom of this
+> bug and fix it and test it.
+>
+> A pointer to an "ideal" GPIO chip + irq_chip driver would be highly
+> appreciated ...
+>
+> Yours,
+> Linus Walleij
 
----8<---
-From: Josh Triplett <josh@joshtriplett.org>
-Subject: [PATCH] linux/err.h: Provide an ERR_PTR_IO that returns an __iomem pointer
+Does qemu support the board that Russell is using? If so, we can fix & 
+test it.
 
-PTR_ERR, IS_ERR, and IS_ERR_OR_NULL already accept any type of pointer
-by using __force; ERR_PTR should similarly be able to return any type of
-pointer.  Provide an ERR_PTR_IO to return an error pointer in __iomem.
-
-Signed-off-by: Josh Triplett <josh@joshtriplett.org>
----
- include/linux/err.h | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/include/linux/err.h b/include/linux/err.h
-index 15f92e0..d64215b 100644
---- a/include/linux/err.h
-+++ b/include/linux/err.h
-@@ -24,6 +24,11 @@ static inline void * __must_check ERR_PTR(long error)
- 	return (void *) error;
- }
- 
-+static inline __iomem void * __must_check ERR_PTR_IO(long error)
-+{
-+	return (__force __iomem void *) error;
-+}
-+
- static inline long __must_check PTR_ERR(__force const void *ptr)
- {
- 	return (long) ptr;
--- 
-1.8.4.4
+Regards
+Haojian
