@@ -1,41 +1,84 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 27 Nov 2013 21:45:25 +0100 (CET)
-Subject: [Q] PL011 DMA Rx, using ste_dma40
-In-Reply-To: <20131127203042.GS16735@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.64.1311271646070.8821@axis700.grange>
- <20131127203042.GS16735@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.64.1311272144480.27723@axis700.grange>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 27 Nov 2013 22:46:21 +0200
+Subject: [PATCH 00/13] mfd: menelaus: a few cleanups
+In-Reply-To: <20131127201149.GB20734@saruman.home>
+References: <1385579217-20127-1-git-send-email-balbi@ti.com>
+ <20131127200247.GH24645@blackmetal.musicnaut.iki.fi>
+ <20131127201149.GB20734@saruman.home>
+Message-ID: <20131127204621.GI24645@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Nov 2013, Russell King - ARM Linux wrote:
+Hi,
 
-> On Wed, Nov 27, 2013 at 05:38:43PM +0100, Guennadi Liakhovetski wrote:
-> > I'm trying to get a PL011 UART to work in DMA mode with an alternative 
-> > DMAC. Transmission works, reception is more problematic. I can receive a 
-> > complete page of data (4096 bytes), but nothing below that triggers a 
-> > reception. Is this expected if no polling is used, as configured by the 
-> > dma_rx_poll_timeout platform parameter, or should it work, triggered by 
-> > the Rx timeout UART interrupt?
+On Wed, Nov 27, 2013 at 02:11:49PM -0600, Felipe Balbi wrote:
+> On Wed, Nov 27, 2013 at 10:02:47PM +0200, Aaro Koskinen wrote:
+> > On Wed, Nov 27, 2013 at 01:06:44PM -0600, Felipe Balbi wrote:
+> > > few cleanups on the old menelaus driver. I don't have
+> > > HW to test these patches, maybe Aaro can help here ?
+> > 
+> > Hmm, I got:
+> > 
+> > [    1.330000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> > [    1.340000] pgd = c0004000
+> > [    1.340000] [00000000] *pgd=00000000
+> > [    1.350000] Internal error: Oops: 17 [#1] ARM
+> > [    1.350000] CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc1-n8x0_tiny-los.git-729021f-00018-g74a0f39 #2
+> > [    1.350000] task: c782c000 ti: c782e000 task.ti: c782e000
+> > [    1.350000] PC is at mutex_lock+0x0/0x20
+> > [    1.350000] LR is at __irq_get_desc_lock+0x6c/0x88
+[...]
+> > [    1.350000] [<c016745c>] (mutex_lock+0x0/0x20) from [<c00509ac>] (__irq_get_desc_lock+0x6c/0x88)
+> > [    1.350000] [<c00509ac>] (__irq_get_desc_lock+0x6c/0x88) from [<c0053518>] (__irq_set_handler+0x24/0x128)
+> > [    1.350000] [<c0053518>] (__irq_set_handler+0x24/0x128) from [<c013ec80>] (menelaus_probe+0xbc/0x280)
+> > [    1.350000] [<c013ec80>] (menelaus_probe+0xbc/0x280) from [<c0140ab8>] (i2c_device_probe+0x98/0xc0)
+
+[...]
+
+> hmm, irq_set_chip_and_handler() will call back into the irq_chip we just
+> registered, so my ->irq_bus_lock needs to have everything setup
+> (chip_data my mutex), this should solve it:
+
+Yes, that fixes it. Seems to work fine now.
+
+A.
+
+> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
+> index 376f01d..c9bd2fb 100644
+> --- a/drivers/mfd/menelaus.c
+> +++ b/drivers/mfd/menelaus.c
+> @@ -1232,6 +1232,7 @@ static int menelaus_probe(struct i2c_client *client,
+>  
+>  	the_menelaus = m;
+>  	m->client = client;
+> +	mutex_init(&m->lock);
+>  
+>  	irq_base = irq_alloc_descs(-1, 0, MENELAUS_NR_IRQS, 0);
+>  	if (irq_base < 0) {
+> @@ -1245,10 +1246,10 @@ static int menelaus_probe(struct i2c_client *client,
+>  	m->irq_base = irq_base;
+>  
+>  	for (i = irq_base; i < irq_base + MENELAUS_NR_IRQS; i++) {
+> +		irq_set_chip_data(i, m);
+>  		irq_set_chip_and_handler(i, &menelaus_irq_chip,
+>  				handle_simple_irq);
+>  		irq_set_nested_thread(i, 1);
+> -		irq_set_chip_data(i, m);
+>  		set_irq_flags(i, IRQF_VALID);
+>  	}
+>  
+> @@ -1280,8 +1281,6 @@ static int menelaus_probe(struct i2c_client *client,
+>  		}
+>  	}
+>  
+> -	mutex_init(&m->lock);
+> -
+>  	pr_info("Menelaus rev %d.%d\n", rev >> 4, rev & 0x0f);
+>  
+>  	val = menelaus_read_reg(m, MENELAUS_VCORE_CTRL1);
 > 
-> Yes, there's a very basic hardware design error here.
 > 
-> The PL011 does, as you've noticed, have a Rx timeout interrupt.  This
-> timeout interrupt only fires if you leave data in the Rx FIFO.
+> let me know when you can, and I'll meld these hunks to proper patch.
 > 
-> This means that when you use DMA, for the hardware to operate correctly,
-> you must _not_ have the DMA engine fully empty the Rx FIFO, otherwise
-> interactive use is impossible.
-
-Thanks, Russell, this perfectly answers my question.
-
-> I wrote about this when I looked at DMA on the ARM Realview boards.
-> I came to the conclusion that was just better to completely ignore the
-> hardware DMA side of PL011 and just use PIO.
-
-Regards
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> -- 
+> balbi
