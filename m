@@ -1,33 +1,47 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 26 Nov 2013 17:33:09 -0800
-Subject: [PATCH v2 00/10] Reuse davinci-nand driver for Keystone arch
-In-Reply-To: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20131127013309.GT9468@ld-irv-0074.broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 26 Nov 2013 17:52:52 -0800
+Subject: [PATCH] Documentation: devicetree: arm: add lpae property to cpus/cpu
+ bindings
+Message-ID: <1385517172-803-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ivan,
+While the LPAE capability is determined by the kernel today, it is still
+useful to be able to specify the feature in the device tree. There is
+precedence from other architectures for this.
 
-On Thu, Nov 21, 2013 at 01:28:15PM +0200, Ivan Khoronzhuk wrote:
-> This series contains fixes and updates of Davinci nand driver in
-> order to reuse it for Keystone platform.
-> 
-> The series is combination of two following series:
-> - Davinci nand driver fixes and updates:
->   https://lkml.org/lkml/2013/11/20/271
-> - Reuse davinci-nand driver for Keystone arch
->   https://lkml.org/lkml/2013/11/20/315
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-Can you make sure to consistently change the email $subject for your
-patch series? For each of the above, it looks like they are actually
-version 2, yet they still just say "[PATCH X/Y]" (not "[PATCH v2 X/Y]").
-This makes it harder to parse the history of each series. (And the
-combining of two un-versioned patch series adds to the confusion.)
+My personal motive for this is to be able to tell which boards are
+work even trying to boot an LPAE kernel on, since we don't disable the
+platforms that are based on A8/A9 when LPAE is turned on. I'll add dtsi
+patches for A7/A15-based platforms once the binding is settled.
 
-Now, this combined series has a good v2 marking (although at this point,
-is it really v3? ...whatever, it doesn't matter). Please continue to
-write appropriate $subjects for this and future patch series.
+I don't think it's worth trying to add those dependencies in Kconfig,
+by the way -- it'd be pretty verbose and churny.
 
-Thanks,
-Brian
+ Documentation/devicetree/bindings/arm/cpus.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 91304353eea4..632015f8314f 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -191,6 +191,14 @@ nodes to be present and contain the properties described below.
+ 			  property identifying a 64-bit zero-initialised
+ 			  memory location.
+ 
++	- lpae
++		Usage: Indicates that the CPU can use the LPAE extensions to
++		       address more than 32 bit physical memory.
++		Value type: <empty>
++		Definition:
++			# On ARMv7 systems this boolean property is used
++			  to indicate LPAE feature capability.
++
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+ 
+ 	cpus {
+-- 
+1.8.4.1.601.g02b3b1d
