@@ -1,168 +1,153 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Wed, 27 Nov 2013 10:00:09 +0530
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <1385500248-6551-2-git-send-email-marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <1385500248-6551-2-git-send-email-marex@denx.de>
-Message-ID: <20131127043009.GB12773@pratyush-vbox>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 27 Nov 2013 12:35:28 +0800
+Subject: [PATCH 2/4] mtd: spi-nor: add a new data structrue spi_nor{}
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA4EEF0@DBDE04.ent.ti.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <1385447575-23773-3-git-send-email-b32955@freescale.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA4EEF0@DBDE04.ent.ti.com>
+Message-ID: <52957690.60102@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut,
+? 2013?11?26? 19:42, Gupta, Pekon ??:
+>> From: Huang Shijie [mailto:b32955 at freescale.com]
+> [...]
+>> +#define	MAX_CMD_SIZE		6
+>> +
+>> +enum read_type {
+>> +	M25P80_NORMAL = 0,
+>> +	M25P80_FAST,
+>> +	M25P80_QUAD,
+>> +};
+> Sorry. no 'M25P80' suffix here this is spi-nor.h :-)
+>
+>
+ok. thanks. :)
+>> +
+>> +struct spi_nor {
+>> +	struct mutex		lock;
+>> +	struct mtd_info		mtd;
+>>
+> mtd_info should not be present here. Rather it should be other way round
+> 'mtd_info->priv = (struct spi_nor *) spi_nor;
+>
+>
+put the mtd here can make code simple,
 
-Please replace imx6 with designware in subject line  of this patch.
-
-On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
-> From: Tim Harvey <tharvey@gateworks.com>
-> 
-> The IMX6 iATU is used for address translation between the AXI bus
-> address space and PCI address space.  This is used for type0 and type1
-> config cycles but is not necessary for outbound io/mem regions.
-> 
-> This patch removes the calls that inappropriately re-configures the ATU
-> viewport for outbound memory and IO after config cycles and removes them
-> altogether as they are not necessary.
-
-Yes, they are not necessary for all the cases where translation is one
-to one. So so for sure all the platform till now introduced should
-work.
-But, what about a platform where memory translation is not one to one?
-
-Existing code should work with all sort of memory translation on a
-platform having atleast two viewports capable of programming any type
-of outbound transaction.
-
-> 
-> This resolves issues with PCI devices behind switches and has been tested with
-> a Gige device behind a PLX PEX860x switch.  More testing is needed for other
-> configurations.
-
-I do not understand if MX6 has 4 Outbound Viewport then how this patch
-helps?
--- PCI devices behind switches would not have been working because
-CFG1 transaction would not have been correct.
--- It works with this patch. This patch changes viewport for CFG1 from
-1 to 0.
--- Can it be possible that MX6 has some restriction on viewport
-programming capability. I mean,like only viewport0 can be programmed
-for CFG0/1?
-
-Otherwise I do not find any convincing reason that why this patch
-helps in resolving issues with PCI devices behind switches.
+do David/Brian have any comment about this?
+If all object to put the mtd here, i will change it.
 
 
-Regards
-Pratyush
+>> +	struct device		*dev;
+> Again, spi_nor would be a MTD device, not a new type of device on its own.
+> Thus you should use, mtd_info->dev.
+>
+>
+this dev pointer is not from the mtd_info->dev, it from the spi_device 
+or other spi nor device .
+>> +	u16			page_size;
+>> +	u16			addr_width;
+>> +	u8			erase_opcode;
+>> +	u8			read_opcode;
+> s/read_opcode/read_flash_opcode
+why not keep the legacy name?
+should we also rename the erase_opcode to erase_flash_opcode? :)
+> How about '+  u8  read_reg_opcode' ??
+>
+>
+>> +	u8			program_opcode;
+> + How about '+  u8  write_reg_opcode' ??
+>
+>
+>> +	u8			command[MAX_CMD_SIZE];
+>> +	enum read_type		flash_read;
+> s/read_type/read_mode
+> (agree .. there is nothing in the name, but it matches SPI generic framework)
+>
+> Other missing fields I can think of are..
+> + u8 read_dummy_cycles;
+I was wondering if other SPI NOR driver needs this field.
+current dummy is 8 clock cycles for quad-read/fast-read, but for DDR 
+QUAD read, the dummy is not 8 clock cycles.
+so i did not add this field to spi-nor{}.
 
-> 
-> From: Tim Harvey <tharvey@gateworks.com>
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Frank Li <lznuaa@gmail.com>
-> Cc: Harro Haan <hrhaan@gmail.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> Cc: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
-> ---
->  drivers/pci/host/pcie-designware.c | 41 +++-----------------------------------
->  1 file changed, 3 insertions(+), 38 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index ed9b11b..01d76ad 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -46,7 +46,6 @@
->  #define PCIE_ATU_VIEWPORT		0x900
->  #define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
->  #define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
-> -#define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
->  #define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
->  #define PCIE_ATU_CR1			0x904
->  #define PCIE_ATU_TYPE_MEM		(0x0 << 0)
-> @@ -494,8 +493,8 @@ static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
->  
->  static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
->  {
-> -	/* Program viewport 1 : OUTBOUND : CFG1 */
-> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
-> +	/* Program viewport 0 : OUTBOUND : CFG1 */
-> +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
->  			  PCIE_ATU_VIEWPORT);
->  	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
->  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> @@ -505,38 +504,8 @@ static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
->  			  PCIE_ATU_LIMIT);
->  	dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
->  	dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
-> -}
-> -
-> -static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
-> -{
-> -	/* Program viewport 0 : OUTBOUND : MEM */
-> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
-> -			  PCIE_ATU_VIEWPORT);
-> -	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
-> -	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> -	dw_pcie_writel_rc(pp, pp->mem_base, PCIE_ATU_LOWER_BASE);
-> -	dw_pcie_writel_rc(pp, (pp->mem_base >> 32), PCIE_ATU_UPPER_BASE);
-> -	dw_pcie_writel_rc(pp, pp->mem_base + pp->config.mem_size - 1,
-> -			  PCIE_ATU_LIMIT);
-> -	dw_pcie_writel_rc(pp, pp->config.mem_bus_addr, PCIE_ATU_LOWER_TARGET);
-> -	dw_pcie_writel_rc(pp, upper_32_bits(pp->config.mem_bus_addr),
-> -			  PCIE_ATU_UPPER_TARGET);
-> -}
-> -
-> -static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
-> -{
-> -	/* Program viewport 1 : OUTBOUND : IO */
-> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
-> -			  PCIE_ATU_VIEWPORT);
-> -	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
-> +	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
->  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> -	dw_pcie_writel_rc(pp, pp->io_base, PCIE_ATU_LOWER_BASE);
-> -	dw_pcie_writel_rc(pp, (pp->io_base >> 32), PCIE_ATU_UPPER_BASE);
-> -	dw_pcie_writel_rc(pp, pp->io_base + pp->config.io_size - 1,
-> -			  PCIE_ATU_LIMIT);
-> -	dw_pcie_writel_rc(pp, pp->config.io_bus_addr, PCIE_ATU_LOWER_TARGET);
-> -	dw_pcie_writel_rc(pp, upper_32_bits(pp->config.io_bus_addr),
-> -			  PCIE_ATU_UPPER_TARGET);
->  }
->  
->  static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
-> @@ -552,11 +521,9 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
->  	if (bus->parent->number == pp->root_bus_nr) {
->  		dw_pcie_prog_viewport_cfg0(pp, busdev);
->  		ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
-> -		dw_pcie_prog_viewport_mem_outbound(pp);
->  	} else {
->  		dw_pcie_prog_viewport_cfg1(pp, busdev);
->  		ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
-> -		dw_pcie_prog_viewport_io_outbound(pp);
->  	}
->  
->  	return ret;
-> @@ -575,11 +542,9 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
->  	if (bus->parent->number == pp->root_bus_nr) {
->  		dw_pcie_prog_viewport_cfg0(pp, busdev);
->  		ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
-> -		dw_pcie_prog_viewport_mem_outbound(pp);
->  	} else {
->  		dw_pcie_prog_viewport_cfg1(pp, busdev);
->  		ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
-> -		dw_pcie_prog_viewport_io_outbound(pp);
->  	}
->  
->  	return ret;
-> -- 
-> 1.8.4.3
+I do not know how the m25p80 handle the non-8 clock cycles cases...
+
+But it's okay to me to add this field to spi-nor{}.
+
+
+
+
+> + u8 write_dummy_cycles;
+>
+>
+do the write need a dummy?
+
+I check the s25fl128s's quad page program, it does not need a dummy.
+>> +	bool			sst_write_second;
+>> +
+>> +	/*
+>> +	 * Read the register:
+>> +	 *  Read `len` length data from the register specified by the `opcode`,
+>> +	 *  and store the data to the `buf`.
+>> +	 */
+>> +	int (*read_reg)(struct spi_nor *flash, u8 opcode, u8 *buf, int len);
+>>
+> Do you need 'opcode' passed in argument here ?
+> Can you add it as 'read_reg_opcode' field in struct spi_nor ?
+> 'read_reg_opcode' should be fixed for a device like a 'read_flash_opcode'.
+>
+>
+the @read_reg can be used to read id, read status and so on.
+so the opcode here is not a fixed value.
+
+but i do not object to add the read_reg_opcode/write_reg_opcode to 
+spi_nor{}.
+
+
+
+>> +
+>> +	/*
+>> +	 * Write the register:
+>> +	 *  Write the `cmd_len` length data stored in the @command to the
+>> NOR,
+>> +	 *  the command[0] stores the write opcode. `offset` is only used for
+>> +	 *  erase operation, it should set to zero for other NOR commands.
+>> +	 */
+>> +	int (*write_reg)(struct spi_nor *flash, int cmd_len, u32 offset);
+>>
+> Instead of having actual 'command[]' array in struct spi_nor, and pass its
+> valid length here.. shouldn't you pass the command as u8[] here..
+> int (*write_reg)(struct spi_nor *flash, u8 *cmd, u32 cmd_len);
+> where
+> 	cmd[0] == command_opcode
+> 	cmd[1] == command argument 1 (like offset for erase)
+> 	cmd[2] == command argument 2
+> 	...
+>
+is there any benefit of your code?
+you will use a local array in the stack.
+
+why not use the spi_nor->command which has used for a long time.
+
+
+>> +
+>> +	/* write data */
+>> +	void (*write)(struct spi_nor *flash, loff_t to, size_t len,
+>> +			size_t *retlen, const u_char *buf);
+>> +	/* read data */
+>> +	int (*read)(struct spi_nor *flash, loff_t from, size_t len,
+>> +			size_t *retlen, u_char *buf);
+>> +};
+>>   #endif
+>> --
+>> 1.7.2.rc3
+>>
+> Sorry for bit intrusive feedback. But I think it would help you to
+> refine it better. Also some reference below
+> http://lists.infradead.org/pipermail/linux-mtd/2013-October/049307.html
+>
+thanks. I referenced it when i wrote this patch.
+
+thanks
+Huang Shijie
