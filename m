@@ -1,129 +1,70 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Wed, 27 Nov 2013 14:21:38 -0600
-Subject: ACPI
-In-Reply-To: <20131126233224.GA21189@srcf.ucam.org>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <CACRpkdbNxxNK0GM28H_nDLu6EpbQ-EYAdEeTp5fnXW5mkEPkgw@mail.gmail.com>
- <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
- <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
- <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
- <20131125154110.GB3243@srcf.ucam.org>
- <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
- <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
- <20131126183344.GA16074@srcf.ucam.org>
- <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
- <20131126233224.GA21189@srcf.ucam.org>
-Message-ID: <CAHCPf3tXN=Vt9q=G7G4yQaAQ+B=eFN5YKV1QguGp13OzEHqGCA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 27 Nov 2013 15:24:57 -0500
+Subject: [PATCH 2/3] ARM: dts: keystone: Add usb devicetree bindings
+In-Reply-To: <5295C27E.3010805@ti.com>
+References: <1385410581-12148-1-git-send-email-w-kwok2@ti.com>
+ <1385410581-12148-3-git-send-email-w-kwok2@ti.com> <5295C27E.3010805@ti.com>
+Message-ID: <52965519.3080209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 5:32 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
-> On Tue, Nov 26, 2013 at 05:11:23PM -0600, Matt Sealey wrote:
+On Wednesday 27 November 2013 04:59 AM, George Cherian wrote:
+> On 11/26/2013 1:46 AM, WingMan Kwok wrote:
+>> Added device tree support for TI's Keystone USB driver and updated the
+>> Documentation with device tree binding information.
+>>
+>> On Keystone II platforms, we use no-op phy driver.
+>>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+>> ---
+>>   .../devicetree/bindings/usb/keystone-usb.txt       |   43 ++++++++++++++++++++
+>>   arch/arm/boot/dts/keystone.dtsi                    |   27 ++++++++++++
+>>   2 files changed, 70 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/usb/keystone-usb.txt
+>>
+[...]
+
+>> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+>> index f6d6d9e..1e1049c 100644
+>> --- a/arch/arm/boot/dts/keystone.dtsi
+>> +++ b/arch/arm/boot/dts/keystone.dtsi
+>> @@ -181,5 +181,32 @@
+>>               interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
+>>               clocks = <&clkspi>;
+>>           };
+>> +
+>> +        usb2_phy: usb2_phy {
+>> +            compatible = "usb-nop-xceiv";
+>> +        };
+>> +
+>> +        usb3_phy: usb3_phy {
+>> +            compatible = "usb-nop-xceiv";
+>> +        };
+>> +
+>> +        usb: usb at 2680000 {
+>> +            compatible = "ti,keystone-dwc3";
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            reg = <0x2680000 0x10000
+>> +                   0x2620738 32>;
+>> +            clocks = <&clkusb>;
+>> +            clock-names = "usb";
+>> +            interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
+> 
+> You don't have seperate interrrupt for wrapper and core?
+> Is it the same interrupt shared between XHCI,DWC3 and wrapper?
 >
->> Before stabbing around adding ACPI and then having DT-in-ACPI isn't
->> there a use case for an an ARM Linux kernel actually being a good
->> citizen of UEFI?
->
-> That's work in progress. Patches have been posted and are getting pretty
-> close to being mergeable. You can already run VExpress with UEFI.
->
->> Having UEFI pass along the DT as a configuration table as well as ACPI
->> tables should be the first order of business. It needn't be
->> DT-specific either - there's no reason that specific configuration
->> table can't define a thousand ways to boot Linux on ARM. But one or
->> two might be better for the sanity of the Linux kernel guys. In fact,
->> because UEFI hands information in the early boot process to the
->> 'application' (being the kernel), and has a very well defined API, it
->> would remove the need for weird out of band stuff like /memreserve/
->> entries in the DT and simplify and make the Linux early boot process
->> more robust and debuggable.
->
-> Passing both is somewhat problematic - if one is supposed to be
-> sufficient, why pass the other? It'd be pretty easy to end up with skew
-> between them, and unless we're clear on what happens in the event of
-> conflicting information then it's going to end badly.
+You don't need actually two seperate interrupts.
+DWC3 core actually registers IRQ for XHCI. And in OMAP case, there
+is one more IRQ in wrapper. After checking with Felipe, it seems
+the OMAP wrapper interrupt was more for debug purpose than any real
+use.
 
-Here's a theory; always pass a basic device tree that describes a
-system. You know it *is* possible to get something running simply by
-having
+On Keystone only one IRQ is used and the handling is managed
+through IRQF_SHARED and that is also mainly because the IRQ
+ack needs special write to EOI register unlike OMAP.
 
-/ {
- model = "ACPI";
- cpu {
-    cpu at 0 {
-      device_type = "cpu";
-      compatible = "arm,armv7";
-    };
- };
- memory at 0 {
-     device_type = "memory";
-     reg = <0x0000000 0x20000000>;
- };
-};
-
-Give or take some address-cells, size-cells.. what you've lost is
-interrupt controllers and whatever else, but then what you need is
-some way of having a system that boots with DT somehow break into
-loading ACPI information.
-
-Right now the best way of doing that - if you're in a server
-environment anyway and dictate UEFI - is the ACPI configuration table
-off the System Table.
-
->> 2) Because you can do fancy 'scripting' as well as bus and device
->> configuration abstraction on top of description.
->
-> Sure.
->
->> 3) Because there seems to be an absolutely moronic assumption that the
->> best way to get an ARMv8 server box on the market is take an existing
->> server design and just drop an ARM SoC into it and the above existing
->> code should "drop in" in that case.
->
-> Well, so far we had any indication as to whether or not anyone's
-> planning on doing that. I suspect it could be made to work, the question
-> is how invasive the kernel changes would be.
-
-It could be made to work; it's a stupid, stupid idea that throws any
-of the benefits of using ARM in the first place out of the window. Why
-would anyone do that?
-
->> But I can't think of a reason why an extension or companion to PSCI
->> couldn't do it, and why you WOULDN'T want to do this as an API
->> implemented via a secure monitor interface which is architecturally
->> defined on ARM where security extensions are present. I can't imagine
->> a reason why it couldn't be done over IPMI to some microcontroller or
->> dedicated external component, for the case of fans and chassis
->> components and tedious other stuff.
->
-> Primarily because people want solutions that aren't tied to having an
-> entirely separate computer running its own embedded OS.
-
-Even though it is almost an absolutely hard requirement for a
-production server environment to have some kind of out of band,
-lights-out management implementation?
-
-> alternative to doing things in ACPI would be to do them in TrustZone,
-> and let's not encourage that.
-
-Why not? It's the best method. Every platform has some teething
-issues.. needing some time to mature. What might be a reasonable
-method, and I can guarantee these will exist (Calxeda..?) is to
-implement a tiny shim in TrustZone which gives an internal OOB
-processor a kick to do the real work. It may have a highly restricted
-address space (power control, DRAM, peripherals that it shares with
-the apps processor) and be doing thermal management and whatever else,
-too.. it is a solution that every server (x86, SPARC, etc.) I've ever
-bought, sold or maintained for customers and in-house everywhere I've
-worked has had.
-
-What makes ARM servers so different?
-
-> see on x86 are down to SMM code that we can't see, let alone debug. It's
-> much easier to handle bugs in code that runs in the same context as the
-> OS.
-
-It really depends what the use case is... so far, none provided.
-
-Ta,
-Matt <neko@bakuhatsu.net>
+Regards,
+Santosh
+ 
