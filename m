@@ -1,50 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 28 Nov 2013 09:13:53 +0100
-Subject: [PATCH 0/3] regulator: tps6586x: add version detection and
- voltage tables
-In-Reply-To: <cover.1385508112.git.stefan@agner.ch>
-References: <cover.1385508112.git.stefan@agner.ch>
-Message-ID: <20131128081351.GA26502@ulmo.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 Nov 2013 17:20:31 +0900
+Subject: [PATCH 10/12] usb: r8a66597-hcd: Convert to clk_prepare/unprepare
+In-Reply-To: <10742564.mkbtL7U7WC@avalon>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1900311.xc3BDUDvCy@avalon> <20131126023608.GA682@kroah.com>
+ <10742564.mkbtL7U7WC@avalon>
+Message-ID: <20131128082030.GU24146@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 12:45:42AM +0100, Stefan Agner wrote:
-> This patchset adds version detection for the tps6586x mfd family. This is
-> required because some regulator versions use different voltage tables. The
-> regulator driver now uses the right voltage table according to the
-> version.
+On Tue, Nov 26, 2013 at 03:08:27PM +0100, Laurent Pinchart wrote:
+> Hi Greg,
 > 
-> The required voltage for the SM2 converter on the Colibri T20 is 1.8V,
-> however, the device tree states 3.7V right now. Newer versions (>=V1.2) of
-> the Colibri T20 module use the TPS658643, whereas old ones (<V1.2) use the
-> TPS658623. Both of them have a different voltage table for SM2. The
-> current device tree contains a voltage which results in 1.8V for the older
-> TPS658623. Since the regulator driver has correct voltage tables for both
-> regulator versions now, we can request the correct 1.8V from the device
-> tree.
+> On Monday 25 November 2013 18:36:08 Greg Kroah-Hartman wrote:
+> > On Tue, Nov 26, 2013 at 03:00:30AM +0100, Laurent Pinchart wrote:
+> > > On Saturday 09 November 2013 08:10:59 Greg Kroah-Hartman wrote:
+> > > > On Sat, Nov 09, 2013 at 03:12:05PM +0100, Laurent Pinchart wrote:
+> > > > > On Tuesday 29 October 2013 18:47:26 Shimoda, Yoshihiro wrote:
+> > > > > > Hi Laurent-san,
+> > > > > > 
+> > > > > > (2013/10/29 7:49), Laurent Pinchart wrote:
+> > > > > > > Turn clk_enable() and clk_disable() calls into
+> > > > > > > clk_prepare_enable() and clk_disable_unprepare() to get ready for
+> > > > > > > the migration to the common clock framework.
+> > > > > > > 
+> > > > > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > > > > > Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > > > > Cc: linux-usb at vger.kernel.org
+> > > > > > > Signed-off-by: Laurent Pinchart
+> > > > > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > > 
+> > > > > > Thank you for the patch.
+> > > > > > 
+> > > > > > Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > > 
+> > > > > Could you please pick this patch up ?
+> > > > 
+> > > > I'll pick things up after 3.13-rc1 is out, I can't do anything until
+> > > > then.
+> > > 
+> > > Sure.
+> > > 
+> > > As this patch is a dependency for other series that will go through
+> > > different trees, could you please provide a stable branch in your tree
+> > > with this patch included that you will push to v3.14 ?
+> > 
+> > If you need this for other work, feel free to take it in your tree, I
+> > have no real need for it to go in mine.
+> > 
+> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > 
-> Tested on Colibri T20 V1.1 and V1.2.
+> Sounds good to me, thanks.
 > 
-> Stefan Agner (3):
->   mfd: tps6586x: add version detection
->   regulator: tps6586x: add voltage table for tps658643
->   ARM: tegra: set SM2 voltage correct
-> 
->  arch/arm/boot/dts/tegra20-colibri-512.dtsi |  4 +-
->  drivers/mfd/tps6586x.c                     | 41 +++++++++++--
->  drivers/regulator/tps6586x-regulator.c     | 97 ++++++++++++++++++++----------
->  include/linux/mfd/tps6586x.h               |  9 +++
->  4 files changed, 110 insertions(+), 41 deletions(-)
+> Simon, could you please pick this patch then ?
 
-Adding Kai Poggensee on Cc. There was a variant of the Tamonten board
-with one of these versions of the chip (or maybe it was even yet another
-one).
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131128/649c7941/attachment.sig>
+Sure. I have queued it up.
+But I may not push it for a day or two.
