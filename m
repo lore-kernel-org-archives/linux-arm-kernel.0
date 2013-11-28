@@ -1,47 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 27 Nov 2013 18:58:51 -0500
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <CAOesGMhRYg4L72v8XCCSwSnLhYuZ6+aBTxPGNvVn=n=xpVm71A@mail.gmail.com>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
- <20131125194631.GE2879@titan.lakedaemon.net>
- <CAOesGMhRYg4L72v8XCCSwSnLhYuZ6+aBTxPGNvVn=n=xpVm71A@mail.gmail.com>
-Message-ID: <20131127235851.GS2879@titan.lakedaemon.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 28 Nov 2013 09:44:31 +0900
+Subject: [PATCH 03/04] ARM: shmobile: Genmai I2C-over-GPIO support
+In-Reply-To: <2757102.StIMV2khe5@avalon>
+References: <20131127082736.20015.21303.sendpatchset@w520>
+ <20131127082805.20015.82680.sendpatchset@w520>
+ <2757102.StIMV2khe5@avalon>
+Message-ID: <CANqRtoQkZHCCZ0hZrFkgndxoOrfdjnRZQR6NUP0KLMiRMxw2Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 11:45:24AM -0800, Olof Johansson wrote:
-> On Mon, Nov 25, 2013 at 11:46 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
-> >> The following commit:
-> >>
-> >>   54f8d501e842 dmaengine: remove DMA unmap from drivers
-> >>
-> >> removed the last caller to mv_desc_get_dest_addr(), creating the
-> >> warning:
-> >>
-> >>   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
-> >>   but not used [-Wunused-function]
-> >>
-> >> Remove it.
-> >>
-> >> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> >> ---
-> >>  drivers/dma/mv_xor.c | 6 ------
-> >>  1 file changed, 6 deletions(-)
-> >
-> > Gah!  I sent too fast.  I meant to mention that I have this in my
-> > mvebu/fixes branch, which gets merged into -next each night.  (The
-> > warning was bugging me :) )
-> >
-> > Just let me know when you take it and I'll drop it from my branches.
-> 
-> Hmm. Please don't add patches for other subsystems into your -next
-> tree, since then there is no indication for those of us who follow
-> -next that the patch is not yet merged by the appropriate maintainer.
+Hi Laurent,
 
-Ack.  Dropped.  Sorry for the confusion and thanks for setting me
-straight.
+On Wed, Nov 27, 2013 at 8:15 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Magnus,
+>
+> Thank you for the patch.
+>
+> On Wednesday 27 November 2013 17:28:05 Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> Add support for the Genmai I2C bus hooked up to P1_5 and P1_4 using
+>> the i2c-gpio driver. On the bus sits a 24c128 EEPRROM.
+>
+> Is this a temporary workaround until we get a proper I2C controller driver, or
+> is the EEPROM really hooked up to pins that are not wired to a hardware I2C
+> controller ?
 
-thx,
+This is a stop-gap solution until we have upstream driver support for
+the I2C master hardware. The pins used for the I2C bus can be
+configured in GPIO mode or a zillion other pin functions including SCL
+and SDA.
 
-Jason.
+Cheers,
+
+/ magnus
