@@ -1,41 +1,166 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 15:36:01 +0900
-Subject: [PATCH] ARM: shmobile: Use r8a7790 suffix for IRQC compat string
-In-Reply-To: <20131120000740.27032.66529.sendpatchset@w520>
-References: <20131120000740.27032.66529.sendpatchset@w520>
-Message-ID: <20131128063559.GI22413@verge.net.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 28 Nov 2013 12:06:44 +0530
+Subject: [PATCH] cpufreq, highbank: enable ECME thermal notifications
+In-Reply-To: <1382226889-11062-1-git-send-email-mark.langsdorf@calxeda.com>
+References: <1382226889-11062-1-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <CAOh2x=nyUDJz0N0Frz3X4-Omi6kcvQ37GEhXgmdw9bmQuWRZNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 20, 2013 at 09:07:40AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Add "renesas,irqc-r8a7790" to the compatible string for IRQC
-> in case of r8a7790. This makes the IRQC follow the same style
-> as the other devices and also makes it more future proof.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+Hi Mark,
 
-Should I make a similar patch for the r8a73a4?
+Sorry for a months delay.. I would suggest adding specific people in --to
+field whom you want to review your patches. That's always helpful.
 
+On Sun, Oct 20, 2013 at 5:24 AM, Mark Langsdorf
+<mark.langsdorf@calxeda.com> wrote:
+> The ECME sends thermal messages with a maximum and minimum allowed
+> frequency when the SoC status reaches certain trip points known to the
+> ECME. Use a notifier function to capture those messages and pass them
+> to a work-queued function that can trigger a policy re-evaluation by
+> cpufreq, capping the allowable frequencies.
+>
+> The core of the policy adjusting code was taken from
+> drivers/thermal/cpu_cooling.c.
+>
+> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
 > ---
-> 
->  arch/arm/boot/dts/r8a7790.dtsi |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- 0003/arch/arm/boot/dts/r8a7790.dtsi
-> +++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-11-20 08:20:30.000000000 +0900
-> @@ -171,7 +171,7 @@
->  	};
->  
->  	irqc0: interrupt-controller at e61c0000 {
-> -		compatible = "renesas,irqc";
-> +		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
->  		#interrupt-cells = <2>;
->  		interrupt-controller;
->  		reg = <0 0xe61c0000 0 0x200>;
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>  drivers/cpufreq/highbank-cpufreq.c | 117 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 117 insertions(+)
+>
+> diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
+> index b61b5a3..f0521d3 100644
+> --- a/drivers/cpufreq/highbank-cpufreq.c
+> +++ b/drivers/cpufreq/highbank-cpufreq.c
+> @@ -17,15 +17,32 @@
+>  #include <linux/module.h>
+>  #include <linux/clk.h>
+>  #include <linux/cpu.h>
+> +#include <linux/cpufreq.h>
+
+How was this missing earlier :)
+
+>  #include <linux/err.h>
+>  #include <linux/of.h>
+>  #include <linux/mailbox.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/cpumask.h>
+
+Please add this after cpu.h to keep them in ascending order..
+Also rearrange module and kernel.h to make this list sorted out in the
+same patch..
+
+> +#include <linux/workqueue.h>
+>
+>  #define HB_CPUFREQ_CHANGE_NOTE 0x80000001
+> +#define HB_CPUFREQ_HEALTH_NOTE  0x00001001
+> +#define HB_CPUFREQ_TPS_REPORT  1
+>  #define HB_CPUFREQ_IPC_LEN     7
+>  #define HB_CPUFREQ_VOLT_RETRIES        15
+>
+> +#define NOTIFY_INVALID NULL
+
+Not actually required. Just use NULL everywhere you want this..
+
+> +struct hb_notify_device {
+> +       unsigned long max_freq;
+> +       unsigned long min_freq;
+> +       unsigned long thermal_state;
+> +       struct cpumask *allowed_cpus;
+
+Because this is always equal to cpu_possible_mask, you
+don't actually need it..
+
+> +};
+> +
+> +static struct hb_notify_device hb_records, *notify_device = NOTIFY_INVALID;
+> +static struct work_struct hb_thermal_wq;
+> +
+>  static int hb_voltage_change(unsigned int freq)
+>  {
+>         u32 msg[HB_CPUFREQ_IPC_LEN] = {HB_CPUFREQ_CHANGE_NOTE, freq / 1000000};
+> @@ -33,6 +50,89 @@ static int hb_voltage_change(unsigned int freq)
+>         return pl320_ipc_transmit(msg);
+>  }
+>
+> +static int hb_thermal_cpufreq_notify(struct notifier_block *nb,
+> +                                   unsigned long event, void *data)
+> +{
+> +       struct cpufreq_policy *policy = data;
+> +       unsigned long max_freq = 0, min_freq = 0;
+> +
+> +       if (event != CPUFREQ_ADJUST || notify_device == NOTIFY_INVALID)
+
+I believe you should check notify_device == NOTIFY_INVALID first and then
+value of event.
+
+> +               return 0;
+> +
+> +       if (cpumask_test_cpu(policy->cpu, notify_device->allowed_cpus)) {
+
+What's your system configuration (Just for my understanding)? How many
+CPUs you have? They are sharing clock lines?
+
+And anyway how can policy->cpu be out of cpu_possible_mask ?
+
+> +               max_freq = notify_device->max_freq;
+> +               min_freq = notify_device->min_freq;
+> +       }
+> +
+> +       /* Never exceed user_policy.max */
+> +       if (max_freq > policy->user_policy.max)
+> +               max_freq = policy->user_policy.max;
+> +       if (min_freq < policy->user_policy.min)
+> +               min_freq = policy->user_policy.min;
+> +
+> +       if ((policy->max != max_freq) || (policy->min != min_freq))
+
+Probably just call cpufreq_verify_within_limits() directly as we have
+similar checks in there, it isn't too heavy ?
+
+> +               cpufreq_verify_within_limits(policy, min_freq, max_freq);
+> +
+> +       return 0;
+> +}
+> +
+> +static struct notifier_block hb_thermal_cpufreq_nb = {
+> +       .notifier_call = hb_thermal_cpufreq_notify,
+> +};
+> +
+> +/*
+> + * We can't call cpufreq_adjust_policy from inside a notifier, so
+> + * do it from inside a workqueue
+> + */
+
+Why exactly? Adding that into comment would be more useful..
+
+> +static void hb_thermal_wq_task(struct work_struct *work)
+> +{
+> +       unsigned int cpuid;
+> +       struct cpumask *mask = hb_records.allowed_cpus;
+> +
+> +       notify_device = &hb_records;
+> +
+> +       for_each_cpu(cpuid, mask) {
+
+That's not a optimal solution. We have CPUs in groups normally
+(i.e. sharing clock lines) and so each policy structure might be
+common for few.. And so we need to do below only for policy->cpu
+and no other CPUs from policy->affected_cpus.
+
+> +               struct cpufreq_policy policy;
+> +               if (cpufreq_get_policy(&policy, cpuid) == 0) {
+
+Do you expect any CPUs to exist without a policy? If not, then
+this check is just not required (Its heavy, memcpy)..
+
+Otherwise, also just call cpufreq_update_policy() and check
+return type for -ENODEV, which is returned if there is no
+policy associated with it..
+
+> +                       cpufreq_update_policy(cpuid);
+> +                       break;
+> +               }
+> +       }
+> +       notify_device = NOTIFY_INVALID;
+> +}
