@@ -1,49 +1,114 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 28 Nov 2013 11:34:29 +0800
-Subject: [PATCH 00/23] mtd: st_spi_fsm: Add new device
-In-Reply-To: <20131127115226.GC3296@lee--X1>
-References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
- <20131127040723.GZ9468@ld-irv-0074.broadcom.com>
- <20131127115226.GC3296@lee--X1>
-Message-ID: <5296B9C5.3060704@freescale.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 28 Nov 2013 11:38:45 +0800
+Subject: [PATCH] ARM: l2x0: add prefetch and power ctrl registers
+ configuration support
+In-Reply-To: <20131127174204.GD27879@e106331-lin.cambridge.arm.com>
+References: <1383800872-7982-1-git-send-email-jszhang@marvell.com>
+ <20131127174204.GD27879@e106331-lin.cambridge.arm.com>
+Message-ID: <20131128113845.27d0176b@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?11?27? 19:52, Lee Jones ??:
-> However, as we send entire 'message sequences' to the FSM Controller
-> as opposed to merely OPCODEs we would have to extract the OPCODE from
-> flash->command[0] and call our own functions to craft the correct
-> 'message sequence' for the task. For this reason we rejected the idea
-> and went with a stand-alone driver.
->
-could you send me the datasheet of your spi nor controller?
-I can change my code if it really not good enough.
+Hi Mark,
 
-we can store the opcode to a field, such as spi_nor_write_op.
-> The framework which Huang is proposing suffers from the same issues.
-> Only providing read(), write(), read_reg() and write_reg() doesn't
-> work for our use-case, as we'd have to decode the flash->command[0] and
-> invoke our own internal routines as before.
->
-> The only framework with would work for us would consist almost all
-> of the important functions such as; read(), write(), erase(),
-> wait_busy(), read_jedec(), read_status_reg(), write_status_reg(),
-> read_control_reg(), write_control_reg(), etc. However, this approach
->   
-read_jedec() can be replaced by read_reg(0x9f);
+On Wed, 27 Nov 2013 09:42:04 -0800
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-read_status() can be replaced by read_reg(0x5);
-
-....
-
-write_control_reg() can be replaced by write_reg(xx).
+> On Thu, Nov 07, 2013 at 05:07:52AM +0000, Jisheng Zhang wrote:
+> > PL310 supports Prefetch offset/control register from r2p0 and Power
+> > control register from r3p0. This patch adds the support to configure
+> > these two registers if there are. The dt binding document is also updated.
+> 
+> I'd like to see a reasoning as to _why_ these should be in the DT.
+> 
+> While we have tag and data RAM latency information, those are hardware
+> properties that we cannot probe. I'm not so clear on the filter-ranges
+> property.
+> 
+> These bits seem to be configuration rather than a hardware description.
+> If there are some portions of this that we can describe with higher
+> level properties, I'd prefer to do that.
+> 
+> But primarily, the question to answer is do we need these, and if so do
+> they belong in the DT?
 
 
-Please correct me if i am wrong.
+After more consideration, configuring these two registers in bootloader or
+TrustZone firmware is more reasonable since the prefetch controller can only be
+written in Secure World.
 
-IMHO, the current four hooks for spi-nor{} can do all the things.
+PS: the tag/ram latency must also be written in secure world, and IMHO, the
+latency and filter-ranges are also configurations
 
-      read/write/read_reg/write_reg.
+Thanks for having look at this patch,
+Jisheng
 
-thanks
-Huang Shijie
+> 
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
+> >  arch/arm/mm/cache-l2x0.c                       | 19 +++++++++++++++++++
+> >  2 files changed, 23 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt
+> > b/Documentation/devicetree/bindings/arm/l2cc.txt index c0c7626..32cd08c
+> > 100644 --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > @@ -39,6 +39,10 @@ Optional properties:
+> >  - arm,filter-ranges : <start length> Starting address and length of
+> > window to filter. Addresses in the filter window are directed to the M1
+> > port. Other addresses will go to the M0 port.
+> > +- arm,prefetch-ctrl : The value for Prefetch Offset/Control Register if
+> > there
+> > +  is. This is a single cell.
+> > +- arm,pwr-ctrl : The value for Power Control Register if there is. This
+> > is a
+> > +  single cell.
+> >  - interrupts : 1 combined interrupt.
+> >  - cache-id-part: cache id part number to be used if it is not present
+> >    on hardware
+> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> > index 447da6f..8f536ea 100644
+> > --- a/arch/arm/mm/cache-l2x0.c
+> > +++ b/arch/arm/mm/cache-l2x0.c
+> > @@ -704,6 +704,8 @@ static void __init pl310_of_setup(const struct
+> > device_node *np, u32 data[3] = { 0, 0, 0 };
+> >  	u32 tag[3] = { 0, 0, 0 };
+> >  	u32 filter[2] = { 0, 0 };
+> > +	u32 l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
+> > +		L2X0_CACHE_ID_RTL_MASK;
+> >  
+> >  	of_property_read_u32_array(np, "arm,tag-latency", tag,
+> > ARRAY_SIZE(tag)); if (tag[0] && tag[1] && tag[2])
+> > @@ -730,6 +732,23 @@ static void __init pl310_of_setup(const struct
+> > device_node *np, writel_relaxed((filter[0] & ~(SZ_1M - 1)) |
+> > L2X0_ADDR_FILTER_EN, l2x0_base + L2X0_ADDR_FILTER_START);
+> >  	}
+> > +
+> > +	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R2P0) {
+> > +		u32 prefetch_ctrl = 0;
+> > +
+> > +		of_property_read_u32(np, "arm,prefetch-ctrl",
+> > +				     &prefetch_ctrl);
+> > +		if (prefetch_ctrl)
+> > +			writel_relaxed(prefetch_ctrl, l2x0_base +
+> > +					L2X0_PREFETCH_CTRL);
+> 
+> Some of the prefetch control regsiter bits are reserved, and the
+> prefetch offset may only take a subset of possible values. I wouldn't
+> want to poke the hardware without performing some sanity checking on
+> these values.
+> 
+> > +		if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
+> > +			u32 pwr_ctrl = 0;
+> > +			of_property_read_u32(np, "arm,pwr-ctrl",
+> > &pwr_ctrl);
+> > +			if (pwr_ctrl)
+> > +				writel_relaxed(pwr_ctrl, l2x0_base +
+> > +						L2X0_POWER_CTRL);
+> 
+> Similarly, all but the lower 2 bits are reserved...
+> 
+> Thanks,
+> Mark.
