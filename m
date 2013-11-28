@@ -1,47 +1,131 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 28 Nov 2013 14:58:53 -0800
-Subject: Build warning in drivers/dma/mmp_tdma.c
-Message-ID: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 28 Nov 2013 16:31:47 -0700
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131128222232.GF14689@mithrandir>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131128203322.GB14689@mithrandir>
+ <20131128211009.GA26447@obsidianresearch.com>
+ <20131128222232.GF14689@mithrandir>
+Message-ID: <20131128233147.GA19387@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My build warning test is failing on this driver please fix:
+On Thu, Nov 28, 2013 at 11:22:33PM +0100, Thierry Reding wrote:
+> On Thu, Nov 28, 2013 at 02:10:09PM -0700, Jason Gunthorpe wrote:
+> > On Thu, Nov 28, 2013 at 09:33:23PM +0100, Thierry Reding wrote:
+> > 
+> > > >   - Describing masters that master through multiple different buses
+> > > > 
+> > > >   - How on Earth this fits in with the Linux device model (it doesn't)
+> > > > 
+> > > >   - Interaction with IOMMU bindings (currently under discussion)
+> > > 
+> > > This is all very vague. Perhaps everyone else knows what this is all
+> > > about, in which case it'd be great if somebody could clue me in.
+> > 
+> > It looks like an approach to describe an AXI physical bus topology in
+> > DT..
+> 
+> Thanks for explaining this. It makes a whole lot more sense now.
 
-drivers/dma/mmp_tdma.c:236:8: warning: 'tdcr' may be used
-uninitialized in this function [-Wuninitialized]
+Hopefully the ARM guys concur, this was just my impression from
+reviewing their patches and having recently done some design work with
+AXI..
 
-It's valid as mmp_tdma_control as the direction is specified in
-mmp_tdma_control() and may not be one of the two tests in that branch.
+> > axi
+> > {
+> >    /* Describe a DAG of AXI connections here. */
+> >    cpu { downstream = &ax_switch,}
+> >    axi_switch {downstream = &memory,&low_speed}
+> >    memory {}
+> >    dma {downstream = &memory}
+> >    low_speed {}
+> > }
+> 
+> Correct me if I'm wrong, but the switch would be what the specification
+> refers to as "interconnect", while a port would correspond to what is
+> called an "interface" in the specification?
 
+That seems correct, but for this purpose we are not interested in
+boring dumb interconnect but fancy interconnect with address remapping
+capabilities, or cache coherency (eg the SCU/L2 cache is modeled as
+switch/interconnect in a AXI DAG).
 
+I called it a switch because the job of the interconnect block is to
+take an AXI input packet on a slave interface and route it to the
+proper master interface with internal arbitration between slave
+interfaces. In my world that is a called a switch ;)
 
-I'm also carrying patch to add a missing dependency:
+AXI is basically an on-chip point-to-point switched fabric like PCI-E,
+and the stuff that travels on AXI looks fairly similar to PCI-E TLPs..
 
-commit 1a4ee91dacedde3e82d8ce6eeace7f16884474f9
-Author: Dan Williams <dan.j.williams@intel.com>
-Date:   Thu Nov 28 12:27:38 2013 -0800
+If you refer to the PDF I linked I broadly modeled the above DT
+fragment on that diagram, each axi sub node (vertex) represents an
+'interconnect' and 'downstream' is a master->slave interface pair (edge).
 
-    dma: mmp_dma depends on CPU_MMP2
+Fundamentally AXI is inherently a DAG, but unlike what we are used to
+in other platforms you don't have to go through a fused
+CPU/cache/memory controller unit to access memory, so there are
+software visible asymmetries depending on how the DMA flows through
+the AXI DAG.
 
-    It calls sram_get_gpool() which is only defined if CONFIG_CPU_MMP2=y
+> > Which is why I think encoding the AXI DAG directly in DT is probably
+> > the most future proof way to model this stuff - it sticks close to the
+> > tools ARM provides to the SOC designers, so it is very likely to be
+> > able to model arbitary SOC designs.
+> 
+> I'm not sure I agree with you fully here. At least I think that if what
+> we want to describe is an AXI bus topology, then we should be describing
+> it in terms of the AXI specification.
 
-    Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+Right, that was what I was trying to describe :) 
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 446687cc2334..dad83634cb65 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -287,7 +287,7 @@ config DMA_SA11X0
+The DAG would be vertexes that are 'interconnect' and directed edges
+that are 'master -> slave interface' pairs.
 
- config MMP_TDMA
-        bool "MMP Two-Channel DMA support"
--       depends on ARCH_MMP
-+       depends on ARCH_MMP && CPU_MMP2
-        select DMA_ENGINE
-        help
-          Support the MMP Two-Channel DMA engine.
+This would be an addendum/side-table dataset to the standard 'soc' CPU
+address map tree, that would only be needed to program address
+mapping/iommu hardware.
 
-Is there a different ARCH type that this driver should be depending on?
+And it isn't really AXI specific, x86 style platforms can have a DAG
+too, it is just much simpler, as there is only 1 vertex - the IOMMU.
 
---
-Dan
+> I mean, even though device tree is supposed to describe hardware, there
+> needs to be a limit to the amount of detail we put into it. After all it
+> isn't a hardware description language, but rather a language to describe
+> the hardware in a way that makes sense for operating system software to
+> use it.
+
+Right - which is why I said the usual 'soc' node should remain as-is
+typical today - a tree formed by viewing the AXI DAG from the CPU
+vertex. That 100% matches the OS perspective of the system for CPU
+originated MMIO.
+
+The AXI DAG side-table would be used to resolve weirdness with 'bus
+master' DMA programming. The OS can detect all the required
+configuration and properties by tracing a path through the DAG from
+the source of the DMA to the target - that tells you what IOMMUs are
+involved, if the path is cache coherent, etc.
+
+> Perhaps this is just another way of saying what Greg has already said.
+> If we continue down this road, we'll eventually end up having to
+> describe all sorts of nitty gritty details. And we'll need even more
+
+Greg's point makes sense, but the HW guys are not designing things
+this way for kicks - there are real physics based reasons for some of
+these choices...
+
+eg An all-to-all bus cross bar (eg like Intel's ring bus) is engery
+expensive compared to a purpose built muxed bus tree. Doing coherency
+look ups on DMA traffic costs energy, etc.
+
+> code to deal with those descriptions and the hardware they represent. At
+> some point we need to start pushing some of the complexity back into
+> hardware so that we can keep a sane code-base.
+
+Some of this is a consequence of the push to have the firmware
+minimal. As soon as you say the kernel has to configure the address
+map you've created a big complexity for it..
+
+Jason
