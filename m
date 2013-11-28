@@ -1,33 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 18:08:39 +0900
-Subject: [PATCH 09/16] ARM: shmobile: bockw: Do not enable CONFIG_DEVTMPFS
- defconfig
+Date: Thu, 28 Nov 2013 18:08:55 +0900
+Subject: [PATCH 16/16] ARM: shmobile: kzm9d: Enable AUTO_ZRELADDR in defconfig
 In-Reply-To: <cover.1385629477.git.horms+renesas@verge.net.au>
 References: <cover.1385629477.git.horms+renesas@verge.net.au>
-Message-ID: <e14ee5deab24200e4b70fe31a8c806f0acd3d37c.1385629477.git.horms+renesas@verge.net.au>
+Message-ID: <577092b3d11530acd8467074f6ea7e2dd36b5028.1385629477.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change brings the bockw defconfig into line with
-other shmobile defconfigs.
+This is required to allow the load address to be supplied
+as an environment variable when building a uImage.
 
-Signed-off-by: Simon Horman <horms@verge.net.au>
+LOADADDR=0x40008000 ARCH=arm make uImage
+
+This is necessary since "ARM: shmobile: Remove legacy KZM9D board code"
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/bockw_defconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/configs/kzm9d_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index 8b5866e..01721faf 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -43,8 +43,6 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_INET_DIAG is not set
- # CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
+diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
+index 6c37f4a..e6aed23 100644
+--- a/arch/arm/configs/kzm9d_defconfig
++++ b/arch/arm/configs/kzm9d_defconfig
+@@ -32,6 +32,7 @@ CONFIG_FORCE_MAX_ZONEORDER=13
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
++CONFIG_AUTO_ZRELADDR=y
+ CONFIG_VFP=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_PM_RUNTIME=y
 -- 
 1.8.4
