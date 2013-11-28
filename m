@@ -1,39 +1,55 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 15:45:56 +0900
-Subject: [PATCH 00/04] ARM: shmobile: Use SoC suffix for INTC compat string
-In-Reply-To: <20131127231450.29081.98054.sendpatchset@w520>
-References: <20131127231450.29081.98054.sendpatchset@w520>
-Message-ID: <20131128064555.GA14878@verge.net.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 28 Nov 2013 11:27:06 +0530
+Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
+In-Reply-To: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
+References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <20131128055706.GM8834@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 08:14:50AM +0900, Magnus Damm wrote:
-> ARM: shmobile: Use SoC suffix for INTC compat string
++ Dan
+
+On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
+> The following commit:
 > 
-> [PATCH 01/04] ARM: shmobile: Use sh73a0 suffix for INTC compat string
-> [PATCH 02/04] ARM: shmobile: Use r8a7740 suffix for INTC compat string
-> [PATCH 03/04] ARM: shmobile: Use r8a7778 suffix for INTC compat string
-> [PATCH 04/04] ARM: shmobile: Use r8a7779 suffix for INTC compat string
+>   54f8d501e842 dmaengine: remove DMA unmap from drivers
 > 
-> Update the DTS for INTC irqpin devices to include the SoC in the compat string.
+> removed the last caller to mv_desc_get_dest_addr(), creating the
+> warning:
 > 
-> Both IRQC and INTC irqpin need documentation for the DT bindings, and this
-> will happen in incremental patches.
+>   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
+>   but not used [-Wunused-function]
+> 
+> Remove it.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-I have posted some patches for that a few moments ago :)
+This should go thru Dan's tree
 
+> ---
+>  drivers/dma/mv_xor.c | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> index 7807f0ef4e20..23bcc9158cbc 100644
+> --- a/drivers/dma/mv_xor.c
+> +++ b/drivers/dma/mv_xor.c
+> @@ -54,12 +54,6 @@ static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
+>  	hw_desc->desc_command = (1 << 31);
+>  }
+>  
+> -static u32 mv_desc_get_dest_addr(struct mv_xor_desc_slot *desc)
+> -{
+> -	struct mv_xor_desc *hw_desc = desc->hw_desc;
+> -	return hw_desc->phy_dest_addr;
+> -}
+> -
+>  static void mv_desc_set_byte_count(struct mv_xor_desc_slot *desc,
+>  				   u32 byte_count)
+>  {
+> -- 
+> 1.8.4.4
+> 
 
-I am curious to if it is intentional that this series replaces
-the use of less-specific compat strings with more specific ones
-while the recent update to the r8a7790 supplemented the
-less-specific renesas,irqc comat string with the more-specific
-renesas,irqc-r8a7790 compat string.
-
-i.e.
-	before: "renesas,intc-irqpin"
-	after:  "renesas,intc-irqpin-sh73a0"
-
-	as opposed to
-
-	before: "renesas,irqc"
-	after: "renesas,irqc-r8a7790", "renesas,irqc"
+-- 
