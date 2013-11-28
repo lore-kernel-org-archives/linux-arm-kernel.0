@@ -1,31 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 28 Nov 2013 17:13:38 +0000
-Subject: [PATCH] I2C: BCM2835: Linking platform nodes to adapter nodes
-In-Reply-To: <20131126130553.GF25130@opensource.wolfsonmicro.com>
-References: <527CB3A1.7050808@koalo.de> <527D1870.8080302@wwwdotorg.org>
- <20131126130553.GF25130@opensource.wolfsonmicro.com>
-Message-ID: <20131128171338.GM27568@sirena.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 28 Nov 2013 18:14:38 +0100
+Subject: [PATCH 03/04] ARM: shmobile: Genmai I2C-over-GPIO support
+In-Reply-To: <52977954.20006@cogentembedded.com>
+References: <20131127082736.20015.21303.sendpatchset@w520>
+ <20131127110413.GA2603@katana> <52977954.20006@cogentembedded.com>
+Message-ID: <4401360.Outsal0mcb@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 01:05:53PM +0000, Charles Keepax wrote:
-> On Fri, Nov 08, 2013 at 09:59:28AM -0700, Stephen Warren wrote:
-
-> > That all said, I wonder if the I2C core shouldn't do something like the
-> > following inside i2c_add_adapter():
+On Thursday 28 November 2013 21:11:48 Sergei Shtylyov wrote:
+> On 27-11-2013 15:04, Wolfram Sang wrote:
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		eeprom: 24c128 at 50 {
+> >> +			compatible = "at,24c128";
 > > 
-> > if (!adap->dev.of_node && adap->dev.parent)
-> > 	adap->dev.of_node = adap->dev.parent->of_node;
+> > Minor nit: Should be a vendor name, not the name of the driver
+> 
+> Moreover, the node should be named generically, like "flash at 50", not
+> "24c128 at 50".
 
-> Should this not also have an of_node_get to increment the ref
-> count on the node?
+Or, given that it's an eeprom, "eeprom at 50" ? :-)
 
-Given that it's pointing to the device that registered the I2C adaptor
-it should be able to assume that there's a reference already.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131128/5170cc34/attachment.sig>
+-- 
+Regards,
+
+Laurent Pinchart
