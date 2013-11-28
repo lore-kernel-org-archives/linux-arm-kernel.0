@@ -1,43 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Nov 2013 21:28:01 -0800
-Subject: [PATCH] Documentation: devicetree: arm: add lpae property to
- cpus/cpu bindings
-In-Reply-To: <CAOesGMh9aQEtqha3gt80q4RmLjXtFTc+Xt39M0m+geTk_betzQ@mail.gmail.com>
-References: <1385517172-803-1-git-send-email-olof@lixom.net>
- <20131127094911.GE5402@e106331-lin.cambridge.arm.com>
- <CAOesGMh9aQEtqha3gt80q4RmLjXtFTc+Xt39M0m+geTk_betzQ@mail.gmail.com>
-Message-ID: <CAOesGMh45EyTm5ZEAXphiD5L=cyLQ=732qZfW1jtQDo8Rd9rpg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Nov 2013 13:40:41 +0800
+Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix chipselect level for
+ dataflash on spi0.1
+In-Reply-To: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
+References: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131128054039.GB5914@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 11:27 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Nov 27, 2013 at 1:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> Hi Olof,
->>
->> On Wed, Nov 27, 2013 at 01:52:52AM +0000, Olof Johansson wrote:
->>> While the LPAE capability is determined by the kernel today, it is still
->>> useful to be able to specify the feature in the device tree. There is
->>> precedence from other architectures for this.
->>>
->>> Signed-off-by: Olof Johansson <olof@lixom.net>
->>> ---
->>>
->>> My personal motive for this is to be able to tell which boards are
->>> work even trying to boot an LPAE kernel on, since we don't disable the
->>> platforms that are based on A8/A9 when LPAE is turned on. I'll add dtsi
->>> patches for A7/A15-based platforms once the binding is settled.
->>
->> It would be nice to have this description of why you want to add this in
->> the commit message proper.
->
-> Sure.
+On Wed, Nov 27, 2013 at 03:55:45PM +0400, Alexander Shiyan wrote:
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
+Applied both, thanks.
 
-By the way, I ended up doing it a different way than depending on DT
-contents, so I don't have a need to push for this now.
+Shawn
 
-Still, I think it's worth resolving long-term (how to encode CPU
-features on ARM as properties), but lower priority.
-
-
--Olof
+> ---
+>  arch/arm/boot/dts/imx51-babbage.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+> index bbe899f..ee0deb3 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -138,7 +138,7 @@
+>  	pinctrl-0 = <&pinctrl_ecspi1>;
+>  	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>,
+> -		   <&gpio4 25 GPIO_ACTIVE_HIGH>;
+> +		   <&gpio4 25 GPIO_ACTIVE_LOW>;
+>  	status = "okay";
+>  
+>  	pmic: mc13892 at 0 {
+> -- 
+> 1.8.3.2
+> 
