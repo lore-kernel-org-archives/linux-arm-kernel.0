@@ -1,41 +1,219 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 28 Nov 2013 14:50:08 +0100
-Subject: ACPI
-In-Reply-To: <CAHCPf3ubLbeEGN-M-GW=ZByH48s=WxMTuWFhEs0mBhuXjUOAMQ@mail.gmail.com>
-References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
- <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
- <20131127141634.A45F3C404EC@trevor.secretlab.ca>
- <CAHCPf3ubLbeEGN-M-GW=ZByH48s=WxMTuWFhEs0mBhuXjUOAMQ@mail.gmail.com>
-Message-ID: <20131128135008.GS24997@rocoto.smurfnet.nu>
+From: vsalve@nvidia.com (Vandana Salve)
+Date: Thu, 28 Nov 2013 19:23:16 +0530
+Subject: [PATCH] common: DMA-mapping: add DMA_ATTR_ALLOC_EXACT_SIZE attribute
+Message-ID: <1385646796-9396-1-git-send-email-vsalve@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 04:17:41PM -0600, Matt Sealey wrote:
-> UEFI hands control to an entry point of a PE/COFF executable (the only
-> thing it's required to know how to load) passing the pointer to the
-> System Table as it's second argument, location defined by the UEFI
-> specification. This is completely subverted in LinuxLoader and the EFI
-> patches you mentioned, which I have seen before and I honestly don't
-> understand why it was done this way - except to assume that rampant
-> paranoia about something new and different took hold, and some
-> internal discussion ended up with "the mainline guys will never accept
-> this.... how do we work around that?"
+This patch adds DMA_ATTR_ALLOC_EXACT_SIZE attribute to the DMA-mapping subsystem
 
-The LinuxLoader is a legacy thing which needs to go away.
-Proper UEFI support in the kernel is one way of making that possible.
+By default dma coherent alloc/free functions allocates/release memory in
+order of 2^pages. By specifying this attribute, allocation/release can
+be done for exact size of memory there by reducing internal memory
+fragmentation when allocation is in large chunks of MBs
 
-Don't really understand yor comments about the arm kernel UEFI support,
-but there seems to be some misunderstanding here, so I don't think going
-over your email and tickbox-refuting them one by one will be of much
-use to anyone.
+Added attr version of dma_alloc/release_from_coherent()
 
-I will be posting an updated set of the arm patches today, to go with
-the updated UEFI stub patches submitted by Roy last night. I will be
-happy to discuss the topics mentioned as part of this message as part
-of the review of those, if you still consider them an issue.
+Signed-off-by: Vandana Salve <vsalve@nvidia.com>
+---
+ arch/arm/mm/dma-mapping.c          |  6 ++---
+ drivers/base/dma-coherent.c        | 51 ++++++++++++++++++++++++++++----------
+ include/asm-generic/dma-coherent.h | 15 ++++++++---
+ include/linux/dma-attrs.h          |  1 +
+ 4 files changed, 54 insertions(+), 19 deletions(-)
 
-But let's be clear - my intent is to get UEFI first-class citizen
-status in the arm kernel.
-
-/
-    Leif
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 79f8b39..a39c1c1 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -710,7 +710,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+ 	void *memory;
+ 
+-	if (dma_alloc_from_coherent(dev, size, handle, &memory))
++	if (dma_alloc_from_coherent_attr(dev, size, handle, &memory, attrs))
+ 		return memory;
+ 
+ 	return __dma_alloc(dev, size, handle, gfp, prot, false,
+@@ -723,7 +723,7 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+ 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+ 	void *memory;
+ 
+-	if (dma_alloc_from_coherent(dev, size, handle, &memory))
++	if (dma_alloc_from_coherent_attr(dev, size, handle, &memory, attrs))
+ 		return memory;
+ 
+ 	return __dma_alloc(dev, size, handle, gfp, prot, true,
+@@ -769,7 +769,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ {
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
+ 
+-	if (dma_release_from_coherent(dev, get_order(size), cpu_addr))
++	if (dma_release_from_coherent_attr(dev, size, cpu_addr, attrs))
+ 		return;
+ 
+ 	size = PAGE_ALIGN(size);
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index bc256b6..51e8ff6 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -96,26 +96,31 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+ EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
+ 
+ /**
+- * dma_alloc_from_coherent() - try to allocate memory from the per-device coherent area
++ * dma_alloc_from_coherent_attr() - try to allocate memory from the per-device
++ * coherent area
+  *
+  * @dev:	device from which we allocate memory
+  * @size:	size of requested memory area
+  * @dma_handle:	This will be filled with the correct dma handle
+  * @ret:	This pointer will be filled with the virtual address
+  *		to allocated area.
++ * @attrs:	DMA Attribute
+  *
+  * This function should be only called from per-arch dma_alloc_coherent()
+  * to support allocation from per-device coherent memory pools.
+  *
+- * Returns 0 if dma_alloc_coherent should continue with allocating from
++ * Returns 0 if dma_alloc_coherent_attr should continue with allocating from
+  * generic memory areas, or !0 if dma_alloc_coherent should return @ret.
+  */
+-int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+-				       dma_addr_t *dma_handle, void **ret)
++int dma_alloc_from_coherent_attr(struct device *dev, ssize_t size,
++				       dma_addr_t *dma_handle, void **ret,
++				       struct dma_attrs *attrs)
+ {
+ 	struct dma_coherent_mem *mem;
+ 	int order = get_order(size);
+ 	int pageno;
++	unsigned int count;
++	unsigned long align;
+ 
+ 	if (!dev)
+ 		return 0;
+@@ -127,11 +132,22 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 
+ 	if (unlikely(size > (mem->size << PAGE_SHIFT)))
+ 		goto err;
++	if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs)) {
++		align = 0;
++		count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	} else {
++		align = (1 << order) - 1;
++		count = 1 << order;
++	}
++
++	pageno = bitmap_find_next_zero_area(mem->bitmap, mem->size,
++			0, count, align);
+ 
+-	pageno = bitmap_find_free_region(mem->bitmap, mem->size, order);
+-	if (unlikely(pageno < 0))
++	if (pageno >= mem->size)
+ 		goto err;
+ 
++	bitmap_set(mem->bitmap, pageno, count);
++
+ 	/*
+ 	 * Memory was found in the per-device area.
+ 	 */
+@@ -149,35 +165,44 @@ err:
+ 	 */
+ 	return mem->flags & DMA_MEMORY_EXCLUSIVE;
+ }
+-EXPORT_SYMBOL(dma_alloc_from_coherent);
++EXPORT_SYMBOL(dma_alloc_from_coherent_attr);
+ 
+ /**
+- * dma_release_from_coherent() - try to free the memory allocated from per-device coherent memory pool
++ * dma_release_from_coherent_attr() - try to free the memory allocated from
++ * per-device coherent memory pool
+  * @dev:	device from which the memory was allocated
+- * @order:	the order of pages allocated
++ * @size:	size of the memory area to free
+  * @vaddr:	virtual address of allocated pages
++ * @attrs:	DMA Attribute
+  *
+  * This checks whether the memory was allocated from the per-device
+  * coherent memory pool and if so, releases that memory.
+  *
+  * Returns 1 if we correctly released the memory, or 0 if
+- * dma_release_coherent() should proceed with releasing memory from
++ * dma_release_coherent_attr() should proceed with releasing memory from
+  * generic pools.
+  */
+-int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
++int dma_release_from_coherent_attr(struct device *dev, size_t size, void *vaddr,
++				struct dma_attrs *attrs)
+ {
+ 	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
++	unsigned int count;
+ 
+ 	if (mem && vaddr >= mem->virt_base && vaddr <
+ 		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
+ 		int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
+ 
+-		bitmap_release_region(mem->bitmap, page, order);
++		if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs))
++			count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++		else
++			count = 1 << size;
++
++		bitmap_clear(mem->bitmap, page, count);
+ 		return 1;
+ 	}
+ 	return 0;
+ }
+-EXPORT_SYMBOL(dma_release_from_coherent);
++EXPORT_SYMBOL(dma_release_from_coherent_attr);
+ 
+ /**
+  * dma_mmap_from_coherent() - try to mmap the memory allocated from
+diff --git a/include/asm-generic/dma-coherent.h b/include/asm-generic/dma-coherent.h
+index 2be8a2d..55e49bd 100644
+--- a/include/asm-generic/dma-coherent.h
++++ b/include/asm-generic/dma-coherent.h
+@@ -6,9 +6,16 @@
+  * These three functions are only for dma allocator.
+  * Don't use them in device drivers.
+  */
+-int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+-				       dma_addr_t *dma_handle, void **ret);
+-int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
++int dma_alloc_from_coherent_attr(struct device *dev, ssize_t size,
++				       dma_addr_t *dma_handle, void **ret,
++				       struct dma_attrs *attrs);
++int dma_release_from_coherent_attr(struct device *dev, size_t size, void *vaddr,
++				       struct dma_attrs *attrs);
++#define dma_alloc_from_coherent(d, s, h, r) \
++	dma_alloc_from_coherent_attr(d, s, h, r, NULL)
++
++#define dma_release_from_coherent(d, s, v) \
++	dma_release_from_coherent_attr(d, s, v, NULL)
+ 
+ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ 			    void *cpu_addr, size_t size, int *ret);
+@@ -27,6 +34,8 @@ extern void *
+ dma_mark_declared_memory_occupied(struct device *dev,
+ 				  dma_addr_t device_addr, size_t size);
+ #else
++#define dma_alloc_from_coherent_attr(dev, size, handle, ret, attr) (0)
++#define dma_release_from_coherent_attr(dev, size, vaddr, attr) (0)
+ #define dma_alloc_from_coherent(dev, size, handle, ret) (0)
+ #define dma_release_from_coherent(dev, order, vaddr) (0)
+ #define dma_mmap_from_coherent(dev, vma, vaddr, order, ret) (0)
+diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
+index c8e1831..d23f28f 100644
+--- a/include/linux/dma-attrs.h
++++ b/include/linux/dma-attrs.h
+@@ -18,6 +18,7 @@ enum dma_attr {
+ 	DMA_ATTR_NO_KERNEL_MAPPING,
+ 	DMA_ATTR_SKIP_CPU_SYNC,
+ 	DMA_ATTR_FORCE_CONTIGUOUS,
++	DMA_ATTR_ALLOC_EXACT_SIZE,
+ 	DMA_ATTR_MAX,
+ };
+ 
+-- 
+1.8.1.5
