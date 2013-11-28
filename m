@@ -1,41 +1,42 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 16:36:36 +0900
-Subject: [PATCH 02/15] input: sh_keysc: Restrict non-COMPILE_TEST
- compilation
-In-Reply-To: <1385515117-23664-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Thu, 28 Nov 2013 16:36:51 +0900
+Subject: [PATCH 04/15] iommu: shmobile: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <1385515117-23664-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131128073636.GD24146@verge.net.au>
+ <1385515117-23664-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131128073651.GE24146@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 02:18:24AM +0100, Laurent Pinchart wrote:
-> Hardware supported by the driver is only found on SUPERH or
-> ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
+On Wed, Nov 27, 2013 at 02:18:26AM +0100, Laurent Pinchart wrote:
+> This helps increasing build testing coverage.
 > 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-input at vger.kernel.org
+> The driver doesn't compile on non-ARM platforms due to usage of the ARM
+> DMA IOMMU API, restrict compilation to ARM.
+> 
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: iommu at lists.linux-foundation.org
 > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
 Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
 > ---
->  drivers/input/keyboard/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/iommu/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index bb174c1..a673c9f 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -525,7 +525,7 @@ config KEYBOARD_SUNKBD
->  
->  config KEYBOARD_SH_KEYSC
->  	tristate "SuperH KEYSC keypad support"
-> -	depends on SUPERH || ARM || COMPILE_TEST
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
->  	help
->  	  Say Y here if you want to use a keypad attached to the KEYSC block
->  	  on SuperH processors such as sh7722 and sh7343.
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 3e7fdbb..79bbc21 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -207,6 +207,7 @@ config SHMOBILE_IOMMU
+>  	bool "IOMMU for Renesas IPMMU/IPMMUI"
+>  	default n
+>  	depends on ARM
+> +	depends on SH_MOBILE || COMPILE_TEST
+>  	select IOMMU_API
+>  	select ARM_DMA_USE_IOMMU
+>  	select SHMOBILE_IPMMU
 > -- 
 > 1.8.3.2
 > 
