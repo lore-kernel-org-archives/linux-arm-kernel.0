@@ -1,78 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 28 Nov 2013 18:56:10 +0100
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <006301ceebfd$8d4ba040$a7e2e0c0$%han@samsung.com>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <201311270944.09383.marex@denx.de>
- <006301ceebfd$8d4ba040$a7e2e0c0$%han@samsung.com>
-Message-ID: <201311281856.10139.marex@denx.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 28 Nov 2013 22:13:06 +0400
+Subject: [PATCH 03/04] ARM: shmobile: Genmai I2C-over-GPIO support
+In-Reply-To: <4401360.Outsal0mcb@avalon>
+References: <20131127082736.20015.21303.sendpatchset@w520>
+ <20131127110413.GA2603@katana> <52977954.20006@cogentembedded.com>
+ <4401360.Outsal0mcb@avalon>
+Message-ID: <529787B2.7010208@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jingoo Han,
+Hello.
 
-> On Wednesday, November 27, 2013 5:44 PM, Marek Vasut wrote:
-> > Wednesday, November 27, 2013 1:30 PM, Pratyush Anand wrote:
-> > > On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
-> > > > From: Tim Harvey <tharvey@gateworks.com>
-> > > > 
-> > > > The IMX6 iATU is used for address translation between the AXI bus
-> > > > address space and PCI address space.  This is used for type0 and
-> > > > type1 config cycles but is not necessary for outbound io/mem
-> > > > regions.
-> > > > 
-> > > > This patch removes the calls that inappropriately re-configures the
-> > > > ATU viewport for outbound memory and IO after config cycles and
-> > > > removes them altogether as they are not necessary.
-> > > 
-> > > Yes, they are not necessary for all the cases where translation is one
-> > > to one. So so for sure all the platform till now introduced should
-> > > work.
-> > > But, what about a platform where memory translation is not one to one?
-> > > 
-> > > Existing code should work with all sort of memory translation on a
-> > > platform having atleast two viewports capable of programming any type
-> > > of outbound transaction.
-> > 
-> > Full ACK, that's why it's called RFC.
-> > 
-> > > > This resolves issues with PCI devices behind switches and has been
-> > > > tested with a Gige device behind a PLX PEX860x switch.  More testing
-> > > > is needed for other configurations.
-> > > 
-> > > I do not understand if MX6 has 4 Outbound Viewport then how this patch
-> > > helps?
-> > > -- PCI devices behind switches would not have been working because
-> > > CFG1 transaction would not have been correct.
-> > > -- It works with this patch. This patch changes viewport for CFG1 from
-> > > 1 to 0.
-> > > -- Can it be possible that MX6 has some restriction on viewport
-> > > programming capability. I mean,like only viewport0 can be programmed
-> > > for CFG0/1?
-> > 
-> > Tim ?
-> > 
-> > Here is the MX6 datasheet [1], the section 48.3.9.1.1 and 48.3.9.1.2
-> > describe the iATU configuration on MX6. My understanding from this
-> > description is that the MX6 has 4 inbound and 4 outbound iATU regions.
-> > Am I wrong ?
-> 
-> The numbers of inbound and outbound are hardware-configurable features.
-> Thus, these numbers  can be confirmed by Freescale  hardware engineers.
-> How about asking Freescale hardware engineers, if possible?
+On 28-11-2013 21:14, Laurent Pinchart wrote:
 
-Richard is on the CC. Richard, can you please confirm those?
+>>>> +		#address-cells = <1>;
+>>>> +		#size-cells = <0>;
+>>>> +
+>>>> +		eeprom: 24c128 at 50 {
+>>>> +			compatible = "at,24c128";
 
-Thanks!
+>>> Minor nit: Should be a vendor name, not the name of the driver
 
-> Best regards,
-> Jingoo Han
-> 
-> > [1] http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf
-> > 
-> > > Otherwise I do not find any convincing reason that why this patch
-> > > helps in resolving issues with PCI devices behind switches.
+>> Moreover, the node should be named generically, like "flash at 50", not
+>> "24c128 at 50".
 
-Best regards,
-Marek Vasut
+> Or, given that it's an eeprom, "eeprom at 50" ? :-)
+
+    At least ePAPR spec. only has "flash".
+
+WBR, Sergei
