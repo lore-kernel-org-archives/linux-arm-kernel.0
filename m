@@ -1,37 +1,87 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Nov 2013 09:30:34 +0100
-Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
-In-Reply-To: <20131127185448.GA21422@localhost>
-References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
- <20131126183559.GA18570@localhost>
- <CAAYSxhqU9GZdaoTjoCAeyQ4h-KPVzU0BH0D1eLYJoFZ+s8tPgQ@mail.gmail.com>
- <20131127185448.GA21422@localhost>
-Message-ID: <20131128093034.5d61130a@skate>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 28 Nov 2013 09:30:26 +0100
+Subject: [PATCH 2/3] regulator: tps6586x: add voltage table for tps658643
+In-Reply-To: <93a0f4b1da2a54e58cee0756ab5f3e36@agner.ch>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <8be2fe8560cc19f03d5be40ad3dc21d5979c8358.1385508112.git.stefan@agner.ch>
+ <5296273C.1000705@wwwdotorg.org>
+ <93a0f4b1da2a54e58cee0756ab5f3e36@agner.ch>
+Message-ID: <20131128083025.GB26502@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
-
-On Wed, 27 Nov 2013 15:54:49 -0300, Ezequiel Garcia wrote:
-
-> > An external device may be keeping the UART busy and preventing LCR
-> > from being written.
+On Wed, Nov 27, 2013 at 10:56:10PM +0100, Stefan Agner wrote:
+> Am 2013-11-27 18:09, schrieb Stephen Warren:
+> > On 11/26/2013 04:45 PM, Stefan Agner wrote:
+> >> Depending on version, the voltage table might be different. Add version
+> >> compatibility to the regulator information in order to select correct
+> >> voltage table.
 > > 
-> > What device is attached to ttyS1?
+> >> diff --git a/drivers/regulator/tps6586x-regulator.c b/drivers/regulator/tps6586x-regulator.c
+> > 
+> >> -static const unsigned int tps6586x_ldo4_voltages[] = {
+> >> +static const unsigned int tps6586x_ldo4_sm2_voltages[] = {
+> > 
+> >> +static const unsigned int tps658643_sm2_voltages[] = {
+> > 
+> > What's the logic behind the "ldo4_sm2" v.s. "sm2" naming? Does it match
+> > the data sheet in some way? If not, it might be better to name this
+> > something like "tps6586x_ldo4_voltages" and "tps65863_ldo4_voltages".
+> > 
 > 
-> There's no device attached at ttyS1. I've just tested this in another
-> box and it seems the same error is obtained on each unused port:
+> This table is used for the TPS6586X (e.g. TPS658621A/D, maybe others)
+> variant for the LDO_4 regulator. The same table applies for TPS658623
+> for the SM2 regulator as well, so this naming should reflect that fact.
+> 
+> I could be some more verbose, e.g. tps6586x_ldo4_tps658623_sm2_voltages.
+> The other solution would be to create two independent (but identically)
+> voltage tables, but takes up more space...
 
-Are you sure about this? I suppose you're testing on the Armada XP GP
-board, and this board has a 4 ports FTDI chip, and according to the
-board schematics the four UARTs are all connected to the FTDI chip. So
-from the SoC perspective, ttyS1 is connected to something, as far as I
-can understand. Or maybe you also tested Armada XP DB ?
+If you only want that name for clarity, perhaps you could just add a
+#define instead of duplicating the whole array. That way you'll be able
+to reference the same array by a different name (for clarity).
 
-Best regards,
+> >> +/* Add version specific entries before any */
+> >>  static struct tps6586x_regulator tps6586x_regulator[] = {
+> >>  	TPS6586X_SYS_REGULATOR(),
+> >> -	TPS6586X_LDO(LDO_0, "vinldo01", ldo0, SUPPLYV1, 5, 3, ENC, 0, END, 0),
+> > ...
+> >> +	TPS6586X_LDO(TPS6586X_ANY, LDO_0, "vinldo01", tps6586x_ldo0, SUPPLYV1,
+> >> +			5, 3, ENC, 0, END, 0),
+> > 
+> > Rather than changing all the macros and table entries, wouldn't it be
+> > much simpler to:
+> > 
+> > 1) Make tps6586x_regulator[] only contain all the common regulator
+> > definitions.
+> > 
+> > 2) Add new version-specific tables for each version of regulator, so
+> > tps6586x_other_regulator[] and tps65863_regulator[].
+> > 
+> > 3) Have probe() walk multiple tables of regulators, selecting which
+> > tables to walk based on version.
+> > 
+> > That would result in a much smaller and less invasive diff.
+> 
+> Hm, sounds easier yes. Would also remove the need for correct ordering,
+> which is a bit ugly. I will try that, lets see how this works out.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I was going to propose something similar, good that I read the whole
+thread at first. My idea would have been to duplicate some of the tables
+for simplicity and just have a tps6586x_regulator[] array with all those
+that use the "default" set of regulators and separate tables for each
+variant. That's obviously suboptimal because it wastes some space, but
+it keeps the code simpler, since you'll just have to select a single
+array and register that.
+
+What Stephen proposes isn't really all that complex, though, so I'd
+prefer that.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131128/4f12358b/attachment.sig>
