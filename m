@@ -1,61 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 28 Nov 2013 11:52:18 +0200
-Subject: [PATCH] ARM: DTS: omap4-sdp: Add regulator for LCD backlight
- (pwm-backlight)
-In-Reply-To: <52970E4C.8070502@baylibre.com>
-References: <1385630924-16392-1-git-send-email-peter.ujfalusi@ti.com>
- <52970E4C.8070502@baylibre.com>
-Message-ID: <52971252.40909@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 28 Nov 2013 10:49:56 +0100
+Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
+In-Reply-To: <5296281C.1060403@wwwdotorg.org>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
+ <5296281C.1060403@wwwdotorg.org>
+Message-ID: <1385632196.5838.4.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Am Mittwoch, den 27.11.2013, 10:13 -0700 schrieb Stephen Warren:
+> On 11/26/2013 04:45 PM, Stefan Agner wrote:
+> > Set the requested SM2 voltage to the correct value of 1.8V. The value
+> > before used to work on TPS658623 since the driver applied a wrong
+> > voltage table too. However, the TPS658643 used on newer devices uses
+> > yet another voltage table and those broke that compatibility. The
+> > regulator driver now has the correct voltage table for both regulator
+> > versions and those the correct voltage can be used in this device
+> > tree.
+> 
+> One thing you haven't called out explicitly here is that this series is
+> an incompatible change to the DT, since the old buggy driver used to
+> allow old buggy DT content to accidentally work.
+> 
+The current (wrong and potentially dangerous) DT content only worked on
+the engineering sample models. So this change definitely does improve
+the situation, even with the risk of breaking a small fraction of
+working boards.
 
-On 11/28/2013 11:35 AM, Benoit Cousson wrote:
-> Hi Peter,
+> I'm not too familiar with who's using mainline on the Colibri boards.
+> Hopefully everyone doing that is using in-kernel DTs, so this
+> incompatible change won't be any issue for anyone.
 > 
-> On 28/11/2013 10:28, Peter Ujfalusi wrote:
->> Since in DT booted kernel dummy regulators are no longer supported we need
->> to provide valid phandle for the regulator needed by the backlight.
->> On the board VBAT is used to power the LCD backlight(s).
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->> Hi,
->>
->> This patch is needed for 3.13 to get the LCD backlight to work again.
-> 
-> OK, so this is a fix for the next -rc?
+I know of some parties using mainline, but I think everyone so far is
+able to use DTs bundled with the kernel.
 
-Yes, it would be really great if this can make it to the next -rc.
-
-> 
-> Regards,
-> Benoit
-> 
->>
->> Regards,
->> Peter
->>
->>   arch/arm/boot/dts/omap4-sdp.dts | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
->> index 5fc3f43..6f86db2 100644
->> --- a/arch/arm/boot/dts/omap4-sdp.dts
->> +++ b/arch/arm/boot/dts/omap4-sdp.dts
->> @@ -104,6 +104,7 @@
->>                   100 110 120 127
->>                   >;
->>           default-brightness-level = <13>;
->> +        power-supply = <&vbat>;
->>       };
->>
->>       sound {
->>
-> 
-> 
-
-
+Regards,
+Lucas
 -- 
-P?ter
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
