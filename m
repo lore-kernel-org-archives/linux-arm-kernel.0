@@ -1,56 +1,45 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 28 Nov 2013 09:20:16 +0800
-Subject: [PATCH 1/2] ASoC: atmel: sam9x5_wm8731: fix oops when unload
- module
-In-Reply-To: <5295C4CB.2060003@gmail.com>
-References: <1385439472-23352-1-git-send-email-voice.shen@atmel.com>
- <CACQ1gAh3W3vyTpFv8CkbO8hFJtU_SDjVuh2pRSFWCbUZPmidsw@mail.gmail.com>
- <52954739.1090501@atmel.com> <5295C4CB.2060003@gmail.com>
-Message-ID: <52969A50.3030601@atmel.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Thu, 28 Nov 2013 09:07:11 +0800
+Subject: [PATCH v4] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <CAA9_cmd6crfVdeLQhnfWLcJViAwHG=c3V5SDgu9teEd3pfch7A@mail.gmail.com>
+References: <1377570010-21870-1-git-send-email-zhangfei.gao@linaro.org>	<1377570010-21870-2-git-send-email-zhangfei.gao@linaro.org>
+ <CAA9_cmd6crfVdeLQhnfWLcJViAwHG=c3V5SDgu9teEd3pfch7A@mail.gmail.com>
+Message-ID: <5296973F.3070009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
 
-On 11/27/2013 06:09 PM, Richard Genoud wrote:
+Dear Dan
 
-[Snip]
+On 11/28/2013 06:35 AM, Dan Williams wrote:
+> On Mon, Aug 26, 2013 at 7:20 PM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
+>> Add dmaengine driver for hisilicon k3 platform based on virt_dma
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Tested-by: Kai Yang <jean.yangkai@huawei.com>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
 
-> dma dma0chan4: prep_dma_cyclic: TO DEVICE buf at 0x27950000 - 8 (65536/8192)
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: scanned 1 descriptors on freelist
-> dma dma0chan4: tx_submit: started 2
-> dma dma0chan4:   channel 4 : imr = 0xff00ff, chsr = 0xff0000
-> dma dma0chan4:   channel: s0x27b3eb20 d0xf0010024 ctrl0x91000590:0x20200010 cfg0x100022dd l0x27981d10
-> dma dma0chan4:   channel 4 : imr = 0xff00ff, chsr = 0xff0010
-> dma dma0chan4:   channel: s0x27950010 d0xf0010024 ctrl0x11000008:0x20200010 cfg0x100022dd l0x27a58344
-> dma dma0chan4: issue_pending
-> [ blocks here forever (or at least a looooong time) ]
+>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>> index 6825957..2945ff0 100644
+>> --- a/drivers/dma/Kconfig
+>> +++ b/drivers/dma/Kconfig
+>> @@ -300,6 +300,15 @@ config DMA_JZ4740
+>>          select DMA_ENGINE
+>>          select DMA_VIRTUAL_CHANNELS
+>>
+>> +config K3_DMA
+>> +       tristate "Hisilicon K3 DMA support"
+>> +       depends on ARCH_HI3xxx
+>
+> Unless I am missing something this driver cannot be built since
+> ARCH_HI3xxx does not exist.  Is this arch still winding its way
+> upstream?
+>
 
-How can I reproduce this issue? Please help provide detail information 
-about your operation.
+The patch set "enable hi3xxx SoC" still on the way, suppose to be in 
+3.13, including adding ARCH_HI3xxx.
 
-On my side, I just do:
---->8---
-while true;
-do
-	insmod snd-soc-atmel-pcm-dma.ko && insmod snd-soc-atmel_ssc_dai.ko && 
-insmod snd-soc-wm8731.ko && insmod snd-soc-sam9x5-wm8731.ko;
-	amixer cset numid=14,iface=MIXER,name='Output Mixer HiFi Playback 
-Switch' on;
-	aplay sample.wav;
-	rmmod snd-soc-sam9x5-wm8731.ko && rmmod snd-soc-wm8731.ko && rmmod 
-snd-soc-atmel_ssc_dai.ko && rmmod snd-soc-atmel-pcm-dma.ko;
-done
----8<---
+Sorry for the confusion.
 
-It works well on my side on at91sam9g35ek board, based on v3.13-rc1
-
-Best Regards,
-Bo Shen
+Thanks
