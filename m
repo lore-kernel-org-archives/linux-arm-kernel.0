@@ -1,43 +1,263 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 11:41:47 +0900
-Subject: [PATCH RFC v2 15/17] ARM: shmobile: Remove non-multiplatform
- Marzen reference support
-In-Reply-To: <CANqRtoSNDC7+qnu5Nf-UTHXNDf680o8Ex9_XQJWAUqVfjKbi0g@mail.gmail.com>
-References: <1385451139-29686-1-git-send-email-horms+renesas@verge.net.au>
- <1385451139-29686-16-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoSNDC7+qnu5Nf-UTHXNDf680o8Ex9_XQJWAUqVfjKbi0g@mail.gmail.com>
-Message-ID: <20131128024146.GF22413@verge.net.au>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 27 Nov 2013 21:44:38 -0500
+Subject: [PATCH 3/4] arm: add early_ioremap support
+In-Reply-To: <1385606679-30446-1-git-send-email-msalter@redhat.com>
+References: <1385606679-30446-1-git-send-email-msalter@redhat.com>
+Message-ID: <1385606679-30446-4-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 05:51:16PM +0900, Magnus Damm wrote:
-> On Tue, Nov 26, 2013 at 4:32 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Now that r8a7779 has CCF support remove the legacy Marzen reference
-> > Kconfig bits CONFIG_MACH_MARZEN_REFERENCE for the non-multiplatform
-> > case.
-> >
-> > Starting from this commit Marzen board support is always enabled via
-> > CONFIG_MACH_MARZEN, and CONFIG_ARCH_MULTIPLATFORM is used to select
-> > between board-marzen.c and board-marzen-reference.c
-> >
-> > The file board-marzen-reference.c can no longer be used together with
-> > the legacy sh-clk clock framework, instead CCF is used.
-> >
-> > Based on work for the Koelsch board by Laurent Pinchart.
-> >
-> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > ---
-> > v2
-> > * Correct changelog to refer to marzen instead of koelsch
-> > * Do not add typo to Makefile
-> 
-> I think we need to discuss _when_ to do this in more detail. I know
-> this follows the same style as Laurent's patches, but I don't think
-> we're ready to flip the switch yet. I propose that we let DT reference
-> coexist with multiplatform and non-multiplatform cases for a while to
-> make testing easier and give time to migrate.
+This patch uses the generic early_ioremap code to implement
+early_ioremap for ARM. The ARM-specific bits come mostly from
+an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
+here:
 
-Yes, I agree this needs to be discussed.
+  https://lkml.org/lkml/2013/10/3/279
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/Kconfig              | 11 +++++
+ arch/arm/include/asm/Kbuild   |  1 +
+ arch/arm/include/asm/fixmap.h | 18 +++++++++
+ arch/arm/include/asm/io.h     |  1 +
+ arch/arm/kernel/setup.c       |  3 ++
+ arch/arm/mm/Makefile          |  1 +
+ arch/arm/mm/early_ioremap.c   | 93 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/mmu.c             |  2 +
+ 8 files changed, 130 insertions(+)
+ create mode 100644 arch/arm/mm/early_ioremap.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7e..78a79a6a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1842,6 +1842,17 @@ config UACCESS_WITH_MEMCPY
+ 	  However, if the CPU data cache is using a write-allocate mode,
+ 	  this option is unlikely to provide any performance gain.
+ 
++config EARLY_IOREMAP
++	depends on MMU
++	bool "Provide early_ioremap() support for kernel initialization."
++	select GENERIC_EARLY_IOREMAP
++	help
++	  Provide a mechanism for kernel initialisation code to temporarily
++	  map, in a highmem-agnostic way, memory pages in before ioremap()
++	  and friends are available (before paging_init() has run). It uses
++	  the same virtual memory range as kmap so all early mappings must
++	  be unapped before paging_init() is called.
++
+ config SECCOMP
+ 	bool
+ 	prompt "Enable seccomp to safely compute untrusted bytecode"
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index c38b58c..49ec506 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -4,6 +4,7 @@ generic-y += auxvec.h
+ generic-y += bitsperlong.h
+ generic-y += cputime.h
+ generic-y += current.h
++generic-y += early_ioremap.h
+ generic-y += emergency-restart.h
+ generic-y += errno.h
+ generic-y += exec.h
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 68ea615..e92b7a4 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -21,8 +21,26 @@ enum fixed_addresses {
+ 	FIX_KMAP_BEGIN,
+ 	FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
+ 	__end_of_fixed_addresses
++/*
++ * 224 temporary boot-time mappings, used by early_ioremap(),
++ * before ioremap() is functional.
++ *
++ * (P)re-using the FIXADDR region, which is used for highmem
++ * later on, and statically aligned to 1MB.
++ */
++#define NR_FIX_BTMAPS		32
++#define FIX_BTMAPS_SLOTS	7
++#define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
++#define FIX_BTMAP_END		FIX_KMAP_BEGIN
++#define FIX_BTMAP_BEGIN		(FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1)
+ };
+ 
++#define FIXMAP_PAGE_NORMAL (L_PTE_MT_WRITEBACK | L_PTE_YOUNG | L_PTE_PRESENT)
++#define FIXMAP_PAGE_IO (L_PTE_MT_DEV_NONSHARED | L_PTE_YOUNG | L_PTE_PRESENT)
++
++extern void __early_set_fixmap(enum fixed_addresses idx,
++			       phys_addr_t phys, pgprot_t flags);
++
+ #include <asm-generic/fixmap.h>
+ 
+ #endif
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 3c597c2..131e0ba 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -28,6 +28,7 @@
+ #include <asm/byteorder.h>
+ #include <asm/memory.h>
+ #include <asm-generic/pci_iomap.h>
++#include <asm/early_ioremap.h>
+ #include <xen/xen.h>
+ 
+ /*
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6a1b8a8..04c1757 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -36,6 +36,7 @@
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
++#include <asm/io.h>
+ #include <asm/procinfo.h>
+ #include <asm/psci.h>
+ #include <asm/sections.h>
+@@ -889,6 +890,8 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	parse_early_param();
+ 
++	early_ioremap_init();
++
+ 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
+ 
+ 	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index ecfe6e5..fea855e 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -15,6 +15,7 @@ endif
+ obj-$(CONFIG_MODULES)		+= proc-syms.o
+ 
+ obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
++obj-$(CONFIG_EARLY_IOREMAP)	+= early_ioremap.o
+ obj-$(CONFIG_HIGHMEM)		+= highmem.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+ 
+diff --git a/arch/arm/mm/early_ioremap.c b/arch/arm/mm/early_ioremap.c
+new file mode 100644
+index 0000000..c3e2bf2
+--- /dev/null
++++ b/arch/arm/mm/early_ioremap.c
+@@ -0,0 +1,93 @@
++/*
++ * early_ioremap() support for ARM
++ *
++ * Based on existing support in arch/x86/mm/ioremap.c
++ *
++ * Restrictions: currently only functional before paging_init()
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++
++#include <asm/fixmap.h>
++#include <asm/pgalloc.h>
++#include <asm/pgtable.h>
++#include <asm/tlbflush.h>
++
++#include <asm/mach/map.h>
++
++static pte_t bm_pte[PTRS_PER_PTE] __aligned(PTE_HWTABLE_SIZE) __initdata;
++
++static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
++{
++	unsigned int index = pgd_index(addr);
++	pgd_t *pgd = cpu_get_pgd() + index;
++	pud_t *pud = pud_offset(pgd, addr);
++	pmd_t *pmd = pmd_offset(pud, addr);
++
++	return pmd;
++}
++
++static inline pte_t * __init early_ioremap_pte(unsigned long addr)
++{
++	return &bm_pte[pte_index(addr)];
++}
++
++void __init early_ioremap_init(void)
++{
++	pmd_t *pmd;
++
++	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
++
++	pmd_populate_kernel(NULL, pmd, bm_pte);
++
++	/*
++	 * Make sure we don't span multiple pmds.
++	 */
++	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
++		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
++
++	if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
++		WARN_ON(1);
++		pr_warn("pmd %p != %p\n",
++			pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
++		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
++			fix_to_virt(FIX_BTMAP_BEGIN));
++		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
++			fix_to_virt(FIX_BTMAP_END));
++		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
++		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
++	}
++
++	early_ioremap_setup();
++}
++
++void __init __early_set_fixmap(enum fixed_addresses idx,
++			       phys_addr_t phys, pgprot_t flags)
++{
++	unsigned long addr = __fix_to_virt(idx);
++	pte_t *pte;
++	u64 desc;
++
++	if (idx > FIX_KMAP_END) {
++		BUG();
++		return;
++	}
++	pte = early_ioremap_pte(addr);
++
++	if (pgprot_val(flags))
++		set_pte_at(NULL, 0xfff00000, pte,
++			   pfn_pte(phys >> PAGE_SHIFT, flags));
++	else
++		pte_clear(NULL, addr, pte);
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
++	desc = *pte;
++}
++
++void __init
++early_ioremap_shutdown(void)
++{
++	pmd_t *pmd;
++	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
++	pmd_clear(pmd);
++}
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 580ef2d..bef59b9 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -34,6 +34,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/pci.h>
++#include <asm/early_ioremap.h>
+ 
+ #include "mm.h"
+ #include "tcm.h"
+@@ -1405,6 +1406,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ {
+ 	void *zero_page;
+ 
++	early_ioremap_reset();
+ 	build_mem_type_table();
+ 	prepare_page_table();
+ 	map_lowmem();
+-- 
+1.8.3.1
