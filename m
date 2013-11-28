@@ -1,36 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 17:24:41 +0900
-Subject: [PATCH] ARM: Kconfig: Mention R-Mobile and R-Car in addition to
- SH-Mobile
-In-Reply-To: <276890521.bvcs6YPeDX@avalon>
-References: <1384351179-4593-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CANqRtoTXdcjoTVDShoA_071YoNznx88YgLTumdYTviLBaK76=g@mail.gmail.com>
- <276890521.bvcs6YPeDX@avalon>
-Message-ID: <20131128082440.GV24146@verge.net.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 28 Nov 2013 09:24:49 +0100
+Subject: [PATCH] clocksource: armada-370-xp: Register sched_clock after
+ the counter reset
+In-Reply-To: <1385500814-15058-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1385500814-15058-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5296FDD1.2090708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 03:46:07PM +0100, Laurent Pinchart wrote:
-> Hi Magnus,
-> 
-> On Thursday 14 November 2013 19:07:12 Magnus Damm wrote:
-> > On Wed, Nov 13, 2013 at 10:59 PM, Laurent Pinchart wrote:
-> > > External engineers working on R-Car platforms sometimes can't find
-> > > upstream platform support as the combination of the SH-Mobile name and
-> > > using the product number proved an effective method of concealment. Make
-> > > sure to mention R-Mobile and R-Car in the Kconfig comments and help
-> > > texts.
-> > > 
-> > > Reported-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > Thanks for your efforts on this. I think this is a good idea, but to
-> > make things a bit more complex I think you should know that r7s72100
-> > is part of the "RZ Family". Also EMEV2 is part of the "Emma" series.
-> > 
-> > May I propose "Renesas SoC" as a generic description?
-> 
-> What about "Renesas ARM SoC" ?
+On 11/26/2013 10:20 PM, Ezequiel Garcia wrote:
+> This commit registers the sched_clock _after_ the counter reset
+> (instead of before). This removes the timestamp 'jump' in kernel
+> log messages.
+>
+> Before this change:
+>
+> [    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
+> [    0.000000] Initializing Coherency fabric
+> [    0.000000] Aurora cache controller enabled
+> [    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
+> [  163.507447] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
+> [  163.521419] pid_max: default: 32768 minimum: 301
+> [  163.526185] Mount-cache hash table entries: 512
+> [  163.531095] CPU: Testing write buffer coherency: ok
+>
+> After this change:
+>
+> [    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
+> [    0.000000] Initializing Coherency fabric
+> [    0.000000] Aurora cache controller enabled
+> [    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
+> [    0.016849] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
+> [    0.030820] pid_max: default: 32768 minimum: 301
+> [    0.035588] Mount-cache hash table entries: 512
+> [    0.040500] CPU: Testing write buffer coherency: ok
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
 
-Sounds good to me.
+Applied to my tree for 3.13 fixes.
+
+Thanks !
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
