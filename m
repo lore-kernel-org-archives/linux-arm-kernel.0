@@ -1,100 +1,123 @@
-From: hrhaan@gmail.com (Harro Haan)
-Date: Thu, 28 Nov 2013 18:20:10 +0100
-Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <201311272006.41202.marex@denx.de>
-References: <0E83723C55F66F43A6041464FE31119D40FC99@039-SN2MPN1-011.039d.mgd.msft.net>
- <20131126072557.GA6113@S2101-09.ap.freescale.net>
- <CAB5oZtDD_KV+QJPUiCxU3on_x5pFd=rZOK0fzYb+meojCJisiA@mail.gmail.com>
- <201311272006.41202.marex@denx.de>
-Message-ID: <CAB5oZtDKA2-GhSUFWab4VSdvFwWxpALpQiDA6sUMsMfW2B7VNg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 28 Nov 2013 17:33:39 +0000
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131128102845.GB21354@mudshark.cambridge.arm.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131127230650.GA6162@kroah.com>
+ <20131128102845.GB21354@mudshark.cambridge.arm.com>
+Message-ID: <20131128173339.GB4634@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2013 20:06, Marek Vasut <marex@denx.de> wrote:
-> Hey Harro,
->
->> On 26 November 2013 08:26, Shawn Guo <shawn.guo@linaro.org> wrote:
->> > On Tue, Nov 26, 2013 at 06:04:16AM +0000, Richard Zhu wrote:
->> >> [Richard] Based on the tag " pci-v3.13-fixes-1" on pci git-repos, imx6
->> >> pcie had been tested on imx6 sabresd board.
->> >>
->> >> The pcie works after enable pcie support in imx6qdl-sabresd.dtsi file.
->> >
->> > Great, thanks, Richard.
->> >
->> > Shawn
->>
->> Thanks Richard,
->>
->> TC1: The following does NOT work with the mainline Linux tree on my
->> SabreSD with PCIe e1000e network card:
->> $ git reset --hard v3.13-rc1
->> $ git apply enable_pcie_on_imx6qdl_sabresd_board.patch # patch
->> supplied by Richard Zhu
->> result: "phy link never came up"
->>
->> TC2: But the following does work with the mainline Linux tree:
->> $ git reset --hard d95d3d53c7ef85ec0dc87db63aece18212c337b0 # HEAD is
->> now at d95d3d5 Merge branch 'pci/host-imx6' into next (just a few
->> commits after v3.12-rc2)
->> $ git cherry-pick 1c4bfb9bd842f09318bc2fa37c1ee0d68bb4e8cb # [master
->> f283273] PCI: imx6: Remove redundant dev_err() in imx6_pcie_probe()
->> $ git cherry-pick 01ee0c70b5b935135dbe7fbf48115d9f16348474 # [master
->> 5c93c84] PCI: imx6: Fix imprecise abort handler
->> $ git cherry-pick 5dcb7c402409f4b1ecb279d5e846bdb1dff9bbe0 # [master
->> c3cc5c5] PCI: imx6: Increase link startup timeout
->> $ git cherry-pick 832f3ca20743911508e0cc1909415080a3128532 # [master
->> b4a81be] PCI: imx6: Remove redundant of_match_ptr
->> $ git cherry-pick ca6457dc1fbcc1f5ed1f8311e7fcf7ff129cda55 # [master
->> 45aa4ab] PCI: imx6: Probe the PCIe in fs_initcall()
->> $ git cherry-pick 212555bde33eeae0bec16d41bd4045fbebc0cfab # [master
->> 4db342b] ARM: dts: imx6qdl: add pcie device node
->> $ git cherry-pick 64990a431469a58b2949aca5be9d69e220d53892 # [master
->> 7c29353] ARM: imx6q: Add pll4_audio_div to clock tree
->> $ git cherry-pick bf22172158cd6dcc5be6dc286ff5c33794dd0ae8 # [master
->> 5e5852f] ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
->> $ git cherry-pick 74b8031307c5d33d36742c26dd0921991bd5a255 # [master
->> 05ae48c] ARM: imx6q: clock and Kconfig update for PCIe support
->> $ git apply enable_pcie_on_imx6qdl_sabresd_board.patch # patch
->> supplied by Richard Zhu
->> result: lspci detects network card
->>
->> I have also tested both test cases (TC1 + TC2) with the patches
->> supplied by Marek Vasut on 26-11-2013:
->> $ git apply 17_pci_imx6_make_reset-gpio_optional.patch
->> $ git apply 37_pci_imx6_fix_waiting_for_link_up.patch
->> $ git apply 47_pci_imx6_split_away_the_phy_reset.patch
->> $ git apply 57_pci_imx6_split_away_the_link_up_wait_loop.patch
->> $ git apply 67_pci_imx6_fix_link_start_operation.patch
->> same results:
->> TC1: "phy link never came up"
->> TC2: lspci detects network card
->
-> A quick remark: try not to top-post replies in the ML, it's frowned upon.
->
-> btw. with my latest patches, do you see the link in Gen=1 or Gen=2 mode ? You
-> will see a line in dmesg, eventually you can try 'dmesg | grep Gen' to find it.
+[Resending -- apologies for any duplicates received.
 
-For the network card:
-$ dmesg | grep Gen
-imx6q-pcie 1ffc000.pcie: Link up, Gen=1
-$ lspci -vvv | grep "LnkSta:"
-LnkSta: Speed 2.5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive+
-BWMgmt- ABWMgmt-
+Real reply below.
 
-For the Xilinx AC701 board configured with a Gen1 design:
-$ dmesg | grep Gen
-imx6q-pcie 1ffc000.pcie: Link up, Gen=1
-$ lspci -vvv | grep "LnkSta:"
-LnkSta: Speed 2.5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive+
-BWMgmt- ABWMgmt-
+My lame excuse:
 
-For the Xilinx AC701 board configured with a Gen2 design:
-$ dmesg | grep Gen
-imx6q-pcie 1ffc000.pcie: Link up, Gen=2
-$ lspci -vvv | grep "LnkSta:"
-LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive+ BWMgmt- ABWMgmt-
+        It turns out that Mutt's decode-copy command (Esc-C) will lose
+        most headers unless you invoke it from the message viewer *and*
+        you have full header display enabled at the time.  Otherwise, or
+        if invoked from the index, many headers may disappear including
+        headers not filtered by normal header weeding, and everything
+        needed for threading.  copy-message (C) always saves full headers
+        though.  Maybe it's a bug.  Or not.  Go figure.
+       
+        This + my habit of saving messages I want to reply to in a
+        separate mbox + mindlessly using decode-save instead of
+        save-message even when I'm not going to run git am on the result
+        = facepalm.]
 
-Regards,
 
-Harro
+On Thu, Nov 28, 2013 at 10:28:45AM +0000, Will Deacon wrote:
+> Hi Greg,
+> 
+> On Wed, Nov 27, 2013 at 11:06:50PM +0000, Greg KH wrote:
+> > On Wed, Nov 27, 2013 at 05:28:06PM +0000, Dave Martin wrote:
+> > > >From will.deacon at arm.com Wed Nov 20 12:06:22 2013
+> > > A number of discussion points remain to be resolved:
+> > > 
+> > >   - Use of the ranges property and describing slave vs master bus
+> > >     address ranges. In the latter case, we actually want to describe our
+> > >     address space with respect to the bus on which the bus masters,
+> > >     rather than the parent. This could potentially be achieved by adding
+> > >     properties such as dma-parent and dma-ranges (already used by PPC?)
+> > > 
+> > >   - Describing masters that master through multiple different buses
+> > > 
+> > >   - How on Earth this fits in with the Linux device model (it doesn't)
+> > 
+> > How does this _not_ fit into the Linux device model?  What am I missing
+> > here that precludes the use of the "driver/device/bus" model we have
+> > today?
+
+The physical-sockets history of buses like PCI tends to force a simple
+tree-like topology as a natural consequence.  You also end up with
+closely linked topologies for power, clocks, interrupts etc., because
+those all pass through the same sockets, so it's difficult to have a
+different structure.
+
+On SoC, those constraints have never existed and are not followed.  A
+device's interface to the system is almost always split into multiple
+connections, not covered by a single design or standard.  The problem
+now is that increasing complexity means that the sometimes bizarre
+topology features of SoCs are becoming less and less transparent for
+software.
+
+The device model currently seems to assume that certain things (power,
+DMA and MMIO accessibility) follow the tree (which may not work for many
+SoCs), and some other things (clocks, regulators, interrupts etc.) are
+not incorporated at all -- making them independent, but it may make some
+abstractions impossible today.
+
+How much this matters for actual systems is hard to foresee yet.  Since
+not _all_ possible insanities find their way into silicon.  The
+onus should certainly be on us (i.e., the ARM/SoC community) to
+demonstrate if the device model needs to change, and to find practical
+ways to change it that minimise the resulting churn.
+
+> The main problem is that we have devices which slave on one bus and master
+> on another. That then complicates probing, power-management, IOMMU
+> configuration, address mapping (e.g. I walk the slave buses to figure out
+> where the slave registers live, but then I need a way to work out where
+> exactly I master on a different bus) and dynamic coherency, amongst other
+> things.
+> 
+> If we try to use the current infrastructure then we end up with one bus per
+> device, which usually ends up being a fake bus representing both the slave
+> and master buses (which is how the platform bus gets abused) and then device
+> drivers having their own idea of the system topology where it's required.
+> 
+> This is fairly horrible and doesn't work for anything other than the trivial
+> case, where one or both of the buses are `dumb' and don't require any work
+> from Linux.
+
+If we can come up with some generic bus type that is just a container for
+a load of hooks that know how to deal with various aspects of each device's
+interface to the system, on a per-device basis, than may be a start.
+
+The platform bus kinda serves that role, but the trouble with that is that
+it doesn't encourage any abstraction at all.  In the face of increasing
+complexity, abstraction is desperately needed.
+
+
+> > >  .../devicetree/bindings/arm/coherent-bus.txt       | 110 +++++++++++++++++++++
+> > 
+> > Why "arm"?
+> > 
+> > What makes it ARM specific?
+> 
+> This is just an RFC, so I'd be happy to put the binding somewhere more
+> broad. I'm not sure how much of an issue this is outside of the SoC space,
+> though.
+
+I think that the ARM community are the ones who care the most today,
+so are likely to make the most noise about it.
+
+The binding is entirely generic in concept, so we should certainly
+push for it to be non-ARM-specific.  Non-ARM SoCs will likely need
+to solve this problem too at some point.
+
+Cheers
+---Dave
