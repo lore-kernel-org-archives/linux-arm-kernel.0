@@ -1,30 +1,38 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 28 Nov 2013 17:03:27 +0400
-Subject: [PATCH 0/2] pcmcia: small fixes for sa1111 machine code
-In-Reply-To: <1384987684-10692-1-git-send-email-dbaryshkov@gmail.com>
-References: <1384987684-10692-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CALT56yNxSvUTszQP+DrkG-qRZ6S7vMzqgfFqAuKH_TQORNbExA@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 28 Nov 2013 15:10:29 +0200
+Subject: [PATCH] clk: tegra: fix return value check in
+ tegra_clk_register_pllc()
+In-Reply-To: <CAPgLHd-wYa3Z7J93LmC0rvRPKsrjK+8DEZR+2f+e14RN+p_fPg@mail.gmail.com>
+References: <CAPgLHd-wYa3Z7J93LmC0rvRPKsrjK+8DEZR+2f+e14RN+p_fPg@mail.gmail.com>
+Message-ID: <20131128131029.GT26617@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Oct 29, 2013 at 03:07:57AM +0100, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function __clk_lookup() returns NULL pointer
+> not ERR_PTR(). The IS_ERR() test in the return value check should
+> be replaced with NULL test.
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  drivers/clk/tegra/clk-pll.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+> index 197074a..a99bef7 100644
+> --- a/drivers/clk/tegra/clk-pll.c
+> +++ b/drivers/clk/tegra/clk-pll.c
+> @@ -1507,7 +1507,7 @@ struct clk *tegra_clk_register_pllc(const char *name, const char *parent_name,
+>  		return ERR_PTR(-EINVAL);
+>  
+>  	parent = __clk_lookup(parent_name);
+> -	if (IS_ERR(parent)) {
+> +	if (!parent) {
+>  		WARN(1, "parent clk %s of %s must be registered first\n",
+>  			name, parent_name);
+>  		return ERR_PTR(-EINVAL);
+> 
 
-On Thu, Nov 21, 2013 at 2:48 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> Dmitry Eremin-Solenikov (2):
->       pcmcia: sa1111: pass sa1111_dev to badge4-specific code
->       pcmcia: sa1111: pass sa1111_dev to jornada720-specific code
->
->  drivers/pcmcia/sa1111_badge4.c     | 2 +-
->  drivers/pcmcia/sa1111_generic.c    | 4 ++--
->  drivers/pcmcia/sa1111_generic.h    | 4 ++--
->  drivers/pcmcia/sa1111_jornada720.c | 3 ++-
->  4 files changed, 7 insertions(+), 6 deletions(-)
-
-These changes do not cause any functional change, are rather trivial
-and fix few compiler warnings.
-Can we get them in?
-
--- 
-With best wishes
-Dmitry
+Ah :( There are a few more instances of this. I will fix them all.
