@@ -1,33 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 18:08:32 +0900
-Subject: [PATCH 02/16] ARM: shmobile: bockw: enable CONFIG_REGULATOR
+Date: Thu, 28 Nov 2013 18:08:34 +0900
+Subject: [PATCH 04/16] ARM: shmobile: marzen: Do not set command line in
+ defconfig
 In-Reply-To: <cover.1385629477.git.horms+renesas@verge.net.au>
 References: <cover.1385629477.git.horms+renesas@verge.net.au>
-Message-ID: <03248fde88e37b1b043b640b1bae4fb14d4d3f23.1385629477.git.horms+renesas@verge.net.au>
+Message-ID: <7a14b78831d34b63032de1bb4d05221ed20cb0cf.1385629477.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+As a set towards moving shmobile towards multi-platform
+the kernel command line should be set in the DTB rather than
+in the kernel config.
 
-CONFIG_REGULATOR is required from MMCIF and SMSC
+marzen already has the command line present in its DTS file
+but it was being overrirden by the kernel config.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/bockw_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/marzen_defconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index b38cd10..6583683 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -82,6 +82,7 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HWMON is not set
- CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
-+CONFIG_REGULATOR=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 5cc6360..103b875 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -30,8 +30,6 @@ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_CMDLINE="console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on"
+-CONFIG_CMDLINE_FORCE=y
+ CONFIG_KEXEC=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_PM_RUNTIME=y
 -- 
 1.8.4
