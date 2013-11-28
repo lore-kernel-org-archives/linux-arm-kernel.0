@@ -1,44 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 11:22:41 +0900
-Subject: [PATCH] ARM: shmobile: lager: Constify lager_boards_compat_dt
-In-Reply-To: <528F5EC9.9000203@cogentembedded.com>
-References: <1385082175-30521-1-git-send-email-horms+renesas@verge.net.au>
- <528F5EC9.9000203@cogentembedded.com>
-Message-ID: <20131128022241.GC22413@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Nov 2013 10:28:09 +0800
+Subject: [PATCH v2 2/2] usb: chipidea: usbmisc: Add support for i.MX51 CPU
+In-Reply-To: <1385480210-9349-2-git-send-email-shc_work@mail.ru>
+References: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
+ <1385480210-9349-2-git-send-email-shc_work@mail.ru>
+Message-ID: <20131128022807.GC5850@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 22, 2013 at 05:40:25PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Tue, Nov 26, 2013 at 07:36:50PM +0400, Alexander Shiyan wrote:
+> This adds i.MX51 as the next user of the usbmisc driver.
+> Functionality is similar to i.MX53, so at this stage simply
+> reuse existing i.MX53 calls.
 > 
-> On 22-11-2013 5:02, Simon Horman wrote:
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/usb/chipidea/usbmisc_imx.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> >lager_boards_compat_dt is kmemdup()ed when the corresponding devices are
-> >registered and can thus be declared as const.  Do so.
-> 
-> >This replicates a portion of 27113d63daac0aac ("ARM: shmobile: lager:
-> >Constify platform data and resources") which appears to have inadvertently
-> >been lost during merging.
-> 
-> >Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/board-lager.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> >diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> >index d47052e..04c5ca8 100644
-> >--- a/arch/arm/mach-shmobile/board-lager.c
-> >+++ b/arch/arm/mach-shmobile/board-lager.c
-> >@@ -249,7 +249,7 @@ static void __init lager_init(void)
-> >  	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-> >  }
-> >
-> >-static const char * const lager_boards_compat_dt[] __initconst = {
-> >+static const char *lager_boards_compat_dt[] __initdata = {
-> >  	"renesas,lager",
-> >  	NULL,
-> 
->    But aren't you in fact reverting the described change?
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index 4381c5a6..cd061ab 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -204,6 +204,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
+>  		.data = &imx27_usbmisc_ops,
+>  	},
+>  	{
+> +		.compatible = "fsl,imx51-usbmisc",
+> +		.data = &imx53_usbmisc_ops,
 
-Yes. This patch is completely bogus.
+If it simply uses imx53 ops, why do we need to introduce a new
+compatible?
+
+Shawn
+
+> +	},
+> +	{
+>  		.compatible = "fsl,imx53-usbmisc",
+>  		.data = &imx53_usbmisc_ops,
+>  	},
+> -- 
+> 1.8.3.2
+> 
