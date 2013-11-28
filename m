@@ -1,91 +1,104 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 28 Nov 2013 10:36:16 -0800
-Subject: [PATCH v2 4/9] clocksource/cadence_ttc: Use enable/disable_irq
-In-Reply-To: <alpine.DEB.2.02.1311281507280.30673@ionos.tec.linutronix.de>
-References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
- <1385514296-26702-5-git-send-email-soren.brinkmann@xilinx.com>
- <52972F3A.9090103@linaro.org>
- <alpine.DEB.2.02.1311281507280.30673@ionos.tec.linutronix.de>
-Message-ID: <b2ed3cbc-c9df-4235-8137-93514c05bffa@DB8EHSMHS031.ehs.local>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 28 Nov 2013 19:36:25 +0100
+Subject: [PATCH] OF: base: match each node compatible against all given
+ matches first
+Message-ID: <1385663785-8643-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Currently, of_match_node compares each given match against all node's
+compatible strings with of_device_is_compatible.
 
-On Thu, Nov 28, 2013 at 03:18:50PM +0100, Thomas Gleixner wrote:
-> On Thu, 28 Nov 2013, Daniel Lezcano wrote:
-> 
-> > On 11/27/2013 02:04 AM, Soren Brinkmann wrote:
-> > > To ensure that the timer interrupt is properly enabled/disabled across
-> > > the whole CPU cluster use enable/disable_irq() instead of
-> > > local_irq_disable().
-> > > 
-> > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > > ---
-> > >   drivers/clocksource/cadence_ttc_timer.c | 6 ++----
-> > >   1 file changed, 2 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/clocksource/cadence_ttc_timer.c
-> > > b/drivers/clocksource/cadence_ttc_timer.c
-> > > index a92350b55d32..246d018d1e63 100644
-> > > --- a/drivers/clocksource/cadence_ttc_timer.c
-> > > +++ b/drivers/clocksource/cadence_ttc_timer.c
-> > > @@ -322,18 +322,16 @@ static int ttc_rate_change_clockevent_cb(struct
-> > > notifier_block *nb,
-> > >   	switch (event) {
-> > >   	case POST_RATE_CHANGE:
-> > >   	{
-> > > -		unsigned long flags;
-> > > -
-> > >   		/*
-> > >   		 * clockevents_update_freq should be called with IRQ disabled
-> > > on
-> > >   		 * the CPU the timer provides events for. The timer we use is
-> > >   		 * common to both CPUs, not sure if we need to run on both
-> > >   		 * cores.
-> 
-> Can we adjust that bogus comment as well, please?
-I can remove that comment. I'll see if including it in one of the
-existing patches or adding another patch for it makes sense.
+To achieve multiple compatible strings per node with ordering from
+specific to generic, this requires given matches to be ordered from
+specific to generic. For most of the drivers this is not true and also
+an alphabetical ordering is more sane there.
 
-> 
-> > >   		 */
-> > > -		local_irq_save(flags);
-> > > +		disable_irq(ttcce->ce.irq);
-> > >   		clockevents_update_freq(&ttcce->ce,
-> > >   				ndata->new_rate / PRESCALE);
-> > > -		local_irq_restore(flags);
-> > > +		enable_irq(ttcce->ce.irq);
-> > > 
-> > >   		/* update cached frequency */
-> > >   		ttc->freq = ndata->new_rate;
-> > > 
-> > 
-> > I am worried about the 'disable_irq' function calling 'synchronize_irq'. Isn't
-> > possible to deadlock with the ondemand cpufreq governor ? I added Viresh in
-> > Cc, he knows better than me the code path.
-> 
-> disable_irq() will only deadlock if called from the interrupt handler
-> of the device interrupt itself or when the calling code is holding
-> locks which prevent the function to proceed.
-> 
-> But what's more important is, that the patch violates the calling
-> convention of clockevents_update_freq(). It must be called with
-> interrupts disabled. 
-> 
-> Now the problem with this device is that it is not a per cpu
-> device. It's a global device, so this update can conflict with a
-> parallel access on the other CPU. Now the disable_irq() only prevents
-> that the other CPU can handle a device interrupt from that timer. But
-> it does not prevent any parallel access from e.g. the idle code path
-> which will try to reprogram it.
-Does that mean interrupts need to be disabled globally? Also, does the
-cpuidle path depend on interrupts or can it interfere no matter what?
+Therefore, this patch modifies of_match_node to match each of the node's
+compatible strings against all given matches first, before checking the
+next compatible string. This implies that node's compatibles are ordered
+from specific to generic while given matches can be in any order.
 
-> 
-> Soren, is that timer used as the broadcast device ?
-Yes, this is the only broadcast capable timer on Zynq, AFAIK. Other than
-the TTC we only have the arm_global_timer and smp_twd timers, which both
-are per_cpu devices and thus not broadcast capable.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/of/base.c |   47 ++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 32 insertions(+), 15 deletions(-)
 
-	S?ren
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 7d4c70f..183a9c7 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -713,23 +713,37 @@ static
+ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
+ 					   const struct device_node *node)
+ {
++	const char *cp;
++	int cplen, l;
++
+ 	if (!matches)
+ 		return NULL;
+ 
+-	while (matches->name[0] || matches->type[0] || matches->compatible[0]) {
+-		int match = 1;
+-		if (matches->name[0])
+-			match &= node->name
+-				&& !strcmp(matches->name, node->name);
+-		if (matches->type[0])
+-			match &= node->type
+-				&& !strcmp(matches->type, node->type);
+-		if (matches->compatible[0])
+-			match &= __of_device_is_compatible(node,
+-							   matches->compatible);
+-		if (match)
+-			return matches;
+-		matches++;
++	cp = __of_get_property(node, "compatible", &cplen);
++	if (!cp)
++		return NULL;
++
++	while (cplen > 0) {
++		const struct of_device_id *m = matches;
++
++		while (m->name[0] || m->type[0] || m->compatible[0]) {
++			int match = 1;
++			if (m->name[0])
++				match &= node->name
++					&& !strcmp(m->name, node->name);
++			if (m->type[0])
++				match &= node->type
++					&& !strcmp(m->type, node->type);
++			if (m->compatible[0])
++				match &= !of_compat_cmp(cp, m->compatible,
++							strlen(m->compatible));
++			if (match)
++				return m;
++			m++;
++		}
++		l = strlen(cp) + 1;
++		cp += l;
++		cplen -= l;
+ 	}
+ 	return NULL;
+ }
+@@ -739,7 +753,10 @@ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
+  *	@matches:	array of of device match structures to search in
+  *	@node:		the of device structure to match against
+  *
+- *	Low level utility function used by device matching.
++ *	Low level utility function used by device matching. Matching order
++ *	is to compare each of the node's compatibles with all given matches
++ *	first. This implies node's compatible is sorted from specific to
++ *	generic while matches can be in any order.
+  */
+ const struct of_device_id *of_match_node(const struct of_device_id *matches,
+ 					 const struct device_node *node)
+-- 
+1.7.10.4
