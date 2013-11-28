@@ -1,30 +1,21 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 28 Nov 2013 18:51:33 +0000
-Subject: ACPI
-In-Reply-To: <20131128184851.GA2365@srcf.ucam.org>
-References: <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
- <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
- <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
- <20131125154110.GB3243@srcf.ucam.org>
- <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
- <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
- <20131126183344.GA16074@srcf.ucam.org>
- <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
- <20131126233224.GA21189@srcf.ucam.org>
- <alpine.DEB.2.02.1311281816350.3198@kaball.uk.xensource.com>
- <20131128184851.GA2365@srcf.ucam.org>
-Message-ID: <alpine.DEB.2.02.1311281850340.3198@kaball.uk.xensource.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 28 Nov 2013 18:58:04 +0000 (UTC)
+Subject: [PATCHv10 00/41] ARM: TI SoC clock DT conversion
+In-Reply-To: <52969313.6090207@ti.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <52969313.6090207@ti.com>
+Message-ID: <alpine.DEB.2.02.1311281857100.23429@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Nov 2013, Matthew Garrett wrote:
-> On Thu, Nov 28, 2013 at 06:26:11PM +0000, Stefano Stabellini wrote:
-> 
-> > In that case, I think that we should use the one we know has better
-> > support in the kernel, that at the moment is device tree but in the
-> > future might change.
-> 
-> We can't just flip this - systems that shipped with valid DT but broken 
-> ACPI would stop working. 
+On Wed, 27 Nov 2013, Nishanth Menon wrote:
 
-I think that the switch should be on a per-platform basis.
+> http://pastebin.mozilla.org/3681900 -> AM3517-evm (not sure yet how
+> long this has been broken).
+
+Seems to work in v3.13-rc1:
+
+http://www.pwsan.com/omap/testlogs/test_v3.13-rc1/20131124230250/boot/3517evm/3517evm_log.txt
+
+
+- Paul
