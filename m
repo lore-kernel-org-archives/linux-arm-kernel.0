@@ -1,38 +1,187 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 28 Nov 2013 11:28:44 +0200
-Subject: [PATCH] ARM: DTS: omap4-sdp: Add regulator for LCD backlight
- (pwm-backlight)
-Message-ID: <1385630924-16392-1-git-send-email-peter.ujfalusi@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 Nov 2013 09:29:04 +0000
+Subject: [PATCH 00/23] mtd: st_spi_fsm: Add new device
+In-Reply-To: <5296B9C5.3060704@freescale.com>
+References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
+ <20131127040723.GZ9468@ld-irv-0074.broadcom.com>
+ <20131127115226.GC3296@lee--X1> <5296B9C5.3060704@freescale.com>
+Message-ID: <20131128092904.GZ3296@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since in DT booted kernel dummy regulators are no longer supported we need
-to provide valid phandle for the regulator needed by the backlight.
-On the board VBAT is used to power the LCD backlight(s).
+> >However, as we send entire 'message sequences' to the FSM Controller
+> >as opposed to merely OPCODEs we would have to extract the OPCODE from
+> >flash->command[0] and call our own functions to craft the correct
+> >'message sequence' for the task. For this reason we rejected the idea
+> >and went with a stand-alone driver.
+> >
+> could you send me the datasheet of your spi nor controller?
+> I can change my code if it really not good enough.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-Hi,
+Unfortunately not, it's ST company confidential.
 
-This patch is needed for 3.13 to get the LCD backlight to work again.
+> we can store the opcode to a field, such as spi_nor_write_op.
 
-Regards,
-Peter
+The OPCODE isn't the issue here.
 
- arch/arm/boot/dts/omap4-sdp.dts | 1 +
- 1 file changed, 1 insertion(+)
+> >The framework which Huang is proposing suffers from the same issues.
+> >Only providing read(), write(), read_reg() and write_reg() doesn't
+> >work for our use-case, as we'd have to decode the flash->command[0] and
+> >invoke our own internal routines as before.
+> >
+> >The only framework with would work for us would consist almost all
+> >of the important functions such as; read(), write(), erase(),
+> >wait_busy(), read_jedec(), read_status_reg(), write_status_reg(),
+> >read_control_reg(), write_control_reg(), etc. However, this approach
+> read_jedec() can be replaced by read_reg(0x9f);
+> 
+> read_status() can be replaced by read_reg(0x5);
+> 
+> ....
+> 
+> write_control_reg() can be replaced by write_reg(xx).
+> 
+> Please correct me if i am wrong.
+>
+> IMHO, the current four hooks for spi-nor{} can do all the things.
+> 
+>      read/write/read_reg/write_reg.
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 5fc3f43..6f86db2 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -104,6 +104,7 @@
- 				100 110 120 127
- 				>;
- 		default-brightness-level = <13>;
-+		power-supply = <&vbat>;
- 	};
- 
- 	sound {
+I _fully_ understand your implementation, but it just won't work for
+our controller. Or it would, but it would mean writing _more_ code to
+bend it into your framework, not less. Let me try to explain in
+another way by implementing what you're suggesting. For your JEDEC
+example above, we would have to implement [1] which to my mind
+completely defeats the purpose.
+
+Most controllers just take an OPCODE and pass it on to the controller
+and have done with it. The issue that you're attempting to rectify is
+that the m25p80 expects every controller to be an SPI controller
+registered to the SPI framework, but as we both know that's not always
+practical as the SPI framework doesn't allow all configuration
+information to be passed back to the controller driver. Our issue is
+not the same. We are required to send entire 'message sequences', to
+the controller rather than just opcodes. The JEDEC message sequence
+can be seen below. Bear in mind that this is also one of the more
+simple message sequences. Some of them even vary depending on which
+chip is present.
+
+[1]:
+
+static struct stfsm_seq stfsm_seq_read_jedec = {
+	.data_size = TRANSFER_SIZE(8),
+	.seq_opc[0] = (SEQ_OPC_PADS_1 |
+		       SEQ_OPC_CYCLES(8) |
+		       SEQ_OPC_OPCODE(FLASH_CMD_RDID)),
+	.seq = {
+		STFSM_INST_CMD1,
+		STFSM_INST_DATA_READ,
+		STFSM_INST_STOP,
+	},
+	.seq_cfg = (SEQ_CFG_PADS_1 |
+		    SEQ_CFG_READNOTWRITE |
+		    SEQ_CFG_CSDEASSERT |
+		    SEQ_CFG_STARTSEQ),
+};
+
+static inline int stfsm_is_idle(struct stfsm *fsm)
+{
+	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
+}
+
+static inline uint32_t stfsm_fifo_available(struct stfsm *fsm)
+{
+	return (readl(fsm->base + SPI_FAST_SEQ_STA) >> 5) & 0x7f;
+}
+
+static inline void stfsm_load_seq(struct stfsm *fsm,
+				  const struct stfsm_seq *seq)
+{
+	void __iomem *dst = fsm->base + SPI_FAST_SEQ_TRANSFER_SIZE;
+	const uint32_t *src = (const uint32_t *)seq;
+	int words = STFSM_SEQ_SIZE / sizeof(uint32_t);
+
+	while (words--) {
+		writel(*src, dst);
+		src++;
+		dst += 4;
+	}
+}
+
+static void stfsm_wait_seq(struct stfsm *fsm)
+{
+	unsigned long timeo = jiffies + HZ;
+
+	while (time_before(jiffies, timeo)) {
+		if (stfsm_is_idle(fsm))
+			return;
+
+		cond_resched();
+	}
+}
+
+static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+			    const uint32_t size)
+{
+	uint32_t remaining = size >> 2;
+	uint32_t avail;
+	uint32_t words;
+
+	while (remaining) {
+		for (;;) {
+			avail = stfsm_fifo_available(fsm);
+			if (avail)
+				break;
+			udelay(1);
+		}
+		words = min(avail, remaining);
+		remaining -= words;
+
+		readsl(fsm->base + SPI_FAST_SEQ_DATA_REG, buf, words);
+		buf += words;
+	}
+}
+
+static void stfsm_read_jedec(struct stfsm *fsm, u8 *jedec)
+{
+	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
+	uint32_t tmp[2];
+
+	stfsm_load_seq(fsm, seq);
+
+	stfsm_read_fifo(fsm, tmp, 8);
+
+	memcpy(jedec, tmp, 5);
+
+	stfsm_wait_seq(fsm);
+}
+
+static int stfsm_read_reg(struct spi_nor *flash, u8 opcode, u8 *buf, int len)
+{
+	struct stfsm *fsm = dev_get_drvdata(flash->mtd->dev.parent);
+	
+	switch (opcode) {
+	case OPCODE_RDID :
+		stfsm_read_jedec(fsm, buf);
+		break;
+
+	case OPCODE_A :
+		stfsm_do_a();
+		break;
+
+	/******** SNIP ********/
+
+	case OPCODE_Z :
+		stfsm_do_z();
+		break;
+
+	case default :
+		return -EINVAL;
+	}
+}
+
 -- 
-1.8.4.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
