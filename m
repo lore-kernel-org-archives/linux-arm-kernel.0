@@ -1,114 +1,34 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 28 Nov 2013 11:38:45 +0800
-Subject: [PATCH] ARM: l2x0: add prefetch and power ctrl registers
- configuration support
-In-Reply-To: <20131127174204.GD27879@e106331-lin.cambridge.arm.com>
-References: <1383800872-7982-1-git-send-email-jszhang@marvell.com>
- <20131127174204.GD27879@e106331-lin.cambridge.arm.com>
-Message-ID: <20131128113845.27d0176b@xhacker>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 28 Nov 2013 12:53:11 +0900
+Subject: [PATCH v4 2/5] extcon: max14577: Add extcon-max14577 driver to
+ support MUIC device
+In-Reply-To: <1385135469-27044-3-git-send-email-k.kozlowski@samsung.com>
+References: <1385135469-27044-1-git-send-email-k.kozlowski@samsung.com>
+ <1385135469-27044-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5296BE27.1040904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 11/23/2013 12:51 AM, Krzysztof Kozlowski wrote:
+> From: Chanwoo Choi <cw00.choi@samsung.com>
+> 
+> This patch supports Maxim MAX14577 MUIC(Micro USB Interface Controller)
+> device by using EXTCON subsystem to handle various external connectors.
+> The max14577 device uses regmap method for i2c communication and
+> supports irq domain.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/extcon/Kconfig           |   10 +
+>  drivers/extcon/Makefile          |    1 +
+>  drivers/extcon/extcon-max14577.c |  752 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 763 insertions(+)
+>  create mode 100644 drivers/extcon/extcon-max14577.c
+> 
 
-On Wed, 27 Nov 2013 09:42:04 -0800
-Mark Rutland <mark.rutland@arm.com> wrote:
+Applied it.
 
-> On Thu, Nov 07, 2013 at 05:07:52AM +0000, Jisheng Zhang wrote:
-> > PL310 supports Prefetch offset/control register from r2p0 and Power
-> > control register from r3p0. This patch adds the support to configure
-> > these two registers if there are. The dt binding document is also updated.
-> 
-> I'd like to see a reasoning as to _why_ these should be in the DT.
-> 
-> While we have tag and data RAM latency information, those are hardware
-> properties that we cannot probe. I'm not so clear on the filter-ranges
-> property.
-> 
-> These bits seem to be configuration rather than a hardware description.
-> If there are some portions of this that we can describe with higher
-> level properties, I'd prefer to do that.
-> 
-> But primarily, the question to answer is do we need these, and if so do
-> they belong in the DT?
-
-
-After more consideration, configuring these two registers in bootloader or
-TrustZone firmware is more reasonable since the prefetch controller can only be
-written in Secure World.
-
-PS: the tag/ram latency must also be written in secure world, and IMHO, the
-latency and filter-ranges are also configurations
-
-Thanks for having look at this patch,
-Jisheng
-
-> 
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
-> >  arch/arm/mm/cache-l2x0.c                       | 19 +++++++++++++++++++
-> >  2 files changed, 23 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt
-> > b/Documentation/devicetree/bindings/arm/l2cc.txt index c0c7626..32cd08c
-> > 100644 --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> > @@ -39,6 +39,10 @@ Optional properties:
-> >  - arm,filter-ranges : <start length> Starting address and length of
-> > window to filter. Addresses in the filter window are directed to the M1
-> > port. Other addresses will go to the M0 port.
-> > +- arm,prefetch-ctrl : The value for Prefetch Offset/Control Register if
-> > there
-> > +  is. This is a single cell.
-> > +- arm,pwr-ctrl : The value for Power Control Register if there is. This
-> > is a
-> > +  single cell.
-> >  - interrupts : 1 combined interrupt.
-> >  - cache-id-part: cache id part number to be used if it is not present
-> >    on hardware
-> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> > index 447da6f..8f536ea 100644
-> > --- a/arch/arm/mm/cache-l2x0.c
-> > +++ b/arch/arm/mm/cache-l2x0.c
-> > @@ -704,6 +704,8 @@ static void __init pl310_of_setup(const struct
-> > device_node *np, u32 data[3] = { 0, 0, 0 };
-> >  	u32 tag[3] = { 0, 0, 0 };
-> >  	u32 filter[2] = { 0, 0 };
-> > +	u32 l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-> > +		L2X0_CACHE_ID_RTL_MASK;
-> >  
-> >  	of_property_read_u32_array(np, "arm,tag-latency", tag,
-> > ARRAY_SIZE(tag)); if (tag[0] && tag[1] && tag[2])
-> > @@ -730,6 +732,23 @@ static void __init pl310_of_setup(const struct
-> > device_node *np, writel_relaxed((filter[0] & ~(SZ_1M - 1)) |
-> > L2X0_ADDR_FILTER_EN, l2x0_base + L2X0_ADDR_FILTER_START);
-> >  	}
-> > +
-> > +	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R2P0) {
-> > +		u32 prefetch_ctrl = 0;
-> > +
-> > +		of_property_read_u32(np, "arm,prefetch-ctrl",
-> > +				     &prefetch_ctrl);
-> > +		if (prefetch_ctrl)
-> > +			writel_relaxed(prefetch_ctrl, l2x0_base +
-> > +					L2X0_PREFETCH_CTRL);
-> 
-> Some of the prefetch control regsiter bits are reserved, and the
-> prefetch offset may only take a subset of possible values. I wouldn't
-> want to poke the hardware without performing some sanity checking on
-> these values.
-> 
-> > +		if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
-> > +			u32 pwr_ctrl = 0;
-> > +			of_property_read_u32(np, "arm,pwr-ctrl",
-> > &pwr_ctrl);
-> > +			if (pwr_ctrl)
-> > +				writel_relaxed(pwr_ctrl, l2x0_base +
-> > +						L2X0_POWER_CTRL);
-> 
-> Similarly, all but the lower 2 bits are reserved...
-> 
-> Thanks,
-> Mark.
+Thanks,
+Chanwoo Choi
