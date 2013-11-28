@@ -1,20 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 17:11:00 +0900
-Subject: [PATCH v2] ARM: shmobile: Fix r8a7791 GPIO resources in DTS
-In-Reply-To: <20131121052200.16972.40390.sendpatchset@w520>
-References: <20131121052200.16972.40390.sendpatchset@w520>
-Message-ID: <20131128081058.GS24146@verge.net.au>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 28 Nov 2013 09:13:53 +0100
+Subject: [PATCH 0/3] regulator: tps6586x: add version detection and
+ voltage tables
+In-Reply-To: <cover.1385508112.git.stefan@agner.ch>
+References: <cover.1385508112.git.stefan@agner.ch>
+Message-ID: <20131128081351.GA26502@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 21, 2013 at 02:22:00PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Wed, Nov 27, 2013 at 12:45:42AM +0100, Stefan Agner wrote:
+> This patchset adds version detection for the tps6586x mfd family. This is
+> required because some regulator versions use different voltage tables. The
+> regulator driver now uses the right voltage table according to the
+> version.
 > 
-> The r8a7791 GPIO resources are currently incorrect. Fix that
-> by making them match the English r8a7791 v0.31 data sheet.
+> The required voltage for the SM2 converter on the Colibri T20 is 1.8V,
+> however, the device tree states 3.7V right now. Newer versions (>=V1.2) of
+> the Colibri T20 module use the TPS658643, whereas old ones (<V1.2) use the
+> TPS658623. Both of them have a different voltage table for SM2. The
+> current device tree contains a voltage which results in 1.8V for the older
+> TPS658623. Since the regulator driver has correct voltage tables for both
+> regulator versions now, we can request the correct 1.8V from the device
+> tree.
 > 
-> Tested with GPIO LED using Koelsch DT reference.
+> Tested on Colibri T20 V1.1 and V1.2.
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Stefan Agner (3):
+>   mfd: tps6586x: add version detection
+>   regulator: tps6586x: add voltage table for tps658643
+>   ARM: tegra: set SM2 voltage correct
+> 
+>  arch/arm/boot/dts/tegra20-colibri-512.dtsi |  4 +-
+>  drivers/mfd/tps6586x.c                     | 41 +++++++++++--
+>  drivers/regulator/tps6586x-regulator.c     | 97 ++++++++++++++++++++----------
+>  include/linux/mfd/tps6586x.h               |  9 +++
+>  4 files changed, 110 insertions(+), 41 deletions(-)
 
-Thanks, I have queued this up.
+Adding Kai Poggensee on Cc. There was a variant of the Tamonten board
+with one of these versions of the chip (or maybe it was even yet another
+one).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131128/649c7941/attachment.sig>
