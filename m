@@ -1,83 +1,84 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 28 Nov 2013 22:20:20 +0100
-Subject: NULL clock items (was: [PATCH 11/31] dma: add channel request
- API that supports deferred probe)
-In-Reply-To: <20131125205224.GT16735@n2100.arm.linux.org.uk>
-References: <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
- <528F95A9.2050305@wwwdotorg.org>
- <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
- <528F9DF9.6080706@wwwdotorg.org>
- <20131123003442.GH16735@n2100.arm.linux.org.uk>
- <5293883A.8050808@wwwdotorg.org>
- <20131125175330.GQ16735@n2100.arm.linux.org.uk>
- <52938F75.7020108@wwwdotorg.org>
- <20131125202808.GN2760@book.gsilab.sittig.org>
- <20131125205224.GT16735@n2100.arm.linux.org.uk>
-Message-ID: <20131128212020.GE2982@book.gsilab.sittig.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 28 Nov 2013 13:25:28 -0800
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131128193917.GC4634@e103592.cambridge.arm.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131127230650.GA6162@kroah.com>
+ <20131128102845.GB21354@mudshark.cambridge.arm.com>
+ <20131128173339.GB4634@e103592.cambridge.arm.com>
+ <20131128191331.GB2385@kroah.com>
+ <20131128193917.GC4634@e103592.cambridge.arm.com>
+Message-ID: <20131128212528.GA6144@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 20:52 +0000, Russell King - ARM Linux wrote:
+On Thu, Nov 28, 2013 at 07:39:17PM +0000, Dave Martin wrote:
+> On Thu, Nov 28, 2013 at 11:13:31AM -0800, Greg KH wrote:
+> > On Thu, Nov 28, 2013 at 05:33:39PM +0000, Dave Martin wrote:
+> > > On Thu, Nov 28, 2013 at 10:28:45AM +0000, Will Deacon wrote:
+> > > > Hi Greg,
+> > > > 
+> > > > On Wed, Nov 27, 2013 at 11:06:50PM +0000, Greg KH wrote:
+> > > > > On Wed, Nov 27, 2013 at 05:28:06PM +0000, Dave Martin wrote:
+> > > > > > >From will.deacon at arm.com Wed Nov 20 12:06:22 2013
+> > > > > > A number of discussion points remain to be resolved:
+> > > > > > 
+> > > > > >   - Use of the ranges property and describing slave vs master bus
+> > > > > >     address ranges. In the latter case, we actually want to describe our
+> > > > > >     address space with respect to the bus on which the bus masters,
+> > > > > >     rather than the parent. This could potentially be achieved by adding
+> > > > > >     properties such as dma-parent and dma-ranges (already used by PPC?)
+> > > > > > 
+> > > > > >   - Describing masters that master through multiple different buses
+> > > > > > 
+> > > > > >   - How on Earth this fits in with the Linux device model (it doesn't)
+> > > > > 
+> > > > > How does this _not_ fit into the Linux device model?  What am I missing
+> > > > > here that precludes the use of the "driver/device/bus" model we have
+> > > > > today?
+> > > 
+> > > The physical-sockets history of buses like PCI tends to force a simple
+> > > tree-like topology as a natural consequence.  You also end up with
+> > > closely linked topologies for power, clocks, interrupts etc., because
+> > > those all pass through the same sockets, so it's difficult to have a
+> > > different structure.
+> > 
+> > There's nothing in the driver core that enforces such a topology.
 > 
-> [ ... 2771399a "fs_enet: cleanup clock API use" example ... ]
-> [ ... NULL clocks won't get released, calls might get skipped ... ]
-
-I agree that the NULL clock reference is not handled correctly in
-that code.  Part of the issue is that NULL is both an
-initialization value and a valid reference to something that was
-acquired (and quite counter intuitive so).
-
-This inability to tell the two reasons for NULL apart only
-vanishes when each clock variable explicitly gets initialized or
-pre-set to some ERR_PTR() value (or when the allocation and
-assignment is unconditional, no code path depends on some other
-condition).  I'm afraid that the source tree currently is not
-there yet, and it may be quite some churn (with a lot of
-potential for conflicts) to touch each driver, if it's at all
-possible to identify all spots where those variables are NULL
-because of
-- static declarations without initializers
-- static declarations with incomplete initializers
-- memory allocation with "zeroes please" flags
-- memset() calls
-- clock acquisition code paths were not taken
-
-
-Which platform or clock provider or specific clock driver exactly
-is this mysterious instance which returns NULL for a valid clock?
-Is this one or the very few instances easier to adjust and thus
-(re-)gain certainty about correct operation with less effort and
-much less risk of missing something?
-
-
-> This is not very nice.  Better solution:
+> Maybe not ... I have to wrap my head around that stuff a bit more.
 > 
-> 	fpi->clk_per = PTR_ERR(-EINVAL);
-> 	clk = devm_clk_get(&ofdev->dev, "per");
-> 	if (!IS_ERR(clk)) {
-> 		err = clk_prepare_enable(clk);
-> 		if (err) {
-> 			ret = err;
-> 			goto out_free_fpi;
-> 		}
-> 		fpi->clk_per = clk;
-> 	}
+> > > On SoC, those constraints have never existed and are not followed.  A
+> > > device's interface to the system is almost always split into multiple
+> > > connections, not covered by a single design or standard.  The problem
+> > > now is that increasing complexity means that the sometimes bizarre
+> > > topology features of SoCs are becoming less and less transparent for
+> > > software.
+> > > 
+> > > The device model currently seems to assume that certain things (power,
+> > > DMA and MMIO accessibility) follow the tree (which may not work for many
+> > > SoCs), and some other things (clocks, regulators, interrupts etc.) are
+> > > not incorporated at all -- making them independent, but it may make some
+> > > abstractions impossible today.
+> > > 
+> > > How much this matters for actual systems is hard to foresee yet.  Since
+> > > not _all_ possible insanities find their way into silicon.  The
+> > > onus should certainly be on us (i.e., the ARM/SoC community) to
+> > > demonstrate if the device model needs to change, and to find practical
+> > > ways to change it that minimise the resulting churn.
+> > 
+> > Yes it is, you all are the ones tasked with implementing the crazy crap
+> > the hardware people have created, best of luck with that :)
 > 
-> ...
-> 
->         of_node_put(fpi->phy_node);
->         if (!IS_ERR(fpi->clk_per))
->                 clk_disable_unprepare(fpi->clk_per);
+> Agreed.  The first assumption should be that we can fit in with the
+> existing device model -- we should only reconsider if we find that
+> to be impossible.
 
-Assume in the above example that the fpi->clk_per assignment
-would be in a conditional code path.  In that case the code is as
-wrong (unpreparing a not acquired NULL reference) as leaking an
-acquired NULL reference is.
+Let me know if you think it is somehow impossible, but you all should
+really push back on the insane hardware designers that are forcing you
+all to do this work.  I find it "interesting" how this all becomes your
+workload for their crazy ideas.
 
+Best of luck,
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+greg k-h
