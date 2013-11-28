@@ -1,62 +1,51 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 28 Nov 2013 09:29:34 +0000
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
-Message-ID: <20131128092933.GA8642@linaro.org>
+From: Florian.Belser@sensor-technik.de (Belser Florian)
+Date: Thu, 28 Nov 2013 09:30:00 +0000
+Subject: [PATCH] IMX6 flexcan: Change serial clock_feq source from IPG clock
+ to PER clock
+In-Reply-To: <E1C9442006A9AE48A7A4B85E0D01C4D4748A18@stwexdb.stww2k.local>
+References: <E1C9442006A9AE48A7A4B85E0D01C4D4748A18@stwexdb.stww2k.local>
+Message-ID: <5EC8D4ACC923FE4D871AFFACC9761279739C0B@stwexdb.stww2k.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 01:04:23PM +0530, mohun106 at gmail.com wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> 
-> This patch series provides an implementation of supporting 48-bit
-> Physical Addresses for ARMv8 platforms. It is the maximum width that
-> any ARMv8 based processor can support. 
-> 
-> The implementation extends the existing support of 40-bit PA.The kernel
-> and user space will now be able to access 128TB each. With 4KB page size
-> the Linux now will be using 4 levels of page tables by making use of
-> 'pud'. And with 64KB page size the Linux will be using 3 levels of page
-> tables.
-> 
-> The code has been tested with LTP.
+Hi,
 
-Hello,
+think I found a bug in the flexcan driver. Currently the serial clock frequency for bitrate calculation is derived from IPG clock.
+According to the imx6d/q reference manual, the CAN serial clock is derived from can_root clock (PER clock in dtb). The patch below fixes this issue.
+However, I'm not sure if the patch below will also work for the rest of the imx family. Does anybody know if the CAN serial clock is derived from IPG clock in other imx processors?
+Is there a case distinction required to keep backward compatibility?
 
-Could you please test how this series interacts with huge pages?
-So please run LTP with THP enabled and always active:
-  TRANSPARENT_HUGEPAGE=y
-  TRANSPARENT_HUGEPAGE_ALWAYS=y
-(for both 4KB and 64KB base page sizes).
-This will give the pmd level code a workout.
+Be aware that getting the flexcan module running on the imx6 also requires patch "[PATCH] IMX6: Add static /8 prescaler to can_root clock configuration"
 
-Then could you please try libhugetlbfs to test HugeTLB?
-  git://git.code.sf.net/p/libhugetlbfs/code (next branch)
-with the following enabled:
-  HUGETLBFS=y
 
-Please run the test suite against 2MB, 1GB (4KB base pages) and 512MB
-(64KB base pages) huge pages.
+Here is my patch:
 
-To set aside 1GB huge pages at boot time, please add the following to
-the kernel command line:
-  hugepagesz=1G hugepages=x
-where x is the number of 1GB huge pages you can get away with :-).
+--- linux-3.10.20/drivers/net/can/flexcan.c.orig    2013-11-20 21:28:01.000000000 +0100
++++ linux-3.10.20/drivers/net/can/flexcan.c    2013-11-28 09:34:01.539469212 +0100
+@@ -1031,7 +1031,6 @@ static int flexcan_probe(struct platform
+             err = PTR_ERR(clk_ipg);
+             goto failed_clock;
+         }
+-        clock_freq = clk_get_rate(clk_ipg);
 
-For 2MB and 512MB:
-  echo x > /proc/sys/vm/nr_hugepages
-again where x is the number of huge pages to set aside.
+         clk_per = devm_clk_get(&pdev->dev, "per");
+         if (IS_ERR(clk_per)) {
+@@ -1039,6 +1038,7 @@ static int flexcan_probe(struct platform
+             err = PTR_ERR(clk_per);
+             goto failed_clock;
+         }
++        clock_freq = clk_get_rate(clk_per);
+     }
 
-Ensure that the hugetlbfs filesystem is mounted:
-  mount -t hugetlbfs hugetlbfs /mnt/hugepages
+     mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-Then
-  make check
+----------------------------------------
 
-The libhugetlbfs tests above will test out the pud and pmd interactions,
-please let me know whether or not anything breaks.
+In the same file there is another bug which only occurs in combination with an imx6 processor.
+Within the function "static int flexcan_chip_start(struct net_device *dev)" all message boxes will be initialized.
+Think that isn't correct for the IMX6 processor.
+In the newest kernel v3.12.r1 the problem is already fixed and I'm not sure if the fix will be automatically added to the LTE kernel version 3.10.20 ?
+If not, shall I create a patch for it ?
 
-Thanks,
--- 
-Steve
+Best regards
+Florian Belser
