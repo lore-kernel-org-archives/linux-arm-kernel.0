@@ -1,77 +1,44 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Thu, 28 Nov 2013 07:44:30 +0530
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <5296330D.9010801@arm.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
- <5295D1A5.5090403@arm.com>
- <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
- <5296330D.9010801@arm.com>
-Message-ID: <CAC8NTUVvLgNPdsSPY6Ms_D3JoyJR8AEFRH0=M7-kQEUegNVhKg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 Nov 2013 11:22:41 +0900
+Subject: [PATCH] ARM: shmobile: lager: Constify lager_boards_compat_dt
+In-Reply-To: <528F5EC9.9000203@cogentembedded.com>
+References: <1385082175-30521-1-git-send-email-horms+renesas@verge.net.au>
+ <528F5EC9.9000203@cogentembedded.com>
+Message-ID: <20131128022241.GC22413@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 11:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 27/11/13 15:33, Radha Mohan wrote:
->> On Wed, Nov 27, 2013 at 4:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> [CC-ing the maintainers - seems odd they were not cc-ed the first place]
->>>
->>> On 27/11/13 07:34, mohun106 at gmail.com wrote:
->>>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>>>
->>>> This patch series provides an implementation of supporting 48-bit
->>>> Physical Addresses for ARMv8 platforms. It is the maximum width that
->>>> any ARMv8 based processor can support.
->>>>
->>>> The implementation extends the existing support of 40-bit PA.The kernel
->>>> and user space will now be able to access 128TB each. With 4KB page size
->>>> the Linux now will be using 4 levels of page tables by making use of
->>>> 'pud'. And with 64KB page size the Linux will be using 3 levels of page
->>>> tables.
->>>>
->>>> The code has been tested with LTP.
->>>
->>> Aside from finding out whether or not this is a useful change, this
->>> breaks KVM, more specifically the way kernel pages are mapped into HYP.
->>> Also, guests will still be limited to 40-bit IPAs, and the stage-2
->>> output range needs to be addressed as well.
->>
->> This is useful for platforms (like ours) that will use 48-bit PAs.
->> Sooner or later there will
->> be such processors.
->
-> So should the 4-level page table cost be unconditionally forced onto all
-> implementations?
->
+On Fri, Nov 22, 2013 at 05:40:25PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 22-11-2013 5:02, Simon Horman wrote:
+> 
+> >lager_boards_compat_dt is kmemdup()ed when the corresponding devices are
+> >registered and can thus be declared as const.  Do so.
+> 
+> >This replicates a portion of 27113d63daac0aac ("ARM: shmobile: lager:
+> >Constify platform data and resources") which appears to have inadvertently
+> >been lost during merging.
+> 
+> >Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/mach-shmobile/board-lager.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> >diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> >index d47052e..04c5ca8 100644
+> >--- a/arch/arm/mach-shmobile/board-lager.c
+> >+++ b/arch/arm/mach-shmobile/board-lager.c
+> >@@ -249,7 +249,7 @@ static void __init lager_init(void)
+> >  	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
+> >  }
+> >
+> >-static const char * const lager_boards_compat_dt[] __initconst = {
+> >+static const char *lager_boards_compat_dt[] __initdata = {
+> >  	"renesas,lager",
+> >  	NULL,
+> 
+>    But aren't you in fact reverting the described change?
 
-We can have a kernel compile-time config option so that platforms having
-a 48-bit PA can select that option. But having it will create the code something
-like below
-
-#ifndef CONFIG_ARM64_64KB_PAGES
-#ifdef CONFIG_ARCH_SUPPORTS_48BIT_PA
-...
-..
-#else
-..
-..
-#endif
-#else /* !CONFIG_ARM64_64KB_PAGES */
-#ifdef CONFIG_ARCH_SUPPORTS_48BIT_PA
-..
-..
-#else
-..
-..
-#endif
-#endif /* CONFIG_ARM64_64KB_PAGES */
-
-And we might need to do this at lot of places. Is this ok?
-
->> And yes, I haven't checked on KVM.
->
-> Yeah, tiny detail... ;-)
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+Yes. This patch is completely bogus.
