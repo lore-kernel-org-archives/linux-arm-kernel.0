@@ -1,71 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 17:54:29 +0900
-Subject: [PATCH 05/16] ARM: shmobile: sh73a0: don't use named resource for I2C
+Date: Thu, 28 Nov 2013 17:54:44 +0900
+Subject: [PATCH 14/16] ARM: shmobile: sh73a0: tidyup clock table order
 In-Reply-To: <cover.1385628709.git.horms+renesas@verge.net.au>
 References: <cover.1385628709.git.horms+renesas@verge.net.au>
-Message-ID: <8e85524bf5a2a6bf35a5011bd1cd116650da5c47.1385628709.git.horms+renesas@verge.net.au>
+Message-ID: <99b7835e0d9653d0cd61c2b16416556dc72b8f55.1385628709.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-i2c-sh_mobile driver doesn't care resource name.
+SuperH lookups clock is using CLKDEV_CON/DEV/ICK_ID() macro
+for a long term.
+But in these days, the ICK clock is defined in random place.
+This patch arranges it.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/clock-sh73a0.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index b7ce68e..c515801 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -316,7 +316,7 @@ static struct platform_device tmu01_device = {
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index c92c023..2aeec46 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -625,12 +625,6 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("sdhi0_clk", &div6_clks[DIV6_SDHI0]),
+ 	CLKDEV_CON_ID("sdhi1_clk", &div6_clks[DIV6_SDHI1]),
+ 	CLKDEV_CON_ID("sdhi2_clk", &div6_clks[DIV6_SDHI2]),
+-	CLKDEV_ICK_ID("dsit_clk", "sh-mipi-dsi.0", &div6_clks[DIV6_DSIT]),
+-	CLKDEV_ICK_ID("dsit_clk", "sh-mipi-dsi.1", &div6_clks[DIV6_DSIT]),
+-	CLKDEV_ICK_ID("dsip_clk", "sh-mipi-dsi.0", &div6_clks[DIV6_DSI0P]),
+-	CLKDEV_ICK_ID("dsip_clk", "sh-mipi-dsi.1", &div6_clks[DIV6_DSI1P]),
+-	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.0", &dsi0phy_clk),
+-	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.1", &dsi1phy_clk),
+ 
+ 	/* MSTP32 clocks */
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[MSTP001]), /* I2C2 */
+@@ -680,6 +674,14 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* I2C4 */
+ 	CLKDEV_DEV_ID("e6828000.i2c", &mstp_clks[MSTP410]), /* I2C4 */
+ 	CLKDEV_DEV_ID("sh_keysc.0", &mstp_clks[MSTP403]), /* KEYSC */
++
++	/* ICK */
++	CLKDEV_ICK_ID("dsit_clk", "sh-mipi-dsi.0", &div6_clks[DIV6_DSIT]),
++	CLKDEV_ICK_ID("dsit_clk", "sh-mipi-dsi.1", &div6_clks[DIV6_DSIT]),
++	CLKDEV_ICK_ID("dsip_clk", "sh-mipi-dsi.0", &div6_clks[DIV6_DSI0P]),
++	CLKDEV_ICK_ID("dsip_clk", "sh-mipi-dsi.1", &div6_clks[DIV6_DSI1P]),
++	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.0", &dsi0phy_clk),
++	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.1", &dsi1phy_clk),
  };
  
- static struct resource i2c0_resources[] = {
--	[0] = DEFINE_RES_MEM_NAMED(0xe6820000, 0x426, "IIC0"),
-+	[0] = DEFINE_RES_MEM(0xe6820000, 0x426),
- 	[1] = {
- 		.start	= gic_spi(167),
- 		.end	= gic_spi(170),
-@@ -325,7 +325,7 @@ static struct resource i2c0_resources[] = {
- };
- 
- static struct resource i2c1_resources[] = {
--	[0] = DEFINE_RES_MEM_NAMED(0xe6822000, 0x426, "IIC1"),
-+	[0] = DEFINE_RES_MEM(0xe6822000, 0x426),
- 	[1] = {
- 		.start	= gic_spi(51),
- 		.end	= gic_spi(54),
-@@ -334,7 +334,7 @@ static struct resource i2c1_resources[] = {
- };
- 
- static struct resource i2c2_resources[] = {
--	[0] = DEFINE_RES_MEM_NAMED(0xe6824000, 0x426, "IIC2"),
-+	[0] = DEFINE_RES_MEM(0xe6824000, 0x426),
- 	[1] = {
- 		.start	= gic_spi(171),
- 		.end	= gic_spi(174),
-@@ -343,7 +343,7 @@ static struct resource i2c2_resources[] = {
- };
- 
- static struct resource i2c3_resources[] = {
--	[0] = DEFINE_RES_MEM_NAMED(0xe6826000, 0x426, "IIC3"),
-+	[0] = DEFINE_RES_MEM(0xe6826000, 0x426),
- 	[1] = {
- 		.start	= gic_spi(183),
- 		.end	= gic_spi(186),
-@@ -352,7 +352,7 @@ static struct resource i2c3_resources[] = {
- };
- 
- static struct resource i2c4_resources[] = {
--	[0] = DEFINE_RES_MEM_NAMED(0xe6828000, 0x426, "IIC4"),
-+	[0] = DEFINE_RES_MEM(0xe6828000, 0x426),
- 	[1] = {
- 		.start	= gic_spi(187),
- 		.end	= gic_spi(190),
+ void __init sh73a0_clock_init(void)
 -- 
 1.8.4
