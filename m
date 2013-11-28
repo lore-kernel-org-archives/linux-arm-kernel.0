@@ -1,83 +1,96 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 28 Nov 2013 11:38:16 +0530
-Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E852497D5@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
- <20131114104620.GB16396@e106331-lin.cambridge.arm.com>
- <B56CDBE15CE27145A4B77D2D24263E852409CE@039-SN1MPN1-003.039d.mgd.msft.net>
- <20131118111451.GA30853@e106331-lin.cambridge.arm.com>
- <B56CDBE15CE27145A4B77D2D24263E852497D5@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <20131128060816.GQ8834@intel.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Thu, 28 Nov 2013 15:29:02 +0800
+Subject: ARM: nommu: Unable to allocate RAM for process text/data, errno 12
+In-Reply-To: <20131126164417.9df88075f9ad394679bb60cb@linux-foundation.org>
+References: <1385458169.6721.2.camel@phoenix>
+ <20131126164417.9df88075f9ad394679bb60cb@linux-foundation.org>
+Message-ID: <CAFRkauDpmyXzs+ryCmxTiadXVs5BppH4NZJ1fG6AmHtruiuarg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 09:38:02AM +0000, Jingchang Lu wrote:
-> > > > > +* DMAMUX
-> > > > > +Required properties:
-> > > >
-> > > > No compatible?
-> > > >
-> > > > Where are DMAMUX nodes expected to live?
-> > > >
-> > > > How to they relate to the eDMA controller in HW? Are they a
-> > > > subcomponent, or a logically separate unit that happens to be
-> > connected?
-> > > [Lu Jingchang-b35083]
-> > > DMAMUX is a multiplexer between dma controller channels and peripheral
-> > deivces,
-> > > each DMAMUX provides 16 independently selectable DMA channel routers,
-> > and each
-> > > channel router can be assigned to one of the possible peripheral DMA
-> > slots.
-> > > So it's not a standalone device, it's just required by the DMA
-> > controller to
-> > > connect the channels and slaves, So it's got by DMA controller's
-> > "fsl,dma-mux" property.
-> > > Thanks!
-> > 
-> > Ok.
-> > 
-> > I'm not so sure on the way this is described, from the point of view of
-> > the device, its DMA channel is wired to the MUX, not to the DMA engine
-> > directly:
-> > 
-> >                        +-------+
-> >              /---------|DEVICE0|
-> >              |         +-------+
-> > +-----+   +------+
-> > | DMA |===|DMAMUX|
-> > +-----+   +------+
-> >              |         +-------+
-> >              \---------|DEVICE1|
-> >                        +-------+
-> > 
-> > If that's the case, I'd expect the DMAMUX to have a #dma-cells and
-> > describe each device as being wired to the mux, and then the mux as
-> > being wired to the DMA. If the MUXes are sub-blocks of the DMA, then I'm
-> > not sure why they need to be described at all.
-> > 
-> > Currently, the DMA code is handling information that's specific to the
-> > MUX (i.e. the channel ID that's specific to the MUX), and that feels odd
-> > unless the MUX is a component of the DMA (which if true I'd expect it to
-> > be described differently).
-> > 
-> Yes, the connection is as your imagination, except for each DMA has two MUX. 
-> The DMA helper looks the registered DMA engineer for DMA channel binding,
-> and the registered DMA engineer is the eDMA node, if binding to DMAMUX,
-> the helper will not find out the dma engineer.
-> The only DMAMUX configuration is programming the slave id into its
-> corresponding register, so its code is handled by the eDMA driver,
-> the DMAMUX is not optional.
-This is fairly common representation of how DMA engines interact with slave
-clients via a programmable mux. Now the slave id value in this case (which we
-program to mux) needs to be for the client and _not_ for the dmanegine. DMA
-engine would have a register to configure the mux value required for the
-transaction.
+2013/11/27 Andrew Morton <akpm@linux-foundation.org>:
+> On Tue, 26 Nov 2013 17:29:29 +0800 Axel Lin <axel.lin@ingics.com> wrote:
+>
+>> Hi,
+>> I got below error messages while starting mdev (busybox).
+>>
+>> ...
+>>
+>> [  108.537109] chmod: page allocation failure: order:8, mode:0xd0
+>
+> It wants to allocate 2^8 physically contiguous pages!
+>
+>> [  108.543945] CPU: 0 PID: 47 Comm: chmod Not tainted 3.13.0-rc1-00170-g1bab531-dirty #1940
+>> [  108.580078] [<0000c430>] (unwind_backtrace+0x0/0xe0) from [<0000ae58>] (show_stack+0x10/0x14)
+>> [  108.592773] [<0000ae58>] (show_stack+0x10/0x14) from [<00050010>] (warn_alloc_failed+0xf8/0x128)
+>> [  108.605468] [<00050010>] (warn_alloc_failed+0xf8/0x128) from [<00052030>] (__alloc_pages_nodemask+0x64c/0x6c4)
+>> [  108.620117] [<00052030>] (__alloc_pages_nodemask+0x64c/0x6c4) from [<0005f028>] (do_mmap_pgoff+0x5d0/0x9b0)
+>> [  108.633789] [<0005f028>] (do_mmap_pgoff+0x5d0/0x9b0) from [<0005ac04>] (vm_mmap_pgoff+0x64/0x7c)
+>> [  108.647460] [<0005ac04>] (vm_mmap_pgoff+0x64/0x7c) from [<0009e6e8>] (load_flat_binary+0x38c/0xa0c)
+>> [  108.660156] [<0009e6e8>] (load_flat_binary+0x38c/0xa0c) from [<0006bc40>] (search_binary_handler+0x4c/0xa4)
+>> [  108.676757] [<0006bc40>] (search_binary_handler+0x4c/0xa4) from [<0006bfc8>] (do_execve+0x330/0x4e8)
+>> [  108.689453] [<0006bfc8>] (do_execve+0x330/0x4e8) from [<0006c3c4>] (SyS_execve+0x30/0x44)
+>> [  108.701171] [<0006c3c4>] (SyS_execve+0x30/0x44) from [<00008f40>] (ret_fast_syscall+0x0/0x44)
+>
+> So the binfmt_flat driver is allocating memory into which to load
+> mdev's text (I assume it's the text).
+>
+>> Why it got page allocation failure?
+>
+> Because 256 physically contiguous free pages were not available.
+>
+>> Does that mean it run into OOM?
+>
+> Nope.
+>
+>> Seem the system still has enough memory available.
+>
+> Sure, but it is too fragmented.  Get an MMU ;)
+>
+>
+> otoh, memory reclaim *should* have at least reclaimed non-mmapped
+> pagecache.  Shooting down lots of pagecache is preferable to failing
+> exec().  But I expect the PAGE_ALLOC_COSTLY_ORDER logic prevents the kernel
+> from trying to do this.
+>
+> If it's repeatable then something like this:
+>
+> --- a/mm/nommu.c~a
+> +++ a/mm/nommu.c
+> @@ -1173,7 +1173,7 @@ static int do_mmap_private(struct vm_are
+>         order = get_order(len);
+>         kdebug("alloc order %d for %lx", order, len);
+>
+> -       pages = alloc_pages(GFP_KERNEL, order);
+> +       pages = alloc_pages(GFP_KERNEL|__GFP_REPEAT, order);
+>         if (!pages)
+>                 goto enomem;
+>
+>
+> *might* help.
 
-The dma engine API provides a way to program the slave id (ie mux value) and IMO
-this should be a property of slave device (perhaps part of its dma resource) and
-used while programming channel. Making it dma driver property makes no sense
-here
+Hi Andrew,
+Thanks for your reply.
 
---
-~Vinod
+I try to boot a couple times with your patch.
+Sometimes I can still see the same (above) messages with your patch applied.
+
+I'm trying to remove unnecessary features to reduce memory usage.
+(seems this does help. I got more free memory so less chance to hit
+memory allocation failure)
+Is it possible to know current memory consumption (slab) in a running system?
+
+BTW, I'm wondering what is the guidline to choose the SLAB allocator?
+(especially, for embedded platforms without mmu).
+
+I google for slab/slub/slob, and found some material [1] says:
+SLOB (Simple List Of Blocks) is a memory allocator optimized for
+embedded systems
+with very little memory?on the order of megabytes.
+But it also says SLOB suffer from pathological fragmentation.
+So I'm wondering if I should choose SLOB or not. ( Currently, I'm using SLUB ).
+
+[1] http://stackoverflow.com/questions/15470560/what-to-choose-between-slab-and-slub-allocator-in-linux-kernel
+
+Regards,
+Axel
