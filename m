@@ -1,124 +1,80 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 28 Nov 2013 10:58:48 +0100
-Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
- system suspend
-In-Reply-To: <1619468.NHTb5ylADI@vostro.rjw.lan>
-References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
- <1619468.NHTb5ylADI@vostro.rjw.lan>
-Message-ID: <CAPDyKFq0OW+uhBF1pMvY01peC1dRERtSdSNY15O=vvdY_XvQUA@mail.gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Thu, 28 Nov 2013 15:32:12 +0530
+Subject: [PATCH] ASoC: samsung: Initialize the dma_data for secondary dai
+Message-ID: <1385632932-16579-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2013 21:42, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, November 27, 2013 04:34:55 PM Ulf Hansson wrote:
->> To put devices into low power state during system suspend, it may be convenient
->> for runtime PM supported subsystems, power domains and drivers to have the
->> option of re-using the runtime PM callbacks.
->>
->> At the moment, quite complex solutions exist for power domains that tries to
->> handle the above, like for OMAP2. The idea here, is to make it possible for
->> drivers, who should know best, how to easiest put their devices into low power
->> state. The intent is thus not only to simplify drivers but also power domains.
->
-> So this is not entirely correct and stems from the fact that you are only
-> considering one platform.
+This patch initializes the dma_data for the secondary dai.
+Without this patch there is crash due to NULL pointer
+dereference during boot time on systems where secondary dai
+is initialized.
 
-Bad wording from my side, sorry.
+Below is the crash log:
+[    1.630000] smdk-audio-wm8894 sound.7:  wm8994-aif1 <-> 3830000.i2s mapping ok
+[    1.630000] Unable to handle kernel NULL pointer dereference at virtual address 00000010
+[    1.630000] pgd = c0004000
+[    1.630000] [00000010] *pgd=00000000
+[    1.630000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+[    1.630000] Modules linked in:
+...
+...
+[<c0342d6c>] (dmaengine_pcm_new+0x284/0x2ac) from [<c0341ae8>] (soc_new_pcm+0x2fc/0x3f4)
+[<c0341ae8>] (soc_new_pcm+0x2fc/0x3f4) from [<c0338558>] (snd_soc_register_card+0x1898/0x18d8)
+[<c0338558>] (snd_soc_register_card+0x1898/0x18d8) from [<c034cc34>] (smdk_audio_probe+0xa8/0xe8)
+[<c034cc34>] (smdk_audio_probe+0xa8/0xe8) from [<c0252368>] (platform_drv_probe+0x18/0x1c)
+[<c0252368>] (platform_drv_probe+0x18/0x1c) from [<c02510a4>] (driver_probe_device+0xf4/0x204)
+[<c02510a4>] (driver_probe_device+0xf4/0x204) from [<c0251240>] (__driver_attach+0x8c/0x90)
+[<c0251240>] (__driver_attach+0x8c/0x90) from [<c024f70c>] (bus_for_each_dev+0x54/0x88)
+[<c024f70c>] (bus_for_each_dev+0x54/0x88) from [<c0250724>] (bus_add_driver+0xe0/0x2b8)
+[<c0250724>] (bus_add_driver+0xe0/0x2b8) from [<c0251868>] (driver_register+0x78/0xf4)
+[<c0251868>] (driver_register+0x78/0xf4) from [<c00086e8>] (do_one_initcall+0x34/0x150)
+[<c00086e8>] (do_one_initcall+0x34/0x150) from [<c0543c30>] (kernel_init_freeable+0x12c/0x1d0)
+[<c0543c30>] (kernel_init_freeable+0x12c/0x1d0) from [<c03ebf9c>] (kernel_init+0x8/0xe8)
+[<c03ebf9c>] (kernel_init+0x8/0xe8) from [<c000e978>] (ret_from_fork+0x14/0x3c)
 
-I guess you realize, that am mostly working on ARM SoCs, but that
-involve many platforms and drivers. In these cases it is quite common
-that drivers are the best "decision makers" for PM. It is also very
-common to have power domain regulators.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
+This is made based on Mark Brown for-next branch of sound.git
+This patch is based on Mark Brown below patches for
+generic dma engine support for samsung audio IPs.
+ASoC: samsung: Use ASoC dmaengine code where possible
+ASoC: samsung: Provide helper for DMA init
 
-This combination is almost impossible to support without "hacks" as of
-today, especially if you have a more complex situation were the driver
-is attached to both a bus and a power domain, and were those also are
-handling runtime PM resources.
+ sound/soc/samsung/dmaengine.c |    3 ++-
+ sound/soc/samsung/i2s.c       |    5 ++++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
->
-> On some other platforms, like x86 PC for one example, device drivers have no
-> idea how to put their devices into low power states at all, because that
-> depends on what's there in the ACPI tables.
->
-> This becomes clearly visible when you try to use the same driver on two
-> different platforms that have different board layouts and power configurations.
-> And if one of them uses ACPI by chance, the driver shouldn't really fiddle with
-> its little knobs for clocks and power rails directly.
-
-Again, this patch set will only provide the option of being able to
-re-use runtime PM callbacks during system suspend; could also be
-considered as fundamental "building blocks" for those SoCs who needs
-this.
-
-Additionally and important, it wont break nor interfere with any other
-platforms like x86, which of course is very important. On the other
-hand, if it makes sense for other platforms to use these new building
-blocks they have the opportunity to do so.
-
->
->> Additionally, some drivers seems to have messed up things when combining
->> runtime PM with system PM. While we enable the option of re-using the runtime
->> PM callbacks during system PM, we also intend to clarify the way forward for
->> how these scenarios could be resolved.
->>
->> Some new helper macros for defining PM callbacks and two new pm_generic*
->> functions has been implemented in this patch set. These are provided to make it
->> easier for those who wants to enable the option of re-using the runtime PM
->> callbacks during system suspend.
->
-> I'm generally opposed to re-using callbacks like this, because it adds confusion
-> to the picture.  It may seem to be clever, but in fact it leads to bad design
-> choices in the drivers in my opinion.
-
-In my world of the kernel, it will clearly resolve confusions and
-simplify a significant amount of code in power domains, buses and
-drivers. So I guess it depends on from what point you look at this.
-
-And, as you stated previously during these discussions, we have the
-opportunity to update the documentation around this topic, I will
-happily do it, if needed.
-
->
-> Let's talk about specific examples, though.
->
-> Why exactly do you need what patch [5/5] does in the exynos_drm_fimc driver?
-
-This was a simple example, I wanted to visualize how the new building
-blocks were going to be used. Anyway, this we achieve with the patch:
-
-1.
-The PM part in the driver becomes simplified, we don't need the
-wrapper functions for the runtime PM callbacks any more.
-
-2.
-Previously the driver did not make sure runtime PM was disabled,
-before it put the device into low power state at .suspend. From a
-runtime PM point of view, this is not a "nice" behaviour and opens up
-for confusions, even if it likely would work in most cases.
-
-3.
-The power domain runtime PM callbacks were by-passed during system
-suspend, my patch fixes this. Why do I want this? Because the power
-domain can have runtime PM resources it need to handle at this phase.
-Potentially, it could handle that from it's .suspend_late callback
-instead, but then it gets unnecessary complicated, which is what
-clearly happened to the power domain for OMAP2, for example.
-
-
-If you want additional proof of concepts, we can have a look at more
-complex example.
-
-Typically I am thinking of cases were a cross SoC driver is attached
-to a bus and for some SoCs a power domain as well. Then, the bus, the
-power domain and the driver - all have runtime PM resources to handle.
-
-In these cases using the new building blocks will not only
-significantly simplify code, but also fix immediate bugs. One example
-are drivers attached to the AMBA bus, at drivers/amba/bus.c.
-
-Kind regards
-Ulf Hansson
-
->
-> Rafael
->
+diff --git a/sound/soc/samsung/dmaengine.c b/sound/soc/samsung/dmaengine.c
+index ad0a371..3f60479 100644
+--- a/sound/soc/samsung/dmaengine.c
++++ b/sound/soc/samsung/dmaengine.c
+@@ -67,7 +67,8 @@ EXPORT_SYMBOL_GPL(samsung_asoc_init_dma_data);
+ int samsung_asoc_dma_platform_register(struct device *dev)
+ {
+ 	return snd_dmaengine_pcm_register(dev, &samsung_dmaengine_pcm_config,
+-					  SND_DMAENGINE_PCM_FLAG_COMPAT);
++					  SND_DMAENGINE_PCM_FLAG_COMPAT |
++				SND_DMAENGINE_PCM_FLAG_CUSTOM_CHANNEL_NAME);
+ }
+ EXPORT_SYMBOL_GPL(samsung_asoc_dma_platform_register);
+ 
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 67d9fa9..0bcd7fb 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -946,8 +946,11 @@ static int samsung_i2s_dai_probe(struct snd_soc_dai *dai)
+ 	struct i2s_dai *i2s = to_info(dai);
+ 	struct i2s_dai *other = i2s->pri_dai ? : i2s->sec_dai;
+ 
+-	if (other && other->clk) /* If this is probe on secondary */
++	if (other && other->clk) { /* If this is probe on secondary */
++		samsung_asoc_init_dma_data(dai, &other->sec_dai->dma_playback,
++						NULL);
+ 		goto probe_exit;
++	}
+ 
+ 	i2s->addr = ioremap(i2s->base, 0x100);
+ 	if (i2s->addr == NULL) {
+-- 
+1.7.4.4
