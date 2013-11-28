@@ -1,48 +1,47 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 29 Nov 2013 07:39:27 +0900
-Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <527671E9.8040704@gmail.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-3-git-send-email-liuj97@gmail.com>
- <20131030001245.GB25346@mudshark.cambridge.arm.com>
- <527671E9.8040704@gmail.com>
-Message-ID: <5297C61F.8000801@linaro.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 28 Nov 2013 14:58:53 -0800
+Subject: Build warning in drivers/dma/mmp_tdma.c
+Message-ID: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2013 12:55 AM, Jiang Liu wrote:
-> On 10/30/2013 08:12 AM, Will Deacon wrote:
->> Hi Jinag Liu,
->>
->>> +static __always_inline u32 aarch64_insn_read(void *addr)
->>> +{
->>> +	return le32_to_cpu(*(u32 *)addr);
->>> +}
->>>
->>> +static __always_inline void aarch64_insn_write(void *addr, u32 insn)
->>> +{
->>> +	*(u32 *)addr = cpu_to_le32(insn);
->>> +}
->>
->> I wouldn't bother with these helpers. You should probably be using
->> probe_kernel_address or similar, then doing the endianness swabbing on the
->> return value in-line.
-> How about keeping and refining aarch64_insn_read/write interfaces
-> by using probe_kernel_address()? I think they may be used in other
-> places when supporting big endian ARM64 kernel.
+My build warning test is failing on this driver please fix:
 
-I prefer it (using probe_kernel_read/write) for my ftrace patch.
-I would be able to replace some portion of my own function (ftrace_modify_code)
-to aarch64_insn_patch_text_nosync().
+drivers/dma/mmp_tdma.c:236:8: warning: 'tdcr' may be used
+uninitialized in this function [-Wuninitialized]
 
-See my comment here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/207001.html
-([PATCH 2/6])
+It's valid as mmp_tdma_control as the direction is specified in
+mmp_tdma_control() and may not be one of the two tests in that branch.
 
-Current implementation assumes stop_machine (via arch_ftrace_update_code()
-in generic ftrace), and, given the discussion btw you and Will, I wonder
-that it might be relaxed because ftrace on arm64 modifies only a single branch
-or nop instruction at any time.
 
--Takahiro AKASHI
+
+I'm also carrying patch to add a missing dependency:
+
+commit 1a4ee91dacedde3e82d8ce6eeace7f16884474f9
+Author: Dan Williams <dan.j.williams@intel.com>
+Date:   Thu Nov 28 12:27:38 2013 -0800
+
+    dma: mmp_dma depends on CPU_MMP2
+
+    It calls sram_get_gpool() which is only defined if CONFIG_CPU_MMP2=y
+
+    Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 446687cc2334..dad83634cb65 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -287,7 +287,7 @@ config DMA_SA11X0
+
+ config MMP_TDMA
+        bool "MMP Two-Channel DMA support"
+-       depends on ARCH_MMP
++       depends on ARCH_MMP && CPU_MMP2
+        select DMA_ENGINE
+        help
+          Support the MMP Two-Channel DMA engine.
+
+Is there a different ARCH type that this driver should be depending on?
+
+--
+Dan
