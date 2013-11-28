@@ -1,45 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 17:54:33 +0900
-Subject: [PATCH 09/16] ARM: shmobile: Cosmetic update of Lager DT Reference
+Date: Thu, 28 Nov 2013 17:54:41 +0900
+Subject: [PATCH 11/16] ARM: shmobile: r8a7779: camera-rcar header cleanup
 In-Reply-To: <cover.1385628709.git.horms+renesas@verge.net.au>
 References: <cover.1385628709.git.horms+renesas@verge.net.au>
-Message-ID: <20c6125fc9d98492e5ed1668d1ea72289c8ff94c.1385628709.git.horms+renesas@verge.net.au>
+Message-ID: <2f3927e815e82874af76db51f8d2c2a596bc6cee.1385628709.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Clean up the Lager DT reference board code to make it match
-Koelsch DT reference including using the rcar-gen2 header.
+<linux/platform_data/camera-rcar.h> is needed on Marzen,
+not setup-r8a7779.c
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager-reference.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/board-marzen.c         | 1 +
+ arch/arm/mach-shmobile/include/mach/r8a7779.h | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 1a1a4a8..7df9ea0 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -20,16 +20,15 @@
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index fa102f7..4f9e3ec 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -29,6 +29,7 @@
+ #include <linux/leds.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/pinctrl/machine.h>
++#include <linux/platform_data/camera-rcar.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_data/rcar-du.h>
+ #include <linux/platform_data/usb-rcar-phy.h>
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+index 905420a..1cab247 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -4,7 +4,6 @@
+ #include <linux/sh_clk.h>
+ #include <linux/pm_domain.h>
+ #include <linux/sh_eth.h>
+-#include <linux/platform_data/camera-rcar.h>
  
- #include <linux/init.h>
- #include <linux/of_platform.h>
-+#include <mach/rcar-gen2.h>
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
- 
- static void __init lager_add_standard_devices(void)
- {
--	/* clocks are setup late during boot in the case of DT */
- 	r8a7790_clock_init();
--
- 	r8a7790_add_dt_devices();
--        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static const char *lager_boards_compat_dt[] __initdata = {
+ /* HPB-DMA slave IDs */
+ enum {
 -- 
 1.8.4
