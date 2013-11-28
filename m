@@ -1,51 +1,41 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 16:36:21 +0900
-Subject: [PATCH 01/15] i2c: shmobile/rcar: Restrict non-COMPILE_TEST
+Date: Thu, 28 Nov 2013 16:36:36 +0900
+Subject: [PATCH 02/15] input: sh_keysc: Restrict non-COMPILE_TEST
  compilation
-In-Reply-To: <1385515117-23664-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+In-Reply-To: <1385515117-23664-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131128073621.GC24146@verge.net.au>
+ <1385515117-23664-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131128073636.GD24146@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 02:18:23AM +0100, Laurent Pinchart wrote:
-> Hardware supported by the i2c sh_mobile and rcar drivers is only found
-> on SUPERH or ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST
-> compilation to them.
+On Wed, Nov 27, 2013 at 02:18:24AM +0100, Laurent Pinchart wrote:
+> Hardware supported by the driver is only found on SUPERH or
+> ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
 > 
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: linux-i2c at vger.kernel.org
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: linux-input at vger.kernel.org
 > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
 Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
 > ---
->  drivers/i2c/busses/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/input/keyboard/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 3b26129..92bdcf9 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -683,7 +683,7 @@ config I2C_SH7760
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index bb174c1..a673c9f 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -525,7 +525,7 @@ config KEYBOARD_SUNKBD
 >  
->  config I2C_SH_MOBILE
->  	tristate "SuperH Mobile I2C Controller"
+>  config KEYBOARD_SH_KEYSC
+>  	tristate "SuperH KEYSC keypad support"
 > -	depends on SUPERH || ARM || COMPILE_TEST
 > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
 >  	help
->  	  If you say yes to this option, support will be included for the
->  	  built-in I2C interface on the Renesas SH-Mobile processor.
-> @@ -796,7 +796,7 @@ config I2C_XLR
->  
->  config I2C_RCAR
->  	tristate "Renesas R-Car I2C Controller"
-> -	depends on ARM || COMPILE_TEST
-> +	depends on ARCH_SHMOBILE || COMPILE_TEST
->  	help
->  	  If you say yes to this option, support will be included for the
->  	  R-Car I2C controller.
+>  	  Say Y here if you want to use a keypad attached to the KEYSC block
+>  	  on SuperH processors such as sh7722 and sh7343.
 > -- 
 > 1.8.3.2
 > 
