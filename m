@@ -1,11 +1,7 @@
 From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Thu, 28 Nov 2013 08:19:32 +0100
-Subject: [PATCHv2 3/3] ARM: dts: imx27: imx27-apf27dev: add pinctrl for cspi,
- i2c, sdhc and framebuffer
-In-Reply-To: <1385623172-87429-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1385623172-87429-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1385623172-87429-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1385623172-87429-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Date: Thu, 28 Nov 2013 08:19:30 +0100
+Subject: [PATCHv2 1/3] ARM: imx27: add pingroups for cspi, sdhc and framebuffer
+Message-ID: <1385623172-87429-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,91 +9,97 @@ Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 ---
 Changelog:
 v2:
- * Fix framebuffer pingroup name: MX27_FB1_PINGRP1 -> MX27_FB_PINGRP1
+ * pingroups entries are now sorted alphabetically;
+ * framebuffer pingroup is renamed: MX27_FB1_PINGRP1 -> MX27_FB_PINGRP1
 
- arch/arm/boot/dts/imx27-apf27dev.dts | 40 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/imx27-pingrp.h | 68 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index 9197329..0010b3e 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -60,6 +60,8 @@
- &cspi1 {
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 28 1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_cspi1>;
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/imx27-pingrp.h b/arch/arm/boot/dts/imx27-pingrp.h
+index 08d8d18..f3fbf5a 100644
+--- a/arch/arm/boot/dts/imx27-pingrp.h
++++ b/arch/arm/boot/dts/imx27-pingrp.h
+@@ -13,6 +13,50 @@
  
-@@ -67,17 +69,23 @@
- 	fsl,spi-num-chipselects = <3>;
- 	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
- 			<&gpio2 17 1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_cspi2>;
- 	status = "okay";
- };
+ #include "imx27-pinfunc.h"
  
- &fb {
- 	display = <&display>;
- 	fsl,dmacr = <0x00020010>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_imxfb1>;
- 	status = "okay";
- };
++#define MX27_CSPI1_PINGRP1 \
++	MX27_PAD_CSPI1_MISO__CSPI1_MISO 0x0 \
++	MX27_PAD_CSPI1_MOSI__CSPI1_MOSI 0x0 \
++	MX27_PAD_CSPI1_SCLK__CSPI1_SCLK 0x0
++
++#define MX27_CSPI2_PINGRP1 \
++	MX27_PAD_CSPI2_MISO__CSPI2_MISO 0x0 \
++	MX27_PAD_CSPI2_MOSI__CSPI2_MOSI 0x0 \
++	MX27_PAD_CSPI2_SCLK__CSPI2_SCLK 0x0
++
++#define MX27_CSPI3_PINGRP1 \
++	MX27_PAD_SD1_CLK__CSPI3_SCLK 0x0 \
++	MX27_PAD_SD1_D0__CSPI3_MISO 0x0 \
++	MX27_PAD_SD1_CMD__CSPI3_MOSI 0x0
++
++#define MX27_FB_PINGRP1 \
++	MX27_PAD_CLS__CLS 0x0 \
++	MX27_PAD_CONTRAST__CONTRAST 0x0 \
++	MX27_PAD_LD0__LD0 0x0 \
++	MX27_PAD_LD1__LD1 0x0 \
++	MX27_PAD_LD2__LD2 0x0 \
++	MX27_PAD_LD3__LD3 0x0 \
++	MX27_PAD_LD4__LD4 0x0 \
++	MX27_PAD_LD5__LD5 0x0 \
++	MX27_PAD_LD6__LD6 0x0 \
++	MX27_PAD_LD7__LD7 0x0 \
++	MX27_PAD_LD8__LD8 0x0 \
++	MX27_PAD_LD9__LD9 0x0 \
++	MX27_PAD_LD10__LD10 0x0 \
++	MX27_PAD_LD11__LD11 0x0 \
++	MX27_PAD_LD12__LD12 0x0 \
++	MX27_PAD_LD13__LD13 0x0 \
++	MX27_PAD_LD14__LD14 0x0 \
++	MX27_PAD_LD15__LD15 0x0 \
++	MX27_PAD_LD16__LD16 0x0 \
++	MX27_PAD_LD17__LD17 0x0 \
++	MX27_PAD_LSCLK__LSCLK 0x0 \
++	MX27_PAD_OE_ACD__OE_ACD 0x0 \
++	MX27_PAD_PS__PS 0x0 \
++	MX27_PAD_REV__REV 0x0 \
++	MX27_PAD_SPL_SPR__SPL_SPR 0x0 \
++	MX27_PAD_HSYNC__HSYNC 0x0 \
++	MX27_PAD_VSYNC__VSYNC 0x0
++
+ #define MX27_FEC1_PINGRP1 \
+ 	MX27_PAD_SD3_CMD__FEC_TXD0 0x0 \
+ 	MX27_PAD_SD3_CLK__FEC_TXD1 0x0 \
+@@ -44,6 +88,30 @@
+ #define MX27_OWIRE1_PINGRP1 \
+ 	MX27_PAD_RTCK__OWIRE 0x0
  
- &i2c1 {
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
- 	status = "okay";
- 
- 	rtc at 68 {
-@@ -87,11 +95,43 @@
- };
- 
- &i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
- 	status = "okay";
- };
- 
-+&iomuxc {
-+	imx27-apf27dev {
-+		pinctrl_cspi1: cspi1grp {
-+			fsl,pins = <MX27_CSPI1_PINGRP1>;
-+		};
++#define MX27_SDHC1_PINGRP1 \
++	MX27_PAD_SD1_CLK__SD1_CLK \
++	MX27_PAD_SD1_CMD__SD1_CMD \
++	MX27_PAD_SD1_D0__SD1_D0 \
++	MX27_PAD_SD1_D1__SD1_D1 \
++	MX27_PAD_SD1_D2__SD1_D2 \
++	MX27_PAD_SD1_D3__SD1_D3
 +
-+		pinctrl_cspi2: cspi2grp {
-+			fsl,pins = <MX27_CSPI2_PINGRP1>;
-+		};
++#define MX27_SDHC2_PINGRP1 \
++	MX27_PAD_SD2_CLK__SD2_CLK \
++	MX27_PAD_SD2_CMD__SD2_CMD \
++	MX27_PAD_SD2_D0__SD2_D0 \
++	MX27_PAD_SD2_D1__SD2_D1 \
++	MX27_PAD_SD2_D2__SD2_D2 \
++	MX27_PAD_SD2_D3__SD2_D3
 +
-+		pinctrl_imxfb1: imxfbgrp {
-+			fsl,pins = <MX27_FB_PINGRP1>;
-+		};
++#define MX27_SDHC3_PINGRP1 \
++	MX27_PAD_SD3_CLK__SD3_CLK \
++	MX27_PAD_SD3_CMD__SD3_CMD \
++	MX27_PAD_SD3_D0__SD3_D0 \
++	MX27_PAD_SD3_D1__SD3_D1 \
++	MX27_PAD_SD3_D2__SD3_D2 \
++	MX27_PAD_SD3_D3__SD3_D3
 +
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <MX27_I2C1_PINGRP1>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <MX27_I2C2_PINGRP1>;
-+		};
-+
-+		pinctrl_sdhc2: sdhc2grp {
-+			fsl,pins = <MX27_SDHC2_PINGRP1>;
-+		};
-+	};
-+};
-+
- &sdhci2 {
- 	bus-width = <4>;
- 	cd-gpios = <&gpio3 14 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sdhc2>;
- 	status = "okay";
- };
+ #define MX27_UART1_PINGRP1 \
+ 	MX27_PAD_UART1_TXD__UART1_TXD 0x0 \
+ 	MX27_PAD_UART1_RXD__UART1_RXD 0x0
 -- 
 1.8.3.2
