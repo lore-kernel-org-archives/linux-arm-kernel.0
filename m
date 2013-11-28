@@ -1,47 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 28 Nov 2013 09:58:33 -0700
-Subject: [PATCH v11 7/7] ARM: tegra: support Trusted Foundations by default
-In-Reply-To: <CAAVeFuJgqgRnWLD+dyvb7+2fLanHmdDT0YV5r8ETsoqqjW8p7A@mail.gmail.com>
-References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
- <1385274652-16415-8-git-send-email-acourbot@nvidia.com>
- <20131126000608.GA21634@quad.lixom.net>
- <CAAVeFu+mMyPhFtVZ09vgYWWCYkPpF3X547ffRAfXXKOOWUUkqg@mail.gmail.com>
- <20131126164730.GE2355@e103592.cambridge.arm.com>
- <CAAVeFuJgqgRnWLD+dyvb7+2fLanHmdDT0YV5r8ETsoqqjW8p7A@mail.gmail.com>
-Message-ID: <52977639.4000308@wwwdotorg.org>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Thu, 28 Nov 2013 19:02:09 +0200
+Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on device
+ id
+In-Reply-To: <20131127213726.GB26766@atomide.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-3-git-send-email-tony@atomide.com>
+ <20131118184723.GR10317@atomide.com> <87ioveeo0x.fsf@octavius.laptop.org>
+ <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
+ <20131127213726.GB26766@atomide.com>
+Message-ID: <52977711.6030806@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2013 11:02 PM, Alexandre Courbot wrote:
-> On Wed, Nov 27, 2013 at 1:47 AM, Dave Martin <Dave.Martin@arm.com> wrote:
->> On Tue, Nov 26, 2013 at 10:35:58AM +0900, Alexandre Courbot wrote:
->>> On Tue, Nov 26, 2013 at 9:06 AM, Olof Johansson <olof@lixom.net> wrote:
->>>> On Sun, Nov 24, 2013 at 03:30:52PM +0900, Alexandre Courbot wrote:
->>>>> Support for Trusted Foundations is light and allows the kernel to run on
->>>>> a wider range of devices, so enable it by default.
->>>>>
->>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->>>>> ---
->>>>>  arch/arm/configs/tegra_defconfig | 1 +
->>>>>  1 file changed, 1 insertion(+)
->>>>
->>>> I think we want this enabled on multi_v7_defconfig too? Send a separate
->>>> patch for that once this is merged though.
->>>
->>> Will do.
->>
->> Should it just be default y if one of the relevant
->> CONFIG_ARCH_TEGRA_*_SOC is selected?
->>
->> That way, it's automatically included if relevant, and automatically
->> excluded if not -- regardless of whether the kernel is multiplatform
->> or not.
-> 
-> So basically, that would mean setting the default to 'y' since the
-> option is not available unless a supported platform is included?
-> 
-> I'm fine this way too, if Stephen also agrees.
+Hi
 
-Fine by me.
+On 11/27/2013 11:37 PM, Tony Lindgren wrote:
+> * Jarkko Nikula <jarkko.nikula@bitmer.com> [131127 12:55]:
+> Bummer, sounds like some duplicate work could have been avoided :(
+> I suggest resend to Chris and linux-mmc one more time as Chris should
+> pick up the MMC patches in general.
+> 
+Before that should Chris merge your 2 patches in order to avoid couple
+trivial merge conflicts with my set when linux-omap and mmc are merged?
+
+-- 
+Jarkko
