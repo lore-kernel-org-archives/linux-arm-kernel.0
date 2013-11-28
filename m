@@ -1,74 +1,61 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 28 Nov 2013 11:23:52 +0530
-Subject: [PATCH v3 5/9] usb: gadget: s3c-hsotg: use generic
- phy_init()/phy_exit() support
-In-Reply-To: <20131127223650.GP31091@beef>
-References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
- <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
- <529476A4.8080600@ti.com> <20131127171325.GD31091@beef>
- <20131127223650.GP31091@beef>
-Message-ID: <5296DA70.8010409@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 28 Nov 2013 14:54:19 +0900
+Subject: [PATCH RFC] PCI: imx6: remove outbound io/mem ATU region mapping
+In-Reply-To: <20131127083637.GD12773@pratyush-vbox>
+References: <1382504143-27915-1-git-send-email-tharvey@gateworks.com>
+ <201311262146.09780.marex@denx.de> <20131127035056.GA12773@pratyush-vbox>
+ <201311270924.47277.marex@denx.de> <20131127083637.GD12773@pratyush-vbox>
+Message-ID: <006401ceebfe$47ab6b00$d7024100$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 November 2013 04:06 AM, Matt Porter wrote:
-> On Wed, Nov 27, 2013 at 12:13:25PM -0500, Matt Porter wrote:
->> On Tue, Nov 26, 2013 at 03:53:32PM +0530, Kishon Vijay Abraham I wrote:
->>> Hi,
->>>
->>> On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
->>>> If a generic phy is present, call phy_init()/phy_exit(). This supports
->>>> generic phys that must be soft reset before power on.
->>>>
->>>> Signed-off-by: Matt Porter <matt.porter@linaro.org>
->>>> ---
->>>>  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
->>>>  1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
->>>> index da3879b..8dfe33f 100644
->>>> --- a/drivers/usb/gadget/s3c-hsotg.c
->>>> +++ b/drivers/usb/gadget/s3c-hsotg.c
->>>> @@ -3622,6 +3622,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
->>>>  		goto err_supplies;
->>>>  	}
->>>>  
->>>> +	if (hsotg->phy)
->>>
->>> IS_ERR? If your phy_get fails *phy* will have a error value..
->>
->> Yes, thanks. I'll fix these and also note that the same issue exists in
->> Kamil's patch for these same hsotg->phy conditional uses. I'll work with
->> Kamil to either get those addressed there or in a follow on fix.
+On Wednesday, November 27, 2013 5:37 PM, Pratyush Anand wrote:
+> On Wed, Nov 27, 2013 at 04:24:47PM +0800, Marek Vasut wrote:
+> > > On Wed, Nov 27, 2013 at 04:46:09AM +0800, Marek Vasut wrote:
+> > > > Dear Pratyush Anand,
+> > > >
+> > > > > Hi,
+> > > > >
+> > > > > On Wed, Oct 23, 2013 at 12:55:43PM +0800, Tim Harvey wrote:
+> > > > > > The IMX6 iATU is used for address translation between the AXI bus
+> > > > > > address space and PCI address space.  This is used for type0 and
+> > > > > > type1 config cycles but is not necessary for outbound io/mem
+> > > > > > regions.
+> > > > > >
+> > > > > > This patch removes the calls that inappropriately re-configures the
+> > > > > > ATU viewport for outbound memory and IO after config cycles and
+> > > > > > removes them altogether as they are not necessary.
+> > > > > >
+> > > > > > This resolves issues with PCI devices behind switches and has been
+> > > > > > tested with a Gige device behind a PLX PEX860x switch.  More testing
+> > > > > > is needed for other configurations.
+> > > > >
+> > > > > It seems to me that in your controller you have only one view port.
+> > > > > Also mem_base and mem_bus_addr is same. Thats why it works in your
+> > > > > case.
+> > > >
+> > > > MX6 has 4 In/4 Out viewports AFAICT.
+> > >
+> > > Then if I do not miss anything, MX6 should work even without this patch.
+> >
+> > Yes, yet, it does not. On the other hand, this defect is only problematic if you
+> > use the devices behind a switch. Do you use a PCIe switch on your platform
+> > please?
 > 
-> I spoke too soon. If devm_phy_get fails, we don't set hsotg->phy and probe
-> defer thus not reaching this point. Since hsotg->phy is either NULL or a
-> valid struct phy *, this is correct as is throughout the driver.
-> 
->>>
->>>> +		phy_init(hsotg->phy);
->>>> +
->>>>  	/* usb phy enable */
->>>>  	s3c_hsotg_phy_enable(hsotg);
->>>>  
->>>> @@ -3715,6 +3718,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
->>>>  	}
->>>>  
->>>>  	s3c_hsotg_phy_disable(hsotg);
->>>> +	if (hsotg->phy)
->>>
->>> same here.
->>
->> Ok.
-> 
-> Same above, this will be NULL on failure (but is only applicable at this
-> point on the platform data path.
+> I had tested with device under bridge.
+> Mohit is in process of validating SPEAr patches with latest kernel.
+> Mohit, see if we can arrange a switch and test, once SPEAr platform is
+> ready with latest kernel.
 
-Ah ok.. Btw where is phy_get being called? Is it not part of this series?
+I agree with Pratyush Anand's opinion.
+One of our engineers had tested PCI cards under switch.
+As far as I know, there was no issue about this.
+However, currently, I don't have any switches. So, I
+Cannot test this on Exynos platform.
 
-Thanks
-Kishon
+Mohit,
+If you test a switch on SPEAr platform, it will be
+very helpful. Thank you.
 
-> 
-> -Matt
-> 
+Best regards,
+Jingoo Han
