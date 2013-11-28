@@ -1,37 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Nov 2013 13:40:41 +0800
-Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix chipselect level for
- dataflash on spi0.1
-In-Reply-To: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
-References: <1385553346-20642-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131128054039.GB5914@S2101-09.ap.freescale.net>
+From: amit.virdi@st.com (Amit Virdi)
+Date: Thu, 28 Nov 2013 11:12:55 +0530
+Subject: [PATCH] ARM: asm: Configure caches as per the defconfig
+In-Reply-To: <20131127121425.GN16735@n2100.arm.linux.org.uk>
+References: <1385553244-1513-1-git-send-email-amit.virdi@st.com>
+ <20131127121425.GN16735@n2100.arm.linux.org.uk>
+Message-ID: <5296D7DF.202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 03:55:45PM +0400, Alexander Shiyan wrote:
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+On 11/27/2013 5:44 PM, Russell King - ARM Linux wrote:
+> On Wed, Nov 27, 2013 at 05:24:04PM +0530, Amit Virdi wrote:
+>> From: Amit VIRDI <Amit.VIRDI@st.com>
+>>
+>> In the current implementation of the decompression code, the caches are enabled
+>> irrespective of their configuration in the deconfig. This makes setting the
+>> ICACHE and DCACHE disable options from the menuconfig irrelevant. Change this
+>> implementation to enable caches only if specified in the defconfig.
+>
+> NAK.  These options are provided more for ARM Ltd's validation of CPUs
+> rather than for users, and it's not supposed to be used with the
+> decompressor.
+>
 
-Applied both, thanks.
+It is perfectly true that these options are used only during CPU 
+validations and not in the end product. Still, it doesn't justify why 
+these options are not to be used with decompressor. Or alternately, why 
+would a user intend to disable a cache when it has been implemented 
+correctly and is stable? Without this change, the effect of disabling 
+cache is not reflected in entirety.
 
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index bbe899f..ee0deb3 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -138,7 +138,7 @@
->  	pinctrl-0 = <&pinctrl_ecspi1>;
->  	fsl,spi-num-chipselects = <2>;
->  	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>,
-> -		   <&gpio4 25 GPIO_ACTIVE_HIGH>;
-> +		   <&gpio4 25 GPIO_ACTIVE_LOW>;
->  	status = "okay";
->  
->  	pmic: mc13892 at 0 {
-> -- 
-> 1.8.3.2
-> 
+Regards
+Amit Virdi
