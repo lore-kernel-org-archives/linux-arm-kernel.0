@@ -1,53 +1,38 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 28 Nov 2013 17:12:41 +0400
-Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
-In-Reply-To: <528C2910.8030705@gmail.com>
-References: <20131116124750.GA26318@anuminas.rup.mentorg.com>
- <CALT56yOcUChApUP6rOyXqWuK55ZR0Ooj457XVP2b7bVR9yk-8A@mail.gmail.com>
- <528C2910.8030705@gmail.com>
-Message-ID: <CALT56yOnv+2ohsiHtQ1a-jwEjo3H9fZ7hpehHfQCGHydHc6vSw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Nov 2013 14:16:07 +0100
+Subject: ACPI
+In-Reply-To: <20131127122543.5DEE2C404EC@trevor.secretlab.ca>
+References: <F5C3F66D-C7C0-494A-8561-77E1DE0FA103@jonmasters.org>
+ <201311261443.30784.jbe@pengutronix.de>
+ <20131127122543.5DEE2C404EC@trevor.secretlab.ca>
+Message-ID: <CACRpkdbCqc4R1YF_eEa5PfnADSdroqnAuQ50sYnuhOnkjqS5bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Haojian,
+On Wed, Nov 27, 2013 at 1:25 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Tue, 26 Nov 2013 14:43:30 +0100, J?rgen Beisert <jbe@pengutronix.de> wrote:
+>> On Tuesday 26 November 2013 13:55:10 Grant Likely wrote:
+>> > On Tue, Nov 26, 2013 at 12:43 PM, Linus Walleij
 
-On Wed, Nov 20, 2013 at 7:14 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On 11/19/2013 04:33 PM, Dmitry Eremin-Solenikov wrote:
+>> > > Since i2c is a slow bus, can be 100kHz or so, how does that
+>> > > avoid locking the entire CPU while e.g. waiting for transactions on
+>> > > the external bus to complete?
+(...)
+>> >
+>> > ACPI5 defines a binding for serial busses (i2c & spi) which allows
+>> > real device drivers to drive the bus and allows ACPI and the kernel to
+>> > share the bus safely. Using that binding means some i2c devices can be
+>> > 'owned' by ACPI and others owned by the kernel.
 >>
->> Hello,
->>
->> On Sat, Nov 16, 2013 at 4:47 PM, Dmitry Eremin-Solenikov
->> <dbaryshkov@gmail.com> wrote:
->>>
->>> When converting from tosa-keyboard driver to matrix keyboard, tosa keys
->>> received extra 1 column shift. Replace that with correct values to make
->>> keyboard work again.
->>>
->>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>> ---
->>>   arch/arm/mach-pxa/tosa.c | 102
->>> +++++++++++++++++++++++------------------------
->>>   1 file changed, 51 insertions(+), 51 deletions(-)
->>
->>
->> As nobody seems to object, I would like to use my tosa maintainer
->> powers and push
->> this patch for inclusion.
->>
->> Both Eric and Haojian seem to be unresponsive now.
->> Russell, can I push it to your patch system? Or should I push it to
->> arm-soc guys?
->>
+>> This means bus locking. And Linus' other question about CPU locking while ACPI
+>> drives the I2C bus?
 >
-> Hi Dmitry,
->
-> I can take this patch. I didn't response since I'm waiting the new
-> v3.13-rc1. I'm sorry on inconvenience.
+> It means Linux owns the I2C bus and AML methods request the OS to
+> perform a transaction on its behalf.
 
-Nearly a week passed and I still don't see the patch either in arm-soc
-or in linux-next.
+Aha OK so that is consistent with how control of GPIOs (and I guess
+other things as well) are partitioned between the kernel and ACPI AML
+methods. And it's not so bad, this is manageable.
 
--- 
-With best wishes
-Dmitry
+Yours,
+Linus Walleij
