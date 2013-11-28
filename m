@@ -1,67 +1,43 @@
-From: ricard.wanderlof@axis.com (Ricard Wanderlof)
-Date: Thu, 28 Nov 2013 08:48:47 +0100
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-In-Reply-To: <87wqjtbm8r.fsf@natisbad.org>
-References: <1384464339-6817-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <87d2lp28pd.fsf@natisbad.org> <20131125120335.GD2408@localhost>
- <87r4a4f5gr.fsf@natisbad.org> <20131126124003.GA2344@localhost>
- <87zjopd240.fsf@natisbad.org> <87wqjtbm8r.fsf@natisbad.org>
-Message-ID: <alpine.DEB.2.00.1311280845470.3251@lnxricardw.se.axis.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 Nov 2013 16:55:24 +0900
+Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM DT
+ Ref
+In-Reply-To: <20131031031841.15992.74619.sendpatchset@w520>
+References: <20131031031841.15992.74619.sendpatchset@w520>
+Message-ID: <20131128075522.GM24146@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Nov 2013, Arnaud Ebalard wrote:
+On Thu, Oct 31, 2013 at 12:18:41PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Add 1GiB of DRAM at 0x2_0000_0000 to support the full 2GiB
+> of APE6EVM system memory also in case of DT reference.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
->> Well, I guess the bad block the driver put in the bbt are not that bad
->> in practice, i.e. they were mistakenly marked that way. I also
->> guess^Whope there is a some low level command I could use to simply
->> clear the bbt (the NAND had no bad block prior to the test). Any help
->> would be appreciated on that point.
->
-> Replying to myself w/ the solution: just in case it happens to someone
-> else, it's as simple as using flash_erase w/ -N option on a kernel
-> modified (in drivers/mtd/nand/nand_base.c) to allow write to a bad
-> block w/ the following patch:
->
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index bd39f7b..e70ef60 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
-> @@ -2591,6 +2591,7 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
->        instr->state = MTD_ERASING;
->
->        while (len) {
-> +#if 0
->                /* Check if we have a bad block, we do not erase bad blocks! */
->                if (nand_block_checkbad(mtd, ((loff_t) page) <<
->                                        chip->page_shift, 0, allowbbt)) {
-> @@ -2599,6 +2600,7 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
->                        instr->state = MTD_ERASE_FAILED;
->                        goto erase_exit;
->                }
-> +#endif
->
->                /*
->                 * Invalidate the page cache, if we erase the block which
->
->
-> After a reboot on that modified kernel, a simple call to flash_erase
-> using -N option will erase the badblocks:
->
-> # flash_erase -N /dev/mtd4 0 0
-> ...
+Thanks, I have queued this up.
 
-I agree, I usually do something along these lines too (especially the 
-kernel bit) when I run into a flash with mistakingly marked bad blocks.
-
-I've always argued against having it switchable in any way in the kernel, 
-I've figured it needs to be hard to do (i.e. require access to kernel code 
-and target build system) so that average users don't start erasing bad 
-blocks at the sign of bad block trouble by just flicking a switch in /sys 
-or whatever.
-
-/Ricard
--- 
-Ricard Wolf Wanderl?f                           ricardw(at)axis.com
-Axis Communications AB, Lund, Sweden            www.axis.com
-Phone +46 46 272 2016                           Fax +46 46 13 61 30
+> ---
+> 
+>  For correct run time operation regardless of kernel configuration
+>  ARM patches 7863/1 and 7864/1 are needed.
+> 
+>  arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> --- 0001/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+> +++ work/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts	2013-10-31 11:46:51.000000000 +0900
+> @@ -25,6 +25,11 @@
+>  		reg = <0 0x40000000 0 0x40000000>;
+>  	};
+>  
+> +	memory at 200000000 {
+> +		device_type = "memory";
+> +		reg = <2 0x00000000 0 0x40000000>;
+> +	};
+> +
+>  	vcc_mmc0: regulator at 0 {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "MMC0 Vcc";
+> 
