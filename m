@@ -1,86 +1,83 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 28 Nov 2013 14:10:09 -0700
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131128203322.GB14689@mithrandir>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131128203322.GB14689@mithrandir>
-Message-ID: <20131128211009.GA26447@obsidianresearch.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 28 Nov 2013 22:20:20 +0100
+Subject: NULL clock items (was: [PATCH 11/31] dma: add channel request
+ API that supports deferred probe)
+In-Reply-To: <20131125205224.GT16735@n2100.arm.linux.org.uk>
+References: <CAPcyv4jTUVjhFFXP8RL2jCqFj1MqxSCKQYvfdLHTj+1PRDDL3Q@mail.gmail.com>
+ <528F95A9.2050305@wwwdotorg.org>
+ <CAPcyv4iXmBmcsHDc7yjxxbH7sO8m1nVoEO6PUibuDeb1Wtge+g@mail.gmail.com>
+ <528F9DF9.6080706@wwwdotorg.org>
+ <20131123003442.GH16735@n2100.arm.linux.org.uk>
+ <5293883A.8050808@wwwdotorg.org>
+ <20131125175330.GQ16735@n2100.arm.linux.org.uk>
+ <52938F75.7020108@wwwdotorg.org>
+ <20131125202808.GN2760@book.gsilab.sittig.org>
+ <20131125205224.GT16735@n2100.arm.linux.org.uk>
+Message-ID: <20131128212020.GE2982@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 09:33:23PM +0100, Thierry Reding wrote:
-
-> >   - Describing masters that master through multiple different buses
-> > 
-> >   - How on Earth this fits in with the Linux device model (it doesn't)
-> > 
-> >   - Interaction with IOMMU bindings (currently under discussion)
+On Mon, Nov 25, 2013 at 20:52 +0000, Russell King - ARM Linux wrote:
 > 
-> This is all very vague. Perhaps everyone else knows what this is all
-> about, in which case it'd be great if somebody could clue me in.
+> [ ... 2771399a "fs_enet: cleanup clock API use" example ... ]
+> [ ... NULL clocks won't get released, calls might get skipped ... ]
 
-It looks like an approach to describe an AXI physical bus topology in
-DT..
+I agree that the NULL clock reference is not handled correctly in
+that code.  Part of the issue is that NULL is both an
+initialization value and a valid reference to something that was
+acquired (and quite counter intuitive so).
 
-AFAIK the issue is that the AXI toolkit arm provides encourages a
-single IP block to have several AXI ports - control, DMA, high speed
-MMIO, for instance. Each of those ports is hooked up into an AXI bus
-DAG that has little to do with the CPU address map.
+This inability to tell the two reasons for NULL apart only
+vanishes when each clock variable explicitly gets initialized or
+pre-set to some ERR_PTR() value (or when the allocation and
+assignment is unconditional, no code path depends on some other
+condition).  I'm afraid that the source tree currently is not
+there yet, and it may be quite some churn (with a lot of
+potential for conflicts) to touch each driver, if it's at all
+possible to identify all spots where those variables are NULL
+because of
+- static declarations without initializers
+- static declarations with incomplete initializers
+- memory allocation with "zeroes please" flags
+- memset() calls
+- clock acquisition code paths were not taken
 
-Contrasted with something like PCI, where each IP has exactly one bus
-port into the system, so the MMIO register access address range
-directly implies the bus master DMA path.
 
-To my mind, a sensble modeling would be to have the DT tree represent
-the AXI DAG flattened into a tree rooted at the CPU vertex. Separately
-in the DT would be the full AXI DAG represented with phandle
-connections.
+Which platform or clock provider or specific clock driver exactly
+is this mysterious instance which returns NULL for a valid clock?
+Is this one or the very few instances easier to adjust and thus
+(re-)gain certainty about correct operation with less effort and
+much less risk of missing something?
 
-Nodes in the DT would use phandles to indicate their connections into
-the AXI DAG.
 
-Hugely roughly:
-soc 
-{
-   ranges = <Some quasi-real ranges indicating IP to CPU mapping>;
-   ip_block 
-   { 
-      reg = <...>
-      axi-ports = <mmio = &axi_low_speed_port0, dma = &axi_dma_port1, .. >;
-   }
-}
+> This is not very nice.  Better solution:
+> 
+> 	fpi->clk_per = PTR_ERR(-EINVAL);
+> 	clk = devm_clk_get(&ofdev->dev, "per");
+> 	if (!IS_ERR(clk)) {
+> 		err = clk_prepare_enable(clk);
+> 		if (err) {
+> 			ret = err;
+> 			goto out_free_fpi;
+> 		}
+> 		fpi->clk_per = clk;
+> 	}
+> 
+> ...
+> 
+>         of_node_put(fpi->phy_node);
+>         if (!IS_ERR(fpi->clk_per))
+>                 clk_disable_unprepare(fpi->clk_per);
 
-axi
-{
-   /* Describe a DAG of AXI connections here. */
-   cpu { downstream = &ax_switch,}
-   axi_switch {downstream = &memory,&low_speed}
-   memory {}
-   dma {downstream = &memory}
-   low_speed {}
-}
+Assume in the above example that the fpi->clk_per assignment
+would be in a conditional code path.  In that case the code is as
+wrong (unpreparing a not acquired NULL reference) as leaking an
+acquired NULL reference is.
 
-I was just reading the Zynq manual which gives a pretty good
-description of what one vendor did using the ARM AXI toolkits..
 
-http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
-Figure 5-1 pg 122
-
-You can see it is a complex DAG of AXI busses. For instance if you
-want to master from a 'High Performance Port M0' to 'On Chip RAM' you
-follow the path AXI_HP[MO] -> Switch1[M2] -> OCM.
-
-But you can't master from 'High Performance Port M0' to internal
-slaves, as there is no routing path.
-
-Each switch block is an opportunity for the designer to provide
-address remapping/IO MMU hardware that needs configuring :)
-
-Which is why I think encoding the AXI DAG directly in DT is probably
-the most future proof way to model this stuff - it sticks close to the
-tools ARM provides to the SOC designers, so it is very likely to be
-able to model arbitary SOC designs.
-
-Regards,
-Jason
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
