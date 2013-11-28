@@ -1,148 +1,89 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 28 Nov 2013 20:24:53 +0000
-Subject: [PATCH] ARM : unwinder : Prevent data abort due to stack
- overflow in unwind_exec_insn Signed-off-by: Anurag Aggarwal
- <a.anurag@samsung.com>
-In-Reply-To: <1385634439-24554-1-git-send-email-a.anurag@samsung.com>
-References: <1385634439-24554-1-git-send-email-a.anurag@samsung.com>
-Message-ID: <20131128202453.GE4634@e103592.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 28 Nov 2013 21:33:23 +0100
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131127172806.GC2291@e103592.cambridge.arm.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+Message-ID: <20131128203322.GB14689@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 03:57:19PM +0530, Anurag Aggarwal wrote:
-> While executing some unwind instructions stack overflow can cause a data abort
-> when area beyond stack is not mapped to physical memory.
+On Wed, Nov 27, 2013 at 05:28:06PM +0000, Dave Martin wrote:
+[...]
+> From will.deacon at arm.com Wed Nov 20 12:06:22 2013
+[...]
+> A number of discussion points remain to be resolved:
 > 
-> To prevent the data abort check whether it is possible to execute
-> these instructions before unwinding the stack
-> ---
->  arch/arm/kernel/unwind.c |   59 +++++++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 58 insertions(+), 1 deletions(-)
+>   - Use of the ranges property and describing slave vs master bus
+>     address ranges. In the latter case, we actually want to describe our
+>     address space with respect to the bus on which the bus masters,
+>     rather than the parent. This could potentially be achieved by adding
+>     properties such as dma-parent and dma-ranges (already used by PPC?)
 > 
-> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-> index 00df012..3777cd7 100644
-> --- a/arch/arm/kernel/unwind.c
-> +++ b/arch/arm/kernel/unwind.c
-> @@ -49,6 +49,8 @@
->  #include <asm/traps.h>
->  #include <asm/unwind.h>
->  
-> +#define TOTAL_REGISTERS 16
-> +
->  /* Dummy functions to avoid linker complaints */
->  void __aeabi_unwind_cpp_pr0(void)
->  {
-> @@ -66,7 +68,7 @@ void __aeabi_unwind_cpp_pr2(void)
->  EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
->  
->  struct unwind_ctrl_block {
-> -	unsigned long vrs[16];		/* virtual register set */
-> +	unsigned long vrs[TOTAL_REGISTERS];	/* virtual register set */
->  	const unsigned long *insn;	/* pointer to the current instructions word */
->  	int entries;			/* number of entries left to interpret */
->  	int byte;			/* current byte number in the instructions word */
-> @@ -235,6 +237,58 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl)
->  	return ret;
->  }
->  
-> +/* check whether there is enough space on stack to execute instructions
-> +   that can cause a data abort*/
-
-Nit: strange comment formatting in all your multi-line comments.
-
-/*
- * Please format multi-line comments
- * like this.
- */
-
-> +static int unwind_check_insn(struct unwind_ctrl_block *ctrl, unsigned long insn)
-> +{
-
-I really think this shouldn't be separated out in this way, because it
-means the decoder has to be implemented twice, and moving the checks far
-away from the code that the checks need to match.
-
-Maybe you could refactor the code so that each insn has its own function,
-including the check and the execution.
-
-Then
-
-> +	unsigned long high, low;
-> +	int required_stack = 0;
-> +
-> +	low = ctrl->vrs[SP];
-> +	high = ALIGN(low, THREAD_SIZE);
-> +
-> +	/* check whether we have enough space to extract
-> +	atleast one set of registers*/
-> +	if ((high - low) > TOTAL_REGISTERS)
-> +		return URC_OK;
-
-Although this appears safe, I wonder whether it just creates additional
-ways for the code to be wrong, without providing much optimisation.
-
-(For example, the maximum number of registers that can be read is
-not actually TOTAL_REGISTERS.)
-
-Cheers
----Dave
-
-> +
-> +	if ((insn & 0xf0) == 0x80) {
-> +		unsigned long mask;
-> +		insn = (insn << 8) | unwind_get_byte(ctrl);
-> +		mask = insn & 0x0fff;
-> +		if (mask == 0) {
-> +			pr_warning("unwind: 'Refuse to unwind' instruction %04lx\n",
-> +				insn);
-> +			return -URC_FAILURE;
-> +		}
-> +		while (mask) {
-> +			if (mask & 1)
-> +				required_stack++;
-> +			mask >>= 1;
-> +		}
-> +	} else if ((insn & 0xf0) == 0xa0) {
-> +		required_stack += insn & 7;
-> +		required_stack +=  (insn & 0x80) ? 1 : 0;
-> +	} else if (insn == 0xb1) {
-> +		unsigned long mask = unwind_get_byte(ctrl);
-> +		if (mask == 0 || mask & 0xf0) {
-> +			pr_warning("unwind: Spare encoding %04lx\n",
-> +				(insn << 8) | mask);
-> +			return -URC_FAILURE;
-> +		}
-> +		while (mask) {
-> +			if (mask & 1)
-> +				required_stack++;
-> +			mask >>= 1;
-> +		}
-> +	}
-> +
-> +	if ((high - low) < required_stack)
-> +		return -URC_FAILURE;
-> +
-> +	return URC_OK;
-> +}
-> +
->  /*
->   * Execute the current unwind instruction.
->   */
-> @@ -244,6 +298,9 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  
->  	pr_debug("%s: insn = %08lx\n", __func__, insn);
->  
-> +	if (unwind_check_insn(ctrl, insn) < 0)
-> +		return -URC_FAILURE;
-> +
->  	if ((insn & 0xc0) == 0x00)
->  		ctrl->vrs[SP] += ((insn & 0x3f) << 2) + 4;
->  	else if ((insn & 0xc0) == 0x40)
-> -- 
-> 1.7.0.4
+>   - Describing masters that master through multiple different buses
 > 
+>   - How on Earth this fits in with the Linux device model (it doesn't)
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   - Interaction with IOMMU bindings (currently under discussion)
+
+This is all very vague. Perhaps everyone else knows what this is all
+about, in which case it'd be great if somebody could clue me in.
+
+In particular I'm not sure what exact problem this solves. Perhaps a
+somewhat more concrete example would help. Or perhaps pointers to
+documentation that can help filling in the gaps.
+
+>  .../devicetree/bindings/arm/coherent-bus.txt       | 110 +++++++++++++++++++++
+>  1 file changed, 110 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/coherent-bus.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/coherent-bus.txt b/Documentation/devicetree/bindings/arm/coherent-bus.txt
+> new file mode 100644
+> index 000000000000..e3fbc2e491c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/coherent-bus.txt
+> @@ -0,0 +1,110 @@
+> +* Generic binding to describe a coherent bus
+> +
+> +In some systems, devices (peripherals and/or CPUs) do not share
+> +coherent views of memory, while on other systems sets of devices may
+> +share a coherent view of memory depending on the static bus topology
+> +and/or dynamic configuration of both the bus and device. Establishing
+> +such dynamic configurations requires appropriate topological information
+> +to be communicated to the operating system.
+> +
+> +This binding document attempts to define a set of generic properties
+> +which can be used to encode topological information in bus and device
+> +nodes.
+> +
+> +
+> +* Terminology
+> +
+> +  - Port                : An interface over which memory transactions
+> +                          can propagate. A port may act as a master,
+> +                          slave or both (see below).
+> +
+> +  - Master port         : A port capable of issuing memory transactions
+> +                          to a slave. For example, a port connecting a
+> +                          DMA controller to main memory.
+> +
+> +  - Slave port          : A port capable of responding to memory
+> +                          transactions received by a master. For
+> +                          example, a port connecting the control
+> +                          registers of an MMIO device to a peripheral
+> +                          bus.
+
+"Port" sounds awfully generic. Other bindings (such as those for V4L2,
+aka media) use ports for something completely different. Perhaps we can
+come up with a more specific term that matches the use-case better?
+
+What exactly does this map to in hardware?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131128/d304b471/attachment.sig>
