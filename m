@@ -1,44 +1,57 @@
-From: amit.virdi@st.com (Amit Virdi)
-Date: Thu, 28 Nov 2013 17:15:41 +0530
-Subject: [PATCH] ARM: asm: Configure caches as per the defconfig
-In-Reply-To: <20131128101154.GT16735@n2100.arm.linux.org.uk>
-References: <1385553244-1513-1-git-send-email-amit.virdi@st.com>
- <20131127121425.GN16735@n2100.arm.linux.org.uk> <5296D7DF.202@st.com>
- <20131128101154.GT16735@n2100.arm.linux.org.uk>
-Message-ID: <52972CE5.6060103@st.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 28 Nov 2013 12:55:38 +0100
+Subject: [PATCH v2 4/9] clocksource/cadence_ttc: Use enable/disable_irq
+In-Reply-To: <1385514296-26702-5-git-send-email-soren.brinkmann@xilinx.com>
+References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1385514296-26702-5-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <52972F3A.9090103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2013 3:41 PM, Russell King - ARM Linux wrote:
-> On Thu, Nov 28, 2013 at 11:12:55AM +0530, Amit Virdi wrote:
->> On 11/27/2013 5:44 PM, Russell King - ARM Linux wrote:
->>> On Wed, Nov 27, 2013 at 05:24:04PM +0530, Amit Virdi wrote:
->>>> From: Amit VIRDI <Amit.VIRDI@st.com>
->>>>
->>>> In the current implementation of the decompression code, the caches are enabled
->>>> irrespective of their configuration in the deconfig. This makes setting the
->>>> ICACHE and DCACHE disable options from the menuconfig irrelevant. Change this
->>>> implementation to enable caches only if specified in the defconfig.
->>>
->>> NAK.  These options are provided more for ARM Ltd's validation of CPUs
->>> rather than for users, and it's not supposed to be used with the
->>> decompressor.
->>>
->>
->> It is perfectly true that these options are used only during CPU
->> validations and not in the end product. Still, it doesn't justify why
->> these options are not to be used with decompressor. Or alternately, why
->> would a user intend to disable a cache when it has been implemented
->> correctly and is stable? Without this change, the effect of disabling
->> cache is not reflected in entirety.
+On 11/27/2013 02:04 AM, Soren Brinkmann wrote:
+> To ensure that the timer interrupt is properly enabled/disabled across
+> the whole CPU cluster use enable/disable_irq() instead of
+> local_irq_disable().
 >
-> When doing CPU validations, the compressed image isn't used.
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>   drivers/clocksource/cadence_ttc_timer.c | 6 ++----
+>   1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
+> index a92350b55d32..246d018d1e63 100644
+> --- a/drivers/clocksource/cadence_ttc_timer.c
+> +++ b/drivers/clocksource/cadence_ttc_timer.c
+> @@ -322,18 +322,16 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
+>   	switch (event) {
+>   	case POST_RATE_CHANGE:
+>   	{
+> -		unsigned long flags;
+> -
+>   		/*
+>   		 * clockevents_update_freq should be called with IRQ disabled on
+>   		 * the CPU the timer provides events for. The timer we use is
+>   		 * common to both CPUs, not sure if we need to run on both
+>   		 * cores.
+>   		 */
+> -		local_irq_save(flags);
+> +		disable_irq(ttcce->ce.irq);
+>   		clockevents_update_freq(&ttcce->ce,
+>   				ndata->new_rate / PRESCALE);
+> -		local_irq_restore(flags);
+> +		enable_irq(ttcce->ce.irq);
+>
+>   		/* update cached frequency */
+>   		ttc->freq = ndata->new_rate;
 >
 
-Well, I have been using compressed images many a times on the FPGA 
-platforms during initial hw design phases when the bitstream isn't 
-stable with caches. I do not see any harm incorporating this patch. It 
-only adds more logic to the existing implementation.
+I am worried about the 'disable_irq' function calling 'synchronize_irq'. 
+Isn't possible to deadlock with the ondemand cpufreq governor ? I added 
+Viresh in Cc, he knows better than me the code path.
 
-Regards
-Amit Virdi
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
