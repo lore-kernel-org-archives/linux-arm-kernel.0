@@ -1,73 +1,29 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Thu, 28 Nov 2013 19:41:42 +0100
-Subject: [PATCH v3 01/15] uprobes: allow ignoring of probe hits
-In-Reply-To: <1385520814-10663-2-git-send-email-dave.long@linaro.org>
-References: <1385520814-10663-1-git-send-email-dave.long@linaro.org>
- <1385520814-10663-2-git-send-email-dave.long@linaro.org>
-Message-ID: <20131128184142.GA21889@redhat.com>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Thu, 28 Nov 2013 18:48:52 +0000
+Subject: ACPI
+In-Reply-To: <alpine.DEB.2.02.1311281816350.3198@kaball.uk.xensource.com>
+References: <CACxGe6uHuWPh7d9NaVuPRBWq0Fh1BmDV190KEN4C4uaq4KjS8g@mail.gmail.com>
+ <CACRpkdaCXJzWXoesjD3Jqpm4XMHLQp3SsHcsDG3veUS+xarqHQ@mail.gmail.com>
+ <CACxGe6vUKzow7QpeX2mU7CiZQzY8aZ+p0jd8Vk0+dqz0B=D0Ew@mail.gmail.com>
+ <20131125154110.GB3243@srcf.ucam.org>
+ <CACRpkdY+6dzs8MpKKtW-3kzsLkZjsit9SeN20k_33TAtVf3NEA@mail.gmail.com>
+ <CACxGe6t_9hUXL_1PHRU=2DYOYfCqZykd7gYRCshZn0XsVoCdRw@mail.gmail.com>
+ <20131126183344.GA16074@srcf.ucam.org>
+ <CAHCPf3t-dKc-xwjLCEWrY6kmi4_dLHp4iMgOwdEJ43UGK9=khQ@mail.gmail.com>
+ <20131126233224.GA21189@srcf.ucam.org>
+ <alpine.DEB.2.02.1311281816350.3198@kaball.uk.xensource.com>
+Message-ID: <20131128184851.GA2365@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26, David Long wrote:
->
-> From: "David A. Long" <dave.long@linaro.org>
->
-> Allow arches to decided to ignore a probe hit.  ARM will use this to
-> only call handlers if the conditions to execute a conditionally executed
-> instruction are satisfied.
->
-> Upleveled for v3.12-rc5.
->
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+On Thu, Nov 28, 2013 at 06:26:11PM +0000, Stefano Stabellini wrote:
 
-Acked-by: Oleg Nesterov <oleg@redhat.com>
+> In that case, I think that we should use the one we know has better
+> support in the kernel, that at the moment is device tree but in the
+> future might change.
 
+We can't just flip this - systems that shipped with valid DT but broken 
+ACPI would stop working. 
 
-> ---
->  include/linux/uprobes.h | 1 +
->  kernel/events/uprobes.c | 9 +++++++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-> index 319eae7..197a36e 100644
-> --- a/include/linux/uprobes.h
-> +++ b/include/linux/uprobes.h
-> @@ -134,6 +134,7 @@ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
->  extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
->  extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
->  extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
-> +extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
->  #else /* !CONFIG_UPROBES */
->  struct uprobes_state {
->  };
-> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-> index 24b7d6c..4eec7ce 100644
-> --- a/kernel/events/uprobes.c
-> +++ b/kernel/events/uprobes.c
-> @@ -1778,6 +1778,11 @@ static bool handle_trampoline(struct pt_regs *regs)
->  	return true;
->  }
->  
-> +bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs)
-> +{
-> +	return false;
-> +}
-> +
->  /*
->   * Run handler and ask thread to singlestep.
->   * Ensure all non-fatal signals cannot interrupt thread while it singlesteps.
-> @@ -1828,7 +1833,11 @@ static void handle_swbp(struct pt_regs *regs)
->  	if (unlikely(!test_bit(UPROBE_COPY_INSN, &uprobe->flags)))
->  		goto out;
->  
-> +	if (arch_uprobe_ignore(&uprobe->arch, regs))
-> +		goto out;
-> +
->  	handler_chain(uprobe, regs);
-> +
->  	if (can_skip_sstep(uprobe, regs))
->  		goto out;
->  
-> -- 
-> 1.8.1.2
-> 
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
