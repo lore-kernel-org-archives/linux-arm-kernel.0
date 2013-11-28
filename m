@@ -1,55 +1,83 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 28 Nov 2013 11:27:06 +0530
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <20131128055706.GM8834@intel.com>
+Date: Thu, 28 Nov 2013 11:38:16 +0530
+Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E852497D5@039-SN1MPN1-003.039d.mgd.msft.net>
+References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
+ <20131114104620.GB16396@e106331-lin.cambridge.arm.com>
+ <B56CDBE15CE27145A4B77D2D24263E852409CE@039-SN1MPN1-003.039d.mgd.msft.net>
+ <20131118111451.GA30853@e106331-lin.cambridge.arm.com>
+ <B56CDBE15CE27145A4B77D2D24263E852497D5@039-SN1MPN1-003.039d.mgd.msft.net>
+Message-ID: <20131128060816.GQ8834@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Dan
+On Wed, Nov 27, 2013 at 09:38:02AM +0000, Jingchang Lu wrote:
+> > > > > +* DMAMUX
+> > > > > +Required properties:
+> > > >
+> > > > No compatible?
+> > > >
+> > > > Where are DMAMUX nodes expected to live?
+> > > >
+> > > > How to they relate to the eDMA controller in HW? Are they a
+> > > > subcomponent, or a logically separate unit that happens to be
+> > connected?
+> > > [Lu Jingchang-b35083]
+> > > DMAMUX is a multiplexer between dma controller channels and peripheral
+> > deivces,
+> > > each DMAMUX provides 16 independently selectable DMA channel routers,
+> > and each
+> > > channel router can be assigned to one of the possible peripheral DMA
+> > slots.
+> > > So it's not a standalone device, it's just required by the DMA
+> > controller to
+> > > connect the channels and slaves, So it's got by DMA controller's
+> > "fsl,dma-mux" property.
+> > > Thanks!
+> > 
+> > Ok.
+> > 
+> > I'm not so sure on the way this is described, from the point of view of
+> > the device, its DMA channel is wired to the MUX, not to the DMA engine
+> > directly:
+> > 
+> >                        +-------+
+> >              /---------|DEVICE0|
+> >              |         +-------+
+> > +-----+   +------+
+> > | DMA |===|DMAMUX|
+> > +-----+   +------+
+> >              |         +-------+
+> >              \---------|DEVICE1|
+> >                        +-------+
+> > 
+> > If that's the case, I'd expect the DMAMUX to have a #dma-cells and
+> > describe each device as being wired to the mux, and then the mux as
+> > being wired to the DMA. If the MUXes are sub-blocks of the DMA, then I'm
+> > not sure why they need to be described at all.
+> > 
+> > Currently, the DMA code is handling information that's specific to the
+> > MUX (i.e. the channel ID that's specific to the MUX), and that feels odd
+> > unless the MUX is a component of the DMA (which if true I'd expect it to
+> > be described differently).
+> > 
+> Yes, the connection is as your imagination, except for each DMA has two MUX. 
+> The DMA helper looks the registered DMA engineer for DMA channel binding,
+> and the registered DMA engineer is the eDMA node, if binding to DMAMUX,
+> the helper will not find out the dma engineer.
+> The only DMAMUX configuration is programming the slave id into its
+> corresponding register, so its code is handled by the eDMA driver,
+> the DMAMUX is not optional.
+This is fairly common representation of how DMA engines interact with slave
+clients via a programmable mux. Now the slave id value in this case (which we
+program to mux) needs to be for the client and _not_ for the dmanegine. DMA
+engine would have a register to configure the mux value required for the
+transaction.
 
-On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
-> The following commit:
-> 
->   54f8d501e842 dmaengine: remove DMA unmap from drivers
-> 
-> removed the last caller to mv_desc_get_dest_addr(), creating the
-> warning:
-> 
->   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
->   but not used [-Wunused-function]
-> 
-> Remove it.
-> 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+The dma engine API provides a way to program the slave id (ie mux value) and IMO
+this should be a property of slave device (perhaps part of its dma resource) and
+used while programming channel. Making it dma driver property makes no sense
+here
 
-This should go thru Dan's tree
-
-> ---
->  drivers/dma/mv_xor.c | 6 ------
->  1 file changed, 6 deletions(-)
-> 
-> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-> index 7807f0ef4e20..23bcc9158cbc 100644
-> --- a/drivers/dma/mv_xor.c
-> +++ b/drivers/dma/mv_xor.c
-> @@ -54,12 +54,6 @@ static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
->  	hw_desc->desc_command = (1 << 31);
->  }
->  
-> -static u32 mv_desc_get_dest_addr(struct mv_xor_desc_slot *desc)
-> -{
-> -	struct mv_xor_desc *hw_desc = desc->hw_desc;
-> -	return hw_desc->phy_dest_addr;
-> -}
-> -
->  static void mv_desc_set_byte_count(struct mv_xor_desc_slot *desc,
->  				   u32 byte_count)
->  {
-> -- 
-> 1.8.4.4
-> 
-
--- 
+--
+~Vinod
