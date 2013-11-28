@@ -1,31 +1,43 @@
-From: Florian.Belser@sensor-technik.de (Belser Florian)
-Date: Thu, 28 Nov 2013 07:55:08 +0000
-Subject: [PATCH] IMX6: Add static /8 prescaler to can_root clock configuration
-Message-ID: <5EC8D4ACC923FE4D871AFFACC9761279739BE8@stwexdb.stww2k.local>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 Nov 2013 16:56:02 +0900
+Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
+In-Reply-To: <20131031031549.15985.23547.sendpatchset@w520>
+References: <20131031031549.15985.23547.sendpatchset@w520>
+Message-ID: <20131128075600.GN24146@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 31, 2013 at 12:15:49PM +0900, Magnus Damm wrote:
+> From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> 
+> Add 1GiB of DRAM at 0x2_0000_0000 to support the full 2GiB
+> of APE6EVM system memory.
+> 
+> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
 
-think I found a bug in the clk-imx6q.c source file. According to the reference manual the can_root clock isn't directly derived from the pll3_usb_otg clock. There is a static /8 divider instead.
-Please refer to the imx6 application reference manual:
-     i.MX 6Dual/6Quad Applications Processor Reference Manual, Rev. 0, 11/2012 --> Figure 18-3. Clock Tree - Part 2 (805)
+Thanks, I have queued this up.
 
-Here is the patch:
-
---- linux-3.10.20/arch/arm/mach-imx/clk-imx6q.c.orig    2013-11-20 21:28:01.000000000 +0100
-+++ linux-3.10.20/arch/arm/mach-imx/clk-imx6q.c    2013-11-28 08:18:47.379521587 +0100
-@@ -424,7 +424,7 @@ int __init mx6q_clocks_init(void)
-     clk[asrc_podf]        = imx_clk_divider("asrc_podf",        "asrc_pred",         base + 0x30, 9,  3);
-     clk[spdif_pred]       = imx_clk_divider("spdif_pred",       "spdif_sel",         base + 0x30, 25, 3);
-     clk[spdif_podf]       = imx_clk_divider("spdif_podf",       "spdif_pred",        base + 0x30, 22, 3);
--    clk[can_root]         = imx_clk_divider("can_root",         "pll3_usb_otg",      base + 0x20, 2,  6);
-+    clk[can_root]         = imx_clk_divider("can_root",         "pll3_60m",          base + 0x20, 2,  6);
-     clk[ecspi_root]       = imx_clk_divider("ecspi_root",       "pll3_60m",          base + 0x38, 19, 6);
-     clk[gpu2d_core_podf]  = imx_clk_divider("gpu2d_core_podf",  "gpu2d_core_sel",    base + 0x18, 23, 3);
-     clk[gpu3d_core_podf]  = imx_clk_divider("gpu3d_core_podf",  "gpu3d_core_sel",    base + 0x18, 26, 3);
-
-
-Best regards,
-
-Florian Belser
+> 
+>  For correct run time operation regardless of kernel configuration
+>  ARM patches 7863/1 and 7864/1 are needed.
+> 
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> --- 0001/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-10-31 11:44:53.000000000 +0900
+> @@ -24,6 +24,11 @@
+>  		reg = <0 0x40000000 0 0x40000000>;
+>  	};
+>  
+> +	memory at 200000000 {
+> +		device_type = "memory";
+> +		reg = <2 0x00000000 0 0x40000000>;
+> +	};
+> +
+>  	ape6evm_fixed_3v3: fixedregulator at 0 {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "3V3";
+> 
