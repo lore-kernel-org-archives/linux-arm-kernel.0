@@ -1,32 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 18:08:51 +0900
-Subject: [PATCH 12/16] ARM: shmobile: marzen: Enable CONFIG_PACKET in defconfig
+Date: Thu, 28 Nov 2013 18:08:52 +0900
+Subject: [PATCH 13/16] ARM: shmobile: marzen: Do not enable CONFIG_SMC911X in
+ defconfig
 In-Reply-To: <cover.1385629477.git.horms+renesas@verge.net.au>
 References: <cover.1385629477.git.horms+renesas@verge.net.au>
-Message-ID: <d4df4b2716336d24e243013c5e64b867c18ccc29.1385629477.git.horms+renesas@verge.net.au>
+Message-ID: <f3a3d2cfb7fb10e2e23d02abb5459ff974f2c8bd.1385629477.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_PACKET is required for the ISC dhcpd daemon function.
-This change brings the marzen defconfig into line with
-other shmobile defconfigs.
+CONFIG_SMC911X is not needed by marzen.
+It appears to have been accidently enabled as well
+as CONFIG_SMSC911X which is needed by marzen.
 
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/marzen_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/marzen_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 3f0f41f..a423bad 100644
+index a423bad..9ce38f6 100644
 --- a/arch/arm/configs/marzen_defconfig
 +++ b/arch/arm/configs/marzen_defconfig
-@@ -35,6 +35,7 @@ CONFIG_KEXEC=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
-+CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
- CONFIG_IP_PNP=y
+@@ -59,7 +59,6 @@ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_MICREL is not set
+ # CONFIG_NET_VENDOR_NATSEMI is not set
+ # CONFIG_NET_VENDOR_SEEQ is not set
+-CONFIG_SMC911X=y
+ CONFIG_SMSC911X=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ # CONFIG_WLAN is not set
 -- 
 1.8.4
