@@ -1,34 +1,47 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 28 Nov 2013 16:41:23 +0000
-Subject: [PATCH v3 3/3] init: efi: arm: enable (U)EFI runtime services on arm
-In-Reply-To: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1385656883-4420-4-git-send-email-leif.lindholm@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 28 Nov 2013 09:58:33 -0700
+Subject: [PATCH v11 7/7] ARM: tegra: support Trusted Foundations by default
+In-Reply-To: <CAAVeFuJgqgRnWLD+dyvb7+2fLanHmdDT0YV5r8ETsoqqjW8p7A@mail.gmail.com>
+References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
+ <1385274652-16415-8-git-send-email-acourbot@nvidia.com>
+ <20131126000608.GA21634@quad.lixom.net>
+ <CAAVeFu+mMyPhFtVZ09vgYWWCYkPpF3X547ffRAfXXKOOWUUkqg@mail.gmail.com>
+ <20131126164730.GE2355@e103592.cambridge.arm.com>
+ <CAAVeFuJgqgRnWLD+dyvb7+2fLanHmdDT0YV5r8ETsoqqjW8p7A@mail.gmail.com>
+Message-ID: <52977639.4000308@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the efi_set_virtual_address_map call has strict init ordering
-requirements, add an explicit hook in the required place.
+On 11/27/2013 11:02 PM, Alexandre Courbot wrote:
+> On Wed, Nov 27, 2013 at 1:47 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+>> On Tue, Nov 26, 2013 at 10:35:58AM +0900, Alexandre Courbot wrote:
+>>> On Tue, Nov 26, 2013 at 9:06 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>> On Sun, Nov 24, 2013 at 03:30:52PM +0900, Alexandre Courbot wrote:
+>>>>> Support for Trusted Foundations is light and allows the kernel to run on
+>>>>> a wider range of devices, so enable it by default.
+>>>>>
+>>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>>>>> ---
+>>>>>  arch/arm/configs/tegra_defconfig | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>
+>>>> I think we want this enabled on multi_v7_defconfig too? Send a separate
+>>>> patch for that once this is merged though.
+>>>
+>>> Will do.
+>>
+>> Should it just be default y if one of the relevant
+>> CONFIG_ARCH_TEGRA_*_SOC is selected?
+>>
+>> That way, it's automatically included if relevant, and automatically
+>> excluded if not -- regardless of whether the kernel is multiplatform
+>> or not.
+> 
+> So basically, that would mean setting the default to 'y' since the
+> option is not available unless a supported platform is included?
+> 
+> I'm fine this way too, if Stephen also agrees.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- init/main.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/init/main.c b/init/main.c
-index febc511..1331829 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -905,6 +905,10 @@ static noinline void __init kernel_init_freeable(void)
- 	smp_prepare_cpus(setup_max_cpus);
- 
- 	do_pre_smp_initcalls();
-+
-+	if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_BOOT))
-+		efi_enter_virtual_mode();
-+
- 	lockup_detector_init();
- 
- 	smp_init();
--- 
-1.7.10.4
+Fine by me.
