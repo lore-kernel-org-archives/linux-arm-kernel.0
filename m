@@ -1,25 +1,54 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 28 Nov 2013 05:20:18 +0200
-Subject: [PATCH] ARM : Kill CONFIG_MTD_PARTITIONS
-In-Reply-To: <15408127.286411385601524346.JavaMail.weblogic@epv6ml06>
-References: <15408127.286411385601524346.JavaMail.weblogic@epv6ml06>
-Message-ID: <20131128032018.GO32436@tarshish>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Nov 2013 11:28:51 +0800
+Subject: [PATCH] ARM: dts: imx6sabre: Pass reg property in lvds
+In-Reply-To: <1385073793-8543-1-git-send-email-festevam@gmail.com>
+References: <1385073793-8543-1-git-send-email-festevam@gmail.com>
+Message-ID: <20131128032846.GA5868@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eunbong,
-
-On Thu, Nov 28, 2013 at 01:18:45AM +0000, Eunbong Song wrote:
-> This patch removes CONFIG_MTD_PARTITIONS in config files for arm.
-> Because CONFIG_MTD_PARTITIONS was removed by commit 6a8a98b22b10f1560d5f90aded4a54234b9b2724.
+On Thu, Nov 21, 2013 at 08:43:13PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> The 'reg' property is missing in the lvds nodes, so add them for correctness.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
-> I resend this patch because i forgot signoff.
+>  arch/arm/boot/dts/imx6q-sabrelite.dts  | 1 +
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index ec9e4c1..ab81576 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -169,6 +169,7 @@
+>  	status = "okay";
+>  
+>  	lvds-channel at 0 {
+> +		reg = <0>;
 
-Well, it seems you forgot it again.
+It's already defined in arch/arm/boot/dts/imx6qdl.dtsi.
 
-baruch
+Patch dropped.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Shawn
+
+>  		fsl,data-mapping = "spwg";
+>  		fsl,data-width = <18>;
+>  		status = "okay";
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index 4239ef9..115bf44 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -236,6 +236,7 @@
+>  	status = "okay";
+>  
+>  	lvds-channel at 1 {
+> +		reg = <1>;
+>  		fsl,data-mapping = "spwg";
+>  		fsl,data-width = <18>;
+>  		status = "okay";
+> -- 
+> 1.8.1.2
+> 
