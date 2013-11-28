@@ -1,182 +1,77 @@
-From: falcon@meizu.com (falcon at meizu.com)
-Date: Thu, 28 Nov 2013 09:52:15 +0800
-Subject: [RFC PATCH] ARM: compressed: Move ramdisk forward to reserve more
- memory for kernel image
-Message-ID: <1385603535-24391-1-git-send-email-falcon@meizu.com>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Thu, 28 Nov 2013 07:44:30 +0530
+Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
+In-Reply-To: <5296330D.9010801@arm.com>
+References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
+ <5295D1A5.5090403@arm.com>
+ <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
+ <5296330D.9010801@arm.com>
+Message-ID: <CAC8NTUVvLgNPdsSPY6Ms_D3JoyJR8AEFRH0=M7-kQEUegNVhKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wu Zhangjin <wuzhangjin@gmail.com>
+On Wed, Nov 27, 2013 at 11:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 27/11/13 15:33, Radha Mohan wrote:
+>> On Wed, Nov 27, 2013 at 4:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> [CC-ing the maintainers - seems odd they were not cc-ed the first place]
+>>>
+>>> On 27/11/13 07:34, mohun106 at gmail.com wrote:
+>>>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>>>>
+>>>> This patch series provides an implementation of supporting 48-bit
+>>>> Physical Addresses for ARMv8 platforms. It is the maximum width that
+>>>> any ARMv8 based processor can support.
+>>>>
+>>>> The implementation extends the existing support of 40-bit PA.The kernel
+>>>> and user space will now be able to access 128TB each. With 4KB page size
+>>>> the Linux now will be using 4 levels of page tables by making use of
+>>>> 'pud'. And with 64KB page size the Linux will be using 3 levels of page
+>>>> tables.
+>>>>
+>>>> The code has been tested with LTP.
+>>>
+>>> Aside from finding out whether or not this is a useful change, this
+>>> breaks KVM, more specifically the way kernel pages are mapped into HYP.
+>>> Also, guests will still be limited to 40-bit IPAs, and the stage-2
+>>> output range needs to be addressed as well.
+>>
+>> This is useful for platforms (like ours) that will use 48-bit PAs.
+>> Sooner or later there will
+>> be such processors.
+>
+> So should the 4-level page table cost be unconditionally forced onto all
+> implementations?
+>
 
-During the booting of an embedded Linux system, before decompressing the kernel
-image, the bootloader(E.g. Uboot) loads the compressed kernel image and ramdisk
-image into two contiguous memory spaces, these two memory spaces are fixed
-after the Uboot is released, as a result, the maximum size of the
-(decompressed) kernel image is limited by the size of the reserved memory space
-(the difference of the two contiguous memory addresses).
+We can have a kernel compile-time config option so that platforms having
+a 48-bit PA can select that option. But having it will create the code something
+like below
 
-If want more functions or some debug options, the decompressed kernel image may
-be bigger and may overwrite the followed ramdisk mage and result in kernel boot
-failure for missing a valid ramdisk.
+#ifndef CONFIG_ARM64_64KB_PAGES
+#ifdef CONFIG_ARCH_SUPPORTS_48BIT_PA
+...
+..
+#else
+..
+..
+#endif
+#else /* !CONFIG_ARM64_64KB_PAGES */
+#ifdef CONFIG_ARCH_SUPPORTS_48BIT_PA
+..
+..
+#else
+..
+..
+#endif
+#endif /* CONFIG_ARM64_64KB_PAGES */
 
-To fix up this issue, before decompressing the kernel image, this option moves
-the loaded ramdisk image forward with a configurable offset and reserve more
-memory for the decompressed kernel image.
+And we might need to do this at lot of places. Is this ok?
 
-Signed-off-by: Wu Zhangjin <wuzhangjin@gmail.com>
----
- arch/arm/boot/compressed/Makefile       |    2 +-
- arch/arm/boot/compressed/misc.c         |    7 ++--
- arch/arm/boot/compressed/move_ramdisk.c |   58 +++++++++++++++++++++++++++++++
- usr/Kconfig                             |   29 ++++++++++++++++
- 4 files changed, 93 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/compressed/move_ramdisk.c
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index e7190bb..c215918 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -23,7 +23,7 @@ endif
- 
- AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
- HEAD	= head.o
--OBJS	+= misc.o decompress.o
-+OBJS	+= misc.o decompress.o move_ramdisk.o
- ifeq ($(CONFIG_DEBUG_UNCOMPRESS),y)
- OBJS	+= debug.o
- endif
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 31bd43b..27bac3c 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -22,7 +22,8 @@ unsigned int __machine_arch_type;
- #include <linux/types.h>
- #include <linux/linkage.h>
- 
--static void putstr(const char *ptr);
-+extern void move_ramdisk(void);
-+extern void putstr(const char *ptr);
- extern void error(char *x);
- 
- #include CONFIG_UNCOMPRESS_INCLUDE
-@@ -83,7 +84,7 @@ static void icedcc_putc(int ch)
- #define putc(ch)	icedcc_putc(ch)
- #endif
- 
--static void putstr(const char *ptr)
-+void putstr(const char *ptr)
- {
- 	char c;
- 
-@@ -144,6 +145,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
- 
- 	arch_decomp_setup();
- 
-+	move_ramdisk();
-+
- 	putstr("Uncompressing Linux...");
- 	ret = do_decompress(input_data, input_data_end - input_data,
- 			    output_data, error);
-diff --git a/arch/arm/boot/compressed/move_ramdisk.c b/arch/arm/boot/compressed/move_ramdisk.c
-new file mode 100644
-index 0000000..4b7ecfc
---- /dev/null
-+++ b/arch/arm/boot/compressed/move_ramdisk.c
-@@ -0,0 +1,58 @@
-+/*
-+ * move_ramdisk.c
-+ *
-+ * Author: Wu Zhangjin, wuzhangjin at gmail.com, December 2013
-+ * Copyright: (C) 2013 TinyLab.org
-+ *
-+ * Please get help of MOVE_RAMDISK from usr/Kconfig.
-+ */
-+
-+#include <asm/setup.h>
-+#include <asm/memory.h>
-+#include <asm/string.h>
-+
-+/* The tag address, may need to be changed for your board, see PHYS_OFFSET, atag_offset */
-+#define TAG_BASE_ADDR		(PLAT_PHYS_OFFSET + 0x100)
-+
-+#define MOVE_RAMDISK_OFFSET	(CONFIG_MOVE_RAMDISK_OFFSET_M * 1024 * 1024)
-+#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
-+
-+extern void putstr(const char *ptr);
-+
-+void move_ramdisk(void)
-+{
-+#ifdef CONFIG_MOVE_RAMDISK
-+	struct tag *tags = (struct tag *)(TAG_BASE_ADDR);
-+	__u32 start, size;
-+	int found = 0;
-+
-+	putstr("Searching ramdisk ...\n");
-+	if (tags->hdr.tag == ATAG_CORE) {
-+		putstr("Found tags ...\n");
-+		for (tags = tag_next(tags); tags->hdr.size; tags = tag_next(tags)) {
-+			if (tags->hdr.tag == ATAG_INITRD2) {
-+				putstr("Found initrd2 tag ...\n");
-+				found = 1;
-+				break;
-+			} else if (tags->hdr.tag == ATAG_INITRD) {
-+				putstr("Found initrd tag ...\n");
-+				found = 1;
-+				break;
-+			} else if (tags->hdr.tag == ATAG_RAMDISK) {
-+				putstr("Found ramdisk tag ...\n");
-+				found = 1;
-+				break;
-+			}
-+		}
-+		if (found) {
-+			start = tags->u.initrd.start;
-+			size = tags->u.initrd.size;
-+			tags->u.initrd.start = start + MOVE_RAMDISK_OFFSET;
-+			putstr("Moving ramdisk forward ...\n");
-+			memcpy((char *)tags->u.initrd.start, (char *)start, size);
-+		}
-+	} else {
-+		putstr("No tag found ...\n");
-+	}
-+#endif
-+}
-diff --git a/usr/Kconfig b/usr/Kconfig
-index 642f503..bd39418 100644
---- a/usr/Kconfig
-+++ b/usr/Kconfig
-@@ -175,3 +175,32 @@ config INITRAMFS_COMPRESSION_LZO
- 	  (both compression and decompression) is the fastest.
- 
- endchoice
-+
-+config MOVE_RAMDISK
-+	bool "Move ramdisk forward to reserve more memory for kernel image"
-+	depends on ARM
-+	help
-+	  During the booting of an embedded Linux system, before decompressing
-+	  the kernel image, the bootloader(E.g. Uboot) loads the compressed
-+	  kernel image and ramdisk into two contiguous memory spaces, these two
-+	  memory spaces are fixed after the Uboot is released, as a result, the
-+	  maximum size of the decompressed kernel image is limited by the size
-+	  of the reserved memory space (the difference of the two contiguous
-+	  memory addresses).
-+
-+	  If want more functions or some debug options, the decompressed kernel
-+	  image may be bigger and may overwrite the followed ramdisk and result
-+	  in kernel boot failure for missing a valid ramdisk.
-+
-+	  To fix up this issue, before decompressing the kernel image, this
-+	  option moves the loaded ramdisk image forward with a configurable
-+	  offset and reserve more memory for the decompressed kernel image.
-+
-+config MOVE_RAMDISK_OFFSET_M
-+	int "Set the move offset of ramdisk (in Mbytes)"
-+	range 5 100
-+	default "20"
-+	depends on MOVE_RAMDISK
-+	help
-+	  Specify the move offset of the ramdisk, if want a bigger kernel, please
-+	  Increase this size.
--- 
-1.7.10.4
+>> And yes, I haven't checked on KVM.
+>
+> Yeah, tiny detail... ;-)
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
