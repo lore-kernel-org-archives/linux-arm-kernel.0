@@ -1,45 +1,39 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 28 Nov 2013 10:45:40 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAyLzJdIHVzYjogY2hpcGlkZWE6IHVzYm1pc2M6IEFk?=
- =?UTF-8?B?ZCBzdXBwb3J0IGZvciBpLk1YNTEgQ1BV?=
-In-Reply-To: <20131128022807.GC5850@S2101-09.ap.freescale.net>
-References: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
- <1385480210-9349-2-git-send-email-shc_work@mail.ru>
- <20131128022807.GC5850@S2101-09.ap.freescale.net>
-Message-ID: <1385621140.705453514@f214.i.mail.ru>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 Nov 2013 15:45:56 +0900
+Subject: [PATCH 00/04] ARM: shmobile: Use SoC suffix for INTC compat string
+In-Reply-To: <20131127231450.29081.98054.sendpatchset@w520>
+References: <20131127231450.29081.98054.sendpatchset@w520>
+Message-ID: <20131128064555.GA14878@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-> On Tue, Nov 26, 2013 at 07:36:50PM +0400, Alexander Shiyan wrote:
-> > This adds i.MX51 as the next user of the usbmisc driver.
-> > Functionality is similar to i.MX53, so at this stage simply
-> > reuse existing i.MX53 calls.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  drivers/usb/chipidea/usbmisc_imx.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> > index 4381c5a6..cd061ab 100644
-> > --- a/drivers/usb/chipidea/usbmisc_imx.c
-> > +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> > @@ -204,6 +204,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
-> >  		.data = &imx27_usbmisc_ops,
-> >  	},
-> >  	{
-> > +		.compatible = "fsl,imx51-usbmisc",
-> > +		.data = &imx53_usbmisc_ops,
+On Thu, Nov 28, 2013 at 08:14:50AM +0900, Magnus Damm wrote:
+> ARM: shmobile: Use SoC suffix for INTC compat string
 > 
-> If it simply uses imx53 ops, why do we need to introduce a new
-> compatible?
+> [PATCH 01/04] ARM: shmobile: Use sh73a0 suffix for INTC compat string
+> [PATCH 02/04] ARM: shmobile: Use r8a7740 suffix for INTC compat string
+> [PATCH 03/04] ARM: shmobile: Use r8a7778 suffix for INTC compat string
+> [PATCH 04/04] ARM: shmobile: Use r8a7779 suffix for INTC compat string
+> 
+> Update the DTS for INTC irqpin devices to include the SoC in the compat string.
+> 
+> Both IRQC and INTC irqpin need documentation for the DT bindings, and this
+> will happen in incremental patches.
 
-This has been discussed here:
-http://www.spinics.net/lists/linux-usb/msg97502.html
+I have posted some patches for that a few moments ago :)
 
-Additionally, "fsl,imx51-usbmisc" string already present in imx51.dtsi.
-Thanks.
 
----
+I am curious to if it is intentional that this series replaces
+the use of less-specific compat strings with more specific ones
+while the recent update to the r8a7790 supplemented the
+less-specific renesas,irqc comat string with the more-specific
+renesas,irqc-r8a7790 compat string.
+
+i.e.
+	before: "renesas,intc-irqpin"
+	after:  "renesas,intc-irqpin-sh73a0"
+
+	as opposed to
+
+	before: "renesas,irqc"
+	after: "renesas,irqc-r8a7790", "renesas,irqc"
