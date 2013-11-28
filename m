@@ -1,82 +1,76 @@
-From: srikanth.thokala@xilinx.com (Srikanth Thokala)
-Date: Thu, 28 Nov 2013 12:59:56 +0530
-Subject: [PATCH 1/2] net: emaclite: Remove unnecessary code that
- enables/disables interrupts on PONG buffers
-Message-ID: <f9b49a0c-0627-432d-b6c9-faeaa7c412b8@CH1EHSMHS011.ehs.local>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 28 Nov 2013 08:34:43 +0100
+Subject: [PATCH] clocksource: sirf/marco+prima2: drop usage of
+ CLOCK_TICK_RATE
+In-Reply-To: <20131126135513.GI28642@pengutronix.de>
+References: <1384201236-8689-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5283DA74.9080402@linaro.org> <20131114090705.GX14892@pengutronix.de>
+ <20131126135513.GI28642@pengutronix.de>
+Message-ID: <5296F213.9030006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no specific interrupts for the PONG buffer on both
-transmit and receive side, same interrupt is valid for both
-buffers. So, this patch removes this code.
+On 11/26/2013 02:55 PM, Uwe Kleine-K?nig wrote:
+> Hi Danial,
+>
+> On Thu, Nov 14, 2013 at 10:07:05AM +0100, Uwe Kleine-K?nig wrote:
+>> On Wed, Nov 13, 2013 at 09:00:52PM +0100, Daniel Lezcano wrote:
+>>> On 11/11/2013 09:20 PM, Uwe Kleine-K?nig wrote:
+>>>> As CSR SiRF is converted to multi platform CLOCK_TICK_RATE is a dummy
+>>>> value that seems to match the right value is used.
+>>>> (arch/arm/mach-prima2/include/mach/timex.h which defined CLOCK_TICK_RATE
+>>>> to 1000000 was removed in commit cf82e0e (ARM: sirf: enable
+>>>> multiplatform support); marco used the same file.)
+>>>>
+>>>> To not depend on that dummy value use a local #define instead.
+>>>
+>>> I don't get this patch. It is to fix a compilation error ?
+>> No, the problem is that CLOCK_TICK_RATE used to be defined in a platform
+>> specific header <mach/timex.h>. For the ARM multiplatform stuff, this
+>> was dropped and now all multiplatform kernels use 1000000. For some
+>> platform (like SiRF) this happens to be correct, but actually it's pure
+>> luck. Further down the road I'd like to drop defining CLOCK_TICK_RATE
+>> for all platforms, so this is a preparing patch. But even independant
+>> from that it feels wrong to use a dummy value that was only introduced
+>> to prevent compile breakage.
+>>
+>> Would this change log be better:
+>>
+>> 	Since CSR SiRF was converted to multi platform in cf82e0e (ARM:
+>> 	sirf: enable multiplatform support) the symbol CLOCK_TICK_RATE
+>> 	isn't the platform specific definition any more, but a global
+>> 	dummy value. There was no harm introduced in cf82e0e because the
+>> 	global value happens to match the old platform specific one,
+>> 	still this dummy value isn't intended to be used and will
+>> 	hopefully disappear soon, so introduce a local #define and use
+>> 	that instead.
+>>
+>> So it's not urgent, but would be a nice cleanup for 3.14-rc1.
+> I'd like to depend on this patch to drop CLOCK_TICK_RATE for
+> mach-prima2. Would it be ok for you when I include it in a pull request
+> to the arm-soc people? If not, do you intend to take that patch, or do
+> you still have objections? In that case I'd back out mach-prima2 from my
+> CLOCK_TICK_RATE change.
 
-Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
----
- drivers/net/ethernet/xilinx/xilinx_emaclite.c | 38 ---------------------------
- 1 file changed, 38 deletions(-)
+I think it would be better to keep the macro name consistent and 
+redefine it in the file with a comment.
 
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index a7c02f4..3a693a1 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -164,26 +164,9 @@ static void xemaclite_enable_interrupts(struct net_local *drvdata)
- 	__raw_writel(reg_data | XEL_TSR_XMIT_IE_MASK,
- 		     drvdata->base_addr + XEL_TSR_OFFSET);
- 
--	/* Enable the Tx interrupts for the second Buffer if
--	 * configured in HW */
--	if (drvdata->tx_ping_pong != 0) {
--		reg_data = __raw_readl(drvdata->base_addr +
--				   XEL_BUFFER_OFFSET + XEL_TSR_OFFSET);
--		__raw_writel(reg_data | XEL_TSR_XMIT_IE_MASK,
--			     drvdata->base_addr + XEL_BUFFER_OFFSET +
--			     XEL_TSR_OFFSET);
--	}
--
- 	/* Enable the Rx interrupts for the first buffer */
- 	__raw_writel(XEL_RSR_RECV_IE_MASK, drvdata->base_addr + XEL_RSR_OFFSET);
- 
--	/* Enable the Rx interrupts for the second Buffer if
--	 * configured in HW */
--	if (drvdata->rx_ping_pong != 0) {
--		__raw_writel(XEL_RSR_RECV_IE_MASK, drvdata->base_addr +
--			     XEL_BUFFER_OFFSET + XEL_RSR_OFFSET);
--	}
--
- 	/* Enable the Global Interrupt Enable */
- 	__raw_writel(XEL_GIER_GIE_MASK, drvdata->base_addr + XEL_GIER_OFFSET);
- }
-@@ -207,31 +190,10 @@ static void xemaclite_disable_interrupts(struct net_local *drvdata)
- 	__raw_writel(reg_data & (~XEL_TSR_XMIT_IE_MASK),
- 		     drvdata->base_addr + XEL_TSR_OFFSET);
- 
--	/* Disable the Tx interrupts for the second Buffer
--	 * if configured in HW */
--	if (drvdata->tx_ping_pong != 0) {
--		reg_data = __raw_readl(drvdata->base_addr + XEL_BUFFER_OFFSET +
--				   XEL_TSR_OFFSET);
--		__raw_writel(reg_data & (~XEL_TSR_XMIT_IE_MASK),
--			     drvdata->base_addr + XEL_BUFFER_OFFSET +
--			     XEL_TSR_OFFSET);
--	}
--
- 	/* Disable the Rx interrupts for the first buffer */
- 	reg_data = __raw_readl(drvdata->base_addr + XEL_RSR_OFFSET);
- 	__raw_writel(reg_data & (~XEL_RSR_RECV_IE_MASK),
- 		     drvdata->base_addr + XEL_RSR_OFFSET);
--
--	/* Disable the Rx interrupts for the second buffer
--	 * if configured in HW */
--	if (drvdata->rx_ping_pong != 0) {
--
--		reg_data = __raw_readl(drvdata->base_addr + XEL_BUFFER_OFFSET +
--				   XEL_RSR_OFFSET);
--		__raw_writel(reg_data & (~XEL_RSR_RECV_IE_MASK),
--			     drvdata->base_addr + XEL_BUFFER_OFFSET +
--			     XEL_RSR_OFFSET);
--	}
- }
- 
- /**
+/* over riding default value because bla bla */
+#ifdef CLOCK_TICK_RATE
+#undef CLOCK_TICK_RATE
+#define CLOCK_TICK_RATE 100000
+#endif
+
+So people reading the code won't have to scratch their head to 
+understand why CLOCK_FREQ is used instead of CLOCK_TICK_RATE. And that 
+will limit the impact in the code.
+
+Alternatively, I am wondering if that shouldn't fall into the DT, 
+without the declaration in the DT, it defaults to 100000.
+
 -- 
-1.8.2.GIT
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
