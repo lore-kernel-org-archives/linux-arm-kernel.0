@@ -1,44 +1,58 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 16:37:11 +0900
-Subject: [PATCH 03/15] serial: sh-sci: Restrict non-COMPILE_TEST
- compilation
-In-Reply-To: <1385515117-23664-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131128073711.GF24146@verge.net.au>
+Date: Thu, 28 Nov 2013 16:43:29 +0900
+Subject: [PATCH] ARM: shmobile: mackerel: clk_round_rate() can return a
+ zero to indicate an error
+In-Reply-To: <alpine.DEB.2.02.1311261647550.11450@tamien>
+References: <alpine.DEB.2.02.1311261647550.11450@tamien>
+Message-ID: <20131128074329.GG24146@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 02:18:25AM +0100, Laurent Pinchart wrote:
-> Hardware supported by the driver is only found on SUPERH or
-> ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
+On Tue, Nov 26, 2013 at 04:49:38PM -0800, Paul Walmsley wrote:
 > 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-serial at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
+> Treat both negative and zero return values from clk_round_rate() as
+> errors.  This is needed since subsequent patches will convert
+> clk_round_rate()'s return value to be an unsigned type, rather than a
+> signed type, since some clock sources can generate rates higher than
+> (2^31)-1 Hz.
+> 
+> Eventually, when calling clk_round_rate(), only a return value of zero
+> will be considered a error.  All other values will be considered valid
+> rates.  The comparison against values less than 0 is kept to preserve
+> the correct behavior in the meantime.
+> 
+> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
 > ---
->  drivers/tty/serial/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Applies on v3.13-rc1.  See also:
 > 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index a3817ab..a640d0b 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -709,7 +709,8 @@ config SERIAL_IP22_ZILOG_CONSOLE
->  
->  config SERIAL_SH_SCI
->  	tristate "SuperH SCI(F) serial port support"
-> -	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
-> +	depends on HAVE_CLK
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
->  	select SERIAL_CORE
->  
->  config SERIAL_SH_SCI_NR_UARTS
-> -- 
-> 1.8.3.2
+>     http://marc.info/?l=linux-arm-kernel&m=138542591313620&w=2
+> 
+>  arch/arm/mach-shmobile/board-mackerel.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Thanks Paul,
+
+I have queued this up.
+
+> 
+> diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+> index af06753eb809..d90d2f11071b 100644
+> --- a/arch/arm/mach-shmobile/board-mackerel.c
+> +++ b/arch/arm/mach-shmobile/board-mackerel.c
+> @@ -548,9 +548,9 @@ static void __init hdmi_init_pm_clock(void)
+>  		 clk_get_rate(&sh7372_pllc2_clk));
+> 
+>  	rate = clk_round_rate(&sh7372_pllc2_clk, 594000000);
+> -	if (rate < 0) {
+> +	if (rate <= 0) {
+>  		pr_err("Cannot get suitable rate: %ld\n", rate);
+> -		ret = rate;
+> +		ret = -EINVAL;
+>  		goto out;
+>  	}
 > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
