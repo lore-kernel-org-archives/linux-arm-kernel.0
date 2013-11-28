@@ -1,26 +1,41 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 15:30:25 +0900
+Date: Thu, 28 Nov 2013 15:36:01 +0900
 Subject: [PATCH] ARM: shmobile: Use r8a7790 suffix for IRQC compat string
-In-Reply-To: <1602466.4IFX4QyYPo@avalon>
+In-Reply-To: <20131120000740.27032.66529.sendpatchset@w520>
 References: <20131120000740.27032.66529.sendpatchset@w520>
- <1602466.4IFX4QyYPo@avalon>
-Message-ID: <20131128063024.GH22413@verge.net.au>
+Message-ID: <20131128063559.GI22413@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 11:11:47AM +0100, Laurent Pinchart wrote:
-> Hi Magnus,
+On Wed, Nov 20, 2013 at 09:07:40AM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-> Thank you for the patch.
+> Add "renesas,irqc-r8a7790" to the compatible string for IRQC
+> in case of r8a7790. This makes the IRQC follow the same style
+> as the other devices and also makes it more future proof.
 > 
-> On Wednesday 20 November 2013 09:07:40 Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Add "renesas,irqc-r8a7790" to the compatible string for IRQC
-> > in case of r8a7790. This makes the IRQC follow the same style
-> > as the other devices and also makes it more future proof.
-> 
-> You should update the device tree bindings documentation as well. As there's 
-> no such documentation of the irqc, you should create it ;-)
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-I will submit a patch for this.
+Should I make a similar patch for the r8a73a4?
+
+> ---
+> 
+>  arch/arm/boot/dts/r8a7790.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- 0003/arch/arm/boot/dts/r8a7790.dtsi
+> +++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-11-20 08:20:30.000000000 +0900
+> @@ -171,7 +171,7 @@
+>  	};
+>  
+>  	irqc0: interrupt-controller at e61c0000 {
+> -		compatible = "renesas,irqc";
+> +		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
+>  		#interrupt-cells = <2>;
+>  		interrupt-controller;
+>  		reg = <0 0xe61c0000 0 0x200>;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
