@@ -1,112 +1,70 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 28 Nov 2013 19:39:17 +0000
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131128191331.GB2385@kroah.com>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131127230650.GA6162@kroah.com>
- <20131128102845.GB21354@mudshark.cambridge.arm.com>
- <20131128173339.GB4634@e103592.cambridge.arm.com>
- <20131128191331.GB2385@kroah.com>
-Message-ID: <20131128193917.GC4634@e103592.cambridge.arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 28 Nov 2013 16:47:21 -0300
+Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
+In-Reply-To: <20131128093034.5d61130a@skate>
+References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
+ <20131126183559.GA18570@localhost>
+ <CAAYSxhqU9GZdaoTjoCAeyQ4h-KPVzU0BH0D1eLYJoFZ+s8tPgQ@mail.gmail.com>
+ <20131127185448.GA21422@localhost> <20131128093034.5d61130a@skate>
+Message-ID: <20131128194720.GD13182@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 11:13:31AM -0800, Greg KH wrote:
-> On Thu, Nov 28, 2013 at 05:33:39PM +0000, Dave Martin wrote:
-> > On Thu, Nov 28, 2013 at 10:28:45AM +0000, Will Deacon wrote:
-> > > Hi Greg,
-> > > 
-> > > On Wed, Nov 27, 2013 at 11:06:50PM +0000, Greg KH wrote:
-> > > > On Wed, Nov 27, 2013 at 05:28:06PM +0000, Dave Martin wrote:
-> > > > > >From will.deacon at arm.com Wed Nov 20 12:06:22 2013
-> > > > > A number of discussion points remain to be resolved:
-> > > > > 
-> > > > >   - Use of the ranges property and describing slave vs master bus
-> > > > >     address ranges. In the latter case, we actually want to describe our
-> > > > >     address space with respect to the bus on which the bus masters,
-> > > > >     rather than the parent. This could potentially be achieved by adding
-> > > > >     properties such as dma-parent and dma-ranges (already used by PPC?)
-> > > > > 
-> > > > >   - Describing masters that master through multiple different buses
-> > > > > 
-> > > > >   - How on Earth this fits in with the Linux device model (it doesn't)
-> > > > 
-> > > > How does this _not_ fit into the Linux device model?  What am I missing
-> > > > here that precludes the use of the "driver/device/bus" model we have
-> > > > today?
-> > 
-> > The physical-sockets history of buses like PCI tends to force a simple
-> > tree-like topology as a natural consequence.  You also end up with
-> > closely linked topologies for power, clocks, interrupts etc., because
-> > those all pass through the same sockets, so it's difficult to have a
-> > different structure.
+Hi Thomas, Tim:
+
+On Thu, Nov 28, 2013 at 09:30:34AM +0100, Thomas Petazzoni wrote:
+> Dear Ezequiel Garcia,
 > 
-> There's nothing in the driver core that enforces such a topology.
-
-Maybe not ... I have to wrap my head around that stuff a bit more.
-
-> > On SoC, those constraints have never existed and are not followed.  A
-> > device's interface to the system is almost always split into multiple
-> > connections, not covered by a single design or standard.  The problem
-> > now is that increasing complexity means that the sometimes bizarre
-> > topology features of SoCs are becoming less and less transparent for
-> > software.
-> > 
-> > The device model currently seems to assume that certain things (power,
-> > DMA and MMIO accessibility) follow the tree (which may not work for many
-> > SoCs), and some other things (clocks, regulators, interrupts etc.) are
-> > not incorporated at all -- making them independent, but it may make some
-> > abstractions impossible today.
-> > 
-> > How much this matters for actual systems is hard to foresee yet.  Since
-> > not _all_ possible insanities find their way into silicon.  The
-> > onus should certainly be on us (i.e., the ARM/SoC community) to
-> > demonstrate if the device model needs to change, and to find practical
-> > ways to change it that minimise the resulting churn.
+> On Wed, 27 Nov 2013 15:54:49 -0300, Ezequiel Garcia wrote:
 > 
-> Yes it is, you all are the ones tasked with implementing the crazy crap
-> the hardware people have created, best of luck with that :)
-
-Agreed.  The first assumption should be that we can fit in with the
-existing device model -- we should only reconsider if we find that
-to be impossible.
-
-> > > The main problem is that we have devices which slave on one bus and master
-> > > on another. That then complicates probing, power-management, IOMMU
-> > > configuration, address mapping (e.g. I walk the slave buses to figure out
-> > > where the slave registers live, but then I need a way to work out where
-> > > exactly I master on a different bus) and dynamic coherency, amongst other
-> > > things.
+> > > An external device may be keeping the UART busy and preventing LCR
+> > > from being written.
 > > > 
-> > > If we try to use the current infrastructure then we end up with one bus per
-> > > device, which usually ends up being a fake bus representing both the slave
-> > > and master buses (which is how the platform bus gets abused) and then device
-> > > drivers having their own idea of the system topology where it's required.
-> > > 
-> > > This is fairly horrible and doesn't work for anything other than the trivial
-> > > case, where one or both of the buses are `dumb' and don't require any work
-> > > from Linux.
+> > > What device is attached to ttyS1?
 > > 
-> > If we can come up with some generic bus type that is just a container for
-> > a load of hooks that know how to deal with various aspects of each device's
-> > interface to the system, on a per-device basis, than may be a start.
-> > 
-> > The platform bus kinda serves that role, but the trouble with that is that
-> > it doesn't encourage any abstraction at all.  In the face of increasing
-> > complexity, abstraction is desperately needed.
+> > There's no device attached at ttyS1. I've just tested this in another
+> > box and it seems the same error is obtained on each unused port:
 > 
-> Then create a different abstraction, the normal solution to any problem
-> in programming :)
+> Are you sure about this? I suppose you're testing on the Armada XP GP
+> board, and this board has a 4 ports FTDI chip, and according to the
+> board schematics the four UARTs are all connected to the FTDI chip. So
+> from the SoC perspective, ttyS1 is connected to something, as far as I
+> can understand. Or maybe you also tested Armada XP DB ?
+> 
 
-That's certainly the first step.  It might end up looking a lot like a
-kludge layer which duplicates core functionality -- if so, we should
-then consider whether there is a better way, but we shouldn't judge it
-prematurely.
+Yeah, sorry about that. I missed the FTDI chip. As Thomas says the XP GP
+board I'm testing this on, has its four UARTs connected to a FTDI chip.
 
+Changing the console port by setting "console=ttyS1,115200" gives this:
 
-It would be great to get some comments [hint to everyone] on the proposed
-DT binding so that we can start to explore this properly.
+[..]
+Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+dw-apb-uart d0012000.serial: Couldn't set LCR to 191
+dw-apb-uart d0012000.serial: Couldn't set LCR to 191
+dw-apb-uart d0012000.serial: Couldn't set LCR to 224
+dw-apb-uart d0012000.serial: Couldn't set LCR to 224
+d0012000.serial: ttyS0 at MMIO 0xd0012000 (irq = 17, base_baud = 15625000) is a 16550A
+dw-apb-uart d0012100.serial: Couldn't set LCR to 191
+dw-apb-uart d0012100.serial: Couldn't set LCR to 191
+dw-apb-uart d0012100.serial: Couldn't set LCR to 224
+dw-apb-uart d0012100.serial: Couldn't set LCR to 224
+d0012100.serial: ttyS1 at MMIO 0xd0012100 (irq = 18, base_baud = 15625000) is a 16550A
+console [ttyS1] enabled
+dw-apb-uart d0012200.serial: Couldn't set LCR to 191
+dw-apb-uart d0012200.serial: Couldn't set LCR to 191
+dw-apb-uart d0012200.serial: Couldn't set LCR to 224
+dw-apb-uart d0012200.serial: Couldn't set LCR to 224
+d0012200.serial: ttyS2 at MMIO 0xd0012200 (irq = 31, base_baud = 15625000) is a 16550A
+dw-apb-uart d0012300.serial: Couldn't set LCR to 191
+dw-apb-uart d0012300.serial: Couldn't set LCR to 191
+dw-apb-uart d0012300.serial: Couldn't set LCR to 224
+dw-apb-uart d0012300.serial: Couldn't set LCR to 224
+d0012300.serial: ttyS3 at MMIO 0xd0012300 (irq = 32, base_baud = 15625000) is a 16550A
 
-Cheers
----Dave
+So we get the "Couldn't set" message in all four ports.
+
+Tim: Any ideas?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
