@@ -1,67 +1,74 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 28 Nov 2013 14:49:06 +0900
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <201311270944.09383.marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <1385500248-6551-2-git-send-email-marex@denx.de>
- <20131127043009.GB12773@pratyush-vbox> <201311270944.09383.marex@denx.de>
-Message-ID: <006301ceebfd$8d4ba040$a7e2e0c0$%han@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 28 Nov 2013 11:23:52 +0530
+Subject: [PATCH v3 5/9] usb: gadget: s3c-hsotg: use generic
+ phy_init()/phy_exit() support
+In-Reply-To: <20131127223650.GP31091@beef>
+References: <1385403367-18144-1-git-send-email-matt.porter@linaro.org>
+ <1385403367-18144-6-git-send-email-matt.porter@linaro.org>
+ <529476A4.8080600@ti.com> <20131127171325.GD31091@beef>
+ <20131127223650.GP31091@beef>
+Message-ID: <5296DA70.8010409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 27, 2013 5:44 PM, Marek Vasut wrote:
-> Wednesday, November 27, 2013 1:30 PM, Pratyush Anand wrote:
-> > On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
-> > > From: Tim Harvey <tharvey@gateworks.com>
-> > >
-> > > The IMX6 iATU is used for address translation between the AXI bus
-> > > address space and PCI address space.  This is used for type0 and type1
-> > > config cycles but is not necessary for outbound io/mem regions.
-> > >
-> > > This patch removes the calls that inappropriately re-configures the ATU
-> > > viewport for outbound memory and IO after config cycles and removes them
-> > > altogether as they are not necessary.
-> >
-> > Yes, they are not necessary for all the cases where translation is one
-> > to one. So so for sure all the platform till now introduced should
-> > work.
-> > But, what about a platform where memory translation is not one to one?
-> >
-> > Existing code should work with all sort of memory translation on a
-> > platform having atleast two viewports capable of programming any type
-> > of outbound transaction.
+On Thursday 28 November 2013 04:06 AM, Matt Porter wrote:
+> On Wed, Nov 27, 2013 at 12:13:25PM -0500, Matt Porter wrote:
+>> On Tue, Nov 26, 2013 at 03:53:32PM +0530, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Monday 25 November 2013 11:46 PM, Matt Porter wrote:
+>>>> If a generic phy is present, call phy_init()/phy_exit(). This supports
+>>>> generic phys that must be soft reset before power on.
+>>>>
+>>>> Signed-off-by: Matt Porter <matt.porter@linaro.org>
+>>>> ---
+>>>>  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
+>>>>  1 file changed, 5 insertions(+)
+>>>>
+>>>> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+>>>> index da3879b..8dfe33f 100644
+>>>> --- a/drivers/usb/gadget/s3c-hsotg.c
+>>>> +++ b/drivers/usb/gadget/s3c-hsotg.c
+>>>> @@ -3622,6 +3622,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+>>>>  		goto err_supplies;
+>>>>  	}
+>>>>  
+>>>> +	if (hsotg->phy)
+>>>
+>>> IS_ERR? If your phy_get fails *phy* will have a error value..
+>>
+>> Yes, thanks. I'll fix these and also note that the same issue exists in
+>> Kamil's patch for these same hsotg->phy conditional uses. I'll work with
+>> Kamil to either get those addressed there or in a follow on fix.
 > 
-> Full ACK, that's why it's called RFC.
+> I spoke too soon. If devm_phy_get fails, we don't set hsotg->phy and probe
+> defer thus not reaching this point. Since hsotg->phy is either NULL or a
+> valid struct phy *, this is correct as is throughout the driver.
 > 
-> > > This resolves issues with PCI devices behind switches and has been tested
-> > > with a Gige device behind a PLX PEX860x switch.  More testing is needed
-> > > for other configurations.
-> >
-> > I do not understand if MX6 has 4 Outbound Viewport then how this patch
-> > helps?
-> > -- PCI devices behind switches would not have been working because
-> > CFG1 transaction would not have been correct.
-> > -- It works with this patch. This patch changes viewport for CFG1 from
-> > 1 to 0.
-> > -- Can it be possible that MX6 has some restriction on viewport
-> > programming capability. I mean,like only viewport0 can be programmed
-> > for CFG0/1?
+>>>
+>>>> +		phy_init(hsotg->phy);
+>>>> +
+>>>>  	/* usb phy enable */
+>>>>  	s3c_hsotg_phy_enable(hsotg);
+>>>>  
+>>>> @@ -3715,6 +3718,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
+>>>>  	}
+>>>>  
+>>>>  	s3c_hsotg_phy_disable(hsotg);
+>>>> +	if (hsotg->phy)
+>>>
+>>> same here.
+>>
+>> Ok.
 > 
-> Tim ?
-> 
-> Here is the MX6 datasheet [1], the section 48.3.9.1.1 and 48.3.9.1.2 describe
-> the iATU configuration on MX6. My understanding from this description is that
-> the MX6 has 4 inbound and 4 outbound iATU regions. Am I wrong ?
+> Same above, this will be NULL on failure (but is only applicable at this
+> point on the platform data path.
 
-The numbers of inbound and outbound are hardware-configurable features.
-Thus, these numbers  can be confirmed by Freescale  hardware engineers.
-How about asking Freescale hardware engineers, if possible?
+Ah ok.. Btw where is phy_get being called? Is it not part of this series?
 
-Best regards,
-Jingoo Han
+Thanks
+Kishon
+
 > 
-> [1] http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf
+> -Matt
 > 
-> > Otherwise I do not find any convincing reason that why this patch
-> > helps in resolving issues with PCI devices behind switches.
