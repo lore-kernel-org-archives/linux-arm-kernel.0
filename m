@@ -1,110 +1,58 @@
-From: a.anurag@samsung.com (Anurag Aggarwal)
-Date: Thu, 28 Nov 2013 15:57:19 +0530
-Subject: [PATCH] ARM : unwinder : Prevent data abort due to stack overflow in
- unwind_exec_insn Signed-off-by: Anurag Aggarwal <a.anurag@samsung.com>
-Message-ID: <1385634439-24554-1-git-send-email-a.anurag@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Nov 2013 10:28:45 +0000
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131127230650.GA6162@kroah.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131127230650.GA6162@kroah.com>
+Message-ID: <20131128102845.GB21354@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While executing some unwind instructions stack overflow can cause a data abort
-when area beyond stack is not mapped to physical memory.
+Hi Greg,
 
-To prevent the data abort check whether it is possible to execute
-these instructions before unwinding the stack
----
- arch/arm/kernel/unwind.c |   59 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 58 insertions(+), 1 deletions(-)
+On Wed, Nov 27, 2013 at 11:06:50PM +0000, Greg KH wrote:
+> On Wed, Nov 27, 2013 at 05:28:06PM +0000, Dave Martin wrote:
+> > >From will.deacon at arm.com Wed Nov 20 12:06:22 2013
+> > A number of discussion points remain to be resolved:
+> > 
+> >   - Use of the ranges property and describing slave vs master bus
+> >     address ranges. In the latter case, we actually want to describe our
+> >     address space with respect to the bus on which the bus masters,
+> >     rather than the parent. This could potentially be achieved by adding
+> >     properties such as dma-parent and dma-ranges (already used by PPC?)
+> > 
+> >   - Describing masters that master through multiple different buses
+> > 
+> >   - How on Earth this fits in with the Linux device model (it doesn't)
+> 
+> How does this _not_ fit into the Linux device model?  What am I missing
+> here that precludes the use of the "driver/device/bus" model we have
+> today?
 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 00df012..3777cd7 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -49,6 +49,8 @@
- #include <asm/traps.h>
- #include <asm/unwind.h>
- 
-+#define TOTAL_REGISTERS 16
-+
- /* Dummy functions to avoid linker complaints */
- void __aeabi_unwind_cpp_pr0(void)
- {
-@@ -66,7 +68,7 @@ void __aeabi_unwind_cpp_pr2(void)
- EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
- 
- struct unwind_ctrl_block {
--	unsigned long vrs[16];		/* virtual register set */
-+	unsigned long vrs[TOTAL_REGISTERS];	/* virtual register set */
- 	const unsigned long *insn;	/* pointer to the current instructions word */
- 	int entries;			/* number of entries left to interpret */
- 	int byte;			/* current byte number in the instructions word */
-@@ -235,6 +237,58 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl)
- 	return ret;
- }
- 
-+/* check whether there is enough space on stack to execute instructions
-+   that can cause a data abort*/
-+static int unwind_check_insn(struct unwind_ctrl_block *ctrl, unsigned long insn)
-+{
-+	unsigned long high, low;
-+	int required_stack = 0;
-+
-+	low = ctrl->vrs[SP];
-+	high = ALIGN(low, THREAD_SIZE);
-+
-+	/* check whether we have enough space to extract
-+	atleast one set of registers*/
-+	if ((high - low) > TOTAL_REGISTERS)
-+		return URC_OK;
-+
-+	if ((insn & 0xf0) == 0x80) {
-+		unsigned long mask;
-+		insn = (insn << 8) | unwind_get_byte(ctrl);
-+		mask = insn & 0x0fff;
-+		if (mask == 0) {
-+			pr_warning("unwind: 'Refuse to unwind' instruction %04lx\n",
-+				insn);
-+			return -URC_FAILURE;
-+		}
-+		while (mask) {
-+			if (mask & 1)
-+				required_stack++;
-+			mask >>= 1;
-+		}
-+	} else if ((insn & 0xf0) == 0xa0) {
-+		required_stack += insn & 7;
-+		required_stack +=  (insn & 0x80) ? 1 : 0;
-+	} else if (insn == 0xb1) {
-+		unsigned long mask = unwind_get_byte(ctrl);
-+		if (mask == 0 || mask & 0xf0) {
-+			pr_warning("unwind: Spare encoding %04lx\n",
-+				(insn << 8) | mask);
-+			return -URC_FAILURE;
-+		}
-+		while (mask) {
-+			if (mask & 1)
-+				required_stack++;
-+			mask >>= 1;
-+		}
-+	}
-+
-+	if ((high - low) < required_stack)
-+		return -URC_FAILURE;
-+
-+	return URC_OK;
-+}
-+
- /*
-  * Execute the current unwind instruction.
-  */
-@@ -244,6 +298,9 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
- 
- 	pr_debug("%s: insn = %08lx\n", __func__, insn);
- 
-+	if (unwind_check_insn(ctrl, insn) < 0)
-+		return -URC_FAILURE;
-+
- 	if ((insn & 0xc0) == 0x00)
- 		ctrl->vrs[SP] += ((insn & 0x3f) << 2) + 4;
- 	else if ((insn & 0xc0) == 0x40)
--- 
-1.7.0.4
+The main problem is that we have devices which slave on one bus and master
+on another. That then complicates probing, power-management, IOMMU
+configuration, address mapping (e.g. I walk the slave buses to figure out
+where the slave registers live, but then I need a way to work out where
+exactly I master on a different bus) and dynamic coherency, amongst other
+things.
+
+If we try to use the current infrastructure then we end up with one bus per
+device, which usually ends up being a fake bus representing both the slave
+and master buses (which is how the platform bus gets abused) and then device
+drivers having their own idea of the system topology where it's required.
+This is fairly horrible and doesn't work for anything other than the trivial
+case, where one or both of the buses are `dumb' and don't require any work
+from Linux.
+
+> >  .../devicetree/bindings/arm/coherent-bus.txt       | 110 +++++++++++++++++++++
+> 
+> Why "arm"?
+> 
+> What makes it ARM specific?
+
+This is just an RFC, so I'd be happy to put the binding somewhere more
+broad. I'm not sure how much of an issue this is outside of the SoC space,
+though.
+
+Will
