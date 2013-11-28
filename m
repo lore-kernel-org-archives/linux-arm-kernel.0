@@ -1,47 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Nov 2013 17:54:40 +0900
-Subject: [PATCH 10/16] ARM: shmobile: Add r8a7790_register_pfc() function
+Date: Thu, 28 Nov 2013 17:54:42 +0900
+Subject: [PATCH 12/16] ARM: shmobile: r8a7790: Correct typo in clocks
 In-Reply-To: <cover.1385628709.git.horms+renesas@verge.net.au>
 References: <cover.1385628709.git.horms+renesas@verge.net.au>
-Message-ID: <8d0b3bf79bfa1dc7d3e2a9dc2b6f2ceea353687f.1385628709.git.horms+renesas@verge.net.au>
+Message-ID: <7d947813d4dbb8cfee0ed2c75b27f65cb2c54434.1385628709.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+This is the r8a7790 SoC not the r8a77a4 SoC and
+clocks are updated in r8a7790_clock_init not r8a73a4_clock_init.
 
-Break out the r8a7790 PFC platform device creation code
-to increase readability and follow same style as r8a7791.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7790.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index c47bceb..3543c3b 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -34,6 +34,10 @@ static const struct resource pfc_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xe6060000, 0x250),
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index a64f965..fa1b477 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -77,7 +77,7 @@ static struct sh_clk_ops followparent_clk_ops = {
  };
  
-+#define r8a7790_register_pfc()						\
-+	platform_device_register_simple("pfc-r8a7790", -1, pfc_resources, \
-+					ARRAY_SIZE(pfc_resources))
-+
- #define R8A7790_GPIO(idx)						\
- static const struct resource r8a7790_gpio##idx##_resources[] __initconst = { \
- 	DEFINE_RES_MEM(0xe6050000 + 0x1000 * (idx), 0x50),		\
-@@ -65,8 +69,7 @@ R8A7790_GPIO(5);
+ static struct clk main_clk = {
+-	/* .parent will be set r8a73a4_clock_init */
++	/* .parent will be set r8a7790_clock_init */
+ 	.ops	= &followparent_clk_ops,
+ };
  
- void __init r8a7790_pinmux_init(void)
- {
--	platform_device_register_simple("pfc-r8a7790", -1, pfc_resources,
--					ARRAY_SIZE(pfc_resources));
-+	r8a7790_register_pfc();
- 	r8a7790_register_gpio(0);
- 	r8a7790_register_gpio(1);
- 	r8a7790_register_gpio(2);
 -- 
 1.8.4
