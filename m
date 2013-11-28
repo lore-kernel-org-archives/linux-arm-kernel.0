@@ -1,58 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Nov 2013 10:28:45 +0000
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131127230650.GA6162@kroah.com>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131127230650.GA6162@kroah.com>
-Message-ID: <20131128102845.GB21354@mudshark.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 28 Nov 2013 11:25:16 +0100
+Subject: [PATCH] IMX6: Add static /8 prescaler to can_root clock
+ configuration
+In-Reply-To: <5EC8D4ACC923FE4D871AFFACC9761279739BE8@stwexdb.stww2k.local>
+References: <5EC8D4ACC923FE4D871AFFACC9761279739BE8@stwexdb.stww2k.local>
+Message-ID: <1385634316.5838.6.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hello,
 
-On Wed, Nov 27, 2013 at 11:06:50PM +0000, Greg KH wrote:
-> On Wed, Nov 27, 2013 at 05:28:06PM +0000, Dave Martin wrote:
-> > >From will.deacon at arm.com Wed Nov 20 12:06:22 2013
-> > A number of discussion points remain to be resolved:
-> > 
-> >   - Use of the ranges property and describing slave vs master bus
-> >     address ranges. In the latter case, we actually want to describe our
-> >     address space with respect to the bus on which the bus masters,
-> >     rather than the parent. This could potentially be achieved by adding
-> >     properties such as dma-parent and dma-ranges (already used by PPC?)
-> > 
-> >   - Describing masters that master through multiple different buses
-> > 
-> >   - How on Earth this fits in with the Linux device model (it doesn't)
+Am Donnerstag, den 28.11.2013, 07:55 +0000 schrieb Belser Florian:
+> Hi,
 > 
-> How does this _not_ fit into the Linux device model?  What am I missing
-> here that precludes the use of the "driver/device/bus" model we have
-> today?
-
-The main problem is that we have devices which slave on one bus and master
-on another. That then complicates probing, power-management, IOMMU
-configuration, address mapping (e.g. I walk the slave buses to figure out
-where the slave registers live, but then I need a way to work out where
-exactly I master on a different bus) and dynamic coherency, amongst other
-things.
-
-If we try to use the current infrastructure then we end up with one bus per
-device, which usually ends up being a fake bus representing both the slave
-and master buses (which is how the platform bus gets abused) and then device
-drivers having their own idea of the system topology where it's required.
-This is fairly horrible and doesn't work for anything other than the trivial
-case, where one or both of the buses are `dumb' and don't require any work
-from Linux.
-
-> >  .../devicetree/bindings/arm/coherent-bus.txt       | 110 +++++++++++++++++++++
+> think I found a bug in the clk-imx6q.c source file. According to the reference manual the can_root clock isn't directly derived from the pll3_usb_otg clock. There is a static /8 divider instead.
+> Please refer to the imx6 application reference manual:
+>      i.MX 6Dual/6Quad Applications Processor Reference Manual, Rev. 0, 11/2012 --> Figure 18-3. Clock Tree - Part 2 (805)
 > 
-> Why "arm"?
+This is already fixed upstream.
+
+> Here is the patch:
 > 
-> What makes it ARM specific?
+If you intend to send patches in the future please generate them with
+Git to make sure they have proper author information and a useful
+changelog.
 
-This is just an RFC, so I'd be happy to put the binding somewhere more
-broad. I'm not sure how much of an issue this is outside of the SoC space,
-though.
+Regards,
+Lucas
 
-Will
+> --- linux-3.10.20/arch/arm/mach-imx/clk-imx6q.c.orig    2013-11-20 21:28:01.000000000 +0100
+> +++ linux-3.10.20/arch/arm/mach-imx/clk-imx6q.c    2013-11-28 08:18:47.379521587 +0100
+> @@ -424,7 +424,7 @@ int __init mx6q_clocks_init(void)
+>      clk[asrc_podf]        = imx_clk_divider("asrc_podf",        "asrc_pred",         base + 0x30, 9,  3);
+>      clk[spdif_pred]       = imx_clk_divider("spdif_pred",       "spdif_sel",         base + 0x30, 25, 3);
+>      clk[spdif_podf]       = imx_clk_divider("spdif_podf",       "spdif_pred",        base + 0x30, 22, 3);
+> -    clk[can_root]         = imx_clk_divider("can_root",         "pll3_usb_otg",      base + 0x20, 2,  6);
+> +    clk[can_root]         = imx_clk_divider("can_root",         "pll3_60m",          base + 0x20, 2,  6);
+>      clk[ecspi_root]       = imx_clk_divider("ecspi_root",       "pll3_60m",          base + 0x38, 19, 6);
+>      clk[gpu2d_core_podf]  = imx_clk_divider("gpu2d_core_podf",  "gpu2d_core_sel",    base + 0x18, 23, 3);
+>      clk[gpu3d_core_podf]  = imx_clk_divider("gpu3d_core_podf",  "gpu3d_core_sel",    base + 0x18, 26, 3);
+> 
+> 
+> Best regards,
+> 
+> Florian Belser
+
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
