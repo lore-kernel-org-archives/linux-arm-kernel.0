@@ -1,75 +1,49 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 28 Nov 2013 14:11:09 +0530
-Subject: [PATCH v7 0/4] Add dual-fifo mode support of i.MX ssi
-In-Reply-To: <cover.1384352281.git.b42378@freescale.com>
-References: <cover.1384352281.git.b42378@freescale.com>
-Message-ID: <20131128084108.GZ8834@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Nov 2013 10:41:04 +0100
+Subject: [PATCH] serial: pl011: use DMA RX polling by default
+Message-ID: <1385631664-32607-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 13, 2013 at 10:55:23PM +0800, Nicolin Chen wrote:
->  * ! This series of patches has a direct dependency between them. When
->  * ! applying them, we need to apply to one single branch. Otherwise,
->  * ! it would break currect branches.
-Applied, thanks
+Making DMA RX polling optional when DMA is on was just
+over-cautious: there is one single system in the kernel tree
+using this facility, Ux500 and after some testing I turned
+this on also for Ux500, which means it should simply be on
+by default if DMA is enabled.
 
---
-~Vinod
-> 
-> Changelog
-> v7:
->  * Appended missing Acked-by to all four patches.
->  * Sorry that I didn't add them at the first place.
-> v6:
->  * PATCH-1: Use goto err_firmware instead of return directly.
->  *
->  * Nothing changes for the other three ack-ed patches
-> v5:
->  * PATCH-3: Add period size constraint when using dual fifo mode
->  *
->  * Nothing changes for the other three patches
-> v4:
->  * PATCH-3: Drop useless register configuration.
->  *
->  * Nothing changes for the other three patches
-> v3:
->  * PATCH-1: Add comments to indicate the end of v1 and v2 array.
->  * PATCH-3: Use better way to keep watermark as even number.
->  *
->  * Nothing changes for PATCH-2 and PATCH-4
-> v2:
->  * Instead of adding rogue scripts to current SDMA driver based on firmware
->  * V1, we define the new SDMA firmware as version 2 and bisect the PATCH-1
->  * to two patches: The first is to add version check code to the SDMA driver;
->  * And the second is to add SSI dual FIFO DMATYPE.
->  *
->  * Nothing changes for the last two patches.
-> v1:
->  * SSI can reduce hardware overrun/underrun possibility when using dual
->  * fifo mode. To support this mode, we need to first update sdma sciprt
->  * list, and then enable dual fifo BIT in SSI driver, and last update DT
->  * bindings of i.MX series.
-> 
-> Nicolin Chen (4):
->   dma: imx-sdma: Add sdma firmware version 2 support
->   dma: imx-sdma: Add new dma type for ssi dual fifo script
->   ASoC: fsl_ssi: Add dual fifo mode support
->   ARM: dts: imx: use dual-fifo sdma script for ssi
-> 
->  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |  1 +
->  arch/arm/boot/dts/imx51.dtsi                       |  4 ++--
->  arch/arm/boot/dts/imx53.dtsi                       |  4 ++--
->  arch/arm/boot/dts/imx6qdl.dtsi                     | 12 +++++-----
->  arch/arm/boot/dts/imx6sl.dtsi                      | 12 +++++-----
->  drivers/dma/imx-sdma.c                             | 19 ++++++++++++++-
->  include/linux/platform_data/dma-imx-sdma.h         |  5 ++++
->  include/linux/platform_data/dma-imx.h              |  1 +
->  sound/soc/fsl/fsl_ssi.c                            | 27 +++++++++++++++++++++-
->  9 files changed, 67 insertions(+), 18 deletions(-)
-> 
-> -- 
-> 1.8.4
-> 
-> 
+Cc: Jongsung Kim <neidhard.kim@lge.com>
+Cc: Chanho Min <chanho.min@lge.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c | 2 +-
+ include/linux/amba/serial.h     | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 7203864992a5..501d96453466 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -327,7 +327,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+ 		dmaengine_slave_config(chan, &rx_conf);
+ 		uap->dmarx.chan = chan;
+ 
+-		if (plat && plat->dma_rx_poll_enable) {
++		if (plat) {
+ 			/* Set poll rate if specified. */
+ 			if (plat->dma_rx_poll_rate) {
+ 				uap->dmarx.auto_poll_rate = false;
+diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
+index 0ddb5c02ad8b..0891ea0458f6 100644
+--- a/include/linux/amba/serial.h
++++ b/include/linux/amba/serial.h
+@@ -203,7 +203,6 @@ struct amba_pl011_data {
+ 	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+ 	void *dma_rx_param;
+ 	void *dma_tx_param;
+-	bool dma_rx_poll_enable;
+ 	unsigned int dma_rx_poll_rate;
+ 	unsigned int dma_rx_poll_timeout;
+         void (*init) (void);
 -- 
+1.8.3.1
