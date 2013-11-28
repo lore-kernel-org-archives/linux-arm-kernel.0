@@ -1,44 +1,124 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 28 Nov 2013 10:49:56 +0100
-Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
-In-Reply-To: <5296281C.1060403@wwwdotorg.org>
-References: <cover.1385508112.git.stefan@agner.ch>
- <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
- <5296281C.1060403@wwwdotorg.org>
-Message-ID: <1385632196.5838.4.camel@weser.hi.pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 28 Nov 2013 10:58:48 +0100
+Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
+ system suspend
+In-Reply-To: <1619468.NHTb5ylADI@vostro.rjw.lan>
+References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
+ <1619468.NHTb5ylADI@vostro.rjw.lan>
+Message-ID: <CAPDyKFq0OW+uhBF1pMvY01peC1dRERtSdSNY15O=vvdY_XvQUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 27.11.2013, 10:13 -0700 schrieb Stephen Warren:
-> On 11/26/2013 04:45 PM, Stefan Agner wrote:
-> > Set the requested SM2 voltage to the correct value of 1.8V. The value
-> > before used to work on TPS658623 since the driver applied a wrong
-> > voltage table too. However, the TPS658643 used on newer devices uses
-> > yet another voltage table and those broke that compatibility. The
-> > regulator driver now has the correct voltage table for both regulator
-> > versions and those the correct voltage can be used in this device
-> > tree.
-> 
-> One thing you haven't called out explicitly here is that this series is
-> an incompatible change to the DT, since the old buggy driver used to
-> allow old buggy DT content to accidentally work.
-> 
-The current (wrong and potentially dangerous) DT content only worked on
-the engineering sample models. So this change definitely does improve
-the situation, even with the risk of breaking a small fraction of
-working boards.
+On 27 November 2013 21:42, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Wednesday, November 27, 2013 04:34:55 PM Ulf Hansson wrote:
+>> To put devices into low power state during system suspend, it may be convenient
+>> for runtime PM supported subsystems, power domains and drivers to have the
+>> option of re-using the runtime PM callbacks.
+>>
+>> At the moment, quite complex solutions exist for power domains that tries to
+>> handle the above, like for OMAP2. The idea here, is to make it possible for
+>> drivers, who should know best, how to easiest put their devices into low power
+>> state. The intent is thus not only to simplify drivers but also power domains.
+>
+> So this is not entirely correct and stems from the fact that you are only
+> considering one platform.
 
-> I'm not too familiar with who's using mainline on the Colibri boards.
-> Hopefully everyone doing that is using in-kernel DTs, so this
-> incompatible change won't be any issue for anyone.
-> 
-I know of some parties using mainline, but I think everyone so far is
-able to use DTs bundled with the kernel.
+Bad wording from my side, sorry.
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I guess you realize, that am mostly working on ARM SoCs, but that
+involve many platforms and drivers. In these cases it is quite common
+that drivers are the best "decision makers" for PM. It is also very
+common to have power domain regulators.
+
+This combination is almost impossible to support without "hacks" as of
+today, especially if you have a more complex situation were the driver
+is attached to both a bus and a power domain, and were those also are
+handling runtime PM resources.
+
+>
+> On some other platforms, like x86 PC for one example, device drivers have no
+> idea how to put their devices into low power states at all, because that
+> depends on what's there in the ACPI tables.
+>
+> This becomes clearly visible when you try to use the same driver on two
+> different platforms that have different board layouts and power configurations.
+> And if one of them uses ACPI by chance, the driver shouldn't really fiddle with
+> its little knobs for clocks and power rails directly.
+
+Again, this patch set will only provide the option of being able to
+re-use runtime PM callbacks during system suspend; could also be
+considered as fundamental "building blocks" for those SoCs who needs
+this.
+
+Additionally and important, it wont break nor interfere with any other
+platforms like x86, which of course is very important. On the other
+hand, if it makes sense for other platforms to use these new building
+blocks they have the opportunity to do so.
+
+>
+>> Additionally, some drivers seems to have messed up things when combining
+>> runtime PM with system PM. While we enable the option of re-using the runtime
+>> PM callbacks during system PM, we also intend to clarify the way forward for
+>> how these scenarios could be resolved.
+>>
+>> Some new helper macros for defining PM callbacks and two new pm_generic*
+>> functions has been implemented in this patch set. These are provided to make it
+>> easier for those who wants to enable the option of re-using the runtime PM
+>> callbacks during system suspend.
+>
+> I'm generally opposed to re-using callbacks like this, because it adds confusion
+> to the picture.  It may seem to be clever, but in fact it leads to bad design
+> choices in the drivers in my opinion.
+
+In my world of the kernel, it will clearly resolve confusions and
+simplify a significant amount of code in power domains, buses and
+drivers. So I guess it depends on from what point you look at this.
+
+And, as you stated previously during these discussions, we have the
+opportunity to update the documentation around this topic, I will
+happily do it, if needed.
+
+>
+> Let's talk about specific examples, though.
+>
+> Why exactly do you need what patch [5/5] does in the exynos_drm_fimc driver?
+
+This was a simple example, I wanted to visualize how the new building
+blocks were going to be used. Anyway, this we achieve with the patch:
+
+1.
+The PM part in the driver becomes simplified, we don't need the
+wrapper functions for the runtime PM callbacks any more.
+
+2.
+Previously the driver did not make sure runtime PM was disabled,
+before it put the device into low power state at .suspend. From a
+runtime PM point of view, this is not a "nice" behaviour and opens up
+for confusions, even if it likely would work in most cases.
+
+3.
+The power domain runtime PM callbacks were by-passed during system
+suspend, my patch fixes this. Why do I want this? Because the power
+domain can have runtime PM resources it need to handle at this phase.
+Potentially, it could handle that from it's .suspend_late callback
+instead, but then it gets unnecessary complicated, which is what
+clearly happened to the power domain for OMAP2, for example.
+
+
+If you want additional proof of concepts, we can have a look at more
+complex example.
+
+Typically I am thinking of cases were a cross SoC driver is attached
+to a bus and for some SoCs a power domain as well. Then, the bus, the
+power domain and the driver - all have runtime PM resources to handle.
+
+In these cases using the new building blocks will not only
+significantly simplify code, but also fix immediate bugs. One example
+are drivers attached to the AMBA bus, at drivers/amba/bus.c.
+
+Kind regards
+Ulf Hansson
+
+>
+> Rafael
+>
