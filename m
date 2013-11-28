@@ -1,33 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Nov 2013 10:11:54 +0000
-Subject: [PATCH] ARM: asm: Configure caches as per the defconfig
-In-Reply-To: <5296D7DF.202@st.com>
-References: <1385553244-1513-1-git-send-email-amit.virdi@st.com>
- <20131127121425.GN16735@n2100.arm.linux.org.uk> <5296D7DF.202@st.com>
-Message-ID: <20131128101154.GT16735@n2100.arm.linux.org.uk>
+From: chiau.ee.chew@intel.com (Chew Chiau Ee)
+Date: Fri, 29 Nov 2013 02:13:11 +0800
+Subject: [PATCH] spi/pxa2xx: Restore private register bits.
+Message-ID: <1385662391-27573-1-git-send-email-chiau.ee.chew@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 11:12:55AM +0530, Amit Virdi wrote:
-> On 11/27/2013 5:44 PM, Russell King - ARM Linux wrote:
->> On Wed, Nov 27, 2013 at 05:24:04PM +0530, Amit Virdi wrote:
->>> From: Amit VIRDI <Amit.VIRDI@st.com>
->>>
->>> In the current implementation of the decompression code, the caches are enabled
->>> irrespective of their configuration in the deconfig. This makes setting the
->>> ICACHE and DCACHE disable options from the menuconfig irrelevant. Change this
->>> implementation to enable caches only if specified in the defconfig.
->>
->> NAK.  These options are provided more for ARM Ltd's validation of CPUs
->> rather than for users, and it's not supposed to be used with the
->> decompressor.
->>
->
-> It is perfectly true that these options are used only during CPU  
-> validations and not in the end product. Still, it doesn't justify why  
-> these options are not to be used with decompressor. Or alternately, why  
-> would a user intend to disable a cache when it has been implemented  
-> correctly and is stable? Without this change, the effect of disabling  
-> cache is not reflected in entirety.
+From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
 
-When doing CPU validations, the compressed image isn't used.
+The Intel LPSS SPI private register bits have to be restored
+when system resume from S3 suspend.
+
+Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+ drivers/spi/spi-pxa2xx.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 7028180..7765b19 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -1293,6 +1293,9 @@ static int pxa2xx_spi_resume(struct device *dev)
+ 	/* Enable the SSP clock */
+ 	clk_prepare_enable(ssp->clk);
+ 
++	/* Restore LPSS private register bits */
++	lpss_ssp_setup(drv_data);
++
+ 	/* Start the queue running */
+ 	status = spi_master_resume(drv_data->master);
+ 	if (status != 0) {
+-- 
+1.7.4.4
