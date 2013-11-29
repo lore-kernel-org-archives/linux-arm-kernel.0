@@ -1,243 +1,77 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 29 Nov 2013 14:52:20 +0100
-Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
- system suspend
-In-Reply-To: <CAPDyKFrRjB7gPpQ4c1U5e-BTHEt6k=kDqo7q1Grc04v-SDrsDw@mail.gmail.com>
-References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
- <81539588.EsdqydM2iX@vostro.rjw.lan>
- <CAPDyKFrRjB7gPpQ4c1U5e-BTHEt6k=kDqo7q1Grc04v-SDrsDw@mail.gmail.com>
-Message-ID: <3006899.CPLMC2kU1a@vostro.rjw.lan>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 29 Nov 2013 10:40:55 -0300
+Subject: [RFC/PATCH] NAND bus-width detection extreme makeover
+Message-ID: <1385732456-32696-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 29, 2013 10:32:06 AM Ulf Hansson wrote:
-> >
-> > The lack of specificity here doesn't make the discussion any easier.
-> >
-> > It usually is better to talk about specific problems to address than
-> > using general terms which may mean slightly different things for different
-> > people.
-> 
-> During these discussions, I have tried to point at existing code for
-> drivers and existing code for power domains. Those which at the moment
-> either have got things wrong or are unnecessary complicated, in
-> regards to their PM implementation.
-> 
-> I suppose I could provide some more patches for proof of concept, will
-> that be a way forward?
+Here's my proposal, based in Pekon's latest work.
 
-I'd like to understand the problems you're trying to address first, to
-be honest.
+This patch removes the flash device bus-width configuration, prior to
+the device detection. With this modification, a NAND driver is no longer
+able to "force" the device width, and instead can only obtain the detected
+bus-width after the call to nand_scan_ident().
 
-> >> >> Additionally, some drivers seems to have messed up things when combining
-> >> >> runtime PM with system PM. While we enable the option of re-using the runtime
-> >> >> PM callbacks during system PM, we also intend to clarify the way forward for
-> >> >> how these scenarios could be resolved.
-> >> >>
-> >> >> Some new helper macros for defining PM callbacks and two new pm_generic*
-> >> >> functions has been implemented in this patch set. These are provided to make it
-> >> >> easier for those who wants to enable the option of re-using the runtime PM
-> >> >> callbacks during system suspend.
-> >> >
-> >> > I'm generally opposed to re-using callbacks like this, because it adds confusion
-> >> > to the picture.  It may seem to be clever, but in fact it leads to bad design
-> >> > choices in the drivers in my opinion.
-> >>
-> >> In my world of the kernel, it will clearly resolve confusions and
-> >> simplify a significant amount of code in power domains, buses and
-> >> drivers. So I guess it depends on from what point you look at this.
-> >
-> > This is so vague that I don't even know how to respond. :-)
-> >
-> > So let me say instead that what you did in patch [5/5] is a layering violation
-> > which always is a bug, even if it doesn't break things outright.
-> >
-> > After that patch the driver would call into a layer that is supposed to call
-> > into it under normal conditions.  Moreover, it would expect that layer to
-> > call back into it again in a specific way, which may or may not happen depending
-> > on how exactly that layer is implemented.  So even if it works today, it will
-> > add constraints on how that other layer may be implmented which *is* confusing
-> > and wrong in my not so humble opinion.
-> >
-> > I'll never apply any patches that lead to situations like that, don't even
-> > bother to send them to me.  Pretty please.
-> >
-> 
-> After all these good discussions which clearly pointed the solution
-> into this direction, you decide to bring up this argument now? It
-> makes me wonder.
-> 
-> Indirectly what you are saying is that, the PM core should at
-> device_prepare, do pm_runtime_disable() instead of
-> pm_runtime_get_noresume(), to prevent drivers/subsystems from
-> triggering "layering violations" by invoking pm_runtime_get_sync().
-> 
-> Because, this is exactly the same kind of layering violation you refer
-> to while neglecting my approach, which at the moment
-> drivers/subsystems not only are allowed to, but also encouraged to do
-> during system suspend.
+Flash devices bus-width are specified either by reading an ONFI feature,
+or through a flag in the in-kernel flash devices table. Therefore, it doesn't
+make any sense to somehow "advise" the NAND core about this parameter.
 
-Well, to be honest, I'd never put a call to pm_runtime_get_sync() into
-a driver's system suspend callback.
+In addition, the ONFI specification requires to issue the detection commands
+using only the lower 8-bits of the data bus. The ONFI specification says:
 
-Subsystem callbacks are a different matter (see below).
+  "" The Read ID and Read Parameter Page commands only use the lower 8-bits
+     of the data bus. The host shall not issue commands that use a word
+     data width on x16 devices until the host determines the device supports
+     a 16-bit data bus width in the parameter page. ""
 
-> Now, obviously I don't think we shall change the behaviour of PM core,
-> that would just not be convenient for subsystems and drivers, right?
-> 
-> So, the PM core allows layering violations for the .runtime_resume
-> callbacks to be invoked during system suspend. It can do so, because
-> it trust drivers/subsystems to act responsibly and to what suites them
-> best.
+IIRC, the current way of setting the device width is to set NAND_BUSWIDTH_AUTO
+in chip->options and then let the driver set some width-specific callbacks after
+the NAND core has detected the width.
 
-Actually, there's different reason for that.  Some subsystems (not necessarily
-drivers) resume devices during the prepare phase of system suspend in case
-those devices need to be reprogrammed before entering system sleep (for
-example, to change their wakeup settings).  That's done by the PCI bus type
-and ACPI PM domain.
+However, as noticed by Pekon Gupta, this means NAND_BUSWIDTH_AUTO should be
+always turned on (and hence the option be removed).
 
-If that wasn't necessary, then yes, I would just disable the runtime PM
-framework for all devices during the entire system suspend/resume.
+That's exactly what this patch is doing.
 
-> For the same reasons, I believe we should trust drivers/subsystems, to
-> understand when it makes sense for them to re-use all of the runtime
-> PM callbacks during system suspend and not just the .runtime_suspend
-> callback.
-> 
-> That is in principle what I and Alan, who came up with this idea, are
-> suggesting.
+This patch has been tested on a AM335x board with 8-bit and 16-bit devices,
+which were successfully detected and nandtest'ed, using ONFI and flash-based
+detection.
 
-The problem with it is, as I said, the subsystem-level code you're calling
-back through pm_generic_suspend_late_runtime() (and the other resume function)
-has to be implemented in a specific way for things to work.  So it goes like
-this: "OK, now I'm not runtime-suspended, so I need to do something about that.
-Why don't I call back to the layer above me that has just called me (and that
-surely won't do anything after I return, right?), so that it does the right
-thing (which it surely will do, of course?) and calls my runtime PM callback
-as expected".
+Note that some driver's might need fixes to work in both 8-bit and 16-bit
+modes, and such work should be done by respective maintainers.
 
-And now suppose that your subsystem-level callbacks look like this (pseudo code):
+Of course, the memory controller (such as GPMC in the OMAP case) still needs
+proper width a-prior configuration, but that's completely unrelated to the
+flash device bus width. If some driver wants (and is able to) re-configure
+its memory controller after the device has been properly detected, it's free
+to do so.
 
-a_suspend_late(dev)
-{
-	if (successful(pm_generic_suspend_late(dev)))
-		do_X(dev);
-}
+Needless to say, if this work is acceptable we'll be able to finally remove/deprecate
+any traces of the NAND bus width setting, include the devicetree nand-bus-width parameter.
 
-a_runtime_suspend(dev)
-{
-	if (successful(pm_generic_runtime_suspend(dev)))
-		do_Y(dev);
-}
+Alexander: Could you try this patch and see if it's suitable for your needs?
+I think you should be able to use it to set the bus-width, without any need for
+a new DT property. You will have to split your nand_scan() call in an initial
+call to nand_scan_ident() and a final call to nand_scan_tail().
 
-Then, if the driver uses your pm_generic_suspend_late_runtime(), the actually
-executed code will be (assuming dev is not runtime-suspended):
+Typically, a driver would work like this:
 
-	a_suspend_late(dev)
-		driver->suspend_late(dev)
-			a_runtime_suspend(dev)
-				driver->runtime_suspend(dev)
-				do_Y(dev)
-	do_X(dev)
+	/* scan NAND device connected to chip controller */
+	if (nand_scan_ident(mtd, 1, NULL))
+		return -ENODEV;
 
-So what if do_X(dev) after do_Y(dev) doesn't actually work?
+	if (nand_chip->options & NAND_BUSWIDTH_16) {
+		nand_chip->read_buf   = xxx_read_buf16;
+		nand_chip->write_buf  = xxx_write_buf16;
+	}
 
-And what you actually want is
+Pekon Gupta (1):
+  mtd: nand: auto-detection of NAND bus-width from ONFI param or
+    nand_id[]
 
-	driver->runtime_suspend(dev)
-	do_Y(dev)
-
-> >> And, as you stated previously during these discussions, we have the
-> >> opportunity to update the documentation around this topic, I will
-> >> happily do it, if needed.
-> >
-> > That's always welcome. :-)
-> >
-> >> >
-> >> > Let's talk about specific examples, though.
-> >> >
-> >> > Why exactly do you need what patch [5/5] does in the exynos_drm_fimc driver?
-> >>
-> >> This was a simple example, I wanted to visualize how the new building
-> >> blocks were going to be used. Anyway, this we achieve with the patch:
-> >>
-> >> 1.
-> >> The PM part in the driver becomes simplified, we don't need the
-> >> wrapper functions for the runtime PM callbacks any more.
-> >
-> > No, it is not simplified.  It becomes *far* more complicated conceptually
-> > instead, although that is hidden by moving the complexity into the functions
-> > added by patch [1/5].  So whoever doesn't look into those functions will
-> > not actually realize how complicated the code really is.
-> >
-> >> 2.
-> >> Previously the driver did not make sure runtime PM was disabled,
-> >> before it put the device into low power state at .suspend. From a
-> >> runtime PM point of view, this is not a "nice" behaviour and opens up
-> >> for confusions, even if it likely would work in most cases.
-> >
-> > So the proper fix, in my opinion, would be to point .suspend_late and
-> > .resume_early in that driver to fimc_suspend() and fimc_resume(),
-> > respectively, and leave the .suspend and .resume pointers unpopulated.
-> >
-> > Wouldn't that actually work?
-> 
-> If we decide to ignore the power domain issue below, yes.
-> 
-> >
-> >> 3.
-> >> The power domain runtime PM callbacks were by-passed during system
-> >> suspend, my patch fixes this.
-> >
-> > I don't exactly understand this.  Why would they be bypassed?
-> >
-> >> Why do I want this? Because the power
-> >> domain can have runtime PM resources it need to handle at this phase.
-> >> Potentially, it could handle that from it's .suspend_late callback
-> >> instead, but then it gets unnecessary complicated, which is what
-> >> clearly happened to the power domain for OMAP2, for example.
-> >
-> > I'd like to understand this.  What exactly do you mean by "unnecessary
-> > complicated"?
-> 
-> Please, have a deeper look into the OMAP power domain implementation.
-
-What files exactly do I need to look at?
-
-> If each SoC (for those that have power domain regulators) needs their
-> own version of such a power domain, then I certainly think it is more
-> complicated that in needs to be.
-
-They surely can share implementations.
-
-> >
-> >>
-> >> If you want additional proof of concepts, we can have a look at more
-> >> complex example.
-> >>
-> >> Typically I am thinking of cases were a cross SoC driver is attached
-> >> to a bus and for some SoCs a power domain as well. Then, the bus, the
-> >> power domain and the driver - all have runtime PM resources to handle.
-> >
-> > Sure.
-> 
-> OK, I consider resending the patch set, including some additional
-> proof of concept patches.
-> 
-> >
-> >> In these cases using the new building blocks will not only
-> >> significantly simplify code, but also fix immediate bugs. One example
-> >> are drivers attached to the AMBA bus, at drivers/amba/bus.c.
-> >
-> > Again, what drivers and what's the bug you're talking about?
-> 
-> I will use some of these as examples, it will be more visible to you then.
-
-Well, I think I know what you're trying to do.  The problem is that in my
-opinion the way you're trying to achieve that is not the right one.
-
-Thanks!
+ drivers/mtd/nand/nand_base.c | 43 +++++++++++++------------------------------
+ include/linux/mtd/nand.h     |  7 -------
+ 2 files changed, 13 insertions(+), 37 deletions(-)
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.8.1.5
