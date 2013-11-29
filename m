@@ -1,35 +1,48 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 14:08:29 +0100
-Subject: [PATCH 05/31] ARM: tegra: update DT files to add DMA properties
-In-Reply-To: <1384548866-13141-6-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 29 Nov 2013 14:10:41 +0100
+Subject: [PATCH 06/31] ARM: tegra: select the reset framework
+In-Reply-To: <1384548866-13141-7-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-6-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131129130828.GR22771@ulmo.nvidia.com>
+ <1384548866-13141-7-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129131040.GS22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:54:00PM -0700, Stephen Warren wrote:
+On Fri, Nov 15, 2013 at 01:54:01PM -0700, Stephen Warren wrote:
 > From: Stephen Warren <swarren@nvidia.com>
 > 
-> This patch switches the Tegra DT files to use the standard DMA DT bindings
-> rather than custom properties. Note that the legacy properties are not yet
-> removed; the drivers must be updated to use the new properties first.
+> The Tegra clock driver is built unconditionally when Tegra support is
+> enabled. In order to avoid having to ifdef the forthcoming reset driver
+> implementation, have ARCH_TEGRA select RESET_CONTROLLER.
 > 
 > Cc: treding at nvidia.com
 > Cc: pdeschrijver at nvidia.com
 > Cc: linux-tegra at vger.kernel.org
 > Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
 > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  arch/arm/boot/dts/tegra114.dtsi | 45 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/tegra20.dtsi  | 35 ++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/tegra30.dtsi  | 39 +++++++++++++++++++++++++++++++++++
->  3 files changed, 119 insertions(+)
+>  arch/arm/mach-tegra/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> index 09e740f58b27..15c09294effa 100644
+> --- a/arch/arm/mach-tegra/Kconfig
+> +++ b/arch/arm/mach-tegra/Kconfig
+> @@ -14,6 +14,8 @@ config ARCH_TEGRA
+>  	select MIGHT_HAVE_CACHE_L2X0
+>  	select MIGHT_HAVE_PCI
+>  	select PINCTRL
+> +	select ARCH_HAS_RESET_CONTROLLER
+> +	select RESET_CONTROLLER
+
+I don't think RESET_CONTROLLER is necessary given this:
+
+	menuconfig RESET_CONTROLLER
+		bool "Reset Controller Support"
+		default y if ARCH_HAS_RESET_CONTROLLER
+
+I suppose that would still make it possible to deselect RESET_CONTROLLER
+and cause breakage. Explicitly selecting it avoids that, so:
 
 Reviewed-by: Thierry Reding <treding@nvidia.com>
 -------------- next part --------------
@@ -38,4 +51,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/ed2e841b/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/5fb29f1b/attachment.sig>
