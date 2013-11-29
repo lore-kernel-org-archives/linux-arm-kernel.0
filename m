@@ -1,38 +1,103 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 29 Nov 2013 14:00:27 +0530
-Subject: [PATCH v6 0/6] gpio: daVinci: cleanup and feature enhancement
-In-Reply-To: <CACRpkdYvNwF+dxfiLCHpCL+Ze17PMAMkJo4s-4T4ku1KxDPXxw@mail.gmail.com>
-References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
- <CACRpkdYvNwF+dxfiLCHpCL+Ze17PMAMkJo4s-4T4ku1KxDPXxw@mail.gmail.com>
-Message-ID: <CA+V-a8vZ22_OpfyEDcQoMWZJbUm3utBSJSrOZUw3ux2whZYXiQ@mail.gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Fri, 29 Nov 2013 08:46:26 +0000
+Subject: [PATCH v2 1/2] usb: chipidea: usbmisc: Add support for
+ i.MX27/i.MX31 CPUs
+In-Reply-To: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
+References: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A64980413ABF4@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-On Fri, Nov 29, 2013 at 1:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Nov 21, 2013 at 7:15 PM, Prabhakar Lad
-> <prabhakar.csengg@gmail.com> wrote:
->
->> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>
->> This patch series does the following
->> 1> Ports the driver to use irqdomain.
->> 2> Adds dt binding support for gpio-davinci.
->> 3> Adds DA850 dt support goio.
->>
->> Changes for v6:
->> 1: GPIO driver now migrated to irq domain legacy.
->> 2: Fixed review comments pointed by Grygorii.
->> 3: Included Ack's.
->
-> This series is looking nice, I assume that Sekhar will take this through
-> the DaVinci tree once he's happy with it. I think I've ACKed all relevant
-> patches, else tell me.
->
-While you are at it, you missed to ACK v6 2/6 patch [1]
+ 
+> 
+> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/usb/chipidea/usbmisc_imx.c | 42
+> ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c
+> b/drivers/usb/chipidea/usbmisc_imx.c
+> index 8a1094b..4381c5a6 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -21,6 +21,10 @@
+>  #define MX25_USB_PHY_CTRL_OFFSET	0x08
+>  #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
+> 
+> +#define MX27_H1_PM_BIT			BIT(8)
+> +#define MX27_H2_PM_BIT			BIT(16)
+> +#define MX27_OTG_PM_BIT			BIT(24)
+> +
+>  #define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08
+>  #define MX53_USB_UH2_CTRL_OFFSET	0x14
+>  #define MX53_USB_UH3_CTRL_OFFSET	0x18
+> @@ -68,6 +72,36 @@ static int usbmisc_imx25_post(struct imx_usbmisc_data
+> *data)
+>  	return 0;
+>  }
+> 
+> +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
+> +{
+> +	unsigned long flags;
+> +	u32 val;
+> +
+> +	switch (data->index) {
+> +	case 0:
+> +		val = MX27_OTG_PM_BIT;
+> +		break;
+> +	case 1:
+> +		val = MX27_H1_PM_BIT;
+> +		break;
+> +	case 2:
+> +		val = MX27_H2_PM_BIT;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	};
+> +
+> +	spin_lock_irqsave(&usbmisc->lock, flags);
+> +	if (data->disable_oc)
+> +		val = readl(usbmisc->base) | val;
+> +	else
+> +		val = readl(usbmisc->base) & ~val;
+> +	writel(val, usbmisc->base);
+> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+>  static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
+>  {
+>  	void __iomem *reg = NULL;
+> @@ -128,6 +162,10 @@ static const struct usbmisc_ops imx25_usbmisc_ops =
+> {
+>  	.post = usbmisc_imx25_post,
+>  };
+> 
+> +static const struct usbmisc_ops imx27_usbmisc_ops = {
+> +	.init = usbmisc_imx27_init,
+> +};
+> +
+>  static const struct usbmisc_ops imx53_usbmisc_ops = {
+>  	.init = usbmisc_imx53_init,
+>  };
+> @@ -162,6 +200,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[]
+> = {
+>  		.data = &imx25_usbmisc_ops,
+>  	},
+>  	{
+> +		.compatible = "fsl,imx27-usbmisc",
+> +		.data = &imx27_usbmisc_ops,
+> +	},
+> +	{
+>  		.compatible = "fsl,imx53-usbmisc",
+>  		.data = &imx53_usbmisc_ops,
+>  	},
+> --
+Acked-by: Peter Chen <peter.chen@freescale.com>
 
-[1] https://lkml.org/lkml/2013/11/21/425
-
-Regards,
---Prabhakar
+Peter
