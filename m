@@ -1,37 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Nov 2013 09:57:03 +0000
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131129093713.GC22771@ulmo.nvidia.com>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131128203322.GB14689@mithrandir>
- <20131128211009.GA26447@obsidianresearch.com>
- <20131128222232.GF14689@mithrandir>
- <20131128233147.GA19387@obsidianresearch.com>
- <20131129023554.GA14239@kroah.com> <20131129093713.GC22771@ulmo.nvidia.com>
-Message-ID: <20131129095703.GV16735@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Nov 2013 11:11:08 +0100
+Subject: STOP THE MADNESS
+In-Reply-To: <20131129020149.GU16735@n2100.arm.linux.org.uk>
+References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+ <20131129020149.GU16735@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdao9ct-fKaUnrdX=dmN+fyuVgcbWQvc_sZTwp8wGdJ0+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 10:37:14AM +0100, Thierry Reding wrote:
-> There's a large gap between how fast new SoCs are supposed to tape out
-> and the rate at which new code can be merged upstream. Perhaps some of
-> that could be mitigated by putting more of the complexity into firmware
-> and that's already happening to some degree for ARMv8. But I suspect
-> there's a limit to what you can hide away in firmware while at the same
-> time giving the kernel enough information to do the right thing.
+On Fri, Nov 29, 2013 at 3:01 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-One of the bigger issues which stands in the way of companies caring
-about mainstream support is closed source IPs like VPUs and GPUs.
+> So... EBSA285... where would people like me to start with that.
+> VGA... broken.  LEDs... broken.  Several other issues as well (eg,
+> my tightening of the vectors page seems to have broken all low-vectors
+> platforms.)
 
-If you have one of those on your chip, even if the kernel side code
-is already under the GPL, normally that code is not "mainline worthy".
-Also, as the userspace code may not be open source, some people object
-to having the open source part in the kernel.
+It seems that the majority of the world's Versatile "users" are
+running the QEMU model of that machine and not really
+testing on anything else. Unsurprisingly the QEMU Versatile
+is overly forgiving when mistreating virtual hardware. Some
+stuff like LEDs I guess are just dummies.
 
-So for customers to be able to get the performance out of the chip,
-they have to stick with having non-mainline kernel.
+I'm having a look at some stuff on this Versatile AB I have here
+(turned out it was not a PB, but hopefully this will suffice).
+I'll try to attend to the stuff that I understand atleast.
 
-At that point, why bother spending too much time getting mainline
-support for the device.  It's never going to be fully functional in
-mainline.  It doesn't make sense for these SoC companies.
+Yours,
+Linus Walleij
