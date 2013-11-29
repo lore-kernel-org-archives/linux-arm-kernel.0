@@ -1,40 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Nov 2013 21:09:29 +0100
-Subject: [PATCH V2] media: i2c: Add ADV761X support
-In-Reply-To: <5298F3A1.7070503@metafoo.de>
-References: <1384520071-16463-1-git-send-email-valentine.barshak@cogentembedded.com>
- <5295E231.9030200@cisco.com> <5295E641.6060603@cogentembedded.com>
- <2150651.hQNra4Rlob@avalon>
- <CACRpkdZQa626hNRFcGvk4t7Z8scTCoEcf7AqO-FsL=BGk6UfeA@mail.gmail.com>
- <52987058.80700@metafoo.de>
- <CACRpkdYuiwH5MzdY3HO7oBSGLqRr5t4HMvGscjsf4QL2G1wiNw@mail.gmail.com>
- <52989B13.8010207@metafoo.de>
- <CACRpkda89fqGd6+ShvFXz-7i56KfG43EggBtjbdKyOCGnJu5Cg@mail.gmail.com>
- <5298F3A1.7070503@metafoo.de>
-Message-ID: <CACRpkdbgbb_dcxyaGpdpwiHxd9p1bEc2JB5bzK5dDBHFcHwjzA@mail.gmail.com>
+Date: Fri, 29 Nov 2013 21:21:44 +0100
+Subject: [PATCH v6] gpio: Add MOXA ART GPIO driver
+In-Reply-To: <201311281737.32696.arnd@arndb.de>
+References: <1381503190-5733-1-git-send-email-jonas.jensen@gmail.com>
+ <1385651945-22355-1-git-send-email-jonas.jensen@gmail.com>
+ <201311281737.32696.arnd@arndb.de>
+Message-ID: <CACRpkda3bEmL+WRX1ct9SoUQOPXOT2mru0uz3-04nZB8G3DsvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 9:05 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> On 11/29/2013 08:52 PM, Linus Walleij wrote:
+On Thu, Nov 28, 2013 at 5:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 28 November 2013, Jonas Jensen wrote:
+>> +static void __iomem *moxart_gpio_base;
+>
+> Just one comment: the usual way to do such a driver is to have
+> a derived data structure like
+>
+> struct moxart_gpio_chip {
+>         struct gpio_chip chip;
+>         void __iomem *moxart_gpio_base;
+> };
+>
+> and dynamically allocate that from probe(), using container_of() to
+> get from the gpio_chip pointer to your own structure.
 
->> I guess you may be referring to the problem of instatiating
->> a dynamic IRQ chip in *board code* and then passing the
->> obtained dynamic IRQ numbers as resources to the
->> devices also created in a board file?
->>
->
-> Yes.
->
->> That would be like you're asking for a function that would
->> return the base of an irq_chip, that needs to be discussed
->> with the irq maintainers, so not much I can say, but maybe
->> I misunderstood this?
->
-> I my opinion the best solution for this problem is to have the same lookup
-> mechanism we've had for clocks, regulators, etc and now also GPIOs.
+I see we make this comment a lot.
 
-Hm this needs to be discussed with some irq people...
+On my TODO there is an item to create
+Documentation/driver-model/design-patterns.txt
+
+And document things like this. And other fun stuff like
+container_of().
+
+What do you think about this idea?
 
 Yours,
 Linus Walleij
