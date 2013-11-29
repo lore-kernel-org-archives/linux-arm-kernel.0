@@ -1,56 +1,98 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Nov 2013 18:21:10 +0000
-Subject: [PATCH 00/10] ASoC: dma: ARM: ux500: Obtain DMA data from Device
- Tree
-In-Reply-To: <CAF2Aj3gj0eAanrW__Bz1SJokKZ9cUuOi6jhaAtQucgh6pLbPbw@mail.gmail.com>
-References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
- <20131129160358.GD26982@lee--X1>
- <20131129164229.GG27568@sirena.org.uk>
- <CAF2Aj3gj0eAanrW__Bz1SJokKZ9cUuOi6jhaAtQucgh6pLbPbw@mail.gmail.com>
-Message-ID: <20131129182110.GH27568@sirena.org.uk>
+From: david.heidelberger@ixit.cz (David Heidelberger)
+Date: Fri, 29 Nov 2013 19:26:02 +0100
+Subject: [PATCH v2] ARM: pxa: Move iotable mapping inside vmalloc region
+In-Reply-To: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <3851da8e73651372353201e697c0f55f@ixit.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 05:37:30PM +0000, Lee Jones wrote:
-> >> Are you/did you already tak(e)ing this set?
+Build fails with this patch with:
+arch/arm/mach-pxa/standby.S:25: Error: missing ')'
+arch/arm/mach-pxa/standby.S:25: Error: garbage following instruction -- 
+`mov r3,#(0xff000000UL-0x00100000)'
 
-> > Don't send contentless nags, they're just noise.
+After replace VMALLOC_END to 0xff000000 (without UL) it fails with:
 
-> Countless. Errr... 1 after 10 days!
+arch/arm/mach-pxa/sleep.S:52: Error: invalid constant (fffffffffef00000) 
+after fixup
 
-Contentless means there's no content in the e-mail rather than that it's
-too soon or something.  
+it will probably fail everywhere in asm code, where is declared 
+UNCACHED_PHYS_0
 
-In general you should either engage with the prior discussion (for
-example here by asking where the patches are if they've not appeared as
-expected and/or sending the patches you were asked to send) or resend
-patches if there was no response at all (since if patches have been
-dropped there's a good chance people don't have them any more).
+Thank you,
+David
 
-> > Looking at my sent mail folder I see:
-
-> > | I'm happy to merge the first few patches if that's easiest for everyone
-> > | else, let me know and send them to me if that's what works for people.
-
-> > which doesn't seem to have happened.
-
-> I'm confused. Why do you want them to be resent?
-
-You only sent me the ASoC portion of the series, I didn't get the
-arch/arm bits since you didn't copy me on them.  I assumed those were
-the patches you were taking about.
-
-> What about the patches which are not in the 'first few'?
-
-> I took a look at asoc/topic/ux500, which was mentioned in the same
-> reply, but they don't appear to be there? Am I looking at a different tree?
-
-Repushed now.  There was one patch I asked for updates to and which (as
-I said) I guess probably depends on the patches you didn't send me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/4a04747f/attachment-0001.sig>
+Dne 2013-11-29 01:00, Ezequiel Garcia napsal:
+> In order to remove the following ugly message:
+> 
+>   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+> 
+> the iotable mappings should be re-located inside the vmalloc
+> region. Such move was introduced at commit:
+> 
+> commit 0536bdf33faff4d940ac094c77998cfac368cfff
+> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date:   Thu Aug 25 00:35:59 2011 -0400
+> 
+>     ARM: move iotable mappings within the vmalloc region
+> 
+> While at it, condition the mapping to PXA25x and PXA27x, which
+> are the only platforms where it's used.
+> 
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: David Heidelberger <david.heidelberger@ixit.cz>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> David,
+> 
+> Is it possible for you to give this a try on your board?
+> 
+>  arch/arm/mach-pxa/generic.c               | 6 ++++--
+>  arch/arm/mach-pxa/include/mach/hardware.h | 5 +++--
+>  2 files changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+> index 4225417..3c1b4fa 100644
+> --- a/arch/arm/mach-pxa/generic.c
+> +++ b/arch/arm/mach-pxa/generic.c
+> @@ -83,11 +83,13 @@ static struct map_desc common_io_desc[] __initdata 
+> = {
+>  		.pfn		= __phys_to_pfn(0x40000000),
+>  		.length		= 0x02000000,
+>  		.type		= MT_DEVICE
+> +#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
+>  	}, {	/* UNCACHED_PHYS_0 */
+> -		.virtual	= 0xff000000,
+> +		.virtual	= UNCACHED_PHYS_0,
+>  		.pfn		= __phys_to_pfn(0x00000000),
+> -		.length		= 0x00100000,
+> +		.length		= UNCACHED_SIZE,
+>  		.type		= MT_DEVICE
+> +#endif
+>  	}
+>  };
+> 
+> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
+> b/arch/arm/mach-pxa/include/mach/hardware.h
+> index ccb06e4..b365a72 100644
+> --- a/arch/arm/mach-pxa/include/mach/hardware.h
+> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
+> @@ -14,13 +14,14 @@
+>  #define __ASM_ARCH_HARDWARE_H
+> 
+>  #include <mach/addr-map.h>
+> +#include <asm/pgtable.h>
+> 
+>  /*
+>   * Workarounds for at least 2 errata so far require this.
+>   * The mapping is set in mach-pxa/generic.c.
+>   */
+> -#define UNCACHED_PHYS_0		0xff000000
+> -#define UNCACHED_ADDR		UNCACHED_PHYS_0
+> +#define UNCACHED_PHYS_0		(VMALLOC_END - UNCACHED_SIZE)
+> +#define UNCACHED_SIZE		SZ_1M
+> 
+>  /*
+>   * Intel PXA2xx internal register mapping:
