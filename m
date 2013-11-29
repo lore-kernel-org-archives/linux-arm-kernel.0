@@ -1,79 +1,60 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 28 Nov 2013 21:00:43 -0300
-Subject: [PATCH v2] ARM: pxa: Move iotable mapping inside vmalloc region
-Message-ID: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Fri, 29 Nov 2013 10:07:48 +0900
+Subject: [PATCH v11 7/7] ARM: tegra: support Trusted Foundations by default
+In-Reply-To: <20131128194751.GD4634@e103592.cambridge.arm.com>
+References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
+ <1385274652-16415-8-git-send-email-acourbot@nvidia.com>
+ <20131126000608.GA21634@quad.lixom.net>
+ <CAAVeFu+mMyPhFtVZ09vgYWWCYkPpF3X547ffRAfXXKOOWUUkqg@mail.gmail.com>
+ <20131126164730.GE2355@e103592.cambridge.arm.com>
+ <CAAVeFuJgqgRnWLD+dyvb7+2fLanHmdDT0YV5r8ETsoqqjW8p7A@mail.gmail.com>
+ <52977639.4000308@wwwdotorg.org>
+ <20131128194751.GD4634@e103592.cambridge.arm.com>
+Message-ID: <5297E8E4.8080401@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove the following ugly message:
+On 11/29/2013 04:47 AM, Dave Martin wrote:
+> On Thu, Nov 28, 2013 at 04:58:33PM +0000, Stephen Warren wrote:
+>> On 11/27/2013 11:02 PM, Alexandre Courbot wrote:
+>>> On Wed, Nov 27, 2013 at 1:47 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+>>>> On Tue, Nov 26, 2013 at 10:35:58AM +0900, Alexandre Courbot wrote:
+>>>>> On Tue, Nov 26, 2013 at 9:06 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>>>> On Sun, Nov 24, 2013 at 03:30:52PM +0900, Alexandre Courbot wrote:
+>>>>>>> Support for Trusted Foundations is light and allows the kernel to run on
+>>>>>>> a wider range of devices, so enable it by default.
+>>>>>>>
+>>>>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>>>>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>>>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>>>>>>> ---
+>>>>>>>   arch/arm/configs/tegra_defconfig | 1 +
+>>>>>>>   1 file changed, 1 insertion(+)
+>>>>>>
+>>>>>> I think we want this enabled on multi_v7_defconfig too? Send a separate
+>>>>>> patch for that once this is merged though.
+>>>>>
+>>>>> Will do.
+>>>>
+>>>> Should it just be default y if one of the relevant
+>>>> CONFIG_ARCH_TEGRA_*_SOC is selected?
+>>>>
+>>>> That way, it's automatically included if relevant, and automatically
+>>>> excluded if not -- regardless of whether the kernel is multiplatform
+>>>> or not.
+>>>
+>>> So basically, that would mean setting the default to 'y' since the
+>>> option is not available unless a supported platform is included?
+>>>
+>>> I'm fine this way too, if Stephen also agrees.
+>>
+>> Fine by me.
+>
+> Sure, as long as the result is right, that should be fine.
 
-  BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+Ok, then please ignore this patch in this series and I will send a new 
+one that changes the CONFIG_TRUSTED_FOUNDATION's default setting once we 
+have confirmation from Russell that this series can be merged.
 
-the iotable mappings should be re-located inside the vmalloc
-region. Such move was introduced at commit:
-
-commit 0536bdf33faff4d940ac094c77998cfac368cfff
-Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date:   Thu Aug 25 00:35:59 2011 -0400
-
-    ARM: move iotable mappings within the vmalloc region
-
-While at it, condition the mapping to PXA25x and PXA27x, which
-are the only platforms where it's used.
-
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: David Heidelberger <david.heidelberger@ixit.cz>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-David,
-
-Is it possible for you to give this a try on your board?
-
- arch/arm/mach-pxa/generic.c               | 6 ++++--
- arch/arm/mach-pxa/include/mach/hardware.h | 5 +++--
- 2 files changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-index 4225417..3c1b4fa 100644
---- a/arch/arm/mach-pxa/generic.c
-+++ b/arch/arm/mach-pxa/generic.c
-@@ -83,11 +83,13 @@ static struct map_desc common_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(0x40000000),
- 		.length		= 0x02000000,
- 		.type		= MT_DEVICE
-+#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
- 	}, {	/* UNCACHED_PHYS_0 */
--		.virtual	= 0xff000000,
-+		.virtual	= UNCACHED_PHYS_0,
- 		.pfn		= __phys_to_pfn(0x00000000),
--		.length		= 0x00100000,
-+		.length		= UNCACHED_SIZE,
- 		.type		= MT_DEVICE
-+#endif
- 	}
- };
- 
-diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
-index ccb06e4..b365a72 100644
---- a/arch/arm/mach-pxa/include/mach/hardware.h
-+++ b/arch/arm/mach-pxa/include/mach/hardware.h
-@@ -14,13 +14,14 @@
- #define __ASM_ARCH_HARDWARE_H
- 
- #include <mach/addr-map.h>
-+#include <asm/pgtable.h>
- 
- /*
-  * Workarounds for at least 2 errata so far require this.
-  * The mapping is set in mach-pxa/generic.c.
-  */
--#define UNCACHED_PHYS_0		0xff000000
--#define UNCACHED_ADDR		UNCACHED_PHYS_0
-+#define UNCACHED_PHYS_0		(VMALLOC_END - UNCACHED_SIZE)
-+#define UNCACHED_SIZE		SZ_1M
- 
- /*
-  * Intel PXA2xx internal register mapping:
--- 
-1.8.1.5
+Thanks,
+Alex.
