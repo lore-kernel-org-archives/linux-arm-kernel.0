@@ -1,71 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 29 Nov 2013 17:50:22 +0100
-Subject: [PATCH 1/3] serial: mxs-auart: implement flush_buffer hook
-In-Reply-To: <1385742927-11358-2-git-send-email-hector.palacios@digi.com>
-References: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
- <1385742927-11358-2-git-send-email-hector.palacios@digi.com>
-Message-ID: <201311291750.22215.marex@denx.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 29 Nov 2013 11:50:10 -0500
+Subject: [PATCH 00/24] mm: Use memblock interface instead of bootmem
+In-Reply-To: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <5298C5C2.60008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hector,
+Tejun, Andrew,
 
-> Terminate any DMA transfer and verify the TX FIFO is empty.
+On Friday 08 November 2013 06:41 PM, Santosh Shilimkar wrote:
+> Tejun and others,
 > 
-> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-> ---
->  drivers/tty/serial/mxs-auart.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
+> Following up with the earlier RFC [1] comments, here is the updated
+> patch series based on the discussion. This series is the last bottleneck
+> now for me to enable the coherency on keystone ARM LPAE architecture on which
+> the physical memory starts after 4BG. I would like to get these patches
+> in next merge window(3.14), so any help in terms of testing/comments is
+> appreciated.
 > 
-> diff --git a/drivers/tty/serial/mxs-auart.c
-> b/drivers/tty/serial/mxs-auart.c index 9f0461778fc1..d9bf6e103f65 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -782,6 +782,28 @@ static unsigned int mxs_auart_tx_empty(struct
-> uart_port *u) return 0;
->  }
-> 
-> +/*
-> + * Flush the transmit buffer.
-> + * Locking: called with port lock held and IRQs disabled.
-> + */
-> +static void mxs_auart_flush_buffer(struct uart_port *u)
-> +{
-> +	struct mxs_auart_port *s = to_auart_port(u);
-> +	struct dma_chan *channel = s->tx_dma_chan;
-> +	unsigned int to;
-> +
-> +	if (auart_dma_enabled(s)) {
-> +		/* Avoid deadlock with the DMA engine callback */
-> +		spin_unlock(&s->port.lock);
-> +		dmaengine_terminate_all(channel);
-> +		spin_lock(&s->port.lock);
+Now since the 3.13-rc1 is out, it will be best to apply these patches 
+on memblock tree so that they start appearing in next to catch any
+regressions, issues etc. It will give us some time to fix any issues
+arises from next.
 
-Can you not maybe just set some flag here to tell the DMA engine callback things 
-are shutting down and to don't do anything funny anymore ?
+For convenience, I have re-based the series on top of 3.13-rc1 and
+pushed it on below tree.
 
-> +	}
-> +	/* Wait for the FIFO to flush */
-> +	to = u->timeout;
-> +	while (!mxs_auart_tx_empty(u) && to--)
-> +		mdelay(1);
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+for_3.14/memblock
 
-Maybe you can put some cond_resched() into the loop to avoid wasting too many 
-cycles ?
+web-url:
+https://git.kernel.org/cgit/linux/kernel/git/ssantosh/linux-keystone.git/log/?h=for_3.14/memblock
 
-> +}
-> +
->  static void mxs_auart_start_tx(struct uart_port *u)
->  {
->  	struct mxs_auart_port *s = to_auart_port(u);
-> @@ -828,6 +850,7 @@ static struct uart_ops mxs_auart_ops = {
->  	.get_mctrl      = mxs_auart_get_mctrl,
->  	.startup	= mxs_auart_startup,
->  	.shutdown       = mxs_auart_shutdown,
-> +	.flush_buffer	= mxs_auart_flush_buffer,
->  	.set_termios    = mxs_auart_settermios,
->  	.type	   	= mxs_auart_type,
->  	.release_port   = mxs_auart_release_port,
+Can you please pull these in you tree and apply against your
+next branch ?
 
-Best regards,
-Marek Vasut
+Regards,
+Santosh		 
