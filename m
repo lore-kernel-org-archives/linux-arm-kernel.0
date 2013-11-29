@@ -1,81 +1,58 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 29 Nov 2013 16:29:00 +0100
-Subject: [PATCH] IMX6 flexcan: Change serial clock_feq source from IPG
- clock to PER clock
-In-Reply-To: <20131129142249.GA10840@S2101-09.ap.freescale.net>
-References: <E1C9442006A9AE48A7A4B85E0D01C4D4748A18@stwexdb.stww2k.local>
- <5EC8D4ACC923FE4D871AFFACC9761279739C0B@stwexdb.stww2k.local>
- <20131129142249.GA10840@S2101-09.ap.freescale.net>
-Message-ID: <5298B2BC.7070002@pengutronix.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 29 Nov 2013 10:30:57 -0500 (EST)
+Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
+ system suspend
+In-Reply-To: <4064706.R9zKA4hcfi@vostro.rjw.lan>
+Message-ID: <Pine.LNX.4.44L0.1311291014020.27250-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 03:22 PM, Shawn Guo wrote:
->> think I found a bug in the flexcan driver. Currently the serial
->> clock frequency for bitrate calculation is derived from IPG clock. 
->> According to the imx6d/q reference manual, the CAN serial clock is
->> derived from can_root clock (PER clock in dtb). The patch below
->> fixes this issue.
+On Fri, 29 Nov 2013, Rafael J. Wysocki wrote:
+
+> That should have been
 > 
-> Marc already had a patch for it.
+>  	driver->runtime_suspend(dev)
+>  	do_X(dev)
 > 
-> http://www.spinics.net/lists/arm-kernel/msg288971.html
+> because do_Y(dev) is for runtime suspend.  Sorry.
+> 
+> And of course, the subsystem-level code you're developing the driver for may not
+> do the do_X(dev) thing at all, in which case all will work.  But what if someone
+> tries to use the driver with a different subsystem-level code (like a new PM
+> domain)?
 
-Ack, it's already in David Miller's net/master and will hit Linus tree
-soon, stable in on Cc.
+It sounds like the problem is one of division of responsibilities.  
+What part of the work is done by the subsystem, and what part is done 
+by the driver?  Obviously the answer will vary from one subsystem to 
+another.
 
->> However, I'm not sure if the patch below will also work for the
->> rest of the imx family. Does anybody know if the CAN serial clock
->> is derived from IPG clock in other imx processors? Is there a case
->> distinction required to keep backward compatibility?
+As I understand it, in Ulf's situation the subsystem knows that the
+operations needed for the suspend_late phase of system suspend are the
+same as those carried out by the driver's runtime_suspend callback (if
+the device isn't already in a runtime-PM low-power state).  Or perhaps
+it knows they are the same as those carried out by the subsystem's
+runtime_suspend callback.  Or perhaps the _driver_ knows that the
+operations it needs for suspend_late are the same as those carried out
+by its own runtime_suspend callback (if the device isn't already in a
+low-power state).
 
-All other processors use the same rate, for now, for both clocks.
-However this will change soon on the mx53, once my patch in mainline.
+Regardless, under those conditions the suspend_late routine merely has
+to invoke the appropriate runtime_suspend routine, after checking the
+device's runtime PM status.  We can't do this by calling
+pm_runtime_suspend, because runtime PM is disabled during suspend_late.  
+Instead, we have to call the proper runtime-suspend routine directly.
 
->> Be aware that getting the flexcan module running on the imx6 also
->> requires patch "[PATCH] IMX6: Add static /8 prescaler to can_root
->> clock configuration"
+The amount of code needed is quite small; basically nothing more than:
 
-That problem has already been fixed with:
+	if (!pm_runtime_status_suspended(dev))
+		dev->driver->pm->runtime_suspend(dev);
 
-    9b3d423 ARM: i.MX6q: fix the wrong parent of can_root clock
+The problems are:
 
-and I've asked Greg to queue this patch for stable, too:
+     1. Which callback does this code belong in?
 
-http://www.spinics.net/lists/stable/msg26282.html
+     2. Which runtime_suspend callback should be invoked?  The example 
+	above uses dev->driver->pm->runtime_suspend, but this may not 
+	always be the right one.
 
->> In the same file there is another bug which only occurs in
->> combination with an imx6 processor. Within the function "static int
->> flexcan_chip_start(struct net_device *dev)" all message boxes will
->> be initialized. Think that isn't correct for the IMX6 processor. In
->> the newest kernel v3.12.r1 the problem is already fixed and I'm not
->> sure if the fix will be automatically added to the LTE kernel
->> version 3.10.20 ? If not, shall I create a patch for it ?
-
-As there already is a patch for the problem, I think you mean:
-
-    0d1862e can: flexcan: fix flexcan_chip_start() on imx6
-
-There was a bit of confusion about this patch, as it creates a
-regression that was fixes by the later patch:
-
-    d5a7b40 can: flexcan: flexcan_chip_start: fix regression, mark one
-MB for TX and abort pending TX
-
-It seems that d5a7b40 got applied but 0d1862e not. I'll ask Greg to
-queue the missing patch ("0d1862e") to stable.
-
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/b6b45f8e/attachment.sig>
+Alan Stern
