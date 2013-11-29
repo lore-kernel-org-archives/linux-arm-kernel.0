@@ -1,68 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Nov 2013 12:15:47 +0000
-Subject: [PATCH 1/4] iommu/arm-smmu: add devices attached to the SMMU to an
- IOMMU group
-In-Reply-To: <1385727350-20032-1-git-send-email-will.deacon@arm.com>
-References: <1385727350-20032-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1385727350-20032-2-git-send-email-will.deacon@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 29 Nov 2013 12:18:49 +0000
+Subject: [PATCH v3 00/36] mtd: st_spi_fsm: Add new driver
+Message-ID: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antonios Motakis <a.motakis@virtualopensystems.com>
+Version 3:
+  Okay, this thing should be fully functional now. Identify a chip
+  based on it's JEDEC ID, Read, Write, Erase (all or by sector).
+  Support for various chip quirks added too.
 
-IOMMU groups are expected by certain users of the IOMMU API,
-e.g. VFIO. Add new devices found by the SMMU driver to an IOMMU
-group to satisfy those users.
+Version 2:
+  The first bunch of these patches have been on the MLs before, but
+  didn't receive a great deal of attention for the most part. We are
+  a little more featureful this time however. We can now successfully
+  setup and configure the N25Q256. We still can't read/write/erase
+  it though. I'll start work on that next week and will provide it in
+  the next instalment.
 
-Acked-by: Alex Williamson <alex.williamson@redhat.com>
-Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index e46a88700b68..879da20617fb 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1494,6 +1494,13 @@ static int arm_smmu_add_device(struct device *dev)
- {
- 	struct arm_smmu_device *child, *parent, *smmu;
- 	struct arm_smmu_master *master = NULL;
-+	struct iommu_group *group;
-+	int ret;
-+
-+	if (dev->archdata.iommu) {
-+		dev_warn(dev, "IOMMU driver already assigned to device\n");
-+		return -EINVAL;
-+	}
+Version 1:
+  First stab at getting this thing Mainlined. It doesn't do a great deal
+  yet, but we are able to initialise the device and dynamically set it up
+  correctly based on an extracted JEDEC ID.
  
- 	spin_lock(&arm_smmu_devices_lock);
- 	list_for_each_entry(parent, &arm_smmu_devices, list) {
-@@ -1526,13 +1533,23 @@ static int arm_smmu_add_device(struct device *dev)
- 	if (!master)
- 		return -ENODEV;
- 
-+	group = iommu_group_alloc();
-+	if (IS_ERR(group)) {
-+		dev_err(dev, "Failed to allocate IOMMU group\n");
-+		return PTR_ERR(group);
-+	}
-+
-+	ret = iommu_group_add_device(group, dev);
-+	iommu_group_put(group);
- 	dev->archdata.iommu = smmu;
--	return 0;
-+
-+	return ret;
- }
- 
- static void arm_smmu_remove_device(struct device *dev)
- {
- 	dev->archdata.iommu = NULL;
-+	iommu_group_remove_device(dev);
- }
- 
- static struct iommu_ops arm_smmu_ops = {
--- 
-1.8.2.2
+ Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
+ arch/arm/boot/dts/stih416-b2105.dts              |   14 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
+ drivers/mtd/devices/Kconfig                      |    7 +
+ drivers/mtd/devices/Makefile                     |    1 +
+ drivers/mtd/devices/serial_flash_cmds.h          |   91 +++++++
+ drivers/mtd/devices/st_spi_fsm.c                 | 1715 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h                 |  456 +++++++++++++++++++++++++++++++
+ 8 files changed, 2322 insertions(+)
