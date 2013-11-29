@@ -1,29 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Nov 2013 10:46:14 +0000
-Subject: STOP THE MADNESS
-In-Reply-To: <CACRpkdao9ct-fKaUnrdX=dmN+fyuVgcbWQvc_sZTwp8wGdJ0+A@mail.gmail.com>
-References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
- <20131129020149.GU16735@n2100.arm.linux.org.uk>
- <CACRpkdao9ct-fKaUnrdX=dmN+fyuVgcbWQvc_sZTwp8wGdJ0+A@mail.gmail.com>
-Message-ID: <20131129104614.GW16735@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 11:53:54 +0100
+Subject: [PATCH 11/15] pwm: pwm-renesas-tpu: Enable driver compilation
+ with COMPILE_TEST
+In-Reply-To: <1385515117-23664-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131129105353.GI22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 11:11:08AM +0100, Linus Walleij wrote:
-> On Fri, Nov 29, 2013 at 3:01 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+On Wed, Nov 27, 2013 at 02:18:33AM +0100, Laurent Pinchart wrote:
+> This helps increasing build testing coverage.
 > 
-> > So... EBSA285... where would people like me to start with that.
-> > VGA... broken.  LEDs... broken.  Several other issues as well (eg,
-> > my tightening of the vectors page seems to have broken all low-vectors
-> > platforms.)
-> 
-> It seems that the majority of the world's Versatile "users" are
-> running the QEMU model of that machine and not really
-> testing on anything else. Unsurprisingly the QEMU Versatile
-> is overly forgiving when mistreating virtual hardware. Some
-> stuff like LEDs I guess are just dummies.
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-pwm at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Acked-by: Simon Horman <horms@verge.net.au>
+> ---
+>  drivers/pwm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Note that the GPIO bug should show on anything due to the nature of it -
-it's probably the debug options which mostly show it.  Making sure you
-have spinlock debugging and lockdep enabled.
+I'm not sure if this has been answered in any of the various subthreads
+before. I've tried to read through them, but I may have missed some. It
+was mentioned that iowrite16() wasn't supported on all architectures;
+won't this possibly cause randconfig autobuilders to break?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/f510a42a/attachment-0001.sig>
