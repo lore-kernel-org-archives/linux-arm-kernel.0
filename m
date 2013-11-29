@@ -1,29 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Nov 2013 16:42:29 +0000
-Subject: [PATCH 00/10] ASoC: dma: ARM: ux500: Obtain DMA data from Device
- Tree
-In-Reply-To: <20131129160358.GD26982@lee--X1>
-References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
- <20131129160358.GD26982@lee--X1>
-Message-ID: <20131129164229.GG27568@sirena.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 29 Nov 2013 17:44:06 +0100
+Subject: [PATCH 0/3] serial: mxs-auart: flush_buffer hook and interrupt
+ processing
+In-Reply-To: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
+References: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
+Message-ID: <201311291744.06943.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 04:03:58PM +0000, Lee Jones wrote:
+Hi Hector,
 
-> Are you/did you already tak(e)ing this set?
+> Hello,
+> 
+> This series implement several fixes to the mxs-auart serial driver.
+> 
+> The first patch implements the flush_buffer hook. Currently the driver
+> can be shut down and pending data in the FIFO will be lost.
+> 
+> The second patchs adds a check of the BUSY flag in the tx_empty hook
+> to make sure the UART is not about to fill data into the FIFO.
+> 
+> The third patch moves the interrupt handling from the ISR out to a
+> tasklet. This was motivated due to different transmission problems
+> with hardware and software flow control at high baudrates whereby
+> transmission was interrupted or data lost.
+> The problem can be reproduced by setting two AUARTs at 576000/N/8
+> with CRTSCTS and sending a large file from one port to the other
+>  with 'cat'.
 
-Don't send contentless nags, they're just noise.  Looking at my sent
-mail folder I see:
+57600 is not that high of a baudrate. Or do you really mean 576000 (576 
+thousand) ?
 
-| I'm happy to merge the first few patches if that's easiest for everyone
-| else, let me know and send them to me if that's what works for people.
-
-which doesn't seem to have happened.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/95ba8a43/attachment.sig>
+Best regards,
+Marek Vasut
