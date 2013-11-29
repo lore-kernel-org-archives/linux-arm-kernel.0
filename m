@@ -1,28 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Nov 2013 02:01:50 +0000
-Subject: STOP THE MADNESS
-In-Reply-To: <20131126163031.GC16735@n2100.arm.linux.org.uk>
-References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
-Message-ID: <20131129020149.GU16735@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Nov 2013 10:10:36 +0800
+Subject: [PATCH 03/10] ARM: imx6q: select ARM and PL310 errata
+In-Reply-To: <52973AA0.4020802@de.bosch.com>
+References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
+ <1351005779-30347-4-git-send-email-shawn.guo@linaro.org>
+ <52973AA0.4020802@de.bosch.com>
+Message-ID: <20131129020953.GD5914@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 04:30:32PM +0000, Russell King - ARM Linux wrote:
-> Versatile PB926 is currently broken in mainline because of this, and it's
-> damn obvious that people are just churning out changes to "update" drivers
-> without testing them at all.
+On Thu, Nov 28, 2013 at 01:44:16PM +0100, Dirk Behme wrote:
+> On 23.10.2012 17:22, Shawn Guo wrote:
+> >ARM core r2p10 and PL310 r3p2 are integrated on imx6q.  Select
+> >corresponding errata.
+> >
+> >Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> >---
+> >  arch/arm/mach-imx/Kconfig |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> >diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> >index 4f73866..3ce2771 100644
+> >--- a/arch/arm/mach-imx/Kconfig
+> >+++ b/arch/arm/mach-imx/Kconfig
+> ...
+> >@@ -843,6 +848,9 @@ config SOC_IMX6Q
+> >  	select MFD_SYSCON
+> >  	select PINCTRL
+> >  	select PINCTRL_IMX6Q
+> >+	select PL310_ERRATA_588369 if CACHE_PL310
+> >+	select PL310_ERRATA_727915 if CACHE_PL310
+> >+	select PL310_ERRATA_769419 if CACHE_PL310
+> >  	select PM_OPP if PM
+> 
+> Just a question: To my understanding, the PL310 on i.MX6D/Q is
+> r3p1-50rel0 and on i.MX6DL/SOLO/SL is r3p2.
+> 
+> The PL310 errata I've (Document Revision: 12.1, 14-Apr-2011) states
+> that 588369 and 727915 don't apply to the PL310 revisions
+> r3p1-50rel0/r3p2. So I would think that we don't have to select them
+> for SOC_IMX6Q.
+> 
+> Have I missed anything?
 
-So... EBSA285... where would people like me to start with that.
-VGA... broken.  LEDs... broken.  Several other issues as well (eg,
-my tightening of the vectors page seems to have broken all low-vectors
-platforms.)
+Hmm, I have forgot the exact reason why I selected these, probably
+because the help text of the errata Kconfig options do not specify any
+particular revision that is affected.  If a formal PL310 errata
+document suggests so, we should probably just drop the items (with
+some testing to ensure no regression is caused).
 
-IDE... both IT821x and CY82C693 broken - CY82C693 is beyond recovery
-given the state of core IDE code - it requires a rewrite to get it
-working again due to broken assumptions concerning this host controller
-by core code.  IT821x gets quickly kicked out of BMDMA mode and then
-sees the occasional PATA _protocol_ error.  Frankly I wouldn't trust
-drivers/ide at all given observed behaviour; I'm not going to even
-bother trying to debug it.
+BTW, is the PL310 errata publicly available somewhere?
 
-libata... better for IT821x.
+Shawn
