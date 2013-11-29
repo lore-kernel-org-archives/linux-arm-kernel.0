@@ -1,37 +1,72 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 13:23:48 +0100
-Subject: [PATCH 02/31] ARM: tegra: document reset properties in DT bindings
-In-Reply-To: <1384548866-13141-3-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131129122348.GO22771@ulmo.nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 29 Nov 2013 12:19:00 +0000
+Subject: [PATCH v3 11/36] mtd: st_spi_fsm: Search for preferred FSM message
+ sequence configurations
+In-Reply-To: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385727565-25794-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:53:57PM -0700, Stephen Warren wrote:
-[...]
-> diff --git a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt b/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
-[...]
-> +  - resets : Must contain an entry for each entry in reset-names.
-> +    See ../reset/reset.txt for details.
-> +  - reset-names : Must include the following entries:
-> +    - dc
+Here we provide a means to traverse though all supplied FSM message
+sequence configurations and pick one based on our chip's capabilities.
+The first one we match will be the preferred one, as they are
+presented in order of preference.
 
-For consistency with this, the clock-names entry for the first clock in
-this node should then be "dc" as well.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/devices/st_spi_fsm.c | 15 +++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h | 12 ++++++++++++
+ 2 files changed, 27 insertions(+)
 
-> diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
-[...]
-> -  - spdif_in
-> +  - spdif
-
-Why is this renamed?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/81266823/attachment.sig>
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index ef177e5..5f21d14 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -124,6 +124,21 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+ 	}
+ }
+ 
++/* Search for preferred configuration based on available flags */
++static struct seq_rw_config *
++stfsm_search_seq_rw_configs(struct stfsm *fsm,
++			    struct seq_rw_config cfgs[])
++{
++	struct seq_rw_config *config;
++	int flags = fsm->info->flags;
++
++	for (config = cfgs; cfgs->cmd != 0; config++)
++		if ((config->flags & flags) == config->flags)
++			return config;
++
++	return NULL;
++}
++
+ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+ {
+ 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
+diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
+index 0a6272c..6fafa07 100644
+--- a/drivers/mtd/devices/st_spi_fsm.h
++++ b/drivers/mtd/devices/st_spi_fsm.h
+@@ -254,6 +254,18 @@ struct stfsm_seq {
+ } __attribute__((__packed__, aligned(4)));
+ #define STFSM_SEQ_SIZE sizeof(struct stfsm_seq)
+ 
++/* Parameters to configure a READ or WRITE FSM sequence */
++struct seq_rw_config {
++	uint32_t	flags;		/* flags to support config */
++	uint8_t		cmd;		/* FLASH command */
++	int		write;		/* Write Sequence */
++	uint8_t		addr_pads;	/* No. of addr pads (MODE & DUMMY) */
++	uint8_t		data_pads;	/* No. of data pads */
++	uint8_t		mode_data;	/* MODE data */
++	uint8_t		mode_cycles;	/* No. of MODE cycles */
++	uint8_t		dummy_cycles;	/* No. of DUMMY cycles */
++};
++
+ /* SPI Flash Device Table */
+ struct flash_info {
+ 	char		*name;
+-- 
+1.8.3.2
