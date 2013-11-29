@@ -1,60 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Nov 2013 09:13:55 -0800
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
- device id
-In-Reply-To: <52976BA4.1000700@bitmer.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-3-git-send-email-tony@atomide.com>
- <20131118184723.GR10317@atomide.com>
- <87ioveeo0x.fsf@octavius.laptop.org>
- <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
- <86fvqhjz4q.fsf@void.printf.net>
- <20131127215918.GD26766@atomide.com> <52976BA4.1000700@bitmer.com>
-Message-ID: <20131129171354.GO31534@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 29 Nov 2013 17:31:17 +0000
+Subject: [GIT PULL] arm64 fixes for 3.13-rc
+Message-ID: <20131129173112.GA16546@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jarkko.nikula@bitmer.com> [131128 08:14]:
-> Hi
-> 
-> On 11/27/2013 11:59 PM, Tony Lindgren wrote:
-> > * Chris Ball <cjb@laptop.org> [131127 13:48]:
-> >> Hi,
-> >>
-> >> On Wed, Nov 27 2013, Jarkko Nikula wrote:
-> >>> Can you enlighten me what's the proper way to get patches to mmc since
-> >>> I cannot figure out working methodology from MAINTAINERS file?
-> >>
-> >> Sorry about this, Jarkko.
-> >>
-> >> Since I don't have omap.c hardware, I'm generally going to wait for
-> >> a Tested-by/Acked-by from someone else on patches like these.  We
-> >> actually have a maintainer already listed for the driver, Jarkko
-> >> Lavinen <jarkko.lavinen@nokia.com>.
-> >>
-> >> So, maybe the MAINTAINERS section for drivers/mmc/host/omap.c needs
-> >> an update?  Feel free to send me patches to it.  Either way, I'll
-> >> start treating Aaro and Jarkko (Nikula) as maintainers for this
-> >> driver.
-> > 
-> Oh, I see. I even didn't check ./scripts/get_maintainer.pl nor check
-> MAINTAINERS file further than main MMC entry as I knew Jarkko L. is not
-> working anymore for Nokia. Sorry, we should have noticed that.
-> 
-> > Hmm looks like here's a reasonably recent update that we've missed
-> > from Jarkko Lavinen to update his email address:
-> > 
-> > http://lkml.org/lkml/2013/10/4/142
-> > 
-> > I've updated Jarkko Lavinen's address in this mail, we should
-> > probably also patch the MAINTAINERS file for that, and then see if
-> > Aaro and Jarkko Nikula are interested to be listed there as well.
-> > 
-> I can volunteer. Not that I know much about mmc but I like to keep my
-> legacy hw still running :-)
+Hi Linus,
 
-Sounds good to me, good to hear :)
+Please pull the arm64 fixes below. Thanks.
 
-Regards,
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-Tony
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
+
+for you to fetch changes up to 3676f9ef5481d614f8c5c857f5319755be248268:
+
+  arm64: Move PTE_PROT_NONE higher up (2013-11-29 15:22:59 +0000)
+
+----------------------------------------------------------------
+Fixes:
+- Remove preempt_count modifications in the arm64 IRQ handling code
+  since that's already dealt with in generic irq_enter/irq_exit
+- PTE_PROT_NONE bit moved higher up to avoid overlapping with the
+  hardware bits (for PROT_NONE mappings which are pte_present)
+- Big-endian fixes for ptrace support
+- Asynchronous aborts unmasking while in the kernel
+- pgprot_writecombine() change to create Normal NonCacheable memory
+  rather than Device GRE
+
+----------------------------------------------------------------
+Catalin Marinas (4):
+      arm64: dts: Reserve the memory used for secondary CPU release address
+      arm64: Unmask asynchronous aborts when in kernel mode
+      arm64: Use Normal NonCacheable memory for writecombine
+      arm64: Move PTE_PROT_NONE higher up
+
+Marc Zyngier (1):
+      arm64: let the core code deal with preempt_count
+
+Matthew Leach (2):
+      arm64: ptrace: fix compat registes get/set to be endian clean
+      arm64: debug: make aarch32 bkpt checking endian clean
+
+ arch/arm64/boot/dts/foundation-v8.dts |  2 ++
+ arch/arm64/include/asm/irqflags.h     |  3 +++
+ arch/arm64/include/asm/pgtable.h      | 33 ++++++++++++++++-------------
+ arch/arm64/kernel/debug-monitors.c    | 20 +++++++++++-------
+ arch/arm64/kernel/entry.S             | 29 ++++++-------------------
+ arch/arm64/kernel/ptrace.c            | 40 +++++++++++++++++------------------
+ arch/arm64/kernel/setup.c             |  5 +++++
+ arch/arm64/kernel/smp.c               |  1 +
+ 8 files changed, 67 insertions(+), 66 deletions(-)
+
+-- 
+Catalin
