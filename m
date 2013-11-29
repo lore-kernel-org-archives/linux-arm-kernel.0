@@ -1,197 +1,161 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 29 Nov 2013 21:27:48 +0100
-Subject: [PATCHv2 3/4] ARM: mvebu: NETGEAR ReadyNAS 104 .dts cleanup
+Date: Fri, 29 Nov 2013 21:27:58 +0100
+Subject: [PATCHv2 4/4] ARM: Fix whitespaces in NETGEAR ReadyNAS .dts files
 In-Reply-To: <cover.1385756371.git.arno@natisbad.org>
 References: <cover.1385756371.git.arno@natisbad.org>
-Message-ID: <6273faf4078ed0bf556cf0abecc9b5d8bdd3a59f.1385756371.git.arno@natisbad.org>
+Message-ID: <d883bb558bffa5253d1a604ce1030f78140e30a3.1385756371.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The patch does some cleanup work on NETGEAR ReadyNAS 104 .dts
-file. Changes are listed below:
+This patch provides some whitespace cleanup for NETGEAR
+ReadyNAS Duo v2 and 102 .dts files:
 
- - Completed conversion from value to macros for GPIO voltage level
- - Converted all numeric input key values to macros
- - Fixed all node names and labels to use respectively '-' and '_'
- - Made button names more explicit
- - Changed order of included files from general to local
- - Removed useless clocks and gpio-keys properties
- - Document ethernet PHY (Marvell 88E1318) via a comment
- - Made G762 clock node name unique by including g762 in it
+ - Fixed bad spaces
+ - Added some space between nodes to improve readability
 
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 68 ++++++++++++--------------
- 1 file changed, 32 insertions(+), 36 deletions(-)
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     |  1 +
+ .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 48 ++++++++++++++--------
+ 2 files changed, 32 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-index 50b5150..e48e5fb 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -11,8 +11,9 @@
- 
- /dts-v1/;
- 
--#include "armada-370.dtsi"
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include "armada-370.dtsi"
- 
- / {
- 	model = "NETGEAR ReadyNAS 104";
-@@ -59,12 +60,12 @@
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 6411105..29541a4 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -64,6 +64,7 @@
+ 					marvell,pins = "mpp57";
  					marvell,function = "gpio";
  				};
- 
--				backup_key_pin: backup-key-pin {
-+				backup_button_pin: backup-button-pin {
- 					marvell,pins = "mpp52";
++
+ 				sata1_led_pin: sata1-led-pin {
+ 					marvell,pins = "mpp15";
  					marvell,function = "gpio";
- 				};
- 
--				power_key_pin: power-key-pin {
-+				power_button_pin: power-button-pin {
- 					marvell,pins = "mpp62";
- 					marvell,function = "gpio";
- 				};
-@@ -79,18 +80,18 @@
- 					marvell,function = "gpio";
- 				};
- 
--				reset_key_pin: reset-key-pin {
-+				reset_button_pin: reset-button-pin {
- 					marvell,pins = "mpp65";
- 					marvell,function = "gpio";
- 				};
+diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+index 03bb136..ea9a039 100644
+--- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
++++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+@@ -45,34 +45,42 @@
+ 				marvell,pins = "mpp47";
+ 				marvell,function = "gpio";
  			};
- 
- 			mdio {
--				phy0: ethernet-phy at 0 {
-+				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
- 					reg = <0>;
- 				};
- 
--				phy1: ethernet-phy at 1 {
-+				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
- 					reg = <1>;
- 				};
++
+ 			pmx_button_backup: pmx-button-backup {
+ 				marvell,pins = "mpp45";
+ 				marvell,function = "gpio";
  			};
-@@ -136,90 +137,85 @@
- 	};
- 
- 	clocks {
--	       #address-cells = <1>;
--	       #size-cells = <0>;
--
--	       g762_clk: fixedclk {
-+	       g762_clk: g762-oscillator {
- 			 compatible = "fixed-clock";
- 			 #clock-cells = <0>;
- 			 clock-frequency = <8192>;
- 	       };
- 	};
- 
--	gpio_leds {
-+	gpio-leds {
- 		compatible = "gpio-leds";
- 		pinctrl-0 = <&backup_led_pin &power_led_pin>;
- 		pinctrl-names = "default";
- 
--		blue_backup_led {
-+		blue-backup-led {
- 			label = "rn104:blue:backup";
--			gpios = <&gpio1 31 0>;   /* GPIO 63 Active High */
-+			gpios = <&gpio1 31 GPIO_ACTIVE_HIGH>;
- 			default-state = "off";
++
+ 			pmx_button_reset: pmx-button-reset {
+ 				marvell,pins = "mpp13";
+ 				marvell,function = "gpio";
+ 			};
++
+ 			pmx_led_blue_power: pmx-led-blue-power {
+ 				marvell,pins = "mpp31";
+ 				marvell,function = "gpio";
+ 			};
++
+ 			pmx_led_blue_activity: pmx-led-blue-activity {
+ 				marvell,pins = "mpp38";
+ 				marvell,function = "gpio";
+ 			};
++
+ 			pmx_led_blue_disk1: pmx-led-blue-disk1 {
+ 				marvell,pins = "mpp23";
+ 				marvell,function = "gpio";
+ 			};
++
+ 			pmx_led_blue_disk2: pmx-led-blue-disk2 {
+ 				marvell,pins = "mpp22";
+ 				marvell,function = "gpio";
+ 			};
++
+ 			pmx_led_blue_backup: pmx-led-blue-backup {
+ 				marvell,pins = "mpp29";
+ 				marvell,function = "gpio";
+ 			};
++
+ 			pmx_poweroff: pmx-poweroff {
+ 				marvell,pins = "mpp30";
+ 				marvell,function = "gpio";
+@@ -129,18 +137,22 @@
+ 			gpios = <&gpio0 31 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "default-on";
  		};
- 
--		blue_power_led {
-+		blue-power-led {
- 			label = "rn104:blue:pwr";
--			gpios = <&gpio2 0 1>;    /* GPIO 64 Active Low */
-+			gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "keep";
++
+ 		activity_led {
+ 			label = "status:blue:activity_led";
+ 			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
  		};
- 
--		sata1_led {
-+		blue-sata1-led {
- 			label = "rn104:blue:sata1";
- 			gpios = <&pca9554 0 GPIO_ACTIVE_LOW>;
- 			default-state = "off";
++
+ 		disk1_led {
+ 			label = "status:blue:disk1_led";
+ 			gpios = <&gpio0 23 GPIO_ACTIVE_LOW>;
  		};
- 
--		sata2_led {
-+		blue-sata2-led {
- 			label = "rn104:blue:sata2";
- 			gpios = <&pca9554 1 GPIO_ACTIVE_LOW>;
- 			default-state = "off";
++
+ 		disk2_led {
+ 			label = "status:blue:disk2_led";
+ 			gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
  		};
- 
--		sata3_led {
-+		blue-sata3-led {
- 			label = "rn104:blue:sata3";
- 			gpios = <&pca9554 2 GPIO_ACTIVE_LOW>;
- 			default-state = "off";
++
+ 		backup_led {
+ 			label = "status:blue:backup_led";
+ 			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
+@@ -158,11 +170,13 @@
+ 			linux,code = <KEY_POWER>;
+ 			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
  		};
- 
--		sata4_led {
-+		blue-sata4-led {
- 			label = "rn104:blue:sata4";
- 			gpios = <&pca9554 3 GPIO_ACTIVE_LOW>;
- 			default-state = "off";
- 		};
- 	};
- 
--	gpio_keys {
-+	gpio-keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
--		pinctrl-0 = <&backup_key_pin
--			     &power_key_pin
--			     &reset_key_pin>;
-+		pinctrl-0 = <&backup_button_pin
-+			     &power_button_pin
-+			     &reset_button_pin>;
- 		pinctrl-names = "default";
- 
--		button at 1 {
-+		backup-button {
- 			label = "Backup Button";
--			linux,code = <133>;     /* KEY_COPY */
--			gpios = <&gpio1 20 1>;
-+			linux,code = <KEY_COPY>;
-+			gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
- 		};
- 
--		button at 2 {
-+		power-button {
- 			label = "Power Button";
--			linux,code = <116>;     /* KEY_POWER */
--			gpios = <&gpio1 30 0>;
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
- 		};
- 
--		button at 3 {
-+		reset-button {
++
+ 		reset-button {
  			label = "Reset Button";
--			linux,code = <0x198>;   /* KEY_RESTART */
--			gpios = <&gpio2 1 1>;
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_RESTART>;
+ 			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
  		};
++
+ 		backup-button {
+ 			label = "Backup Button";
+ 			linux,code = <KEY_COPY>;
+@@ -177,23 +191,23 @@
+ 		gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
  	};
  
--	gpio_poweroff {
-+	gpio-poweroff {
- 		compatible = "gpio-poweroff";
- 		pinctrl-0 = <&poweroff>;
- 		pinctrl-names = "default";
--		gpios = <&gpio1 28 1>;
-+		gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
- 	};
+-        regulators {
+-                compatible = "simple-bus";
+-                #address-cells = <1>;
+-                #size-cells = <0>;
+-
+-                usb_power: regulator at 1 {
+-                        compatible = "regulator-fixed";
+-                        reg = <1>;
+-                        regulator-name = "USB 3.0 Power";
+-                        regulator-min-microvolt = <5000000>;
+-                        regulator-max-microvolt = <5000000>;
+-                        enable-active-high;
+-                        regulator-always-on;
+-                        regulator-boot-on;
+-                        gpio = <&gpio1 14 0>;
+-                };
+-        };
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		usb3_regulator: usb3-regulator {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB 3.0 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio1 14 GPIO_ACTIVE_HIGH>;
++		};
++	};
  };
+ 
+ &nand {
 -- 
 1.8.4.4
