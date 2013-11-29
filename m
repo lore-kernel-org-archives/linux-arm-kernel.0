@@ -1,58 +1,70 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 29 Nov 2013 10:30:57 -0500 (EST)
-Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
- system suspend
-In-Reply-To: <4064706.R9zKA4hcfi@vostro.rjw.lan>
-Message-ID: <Pine.LNX.4.44L0.1311291014020.27250-100000@netrider.rowland.org>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 29 Nov 2013 16:30:23 +0100
+Subject: [PATCH 5/9] ARM: at91/dt: add mmc0 slot0 support to at91rm9200ek
+ board
+In-Reply-To: <CACRpkdag5=QYsWe81ocpkMp2APaoBAOOn2r0iAVdf9DHTKrSXA@mail.gmail.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>	<1377687995-10758-1-git-send-email-b.brezillon@overkiz.com>	<20131120145926.GE14627@ns203013.ovh.net>	<528CDFFB.1020601@overkiz.com>	<CACRpkdboBg4YOnMNiar0DDBVnoky=zNky+Pzyp1=P_POtH15qQ@mail.gmail.com>	<528DE1C4.6060900@overkiz.com>	<CACRpkdZdweyWJefttiuiYAJ9qhahLbnj7eHUiLV_83UA41X_uQ@mail.gmail.com>	<5294D64D.7000100@overkiz.com>	<CACRpkdZoAjuWVpWZfvPgOAd7qB1ZBtC+45nD3SYay3SrMhqwVA@mail.gmail.com>	<52986CA8.3010601@overkiz.com>
+ <CACRpkdag5=QYsWe81ocpkMp2APaoBAOOn2r0iAVdf9DHTKrSXA@mail.gmail.com>
+Message-ID: <5298B30F.3060905@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Nov 2013, Rafael J. Wysocki wrote:
+On 29/11/2013 14:31, Linus Walleij wrote:
+> On Fri, Nov 29, 2013 at 11:30 AM, boris brezillon
+> <b.brezillon@overkiz.com> wrote:
+>> On 29/11/2013 11:03, Linus Walleij wrote:
+>>> I guess one way is to obtain this GPIO in board code and just
+>>> flick it depending on which device you register.
+> (...)
+>> The whole goal of moving from board files to dt is to drop all board
+>> specific processing or initialization and only keep a common description
+>> with generic drivers capable of handling common use cases.
+>>
+>> I'm not sure providing new board specific drivers is a good solution
+>> (even if it is the simplest way to achieve our goal).
+>>
+>> Could we have something similar to pinctrl but with gpios :
+>> when the device is probed the device/driver core code request the gpio
+>> configure it appropriately and set it to the requested value (if configured
+>> as output).
+> This has been suggested under the name "GPIO hogs" in the past.
+>
+> It would work similar to how pinctrl hogs work by associating the
+> GPIO line the controller itself, using some specific string
+> like gpio-input-hogs = <...> / gpio-output-hogs = <...>;
+>
+> The gpiolib core will then grab and set up these before
+> returning from the registration call so noone ever gets a chance
+> to use them.
 
-> That should have been
-> 
->  	driver->runtime_suspend(dev)
->  	do_X(dev)
-> 
-> because do_Y(dev) is for runtime suspend.  Sorry.
-> 
-> And of course, the subsystem-level code you're developing the driver for may not
-> do the do_X(dev) thing at all, in which case all will work.  But what if someone
-> tries to use the driver with a different subsystem-level code (like a new PM
-> domain)?
+Ok, I'll take a look.
 
-It sounds like the problem is one of division of responsibilities.  
-What part of the work is done by the subsystem, and what part is done 
-by the driver?  Obviously the answer will vary from one subsystem to 
-another.
+Could you point me out a thread (or other documents) talking about gpio 
+hogs.
+I found this one 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/162254.html.
 
-As I understand it, in Ulf's situation the subsystem knows that the
-operations needed for the suspend_late phase of system suspend are the
-same as those carried out by the driver's runtime_suspend callback (if
-the device isn't already in a runtime-PM low-power state).  Or perhaps
-it knows they are the same as those carried out by the subsystem's
-runtime_suspend callback.  Or perhaps the _driver_ knows that the
-operations it needs for suspend_late are the same as those carried out
-by its own runtime_suspend callback (if the device isn't already in a
-low-power state).
+>> These are just thoughts, and I guess introducing new code in the
+>> device/driver core
+>> code is not that easy, especially when this code is here to handle specific
+>> case
+>> like ours.
+> It is very easy, just write the patch, iterate it (these patches get
+> a lot of scrutiny as it is core code, so expect some work and time
+> to get it done), and then unless there is a blocker, I would merge it.
+> The concept is entirely sound, just that someone needs to step
+> up and do the work...
 
-Regardless, under those conditions the suspend_late routine merely has
-to invoke the appropriate runtime_suspend routine, after checking the
-device's runtime PM status.  We can't do this by calling
-pm_runtime_suspend, because runtime PM is disabled during suspend_late.  
-Instead, we have to call the proper runtime-suspend routine directly.
+Sure, I'll propose something (I guess your talking about GPIO hogs 
+concept not gpio-switch driver).
+If you already thought a bit about GPIO hogs, I'd be interested to get 
+some inputs (suggestions, ideas, code, ...).
 
-The amount of code needed is quite small; basically nothing more than:
+Anyway, thanks for taking time to answer my questions.
 
-	if (!pm_runtime_status_suspended(dev))
-		dev->driver->pm->runtime_suspend(dev);
+Best Reagrds,
 
-The problems are:
+Boris
 
-     1. Which callback does this code belong in?
-
-     2. Which runtime_suspend callback should be invoked?  The example 
-	above uses dev->driver->pm->runtime_suspend, but this may not 
-	always be the right one.
-
-Alan Stern
+> Yours,
+> Linus Walleij
