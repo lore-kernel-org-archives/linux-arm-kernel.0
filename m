@@ -1,115 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Nov 2013 10:28:55 +0800
-Subject: [PATCHv2 1/3] ARM: imx27: add pingroups for cspi, sdhc and
- framebuffer
-In-Reply-To: <1385623172-87429-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1385623172-87429-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20131129022853.GE5914@S2101-09.ap.freescale.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 28 Nov 2013 18:35:54 -0800
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131128233147.GA19387@obsidianresearch.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131128203322.GB14689@mithrandir>
+ <20131128211009.GA26447@obsidianresearch.com>
+ <20131128222232.GF14689@mithrandir>
+ <20131128233147.GA19387@obsidianresearch.com>
+Message-ID: <20131129023554.GA14239@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 08:19:30AM +0100, Gwenhael Goavec-Merou wrote:
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-
-Applied all 3, thanks.
-
-Shawn
-
-> ---
-> Changelog:
-> v2:
->  * pingroups entries are now sorted alphabetically;
->  * framebuffer pingroup is renamed: MX27_FB1_PINGRP1 -> MX27_FB_PINGRP1
+On Thu, Nov 28, 2013 at 04:31:47PM -0700, Jason Gunthorpe wrote:
+> > Perhaps this is just another way of saying what Greg has already said.
+> > If we continue down this road, we'll eventually end up having to
+> > describe all sorts of nitty gritty details. And we'll need even more
 > 
->  arch/arm/boot/dts/imx27-pingrp.h | 68 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
+> Greg's point makes sense, but the HW guys are not designing things
+> this way for kicks - there are real physics based reasons for some of
+> these choices...
 > 
-> diff --git a/arch/arm/boot/dts/imx27-pingrp.h b/arch/arm/boot/dts/imx27-pingrp.h
-> index 08d8d18..f3fbf5a 100644
-> --- a/arch/arm/boot/dts/imx27-pingrp.h
-> +++ b/arch/arm/boot/dts/imx27-pingrp.h
-> @@ -13,6 +13,50 @@
->  
->  #include "imx27-pinfunc.h"
->  
-> +#define MX27_CSPI1_PINGRP1 \
-> +	MX27_PAD_CSPI1_MISO__CSPI1_MISO 0x0 \
-> +	MX27_PAD_CSPI1_MOSI__CSPI1_MOSI 0x0 \
-> +	MX27_PAD_CSPI1_SCLK__CSPI1_SCLK 0x0
-> +
-> +#define MX27_CSPI2_PINGRP1 \
-> +	MX27_PAD_CSPI2_MISO__CSPI2_MISO 0x0 \
-> +	MX27_PAD_CSPI2_MOSI__CSPI2_MOSI 0x0 \
-> +	MX27_PAD_CSPI2_SCLK__CSPI2_SCLK 0x0
-> +
-> +#define MX27_CSPI3_PINGRP1 \
-> +	MX27_PAD_SD1_CLK__CSPI3_SCLK 0x0 \
-> +	MX27_PAD_SD1_D0__CSPI3_MISO 0x0 \
-> +	MX27_PAD_SD1_CMD__CSPI3_MOSI 0x0
-> +
-> +#define MX27_FB_PINGRP1 \
-> +	MX27_PAD_CLS__CLS 0x0 \
-> +	MX27_PAD_CONTRAST__CONTRAST 0x0 \
-> +	MX27_PAD_LD0__LD0 0x0 \
-> +	MX27_PAD_LD1__LD1 0x0 \
-> +	MX27_PAD_LD2__LD2 0x0 \
-> +	MX27_PAD_LD3__LD3 0x0 \
-> +	MX27_PAD_LD4__LD4 0x0 \
-> +	MX27_PAD_LD5__LD5 0x0 \
-> +	MX27_PAD_LD6__LD6 0x0 \
-> +	MX27_PAD_LD7__LD7 0x0 \
-> +	MX27_PAD_LD8__LD8 0x0 \
-> +	MX27_PAD_LD9__LD9 0x0 \
-> +	MX27_PAD_LD10__LD10 0x0 \
-> +	MX27_PAD_LD11__LD11 0x0 \
-> +	MX27_PAD_LD12__LD12 0x0 \
-> +	MX27_PAD_LD13__LD13 0x0 \
-> +	MX27_PAD_LD14__LD14 0x0 \
-> +	MX27_PAD_LD15__LD15 0x0 \
-> +	MX27_PAD_LD16__LD16 0x0 \
-> +	MX27_PAD_LD17__LD17 0x0 \
-> +	MX27_PAD_LSCLK__LSCLK 0x0 \
-> +	MX27_PAD_OE_ACD__OE_ACD 0x0 \
-> +	MX27_PAD_PS__PS 0x0 \
-> +	MX27_PAD_REV__REV 0x0 \
-> +	MX27_PAD_SPL_SPR__SPL_SPR 0x0 \
-> +	MX27_PAD_HSYNC__HSYNC 0x0 \
-> +	MX27_PAD_VSYNC__VSYNC 0x0
-> +
->  #define MX27_FEC1_PINGRP1 \
->  	MX27_PAD_SD3_CMD__FEC_TXD0 0x0 \
->  	MX27_PAD_SD3_CLK__FEC_TXD1 0x0 \
-> @@ -44,6 +88,30 @@
->  #define MX27_OWIRE1_PINGRP1 \
->  	MX27_PAD_RTCK__OWIRE 0x0
->  
-> +#define MX27_SDHC1_PINGRP1 \
-> +	MX27_PAD_SD1_CLK__SD1_CLK \
-> +	MX27_PAD_SD1_CMD__SD1_CMD \
-> +	MX27_PAD_SD1_D0__SD1_D0 \
-> +	MX27_PAD_SD1_D1__SD1_D1 \
-> +	MX27_PAD_SD1_D2__SD1_D2 \
-> +	MX27_PAD_SD1_D3__SD1_D3
-> +
-> +#define MX27_SDHC2_PINGRP1 \
-> +	MX27_PAD_SD2_CLK__SD2_CLK \
-> +	MX27_PAD_SD2_CMD__SD2_CMD \
-> +	MX27_PAD_SD2_D0__SD2_D0 \
-> +	MX27_PAD_SD2_D1__SD2_D1 \
-> +	MX27_PAD_SD2_D2__SD2_D2 \
-> +	MX27_PAD_SD2_D3__SD2_D3
-> +
-> +#define MX27_SDHC3_PINGRP1 \
-> +	MX27_PAD_SD3_CLK__SD3_CLK \
-> +	MX27_PAD_SD3_CMD__SD3_CMD \
-> +	MX27_PAD_SD3_D0__SD3_D0 \
-> +	MX27_PAD_SD3_D1__SD3_D1 \
-> +	MX27_PAD_SD3_D2__SD3_D2 \
-> +	MX27_PAD_SD3_D3__SD3_D3
-> +
->  #define MX27_UART1_PINGRP1 \
->  	MX27_PAD_UART1_TXD__UART1_TXD 0x0 \
->  	MX27_PAD_UART1_RXD__UART1_RXD 0x0
-> -- 
-> 1.8.3.2
+> eg An all-to-all bus cross bar (eg like Intel's ring bus) is engery
+> expensive compared to a purpose built muxed bus tree. Doing coherency
+> look ups on DMA traffic costs energy, etc.
+
+Really?  How much power exactly does it take / save?  Yes, hardware
+people think "software is free", but when you can't actually control the
+hardware in the software properly, well, you end up with something like
+itanium...
+
+> > code to deal with those descriptions and the hardware they represent. At
+> > some point we need to start pushing some of the complexity back into
+> > hardware so that we can keep a sane code-base.
 > 
+> Some of this is a consequence of the push to have the firmware
+> minimal. As soon as you say the kernel has to configure the address
+> map you've created a big complexity for it..
+
+Why the push to make firmware "minimal"?  What is that "saving"?  You
+just push the complexity from one place to the other, just because ARM
+doesn't seem to have good firmware engineers, doesn't mean they should
+punish their kernel developers :)
+
+greg k-h
