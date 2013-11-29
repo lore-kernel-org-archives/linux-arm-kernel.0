@@ -1,51 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Nov 2013 12:15:48 +0000
-Subject: [PATCH 2/4] iommu/arm-smmu: use VA_BITS to determine arm64 virtual
- address space
+Date: Fri, 29 Nov 2013 12:15:50 +0000
+Subject: [PATCH 4/4] iommu/arm-smmu: add support for IOMMU_EXEC
 In-Reply-To: <1385727350-20032-1-git-send-email-will.deacon@arm.com>
 References: <1385727350-20032-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1385727350-20032-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1385727350-20032-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of the VA_BITS definition for arm64, make use of
-it in the driver, allowing up to 42-bits of VA space when configured
-with 64k pages.
+Previously, all of our mappings were marked as executable, which isn't
+usually required. Now that we have the IOMMU_EXEC flag, use that to
+determine whether or not a mapping should be marked as executable.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/iommu/arm-smmu.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 879da20617fb..fa3371adea4f 100644
+index fa3371adea4f..8911850c9444 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -24,7 +24,7 @@
-  *	- v7/v8 long-descriptor format
-  *	- Non-secure access to the SMMU
-  *	- 4k and 64k pages, with contiguous pte hints.
-- *	- Up to 39-bit addressing
-+ *	- Up to 42-bit addressing (dependent on VA_BITS)
-  *	- Context fault reporting
-  */
+@@ -61,12 +61,13 @@
+ #define ARM_SMMU_GR1(smmu)		((smmu)->base + (smmu)->pagesize)
  
-@@ -1747,7 +1747,6 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 	 * allocation (PTRS_PER_PGD).
- 	 */
- #ifdef CONFIG_64BIT
--	/* Current maximum output size of 39 bits */
- 	smmu->s1_output_size = min(39UL, size);
- #else
- 	smmu->s1_output_size = min(32UL, size);
-@@ -1762,7 +1761,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 	} else {
- #ifdef CONFIG_64BIT
- 		size = (id >> ID2_UBS_SHIFT) & ID2_UBS_MASK;
--		size = min(39, arm_smmu_id_size_to_bits(size));
-+		size = min(VA_BITS, arm_smmu_id_size_to_bits(size));
- #else
- 		size = 32;
- #endif
+ /* Page table bits */
+-#define ARM_SMMU_PTE_PAGE		(((pteval_t)3) << 0)
++#define ARM_SMMU_PTE_XN			(((pteval_t)3) << 53)
+ #define ARM_SMMU_PTE_CONT		(((pteval_t)1) << 52)
+ #define ARM_SMMU_PTE_AF			(((pteval_t)1) << 10)
+ #define ARM_SMMU_PTE_SH_NS		(((pteval_t)0) << 8)
+ #define ARM_SMMU_PTE_SH_OS		(((pteval_t)2) << 8)
+ #define ARM_SMMU_PTE_SH_IS		(((pteval_t)3) << 8)
++#define ARM_SMMU_PTE_PAGE		(((pteval_t)3) << 0)
+ 
+ #if PAGE_SIZE == SZ_4K
+ #define ARM_SMMU_PTE_CONT_ENTRIES	16
+@@ -1205,7 +1206,7 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
+ 				   unsigned long pfn, int flags, int stage)
+ {
+ 	pte_t *pte, *start;
+-	pteval_t pteval = ARM_SMMU_PTE_PAGE | ARM_SMMU_PTE_AF;
++	pteval_t pteval = ARM_SMMU_PTE_PAGE | ARM_SMMU_PTE_AF | ARM_SMMU_PTE_XN;
+ 
+ 	if (pmd_none(*pmd)) {
+ 		/* Allocate a new set of tables */
+@@ -1244,7 +1245,9 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
+ 	}
+ 
+ 	/* If no access, create a faulting entry to avoid TLB fills */
+-	if (!(flags & (IOMMU_READ | IOMMU_WRITE)))
++	if (flags & IOMMU_EXEC)
++		pteval &= ~ARM_SMMU_PTE_XN;
++	else if (!(flags & (IOMMU_READ | IOMMU_WRITE)))
+ 		pteval &= ~ARM_SMMU_PTE_PAGE;
+ 
+ 	pteval |= ARM_SMMU_PTE_SH_IS;
 -- 
 1.8.2.2
