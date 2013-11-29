@@ -1,68 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Nov 2013 12:19:21 +0000
-Subject: [PATCH v3 32/36] mtd: st_spi_fsm: Add the ability to write to FSM's
- status register
+Date: Fri, 29 Nov 2013 12:19:20 +0000
+Subject: [PATCH v3 31/36] mtd: st_spi_fsm: Add the ability to read the FSM's
+ status
 In-Reply-To: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
 References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385727565-25794-33-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385727565-25794-32-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 1d6bd94..f1276e5 100644
+index ecb001d..1d6bd94 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -177,6 +177,23 @@ static struct stfsm_seq stfsm_seq_erase_chip = {
- 		    SEQ_CFG_STARTSEQ),
- };
- 
-+static struct stfsm_seq stfsm_seq_write_status = {
-+	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
-+	.seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_WRSR)),
-+	.seq = {
-+		STFSM_INST_CMD1,
-+		STFSM_INST_CMD2,
-+		STFSM_INST_STA_WR1,
-+		STFSM_INST_STOP,
-+	},
-+	.seq_cfg = (SEQ_CFG_PADS_1 |
-+		    SEQ_CFG_READNOTWRITE |
-+		    SEQ_CFG_CSDEASSERT |
-+		    SEQ_CFG_STARTSEQ),
-+};
-+
- static struct stfsm_seq stfsm_seq_wrvcr = {
- 	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
- 		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
-@@ -389,6 +406,25 @@ static int stfsm_read_status(struct stfsm *fsm, uint8_t cmd,
- 	return 0;
+@@ -365,6 +365,30 @@ static uint8_t stfsm_wait_busy(struct stfsm *fsm)
+ 	return -EIO;
  }
  
-+static int stfsm_write_status(struct stfsm *fsm, uint16_t status,
-+			       int sta_bytes)
++static int stfsm_read_status(struct stfsm *fsm, uint8_t cmd,
++			   uint8_t *status)
 +{
-+	struct stfsm_seq *seq = &stfsm_seq_write_status;
++	struct stfsm_seq *seq = &stfsm_seq_read_status_fifo;
++	uint32_t tmp;
 +
-+	dev_dbg(fsm->dev, "writing STA[%s] 0x%04x\n",
-+		(sta_bytes == 1) ? "1" : "1+2", status);
++	dev_dbg(fsm->dev, "reading STA[%s]\n",
++		(cmd == FLASH_CMD_RDSR) ? "1" : "2");
 +
-+	seq->status = (uint32_t)status | STA_PADS_1 | STA_CSDEASSERT;
-+	seq->seq[2] = (sta_bytes == 1) ?
-+		STFSM_INST_STA_WR1 : STFSM_INST_STA_WR1_2;
++	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
++			   SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(cmd)),
 +
 +	stfsm_load_seq(fsm, seq);
++
++	stfsm_read_fifo(fsm, &tmp, 4);
++
++	*status = (uint8_t)(tmp >> 24);
 +
 +	stfsm_wait_seq(fsm);
 +
 +	return 0;
-+};
++}
 +
  static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
  {
