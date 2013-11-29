@@ -1,46 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 29 Nov 2013 11:28:32 -0500
-Subject: [PATCH v2 00/10] Reuse davinci-nand driver for Keystone arch
-In-Reply-To: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385033305-13179-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <5298C0B0.4030404@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Nov 2013 08:34:24 -0800
+Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
+ device id
+In-Reply-To: <52977711.6030806@bitmer.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-3-git-send-email-tony@atomide.com>
+ <20131118184723.GR10317@atomide.com>
+ <87ioveeo0x.fsf@octavius.laptop.org>
+ <20131127225704.208445df2aa7fc5fc6cb5faa@bitmer.com>
+ <20131127213726.GB26766@atomide.com> <52977711.6030806@bitmer.com>
+Message-ID: <20131129163424.GK31534@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ivan,
-On Thursday 21 November 2013 06:28 AM, Ivan Khoronzhuk wrote:
-> This series contains fixes and updates of Davinci nand driver in
-> order to reuse it for Keystone platform.
+* Jarkko Nikula <jarkko.nikula@bitmer.com> [131128 09:03]:
+> Hi
 > 
-> The series is combination of two following series:
-> - Davinci nand driver fixes and updates:
->   https://lkml.org/lkml/2013/11/20/271
-> - Reuse davinci-nand driver for Keystone arch
->   https://lkml.org/lkml/2013/11/20/315
-> 
-> Ivan Khoronzhuk (10):
->   mtd: nand: davinci: fix driver registration
->   mtd: nand: davinci: return ENOMEM if memory allocation is failed
->   mtd: nand: davinci: check required ti,davinci-chipselect property
->   mtd: nand: davinci: simplify error handling
->   mtd: nand: davinci: move bindings under mtd
->   mtd: nand: davinci: extend description of bindings
->   mtd: nand: davinci: adjust DT properties to MTD generic
->   mtd: nand: davinci: reuse driver for Keystone arch
->   mtd: nand: davinci: don't set timings if AEMIF is used
->   mtd: nand: davinci: don't request AEMIF address range
-> 
->  .../devicetree/bindings/arm/davinci/nand.txt       |   46 --------
->  .../devicetree/bindings/mtd/davinci-nand.txt       |   94 ++++++++++++++++
->  drivers/mtd/nand/Kconfig                           |    6 +-
->  drivers/mtd/nand/davinci_nand.c                    |  117 +++++++++++---------
->  4 files changed, 164 insertions(+), 99 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
->  create mode 100644 Documentation/devicetree/bindings/mtd/davinci-nand.txt
-> 
-Please drop patch 9 from the series considering we are handling it
-differently and repost the entire series with David in cc. David
-has been lining up the patches.
+> On 11/27/2013 11:37 PM, Tony Lindgren wrote:
+> > * Jarkko Nikula <jarkko.nikula@bitmer.com> [131127 12:55]:
+> > Bummer, sounds like some duplicate work could have been avoided :(
+> > I suggest resend to Chris and linux-mmc one more time as Chris should
+> > pick up the MMC patches in general.
+> > 
+> Before that should Chris merge your 2 patches in order to avoid couple
+> trivial merge conflicts with my set when linux-omap and mmc are merged?
+
+Those are already queued to arm-soc/fixes branch and should hit the
+mainline tree within next few days, hopefully before -rc2 so it's probably
+to wait for that for that for further fixes.
 
 Regards,
-Santosh
+
+Tony
