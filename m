@@ -1,40 +1,78 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 14:47:33 +0100
-Subject: [PATCH 12/31] dma: tegra: use reset framework
-In-Reply-To: <1384548866-13141-13-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-13-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131129134732.GZ22771@ulmo.nvidia.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 29 Nov 2013 15:02:07 +0100
+Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
+ system suspend
+In-Reply-To: <3006899.CPLMC2kU1a@vostro.rjw.lan>
+References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFrRjB7gPpQ4c1U5e-BTHEt6k=kDqo7q1Grc04v-SDrsDw@mail.gmail.com>
+ <3006899.CPLMC2kU1a@vostro.rjw.lan>
+Message-ID: <4064706.R9zKA4hcfi@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:54:07PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Tegra's clock driver now provides an implementation of the common
-> reset API (include/linux/reset.h). Use this instead of the old Tegra-
-> specific API; that will soon be removed.
-> 
-> Cc: treding at nvidia.com
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
-> ---
->  drivers/dma/tegra20-apb-dma.c | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
+On Friday, November 29, 2013 02:52:20 PM Rafael J. Wysocki wrote:
+> On Friday, November 29, 2013 10:32:06 AM Ulf Hansson wrote:
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/74c4225f/attachment-0001.sig>
+[...]
+
+> > For the same reasons, I believe we should trust drivers/subsystems, to
+> > understand when it makes sense for them to re-use all of the runtime
+> > PM callbacks during system suspend and not just the .runtime_suspend
+> > callback.
+> > 
+> > That is in principle what I and Alan, who came up with this idea, are
+> > suggesting.
+> 
+> The problem with it is, as I said, the subsystem-level code you're calling
+> back through pm_generic_suspend_late_runtime() (and the other resume function)
+> has to be implemented in a specific way for things to work.  So it goes like
+> this: "OK, now I'm not runtime-suspended, so I need to do something about that.
+> Why don't I call back to the layer above me that has just called me (and that
+> surely won't do anything after I return, right?), so that it does the right
+> thing (which it surely will do, of course?) and calls my runtime PM callback
+> as expected".
+> 
+> And now suppose that your subsystem-level callbacks look like this (pseudo code):
+> 
+> a_suspend_late(dev)
+> {
+> 	if (successful(pm_generic_suspend_late(dev)))
+> 		do_X(dev);
+> }
+> 
+> a_runtime_suspend(dev)
+> {
+> 	if (successful(pm_generic_runtime_suspend(dev)))
+> 		do_Y(dev);
+> }
+> 
+> Then, if the driver uses your pm_generic_suspend_late_runtime(), the actually
+> executed code will be (assuming dev is not runtime-suspended):
+> 
+> 	a_suspend_late(dev)
+> 		driver->suspend_late(dev)
+> 			a_runtime_suspend(dev)
+> 				driver->runtime_suspend(dev)
+> 				do_Y(dev)
+> 	do_X(dev)
+> 
+> So what if do_X(dev) after do_Y(dev) doesn't actually work?
+> 
+> And what you actually want is
+> 
+> 	driver->runtime_suspend(dev)
+> 	do_Y(dev)
+
+That should have been
+
+ 	driver->runtime_suspend(dev)
+ 	do_X(dev)
+
+because do_Y(dev) is for runtime suspend.  Sorry.
+
+And of course, the subsystem-level code you're developing the driver for may not
+do the do_X(dev) thing at all, in which case all will work.  But what if someone
+tries to use the driver with a different subsystem-level code (like a new PM
+domain)?
+
+Rafael
