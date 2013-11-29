@@ -1,129 +1,70 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 29 Nov 2013 10:10:44 -0500
-Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <5298ABFA.8070804@ti.com>
-References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
- <20131120182102.GK14627@ns203013.ovh.net> <528D076A.8070806@ti.com>
- <C0B815B0-E394-494C-88A2-78A0DBFA23DA@kernel.crashing.org>
- <5298ABFA.8070804@ti.com>
-Message-ID: <5298AE74.7020804@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 29 Nov 2013 20:48:20 +0530
+Subject: [PATCH] dma: pl330: ensure DMA descriptors are zero-initialised
+In-Reply-To: <1385725828-836-1-git-send-email-will.deacon@arm.com>
+References: <1385725828-836-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CABb+yY1WQ1dJGQe8kK_R0B8A-aCf7OX3WN_dC5k10F3pa=hwVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 November 2013 10:00 AM, Grygorii Strashko wrote:
-> Hi Kumar Gala,
-> 
-> On 11/22/2013 11:06 PM, Kumar Gala wrote:
->>
->> On Nov 20, 2013, at 1:03 PM, ivan.khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->>
->>> On 11/20/2013 08:21 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>>> +				the chip select signal.
->>>>> +				Minimum value is 1 (0 treated as 1).
->>>>> +
->>>>> +- ti,cs-wsetup:		write setup width, ns
->>>>> +				Time between the beginning of a memory cycle
->>>>> +				and the activation of write strobe.
->>>>> +				Minimum value is 1 (0 treated as 1).
->>>>> +
->>>>> +- ti,cs-wstrobe:	write strobe width, ns
->>>>> +				Time between the activation and deactivation of
->>>>> +				the write strobe.
->>>>> +				Minimum value is 1 (0 treated as 1).
->>>>> +
->>>>> +- ti,cs-whold:		write hold width, ns
->>>>> +				Time between the deactivation of the write
->>>>> +				strobe and the end of the cycle (which may be
->>>>> +				either an address change or the deactivation of
->>>>> +				the chip select signal.
->>>>> +				Minimum value is 1 (0 treated as 1).
->>>>> +
->>>>> +If any of the above parameters are absent, current parameter value will be taken
->>>>> +from the corresponding HW reg.
->>>>> +
->>>>> +The name for cs node must be in format csN, where N is the cs number.
->>>>
->>>> this is wired we should use reg instead to represent the cs as done for SPI
->>>> or a an other property
->>>>
->>>> Best Regards,
->>>> J.
->>>>
->>>
->>> Ok, I will add new property cs-chipselect like following :
->>>
->>> ti,cs-chipselect:	number of chipselect. Indicates on the
->>> 			aemif driver which chipselect is used
->>> 			for accessing the memory.
->>> 			For compatibles "ti,davinci-aemif" and
->>> 			"ti,keystone-aemif" it can be in range [0-3].
->>> 			For compatible "ti,omap-L138-aemif" range is [2-5].
->>>
->>> Is it OK?
->>
->> Why do you need this? As it was mentioned just use reg:
->>
->> So you?d have something like:
->>
->> memory-controller at 21000A00 {
->> 	?
->> 	nand:cs2 at 2 {
->> 		reg = <2 0 0>;
->> 		ranges;
->> 		...
->>
->> 	}:
->> };
-> 
-> I'd prefer to continue with "ti,cs-chipselect" (this is more human friendly definition, as for me),
-> but if you insist - it can be changed as:
-> memory-controller at 21000A00 {
-> 	compatible = "ti,keystone-aemif";
-> ...
-> 
-> 	cs2 {
-> 		compatible = "ti,aemif-cs";
-> 		reg = <2>;
-> ...
-> 	}
-> 
-> 	cs0 {
-> 		compatible = "ti,aemif-cs";
-> 		reg = <0>;
-> ...
-> 	}
-> 
->>
->> However, I?m confused by the example in which you have:
->>
->> +		nand at 0,0x8000000 {
->> +			compatible = "ti,davinci-nand";
->> +			reg = <0 0x8000000 0x4000000
->> +			       1 0x0000000 0x0000100>;
->> +
->> +			.. see davinci-nand.txt
->> +		};
->>
->> What chipselects is this on 0 & 1?
-> 
-> As I described in https://lkml.org/lkml/2013/11/26/282 we are not encoding CS number in reg
->  - it's memory partition number.
-> 
-> Also, I'd like to note that we *DO NOT introduce* NAND device bindings here.
-> The Davinci NAND bindings was introduced and accepted more then one year ago, and
-> we've just updated its a bit (keeping full compatibility) and reused
-> (see https://lkml.org/lkml/2013/11/21/182). 
-> And the CS number is encoded for Davinci NAND node using standalone property
-> "ti,davinci-chipselect" and we need to provide (2) two memory ranges to it,
-> as result we can't encode CS number in "reg" for AEMIF child devices (NAND/NOR/etc),
-> as it will break bindings compatibility.
-> 
-> In this document, NAND node is used just as an example of child node.
-> 
-The above should have been really captured in the commit log to get a better
-picture. No way on earth, a reviewer can figure out whether this is new bindings
-or copy of bindings already used.
+Hi Will,
 
-Regards,
-Santosh
+On Fri, Nov 29, 2013 at 5:20 PM, Will Deacon <will.deacon@arm.com> wrote:
+>
+> I see the following splat with 3.13-rc1 when attempting to perform DMA:
+>
+> [  253.004516] Alignment trap: not handling instruction e1902f9f at [<c0204b40>]
+> [  253.004583] Unhandled fault: alignment exception (0x221) at 0xdfdfdfd7
+> [  253.004646] Internal error: : 221 [#1] PREEMPT SMP ARM
+> [  253.004691] Modules linked in: dmatest(+) [last unloaded: dmatest]
+> [  253.004798] CPU: 0 PID: 671 Comm: kthreadd Not tainted 3.13.0-rc1+ #2
+> [  253.004864] task: df9b0900 ti: df03e000 task.ti: df03e000
+> [  253.004937] PC is at dmaengine_unmap_put+0x14/0x34
+> [  253.005010] LR is at pl330_tasklet+0x3c8/0x550
+> [  253.005087] pc : [<c0204b44>]    lr : [<c0207478>]    psr: a00e0193
+> [  253.005087] sp : df03fe48  ip : 00000000  fp : df03bf18
+> [  253.005178] r10: bf00e108  r9 : 00000001  r8 : 00000000
+> [  253.005245] r7 : df837040  r6 : dfb41800  r5 : df837048  r4 : df837000
+> [  253.005316] r3 : dfdfdfcf  r2 : dfb41f80  r1 : df837048  r0 : dfdfdfd7
+> [  253.005384] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> [  253.005459] Control: 30c5387d  Table: 9fb9ba80  DAC: fffffffd
+> [  253.005520] Process kthreadd (pid: 671, stack limit = 0xdf03e248)
+>
+> This is due to desc->txd.unmap containing garbage (uninitialised memory).
+>
+> Rather than add another dummy initialisation to _init_desc, instead
+> ensure that the descriptors are zero-initialised during allocation and
+> remove the dummy, per-field initialisation.
+>
+> Cc: Jassi Brar <jaswinder.singh@linaro.org>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/dma/pl330.c | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 98641eaca080..79e52a94f054 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2492,14 +2492,8 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
+>
+>  static inline void _init_desc(struct dma_pl330_desc *desc)
+>  {
+> -       desc->pchan = NULL;
+>         desc->req.x = &desc->px;
+>         desc->req.token = desc;
+> -       desc->rqcfg.swap = SWAP_NO;
+> -       desc->rqcfg.privileged = 0;
+> -       desc->rqcfg.insnaccess = 0;
+> -       desc->rqcfg.scctl = SCCTRL0;
+> -       desc->rqcfg.dcctl = DCCTRL0;
+>
+These happen to evaluate to 0, but for completeness sake they ought to
+be initialized somewhere. Otherwise we might as well drop these
+members.
+
+However I don't strongly feel about either way. So whatever comes in v2...
+
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
