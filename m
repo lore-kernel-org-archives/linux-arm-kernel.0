@@ -1,32 +1,40 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 14:46:14 +0100
-Subject: [PATCH 10/31] ARM: tegra: pass reset to
- tegra_powergate_sequence_power_up()
-In-Reply-To: <20131129134532.GX22771@ulmo.nvidia.com>
+Date: Fri, 29 Nov 2013 14:47:33 +0100
+Subject: [PATCH 12/31] dma: tegra: use reset framework
+In-Reply-To: <1384548866-13141-13-git-send-email-swarren@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-11-git-send-email-swarren@wwwdotorg.org>
- <20131129134532.GX22771@ulmo.nvidia.com>
-Message-ID: <20131129134613.GY22771@ulmo.nvidia.com>
+ <1384548866-13141-13-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129134732.GZ22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 02:45:33PM +0100, Thierry Reding wrote:
-> On Fri, Nov 15, 2013 at 01:54:05PM -0700, Stephen Warren wrote:
-> > From: Stephen Warren <swarren@nvidia.com>
-> > 
-> > Tegra's clock driver now provides an implementation of the common
-> > reset API (include/linux/reset.h). Use this instead of the old Tegra-
-> > specific API; that will soon be removed.
+On Fri, Nov 15, 2013 at 01:54:07PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Ah, there it is!
+> Tegra's clock driver now provides an implementation of the common
+> reset API (include/linux/reset.h). Use this instead of the old Tegra-
+> specific API; that will soon be removed.
 > 
-> Reviewed-by: Thierry Reding <treding@nvidia.com>
+> Cc: treding at nvidia.com
+> Cc: pdeschrijver at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
+> ---
+>  drivers/dma/tegra20-apb-dma.c | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
 
-And: Acked-by: Thierry Reding <treding@nvidia.com>
+Reviewed-by: Thierry Reding <treding@nvidia.com>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/7a886112/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/74c4225f/attachment-0001.sig>
