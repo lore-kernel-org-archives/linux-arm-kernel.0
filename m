@@ -1,129 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Nov 2013 20:37:15 +0100
-Subject: [PATCH RFC 08/10] net: stmmac:sti: Add STi SOC glue driver.
-In-Reply-To: <1384264383-7653-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
- <1384264383-7653-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20131129193715.GA3441@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 20:45:58 +0100
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131129174223.GB5635@kroah.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131128203322.GB14689@mithrandir>
+ <20131128211009.GA26447@obsidianresearch.com>
+ <20131128222232.GF14689@mithrandir>
+ <20131128233147.GA19387@obsidianresearch.com>
+ <20131129023554.GA14239@kroah.com>
+ <20131129093713.GC22771@ulmo.nvidia.com>
+ <20131129174223.GB5635@kroah.com>
+Message-ID: <20131129194557.GA16826@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
-
-On Tue, Nov 12, 2013 at 01:53:03PM +0000, srinivas.kandagatla at st.com wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Fri, Nov 29, 2013 at 09:42:23AM -0800, Greg KH wrote:
+> On Fri, Nov 29, 2013 at 10:37:14AM +0100, Thierry Reding wrote:
+> > > > Some of this is a consequence of the push to have the firmware
+> > > > minimal. As soon as you say the kernel has to configure the address
+> > > > map you've created a big complexity for it..
+> > > 
+> > > Why the push to make firmware "minimal"?  What is that "saving"?  You
+> > > just push the complexity from one place to the other, just because ARM
+> > > doesn't seem to have good firmware engineers, doesn't mean they should
+> > > punish their kernel developers :)
+> > 
+> > In my experience the biggest problem here is that people working on
+> > upstream kernels and therefore confronted with these issues are seldom
+> > able to track the latest developments of new chips.
+> > 
+> > When the time comes to upstream support, most of the functionality has
+> > been implemented downstream already, so it actually works and there's no
+> > apparent reason why things should change.
 > 
-> STi series SOCs have a glue layer on top of the synopsis gmac IP, this
-> glue layer needs to be configured before the gmac driver starts using
-> the IP.
+> That's a failure of the companies involved.
+
+Yes, I know.
+
+> > Now I know that that's not an ideal situation and upstreaming should
+> > start a whole lot earlier, but even if that were the case, once the
+> > silicon tapes out there's not a whole lot you can do about it anymore.
+> > Starting with upstreaming even before that would have to be a solution,
+> > but I don't think that's realistic at the current pace of development.
 > 
-> This patch adds a platform driver for the glue layer which configures
-> the IP before stmmac driver takes over.
+> For other companies it is realistic.  I have a whole presentation on
+> this, and why it even makes good business sense to do it properly (hint,
+> saves you time and money, who doesn't like that?)
+
+I've seen a recording of that presentation. Twice. =)
+
+> > There's a large gap between how fast new SoCs are supposed to tape out
+> > and the rate at which new code can be merged upstream. Perhaps some of
+> > that could be mitigated by putting more of the complexity into firmware
+> > and that's already happening to some degree for ARMv8. But I suspect
+> > there's a limit to what you can hide away in firmware while at the same
+> > time giving the kernel enough information to do the right thing.
+> > 
+> > I am completely convinced that our goal should be to do upstreaming
+> > early and ideally there shouldn't be any downstream development in the
+> > first place. The reason why we're not there yet is because it isn't
+> > practical to do so currently, so I'm very interested in suggestions or
+> > finding ways to improve the situation.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> ---
->  .../devicetree/bindings/net/sti-dwmac.txt          |   45 +++
->  drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
->  drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    |  294 ++++++++++++++++++++
->  3 files changed, 340 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/sti-dwmac.txt
->  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+> "Practical"?  Heh, other companies know how to do this properly, and
+> because of that, they will succeed, sorry.
 > 
-> diff --git a/Documentation/devicetree/bindings/net/sti-dwmac.txt b/Documentation/devicetree/bindings/net/sti-dwmac.txt
-> new file mode 100644
-> index 0000000..5431d9d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/sti-dwmac.txt
-> @@ -0,0 +1,45 @@
-> +STMicroelectronics SoC DWMAC controller
-> +
-> +The device node has following properties.
-> +
-> +Required properties:
-> + - compatible	: Can be "st,stih415-dwmac", "st,stih416-dwmac" or
-> +   "st,stid127-dwmac".
-> + - reg		: Offset of the glue configuration register map in system
-> +   configuration regmap pointed by st,syscon property and size.
-> + - st,syscon	: Should be phandle to system configuration node which
-> +   encompases this glue registers.
-> + - st,tx-retime-src: This specifies which clk is wired up to the mac for
-> +   retimeing tx lines. This is totally board dependent and can take one of the
-> +   posssible values from "txclk", "clk_125", "phyclk" or "clkgen".
-> +
-> +Optional properties:
-> + - resets	: phandle pointing to the system reset controller with correct
-> +   reset line index for ethernet reset.
-> +
-> +Sub-nodes:
-> +The dwmac core should be added as subnode to STMicroelectronics dwmac glue.
-> +- dwmac :	The binding details of dwmac can be found in
-> +  Documentation/devicetree/bindings/net/stmmac.txt
-> +
-> +Example:
-> +
-> +ethernet0: ethernet0{
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	compatible		= "st,stih415-dwmac";
-> +	reg			= <0x148 0x4>;
-> +	resets			= <&softreset STIH415_ETH0_SOFTRESET>;
-> +	st,syscon		= <&syscfg_rear>;
-> +	st,tx-retime-src	= "clk_125";
-> +	ranges;
-> +
-> +	dwmac0:dwmac at fe810000 {
-> +		device_type 	= "network";
-> +		compatible	= "snps,dwmac", "snps,dwmac-3.610";
-> +		reg 		= <0xfe810000 0x8000>;
-> +		interrupts 	= <0 147 0>;
-> +		interrupt-names = "macirq";
-> +		...
-> +	};
-> +};
+> It can be done, the fact that ARM and it's licensees don't want to do
+> it, doesn't mean it isn't "practical" at all, it's just a failure on
+> their part to do things in the "correct" way, wasting time and money in
+> the process.
 
-Sorry for stepping up so late, but I dont' think this is the right way
-to do it.
+Well, I can't really argue with that, so I'll stop with the whining and
+go back to work.
 
-DT is to describe how the hardware is laid out in a system agnostic
-way, hence, it should not be impacted by the implementation details.
-
-The fact that you use a glue to the dwmac driver *is* an
-implementation detail.
-
-I think you'd rather have something like:
-
-dwmac0: ethernet at fe810000 {
-	compatible		= "st,stih415-dwmac";
-	reg 			= <0xfe810000 0x8000 0x148 0x4>;
-	resets			= <&softreset STIH415_ETH0_SOFTRESET>;
-	st,syscon		= <&syscfg_rear>;
-	st,tx-retime-src	= "clk_125";
-	interrupts 		= <0 147 0>;
-	interrupt-names 	= "macirq";
-	...
-};
-
-Then, the driver can have its init functions associated to the
-compatible you're using, through the .data field of the of_device_id
-structure, and you just call it in the generic driver at probe's time.
-
-
-I don't really know what this syscon thing is either, but I think the
-reg <0x148 0x4> is related to that.
-
-Why don't you pass it directly in the st,syscon property, to have
-something like <&syscfg_rear 0x148>?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/d5c007b0/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/167c3957/attachment-0001.sig>
