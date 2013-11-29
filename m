@@ -1,52 +1,87 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 29 Nov 2013 19:05:18 +0800
-Subject: [PATCH 00/23] mtd: st_spi_fsm: Add new device
-In-Reply-To: <20131128092904.GZ3296@lee--X1>
-References: <1385137380-28968-1-git-send-email-lee.jones@linaro.org>
- <20131127040723.GZ9468@ld-irv-0074.broadcom.com>
- <20131127115226.GC3296@lee--X1> <5296B9C5.3060704@freescale.com>
- <20131128092904.GZ3296@lee--X1>
-Message-ID: <529874EE.402@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 29 Nov 2013 09:02:05 -0200
+Subject: [RFC] ARM: lib: delay-loop: Add align directive to fix BogoMIPS
+ calculation
+In-Reply-To: <1385121212-30182-1-git-send-email-festevam@gmail.com>
+References: <1385121212-30182-1-git-send-email-festevam@gmail.com>
+Message-ID: <CAOMZO5AyjD4f2o2c-QbK13Pb5cZCWEV4f5dc38MspDBY6_OjDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jones & Augus:
+Hi Russell,
 
-thanks for your explanations.
-> Most controllers just take an OPCODE and pass it on to the controller
-> and have done with it. The issue that you're attempting to rectify is
-> that the m25p80 expects every controller to be an SPI controller
-> registered to the SPI framework, but as we both know that's not always
-> practical as the SPI framework doesn't allow all configuration
-> information to be passed back to the controller driver. Our issue is
-> not the same. We are required to send entire 'message sequences', to
-> the controller rather than just opcodes. The JEDEC message sequence
-> can be seen below. Bear in mind that this is also one of the more
-> simple message sequences. Some of them even vary depending on which
-> chip is present.
-Frankly speaking, my quadspi driver's code is just like Jones's code.
-Yes, a big "switch".
+On Fri, Nov 22, 2013 at 9:53 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Currently mx53 (CortexA8) running at 1GHz reports:
+> Calibrating delay loop... 663.55 BogoMIPS (lpj=3317760)
+>
+> Tom Evans verified that alignments of 0x0 and 0x8 run the two instructions of
+> __loop_delay in one clock cycle (1 clock/loop), while alignments of 0x4 and
+> 0xc take 3 clocks to run the loop twice. (1.5 clock/loop)
+>
+> The original object code looks like this:
+>
+> 00000010 <__loop_const_udelay>:
+>   10:   e3e01000        mvn     r1, #0
+>   14:   e51f201c        ldr     r2, [pc, #-28]  ; 0 <__loop_udelay-0x8>
+>   18:   e5922000        ldr     r2, [r2]
+>   1c:   e0800921        add     r0, r0, r1, lsr #18
+>   20:   e1a00720        lsr     r0, r0, #14
+>   24:   e0822b21        add     r2, r2, r1, lsr #22
+>   28:   e1a02522        lsr     r2, r2, #10
+>   2c:   e0000092        mul     r0, r2, r0
+>   30:   e0800d21        add     r0, r0, r1, lsr #26
+>   34:   e1b00320        lsrs    r0, r0, #6
+>   38:   01a0f00e        moveq   pc, lr
+>
+> 0000003c <__loop_delay>:
+>   3c:   e2500001        subs    r0, r0, #1
+>   40:   8afffffe        bhi     3c <__loop_delay>
+>   44:   e1a0f00e        mov     pc, lr
+>
+> After adding the 'align 3' directive to __loop_delay (align to 8 bytes):
+>
+> 00000010 <__loop_const_udelay>:
+>   10:   e3e01000        mvn     r1, #0
+>   14:   e51f201c        ldr     r2, [pc, #-28]  ; 0 <__loop_udelay-0x8>
+>   18:   e5922000        ldr     r2, [r2]
+>   1c:   e0800921        add     r0, r0, r1, lsr #18
+>   20:   e1a00720        lsr     r0, r0, #14
+>   24:   e0822b21        add     r2, r2, r1, lsr #22
+>   28:   e1a02522        lsr     r2, r2, #10
+>   2c:   e0000092        mul     r0, r2, r0
+>   30:   e0800d21        add     r0, r0, r1, lsr #26
+>   34:   e1b00320        lsrs    r0, r0, #6
+>   38:   01a0f00e        moveq   pc, lr
+>   3c:   e320f000        nop     {0}
+>
+> 00000040 <__loop_delay>:
+>   40:   e2500001        subs    r0, r0, #1
+>   44:   8afffffe        bhi     40 <__loop_delay>
+>   48:   e1a0f00e        mov     pc, lr
+>   4c:   e320f000        nop     {0}
+>
+> , which now reports:
+> Calibrating delay loop... 996.14 BogoMIPS (lpj=4980736)
+>
+> Some more test results:
+>
+> On mx31 (ARM1136) running at 532 MHz, before the patch:
+> Calibrating delay loop... 351.43 BogoMIPS (lpj=1757184)
+>
+> On mx31 (ARM1136) running at 532 MHz after the patch:
+> Calibrating delay loop... 528.79 BogoMIPS (lpj=2643968)
+>
+> Also tested on mx6 (CortexA9) and on mx27 (ARM926), which shows the same
+> BogoMIPS value before and after this patch.
+>
+> Reported-by: Tom Evans <tom_usenet@optusnet.com.au>
+> Suggested-by: Tom Evans <tom_usenet@optusnet.com.au>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-The opcode is just like an index to trigger the proper operation.
-That's why i add this hook @->read_reg(). (the hook acts as the ioctl)
+Any comments on this, please?
 
-If we do not use this hooks, we should add more hooks such as
-@->read_id, @->read_sr, @->read_cr...
+Regards,
 
-That's make the interface not graceful enough.
-
-
-I read the your patch implementing the read_id:
-
-http://lists.infradead.org/pipermail/linux-mtd/2013-November/050221.html
-
-
-it's more readable. But i think Jones's stfsm_read_reg() is workable too.
-
-
-If you do not like the read_reg() hook, do you have any better idea?
-
-
-
-thanks
-Huang Shijie
+Fabio Estevam
