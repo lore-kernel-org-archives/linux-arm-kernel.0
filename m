@@ -1,55 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Nov 2013 12:19:06 +0000
-Subject: [PATCH v3 17/36] mtd: st_spi_fsm: Provide the sequence for enabling
- 32bit addressing mode
+Date: Fri, 29 Nov 2013 12:19:09 +0000
+Subject: [PATCH v3 20/36] mtd: st_spi_fsm: Provide a method to put the chip
+ into 32bit addressing mode
 In-Reply-To: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
 References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385727565-25794-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385727565-25794-21-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FSM Serial Flash Controller is driven by issuing a standard set of
-register writes we call a message sequence. This patch supplies a method
-to prepare the message sequence responsible for setting 32bit addressing
-mode on the Flash chip.
+Most Serial Flash chips support 24bit addressing as a default but more
+recent incarnations can support 32bit. Based on information provided
+though platform specific data and capabilities we can determine whether
+or not our current chip can. This patch provides a means to setup the
+FSM message sequence to put the chip into 32bit mode.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 47f9da0..7d690c7 100644
+index 4edd3f2..325fd7a 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -66,6 +66,28 @@ static struct stfsm_seq stfsm_seq_erase_sector = {
- 		    SEQ_CFG_STARTSEQ),
- };
+@@ -28,6 +28,8 @@
+ #include "st_spi_fsm.h"
+ #include "serial_flash_cmds.h"
  
-+static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
++static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
++
+ static struct stfsm_seq stfsm_seq_read_jedec = {
+ 	.data_size = TRANSFER_SIZE(8),
+ 	.seq_opc[0] = (SEQ_OPC_PADS_1 |
+@@ -170,6 +172,23 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+ 	}
+ }
+ 
++static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
 +{
-+	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_EN4B_ADDR));
-+	seq->seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_WREN) |
++	struct stfsm_seq *seq = &stfsm_seq_en_32bit_addr;
++	uint32_t cmd = enter ? FLASH_CMD_EN4B_ADDR : FLASH_CMD_EX4B_ADDR;
++
++	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
++			   SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(cmd) |
 +			   SEQ_OPC_CSDEASSERT);
 +
-+	seq->seq[0] = STFSM_INST_CMD2;
-+	seq->seq[1] = STFSM_INST_CMD1;
-+	seq->seq[2] = STFSM_INST_WAIT;
-+	seq->seq[3] = STFSM_INST_STOP;
++	stfsm_load_seq(fsm, seq);
 +
-+	seq->seq_cfg = (SEQ_CFG_PADS_1 |
-+			SEQ_CFG_ERASE |
-+			SEQ_CFG_READNOTWRITE |
-+			SEQ_CFG_CSDEASSERT |
-+			SEQ_CFG_STARTSEQ);
++	stfsm_wait_seq(fsm);
 +
 +	return 0;
 +}
 +
- static inline int stfsm_is_idle(struct stfsm *fsm)
- {
- 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
+ /*
+  * SoC reset on 'boot-from-spi' systems
+  *
 -- 
 1.8.3.2
