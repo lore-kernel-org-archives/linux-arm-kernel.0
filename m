@@ -1,67 +1,57 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 29 Nov 2013 15:34:21 +0000
-Subject: [PATCH] arm64: mm: Avoid set_pte_at with HugeTLB pages
-Message-ID: <1385739261-26689-1-git-send-email-steve.capper@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 16:37:09 +0100
+Subject: [PATCH 1/5] clk: tegra: fix blink clock rate
+In-Reply-To: <20131129152241.GM9712@ulmo.nvidia.com>
+References: <1384991242-13596-1-git-send-email-swarren@wwwdotorg.org>
+ <20131129152241.GM9712@ulmo.nvidia.com>
+Message-ID: <20131129153708.GN9712@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For huge pages, given newprot a pgprot_t value for a shared writable
-VMA, and ptep a pointer to a pte belonging to this VMA; the following
-behaviour is assumed by core code:
+On Fri, Nov 29, 2013 at 04:22:42PM +0100, Thierry Reding wrote:
+> On Wed, Nov 20, 2013 at 04:47:18PM -0700, Stephen Warren wrote:
+> > From: Stephen Warren <swarren@nvidia.com>
+> > 
+> > The blink clock rate needs to be configured, or it will run at ~1Hz
+> > rather than the desired 32KHz. If it runs at the wrong rate, e.g. the
+> > SDIO WiFi on Seaboard and Cardhu will fail to be detected.
+> 
+> How is this related to WiFi?
+> 
+> > 
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > ---
+> > This probably needs to be squashed into commit 32721a734a3d "clk: tegra:
+> > move PMC, fixed clocks to common files".
+> > ---
+> >  drivers/clk/tegra/clk-tegra-pmc.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/clk/tegra/clk-tegra-pmc.c b/drivers/clk/tegra/clk-tegra-pmc.c
+> > index 00e8275a7178..08b21c1ee867 100644
+> > --- a/drivers/clk/tegra/clk-tegra-pmc.c
+> > +++ b/drivers/clk/tegra/clk-tegra-pmc.c
+> > @@ -114,6 +114,7 @@ void __init tegra_pmc_clk_init(void __iomem *pmc_base,
+> >  	}
+> >  
+> >  	/* blink */
+> > +	writel_relaxed(0, pmc_base + PMC_BLINK_TIMER);
+> >  	clk = clk_register_gate(NULL, "blink_override", "clk_32k", 0,
+> >  				pmc_base + PMC_DPD_PADS_ORIDE,
+> >  				PMC_DPD_PADS_ORIDE_BLINK_ENB, 0, NULL);
+> 
+> Perhaps a better location would be a few lines below, where the "blink"
+> clock is registered, since this actually controls the "blink" clock
+> rather than "blink_override". But either way:
 
-   hugetlb_change_protection(vma, address, end, newprot);
-   ...
+Just realized that Peter already squashed all of these into his -next
+branch, so nevermind.
 
-   huge_pte_write(huge_ptep_get(ptep)); /* should be true! */
-
-Unfortunately, set_huge_pte_at calls set_pte_at which includes a
-side-effect that renders ptes read only if the dirty bit is unset.
-
-If one were to allocate a read only shared huge page, then fault it in,
-and then mprotect it to be writeable. A subsequent write to that huge
-page will result in a spurious call to hugetlb_cow, which causes
-corruption. This call is optimised away prior to:
- 37a2140 mm, hugetlb: do not use a page in page cache for cow
-         optimization
-
-If one runs the libhugetlbfs test suite on v3.12-rc1 upwards, then the
-mprotect test will cause the afformentioned corruption and before the
-set of tests completes, the system will be left in an unresponsive
-state. (calls to fork fail with -ENOMEM).
-
-This patch re-implements set_huge_pte_at to dereference the pte value
-explicitly. hugetlb_cow is no longer called spuriously, and the unit
-tests complete successfully.
-
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
-I operated under the deluded notion that set_pte_at on arm64 had no
-side effects when I originally sent out:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/212475.html
-
-As this is patch is more or less self-contained for arm64, I am sending
-this out on its own rather than merging with the above series.
-
-Apologies for not catching this sooner.
----
- arch/arm64/include/asm/hugetlb.h | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index 5b7ca8a..32b042f 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -33,7 +33,10 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
- static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 				   pte_t *ptep, pte_t pte)
- {
--	set_pte_at(mm, addr, ptep, pte);
-+	if (pte_exec(pte))
-+		__sync_icache_dcache(pte, addr);
-+
-+	*ptep = pte;
- }
- 
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
--- 
-1.8.1.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/81f676eb/attachment.sig>
