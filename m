@@ -1,149 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Nov 2013 12:18:57 +0000
-Subject: [PATCH v3 08/36] mtd: devices: Provide header for shared OPCODEs and
- SFDP commands
-In-Reply-To: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385727565-25794-9-git-send-email-lee.jones@linaro.org>
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Fri, 29 Nov 2013 12:57:50 +0000
+Subject: [PATCH] dma: pl330: ensure DMA descriptors are zero-initialised
+In-Reply-To: <1385725828-836-1-git-send-email-will.deacon@arm.com>
+References: <1385725828-836-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1385729844.1871.24.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-JEDEC have helped to standardise a great deal of the commands which
-can be issued to a Serial Flash devices. Many of the OPCODEs and all
-of the Serial Flash Discoverable Parameters (SFDP) commands are
-generic across devices. This patch provides a shared point where
-these commands can be defined.
+On Fri, 2013-11-29 at 11:50 +0000, Will Deacon wrote:
+> I see the following splat with 3.13-rc1 when attempting to perform DMA:
+> 
+> [  253.004516] Alignment trap: not handling instruction e1902f9f at [<c0204b40>]
+> [  253.004583] Unhandled fault: alignment exception (0x221) at 0xdfdfdfd7
+> [  253.004646] Internal error: : 221 [#1] PREEMPT SMP ARM
+> [  253.004691] Modules linked in: dmatest(+) [last unloaded: dmatest]
+> [  253.004798] CPU: 0 PID: 671 Comm: kthreadd Not tainted 3.13.0-rc1+ #2
+> [  253.004864] task: df9b0900 ti: df03e000 task.ti: df03e000
+> [  253.004937] PC is at dmaengine_unmap_put+0x14/0x34
+> [  253.005010] LR is at pl330_tasklet+0x3c8/0x550
+> [  253.005087] pc : [<c0204b44>]    lr : [<c0207478>]    psr: a00e0193
+> [  253.005087] sp : df03fe48  ip : 00000000  fp : df03bf18
+> [  253.005178] r10: bf00e108  r9 : 00000001  r8 : 00000000
+> [  253.005245] r7 : df837040  r6 : dfb41800  r5 : df837048  r4 : df837000
+> [  253.005316] r3 : dfdfdfcf  r2 : dfb41f80  r1 : df837048  r0 : dfdfdfd7
+> [  253.005384] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> [  253.005459] Control: 30c5387d  Table: 9fb9ba80  DAC: fffffffd
+> [  253.005520] Process kthreadd (pid: 671, stack limit = 0xdf03e248)
+> 
+> This is due to desc->txd.unmap containing garbage (uninitialised memory).
+> 
+> Rather than add another dummy initialisation to _init_desc, instead
+> ensure that the descriptors are zero-initialised during allocation and
+> remove the dummy, per-field initialisation.
+> 
+> Cc: Jassi Brar <jaswinder.singh@linaro.org>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/dma/pl330.c | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 98641eaca080..79e52a94f054 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2492,14 +2492,8 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
+>  
+>  static inline void _init_desc(struct dma_pl330_desc *desc)
+>  {
+> -	desc->pchan = NULL;
+>  	desc->req.x = &desc->px;
+>  	desc->req.token = desc;
+> -	desc->rqcfg.swap = SWAP_NO;
+> -	desc->rqcfg.privileged = 0;
+> -	desc->rqcfg.insnaccess = 0;
+> -	desc->rqcfg.scctl = SCCTRL0;
+> -	desc->rqcfg.dcctl = DCCTRL0;
+>  	desc->req.cfg = &desc->rqcfg;
+>  	desc->req.xfer_cb = dma_pl330_rqcb;
+>  	desc->txd.tx_submit = pl330_tx_submit;
+> @@ -2517,7 +2511,7 @@ static int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
+>  	if (!pdmac)
+>  		return 0;
+>  
+> -	desc = kmalloc(count * sizeof(*desc), flg);
+> +	desc = kzalloc(count * sizeof(*desc), flg);
 
-Suggested-by: Mark Brown <broonie@kernel.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/serial_flash_cmds.h | 91 +++++++++++++++++++++++++++++++++
- drivers/mtd/devices/st_spi_fsm.c        |  1 +
- drivers/mtd/devices/st_spi_fsm.h        |  2 +
- 3 files changed, 94 insertions(+)
- create mode 100644 drivers/mtd/devices/serial_flash_cmds.h
+Maybe kcalloc() ?
 
-diff --git a/drivers/mtd/devices/serial_flash_cmds.h b/drivers/mtd/devices/serial_flash_cmds.h
-new file mode 100644
-index 0000000..62aa420
---- /dev/null
-+++ b/drivers/mtd/devices/serial_flash_cmds.h
-@@ -0,0 +1,91 @@
-+/*
-+ * Generic/SFDP Flash Commands and Device Capabilities
-+ *
-+ * Copyright (C) 2013 Lee Jones <lee.jones@lianro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+#ifndef _MTD_SERIAL_FLASH_CMDS_H
-+#define _MTD_SERIAL_FLASH_CMDS_H
-+
-+/* Generic Flash Commands/OPCODEs */
-+#define FLASH_CMD_WREN		0x06
-+#define FLASH_CMD_WRDI		0x04
-+#define FLASH_CMD_RDID		0x9f
-+#define FLASH_CMD_RDSR		0x05
-+#define FLASH_CMD_RDSR2		0x35
-+#define FLASH_CMD_WRSR		0x01
-+#define FLASH_CMD_SE_4K		0x20
-+#define FLASH_CMD_SE_32K	0x52
-+#define FLASH_CMD_SE		0xd8
-+#define FLASH_CMD_CHIPERASE	0xc7
-+#define FLASH_CMD_WRVCR		0x81
-+#define FLASH_CMD_RDVCR		0x85
-+
-+/* JEDEC Standard - Serial Flash Discoverable Parmeters (SFDP) Commands */
-+#define FLASH_CMD_READ		0x03	/* READ */
-+#define FLASH_CMD_READ_FAST	0x0b	/* FAST READ */
-+#define FLASH_CMD_READ_1_1_2	0x3b	/* DUAL OUTPUT READ */
-+#define FLASH_CMD_READ_1_2_2	0xbb	/* DUAL I/O READ */
-+#define FLASH_CMD_READ_1_1_4	0x6b	/* QUAD OUTPUT READ */
-+#define FLASH_CMD_READ_1_4_4	0xeb	/* QUAD I/O READ */
-+
-+#define FLASH_CMD_WRITE		0x02	/* PAGE PROGRAM */
-+#define FLASH_CMD_WRITE_1_1_2	0xa2	/* DUAL INPUT PROGRAM */
-+#define FLASH_CMD_WRITE_1_2_2	0xd2	/* DUAL INPUT EXT PROGRAM */
-+#define FLASH_CMD_WRITE_1_1_4	0x32	/* QUAD INPUT PROGRAM */
-+#define FLASH_CMD_WRITE_1_4_4	0x12	/* QUAD INPUT EXT PROGRAM */
-+
-+#define FLASH_CMD_EN4B_ADDR	0xb7	/* Enter 4-byte address mode */
-+#define FLASH_CMD_EX4B_ADDR	0xe9	/* Exit 4-byte address mode */
-+
-+/* READ commands with 32-bit addressing */
-+#define FLASH_CMD_READ4		0x13
-+#define FLASH_CMD_READ4_FAST	0x0c
-+#define FLASH_CMD_READ4_1_1_2	0x3c
-+#define FLASH_CMD_READ4_1_2_2	0xbc
-+#define FLASH_CMD_READ4_1_1_4	0x6c
-+#define FLASH_CMD_READ4_1_4_4	0xec
-+
-+/* Configuration flags */
-+#define FLASH_FLAG_SINGLE	0x000000ff
-+#define FLASH_FLAG_READ_WRITE	0x00000001
-+#define FLASH_FLAG_READ_FAST	0x00000002
-+#define FLASH_FLAG_SE_4K	0x00000004
-+#define FLASH_FLAG_SE_32K	0x00000008
-+#define FLASH_FLAG_CE		0x00000010
-+#define FLASH_FLAG_32BIT_ADDR	0x00000020
-+#define FLASH_FLAG_RESET	0x00000040
-+#define FLASH_FLAG_DYB_LOCKING	0x00000080
-+
-+#define FLASH_FLAG_DUAL		0x0000ff00
-+#define FLASH_FLAG_READ_1_1_2	0x00000100
-+#define FLASH_FLAG_READ_1_2_2	0x00000200
-+#define FLASH_FLAG_READ_2_2_2	0x00000400
-+#define FLASH_FLAG_WRITE_1_1_2	0x00001000
-+#define FLASH_FLAG_WRITE_1_2_2	0x00002000
-+#define FLASH_FLAG_WRITE_2_2_2	0x00004000
-+
-+#define FLASH_FLAG_QUAD		0x00ff0000
-+#define FLASH_FLAG_READ_1_1_4	0x00010000
-+#define FLASH_FLAG_READ_1_4_4	0x00020000
-+#define FLASH_FLAG_READ_4_4_4	0x00040000
-+#define FLASH_FLAG_WRITE_1_1_4	0x00100000
-+#define FLASH_FLAG_WRITE_1_4_4	0x00200000
-+#define FLASH_FLAG_WRITE_4_4_4	0x00400000
-+
-+#endif /* _MTD_SERIAL_FLASH_CMDS_H */
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index fe19ec3..71b6188 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -24,6 +24,7 @@
- #include <asm/io.h>
- 
- #include "st_spi_fsm.h"
-+#include "serial_flash_cmds.h"
- 
- static struct stfsm_seq stfsm_seq_read_jedec = {
- 	.data_size = TRANSFER_SIZE(8),
-diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
-index 97b4868..5c6c55e 100644
---- a/drivers/mtd/devices/st_spi_fsm.h
-+++ b/drivers/mtd/devices/st_spi_fsm.h
-@@ -16,6 +16,8 @@
- #ifndef ST_SPI_FSM_H
- #define ST_SPI_FSM_H
- 
-+#include "serial_flash_cmds.h"
-+
- /*
-  * FSM SPI Controller Registers
-  */
+>  	if (!desc)
+>  		return 0;
+>  
+
 -- 
-1.8.3.2
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
