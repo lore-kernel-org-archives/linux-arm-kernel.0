@@ -1,44 +1,37 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 15:56:29 +0100
-Subject: [PATCH 31/31] clk: tegra: remove bogus PCIE_XCLK
-In-Reply-To: <1384548866-13141-32-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-32-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131129145628.GK9712@ulmo.nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 29 Nov 2013 09:57:29 -0500
+Subject: [PATCH v4 0/5] Update Davinci watchdog driver
+In-Reply-To: <5298943D.8010608@ti.com>
+References: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <5298943D.8010608@ti.com>
+Message-ID: <5298AB59.7020506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:54:26PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Friday 29 November 2013 08:18 AM, Grygorii Strashko wrote:
+> Hi Sekhar,
 > 
-> The "pcie_xclk" clock is not actually a clock at all, but rather a reset
-> domain. Now that the custom Tegra module reset API has been removed, we
-> can remove the definition of any "clocks" that existed solely to support
-> it.
+> On 11/27/2013 02:48 PM, Ivan Khoronzhuk wrote:
+>> These patches are intended to update Davinci watchdog to use WDT core
+>> and reuse driver for keystone arch, because Keystone uses the similar
+>> IP like Davinci.
+>>
+>> See Documentation:
+>> Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
+>> Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
+>>
+>> Also:
+>>   - improved to support GET_TIMELEFT option.
+>>   - added "clocks" and "timeout-sec" properties to DT.
 > 
-> Cc: treding at nvidia.com
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
-> ---
->  drivers/clk/tegra/clk-tegra20.c         | 6 ------
->  drivers/clk/tegra/clk-tegra30.c         | 7 -------
->  include/dt-bindings/clock/tegra20-car.h | 2 +-
->  include/dt-bindings/clock/tegra30-car.h | 2 +-
->  4 files changed, 2 insertions(+), 15 deletions(-)
+> Do you have any additional comments to this series?
+> 
+> By the way patch "[PATCH] watchdog: davinci: rename platform driver to davinci-wdt"
+> https://lkml.org/lkml/2013/11/27/201 can be applied as before as after this series
+> without conflicts.
+> 
+Thats good then and probably the series can go via watchdog tree.
+In either way, it will be good to know who is queuing up the series for 3.14
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/c89c816d/attachment.sig>
+Regards,
+Santosh
