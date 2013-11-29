@@ -1,60 +1,28 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Fri, 29 Nov 2013 10:07:48 +0900
-Subject: [PATCH v11 7/7] ARM: tegra: support Trusted Foundations by default
-In-Reply-To: <20131128194751.GD4634@e103592.cambridge.arm.com>
-References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
- <1385274652-16415-8-git-send-email-acourbot@nvidia.com>
- <20131126000608.GA21634@quad.lixom.net>
- <CAAVeFu+mMyPhFtVZ09vgYWWCYkPpF3X547ffRAfXXKOOWUUkqg@mail.gmail.com>
- <20131126164730.GE2355@e103592.cambridge.arm.com>
- <CAAVeFuJgqgRnWLD+dyvb7+2fLanHmdDT0YV5r8ETsoqqjW8p7A@mail.gmail.com>
- <52977639.4000308@wwwdotorg.org>
- <20131128194751.GD4634@e103592.cambridge.arm.com>
-Message-ID: <5297E8E4.8080401@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Nov 2013 02:01:50 +0000
+Subject: STOP THE MADNESS
+In-Reply-To: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+References: <20131126163031.GC16735@n2100.arm.linux.org.uk>
+Message-ID: <20131129020149.GU16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 04:47 AM, Dave Martin wrote:
-> On Thu, Nov 28, 2013 at 04:58:33PM +0000, Stephen Warren wrote:
->> On 11/27/2013 11:02 PM, Alexandre Courbot wrote:
->>> On Wed, Nov 27, 2013 at 1:47 AM, Dave Martin <Dave.Martin@arm.com> wrote:
->>>> On Tue, Nov 26, 2013 at 10:35:58AM +0900, Alexandre Courbot wrote:
->>>>> On Tue, Nov 26, 2013 at 9:06 AM, Olof Johansson <olof@lixom.net> wrote:
->>>>>> On Sun, Nov 24, 2013 at 03:30:52PM +0900, Alexandre Courbot wrote:
->>>>>>> Support for Trusted Foundations is light and allows the kernel to run on
->>>>>>> a wider range of devices, so enable it by default.
->>>>>>>
->>>>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->>>>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>>>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->>>>>>> ---
->>>>>>>   arch/arm/configs/tegra_defconfig | 1 +
->>>>>>>   1 file changed, 1 insertion(+)
->>>>>>
->>>>>> I think we want this enabled on multi_v7_defconfig too? Send a separate
->>>>>> patch for that once this is merged though.
->>>>>
->>>>> Will do.
->>>>
->>>> Should it just be default y if one of the relevant
->>>> CONFIG_ARCH_TEGRA_*_SOC is selected?
->>>>
->>>> That way, it's automatically included if relevant, and automatically
->>>> excluded if not -- regardless of whether the kernel is multiplatform
->>>> or not.
->>>
->>> So basically, that would mean setting the default to 'y' since the
->>> option is not available unless a supported platform is included?
->>>
->>> I'm fine this way too, if Stephen also agrees.
->>
->> Fine by me.
->
-> Sure, as long as the result is right, that should be fine.
+On Tue, Nov 26, 2013 at 04:30:32PM +0000, Russell King - ARM Linux wrote:
+> Versatile PB926 is currently broken in mainline because of this, and it's
+> damn obvious that people are just churning out changes to "update" drivers
+> without testing them at all.
 
-Ok, then please ignore this patch in this series and I will send a new 
-one that changes the CONFIG_TRUSTED_FOUNDATION's default setting once we 
-have confirmation from Russell that this series can be merged.
+So... EBSA285... where would people like me to start with that.
+VGA... broken.  LEDs... broken.  Several other issues as well (eg,
+my tightening of the vectors page seems to have broken all low-vectors
+platforms.)
 
-Thanks,
-Alex.
+IDE... both IT821x and CY82C693 broken - CY82C693 is beyond recovery
+given the state of core IDE code - it requires a rewrite to get it
+working again due to broken assumptions concerning this host controller
+by core code.  IT821x gets quickly kicked out of BMDMA mode and then
+sees the occasional PATA _protocol_ error.  Frankly I wouldn't trust
+drivers/ide at all given observed behaviour; I'm not going to even
+bother trying to debug it.
+
+libata... better for IT821x.
