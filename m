@@ -1,365 +1,71 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 29 Nov 2013 12:59:53 +0000
-Subject: [PATCH V2] ARM : unwinder : Prevent data abort due to stack
- overflow while executing unwind instructions Signed-off-by: Anurag Aggarwal
- <a.anurag@samsung.com>
-In-Reply-To: <1385717671-28953-1-git-send-email-a.anurag@samsung.com>
-References: <1385717671-28953-1-git-send-email-a.anurag@samsung.com>
-Message-ID: <20131129125953.GG4634@e103592.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 14:00:32 +0100
+Subject: [PATCH 04/31] ARM: tegra: update DT files to add reset properties
+In-Reply-To: <1384548866-13141-5-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129130031.GQ22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like you still need to move your S-o-B line.  It needs to be at
-the end of the commit message.
+On Fri, Nov 15, 2013 at 01:53:59PM -0700, Stephen Warren wrote:
+[...]
+> @@ -135,8 +140,10 @@
+>  		reg-shift = <2>;
+>  		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>  		nvidia,dma-request-selector = <&apbdma 9>;
+> -		status = "disabled";
+>  		clocks = <&tegra_car TEGRA114_CLK_UARTB>;
+> +		resets = <&tegra_car 7>;
 
-On Fri, Nov 29, 2013 at 09:34:31AM +0000, Anurag Aggarwal wrote:
-> While unwinding backtrace, stack overflow is possible. This stack overflow can sometimes
-> lead to data abort in system if the area after stack is not mapped to physical memory.
-> 
-> To prevent this problem from happening execute the instructions that can cause data
-> abort in there seperate functions instead of unwind_exec_insn, where a check for there
-> feasibility is made first.
+This is confusing. For some reason that escapes me the tegra114-car.h
+file defines TEGRA114_CLK_UARTB as 192. Other reset entries match the
+numerical value of the TEGRA114_CLK_* define, which makes it easy to
+double-check this.
 
-Minor nit, but please wrap the commit message lines to 72 chars or less.
-This helps the patch message to be listed nicely in git log.
+But UARTB is indeed at bit 7, so this looks good.
 
+Oh, I think perhaps it's caused by bit 7 being shared by both the UARTB
+and the VFIR controllers for reset, but not for the clocks.
 
-If you agree with the changes I suggest below, the second paragraph
-could be reworded something like:
+>  			reg = <0x70080300 0x100>;
+>  			nvidia,ahub-cif-ids = <4 4>;
+>  			clocks = <&tegra_car TEGRA114_CLK_I2S0>;
 
---snip--
+The clocks for these i2s devices are already listed in the ahub node. Is
+that on purpose?
 
-To prevent this problem from happening, execute the instructions that
-can cause a data abort in separate helper functions, where a check for
-feasibility is made before reading each word from the stack.
+> @@ -110,6 +118,8 @@
+>  			reg = <0x54080000 0x00040000>;
+>  			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&tegra_car TEGRA30_CLK_VI>;
+> +			resets = <&tegra_car 164>;
 
---snip--
+I think this needs to be 20.
 
+> @@ -139,6 +155,9 @@
+>  			clocks = <&tegra_car TEGRA30_CLK_GR3D
+>  				  &tegra_car TEGRA30_CLK_GR3D2>;
+>  			clock-names = "3d", "3d2";
+> +			resets = <&tegra_car 24>,
 
-> ---
->  arch/arm/kernel/unwind.c |  197 ++++++++++++++++++++++++++++++++++------------
->  1 files changed, 148 insertions(+), 49 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-> index 00df012..150e0fc 100644
-> --- a/arch/arm/kernel/unwind.c
-> +++ b/arch/arm/kernel/unwind.c
-> @@ -49,6 +49,8 @@
->  #include <asm/traps.h>
->  #include <asm/unwind.h>
->  
-> +#define TOTAL_REGISTERS 16
-> +
->  /* Dummy functions to avoid linker complaints */
->  void __aeabi_unwind_cpp_pr0(void)
->  {
-> @@ -66,7 +68,7 @@ void __aeabi_unwind_cpp_pr2(void)
->  EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
->  
->  struct unwind_ctrl_block {
-> -	unsigned long vrs[16];		/* virtual register set */
-> +	unsigned long vrs[TOTAL_REGISTERS];	/* virtual register set */
->  	const unsigned long *insn;	/* pointer to the current instructions word */
->  	int entries;			/* number of entries left to interpret */
->  	int byte;			/* current byte number in the instructions word */
-> @@ -235,6 +237,148 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl)
->  	return ret;
->  }
->  
-> +static int unwind_exec_insn_0x80(struct unwind_ctrl_block *ctrl,
-> +				unsigned long insn)
+For some reason bit 24 is missing from the register definition. Given
+that this has worked before I suppose either the documentation is stale
+or it's not necessary to take this module out of reset.
 
-Since these are now split out as named functions, it's useful to have
-human readable names.
+> +			 <&tegra_car 30>,  /* i2s0 */
+> +			 <&tegra_car 11>,  /* i2s1 */
+> +			 <&tegra_car 18>,  /* i2s2 */
+> +			 <&tegra_car 101>, /* i2s3 */
+> +			 <&tegra_car 102>, /* i2s4 */
 
-Maybe something like:
+Some comment for these as for Tegra20.
 
-        unwind_exec_pop_subset_r4_to_r13
-
-What do you think?
-
-> +{
-> +	unsigned long high, low;
-> +	unsigned long mask;
-> +	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> +	int load_sp, reg = 4;
-> +
-> +	low = ctrl->vrs[SP];
-> +	high = ALIGN(low, THREAD_SIZE);
-
-You can calculate low, high and high - low once and store them in
-unwind_ctrl_block.  No need to recalculate them every time.
-
-Field names like "low" may be confusing though.  "sp_low" etc. may be
-clearer.
-
-> +
-> +	insn = (insn << 8) | unwind_get_byte(ctrl);
-> +	mask = insn & 0x0fff;
-> +	if (mask == 0) {
-> +		pr_warning("unwind: 'Refuse to unwind' instruction %04lx\n",
-> +			insn);
-> +		return -URC_FAILURE;
-> +	}
-> +
-> +	/*
-> +	 *  Check whether there is enough space
-> +	 *  on stack to execute the instruction
-> +	 *  if not then return failure
-> +	 */
-> +	if ((high - low) < TOTAL_REGISTERS) {
-
-I'm still not sure we are optimising something valuable by factoring out
-this check.
-
-It's also unfortunate that the code describes how many registers to pop
-twice -- once in the check, and once in the while loop that does the
-popping.  That kind of duplication brings risks of accidentally breaking
-the code during future maintenance.  Someone might not modify the two
-pieces of code in a consistent way.  Because stack overflow should never
-normally occur anyway, a mistake like that could easily get missed
-during testing.
-
-Removing this whole if block and just doing a simple check each time a
-register is loaded...
-
-
-> +		unsigned long mask_copy = mask;
-> +		int required_stack = 0;
-> +
-> +		while (mask_copy) {
-> +			if (mask_copy & 1)
-> +				required_stack++;
-> +			mask_copy >>= 1;
-> +		}
-> +
-> +		if ((high - low) < required_stack)
-> +			return -URC_FAILURE;
-> +	}
-> +
-> +	load_sp = mask & (1 << (13 - 4));
-> +	while (mask) {
-> +		if (mask & 1)
-> +			ctrl->vrs[reg] = *vsp++;
-
-... like this ...
-
-	if (mask & 1) {
-		if (vsp >= high)
-			return -URC_FAILURE;
-
-		ctrl->vrs[reg] = *vsp++;
-
-... feels simpler.
-
-Better though, that can be factored out as a separate function:
-
-static int unwind_pop_reg(struct unwind_ctrl_block *ctrl, unsigned long **vsp,
-			  unsigned int reg)
-{
-	if (*vsp >= ctrl->high)
-		return -URC_FAILURE;
-
-	ctrl->vrs[reg] = *(*vsp)++;
-}
-
-Then, in the insn helper, just do:
-
-	if (mask & 1) {
-		if (unwind_pop_reg(ctrl, &vsp, reg))
-			return -URC_FAILURE;
-
-
-And you can reuse that in each of the insn helpers.
-
-This is likely to be a bit less efficient, but I think it will reduce
-the amount of code and make things a bit cleaner.
-
-> +		mask >>= 1;
-> +		reg++;
-> +	}
-> +	if (!load_sp)
-> +		ctrl->vrs[SP] = (unsigned long)vsp;
-> +
-> +	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
-> +		ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
-> +
-> +	return URC_OK;
-> +}
-> +
-> +static int unwind_exec_insn_0xa0(struct unwind_ctrl_block *ctrl,
-
-Maybe call this unwind_exec_pop_r4_to_rN?
-
-> +				unsigned long insn)
-> +{
-> +	unsigned long high, low;
-> +	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> +	int reg;
-> +
-> +	low = ctrl->vrs[SP];
-> +	high = ALIGN(low, THREAD_SIZE);
-> +
-> +	/*
-> +	 *  Check whether there is enough space
-> +	 *  on stack to execute the instruction
-> +	 *  if not then return failure
-> +	 */
-> +	if ((high-low) < TOTAL_REGISTERS) {
-> +		int required_stack;
-> +
-> +		required_stack = insn & 7;
-> +		required_stack += (insn & 0x80) ? 1 : 0;
-> +
-> +		if ((high-low) < required_stack)
-> +			return -URC_FAILURE;
-> +	}
-> +
-> +	/* pop R4-R[4+bbb] */
-> +	for (reg = 4; reg <= 4 + (insn & 7); reg++)
-> +		ctrl->vrs[reg] = *vsp++;
-> +	if (insn & 0x80)
-> +		ctrl->vrs[14] = *vsp++;
-> +	ctrl->vrs[SP] = (unsigned long)vsp;
-> +
-> +	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
-> +		ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
-> +
-> +	return URC_OK;
-> +}
-> +
-> +static int unwind_exec_insn_0xb1(struct unwind_ctrl_block *ctrl,
-
-Maybe call this unwind_exec_pop_subset_r0_to_r3?
-
-> +				unsigned long insn)
-> +{
-> +	unsigned long high, low;
-> +	unsigned long mask = unwind_get_byte(ctrl);
-> +	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> +	int reg = 0;
-> +
-> +	if (mask == 0 || mask & 0xf0) {
-> +		pr_warning("unwind: Spare encoding %04lx\n",
-> +			(insn << 8) | mask);
-> +		return -URC_FAILURE;
-> +	}
-> +
-> +	low = ctrl->vrs[SP];
-> +	high = ALIGN(low, THREAD_SIZE);
-> +
-> +	/*
-> +	 *  Check whether there is enough space
-> +	 *  on stack to execute the instruction
-> +	 *  if not then return failure
-> +	 */
-> +	if ((high-low) < TOTAL_REGISTERS) {
-> +		unsigned long mask_copy = mask;
-> +		int required_stack = 0;
-> +
-> +		while (mask_copy) {
-> +			if (mask_copy & 1)
-> +				required_stack++;
-> +			mask_copy >>= 1;
-> +		}
-> +		if ((high-low) < required_stack)
-> +			return -URC_FAILURE;
-> +	}
-> +
-> +	/* pop R0-R3 according to mask */
-> +	while (mask) {
-> +		if (mask & 1)
-> +			ctrl->vrs[reg] = *vsp++;
-> +		mask >>= 1;
-> +		reg++;
-> +	}
-> +	ctrl->vrs[SP] = (unsigned long)vsp;
-> +
-> +	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
-> +		ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
-> +
-> +	return URC_OK;
-> +}
-> +
->  /*
->   * Execute the current unwind instruction.
->   */
-> @@ -249,65 +393,20 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  	else if ((insn & 0xc0) == 0x40)
->  		ctrl->vrs[SP] -= ((insn & 0x3f) << 2) + 4;
->  	else if ((insn & 0xf0) == 0x80) {
-> -		unsigned long mask;
-> -		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> -		int load_sp, reg = 4;
-> -
-> -		insn = (insn << 8) | unwind_get_byte(ctrl);
-> -		mask = insn & 0x0fff;
-> -		if (mask == 0) {
-> -			pr_warning("unwind: 'Refuse to unwind' instruction %04lx\n",
-> -				   insn);
-> -			return -URC_FAILURE;
-> -		}
-> -
-> -		/* pop R4-R15 according to mask */
-> -		load_sp = mask & (1 << (13 - 4));
-> -		while (mask) {
-> -			if (mask & 1)
-> -				ctrl->vrs[reg] = *vsp++;
-> -			mask >>= 1;
-> -			reg++;
-> -		}
-> -		if (!load_sp)
-> -			ctrl->vrs[SP] = (unsigned long)vsp;
-> +		return unwind_exec_insn_0x80(ctrl, insn);
->  	} else if ((insn & 0xf0) == 0x90 &&
->  		   (insn & 0x0d) != 0x0d)
->  		ctrl->vrs[SP] = ctrl->vrs[insn & 0x0f];
->  	else if ((insn & 0xf0) == 0xa0) {
-> -		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> -		int reg;
-> -
-> -		/* pop R4-R[4+bbb] */
-> -		for (reg = 4; reg <= 4 + (insn & 7); reg++)
-> -			ctrl->vrs[reg] = *vsp++;
-> -		if (insn & 0x80)
-> -			ctrl->vrs[14] = *vsp++;
-> -		ctrl->vrs[SP] = (unsigned long)vsp;
-> +		 return unwind_exec_insn_0xa0(ctrl, insn);
-
-There's an extra space before "return", here.
-
->  	} else if (insn == 0xb0) {
->  		if (ctrl->vrs[PC] == 0)
->  			ctrl->vrs[PC] = ctrl->vrs[LR];
->  		/* no further processing */
->  		ctrl->entries = 0;
->  	} else if (insn == 0xb1) {
-> -		unsigned long mask = unwind_get_byte(ctrl);
-> -		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> -		int reg = 0;
->  
-> -		if (mask == 0 || mask & 0xf0) {
-> -			pr_warning("unwind: Spare encoding %04lx\n",
-> -			       (insn << 8) | mask);
-> -			return -URC_FAILURE;
-> -		}
-> -
-> -		/* pop R0-R3 according to mask */
-> -		while (mask) {
-> -			if (mask & 1)
-> -				ctrl->vrs[reg] = *vsp++;
-> -			mask >>= 1;
-> -			reg++;
-> -		}
-> -		ctrl->vrs[SP] = (unsigned long)vsp;
-> +		 return unwind_exec_insn_0xb1(ctrl, insn);
-
-And here.
-
->  	} else if (insn == 0xb2) {
->  		unsigned long uleb128 = unwind_get_byte(ctrl);
->  
-> -- 
-> 1.7.0.4
-> 
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/b74c4a8e/attachment.sig>
