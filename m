@@ -1,37 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Nov 2013 17:37:30 +0000
-Subject: [PATCH 00/10] ASoC: dma: ARM: ux500: Obtain DMA data from Device
- Tree
-In-Reply-To: <20131129164229.GG27568@sirena.org.uk>
-References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
- <20131129160358.GD26982@lee--X1>
- <20131129164229.GG27568@sirena.org.uk>
-Message-ID: <CAF2Aj3gj0eAanrW__Bz1SJokKZ9cUuOi6jhaAtQucgh6pLbPbw@mail.gmail.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Fri, 29 Nov 2013 18:49:42 +0100
+Subject: [PATCH 1/3] serial: mxs-auart: implement flush_buffer hook
+In-Reply-To: <201311291750.22215.marex@denx.de>
+References: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
+ <1385742927-11358-2-git-send-email-hector.palacios@digi.com>
+ <201311291750.22215.marex@denx.de>
+Message-ID: <5298D3B6.5050700@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Are you/did you already tak(e)ing this set?
+Hi Marek,
+
+On 11/29/2013 05:50 PM, Marek Vasut wrote:
+> Hello Hector,
 >
-> Don't send contentless nags, they're just noise.
-
-Countless. Errr... 1 after 10 days!
-
-> Looking at my sent mail folder I see:
+>> Terminate any DMA transfer and verify the TX FIFO is empty.
+>>
+>> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+>> ---
+>>   drivers/tty/serial/mxs-auart.c | 23 +++++++++++++++++++++++
+>>   1 file changed, 23 insertions(+)
+>>
+>> diff --git a/drivers/tty/serial/mxs-auart.c
+>> b/drivers/tty/serial/mxs-auart.c index 9f0461778fc1..d9bf6e103f65 100644
+>> --- a/drivers/tty/serial/mxs-auart.c
+>> +++ b/drivers/tty/serial/mxs-auart.c
+>> @@ -782,6 +782,28 @@ static unsigned int mxs_auart_tx_empty(struct
+>> uart_port *u) return 0;
+>>   }
+>>
+>> +/*
+>> + * Flush the transmit buffer.
+>> + * Locking: called with port lock held and IRQs disabled.
+>> + */
+>> +static void mxs_auart_flush_buffer(struct uart_port *u)
+>> +{
+>> +	struct mxs_auart_port *s = to_auart_port(u);
+>> +	struct dma_chan *channel = s->tx_dma_chan;
+>> +	unsigned int to;
+>> +
+>> +	if (auart_dma_enabled(s)) {
+>> +		/* Avoid deadlock with the DMA engine callback */
+>> +		spin_unlock(&s->port.lock);
+>> +		dmaengine_terminate_all(channel);
+>> +		spin_lock(&s->port.lock);
 >
-> | I'm happy to merge the first few patches if that's easiest for everyone
-> | else, let me know and send them to me if that's what works for people.
+> Can you not maybe just set some flag here to tell the DMA engine callback things
+> are shutting down and to don't do anything funny anymore ?
+
+I copied these spin_lock protections from the amba-pl011.c driver.
+The callbacks in the mxs-auart driver are not taking the lock but I was not sure if 
+any of the serial core functions they call are, so I thought it was a good idea to 
+take it.
+
+>> +	}
+>> +	/* Wait for the FIFO to flush */
+>> +	to = u->timeout;
+>> +	while (!mxs_auart_tx_empty(u) && to--)
+>> +		mdelay(1);
 >
-> which doesn't seem to have happened.
+> Maybe you can put some cond_resched() into the loop to avoid wasting too many
+> cycles ?
 
-I'm confused. Why do you want them to be resent?
+Do you mean like this? Ok
 
-What about the patches which are not in the 'first few'?
+	while (!mxs_auart_tx_empty(u) && to--) {
+		cond_resched();
+		mdelay(1);
+	}
 
-I took a look at asoc/topic/ux500, which was mentioned in the same
-reply, but they don't appear to be there? Am I looking at a different tree?
 
--- 
-Lee Jones
-Linaro ST Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+--
+Hector Palacios
