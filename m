@@ -1,86 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 29 Nov 2013 22:20:42 +0100
-Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
- system suspend
-In-Reply-To: <Pine.LNX.4.44L0.1311291014020.27250-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1311291014020.27250-100000@netrider.rowland.org>
-Message-ID: <4994754.y6gINBtP7i@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Nov 2013 22:08:25 +0100
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <5293CF9F.6040305@wwwdotorg.org>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+ <2205346.2EJcydzRLA@wuerfel> <5293CF9F.6040305@wwwdotorg.org>
+Message-ID: <201311292208.26215.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 29, 2013 10:30:57 AM Alan Stern wrote:
-> On Fri, 29 Nov 2013, Rafael J. Wysocki wrote:
-> 
-> > That should have been
-> > 
-> >  	driver->runtime_suspend(dev)
-> >  	do_X(dev)
-> > 
-> > because do_Y(dev) is for runtime suspend.  Sorry.
-> > 
-> > And of course, the subsystem-level code you're developing the driver for may not
-> > do the do_X(dev) thing at all, in which case all will work.  But what if someone
-> > tries to use the driver with a different subsystem-level code (like a new PM
-> > domain)?
-> 
-> It sounds like the problem is one of division of responsibilities.  
-> What part of the work is done by the subsystem, and what part is done 
-> by the driver?  Obviously the answer will vary from one subsystem to 
-> another.
-> 
-> As I understand it, in Ulf's situation the subsystem knows that the
-> operations needed for the suspend_late phase of system suspend are the
-> same as those carried out by the driver's runtime_suspend callback (if
-> the device isn't already in a runtime-PM low-power state).  Or perhaps
-> it knows they are the same as those carried out by the subsystem's
-> runtime_suspend callback.  Or perhaps the _driver_ knows that the
-> operations it needs for suspend_late are the same as those carried out
-> by its own runtime_suspend callback (if the device isn't already in a
-> low-power state).
-> 
-> Regardless, under those conditions the suspend_late routine merely has
-> to invoke the appropriate runtime_suspend routine, after checking the
-> device's runtime PM status.  We can't do this by calling
-> pm_runtime_suspend, because runtime PM is disabled during suspend_late.  
-> Instead, we have to call the proper runtime-suspend routine directly.
+On Monday 25 November 2013, Stephen Warren wrote:
+> Well, you suggested not using of_dma_simple_xlate() since it wasn't
+> appropriate. I then started to implement an open-coded xlate function,
+> but found that it was 99% identical to the same thing in the mmp driver,
+> and hence created a common of_dma_slave_xlate() so as not to just
+> cut/paste it everywhere. Unfortunately, I only sent that patch to
+> dmaengine at vger.kernel.org and the DMA maintainers, and there's no
+> archive of that list:-(
 
-That would be kind of OK, if the driver's .suspend_late() only invoked its own
-.runtime_suspend(), what you did below.
+Ok, I see. However, I think the need for nontrivial code to be duplicated
+across drivers is not a sign that we are missing a generic xlate function
+and another indirection level, but rather that we got the interface
+for dma_get_slave_channel() wrong (yes, that would be my fault).
 
-But, in the Ulf's approach the driver calls .runtime_suspend() from
-its *subsystem* in the hope that it will all work out properly (or
-perhaps based on the knowledge about this particular subsystem).
+Can you try coming up with a different method to achieve the same
+where you use a different helper from the driver specific xlate
+function that does not require a callback?
 
-As I said, that may lead to problems when the same driver is attempted to
-be used with a different subsystem-level code (for example, a different PM
-domain).
+I think dma_get_slave_channel is great if you have one channel per
+request line and you can directly look up the channel from the
+DT data, but it is not good if you have pick a channel and work
+around the race.
 
-> The amount of code needed is quite small; basically nothing more than:
-> 
-> 	if (!pm_runtime_status_suspended(dev))
-> 		dev->driver->pm->runtime_suspend(dev);
-> 
-> The problems are:
-> 
->      1. Which callback does this code belong in?
-> 
->      2. Which runtime_suspend callback should be invoked?  The example 
-> 	above uses dev->driver->pm->runtime_suspend, but this may not 
-> 	always be the right one.
-
-Well, none of them may always be the right one, which is my point.
-
-I don't think we can come up with a really generic set of routines that will
-be generally useful regardless of the subsystem/driver combination in question,
-so in my opinion the PM core is not the right place to put such routines into.
-
-I wouldn't have problems with them being defined in the OMAP PM code.  As part
-of that code they are free to do whatever they like if that code's maintainers
-are fine with that.  But I don't want to see such confusing stuff in the core.
-
-Anyway, I'd like to understand what problems in particular those things would
-be useful to solve, as I suspect that they may be addressed differently and
-more cleanly.
-
-Thanks,
-Rafael
+	Arnd
