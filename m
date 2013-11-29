@@ -1,142 +1,101 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Nov 2013 12:19:22 +0000
-Subject: [PATCH v3 33/36] mtd: st_spi_fsm: Supply the MX25xxx chip specific
+Date: Fri, 29 Nov 2013 12:19:24 +0000
+Subject: [PATCH v3 35/36] mtd: st_spi_fsm: Supply the W25Qxxx chip specific
  configuration call-back
 In-Reply-To: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
 References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385727565-25794-34-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385727565-25794-36-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 84 ++++++++++++++++++++++++++++++++++++++++
- drivers/mtd/devices/st_spi_fsm.h |  4 +-
- 2 files changed, 87 insertions(+), 1 deletion(-)
+ drivers/mtd/devices/st_spi_fsm.c | 34 ++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h | 13 +++++++++----
+ 2 files changed, 43 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index f1276e5..be66a49 100644
+index d31348a..72474f1 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -98,6 +98,31 @@ static struct seq_rw_config n25q_read4_configs[] = {
- 	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
+@@ -150,6 +150,11 @@ static struct seq_rw_config stfsm_s25fl_write4_configs[] = {
+ 	{0x00,                   0,                      0, 0, 0, 0x00, 0, 0},
  };
  
 +/*
-+ * [MX25xxx] Configuration
++ * [W25Qxxx] Configuration
 + */
-+#define MX25_STATUS_QE			(0x1 << 6)
-+
-+static int stfsm_mx25_en_32bit_addr_seq(struct stfsm_seq *seq)
-+{
-+	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
-+			   SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_EN4B_ADDR) |
-+			   SEQ_OPC_CSDEASSERT);
-+
-+	seq->seq[0] = STFSM_INST_CMD1;
-+	seq->seq[1] = STFSM_INST_WAIT;
-+	seq->seq[2] = STFSM_INST_STOP;
-+
-+	seq->seq_cfg = (SEQ_CFG_PADS_1 |
-+			SEQ_CFG_ERASE |
-+			SEQ_CFG_READNOTWRITE |
-+			SEQ_CFG_CSDEASSERT |
-+			SEQ_CFG_STARTSEQ);
-+
-+	return 0;
-+}
++#define W25Q_STATUS_QE			(0x1 << 9)
 +
  static struct stfsm_seq stfsm_seq_read; 	/* Dynamically populated */
  static struct stfsm_seq stfsm_seq_write;	/* Dynamically populated */
  static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
-@@ -620,6 +645,65 @@ static int stfsm_prepare_rwe_seqs_default(struct stfsm *fsm)
+@@ -1010,6 +1015,35 @@ static int stfsm_s25fl_config(struct stfsm *fsm)
  	return 0;
  }
  
-+static int stfsm_mx25_config(struct stfsm *fsm)
++static int stfsm_w25q_config(struct stfsm *fsm)
 +{
-+	uint32_t flags = fsm->info->flags;
 +	uint32_t data_pads;
-+	uint8_t sta;
++	uint16_t sta_wr;
++	uint8_t sta1, sta2;
 +	int ret;
-+	bool soc_reset;
 +
-+	/* Disable support for 'WRITE_1_4_4' (limited to 20MHz which is of
-+	 * marginal benefit on our hardware and doesn't justify implementing
-+	 * different READ/WRITE frequencies).
-+	 */
-+	flags &= ~FLASH_FLAG_WRITE_1_4_4;
-+
-+	/*
-+	 * Use default READ/WRITE sequences
-+	 */
 +	ret = stfsm_prepare_rwe_seqs_default(fsm);
 +	if (ret)
 +		return ret;
 +
-+	/*
-+	 * Configure 32-bit Address Support
-+	 */
-+	if (flags & FLASH_FLAG_32BIT_ADDR) {
-+		/* Configure 'enter_32bitaddr' FSM sequence */
-+		stfsm_mx25_en_32bit_addr_seq(&stfsm_seq_en_32bit_addr);
-+
-+		soc_reset = stfsm_can_handle_soc_reset(fsm);
-+		if (soc_reset || !fsm->booted_from_spi) {
-+			/* If we can handle SoC resets, we enable 32-bit address
-+			 * mode pervasively */
-+			stfsm_enter_32bit_addr(fsm, 1);
-+
-+		} else {
-+			/* Else, enable/disable 32-bit addressing before/after
-+			 * each operation */
-+			fsm->configuration = (CFG_READ_TOGGLE_32BIT_ADDR |
-+					      CFG_WRITE_TOGGLE_32BIT_ADDR |
-+					      CFG_ERASESEC_TOGGLE_32BIT_ADDR);
-+			/* It seems a small delay is required after exiting
-+			 * 32-bit mode following a write operation.  The issue
-+			 * is under investigation.
-+			 */
-+			fsm->configuration |= CFG_WRITE_EX_32BIT_ADDR_DELAY;
-+		}
-+	}
-+
-+	/* For QUAD mode, set 'QE' STATUS bit */
++	/* If using QUAD mode, set QE STATUS bit */
 +	data_pads = ((stfsm_seq_read.seq_cfg >> 16) & 0x3) + 1;
 +	if (data_pads == 4) {
-+		stfsm_read_status(fsm, FLASH_CMD_RDSR, &sta);
-+		sta |= MX25_STATUS_QE;
-+		stfsm_write_status(fsm, sta, 1);
++		stfsm_read_status(fsm, FLASH_CMD_RDSR, &sta1);
++		stfsm_read_status(fsm, FLASH_CMD_RDSR2, &sta2);
++
++		sta_wr = ((uint16_t)sta2 << 8) | sta1;
++
++		sta_wr |= W25Q_STATUS_QE;
++
++		stfsm_write_status(fsm, sta_wr, 2);
++
++		stfsm_wait_busy(fsm);
 +	}
 +
 +	return 0;
 +}
 +
- static int stfsm_n25q_config(struct stfsm *fsm)
+ static int stfsm_read(struct stfsm *fsm, uint8_t *const buf,
+ 		      const uint32_t size, const uint32_t offset)
  {
- 	uint32_t flags = fsm->info->flags;
 diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
-index 5143843..10c12ba 100644
+index 83b30f9..4c8fecd 100644
 --- a/drivers/mtd/devices/st_spi_fsm.h
 +++ b/drivers/mtd/devices/st_spi_fsm.h
-@@ -318,6 +318,7 @@ struct flash_info {
- };
- 
+@@ -333,6 +333,7 @@ struct flash_info {
  static int stfsm_n25q_config(struct stfsm *fsm);
-+static int stfsm_mx25_config(struct stfsm *fsm);
+ static int stfsm_mx25_config(struct stfsm *fsm);
+ static int stfsm_s25fl_config(struct stfsm *fsm);
++static int stfsm_w25q_config(struct stfsm *fsm);
  
  static struct flash_info flash_types[] = {
  	/*
-@@ -350,7 +351,8 @@ static struct flash_info flash_types[] = {
- 		   FLASH_FLAG_SE_4K		| \
- 		   FLASH_FLAG_SE_32K)
- 	{ "mx25l25635e", 0xc22019, 0, 64*1024, 512,
--	  (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70, NULL },
-+	  (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
-+	  stfsm_mx25_config },
+@@ -439,10 +440,14 @@ static struct flash_info flash_types[] = {
+ 		   FLASH_FLAG_READ_1_1_4	| \
+ 		   FLASH_FLAG_READ_1_4_4	| \
+ 		   FLASH_FLAG_WRITE_1_1_4)
+-	{ "w25q80",  0xef4014, 0,  64 * 1024,  16, W25Q_FLAG, 80, NULL },
+-	{ "w25q16",  0xef4015, 0,  64 * 1024,  32, W25Q_FLAG, 80, NULL },
+-	{ "w25q32",  0xef4016, 0,  64 * 1024,  64, W25Q_FLAG, 80, NULL },
+-	{ "w25q64",  0xef4017, 0,  64 * 1024, 128, W25Q_FLAG, 80, NULL },
++	{ "w25q80",  0xef4014, 0,  64 * 1024,  16, W25Q_FLAG, 80,
++	  stfsm_w25q_config },
++	{ "w25q16",  0xef4015, 0,  64 * 1024,  32, W25Q_FLAG, 80,
++	  stfsm_w25q_config },
++	{ "w25q32",  0xef4016, 0,  64 * 1024,  64, W25Q_FLAG, 80,
++	  stfsm_w25q_config },
++	{ "w25q64",  0xef4017, 0,  64 * 1024, 128, W25Q_FLAG, 80,
++	  stfsm_w25q_config },
  
- #define N25Q_FLAG (FLASH_FLAG_READ_WRITE	| \
- 		   FLASH_FLAG_READ_FAST		| \
+ 	/* Sentinel */
+ 	{ NULL, 0x000000, 0, 0, 0, 0, 0, NULL },
 -- 
 1.8.3.2
