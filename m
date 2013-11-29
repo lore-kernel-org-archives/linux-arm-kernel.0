@@ -1,65 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Nov 2013 18:01:10 +0000
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131129173701.GA5635@kroah.com>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131127230650.GA6162@kroah.com>
- <20131128102845.GB21354@mudshark.cambridge.arm.com>
- <20131128173339.GB4634@e103592.cambridge.arm.com>
- <20131128191331.GB2385@kroah.com>
- <20131128193917.GC4634@e103592.cambridge.arm.com>
- <20131128212528.GA6144@kroah.com>
- <20131129114453.GC21336@mudshark.cambridge.arm.com>
- <20131129173701.GA5635@kroah.com>
-Message-ID: <20131129180110.GJ31000@mudshark.cambridge.arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 29 Nov 2013 19:02:34 +0100
+Subject: [PATCH 1/3] serial: mxs-auart: implement flush_buffer hook
+In-Reply-To: <5298D3B6.5050700@digi.com>
+References: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
+ <201311291750.22215.marex@denx.de> <5298D3B6.5050700@digi.com>
+Message-ID: <201311291902.34445.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 05:37:01PM +0000, Greg KH wrote:
-> On Fri, Nov 29, 2013 at 11:44:53AM +0000, Will Deacon wrote:
-> > On Thu, Nov 28, 2013 at 09:25:28PM +0000, Greg KH wrote:
-> > > On Thu, Nov 28, 2013 at 07:39:17PM +0000, Dave Martin wrote:
-> > > > On Thu, Nov 28, 2013 at 11:13:31AM -0800, Greg KH wrote:
-> > > > > Yes it is, you all are the ones tasked with implementing the crazy crap
-> > > > > the hardware people have created, best of luck with that :)
-> > > > 
-> > > > Agreed.  The first assumption should be that we can fit in with the
-> > > > existing device model -- we should only reconsider if we find that
-> > > > to be impossible.
-> > > 
-> > > Let me know if you think it is somehow impossible, but you all should
-> > > really push back on the insane hardware designers that are forcing you
-> > > all to do this work.  I find it "interesting" how this all becomes your
-> > > workload for their crazy ideas.
-> > 
-> > Oh, I don't think we're claiming anything is impossible here :) It's more
-> > that we will probably want to make some changes to the device model to allow,
-> > for example, a device to be associated with multiple buses of potentially
-> > different types.
+Dear Hector Palacios,
+
+> Hi Marek,
 > 
-> Why would you want that?  What good would that help with?
-
-It would help with devices which have their slave interface on one bus, but
-master to another.
-
-We need a way to configure the master side of things (IOMMU, coherency, MSI
-routing, etc) on one bus and configure the slave side (device probing, power
-management, clocks, etc) on another.
-
-> > Step one is to get the DT binding sorted, then we can try and get Linux to
-> > make use of it. This goes hand-in-hand with the IOMMU discussion going on
-> > here:
+> On 11/29/2013 05:50 PM, Marek Vasut wrote:
+> > Hello Hector,
 > > 
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210401.html
+> >> Terminate any DMA transfer and verify the TX FIFO is empty.
+> >> 
+> >> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+> >> ---
+> >> 
+> >>   drivers/tty/serial/mxs-auart.c | 23 +++++++++++++++++++++++
+> >>   1 file changed, 23 insertions(+)
+> >> 
+> >> diff --git a/drivers/tty/serial/mxs-auart.c
+> >> b/drivers/tty/serial/mxs-auart.c index 9f0461778fc1..d9bf6e103f65 100644
+> >> --- a/drivers/tty/serial/mxs-auart.c
+> >> +++ b/drivers/tty/serial/mxs-auart.c
+> >> @@ -782,6 +782,28 @@ static unsigned int mxs_auart_tx_empty(struct
+> >> uart_port *u) return 0;
+> >> 
+> >>   }
+> >> 
+> >> +/*
+> >> + * Flush the transmit buffer.
+> >> + * Locking: called with port lock held and IRQs disabled.
+> >> + */
+> >> +static void mxs_auart_flush_buffer(struct uart_port *u)
+> >> +{
+> >> +	struct mxs_auart_port *s = to_auart_port(u);
+> >> +	struct dma_chan *channel = s->tx_dma_chan;
+> >> +	unsigned int to;
+> >> +
+> >> +	if (auart_dma_enabled(s)) {
+> >> +		/* Avoid deadlock with the DMA engine callback */
+> >> +		spin_unlock(&s->port.lock);
+> >> +		dmaengine_terminate_all(channel);
+> >> +		spin_lock(&s->port.lock);
 > > 
-> > which is one of the issues that is hitting us right now.
+> > Can you not maybe just set some flag here to tell the DMA engine callback
+> > things are shutting down and to don't do anything funny anymore ?
 > 
-> Interesting how people seem to not know how to cc: the needed
-> maintainers when they touch core code :(
+> I copied these spin_lock protections from the amba-pl011.c driver.
+> The callbacks in the mxs-auart driver are not taking the lock but I was not
+> sure if any of the serial core functions they call are, so I thought it
+> was a good idea to take it.
 
-To be fair, I don't think that code was intended to be merged, and ended up
-sparking a discussion about what we need in the DT to represent these
-topologies. DT people were on CC iirc.
+It might be worth investigating this then.
 
-Will
+> >> +	}
+> >> +	/* Wait for the FIFO to flush */
+> >> +	to = u->timeout;
+> >> +	while (!mxs_auart_tx_empty(u) && to--)
+> >> +		mdelay(1);
+> > 
+> > Maybe you can put some cond_resched() into the loop to avoid wasting too
+> > many cycles ?
+> 
+> Do you mean like this? Ok
+> 
+> 	while (!mxs_auart_tx_empty(u) && to--) {
+> 		cond_resched();
+> 		mdelay(1);
+> 	}
+
+Yes, like that.
+
+Best regards,
+Marek Vasut
