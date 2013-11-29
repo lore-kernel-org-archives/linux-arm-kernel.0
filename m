@@ -1,82 +1,70 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 10:37:14 +0100
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131129023554.GA14239@kroah.com>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131128203322.GB14689@mithrandir>
- <20131128211009.GA26447@obsidianresearch.com>
- <20131128222232.GF14689@mithrandir>
- <20131128233147.GA19387@obsidianresearch.com>
- <20131129023554.GA14239@kroah.com>
-Message-ID: <20131129093713.GC22771@ulmo.nvidia.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Fri, 29 Nov 2013 11:36:31 +0200
+Subject: [PATCH v2] ARM: davinci: aemif: get rid of davinci-nand driver
+ dependency on aemif
+In-Reply-To: <52981A4B.70703@ti.com>
+References: <1385562694-24618-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <52981A4B.70703@ti.com>
+Message-ID: <5298601F.4090200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 06:35:54PM -0800, Greg KH wrote:
-> On Thu, Nov 28, 2013 at 04:31:47PM -0700, Jason Gunthorpe wrote:
-> > > Perhaps this is just another way of saying what Greg has already said.
-> > > If we continue down this road, we'll eventually end up having to
-> > > describe all sorts of nitty gritty details. And we'll need even more
-> > 
-> > Greg's point makes sense, but the HW guys are not designing things
-> > this way for kicks - there are real physics based reasons for some of
-> > these choices...
-> > 
-> > eg An all-to-all bus cross bar (eg like Intel's ring bus) is engery
-> > expensive compared to a purpose built muxed bus tree. Doing coherency
-> > look ups on DMA traffic costs energy, etc.
+On 11/29/2013 06:38 AM, Sekhar Nori wrote:
+> On Wednesday 27 November 2013 08:01 PM, Ivan Khoronzhuk wrote:
+>> The problem that the set timings code contains the call of Davinci
+>> platform function davinci_aemif_setup_timing() which is not
+>> accessible if kernel is built for another platform like Keystone.
+>>
+>> The Keysone platform is going to use TI AEMIF driver.
+>> If TI AEMIF is used we don't need to set timings and bus width.
+>> It is done by AEMIF driver.
+>>
+>> To get rid of davinci-nand driver dependency on aemif platform code
+>> we moved aemif code to davinci platform.
+>>
+>> The platform AEMIF code (aemif.c) has to be removed once Davinci
+>> will be converted to DT and use ti-aemif.c driver.
+>>
+>> The long device name "davinci_ntosd2_nandflash_device" was renamed
+>> to "ntosd2_nandflash" as requested by Sekhar Nori, because after
+>> adding changes the line is so broken that its almost unreadable.
+>>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 > 
-> Really?  How much power exactly does it take / save?  Yes, hardware
-> people think "software is free", but when you can't actually control the
-> hardware in the software properly, well, you end up with something like
-> itanium...
+> This patch can be simplified in some places.
 > 
-> > > code to deal with those descriptions and the hardware they represent. At
-> > > some point we need to start pushing some of the complexity back into
-> > > hardware so that we can keep a sane code-base.
-> > 
-> > Some of this is a consequence of the push to have the firmware
-> > minimal. As soon as you say the kernel has to configure the address
-> > map you've created a big complexity for it..
+>> ---
+>> v2..v1:
+>> - enabled AEMIF clock
+>> - removed EXPORT_SYMBOL(davinci_aemif_setup)
+>> - renamed ugly name davinci_ntosd2_nandflash_device
+>>
+>> CC:
+>> Sekhar Nori <nsekhar@ti.com>
+>>
+>>   arch/arm/mach-davinci/aemif.c                   |   89 ++++++++++++++++++++++-
+>>   arch/arm/mach-davinci/board-da830-evm.c         |    3 +
+>>   arch/arm/mach-davinci/board-da850-evm.c         |    3 +
+>>   arch/arm/mach-davinci/board-dm355-evm.c         |    5 ++
+>>   arch/arm/mach-davinci/board-dm355-leopard.c     |    5 ++
+>>   arch/arm/mach-davinci/board-dm365-evm.c         |    4 +
+>>   arch/arm/mach-davinci/board-dm644x-evm.c        |    5 ++
+>>   arch/arm/mach-davinci/board-dm646x-evm.c        |    3 +
+>>   arch/arm/mach-davinci/board-mityomapl138.c      |    3 +
+>>   arch/arm/mach-davinci/board-neuros-osd2.c       |   13 +++-
+>>   arch/arm/mach-davinci/devices-tnetv107x.c       |    3 +
+>>   drivers/mtd/nand/davinci_nand.c                 |   23 ------
+>>   include/linux/platform_data/mtd-davinci-aemif.h |    5 +-
 > 
-> Why the push to make firmware "minimal"?  What is that "saving"?  You
-> just push the complexity from one place to the other, just because ARM
-> doesn't seem to have good firmware engineers, doesn't mean they should
-> punish their kernel developers :)
+> Most of these boards dont really have a timing structure defined.
+> Instead of blindly calling AEMIF setup on all boards, it can be
+> done only on boards that actually need it.
+> 
 
-In my experience the biggest problem here is that people working on
-upstream kernels and therefore confronted with these issues are seldom
-able to track the latest developments of new chips.
+Yes, but in such case we should add AEMIF setup to
+arch/arm/mach-davinci/board-mityomapl138.c also,
+because it has: .options = NAND_BUSWIDTH_16
 
-When the time comes to upstream support, most of the functionality has
-been implemented downstream already, so it actually works and there's no
-apparent reason why things should change.
-
-Now I know that that's not an ideal situation and upstreaming should
-start a whole lot earlier, but even if that were the case, once the
-silicon tapes out there's not a whole lot you can do about it anymore.
-Starting with upstreaming even before that would have to be a solution,
-but I don't think that's realistic at the current pace of development.
-
-There's a large gap between how fast new SoCs are supposed to tape out
-and the rate at which new code can be merged upstream. Perhaps some of
-that could be mitigated by putting more of the complexity into firmware
-and that's already happening to some degree for ARMv8. But I suspect
-there's a limit to what you can hide away in firmware while at the same
-time giving the kernel enough information to do the right thing.
-
-I am completely convinced that our goal should be to do upstreaming
-early and ideally there shouldn't be any downstream development in the
-first place. The reason why we're not there yet is because it isn't
-practical to do so currently, so I'm very interested in suggestions or
-finding ways to improve the situation.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/e1534e12/attachment-0001.sig>
+-- 
+Regards,
+Ivan Khoronzhuk
