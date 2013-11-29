@@ -1,148 +1,115 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 13:29:07 +0100
-Subject: [PATCH 03/31] ARM: tegra: document use of standard DMA DT bindings
-In-Reply-To: <1384548866-13141-4-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-4-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131129122907.GP22771@ulmo.nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 29 Nov 2013 12:19:17 +0000
+Subject: [PATCH v3 28/36] mtd: st_spi_fsm: Supply a busy wait for post-write
+ status
+In-Reply-To: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1385727565-25794-29-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:53:58PM -0700, Stephen Warren wrote:
-[...]
-> diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
-> index 2b6817f6e40e..eaf00102d92c 100644
-> --- a/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
-> +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
-> @@ -4,14 +4,17 @@ Required properties:
->  - compatible : "nvidia,tegra20-ac97"
->  - reg : Should contain AC97 controller registers location and length
->  - interrupts : Should contain AC97 interrupt
-> -- clocks : Must contain one entry, for the module clock.
-> -  See ../clocks/clock-bindings.txt for details.
->  - resets : Must contain an entry for each entry in reset-names.
->    See ../reset/reset.txt for details.
->  - reset-names : Must include the following entries:
->    - ac97
-> -- nvidia,dma-request-selector : The Tegra DMA controller's phandle and
-> -  request selector for the AC97 controller
-> +- dmas : Must contain an entry for each entry in clock-names.
-> +  See ../dma/dma.txt for details.
-> +- dma-names : Must include the following entries:
-> +  - rx
-> +  - tx
-> +- clocks : Must contain one entry, for the module clock.
-> +  See ../clocks/clock-bindings.txt for details.
+When we write data to the Serial Flash chip we'll wait a predetermined
+period of time before giving up. During that period of time we poll the
+status register until completion.
 
-Was this unintentionally moved?
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/devices/st_spi_fsm.c | 52 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/st_spi_fsm.h | 10 ++++++++
+ 2 files changed, 62 insertions(+)
 
-> diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt
-> index 8b070aeca3db..dc30c6bfbe95 100644
-> --- a/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt
-> +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra20-i2s.txt
-> @@ -4,14 +4,17 @@ Required properties:
->  - compatible : "nvidia,tegra20-i2s"
->  - reg : Should contain I2S registers location and length
->  - interrupts : Should contain I2S interrupt
-> -- clocks : Must contain one entry, for the module clock.
-> -  See ../clocks/clock-bindings.txt for details.
->  - resets : Must contain an entry for each entry in reset-names.
->    See ../reset/reset.txt for details.
->  - reset-names : Must include the following entries:
->    - i2s
-> -- nvidia,dma-request-selector : The Tegra DMA controller's phandle and
-> -  request selector for this I2S controller
-> +- dmas : Must contain an entry for each entry in clock-names.
-> +  See ../dma/dma.txt for details.
-> +- dma-names : Must include the following entries:
-> +  - rx
-> +  - tx
-> +- clocks : Must contain one entry, for the module clock.
-> +  See ../clocks/clock-bindings.txt for details.
-
-This too?
-
-> diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
-> index 60d59a54ca07..3376ba42a209 100644
-> --- a/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
-> +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
-> @@ -7,11 +7,6 @@ Required properties:
->    - Tegra30 requires 2 entries, for the APBIF and AHUB/AUDIO register blocks.
->    - Tegra114 requires an additional entry, for the APBIF2 register block.
->  - interrupts : Should contain AHUB interrupt
-> -- nvidia,dma-request-selector : A list of the DMA channel specifiers. Each
-> -  entry contains the Tegra DMA controller's phandle and request selector.
-> -  If a single entry is present, the request selectors for the channels are
-> -  assumed to be contiguous, and increment from this value.
-> -  If multiple values are given, one value must be given per channel.
->  - clocks : Must contain an entry for each entry in clock-names.
->    See ../clocks/clock-bindings.txt for details.
->  - clock-names : Must include the following entries:
-> @@ -36,6 +31,14 @@ Required properties:
->    - amx
->    - adx
->  - ranges : The bus address mapping for the configlink register bus.
-> +- dmas : Must contain an entry for each entry in clock-names.
-> +  See ../dma/dma.txt for details.
-> +- dma-names : Must include the following entries:
-> +  - rx0 .. rx<n>
-> +  - tx0 .. tx<n>
-> +  ... where n is:
-> +  Tegra30: 3
-> +  Tegra114, Tegra124: 9
->    Can be empty since the mapping is 1:1.
-
-I think this line belongs to the description of the "ranges" property.
-
-> diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
-> index fcd9f67999de..7ea701e07dc2 100644
-> --- a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
-> +++ b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
-> @@ -4,16 +4,19 @@ Required properties:
->  - compatible : should be "nvidia,tegra114-spi".
->  - reg: Should contain SPI registers location and length.
->  - interrupts: Should contain SPI interrupts.
-> -- nvidia,dma-request-selector : The Tegra DMA controller's phandle and
-> -  request selector for this SPI controller.
-> -- clocks : Must contain an entry for each entry in clock-names.
-> -  See ../clocks/clock-bindings.txt for details.
->  - clock-names : Must include the following entries:
->    - spi
->  - resets : Must contain an entry for each entry in reset-names.
->    See ../reset/reset.txt for details.
->  - reset-names : Must include the following entries:
->    - spi
-> +- dmas : Must contain an entry for each entry in clock-names.
-> +  See ../dma/dma.txt for details.
-> +- dma-names : Must include the following entries:
-> +  - rx
-> +  - tx
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-
-Another accidental move? I beginning to think there might be a pattern
-to this, but I haven't figured it out yet.
-
-> diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
-> index e144f144717f..bdf08e6dec9b 100644
-> --- a/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
-> +++ b/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
-> @@ -4,14 +4,17 @@ Required properties:
->  - compatible : should be "nvidia,tegra20-sflash".
->  - reg: Should contain SFLASH registers location and length.
->  - interrupts: Should contain SFLASH interrupts.
-> -- nvidia,dma-request-selector : The Tegra DMA controller's phandle and
-> -  request selector for this SFLASH controller.
->  - clocks : Must contain one entry, for the module clock.
-
-But then this doesn't move it... perhaps it really is accidental in
-other places. =)
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/195c8685/attachment.sig>
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index c08805f..d8fc97b 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -118,6 +118,22 @@ static struct stfsm_seq stfsm_seq_read_jedec = {
+ 		    SEQ_CFG_STARTSEQ),
+ };
+ 
++static struct stfsm_seq stfsm_seq_read_status_fifo = {
++	.data_size = TRANSFER_SIZE(4),
++	.seq_opc[0] = (SEQ_OPC_PADS_1 |
++		       SEQ_OPC_CYCLES(8) |
++		       SEQ_OPC_OPCODE(FLASH_CMD_RDSR)),
++	.seq = {
++		STFSM_INST_CMD1,
++		STFSM_INST_DATA_READ,
++		STFSM_INST_STOP,
++	},
++	.seq_cfg = (SEQ_CFG_PADS_1 |
++		    SEQ_CFG_READNOTWRITE |
++		    SEQ_CFG_CSDEASSERT |
++		    SEQ_CFG_STARTSEQ),
++};
++
+ static struct stfsm_seq stfsm_seq_erase_sector = {
+ 	/* 'addr_cfg' configured during initialisation */
+ 	.seq_opc = {
+@@ -292,6 +308,42 @@ static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
+ 	return 0;
+ }
+ 
++static uint8_t stfsm_wait_busy(struct stfsm *fsm)
++{
++	struct stfsm_seq *seq = &stfsm_seq_read_status_fifo;
++	unsigned long deadline;
++	uint32_t status;
++
++	/* Use RDRS1 */
++	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
++			   SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(FLASH_CMD_RDSR));
++
++	/* Load read_status sequence */
++	stfsm_load_seq(fsm, seq);
++
++	/* Repeat until busy bit is deasserted, or timeout */
++	deadline = jiffies + FLASH_MAX_BUSY_WAIT;
++	do {
++		cond_resched();
++
++		stfsm_wait_seq(fsm);
++
++		stfsm_read_fifo(fsm, &status, 4);
++
++		if ((status & FLASH_STATUS_BUSY) == 0)
++			return 0;
++
++		/* Restart */
++		writel(seq->seq_cfg, fsm->base + SPI_FAST_SEQ_CFG);
++
++	} while (!time_after_eq(jiffies, deadline));
++
++	dev_err(fsm->dev, "timeout on wait_busy\n");
++
++	return -EIO;
++}
++
+ static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
+ {
+ 	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
+diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
+index e168296..5143843 100644
+--- a/drivers/mtd/devices/st_spi_fsm.h
++++ b/drivers/mtd/devices/st_spi_fsm.h
+@@ -229,8 +229,18 @@
+ #define FLASH_CMD_READ4_1_1_4	0x6c
+ #define FLASH_CMD_READ4_1_4_4	0xec
+ 
++/* Status register */
++#define FLASH_STATUS_BUSY	0x01
++#define FLASH_STATUS_WEL	0x02
++#define FLASH_STATUS_BP0	0x04
++#define FLASH_STATUS_BP1	0x08
++#define FLASH_STATUS_BP2	0x10
++#define FLASH_STATUS_SRWP0	0x80
++#define FLASH_STATUS_TIMEOUT	0xff
++
+ #define FLASH_PAGESIZE		256			/* In Bytes    */
+ #define FLASH_PAGESIZE_32	FLASH_PAGESIZE / 4	/* In uint32_t */
++#define FLASH_MAX_BUSY_WAIT	(300 * HZ)	/* Maximum 'CHIPERASE' time */
+ 
+ /*
+  * Flags to tweak operation of default read/write/erase routines
+-- 
+1.8.3.2
