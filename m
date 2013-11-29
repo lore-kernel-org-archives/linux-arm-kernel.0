@@ -1,181 +1,261 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Nov 2013 10:32:06 +0100
-Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
- system suspend
-In-Reply-To: <81539588.EsdqydM2iX@vostro.rjw.lan>
-References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
- <1619468.NHTb5ylADI@vostro.rjw.lan>
- <CAPDyKFq0OW+uhBF1pMvY01peC1dRERtSdSNY15O=vvdY_XvQUA@mail.gmail.com>
- <81539588.EsdqydM2iX@vostro.rjw.lan>
-Message-ID: <CAPDyKFrRjB7gPpQ4c1U5e-BTHEt6k=kDqo7q1Grc04v-SDrsDw@mail.gmail.com>
+From: a.anurag@samsung.com (Anurag Aggarwal)
+Date: Fri, 29 Nov 2013 15:04:31 +0530
+Subject: [PATCH V2] ARM : unwinder : Prevent data abort due to stack overflow
+ while executing unwind instructions Signed-off-by: Anurag Aggarwal
+ <a.anurag@samsung.com>
+Message-ID: <1385717671-28953-1-git-send-email-a.anurag@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> The lack of specificity here doesn't make the discussion any easier.
->
-> It usually is better to talk about specific problems to address than
-> using general terms which may mean slightly different things for different
-> people.
+While unwinding backtrace, stack overflow is possible. This stack overflow can sometimes
+lead to data abort in system if the area after stack is not mapped to physical memory.
 
-During these discussions, I have tried to point at existing code for
-drivers and existing code for power domains. Those which at the moment
-either have got things wrong or are unnecessary complicated, in
-regards to their PM implementation.
+To prevent this problem from happening execute the instructions that can cause data
+abort in there seperate functions instead of unwind_exec_insn, where a check for there
+feasibility is made first.
+---
+ arch/arm/kernel/unwind.c |  197 ++++++++++++++++++++++++++++++++++------------
+ 1 files changed, 148 insertions(+), 49 deletions(-)
 
-I suppose I could provide some more patches for proof of concept, will
-that be a way forward?
-
->
->> >> Additionally, some drivers seems to have messed up things when combining
->> >> runtime PM with system PM. While we enable the option of re-using the runtime
->> >> PM callbacks during system PM, we also intend to clarify the way forward for
->> >> how these scenarios could be resolved.
->> >>
->> >> Some new helper macros for defining PM callbacks and two new pm_generic*
->> >> functions has been implemented in this patch set. These are provided to make it
->> >> easier for those who wants to enable the option of re-using the runtime PM
->> >> callbacks during system suspend.
->> >
->> > I'm generally opposed to re-using callbacks like this, because it adds confusion
->> > to the picture.  It may seem to be clever, but in fact it leads to bad design
->> > choices in the drivers in my opinion.
->>
->> In my world of the kernel, it will clearly resolve confusions and
->> simplify a significant amount of code in power domains, buses and
->> drivers. So I guess it depends on from what point you look at this.
->
-> This is so vague that I don't even know how to respond. :-)
->
-> So let me say instead that what you did in patch [5/5] is a layering violation
-> which always is a bug, even if it doesn't break things outright.
->
-> After that patch the driver would call into a layer that is supposed to call
-> into it under normal conditions.  Moreover, it would expect that layer to
-> call back into it again in a specific way, which may or may not happen depending
-> on how exactly that layer is implemented.  So even if it works today, it will
-> add constraints on how that other layer may be implmented which *is* confusing
-> and wrong in my not so humble opinion.
->
-> I'll never apply any patches that lead to situations like that, don't even
-> bother to send them to me.  Pretty please.
->
-
-After all these good discussions which clearly pointed the solution
-into this direction, you decide to bring up this argument now? It
-makes me wonder.
-
-Indirectly what you are saying is that, the PM core should at
-device_prepare, do pm_runtime_disable() instead of
-pm_runtime_get_noresume(), to prevent drivers/subsystems from
-triggering "layering violations" by invoking pm_runtime_get_sync().
-
-Because, this is exactly the same kind of layering violation you refer
-to while neglecting my approach, which at the moment
-drivers/subsystems not only are allowed to, but also encouraged to do
-during system suspend.
-
-Now, obviously I don't think we shall change the behaviour of PM core,
-that would just not be convenient for subsystems and drivers, right?
-
-So, the PM core allows layering violations for the .runtime_resume
-callbacks to be invoked during system suspend. It can do so, because
-it trust drivers/subsystems to act responsibly and to what suites them
-best.
-
-For the same reasons, I believe we should trust drivers/subsystems, to
-understand when it makes sense for them to re-use all of the runtime
-PM callbacks during system suspend and not just the .runtime_suspend
-callback.
-
-That is in principle what I and Alan, who came up with this idea, are
-suggesting.
-
->> And, as you stated previously during these discussions, we have the
->> opportunity to update the documentation around this topic, I will
->> happily do it, if needed.
->
-> That's always welcome. :-)
->
->> >
->> > Let's talk about specific examples, though.
->> >
->> > Why exactly do you need what patch [5/5] does in the exynos_drm_fimc driver?
->>
->> This was a simple example, I wanted to visualize how the new building
->> blocks were going to be used. Anyway, this we achieve with the patch:
->>
->> 1.
->> The PM part in the driver becomes simplified, we don't need the
->> wrapper functions for the runtime PM callbacks any more.
->
-> No, it is not simplified.  It becomes *far* more complicated conceptually
-> instead, although that is hidden by moving the complexity into the functions
-> added by patch [1/5].  So whoever doesn't look into those functions will
-> not actually realize how complicated the code really is.
->
->> 2.
->> Previously the driver did not make sure runtime PM was disabled,
->> before it put the device into low power state at .suspend. From a
->> runtime PM point of view, this is not a "nice" behaviour and opens up
->> for confusions, even if it likely would work in most cases.
->
-> So the proper fix, in my opinion, would be to point .suspend_late and
-> .resume_early in that driver to fimc_suspend() and fimc_resume(),
-> respectively, and leave the .suspend and .resume pointers unpopulated.
->
-> Wouldn't that actually work?
-
-If we decide to ignore the power domain issue below, yes.
-
->
->> 3.
->> The power domain runtime PM callbacks were by-passed during system
->> suspend, my patch fixes this.
->
-> I don't exactly understand this.  Why would they be bypassed?
->
->> Why do I want this? Because the power
->> domain can have runtime PM resources it need to handle at this phase.
->> Potentially, it could handle that from it's .suspend_late callback
->> instead, but then it gets unnecessary complicated, which is what
->> clearly happened to the power domain for OMAP2, for example.
->
-> I'd like to understand this.  What exactly do you mean by "unnecessary
-> complicated"?
-
-Please, have a deeper look into the OMAP power domain implementation.
-
-If each SoC (for those that have power domain regulators) needs their
-own version of such a power domain, then I certainly think it is more
-complicated that in needs to be.
-
->
->>
->> If you want additional proof of concepts, we can have a look at more
->> complex example.
->>
->> Typically I am thinking of cases were a cross SoC driver is attached
->> to a bus and for some SoCs a power domain as well. Then, the bus, the
->> power domain and the driver - all have runtime PM resources to handle.
->
-> Sure.
-
-OK, I consider resending the patch set, including some additional
-proof of concept patches.
-
->
->> In these cases using the new building blocks will not only
->> significantly simplify code, but also fix immediate bugs. One example
->> are drivers attached to the AMBA bus, at drivers/amba/bus.c.
->
-> Again, what drivers and what's the bug you're talking about?
-
-I will use some of these as examples, it will be more visible to you then.
-
-Kind regards
-Uffe
-
->
-> Rafael
->
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 00df012..150e0fc 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -49,6 +49,8 @@
+ #include <asm/traps.h>
+ #include <asm/unwind.h>
+ 
++#define TOTAL_REGISTERS 16
++
+ /* Dummy functions to avoid linker complaints */
+ void __aeabi_unwind_cpp_pr0(void)
+ {
+@@ -66,7 +68,7 @@ void __aeabi_unwind_cpp_pr2(void)
+ EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
+ 
+ struct unwind_ctrl_block {
+-	unsigned long vrs[16];		/* virtual register set */
++	unsigned long vrs[TOTAL_REGISTERS];	/* virtual register set */
+ 	const unsigned long *insn;	/* pointer to the current instructions word */
+ 	int entries;			/* number of entries left to interpret */
+ 	int byte;			/* current byte number in the instructions word */
+@@ -235,6 +237,148 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl)
+ 	return ret;
+ }
+ 
++static int unwind_exec_insn_0x80(struct unwind_ctrl_block *ctrl,
++				unsigned long insn)
++{
++	unsigned long high, low;
++	unsigned long mask;
++	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
++	int load_sp, reg = 4;
++
++	low = ctrl->vrs[SP];
++	high = ALIGN(low, THREAD_SIZE);
++
++	insn = (insn << 8) | unwind_get_byte(ctrl);
++	mask = insn & 0x0fff;
++	if (mask == 0) {
++		pr_warning("unwind: 'Refuse to unwind' instruction %04lx\n",
++			insn);
++		return -URC_FAILURE;
++	}
++
++	/*
++	 *  Check whether there is enough space
++	 *  on stack to execute the instruction
++	 *  if not then return failure
++	 */
++	if ((high - low) < TOTAL_REGISTERS) {
++		unsigned long mask_copy = mask;
++		int required_stack = 0;
++
++		while (mask_copy) {
++			if (mask_copy & 1)
++				required_stack++;
++			mask_copy >>= 1;
++		}
++
++		if ((high - low) < required_stack)
++			return -URC_FAILURE;
++	}
++
++	load_sp = mask & (1 << (13 - 4));
++	while (mask) {
++		if (mask & 1)
++			ctrl->vrs[reg] = *vsp++;
++		mask >>= 1;
++		reg++;
++	}
++	if (!load_sp)
++		ctrl->vrs[SP] = (unsigned long)vsp;
++
++	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
++		ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
++
++	return URC_OK;
++}
++
++static int unwind_exec_insn_0xa0(struct unwind_ctrl_block *ctrl,
++				unsigned long insn)
++{
++	unsigned long high, low;
++	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
++	int reg;
++
++	low = ctrl->vrs[SP];
++	high = ALIGN(low, THREAD_SIZE);
++
++	/*
++	 *  Check whether there is enough space
++	 *  on stack to execute the instruction
++	 *  if not then return failure
++	 */
++	if ((high-low) < TOTAL_REGISTERS) {
++		int required_stack;
++
++		required_stack = insn & 7;
++		required_stack += (insn & 0x80) ? 1 : 0;
++
++		if ((high-low) < required_stack)
++			return -URC_FAILURE;
++	}
++
++	/* pop R4-R[4+bbb] */
++	for (reg = 4; reg <= 4 + (insn & 7); reg++)
++		ctrl->vrs[reg] = *vsp++;
++	if (insn & 0x80)
++		ctrl->vrs[14] = *vsp++;
++	ctrl->vrs[SP] = (unsigned long)vsp;
++
++	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
++		ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
++
++	return URC_OK;
++}
++
++static int unwind_exec_insn_0xb1(struct unwind_ctrl_block *ctrl,
++				unsigned long insn)
++{
++	unsigned long high, low;
++	unsigned long mask = unwind_get_byte(ctrl);
++	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
++	int reg = 0;
++
++	if (mask == 0 || mask & 0xf0) {
++		pr_warning("unwind: Spare encoding %04lx\n",
++			(insn << 8) | mask);
++		return -URC_FAILURE;
++	}
++
++	low = ctrl->vrs[SP];
++	high = ALIGN(low, THREAD_SIZE);
++
++	/*
++	 *  Check whether there is enough space
++	 *  on stack to execute the instruction
++	 *  if not then return failure
++	 */
++	if ((high-low) < TOTAL_REGISTERS) {
++		unsigned long mask_copy = mask;
++		int required_stack = 0;
++
++		while (mask_copy) {
++			if (mask_copy & 1)
++				required_stack++;
++			mask_copy >>= 1;
++		}
++		if ((high-low) < required_stack)
++			return -URC_FAILURE;
++	}
++
++	/* pop R0-R3 according to mask */
++	while (mask) {
++		if (mask & 1)
++			ctrl->vrs[reg] = *vsp++;
++		mask >>= 1;
++		reg++;
++	}
++	ctrl->vrs[SP] = (unsigned long)vsp;
++
++	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
++		ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
++
++	return URC_OK;
++}
++
+ /*
+  * Execute the current unwind instruction.
+  */
+@@ -249,65 +393,20 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+ 	else if ((insn & 0xc0) == 0x40)
+ 		ctrl->vrs[SP] -= ((insn & 0x3f) << 2) + 4;
+ 	else if ((insn & 0xf0) == 0x80) {
+-		unsigned long mask;
+-		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
+-		int load_sp, reg = 4;
+-
+-		insn = (insn << 8) | unwind_get_byte(ctrl);
+-		mask = insn & 0x0fff;
+-		if (mask == 0) {
+-			pr_warning("unwind: 'Refuse to unwind' instruction %04lx\n",
+-				   insn);
+-			return -URC_FAILURE;
+-		}
+-
+-		/* pop R4-R15 according to mask */
+-		load_sp = mask & (1 << (13 - 4));
+-		while (mask) {
+-			if (mask & 1)
+-				ctrl->vrs[reg] = *vsp++;
+-			mask >>= 1;
+-			reg++;
+-		}
+-		if (!load_sp)
+-			ctrl->vrs[SP] = (unsigned long)vsp;
++		return unwind_exec_insn_0x80(ctrl, insn);
+ 	} else if ((insn & 0xf0) == 0x90 &&
+ 		   (insn & 0x0d) != 0x0d)
+ 		ctrl->vrs[SP] = ctrl->vrs[insn & 0x0f];
+ 	else if ((insn & 0xf0) == 0xa0) {
+-		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
+-		int reg;
+-
+-		/* pop R4-R[4+bbb] */
+-		for (reg = 4; reg <= 4 + (insn & 7); reg++)
+-			ctrl->vrs[reg] = *vsp++;
+-		if (insn & 0x80)
+-			ctrl->vrs[14] = *vsp++;
+-		ctrl->vrs[SP] = (unsigned long)vsp;
++		 return unwind_exec_insn_0xa0(ctrl, insn);
+ 	} else if (insn == 0xb0) {
+ 		if (ctrl->vrs[PC] == 0)
+ 			ctrl->vrs[PC] = ctrl->vrs[LR];
+ 		/* no further processing */
+ 		ctrl->entries = 0;
+ 	} else if (insn == 0xb1) {
+-		unsigned long mask = unwind_get_byte(ctrl);
+-		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
+-		int reg = 0;
+ 
+-		if (mask == 0 || mask & 0xf0) {
+-			pr_warning("unwind: Spare encoding %04lx\n",
+-			       (insn << 8) | mask);
+-			return -URC_FAILURE;
+-		}
+-
+-		/* pop R0-R3 according to mask */
+-		while (mask) {
+-			if (mask & 1)
+-				ctrl->vrs[reg] = *vsp++;
+-			mask >>= 1;
+-			reg++;
+-		}
+-		ctrl->vrs[SP] = (unsigned long)vsp;
++		 return unwind_exec_insn_0xb1(ctrl, insn);
+ 	} else if (insn == 0xb2) {
+ 		unsigned long uleb128 = unwind_get_byte(ctrl);
+ 
+-- 
+1.7.0.4
