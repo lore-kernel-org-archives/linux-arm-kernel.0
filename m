@@ -1,30 +1,35 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Nov 2013 12:14:32 +0000
-Subject: [PATCH 0/3] iommu: arm/smmu: fixes for 3.13
-Message-ID: <1385727275-19082-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 29 Nov 2013 12:14:35 +0000
+Subject: [PATCH 3/3] iommu/arm-smmu: fix error return code in
+ arm_smmu_device_dt_probe()
+In-Reply-To: <1385727275-19082-1-git-send-email-will.deacon@arm.com>
+References: <1385727275-19082-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1385727275-19082-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Here are a few fixes for the arm/smmu driver. I think the main one is
-fixing the locking around page-table walking/creating, which is probably
-a candidate for stable.
+Fix to return -ENODEV instead of 0 when context interrupt number
+does no match in arm_smmu_device_dt_probe().
 
-All comments welcome,
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Will
-
-
-Wei Yongjun (1):
-  iommu/arm-smmu: fix error return code in arm_smmu_device_dt_probe()
-
-Will Deacon (2):
-  iommu/arm-smmu: use mutex instead of spinlock for locking page tables
-  iommu/arm-smmu: remove potential NULL dereference on mapping path
-
- drivers/iommu/arm-smmu.c | 66 ++++++++++++++++++++----------------------------
- 1 file changed, 28 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ef77e3dd6dd2..e46a88700b68 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1852,6 +1852,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		dev_err(dev,
+ 			"found only %d context interrupt(s) but %d required\n",
+ 			smmu->num_context_irqs, smmu->num_context_banks);
++		err = -ENODEV;
+ 		goto out_put_parent;
+ 	}
+ 
 -- 
 1.8.2.2
