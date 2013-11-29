@@ -1,42 +1,135 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 15:51:31 +0100
-Subject: [PATCH 27/31] USB: EHCI: tegra: use reset framework
-In-Reply-To: <1384548866-13141-28-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-28-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131129145131.GG9712@ulmo.nvidia.com>
+From: angus.clark@st.com (Angus Clark)
+Date: Fri, 29 Nov 2013 14:52:19 +0000
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+Message-ID: <5298AA23.7080404@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:54:22PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Tegra's clock driver now provides an implementation of the common
-> reset API (include/linux/reset.h). Use this instead of the old Tegra-
-> specific API; that will soon be removed.
-> 
-> Cc: treding at nvidia.com
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: linux-usb at vger.kernel.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
-> ---
->  drivers/usb/host/ehci-tegra.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+Hi Huang Shijie,
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/378af942/attachment.sig>
+On 11/27/2013 04:32 AM, Brian Norris wrote:
+> + Lee Jones, others
+> 
+> I'd like to keep a similar CC list for the various conversations going
+> on about SPI NOR frameworks.
+> 
+> On Tue, Nov 26, 2013 at 02:32:51PM +0800, Huang Shijie wrote:
+>> 1.) Why add a new framework for SPI NOR?
+>>   The SPI-NOR controller such as Freescale's Quadspi controller is working
+>>   in a different way from the SPI bus. It should knows the NOR commands to
+>>   find the right LUT sequence. Unfortunately, the current code can not meet
+>>   this requirement.
+
+I fully support your argument for introducing a new framework to support Serial
+Flash controllers.  Reiterating my previous comment:
+
+"The kernel offers many examples of others who have struggled with the same
+problem.  Some have chosen to write self-contained drivers (e.g.
+drivers/mtd/devices/spear_smi.c and drivers/mtd/devices/sst251.c) duplicating
+much of m25p80.c, while others have attempted to squeeze into the SPI framework
+(e.g. drivers/spi/spi-tegra20-sflash.c and drivers/spi/spi-falcon.c), relying on
+fragile heuristics to recreate the semantics of m25p80 that is lost over the ,
+current circumstances SPI framework ."
+
+However, having now been through your proposed framework, it would not seem to
+provide a generally applicable solution.  Indeed, other than making the Serial
+Flash commands and the device table available, it is not obvious how it improves
+the situation for your own specific controller either; the
+read/write/read_reg/write_reg callbacks do not offer a great deal more than
+spi_read_then_write().  (Perhaps all will become clear when you submit the
+fsl-quadspi driver.)
+
+As I see it, the main problem with the current support is that dedicated Serial
+Flash Controllers require a level of semantics that cannot be conveyed over the
+generic SPI framework.  With this in mind, I would start by defining something
+along the lines of a "Serial Flash transfer".  Some initial ramblings of my mind:
+
+/**
+ * struct spi_nor_xfer_cfg - Structure for defining a Serial Flash transfer
+ * @wren:		command for "Write Enable", or 0x00 for not required
+ * @cmd:		command for operation
+ * @cmd_pins:		number of pins to send @cmd (1, 2, 4)
+ * @addr:		address for operation
+ * @addr_pins:		number of pins to send @addr (1, 2, 4)
+ * @addr_width: 	number of address bytes (3,4, or 0 for address not required)
+ * @mode:		mode data
+ * @mode_pins:		number of pins to send @mode (1, 2, 4)
+ * @mode_cycles:	number of mode cycles (0 for mode not required)
+ * @dummy_cycles:	number of dummy cycles (0 for dummy not required)
+ */
+struct spi_nor_xfer_cfg {
+	uint8_t		wren;
+	uint8_t		cmd;
+	int		cmd_pins;
+	uint32_t	addr;
+	int		addr_pins;
+	int		addr_width;
+	uint32_t	mode;
+	int		mode_pins;
+	int		mode_cycles;
+	int		dummy_cycles;
+};
+
+We could then build up layers of functionality, based on two fundamental primitives:
+
+	int (*read_xfer)(struct spi_nor_info *info,
+			 struct spi_nor_xfer_cfg *cfg,
+			 uint8_t *buf, size_t len);
+	
+	int (*write_xfer)(struct spi_nor_info *info,
+			  struct spi_nor_xfer_cfg *cfg,
+			  uint8_t *buf, size_t len);
+	
+Default implementations for standard operations could follow:
+
+	int (*read_reg)(struct spi_nor_info *info,
+			uint8_t cmd, uint8_t *reg, int len);
+	int (*write_reg)(struct spi_nor_info *info,
+			 uint8_t cmd, uint8_t *reg, int len,
+			 int wren, int wtr);
+
+	int (*readid)(struct spi_nor_info *info, uint8_t *readid);
+	int (*wait_till_ready)(struct spi_nor_info *info);
+	
+	int (*read)(struct spi_nor_info *info, uint8_t buf, off_t offs, size_t len);
+	int (*write)(struct spi_nor_info *info, off_t offs, size_t len);
+	int (*erase_sector)(struct spi_nor_info *info, off_t offs);
+
+Each driver would be required to implement read_xfer() and write_xfer(), and
+then free to either use the default implementations, or override with
+driver-optimised implementations.
+
+In the case of a pure SPI Controller, read_xfer() and write_xfer() would simply
+flatten to spi_messages.  The key benefit is that dedicated Serial Flash
+Controllers would be able to take advantage of the richer semantics offered by
+the 'spi_nor_xfer_cfg' data.
+
+I would also expect the spi-nor framework to provide the following services,
+applicable to all Serial Flash drivers:
+
+	- determine devices properties at runtime, based on the READID data (and
+perhaps SFDP, if and when it matures!).  This should include supported opcodes
+(e.g. READ_1_1_4, READ_1_4_4, READ4B_1_1_4...), operating frequencies, mode and
+dummy requirements, means of setting Quad Enable, entering/exiting 4-byte
+addressing etc.
+
+	- provide optimal read, write and erase configurations, based on the combined
+capabilities of the Serial Flash device and the H/W Controller.
+
+	- device specific configuration (e.g. setting QE, unlock BPx bits, DYB unlocking).
+
+Getting back to reality, I realise undertaking such a task would be a huge
+commitment.  I would be keen to put forward my own proposal, but current
+circumstances mean that that is unlikely to happen any time soon.
+
+I guess in summary, while I am pleased that this area is being looked at, my own
+feeling is that proposed framework needs to be reworked for it to be generally
+applicable to other Serial Flash controllers.  Of course, another option would
+be to stick with what is currently offered, and make do.
+
+Cheers,
+
+Angus
