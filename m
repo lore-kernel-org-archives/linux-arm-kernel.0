@@ -1,272 +1,151 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Fri, 29 Nov 2013 15:27:34 +0530
-Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
-In-Reply-To: <CAKv+Gu9-XqLmvZ1HhCKvgM5=BvZWbR8SSnb7oJzMqGja_LHbAw@mail.gmail.com>
-References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
- <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
- <CAKv+Gu_yMFE7YLKG=KuiW-vCjbjkpWDjyBx+43PW4t32M7P22g@mail.gmail.com>
- <CALicx6t+V8Vt7u-8saV=e1KzK99D=_O_UsSvPrdMY3j9xR3opw@mail.gmail.com>
- <CAKv+Gu9-XqLmvZ1HhCKvgM5=BvZWbR8SSnb7oJzMqGja_LHbAw@mail.gmail.com>
-Message-ID: <CALicx6uRtxhj0+Fj98WtFAXssbV5G6sNQjkWikxaZnbMkBmWhA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 10:57:12 +0100
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131128233147.GA19387@obsidianresearch.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131128203322.GB14689@mithrandir>
+ <20131128211009.GA26447@obsidianresearch.com>
+ <20131128222232.GF14689@mithrandir>
+ <20131128233147.GA19387@obsidianresearch.com>
+Message-ID: <20131129095711.GD22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 2:57 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 29 November 2013 10:20, Vijay Kilari <vijay.kilari@gmail.com> wrote:
->> On Fri, Nov 29, 2013 at 2:23 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> On 18 November 2013 13:06,  <vijay.kilari@gmail.com> wrote:
->>>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>>>
->>>> Add KGDB debug support for FP/SIMD processor.This support
->>>> only debugging of FP/SIMD in kernel mode.
->>>> With this patch one can view or set FP/SIMD registers in
->>>> kernel context
->>>>
->>>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>>> ---
->>>>  arch/arm64/include/asm/fpsimd.h |    1 +
->>>>  arch/arm64/kernel/fpsimd.c      |    5 ++
->>>>  arch/arm64/kernel/kgdb.c        |  105 +++++++++++++++++++++++++--------------
->>>>  3 files changed, 73 insertions(+), 38 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
->>>> index 609bc44..5039d6d 100644
->>>> --- a/arch/arm64/include/asm/fpsimd.h
->>>> +++ b/arch/arm64/include/asm/fpsimd.h
->>>> @@ -60,6 +60,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
->>>>  extern void fpsimd_thread_switch(struct task_struct *next);
->>>>  extern void fpsimd_flush_thread(void);
->>>>  extern void fpsimd_reload_fpstate(void);
->>>> +extern int  fpsimd_thread_state(void);
->>>>
->>>>  #endif
->>>>
->>>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->>>> index 5b13c17..27604c1 100644
->>>> --- a/arch/arm64/kernel/fpsimd.c
->>>> +++ b/arch/arm64/kernel/fpsimd.c
->>>> @@ -124,6 +124,11 @@ void fpsimd_flush_thread(void)
->>>>         set_thread_flag(TIF_FOREIGN_FPSTATE);
->>>>  }
->>>>
->>>> +int fpsimd_thread_state(void)
->>>
->>> Please use a meaningful name for the function. Currently, it returns
->>> true iff 'current' is a non-kernel thread whose FPSIMD state is /not/
->>> present in the FPSIMD register file. You should choose a name that
->>> reflects that purpose.
->>>
->>  do you have any reason why only TIF_FOREIGN_FPSTATE flag is
->> set only for non-kernel threads in kernel_neon_begin()?
->>
->
-> The purpose of the TIF_FOREIGN_FPSTATE flag is to convey that the
-> FPSIMD context should be restored before a task enters userland. A
-> kernel thread never enters userland by definition so the flag has no
-> meaning there.
->
->>>> +{
->>>> +       return (current->mm && test_thread_flag(TIF_FOREIGN_FPSTATE)) ? 1 : 0;
->>>> +}
->>>> +
->>>
->>> As Will pointed out, the expression before ? already evaluates to 1 or
->>> 0, so appending '? 1 : 0' is redundant.
->>>
->>>>  void fpsimd_reload_fpstate(void)
->>>>  {
->>>>         preempt_disable();
->>>> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
->>>> index f10f2ba..5e34852 100644
->>>> --- a/arch/arm64/kernel/kgdb.c
->>>> +++ b/arch/arm64/kernel/kgdb.c
->>>> @@ -23,6 +23,14 @@
->>>>  #include <linux/kdebug.h>
->>>>  #include <linux/kgdb.h>
->>>>  #include <asm/traps.h>
->>>> +#include <asm/fpsimd.h>
->>>> +
->>>> +#ifdef CONFIG_KERNEL_MODE_NEON
->>>> +/*
->>>> + * Structure to hold FP/SIMD register contents
->>>> + */
->>>> +struct fpsimd_state kgdb_fpsimd_regs;
->>>
->>> 'static' if it's local to this source file
->>>
->>    OK
->>>> +#endif
->>>>
->>>>  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->>>>         { "x0", 8, offsetof(struct pt_regs, regs[0])},
->>>> @@ -59,40 +67,40 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->>>>         { "sp", 8, offsetof(struct pt_regs, sp)},
->>>>         { "pc", 8, offsetof(struct pt_regs, pc)},
->>>>         { "pstate", 4, offsetof(struct pt_regs, pstate)},
->>>> -       { "v0", 16, -1 },
->>>> -       { "v1", 16, -1 },
->>>> -       { "v2", 16, -1 },
->>>> -       { "v3", 16, -1 },
->>>> -       { "v4", 16, -1 },
->>>> -       { "v5", 16, -1 },
->>>> -       { "v6", 16, -1 },
->>>> -       { "v7", 16, -1 },
->>>> -       { "v8", 16, -1 },
->>>> -       { "v9", 16, -1 },
->>>> -       { "v10", 16, -1 },
->>>> -       { "v11", 16, -1 },
->>>> -       { "v12", 16, -1 },
->>>> -       { "v13", 16, -1 },
->>>> -       { "v14", 16, -1 },
->>>> -       { "v15", 16, -1 },
->>>> -       { "v16", 16, -1 },
->>>> -       { "v17", 16, -1 },
->>>> -       { "v18", 16, -1 },
->>>> -       { "v19", 16, -1 },
->>>> -       { "v20", 16, -1 },
->>>> -       { "v21", 16, -1 },
->>>> -       { "v22", 16, -1 },
->>>> -       { "v23", 16, -1 },
->>>> -       { "v24", 16, -1 },
->>>> -       { "v25", 16, -1 },
->>>> -       { "v26", 16, -1 },
->>>> -       { "v27", 16, -1 },
->>>> -       { "v28", 16, -1 },
->>>> -       { "v29", 16, -1 },
->>>> -       { "v30", 16, -1 },
->>>> -       { "v31", 16, -1 },
->>>> -       { "fpsr", 4, -1 },
->>>> -       { "fpcr", 4, -1 },
->>>> +       { "v0", 16, offsetof(struct fpsimd_state, vregs[0])},
->>>> +       { "v1", 16, offsetof(struct fpsimd_state, vregs[1])},
->>>> +       { "v2", 16, offsetof(struct fpsimd_state, vregs[2])},
->>>> +       { "v3", 16, offsetof(struct fpsimd_state, vregs[3])},
->>>> +       { "v4", 16, offsetof(struct fpsimd_state, vregs[4])},
->>>> +       { "v5", 16, offsetof(struct fpsimd_state, vregs[5])},
->>>> +       { "v6", 16, offsetof(struct fpsimd_state, vregs[6])},
->>>> +       { "v7", 16, offsetof(struct fpsimd_state, vregs[7])},
->>>> +       { "v8", 16, offsetof(struct fpsimd_state, vregs[8])},
->>>> +       { "v9", 16, offsetof(struct fpsimd_state, vregs[9])},
->>>> +       { "v10", 16, offsetof(struct fpsimd_state, vregs[10])},
->>>> +       { "v11", 16, offsetof(struct fpsimd_state, vregs[11])},
->>>> +       { "v12", 16, offsetof(struct fpsimd_state, vregs[12])},
->>>> +       { "v13", 16, offsetof(struct fpsimd_state, vregs[13])},
->>>> +       { "v14", 16, offsetof(struct fpsimd_state, vregs[14])},
->>>> +       { "v15", 16, offsetof(struct fpsimd_state, vregs[15])},
->>>> +       { "v16", 16, offsetof(struct fpsimd_state, vregs[16])},
->>>> +       { "v17", 16, offsetof(struct fpsimd_state, vregs[17])},
->>>> +       { "v18", 16, offsetof(struct fpsimd_state, vregs[18])},
->>>> +       { "v19", 16, offsetof(struct fpsimd_state, vregs[19])},
->>>> +       { "v20", 16, offsetof(struct fpsimd_state, vregs[20])},
->>>> +       { "v21", 16, offsetof(struct fpsimd_state, vregs[21])},
->>>> +       { "v22", 16, offsetof(struct fpsimd_state, vregs[22])},
->>>> +       { "v23", 16, offsetof(struct fpsimd_state, vregs[23])},
->>>> +       { "v24", 16, offsetof(struct fpsimd_state, vregs[24])},
->>>> +       { "v25", 16, offsetof(struct fpsimd_state, vregs[25])},
->>>> +       { "v26", 16, offsetof(struct fpsimd_state, vregs[26])},
->>>> +       { "v27", 16, offsetof(struct fpsimd_state, vregs[27])},
->>>> +       { "v28", 16, offsetof(struct fpsimd_state, vregs[28])},
->>>> +       { "v29", 16, offsetof(struct fpsimd_state, vregs[29])},
->>>> +       { "v30", 16, offsetof(struct fpsimd_state, vregs[30])},
->>>> +       { "v31", 16, offsetof(struct fpsimd_state, vregs[31])},
->>>> +       { "fpsr", 4, offsetof(struct fpsimd_state, fpsr)},
->>>> +       { "fpcr", 4, offsetof(struct fpsimd_state, fpcr)},
->>>>  };
->>>>
->>>>  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->>>> @@ -100,11 +108,22 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->>>>         if (regno >= DBG_MAX_REG_NUM || regno < 0)
->>>>                 return NULL;
->>>>
->>>> -       if (dbg_reg_def[regno].offset != -1)
->>>> +       if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
->>>>                 memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
->>>>                        dbg_reg_def[regno].size);
->>>> -       else
->>>> +       else {
->>>> +#ifdef CONFIG_KERNEL_MODE_NEON
->>>
->>> else if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON)) {
->>>
->>>> +               if (fpsimd_thread_state()) {
->>>> +                       fpsimd_save_state(&kgdb_fpsimd_regs);
->>>> +                       memcpy(mem, (void *)&kgdb_fpsimd_regs +
->>>> +                                       dbg_reg_def[regno].offset,
->>>> +                                       dbg_reg_def[regno].size);
->>>
->>> Why do this conditionally? Shouldn't kgdb return whatever is currently
->>> present in the register file, regardless of whether 'current' is a
->>> kernel thread or has had its FPSIMD state swapped out?
->>> Also, one could wonder why this is dependent on KERNEL_MODE_NEON being set
->>>
->>
->> KGDB, being kernel debugger it was thought that allow
->> debugging only if kernel mode is supported.
->> In fact, I proposed (previous email)  to remove this condition and
->> allow to reading neon
->> registers always and allow write only if neon is in kernel mode.
->>
->
-> I think KGDB is a special case here and should not considered as a
-> user of kernel mode NEON. So even writing the registers should
-> allowable regardless of this setting imo.
->
->> But completely removing this condition check and allowing to modify
->> is user choice to ensure neon registers state.
->>
->> Will, Please let me know your opinion?
->>
->>>> +               } else
->>>> +                       memset(mem, 0, dbg_reg_def[regno].size);
->>>> +#else
->>>>                 memset(mem, 0, dbg_reg_def[regno].size);
->>>> +#endif
->>>> +       }
->>>>         return dbg_reg_def[regno].name;
->>>>  }
->>>>
->>>> @@ -113,9 +132,19 @@ int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
->>>>         if (regno >= DBG_MAX_REG_NUM || regno < 0)
->>>>                 return -EINVAL;
->>>>
->>>> -       if (dbg_reg_def[regno].offset != -1)
->>>> +       if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
->>>>                 memcpy((void *)regs + dbg_reg_def[regno].offset, mem,
->>>> -                      dbg_reg_def[regno].size);
->>>> +                       dbg_reg_def[regno].size);
->>>> +#ifdef CONFIG_KERNEL_MODE_NEON
->>>> +       else {
->>>> +               if (fpsimd_thread_state()) {
->>>
->>> Again, why the conditional?
->>>
->>>> +                       memcpy((void *)&kgdb_fpsimd_regs +
->>>> +                                       dbg_reg_def[regno].offset,
->>>> +                                       mem, dbg_reg_def[regno].size);
->>>> +                       fpsimd_load_state(&kgdb_fpsimd_regs);
->>>
->>> Are you sure it is safe to clobber all the registers here? Shouldn't
->>> you save the state first, do the memcpy() and then load?
->>>
->> yes it is safe. gdb read registers after every command so all registers
->> are saved first before they are modified
->>
->
-> Does that imply that -after every command- the whole NEON state (32*16
-> bytes) is saved to kgdb_fpsimd_regs 32 times, each time to access the
-> contents of a single register?
->
-Yes, I mentioned this overhead in cover letter. There is no single call to
-architecture specific code to read all the registers at once for gdb
-'register read'
-command. The kgdb makes one call for every register read.
+On Thu, Nov 28, 2013 at 04:31:47PM -0700, Jason Gunthorpe wrote:
+> On Thu, Nov 28, 2013 at 11:22:33PM +0100, Thierry Reding wrote:
+> > On Thu, Nov 28, 2013 at 02:10:09PM -0700, Jason Gunthorpe wrote:
+> > > On Thu, Nov 28, 2013 at 09:33:23PM +0100, Thierry Reding wrote:
+> > > 
+> > > > >   - Describing masters that master through multiple different buses
+> > > > > 
+> > > > >   - How on Earth this fits in with the Linux device model (it doesn't)
+> > > > > 
+> > > > >   - Interaction with IOMMU bindings (currently under discussion)
+> > > > 
+> > > > This is all very vague. Perhaps everyone else knows what this is all
+> > > > about, in which case it'd be great if somebody could clue me in.
+> > > 
+> > > It looks like an approach to describe an AXI physical bus topology in
+> > > DT..
+> > 
+> > Thanks for explaining this. It makes a whole lot more sense now.
+> 
+> Hopefully the ARM guys concur, this was just my impression from
+> reviewing their patches and having recently done some design work with
+> AXI..
+> 
+> > > axi
+> > > {
+> > >    /* Describe a DAG of AXI connections here. */
+> > >    cpu { downstream = &ax_switch,}
+> > >    axi_switch {downstream = &memory,&low_speed}
+> > >    memory {}
+> > >    dma {downstream = &memory}
+> > >    low_speed {}
+> > > }
+> > 
+> > Correct me if I'm wrong, but the switch would be what the specification
+> > refers to as "interconnect", while a port would correspond to what is
+> > called an "interface" in the specification?
+> 
+> That seems correct, but for this purpose we are not interested in
+> boring dumb interconnect but fancy interconnect with address remapping
+> capabilities, or cache coherency (eg the SCU/L2 cache is modeled as
+> switch/interconnect in a AXI DAG).
+> 
+> I called it a switch because the job of the interconnect block is to
+> take an AXI input packet on a slave interface and route it to the
+> proper master interface with internal arbitration between slave
+> interfaces. In my world that is a called a switch ;)
+> 
+> AXI is basically an on-chip point-to-point switched fabric like PCI-E,
+> and the stuff that travels on AXI looks fairly similar to PCI-E TLPs..
+> 
+> If you refer to the PDF I linked I broadly modeled the above DT
+> fragment on that diagram, each axi sub node (vertex) represents an
+> 'interconnect' and 'downstream' is a master->slave interface pair (edge).
+> 
+> Fundamentally AXI is inherently a DAG, but unlike what we are used to
+> in other platforms you don't have to go through a fused
+> CPU/cache/memory controller unit to access memory, so there are
+> software visible asymmetries depending on how the DMA flows through
+> the AXI DAG.
+> 
+> > > Which is why I think encoding the AXI DAG directly in DT is probably
+> > > the most future proof way to model this stuff - it sticks close to the
+> > > tools ARM provides to the SOC designers, so it is very likely to be
+> > > able to model arbitary SOC designs.
+> > 
+> > I'm not sure I agree with you fully here. At least I think that if what
+> > we want to describe is an AXI bus topology, then we should be describing
+> > it in terms of the AXI specification.
+> 
+> Right, that was what I was trying to describe :) 
+> 
+> The DAG would be vertexes that are 'interconnect' and directed edges
+> that are 'master -> slave interface' pairs.
+> 
+> This would be an addendum/side-table dataset to the standard 'soc' CPU
+> address map tree, that would only be needed to program address
+> mapping/iommu hardware.
+> 
+> And it isn't really AXI specific, x86 style platforms can have a DAG
+> too, it is just much simpler, as there is only 1 vertex - the IOMMU.
+> 
+> > I mean, even though device tree is supposed to describe hardware, there
+> > needs to be a limit to the amount of detail we put into it. After all it
+> > isn't a hardware description language, but rather a language to describe
+> > the hardware in a way that makes sense for operating system software to
+> > use it.
+> 
+> Right - which is why I said the usual 'soc' node should remain as-is
+> typical today - a tree formed by viewing the AXI DAG from the CPU
+> vertex. That 100% matches the OS perspective of the system for CPU
+> originated MMIO.
+> 
+> The AXI DAG side-table would be used to resolve weirdness with 'bus
+> master' DMA programming. The OS can detect all the required
+> configuration and properties by tracing a path through the DAG from
+> the source of the DMA to the target - that tells you what IOMMUs are
+> involved, if the path is cache coherent, etc.
 
-I can think of saving this registers for every debug exception call,
-but that too is not optimized because gdb tool issues multiple step commands
-for every 'next' command.
-IMO, this little overhead is still ok as it is used only in step debugging
+That all sounds like an awful amount of data to wade through. Do we
+really need all of it to do what we want? Perhaps it can be simplified
+a bit. For instance it seems like the majority of hardware where this is
+actually required will have to go through one IOMMU (or a cascade of
+IOMMUs) and the path isn't cache coherent.
 
-> --
-> Ard.
+IOMMUs typically require additional parameters to properly map devices
+to virtual address spaces, so we'll need to hook them up with masters in
+DT anyway. If we further assume that all masters use non-cache-coherent
+paths, then the problem becomes much simpler.
+
+Of course that would only work for a specific case and not solve the
+more general case. But perhaps it'll be good enough to cover the
+majority of uses.
+
+> > Perhaps this is just another way of saying what Greg has already said.
+> > If we continue down this road, we'll eventually end up having to
+> > describe all sorts of nitty gritty details. And we'll need even more
+> 
+> Greg's point makes sense, but the HW guys are not designing things
+> this way for kicks - there are real physics based reasons for some of
+> these choices...
+> 
+> eg An all-to-all bus cross bar (eg like Intel's ring bus) is engery
+> expensive compared to a purpose built muxed bus tree. Doing coherency
+> look ups on DMA traffic costs energy, etc.
+
+I understand that these may all contribute to saving power. However what
+good is a system that's very power-efficient if it's so complex that the
+software can no longer control it?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/89d3f12f/attachment.sig>
