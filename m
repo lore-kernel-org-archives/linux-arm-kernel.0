@@ -1,54 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 14:10:41 +0100
-Subject: [PATCH 06/31] ARM: tegra: select the reset framework
-In-Reply-To: <1384548866-13141-7-git-send-email-swarren@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-7-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131129131040.GS22771@ulmo.nvidia.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 29 Nov 2013 13:13:59 +0000
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131129095703.GV16735@n2100.arm.linux.org.uk>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131128203322.GB14689@mithrandir>
+ <20131128211009.GA26447@obsidianresearch.com>
+ <20131128222232.GF14689@mithrandir>
+ <20131128233147.GA19387@obsidianresearch.com>
+ <20131129023554.GA14239@kroah.com>
+ <20131129093713.GC22771@ulmo.nvidia.com>
+ <20131129095703.GV16735@n2100.arm.linux.org.uk>
+Message-ID: <20131129131359.GH4634@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 15, 2013 at 01:54:01PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Fri, Nov 29, 2013 at 09:57:03AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Nov 29, 2013 at 10:37:14AM +0100, Thierry Reding wrote:
+> > There's a large gap between how fast new SoCs are supposed to tape out
+> > and the rate at which new code can be merged upstream. Perhaps some of
+> > that could be mitigated by putting more of the complexity into firmware
+> > and that's already happening to some degree for ARMv8. But I suspect
+> > there's a limit to what you can hide away in firmware while at the same
+> > time giving the kernel enough information to do the right thing.
 > 
-> The Tegra clock driver is built unconditionally when Tegra support is
-> enabled. In order to avoid having to ifdef the forthcoming reset driver
-> implementation, have ARCH_TEGRA select RESET_CONTROLLER.
+> One of the bigger issues which stands in the way of companies caring
+> about mainstream support is closed source IPs like VPUs and GPUs.
 > 
-> Cc: treding at nvidia.com
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/mach-tegra/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
+> If you have one of those on your chip, even if the kernel side code
+> is already under the GPL, normally that code is not "mainline worthy".
+> Also, as the userspace code may not be open source, some people object
+> to having the open source part in the kernel.
 > 
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index 09e740f58b27..15c09294effa 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
-> @@ -14,6 +14,8 @@ config ARCH_TEGRA
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select MIGHT_HAVE_PCI
->  	select PINCTRL
-> +	select ARCH_HAS_RESET_CONTROLLER
-> +	select RESET_CONTROLLER
+> So for customers to be able to get the performance out of the chip,
+> they have to stick with having non-mainline kernel.
+> 
+> At that point, why bother spending too much time getting mainline
+> support for the device.  It's never going to be fully functional in
+> mainline.  It doesn't make sense for these SoC companies.
 
-I don't think RESET_CONTROLLER is necessary given this:
+Putting effort into upstream support for something that is only relevant
+to GPUs (or VPUs) does look less valuable for us right now, unless it
+encourages people to start posting more GPU/VPU code upstream, and we
+know there are other blockers there.
 
-	menuconfig RESET_CONTROLLER
-		bool "Reset Controller Support"
-		default y if ARCH_HAS_RESET_CONTROLLER
+DMA and IOMMU we definitely care about, though.
 
-I suppose that would still make it possible to deselect RESET_CONTROLLER
-and cause breakage. Explicitly selecting it avoids that, so:
-
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/5fb29f1b/attachment.sig>
+Cheers
+---Dave
