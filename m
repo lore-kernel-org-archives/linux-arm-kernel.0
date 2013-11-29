@@ -1,24 +1,38 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 29 Nov 2013 13:59:47 +0530
-Subject: [PATCH] ARM: davinci: Fix McASP mem resource names
-In-Reply-To: <1384354097-1163-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1384354097-1163-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5298507B.5050102@ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 29 Nov 2013 14:00:27 +0530
+Subject: [PATCH v6 0/6] gpio: daVinci: cleanup and feature enhancement
+In-Reply-To: <CACRpkdYvNwF+dxfiLCHpCL+Ze17PMAMkJo4s-4T4ku1KxDPXxw@mail.gmail.com>
+References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
+ <CACRpkdYvNwF+dxfiLCHpCL+Ze17PMAMkJo4s-4T4ku1KxDPXxw@mail.gmail.com>
+Message-ID: <CA+V-a8vZ22_OpfyEDcQoMWZJbUm3utBSJSrOZUw3ux2whZYXiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
+Hi Linus,
 
-On Wednesday 13 November 2013 08:18 PM, Peter Ujfalusi wrote:
-> The ASoC McASP driver looks for the mem resources by name and:
-> "mpu" and "dat" regions.
-> Change/add the needed name for the mem resources so the driver can pick the
-> correct resource.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On Fri, Nov 29, 2013 at 1:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Nov 21, 2013 at 7:15 PM, Prabhakar Lad
+> <prabhakar.csengg@gmail.com> wrote:
+>
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> This patch series does the following
+>> 1> Ports the driver to use irqdomain.
+>> 2> Adds dt binding support for gpio-davinci.
+>> 3> Adds DA850 dt support goio.
+>>
+>> Changes for v6:
+>> 1: GPIO driver now migrated to irq domain legacy.
+>> 2: Fixed review comments pointed by Grygorii.
+>> 3: Included Ack's.
+>
+> This series is looking nice, I assume that Sekhar will take this through
+> the DaVinci tree once he's happy with it. I think I've ACKed all relevant
+> patches, else tell me.
+>
+While you are at it, you missed to ACK v6 2/6 patch [1]
 
-Thanks for the patch. It does make the soundcard detect again on
-DaVinci. Will queue for v3.13-rc3 (too late for -rc2, sorry!)
+[1] https://lkml.org/lkml/2013/11/21/425
 
-Thanks,
-Sekhar
+Regards,
+--Prabhakar
