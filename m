@@ -1,73 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Nov 2013 11:43:15 +0100
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131129095703.GV16735@n2100.arm.linux.org.uk>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131128203322.GB14689@mithrandir>
- <20131128211009.GA26447@obsidianresearch.com>
- <20131128222232.GF14689@mithrandir>
- <20131128233147.GA19387@obsidianresearch.com>
- <20131129023554.GA14239@kroah.com>
- <20131129093713.GC22771@ulmo.nvidia.com>
- <20131129095703.GV16735@n2100.arm.linux.org.uk>
-Message-ID: <20131129104313.GG22771@ulmo.nvidia.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 29 Nov 2013 11:45:44 +0100
+Subject: [PATCH V2] media: i2c: Add ADV761X support
+In-Reply-To: <CACRpkdZQa626hNRFcGvk4t7Z8scTCoEcf7AqO-FsL=BGk6UfeA@mail.gmail.com>
+References: <1384520071-16463-1-git-send-email-valentine.barshak@cogentembedded.com>
+ <5295E231.9030200@cisco.com> <5295E641.6060603@cogentembedded.com>
+ <2150651.hQNra4Rlob@avalon>
+ <CACRpkdZQa626hNRFcGvk4t7Z8scTCoEcf7AqO-FsL=BGk6UfeA@mail.gmail.com>
+Message-ID: <52987058.80700@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 09:57:03AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 29, 2013 at 10:37:14AM +0100, Thierry Reding wrote:
-> > There's a large gap between how fast new SoCs are supposed to tape out
-> > and the rate at which new code can be merged upstream. Perhaps some of
-> > that could be mitigated by putting more of the complexity into firmware
-> > and that's already happening to some degree for ARMv8. But I suspect
-> > there's a limit to what you can hide away in firmware while at the same
-> > time giving the kernel enough information to do the right thing.
+On 11/29/2013 11:37 AM, Linus Walleij wrote:
+> On Wed, Nov 27, 2013 at 5:40 PM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+>> (CC'ing Linus Walleij, Wolfram Sang and LAKML)
+>> On Wednesday 27 November 2013 16:32:01 Valentine wrote:
+>>> On 11/27/2013 04:14 PM, Hans Verkuil wrote:
 > 
-> One of the bigger issues which stands in the way of companies caring
-> about mainstream support is closed source IPs like VPUs and GPUs.
+>>>> Yes, of course. Although the adv7604 has two interrupt lines, so if you
+>>>> would want to use the second, then that would still have to be specified
+>>>> through the platform data.
+>>>
+>>> In this case the GPIO should be configured as interrupt source in the
+>>> platform code. But this doesn't seem to work with R-Car GPIO since it is
+>>> initialized later, and the gpio_to_irq function returns an error.
+>>> The simplest way seemed to use a GPIO number in the platform data
+>>> to have the adv driver configure the pin and request the IRQ.
+>>> I'm not sure how to easily defer I2C board info IRQ setup (and
+>>> camera/subdevice probing) until GPIO driver is ready.
+>>
+>> Good question. This looks like a core problem to me, not specific to the
+>> adv761x driver. Linus, Wolfram, do you have a comment on that ?
 > 
-> If you have one of those on your chip, even if the kernel side code
-> is already under the GPL, normally that code is not "mainline worthy".
-> Also, as the userspace code may not be open source, some people object
-> to having the open source part in the kernel.
+> So we recently has a large-ish discussion involving me, Stephen
+> Warren and Jean-Christophe, leading to the conclusion that the
+> gpio_chip and irq_chip abstractions are orthogonal, and you should
+> be able to request a GPIO or IRQ without interacting with the other
+> subsystem.
 > 
-> So for customers to be able to get the performance out of the chip,
-> they have to stick with having non-mainline kernel.
+> Specifically you should be able to request an IRQ from the irq_chip
+> portions of the driver without first requesting the GPIO line.
 > 
-> At that point, why bother spending too much time getting mainline
-> support for the device.  It's never going to be fully functional in
-> mainline.  It doesn't make sense for these SoC companies.
+> Some drivers already support this.
+> 
+> We added an internal API to the gpiolib so that the lib, *internally*
+> can be made aware that a certain GPIO line is used for IRQs,
+> see commit d468bf9ecaabd3bf3a6134e5a369ced82b1d1ca1
+> "gpio: add API to be strict about GPIO IRQ usage"
+> 
+> So I guess the answer to the question is something like, fix
+> the GPIO driver to stop requiring the GPIO lines to be requested
+> and configured before being used as IRQs, delete that code,
+> and while you're at it add a call to gpiod_lock_as_irq()
+> to your GPIO driver in the right spot: examples are on the
+> mailing list and my mark-irqs branch in the GPIO tree.
 
-Well, there are advantages to having large parts, even if not all, of an
-SoC supported in the mainline kernel. The closer you are to mainline,
-the easier it becomes for customers and users to use a mainline kernel.
+As far as I understand it this already works more or less with the driver.
+The problem is that the IRQ numbers are dynamically allocated, while the
+GPIO numbers apparently are not. So the board code knows the the GPIO number
+at compile time and can pass this to the diver which then does a gpio_to_irq
+to lookup the IRQ number. This of course isn't really a problem with
+devicetree, but only with platform board code.
 
-The better an SoC is supported upstream the fewer vendor-specific
-patches are required to get feature parity, which in turn makes it
-easier for customers to forward-port (and back-port for that matter)
-those patches to whatever kernel they want. It also allows vendors to
-concentrate on the more contentious patches and spend time on making
-them worthy of mainline.
-
-Customers aren't only end-users but also embedded partners that want to
-use the SoC in their products. It's no secret that many vendor trees lag
-behind upstream and that causes all kinds of pain such as having to port
-drivers for new hardware that's not supported in whatever vendor tree
-you happen to get. Tracking upstream is invaluable because it makes it
-almost trivial to support new hardware and it helps in turn with getting
-your own changes merged.
-
-So upstreaming SoC support isn't only for the benefit of SoC vendors. It
-also is very convenient for all users of the SoC. It's true that ideally
-an SoC would be fully functional in mainline. That's not the case today,
-but that doesn't mean it will always be true.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/ca96f5ec/attachment.sig>
+- Lars
