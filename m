@@ -1,45 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Nov 2013 14:41:57 +0000
-Subject: [PATCH] dma: pl330: ensure DMA descriptors are zero-initialised
-In-Reply-To: <1385729844.1871.24.camel@smile>
-References: <1385725828-836-1-git-send-email-will.deacon@arm.com>
- <1385729844.1871.24.camel@smile>
-Message-ID: <20131129144157.GD31000@mudshark.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 15:46:16 +0100
+Subject: [PATCH 20/31] i2c: tegra: use reset framework
+In-Reply-To: <1384548866-13141-21-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-21-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129144615.GB9712@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 12:57:50PM +0000, Shevchenko, Andriy wrote:
-> On Fri, 2013-11-29 at 11:50 +0000, Will Deacon wrote:
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 98641eaca080..79e52a94f054 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -2492,14 +2492,8 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
-> >  
-> >  static inline void _init_desc(struct dma_pl330_desc *desc)
-> >  {
-> > -	desc->pchan = NULL;
-> >  	desc->req.x = &desc->px;
-> >  	desc->req.token = desc;
-> > -	desc->rqcfg.swap = SWAP_NO;
-> > -	desc->rqcfg.privileged = 0;
-> > -	desc->rqcfg.insnaccess = 0;
-> > -	desc->rqcfg.scctl = SCCTRL0;
-> > -	desc->rqcfg.dcctl = DCCTRL0;
-> >  	desc->req.cfg = &desc->rqcfg;
-> >  	desc->req.xfer_cb = dma_pl330_rqcb;
-> >  	desc->txd.tx_submit = pl330_tx_submit;
-> > @@ -2517,7 +2511,7 @@ static int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
-> >  	if (!pdmac)
-> >  		return 0;
-> >  
-> > -	desc = kmalloc(count * sizeof(*desc), flg);
-> > +	desc = kzalloc(count * sizeof(*desc), flg);
+On Fri, Nov 15, 2013 at 01:54:15PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Maybe kcalloc() ?
+> Tegra's clock driver now provides an implementation of the common
+> reset API (include/linux/reset.h). Use this instead of the old Tegra-
+> specific API; that will soon be removed.
+> 
+> Cc: treding at nvidia.com
+> Cc: pdeschrijver at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: linux-i2c at vger.kernel.org
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
+> ---
+>  drivers/i2c/busses/i2c-tegra.c | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
 
-Yup, that could work. I'll include that in v2 pending any other comments.
-
-Cheers,
-
-Will
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/132c4e3e/attachment.sig>
