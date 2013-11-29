@@ -1,57 +1,29 @@
-From: hector.palacios@digi.com (Hector Palacios)
-Date: Fri, 29 Nov 2013 17:35:25 +0100
-Subject: [PATCH 1/3] serial: mxs-auart: implement flush_buffer hook
-In-Reply-To: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
-References: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <1385742927-11358-2-git-send-email-hector.palacios@digi.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 29 Nov 2013 16:42:29 +0000
+Subject: [PATCH 00/10] ASoC: dma: ARM: ux500: Obtain DMA data from Device
+ Tree
+In-Reply-To: <20131129160358.GD26982@lee--X1>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+ <20131129160358.GD26982@lee--X1>
+Message-ID: <20131129164229.GG27568@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Terminate any DMA transfer and verify the TX FIFO is empty.
+On Fri, Nov 29, 2013 at 04:03:58PM +0000, Lee Jones wrote:
 
-Signed-off-by: Hector Palacios <hector.palacios@digi.com>
----
- drivers/tty/serial/mxs-auart.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+> Are you/did you already tak(e)ing this set?
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 9f0461778fc1..d9bf6e103f65 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -782,6 +782,28 @@ static unsigned int mxs_auart_tx_empty(struct uart_port *u)
- 		return 0;
- }
- 
-+/*
-+ * Flush the transmit buffer.
-+ * Locking: called with port lock held and IRQs disabled.
-+ */
-+static void mxs_auart_flush_buffer(struct uart_port *u)
-+{
-+	struct mxs_auart_port *s = to_auart_port(u);
-+	struct dma_chan *channel = s->tx_dma_chan;
-+	unsigned int to;
-+
-+	if (auart_dma_enabled(s)) {
-+		/* Avoid deadlock with the DMA engine callback */
-+		spin_unlock(&s->port.lock);
-+		dmaengine_terminate_all(channel);
-+		spin_lock(&s->port.lock);
-+	}
-+	/* Wait for the FIFO to flush */
-+	to = u->timeout;
-+	while (!mxs_auart_tx_empty(u) && to--)
-+		mdelay(1);
-+}
-+
- static void mxs_auart_start_tx(struct uart_port *u)
- {
- 	struct mxs_auart_port *s = to_auart_port(u);
-@@ -828,6 +850,7 @@ static struct uart_ops mxs_auart_ops = {
- 	.get_mctrl      = mxs_auart_get_mctrl,
- 	.startup	= mxs_auart_startup,
- 	.shutdown       = mxs_auart_shutdown,
-+	.flush_buffer	= mxs_auart_flush_buffer,
- 	.set_termios    = mxs_auart_settermios,
- 	.type	   	= mxs_auart_type,
- 	.release_port   = mxs_auart_release_port,
+Don't send contentless nags, they're just noise.  Looking at my sent
+mail folder I see:
+
+| I'm happy to merge the first few patches if that's easiest for everyone
+| else, let me know and send them to me if that's what works for people.
+
+which doesn't seem to have happened.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/95ba8a43/attachment.sig>
