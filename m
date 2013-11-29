@@ -1,88 +1,82 @@
-From: hector.palacios@digi.com (Hector Palacios)
-Date: Fri, 29 Nov 2013 19:04:49 +0100
-Subject: [PATCH 3/3] serial: mxs-auart: move irq handling to a tasklet
-In-Reply-To: <201311291800.12366.marex@denx.de>
-References: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
- <1385742927-11358-4-git-send-email-hector.palacios@digi.com>
- <201311291800.12366.marex@denx.de>
-Message-ID: <5298D741.1080100@digi.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 29 Nov 2013 15:04:50 -0300
+Subject: [PATCH/RESEND] clocksource: armada-370-xp: Enable timer divider only
+ when needed
+Message-ID: <1385748290-1178-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 06:00 PM, Marek Vasut wrote:
-> Dear Hector Palacios,
->
->> The ISR was handling CTS flag and RX/TX processing.
->> Occasionally interrupts were coming in the middle of the ISR and
->> led to blocking transmission (with hw flow) or loss of data.
->> This patch moves this processing to a tasklet that the ISR schedules.
->>
->> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
->> ---
->>   drivers/tty/serial/mxs-auart.c | 61
->> +++++++++++++++++++++++++++--------------- 1 file changed, 39
->> insertions(+), 22 deletions(-)
->>
->> diff --git a/drivers/tty/serial/mxs-auart.c
->> b/drivers/tty/serial/mxs-auart.c index e5540c89dd48..7021269c70b2 100644
->> --- a/drivers/tty/serial/mxs-auart.c
->> +++ b/drivers/tty/serial/mxs-auart.c
->> @@ -148,6 +148,10 @@ struct mxs_auart_port {
->>   	struct clk *clk;
->>   	struct device *dev;
->>
->> +	struct tasklet_struct tasklet;
->> +	unsigned int irq_status;
->> +	unsigned int status;
->> +
->>   	/* for DMA */
->>   	struct scatterlist tx_sgl;
->>   	struct dma_chan	*tx_dma_chan;
->> @@ -680,38 +684,48 @@ static void mxs_auart_settermios(struct uart_port *u,
->>   	}
->>   }
->>
->> +/*
->> + * tasklet handling tty stuff outside the interrupt handler.
->> + */
->> +static void mxs_auart_tasklet_func(unsigned long data)
->> +{
->> +	struct uart_port *port = (struct uart_port *)data;
->> +	struct mxs_auart_port *s = to_auart_port(port);
->> +
->> +	/* Handle status irq */
->> +	if (s->irq_status & AUART_INTR_CTSMIS) {
->> +		uart_handle_cts_change(&s->port, s->status & AUART_STAT_CTS);
->> +		writel(AUART_INTR_CTSMIS,
->> +		       s->port.membase + AUART_INTR_CLR);
->> +	}
->> +	/* Handle receive irq */
->> +	if (s->irq_status & (AUART_INTR_RTIS | AUART_INTR_RXIS)) {
->> +		if (!auart_dma_enabled(s))
->> +			mxs_auart_rx_chars(s);
->> +	}
->> +	/* Handle transmit irq */
->> +	if (s->irq_status & AUART_INTR_TXIS)
->> +		mxs_auart_tx_chars(s);
->> +}
->> +
->>   static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
->>   {
->> -	u32 istat;
->>   	struct mxs_auart_port *s = context;
->> -	u32 stat = readl(s->port.membase + AUART_STAT);
->>
->> -	istat = readl(s->port.membase + AUART_INTR);
->> +	s->status = readl(s->port.membase + AUART_STAT);
->> +	s->irq_status = readl(s->port.membase + AUART_INTR);
->
-> Aren't you up for a nice race condition here if you get interrupt while checking
-> the s->irq_status bits in the tasklet ?
+The current code sets the timer divider bits always. However, when
+the 25 MHz timer is enabled, this is not needed and has no effect.
+As this causes some confusion, rework the code so the divider is
+set only when needed, i.e. when the 25 MHz timer is not in use.
 
-Sad, but true. :-(
-But if I need to wait on the ISR for the tasklet to process then this patch loses its 
-original meaning. Argh... it works so nicely!
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+Resending as per Daniel's request
 
-Best regards,
---
-Hector Palacios
+ drivers/clocksource/time-armada-370-xp.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 4e7f680..ee8691b 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -76,6 +76,7 @@
+ static void __iomem *timer_base, *local_base;
+ static unsigned int timer_clk;
+ static bool timer25Mhz = true;
++static u32 enable_mask;
+ 
+ /*
+  * Number of timer ticks per jiffy.
+@@ -121,8 +122,7 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
+ 	/*
+ 	 * Enable the timer.
+ 	 */
+-	local_timer_ctrl_clrset(TIMER0_RELOAD_EN,
+-				TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT));
++	local_timer_ctrl_clrset(TIMER0_RELOAD_EN, enable_mask);
+ 	return 0;
+ }
+ 
+@@ -141,9 +141,7 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
+ 		/*
+ 		 * Enable timer.
+ 		 */
+-		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN |
+-					   TIMER0_EN |
+-					   TIMER0_DIV(TIMER_DIVIDER_SHIFT));
++		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+ 	} else {
+ 		/*
+ 		 * Disable timer.
+@@ -240,10 +238,13 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	WARN_ON(!timer_base);
+ 	local_base = of_iomap(np, 1);
+ 
+-	if (timer25Mhz)
++	if (timer25Mhz) {
+ 		set = TIMER0_25MHZ;		
+-	else
++		enable_mask = TIMER0_EN;
++	} else {
+ 		clr = TIMER0_25MHZ;
++		enable_mask = TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT);
++	}
+ 	timer_ctrl_clrset(clr, set);
+ 	local_timer_ctrl_clrset(clr, set);
+ 
+@@ -262,8 +263,7 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
+ 	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
+ 
+-	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
+-			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
++	timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+ 
+ 	/*
+ 	 * Set scale and timer for sched_clock.
+-- 
+1.8.1.5
