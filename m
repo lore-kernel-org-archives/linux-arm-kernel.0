@@ -1,82 +1,91 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 29 Nov 2013 15:04:50 -0300
-Subject: [PATCH/RESEND] clocksource: armada-370-xp: Enable timer divider only
- when needed
-Message-ID: <1385748290-1178-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 29 Nov 2013 19:02:49 +0100
+Subject: [PATCH 1/3] serial: mxs-auart: implement flush_buffer hook
+In-Reply-To: <201311291902.34445.marex@denx.de>
+References: <1385742927-11358-1-git-send-email-hector.palacios@digi.com>
+ <201311291750.22215.marex@denx.de> <5298D3B6.5050700@digi.com>
+ <201311291902.34445.marex@denx.de>
+Message-ID: <1385748169.4244.1.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code sets the timer divider bits always. However, when
-the 25 MHz timer is enabled, this is not needed and has no effect.
-As this causes some confusion, rework the code so the divider is
-set only when needed, i.e. when the 25 MHz timer is not in use.
+Am Freitag, den 29.11.2013, 19:02 +0100 schrieb Marek Vasut:
+> Dear Hector Palacios,
+> 
+> > Hi Marek,
+> > 
+> > On 11/29/2013 05:50 PM, Marek Vasut wrote:
+> > > Hello Hector,
+> > > 
+> > >> Terminate any DMA transfer and verify the TX FIFO is empty.
+> > >> 
+> > >> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+> > >> ---
+> > >> 
+> > >>   drivers/tty/serial/mxs-auart.c | 23 +++++++++++++++++++++++
+> > >>   1 file changed, 23 insertions(+)
+> > >> 
+> > >> diff --git a/drivers/tty/serial/mxs-auart.c
+> > >> b/drivers/tty/serial/mxs-auart.c index 9f0461778fc1..d9bf6e103f65 100644
+> > >> --- a/drivers/tty/serial/mxs-auart.c
+> > >> +++ b/drivers/tty/serial/mxs-auart.c
+> > >> @@ -782,6 +782,28 @@ static unsigned int mxs_auart_tx_empty(struct
+> > >> uart_port *u) return 0;
+> > >> 
+> > >>   }
+> > >> 
+> > >> +/*
+> > >> + * Flush the transmit buffer.
+> > >> + * Locking: called with port lock held and IRQs disabled.
+> > >> + */
+> > >> +static void mxs_auart_flush_buffer(struct uart_port *u)
+> > >> +{
+> > >> +	struct mxs_auart_port *s = to_auart_port(u);
+> > >> +	struct dma_chan *channel = s->tx_dma_chan;
+> > >> +	unsigned int to;
+> > >> +
+> > >> +	if (auart_dma_enabled(s)) {
+> > >> +		/* Avoid deadlock with the DMA engine callback */
+> > >> +		spin_unlock(&s->port.lock);
+> > >> +		dmaengine_terminate_all(channel);
+> > >> +		spin_lock(&s->port.lock);
+> > > 
+> > > Can you not maybe just set some flag here to tell the DMA engine callback
+> > > things are shutting down and to don't do anything funny anymore ?
+> > 
+> > I copied these spin_lock protections from the amba-pl011.c driver.
+> > The callbacks in the mxs-auart driver are not taking the lock but I was not
+> > sure if any of the serial core functions they call are, so I thought it
+> > was a good idea to take it.
+> 
+> It might be worth investigating this then.
+> 
+> > >> +	}
+> > >> +	/* Wait for the FIFO to flush */
+> > >> +	to = u->timeout;
+> > >> +	while (!mxs_auart_tx_empty(u) && to--)
+> > >> +		mdelay(1);
+> > > 
+> > > Maybe you can put some cond_resched() into the loop to avoid wasting too
+> > > many cycles ?
+> > 
+> > Do you mean like this? Ok
+> > 
+> > 	while (!mxs_auart_tx_empty(u) && to--) {
+> > 		cond_resched();
+> > 		mdelay(1);
+> > 	}
+> 
+> Yes, like that.
+> 
+This path isn't timing critical. mdelay still keeps the cpu spinning,
+even with a resched. Just use an absolute timeout and sleep instead of
+delay.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-Resending as per Daniel's request
-
- drivers/clocksource/time-armada-370-xp.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 4e7f680..ee8691b 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -76,6 +76,7 @@
- static void __iomem *timer_base, *local_base;
- static unsigned int timer_clk;
- static bool timer25Mhz = true;
-+static u32 enable_mask;
- 
- /*
-  * Number of timer ticks per jiffy.
-@@ -121,8 +122,7 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
- 	/*
- 	 * Enable the timer.
- 	 */
--	local_timer_ctrl_clrset(TIMER0_RELOAD_EN,
--				TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT));
-+	local_timer_ctrl_clrset(TIMER0_RELOAD_EN, enable_mask);
- 	return 0;
- }
- 
-@@ -141,9 +141,7 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
- 		/*
- 		 * Enable timer.
- 		 */
--		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN |
--					   TIMER0_EN |
--					   TIMER0_DIV(TIMER_DIVIDER_SHIFT));
-+		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
- 	} else {
- 		/*
- 		 * Disable timer.
-@@ -240,10 +238,13 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	WARN_ON(!timer_base);
- 	local_base = of_iomap(np, 1);
- 
--	if (timer25Mhz)
-+	if (timer25Mhz) {
- 		set = TIMER0_25MHZ;		
--	else
-+		enable_mask = TIMER0_EN;
-+	} else {
- 		clr = TIMER0_25MHZ;
-+		enable_mask = TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT);
-+	}
- 	timer_ctrl_clrset(clr, set);
- 	local_timer_ctrl_clrset(clr, set);
- 
-@@ -262,8 +263,7 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
- 	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
- 
--	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
--			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
-+	timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
- 
- 	/*
- 	 * Set scale and timer for sched_clock.
+Regards,
+Lucas
 -- 
-1.8.1.5
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
