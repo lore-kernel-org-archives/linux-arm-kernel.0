@@ -1,98 +1,65 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Fri, 29 Nov 2013 20:00:14 +0200
-Subject: [RFC] kprobes/kprobes-test fixes, .inst updates
-In-Reply-To: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <5298D62E.2000208@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 Nov 2013 18:01:10 +0000
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131129173701.GA5635@kroah.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131127230650.GA6162@kroah.com>
+ <20131128102845.GB21354@mudshark.cambridge.arm.com>
+ <20131128173339.GB4634@e103592.cambridge.arm.com>
+ <20131128191331.GB2385@kroah.com>
+ <20131128193917.GC4634@e103592.cambridge.arm.com>
+ <20131128212528.GA6144@kroah.com>
+ <20131129114453.GC21336@mudshark.cambridge.arm.com>
+ <20131129173701.GA5635@kroah.com>
+Message-ID: <20131129180110.GJ31000@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 08:37 PM, Ben Dooks wrote:
-> This is a series to fix kprobes and kprobes-test, as well as tidy
-> up the <asm/opcodes.h> use of data instructions to output code and
-> a missed bug in traps.
+On Fri, Nov 29, 2013 at 05:37:01PM +0000, Greg KH wrote:
+> On Fri, Nov 29, 2013 at 11:44:53AM +0000, Will Deacon wrote:
+> > On Thu, Nov 28, 2013 at 09:25:28PM +0000, Greg KH wrote:
+> > > On Thu, Nov 28, 2013 at 07:39:17PM +0000, Dave Martin wrote:
+> > > > On Thu, Nov 28, 2013 at 11:13:31AM -0800, Greg KH wrote:
+> > > > > Yes it is, you all are the ones tasked with implementing the crazy crap
+> > > > > the hardware people have created, best of luck with that :)
+> > > > 
+> > > > Agreed.  The first assumption should be that we can fit in with the
+> > > > existing device model -- we should only reconsider if we find that
+> > > > to be impossible.
+> > > 
+> > > Let me know if you think it is somehow impossible, but you all should
+> > > really push back on the insane hardware designers that are forcing you
+> > > all to do this work.  I find it "interesting" how this all becomes your
+> > > workload for their crazy ideas.
+> > 
+> > Oh, I don't think we're claiming anything is impossible here :) It's more
+> > that we will probably want to make some changes to the device model to allow,
+> > for example, a device to be associated with multiple buses of potentially
+> > different types.
 > 
-> I have not had time to test these, or push to the new git server we
-> are using. I will try and sort this out on monday.
+> Why would you want that?  What good would that help with?
+
+It would help with devices which have their slave interface on one bus, but
+master to another.
+
+We need a way to configure the master side of things (IOMMU, coherency, MSI
+routing, etc) on one bus and configure the slave side (device probing, power
+management, clocks, etc) on another.
+
+> > Step one is to get the DT binding sorted, then we can try and get Linux to
+> > make use of it. This goes hand-in-hand with the IOMMU discussion going on
+> > here:
+> > 
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210401.html
+> > 
+> > which is one of the issues that is hitting us right now.
 > 
-> This is an initial review series and I would appreicate testing.
+> Interesting how people seem to not know how to cc: the needed
+> maintainers when they touch core code :(
 
-kprobes-thumb.c fixes are missed in this series. Patch is below.
+To be fair, I don't think that code was intended to be merged, and ended up
+sparking a discussion about what we need in the DT to represent these
+topologies. DT people were on CC iirc.
 
-I've tested the series with all my comments addressed,
-Dave's patch instead of 9/9 and with the patch below.
-Kprobes-test passed for all combinations ARM/Thumb LE/BE.
-
-
-From: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-Date: Fri, 29 Nov 2013 19:15:53 +0200
-Subject: [PATCH] ARM: kprobes-thumb: fix instruction fetch order with <asm/opcodes.h>
-
-If we are running BE8, the data and instruction endianness
-do not match, so use <asm/opcodes.h> to correctly
-translate memory accesses into ARM instructions.
-
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
----
- arch/arm/kernel/kprobes-thumb.c |   20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-index 6123daf..b82e798 100644
---- a/arch/arm/kernel/kprobes-thumb.c
-+++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -163,9 +163,9 @@ t32_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	enum kprobe_insn ret = kprobe_decode_ldmstm(insn, asi);
- 
- 	/* Fixup modified instruction to have halfwords in correct order...*/
--	insn = asi->insn[0];
--	((u16 *)asi->insn)[0] = insn >> 16;
--	((u16 *)asi->insn)[1] = insn & 0xffff;
-+	insn = __mem_to_opcode_arm(asi->insn[0]);
-+	((u16 *)asi->insn)[0] = __opcode_to_mem_thumb16(insn >> 16);
-+	((u16 *)asi->insn)[1] = __opcode_to_mem_thumb16(insn & 0xffff);
- 
- 	return ret;
- }
-@@ -1153,7 +1153,7 @@ t16_decode_hiregs(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- {
- 	insn &= ~0x00ff;
- 	insn |= 0x001; /* Set Rdn = R1 and Rm = R0 */
--	((u16 *)asi->insn)[0] = insn;
-+	((u16 *)asi->insn)[0] = __opcode_to_mem_thumb16(insn);
- 	asi->insn_handler = t16_emulate_hiregs;
- 	return INSN_GOOD;
- }
-@@ -1182,8 +1182,10 @@ t16_decode_push(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	 * and call it with R9=SP and LR in the register list represented
- 	 * by R8.
- 	 */
--	((u16 *)asi->insn)[0] = 0xe929;		/* 1st half STMDB R9!,{} */
--	((u16 *)asi->insn)[1] = insn & 0x1ff;	/* 2nd half (register list) */
-+	/* 1st half STMDB R9!,{} */
-+	((u16 *)asi->insn)[0] = __opcode_to_mem_thumb16(0xe929);
-+	/* 2nd half (register list) */
-+	((u16 *)asi->insn)[1] = __opcode_to_mem_thumb16(insn & 0x1ff);
- 	asi->insn_handler = t16_emulate_push;
- 	return INSN_GOOD;
- }
-@@ -1232,8 +1234,10 @@ t16_decode_pop(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	 * and call it with R9=SP and PC in the register list represented
- 	 * by R8.
- 	 */
--	((u16 *)asi->insn)[0] = 0xe8b9;		/* 1st half LDMIA R9!,{} */
--	((u16 *)asi->insn)[1] = insn & 0x1ff;	/* 2nd half (register list) */
-+	/* 1st half LDMIA R9!,{} */
-+	((u16 *)asi->insn)[0] = __opcode_to_mem_thumb16(0xe8b9);
-+	/* 2nd half (register list) */
-+	((u16 *)asi->insn)[1] = __opcode_to_mem_thumb16(insn & 0x1ff);
- 	asi->insn_handler = insn & 0x100 ? t16_emulate_pop_pc
- 					 : t16_emulate_pop_nopc;
- 	return INSN_GOOD;
--- 
-1.7.9.5
-
-
-
--- 
-Taras Kondratiuk
+Will
