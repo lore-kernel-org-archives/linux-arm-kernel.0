@@ -1,28 +1,79 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 29 Nov 2013 01:57:58 +0200
-Subject: [PATCH 01/12 diet] ARM: OMAP2+: Remove legacy omap3 board-*.c
- files and make mach-omap2 DT only for booting
-In-Reply-To: <20131126011744.GA26766@atomide.com>
-References: <1385424867-27243-1-git-send-email-tony@atomide.com>
- <20131126011744.GA26766@atomide.com>
-Message-ID: <CANOLnONmmRgDSfdObUii-FxwVOTo45WGX81Lend7QGWuqXWaZA@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 28 Nov 2013 21:00:43 -0300
+Subject: [PATCH v2] ARM: pxa: Move iotable mapping inside vmalloc region
+Message-ID: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
-> We can now boot all mach-omap2 related boards using appended device
-> tree by creating a related .dts file with pretty much the same
-> functionality as booted in the legacy platform data mode.
+In order to remove the following ugly message:
 
-Not really the same, quite some drivers are still missing, and it
-makes pandora unusable :( . For example, SDIO variation of wl1251,
-that one is non-probeable and used to be "detected" by using
-MMC_QUIRK_NONSTD_SDIO quirk (see pandora_wl1251_init_card() in
-board-omap3pandora.c). Also there are at least pandora-backlight,
-twl4030_keypad and panel drivers that are not converted yet.
+  BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
 
-Can pdata-quirks.c be used for SDIO wl1251 at least, as I have no idea
-how to express it using device tree?
+the iotable mappings should be re-located inside the vmalloc
+region. Such move was introduced at commit:
 
---
-Gra?vydas
+commit 0536bdf33faff4d940ac094c77998cfac368cfff
+Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date:   Thu Aug 25 00:35:59 2011 -0400
+
+    ARM: move iotable mappings within the vmalloc region
+
+While at it, condition the mapping to PXA25x and PXA27x, which
+are the only platforms where it's used.
+
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: David Heidelberger <david.heidelberger@ixit.cz>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+David,
+
+Is it possible for you to give this a try on your board?
+
+ arch/arm/mach-pxa/generic.c               | 6 ++++--
+ arch/arm/mach-pxa/include/mach/hardware.h | 5 +++--
+ 2 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 4225417..3c1b4fa 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -83,11 +83,13 @@ static struct map_desc common_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(0x40000000),
+ 		.length		= 0x02000000,
+ 		.type		= MT_DEVICE
++#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
+ 	}, {	/* UNCACHED_PHYS_0 */
+-		.virtual	= 0xff000000,
++		.virtual	= UNCACHED_PHYS_0,
+ 		.pfn		= __phys_to_pfn(0x00000000),
+-		.length		= 0x00100000,
++		.length		= UNCACHED_SIZE,
+ 		.type		= MT_DEVICE
++#endif
+ 	}
+ };
+ 
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index ccb06e4..b365a72 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -14,13 +14,14 @@
+ #define __ASM_ARCH_HARDWARE_H
+ 
+ #include <mach/addr-map.h>
++#include <asm/pgtable.h>
+ 
+ /*
+  * Workarounds for at least 2 errata so far require this.
+  * The mapping is set in mach-pxa/generic.c.
+  */
+-#define UNCACHED_PHYS_0		0xff000000
+-#define UNCACHED_ADDR		UNCACHED_PHYS_0
++#define UNCACHED_PHYS_0		(VMALLOC_END - UNCACHED_SIZE)
++#define UNCACHED_SIZE		SZ_1M
+ 
+ /*
+  * Intel PXA2xx internal register mapping:
+-- 
+1.8.1.5
