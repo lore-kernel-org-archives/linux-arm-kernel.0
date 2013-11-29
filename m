@@ -1,81 +1,74 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 29 Nov 2013 14:13:25 +0000
-Subject: [RFC PATCH] Documentation: devicetree: add description for
- generic bus properties
-In-Reply-To: <20131129095711.GD22771@ulmo.nvidia.com>
-References: <20131127172806.GC2291@e103592.cambridge.arm.com>
- <20131128203322.GB14689@mithrandir>
- <20131128211009.GA26447@obsidianresearch.com>
- <20131128222232.GF14689@mithrandir>
- <20131128233147.GA19387@obsidianresearch.com>
- <20131129095711.GD22771@ulmo.nvidia.com>
-Message-ID: <20131129141325.GE3136@e103592.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 15:17:26 +0100
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129141725.GA22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 09:57:12AM +0000, Thierry Reding wrote:
-> On Thu, Nov 28, 2013 at 04:31:47PM -0700, Jason Gunthorpe wrote:
-
+On Mon, Nov 25, 2013 at 02:53:36PM -0700, Stephen Warren wrote:
 [...]
+>  	memcpy(&tdc->dma_sconfig, sconfig, sizeof(*sconfig));
+> +	if (!tdc->slave_id)
+> +		tdc->slave_id = sconfig->slave_id;
+>  	tdc->config_init = true;
 
-> > The AXI DAG side-table would be used to resolve weirdness with 'bus
-> > master' DMA programming. The OS can detect all the required
-> > configuration and properties by tracing a path through the DAG from
-> > the source of the DMA to the target - that tells you what IOMMUs are
-> > involved, if the path is cache coherent, etc.
-> 
-> That all sounds like an awful amount of data to wade through. Do we
-> really need all of it to do what we want? Perhaps it can be simplified
-> a bit. For instance it seems like the majority of hardware where this is
-> actually required will have to go through one IOMMU (or a cascade of
-> IOMMUs) and the path isn't cache coherent.
+This could use some blank lines to unclutter it a bit.
 
-The DT should describe the hardware, but only those aspects that a sane
-OS should need to care about.  Some judgment is needed.
+>  	return 0;
+>  }
+> @@ -942,7 +947,7 @@ static struct dma_async_tx_descriptor *tegra_dma_prep_slave_sg(
+>  	ahb_seq |= TEGRA_APBDMA_AHBSEQ_BUS_WIDTH_32;
+>  
+>  	csr |= TEGRA_APBDMA_CSR_ONCE | TEGRA_APBDMA_CSR_FLOW;
+> -	csr |= tdc->dma_sconfig.slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
+> +	csr |= tdc->slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
 
-Figuring out exactly which info we ought to care about is part of the
-purpose of this discussion.  There are certainly lots of hardware
-integration and configuration parameters that we don't need to know.
+Perhaps I'm missing something, but couldn't we reuse the .slave_id field
+of struct dma_slave_config? It seems like it might be overwritten by the
+DMA engine core or users when they call dmaengine_slave_config().
 
-I think that figuring out the path capabilities ought to be a one-off
-step, done when the DMA client device is probed.  We need to retain
-enough information to do the mapping each time a buffer needs to be
-set up, but we shouldn't have to re-scan the DT each time.
+But wouldn't it be better to have the core take care of all the slave ID
+management, so we don't have to jump through hoops? Or perhaps the
+concept isn't general enough to map well to other drivers.
 
+>  /* Tegra20 specific DMA controller information */
+> @@ -1245,6 +1262,8 @@ static const struct of_device_id tegra_dma_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, tegra_dma_of_match);
+>  
+> +static struct platform_driver tegra_dmac_driver;
+> +
 
-In more general cases, there are still some things that really can't
-be pushed into firmware for which Linux needs a fair amount of
-topology information.
+This doesn't seem to be used anymore.
 
-Our current example is things like MSIs from PCIe devices in systems
-with newer GICs and SMMU.  Particularly for guests under KVM, the ways
-all these link together is needed for configuring and routing MSIs to
-guest CPUs.
+>  static int tegra_dma_probe(struct platform_device *pdev)
+>  {
+>  	struct resource	*res;
+> @@ -1383,10 +1402,22 @@ static int tegra_dma_probe(struct platform_device *pdev)
+>  		goto err_irq;
+>  	}
+>  
+> +	tdma->xlate_info.device = &tdma->dma_dev;
+> +	tdma->xlate_info.post_alloc = tegra_dma_of_xlate_post_alloc;
+> +	ret = of_dma_controller_register(pdev->dev.of_node,
+> +					 of_dma_slave_xlate, &tdma->xlate_info);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev,
+> +			"Tegra20 APB DMA OF registration failed %d\n", ret);
+> +		goto err_unregister_dma_dev;
+> +	}
 
+Would it be useful to move this into the core and have it register the
+OF parts transparently to the driver? That's of course nothing that
+should be done in this patch.
 
-[...]
-
-> > eg An all-to-all bus cross bar (eg like Intel's ring bus) is engery
-> > expensive compared to a purpose built muxed bus tree. Doing coherency
-> > look ups on DMA traffic costs energy, etc.
-> 
-> I understand that these may all contribute to saving power. However what
-> good is a system that's very power-efficient if it's so complex that the
-> software can no longer control it?
-
-Not a lot of good.  However, that's the extreme case.  We have to deal
-with some pain for sure -- and some parts of that pain may turn out to be
-too ridiculous (either too useless, or too unworkable) for it to be worth
-supporting them in Linux.
-
-This thread focuses on one of the less ridculous things: the aim is not
-to describe the hardware bus architecture in full detail, just the
-aspects the OS needs to know about for important, abstractable things
-like DMA and IOMMU topology.
-
-If we model the description around the actual topology, there seems
-less chance of needing to bodge the bindings in the future when some
-previously non-relevant aspect of the topology becomes important.
-
-Cheers
----Dave
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/c1550f62/attachment.sig>
