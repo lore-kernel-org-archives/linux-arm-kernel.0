@@ -1,82 +1,31 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Fri, 29 Nov 2013 19:57:32 +0200
-Subject: [PATCH 9/9] ARM: asm/opcodes.h: use ARM_HAVE_INST to use .inst
- to build instructions
-In-Reply-To: <1383935832-20865-10-git-send-email-ben.dooks@codethink.co.uk>
-References: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
- <1383935832-20865-10-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <5298D58C.1030605@linaro.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 29 Nov 2013 18:58:51 +0100
+Subject: [PATCH v3 0/3] (U)EFI runtime services for arm
+In-Reply-To: <20131129115319.GC11775@console-pimps.org>
+References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
+ <20131129115319.GC11775@console-pimps.org>
+Message-ID: <20131129175850.GW24997@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 08:37 PM, Ben Dooks wrote:
-> Currently the <asm/opcodes.h> header uses .work and .short to build
-> instructions. This means the output data does not get marked as an
-> instruction which can cause issues such as BE8 code failures.
+On Fri, Nov 29, 2013 at 11:53:19AM +0000, Matt Fleming wrote:
+> On Thu, 28 Nov, at 04:41:20PM, Leif Lindholm wrote:
+> > In systems based on [U]EFI-conformant firmware, runtime services provide
+> > a standardised way for the kernel to update firmware environment
+> > variables. This is used for example by efibootmgr to update which image
+> > should be loaded on next boot.
+> > 
+> > This patchset implements basic support for UEFI runtime services on ARM
+> > platforms, as well as the basic underlying EFI support. It also defines
+> > a mechanism by which the required information is passed from the
+> > bootloader (the EFI stub submitted separately) to the kernel via FDT
+> > entries.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/include/asm/opcodes.h | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-> index e796c59..4c7cac1 100644
-> --- a/arch/arm/include/asm/opcodes.h
-> +++ b/arch/arm/include/asm/opcodes.h
-> @@ -103,9 +103,15 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->  #define __opcode_to_mem_arm(x) ___opcode_swab32(x)
->  #define __opcode_to_mem_thumb16(x) ___opcode_swab16(x)
->  #define __opcode_to_mem_thumb32(x) ___opcode_swahb32(x)
-> +#ifdef ARM_HAVE_INST
->  #define ___asm_opcode_to_mem_arm(x) ___asm_opcode_swab32(x)
->  #define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_swab16(x)
->  #define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahb32(x)
-> +#else
-> +#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_identity32(x)
-> +#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_identity16(x)
-> +#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_identity32(x)
-> +#endif /* !ARM_HAVE_INST */
->  
->  #else /* ! CONFIG_CPU_ENDIAN_BE8 */
->  
-> @@ -218,14 +224,27 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->  
->  /* Helpers for the helpers.  Don't use these directly. */
->  #ifdef __ASSEMBLY__
-> +#ifdef ARM_HAVE_INST
-> +#define ___inst_arm(x) .inst x
-> +#define ___inst_thumb16(x) .inst.w x
-> +#define ___inst_thumb32(first, second) .inst.w first, second
-> +#else
->  #define ___inst_arm(x) .long x
->  #define ___inst_thumb16(x) .short x
->  #define ___inst_thumb32(first, second) .short first, second
-> +#endif /* !ARM_HAVE_INST */
-> +#else
-> +#ifdef ARM_HAVE_INST
-> +#define ___inst_arm(x) ".inst " __stringify(x) "\n\t"
-> +#define ___inst_thumb16(x) ".inst.w " __stringify(x) "\n\t"
+> This all looks pretty good to me. Is this series going through the ARM
+> trees?
 
-It should be .inst.n instead of .inst.w
+Thanks.
+That's the plan.
 
-> +#define ___inst_thumb32(first, second) \
-> +	".inst.w " __stringify(first) ", " __stringify(second) "\n\t"
-
-I have not checked, but I think .inst.w will not combine two 16-bit
-arguments into one 32-bit instruction, but instead it will generate two
-wrong 32-bit instructions here.
-
->  #else
->  #define ___inst_arm(x) ".long " __stringify(x) "\n\t"
->  #define ___inst_thumb16(x) ".short " __stringify(x) "\n\t"
->  #define ___inst_thumb32(first, second) \
->  	".short " __stringify(first) ", " __stringify(second) "\n\t"
-> +#endif /* !ARM_HAVE_INST */
->  #endif
->  
->  #endif /* __ASM_ARM_OPCODES_H */
-> 
-
-
--- 
-Taras Kondratiuk
+/
+    Leif
