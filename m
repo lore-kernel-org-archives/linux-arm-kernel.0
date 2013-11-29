@@ -1,70 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Nov 2013 12:19:25 +0000
-Subject: [PATCH v3 36/36] ARM: STi: Add support for the FSM Serial Flash
- Controller
-In-Reply-To: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 13:23:48 +0100
+Subject: [PATCH 02/31] ARM: tegra: document reset properties in DT bindings
+In-Reply-To: <1384548866-13141-3-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129122348.GO22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we add the necessary device nodes required for successful device
-probing and Pinctrl setup for the FSM.
+On Fri, Nov 15, 2013 at 01:53:57PM -0700, Stephen Warren wrote:
+[...]
+> diff --git a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt b/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
+[...]
+> +  - resets : Must contain an entry for each entry in reset-names.
+> +    See ../reset/reset.txt for details.
+> +  - reset-names : Must include the following entries:
+> +    - dc
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih416-b2105.dts    | 14 ++++++++++++++
- arch/arm/boot/dts/stih416-pinctrl.dtsi | 12 ++++++++++++
- 2 files changed, 26 insertions(+)
+For consistency with this, the clock-names entry for the first clock in
+this node should then be "dc" as well.
 
-diff --git a/arch/arm/boot/dts/stih416-b2105.dts b/arch/arm/boot/dts/stih416-b2105.dts
-index e518eb0..7acdfdf 100644
---- a/arch/arm/boot/dts/stih416-b2105.dts
-+++ b/arch/arm/boot/dts/stih416-b2105.dts
-@@ -33,6 +33,20 @@
- 			status = "okay";
- 		};
- 
-+		/* FSM */
-+		spifsm: spifsm at fe902000{
-+		        compatible         = "st,spi-fsm", "simple-bus";
-+		        reg                =  <0xfe902000 0x1000>;
-+		        reg-names          = "spi-fsm";
-+		        pinctrl-0          = <&pinctrl_fsm>;
-+
-+			st,syscfg	   = <&syscfg_rear>;
-+		        st,boot-device-reg = <0x958>;
-+		        st,boot-device-spi = <0x1a>;
-+
-+		        status = "okay";
-+		};
-+
- 		leds {
- 			compatible	= "gpio-leds";
- 			fp_led {
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index 10bb4df..9a48710 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -235,6 +235,18 @@
- 				};
- 			};
- 
-+			fsm {
-+				pinctrl_fsm: fsm {
-+					st,pins {
-+						spi-fsm-clk     = <&PIO12 2     OUT     ALT1>;
-+						spi-fsm-cs      = <&PIO12 3     OUT     ALT1>;
-+						spi-fsm-mosi    = <&PIO12 4     OUT     ALT1>;
-+						spi-fsm-miso    = <&PIO12 5     IN      ALT1>;
-+						spi-fsm-hol     = <&PIO12 6     OUT     ALT1>;
-+						spi-fsm-wp      = <&PIO12 7     OUT     ALT1>;
-+					};
-+				};
-+			};
- 		};
- 
- 		pin-controller-rear {
--- 
-1.8.3.2
+> diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra30-ahub.txt
+[...]
+> -  - spdif_in
+> +  - spdif
+
+Why is this renamed?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/81266823/attachment.sig>
