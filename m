@@ -1,62 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Nov 2013 22:22:51 +0800
-Subject: [PATCH] IMX6 flexcan: Change serial clock_feq source from IPG
- clock to PER clock
-In-Reply-To: <5EC8D4ACC923FE4D871AFFACC9761279739C0B@stwexdb.stww2k.local>
-References: <E1C9442006A9AE48A7A4B85E0D01C4D4748A18@stwexdb.stww2k.local>
- <5EC8D4ACC923FE4D871AFFACC9761279739C0B@stwexdb.stww2k.local>
-Message-ID: <20131129142249.GA10840@S2101-09.ap.freescale.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 15:20:33 +0100
+Subject: [PATCH V2] serial: tegra: convert to standard DMA DT bindings
+In-Reply-To: <1385416270-3421-1-git-send-email-swarren@wwwdotorg.org>
+References: <1385416270-3421-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129142032.GB22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 09:30:00AM +0000, Belser Florian wrote:
-> Hi,
+On Mon, Nov 25, 2013 at 02:51:10PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> think I found a bug in the flexcan driver. Currently the serial clock frequency for bitrate calculation is derived from IPG clock.
-> According to the imx6d/q reference manual, the CAN serial clock is derived from can_root clock (PER clock in dtb). The patch below fixes this issue.
+> By using dma_request_slave_channel_or_err(), the DMA slave ID can be
+> looked up from standard DT properties, and squirrelled away during
+> channel allocation. Hence, there's no need to use a custom DT property
+> to store the slave ID.
+> 
+> Cc: treding at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-serial at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2:
+> * Don't allocate DMA channels inside probe(); the DMA channel setup
+>   relies on some buffers that don't get allocated until startup().
+> 
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
+> 
+> Greg, you'd previously ack'd this, but I had to change the patch to fix
+> some bugs, which was a fair textual change, so I dropped your ack.
+> ---
+>  drivers/tty/serial/serial-tegra.c | 24 ++++++------------------
+>  1 file changed, 6 insertions(+), 18 deletions(-)
 
-
-Marc already had a patch for it.
-
-http://www.spinics.net/lists/arm-kernel/msg288971.html
-
-Shawn
-
-
-> However, I'm not sure if the patch below will also work for the rest of the imx family. Does anybody know if the CAN serial clock is derived from IPG clock in other imx processors?
-> Is there a case distinction required to keep backward compatibility?
-> 
-> Be aware that getting the flexcan module running on the imx6 also requires patch "[PATCH] IMX6: Add static /8 prescaler to can_root clock configuration"
-> 
-> 
-> Here is my patch:
-> 
-> --- linux-3.10.20/drivers/net/can/flexcan.c.orig    2013-11-20 21:28:01.000000000 +0100
-> +++ linux-3.10.20/drivers/net/can/flexcan.c    2013-11-28 09:34:01.539469212 +0100
-> @@ -1031,7 +1031,6 @@ static int flexcan_probe(struct platform
->              err = PTR_ERR(clk_ipg);
->              goto failed_clock;
->          }
-> -        clock_freq = clk_get_rate(clk_ipg);
-> 
->          clk_per = devm_clk_get(&pdev->dev, "per");
->          if (IS_ERR(clk_per)) {
-> @@ -1039,6 +1038,7 @@ static int flexcan_probe(struct platform
->              err = PTR_ERR(clk_per);
->              goto failed_clock;
->          }
-> +        clock_freq = clk_get_rate(clk_per);
->      }
-> 
->      mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> 
-> ----------------------------------------
-> 
-> In the same file there is another bug which only occurs in combination with an imx6 processor.
-> Within the function "static int flexcan_chip_start(struct net_device *dev)" all message boxes will be initialized.
-> Think that isn't correct for the IMX6 processor.
-> In the newest kernel v3.12.r1 the problem is already fixed and I'm not sure if the fix will be automatically added to the LTE kernel version 3.10.20 ?
-> If not, shall I create a patch for it ?
-> 
-> Best regards
-> Florian Belser
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/23b7fd3f/attachment.sig>
