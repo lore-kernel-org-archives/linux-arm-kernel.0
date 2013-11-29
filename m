@@ -1,70 +1,188 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Fri, 29 Nov 2013 11:36:31 +0200
-Subject: [PATCH v2] ARM: davinci: aemif: get rid of davinci-nand driver
- dependency on aemif
-In-Reply-To: <52981A4B.70703@ti.com>
-References: <1385562694-24618-1-git-send-email-ivan.khoronzhuk@ti.com>
- <52981A4B.70703@ti.com>
-Message-ID: <5298601F.4090200@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 29 Nov 2013 10:35:57 +0100
+Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
+ system suspend
+In-Reply-To: <CAPDyKFrRjB7gPpQ4c1U5e-BTHEt6k=kDqo7q1Grc04v-SDrsDw@mail.gmail.com>
+References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
+ <1619468.NHTb5ylADI@vostro.rjw.lan>
+ <CAPDyKFq0OW+uhBF1pMvY01peC1dRERtSdSNY15O=vvdY_XvQUA@mail.gmail.com>
+ <81539588.EsdqydM2iX@vostro.rjw.lan>
+ <CAPDyKFrRjB7gPpQ4c1U5e-BTHEt6k=kDqo7q1Grc04v-SDrsDw@mail.gmail.com>
+Message-ID: <CAPDyKFp-J4DCBGUgMJ+oW_GugFthfYjSXajdye2Dv0TKLXcE-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 06:38 AM, Sekhar Nori wrote:
-> On Wednesday 27 November 2013 08:01 PM, Ivan Khoronzhuk wrote:
->> The problem that the set timings code contains the call of Davinci
->> platform function davinci_aemif_setup_timing() which is not
->> accessible if kernel is built for another platform like Keystone.
+On 29 November 2013 10:32, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 >>
->> The Keysone platform is going to use TI AEMIF driver.
->> If TI AEMIF is used we don't need to set timings and bus width.
->> It is done by AEMIF driver.
+>> The lack of specificity here doesn't make the discussion any easier.
 >>
->> To get rid of davinci-nand driver dependency on aemif platform code
->> we moved aemif code to davinci platform.
+>> It usually is better to talk about specific problems to address than
+>> using general terms which may mean slightly different things for different
+>> people.
+>
+> During these discussions, I have tried to point at existing code for
+> drivers and existing code for power domains. Those which at the moment
+> either have got things wrong or are unnecessary complicated, in
+> regards to their PM implementation.
+>
+> I suppose I could provide some more patches for proof of concept, will
+> that be a way forward?
+>
 >>
->> The platform AEMIF code (aemif.c) has to be removed once Davinci
->> will be converted to DT and use ti-aemif.c driver.
+>>> >> Additionally, some drivers seems to have messed up things when combining
+>>> >> runtime PM with system PM. While we enable the option of re-using the runtime
+>>> >> PM callbacks during system PM, we also intend to clarify the way forward for
+>>> >> how these scenarios could be resolved.
+>>> >>
+>>> >> Some new helper macros for defining PM callbacks and two new pm_generic*
+>>> >> functions has been implemented in this patch set. These are provided to make it
+>>> >> easier for those who wants to enable the option of re-using the runtime PM
+>>> >> callbacks during system suspend.
+>>> >
+>>> > I'm generally opposed to re-using callbacks like this, because it adds confusion
+>>> > to the picture.  It may seem to be clever, but in fact it leads to bad design
+>>> > choices in the drivers in my opinion.
+>>>
+>>> In my world of the kernel, it will clearly resolve confusions and
+>>> simplify a significant amount of code in power domains, buses and
+>>> drivers. So I guess it depends on from what point you look at this.
 >>
->> The long device name "davinci_ntosd2_nandflash_device" was renamed
->> to "ntosd2_nandflash" as requested by Sekhar Nori, because after
->> adding changes the line is so broken that its almost unreadable.
+>> This is so vague that I don't even know how to respond. :-)
 >>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> 
-> This patch can be simplified in some places.
-> 
->> ---
->> v2..v1:
->> - enabled AEMIF clock
->> - removed EXPORT_SYMBOL(davinci_aemif_setup)
->> - renamed ugly name davinci_ntosd2_nandflash_device
+>> So let me say instead that what you did in patch [5/5] is a layering violation
+>> which always is a bug, even if it doesn't break things outright.
 >>
->> CC:
->> Sekhar Nori <nsekhar@ti.com>
+>> After that patch the driver would call into a layer that is supposed to call
+>> into it under normal conditions.  Moreover, it would expect that layer to
+>> call back into it again in a specific way, which may or may not happen depending
+>> on how exactly that layer is implemented.  So even if it works today, it will
+>> add constraints on how that other layer may be implmented which *is* confusing
+>> and wrong in my not so humble opinion.
 >>
->>   arch/arm/mach-davinci/aemif.c                   |   89 ++++++++++++++++++++++-
->>   arch/arm/mach-davinci/board-da830-evm.c         |    3 +
->>   arch/arm/mach-davinci/board-da850-evm.c         |    3 +
->>   arch/arm/mach-davinci/board-dm355-evm.c         |    5 ++
->>   arch/arm/mach-davinci/board-dm355-leopard.c     |    5 ++
->>   arch/arm/mach-davinci/board-dm365-evm.c         |    4 +
->>   arch/arm/mach-davinci/board-dm644x-evm.c        |    5 ++
->>   arch/arm/mach-davinci/board-dm646x-evm.c        |    3 +
->>   arch/arm/mach-davinci/board-mityomapl138.c      |    3 +
->>   arch/arm/mach-davinci/board-neuros-osd2.c       |   13 +++-
->>   arch/arm/mach-davinci/devices-tnetv107x.c       |    3 +
->>   drivers/mtd/nand/davinci_nand.c                 |   23 ------
->>   include/linux/platform_data/mtd-davinci-aemif.h |    5 +-
-> 
-> Most of these boards dont really have a timing structure defined.
-> Instead of blindly calling AEMIF setup on all boards, it can be
-> done only on boards that actually need it.
-> 
+>> I'll never apply any patches that lead to situations like that, don't even
+>> bother to send them to me.  Pretty please.
+>>
+>
+> After all these good discussions which clearly pointed the solution
+> into this direction, you decide to bring up this argument now? It
+> makes me wonder.
+>
+> Indirectly what you are saying is that, the PM core should at
+> device_prepare, do pm_runtime_disable() instead of
+> pm_runtime_get_noresume(), to prevent drivers/subsystems from
+> triggering "layering violations" by invoking pm_runtime_get_sync().
+>
+> Because, this is exactly the same kind of layering violation you refer
+> to while neglecting my approach, which at the moment
+> drivers/subsystems not only are allowed to, but also encouraged to do
+> during system suspend.
+>
+> Now, obviously I don't think we shall change the behaviour of PM core,
+> that would just not be convenient for subsystems and drivers, right?
+>
+> So, the PM core allows layering violations for the .runtime_resume
+> callbacks to be invoked during system suspend. It can do so, because
+> it trust drivers/subsystems to act responsibly and to what suites them
+> best.
+>
+> For the same reasons, I believe we should trust drivers/subsystems, to
+> understand when it makes sense for them to re-use all of the runtime
+> PM callbacks during system suspend and not just the .runtime_suspend
+> callback.
 
-Yes, but in such case we should add AEMIF setup to
-arch/arm/mach-davinci/board-mityomapl138.c also,
-because it has: .options = NAND_BUSWIDTH_16
+Sorry, another typo:
 
--- 
-Regards,
-Ivan Khoronzhuk
+"not just the .runtime_suspend" -> "not just the .runtime_resume".
+
+>
+> That is in principle what I and Alan, who came up with this idea, are
+> suggesting.
+>
+>>> And, as you stated previously during these discussions, we have the
+>>> opportunity to update the documentation around this topic, I will
+>>> happily do it, if needed.
+>>
+>> That's always welcome. :-)
+>>
+>>> >
+>>> > Let's talk about specific examples, though.
+>>> >
+>>> > Why exactly do you need what patch [5/5] does in the exynos_drm_fimc driver?
+>>>
+>>> This was a simple example, I wanted to visualize how the new building
+>>> blocks were going to be used. Anyway, this we achieve with the patch:
+>>>
+>>> 1.
+>>> The PM part in the driver becomes simplified, we don't need the
+>>> wrapper functions for the runtime PM callbacks any more.
+>>
+>> No, it is not simplified.  It becomes *far* more complicated conceptually
+>> instead, although that is hidden by moving the complexity into the functions
+>> added by patch [1/5].  So whoever doesn't look into those functions will
+>> not actually realize how complicated the code really is.
+>>
+>>> 2.
+>>> Previously the driver did not make sure runtime PM was disabled,
+>>> before it put the device into low power state at .suspend. From a
+>>> runtime PM point of view, this is not a "nice" behaviour and opens up
+>>> for confusions, even if it likely would work in most cases.
+>>
+>> So the proper fix, in my opinion, would be to point .suspend_late and
+>> .resume_early in that driver to fimc_suspend() and fimc_resume(),
+>> respectively, and leave the .suspend and .resume pointers unpopulated.
+>>
+>> Wouldn't that actually work?
+>
+> If we decide to ignore the power domain issue below, yes.
+>
+>>
+>>> 3.
+>>> The power domain runtime PM callbacks were by-passed during system
+>>> suspend, my patch fixes this.
+>>
+>> I don't exactly understand this.  Why would they be bypassed?
+>>
+>>> Why do I want this? Because the power
+>>> domain can have runtime PM resources it need to handle at this phase.
+>>> Potentially, it could handle that from it's .suspend_late callback
+>>> instead, but then it gets unnecessary complicated, which is what
+>>> clearly happened to the power domain for OMAP2, for example.
+>>
+>> I'd like to understand this.  What exactly do you mean by "unnecessary
+>> complicated"?
+>
+> Please, have a deeper look into the OMAP power domain implementation.
+>
+> If each SoC (for those that have power domain regulators) needs their
+> own version of such a power domain, then I certainly think it is more
+> complicated that in needs to be.
+>
+>>
+>>>
+>>> If you want additional proof of concepts, we can have a look at more
+>>> complex example.
+>>>
+>>> Typically I am thinking of cases were a cross SoC driver is attached
+>>> to a bus and for some SoCs a power domain as well. Then, the bus, the
+>>> power domain and the driver - all have runtime PM resources to handle.
+>>
+>> Sure.
+>
+> OK, I consider resending the patch set, including some additional
+> proof of concept patches.
+>
+>>
+>>> In these cases using the new building blocks will not only
+>>> significantly simplify code, but also fix immediate bugs. One example
+>>> are drivers attached to the AMBA bus, at drivers/amba/bus.c.
+>>
+>> Again, what drivers and what's the bug you're talking about?
+>
+> I will use some of these as examples, it will be more visible to you then.
+>
+> Kind regards
+> Uffe
+>
+>>
+>> Rafael
+>>
