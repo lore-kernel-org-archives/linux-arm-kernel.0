@@ -1,40 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Nov 2013 22:45:16 +0100
-Subject: [PATCH v6] gpio: Add MOXA ART GPIO driver
-In-Reply-To: <CACRpkda3bEmL+WRX1ct9SoUQOPXOT2mru0uz3-04nZB8G3DsvA@mail.gmail.com>
-References: <1381503190-5733-1-git-send-email-jonas.jensen@gmail.com>
- <201311281737.32696.arnd@arndb.de>
- <CACRpkda3bEmL+WRX1ct9SoUQOPXOT2mru0uz3-04nZB8G3DsvA@mail.gmail.com>
-Message-ID: <201311292245.16573.arnd@arndb.de>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 29 Nov 2013 17:05:09 -0500
+Subject: [PATCH 0/3] arm64: Add EFI stub and runtime services support
+Message-ID: <1385762712-17043-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 November 2013, Linus Walleij wrote:
-> On Thu, Nov 28, 2013 at 5:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 28 November 2013, Jonas Jensen wrote:
-> >> +static void __iomem *moxart_gpio_base;
-> >
-> > Just one comment: the usual way to do such a driver is to have
-> > a derived data structure like
-> >
-> > struct moxart_gpio_chip {
-> >         struct gpio_chip chip;
-> >         void __iomem *moxart_gpio_base;
-> > };
-> >
-> > and dynamically allocate that from probe(), using container_of() to
-> > get from the gpio_chip pointer to your own structure.
-> 
-> I see we make this comment a lot.
-> 
-> On my TODO there is an item to create
-> Documentation/driver-model/design-patterns.txt
-> 
-> And document things like this. And other fun stuff like
-> container_of().
-> 
-> What do you think about this idea?
+This patch series adds EFI support to the arm64 kernel. This support has
+two main parts: an EFI stub and runtime support. The EFI stub support
+has the kernel masquerade as a PE/COFF application which can be directly
+booted by EFI firmware (or by secondary loaders with EFI support). The
+runtime services support provides access to various EFI firmware services
+such as reboot, real-time clock, boot variables, and others.
 
-Great idea!
+These patches have dependencies on other patches which are not yet in
+the kernel but have been posted and are currently under review. In
+particular:
 
-	Arnd
+  - Generic fixmap support being discussed here:
+      http://lkml.org/lkml/2013/11/25/474
+
+  - early_ioremap support being discussed here:
+      https://lkml.org/lkml/2013/11/27/621
+
+  - shared EFI update_fdt() function being discussed here:
+      https://lkml.org/lkml/2013/11/27/565
+
+A repo with this patch series and the prerequisite patches is at:
+
+  git://github.com/mosalter/linux.git (arm64-efi-patches branch)
+
+Mark Salter (3):
+  arm64: add EFI stub
+  doc: arm64: add description of EFI stub support
+  arm64: add EFI runtime services
+
+ Documentation/arm64/booting.txt |   4 +
+ Documentation/efi-stub.txt      |  10 +-
+ arch/arm64/Kconfig              |  25 ++
+ arch/arm64/include/asm/efi.h    |  18 ++
+ arch/arm64/kernel/Makefile      |   4 +
+ arch/arm64/kernel/efi-entry.S   |  81 +++++++
+ arch/arm64/kernel/efi-stub.c    | 280 ++++++++++++++++++++++
+ arch/arm64/kernel/efi.c         | 507 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/head.S        | 112 +++++++++
+ arch/arm64/kernel/setup.c       |   6 +
+ include/linux/efi.h             |   2 +-
+ 11 files changed, 1046 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/include/asm/efi.h
+ create mode 100644 arch/arm64/kernel/efi-entry.S
+ create mode 100644 arch/arm64/kernel/efi-stub.c
+ create mode 100644 arch/arm64/kernel/efi.c
+
+-- 
+1.8.3.1
