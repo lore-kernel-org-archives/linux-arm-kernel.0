@@ -1,70 +1,82 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 29 Nov 2013 17:55:16 +0000
-Subject: [PATCH 2/9] ARM: kprobes: fix instruction fetch order with
- <asm/opcodes.h>
-In-Reply-To: <CAArO44sQAiz4nHd8LW6kpRg-jPgfr8dbiXfKi+sdjf8zRnE46g@mail.gmail.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Fri, 29 Nov 2013 19:57:32 +0200
+Subject: [PATCH 9/9] ARM: asm/opcodes.h: use ARM_HAVE_INST to use .inst
+ to build instructions
+In-Reply-To: <1383935832-20865-10-git-send-email-ben.dooks@codethink.co.uk>
 References: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
- <1383935832-20865-3-git-send-email-ben.dooks@codethink.co.uk>
- <CAArO44sQAiz4nHd8LW6kpRg-jPgfr8dbiXfKi+sdjf8zRnE46g@mail.gmail.com>
-Message-ID: <5298D504.5090304@codethink.co.uk>
+ <1383935832-20865-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5298D58C.1030605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/11/13 13:01, Taras Kondratiuk wrote:
-> On 8 November 2013 20:37, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
->> If we are running BE8, the data and instruction endian-ness do not
->> match, so use <asm/opcodes.h> to correctly translate memory accesses
->> into ARM instructions.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>y
->> ---
->>   arch/arm/kernel/kprobes-common.c | 14 ++++++++------
->>   arch/arm/kernel/kprobes.c        |  9 +++++----
->>   2 files changed, 13 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
->> index 18a7628..4954e0f 100644
->> --- a/arch/arm/kernel/kprobes-common.c
->> +++ b/arch/arm/kernel/kprobes-common.c
->> @@ -14,6 +14,7 @@
->>   #include <linux/kernel.h>
->>   #include <linux/kprobes.h>
->>   #include <asm/system_info.h>
->> +#include <asm/opcodes.h>
->>
->>   #include "kprobes.h"
->>
->> @@ -305,7 +306,8 @@ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
->>
->>          if (handler) {
->>                  /* We can emulate the instruction in (possibly) modified form */
->> -               asi->insn[0] = (insn & 0xfff00000) | (rn << 16) | reglist;
->> +               asi->insn[0] = __opcode_to_mem_arm((insn & 0xfff00000) |
->> +                                                  (rn << 16) | reglist);
->>                  asi->insn_handler = handler;
->>                  return INSN_GOOD;
->>          }
->> @@ -338,9 +340,9 @@ prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->>                  thumb_insn[2] = 0x4770; /* Thumb bx lr */
->
-> should be
-> thumb_insn[1] = __opcode_to_mem_thumb16(0x4770);
-> thumb_insn[2] = __opcode_to_mem_thumb16(0x4770);
->
->>                  return insn;
->>          }
->> -       asi->insn[1] = 0xe12fff1e; /* ARM bx lr */
->> +       asi->insn[1] = __opcode_to_mem_arm(0xe12fff1e); /* ARM bx lr */
->>   #else
->> -       asi->insn[1] = 0xe1a0f00e; /* mov pc, lr */
->> +       asi->insn[1] = __opcode_to_mem_arm(0xe1a0f00e); /* mov pc, lr */
->>   #endif
->>          /* Make an ARM instruction unconditional */
->>          if (insn < 0xe0000000)
->
+On 11/08/2013 08:37 PM, Ben Dooks wrote:
+> Currently the <asm/opcodes.h> header uses .work and .short to build
+> instructions. This means the output data does not get marked as an
+> instruction which can cause issues such as BE8 code failures.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/include/asm/opcodes.h | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+> index e796c59..4c7cac1 100644
+> --- a/arch/arm/include/asm/opcodes.h
+> +++ b/arch/arm/include/asm/opcodes.h
+> @@ -103,9 +103,15 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+>  #define __opcode_to_mem_arm(x) ___opcode_swab32(x)
+>  #define __opcode_to_mem_thumb16(x) ___opcode_swab16(x)
+>  #define __opcode_to_mem_thumb32(x) ___opcode_swahb32(x)
+> +#ifdef ARM_HAVE_INST
+>  #define ___asm_opcode_to_mem_arm(x) ___asm_opcode_swab32(x)
+>  #define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_swab16(x)
+>  #define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahb32(x)
+> +#else
+> +#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_identity32(x)
+> +#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_identity16(x)
+> +#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_identity32(x)
+> +#endif /* !ARM_HAVE_INST */
+>  
+>  #else /* ! CONFIG_CPU_ENDIAN_BE8 */
+>  
+> @@ -218,14 +224,27 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+>  
+>  /* Helpers for the helpers.  Don't use these directly. */
+>  #ifdef __ASSEMBLY__
+> +#ifdef ARM_HAVE_INST
+> +#define ___inst_arm(x) .inst x
+> +#define ___inst_thumb16(x) .inst.w x
+> +#define ___inst_thumb32(first, second) .inst.w first, second
+> +#else
+>  #define ___inst_arm(x) .long x
+>  #define ___inst_thumb16(x) .short x
+>  #define ___inst_thumb32(first, second) .short first, second
+> +#endif /* !ARM_HAVE_INST */
+> +#else
+> +#ifdef ARM_HAVE_INST
+> +#define ___inst_arm(x) ".inst " __stringify(x) "\n\t"
+> +#define ___inst_thumb16(x) ".inst.w " __stringify(x) "\n\t"
 
-Thanks, will re-do these patches.
+It should be .inst.n instead of .inst.w
+
+> +#define ___inst_thumb32(first, second) \
+> +	".inst.w " __stringify(first) ", " __stringify(second) "\n\t"
+
+I have not checked, but I think .inst.w will not combine two 16-bit
+arguments into one 32-bit instruction, but instead it will generate two
+wrong 32-bit instructions here.
+
+>  #else
+>  #define ___inst_arm(x) ".long " __stringify(x) "\n\t"
+>  #define ___inst_thumb16(x) ".short " __stringify(x) "\n\t"
+>  #define ___inst_thumb32(first, second) \
+>  	".short " __stringify(first) ", " __stringify(second) "\n\t"
+> +#endif /* !ARM_HAVE_INST */
+>  #endif
+>  
+>  #endif /* __ASM_ARM_OPCODES_H */
+> 
+
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Taras Kondratiuk
