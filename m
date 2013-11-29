@@ -1,78 +1,48 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 29 Nov 2013 15:02:07 +0100
-Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
- system suspend
-In-Reply-To: <3006899.CPLMC2kU1a@vostro.rjw.lan>
-References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFrRjB7gPpQ4c1U5e-BTHEt6k=kDqo7q1Grc04v-SDrsDw@mail.gmail.com>
- <3006899.CPLMC2kU1a@vostro.rjw.lan>
-Message-ID: <4064706.R9zKA4hcfi@vostro.rjw.lan>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 29 Nov 2013 14:51:25 +0100
+Subject: [PATCH 11/15] pwm: pwm-renesas-tpu: Enable driver compilation
+ with COMPILE_TEST
+In-Reply-To: <20131129105353.GI22771@ulmo.nvidia.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131129105353.GI22771@ulmo.nvidia.com>
+Message-ID: <7787436.L49ODt45in@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 29, 2013 02:52:20 PM Rafael J. Wysocki wrote:
-> On Friday, November 29, 2013 10:32:06 AM Ulf Hansson wrote:
+Hi Thierry,
 
-[...]
-
-> > For the same reasons, I believe we should trust drivers/subsystems, to
-> > understand when it makes sense for them to re-use all of the runtime
-> > PM callbacks during system suspend and not just the .runtime_suspend
-> > callback.
+On Friday 29 November 2013 11:53:54 Thierry Reding wrote:
+> On Wed, Nov 27, 2013 at 02:18:33AM +0100, Laurent Pinchart wrote:
+> > This helps increasing build testing coverage.
 > > 
-> > That is in principle what I and Alan, who came up with this idea, are
-> > suggesting.
+> > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > Cc: linux-pwm at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > Acked-by: Simon Horman <horms@verge.net.au>
+> > ---
+> > 
+> >  drivers/pwm/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> The problem with it is, as I said, the subsystem-level code you're calling
-> back through pm_generic_suspend_late_runtime() (and the other resume function)
-> has to be implemented in a specific way for things to work.  So it goes like
-> this: "OK, now I'm not runtime-suspended, so I need to do something about that.
-> Why don't I call back to the layer above me that has just called me (and that
-> surely won't do anything after I return, right?), so that it does the right
-> thing (which it surely will do, of course?) and calls my runtime PM callback
-> as expected".
-> 
-> And now suppose that your subsystem-level callbacks look like this (pseudo code):
-> 
-> a_suspend_late(dev)
-> {
-> 	if (successful(pm_generic_suspend_late(dev)))
-> 		do_X(dev);
-> }
-> 
-> a_runtime_suspend(dev)
-> {
-> 	if (successful(pm_generic_runtime_suspend(dev)))
-> 		do_Y(dev);
-> }
-> 
-> Then, if the driver uses your pm_generic_suspend_late_runtime(), the actually
-> executed code will be (assuming dev is not runtime-suspended):
-> 
-> 	a_suspend_late(dev)
-> 		driver->suspend_late(dev)
-> 			a_runtime_suspend(dev)
-> 				driver->runtime_suspend(dev)
-> 				do_Y(dev)
-> 	do_X(dev)
-> 
-> So what if do_X(dev) after do_Y(dev) doesn't actually work?
-> 
-> And what you actually want is
-> 
-> 	driver->runtime_suspend(dev)
-> 	do_Y(dev)
+> I'm not sure if this has been answered in any of the various subthreads
+> before. I've tried to read through them, but I may have missed some. It
+> was mentioned that iowrite16() wasn't supported on all architectures;
+> won't this possibly cause randconfig autobuilders to break?
 
-That should have been
+That's possible (although it has been reported to me that the situation got 
+fixed on arch/cris in v3.12), but the only way to find out is to try it. That 
+would be a bug in the architecture, and it should then get fixed.
 
- 	driver->runtime_suspend(dev)
- 	do_X(dev)
+-- 
+Regards,
 
-because do_Y(dev) is for runtime suspend.  Sorry.
-
-And of course, the subsystem-level code you're developing the driver for may not
-do the do_X(dev) thing at all, in which case all will work.  But what if someone
-tries to use the driver with a different subsystem-level code (like a new PM
-domain)?
-
-Rafael
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/ef9d4ba2/attachment.sig>
