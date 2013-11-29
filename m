@@ -1,59 +1,62 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 29 Nov 2013 15:18:53 +0200
-Subject: [PATCH v4 0/5] Update Davinci watchdog driver
-In-Reply-To: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <5298943D.8010608@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Nov 2013 14:26:19 +0100
+Subject: [PATCH 07/31] clk: tegra: implement a reset driver
+In-Reply-To: <1384548866-13141-8-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-8-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131129132618.GT22771@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
-On 11/27/2013 02:48 PM, Ivan Khoronzhuk wrote:
-> These patches are intended to update Davinci watchdog to use WDT core
-> and reuse driver for keystone arch, because Keystone uses the similar
-> IP like Davinci.
-> 
-> See Documentation:
-> Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
-> Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
-> 
-> Also:
->   - improved to support GET_TIMELEFT option.
->   - added "clocks" and "timeout-sec" properties to DT.
-
-Do you have any additional comments to this series?
-
-By the way patch "[PATCH] watchdog: davinci: rename platform driver to davinci-wdt"
-https://lkml.org/lkml/2013/11/27/201 can be applied as before as after this series
-without conflicts.
-
-> 
-> Based on
-> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
-> keystone/master
-> 
-> v3..v4:
-> - watchdog: davinci: change driver to use WDT core
-> 	reverted rename of platform driver to "davinci-wdt"
-> 	as it causes a regression on Davinci platforms.
-> 
+On Fri, Nov 15, 2013 at 01:54:02PM -0700, Stephen Warren wrote:
 [...]
-> 
-> Ivan Khoronzhuk (5):
->    watchdog: davinci: change driver to use WDT core
->    watchdog: davinci: use davinci_wdt_device structure to hold device
->      data
->    watchdog: davinci: add GET_TIMELEFT option support
->    watchdog: davinci: add "timeout-sec" property
->    watchdog: davinci: reuse driver for keystone arch
-> 
->   .../devicetree/bindings/watchdog/davinci-wdt.txt   |   16 +-
->   drivers/watchdog/Kconfig                           |    6 +-
->   drivers/watchdog/davinci_wdt.c                     |  221 +++++++++-----------
->   3 files changed, 114 insertions(+), 129 deletions(-)
-> 
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+[...]
+> -	clks = tegra_clk_init(TEGRA124_CLK_CLK_MAX, 6);
+> +	clks = tegra_clk_init(clk_base, TEGRA124_CLK_CLK_MAX, 6);
 
+This doesn't really concern this patch, but this is inconsistent with
+the drivers for other generations. We should probably make that
+consistent in a separate patch.
 
-Regards,
--grygorii
+> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
+
+> +static int tegra_clk_rst_assert(struct reset_controller_dev *rcdev,
+> +		unsigned long id);
+> +static int tegra_clk_rst_deassert(struct reset_controller_dev *rcdev,
+> +		unsigned long id);
+
+Can you reorder the code so that these forward-declarations can be
+avoided?
+
+>  /* Global data of Tegra CPU CAR ops */
+>  static struct tegra_cpu_car_ops dummy_car_ops;
+>  struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+> @@ -70,6 +77,17 @@ static struct clk **clks;
+>  static int clk_num;
+>  static struct clk_onecell_data clk_data;
+>  
+> +static struct reset_control_ops rst_ops = {
+> +	.assert = tegra_clk_rst_assert,
+> +	.deassert = tegra_clk_rst_deassert,
+> +};
+> +
+> +static struct reset_controller_dev rst_ctlr = {
+> +	.ops = &rst_ops,
+> +	.owner = THIS_MODULE,
+> +	.of_reset_n_cells = 1,
+> +};
+
+It looks like these can be moved further down (below the implementation
+of tegra_clk_rst_assert() and tegra_clk_rst_deassert()). I rather like
+not having to modify two locations when the signature changes, but it's
+not that big a deal, so with or without that fixed up:
+
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131129/3f8e4466/attachment.sig>
