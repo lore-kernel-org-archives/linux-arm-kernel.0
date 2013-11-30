@@ -1,101 +1,56 @@
-From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
-Date: Sat, 30 Nov 2013 13:19:30 +0800
-Subject: [PATCH v2 1/2] usb: chipidea: usbmisc: Add support for
- i.MX27/i.MX31 CPUs
-In-Reply-To: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
-References: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
-Message-ID: <52997562.8020506@gtsys.com.hk>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 30 Nov 2013 10:18:03 +0400
+Subject: [PATCH 3/4] ARM: dts: imx27-phytec-phycore-som: Update FEC node
+In-Reply-To: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
+References: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1385792284-22286-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch updates FEC devicetree node of Phytec PCM038 module:
+- Adding missing phy_mode properties.
+- Adding fixed regulator to provide functionality without
+  dummy-regulator in the kernel.
 
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-On Tuesday, November 26, 2013 11:36 PM, Alexander Shiyan wrote:
-> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
->
-> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
-> ---
->   drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
->   1 file changed, 42 insertions(+)
->
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index 8a1094b..4381c5a6 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> @@ -21,6 +21,10 @@
->   #define MX25_USB_PHY_CTRL_OFFSET	0x08
->   #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
->
-> +#define MX27_H1_PM_BIT			BIT(8)
-> +#define MX27_H2_PM_BIT			BIT(16)
-> +#define MX27_OTG_PM_BIT			BIT(24)
-> +
->   #define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08
->   #define MX53_USB_UH2_CTRL_OFFSET	0x14
->   #define MX53_USB_UH3_CTRL_OFFSET	0x18
-> @@ -68,6 +72,36 @@ static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
->   	return 0;
->   }
->
-> +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
-> +{
-> +	unsigned long flags;
-> +	u32 val;
-> +
-> +	switch (data->index) {
-> +	case 0:
-> +		val = MX27_OTG_PM_BIT;
-> +		break;
-> +	case 1:
-> +		val = MX27_H1_PM_BIT;
-> +		break;
-> +	case 2:
-> +		val = MX27_H2_PM_BIT;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	};
-> +
-> +	spin_lock_irqsave(&usbmisc->lock, flags);
-> +	if (data->disable_oc)
-> +		val = readl(usbmisc->base) | val;
-> +	else
-> +		val = readl(usbmisc->base)&  ~val;
-> +	writel(val, usbmisc->base);
-> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
->   static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
->   {
->   	void __iomem *reg = NULL;
-> @@ -128,6 +162,10 @@ static const struct usbmisc_ops imx25_usbmisc_ops = {
->   	.post = usbmisc_imx25_post,
->   };
->
-> +static const struct usbmisc_ops imx27_usbmisc_ops = {
-> +	.init = usbmisc_imx27_init,
-> +};
-> +
->   static const struct usbmisc_ops imx53_usbmisc_ops = {
->   	.init = usbmisc_imx53_init,
->   };
-> @@ -162,6 +200,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
->   		.data =&imx25_usbmisc_ops,
->   	},
->   	{
-> +		.compatible = "fsl,imx27-usbmisc",
-> +		.data =&imx27_usbmisc_ops,
-> +	},
-> +	{
->   		.compatible = "fsl,imx53-usbmisc",
->   		.data =&imx53_usbmisc_ops,
->   	},
-
-Tested and works fine.
-
-Acked-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
-
-Regards
-Chris
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+index fec2d29..861e2e0 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+@@ -19,6 +19,20 @@
+ 	memory {
+ 		reg = <0xa0000000 0x08000000>;
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3v3: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
++	};
+ };
+ 
+ &audmux {
+@@ -134,7 +148,9 @@
+ };
+ 
+ &fec {
++	phy-mode = "mii";
+ 	phy-reset-gpios = <&gpio3 30 0>;
++	phy-supply = <&reg_3v3>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec1>;
+ 	status = "okay";
+-- 
+1.8.3.2
