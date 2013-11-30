@@ -1,239 +1,179 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Sat, 30 Nov 2013 23:51:36 +0100
-Subject: [PATCH v6 16/17] powerpc/mpc512x: improve DIU related clock setup
-In-Reply-To: <1385851897-23475-1-git-send-email-gsi@denx.de>
-References: <1385851897-23475-1-git-send-email-gsi@denx.de>
-Message-ID: <1385851897-23475-17-git-send-email-gsi@denx.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 30 Nov 2013 14:56:26 -0800
+Subject: [PATCH v5 00/17] ARM: at91: move to common clk framework
+In-Reply-To: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
+References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131130225626.16819.99250@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adapt the DIU clock initialization to the COMMON_CLK approach:
-device tree based clock lookup, prepare and unprepare for clocks,
-work with frequencies not dividers, call the appropriate clk_*()
-routines and don't access CCM registers
+Quoting Boris BREZILLON (2013-11-12 12:51:52)
+> Hello,
+> 
+> This patch series is the 5th version of the at91 clk implementations
+> using the Common Clk Framework.
 
-the "best clock" determination now completely relies on the
-platform's clock driver to pick a frequency close to what the
-caller requests, and merely checks whether the desired frequency
-was met (fits the tolerance of the monitor)
+Thanks for sending this latest version. A couple recurring themes to be
+addressed:
 
-this approach shall succeed upon first try in the usual case,
-will test a few less desirable yet acceptable frequencies in
-edge cases, and will fallback to "best effort" if none of the
-previously tried frequencies pass the test
+1) Some clocks implement .prepare and .disable but not .unprepre nor
+.enable. Please only use .prepare and .unprepare in this case.
 
-provide a fallback clock lookup approach in case the OF based clock
-lookup for the DIU fails, this allows for successful operation in
-the presence of an outdated device tree which lacks clock specs
+2) Remove the file names & paths from the comment block at the top of
+the files.
 
-Cc: Anatolij Gustschin <agust@denx.de>
-Cc: linuxppc-dev at lists.ozlabs.org
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/platforms/512x/mpc512x_shared.c |  169 ++++++++++++++------------
- 1 file changed, 92 insertions(+), 77 deletions(-)
+These are minor issues. Are you taking these through your platform tree or the
+clk tree? If you want to take them through your platform tree then feel
+free to add my acked-by to the next version.
 
-diff --git a/arch/powerpc/platforms/512x/mpc512x_shared.c b/arch/powerpc/platforms/512x/mpc512x_shared.c
-index 36b5652aada2..adb95f03d4d4 100644
---- a/arch/powerpc/platforms/512x/mpc512x_shared.c
-+++ b/arch/powerpc/platforms/512x/mpc512x_shared.c
-@@ -12,6 +12,7 @@
-  * (at your option) any later version.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/kernel.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -68,98 +69,112 @@ struct fsl_diu_shared_fb {
- 	bool		in_use;
- };
- 
--#define DIU_DIV_MASK	0x000000ff
-+/* receives a pixel clock spec in pico seconds, adjusts the DIU clock rate */
- static void mpc512x_set_pixel_clock(unsigned int pixclock)
- {
--	unsigned long bestval, bestfreq, speed, busfreq;
--	unsigned long minpixclock, maxpixclock, pixval;
--	struct mpc512x_ccm __iomem *ccm;
- 	struct device_node *np;
--	u32 temp;
--	long err;
--	int i;
-+	struct clk *clk_diu;
-+	unsigned long epsilon, minpixclock, maxpixclock;
-+	unsigned long offset, want, got, delta;
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,mpc5121-clock");
-+	/* lookup and enable the DIU clock */
-+	np = of_find_compatible_node(NULL, NULL, "fsl,mpc5121-diu");
- 	if (!np) {
--		pr_err("Can't find clock control module.\n");
-+		pr_err("Could not find DIU device tree node.\n");
- 		return;
- 	}
--
--	ccm = of_iomap(np, 0);
-+	clk_diu = of_clk_get(np, 0);
-+	if (IS_ERR(clk_diu)) {
-+		/* backwards compat with device trees that lack clock specs */
-+		clk_diu = clk_get_sys(np->name, "ipg");
-+	}
- 	of_node_put(np);
--	if (!ccm) {
--		pr_err("Can't map clock control module reg.\n");
-+	if (IS_ERR(clk_diu)) {
-+		pr_err("Could not lookup DIU clock.\n");
- 		return;
- 	}
--
--	np = of_find_node_by_type(NULL, "cpu");
--	if (np) {
--		const unsigned int *prop =
--			of_get_property(np, "bus-frequency", NULL);
--
--		of_node_put(np);
--		if (prop) {
--			busfreq = *prop;
--		} else {
--			pr_err("Can't get bus-frequency property\n");
--			return;
--		}
--	} else {
--		pr_err("Can't find 'cpu' node.\n");
-+	if (clk_prepare_enable(clk_diu)) {
-+		pr_err("Could not enable DIU clock.\n");
- 		return;
- 	}
- 
--	/* Pixel Clock configuration */
--	pr_debug("DIU: Bus Frequency = %lu\n", busfreq);
--	speed = busfreq * 4; /* DIU_DIV ratio is 4 * CSB_CLK / DIU_CLK */
--
--	/* Calculate the pixel clock with the smallest error */
--	/* calculate the following in steps to avoid overflow */
--	pr_debug("DIU pixclock in ps - %d\n", pixclock);
--	temp = (1000000000 / pixclock) * 1000;
--	pixclock = temp;
--	pr_debug("DIU pixclock freq - %u\n", pixclock);
--
--	temp = temp / 20; /* pixclock * 0.05 */
--	pr_debug("deviation = %d\n", temp);
--	minpixclock = pixclock - temp;
--	maxpixclock = pixclock + temp;
--	pr_debug("DIU minpixclock - %lu\n", minpixclock);
--	pr_debug("DIU maxpixclock - %lu\n", maxpixclock);
--	pixval = speed/pixclock;
--	pr_debug("DIU pixval = %lu\n", pixval);
--
--	err = LONG_MAX;
--	bestval = pixval;
--	pr_debug("DIU bestval = %lu\n", bestval);
--
--	bestfreq = 0;
--	for (i = -1; i <= 1; i++) {
--		temp = speed / (pixval+i);
--		pr_debug("DIU test pixval i=%d, pixval=%lu, temp freq. = %u\n",
--			i, pixval, temp);
--		if ((temp < minpixclock) || (temp > maxpixclock))
--			pr_debug("DIU exceeds monitor range (%lu to %lu)\n",
--				minpixclock, maxpixclock);
--		else if (abs(temp - pixclock) < err) {
--			pr_debug("Entered the else if block %d\n", i);
--			err = abs(temp - pixclock);
--			bestval = pixval + i;
--			bestfreq = temp;
--		}
-+	/*
-+	 * convert the picoseconds spec into the desired clock rate,
-+	 * determine the acceptable clock range for the monitor (+/- 5%),
-+	 * do the calculation in steps to avoid integer overflow
-+	 */
-+	pr_debug("DIU pixclock in ps - %u\n", pixclock);
-+	pixclock = (1000000000 / pixclock) * 1000;
-+	pr_debug("DIU pixclock freq  - %u\n", pixclock);
-+	epsilon = pixclock / 20; /* pixclock * 0.05 */
-+	pr_debug("DIU deviation      - %lu\n", epsilon);
-+	minpixclock = pixclock - epsilon;
-+	maxpixclock = pixclock + epsilon;
-+	pr_debug("DIU minpixclock    - %lu\n", minpixclock);
-+	pr_debug("DIU maxpixclock    - %lu\n", maxpixclock);
-+
-+	/*
-+	 * check whether the DIU supports the desired pixel clock
-+	 *
-+	 * - simply request the desired clock and see what the
-+	 *   platform's clock driver will make of it, assuming that it
-+	 *   will setup the best approximation of the requested value
-+	 * - try other candidate frequencies in the order of decreasing
-+	 *   preference (i.e. with increasing distance from the desired
-+	 *   pixel clock, and checking the lower frequency before the
-+	 *   higher frequency to not overload the hardware) until the
-+	 *   first match is found -- any potential subsequent match
-+	 *   would only be as good as the former match or typically
-+	 *   would be less preferrable
-+	 *
-+	 * the offset increment of pixelclock divided by 64 is an
-+	 * arbitrary choice -- it's simple to calculate, in the typical
-+	 * case we expect the first check to succeed already, in the
-+	 * worst case seven frequencies get tested (the exact center and
-+	 * three more values each to the left and to the right) before
-+	 * the 5% tolerance window is exceeded, resulting in fast enough
-+	 * execution yet high enough probability of finding a suitable
-+	 * value, while the error rate will be in the order of single
-+	 * percents
-+	 */
-+	for (offset = 0; offset <= epsilon; offset += pixclock / 64) {
-+		want = pixclock - offset;
-+		pr_debug("DIU checking clock - %lu\n", want);
-+		clk_set_rate(clk_diu, want);
-+		got = clk_get_rate(clk_diu);
-+		delta = abs(pixclock - got);
-+		if (delta < epsilon)
-+			break;
-+		if (!offset)
-+			continue;
-+		want = pixclock + offset;
-+		pr_debug("DIU checking clock - %lu\n", want);
-+		clk_set_rate(clk_diu, want);
-+		got = clk_get_rate(clk_diu);
-+		delta = abs(pixclock - got);
-+		if (delta < epsilon)
-+			break;
- 	}
-+	if (offset <= epsilon) {
-+		pr_debug("DIU clock accepted - %lu\n", want);
-+		pr_debug("DIU pixclock want %u, got %lu, delta %lu, eps %lu\n",
-+			 pixclock, got, delta, epsilon);
-+		return;
-+	}
-+	pr_warn("DIU pixclock auto search unsuccessful\n");
- 
--	pr_debug("DIU chose = %lx\n", bestval);
--	pr_debug("DIU error = %ld\n NomPixClk ", err);
--	pr_debug("DIU: Best Freq = %lx\n", bestfreq);
--	/* Modify DIU_DIV in CCM SCFR1 */
--	temp = in_be32(&ccm->scfr1);
--	pr_debug("DIU: Current value of SCFR1: 0x%08x\n", temp);
--	temp &= ~DIU_DIV_MASK;
--	temp |= (bestval & DIU_DIV_MASK);
--	out_be32(&ccm->scfr1, temp);
--	pr_debug("DIU: Modified value of SCFR1: 0x%08x\n", temp);
--	iounmap(ccm);
-+	/*
-+	 * what is the most appropriate action to take when the search
-+	 * for an available pixel clock which is acceptable to the
-+	 * monitor has failed?  disable the DIU (clock) or just provide
-+	 * a "best effort"?  we go with the latter
-+	 */
-+	pr_warn("DIU pixclock best effort fallback (backend's choice)\n");
-+	clk_set_rate(clk_diu, pixclock);
-+	got = clk_get_rate(clk_diu);
-+	delta = abs(pixclock - got);
-+	pr_debug("DIU pixclock want %u, got %lu, delta %lu, eps %lu\n",
-+		 pixclock, got, delta, epsilon);
- }
- 
- static enum fsl_diu_monitor_port
--- 
-1.7.10.4
+Regards,
+Mike
+
+> 
+> Most of the clock provided by the PMC (Power Management Controller) are
+> implemented :
+> - main clock (main oscillator)
+> - pll clocks
+> - master clock
+> - programmable clocks
+> - utmi clock
+> - peripheral clocks
+> - system clocks
+> 
+> Actually some clk drivers are missing (slow clk, main clk and processor
+> clk), and some drivers only implement a subset of the hardware capabilities
+> (master clk rate change is missing).
+> But this series implements all the already available clks, and I will hopefully
+> add missing features in a near future.
+> 
+> This implementation is only compatible with device tree definition.
+> The goal is to define the whole clock tree using the device tree.
+> 
+> BTW, could a dt maintainer take a look at these dt bindinds ?
+> 
+> Just a note to let you know these bindings are currently unstable and might
+> change in the future.
+> 
+> 
+> Mike, I know you already acked the previous version, but I slighty changed
+> the dt bindings, according to some feedbacks I got during ELCE.
+> Could you take a look at this new version (at least the new dt bindings),
+> and add your acked-by if you agree with these changes ?
+> 
+> Best Regards,
+> Boris
+> 
+> Changes since v4:
+>  - rework dt bindings:
+>    * replace "atmel,clk-id" property by the standard "reg" property
+>    * reference system, peripheral and programmable clks using the direct
+>      clk node instead of the parent node plus a clk id
+>  - provide a new helper function (of_at91_get_clk_range) to retrieve a clk
+>    range from the device tree
+> 
+> Changes since v3:
+>  - simplify master clk implementation (drop set_rate/parent support)
+>  - fix bug in set_rate function of pll driver
+>  - fix coding style issues
+>  - define macros and constants where needed
+>  - remove peripheral id macro references
+>  - remove sam9g35 specific handling (sam9g35 = sam9x5)
+>  - rework main clk prepare function to handle automatic rate calculation
+> 
+> Changes since v2:
+>  - fix several bugs in clk implementations
+>  - drop non-dt boards support
+>  - split the series to ease review and tests:
+>    * 1 patch series for new clk implementations (this series)
+>    * 1 patch series to move each at91 SoC to common clk framework (coming soon)
+>  - modify dt-bindings (add atmel,clk- prefix to atmel specific properties)
+>  - add clk macros for dt-bindings
+>  - add pmc framework (helper function to access pmc registers)
+>  - add interrupt support to enable passive wait in clk_prepare functions
+> 
+> Changes since v1:
+>  - fix bugs in pll, programmable and system clock implementations
+>    (wrong bit position).
+>  - add usb clock configuration support (ohci and udc drivers +
+>    clk_lookup for non dt boards)
+>  - rework of the system clock interfaces (no need to define a parent clock,
+>    system clock is a gate with no rate info)
+>  - change system, peripheral and programmable clk dt bindings (1 master node
+>    and multiple child nodes each defining a system/peripheral or prog clock)
+>  - fix bugs in sama5 dt definition
+> 
+> Boris BREZILLON (17):
+>   ARM: at91: move at91_pmc.h to include/linux/clk/at91_pmc.h
+>   ARM: at91: add Kconfig options for common clk support
+>   clk: at91: add PMC base support
+>   clk: at91: add PMC macro file for dt definitions
+>   clk: at91: add PMC main clock
+>   clk: at91: add PMC pll clocks
+>   clk: at91: add PMC master clock
+>   clk: at91: add PMC system clocks
+>   clk: at91: add PMC peripheral clocks
+>   clk: at91: add peripheral clk macros for peripheral clk dt bindings
+>   clk: at91: add PMC programmable clocks
+>   clk: at91: add PMC utmi clock
+>   clk: at91: add PMC usb clock
+>   clk: at91: add PMC smd clock
+>   clk: at91: add PMC clk device tree binding doc.
+>   ARM: at91: move pit timer to common clk framework
+>   ARM: at91: add new compatible strings for pmc driver
+> 
+>  .../devicetree/bindings/clock/at91-clock.txt       |  339 +++++++++++++
+>  arch/arm/mach-at91/Kconfig                         |   44 ++
+>  arch/arm/mach-at91/Kconfig.non_dt                  |    6 +
+>  arch/arm/mach-at91/Makefile                        |    2 +-
+>  arch/arm/mach-at91/at91rm9200.c                    |    2 +-
+>  arch/arm/mach-at91/at91sam9260.c                   |    2 +-
+>  arch/arm/mach-at91/at91sam9261.c                   |    2 +-
+>  arch/arm/mach-at91/at91sam9263.c                   |    2 +-
+>  arch/arm/mach-at91/at91sam926x_time.c              |   14 +-
+>  arch/arm/mach-at91/at91sam9g45.c                   |    2 +-
+>  arch/arm/mach-at91/at91sam9n12.c                   |    2 +-
+>  arch/arm/mach-at91/at91sam9rl.c                    |    2 +-
+>  arch/arm/mach-at91/at91sam9x5.c                    |    2 +-
+>  arch/arm/mach-at91/clock.c                         |    7 +-
+>  arch/arm/mach-at91/generic.h                       |    3 +-
+>  arch/arm/mach-at91/pm.c                            |    2 +-
+>  arch/arm/mach-at91/pm_slowclock.S                  |    2 +-
+>  arch/arm/mach-at91/sama5d3.c                       |    2 +-
+>  arch/arm/mach-at91/setup.c                         |    8 +-
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/at91/Makefile                          |   12 +
+>  drivers/clk/at91/clk-main.c                        |  189 +++++++
+>  drivers/clk/at91/clk-master.c                      |  272 ++++++++++
+>  drivers/clk/at91/clk-peripheral.c                  |  412 +++++++++++++++
+>  drivers/clk/at91/clk-pll.c                         |  534 ++++++++++++++++++++
+>  drivers/clk/at91/clk-plldiv.c                      |  137 +++++
+>  drivers/clk/at91/clk-programmable.c                |  368 ++++++++++++++
+>  drivers/clk/at91/clk-smd.c                         |  173 +++++++
+>  drivers/clk/at91/clk-system.c                      |  137 +++++
+>  drivers/clk/at91/clk-usb.c                         |  400 +++++++++++++++
+>  drivers/clk/at91/clk-utmi.c                        |  162 ++++++
+>  drivers/clk/at91/pmc.c                             |  399 +++++++++++++++
+>  drivers/clk/at91/pmc.h                             |  116 +++++
+>  drivers/usb/gadget/atmel_usba_udc.c                |    2 +-
+>  include/dt-bindings/clk/at91.h                     |   28 +
+>  .../include/mach => include/linux/clk}/at91_pmc.h  |    4 +-
+>  36 files changed, 3771 insertions(+), 20 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/at91-clock.txt
+>  create mode 100644 drivers/clk/at91/Makefile
+>  create mode 100644 drivers/clk/at91/clk-main.c
+>  create mode 100644 drivers/clk/at91/clk-master.c
+>  create mode 100644 drivers/clk/at91/clk-peripheral.c
+>  create mode 100644 drivers/clk/at91/clk-pll.c
+>  create mode 100644 drivers/clk/at91/clk-plldiv.c
+>  create mode 100644 drivers/clk/at91/clk-programmable.c
+>  create mode 100644 drivers/clk/at91/clk-smd.c
+>  create mode 100644 drivers/clk/at91/clk-system.c
+>  create mode 100644 drivers/clk/at91/clk-usb.c
+>  create mode 100644 drivers/clk/at91/clk-utmi.c
+>  create mode 100644 drivers/clk/at91/pmc.c
+>  create mode 100644 drivers/clk/at91/pmc.h
+>  create mode 100644 include/dt-bindings/clk/at91.h
+>  rename {arch/arm/mach-at91/include/mach => include/linux/clk}/at91_pmc.h (98%)
+> 
+> -- 
+> 1.7.9.5
