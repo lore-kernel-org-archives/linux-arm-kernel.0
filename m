@@ -1,51 +1,177 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 30 Nov 2013 10:18:02 +0400
-Subject: [PATCH 2/4] ARM: dts: imx27-phytec-phycore-rdk: Add DT node for
- camera module
+Date: Sat, 30 Nov 2013 10:18:04 +0400
+Subject: [PATCH 4/4] ARM: dts: i.MX27 boards: Switch to use standard GPIO and
+ IRQ flags definitions
 In-Reply-To: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
 References: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1385792284-22286-2-git-send-email-shc_work@mail.ru>
+Message-ID: <1385792284-22286-4-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds first I2C bus and PCA9536 device.
-This device is used on Phytec PCM-970 RDK camera addon module.
-
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/imx27-apf27dev.dts             | 13 +++++++------
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts |  2 +-
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts |  4 ++--
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts   |  9 +++++----
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dts   |  6 +++---
+ arch/arm/boot/dts/imx27.dtsi                     |  2 ++
+ 6 files changed, 20 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index e792469..3145bdb 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -19,8 +19,26 @@
- 	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
+diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
+index 9197329..51a19ad 100644
+--- a/arch/arm/boot/dts/imx27-apf27dev.dts
++++ b/arch/arm/boot/dts/imx27-apf27dev.dts
+@@ -41,7 +41,7 @@
+ 
+ 		user-key {
+ 			label = "user";
+-			gpios = <&gpio6 13 0>;
++			gpios = <&gpio6 13 GPIO_ACTIVE_HIGH>;
+ 			linux,code = <276>; /* BTN_EXTRA */
+ 		};
+ 	};
+@@ -51,7 +51,7 @@
+ 
+ 		user {
+ 			label = "Heartbeat";
+-			gpios = <&gpio6 14 0>;
++			gpios = <&gpio6 14 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
+@@ -59,14 +59,15 @@
+ 
+ &cspi1 {
+ 	fsl,spi-num-chipselects = <1>;
+-	cs-gpios = <&gpio4 28 1>;
++	cs-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
  };
  
-+&i2c1 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	camgpio: pca9536 at 41 {
-+		compatible = "nxp,pca9536";
-+		reg = <0x41>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+};
-+
- &iomuxc {
- 	imx27_phycore_rdk {
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <MX27_I2C1_PINGRP1>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX27_UART1_PINGRP1
+ &cspi2 {
+ 	fsl,spi-num-chipselects = <3>;
+-	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
+-			<&gpio2 17 1>;
++	cs-gpios = <&gpio4 21 GPIO_ACTIVE_LOW>,
++		   <&gpio4 27 GPIO_ACTIVE_LOW>,
++		   <&gpio2 17 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+@@ -92,6 +93,6 @@
+ 
+ &sdhci2 {
+ 	bus-width = <4>;
+-	cd-gpios = <&gpio3 14 0>;
++	cd-gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+index 0a90df1..0d65023 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+@@ -113,7 +113,7 @@
+ };
+ 
+ &sdhci2 {
+-	cd-gpios = <&gpio3 29 0>;
++	cd-gpios = <&gpio3 29 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+index 62e7fcb..db8c095 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+@@ -24,8 +24,8 @@
+ 
+ &cspi1 {
+ 	fsl,spi-num-chipselects = <2>;
+-	cs-gpios = <&gpio4 28 0>,
+-		<&gpio4 27 0>;
++	cs-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>,
++		   <&gpio4 27 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index 3145bdb..2cb9e4b 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -16,7 +16,8 @@
+ 
+ &cspi1 {
+ 	fsl,spi-num-chipselects = <2>;
+-	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
++	cs-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>,
++		   <&gpio4 27 GPIO_ACTIVE_LOW>;
+ };
+ 
+ &i2c1 {
+@@ -57,8 +58,8 @@
+ 
+ &sdhci2 {
+ 	bus-width = <4>;
+-	cd-gpios = <&gpio3 29 0>;
+-	wp-gpios = <&gpio3 28 0>;
++	cd-gpios = <&gpio3 29 GPIO_ACTIVE_HIGH>;
++	wp-gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
+ 	vmmc-supply = <&vmmc1_reg>;
+ 	status = "okay";
+ };
+@@ -82,7 +83,7 @@
+ 		compatible = "nxp,sja1000";
+ 		reg = <4 0x00000000 0x00000100>;
+ 		interrupt-parent = <&gpio5>;
+-		interrupts = <19 0x2>;
++		interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
+ 		nxp,external-clock-frequency = <16000000>;
+ 		nxp,tx-output-config = <0x16>;
+ 		nxp,no-comparator-bypass;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+index 861e2e0..3435ce9 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+@@ -52,7 +52,7 @@
+ 
+ &cspi1 {
+ 	fsl,spi-num-chipselects = <1>;
+-	cs-gpios = <&gpio4 28 0>;
++	cs-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ 
+ 	pmic: mc13783 at 0 {
+@@ -62,7 +62,7 @@
+ 		spi-max-frequency = <20000000>;
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio2>;
+-		interrupts = <23 0x4>;
++		interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
+ 		fsl,mc13xxx-uses-adc;
+ 		fsl,mc13xxx-uses-rtc;
+ 
+@@ -149,7 +149,7 @@
+ 
+ &fec {
+ 	phy-mode = "mii";
+-	phy-reset-gpios = <&gpio3 30 0>;
++	phy-reset-gpios = <&gpio3 30 GPIO_ACTIVE_HIGH>;
+ 	phy-supply = <&reg_3v3>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec1>;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 5cfe288..63b1b32 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -11,6 +11,8 @@
+ 
+ #include "skeleton.dtsi"
+ #include "imx27-pingrp.h"
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	aliases {
 -- 
 1.8.3.2
