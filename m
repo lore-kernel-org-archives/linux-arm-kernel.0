@@ -1,59 +1,97 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Sat, 30 Nov 2013 09:51:12 +0100
-Subject: [PATCH 1/2] ARM: imx28: add apf28 specific initialization (macaddr)
-Message-ID: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 30 Nov 2013 11:49:37 +0000
+Subject: [RFC] ARM: lib: delay-loop: Add align directive to fix
+ BogoMIPS calculation
+In-Reply-To: <CAOMZO5AyjD4f2o2c-QbK13Pb5cZCWEV4f5dc38MspDBY6_OjDg@mail.gmail.com>
+References: <1385121212-30182-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5AyjD4f2o2c-QbK13Pb5cZCWEV4f5dc38MspDBY6_OjDg@mail.gmail.com>
+Message-ID: <20131130114937.GY16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/mach-mxs/mach-mxs.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+On Fri, Nov 29, 2013 at 09:02:05AM -0200, Fabio Estevam wrote:
+> Hi Russell,
+> 
+> On Fri, Nov 22, 2013 at 9:53 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> >
+> > Currently mx53 (CortexA8) running at 1GHz reports:
+> > Calibrating delay loop... 663.55 BogoMIPS (lpj=3317760)
+> >
+> > Tom Evans verified that alignments of 0x0 and 0x8 run the two instructions of
+> > __loop_delay in one clock cycle (1 clock/loop), while alignments of 0x4 and
+> > 0xc take 3 clocks to run the loop twice. (1.5 clock/loop)
+> >
+> > The original object code looks like this:
+> >
+> > 00000010 <__loop_const_udelay>:
+> >   10:   e3e01000        mvn     r1, #0
+> >   14:   e51f201c        ldr     r2, [pc, #-28]  ; 0 <__loop_udelay-0x8>
+> >   18:   e5922000        ldr     r2, [r2]
+> >   1c:   e0800921        add     r0, r0, r1, lsr #18
+> >   20:   e1a00720        lsr     r0, r0, #14
+> >   24:   e0822b21        add     r2, r2, r1, lsr #22
+> >   28:   e1a02522        lsr     r2, r2, #10
+> >   2c:   e0000092        mul     r0, r2, r0
+> >   30:   e0800d21        add     r0, r0, r1, lsr #26
+> >   34:   e1b00320        lsrs    r0, r0, #6
+> >   38:   01a0f00e        moveq   pc, lr
+> >
+> > 0000003c <__loop_delay>:
+> >   3c:   e2500001        subs    r0, r0, #1
+> >   40:   8afffffe        bhi     3c <__loop_delay>
+> >   44:   e1a0f00e        mov     pc, lr
+> >
+> > After adding the 'align 3' directive to __loop_delay (align to 8 bytes):
+> >
+> > 00000010 <__loop_const_udelay>:
+> >   10:   e3e01000        mvn     r1, #0
+> >   14:   e51f201c        ldr     r2, [pc, #-28]  ; 0 <__loop_udelay-0x8>
+> >   18:   e5922000        ldr     r2, [r2]
+> >   1c:   e0800921        add     r0, r0, r1, lsr #18
+> >   20:   e1a00720        lsr     r0, r0, #14
+> >   24:   e0822b21        add     r2, r2, r1, lsr #22
+> >   28:   e1a02522        lsr     r2, r2, #10
+> >   2c:   e0000092        mul     r0, r2, r0
+> >   30:   e0800d21        add     r0, r0, r1, lsr #26
+> >   34:   e1b00320        lsrs    r0, r0, #6
+> >   38:   01a0f00e        moveq   pc, lr
+> >   3c:   e320f000        nop     {0}
+> >
+> > 00000040 <__loop_delay>:
+> >   40:   e2500001        subs    r0, r0, #1
+> >   44:   8afffffe        bhi     40 <__loop_delay>
+> >   48:   e1a0f00e        mov     pc, lr
+> >   4c:   e320f000        nop     {0}
+> >
+> > , which now reports:
+> > Calibrating delay loop... 996.14 BogoMIPS (lpj=4980736)
+> >
+> > Some more test results:
+> >
+> > On mx31 (ARM1136) running at 532 MHz, before the patch:
+> > Calibrating delay loop... 351.43 BogoMIPS (lpj=1757184)
+> >
+> > On mx31 (ARM1136) running at 532 MHz after the patch:
+> > Calibrating delay loop... 528.79 BogoMIPS (lpj=2643968)
+> >
+> > Also tested on mx6 (CortexA9) and on mx27 (ARM926), which shows the same
+> > BogoMIPS value before and after this patch.
+> >
+> > Reported-by: Tom Evans <tom_usenet@optusnet.com.au>
+> > Suggested-by: Tom Evans <tom_usenet@optusnet.com.au>
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Any comments on this, please?
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 3982e12..02b17f7 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -158,6 +158,7 @@ enum mac_oui {
- 	OUI_DENX,
- 	OUI_CRYSTALFONTZ,
- 	OUI_I2SE,
-+	OUI_ARMADEUS,
- };
- 
- static void __init update_fec_mac_prop(enum mac_oui oui)
-@@ -217,6 +218,11 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
- 			macaddr[1] = 0x01;
- 			macaddr[2] = 0x87;
- 			break;
-+		case OUI_ARMADEUS:
-+			macaddr[0] = 0x00;
-+			macaddr[1] = 0x1e;
-+			macaddr[2] = 0xac;
-+			break;
- 		}
- 		val = ocotp[i];
- 		macaddr[3] = (val >> 16) & 0xff;
-@@ -242,6 +248,11 @@ static void __init imx28_evk_init(void)
- 	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
- }
- 
-+static void __init imx28_apf28_init(void)
-+{
-+	update_fec_mac_prop(OUI_ARMADEUS);
-+}
-+
- static int apx4devkit_phy_fixup(struct phy_device *phy)
- {
- 	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
-@@ -469,6 +480,8 @@ static void __init mxs_machine_init(void)
- 
- 	if (of_machine_is_compatible("fsl,imx28-evk"))
- 		imx28_evk_init();
-+	if (of_machine_is_compatible("armadeus,imx28-apf28"))
-+		imx28_apf28_init();
- 	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
- 		apx4devkit_init();
- 	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
--- 
-1.8.3.2
+Any chance that you could run hackbench, and build the kernel with
+-falign-functions=32, comparing the kernel without and with this
+option ?
+
+If alignment has as much effect as the above suggests, the results
+may be interesting.
+
+As far as this patch is concerned, I'm happy with it, please put it in
+the patch system, thanks.
+
+Thanks.
