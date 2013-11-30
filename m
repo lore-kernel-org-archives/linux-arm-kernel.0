@@ -1,50 +1,137 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 30 Nov 2013 17:24:14 +0100
-Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
-In-Reply-To: <1385632196.5838.4.camel@weser.hi.pengutronix.de>
-References: <cover.1385508112.git.stefan@agner.ch>
- <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
- <5296281C.1060403@wwwdotorg.org>
- <1385632196.5838.4.camel@weser.hi.pengutronix.de>
-Message-ID: <ab16891b4a6bcfbb1854aa766e4926a7@agner.ch>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 30 Nov 2013 13:28:25 -0300
+Subject: [RFC/PATCH] NAND bus-width detection extreme makeover
+In-Reply-To: <20131130083537.GB29397@norris.computersforpeace.net>
+References: <1385732456-32696-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131130083537.GB29397@norris.computersforpeace.net>
+Message-ID: <20131130162824.GA2402@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2013-11-28 10:49, schrieb Lucas Stach:
-> Am Mittwoch, den 27.11.2013, 10:13 -0700 schrieb Stephen Warren:
->> On 11/26/2013 04:45 PM, Stefan Agner wrote:
->> > Set the requested SM2 voltage to the correct value of 1.8V. The value
->> > before used to work on TPS658623 since the driver applied a wrong
->> > voltage table too. However, the TPS658643 used on newer devices uses
->> > yet another voltage table and those broke that compatibility. The
->> > regulator driver now has the correct voltage table for both regulator
->> > versions and those the correct voltage can be used in this device
->> > tree.
->>
->> One thing you haven't called out explicitly here is that this series is
->> an incompatible change to the DT, since the old buggy driver used to
->> allow old buggy DT content to accidentally work.
->>
-> The current (wrong and potentially dangerous) DT content only worked on
-> the engineering sample models. So this change definitely does improve
-> the situation, even with the risk of breaking a small fraction of
-> working boards.
-On the released modules, the current value ends in a freeze during
-boot-up (since the wrong voltage table results in a too low voltage).
+Hi Brian,
 
-When I use 1.8V in the device tree, the old drivers refuses to set any
-voltage. The regulators default/bootloader settings work then better
-than the wrongfully applied values (tested on a new device). The probe
-just fails:
+On Sat, Nov 30, 2013 at 12:35:37AM -0800, Brian Norris wrote:
+> Hi Ezequiel,
+> 
+> On Fri, Nov 29, 2013 at 10:40:55AM -0300, Ezequiel Garcia wrote:
+> > Here's my proposal, based in Pekon's latest work.
+> > 
+> > This patch removes the flash device bus-width configuration, prior to
+> > the device detection. With this modification, a NAND driver is no longer
+> > able to "force" the device width, and instead can only obtain the detected
+> > bus-width after the call to nand_scan_ident().
+> > 
+> > Flash devices bus-width are specified either by reading an ONFI feature,
+> > or through a flag in the in-kernel flash devices table. Therefore, it doesn't
+> > make any sense to somehow "advise" the NAND core about this parameter.
+> 
+> Hmm, I think there are a few factors at play here. First of all, the
+> hardware driver knows the best about the physical buswidth. It should
+> know if there are 8 or 16 data lines connected to the device, so it
+> could, for instance, know that it does not have enough data lines to
+> support x16 buswidth. (You could possibly devise hardware that can
+> support x16 but not x8, I suppose.) So this is one way in which the
+> driver must "advise" the NAND core about the buswidth.
+> 
+> On the other hand, the hardware/driver doesn't know what buswidth the
+> flash chip is. That's nand_base's job. So in that sense, we don't need
+> to "advise" the NAND core.
+> 
+> But there are certainly cases where the driver should advise, and if
+> there is a mismatch, bail.
+> 
 
-[    0.243864] tps6586x-regulator tps6586x-regulator: failed to register
-regulator REG-SM_2
-[    0.244317] tps6586x-regulator: probe of tps6586x-regulator failed
-with error -22
+As Pekon just said, the driver can take this action, once the NAND core
+has detected the NAND device width and bail out.
 
-So, for newer modules, the incompatible 1.8V DT results in a successful
-boot. Since we don't have a regulator driver at all, likely other things
-are broken at that situation...
+I really don't see why we need to *enforce* that in the NAND core.
 
---
-Stefan
+> > In addition, the ONFI specification requires to issue the detection commands
+> > using only the lower 8-bits of the data bus. The ONFI specification says:
+> > 
+> >   "" The Read ID and Read Parameter Page commands only use the lower 8-bits
+> >      of the data bus. The host shall not issue commands that use a word
+> >      data width on x16 devices until the host determines the device supports
+> >      a 16-bit data bus width in the parameter page. ""
+> 
+> This does not really say that *all* NAND transactions must be performed
+> on the lower 8 bits (a true x8 buswidth), but only that all ONFI
+> transactions must be.
+> 
+
+Well, I *think* I never said that, and this patch doesn't imply that
+either. All the patch is doing is using x8 buswidth until the width is
+detected. Then it switches to whatever the width was detected to.
+
+> > IIRC, the current way of setting the device width is to set NAND_BUSWIDTH_AUTO
+> > in chip->options and then let the driver set some width-specific callbacks after
+> > the NAND core has detected the width.
+> > 
+> > However, as noticed by Pekon Gupta, this means NAND_BUSWIDTH_AUTO should be
+> > always turned on (and hence the option be removed).
+> 
+> No, I think you can solve the x16 ONFI detection problem without
+> requiring NAND_BUSWIDTH_AUTO.
+
+Uh? I'm not requiring NAND_BUSWIDTH_AUTO at all.
+
+> And in fact, NAND_BUSWIDTH_AUTO only helps
+> you wil part of the problem: performing ONFI transactions during the
+> initial detection, where you pretend like you're an x8 device.
+> 
+> But what happens if a driver needs to use ONFI SET_FEATURES or
+> GET_FEATURES after initial probe?
+> 
+> So I think the problem may need to be divided into 2 parts:
+> 
+>  1) How do we best handle ONFI transactions, so that they are always
+>     performed on the lower 8 bits of the bus **regardless of actual
+>     buswidth**? (I think Uwe's patch + my response in [1] might solve
+>     this.)
+> 
+>  2) Can/should we relax the old restrictions where drivers have to
+>     configure the buswidth correctly before running nand_scan_ident(),
+>     in the spirit of NAND_BUSWIDTH_AUTO? And why do we need this
+>     flexibility?
+> 
+
+Uh? Both (1) and (2) are already handled by this patch, regarding the
+initial device detection.
+
+[..]
+> > Of course, the memory controller (such as GPMC in the OMAP case) still needs
+> > proper width a-prior configuration, but that's completely unrelated to the
+> > flash device bus width.
+> 
+> I would disagree.
+> 
+
+On which arguments?
+
+To be honest with you, I'm a bit lost about your feedback :-)
+
+I guess you *did* read the patch, right? It's pretty straight-forward
+and it fixes a *current* bug: 16-bit devices *cannot* be ONFI
+detected.
+
+All the patch does is:
+
+1. Set defaults to x8
+
+2. Detect device. Either method works.
+
+3. Set defaults to detected width, x8 or x16.
+
+The NAND driver is free, after the detection, to error-out, print a
+message, or re-arrange the callbacks.
+
+Which part exactly of the above do you disagree with?
+
+Now, maybe I went to far talking about removing this or that, but as far
+as the ONFI detection, I think the change is pretty-straightforward.
+
+(I'll reply to your suggestion in the proper mail)
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
