@@ -1,107 +1,36 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Sat, 30 Nov 2013 14:19:40 +0000
-Subject: [RFC/PATCH] NAND bus-width detection extreme makeover
-In-Reply-To: <20131130083537.GB29397@norris.computersforpeace.net>
-References: <1385732456-32696-1-git-send-email-ezequiel.garcia@free-electrons.com>,
- <20131130083537.GB29397@norris.computersforpeace.net>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA50432@DBDE04.ent.ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 30 Nov 2013 12:31:33 -0200
+Subject: [RFC] ARM: lib: delay-loop: Add align directive to fix BogoMIPS
+ calculation
+In-Reply-To: <20131130114937.GY16735@n2100.arm.linux.org.uk>
+References: <1385121212-30182-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5AyjD4f2o2c-QbK13Pb5cZCWEV4f5dc38MspDBY6_OjDg@mail.gmail.com>
+ <20131130114937.GY16735@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5AetDM0N5uLRHBy7UdHcXeA_4U-m4aDOEuOM6hv+cw5Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian, Ezequiel,
+On Sat, Nov 30, 2013 at 9:49 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Sorry Im bit confused on below, so few queries ..
+> Any chance that you could run hackbench, and build the kernel with
+> -falign-functions=32, comparing the kernel without and with this
+> option ?
+>
+> If alignment has as much effect as the above suggests, the results
+> may be interesting.
 
->From: Brian Norris [computersforpeace at gmail.com]
->So I think the problem may need to be divided into 2 parts:
->
->1) How do we best handle ONFI transactions, so that they are always
->  performed on the lower 8 bits of the bus **regardless of actual
->   buswidth**? (I think Uwe's patch + my response in [1] might solve
->   this.)
->
-> 2) Can/should we relax the old restrictions where drivers have to
->    configure the buswidth correctly before running nand_scan_ident(),
->    in the spirit of NAND_BUSWIDTH_AUTO? And why do we need this
->    flexibility?
->
->I think problem (1) is solvable independently of (2). So we don't
->inherently *need* BUSWIDTH_AUTO just to support ONFI correctly; we can
->just enforce that we ignore the upper 8 bits.
->
->Now, what do we have NAND_BUSWIDTH_AUTO for, anyway? It seems like its
->best use case is for a driver that (a) knows it might encounter either
->x8 or x16 flash chips and (b) is equipped to handle this change at
->runtime (e.g., it only needs to re-assign some call-backs after
->nand_scan_ident()). This means, for one, that it should have at least
->all 16 data lines connected.
->
->However, not all hardware/drivers fit (a) and (b). For such systems, we
->probably want to just indicate the expected buswidth and error out
->automatically if we detect this is incorrect.
->
-Sorry I'm bit confused here.. Where do you want to error out ?
-(a) In nand_base.c (generic driver) OR
-(b) you want the controller driver (callee of nand_scan_ident) to handle
-the bus-width mismatch on its own.
+Yes, that would be interesting to know.
 
-I prefer (b), which is the basis of my first proposal patch.
-In my opinion following sequence should be followed by each controller driver
-during probe.
-Step-1: assign basic callbacks and parameters which are required for
-     basic NAND device I/O (like chip->ctrl, chip->delay, etc)
-Step-2: call nand_scan_ident()
-      nand_scan_ident() would populate detect NAND device parameter by
-     - reading ONFI parameters in x8 bit mode (ignoring pre-configurations)
-     - look-up from nand_flash_id[]
-      And populate chip->options, mtd->writesize, etc...
-Step-3: On return from nand_scan_ident, each controller driver should
-     check whether (chip_options & NAND_BUSWIDTH_16) as set by 
-     nand_scan_ident() matches its controller & board configurations or
-     not. Based on which it can take corrective action or error out.
+I will try to run this test next week, or maybe Tom Evans could try it
+sooner if he has a chance.
 
-If we follow above sequence then 
-(1) NAND_BUSWIDTH_AUTO becomes implicit. And controller driver
-   does not need to set any such flags before calling nand_scan_ident().
-(2) Currently, we are error-out inside nand_base.c when 
-   (busw != chip->options & BUS_WIDTH_16).
-   Now this would be handled by individual controller drivers, as they
-   know their hardware best.
-  (If you remember, this was the reason of omap2,c calling
-   nand_scan_ident() twice. If instead of failing the first call to 
-   nand_scan_ident  would have just returned with *corrected* bus-width,
-   then omap2,c could have handled that situation by re-configuring
-   its controller).
-
-
-
->So I think we still want to support the following three configurations:
 >
->  !NAND_BUSWIDTH_16 && !NAND_BUSWIDTH_AUTO: device must use 8-bit
->  buswidth
->
->  NAND_BUSWIDTH_16 && !NAND_BUSWIDTH_AUTO: device must use 16-bit
->  buswidth
->
->  NAND_BUSWIDTH_AUTO: can support either buswidth (auto-detectable)
->
->But I think these selections should only be restricted by hardware
->limitations (lack of I/O pin connections, inflexible controller) and not
->enforced because of software limitations in handling ONFI. This brings
->be back to problem (1), where I think we need resolve it along the lines
->of Uwe's + my patch (see [1]), not by forcing NAND_BUSWIDTH_AUTO on all
->drivers.
->
-> That's exactly what this patch is doing.
+> As far as this patch is concerned, I'm happy with it, please put it in
+> the patch system, thanks.
 
-Sorry, I'll re-review Uwe's + ur patch.
-But do you agree on following:
-(1) somehow we need to do away with NAND_BUSWIDTH_AUTO *macro*.
-And instead make its functionality, built-in the nand_base.c driver ?
+Sent it as 7907/1.
 
-(2) And nand-bus-width DT binding will still be required for defining controller
-and board level description ... 
-Is my understanding correct ?
+Regards,
 
-
-with regards, pekon
+Fabio Estevam
