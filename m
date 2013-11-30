@@ -1,103 +1,110 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Sat, 30 Nov 2013 23:51:22 +0100
-Subject: [PATCH v6 02/17] dts: mpc512x: introduce dt-bindings/clock/ header
+Date: Sat, 30 Nov 2013 23:51:37 +0100
+Subject: [PATCH v6 17/17] clk: mpc512x: remove migration support workarounds
 In-Reply-To: <1385851897-23475-1-git-send-email-gsi@denx.de>
 References: <1385851897-23475-1-git-send-email-gsi@denx.de>
-Message-ID: <1385851897-23475-3-git-send-email-gsi@denx.de>
+Message-ID: <1385851897-23475-18-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-introduce a dt-bindings/ header file for MPC512x clocks,
-providing symbolic identifiers for those SoC clocks which
-clients will reference from their device tree nodes
+this change removes workarounds which have become obsolete after
+migration to common clock support has completed
+- remove clkdev registration calls (compatibility clock item aliases)
+  after all peripheral drivers were adjusted for device tree based
+  clock lookup
+- remove pre-enable workarounds after all peripheral drivers were
+  adjusted to acquire their respective clock items
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: devicetree at vger.kernel.org
-Reviewed-by: Mike Turquette <mturquette@linaro.org>	# for v3: w/o bdlc, PSC ipg
+workarounds for these clock items get removed:  FEC (ethernet), I2C,
+PSC (UART, SPI), PSC FIFO, USB, NFC (NAND flash), VIU (video capture),
+BDLC (CAN), CAN MCLK, DIU (video output)
+
+these clkdev registered names won't be provided any longer by the
+MPC512x platform's clock driver:  "psc%d_mclk", "mscan%d_mclk",
+"usb%d_clk", "nfc_clk", "viu_clk", "sys_clk", "ref_clk"
+
+the pre-enable workaround for PCI remains, but depends on the presence
+of PCI related device tree nodes (disables the PCI clock in the absence
+of PCI nodes, keeps the PCI clock enabled in the presence of nodes) --
+moving clock acquisition into the peripheral driver isn't possible for
+PCI because its initialization takes place before the platform clock
+driver gets initialized, thus the clock provider isn't available then
+
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Anatolij Gustschin <agust@denx.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linuxppc-dev at lists.ozlabs.org
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- include/dt-bindings/clock/mpc512x-clock.h |   69 +++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
- create mode 100644 include/dt-bindings/clock/mpc512x-clock.h
+ arch/powerpc/platforms/512x/clock-commonclk.c |   50 ++++++++-----------------
+ 1 file changed, 16 insertions(+), 34 deletions(-)
 
-diff --git a/include/dt-bindings/clock/mpc512x-clock.h b/include/dt-bindings/clock/mpc512x-clock.h
-new file mode 100644
-index 000000000000..9e81b3b99a32
---- /dev/null
-+++ b/include/dt-bindings/clock/mpc512x-clock.h
-@@ -0,0 +1,69 @@
-+/*
-+ * This header provides constants for MPC512x clock specs in DT bindings.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
-+#define _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
-+
-+#define MPC512x_CLK_DUMMY		0
-+#define MPC512x_CLK_REF			1
-+#define MPC512x_CLK_SYS			2
-+#define MPC512x_CLK_DIU			3
-+#define MPC512x_CLK_VIU			4
-+#define MPC512x_CLK_CSB			5
-+#define MPC512x_CLK_E300		6
-+#define MPC512x_CLK_IPS			7
-+#define MPC512x_CLK_FEC			8
-+#define MPC512x_CLK_SATA		9
-+#define MPC512x_CLK_PATA		10
-+#define MPC512x_CLK_NFC			11
-+#define MPC512x_CLK_LPC			12
-+#define MPC512x_CLK_MBX_BUS		13
-+#define MPC512x_CLK_MBX			14
-+#define MPC512x_CLK_MBX_3D		15
-+#define MPC512x_CLK_AXE			16
-+#define MPC512x_CLK_USB1		17
-+#define MPC512x_CLK_USB2		18
-+#define MPC512x_CLK_I2C			19
-+#define MPC512x_CLK_MSCAN0_MCLK		20
-+#define MPC512x_CLK_MSCAN1_MCLK		21
-+#define MPC512x_CLK_MSCAN2_MCLK		22
-+#define MPC512x_CLK_MSCAN3_MCLK		23
-+#define MPC512x_CLK_BDLC		24
-+#define MPC512x_CLK_SDHC		25
-+#define MPC512x_CLK_PCI			26
-+#define MPC512x_CLK_PSC_MCLK_IN		27
-+#define MPC512x_CLK_SPDIF_TX		28
-+#define MPC512x_CLK_SPDIF_RX		29
-+#define MPC512x_CLK_SPDIF_MCLK		30
-+#define MPC512x_CLK_SPDIF		31
-+#define MPC512x_CLK_AC97		32
-+#define MPC512x_CLK_PSC0_MCLK		33
-+#define MPC512x_CLK_PSC1_MCLK		34
-+#define MPC512x_CLK_PSC2_MCLK		35
-+#define MPC512x_CLK_PSC3_MCLK		36
-+#define MPC512x_CLK_PSC4_MCLK		37
-+#define MPC512x_CLK_PSC5_MCLK		38
-+#define MPC512x_CLK_PSC6_MCLK		39
-+#define MPC512x_CLK_PSC7_MCLK		40
-+#define MPC512x_CLK_PSC8_MCLK		41
-+#define MPC512x_CLK_PSC9_MCLK		42
-+#define MPC512x_CLK_PSC10_MCLK		43
-+#define MPC512x_CLK_PSC11_MCLK		44
-+#define MPC512x_CLK_PSC_FIFO		45
-+#define MPC512x_CLK_PSC0		46
-+#define MPC512x_CLK_PSC1		47
-+#define MPC512x_CLK_PSC2		48
-+#define MPC512x_CLK_PSC3		49
-+#define MPC512x_CLK_PSC4		50
-+#define MPC512x_CLK_PSC5		51
-+#define MPC512x_CLK_PSC6		52
-+#define MPC512x_CLK_PSC7		53
-+#define MPC512x_CLK_PSC8		54
-+#define MPC512x_CLK_PSC9		55
-+#define MPC512x_CLK_PSC10		56
-+#define MPC512x_CLK_PSC11		57
-+
-+#define MPC512x_CLK_LAST_PUBLIC		57
-+
-+#endif
+diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
+index 945e4609e773..189be4a4cb42 100644
+--- a/arch/powerpc/platforms/512x/clock-commonclk.c
++++ b/arch/powerpc/platforms/512x/clock-commonclk.c
+@@ -696,46 +696,28 @@ static void mpc5121_clk_register_of_provider(struct device_node *np)
+  */
+ static void mpc5121_clk_provide_migration_support(void)
+ {
+-	int idx;
+-	char name[32];
+-
+-	/*
+-	 * provide "pre-CCF" alias clock names for peripheral drivers
+-	 * which have not yet been adjusted to do OF based clock lookups
+-	 */
+-	clk_register_clkdev(clks[MPC512x_CLK_REF], "ref_clk", NULL);
+-	clk_register_clkdev(clks[MPC512x_CLK_SYS], "sys_clk", NULL);
+-	clk_register_clkdev(clks[MPC512x_CLK_VIU], "viu_clk", NULL);
+-	clk_register_clkdev(clks[MPC512x_CLK_NFC], "nfc_clk", NULL);
+-	clk_register_clkdev(clks[MPC512x_CLK_USB1], "usb1_clk", NULL);
+-	clk_register_clkdev(clks[MPC512x_CLK_USB2], "usb2_clk", NULL);
+-	for (idx = 0; idx < NR_PSCS; idx++) {
+-		snprintf(name, sizeof(name), "psc%d_mclk", idx);
+-		clk_register_clkdev(clks[MPC512x_CLK_PSC0_MCLK + idx],
+-				    name, NULL);
+-	}
+-	for (idx = 0; idx < NR_MSCANS; idx++) {
+-		snprintf(name, sizeof(name), "mscan%d_mclk", idx);
+-		clk_register_clkdev(clks[MPC512x_CLK_MSCAN0_MCLK + idx],
+-				    name, NULL);
+-	}
+-	clk_register_clkdev(clks[MPC512x_CLK_SPDIF_MCLK], "spdif_mclk", NULL);
+ 
+ 	/*
+ 	 * pre-enable those clock items which are not yet appropriately
+ 	 * acquired by their peripheral driver
++	 *
++	 * the PCI clock cannot get acquired by its peripheral driver,
++	 * because for this platform the driver won't probe(), instead
++	 * initialization is done from within the .setup_arch() routine
++	 *@a point in time where the clock provider has not been
++	 * setup yet and thus isn't available yet
++	 *
++	 * so we "pre-enable" the clock here, to not have the clock
++	 * subsystem automatically disable this item in a late init call
++	 *
++	 * this PCI clock pre-enable workaround only applies when there
++	 * are device tree nodes for PCI and thus the peripheral driver
++	 * has attached to bridges, otherwise the PCI clock remains
++	 * unused and so it gets disabled
+ 	 */
+-	clk_prepare_enable(clks[MPC512x_CLK_PSC_FIFO]);
+ 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
+-	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
+-	clk_prepare_enable(clks[MPC512x_CLK_DIU]);	/* display */
+-	clk_prepare_enable(clks[MPC512x_CLK_I2C]);	/* I2C */
+-	for (idx = 0; idx < NR_PSCS; idx++)		/* PSC ipg */
+-		clk_prepare_enable(clks[MPC512x_CLK_PSC0 + idx]);
+-	clk_prepare_enable(clks[MPC512x_CLK_BDLC]);	/* MSCAN ipg */
+-	for (idx = 0; idx < NR_MSCANS; idx++)		/* MSCAN mclk */
+-		clk_prepare_enable(clks[MPC512x_CLK_MSCAN0_MCLK + idx]);
+-	clk_prepare_enable(clks[MPC512x_CLK_PCI]);	/* PCI */
++	if (of_find_compatible_node(NULL, "pci", "fsl,mpc5121-pci"))
++		clk_prepare_enable(clks[MPC512x_CLK_PCI]);
+ }
+ 
+ /*
 -- 
 1.7.10.4
