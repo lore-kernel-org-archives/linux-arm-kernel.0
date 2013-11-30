@@ -1,67 +1,121 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 30 Nov 2013 09:33:18 -0800
-Subject: [PATCH 2/8] mmc: omap: Fix DMA configuration to not rely on
- device id
-In-Reply-To: <5299339C.2040102@ti.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-3-git-send-email-tony@atomide.com>
- <5299339C.2040102@ti.com>
-Message-ID: <20131130173317.GG23334@atomide.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sat, 30 Nov 2013 23:51:21 +0100
+Subject: [PATCH v6 01/17] powerpc/fsl-pci: improve clock API use
+In-Reply-To: <1385851897-23475-1-git-send-email-gsi@denx.de>
+References: <1385851897-23475-1-git-send-email-gsi@denx.de>
+Message-ID: <1385851897-23475-2-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joel Fernandes <joelf@ti.com> [131129 16:39]:
-> On 11/13/2013 08:35 PM, Tony Lindgren wrote:
-> > --- a/drivers/mmc/host/omap.c
-> > +++ b/drivers/mmc/host/omap.c
-> > @@ -90,17 +90,6 @@
-> >  #define OMAP_MMC_CMDTYPE_AC	2
-> >  #define OMAP_MMC_CMDTYPE_ADTC	3
-> >  
-> > -#define OMAP_DMA_MMC_TX		21
-> > -#define OMAP_DMA_MMC_RX		22
-> > -#define OMAP_DMA_MMC2_TX	54
-> > -#define OMAP_DMA_MMC2_RX	55
-> > -
-> > -#define OMAP24XX_DMA_MMC2_TX	47
-> > -#define OMAP24XX_DMA_MMC2_RX	48
-> > -#define OMAP24XX_DMA_MMC1_TX	61
-> > -#define OMAP24XX_DMA_MMC1_RX	62
-> > -
-> > -
-> >  #define DRIVER_NAME "mmci-omap"
-> >  
-> >  /* Specifies how often in millisecs to poll for card status changes
-> > @@ -1408,19 +1397,20 @@ static int mmc_omap_probe(struct platform_device *pdev)
-> >  	host->dma_tx_burst = -1;
-> >  	host->dma_rx_burst = -1;
-> >  
-> > -	if (mmc_omap2())
-> > -		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX : OMAP24XX_DMA_MMC2_TX;
-> > -	else
-> > -		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
-> > -	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> > +	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
-> > +	if (res)
-> > +		sig = res->start;
-> > +	host->dma_tx = dma_request_slave_channel_compat(mask,
-> > +				omap_dma_filter_fn, &sig, &pdev->dev, "tx");
-> 
-> Minor comment, since we're moving to DT-only for platforms using this driver
-> (hope I'm right about that), why not just do:
-> 	dma_request_slave_channel_(&pdev->dev, "tx");
-> 
-> IORESOURCE_DMA is not created by OF layer so I guess no need to call
-> platform_get_resource either.
+make the Freescale PCI driver get, prepare and enable the PCI clock
+during probe(); the clock gets put upon device shutdown by the devm
+approach
 
-Well this is not the omap_hsmmc.c driver, this is the one for earlier hardware
-that's available on omap1 and 2420. All the later ones use the omap_hsmmc.c
-driver instead. So this one we cannot make DT only unless we make mach-omap1
-DT only, which is doable, but may never happen because of the effort needed.
+clock lookup is non-fatal as not all platforms may provide clock specs
+in their device tree or implement a device tree based clock provider,
+but failure to enable clocks after successful lookup is fatal
 
-Most of the effort would be quite trivial, except for the conversion to use
-the common clock framework.
+the driver appears to not have a remove() routine, so no reference to
+the clock is kept during use, and the clock isn't released (the devm
+approach will put the clock, but it won't get disabled or unprepared)
 
-Regards,
+the 85xx/86xx platforms go through the probe() routine, where clock
+lookup occurs and the clock gets acquired if one was specified; the
+512x/83xx platforms don't pass through probe() but instead directly call
+the add_bridge() routine at a point in time where the clock provider has
+not been setup yet even if the platform implements one -- add comments
+to the code paths as a reminder for the potential need of a workaround
+in the platform's clock driver, and to keep awareness if code should get
+re-arranged or moved
 
-Tony
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Kumar Gala <galak@kernel.crashing.org>
+Cc: linuxppc-dev at lists.ozlabs.org
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ arch/powerpc/sysdev/fsl_pci.c |   52 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+
+diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
+index 4dfd61df8aba..bee8011d6bd7 100644
+--- a/arch/powerpc/sysdev/fsl_pci.c
++++ b/arch/powerpc/sysdev/fsl_pci.c
+@@ -17,6 +17,8 @@
+  * Free Software Foundation;  either version 2 of the  License, or (at your
+  * option) any later version.
+  */
++
++#include <linux/clk.h>
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/delay.h>
+@@ -756,6 +758,32 @@ int __init mpc83xx_add_bridge(struct device_node *dev)
+ 	const int *bus_range;
+ 	int primary;
+ 
++	/*
++	 * 85xx/86xx platforms take the path through the probe() routine
++	 * as one would expect, PCI related clocks get acquired there if
++	 * specified
++	 *
++	 * 83xx/512x _don't_ pass through probe(), this add_bridge()
++	 * routine instead is called from within .setup_arch() at a
++	 * point in time where clock providers haven't been setup yet;
++	 * so clocks cannot get acquired here -- lookup would always
++	 * fail even on those platforms which implement the provider
++	 *
++	 * there is no counterpart for add_bridge() just like there is
++	 * no remove() counterpart for probe(), so in either case the
++	 * PCI related clock won't get released, and all of the
++	 * 512x/83xx/85xx/86xx platforms behave in identical ways
++	 *
++	 * this comment is here to "keep the balance" against the
++	 * probe() routine, and as a reminder to acquire clocks if the
++	 * add_bridge() call should move to some later point in time
++	 *
++	 * until then clock providers are expected to work around the
++	 * peripheral driver's not acquiring the PCI clock on those
++	 * platforms where clock providers exist, while nothing needs to
++	 * be done for those platforms without a clock provider
++	 */
++
+ 	is_mpc83xx_pci = 1;
+ 
+ 	if (!of_device_is_available(dev)) {
+@@ -1087,9 +1115,33 @@ void fsl_pci_assign_primary(void)
+ 
+ static int fsl_pci_probe(struct platform_device *pdev)
+ {
++	struct clk *clk;
+ 	int ret;
+ 	struct device_node *node;
+ 
++	/*
++	 * clock lookup is non-fatal since the driver is shared among
++	 * platforms and not all of them provide clocks specs in their
++	 * device tree, but failure to enable a specified clock is
++	 * considered fatal
++	 *
++	 * note that only the 85xx and 86xx platforms pass through this
++	 * probe() routine, while 83xx and 512x directly invoke the
++	 * mpc83xx_add_bridge() routine from within .setup_arch() code
++	 */
++	clk = devm_clk_get(&pdev->dev, "ipg");
++	if (!IS_ERR(clk)) {
++		ret = clk_prepare_enable(clk);
++		if (ret) {
++			dev_err(&pdev->dev, "Could not enable PCI clock\n");
++			return ret;
++		}
++		/*
++		 * TODO where to store the 'clk' reference?  there appears
++		 * to be no remove() routine which undoes what probe() does
++		 */
++	}
++
+ 	node = pdev->dev.of_node;
+ 	ret = fsl_add_bridge(pdev, fsl_pci_primary == node);
+ 
+-- 
+1.7.10.4
