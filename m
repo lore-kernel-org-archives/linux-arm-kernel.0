@@ -1,36 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 30 Nov 2013 12:31:33 -0200
-Subject: [RFC] ARM: lib: delay-loop: Add align directive to fix BogoMIPS
- calculation
-In-Reply-To: <20131130114937.GY16735@n2100.arm.linux.org.uk>
-References: <1385121212-30182-1-git-send-email-festevam@gmail.com>
- <CAOMZO5AyjD4f2o2c-QbK13Pb5cZCWEV4f5dc38MspDBY6_OjDg@mail.gmail.com>
- <20131130114937.GY16735@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5AetDM0N5uLRHBy7UdHcXeA_4U-m4aDOEuOM6hv+cw5Zw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 30 Nov 2013 14:41:31 +0000
+Subject: [PATCH] ARM: sunxi: stop timer from ticking before enabling
+ interrupts
+In-Reply-To: <20131130141558.GD3002@lukather>
+References: <1385815995-15145-1-git-send-email-marc.zyngier@arm.com>
+ <20131130141558.GD3002@lukather>
+Message-ID: <5c486d6c2b5b3515db44200d36fd1078@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 30, 2013 at 9:49 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On 2013-11-30 14:15, Maxime Ripard wrote:
 
-> Any chance that you could run hackbench, and build the kernel with
-> -falign-functions=32, comparing the kernel without and with this
-> option ?
+Hi Maxime,
+
+> On Sat, Nov 30, 2013 at 12:53:15PM +0000, Marc Zyngier wrote:
+>> The sun4i timer can still be ticking when we enable the interrupt.
+>> If another timer is actually used (A7 architected timer, for 
+>> example),
+>> odds are that the interrupt will eventually fire with the 
+>> event_handler
+>> pointer being NULL.
+>>
+>> The obvious fix it to stop the timer before registering the 
+>> interrupt.
+>>
+>> Observed and tested on sun7i (cubietruck).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >
-> If alignment has as much effect as the above suggests, the results
-> may be interesting.
+> You can add my Acked-by, but you should rather send this to Daniel
+> Lezcano, which is the clocksource/clockevent maintainer.
 
-Yes, that would be interesting to know.
+Thanks. I'll push that to Daniel directly.
 
-I will try to run this test next week, or maybe Tom Evans could try it
-sooner if he has a chance.
+Cheers,
 
->
-> As far as this patch is concerned, I'm happy with it, please put it in
-> the patch system, thanks.
-
-Sent it as 7907/1.
-
-Regards,
-
-Fabio Estevam
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
