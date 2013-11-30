@@ -1,121 +1,103 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Sat, 30 Nov 2013 23:51:21 +0100
-Subject: [PATCH v6 01/17] powerpc/fsl-pci: improve clock API use
+Date: Sat, 30 Nov 2013 23:51:23 +0100
+Subject: [PATCH v6 03/17] dts: mpc512x: add clock related device tree specs
 In-Reply-To: <1385851897-23475-1-git-send-email-gsi@denx.de>
 References: <1385851897-23475-1-git-send-email-gsi@denx.de>
-Message-ID: <1385851897-23475-2-git-send-email-gsi@denx.de>
+Message-ID: <1385851897-23475-4-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make the Freescale PCI driver get, prepare and enable the PCI clock
-during probe(); the clock gets put upon device shutdown by the devm
-approach
+this addresses the clock driver aka provider's side of clocks
+- introduce a 'clocks' subtree with an 'osc' node for the crystal
+  or oscillator SoC input (fixed frequency)
+- the 'clock at f00' clock-control-module node references the 'osc' for
+  its input, and is another provider for all the clocks which the
+  CCM component manages
+- prepare for future references to clocks from peripheral nodes
+  by means of the <&clks ID> syntax and symbolic ID names which a
+  header file provides
+- provide default values with 33MHz oscillator frequency in the
+  common include (the 66MHz IPS bus already was there), and add
+  override values for the ifm AC14xx board which deviates from
+  the reference design (25MHz xtal, 80MHz IPS bus)
 
-clock lookup is non-fatal as not all platforms may provide clock specs
-in their device tree or implement a device tree based clock provider,
-but failure to enable clocks after successful lookup is fatal
-
-the driver appears to not have a remove() routine, so no reference to
-the clock is kept during use, and the clock isn't released (the devm
-approach will put the clock, but it won't get disabled or unprepared)
-
-the 85xx/86xx platforms go through the probe() routine, where clock
-lookup occurs and the clock gets acquired if one was specified; the
-512x/83xx platforms don't pass through probe() but instead directly call
-the add_bridge() routine at a point in time where the clock provider has
-not been setup yet even if the platform implements one -- add comments
-to the code paths as a reminder for the potential need of a workaround
-in the platform's clock driver, and to keep awareness if code should get
-re-arranged or moved
-
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Kumar Gala <galak@kernel.crashing.org>
-Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Reviewed-by: Mike Turquette <mturquette@linaro.org> # for v3, before &osc
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/sysdev/fsl_pci.c |   52 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/powerpc/boot/dts/ac14xx.dts   |    7 +++++++
+ arch/powerpc/boot/dts/mpc5121.dtsi |   18 +++++++++++++++++-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
-index 4dfd61df8aba..bee8011d6bd7 100644
---- a/arch/powerpc/sysdev/fsl_pci.c
-+++ b/arch/powerpc/sysdev/fsl_pci.c
-@@ -17,6 +17,8 @@
-  * Free Software Foundation;  either version 2 of the  License, or (at your
+diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
+index a543c4088cba..a1b883730b31 100644
+--- a/arch/powerpc/boot/dts/ac14xx.dts
++++ b/arch/powerpc/boot/dts/ac14xx.dts
+@@ -139,7 +139,14 @@
+ 		};
+ 	};
+ 
++	clocks {
++		osc {
++			clock-frequency = <25000000>;
++		};
++	};
++
+ 	soc at 80000000 {
++		bus-frequency = <80000000>;	/* 80 MHz ips bus */
+ 
+ 		clock at f00 {
+ 			compatible = "fsl,mpc5121rev2-clock", "fsl,mpc5121-clock";
+diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
+index bd14c00e5146..9bfcb7558197 100644
+--- a/arch/powerpc/boot/dts/mpc5121.dtsi
++++ b/arch/powerpc/boot/dts/mpc5121.dtsi
+@@ -9,6 +9,8 @@
   * option) any later version.
   */
+ 
++#include <dt-bindings/clock/mpc512x-clock.h>
 +
-+#include <linux/clk.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/delay.h>
-@@ -756,6 +758,32 @@ int __init mpc83xx_add_bridge(struct device_node *dev)
- 	const int *bus_range;
- 	int primary;
+ /dts-v1/;
  
-+	/*
-+	 * 85xx/86xx platforms take the path through the probe() routine
-+	 * as one would expect, PCI related clocks get acquired there if
-+	 * specified
-+	 *
-+	 * 83xx/512x _don't_ pass through probe(), this add_bridge()
-+	 * routine instead is called from within .setup_arch() at a
-+	 * point in time where clock providers haven't been setup yet;
-+	 * so clocks cannot get acquired here -- lookup would always
-+	 * fail even on those platforms which implement the provider
-+	 *
-+	 * there is no counterpart for add_bridge() just like there is
-+	 * no remove() counterpart for probe(), so in either case the
-+	 * PCI related clock won't get released, and all of the
-+	 * 512x/83xx/85xx/86xx platforms behave in identical ways
-+	 *
-+	 * this comment is here to "keep the balance" against the
-+	 * probe() routine, and as a reminder to acquire clocks if the
-+	 * add_bridge() call should move to some later point in time
-+	 *
-+	 * until then clock providers are expected to work around the
-+	 * peripheral driver's not acquiring the PCI clock on those
-+	 * platforms where clock providers exist, while nothing needs to
-+	 * be done for those platforms without a clock provider
-+	 */
+ / {
+@@ -73,6 +75,17 @@
+ 		ranges = <0x0 0x0 0xfc000000 0x04000000>;
+ 	};
+ 
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
- 	is_mpc83xx_pci = 1;
- 
- 	if (!of_device_is_available(dev)) {
-@@ -1087,9 +1115,33 @@ void fsl_pci_assign_primary(void)
- 
- static int fsl_pci_probe(struct platform_device *pdev)
- {
-+	struct clk *clk;
- 	int ret;
- 	struct device_node *node;
- 
-+	/*
-+	 * clock lookup is non-fatal since the driver is shared among
-+	 * platforms and not all of them provide clocks specs in their
-+	 * device tree, but failure to enable a specified clock is
-+	 * considered fatal
-+	 *
-+	 * note that only the 85xx and 86xx platforms pass through this
-+	 * probe() routine, while 83xx and 512x directly invoke the
-+	 * mpc83xx_add_bridge() routine from within .setup_arch() code
-+	 */
-+	clk = devm_clk_get(&pdev->dev, "ipg");
-+	if (!IS_ERR(clk)) {
-+		ret = clk_prepare_enable(clk);
-+		if (ret) {
-+			dev_err(&pdev->dev, "Could not enable PCI clock\n");
-+			return ret;
-+		}
-+		/*
-+		 * TODO where to store the 'clk' reference?  there appears
-+		 * to be no remove() routine which undoes what probe() does
-+		 */
-+	}
++		osc: osc {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <33000000>;
++		};
++	};
 +
- 	node = pdev->dev.of_node;
- 	ret = fsl_add_bridge(pdev, fsl_pci_primary == node);
+ 	soc at 80000000 {
+ 		compatible = "fsl,mpc5121-immr";
+ 		#address-cells = <1>;
+@@ -118,9 +131,12 @@
+ 		};
  
+ 		/* Clock control */
+-		clock at f00 {
++		clks: clock at f00 {
+ 			compatible = "fsl,mpc5121-clock";
+ 			reg = <0xf00 0x100>;
++			#clock-cells = <1>;
++			clocks = <&osc>;
++			clock-names = "osc";
+ 		};
+ 
+ 		/* Power Management Controller */
 -- 
 1.7.10.4
