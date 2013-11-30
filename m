@@ -1,97 +1,36 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Sat, 30 Nov 2013 23:51:28 +0100
-Subject: [PATCH v6 08/17] spi: mpc512x: adjust to OF based clock lookup
+Date: Sat, 30 Nov 2013 23:51:32 +0100
+Subject: [PATCH v6 12/17] mtd: mpc5121_nfc: adjust for OF based clock lookup
 In-Reply-To: <1385851897-23475-1-git-send-email-gsi@denx.de>
 References: <1385851897-23475-1-git-send-email-gsi@denx.de>
-Message-ID: <1385851897-23475-9-git-send-email-gsi@denx.de>
+Message-ID: <1385851897-23475-13-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-after device tree based clock lookup became available, the peripheral
-driver need no longer construct clock names which include the PSC index,
-remove the "psc%d_mclk" template and unconditionally use 'mclk'
+after device tree based clock lookup became available, the NAND
+flash driver need no longer use the previous global "nfc_clk" name,
+but should use the "ipg" clock name specific to the OF node
 
-acquire and release the 'ipg' clock item for register access as well
-
-Cc: Mark Brown <broonie@kernel.org>
-Cc: linux-spi at vger.kernel.org
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Cc: linux-mtd at lists.infradead.org
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/spi/spi-mpc512x-psc.c |   26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+ drivers/mtd/nand/mpc5121_nfc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
-index 9602bbd8d7ea..de66c676c248 100644
---- a/drivers/spi/spi-mpc512x-psc.c
-+++ b/drivers/spi/spi-mpc512x-psc.c
-@@ -40,6 +40,7 @@ struct mpc512x_psc_spi {
- 	unsigned int irq;
- 	u8 bits_per_word;
- 	struct clk *clk_mclk;
-+	struct clk *clk_ipg;
- 	u32 mclk_rate;
+diff --git a/drivers/mtd/nand/mpc5121_nfc.c b/drivers/mtd/nand/mpc5121_nfc.c
+index 439bc3896418..779e60d12f89 100644
+--- a/drivers/mtd/nand/mpc5121_nfc.c
++++ b/drivers/mtd/nand/mpc5121_nfc.c
+@@ -731,7 +731,7 @@ static int mpc5121_nfc_probe(struct platform_device *op)
+ 	of_node_put(rootnode);
  
- 	struct completion txisrdone;
-@@ -475,8 +476,6 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
- 	struct spi_master *master;
- 	int ret;
- 	void *tempp;
--	int psc_num;
--	char clk_name[16];
- 	struct clk *clk;
- 
- 	master = spi_alloc_master(dev, sizeof *mps);
-@@ -520,9 +519,7 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
- 		goto free_master;
- 	init_completion(&mps->txisrdone);
- 
--	psc_num = master->bus_num;
--	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
--	clk = devm_clk_get(dev, clk_name);
-+	clk = devm_clk_get(dev, "mclk");
- 	if (IS_ERR(clk)) {
- 		ret = PTR_ERR(clk);
- 		goto free_irq;
-@@ -533,17 +530,29 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
- 	mps->clk_mclk = clk;
- 	mps->mclk_rate = clk_get_rate(clk);
- 
+ 	/* Enable NFC clock */
+-	clk = devm_clk_get(dev, "nfc_clk");
 +	clk = devm_clk_get(dev, "ipg");
-+	if (IS_ERR(clk)) {
-+		ret = PTR_ERR(clk);
-+		goto free_mclk_clock;
-+	}
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		goto free_mclk_clock;
-+	mps->clk_ipg = clk;
-+
- 	ret = mpc512x_psc_spi_port_config(master, mps);
- 	if (ret < 0)
--		goto free_clock;
-+		goto free_ipg_clock;
- 
- 	ret = devm_spi_register_master(dev, master);
- 	if (ret < 0)
--		goto free_clock;
-+		goto free_ipg_clock;
- 
- 	return ret;
- 
--free_clock:
-+free_ipg_clock:
-+	clk_disable_unprepare(mps->clk_ipg);
-+free_mclk_clock:
- 	clk_disable_unprepare(mps->clk_mclk);
- free_irq:
- 	free_irq(mps->irq, mps);
-@@ -561,6 +570,7 @@ static int mpc512x_psc_spi_do_remove(struct device *dev)
- 	struct mpc512x_psc_spi *mps = spi_master_get_devdata(master);
- 
- 	clk_disable_unprepare(mps->clk_mclk);
-+	clk_disable_unprepare(mps->clk_ipg);
- 	free_irq(mps->irq, mps);
- 	if (mps->psc)
- 		iounmap(mps->psc);
+ 	if (IS_ERR(clk)) {
+ 		dev_err(dev, "Unable to acquire NFC clock!\n");
+ 		retval = PTR_ERR(clk);
 -- 
 1.7.10.4
