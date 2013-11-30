@@ -1,97 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 30 Nov 2013 11:49:37 +0000
-Subject: [RFC] ARM: lib: delay-loop: Add align directive to fix
- BogoMIPS calculation
-In-Reply-To: <CAOMZO5AyjD4f2o2c-QbK13Pb5cZCWEV4f5dc38MspDBY6_OjDg@mail.gmail.com>
-References: <1385121212-30182-1-git-send-email-festevam@gmail.com>
- <CAOMZO5AyjD4f2o2c-QbK13Pb5cZCWEV4f5dc38MspDBY6_OjDg@mail.gmail.com>
-Message-ID: <20131130114937.GY16735@n2100.arm.linux.org.uk>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 30 Nov 2013 12:02:02 +0000
+Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
+ gyroscopes
+In-Reply-To: <20131125094044.GE3176@lukather>
+References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
+ <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
+ <52926901.9080004@kernel.org> <20131125094044.GE3176@lukather>
+Message-ID: <5299D3BA.8080700@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 09:02:05AM -0200, Fabio Estevam wrote:
-> Hi Russell,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+On 11/25/13 09:40, Maxime Ripard wrote:
+> Hi Jonathan,
 > 
-> On Fri, Nov 22, 2013 at 9:53 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> >
-> > Currently mx53 (CortexA8) running at 1GHz reports:
-> > Calibrating delay loop... 663.55 BogoMIPS (lpj=3317760)
-> >
-> > Tom Evans verified that alignments of 0x0 and 0x8 run the two instructions of
-> > __loop_delay in one clock cycle (1 clock/loop), while alignments of 0x4 and
-> > 0xc take 3 clocks to run the loop twice. (1.5 clock/loop)
-> >
-> > The original object code looks like this:
-> >
-> > 00000010 <__loop_const_udelay>:
-> >   10:   e3e01000        mvn     r1, #0
-> >   14:   e51f201c        ldr     r2, [pc, #-28]  ; 0 <__loop_udelay-0x8>
-> >   18:   e5922000        ldr     r2, [r2]
-> >   1c:   e0800921        add     r0, r0, r1, lsr #18
-> >   20:   e1a00720        lsr     r0, r0, #14
-> >   24:   e0822b21        add     r2, r2, r1, lsr #22
-> >   28:   e1a02522        lsr     r2, r2, #10
-> >   2c:   e0000092        mul     r0, r2, r0
-> >   30:   e0800d21        add     r0, r0, r1, lsr #26
-> >   34:   e1b00320        lsrs    r0, r0, #6
-> >   38:   01a0f00e        moveq   pc, lr
-> >
-> > 0000003c <__loop_delay>:
-> >   3c:   e2500001        subs    r0, r0, #1
-> >   40:   8afffffe        bhi     3c <__loop_delay>
-> >   44:   e1a0f00e        mov     pc, lr
-> >
-> > After adding the 'align 3' directive to __loop_delay (align to 8 bytes):
-> >
-> > 00000010 <__loop_const_udelay>:
-> >   10:   e3e01000        mvn     r1, #0
-> >   14:   e51f201c        ldr     r2, [pc, #-28]  ; 0 <__loop_udelay-0x8>
-> >   18:   e5922000        ldr     r2, [r2]
-> >   1c:   e0800921        add     r0, r0, r1, lsr #18
-> >   20:   e1a00720        lsr     r0, r0, #14
-> >   24:   e0822b21        add     r2, r2, r1, lsr #22
-> >   28:   e1a02522        lsr     r2, r2, #10
-> >   2c:   e0000092        mul     r0, r2, r0
-> >   30:   e0800d21        add     r0, r0, r1, lsr #26
-> >   34:   e1b00320        lsrs    r0, r0, #6
-> >   38:   01a0f00e        moveq   pc, lr
-> >   3c:   e320f000        nop     {0}
-> >
-> > 00000040 <__loop_delay>:
-> >   40:   e2500001        subs    r0, r0, #1
-> >   44:   8afffffe        bhi     40 <__loop_delay>
-> >   48:   e1a0f00e        mov     pc, lr
-> >   4c:   e320f000        nop     {0}
-> >
-> > , which now reports:
-> > Calibrating delay loop... 996.14 BogoMIPS (lpj=4980736)
-> >
-> > Some more test results:
-> >
-> > On mx31 (ARM1136) running at 532 MHz, before the patch:
-> > Calibrating delay loop... 351.43 BogoMIPS (lpj=1757184)
-> >
-> > On mx31 (ARM1136) running at 532 MHz after the patch:
-> > Calibrating delay loop... 528.79 BogoMIPS (lpj=2643968)
-> >
-> > Also tested on mx6 (CortexA9) and on mx27 (ARM926), which shows the same
-> > BogoMIPS value before and after this patch.
-> >
-> > Reported-by: Tom Evans <tom_usenet@optusnet.com.au>
-> > Suggested-by: Tom Evans <tom_usenet@optusnet.com.au>
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> On Sun, Nov 24, 2013 at 09:00:49PM +0000, Jonathan Cameron wrote:
+>> -----BEGIN PGP SIGNED MESSAGE----- Hash: SHA1
+>> 
+>> On 11/21/13 13:14, Maxime Ripard wrote:
+>>> Hi Denis,
+>>> 
+>>> On Thu, Nov 21, 2013 at 12:41:24PM +0100, Denis CIOCCA wrote:
+>>>> only one point: it's possible to use the same names with DT? (using _ instead of -)
+>>> 
+>>> Yes, it is, but only for i2c as far as I'm aware, and usually the DT compatibles are with - as a separator (I
+>>> looked into the ePAPR, but couldn't get any explanations or requirements on this, even though it's used in all
+>>> of their examples)
+>> 
+>> In other discussions, where the defacto i2c device tree bindings have been followed, the conclusion has been that
+>> to change to a - from _ would result in userspace ABI changes, so whilst no one wants _ the discussion has
+>> concluded we can't really avoid it.
 > 
-> Any comments on this, please?
+> What kind of userspace ABI changes are we talking about?
+IIRC:
 
-Any chance that you could run hackbench, and build the kernel with
--falign-functions=32, comparing the kernel without and with this
-option ?
+i2c has a generic binding that matches to the name bit of the i2c_device_id
+array.  That is then exported in sysfs.  There are quite a lot of instances
+of underscores out there in these names.  Thus unforutnately they can't
+be changed without possibly breaking userspace.  Typically those same names
+are also output by IIO though obviously we could keep that the same whilst
+changing the dt binding.
 
-If alignment has as much effect as the above suggests, the results
-may be interesting.
+Also the i2c binding allows binding after dropping the vendor prefix which
+is even more 'interesting'. See of_modialias_node in drivers/of/base.c
 
-As far as this patch is concerned, I'm happy with it, please put it in
-the patch system, thanks.
+I'd therefore argue in favour of just leaving the underscores in existing
+drivers as a nasty bit of legacy and doing our best to not introduce any
+new ones!
 
-Thanks.
+Jonathan
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.22 (GNU/Linux)
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+
+iQIcBAEBAgAGBQJSmdOzAAoJEFSFNJnE9BaIilUP/RPwSswdYi9wWtN0tBEFfZvo
+JO0bybjw342LE2xt3DXd7fo04v1+LspWxatw6kht1mJ/aU6O4HwNHQpPO7Md5pDm
+4HPoPSREaDbYEOqhVSjXaBUOXIOYSe392KtqKJMRSxRs3XiIeqYPfojqtIE2KF7a
+W3EEjud5wrWuOLKtdQWjRt+UpDnewImR+qORtRUoA7NY2YIHvdarOQFlfDqLXSRK
+GvE49O8jCtQvcjI1rsybMRXQkUF3GE8hLyATaf/SbvgVeILbHSl6OvaN7O7nNJ+b
+DGGrzAzmKwj56G47imQ7z2v/D9ExWNwr1DZ2CMPt+yXQ15OBXDnAmWGXTr45/dUl
+G8PjaZA9GKsp0dE713b0RN/eJnsoFsJd8bDCeXh9IpVblmkQzW3HsvI8p2Uj8xga
+5d/txeXytLNvHj+3OiiVTaKA3Y9/dFNq9dwI+QAMbLY87T4ft70z533liTZRnMWG
+2O8x2oHYnoFRH3qmpg6jy3/qCFe6wTTXy1yMFQ0Ds/bJ93vhrv7SiXXsxX3CNl9X
+KI8t74zx51GMxBV5pMixgX9aBH7Wrn+WSXmUKkMkm7JGbeicZEjk259EjAluuohD
+HHh0cehjCuVPY6PTUhkXTfCFDfpFtwOkXsZb6fOMS2wDKK4BLwb3SPwyn+ID7XJs
+u/RQzwNNjvdsR2hmBQOw
+=lpwt
+-----END PGP SIGNATURE-----
