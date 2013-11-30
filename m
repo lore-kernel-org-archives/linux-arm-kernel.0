@@ -1,30 +1,20 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 30 Nov 2013 14:56:26 -0800
-Subject: [PATCH v5 00/17] ARM: at91: move to common clk framework
-In-Reply-To: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
-References: <1384289513-3068-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131130225626.16819.99250@quantum>
+Date: Sat, 30 Nov 2013 15:05:49 -0800
+Subject: [PATCH v6 00/16] ARM: at91: move to common clk framework
+In-Reply-To: <1385642184-6467-1-git-send-email-b.brezillon@overkiz.com>
+References: <1385642184-6467-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131130230549.16819.84161@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2013-11-12 12:51:52)
+Quoting Boris BREZILLON (2013-11-28 04:36:24)
 > Hello,
 > 
 > This patch series is the 5th version of the at91 clk implementations
 > using the Common Clk Framework.
 
-Thanks for sending this latest version. A couple recurring themes to be
-addressed:
-
-1) Some clocks implement .prepare and .disable but not .unprepre nor
-.enable. Please only use .prepare and .unprepare in this case.
-
-2) Remove the file names & paths from the comment block at the top of
-the files.
-
-These are minor issues. Are you taking these through your platform tree or the
-clk tree? If you want to take them through your platform tree then feel
-free to add my acked-by to the next version.
+Oops, I just replied to v5 of this series. Thanks for the fixes. Which
+tree do you want this to go through?
 
 Regards,
 Mike
@@ -49,19 +39,22 @@ Mike
 > This implementation is only compatible with device tree definition.
 > The goal is to define the whole clock tree using the device tree.
 > 
-> BTW, could a dt maintainer take a look at these dt bindinds ?
-> 
 > Just a note to let you know these bindings are currently unstable and might
 > change in the future.
 > 
 > 
-> Mike, I know you already acked the previous version, but I slighty changed
-> the dt bindings, according to some feedbacks I got during ELCE.
-> Could you take a look at this new version (at least the new dt bindings),
-> and add your acked-by if you agree with these changes ?
-> 
 > Best Regards,
 > Boris
+> 
+> Changes since v5:
+>  - remove peripheral divisors macros from dt binding include file
+>  - remove file path from comment blocks
+>  - replace pll and utmi disable function by unprepare function to
+>    avoid issue when disabling and reenabling a clk
+>  - fix programmable clk interrupt retrieval
+>  - fix OF_CLK_DECLARE names (xxx_clk_main -> xxx_clk_pmc)
+>  - add missing comma in at91rm9200 main clk dt declaration
+>  - fix num_parents check in smd clk driver
 > 
 > Changes since v4:
 >  - rework dt bindings:
@@ -102,7 +95,7 @@ Mike
 >    and multiple child nodes each defining a system/peripheral or prog clock)
 >  - fix bugs in sama5 dt definition
 > 
-> Boris BREZILLON (17):
+> Boris BREZILLON (16):
 >   ARM: at91: move at91_pmc.h to include/linux/clk/at91_pmc.h
 >   ARM: at91: add Kconfig options for common clk support
 >   clk: at91: add PMC base support
@@ -112,12 +105,11 @@ Mike
 >   clk: at91: add PMC master clock
 >   clk: at91: add PMC system clocks
 >   clk: at91: add PMC peripheral clocks
->   clk: at91: add peripheral clk macros for peripheral clk dt bindings
 >   clk: at91: add PMC programmable clocks
 >   clk: at91: add PMC utmi clock
 >   clk: at91: add PMC usb clock
 >   clk: at91: add PMC smd clock
->   clk: at91: add PMC clk device tree binding doc.
+>   dt: binding: add at91 clks dt bindings documentation
 >   ARM: at91: move pit timer to common clk framework
 >   ARM: at91: add new compatible strings for pmc driver
 > 
@@ -142,22 +134,22 @@ Mike
 >  arch/arm/mach-at91/setup.c                         |    8 +-
 >  drivers/clk/Makefile                               |    1 +
 >  drivers/clk/at91/Makefile                          |   12 +
->  drivers/clk/at91/clk-main.c                        |  189 +++++++
->  drivers/clk/at91/clk-master.c                      |  272 ++++++++++
->  drivers/clk/at91/clk-peripheral.c                  |  412 +++++++++++++++
->  drivers/clk/at91/clk-pll.c                         |  534 ++++++++++++++++++++
->  drivers/clk/at91/clk-plldiv.c                      |  137 +++++
->  drivers/clk/at91/clk-programmable.c                |  368 ++++++++++++++
->  drivers/clk/at91/clk-smd.c                         |  173 +++++++
->  drivers/clk/at91/clk-system.c                      |  137 +++++
->  drivers/clk/at91/clk-usb.c                         |  400 +++++++++++++++
->  drivers/clk/at91/clk-utmi.c                        |  162 ++++++
->  drivers/clk/at91/pmc.c                             |  399 +++++++++++++++
+>  drivers/clk/at91/clk-main.c                        |  187 +++++++
+>  drivers/clk/at91/clk-master.c                      |  270 ++++++++++
+>  drivers/clk/at91/clk-peripheral.c                  |  410 +++++++++++++++
+>  drivers/clk/at91/clk-pll.c                         |  531 ++++++++++++++++++++
+>  drivers/clk/at91/clk-plldiv.c                      |  135 +++++
+>  drivers/clk/at91/clk-programmable.c                |  366 ++++++++++++++
+>  drivers/clk/at91/clk-smd.c                         |  171 +++++++
+>  drivers/clk/at91/clk-system.c                      |  135 +++++
+>  drivers/clk/at91/clk-usb.c                         |  398 +++++++++++++++
+>  drivers/clk/at91/clk-utmi.c                        |  159 ++++++
+>  drivers/clk/at91/pmc.c                             |  397 +++++++++++++++
 >  drivers/clk/at91/pmc.h                             |  116 +++++
 >  drivers/usb/gadget/atmel_usba_udc.c                |    2 +-
->  include/dt-bindings/clk/at91.h                     |   28 +
+>  include/dt-bindings/clk/at91.h                     |   22 +
 >  .../include/mach => include/linux/clk}/at91_pmc.h  |    4 +-
->  36 files changed, 3771 insertions(+), 20 deletions(-)
+>  36 files changed, 3741 insertions(+), 20 deletions(-)
 >  create mode 100644 Documentation/devicetree/bindings/clock/at91-clock.txt
 >  create mode 100644 drivers/clk/at91/Makefile
 >  create mode 100644 drivers/clk/at91/clk-main.c
