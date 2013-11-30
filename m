@@ -1,47 +1,44 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Sat, 30 Nov 2013 12:02:28 +0530
-Subject: [PATCH v5 4/4] KGDB: make kgdb_breakpoint() as noinline
-In-Reply-To: <1385793148-28979-1-git-send-email-vijay.kilari@gmail.com>
-References: <1385793148-28979-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1385793148-28979-5-git-send-email-vijay.kilari@gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 30 Nov 2013 10:35:44 +0400
+Subject: [PATCH] ARM: dts: i.MX51: Move include "imx51-pinfunc.h" into
+ "imx51-pingrp.h"
+Message-ID: <1385793344-24837-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+Pin function definitions are used for pin groups definitions,
+so move the header in the "imx51-pingrp.h".
 
-The function kgdb_breakpoint() sets up break point at
-compile time by calling arch_kgdb_breakpoint();
-Though this call is surrounded by wmb() barrier,
-the compile can still re-order the break point,
-because this scheduling barrier is not a code motion
-barrier in gcc.
-
-Making kgdb_breakpoint() as noinline solves this problem
-of code reording around break point instruction and also
-avoids problem of being called as inline function from
-other places
-
-More details about discussion on this can be found here
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/269732
-
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- kernel/debug/debug_core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx51-pingrp.h | 2 ++
+ arch/arm/boot/dts/imx51.dtsi     | 1 -
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-index 7d2f35e..cf04798 100644
---- a/kernel/debug/debug_core.c
-+++ b/kernel/debug/debug_core.c
-@@ -1034,7 +1034,7 @@ int dbg_io_get_char(void)
-  * otherwise as a quick means to stop program execution and "break" into
-  * the debugger.
+diff --git a/arch/arm/boot/dts/imx51-pingrp.h b/arch/arm/boot/dts/imx51-pingrp.h
+index 550d0d1..f63267b 100644
+--- a/arch/arm/boot/dts/imx51-pingrp.h
++++ b/arch/arm/boot/dts/imx51-pingrp.h
+@@ -10,6 +10,8 @@
+ #ifndef __DTS_IMX51_PINGRP_H
+ #define __DTS_IMX51_PINGRP_H
+ 
++#include "imx51-pinfunc.h"
++
+ #define MX51_AUDMUX_PINGRP1 \
+ 	MX51_PAD_AUD3_BB_TXD__AUD3_TXD			0x80000000 \
+ 	MX51_PAD_AUD3_BB_RXD__AUD3_RXD			0x80000000 \
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index cad5a56..61a2552 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -11,7 +11,6 @@
   */
--void kgdb_breakpoint(void)
-+noinline void kgdb_breakpoint(void)
- {
- 	atomic_inc(&kgdb_setting_breakpoint);
- 	wmb(); /* Sync point before breakpoint */
+ 
+ #include "skeleton.dtsi"
+-#include "imx51-pinfunc.h"
+ #include "imx51-pingrp.h"
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/clock/imx5-clock.h>
 -- 
-1.7.9.5
+1.8.3.2
