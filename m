@@ -1,103 +1,97 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Sat, 30 Nov 2013 23:51:23 +0100
-Subject: [PATCH v6 03/17] dts: mpc512x: add clock related device tree specs
+Date: Sat, 30 Nov 2013 23:51:28 +0100
+Subject: [PATCH v6 08/17] spi: mpc512x: adjust to OF based clock lookup
 In-Reply-To: <1385851897-23475-1-git-send-email-gsi@denx.de>
 References: <1385851897-23475-1-git-send-email-gsi@denx.de>
-Message-ID: <1385851897-23475-4-git-send-email-gsi@denx.de>
+Message-ID: <1385851897-23475-9-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this addresses the clock driver aka provider's side of clocks
-- introduce a 'clocks' subtree with an 'osc' node for the crystal
-  or oscillator SoC input (fixed frequency)
-- the 'clock at f00' clock-control-module node references the 'osc' for
-  its input, and is another provider for all the clocks which the
-  CCM component manages
-- prepare for future references to clocks from peripheral nodes
-  by means of the <&clks ID> syntax and symbolic ID names which a
-  header file provides
-- provide default values with 33MHz oscillator frequency in the
-  common include (the 66MHz IPS bus already was there), and add
-  override values for the ifm AC14xx board which deviates from
-  the reference design (25MHz xtal, 80MHz IPS bus)
+after device tree based clock lookup became available, the peripheral
+driver need no longer construct clock names which include the PSC index,
+remove the "psc%d_mclk" template and unconditionally use 'mclk'
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Reviewed-by: Mike Turquette <mturquette@linaro.org> # for v3, before &osc
+acquire and release the 'ipg' clock item for register access as well
+
+Cc: Mark Brown <broonie@kernel.org>
+Cc: linux-spi at vger.kernel.org
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/ac14xx.dts   |    7 +++++++
- arch/powerpc/boot/dts/mpc5121.dtsi |   18 +++++++++++++++++-
- 2 files changed, 24 insertions(+), 1 deletion(-)
+ drivers/spi/spi-mpc512x-psc.c |   26 ++++++++++++++++++--------
+ 1 file changed, 18 insertions(+), 8 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-index a543c4088cba..a1b883730b31 100644
---- a/arch/powerpc/boot/dts/ac14xx.dts
-+++ b/arch/powerpc/boot/dts/ac14xx.dts
-@@ -139,7 +139,14 @@
- 		};
- 	};
+diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
+index 9602bbd8d7ea..de66c676c248 100644
+--- a/drivers/spi/spi-mpc512x-psc.c
++++ b/drivers/spi/spi-mpc512x-psc.c
+@@ -40,6 +40,7 @@ struct mpc512x_psc_spi {
+ 	unsigned int irq;
+ 	u8 bits_per_word;
+ 	struct clk *clk_mclk;
++	struct clk *clk_ipg;
+ 	u32 mclk_rate;
  
-+	clocks {
-+		osc {
-+			clock-frequency = <25000000>;
-+		};
-+	};
+ 	struct completion txisrdone;
+@@ -475,8 +476,6 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+ 	struct spi_master *master;
+ 	int ret;
+ 	void *tempp;
+-	int psc_num;
+-	char clk_name[16];
+ 	struct clk *clk;
+ 
+ 	master = spi_alloc_master(dev, sizeof *mps);
+@@ -520,9 +519,7 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+ 		goto free_master;
+ 	init_completion(&mps->txisrdone);
+ 
+-	psc_num = master->bus_num;
+-	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
+-	clk = devm_clk_get(dev, clk_name);
++	clk = devm_clk_get(dev, "mclk");
+ 	if (IS_ERR(clk)) {
+ 		ret = PTR_ERR(clk);
+ 		goto free_irq;
+@@ -533,17 +530,29 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+ 	mps->clk_mclk = clk;
+ 	mps->mclk_rate = clk_get_rate(clk);
+ 
++	clk = devm_clk_get(dev, "ipg");
++	if (IS_ERR(clk)) {
++		ret = PTR_ERR(clk);
++		goto free_mclk_clock;
++	}
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		goto free_mclk_clock;
++	mps->clk_ipg = clk;
 +
- 	soc at 80000000 {
-+		bus-frequency = <80000000>;	/* 80 MHz ips bus */
+ 	ret = mpc512x_psc_spi_port_config(master, mps);
+ 	if (ret < 0)
+-		goto free_clock;
++		goto free_ipg_clock;
  
- 		clock at f00 {
- 			compatible = "fsl,mpc5121rev2-clock", "fsl,mpc5121-clock";
-diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
-index bd14c00e5146..9bfcb7558197 100644
---- a/arch/powerpc/boot/dts/mpc5121.dtsi
-+++ b/arch/powerpc/boot/dts/mpc5121.dtsi
-@@ -9,6 +9,8 @@
-  * option) any later version.
-  */
+ 	ret = devm_spi_register_master(dev, master);
+ 	if (ret < 0)
+-		goto free_clock;
++		goto free_ipg_clock;
  
-+#include <dt-bindings/clock/mpc512x-clock.h>
-+
- /dts-v1/;
+ 	return ret;
  
- / {
-@@ -73,6 +75,17 @@
- 		ranges = <0x0 0x0 0xfc000000 0x04000000>;
- 	};
+-free_clock:
++free_ipg_clock:
++	clk_disable_unprepare(mps->clk_ipg);
++free_mclk_clock:
+ 	clk_disable_unprepare(mps->clk_mclk);
+ free_irq:
+ 	free_irq(mps->irq, mps);
+@@ -561,6 +570,7 @@ static int mpc512x_psc_spi_do_remove(struct device *dev)
+ 	struct mpc512x_psc_spi *mps = spi_master_get_devdata(master);
  
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		osc: osc {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <33000000>;
-+		};
-+	};
-+
- 	soc at 80000000 {
- 		compatible = "fsl,mpc5121-immr";
- 		#address-cells = <1>;
-@@ -118,9 +131,12 @@
- 		};
- 
- 		/* Clock control */
--		clock at f00 {
-+		clks: clock at f00 {
- 			compatible = "fsl,mpc5121-clock";
- 			reg = <0xf00 0x100>;
-+			#clock-cells = <1>;
-+			clocks = <&osc>;
-+			clock-names = "osc";
- 		};
- 
- 		/* Power Management Controller */
+ 	clk_disable_unprepare(mps->clk_mclk);
++	clk_disable_unprepare(mps->clk_ipg);
+ 	free_irq(mps->irq, mps);
+ 	if (mps->psc)
+ 		iounmap(mps->psc);
 -- 
 1.7.10.4
