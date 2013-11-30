@@ -1,112 +1,50 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Sat, 30 Nov 2013 15:36:10 +0100
-Subject: [PATCH 3/3] ARM: dts: imx27-apf27dev: Add pinctrl for cspi
- chip-select, sdhci2 card-detect, gpio-leds and gpio-keys
-In-Reply-To: <1385822170-98486-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1385822170-98486-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1385822170-98486-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1385822170-98486-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 30 Nov 2013 14:17:38 -0300
+Subject: [RFC/PATCH v2] NAND bus-width detection extreme makeover
+Message-ID: <1385831859-19170-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/boot/dts/imx27-apf27dev.dts | 34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+Another iteration of this proposal, although Brian Norris already said
+he didn't like the v1. I guess I'm stubborn ;-)
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index 6069331..c8d3cb4 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -38,6 +38,8 @@
- 
- 	gpio-keys {
- 		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
- 
- 		user-key {
- 			label = "user";
-@@ -48,6 +50,8 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_leds>;
- 
- 		user {
- 			label = "Heartbeat";
-@@ -61,7 +65,7 @@
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 28 1>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_cspi1>;
-+	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
- 	status = "okay";
- };
- 
-@@ -70,7 +74,7 @@
- 	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
- 			<&gpio2 17 1>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_cspi2>;
-+	pinctrl-0 = <&pinctrl_cspi2 &pinctrl_cspi2_cs>;
- 	status = "okay";
- };
- 
-@@ -106,10 +110,22 @@
- 			fsl,pins = <MX27_CSPI1_PINGRP1>;
- 		};
- 
-+		pinctrl_cspi1_cs: cspi1csgrp {
-+			fsl,pins = <MX27_PAD_CSPI1_SS0__GPIO4_28 0x0>;
-+		};
-+
- 		pinctrl_cspi2: cspi2grp {
- 			fsl,pins = <MX27_CSPI2_PINGRP1>;
- 		};
- 
-+		pinctrl_cspi2_cs: cspi2csgrp {
-+			fsl,pins = <
-+				MX27_PAD_CSI_D5__GPIO2_17 0x0
-+				MX27_PAD_CSPI2_SS0__GPIO4_21 0x0
-+				MX27_PAD_CSPI1_SS1__GPIO4_27 0x0
-+			>;
-+		};
-+
- 		pinctrl_imxfb1: imxfbgrp {
- 			fsl,pins = <MX27_FB_PINGRP1>;
- 		};
-@@ -126,9 +142,21 @@
- 			fsl,pins = <MX27_SDHC2_PINGRP1>;
- 		};
- 
-+		pinctrl_sdhc2_cd: sdhc2cdgrp {
-+			fsl,pins = <MX27_PAD_TOUT__GPIO3_14 0x0>;
-+		};
-+
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <MX27_PWM0_PINGRP1>;
- 		};
-+
-+		pinctrl_gpio_leds: gpioledsgrp {
-+			fsl,pins = <MX27_PAD_PC_VS1__GPIO6_14 0x0>;
-+		};
-+
-+		pinctrl_gpio_keys: gpiokeysgrp {
-+			fsl,pins = <MX27_PAD_PC_VS2__GPIO6_13 0x0>;
-+		};
- 	};
- };
- 
-@@ -136,7 +164,7 @@
- 	bus-width = <4>;
- 	cd-gpios = <&gpio3 14 0>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_sdhc2>;
-+	pinctrl-0 = <&pinctrl_sdhc2 &pinctrl_sdhc2_cd>;
- 	status = "okay";
- };
- 
+This patch removes the flash device bus-width configuration, prior to
+the device detection. With this modification, a NAND driver *shouldn't*
+need to set the device width, but can instead obtain the detected
+bus-width after the call to nand_scan_ident() and perform any neccessary
+action.
+
+As usual, this has been tested on a AM335x board with 8-bit and 16-bit devices,
+which were successfully detected and nandtest'ed, using ONFI and flash-based
+detection.
+
+Improving from v1, now driver's shouldn't need *any* modification to work in
+both 8-bit and 16-bit modes (although I'm only testing the omap2-nand driver).
+
+Brian and others:
+
+I'm no longer talking about removing any property or option :-), but merely
+fixing our current incapability of detecting x16 devices by ONFI. I think
+we can discuss about the DT property or the future of NAND_BUSWIDTH_AUTO
+in another thread.
+
+Probably there's more work needed along the lines of Uwe's patch to
+fix other ONFI-related usage.
+
+Changes from v1:
+
+  * In addition to setting nand_set_default to x8 for the detection phase,
+    this commit now clears the NAND_BUSWIDTH_16 flag from chip->options
+    as it prevented device from getting detected.
+
+  * This v2 no longer removes the NAND_BUSWIDTH_AUTO option. We can do that
+    later after some proper discussion.
+
+Ezequiel Garcia (1):
+  mtd: nand: Fix ONFI detection of 16-bit width NAND devices
+
+ drivers/mtd/nand/nand_base.c | 43 +++++++++++++------------------------------
+ 1 file changed, 13 insertions(+), 30 deletions(-)
+
 -- 
-1.8.3.2
+1.8.1.5
