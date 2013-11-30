@@ -1,177 +1,79 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 30 Nov 2013 10:18:04 +0400
-Subject: [PATCH 4/4] ARM: dts: i.MX27 boards: Switch to use standard GPIO and
- IRQ flags definitions
-In-Reply-To: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
-References: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1385792284-22286-4-git-send-email-shc_work@mail.ru>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Sat, 30 Nov 2013 12:02:24 +0530
+Subject: [PATCH v5 0/4] AArch64: KGDB support
+Message-ID: <1385793148-28979-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27-apf27dev.dts             | 13 +++++++------
- arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts |  2 +-
- arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts |  4 ++--
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts   |  9 +++++----
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts   |  6 +++---
- arch/arm/boot/dts/imx27.dtsi                     |  2 ++
- 6 files changed, 20 insertions(+), 16 deletions(-)
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index 9197329..51a19ad 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -41,7 +41,7 @@
- 
- 		user-key {
- 			label = "user";
--			gpios = <&gpio6 13 0>;
-+			gpios = <&gpio6 13 GPIO_ACTIVE_HIGH>;
- 			linux,code = <276>; /* BTN_EXTRA */
- 		};
- 	};
-@@ -51,7 +51,7 @@
- 
- 		user {
- 			label = "Heartbeat";
--			gpios = <&gpio6 14 0>;
-+			gpios = <&gpio6 14 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-@@ -59,14 +59,15 @@
- 
- &cspi1 {
- 	fsl,spi-num-chipselects = <1>;
--	cs-gpios = <&gpio4 28 1>;
-+	cs-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
- &cspi2 {
- 	fsl,spi-num-chipselects = <3>;
--	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
--			<&gpio2 17 1>;
-+	cs-gpios = <&gpio4 21 GPIO_ACTIVE_LOW>,
-+		   <&gpio4 27 GPIO_ACTIVE_LOW>,
-+		   <&gpio2 17 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
-@@ -92,6 +93,6 @@
- 
- &sdhci2 {
- 	bus-width = <4>;
--	cd-gpios = <&gpio3 14 0>;
-+	cd-gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-index 0a90df1..0d65023 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-@@ -113,7 +113,7 @@
- };
- 
- &sdhci2 {
--	cd-gpios = <&gpio3 29 0>;
-+	cd-gpios = <&gpio3 29 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-index 62e7fcb..db8c095 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-@@ -24,8 +24,8 @@
- 
- &cspi1 {
- 	fsl,spi-num-chipselects = <2>;
--	cs-gpios = <&gpio4 28 0>,
--		<&gpio4 27 0>;
-+	cs-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>,
-+		   <&gpio4 27 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index 3145bdb..2cb9e4b 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -16,7 +16,8 @@
- 
- &cspi1 {
- 	fsl,spi-num-chipselects = <2>;
--	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
-+	cs-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>,
-+		   <&gpio4 27 GPIO_ACTIVE_LOW>;
- };
- 
- &i2c1 {
-@@ -57,8 +58,8 @@
- 
- &sdhci2 {
- 	bus-width = <4>;
--	cd-gpios = <&gpio3 29 0>;
--	wp-gpios = <&gpio3 28 0>;
-+	cd-gpios = <&gpio3 29 GPIO_ACTIVE_HIGH>;
-+	wp-gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
- 	vmmc-supply = <&vmmc1_reg>;
- 	status = "okay";
- };
-@@ -82,7 +83,7 @@
- 		compatible = "nxp,sja1000";
- 		reg = <4 0x00000000 0x00000100>;
- 		interrupt-parent = <&gpio5>;
--		interrupts = <19 0x2>;
-+		interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
- 		nxp,external-clock-frequency = <16000000>;
- 		nxp,tx-output-config = <0x16>;
- 		nxp,no-comparator-bypass;
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index 861e2e0..3435ce9 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -52,7 +52,7 @@
- 
- &cspi1 {
- 	fsl,spi-num-chipselects = <1>;
--	cs-gpios = <&gpio4 28 0>;
-+	cs-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- 
- 	pmic: mc13783 at 0 {
-@@ -62,7 +62,7 @@
- 		spi-max-frequency = <20000000>;
- 		reg = <0>;
- 		interrupt-parent = <&gpio2>;
--		interrupts = <23 0x4>;
-+		interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
- 		fsl,mc13xxx-uses-adc;
- 		fsl,mc13xxx-uses-rtc;
- 
-@@ -149,7 +149,7 @@
- 
- &fec {
- 	phy-mode = "mii";
--	phy-reset-gpios = <&gpio3 30 0>;
-+	phy-reset-gpios = <&gpio3 30 GPIO_ACTIVE_HIGH>;
- 	phy-supply = <&reg_3v3>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_fec1>;
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 5cfe288..63b1b32 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -11,6 +11,8 @@
- 
- #include "skeleton.dtsi"
- #include "imx27-pingrp.h"
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	aliases {
+Based on the step-handler and break-handler hooks patch from
+Sandeepa (Patch 1), KGDB debugging support is added for EL1
+debug in AArch64 mode. Any updates that come for Patch 1 from
+Sandeepa will be rebased in next version
+
+With second patch,register layout is updated to be inline with GDB tool.
+Basic GDB connection, break point set/clear and info commands
+are supported except step/next debugging
+
+With third patch, step/next debugging support is added, where in
+pc is updated to point to the instruction to be stepped and
+stopped.
+
+With fourth patch, the compile time breakpoint instruction
+reordering is fixed by making kgbd_breakpoint() as noinline
+
+Tested with ARM64 simulator
+
+v5:
+ - Updated BRK #imm16 value to 0x400 & 0x401 as per recommendation
+   as per Marcus recommendataion
+   http://patchwork.ozlabs.org/patch/290801/
+ - Rebased to 3.13 AArch64 kernel
+
+v4:
+ - Updated kgdb_single_step and kgdb_cpu_doing_single_step
+   variables properly based on gdb state
+
+v3:
+ - Rebased to v4 version of Sandeepa Prabhu's patch (patch 1)
+ - Made dynamic break point instruction encoding generic
+ - Made ESR value encoding generic for dynamic and compile break point
+ - Used memcpy and memset to copy register contents to gdb buffer
+ - Fixed reordering of break point instruction by compiler with
+   patch 3
+ - Rebased against AAach64 upstream kernel
+
+v2:
+ - Moved break instruction encoding to debug-monitors.h file
+ - Fixed endianess of compile break instruction encoding
+ - Updated I/O buffer sizes
+ - Updated register buffer size
+ - Remove changes to debug_exception handler in entry.S for
+ - ELR update and step debugging with update pc instead of ELR
+ - Rebased against AArch64 upstream kernel
+
+v1:
+ - Initial patch-set
+
+Sandeepa Prabhu (1):
+  arm64: support single-step and breakpoint handler hooks
+
+Vijaya Kumar K (3):
+  AArch64: KGDB: Add Basic KGDB support
+  AArch64: KGDB: Add step debugging support
+  KGDB: make kgdb_breakpoint() as noinline
+
+ arch/arm64/include/asm/debug-monitors.h |   68 +++++++
+ arch/arm64/include/asm/kgdb.h           |   86 ++++++++
+ arch/arm64/kernel/Makefile              |    1 +
+ arch/arm64/kernel/debug-monitors.c      |   86 +++++++-
+ arch/arm64/kernel/entry.S               |    2 +
+ arch/arm64/kernel/kgdb.c                |  338 +++++++++++++++++++++++++++++++
+ kernel/debug/debug_core.c               |    2 +-
+ 7 files changed, 581 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kgdb.h
+ create mode 100644 arch/arm64/kernel/kgdb.c
+
 -- 
-1.8.3.2
+1.7.9.5
