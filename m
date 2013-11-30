@@ -1,55 +1,59 @@
 From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Sat, 30 Nov 2013 09:51:13 +0100
-Subject: [PATCH 2/2] ARM: apf28dev: dts: set gpio polarity for usb regulator
- and pinctrl for regulator gpio
-In-Reply-To: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1385801473-97460-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Date: Sat, 30 Nov 2013 09:51:12 +0100
+Subject: [PATCH 1/2] ARM: imx28: add apf28 specific initialization (macaddr)
+Message-ID: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 ---
- arch/arm/boot/dts/imx28-apf28dev.dts | 13 +++++++++++++
+ arch/arm/mach-mxs/mach-mxs.c | 13 +++++++++++++
  1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-index 741aecb..334dea5 100644
---- a/arch/arm/boot/dts/imx28-apf28dev.dts
-+++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-@@ -66,6 +66,16 @@
- 					fsl,voltage = <MXS_VOLTAGE_HIGH>;
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 3982e12..02b17f7 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -158,6 +158,7 @@ enum mac_oui {
+ 	OUI_DENX,
+ 	OUI_CRYSTALFONTZ,
+ 	OUI_I2SE,
++	OUI_ARMADEUS,
+ };
+ 
+ static void __init update_fec_mac_prop(enum mac_oui oui)
+@@ -217,6 +218,11 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 			macaddr[1] = 0x01;
+ 			macaddr[2] = 0x87;
+ 			break;
++		case OUI_ARMADEUS:
++			macaddr[0] = 0x00;
++			macaddr[1] = 0x1e;
++			macaddr[2] = 0xac;
++			break;
+ 		}
+ 		val = ocotp[i];
+ 		macaddr[3] = (val >> 16) & 0xff;
+@@ -242,6 +248,11 @@ static void __init imx28_evk_init(void)
+ 	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
+ }
+ 
++static void __init imx28_apf28_init(void)
++{
++	update_fec_mac_prop(OUI_ARMADEUS);
++}
 +
-+				usb0_otg_apf28dev: otg-apf28dev at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						MX28_PAD_LCD_D23__GPIO_1_23
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+				};
- 			};
+ static int apx4devkit_phy_fixup(struct phy_device *phy)
+ {
+ 	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
+@@ -469,6 +480,8 @@ static void __init mxs_machine_init(void)
  
- 			lcdif at 80030000 {
-@@ -131,6 +141,8 @@
- 
- 	ahb at 80080000 {
- 		usb0: usb at 80080000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&usb0_otg_apf28dev>;
- 			vbus-supply = <&reg_usb0_vbus>;
- 			status = "okay";
- 		};
-@@ -160,6 +172,7 @@
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio1 23 1>;
-+			enable-active-high;
- 		};
- 	};
- 
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+ 		imx28_evk_init();
++	if (of_machine_is_compatible("armadeus,imx28-apf28"))
++		imx28_apf28_init();
+ 	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
+ 		apx4devkit_init();
+ 	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
 -- 
 1.8.3.2
