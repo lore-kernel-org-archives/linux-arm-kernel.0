@@ -1,30 +1,51 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 30 Nov 2013 10:18:01 +0400
-Subject: [PATCH 1/4] ARM: dts: imx27-phytec-phycore-som: Add on-flash BBT
- support
-Message-ID: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
+Date: Sat, 30 Nov 2013 10:18:02 +0400
+Subject: [PATCH 2/4] ARM: dts: imx27-phytec-phycore-rdk: Add DT node for
+ camera module
+In-Reply-To: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
+References: <1385792284-22286-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1385792284-22286-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for On Flash Bad Block Table for PCM-038
-onboard NAND.
+This patch adds first I2C bus and PCA9536 device.
+This device is used on Phytec PCM-970 RDK camera addon module.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index 56960c7..fec2d29 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -178,6 +178,7 @@
- &nfc {
- 	nand-bus-width = <8>;
- 	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index e792469..3145bdb 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -19,8 +19,26 @@
+ 	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
  };
  
++&i2c1 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	camgpio: pca9536 at 41 {
++		compatible = "nxp,pca9536";
++		reg = <0x41>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++};
++
+ &iomuxc {
+ 	imx27_phycore_rdk {
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <MX27_I2C1_PINGRP1>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX27_UART1_PINGRP1
 -- 
 1.8.3.2
