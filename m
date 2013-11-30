@@ -1,27 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 30 Nov 2013 15:44:40 +0000
-Subject: [PATCH V2] ARM : unwinder : Prevent data abort due to stack
- overflow while executing unwind instructions Signed-off-by: Anurag
- Aggarwal <a.anurag@samsung.com>
-In-Reply-To: <CAPoNrttZfHLa9WDJihChbMGNBmdtPa+TOS=HEd2Ro-3hcuVxNA@mail.gmail.com>
-References: <1385717671-28953-1-git-send-email-a.anurag@samsung.com>
- <20131129125953.GG4634@e103592.cambridge.arm.com>
- <CAPoNrttZfHLa9WDJihChbMGNBmdtPa+TOS=HEd2Ro-3hcuVxNA@mail.gmail.com>
-Message-ID: <20131130154440.GZ16735@n2100.arm.linux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 30 Nov 2013 17:24:14 +0100
+Subject: [PATCH 3/3] ARM: tegra: set SM2 voltage correct
+In-Reply-To: <1385632196.5838.4.camel@weser.hi.pengutronix.de>
+References: <cover.1385508112.git.stefan@agner.ch>
+ <c9ceead9e3df77b5a33ad654db23c241cd624096.1385508112.git.stefan@agner.ch>
+ <5296281C.1060403@wwwdotorg.org>
+ <1385632196.5838.4.camel@weser.hi.pengutronix.de>
+Message-ID: <ab16891b4a6bcfbb1854aa766e4926a7@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 30, 2013 at 08:39:02PM +0530, Anurag Aggarwal wrote:
-> > You can calculate low, high and high - low once and store them in
-> > unwind_ctrl_block.  No need to recalculate them every time.
-> 
-> I don't think it is feasible to store high and low in unwind_ctrl_block,
-> we will have to recalculate them every time in this case also as the
-> value of sp is which change every time and depending on the value
-> of sp the value of high and low will also change.
+Am 2013-11-28 10:49, schrieb Lucas Stach:
+> Am Mittwoch, den 27.11.2013, 10:13 -0700 schrieb Stephen Warren:
+>> On 11/26/2013 04:45 PM, Stefan Agner wrote:
+>> > Set the requested SM2 voltage to the correct value of 1.8V. The value
+>> > before used to work on TPS658623 since the driver applied a wrong
+>> > voltage table too. However, the TPS658643 used on newer devices uses
+>> > yet another voltage table and those broke that compatibility. The
+>> > regulator driver now has the correct voltage table for both regulator
+>> > versions and those the correct voltage can be used in this device
+>> > tree.
+>>
+>> One thing you haven't called out explicitly here is that this series is
+>> an incompatible change to the DT, since the old buggy driver used to
+>> allow old buggy DT content to accidentally work.
+>>
+> The current (wrong and potentially dangerous) DT content only worked on
+> the engineering sample models. So this change definitely does improve
+> the situation, even with the risk of breaking a small fraction of
+> working boards.
+On the released modules, the current value ends in a freeze during
+boot-up (since the wrong voltage table results in a too low voltage).
 
-low may change, but high definitely won't do.  The SP is not allowed to
-move outside the 8K page.
+When I use 1.8V in the device tree, the old drivers refuses to set any
+voltage. The regulators default/bootloader settings work then better
+than the wrongfully applied values (tested on a new device). The probe
+just fails:
 
-Also, please learn to cut text which is not relevant to your reply,
-rather than leaving lots of lines of unnecessary quoted text in.
+[    0.243864] tps6586x-regulator tps6586x-regulator: failed to register
+regulator REG-SM_2
+[    0.244317] tps6586x-regulator: probe of tps6586x-regulator failed
+with error -22
+
+So, for newer modules, the incompatible 1.8V DT results in a successful
+boot. Since we don't have a regulator driver at all, likely other things
+are broken at that situation...
+
+--
+Stefan
