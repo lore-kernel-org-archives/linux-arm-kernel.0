@@ -1,119 +1,162 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 30 Nov 2013 12:04:20 +0000
-Subject: [RFC PATCH 1/3] iio: accel: Add device tree probing for STMicro
- accelerometers
-In-Reply-To: <1384876234-1211-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
- <1384876234-1211-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5299D444.30801@kernel.org>
+Date: Sat, 30 Nov 2013 12:15:34 +0000
+Subject: [PATCH] iio: mxs-lradc: compute temperature from channel 8 and 9
+In-Reply-To: <1384857392-2199-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1384857392-2199-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5299D6E6.2080100@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/13 15:50, Maxime Ripard wrote:
-> Add the compatibles supported by the st_sensors library. This uses kind
-> of a hack, since the st_sensors core will actively check at probe time
-> that the device name matches the one reported when using old style i2c
-> probing, and that this name will be different with device tree.
+On 11/19/13 10:36, Maxime Ripard wrote:
+> From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > 
+> The mxs LRADC is able to read an internal die temperature sensor. The
+> temperature has to be calculated from the value read on channel 8 and channel 9.
+> To be able to expose the result to hwmon, implement iio channel 8 as
+> (channel 9 - channel 8). Then, implement IIO_CHAN_INFO_SCALE and
+> IIO_CHAN_INFO_OFFSET so that it can be processed by hwmon through the in kernel
+> provider/consumer mechanism.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Note that this is unnecessary give core i2c matching, until we have some
-more elements in the binding.  I'd certainly expect the interrupts
-on the relevant devices to be in the binding...
+> Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
+As this is still in staging, I think we can get away with the resulting
+ABI change from this patch.
+
+Applied to the togreg branch of iio.git
+
+Thanks,
+
+Jonathan
 > ---
->  .../devicetree/bindings/iio/accel/st_accel_i2c.txt | 22 +++++++++++++++
->  drivers/iio/accel/st_accel_i2c.c                   | 33 ++++++++++++++++++++++
->  2 files changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
+>  drivers/staging/iio/adc/mxs-lradc.c | 91 +++++++++++++++++++++++++++++++------
+>  1 file changed, 78 insertions(+), 13 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt b/Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
-> new file mode 100644
-> index 000000000000..4a1efdf1775f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/accel/st_accel_i2c.txt
-> @@ -0,0 +1,22 @@
-> +* ST Micro accelerometer sensors 
-> +
-> +Required properties:
-> +  - compatible : should be either:
-> +	* "st,lis3dh"
-> +	* "st,lis331dlh"
-> +	* "st,lsm303dl-accel"
-> +	* "st,lsm303dlh-accel"
-> +	* "st,lsm303dlhc-accel"
-> +	* "st,lsm303dlm-accel"
-> +	* "st,lsm330-accel"
-> +	* "st,lsm330d-accel"
-> +	* "st,lsm330dl-accel"
-> +	* "st,lsm330dlc-accel"
-> +  - reg : the I2C address of the sensor
-> +
-> +Example:
-> +
-> +accel: accel at 19 {
-> +	compatible = "st,lsm330dlc-accel";
-> +	reg = <0x19>;
-> +};
-> diff --git a/drivers/iio/accel/st_accel_i2c.c b/drivers/iio/accel/st_accel_i2c.c
-> index d7bedbdfc81d..de2bf76378d8 100644
-> --- a/drivers/iio/accel/st_accel_i2c.c
-> +++ b/drivers/iio/accel/st_accel_i2c.c
-> @@ -13,11 +13,27 @@
->  #include <linux/slab.h>
->  #include <linux/i2c.h>
->  #include <linux/iio/iio.h>
-> +#include <linux/of_device.h>
->  
->  #include <linux/iio/common/st_sensors.h>
->  #include <linux/iio/common/st_sensors_i2c.h>
->  #include "st_accel.h"
->  
-> +static const struct of_device_id st_accel_of_table[] = {
-> +	{ .compatible = "st,lis3dh", .data = LIS3DH_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lis331dlh", .data = LIS331DLH_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm303dl-accel", .data = LSM303DL_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm303dlh-accel", .data = LSM303DLH_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm303dlhc-accel", .data = LSM303DLHC_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm303dlm-accel", .data = LSM303DLM_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm330-accel", .data = LSM330_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm330d-accel", .data = LSM330D_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm330dl-accel", .data = LSM330DL_ACCEL_DEV_NAME },
-> +	{ .compatible = "st,lsm330dlc-accel", .data = LSM330DLC_ACCEL_DEV_NAME },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, st_accel_of_table);
-> +
->  static int st_accel_i2c_probe(struct i2c_client *client,
->  						const struct i2c_device_id *id)
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+> index a08c1736458b..fec76090dae5 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -231,20 +231,11 @@ struct mxs_lradc {
+>  /*
+>   * Raw I/O operations
+>   */
+> -static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
+> -			const struct iio_chan_spec *chan,
+> -			int *val, int *val2, long m)
+> +static int mxs_lradc_read_single(struct iio_dev *iio_dev, int chan, int *val)
 >  {
-> @@ -34,6 +50,22 @@ static int st_accel_i2c_probe(struct i2c_client *client,
+>  	struct mxs_lradc *lradc = iio_priv(iio_dev);
+>  	int ret;
 >  
->  	st_sensors_i2c_configure(indio_dev, client, adata);
+> -	if (m != IIO_CHAN_INFO_RAW)
+> -		return -EINVAL;
+> -
+> -	/* Check for invalid channel */
+> -	if (chan->channel > LRADC_MAX_TOTAL_CHANS)
+> -		return -EINVAL;
+> -
+>  	/*
+>  	 * See if there is no buffered operation in progess. If there is, simply
+>  	 * bail out. This can be improved to support both buffered and raw IO at
+> @@ -269,7 +260,7 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
+>  	/* Clean the slot's previous content, then set new one. */
+>  	writel(LRADC_CTRL4_LRADCSELECT_MASK(0),
+>  		lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_CLR);
+> -	writel(chan->channel, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
+> +	writel(chan, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
 >  
-> +	/*
-> +	 * If we are probed through DT, st_sensors_i2c_configure will
-> +	 * fill the indio_dev->name string with the client->name,
-> +	 * which is the compatible without the vendor prefix.  Since
-> +	 * compatibles separators are usually "-", and that the
-> +	 * convention in this driver is using "_", we obviously have a
-> +	 * problem when the st-sensors core checks that the two
-> +	 * strings matches. We need to set again the indio_dev->name
-> +	 * string to the real value used by the core later on.
-> +	 */
-> +	if (client->dev.of_node) {
-> +		const struct of_device_id *device;
-> +		device = of_match_device(st_accel_of_table, &client->dev);
-> +		indio_dev->name = device->data;
+>  	writel(0, lradc->base + LRADC_CH(0));
+>  
+> @@ -298,6 +289,71 @@ err:
+>  	return ret;
+>  }
+>  
+> +static int mxs_lradc_read_temp(struct iio_dev *iio_dev, int *val)
+> +{
+> +	int ret, min, max;
+> +
+> +	ret = mxs_lradc_read_single(iio_dev, 8, &min);
+> +	if (ret != IIO_VAL_INT)
+> +		return ret;
+> +
+> +	ret = mxs_lradc_read_single(iio_dev, 9, &max);
+> +	if (ret != IIO_VAL_INT)
+> +		return ret;
+> +
+> +	*val = max - min;
+> +
+> +	return IIO_VAL_INT;
+> +}
+> +
+> +static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
+> +			const struct iio_chan_spec *chan,
+> +			int *val, int *val2, long m)
+> +{
+> +	/* Check for invalid channel */
+> +	if (chan->channel > LRADC_MAX_TOTAL_CHANS)
+> +		return -EINVAL;
+> +
+> +	switch (m) {
+> +	case IIO_CHAN_INFO_RAW:
+> +		if (chan->type == IIO_TEMP)
+> +			return mxs_lradc_read_temp(iio_dev, val);
+> +
+> +		return mxs_lradc_read_single(iio_dev, chan->channel, val);
+> +
+> +	case IIO_CHAN_INFO_SCALE:
+> +		if (chan->type == IIO_TEMP) {
+> +			/* From the datasheet, we have to multiply by 1.012 and
+> +			 * divide by 4
+> +			 */
+> +			*val = 0;
+> +			*val2 = 253000;
+> +			return IIO_VAL_INT_PLUS_MICRO;
+> +		}
+> +
+> +		return -EINVAL;
+> +
+> +	case IIO_CHAN_INFO_OFFSET:
+> +		if (chan->type == IIO_TEMP) {
+> +			/* The calculated value from the ADC is in Kelvin, we
+> +			 * want Celsius for hwmon so the offset is
+> +			 * -272.15 * scale
+> +			 */
+> +			*val = -1075;
+> +			*val2 = 691699;
+> +
+> +			return IIO_VAL_INT_PLUS_MICRO;
+> +		}
+> +
+> +		return -EINVAL;
+> +
+> +	default:
+> +		break;
 > +	}
 > +
->  	err = st_accel_common_probe(indio_dev, client->dev.platform_data);
->  	if (err < 0)
->  		return err;
-> @@ -67,6 +99,7 @@ static struct i2c_driver st_accel_driver = {
->  	.driver = {
->  		.owner = THIS_MODULE,
->  		.name = "st-accel-i2c",
-> +		.of_match_table = of_match_ptr(st_accel_of_table),
->  	},
->  	.probe = st_accel_i2c_probe,
->  	.remove = st_accel_i2c_remove,
+> +	return -EINVAL;
+> +}
+> +
+>  static const struct iio_info mxs_lradc_iio_info = {
+>  	.driver_module		= THIS_MODULE,
+>  	.read_raw		= mxs_lradc_read_raw,
+> @@ -835,8 +891,17 @@ static const struct iio_chan_spec mxs_lradc_chan_spec[] = {
+>  	MXS_ADC_CHAN(5, IIO_VOLTAGE),
+>  	MXS_ADC_CHAN(6, IIO_VOLTAGE),
+>  	MXS_ADC_CHAN(7, IIO_VOLTAGE),	/* VBATT */
+> -	MXS_ADC_CHAN(8, IIO_TEMP),	/* Temp sense 0 */
+> -	MXS_ADC_CHAN(9, IIO_TEMP),	/* Temp sense 1 */
+> +	/* Combined Temperature sensors */
+> +	{
+> +		.type = IIO_TEMP,
+> +		.indexed = 1,
+> +		.scan_index = 8,
+> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
+> +				      BIT(IIO_CHAN_INFO_OFFSET) |
+> +				      BIT(IIO_CHAN_INFO_SCALE),
+> +		.channel = 8,
+> +		.scan_type = {.sign = 'u', .realbits = 18, .storagebits = 32,},
+> +	},
+>  	MXS_ADC_CHAN(10, IIO_VOLTAGE),	/* VDDIO */
+>  	MXS_ADC_CHAN(11, IIO_VOLTAGE),	/* VTH */
+>  	MXS_ADC_CHAN(12, IIO_VOLTAGE),	/* VDDA */
 > 
