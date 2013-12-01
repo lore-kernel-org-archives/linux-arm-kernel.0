@@ -1,15 +1,14 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 1 Dec 2013 16:23:50 -0500
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.14
-Message-ID: <20131201212350.GY2879@titan.lakedaemon.net>
+Date: Sun, 1 Dec 2013 16:29:31 -0500
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.14
+Message-ID: <20131201212931.GZ2879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Guys,
 
-This one is a little short.  If you want to hold off pulling until there
-are a few more driver commits, that's fine.  However, I don't currently
-see anything on the radar, and these are ready.
+Last small one for today.  You can hold off on this one as well if you
+like, but I also don't forsee adding a bunch to this branch either.
 
 thx,
 
@@ -22,25 +21,25 @@ The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-3.14
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.14
 
-for you to fetch changes up to 9c8eca3ca43d7337be2485169d4d86a9b6f477d2:
+for you to fetch changes up to 9ec1acb88698d3b5f181fe8621d259c59b392e49:
 
-  bus: mvebu-mbus: Remove deprecated comment (2013-11-24 16:39:41 +0000)
-
-----------------------------------------------------------------
-mvebu driver changes for v3.14
-
- - mvebu-mbus:
-    - remove potential forever loop
-    - remove deprecated comment
+  ARM: kirkwood: enable HIGHMEM in defconfig (2013-11-23 17:17:13 +0000)
 
 ----------------------------------------------------------------
-Dan Carpenter (1):
-      bus: mvebu-mbus: potential forever loop in mvebu_mbus_init()
+mvebu defconfig changes for v3.14
 
+ - mvebu: add GPIO LEDs
+ - kirkwood: enable HIGHMEM
+
+----------------------------------------------------------------
 Ezequiel Garcia (1):
-      bus: mvebu-mbus: Remove deprecated comment
+      ARM: mvebu: config: Add GPIO connected LEDs support to defconfig
 
- drivers/bus/mvebu-mbus.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+Thomas Petazzoni (1):
+      ARM: kirkwood: enable HIGHMEM in defconfig
+
+ arch/arm/configs/kirkwood_defconfig | 1 +
+ arch/arm/configs/mvebu_defconfig    | 1 +
+ 2 files changed, 2 insertions(+)
