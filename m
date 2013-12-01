@@ -1,37 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 1 Dec 2013 18:34:54 -0500
-Subject: [PATCHv2 0/4] ARM: mvebu/kirkwood: NETGEAR ReadyNAS .dts files
- cleanup
-In-Reply-To: <87eh5wmanc.fsf@natisbad.org>
-References: <cover.1385756371.git.arno@natisbad.org>
- <20131201221710.GB2879@titan.lakedaemon.net>
- <87eh5wmanc.fsf@natisbad.org>
-Message-ID: <20131201233454.GE2879@titan.lakedaemon.net>
+Date: Sun, 1 Dec 2013 18:40:03 -0500
+Subject: [PATCH V5] kbuild: dtbs_install: new make target
+In-Reply-To: <653B066B-5B24-4817-86EF-D4D9F129123D@codeaurora.org>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <1385062552-9882-1-git-send-email-jason@lakedaemon.net>
+ <653B066B-5B24-4817-86EF-D4D9F129123D@codeaurora.org>
+Message-ID: <20131201234003.GF2879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 12:09:11AM +0100, Arnaud Ebalard wrote:
-> 
-> Jason Cooper <jason@lakedaemon.net> writes:
-> 
-> >> Arnaud Ebalard (4):
-> >>   ARM: kirkwood: NETGEAR ReadyNAS Duo v2 .dts cleanup
-> >>   ARM: mvebu: NETGEAR ReadyNAS 102 .dts cleanup
-> >>   ARM: mvebu: NETGEAR ReadyNAS 104 .dts cleanup
-> >>   ARM: Fix whitespaces in NETGEAR ReadyNAS .dts files
-> >> 
-> >>  arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 82 ++++++++++--------
-> >>  arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 68 +++++++--------
-> >>  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 99 +++++++++++++---------
-> >>  3 files changed, 141 insertions(+), 108 deletions(-)
-> >
-> > whole series applied to mvebu/dt.  There was a small conflict with
-> > Sebastian's pinctrl work.  Please double check and let me know if
-> > anything is amiss.
-> 
-> All three .dts files look as they should in your branch.
+Kumar,
 
-Great!
+On Thu, Nov 21, 2013 at 05:31:49PM -0600, Kumar Gala wrote:
+> On Nov 21, 2013, at 1:35 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+...
+> > #
+> > +# INSTALL_DTBS_PATH specifies a prefix for relocations required by build roots.
+> > +# Like INSTALL_MOD_PATH, it isn't defined in the Makefile, but can be passed as
+> > +# an argument if needed.
+> > +#
+> 
+> Nit, do we want to match INSTALL_MOD_PATH and drop the ?S? for INSTALL_DTB_PATH?
+
+I thought about this, and I prefer to keep the S.  Installing one
+module sounds silly, while installing one dtb implies we are doing
+something we aren't.  Namely selecting the correct dtb.
 
 thx,
 
