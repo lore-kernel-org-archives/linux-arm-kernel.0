@@ -1,32 +1,47 @@
-From: kasimling@gmail.com (Alex Ling)
-Date: Sun,  1 Dec 2013 18:11:47 +0800
-Subject: [PATCH 1/1] ARM: dts: Add missing clock names for exynos4412 dwmmc
- node
-Message-ID: <1385892707-25063-1-git-send-email-kasimling@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun,  1 Dec 2013 16:59:12 +0100
+Subject: [PATCH v2 0/3] regulator: tps6586x: add version detection and voltage
+ tables
+Message-ID: <cover.1385913227.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds "biu" and "ciu" clock names for exynos4412 dwmmc
-node. Without this patch, dwmmc host driver will skip enabling the
-two clocks and it will break dwmmc host function on exynos4412.
-Tested on FriendlyARM TINY4412 board.
+regulator: tps6586x: add version detection and voltage tables
 
-Signed-off-by: Alex Ling <kasimling@gmail.com>
----
- arch/arm/boot/dts/exynos4412.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+This is the 2nd version of this patchset which adds version detection
+for the tps6586x mfd family. This is required because some regulator
+versions use different voltage tables. The regulator driver now uses
+the right voltage table according to the version. Is it still posible
+to see this patch in v3.13?
 
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index e743e67..67bef99 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -67,5 +67,7 @@
- 		interrupts = <0 77 0>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&clock 301>, <&clock 149>;
-+		clock-names = "biu", "ciu";
- 	};
- };
+While at it, there are a few other incorrect regulator entries in the
+device tree, change them accordingly (this patch is new and grew out
+of a patch with the same name which Lucas Stach posted in July).
+
+Tested on Colibri T20 V1.1 and V1.2 which makes use of diffent version
+of that regulator.
+
+Changes since v1:
+  - Merged DT and driver change (preserves bisectability)
+  - Use different regulator tables for different regulator version
+    * This also makes the TPS6586X_ANY version needless
+  - Replaced enum with defines
+  - Move version message in a sperate function
+  - Include regulator bugfix, use correct supply voltage
+  - Checked all voltages, fix SM0/SM1 (Core/CPU) and LDO6 voltage (VDAC/VI)
+    in another commit
+  - Rebased on top of v3.13-rc2
+
+Stefan Agner (3):
+  mfd: tps6586x: add version detection
+  regulator: tps6586x: add and use correct voltage table
+  ARM: tegra: correct Colibri T20 regulator settings
+
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi | 34 ++++++------
+ drivers/mfd/tps6586x.c                     | 47 +++++++++++++---
+ drivers/regulator/tps6586x-regulator.c     | 89 +++++++++++++++++++++++-------
+ include/linux/mfd/tps6586x.h               |  7 +++
+ 4 files changed, 132 insertions(+), 45 deletions(-)
+
 -- 
-1.7.9.5
+1.8.4.2
