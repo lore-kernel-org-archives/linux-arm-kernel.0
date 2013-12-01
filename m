@@ -1,28 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 1 Dec 2013 23:20:43 +0100
-Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
-In-Reply-To: <20131120112010.GA20958@gondor.apana.org.au>
-References: <1380194306-5243-1-git-send-email-marex@denx.de>
- <201311101848.12215.marex@denx.de>
- <20131120112010.GA20958@gondor.apana.org.au>
-Message-ID: <201312012320.43292.marex@denx.de>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 02 Dec 2013 00:09:11 +0100
+Subject: [PATCHv2 0/4] ARM: mvebu/kirkwood: NETGEAR ReadyNAS .dts files
+ cleanup
+In-Reply-To: <20131201221710.GB2879@titan.lakedaemon.net> (Jason Cooper's
+ message of "Sun, 1 Dec 2013 17:17:10 -0500")
+References: <cover.1385756371.git.arno@natisbad.org>
+ <20131201221710.GB2879@titan.lakedaemon.net>
+Message-ID: <87eh5wmanc.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
 
-[...]
+Jason Cooper <jason@lakedaemon.net> writes:
 
-> > > I can do that. I wonder if we can't agree to nuke the in-tree driver
-> > > altogether instead and replace it by this one though. Does it not sound
-> > > more reasonable?
-> > 
-> > Bump?
-> 
-> Well as it's been months and nobody has stepped up to maintain
-> the in-tree driver then yes we can get rid of it.
+>> Arnaud Ebalard (4):
+>>   ARM: kirkwood: NETGEAR ReadyNAS Duo v2 .dts cleanup
+>>   ARM: mvebu: NETGEAR ReadyNAS 102 .dts cleanup
+>>   ARM: mvebu: NETGEAR ReadyNAS 104 .dts cleanup
+>>   ARM: Fix whitespaces in NETGEAR ReadyNAS .dts files
+>> 
+>>  arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 82 ++++++++++--------
+>>  arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 68 +++++++--------
+>>  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 99 +++++++++++++---------
+>>  3 files changed, 141 insertions(+), 108 deletions(-)
+>
+> whole series applied to mvebu/dt.  There was a small conflict with
+> Sebastian's pinctrl work.  Please double check and let me know if
+> anything is amiss.
 
-OK, I updated the DCP patches and re-posted them. Thanks!
-
-Best regards,
-Marek Vasut
+All three .dts files look as they should in your branch.
