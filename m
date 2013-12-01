@@ -1,42 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 1 Dec 2013 17:21:17 -0500
-Subject: [PATCHv0] ARM: kirkwood: Add support for NETGEAR ReadyNAS NV+ v2
-In-Reply-To: <58e99356aad0daf90d28162eac6a4ecec70470f8.1385822676.git.arno@natisbad.org>
-References: <58e99356aad0daf90d28162eac6a4ecec70470f8.1385822676.git.arno@natisbad.org>
-Message-ID: <20131201222117.GD2879@titan.lakedaemon.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 02 Dec 2013 07:37:31 +0900
+Subject: [PATCH v2] irqchip: exynos-combiner: remove hard-coded irq_base
+ value
+In-Reply-To: <CANuQgHFSNMV=RF8SHdZf3=gyNoXJWXEcevQ=DAOqUuZXSeugrQ@mail.gmail.com>
+References: <1379937815-21746-1-git-send-email-chander.kashyap@linaro.org>	<02c701ceba75$f95b1900$ec114b00$@org>	<1949846.N3fAUHQ1Nx@flatron>	<526444E5.5000405@samsung.com>
+ <CANuQgHFSNMV=RF8SHdZf3=gyNoXJWXEcevQ=DAOqUuZXSeugrQ@mail.gmail.com>
+Message-ID: <529BBA2B.3080408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 30, 2013 at 04:13:44PM +0100, Arnaud Ebalard wrote:
-> 
-> Almost all hardware parts of the NETGEAR ReadyNAS NV+ v2 ([1] for more
-> details) are supported by mainline kernel. The only missing elements in
-> provided .dts file are:
-> 
->  - the front LCD module (Winstar WINSTAR WH1602): driver development is
->    ongoing. This is the same LCD module as on ReadyNAS 104.
->  - the Macronix MX25L512 512Kbit SPI flash: no time to play with it yet.
-> 
-> The device is the big brother (4 vs 2 bay) of the ReadyNAS Duo v2. The
-> main differences are some additional LEDs for the disks, a Marvell
-> 88SM4140 SATA Port multiplier (no driver required to access the disk)
-> and previously described LCD module. Otherwise, it shares the same SoC
-> (kirkwood 88F6282), RAM (256MB), NAND (128MB), RTC chip (Ricoh rs5c372a),
-> fan controller (GMT G762), XHCI controller (NEC/Renesas ?PD720200).
-> 
-> [1]: http://natisbad.org/NAS5/
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
-...
-> 
->  arch/arm/boot/dts/Makefile                         |   1 +
->  .../boot/dts/kirkwood-netgear_readynas_nv+_v2.dts  | 270 +++++++++++++++++++++
->  2 files changed, 271 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
+On 11/25/13 15:37, Chander Kashyap wrote:
+> Hi Kikjin,
+>
+Hi Chander,
 
-Applied to mvebu/dt
+> On 21 October 2013 02:32, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>> On 10/18/13 02:53, Tomasz Figa wrote:
+>>>
+>>> Hi Kukjin,
+>>>
+>>> On Thursday 26 of September 2013 14:05:09 Kukjin Kim wrote:
+>>>>
+>>>> Chander Kashyap wrote:
+>>>>>
+>>>>> Replace irq_domain_add_simple with "irq_domain_add_linear" in order to
+>>>>> use linear irq domain, and to remove hardcoded irq_base_value.
+>>>>>
+>>>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+>>>>> ---
+>>>>>
+>>>>> Changes since v1:
+>>>>>          - Replaced irq_domain_add_simple with irq_domain_add_linear,
+>>>>>
+>>>>>            as suggested by Tomasz
+>>>>>
+>>>>>    drivers/irqchip/exynos-combiner.c |   15 +++------------
+>>>>>    1 file changed, 3 insertions(+), 12 deletions(-)
+>>>
+>>> [snip]
+>>>>
+>>>>
+>>>> Looks nice to me, applied with Tomasz's review.
+>>>
+>>>
+>>> I don't see this patch in your tree. Did you apply it in the end?
+>>>
+>> Thanks for your gentle reminder.
+>
+> I still can not see these patches in yours branches ?
+>
+Oops, sorry for missing. This should be queued in next.
 
-thx,
-
-Jason.
+Thanks.
+Kukjin
