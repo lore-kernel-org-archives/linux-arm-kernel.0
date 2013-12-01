@@ -1,117 +1,75 @@
-From: r65037@freescale.com (Richard Zhu)
-Date: Fri, 1 Nov 2013 03:31:23 +0000
-Subject: [PATCH] PCI: imx6: fix imprecise abort handler
-In-Reply-To: <201310301555.02807.marex@denx.de>
-References: <1382056042-7299-1-git-send-email-tharvey@gateworks.com>
- <CAHM4w1nyXCuTya+TR7Rxiw0ojmwZHwz9iUmz=cG8z_8h2wKhSw@mail.gmail.com>
- <CAErSpo5NHXXZPm5wj05DSD94KkzEUkefceHPC_Zup+-APUYdKQ@mail.gmail.com>
- <201310301555.02807.marex@denx.de>
-Message-ID: <0E83723C55F66F43A6041464FE31119D418299@039-SN2MPN1-011.039d.mgd.msft.net>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sun,  1 Dec 2013 10:26:13 +0400
+Subject: [PATCH 00/11] ARM: support for ICP DAS LP-8x4x
+Message-ID: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek:
+ICP DAS calls LP-8x4x 'programmable automation controller'. It is
+an industrial computer based on PXA270 SoC. They ship it with a 2.6.19
+kernel and proprietary kernel module and userspace library to access its
+industrial IO.
 
-> -----Original Message-----
-> From: Marek Vasut [mailto:marex at denx.de]
-> Sent: Wednesday, October 30, 2013 10:55 PM
-> To: Bjorn Helgaas
-> Cc: Pratyush Anand; Tim Harvey; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Sascha Hauer; Zhu Richard-R65037; Shawn Guo;
-> Jingoo Han; Pratyush Anand; Troy Kisky
-> Subject: Re: [PATCH] PCI: imx6: fix imprecise abort handler
-> 
-> Dear Bjorn Helgaas,
-> 
-> > On Mon, Oct 21, 2013 at 2:16 AM, Pratyush Anand
-> >
-> > <pratyush.anand@gmail.com> wrote:
-> > > Hi,
-> > >
-> > > On Sat, Oct 19, 2013 at 7:03 AM, Marek Vasut <marex@denx.de> wrote:
-> > >> Dear Tim Harvey,
-> > >>
-> > >> > An imprecise abort is triggered when a port behind a switch is
-> > >> > accessed and no device is present.  At enumeration, imprecise
-> > >> > aborts are not enabled
-> > >
-> > > I do not know the complete history. But I do not understand, why
-> > > imprecise aborts are not enabled during kernel enumeration.
-> > > What happens when PCIe switch is already connected before boot?
-> > > pci_common_init will try to read vendor/product ID for a
-> > > non-existing function during kernel enumeration itself, which should
-> > > result in imprecise external abort. In fact, I had observed with my
-> > > system that if a switch is connected to PCIe RC, then abort occurs
-> > > during kernel initialization itself. So a proper handling was
-> > > needed. We called hook_fault_code from a subsys_init pcie_init (or
-> > > similar) function, which insured that abort handler is called
-> > > whenever, software tries to read vendor/product id of a non-existing
-> > > function
-> > >
-> > >> > thus this ends up getting deferred until the kernel has completed
-> > >> > init. At that point we must not adjust PC - the handler must do
-> > >> > nothing, but a handler must exist.
-> > >> >
-> > >> > This fixes random crashes that occur right after freeing init.
-> > >> > This is against linux-pci/host-imx6.
-> > >> >
-> > >> > Acked-by: Marek Vasut <marex@denx.de>
-> > >> > Tested-by: Marek Vasut <marex@denx.de>
-> > >> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> > >>
-> > >> Expanding CC a bit, let's have more eyes on this.
-> > >>
-> > >> > ---
-> > >> >
-> > >> >  drivers/pci/host/pci-imx6.c |    6 ------
-> > >> >  1 file changed, 6 deletions(-)
-> > >> >
-> > >> > diff --git a/drivers/pci/host/pci-imx6.c
-> > >> > b/drivers/pci/host/pci-imx6.c index 966bac6..90fce05 100644
-> > >> > --- a/drivers/pci/host/pci-imx6.c
-> > >> > +++ b/drivers/pci/host/pci-imx6.c
-> > >> > @@ -200,12 +200,6 @@ static int pcie_phy_write(void __iomem
-> > >> > *dbi_base, int addr, int data) static int
-> > >> > imx6q_pcie_abort_handler(unsigned long addr,
-> > >> >
-> > >> >               unsigned int fsr, struct pt_regs *regs)
-> > >> >
-> > >> >  {
-> > >> >
-> > >> > -     /*
-> > >> > -      * If it was an imprecise abort, then we need to correct the
-> > >> > -      * return address to be _after_ the instruction.
-> > >> > -      */
-> > >> > -     if (fsr & (1 << 10))
-> > >> > -             regs->ARM_pc += 4;
-> > >
-> > > Just for knowledge, is there any case other than read of IDs which
-> > > might cause imprecise abort? If not, then this handler can be
-> > > modified a bit to insure that it does not handle any unintended
-> > > imprecise abort.
-> > >
-> > > Regards
-> > > Pratyush
-> > >
-> > >> >       return 0;
-> > >> >
-> > >> >  }
-> >
-> > I'm sort of dubious about imx6q_pcie_abort_handler() to begin with --
-> > it seems like it assumes that imprecise aborts are either enabled or
-> > disabled.  Isn't there some way it can *check* whether that's the
-> > case, so it won't break if those aborts are enabled at a different
-> > point in the future?
-> 
-> The best way here would be to find a way to prevent the DWC controller from
-> generating data abort on missing device _at_all_ and just make the read from
-> that portion of config space be 0xffffffff or zeroes . I didn't find any
-> configuration bit that would be able to do it though :( Richard, can you maybe
-> check with FSL if such an option exists on the controller?
-> 
-[Richard] Unfortunately, discussed with IC guys, there is no such kind of mechanism.
+This patch series allows to boot the device with a modern kernel. It adds
+support for:
+* FPGA irq chip
+* MMC card interface on PXA270
+* USB 1.1 port on PXA270
+* 2 NOR flash devices
+* VGA interface on PXA270
+* 2 onboard ethernet Davicom DM9000 devices
+* 3 serial UART ports on PXA270
+* DS1302 RTC
+* 512kiB SRAM with double battery-backup
+* 3 built-in 16550 serial UART ports
+* industrial IO parallel bus
+* serial interface for digital and analog industrial IO modules on
+  parallel bus (any I-870xx series)
+* digital and analog industrial IO modules for parallel bus:
+  * I-8024 (analog output)
+  * I-8041 (digital output)
+  * I-8042 (digital input-output)
 
-> > For now, I'll apply this to my pci/host-imx6 branch for v3.13, but let
-> > me know if you want to tweak it somehow.
-> >
-> > Bjorn
+Sergei Ianovich (11):
+  resolve PXA<->8250 serial device address conflict
+  arm: pxa27x: support ICP DAS LP-8x4x
+  rtc: support DS1302 RTC on ICP DAS LP-8x4x
+  mtd: support BB SRAM on ICP DAS LP-8x4x
+  serial: support for 16550 serial ports on LP-8x4x
+  misc: support for LP-8x4x custom parallel bus
+  misc: support for serial slots in LP-8x4x
+  misc: support for parallel slots in LP-8x4x
+  misc: support for I-8041 in LP-8x4x
+  misc: support for I-8042 in LP-8x4x
+  misc: support for I-8024 in LP-8x4x
+
+ Documentation/misc-devices/lp8x4x_bus.txt |   74 +
+ arch/arm/configs/lp8x4x_defconfig         | 2324 +++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/Kconfig                 |    8 +
+ arch/arm/mach-pxa/Makefile                |    1 +
+ arch/arm/mach-pxa/include/mach/lp8x4x.h   |   95 ++
+ arch/arm/mach-pxa/lp8x4x.c                |  557 +++++++
+ drivers/misc/Kconfig                      |   12 +
+ drivers/misc/Makefile                     |    1 +
+ drivers/misc/lp8x4x_bus.c                 |  581 ++++++++
+ drivers/mtd/devices/Kconfig               |   13 +
+ drivers/mtd/devices/Makefile              |    1 +
+ drivers/mtd/devices/lp8x4x_sram.c         |  229 +++
+ drivers/rtc/Kconfig                       |    2 +-
+ drivers/rtc/rtc-ds1302.c                  |   85 ++
+ drivers/tty/serial/8250/8250_lp8x4x.c     |  181 +++
+ drivers/tty/serial/8250/Kconfig           |   11 +
+ drivers/tty/serial/8250/Makefile          |    1 +
+ drivers/tty/serial/Kconfig                |   19 +
+ drivers/tty/serial/pxa.c                  |   22 +-
+ 19 files changed, 4212 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/misc-devices/lp8x4x_bus.txt
+ create mode 100644 arch/arm/configs/lp8x4x_defconfig
+ create mode 100644 arch/arm/mach-pxa/include/mach/lp8x4x.h
+ create mode 100644 arch/arm/mach-pxa/lp8x4x.c
+ create mode 100644 drivers/misc/lp8x4x_bus.c
+ create mode 100644 drivers/mtd/devices/lp8x4x_sram.c
+ create mode 100644 drivers/tty/serial/8250/8250_lp8x4x.c
+
+-- 
+1.8.4.2
