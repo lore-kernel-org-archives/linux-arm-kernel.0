@@ -1,36 +1,39 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Sun, 01 Dec 2013 20:46:19 +0100
-Subject: Support for KGDB/gdb data watchpoints in ARM kernel?
-Message-ID: <529B920B.1000200@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 1 Dec 2013 11:55:38 -0800
+Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.13
+In-Reply-To: <20131201171649.GU2879@titan.lakedaemon.net>
+References: <20131201171649.GU2879@titan.lakedaemon.net>
+Message-ID: <CAOesGMiZMhwO_-WoLw23qK_xuMu4RrgfYicta4Vhuc2tnPxCpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Dec 1, 2013 at 9:16 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> All,
+>
+> Here's a round of DT fixes for v3.13.  They've all been in -next at
+> least five days.  (Yes, I know they only need to be in -next a day or
+> two, my schedule got away from me :) ).
+>
+> thx,
+>
+> Jason.
+>
+>
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-fixes-3.13
+>
+> for you to fetch changes up to 96039f735e290281d0c8a08fc467de2cd610543d:
+>
+>   ARM: mvebu: re-enable PCIe on Armada 370 DB (2013-11-25 18:24:36 +0000)
+
+Pulled. Thanks for great patch descriptions: I was wondering if some
+of them were fixes or features (i.e. the one from Gregory), and with a
+patch write-up like that I didn't have to ask. :)
 
 
-I've been trying to use KGDB with gdb to debug an ARM Linux kernel. Setting breakpoints at functions works fine, but
-whenever I try to set a data watchpoint to make the debugger/system stop when a certain variable/memory location is
-modified gdb says 'Could no insert hardware watchpoint 2.'. Although I don't have any other watchpoints/breakpoints
-enabled at this time, unless there's something going on under the hood.
-
-I've tried with Kernel 3.12 on i.MX31 (ARM1136) and i.MX53 (Cortex-A8) using both gdb 7.6.1 compiled from sources and
-gdb 7.2 from Sourcery CodeBench 2011.09-70.
-
-Any ideas, comments or RTFMs are welcome to enlighten me!
-
-
-(gdb) watch *(0x8000d300)
-Hardware watchpoint 2: *(0x8000d300)
-
-(gdb) c
-Continuing.
-Warning:
-Could not insert hardware watchpoint 2.
-Could not insert hardware breakpoints:
-You may have requested too many hardware breakpoints/watchpoints.
-
-(gdb) info b
-Num     Type           Disp Enb Address    What
-2       hw watchpoint  keep y              *(0x8000d300)
-
-Regards, Magnus Lilja
+-Olof
