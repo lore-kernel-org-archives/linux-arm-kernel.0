@@ -1,28 +1,184 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Dec 2013 13:54:52 +0000
-Subject: [alsa-devel] [PATCH 07/10] ASoC: ux500: Store DMA data in the
- DAI differently in the pdata and DT case
-In-Reply-To: <20131202101256.GA29373@lee--X1>
-References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
- <1384859269-19801-8-git-send-email-lee.jones@linaro.org>
- <CAOesGMiu16f_L=cMWFCNZMjNB9tBK-2LXn02k-R7FhkkgR5-+g@mail.gmail.com>
- <20131202101256.GA29373@lee--X1>
-Message-ID: <20131202135452.GI27568@sirena.org.uk>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Mon, 2 Dec 2013 13:52:43 +0000
+Subject: [PATCH v3 01/36] mtd: st_spi_fsm: Allocate resources and register
+ with MTD framework
+In-Reply-To: <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <529C90AB.10704@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 10:12:56AM +0000, Lee Jones wrote:
+On 29/11/13 12:18, Lee Jones wrote:
+> This is a new driver. It's used to communicate with a special type of
+> optimised Serial Flash Controller called the FSM. The FSM uses a subset
+> of the SPI protocol to communicate with supported NOR-Flash devices.
+> 
+You might want to expand what is FSM here..(Fast sequence mode).
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mtd/devices/Kconfig      |   7 +++
+>  drivers/mtd/devices/Makefile     |   1 +
+>  drivers/mtd/devices/st_spi_fsm.c | 111 +++++++++++++++++++++++++++++++++++++++
+>  drivers/mtd/devices/st_spi_fsm.h |  27 ++++++++++
+>  4 files changed, 146 insertions(+)
+>  create mode 100644 drivers/mtd/devices/st_spi_fsm.c
+>  create mode 100644 drivers/mtd/devices/st_spi_fsm.h
+> 
+> diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
+> index 74ab4b7..d977281 100644
+> --- a/drivers/mtd/devices/Kconfig
+> +++ b/drivers/mtd/devices/Kconfig
+> @@ -217,6 +217,13 @@ config MTD_DOCG3
+>  	  M-Systems and now Sandisk. The support is very experimental,
+>  	  and doesn't give access to any write operations.
+>  
+> +config MTD_ST_SPI_FSM
+> +	tristate "ST Microelectronics SPI FSM Serial Flash Controller"
 
-> It's actually my fault. I had two patches round the wrong way in the
-> series. The imediately subsequent patch in the set fixes this issue:
+I think this should depend on ARCH_STI, so that it is not build for x86
+or any other platforms.
 
-OK, so what do we do about this?  Is there going to be a revision of
-that patch adding the note about not using the autoconfiguration stuff
-and what (if any) are the dependencies on the arch/arm changes?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/5fc251ff/attachment.sig>
+> +	help
+> +	  This provides an MTD device driver for the ST Microelectronics
+> +	  SPI FSM Serial Flash Controller and support for a subset of
+> +	  connected Serial Flash devices.
+> +
+>  if MTD_DOCG3
+>  config BCH_CONST_M
+>  	default 14
+> diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
+> index d83bd73..c68868f 100644
+> --- a/drivers/mtd/devices/Makefile
+> +++ b/drivers/mtd/devices/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_MTD_NAND_OMAP_BCH)	+= elm.o
+>  obj-$(CONFIG_MTD_SPEAR_SMI)	+= spear_smi.o
+>  obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
+>  obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
+> +obj-$(CONFIG_MTD_ST_SPI_FSM)    += st_spi_fsm.o
+>  
+>  
+>  CFLAGS_docg3.o			+= -I$(src)
+> diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+> new file mode 100644
+> index 0000000..1e3abde
+> --- /dev/null
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -0,0 +1,111 @@
+> +/*
+> + * st_spi_fsm.c	Support for ST Serial Flash Controller
+> + *
+> + * Author: Angus Clark <angus.clark@st.com>
+> + *
+> + * Copyright (C) 2010-2013 STicroelectronics Limited
+> + *
+> + * JEDEC probe based on drivers/mtd/devices/m25p80.c
+> + *
+> + * This code is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/sched.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +
+> +#include <asm/io.h>
+Are you sure about including this?
+> +
+> +#include "st_spi_fsm.h"
+Header file can be removed totally, as this is the only file which is
+using it.
+> +
+> +static int stfsm_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct resource *res;
+> +	struct stfsm *fsm;
+> +
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "No DT found\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	fsm = devm_kzalloc(&pdev->dev, sizeof(*fsm), GFP_KERNEL);
+> +	if (!fsm)
+> +		return -ENOMEM;
+> +
+> +	fsm->dev = &pdev->dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "Resource not found\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	fsm->region = devm_request_mem_region(&pdev->dev, res->start,
+> +					      resource_size(res), pdev->name);
+> +	if (!fsm->region) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to reserve memory region [0x%08x-0x%08x]\n",
+> +			res->start, res->end);
+> +		return -EBUSY;
+> +	}
+> +
+> +	fsm->base = devm_ioremap_nocache(&pdev->dev,
+> +					 res->start, resource_size(res));
+> +	if (!fsm->base) {
+> +		dev_err(&pdev->dev, "Failed to ioremap [0x%08x]\n", res->start);
+> +		return -EINVAL;
+> +	}
+> +
+> +	mutex_init(&fsm->lock);
+> +
+> +	platform_set_drvdata(pdev, fsm);
+> +
+> +	fsm->mtd.dev.parent	= &pdev->dev;
+> +	fsm->mtd.type		= MTD_NORFLASH;
+> +	fsm->mtd.writesize	= 4;
+> +	fsm->mtd.writebufsize	= fsm->mtd.writesize;
+> +	fsm->mtd.flags		= MTD_CAP_NORFLASH;
+> +
+> +	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
+> +}
+> +
+> +static int stfsm_remove(struct platform_device *pdev)
+> +{
+> +	struct stfsm *fsm = platform_get_drvdata(pdev);
+> +	int err;
+> +
+> +	err = mtd_device_unregister(&fsm->mtd);
+> +	if (err)
+> +		return err;
+> +
+> +	return 0;
+> +}
+> +Any reason not to use of_match_ptr macro here?
+
+
+Thanks,
+srini
+
+> +static struct of_device_id stfsm_match[] = {
+> +	{ .compatible = "st,spi-fsm", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, spi_fsm_match);
+> +
+> +static struct platform_driver stfsm_driver = {
+> +	.probe		= stfsm_probe,
+> +	.remove		= stfsm_remove,
+> +	.driver		= {
+> +		.name	= "st-spi-fsm",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = stfsm_match,
+Any reason not to use of_match_ptr macro here?
+
+
+Thanks,
+srini
