@@ -1,53 +1,45 @@
-From: philippe.retornaz@gmail.com (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
-Date: Mon, 02 Dec 2013 10:51:00 +0100
-Subject: [PATCH RESEND] mfd: mc13xxx: Remove unneeded mc13xxx_lock/unlock
-In-Reply-To: <1385787681-7736-1-git-send-email-shc_work@mail.ru>
-References: <1385787681-7736-1-git-send-email-shc_work@mail.ru>
-Message-ID: <529C5804.2020501@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Dec 2013 09:52:53 +0000
+Subject: [PATCH 1/1] ARM: dts: Add missing clock names for exynos4412
+ dwmmc node
+In-Reply-To: <1385892707-25063-1-git-send-email-kasimling@gmail.com>
+References: <1385892707-25063-1-git-send-email-kasimling@gmail.com>
+Message-ID: <20131202095253.GC12952@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/11/2013 06:01, Alexander Shiyan a ?crit :
-> Locking is performed by regmap API so no additional locking is
-> needed. Nevertheless, keep locking in the ADC conversion routine.
-> This need for keep proper read ADC sequence when calling from adc &
-> touchscreen drivers.
+On Sun, Dec 01, 2013 at 10:11:47AM +0000, Alex Ling wrote:
+> This patch adds "biu" and "ciu" clock names for exynos4412 dwmmc
+> node. Without this patch, dwmmc host driver will skip enabling the
+> two clocks and it will break dwmmc host function on exynos4412.
+> Tested on FriendlyARM TINY4412 board.
 
-You can't do that so easily !
-Regmap only protect against concurrent access to the SPI/I2C bus, but do
-not protect the driver's internal data.
-And it does not protect against a race between concurrent access at a
-higher level :
+The patch description is a little off; this patch adds the clocks as
+well as the clock-names.
 
-reg = regmap_read();
-(modify reg)
-regmap_write(reg);
+The patch itself looks fine to me.
 
-And we do have such behavior:
-* The mc13xxx->irqhandler/irqdata array is
-   protected by this mutex.
+Mark.
 
-* And we also have non-atomic RMW in mc13xxx_irq_unmask():
-
-ret = mc13xxx_reg_read(mc13xxx, offmask, &mask);
-if (ret)
-	return ret;
-if (!(mask & irqbit))
-	return 0;
-return mc13xxx_reg_write(mc13xxx, offmask, mask & ~irqbit);
-
-It's OK to do this if you are protected by a mutex, but as soon as you
-remove it you will have concurrency between two irq_unmask/irq_mask.
-
-So you can remove the lock from trivial function like:
-	mc13xxx_lock(led->master);
-  	mc13xxx_reg_rmw(led->master, reg, mask << shift, value << shift);
-	mc13xxx_unlock(led->master);
-
-Which protect only a single access to regmap.
-
-But we need to keep it for more complex behavior.
-
-Regards,
-
-Philippe
+> 
+> Signed-off-by: Alex Ling <kasimling@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4412.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> index e743e67..67bef99 100644
+> --- a/arch/arm/boot/dts/exynos4412.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> @@ -67,5 +67,7 @@
+>  		interrupts = <0 77 0>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		clocks = <&clock 301>, <&clock 149>;
+> +		clock-names = "biu", "ciu";
+>  	};
+>  };
+> -- 
+> 1.7.9.5
+> 
+> 
