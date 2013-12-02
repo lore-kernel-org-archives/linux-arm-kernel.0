@@ -1,37 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  2 Dec 2013 11:19:17 +0900
-Subject: [PATCH 11/28] ARM: shmobile: r8a7779: add SDHI clock support for DT
+Date: Mon,  2 Dec 2013 11:19:21 +0900
+Subject: [PATCH 15/28] ARM: shmobile: Add shared EMEV2 code for
+ ->init_machine()
 In-Reply-To: <cover.1385950394.git.horms+renesas@verge.net.au>
 References: <cover.1385950394.git.horms+renesas@verge.net.au>
-Message-ID: <dbb5d1c05baff7d7106775be15402fd4ea00ca29.1385950394.git.horms+renesas@verge.net.au>
+Message-ID: <39337fbedb336b98eb03fc89d40cffc909ef8723.1385950394.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Add a SoC specific function that initializes
+clocks and starts DT probing in case of EMEV2.
+
+This EMEV2 SoC support code may be built for
+either legacy SHMOBILE or SMOBILE_MULTI.
+
+The change allows us to support existing board
+specific KZM9D DTB with these SoC specific
+DT_MACHINE_START() callbacks.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-shmobile/setup-emev2.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index badb8b7..5c83259 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -201,9 +201,13 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
- 	CLKDEV_DEV_ID("sh-hspi.2", &mstp_clks[MSTP007]), /* HSPI2 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
-+	CLKDEV_DEV_ID("ffe4c000.sdhi", &mstp_clks[MSTP323]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
-+	CLKDEV_DEV_ID("ffe4d000.sdhi", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
-+	CLKDEV_DEV_ID("ffe4e000.sdhi", &mstp_clks[MSTP321]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
-+	CLKDEV_DEV_ID("ffe4f000.sdhi", &mstp_clks[MSTP320]), /* SDHI3 */
- 	CLKDEV_DEV_ID("rcar-du-r8a7779", &mstp_clks[MSTP103]), /* DU */
- };
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index 3ad531c..2d64b95 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -16,6 +16,7 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
++#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+@@ -197,6 +198,16 @@ void __init emev2_init_delay(void)
+ 
+ #ifdef CONFIG_USE_OF
+ 
++static void __init emev2_add_standard_devices_dt(void)
++{
++#ifdef CONFIG_COMMON_CLK
++	of_clk_init(NULL);
++#else
++	emev2_clock_init();
++#endif
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ static const char *emev2_boards_compat_dt[] __initdata = {
+ 	"renesas,emev2",
+ 	NULL,
+@@ -206,6 +217,7 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+ 	.init_early	= emev2_init_delay,
++	.init_machine	= emev2_add_standard_devices_dt,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
  
 -- 
 1.8.4
