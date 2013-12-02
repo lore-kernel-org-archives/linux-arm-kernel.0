@@ -1,51 +1,53 @@
-From: kasimling@gmail.com (Alex Ling)
-Date: Mon, 2 Dec 2013 22:01:20 +0800
-Subject: [PATCH 1/1] ARM: dts: Add missing clock names for exynos4412
- dwmmc node
-In-Reply-To: <20131202095253.GC12952@e106331-lin.cambridge.arm.com>
-References: <1385892707-25063-1-git-send-email-kasimling@gmail.com>
- <20131202095253.GC12952@e106331-lin.cambridge.arm.com>
-Message-ID: <CAHaF_kjuXZOkUXiK-E8mk1BmMvBPf-dUkha+nRnM3XhKOoSOJA@mail.gmail.com>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Mon, 2 Dec 2013 13:56:56 +0000
+Subject: [PATCH v3 36/36] ARM: STi: Add support for the FSM Serial Flash
+ Controller
+In-Reply-To: <20131202134348.GG31626@lee--X1>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
+ <529C858B.1040601@st.com> <20131202132013.GF31626@lee--X1>
+ <529C8A99.1020204@st.com> <20131202134348.GG31626@lee--X1>
+Message-ID: <529C91A8.3030401@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 2, 2013 at 5:52 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Sun, Dec 01, 2013 at 10:11:47AM +0000, Alex Ling wrote:
->> This patch adds "biu" and "ciu" clock names for exynos4412 dwmmc
->> node. Without this patch, dwmmc host driver will skip enabling the
->> two clocks and it will break dwmmc host function on exynos4412.
->> Tested on FriendlyARM TINY4412 board.
->
-> The patch description is a little off; this patch adds the clocks as
-> well as the clock-names.
-Well noted. I'll update the description later. Thanks!
->
-> The patch itself looks fine to me.
->
-> Mark.
->
+On 02/12/13 13:43, Lee Jones wrote:
+> On Mon, 02 Dec 2013, srinivas kandagatla wrote:
+> 
+>> On 02/12/13 13:20, Lee Jones wrote:
+>>>>> +		/* FSM */
+>>>>> +		spifsm: spifsm at fe902000{
+>>>>> +		        compatible         = "st,spi-fsm", "simple-bus";
+>>>> "simple-bus" is redundant here.
+>>>
+>>> Yes I agree, good spot.
+>>>
+>>> I removed it from the Documentation, but missed this one.
+>>>
+>>> If I remove it, can I add your Ack for the remainder of the patch?
+>> Yes,
 >>
->> Signed-off-by: Alex Ling <kasimling@gmail.com>
->> ---
->>  arch/arm/boot/dts/exynos4412.dtsi |    2 ++
->>  1 file changed, 2 insertions(+)
+>> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 >>
->> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
->> index e743e67..67bef99 100644
->> --- a/arch/arm/boot/dts/exynos4412.dtsi
->> +++ b/arch/arm/boot/dts/exynos4412.dtsi
->> @@ -67,5 +67,7 @@
->>               interrupts = <0 77 0>;
->>               #address-cells = <1>;
->>               #size-cells = <0>;
->> +             clocks = <&clock 301>, <&clock 149>;
->> +             clock-names = "biu", "ciu";
->>       };
->>  };
->> --
->> 1.7.9.5
->>
->>
+>> You should be aware that arch/arm/boot/dts/stih416-b2105.dts is not in
+>> mainline yet.
+> 
+> Yes, I am aware of this. Are you queuing patches for it?
+Yes, I will post this soon.
 
-BR,
-Alex
+thanks,
+srini
+> 
+>>>>> +		        reg                =  <0xfe902000 0x1000>;
+>>>>> +		        reg-names          = "spi-fsm";
+>>>>> +		        pinctrl-0          = <&pinctrl_fsm>;
+>>>>> +
+>>>>> +			st,syscfg	   = <&syscfg_rear>;
+>>>>> +		        st,boot-device-reg = <0x958>;
+>>>>> +		        st,boot-device-spi = <0x1a>;
+>>>>> +
+>>>>> +		        status = "okay";
+>>>>> +		};
+>>>
+>>
+> 
