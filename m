@@ -1,101 +1,49 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Dec 2013 09:52:58 +0100
-Subject: [PATCH 01/31] ARM: tegra: add missing clock documentation to DT
- bindings
-In-Reply-To: <529B8888.3010801@wwwdotorg.org>
+Date: Mon, 2 Dec 2013 10:01:46 +0100
+Subject: [PATCH 04/31] ARM: tegra: update DT files to add reset properties
+In-Reply-To: <529B8ABB.5040109@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-2-git-send-email-swarren@wwwdotorg.org>
- <20131129114900.GN22771@ulmo.nvidia.com>
- <529B8888.3010801@wwwdotorg.org>
-Message-ID: <20131202085257.GA17834@ulmo.nvidia.com>
+ <1384548866-13141-5-git-send-email-swarren@wwwdotorg.org>
+ <20131129130031.GQ22771@ulmo.nvidia.com>
+ <529B8ABB.5040109@wwwdotorg.org>
+Message-ID: <20131202090145.GB17834@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 01, 2013 at 12:05:44PM -0700, Stephen Warren wrote:
-> On 11/29/2013 04:49 AM, Thierry Reding wrote:
-> > On Fri, Nov 15, 2013 at 01:53:56PM -0700, Stephen Warren wrote: 
-> > [...]
-> >> @@ -60,6 +81,12 @@ of the following host1x client modules: -
-> >> compatible: "nvidia,tegra<chip>-dc" - reg: Physical base address
-> >> and length of the controller's registers. - interrupts: The
-> >> interrupt outputs from the controller. +  - clocks : Must contain
-> >> an entry for each entry in clock-names. +    See
-> >> ../clocks/clock-bindings.txt for details. +  - clock-names : Must
-> >> include the following entries: +    - disp1 or disp2 (depending
-> >> on the controller instance)
+On Sun, Dec 01, 2013 at 12:15:07PM -0700, Stephen Warren wrote:
+> On 11/29/2013 06:00 AM, Thierry Reding wrote:
+> > On Fri, Nov 15, 2013 at 01:53:59PM -0700, Stephen Warren wrote: 
+[...]
+> >> reg = <0x70080300 0x100>; nvidia,ahub-cif-ids = <4 4>; clocks =
+> >> <&tegra_car TEGRA114_CLK_I2S0>;
 > > 
-> > I'm not sure if this makes sense. The name could be the same
-> > independent of which controller uses it. If it isn't then the
-> > driver would need additional code to find out which instance it is
-> > and construct a dynamic string.
-> > 
-> > Any objection to just make this entry "disp", or "dc"?
+> > The clocks for these i2s devices are already listed in the ahub
+> > node. Is that on purpose?
 > 
-> This patch simply documents the binding that the various drivers
-> already require and/or whatever is already in the DT files if there
-> are any clocks the drivers don't currently use. I did consider fixing
-> up all the current usage to actually be sane, but that would require
-> even more driver changes (in addition to those required for the reset
-> framework patches).
-
-Okay, I understand. I still think we should change the usage for this
-particular use-case subsequently. In retrospect the entry in clock-names
-wasn't thought out very well. It seems like the reason for using disp1
-and disp2 respectively was so that it would match the system-wide clock
-name, rather than the clock's label within the display controller's
-context.
-
-Just to clarify what I mean, if we stick to the above, then we'll need
-to add code to the driver along the lines of:
-
-	char clock_name[6];
-
-	if (regs->start == 0x54200000)
-		index = 1;
-	else
-		index = 2;
-
-	sprintf(clock_name, "disp%u", index);
-
-	clk = devm_clk_get(&pdev->dev, clock_name);
-
-rather than the much more simple and elegant:
-
-	clk = devm_clk_get(&pdev->dev, "disp");
-
-The whole purpose of the clock consumer ID is to be generic and as such
-independent of the specific IP block or instance thereof.
-
-> >> diff --git
-> >> a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
-> >> b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt 
-> >> index 91ff771c7e77..d4f2d534934b 100644 ---
-> >> a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt 
-> >> +++
-> >> b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt 
-> >> @@ -6,8 +6,10 @@ Required properties: - interrupts: Should
-> >> contain SPI interrupts. - nvidia,dma-request-selector : The Tegra
-> >> DMA controller's phandle and request selector for this SPI
-> >> controller. -- This is also require clock named "spi" as per
-> >> binding document -
-> >> Documentation/devicetree/bindings/clock/clock-bindings.txt +-
-> >> clocks : Must contain an entry for each entry in clock-names. +
-> >> See ../clocks/clock-bindings.txt for details. +- clock-names :
-> >> Must include the following entries: +  - spi
-> > 
-> > This is inconsistent with other bindings that require only a
-> > single clock entry. I suppose that this is required because of the
-> > driver requesting a specifically named clock, in which case that's
-> > fine.
+> Yes.
 > 
-> This driver does clk_get(dev, "spi") rather than clk_get(dev, NULL),
-> so this requires a specific name. Again, I did consider updating all
-> drivers to use names, but decided I didn't want to do even more driver
-> changes, but instead just document what was currently required.
+> The AHUB driver needs to remove reset from the HW modules, so that the
+> configlink bus works. Reset removal used to require a custom Tegra API
+> that took a clock as a parameter. Hence, the AHUB node needed the
+> clock reference. After this series, the AHUB only needs a reset handle
+> to use the standard reset API. However, the clock references are left
+> in the AHUB node until after the AHUB driver is converted, so the
+> series is bisectable. After the series, only the I2S driver needs to
+> clock references.
+[...]
+> >> +			 <&tegra_car 30>,  /* i2s0 */ +			 <&tegra_car 11>,  /* i2s1
+> >> */ +			 <&tegra_car 18>,  /* i2s2 */ +			 <&tegra_car 101>, /*
+> >> i2s3 */ +			 <&tegra_car 102>, /* i2s4 */
+> > 
+> > Some comment for these as for Tegra20.
+> 
+> I'm not sure which other comment was "for Tegra20", since none of the
+> filenames were quoted, but I'll try to check when I get back.
 
-Yes, I realized that as well. Oh well, I guess that's part of the "pain"
-for not doing it right from the start. Although, admittedly, this really
-isn't a big issue.
+Indeed. I didn't quote the filenames. =( And I typoed Tegra114 as
+Tegra20. I was referring to the "I2S clocks are listed in both the AHUB
+and I2S nodes" comment above for Tegra114. From your earlier reply,
+though this looks good then.
 
 Thierry
 -------------- next part --------------
@@ -104,4 +52,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/0b6bf11c/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/8d805519/attachment.sig>
