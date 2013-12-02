@@ -1,37 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 2 Dec 2013 14:18:07 +0100
-Subject: [PATCH 2/3] leds/pwm: Don't disable pwm when setting brightness
- to 0
-In-Reply-To: <20131202123318.GC12793@ulmo.nvidia.com>
-References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1385412225-29740-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131202123318.GC12793@ulmo.nvidia.com>
-Message-ID: <20131202131807.GC29721@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Dec 2013 13:20:13 +0000
+Subject: [PATCH v3 36/36] ARM: STi: Add support for the FSM Serial Flash
+ Controller
+In-Reply-To: <529C858B.1040601@st.com>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
+ <529C858B.1040601@st.com>
+Message-ID: <20131202132013.GF31626@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 01:33:19PM +0100, Thierry Reding wrote:
-> On Mon, Nov 25, 2013 at 09:43:44PM +0100, Uwe Kleine-K?nig wrote:
-> > This fixes disabling the LED on i.MX28. The PWM hardware delays using
-> > the newly set pwm-config until the beginning of a new period. It's very
-> > likely that pwm_disable is called before the current period ends. In
-> > case the LED was on brightness=max before the LED stays on because in
-> > the disabled PWM block the period never ends.
-> > 
-> > Also only call pwm_enable only once in the probe call back and the
-> > matching pwm_disable in .remove(). Moreover the pwm is explicitly
-> > initialized to off.
-> 
-> While I do understand the reasoning behind this, if this is really the
-> behaviour that we need then there's no use in having pwm_enable() and
-> pwm_disable() at all. They can just be folded into pwm_get() and
-> pwm_put(), respectively.
-So after the first pwm_get the pwm starts with an unspecified duty
-cycle? That's not that nice, is it?
+> > +		/* FSM */
+> > +		spifsm: spifsm at fe902000{
+> > +		        compatible         = "st,spi-fsm", "simple-bus";
+> "simple-bus" is redundant here.
 
-Best regards
-Uwe
+Yes I agree, good spot.
+
+I removed it from the Documentation, but missed this one.
+
+If I remove it, can I add your Ack for the remainder of the patch?
+
+> > +		        reg                =  <0xfe902000 0x1000>;
+> > +		        reg-names          = "spi-fsm";
+> > +		        pinctrl-0          = <&pinctrl_fsm>;
+> > +
+> > +			st,syscfg	   = <&syscfg_rear>;
+> > +		        st,boot-device-reg = <0x958>;
+> > +		        st,boot-device-spi = <0x1a>;
+> > +
+> > +		        status = "okay";
+> > +		};
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
