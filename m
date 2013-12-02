@@ -1,89 +1,46 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Mon, 2 Dec 2013 11:11:18 +0300
-Subject: [patch] video: vt8500: fix error handling in probe()
-Message-ID: <20131202081118.GB3852@elgon.mountain>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 2 Dec 2013 09:28:02 +0100
+Subject: [PATCH] rtc: rtc-at91rm9200: Corrected alarm over day/month wrap:
+In-Reply-To: <20131118143740.cdb5c0ee72b3d68e443afd66@linux-foundation.org>
+References: <1384795254-11996-1-git-send-email-nicolas.ferre@atmel.com>
+ <20131118143740.cdb5c0ee72b3d68e443afd66@linux-foundation.org>
+Message-ID: <529C4492.6060203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We shouldn't kfree(fbi) because that was allocated with devm_kzalloc().
-There were several error paths which returned directly instead of
-releasing resources.
+On 18/11/2013 23:37, Andrew Morton :
+> On Mon, 18 Nov 2013 18:20:54 +0100 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>
+>> From: Linus Pizunski <linus@narrativeteam.com>
+>>
+>> Update month and day of month to the alarm month/day instead
+>> of current day/month when setting the RTC alarm mask.
+>>
+>> Signed-off-by: Linus Pizunski <linus@narrativeteam.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> I changed this to signed-off-by, as you were on the patch delivery path.
+>
+>> --- a/drivers/rtc/rtc-at91rm9200.c
+>> +++ b/drivers/rtc/rtc-at91rm9200.c
+>> @@ -220,6 +220,8 @@ static int at91_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
+>>
+>>   	at91_alarm_year = tm.tm_year;
+>>
+>> +	tm.tm_mon = alrm->time.tm_mon;
+>> +	tm.tm_mday = alrm->time.tm_mday;
+>>   	tm.tm_hour = alrm->time.tm_hour;
+>>   	tm.tm_min = alrm->time.tm_min;
+>>   	tm.tm_sec = alrm->time.tm_sec;
+>
+> I queued this for 3.13.  Do we think it warrants a -stable backport?
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+(I am late, but it seems this one is not sent to Linus yet...)
 
-diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-index b30e5a439d1f..a8f2b280f796 100644
---- a/drivers/video/vt8500lcdfb.c
-+++ b/drivers/video/vt8500lcdfb.c
-@@ -293,8 +293,7 @@ static int vt8500lcd_probe(struct platform_device *pdev)
- 			+ sizeof(u32) * 16, GFP_KERNEL);
- 	if (!fbi) {
- 		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
--		ret = -ENOMEM;
--		goto failed;
-+		return -ENOMEM;
- 	}
- 
- 	strcpy(fbi->fb.fix.id, "VT8500 LCD");
-@@ -327,15 +326,13 @@ static int vt8500lcd_probe(struct platform_device *pdev)
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (res == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
--		ret = -ENODEV;
--		goto failed_fbi;
-+		return -ENODEV;
- 	}
- 
- 	res = request_mem_region(res->start, resource_size(res), "vt8500lcd");
- 	if (res == NULL) {
- 		dev_err(&pdev->dev, "failed to request I/O memory\n");
--		ret = -EBUSY;
--		goto failed_fbi;
-+		return -EBUSY;
- 	}
- 
- 	fbi->regbase = ioremap(res->start, resource_size(res));
-@@ -346,17 +343,19 @@ static int vt8500lcd_probe(struct platform_device *pdev)
- 	}
- 
- 	disp_timing = of_get_display_timings(pdev->dev.of_node);
--	if (!disp_timing)
--		return -EINVAL;
-+	if (!disp_timing) {
-+		ret = -EINVAL;
-+		goto failed_free_io;
-+	}
- 
- 	ret = of_get_fb_videomode(pdev->dev.of_node, &of_mode,
- 							OF_USE_NATIVE_MODE);
- 	if (ret)
--		return ret;
-+		goto failed_free_io;
- 
- 	ret = of_property_read_u32(pdev->dev.of_node, "bits-per-pixel", &bpp);
- 	if (ret)
--		return ret;
-+		goto failed_free_io;
- 
- 	/* try allocating the framebuffer */
- 	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
-@@ -364,7 +363,8 @@ static int vt8500lcd_probe(struct platform_device *pdev)
- 				GFP_KERNEL);
- 	if (!fb_mem_virt) {
- 		pr_err("%s: Failed to allocate framebuffer\n", __func__);
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto failed_free_io;
- 	}
- 
- 	fbi->fb.fix.smem_start	= fb_mem_phys;
-@@ -447,9 +447,6 @@ failed_free_io:
- 	iounmap(fbi->regbase);
- failed_free_res:
- 	release_mem_region(res->start, resource_size(res));
--failed_fbi:
--	kfree(fbi);
--failed:
- 	return ret;
- }
- 
+Well, yes, we can tag this one for "-stable". The patch applies on 
+nearly each kernel that I can think about (code is from 2.6.17-ish). But 
+this patch applies with an offset...
+
+Best regards,
+-- 
+Nicolas Ferre
