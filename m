@@ -1,206 +1,107 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 2 Dec 2013 10:48:45 +0200
-Subject: [PATCH 05/11] serial: support for 16550 serial ports on LP-8x4x
-In-Reply-To: <1385879185-22455-6-git-send-email-ynvich@gmail.com>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-6-git-send-email-ynvich@gmail.com>
-Message-ID: <20131202084845.GD3942@xps8300>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Dec 2013 09:52:58 +0100
+Subject: [PATCH 01/31] ARM: tegra: add missing clock documentation to DT
+ bindings
+In-Reply-To: <529B8888.3010801@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-2-git-send-email-swarren@wwwdotorg.org>
+ <20131129114900.GN22771@ulmo.nvidia.com>
+ <529B8888.3010801@wwwdotorg.org>
+Message-ID: <20131202085257.GA17834@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Dec 01, 2013 at 10:26:18AM +0400, Sergei Ianovich wrote:
-> The patch adds support for 3 additional LP-8x4x built-in serial
-> ports.
+On Sun, Dec 01, 2013 at 12:05:44PM -0700, Stephen Warren wrote:
+> On 11/29/2013 04:49 AM, Thierry Reding wrote:
+> > On Fri, Nov 15, 2013 at 01:53:56PM -0700, Stephen Warren wrote: 
+> > [...]
+> >> @@ -60,6 +81,12 @@ of the following host1x client modules: -
+> >> compatible: "nvidia,tegra<chip>-dc" - reg: Physical base address
+> >> and length of the controller's registers. - interrupts: The
+> >> interrupt outputs from the controller. +  - clocks : Must contain
+> >> an entry for each entry in clock-names. +    See
+> >> ../clocks/clock-bindings.txt for details. +  - clock-names : Must
+> >> include the following entries: +    - disp1 or disp2 (depending
+> >> on the controller instance)
+> > 
+> > I'm not sure if this makes sense. The name could be the same
+> > independent of which controller uses it. If it isn't then the
+> > driver would need additional code to find out which instance it is
+> > and construct a dynamic string.
+> > 
+> > Any objection to just make this entry "disp", or "dc"?
 > 
-> The device can also host up to 8 extension cards with 4 serial ports
-> on each card for a total of 35 ports. However, I don't have
-> the hardware to test extension cards, so they are not supported, yet.
+> This patch simply documents the binding that the various drivers
+> already require and/or whatever is already in the DT files if there
+> are any clocks the drivers don't currently use. I did consider fixing
+> up all the current usage to actually be sane, but that would require
+> even more driver changes (in addition to those required for the reset
+> framework patches).
+
+Okay, I understand. I still think we should change the usage for this
+particular use-case subsequently. In retrospect the entry in clock-names
+wasn't thought out very well. It seems like the reason for using disp1
+and disp2 respectively was so that it would match the system-wide clock
+name, rather than the clock's label within the display controller's
+context.
+
+Just to clarify what I mean, if we stick to the above, then we'll need
+to add code to the driver along the lines of:
+
+	char clock_name[6];
+
+	if (regs->start == 0x54200000)
+		index = 1;
+	else
+		index = 2;
+
+	sprintf(clock_name, "disp%u", index);
+
+	clk = devm_clk_get(&pdev->dev, clock_name);
+
+rather than the much more simple and elegant:
+
+	clk = devm_clk_get(&pdev->dev, "disp");
+
+The whole purpose of the clock consumer ID is to be generic and as such
+independent of the specific IP block or instance thereof.
+
+> >> diff --git
+> >> a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt
+> >> b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt 
+> >> index 91ff771c7e77..d4f2d534934b 100644 ---
+> >> a/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt 
+> >> +++
+> >> b/Documentation/devicetree/bindings/spi/nvidia,tegra114-spi.txt 
+> >> @@ -6,8 +6,10 @@ Required properties: - interrupts: Should
+> >> contain SPI interrupts. - nvidia,dma-request-selector : The Tegra
+> >> DMA controller's phandle and request selector for this SPI
+> >> controller. -- This is also require clock named "spi" as per
+> >> binding document -
+> >> Documentation/devicetree/bindings/clock/clock-bindings.txt +-
+> >> clocks : Must contain an entry for each entry in clock-names. +
+> >> See ../clocks/clock-bindings.txt for details. +- clock-names :
+> >> Must include the following entries: +  - spi
+> > 
+> > This is inconsistent with other bindings that require only a
+> > single clock entry. I suppose that this is required because of the
+> > driver requesting a specifically named clock, in which case that's
+> > fine.
 > 
-> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> ---
->  arch/arm/configs/lp8x4x_defconfig       |   1 +
->  arch/arm/mach-pxa/include/mach/lp8x4x.h |   6 ++
->  drivers/tty/serial/8250/8250_lp8x4x.c   | 181 ++++++++++++++++++++++++++++++++
->  drivers/tty/serial/8250/Kconfig         |  11 ++
->  drivers/tty/serial/8250/Makefile        |   1 +
->  5 files changed, 200 insertions(+)
->  create mode 100644 drivers/tty/serial/8250/8250_lp8x4x.c
-> 
-> diff --git a/arch/arm/configs/lp8x4x_defconfig b/arch/arm/configs/lp8x4x_defconfig
-> index 03c85bc..d297a67 100644
-> --- a/arch/arm/configs/lp8x4x_defconfig
-> +++ b/arch/arm/configs/lp8x4x_defconfig
-> @@ -1141,6 +1141,7 @@ CONFIG_SERIAL_8250_NR_UARTS=36
->  CONFIG_SERIAL_8250_RUNTIME_UARTS=36
->  CONFIG_SERIAL_8250_EXTENDED=y
->  CONFIG_SERIAL_8250_MANY_PORTS=y
-> +CONFIG_SERIAL_8250_LP8X4X=m
->  CONFIG_SERIAL_8250_SHARE_IRQ=y
->  # CONFIG_SERIAL_8250_DETECT_IRQ is not set
->  # CONFIG_SERIAL_8250_RSA is not set
-> diff --git a/arch/arm/mach-pxa/include/mach/lp8x4x.h b/arch/arm/mach-pxa/include/mach/lp8x4x.h
-> index a49df22..4d5474e 100644
-> --- a/arch/arm/mach-pxa/include/mach/lp8x4x.h
-> +++ b/arch/arm/mach-pxa/include/mach/lp8x4x.h
-> @@ -50,6 +50,12 @@
->  #define LP8X4X_CLRFALLINT	LP8X4X_P2V(0x1700901a)
->  #define LP8X4X_RWRTC		LP8X4X_P2V(0x1700901c)
->  #define LP8X4X_SRAMBANK		0x1700901e
-> +#define LP8X4X_TTYS0_QUIRK	0x17009030
-> +#define LP8X4X_TTYS1_QUIRK	0x17009032
-> +#define LP8X4X_TTYS2_QUIRK	0x17009034
-> +#define LP8X4X_TTYS0_IOMEM	0x17009050
-> +#define LP8X4X_TTYS1_IOMEM	0x17009060
-> +#define LP8X4X_TTYS2_IOMEM	0x17009070
->  #define LP8X4X_SRAM		0x1700a000
->  
->  /* board specific IRQs */
-> diff --git a/drivers/tty/serial/8250/8250_lp8x4x.c b/drivers/tty/serial/8250/8250_lp8x4x.c
-> new file mode 100644
-> index 0000000..27b01f0b
-> --- /dev/null
-> +++ b/drivers/tty/serial/8250/8250_lp8x4x.c
-> @@ -0,0 +1,181 @@
-> +/*  linux/drivers/tty/serial/8250/8250_lp8x4x.c
-> + *
-> + *  Support for 16550 serial ports on ICP DAS LP-8x4x
-> + *
-> + *  Copyright (C) 2013 Sergei Ianovich <ynvich@gmail.com>
-> + *  Framework taken from linux/drivers/tty/serial/8250/8250_accent.c
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  published by the Free Software Foundation.
-> + */
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/irq.h>
-> +#include <linux/delay.h>
-> +#include <linux/serial_8250.h>
-> +#include <mach/lp8x4x.h>
-> +#include <linux/io.h>
-> +
-> +#define QUIRK_PORT(_base, _irq)					\
-> +	{							\
-> +		.iobase		= _base,			\
-> +		.membase	= (void *) _base,		\
-> +		.mapbase	= _base,			\
-> +		.irq		= _irq,				\
-> +		.uartclk	= 14745600,			\
-> +		.regshift	= 1,				\
-> +		.iotype		= UPIO_MEM,			\
-> +		.flags		= UPF_IOREMAP,			\
-> +		.set_termios	= lp8x4x_set_termios,		\
-> +		.serial_in	= lp8x4x_serial_in,		\
-> +		.serial_out	= lp8x4x_serial_out,		\
-> +	}
-> +
-> +static void lp8x4x_set_termios(struct uart_port *port,
-> +		struct ktermios *termios, struct ktermios *old)
-> +{
+> This driver does clk_get(dev, "spi") rather than clk_get(dev, NULL),
+> so this requires a specific name. Again, I did consider updating all
+> drivers to use names, but decided I didn't want to do even more driver
+> changes, but instead just document what was currently required.
 
-<snip>
+Yes, I realized that as well. Oh well, I guess that's part of the "pain"
+for not doing it right from the start. Although, admittedly, this really
+isn't a big issue.
 
-> +}
-> +
-> +static unsigned int lp8x4x_serial_in(struct uart_port *p, int offset)
-> +{
-> +	unsigned int b;
-> +	udelay(30);
-> +	offset = offset << p->regshift;
-> +	b = readb(p->membase + offset);
-> +	return b;
-> +}
-> +
-> +static void lp8x4x_serial_out(struct uart_port *p, int offset, int value)
-> +{
-> +	offset = offset << p->regshift;
-> +	writeb(value, p->membase + offset);
-> +}
-> +
-> +static struct plat_serial8250_port lp8x4x_data[] = {
-> +	QUIRK_PORT(LP8X4X_TTYS0_IOMEM, LP8X4X_TTYS0_IRQ),
-> +	QUIRK_PORT(LP8X4X_TTYS1_IOMEM, LP8X4X_TTYS1_IRQ),
-> +	QUIRK_PORT(LP8X4X_TTYS2_IOMEM, LP8X4X_TTYS2_IRQ),
-> +	{ },
-> +};
-> +
-> +/* Total number of ports can be 35. The first 3 ports are on
-> + * the device, the rest are on extension slots. Only the first 3
-> + * require termios quirk */
-> +#define LP8X4X_QUIRK_PORTS	3
-> +
-> +static unsigned int extra_mem[LP8X4X_QUIRK_PORTS] = {
-> +	LP8X4X_TTYS0_QUIRK,
-> +	LP8X4X_TTYS1_QUIRK,
-> +	LP8X4X_TTYS2_QUIRK
-> +};
-> +
-> +static int request_and_remap(int i)
-> +{
-> +	if (!request_mem_region(extra_mem[i], 1, "serial"))
-> +		return -EBUSY;
-> +
-> +	lp8x4x_data[i].private_data = ioremap(extra_mem[i], 1);
-> +	if (lp8x4x_data[i].private_data)
-> +		return 0;
-> +
-> +	release_mem_region(extra_mem[i], 1);
-> +	return -ENODEV;
-> +}
-> +
-> +static void release_and_unmap(int i)
-> +{
-> +	iounmap((void *) lp8x4x_data[i].private_data);
-> +	release_mem_region(extra_mem[i], 1);
-> +}
-> +
-> +static struct platform_device lp8x4x_device = {
-> +	.name			= "serial8250",
-> +	.id			= PLAT8250_DEV_ACCENT,
-> +	.dev			= {
-> +		.platform_data	= lp8x4x_data,
-> +	},
-> +};
-> +
-> +static int __init lp8x4x_init(void)
-> +{
-> +	int i = 0;
-> +	int err = 0;
-> +
-> +	for (i = 0; i < LP8X4X_QUIRK_PORTS; i++) {
-> +		err = request_and_remap(i);
-> +		if (err == 0)
-> +			continue;
-> +
-> +		for (; i >= 0; i--)
-> +			release_and_unmap(i);
-> +		lp8x4x_device.dev.platform_data = NULL;
-> +		return err;
-> +	}
-> +	return platform_device_register(&lp8x4x_device);
-> +}
-> +
-> +module_init(lp8x4x_init);
-
-Instead of registering a platform device for serial8250 here, you need
-to simply register a platform driver for something like lp8x4x_serial.
-The platform code will to registers the platform devices for it. You
-will use serial8250_register_8250_port() in your probe to register a
-new port. Use 8250_em.c and 8250_dw.c under drivers/tty/serial/8250/
-as an example.
-
-You don't need to introduce plat_serial8250_port so you won't need
-the QUIRK_PORT stuff. You deliver the iomem and the irq as normal
-resources that the driver uses when you create the platform device.
-That of course also means the driver does not need to care about the
-instances. The platform code will generate a platform device for as
-many ports you have and set to resources accordingly.
-
-
-Thanks,
-
--- 
-heikki
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/0b6bf11c/attachment-0001.sig>
