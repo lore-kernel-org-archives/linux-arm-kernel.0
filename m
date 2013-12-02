@@ -1,183 +1,88 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Mon,  2 Dec 2013 15:04:03 +0530
-Subject: [PATCH V6 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1385976843-13280-1-git-send-email-vkale@apm.com>
-References: <1385976843-13280-1-git-send-email-vkale@apm.com>
-Message-ID: <1385976843-13280-3-git-send-email-vkale@apm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Dec 2013 10:36:23 +0100
+Subject: [PATCH v2 2/3] regulator: tps6586x: add and use correct voltage
+ table
+In-Reply-To: <77c960e6e3a91cf39bc866ccb9cd578ccc5acc95.1385913228.git.stefan@agner.ch>
+References: <cover.1385913227.git.stefan@agner.ch>
+ <77c960e6e3a91cf39bc866ccb9cd578ccc5acc95.1385913228.git.stefan@agner.ch>
+Message-ID: <20131202093622.GF17834@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for irq registration when pmu interrupt is percpu.
+On Sun, Dec 01, 2013 at 04:59:14PM +0100, Stefan Agner wrote:
+[...]
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
----
- arch/arm64/kernel/perf_event.c |  116 +++++++++++++++++++++++++++++-----------
- 1 file changed, 86 insertions(+), 30 deletions(-)
+This looks pretty good generally. A few minor nits below...
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index cea1594..d2d562f 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/bitmap.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/perf_event.h>
-@@ -363,26 +364,61 @@ validate_group(struct perf_event *event)
- }
- 
- static void
-+armpmu_disable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-+	disable_percpu_irq(irq);
-+}
-+
-+static void
- armpmu_release_hardware(struct arm_pmu *armpmu)
- {
--	int i, irq, irqs;
-+	int irq;
-+	unsigned int i, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
- 
- 	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+	if (!irqs)
-+		return;
- 
--	for (i = 0; i < irqs; ++i) {
--		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
--			continue;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, armpmu);
-+	irq = platform_get_irq(pmu_device, 0);
-+	if (irq <= 0)
-+		return;
-+
-+	if (irq_is_percpu(irq)) {
-+		on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
-+		free_percpu_irq(irq, &cpu_hw_events);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-+				continue;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq > 0)
-+				free_irq(irq, armpmu);
-+		}
- 	}
- }
- 
-+static void
-+armpmu_enable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	enable_percpu_irq(irq, IRQ_TYPE_NONE);
-+	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-+}
-+
- static int
- armpmu_reserve_hardware(struct arm_pmu *armpmu)
- {
--	int i, err, irq, irqs;
-+	int err, irq;
-+	unsigned int i, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
- 
- 	if (!pmu_device) {
-@@ -391,39 +427,59 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 	}
- 
- 	irqs = min(pmu_device->num_resources, num_possible_cpus());
--	if (irqs < 1) {
-+	if (!irqs) {
- 		pr_err("no irqs for PMUs defined\n");
- 		return -ENODEV;
- 	}
- 
--	for (i = 0; i < irqs; ++i) {
--		err = 0;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq < 0)
--			continue;
-+	irq = platform_get_irq(pmu_device, 0);
-+	if (irq <= 0) {
-+		pr_err("failed to get valid irq for PMU device\n");
-+		return -ENODEV;
-+	}
- 
--		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
--		 */
--		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
--			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				    irq, i);
--			continue;
--		}
-+	if (irq_is_percpu(irq)) {
-+		err = request_percpu_irq(irq, armpmu->handle_irq,
-+				"arm-pmu", &cpu_hw_events);
- 
--		err = request_irq(irq, armpmu->handle_irq,
--				  IRQF_NOBALANCING,
--				  "arm-pmu", armpmu);
- 		if (err) {
--			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
-+			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
-+					irq);
- 			armpmu_release_hardware(armpmu);
- 			return err;
- 		}
- 
--		cpumask_set_cpu(i, &armpmu->active_irqs);
-+		on_each_cpu(armpmu_enable_percpu_irq, armpmu, 1);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			err = 0;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq <= 0)
-+				continue;
-+
-+			/*
-+			 * If we have a single PMU interrupt that we can't shift,
-+			 * assume that we're running on a uniprocessor machine and
-+			 * continue. Otherwise, continue without this interrupt.
-+			 */
-+			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-+				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+						irq, i);
-+				continue;
-+			}
-+
-+			err = request_irq(irq, armpmu->handle_irq,
-+					IRQF_NOBALANCING,
-+					"arm-pmu", armpmu);
-+			if (err) {
-+				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+						irq);
-+				armpmu_release_hardware(armpmu);
-+				return err;
-+			}
-+
-+			cpumask_set_cpu(i, &armpmu->active_irqs);
-+		}
- 	}
- 
- 	return 0;
--- 
-1.7.9.5
+> diff --git a/drivers/regulator/tps6586x-regulator.c b/drivers/regulator/tps6586x-regulator.c
+[...]
+> +#define tps658623_sm2_voltages tps6586x_ldo4_voltages
+>  static const unsigned int tps6586x_ldo4_voltages[] = {
+>  	1700000, 1725000, 1750000, 1775000, 1800000, 1825000, 1850000, 1875000,
+>  	1900000, 1925000, 1950000, 1975000, 2000000, 2025000, 2050000, 2075000,
+
+I'd put the #define below the ldo4 table. This doesn't actually matter
+for the preprocessor, but it makes it easier to read the code. Also an
+additional blank line would help with readability.
+
+> +	TPS6586X_LDO(LDO_0, "vinldo01", tps6586x_ldo0, SUPPLYV1, 5, 3, ENC, 0,
+> +					END, 0),
+
+Perhaps reduce the indentation here so there's more room in case this
+ever needs to be extended?
+
+> @@ -351,6 +380,7 @@ static int tps6586x_regulator_probe(struct platform_device *pdev)
+>  	struct regulator_init_data *reg_data;
+>  	struct tps6586x_platform_data *pdata;
+>  	struct of_regulator_match *tps6586x_reg_matches = NULL;
+> +	int reg_version;
+
+Why the prefix "reg_"?
+
+> @@ -373,10 +403,27 @@ static int tps6586x_regulator_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	reg_version = tps6586x_get_version(pdev->dev.parent);
+> +
+>  	for (id = 0; id < TPS6586X_ID_MAX_REGULATOR; ++id) {
+>  		reg_data = pdata->reg_init_data[id];
+>  
+> -		ri = find_regulator_info(id);
+> +		switch(reg_version) {
+> +		case TPS658623:
+> +			ri = find_regulator_info(id, tps658623_regulator,
+> +					ARRAY_SIZE(tps658623_regulator));
+> +			break;
+> +		case TPS658643:
+> +			ri = find_regulator_info(id, tps658643_regulator,
+> +					ARRAY_SIZE(tps658643_regulator));
+> +			break;
+> +		}
+
+Perhaps instead of repeating the function calls this could be:
+
+		switch (version) {
+		case TPS6586XYZ:
+			num = ARRAY_SIZE(tps6586xyz_regulator);
+			table = tps6586xys_regulator;
+			break;
+
+		...
+		}
+
+		if (table)
+			ri = find_regulator_info(id, table, num);
+
+That's slightly longer, but I find that to be more intuitive. Perhaps
+a bit more future-proof since you only have a single call. But that's
+perhaps subjective, so I'm fine with your alternative, too.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/cd4a8799/attachment.sig>
