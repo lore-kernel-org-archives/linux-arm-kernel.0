@@ -1,37 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Dec 2013 08:09:39 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: enable network for BeagleBone
- Black
-In-Reply-To: <1385972129-3638-1-git-send-email-olof@lixom.net>
-References: <1385972129-3638-1-git-send-email-olof@lixom.net>
-Message-ID: <20131202160938.GH23334@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 2 Dec 2013 17:10:04 +0100
+Subject: [PATCH] ARM: at91: add uart aliases to sama5d3 dtsi
+Message-ID: <1386000604-20829-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [131202 00:15]:
-> BeagleBone Black uses the TI CPSW ethernet controller, enable it in the
-> multi_v7_defconfig for testing coverage purposes.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3_uart.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-> ---
->  arch/arm/configs/multi_v7_defconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 4a5903e..d30507d 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -69,6 +69,7 @@ CONFIG_KS8851=y
->  CONFIG_SMSC911X=y
->  CONFIG_STMMAC_ETH=y
->  CONFIG_MDIO_SUN4I=y
-> +CONFIG_TI_CPSW=y
->  CONFIG_KEYBOARD_SPEAR=y
->  CONFIG_SERIO_AMBAKMI=y
->  CONFIG_SERIAL_8250=y
-> -- 
-> 1.7.10.4
-> 
+diff --git a/arch/arm/boot/dts/sama5d3_uart.dtsi b/arch/arm/boot/dts/sama5d3_uart.dtsi
+index 49d4d76ca6f4..a9fa75e41652 100644
+--- a/arch/arm/boot/dts/sama5d3_uart.dtsi
++++ b/arch/arm/boot/dts/sama5d3_uart.dtsi
+@@ -12,6 +12,11 @@
+ #include <dt-bindings/clk/at91.h>
+ 
+ / {
++	aliases {
++		serial5 = &uart0;
++		serial6 = &uart1;
++	};
++
+ 	ahb {
+ 		apb {
+ 			pinctrl at fffff200 {
+-- 
+1.8.2.2
