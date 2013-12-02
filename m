@@ -1,66 +1,41 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 2 Dec 2013 16:10:33 +0200
-Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
-In-Reply-To: <1385980005.12531.21.camel@host5.omatika.ru>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-2-git-send-email-ynvich@gmail.com>
- <20131202090253.GE3942@xps8300>
- <1385976238.12531.8.camel@host5.omatika.ru>
- <20131202094932.GF3942@xps8300>
- <1385980005.12531.21.camel@host5.omatika.ru>
-Message-ID: <20131202141033.GK3942@xps8300>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Mon, 2 Dec 2013 15:25:37 +0100
+Subject: [PATCH v6 02/17] dts: mpc512x: introduce dt-bindings/clock/ header
+In-Reply-To: <20131202094656.GA12952@e106331-lin.cambridge.arm.com>
+References: <1385851897-23475-1-git-send-email-gsi@denx.de>
+ <1385851897-23475-3-git-send-email-gsi@denx.de>
+ <20131202094656.GA12952@e106331-lin.cambridge.arm.com>
+Message-ID: <20131202142537.GS2982@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Dec 02, 2013 at 02:26:45PM +0400, Sergei Ianovich wrote:
-> On Mon, 2013-12-02 at 11:49 +0200, Heikki Krogerus wrote:
-> > On Mon, Dec 02, 2013 at 01:23:58PM +0400, Sergei Ianovich wrote:
-> > > On Mon, 2013-12-02 at 11:02 +0200, Heikki Krogerus wrote:
-> > > > 
-> > > > If drivers/tty/serial/pxa.c was converted to an other probe driver for
-> > > > the 8250, this would not be an issue.
-> > > 
-> > > It seems that my patch is not going to be accepted. However, there is a
-> > > device which has both PXA ports and a additional 8250 accent chip. As a
-> > > result, there is a device allocation conflict. For the device to be
-> > > usable the conflict needs to be resolved.
-> > > 
-> > > Do you mean that drivers/tty/serial/pxa.c needs to be rewritten to
-> > > support lp8x4x special case?
-> > 
-> > Sorry I was not clear. I was suggesting that drivers/tty/serial/pxa.c
-> > would be converted to drivers/tty/serial/8250/8250_pxa.c since it
-> > looks to me like just an other 16x50 compatible UART. That would fix
-> > the issue with the name conflict. You would then simply register 8250
-> > ports from two probe drivers (drivers/tty/serial/8250/8250_pxa.c and
-> > drivers/tty/serial/8250/8250_lp8x4x.c).
-> > 
-> > Depending on the order you register your platform devices (which you
-> > decide in your platform code), but let's say the pxa gets registered
-> > first and let's say it only has one port. You will then have in your
-> > system /dev/ttyS0 for the pxa port and /dev/ttyS[1-4] for the other
-> > UART.
-> > 
-> > I hope I was able to explain what I mean this time :)
+On Mon, Dec 02, 2013 at 09:46 +0000, Mark Rutland wrote:
 > 
-> Sorry, I wasn't clear as well. I got it right the first time. You mean
-> pxa.c needs to merged into 8250. This will solve the conflict in
-> question, and do it the right way. However, this will be a *much* bigger
-> patch, and it will affect everyone on pxa.
+> On Sat, Nov 30, 2013 at 10:51:22PM +0000, Gerhard Sittig wrote:
+> > introduce a dt-bindings/ header file for MPC512x clocks,
+> > providing symbolic identifiers for those SoC clocks which
+> > clients will reference from their device tree nodes
 > 
-> Who makes the decision which way to go?
+> There should be a binding document update to go with this, pointing out
+> that this include file defines the set of clock IDs for the MPC512x
+> clocks.
 
-Greg and Russel make this decision. By having the pxa driver simply
-register 8250 ports would probable reduce the code. Thats about the
-biggest benefit from it.
+It turns out the Freescale MPC512x did not have a separate clocks
+binding document, but "just did the usual" and followed the
+common bindings.
 
-It would still be something nice to have IMO. Ideally all the
-8250/16x50 UARTs should register the ports with 8250_core.c, and not
-create complete uart driver on their own.
+I've sent a separate doc update patch which becomes applicable
+after the CCF implementation got accepted.
 
-Br,
+> Otherwise, this looks fine to me.
 
+So I take this as a "reviewed by" of yours for this dt-bindings
+header file patch, shall I have to re-submit the series.  Thanks!
+
+
+virtually yours
+Gerhard Sittig
 -- 
-heikki
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
