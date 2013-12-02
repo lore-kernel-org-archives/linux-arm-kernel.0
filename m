@@ -1,29 +1,46 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 2 Dec 2013 11:57:52 +0530
-Subject: [PATCH V4 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
-In-Reply-To: <CACRpkdYM1XcBAznCpmPU+j2kHFPKYA98OAYrpLhcSJr4KbRZzA@mail.gmail.com>
-References: <1384431530-2166-1-git-send-email-r.sricharan@ti.com>
- <CACRpkdYM1XcBAznCpmPU+j2kHFPKYA98OAYrpLhcSJr4KbRZzA@mail.gmail.com>
-Message-ID: <529C2868.2090404@ti.com>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Mon, 2 Dec 2013 14:42:23 +0800
+Subject: Build warning in drivers/dma/mmp_tdma.c
+In-Reply-To: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
+References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
+Message-ID: <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 November 2013 02:07 PM, Linus Walleij wrote:
-> On Thu, Nov 14, 2013 at 1:18 PM, Sricharan R <r.sricharan@ti.com> wrote:
->
->> The minimal crossbar driver to track and allocate free GIC lines and configure the
->> crossbar is added here, along with the DT bindings.
->>
->> V4:
->>    Addressed a couple of comments and split the DTS file updates in to
->>    a separate series.
-> I'm pretty happy with the work and effort put into this now it's looking
-> real elegant.
-> FWIW: Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Yours,
-> Linus Walleij
-Thanks Linus.
+Thanks Dan
 
-Regards,
- Sricharan
+On Fri, Nov 29, 2013 at 6:58 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+
+> I'm also carrying patch to add a missing dependency:
+>
+> commit 1a4ee91dacedde3e82d8ce6eeace7f16884474f9
+> Author: Dan Williams <dan.j.williams@intel.com>
+> Date:   Thu Nov 28 12:27:38 2013 -0800
+>
+>     dma: mmp_dma depends on CPU_MMP2
+>
+>     It calls sram_get_gpool() which is only defined if CONFIG_CPU_MMP2=y
+>
+>     Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+>
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index 446687cc2334..dad83634cb65 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -287,7 +287,7 @@ config DMA_SA11X0
+>
+>  config MMP_TDMA
+>         bool "MMP Two-Channel DMA support"
+> -       depends on ARCH_MMP
+> +       depends on ARCH_MMP && CPU_MMP2
+
+Hi, Qiao
+
+Do you have comments?
+Does this work on PXA910?
+
+Does sram also use on pxa910?
+arch/arm/mach-mmp/Makefile
+obj-$(CONFIG_CPU_MMP2)          += mmp2.o sram.o
+
+Zhangfei
