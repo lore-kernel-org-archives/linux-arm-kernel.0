@@ -1,54 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Dec 2013 11:46:38 +0000
-Subject: [PATCH] ARM:INTEGRATOR: Default enable ARM_PATCH_PHYS_VIRT,
- AUTO_ZRELADDR
-In-Reply-To: <1385983731-13196-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
-References: <1385983731-13196-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
- <1385983731-13196-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
-Message-ID: <20131202114638.GH16735@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Dec 2013 11:51:18 +0000
+Subject: [PATCH 1/2] chipidea: ci_hdrc_imx: Allow handling the clock
+ for an USB phy/hub
+In-Reply-To: <1384394987-15134-1-git-send-email-festevam@gmail.com>
+References: <1384394987-15134-1-git-send-email-festevam@gmail.com>
+Message-ID: <20131202115118.GG12952@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 04:58:51PM +0530, panchaxari wrote:
-> ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR has been enabled as default configs
-> to integrator platform.
+On Thu, Nov 14, 2013 at 02:09:46AM +0000, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Introduction of PHYS_VIRT config as default would enable phy-to-virt and
-> virt-to-phy translation function at boot and module loading time
-> and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
-> enable calculation of kernel load address at run time.
+> When using external USB PHY or USB hub, it is common that they require a clock
+> input.
 > 
-> PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
-> systems with NOR flash devices, and ZRELADDR config is mutually exclusive
-> to ZBOOT_ROM.
+> Add a 'clk_phy' clock, so that it can be retrieved from the device tree and 
+> enabled in the driver, so that the clock can properly drive the external 
+> USB phy/hub.
+
+As this clock feeds the PHY, it should be described on the PHY node.
+It's a property of the PHY itself.
+
 > 
-> Requesting maintainers of Integrator platform to evaluate the changes on the
-> board and comment, as I dont have the board for testing and also requesting
-> an ACK.
+> Tested on a imx6q-udoo board, that connects via USBH1 to a USB2514 hub.
+> 
+> In this board the USB2514 is clocked from a 24MHz clock that comes from the 
+> imx6q CLKO2 pin.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt          |  2 ++
+>  drivers/usb/chipidea/ci_hdrc_imx.c                   | 20 +++++++++++++++++++-
+>  2 files changed, 21 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> index b4b5b79..07ba38c 100644
+> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -18,6 +18,8 @@ Optional properties:
+>  - vbus-supply: regulator for vbus
+>  - disable-over-current: disable over current detect
+>  - external-vbus-divider: enables off-chip resistor divider for Vbus
+> +- clocks: phandle to the clock that drives the USB hub
 
-This is _exactly_ the kind of patches I don't want to see - people
-running around changing platforms with no way to test them.  I spent
-most of last week sorting out the fallout from the "single zImage"
-project breaking the Versatile and footbridge platforms, and I've
-decided that this kind of thing has to stop.
+If you're using clock-names, define clocks in terms of it:
 
-We can't have arch/arm living in a constant cycle of total brokenness
-with nothing being stable.  It was a hell of a lot better in terms of
-not being broken when we didn't have this silly single zImage project.
+- clocks: a list of phandle + clock-specifier pairs corresponding to
+  entries in clock-names.
 
-If you want to do such work, send the patches with "[CFT]" in the
-subject line - call for testing.
+> +- clock-names: must be "phy"
 
-What that means is "this patch is experimental, we don't know if it
-works, and we'd like someone to test it." and more importantly "It's
-not for merging yet."
+s/must be/should contain/
 
-If no one steps up to test it, then it should *not* be merged, because
-you're potentially de-stablising an existing platform.  Yes, I know
-that will make things harder to get into the kernel, but that's the way
-it _should_ be if you're going to be causing pain to people.
-
-Frankly, I suspect most "users" just don't touch the mainline kernel
-anymore - they all rely on (eg) debian people to maintain an effective
-forked mainline kernel separately which has all our fsckups fixed.
-Hence why we don't get to hear about this stuff breaking.
+Thanks,
+Mark.
