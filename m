@@ -1,56 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Dec 2013 11:51:18 +0000
-Subject: [PATCH 1/2] chipidea: ci_hdrc_imx: Allow handling the clock
- for an USB phy/hub
-In-Reply-To: <1384394987-15134-1-git-send-email-festevam@gmail.com>
-References: <1384394987-15134-1-git-send-email-festevam@gmail.com>
-Message-ID: <20131202115118.GG12952@e106331-lin.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 02 Dec 2013 12:47:27 +0100
+Subject: [PATCH] clk: tegra: Correct clock number for UARTE
+In-Reply-To: <1385983825-20317-1-git-send-email-treding@nvidia.com>
+References: <1385983825-20317-1-git-send-email-treding@nvidia.com>
+Message-ID: <1385984847.4086.3.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 14, 2013 at 02:09:46AM +0000, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+Am Montag, den 02.12.2013, 12:30 +0100 schrieb Thierry Reding:
+> UARTE has clock number 66. Number 65 is the right one for UARTD.
 > 
-> When using external USB PHY or USB hub, it is common that they require a clock
-> input.
-> 
-> Add a 'clk_phy' clock, so that it can be retrieved from the device tree and 
-> enabled in the driver, so that the clock can properly drive the external 
-> USB phy/hub.
-
-As this clock feeds the PHY, it should be described on the PHY node.
-It's a property of the PHY itself.
-
-> 
-> Tested on a imx6q-udoo board, that connects via USBH1 to a USB2514 hub.
-> 
-> In this board the USB2514 is clocked from a 24MHz clock that comes from the 
-> imx6q CLKO2 pin.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 > ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt          |  2 ++
->  drivers/usb/chipidea/ci_hdrc_imx.c                   | 20 +++++++++++++++++++-
->  2 files changed, 21 insertions(+), 1 deletion(-)
+>  drivers/clk/tegra/clk-tegra-periph.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index b4b5b79..07ba38c 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -18,6 +18,8 @@ Optional properties:
->  - vbus-supply: regulator for vbus
->  - disable-over-current: disable over current detect
->  - external-vbus-divider: enables off-chip resistor divider for Vbus
-> +- clocks: phandle to the clock that drives the USB hub
+> diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
+> index 5c35885f4a7c..3744a6fe589e 100644
+> --- a/drivers/clk/tegra/clk-tegra-periph.c
+> +++ b/drivers/clk/tegra/clk-tegra-periph.c
+> @@ -492,7 +492,7 @@ static struct tegra_periph_init_data periph_clks[] = {
+>  	UART("uartb", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTB, 7, tegra_clk_uartb),
+>  	UART("uartc", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTC, 55, tegra_clk_uartc),
+>  	UART("uartd", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTD, 65, tegra_clk_uartd),
+> -	UART("uarte", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTE, 65, tegra_clk_uarte),
+> +	UART("uarte", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTE, 66, tegra_clk_uarte),
+>  	XUSB("xusb_host_src", mux_clkm_pllp_pllc_pllre, CLK_SOURCE_XUSB_HOST_SRC, 143, TEGRA_PERIPH_ON_APB | TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_host_src),
+>  	XUSB("xusb_falcon_src", mux_clkm_pllp_pllc_pllre, CLK_SOURCE_XUSB_FALCON_SRC, 143, TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_falcon_src),
+>  	XUSB("xusb_fs_src", mux_clkm_48M_pllp_480M, CLK_SOURCE_XUSB_FS_SRC, 143, TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_fs_src),
 
-If you're using clock-names, define clocks in terms of it:
+Is this a stable patch or why are those magic numbers even necessary? I
+have to admit I didn't follow the Tegra clk stuff closely, but with all
+the churn going on there I would have suspected that those numbers would
+have been replaced by the DT include defines by now.
 
-- clocks: a list of phandle + clock-specifier pairs corresponding to
-  entries in clock-names.
-
-> +- clock-names: must be "phy"
-
-s/must be/should contain/
-
-Thanks,
-Mark.
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
