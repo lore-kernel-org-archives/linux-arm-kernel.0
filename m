@@ -1,122 +1,36 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Dec 2013 10:17:29 +0100
-Subject: [PATCH v2 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <2d5282f031a16d2ff227694daaabc977440fbd2e.1385913228.git.stefan@agner.ch>
-References: <cover.1385913227.git.stefan@agner.ch>
- <2d5282f031a16d2ff227694daaabc977440fbd2e.1385913228.git.stefan@agner.ch>
-Message-ID: <20131202091728.GE17834@ulmo.nvidia.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 02 Dec 2013 13:23:58 +0400
+Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
+In-Reply-To: <20131202090253.GE3942@xps8300>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <1385879185-22455-2-git-send-email-ynvich@gmail.com>
+ <20131202090253.GE3942@xps8300>
+Message-ID: <1385976238.12531.8.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 01, 2013 at 04:59:13PM +0100, Stefan Agner wrote:
-> Use the VERSIONCRC to determine the exact device version. According to
-> the datasheet this register can be used as device identifier. The
-> identification is needed since some tps6586x regulators use a different
-> voltage table.
+On Mon, 2013-12-02 at 11:02 +0200, Heikki Krogerus wrote:
+> On Sun, Dec 01, 2013 at 10:26:14AM +0400, Sergei Ianovich wrote:
+> > PXA serial ports have "standard" UART names (ttyS[0-3]), major
+> > device number (4) and first minor device number (64) by default.
+> > 
+> > If the system has extra 8250 serial port hardware in addition
+> > to onboard PXA serial ports, default settings produce a device
+> > allocation conflict.
+> > 
+> > The patch provides a configuration option which can move onboard
+> > ports out of the way of 8250_core by assigning a different (204)
+> > major number and corresponding device names (ttySA[0-3]).
+> > 
+> <snip>
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/mfd/tps6586x.c       | 47 +++++++++++++++++++++++++++++++++++++-------
->  include/linux/mfd/tps6586x.h |  7 +++++++
->  2 files changed, 47 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
-> index ee61fd7..8fc5a68 100644
-> --- a/drivers/mfd/tps6586x.c
-> +++ b/drivers/mfd/tps6586x.c
-> @@ -124,6 +124,7 @@ struct tps6586x {
->  	struct device		*dev;
->  	struct i2c_client	*client;
->  	struct regmap		*regmap;
-> +	int			version;
->  
->  	int			irq;
->  	struct irq_chip		irq_chip;
-> @@ -208,6 +209,14 @@ int tps6586x_irq_get_virq(struct device *dev, int irq)
->  }
->  EXPORT_SYMBOL_GPL(tps6586x_irq_get_virq);
->  
-> +int tps6586x_get_version(struct device *dev)
-> +{
-> +	struct tps6586x *tps6586x = dev_get_drvdata(dev);
-> +
-> +	return tps6586x->version;
-> +}
-> +EXPORT_SYMBOL_GPL(tps6586x_get_version);
-> +
->  static int __remove_subdev(struct device *dev, void *unused)
->  {
->  	platform_device_unregister(to_platform_device(dev));
-> @@ -472,6 +481,31 @@ static void tps6586x_power_off(void)
->  	tps6586x_set_bits(tps6586x_dev, TPS6586X_SUPPLYENE, SLEEP_MODE_BIT);
->  }
->  
-> +static void tps6586x_print_version(struct i2c_client *client, int version)
-> +{
-> +	const char *name;
-> +
-> +	switch (version) {
-> +	case TPS658621A:
-> +		name = "TPS658621A";
-> +		break;
-> +	case TPS658621CD:
-> +		name = "TPS658621C/D";
-> +		break;
-> +	case TPS658623:
-> +		name = "TPS658623";
-> +		break;
-> +	case TPS658643:
-> +		name = "TPS658643";
-> +		break;
-> +	default:
-> +		name = "TPS6586X";
-> +		break;
-> +	}
-> +
-> +	dev_info(&client->dev, "Found %s, VERSIONCRC is %02x\n", name, version);
-> +}
-> +
->  static int tps6586x_i2c_probe(struct i2c_client *client,
->  					const struct i2c_device_id *id)
->  {
-> @@ -487,19 +521,18 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
->  		return -ENOTSUPP;
->  	}
->  
-> +	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
-> +	if (!tps6586x)
-> +		return -ENOMEM;
-> +
+> If drivers/tty/serial/pxa.c was converted to an other probe driver for
+> the 8250, this would not be an issue.
 
-This hunk is being needlessly moved around....
+It seems that my patch is not going to be accepted. However, there is a
+device which has both PXA ports and a additional 8250 accent chip. As a
+result, there is a device allocation conflict. For the device to be
+usable the conflict needs to be resolved.
 
->  	ret = i2c_smbus_read_byte_data(client, TPS6586X_VERSIONCRC);
->  	if (ret < 0) {
->  		dev_err(&client->dev, "Chip ID read failed: %d\n", ret);
->  		return -EIO;
->  	}
->  
-> -	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
-> -
-> -	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
-> -	if (tps6586x == NULL) {
-> -		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
-> -		return -ENOMEM;
-> -	}
-> +	tps6586x->version = ret;
-> +	tps6586x_print_version(client, tps6586x->version);
-
-... none of this new code overwrites "ret", so you could just keep the
-previous order of operations. It probably doesn't matter all that much,
-but deferring allocation until we're sure that the chip actually exists
-is a minor optimization. Also not moving that hunk around makes the
-patch simpler.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/343b80b9/attachment-0001.sig>
+Do you mean that drivers/tty/serial/pxa.c needs to be rewritten to
+support lp8x4x special case?
