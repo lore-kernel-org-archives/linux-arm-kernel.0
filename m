@@ -1,86 +1,86 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 2 Dec 2013 11:02:53 +0200
-Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
-In-Reply-To: <1385879185-22455-2-git-send-email-ynvich@gmail.com>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-2-git-send-email-ynvich@gmail.com>
-Message-ID: <20131202090253.GE3942@xps8300>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Dec 2013 10:05:27 +0100
+Subject: [PATCH 03/31] ARM: tegra: document use of standard DMA DT bindings
+In-Reply-To: <529B897F.1010101@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-4-git-send-email-swarren@wwwdotorg.org>
+ <20131129122907.GP22771@ulmo.nvidia.com>
+ <529B897F.1010101@wwwdotorg.org>
+Message-ID: <20131202090526.GC17834@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Dec 01, 2013 at 10:26:14AM +0400, Sergei Ianovich wrote:
-> PXA serial ports have "standard" UART names (ttyS[0-3]), major
-> device number (4) and first minor device number (64) by default.
+On Sun, Dec 01, 2013 at 12:09:51PM -0700, Stephen Warren wrote:
+> On 11/29/2013 05:29 AM, Thierry Reding wrote:
+> > On Fri, Nov 15, 2013 at 01:53:58PM -0700, Stephen Warren wrote: 
+> > [...]
+> >> diff --git
+> >> a/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
+> >> b/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
+> >>
+> >> 
+> index 2b6817f6e40e..eaf00102d92c 100644
+> >> ---
+> >> a/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
+> >>
+> >> 
+> +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra20-ac97.txt
+> >> @@ -4,14 +4,17 @@ Required properties: - compatible :
+> >> "nvidia,tegra20-ac97" - reg : Should contain AC97 controller
+> >> registers location and length - interrupts : Should contain AC97
+> >> interrupt -- clocks : Must contain one entry, for the module
+> >> clock. -  See ../clocks/clock-bindings.txt for details. - resets
+> >> : Must contain an entry for each entry in reset-names. See
+> >> ../reset/reset.txt for details. - reset-names : Must include the
+> >> following entries: - ac97 -- nvidia,dma-request-selector : The
+> >> Tegra DMA controller's phandle and -  request selector for the
+> >> AC97 controller +- dmas : Must contain an entry for each entry in
+> >> clock-names. +  See ../dma/dma.txt for details. +- dma-names :
+> >> Must include the following entries: +  - rx +  - tx +- clocks :
+> >> Must contain one entry, for the module clock. +  See
+> >> ../clocks/clock-bindings.txt for details.
+> > 
+> > Was this unintentionally moved?
 > 
-> If the system has extra 8250 serial port hardware in addition
-> to onboard PXA serial ports, default settings produce a device
-> allocation conflict.
+> IIRC, at the end of the series, each binding describes reg,
+> interrupts, clocks, reset, dmas in that order, for consistency.
+
+Okay, that's fine then. I was just making sure this hadn't slipped
+through the cracks.
+
+> >> diff --git
+> >> a/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
+> >> b/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
+> >>
+> >> 
+> index e144f144717f..bdf08e6dec9b 100644
+> >> ---
+> >> a/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
+> >>
+> >> 
+> +++ b/Documentation/devicetree/bindings/spi/nvidia,tegra20-sflash.txt
+> >> @@ -4,14 +4,17 @@ Required properties: - compatible : should be
+> >> "nvidia,tegra20-sflash". - reg: Should contain SFLASH registers
+> >> location and length. - interrupts: Should contain SFLASH
+> >> interrupts. -- nvidia,dma-request-selector : The Tegra DMA
+> >> controller's phandle and -  request selector for this SFLASH
+> >> controller. - clocks : Must contain one entry, for the module
+> >> clock.
+> > 
+> > But then this doesn't move it... perhaps it really is accidental
+> > in other places. =)
 > 
-> The patch provides a configuration option which can move onboard
-> ports out of the way of 8250_core by assigning a different (204)
-> major number and corresponding device names (ttySA[0-3]).
-> 
-> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> ---
->  drivers/tty/serial/Kconfig | 19 +++++++++++++++++++
->  drivers/tty/serial/pxa.c   | 22 ++++++++++++++++++----
->  2 files changed, 37 insertions(+), 4 deletions(-)
-> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+> The patch to that file does move the docs for the dmas property...
 
-<snip>
+My point was that the clocks and clock-names properties didn't move like
+they did for other hunks. But if all those changes end up making the
+bindings documentation more consistent, then I'm all for it.
 
-> --- a/drivers/tty/serial/pxa.c
-> +++ b/drivers/tty/serial/pxa.c
-> @@ -593,6 +593,20 @@ serial_pxa_type(struct uart_port *port)
->  static struct uart_pxa_port *serial_pxa_ports[4];
->  static struct uart_driver serial_pxa_reg;
->  
-> +#ifndef CONFIG_SERIAL_PXA_AS_TTYSA
-> +
-> +#define PXA_TTY_NAME	"ttyS"
-> +#define PXA_TTY_MAJOR	TTY_MAJOR
-> +#define PXA_TTY_MINOR	64
-> +
-> +#else
-> +
-> +#define PXA_TTY_NAME	"ttySA"
-> +#define PXA_TTY_MAJOR	204
-> +#define PXA_TTY_MINOR	5
-> +
-> +#endif
-> +
->  #ifdef CONFIG_SERIAL_PXA_CONSOLE
->  
->  #define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
-> @@ -751,7 +765,7 @@ serial_pxa_console_setup(struct console *co, char *options)
->  }
->  
->  static struct console serial_pxa_console = {
-> -	.name		= "ttyS",
-> +	.name		= PXA_TTY_NAME,
->  	.write		= serial_pxa_console_write,
->  	.device		= uart_console_device,
->  	.setup		= serial_pxa_console_setup,
-> @@ -792,9 +806,9 @@ static struct uart_ops serial_pxa_pops = {
->  static struct uart_driver serial_pxa_reg = {
->  	.owner		= THIS_MODULE,
->  	.driver_name	= "PXA serial",
-> -	.dev_name	= "ttyS",
-> -	.major		= TTY_MAJOR,
-> -	.minor		= 64,
-> +	.dev_name	= PXA_TTY_NAME,
-> +	.major		= PXA_TTY_MAJOR,
-> +	.minor		= PXA_TTY_MINOR,
->  	.nr		= 4,
->  	.cons		= PXA_CONSOLE,
->  };
-
-If drivers/tty/serial/pxa.c was converted to an other probe driver for
-the 8250, this would not be an issue.
-
-Br,
-
--- 
-heikki
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/57511648/attachment.sig>
