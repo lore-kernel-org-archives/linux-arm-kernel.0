@@ -1,89 +1,61 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 02 Dec 2013 12:38:58 +0100
-Subject: [PATCH v2 2/3] regulator: tps6586x: add and use correct voltage
- table
-In-Reply-To: <20131202093622.GF17834@ulmo.nvidia.com>
-References: <cover.1385913227.git.stefan@agner.ch>
- <77c960e6e3a91cf39bc866ccb9cd578ccc5acc95.1385913228.git.stefan@agner.ch>
- <20131202093622.GF17834@ulmo.nvidia.com>
-Message-ID: <7ec014a74ccbcf975f45e0c517615ae2@agner.ch>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 02 Dec 2013 12:36:39 +0100
+Subject: [PATCH] ARM: at91: add usart3 alias to dtsi
+In-Reply-To: <1385979186-29447-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1385979186-29447-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <529C70C7.9050707@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2013-12-02 10:36, schrieb Thierry Reding:
-> On Sun, Dec 01, 2013 at 04:59:14PM +0100, Stefan Agner wrote:
-> [...]
-> 
-> This looks pretty good generally. A few minor nits below...
-> 
->> diff --git a/drivers/regulator/tps6586x-regulator.c b/drivers/regulator/tps6586x-regulator.c
-> [...]
->> +#define tps658623_sm2_voltages tps6586x_ldo4_voltages
->>  static const unsigned int tps6586x_ldo4_voltages[] = {
->>  	1700000, 1725000, 1750000, 1775000, 1800000, 1825000, 1850000, 1875000,
->>  	1900000, 1925000, 1950000, 1975000, 2000000, 2025000, 2050000, 2075000,
-> 
-> I'd put the #define below the ldo4 table. This doesn't actually matter
-> for the preprocessor, but it makes it easier to read the code. Also an
-> additional blank line would help with readability.
-> 
->> +	TPS6586X_LDO(LDO_0, "vinldo01", tps6586x_ldo0, SUPPLYV1, 5, 3, ENC, 0,
->> +					END, 0),
-> 
-> Perhaps reduce the indentation here so there's more room in case this
-> ever needs to be extended?
+Hi Nicolas,
 
-The last 4 lines indentation was already that far, so I just adopted
-those lines in order to avoid having to touch them too.
+Le 02/12/2013 11:13, Nicolas Ferre a ?crit :
+> Alias was missing for SoC of the at91sam9x5 familly that embed USART3.
+> Preripheral node and pinctrl declarations are already in the
+> at91sam9x5_usart3.dtsi file.
+>
+> Reported-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>   arch/arm/boot/dts/at91sam9g25.dtsi | 4 ++++
+>   arch/arm/boot/dts/at91sam9x25.dtsi | 4 ++++
+>   2 files changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
+> index 17b879990914..d4650b4e9ebb 100644
+> --- a/arch/arm/boot/dts/at91sam9g25.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g25.dtsi
+> @@ -14,6 +14,10 @@
+>   	model = "Atmel AT91SAM9G25 SoC";
+>   	compatible = "atmel,at91sam9g25", "atmel,at91sam9x5";
+>   
+> +	aliases {
+> +		serial4 = &usart3;
+> +	};
+> +
 
+Shouldn't this go into at91sam9x5_usart3.dtsi ?
+This way you would have the same alias for all the SoCs supporting usart3.
 
-> 
->> @@ -351,6 +380,7 @@ static int tps6586x_regulator_probe(struct platform_device *pdev)
->>  	struct regulator_init_data *reg_data;
->>  	struct tps6586x_platform_data *pdata;
->>  	struct of_regulator_match *tps6586x_reg_matches = NULL;
->> +	int reg_version;
-> 
-> Why the prefix "reg_"?
-> 
->> @@ -373,10 +403,27 @@ static int tps6586x_regulator_probe(struct platform_device *pdev)
->>  		return -ENOMEM;
->>  	}
->>
->> +	reg_version = tps6586x_get_version(pdev->dev.parent);
->> +
->>  	for (id = 0; id < TPS6586X_ID_MAX_REGULATOR; ++id) {
->>  		reg_data = pdata->reg_init_data[id];
->>
->> -		ri = find_regulator_info(id);
->> +		switch(reg_version) {
->> +		case TPS658623:
->> +			ri = find_regulator_info(id, tps658623_regulator,
->> +					ARRAY_SIZE(tps658623_regulator));
->> +			break;
->> +		case TPS658643:
->> +			ri = find_regulator_info(id, tps658643_regulator,
->> +					ARRAY_SIZE(tps658643_regulator));
->> +			break;
->> +		}
-> 
-> Perhaps instead of repeating the function calls this could be:
-> 
-> 		switch (version) {
-> 		case TPS6586XYZ:
-> 			num = ARRAY_SIZE(tps6586xyz_regulator);
-> 			table = tps6586xys_regulator;
-> 			break;
-> 
-> 		...
-> 		}
-> 
-> 		if (table)
-> 			ri = find_regulator_info(id, table, num);
-> 
-> That's slightly longer, but I find that to be more intuitive. Perhaps
-> a bit more future-proof since you only have a single call. But that's
-> perhaps subjective, so I'm fine with your alternative, too.
+Best Regards,
 
-Sounds reasonable, will change that accordingly in the next patch
-version.
+Boris
+
+>   	ahb {
+>   		apb {
+>   			pinctrl at fffff400 {
+> diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
+> index c2554219f7a4..aceee86f60eb 100644
+> --- a/arch/arm/boot/dts/at91sam9x25.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x25.dtsi
+> @@ -15,6 +15,10 @@
+>   	model = "Atmel AT91SAM9X25 SoC";
+>   	compatible = "atmel,at91sam9x25", "atmel,at91sam9x5";
+>   
+> +	aliases {
+> +		serial4 = &usart3;
+> +	};
+> +
+>   	ahb {
+>   		apb {
+>   			pinctrl at fffff400 {
