@@ -1,66 +1,228 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Dec 2013 15:35:11 +0100
-Subject: [PATCH v4 0/6] ARM: at91: use new at91 clks for samad3 SoCs
-In-Reply-To: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
-References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <529C9A9F.6080407@atmel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 2 Dec 2013 08:39:25 -0600
+Subject: [RFC][PATCHv6+++ 01/13] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <20131202.130220.1404999403649937134.hdoyu@nvidia.com>
+References: <20131128.145818.1345100874304396564.hdoyu@nvidia.com>
+ <20131129.134625.431945240074254704.hdoyu@nvidia.com>
+ <529B8739.60701@wwwdotorg.org>
+ <20131202.130220.1404999403649937134.hdoyu@nvidia.com>
+Message-ID: <CAL_JsqKDokswB1jJN7ZT-Us0h=uTf5qHLZFUJfGFkXBjdO5XjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/2013 15:49, Boris BREZILLON :
-> Hello,
+On Mon, Dec 2, 2013 at 5:02 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Sun, 1 Dec 2013 20:00:09 +0100:
 >
-> This patch series moves sama5d3 SoCs and boards to the new at91 clk framework
-> (based on common clk framework).
+>> On 11/29/2013 04:46 AM, Hiroshi Doyu wrote:
+>> ...
+>> > Iterating over a property containing a list of phandles with arguments
+>> > is a common operation for device drivers. This patch adds a new
+>> > of_property_for_each_phandle_with_args() macro to make the iteration
+>> > simpler.
+>> >
+>> > Introduced a new struct "of_phandle_iter" to keep the state when
+>> > iterating over the list.
+>> >
+>> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+>> > ---
+>> > v6+++:
+>>
+>> Surely that's v9; "+++" is rather unusual.
 >
-> Best Regards,
+> My intention was to put this into the next v7 series after I get this
+> reviewed as RFC.
+> ...
+>> Together with removing:
+>>
+>> > +   const char      *cells_name;
+>> > +   int             cell_count;
+>>
+>> ... then you'd only be left with cur/end, so I think you could get away
+>> without a struct at all, but simply "cur" as the iterator variable, plus
+>> "end" as the one temp variable.
+>
+> Although the above proposal would be alsmot same as "[RFC][PATCHv6++
+> 01/13]"(*1) where I use *list(cur) and rem as remaining count, here's
+> the update. I'll put this into v7 series.
+>
+> ---8<------8<------8<------8<------8<------8<------8<------8<------8<---
+> From: Hiroshi Doyu <hdoyu@nvidia.com>
+>
+> Iterating over a property containing a list of phandles with arguments
+> is a common operation for device drivers. This patch adds a new
+> of_property_for_each_phandle_with_args() macro to make the iteration
+> simpler.
+>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+> v6++++:
+> Iterate without intrducing a new struct.
+>
+> v6+++:
+> Introduced a new struct "of_phandle_iter" to keep the state when
+> iterating over the list.
+>
+> v6++:
+> Optimized to avoid O(n^2), suggested by Stephen Warren.
+> http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007066.html
+>
+> I didn't introduce any struct to hold params and state here.
+>
+> v6+:
+> Use the description, which Grant Likely proposed, to be full enough
+> that a future reader can figure out why a patch was written.
+>
+> v5:
+> New patch for v5.
+>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  drivers/of/base.c  | 53 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of.h | 34 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 87 insertions(+)
+>
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index f807d0e..7501f24 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -1201,6 +1201,59 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
+>         printk("\n");
+>  }
+>
+> +const __be32 *of_phandle_iter_next(const char *cells_name, int cell_count,
+> +                                  const __be32 *cur, const __be32 *end,
+> +                                  struct of_phandle_args *out_args)
+> +{
+> +       phandle phandle;
+> +       struct device_node *dn;
+> +       int i;
+> +
+> +       if (!cells_name && !cell_count)
+> +               return NULL;
+> +
+> +       if (!cur)
+> +               return NULL;
+> +
+> +       if (end - cur <= 0)
 
-Whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+These 2 if's can be combined: if (!cur || (end - cur <= 0))
 
-and added on top of CCF one for at91-3.14-cleanup
+> +               return NULL;
+> +
+> +       phandle = be32_to_cpup(cur++);
+> +       if (!phandle)
+> +               return NULL;
 
-Bye,
+Won't of_find_node_by_phandle do this check?
 
-> Boris
+> +
+> +       dn = of_find_node_by_phandle(phandle);
+> +       if (!dn)
+> +               return NULL;
+> +
+> +       if (cells_name)
+> +               if (of_property_read_u32(dn, cells_name, &cell_count))
+> +                       return NULL;
+> +
+> +       out_args->np = dn;
+> +       out_args->args_count = cell_count;
+> +       for (i = 0; i < cell_count; i++)
+> +               out_args->args[i] = be32_to_cpup(cur++);
+> +
+> +       return cur;
+> +}
+> +EXPORT_SYMBOL_GPL(of_phandle_iter_next);
+> +
+> +const __be32 *of_phandle_iter_init(const struct device_node *np,
+> +                                  const char *list_name,
+> +                                  const __be32 **end)
+> +{
+> +       size_t bytes;
+> +       const __be32 *cur;
+> +
+> +       cur = of_get_property(np, list_name, &bytes);
+> +       if (bytes)
+> +               *end = cur + bytes / sizeof(*cur);
+> +
+> +       return cur;
+> +}
+> +EXPORT_SYMBOL_GPL(of_phandle_iter_init);
+> +
+>  static int __of_parse_phandle_with_args(const struct device_node *np,
+>                                         const char *list_name,
+>                                         const char *cells_name,
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 276c546..c23710b 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -303,6 +303,14 @@ extern int of_parse_phandle_with_fixed_args(const struct device_node *np,
+>  extern int of_count_phandle_with_args(const struct device_node *np,
+>         const char *list_name, const char *cells_name);
 >
-> Changes since v3:
->   - fix prog clks declaration
+> +extern const __be32 *of_phandle_iter_init(const struct device_node *np,
+> +                                         const char *list_name,
+> +                                         const __be32 **end);
+> +extern const __be32 *of_phandle_iter_next(const char *cells_name,
+> +                                         int cell_count,
+> +                                         const __be32 *cur, const __be32 *end,
+> +                                         struct of_phandle_args *out_args);
+> +
+>  extern void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align));
+>  extern int of_alias_get_id(struct device_node *np, const char *stem);
 >
-> Changes since v2:
->   - rework dt bindings:
->     * replace "atmel,clk-id" property by the standard "reg" property
->     * reference system, peripheral and programmable clks using the direct
->       clk node instead of the parent node plus a clk id
->   - add usb_clk to usb ehci controller node
+> @@ -527,6 +535,24 @@ static inline int of_count_phandle_with_args(struct device_node *np,
+>         return -ENOSYS;
+>  }
 >
-> Changes since v1:
->   - remove references to peripheral id macros
->   - remove old clk definitions after moving to new clk framework
->
-> Boris BREZILLON (6):
->    ARM: at91: prepare sama5 dt boards transition to common clk
->    ARM: at91: prepare common clk transition for sama5d3 SoC
->    ARM: at91/dt: define sama5d3 clocks
->    ARM: at91/dt: define sama5d3xek's main clk frequency
->    ARM: at91: move sama5d3 SoC to common clk
->    ARM: at91/dt: remove old clk material
->
->   arch/arm/boot/dts/sama5d3.dtsi      |  379 ++++++++++++++++++++++++++++++++++-
->   arch/arm/boot/dts/sama5d3_can.dtsi  |   20 ++
->   arch/arm/boot/dts/sama5d3_emac.dtsi |   11 +
->   arch/arm/boot/dts/sama5d3_gmac.dtsi |   11 +
->   arch/arm/boot/dts/sama5d3_lcd.dtsi  |   17 ++
->   arch/arm/boot/dts/sama5d3_mci2.dtsi |   12 ++
->   arch/arm/boot/dts/sama5d3_tcb1.dtsi |   12 ++
->   arch/arm/boot/dts/sama5d3_uart.dtsi |   21 ++
->   arch/arm/boot/dts/sama5d3xcm.dtsi   |   17 +-
->   arch/arm/mach-at91/Kconfig          |    1 -
->   arch/arm/mach-at91/board-dt-sama5.c |   10 +-
->   arch/arm/mach-at91/sama5d3.c        |  342 -------------------------------
->   12 files changed, 497 insertions(+), 356 deletions(-)
->
+> +static inline const __be32 *of_phandle_iter_init(const struct device_node *np,
+> +                                                const char *list_name,
+> +                                                const char *cells_name,
+> +                                                const int cell_count,
+> +                                                struct of_phandle_args *out_args)
 
+Need to update the arguments.
 
--- 
-Nicolas Ferre
+> +{
+> +       return NULL;
+> +}
+> +
+> +static inline const __be32 *of_phandle_iter_next(const char *cells_name,
+> +                                                int cell_count,
+> +                                                const __be32 *cur,
+> +                                                const __be32 *end,
+> +                                                struct of_phandle_args *out_args);
+> +{
+> +       return NULL;
+> +}
+> +
+>  static inline int of_alias_get_id(struct device_node *np, const char *stem)
+>  {
+>         return -ENOSYS;
+> @@ -613,6 +639,14 @@ static inline int of_property_read_u32(const struct device_node *np,
+>                 s;                                              \
+>                 s = of_prop_next_string(prop, s))
+>
+> +#define of_property_for_each_phandle_with_args(node, list_name,        cells_name, \
+
+Some extra whitespace here.
+
+> +                                              cell_count, out_args, cur, end) \
+> +       for (cur = of_phandle_iter_init(node, list_name, &end),         \
+> +                    cur = of_phandle_iter_next(cells_name, cell_count, \
+> +                                               cur, end, &out_args);   \
+> +            cur;                                                       \
+> +            cur = of_phandle_iter_next(cells_name, cell_count, cur, end, &out_args))
+> +
+>  #if defined(CONFIG_PROC_FS) && defined(CONFIG_PROC_DEVICETREE)
+>  extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
+>  extern void proc_device_tree_add_prop(struct proc_dir_entry *pde, struct property *prop);
+> --
+> 1.8.1.5
+>
+>
+>
+>
+>
+> *1:
+>  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007086.html
