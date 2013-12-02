@@ -1,56 +1,45 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 2 Dec 2013 13:36:54 -0800
-Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset
- the system
-In-Reply-To: <CAOesGMi-P6LG1-XKVizUS_qX-gfZi_iXBO5r+=6a2nfvBS60mw@mail.gmail.com>
-References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
- <20131202202120.GA23611@roeck-us.net>
- <CAOesGMi-P6LG1-XKVizUS_qX-gfZi_iXBO5r+=6a2nfvBS60mw@mail.gmail.com>
-Message-ID: <20131202213654.GA4059@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 Dec 2013 13:40:45 -0800
+Subject: [GIT PULL] more omap dt fixes against v3.13-rc1
+Message-ID: <pull-1386020445-705876>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 12:47:53PM -0800, Olof Johansson wrote:
-> On Mon, Dec 2, 2013 at 12:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
-> >> A good watchdog driver is supposed to report when it was responsible
-> >> for resetting the system.  Implement this for the s3c2410, at least on
-> >> exynos5250 and exynos5420 where we already have a pointer to the PMU
-> >> registers to read the information.
-> >>
-> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> >> ---
-> >> This patch is based atop Leela Krishna's recent series that ends with
-> >> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
-> >> AKA <https://patchwork.kernel.org/patch/3251861/>.
-> >>
-> >>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
-> >>  1 file changed, 39 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> >> index 47f4dcf..2c87d37 100644
-> >> --- a/drivers/watchdog/s3c2410_wdt.c
-> >> +++ b/drivers/watchdog/s3c2410_wdt.c
-> >> @@ -62,9 +62,13 @@
-> >>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
-> >>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
-> >>
-> >> +#define RST_STAT_REG_OFFSET          0x0404
-> >>  #define WDT_DISABLE_REG_OFFSET               0x0408
-> >>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
-> >>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
-> >> +#define QUIRK_HAS_RST_STAT           (1 << 1)
-> >> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
-> >> +                                      QUIRK_HAS_RST_STAT)
-> >>
-> > I am not really happy about the NEED (both of them, really) here.
-> > How about HAS instead ?
-> 
-> Ah, I just commented on these things on our internal review site too
-> on this patch. I don't even think a quirk is needed -- just use the
-> presence of a non-0 rst_stat_reg to tell if you need to use regmap.
-> 
-Agreed; same is true for the QUIRK_NEEDS_PMU_CONFIG related registers
-as well.
+The following changes since commit 9cb238c00ba5c1ddfff2c2ed6aa66c15b962e4c3:
 
-Guenter
+  mmc: omap: Fix I2C dependency and make driver usable with device tree (2013-11-26 15:51:16 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/more-dt-regressions
+
+for you to fetch changes up to ac46bf3933421bde881399d9ad3d165064862cc3:
+
+  ARM: dts: Fix the name of supplies for smsc911x shared by OMAP (2013-12-02 11:38:15 -0800)
+
+----------------------------------------------------------------
+Few more legacy booting vs device tree booting fixes that people
+have noticed while booting things with device tree for things like
+omap4 WLAN, smsc911x, and beagle audio. Hopefully this will be it
+for the legacy booting vs device tree fixes for this -rc cycle.
+
+----------------------------------------------------------------
+Balaji T K (2):
+      ARM: dts: omap4-panda-common: Fix pin muxing for wl12xx
+      ARM: dts: omap4-sdp: Fix pin muxing for wl12xx
+
+Florian Vaussard (1):
+      ARM: dts: Fix the name of supplies for smsc911x shared by OMAP
+
+Jarkko Nikula (1):
+      ARM: dts: omap3-beagle: Add omap-twl4030 audio support
+
+Rajendra Nayak (1):
+      ARM: OMAP2+: Powerdomain: Fix unchecked dereference of arch_pwrdm
+
+ arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi |  4 ++--
+ arch/arm/boot/dts/omap3-beagle.dts        | 14 ++++++++++++++
+ arch/arm/boot/dts/omap4-panda-common.dtsi | 20 ++++++++++----------
+ arch/arm/boot/dts/omap4-sdp.dts           | 12 ++++++------
+ arch/arm/mach-omap2/powerdomain.c         |  3 ++-
+ 5 files changed, 34 insertions(+), 19 deletions(-)
