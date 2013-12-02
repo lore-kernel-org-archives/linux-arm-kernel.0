@@ -1,53 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Dec 2013 13:43:48 +0000
-Subject: [PATCH v3 36/36] ARM: STi: Add support for the FSM Serial Flash
- Controller
-In-Reply-To: <529C8A99.1020204@st.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
- <529C858B.1040601@st.com> <20131202132013.GF31626@lee--X1>
- <529C8A99.1020204@st.com>
-Message-ID: <20131202134348.GG31626@lee--X1>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Mon, 2 Dec 2013 15:53:33 +0200
+Subject: [PATCH 05/11] serial: support for 16550 serial ports on LP-8x4x
+In-Reply-To: <1385984782.12531.26.camel@host5.omatika.ru>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <1385879185-22455-6-git-send-email-ynvich@gmail.com>
+ <20131202084845.GD3942@xps8300>
+ <1385984782.12531.26.camel@host5.omatika.ru>
+Message-ID: <20131202135333.GJ3942@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Dec 2013, srinivas kandagatla wrote:
+Hi,
 
-> On 02/12/13 13:20, Lee Jones wrote:
-> >>> +		/* FSM */
-> >>> +		spifsm: spifsm at fe902000{
-> >>> +		        compatible         = "st,spi-fsm", "simple-bus";
-> >> "simple-bus" is redundant here.
-> > 
-> > Yes I agree, good spot.
-> > 
-> > I removed it from the Documentation, but missed this one.
-> > 
-> > If I remove it, can I add your Ack for the remainder of the patch?
-> Yes,
+On Mon, Dec 02, 2013 at 03:46:22PM +0400, Sergei Ianovich wrote:
+> On Mon, 2013-12-02 at 10:48 +0200, Heikki Krogerus wrote:
+> > On Sun, Dec 01, 2013 at 10:26:18AM +0400, Sergei Ianovich wrote:
+> > > +static int request_and_remap(int i)
+> > > +{
+> > > +	if (!request_mem_region(extra_mem[i], 1, "serial"))
+> > > +		return -EBUSY;
+> > > +
+> > > +	lp8x4x_data[i].private_data = ioremap(extra_mem[i], 1);
+> > > +	if (lp8x4x_data[i].private_data)
+> > > +		return 0;
+> > > +
+> > > +	release_mem_region(extra_mem[i], 1);
+> > > +	return -ENODEV;
 > 
-> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> > Instead of registering a platform device for serial8250 here, you need
+> > to simply register a platform driver for something like lp8x4x_serial.
+> > The platform code will to registers the platform devices for it. You
+> > will use serial8250_register_8250_port() in your probe to register a
+> > new port. Use 8250_em.c and 8250_dw.c under drivers/tty/serial/8250/
+> > as an example.
+> > 
+> > You don't need to introduce plat_serial8250_port so you won't need
+> > the QUIRK_PORT stuff. You deliver the iomem and the irq as normal
+> > resources that the driver uses when you create the platform device.
+> > That of course also means the driver does not need to care about the
+> > instances. The platform code will generate a platform device for as
+> > many ports you have and set to resources accordingly.
 > 
-> You should be aware that arch/arm/boot/dts/stih416-b2105.dts is not in
-> mainline yet.
+> 8250_core.c doesn't use platform infrastructure to request and map IO
+> memory. There will be a conflict (and an error in
+> serial8250_request_std_resource()), if main IO memory is requested by
+> the platform device, won't it?
 
-Yes, I am aware of this. Are you queuing patches for it?
+You don't need to request the mem region in your probe driver.
 
-> >>> +		        reg                =  <0xfe902000 0x1000>;
-> >>> +		        reg-names          = "spi-fsm";
-> >>> +		        pinctrl-0          = <&pinctrl_fsm>;
-> >>> +
-> >>> +			st,syscfg	   = <&syscfg_rear>;
-> >>> +		        st,boot-device-reg = <0x958>;
-> >>> +		        st,boot-device-spi = <0x1a>;
-> >>> +
-> >>> +		        status = "okay";
-> >>> +		};
-> > 
-> 
+You can still map it. You have the flag UPF_IOREMAP that you can use
+to tell 8250_code.c to map the region. If you don't set the flag,
+8250_core.c will in practice expect that port->membase is already set
+by the probe driver.
+
+Check 8250_dw.c. It does the mapping on it's own and simply doesn't
+set the flag.
+
+Br,
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+heikki
