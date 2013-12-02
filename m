@@ -1,15 +1,20 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon,  2 Dec 2013 16:39:27 +0100
-Subject: [PATCH 2/3] imx-drm: ipuv3-crtc: Make DISP_CLK polarity configurable
+Date: Mon,  2 Dec 2013 16:39:28 +0100
+Subject: [PATCH 3/3] ARM: dts: imx53: Switch DISP_CLK polarity on M53EVK
 In-Reply-To: <1385998768-23512-1-git-send-email-marex@denx.de>
 References: <1385998768-23512-1-git-send-email-marex@denx.de>
-Message-ID: <1385998768-23512-2-git-send-email-marex@denx.de>
+Message-ID: <1385998768-23512-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the LCD display clock polarity configurable via DT so in case
-board needs different DISP_CLK clock polarity, it can use the 'pixelclk-active'
-DT prop to do such adjustment.
+Change the DISP_CLK line polarity on M53EVK to work correctly after
+the following commit:
+
+commit f0ac9bebf19001f38afbb93e2dc719a15dfb75e5
+Author: Fabio Estevam <fabio.estevam@freescale.com>
+Date:   Tue Oct 29 19:42:22 2013 -0200
+
+    imx-drm: ipuv3-crtc: Invert IPU DI0 clock polarity
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Dave Airlie <airlied@gmail.com>
@@ -18,21 +23,20 @@ Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/staging/imx-drm/ipuv3-crtc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx53-m53evk.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index ce6ba98..1d8223e 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -157,7 +157,7 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
- 		sig_cfg.Vsync_pol = 1;
- 
- 	sig_cfg.enable_pol = 1;
--	sig_cfg.clk_pol = 1;
-+	sig_cfg.clk_pol = !!(mode->flags & DRM_MODE_FLAG_PIXELCLK_NPOL);
- 	sig_cfg.width = mode->hdisplay;
- 	sig_cfg.height = mode->vdisplay;
- 	sig_cfg.pixel_fmt = out_pixel_fmt;
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index 84a2cdc..97ec9c7 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -41,6 +41,7 @@
+ 					vfront-porch = <9>;
+ 					vsync-len = <3>;
+ 					vsync-active = <1>;
++					pixelclk-active = <1>;
+ 				};
+ 			};
+ 		};
 -- 
 1.8.4.2
