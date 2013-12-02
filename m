@@ -1,68 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Dec 2013 09:42:11 +0100
-Subject: [PATCH v2] ARM: at91: sama5d3: reduce TWI internal clock frequency
-In-Reply-To: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <529C47E3.2010508@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon,  2 Dec 2013 00:15:29 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: enable network for BeagleBone Black
+Message-ID: <1385972129-3638-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/2013 17:08, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> With some devices, transfer hangs during I2C frame transmission. This issue
-> disappears when reducing the internal frequency of the TWI IP. Even if it is
-> indicated that internal clock max frequency is 66MHz, it seems we have
-> oversampling on I2C signals making TWI believe that a transfer in progress
-> is done.
->
-> This fix has no impact on the I2C bus frequency.
->
-> Cc: <stable@vger.kernel.org> #3.10+
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+BeagleBone Black uses the TI CPSW ethernet controller, enable it in the
+multi_v7_defconfig for testing coverage purposes.
 
-added to at91-3.14-dt branch.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-thanks,
-
-
-> ---
->
-> v2: update commit message
->
->   arch/arm/mach-at91/sama5d3.c |    6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-> index 4012797..4ee0de5 100644
-> --- a/arch/arm/mach-at91/sama5d3.c
-> +++ b/arch/arm/mach-at91/sama5d3.c
-> @@ -95,19 +95,19 @@ static struct clk twi0_clk = {
->   	.name		= "twi0_clk",
->   	.pid		= SAMA5D3_ID_TWI0,
->   	.type		= CLK_TYPE_PERIPHERAL,
-> -	.div		= AT91_PMC_PCR_DIV2,
-> +	.div		= AT91_PMC_PCR_DIV8,
->   };
->   static struct clk twi1_clk = {
->   	.name		= "twi1_clk",
->   	.pid		= SAMA5D3_ID_TWI1,
->   	.type		= CLK_TYPE_PERIPHERAL,
-> -	.div		= AT91_PMC_PCR_DIV2,
-> +	.div		= AT91_PMC_PCR_DIV8,
->   };
->   static struct clk twi2_clk = {
->   	.name		= "twi2_clk",
->   	.pid		= SAMA5D3_ID_TWI2,
->   	.type		= CLK_TYPE_PERIPHERAL,
-> -	.div		= AT91_PMC_PCR_DIV2,
-> +	.div		= AT91_PMC_PCR_DIV8,
->   };
->   static struct clk mmc0_clk = {
->   	.name		= "mci0_clk",
->
-
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4a5903e..d30507d 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -69,6 +69,7 @@ CONFIG_KS8851=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_MDIO_SUN4I=y
++CONFIG_TI_CPSW=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_SERIAL_8250=y
 -- 
-Nicolas Ferre
+1.7.10.4
