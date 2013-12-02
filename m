@@ -1,55 +1,90 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 2 Dec 2013 11:09:28 -0600
-Subject: [GIT PULL] clk: socfpga: Clock fix for 3.13
-In-Reply-To: <20131127204948.16819.21032@quantum>
-References: <1382604095-3097-1-git-send-email-dinguyen@altera.com>
- <527B6765.1000409@gmail.com> <20131127204948.16819.21032@quantum>
-Message-ID: <1386004168.11807.0.camel@linux-builds1>
+Date: Mon, 2 Dec 2013 11:10:44 -0600
+Subject: [PATCH 1/2] arm: socfpga: Add clock for smp_twd timer
+In-Reply-To: <20131127205242.16819.8437@quantum>
+References: <1379435541-26338-1-git-send-email-dinguyen@altera.com>
+ <524B2119.3020702@gmail.com> <1380656155.13502.10.camel@linux-builds1>
+ <20131127205242.16819.8437@quantum>
+Message-ID: <1386004244.11807.2.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-11-27 at 12:49 -0800, Mike Turquette wrote:
-> Quoting Dinh Nguyen (2013-11-07 02:11:49)
-> > Hi Mike,
+On Wed, 2013-11-27 at 12:52 -0800, Mike Turquette wrote:
+> Quoting Dinh Nguyen (2013-10-01 12:35:55)
+> > On Tue, 2013-10-01 at 14:23 -0500, Rob Herring wrote:
+> > > On 09/17/2013 11:32 AM, dinguyen at altera.com wrote:
+> > > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > > 
+> > > > Assign a clock for the twd-timer.
+> > > > 
+> > > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > > Cc: Pawel Moll <pawel.moll@arm.com>
+> > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > > > Cc: Ian Campbell <ian.campbell@citrix.com>
+> > > > CC: linux-arm-kernel at lists.infradead.org
+> > > > ---
+> > > >  arch/arm/boot/dts/socfpga.dtsi |    4 ++--
+> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > > > index acd6c3a..e28df94 100644
+> > > > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > > > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > > > @@ -480,11 +480,11 @@
+> > > >                     clock-names = "biu", "ciu";
+> > > >             };
+> > > >  
+> > > > -           /* Local timer */
+> > > > -           timer at fffec600 {
+> > > > +           local-timer at fffec600 {
+> > > 
+> > > timer was the right name.
 > > 
-> > On 10/24/13 3:41 AM, dinguyen at altera.com wrote:
-> > > The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
-> > >
-> > >   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
-> > >
-> > > are available in the git repository at:
-> > >
-> > >   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.13
-> > >
-> > > for you to fetch changes up to f592c5da6869133de941e44ef2ed4ede7f6b2791:
-> > >
-> > >   clk: socfpga: Remove check for "reg" property in socfpga_clk_init (2013-10-24 03:18:30 -0500)
-> > >
-> > > ----------------------------------------------------------------
-> > > Clock fix for SOCFPGA
-> > >
-> > > Remove check for "reg" property in socfpga_clk_init() function
-> > > This allows for clk property to be assigned for the arm_twd timer, which
-> > > will lead to removing socfpga_init_clocks().
-> > >
-> > > ----------------------------------------------------------------
-> > > Dinh Nguyen (1):
-> > >       clk: socfpga: Remove check for "reg" property in socfpga_clk_init
-> > >
-> > >  drivers/clk/socfpga/clk.c |    4 +---
-> > >  1 file changed, 1 insertion(+), 3 deletions(-)
-> > >
-> > Can you please pull this?
+> > I'll put it back...
+> > 
+> > > 
+> > > >                     compatible = "arm,cortex-a9-twd-timer";
+> > > >                     reg = <0xfffec600 0x100>;
+> > > >                     interrupts = <1 13 0xf04>;
+> > > > +                   clocks = <&mpu_periph_clk>;
+> > > 
+> > > Otherwise, this looks fine and I wouldn't expect much input on a change
+> > > that doesn't add a new binding.
+> > > 
+> > > Acked-by: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Thanks Rob!
 > 
-> Taken into clk-next.
+> Looks good to me too. Can you respin it with the fix for 'timer' and
+> I'll take it in?
 
-Thanks Mike.
+This already went in through the DTS bindings tree.
 
+Thanks,
 Dinh
 > 
 > Thanks,
 > Mike
 > 
-> > Thanks,
+> > 
 > > Dinh
+> > > 
+> > > Rob
+> > > 
+> > > >             };
+> > > >  
+> > > >             timer0: timer0 at ffc08000 {
+> > > > 
+> > > 
+> > > 
+> > 
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
