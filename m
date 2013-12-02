@@ -1,67 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  2 Dec 2013 11:19:27 +0900
-Subject: [PATCH 21/28] ARM: shmobile: r8a7791: Add DU and LVDS clocks
+Date: Mon,  2 Dec 2013 11:19:25 +0900
+Subject: [PATCH 19/28] ARM: shmobile: r8a7778: add HSPI clock support for DT
 In-Reply-To: <cover.1385950394.git.horms+renesas@verge.net.au>
 References: <cover.1385950394.git.horms+renesas@verge.net.au>
-Message-ID: <f817c83b3b8ee81829fceb4bfc999e8421a077b3.1385950394.git.horms+renesas@verge.net.au>
+Message-ID: <8775e2d612ec47feb158292a706cfec0508e68b1.1385950394.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The ZX parent clock isn't implemented yet, add it as well.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7791.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7778.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index c9a26f1..fda7c6c 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -103,6 +103,7 @@ SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
- SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
- SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
- SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
-+SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 011564f..5406434 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -203,8 +203,11 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+ 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
+ 	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
++	CLKDEV_DEV_ID("fffc7000.spi", &mstp_clks[MSTP007]), /* HSPI0 */
+ 	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
++	CLKDEV_DEV_ID("fffc8000.spi", &mstp_clks[MSTP007]), /* HSPI1 */
+ 	CLKDEV_DEV_ID("sh-hspi.2", &mstp_clks[MSTP007]), /* HSPI2 */
++	CLKDEV_DEV_ID("fffc6000.spi", &mstp_clks[MSTP007]), /* HSPI2 */
+ 	CLKDEV_DEV_ID("rcar_sound", &mstp_clks[MSTP008]), /* SRU */
  
- static struct clk *main_clks[] = {
- 	&extal_clk,
-@@ -116,11 +117,12 @@ static struct clk *main_clks[] = {
- 	&rclk_clk,
- 	&mp_clk,
- 	&cp_clk,
-+	&zx_clk,
- };
- 
- /* MSTP */
- enum {
--	MSTP721, MSTP720,
-+	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
- 	MSTP719, MSTP718, MSTP715, MSTP714,
- 	MSTP216, MSTP207, MSTP206,
- 	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
-@@ -129,6 +131,9 @@ enum {
- };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
-+	[MSTP724] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 24, 0), /* DU0 */
-+	[MSTP723] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 23, 0), /* DU1 */
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
- 	[MSTP719] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 19, 0), /* SCIF2 */
-@@ -164,6 +169,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("peripheral_clk", &hp_clk),
- 
- 	/* MSTP */
-+	CLKDEV_ICK_ID("lvds.0", "rcar-du-r8a7791", &mstp_clks[MSTP726]),
-+	CLKDEV_ICK_ID("du.0", "rcar-du-r8a7791", &mstp_clks[MSTP724]),
-+	CLKDEV_ICK_ID("du.1", "rcar-du-r8a7791", &mstp_clks[MSTP723]),
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]), /* SCIFB0 */
+ 	CLKDEV_ICK_ID("ssi.0", "rcar_sound", &mstp_clks[MSTP012]),
 -- 
 1.8.4
