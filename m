@@ -1,90 +1,47 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 2 Dec 2013 18:34:12 +0000
-Subject: [PATCH RFC 1/2] Documentation: arm: add cache DT bindings
-In-Reply-To: <CB2ECFBB-A959-4A44-B301-0188EA5599A3@codeaurora.org>
-References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
- <D010BD06-683A-4500-AF13-64699ECEF808@codeaurora.org>
- <20131202175055.GA13125@e102568-lin.cambridge.arm.com>
- <CB2ECFBB-A959-4A44-B301-0188EA5599A3@codeaurora.org>
-Message-ID: <20131202183412.GA13791@e102568-lin.cambridge.arm.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 02 Dec 2013 19:54:09 +0100
+Subject: [PATCH] ARM: at91: add i2c2 pinctrl speficifation to sama5d3
+ DT
+In-Reply-To: <1386001128-29147-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1386001128-29147-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <529CD751.3020704@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 05:59:56PM +0000, Kumar Gala wrote:
-> 
-> On Dec 2, 2013, at 11:50 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> 
-> > On Mon, Dec 02, 2013 at 05:28:41PM +0000, Kumar Gala wrote:
-> >> 
-> >> On Dec 2, 2013, at 10:20 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> >> 
-> >>> On ARM systems the cache topology cannot be probed at runtime, in
-> >>> particular, it is impossible to probe which CPUs share a given cache
-> >>> level. Power management software requires this knowledge to implement
-> >>> optimized power down sequences, hence this patch adds a document that
-> >>> defines the DT cache bindings for ARM systems. The bindings are compliant
-> >>> with ePAPR (PowerPC bindings), and rely on the cache bindings already
-> >>> standardized in the ePAPR v1.1 document; ARM required updates are underlined
-> >>> in the binding document.
-> >>> 
-> >>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>> ---
-> >>> Documentation/devicetree/bindings/arm/cache.txt | 25 +++++++++++++++++++++++++
-> >>> 1 file changed, 25 insertions(+)
-> >>> create mode 100644 Documentation/devicetree/bindings/arm/cache.txt
-> >>> 
-> >>> diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
-> >>> new file mode 100644
-> >>> index 0000000..009cddb
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/arm/cache.txt
-> >>> @@ -0,0 +1,25 @@
-> >>> +==========================================
-> >>> +ARM processors cache binding description
-> >>> +==========================================
-> >>> +
-> >>> +Device tree bindings for ARM processor caches adhere to the cache bindings
-> >>> +described in [3], in section 3.8 for multi-level and shared caches.
-> >>> +
-> >>> +On ARM, internal caches cannot be described in the cpu node but require
-> >>> +specific nodes marked with compatible string set to "cache" (see [3],
-> >>> +section 3.8).
-> >> 
-> >> can you explain why
-> > 
-> > ARM v7 and v8 processors have a concept of cache levels which is valid
-> > even for internal caches. So either we add a cache-level property to
-> > internal caches or we do not use them for ARM.
-> 
-> There isn't anything precluding a cachel-level property for internal caches.
-> 
-> > On top of that the definition of internal caches in the ePAPR is not
-> > well defined (for ARM) (what if you have multiple levels of internal
-> > caches ? - do we describe just L1 in the cpu node ?).
-> 
-> ePAPR has examples of multiple level's of internal cache in the cpu node.
+On 02/12/2013 17:18, Nicolas Ferre wrote:
 
-Where ? 3.7.3 (ePAPR v1.1) Internal (L1) Cache properties ? I do not think so.
 
-It does by using the definitions in 3.8 "Multi level and shared caches".
-
-So, since the cache bindings in 3.8 allow to describe a cache hierarchy
-on ARM, that's what I used. Declaring L1 in the CPU node buys us nothing, so
-I do not think there is a point in using it on ARM. That's why instead
-of changing the bindings for internal (L1) caches to require cache-level
-we should just ignore them IMHO.
-
-ePAPR v1.1 contains a bug (example page 47 - line 47) since a cpu node cannot
-contain a cache-level property, that's not a property of internal caches and
-it has to be declared in a node with:
-
-compatible = "cache";
-
-unless my understanding of ePAPR is wrong.
-
-All I am saying is that multi-level cache bindings can be used to
-describe all cache hierarchies for ARM, we do not need internal (L1)
-cache bindings at all, it is just legacy stuff.
-
-Lorenzo
+Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>   arch/arm/boot/dts/sama5d3.dtsi | 10 ++++++++++
+>   1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index f520b0236671..f5fd111b5ee6 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -304,6 +304,8 @@
+>   				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(11)>,
+>   				       <&dma1 2 AT91_DMA_CFG_PER_ID(12)>;
+>   				dma-names = "tx", "rx";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_i2c2>;
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+>   				clocks = <&twi2_clk>;
+> @@ -494,6 +496,14 @@
+>   					};
+>   				};
+>   
+> +				i2c2 {
+> +					pinctrl_i2c2: i2c2-0 {
+> +						atmel,pins =
+> +							<AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_NONE	/* TWD2 pin, conflicts with LCDDAT18, ISI_D2 */
+> +							 AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* TWCK2 pin, conflicts with LCDDAT19, ISI_D3 */
+> +					};
+> +				};
+> +
+>   				isi {
+>   					pinctrl_isi: isi-0 {
+>   						atmel,pins =
