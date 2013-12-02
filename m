@@ -1,28 +1,58 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Mon, 2 Dec 2013 07:17:56 +0000
-Subject: [PATCHv6 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <20131128213159.GE14689@mithrandir>
-References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
- <1384220218-12716-5-git-send-email-Li.Xiubo@freescale.com>
- <20131128213159.GE14689@mithrandir>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828E1A04@039-SN2MPN1-011.039d.mgd.msft.net>
+From: zhouqiao@marvell.com (Qiao Zhou)
+Date: Mon, 2 Dec 2013 15:34:11 +0800
+Subject: Build warning in drivers/dma/mmp_tdma.c
+In-Reply-To: <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
+References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
+ <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
+Message-ID: <529C37F3.1040205@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> > +    "ftm0" (module clock),
-> > +    "ftm0_counter" (counter clock),
-> > +- clocks : Must contain a clock specifier for each entry in
-> > +clock-names,
-> > +  See clock/clock-bindings.txt for details of the property values.
-> 
-> Note that the order is significant here, at least from the way the driver
-> currently implements this. You can probably make this more generic in the
-> driver by using of_property_match_string() on the clock-names property to
-> find the index of "ftm0_counter" and pass that index to the
-> of_parse_phandle_with_args() function to cope with the situation where the
-> device tree has the clocks in a different order.
-> 
+On 12/02/2013 02:42 PM, Zhangfei Gao wrote:
+> Thanks Dan
+>
+> On Fri, Nov 29, 2013 at 6:58 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+>
+>> I'm also carrying patch to add a missing dependency:
+>>
+>> commit 1a4ee91dacedde3e82d8ce6eeace7f16884474f9
+>> Author: Dan Williams <dan.j.williams@intel.com>
+>> Date:   Thu Nov 28 12:27:38 2013 -0800
+>>
+>>      dma: mmp_dma depends on CPU_MMP2
+>>
+>>      It calls sram_get_gpool() which is only defined if CONFIG_CPU_MMP2=y
+>>
+>>      Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+>>
+>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>> index 446687cc2334..dad83634cb65 100644
+>> --- a/drivers/dma/Kconfig
+>> +++ b/drivers/dma/Kconfig
+>> @@ -287,7 +287,7 @@ config DMA_SA11X0
+>>
+>>   config MMP_TDMA
+>>          bool "MMP Two-Channel DMA support"
+>> -       depends on ARCH_MMP
+>> +       depends on ARCH_MMP && CPU_MMP2
+>
+> Hi, Qiao
+>
+> Do you have comments?
+> Does this work on PXA910?
+MMP_TDMA should not depend on CPU_MMP2. PXA910, and other chip set also 
+use mmp_tdma.
+>
+> Does sram also use on pxa910?
+> arch/arm/mach-mmp/Makefile
+> obj-$(CONFIG_CPU_MMP2)          += mmp2.o sram.o
+yes, PXA910 also uses sram.
+>
+> Zhangfei
+>
 
-Yes, that's much better.
+
+-- 
+
+Best Regards
+Qiao
