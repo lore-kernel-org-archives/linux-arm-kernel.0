@@ -1,139 +1,89 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Mon,  2 Dec 2013 16:05:52 +0800
-Subject: [PATCH 1/2] mmc: dw_mmc: add dw_mci_of_get_cd_gpio to handle cd pin
-In-Reply-To: <1383889128-12540-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1383889128-12540-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1385971552-31009-1-git-send-email-zhangfei.gao@linaro.org>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 2 Dec 2013 11:11:18 +0300
+Subject: [patch] video: vt8500: fix error handling in probe()
+Message-ID: <20131202081118.GB3852@elgon.mountain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change function dw_mci_of_get_cd_gpio type to void suggested by Jaehoon
-And check any other comments
+We shouldn't kfree(fbi) because that was allocated with devm_kzalloc().
+There were several error paths which returned directly instead of
+releasing resources.
 
-Thanks
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
-mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
-
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-CC: Jaehoon Chung <jh80.chung@samsung.com>
----
- drivers/mmc/host/dw_mmc.c |   48 +++++++++++++++++++++++++++++++++------------
- 1 file changed, 35 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 4bce0de..a776f24 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -36,6 +36,7 @@
- #include <linux/workqueue.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
-+#include <linux/mmc/slot-gpio.h>
- 
- #include "dw_mmc.h"
- 
-@@ -1032,20 +1033,26 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
- 	int present;
- 	struct dw_mci_slot *slot = mmc_priv(mmc);
- 	struct dw_mci_board *brd = slot->host->pdata;
-+	int gpio_cd = !mmc_gpio_get_cd(mmc);
- 
- 	/* Use platform get_cd function, else try onboard card detect */
- 	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
- 		present = 1;
- 	else if (brd->get_cd)
- 		present = !brd->get_cd(slot->id);
-+	else if (!IS_ERR_VALUE(gpio_cd))
-+		present = !!gpio_cd;
- 	else
- 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
- 			== 0 ? 1 : 0;
- 
--	if (present)
-+	if (present) {
-+		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
- 		dev_dbg(&mmc->class_dev, "card is present\n");
--	else
-+	} else {
-+		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
- 		dev_dbg(&mmc->class_dev, "card is not present\n");
-+	}
- 
- 	return present;
- }
-@@ -1926,10 +1933,6 @@ static void dw_mci_work_routine_card(struct work_struct *work)
- 			/* Card change detected */
- 			slot->last_detect_state = present;
- 
--			/* Mark card as present if applicable */
--			if (present != 0)
--				set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
--
- 			/* Clean up queue if present */
- 			mrq = slot->mrq;
- 			if (mrq) {
-@@ -1977,8 +1980,6 @@ static void dw_mci_work_routine_card(struct work_struct *work)
- 
- 			/* Power down slot */
- 			if (present == 0) {
--				clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
--
- 				/* Clear down the FIFO */
- 				dw_mci_fifo_reset(host);
- #ifdef CONFIG_MMC_DW_IDMAC
-@@ -2079,6 +2080,26 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
- 
- 	return gpio;
- }
-+
-+/* find the cd gpio for a given slot; or -1 if none specified */
-+static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
-+					struct mmc_host *mmc)
-+{
-+	struct device_node *np = dw_mci_of_find_slot_node(dev, slot);
-+	int gpio;
-+
-+	if (!np)
-+		return;
-+
-+	gpio = of_get_named_gpio(np, "cd-gpios", 0);
-+
-+	/* Having a missing entry is valid; return silently */
-+	if (!gpio_is_valid(gpio))
-+		return;
-+
-+	if (mmc_gpio_request_cd(mmc, gpio, 0))
-+		dev_warn(dev, "gpio [%d] request failed\n", gpio);
-+}
- #else /* CONFIG_OF */
- static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
- {
-@@ -2096,6 +2117,11 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
- {
- 	return -EINVAL;
- }
-+static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
-+					struct mmc_host *mmc)
-+{
-+	return;
-+}
- #endif /* CONFIG_OF */
- 
- static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
-@@ -2197,12 +2223,8 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- #endif /* CONFIG_MMC_DW_IDMAC */
+diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+index b30e5a439d1f..a8f2b280f796 100644
+--- a/drivers/video/vt8500lcdfb.c
++++ b/drivers/video/vt8500lcdfb.c
+@@ -293,8 +293,7 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+ 			+ sizeof(u32) * 16, GFP_KERNEL);
+ 	if (!fbi) {
+ 		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
+-		ret = -ENOMEM;
+-		goto failed;
++		return -ENOMEM;
  	}
  
--	if (dw_mci_get_cd(mmc))
--		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
--	else
--		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
--
- 	slot->wp_gpio = dw_mci_of_get_wp_gpio(host->dev, slot->id);
-+	dw_mci_of_get_cd_gpio(host->dev, slot->id, mmc);
+ 	strcpy(fbi->fb.fix.id, "VT8500 LCD");
+@@ -327,15 +326,13 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (res == NULL) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+-		ret = -ENODEV;
+-		goto failed_fbi;
++		return -ENODEV;
+ 	}
  
- 	ret = mmc_add_host(mmc);
+ 	res = request_mem_region(res->start, resource_size(res), "vt8500lcd");
+ 	if (res == NULL) {
+ 		dev_err(&pdev->dev, "failed to request I/O memory\n");
+-		ret = -EBUSY;
+-		goto failed_fbi;
++		return -EBUSY;
+ 	}
+ 
+ 	fbi->regbase = ioremap(res->start, resource_size(res));
+@@ -346,17 +343,19 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	disp_timing = of_get_display_timings(pdev->dev.of_node);
+-	if (!disp_timing)
+-		return -EINVAL;
++	if (!disp_timing) {
++		ret = -EINVAL;
++		goto failed_free_io;
++	}
+ 
+ 	ret = of_get_fb_videomode(pdev->dev.of_node, &of_mode,
+ 							OF_USE_NATIVE_MODE);
  	if (ret)
--- 
-1.7.9.5
+-		return ret;
++		goto failed_free_io;
+ 
+ 	ret = of_property_read_u32(pdev->dev.of_node, "bits-per-pixel", &bpp);
+ 	if (ret)
+-		return ret;
++		goto failed_free_io;
+ 
+ 	/* try allocating the framebuffer */
+ 	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
+@@ -364,7 +363,8 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+ 				GFP_KERNEL);
+ 	if (!fb_mem_virt) {
+ 		pr_err("%s: Failed to allocate framebuffer\n", __func__);
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto failed_free_io;
+ 	}
+ 
+ 	fbi->fb.fix.smem_start	= fb_mem_phys;
+@@ -447,9 +447,6 @@ failed_free_io:
+ 	iounmap(fbi->regbase);
+ failed_free_res:
+ 	release_mem_region(res->start, resource_size(res));
+-failed_fbi:
+-	kfree(fbi);
+-failed:
+ 	return ret;
+ }
+ 
