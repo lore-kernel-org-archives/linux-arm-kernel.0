@@ -1,26 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Dec 2013 11:52:26 +0000
-Subject: [PATCH 05/11] serial: support for 16550 serial ports on LP-8x4x
-In-Reply-To: <1385984366.12531.24.camel@host5.omatika.ru>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-6-git-send-email-ynvich@gmail.com>
- <20131202113052.GG16735@n2100.arm.linux.org.uk>
- <1385984366.12531.24.camel@host5.omatika.ru>
-Message-ID: <20131202115226.GI16735@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Dec 2013 11:53:03 +0000
+Subject: [PATCH 2/2] ARM: dts: imx6q-udoo: Add USB host support
+In-Reply-To: <1384394987-15134-2-git-send-email-festevam@gmail.com>
+References: <1384394987-15134-1-git-send-email-festevam@gmail.com>
+ <1384394987-15134-2-git-send-email-festevam@gmail.com>
+Message-ID: <20131202115303.GH12952@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 03:39:26PM +0400, Sergei Ianovich wrote:
-> On Mon, 2013-12-02 at 11:30 +0000, Russell King - ARM Linux wrote:
-> > On Sun, Dec 01, 2013 at 10:26:18AM +0400, Sergei Ianovich wrote:
-> > > +static struct platform_device lp8x4x_device = {
-> > > +	.name			= "serial8250",
-> > > +	.id			= PLAT8250_DEV_ACCENT,
-> > 
-> > You should not re-use the enum value here.  The enum is designed as a
-> > method to provide the platform devices with a unique id, not as a means
-> > to identify the manufacturer or anything else like that.
+On Thu, Nov 14, 2013 at 02:09:47AM +0000, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Should I add a new enum?
+> Udoo board has USBH1 port connected to a USB2514 hub.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6q-udoo.dts | 34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
+> index 1c7f7a1..109b997 100644
+> --- a/arch/arm/boot/dts/imx6q-udoo.dts
+> +++ b/arch/arm/boot/dts/imx6q-udoo.dts
+> @@ -19,6 +19,23 @@
+>  	memory {
+>  		reg = <0x10000000 0x40000000>;
+>  	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
 
-Add a new enum.
+This should have a ranges property, or it's not a simple-bus.
+
+Why do you even need this anyway? The regulators can live under the root
+quite happily.
+
+Thanks,
+Mark.
