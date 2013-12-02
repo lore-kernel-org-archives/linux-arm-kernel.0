@@ -1,42 +1,83 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon,  2 Dec 2013 16:39:28 +0100
-Subject: [PATCH 3/3] ARM: dts: imx53: Switch DISP_CLK polarity on M53EVK
-In-Reply-To: <1385998768-23512-1-git-send-email-marex@denx.de>
-References: <1385998768-23512-1-git-send-email-marex@denx.de>
-Message-ID: <1385998768-23512-3-git-send-email-marex@denx.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 2 Dec 2013 16:50:59 +0100
+Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
+ system suspend
+In-Reply-To: <4994754.y6gINBtP7i@vostro.rjw.lan>
+References: <Pine.LNX.4.44L0.1311291014020.27250-100000@netrider.rowland.org>
+ <4994754.y6gINBtP7i@vostro.rjw.lan>
+Message-ID: <CAPDyKFpf58CRKUhFPKHyg4S9oaUR=XHJQs=hK7p63Hkv8gnbbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the DISP_CLK line polarity on M53EVK to work correctly after
-the following commit:
+>
+> That would be kind of OK, if the driver's .suspend_late() only invoked its own
+> .runtime_suspend(), what you did below.
+>
+> But, in the Ulf's approach the driver calls .runtime_suspend() from
+> its *subsystem* in the hope that it will all work out properly (or
+> perhaps based on the knowledge about this particular subsystem).
 
-commit f0ac9bebf19001f38afbb93e2dc719a15dfb75e5
-Author: Fabio Estevam <fabio.estevam@freescale.com>
-Date:   Tue Oct 29 19:42:22 2013 -0200
+Correct assumption.
 
-    imx-drm: ipuv3-crtc: Invert IPU DI0 clock polarity
+>
+> As I said, that may lead to problems when the same driver is attempted to
+> be used with a different subsystem-level code (for example, a different PM
+> domain).
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Dave Airlie <airlied@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx53-m53evk.dts | 1 +
- 1 file changed, 1 insertion(+)
+I don't think this is an issue we need to consider.
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 84a2cdc..97ec9c7 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -41,6 +41,7 @@
- 					vfront-porch = <9>;
- 					vsync-len = <3>;
- 					vsync-active = <1>;
-+					pixelclk-active = <1>;
- 				};
- 			};
- 		};
--- 
-1.8.4.2
+I assume the reason for having a PM domain is typically because you
+have a PM domain regulator to handle. Certainly the PM domain,
+controls it by using the runtime PM callbacks.
+
+Thus it does not make sense to bypass the PM domain callbacks, and
+just letting the driver call it's own runtime PM callbacks during
+system suspend. It will only do parts of the work then.
+
+>
+>> The amount of code needed is quite small; basically nothing more than:
+>>
+>>       if (!pm_runtime_status_suspended(dev))
+>>               dev->driver->pm->runtime_suspend(dev);
+>>
+>> The problems are:
+>>
+>>      1. Which callback does this code belong in?
+>>
+>>      2. Which runtime_suspend callback should be invoked?  The example
+>>       above uses dev->driver->pm->runtime_suspend, but this may not
+>>       always be the right one.
+>
+> Well, none of them may always be the right one, which is my point.
+>
+> I don't think we can come up with a really generic set of routines that will
+> be generally useful regardless of the subsystem/driver combination in question,
+> so in my opinion the PM core is not the right place to put such routines into.
+>
+> I wouldn't have problems with them being defined in the OMAP PM code.  As part
+> of that code they are free to do whatever they like if that code's maintainers
+> are fine with that.  But I don't want to see such confusing stuff in the core.
+
+As I just replied in my other email, having the code to be available
+and used in the PM domain code is not an option that we will gain
+from. The OMAP PM domain already does this, though in a slightly other
+form  - and side effects is not what we want.
+
+The drivers need to re-use and invoke the runtime PM callbacks, that
+is to me the only option that makes sense.
+
+At the same time, I somewhat agree with you that the new functions I
+propose to be added is not so "generic". What if we think of them as
+pm_runtime helper functions instead, would that make more sense?
+
+Kind regards
+Uffe
+
+>
+> Anyway, I'd like to understand what problems in particular those things would
+> be useful to solve, as I suspect that they may be addressed differently and
+> more cleanly.
+>
+> Thanks,
+> Rafael
+>
