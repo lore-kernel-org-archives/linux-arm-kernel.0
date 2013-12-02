@@ -1,113 +1,65 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 2 Dec 2013 11:59:56 -0600
-Subject: [PATCH RFC 1/2] Documentation: arm: add cache DT bindings
-In-Reply-To: <20131202175055.GA13125@e102568-lin.cambridge.arm.com>
-References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
- <D010BD06-683A-4500-AF13-64699ECEF808@codeaurora.org>
- <20131202175055.GA13125@e102568-lin.cambridge.arm.com>
-Message-ID: <CB2ECFBB-A959-4A44-B301-0188EA5599A3@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  2 Dec 2013 18:00:21 +0000
+Subject: [PATCH 2/3] ASoC: ux500_pcm: Differentiate between pdata and DT
+ initialisation
+In-Reply-To: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+References: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1386007222-10081-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If booting with full DT support (i.e. DMA too, the last piece of the
+puzzle), then we don't need to use the compatible request channel call
+back. We also require slightly different flags to inform the core that
+we are booting with DT.
 
-On Dec 2, 2013, at 11:50 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+Cc: alsa-devel at alsa-project.org
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ sound/soc/ux500/ux500_pcm.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-> On Mon, Dec 02, 2013 at 05:28:41PM +0000, Kumar Gala wrote:
->> 
->> On Dec 2, 2013, at 10:20 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> 
->>> On ARM systems the cache topology cannot be probed at runtime, in
->>> particular, it is impossible to probe which CPUs share a given cache
->>> level. Power management software requires this knowledge to implement
->>> optimized power down sequences, hence this patch adds a document that
->>> defines the DT cache bindings for ARM systems. The bindings are compliant
->>> with ePAPR (PowerPC bindings), and rely on the cache bindings already
->>> standardized in the ePAPR v1.1 document; ARM required updates are underlined
->>> in the binding document.
->>> 
->>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> ---
->>> Documentation/devicetree/bindings/arm/cache.txt | 25 +++++++++++++++++++++++++
->>> 1 file changed, 25 insertions(+)
->>> create mode 100644 Documentation/devicetree/bindings/arm/cache.txt
->>> 
->>> diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
->>> new file mode 100644
->>> index 0000000..009cddb
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/cache.txt
->>> @@ -0,0 +1,25 @@
->>> +==========================================
->>> +ARM processors cache binding description
->>> +==========================================
->>> +
->>> +Device tree bindings for ARM processor caches adhere to the cache bindings
->>> +described in [3], in section 3.8 for multi-level and shared caches.
->>> +
->>> +On ARM, internal caches cannot be described in the cpu node but require
->>> +specific nodes marked with compatible string set to "cache" (see [3],
->>> +section 3.8).
->> 
->> can you explain why
-> 
-> ARM v7 and v8 processors have a concept of cache levels which is valid
-> even for internal caches. So either we add a cache-level property to
-> internal caches or we do not use them for ARM.
-
-There isn?t anything precluding a cachel-level property for internal caches.
-
-> On top of that the definition of internal caches in the ePAPR is not
-> well defined (for ARM) (what if you have multiple levels of internal
-> caches ? - do we describe just L1 in the cpu node ?).
-
-ePAPR has examples of multiple level?s of internal cache in the cpu node.
-
-> Overall I think that is better to describe every cache object with a node
-> and a compatible string, and shared caches are just cache nodes pointed at
-> by multiple nodes (and private caches are just pointed at by one phandle
-> in the respective cpu node).
-> 
-> No strong position on that though, provided every cache "object" on ARM has a
-> cache-level attached to it.
-> 
-> Lorenzo
-> 
->>> +
->>> +Furthermore the cache bindings in [3] require the following property update:
->>> +
->>> +- [Table 3.9] cache-level: This property of cache nodes must match the cache
->>> +			   level encoded in the processors CLIDR (v7) and
->>> +			   CLIDR_EL1 (v8) registers, as described in [1][2].
->>> +
->>> +All other properties and rules apply.
->>> +
->>> +[1] ARMv7-AR Reference Manual
->>> +    http://infocenter.arm.com/help/index.jsp
->>> +[2] ARMv8-A Reference Manual
->>> +    http://infocenter.arm.com/help/index.jsp
->>> +[3] ePAPR standard
->>> +    https://www.power.org/documentation/epapr-version-1-1/
->>> -- 
->>> 1.8.4
->>> 
->>> 
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> 
->> -- 
->> Employee of Qualcomm Innovation Center, Inc.
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->> 
->> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
+diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+index 2f1bdb7..00cdd7b 100644
+--- a/sound/soc/ux500/ux500_pcm.c
++++ b/sound/soc/ux500/ux500_pcm.c
+@@ -134,15 +134,31 @@ static const struct snd_dmaengine_pcm_config ux500_dmaengine_pcm_config = {
+ 	.prepare_slave_config = ux500_pcm_prepare_slave_config,
+ };
+ 
++static const struct snd_dmaengine_pcm_config ux500_dmaengine_of_pcm_config = {
++	.prepare_slave_config = ux500_pcm_prepare_slave_config,
++};
++
+ int ux500_pcm_register_platform(struct platform_device *pdev)
+ {
++	const struct snd_dmaengine_pcm_config *pcm_config;
++	struct device_node *np = pdev->dev.of_node;
++	unsigned int pcm_flags;
+ 	int ret;
+ 
+-	ret = snd_dmaengine_pcm_register(&pdev->dev,
+-			&ux500_dmaengine_pcm_config,
+-			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
+-			SND_DMAENGINE_PCM_FLAG_COMPAT |
+-			SND_DMAENGINE_PCM_FLAG_NO_DT);
++	if (np) {
++		pcm_config = &ux500_dmaengine_of_pcm_config;
++
++		pcm_flags = SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
++			SND_DMAENGINE_PCM_FLAG_COMPAT;
++	} else {
++		pcm_config = &ux500_dmaengine_pcm_config;
++
++		pcm_flags = SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
++			SND_DMAENGINE_PCM_FLAG_NO_DT |
++			SND_DMAENGINE_PCM_FLAG_COMPAT;
++	}
++
++	ret = snd_dmaengine_pcm_register(&pdev->dev, pcm_config, pcm_flags);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev,
+ 			"%s: ERROR: Failed to register platform '%s' (%d)!\n",
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.8.3.2
