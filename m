@@ -1,81 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  2 Dec 2013 11:19:20 +0900
-Subject: [PATCH 14/28] ARM: shmobile: Enable MTU2 on r7s72100
+Date: Mon,  2 Dec 2013 11:19:26 +0900
+Subject: [PATCH 20/28] ARM: shmobile: Select USE_OF on EMEV2
 In-Reply-To: <cover.1385950394.git.horms+renesas@verge.net.au>
 References: <cover.1385950394.git.horms+renesas@verge.net.au>
-Message-ID: <9e2b4e8b5a82659e3ddd785f6b59417f408a933d.1385950394.git.horms+renesas@verge.net.au>
+Message-ID: <4fc4e85808c9d141f8d02766ac2d9e8bf4fa6b41.1385950394.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add MTU2 as r7s72100 system timer.
+Now when the legacy KZM9D board code is gone, make sure
+USE_OF is selected in case of the EMEV2 SoC.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c |  1 +
- arch/arm/mach-shmobile/setup-r7s72100.c | 22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm/mach-shmobile/Kconfig       | 1 +
+ arch/arm/mach-shmobile/setup-emev2.c | 4 ----
+ 2 files changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 4aba20c..1c9d261 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -178,6 +178,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
-+	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
- };
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 564e0ad..180b71f 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -108,6 +108,7 @@ config ARCH_EMEV2
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
++	select USE_OF
  
- void __init r7s72100_clock_init(void)
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index d4eb509..55f0b9c 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_timer.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r7s72100.h>
-@@ -58,6 +59,26 @@ static inline void r7s72100_register_scif(int idx)
- 				      sizeof(struct plat_sci_port));
+ config ARCH_R7S72100
+ 	bool "RZ/A1H (R7S72100)"
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index e7031b0..c8f2a1a 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -48,8 +48,6 @@ void __init emev2_init_delay(void)
+ 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
  }
  
-+
-+static struct sh_timer_config mtu2_0_platform_data __initdata = {
-+	.name = "MTU2_0",
-+	.timer_bit = 0,
-+	.channel_offset = -0x80,
-+	.clockevent_rating = 200,
-+};
-+
-+static struct resource mtu2_0_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xfcff0300, 0x27),
-+	DEFINE_RES_IRQ(gic_iid(139)), /* MTU2 TGI0A */
-+};
-+
-+#define r7s72100_register_mtu2(idx)					\
-+	platform_device_register_resndata(&platform_bus, "sh_mtu2",	\
-+					  idx, mtu2_##idx##_resources,	\
-+					  ARRAY_SIZE(mtu2_##idx##_resources), \
-+					  &mtu2_##idx##_platform_data,	\
-+					  sizeof(struct sh_timer_config))
-+
- void __init r7s72100_add_dt_devices(void)
+-#ifdef CONFIG_USE_OF
+-
+ static void __init emev2_add_standard_devices_dt(void)
  {
- 	r7s72100_register_scif(SCIF0);
-@@ -68,6 +89,7 @@ void __init r7s72100_add_dt_devices(void)
- 	r7s72100_register_scif(SCIF5);
- 	r7s72100_register_scif(SCIF6);
- 	r7s72100_register_scif(SCIF7);
-+	r7s72100_register_mtu2(0);
- }
- 
- void __init r7s72100_init_early(void)
+ #ifdef CONFIG_COMMON_CLK
+@@ -73,5 +71,3 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
+-
+-#endif /* CONFIG_USE_OF */
 -- 
 1.8.4
