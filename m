@@ -1,36 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  2 Dec 2013 11:19:09 +0900
-Subject: [PATCH 07/28] ARM: shmobile: r8a73a4: don't use named irq for
- DMAEngine
+Date: Mon,  2 Dec 2013 11:19:11 +0900
+Subject: [PATCH 09/28] ARM: shmobile: r8a7778: add MMCIF clock support for DT
 In-Reply-To: <cover.1385950394.git.horms+renesas@verge.net.au>
 References: <cover.1385950394.git.horms+renesas@verge.net.au>
-Message-ID: <3a47b0a1a26d70f391bb42fa8c70afc6bbd8e5a1.1385950394.git.horms+renesas@verge.net.au>
+Message-ID: <5f94ee41064c25b63b3defbf9be520446466717a.1385950394.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-sh-dma-engine driver doesn't care irq name.
-
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a73a4.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7778.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index b0f2749..cc94b64 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -275,7 +275,7 @@ static const struct sh_dmae_pdata dma_pdata = {
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index a77089f..e043715 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -173,6 +173,7 @@ static struct clk_lookup lookups[] = {
  
- static struct resource dma_resources[] = {
- 	DEFINE_RES_MEM(0xe6700020, 0x89e0),
--	DEFINE_RES_IRQ_NAMED(gic_spi(220), "error_irq"),
-+	DEFINE_RES_IRQ(gic_spi(220)),
- 	{
- 		/* IRQ for channels 0-19 */
- 		.start  = gic_spi(200),
+ 	/* MSTP32 clocks */
+ 	CLKDEV_DEV_ID("sh_mmcif", &mstp_clks[MSTP331]), /* MMC */
++	CLKDEV_DEV_ID("ffe4e000.mmcif", &mstp_clks[MSTP331]), /* MMC */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
 -- 
 1.8.4
