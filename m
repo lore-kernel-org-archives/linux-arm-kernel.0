@@ -1,62 +1,28 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 2 Dec 2013 15:53:33 +0200
-Subject: [PATCH 05/11] serial: support for 16550 serial ports on LP-8x4x
-In-Reply-To: <1385984782.12531.26.camel@host5.omatika.ru>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-6-git-send-email-ynvich@gmail.com>
- <20131202084845.GD3942@xps8300>
- <1385984782.12531.26.camel@host5.omatika.ru>
-Message-ID: <20131202135333.GJ3942@xps8300>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Dec 2013 13:54:52 +0000
+Subject: [alsa-devel] [PATCH 07/10] ASoC: ux500: Store DMA data in the
+ DAI differently in the pdata and DT case
+In-Reply-To: <20131202101256.GA29373@lee--X1>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+ <1384859269-19801-8-git-send-email-lee.jones@linaro.org>
+ <CAOesGMiu16f_L=cMWFCNZMjNB9tBK-2LXn02k-R7FhkkgR5-+g@mail.gmail.com>
+ <20131202101256.GA29373@lee--X1>
+Message-ID: <20131202135452.GI27568@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 02, 2013 at 10:12:56AM +0000, Lee Jones wrote:
 
-On Mon, Dec 02, 2013 at 03:46:22PM +0400, Sergei Ianovich wrote:
-> On Mon, 2013-12-02 at 10:48 +0200, Heikki Krogerus wrote:
-> > On Sun, Dec 01, 2013 at 10:26:18AM +0400, Sergei Ianovich wrote:
-> > > +static int request_and_remap(int i)
-> > > +{
-> > > +	if (!request_mem_region(extra_mem[i], 1, "serial"))
-> > > +		return -EBUSY;
-> > > +
-> > > +	lp8x4x_data[i].private_data = ioremap(extra_mem[i], 1);
-> > > +	if (lp8x4x_data[i].private_data)
-> > > +		return 0;
-> > > +
-> > > +	release_mem_region(extra_mem[i], 1);
-> > > +	return -ENODEV;
-> 
-> > Instead of registering a platform device for serial8250 here, you need
-> > to simply register a platform driver for something like lp8x4x_serial.
-> > The platform code will to registers the platform devices for it. You
-> > will use serial8250_register_8250_port() in your probe to register a
-> > new port. Use 8250_em.c and 8250_dw.c under drivers/tty/serial/8250/
-> > as an example.
-> > 
-> > You don't need to introduce plat_serial8250_port so you won't need
-> > the QUIRK_PORT stuff. You deliver the iomem and the irq as normal
-> > resources that the driver uses when you create the platform device.
-> > That of course also means the driver does not need to care about the
-> > instances. The platform code will generate a platform device for as
-> > many ports you have and set to resources accordingly.
-> 
-> 8250_core.c doesn't use platform infrastructure to request and map IO
-> memory. There will be a conflict (and an error in
-> serial8250_request_std_resource()), if main IO memory is requested by
-> the platform device, won't it?
+> It's actually my fault. I had two patches round the wrong way in the
+> series. The imediately subsequent patch in the set fixes this issue:
 
-You don't need to request the mem region in your probe driver.
-
-You can still map it. You have the flag UPF_IOREMAP that you can use
-to tell 8250_code.c to map the region. If you don't set the flag,
-8250_core.c will in practice expect that port->membase is already set
-by the probe driver.
-
-Check 8250_dw.c. It does the mapping on it's own and simply doesn't
-set the flag.
-
-Br,
-
--- 
-heikki
+OK, so what do we do about this?  Is there going to be a revision of
+that patch adding the note about not using the autoconfiguration stuff
+and what (if any) are the dependencies on the arch/arm changes?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/5fc251ff/attachment.sig>
