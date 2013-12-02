@@ -1,42 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Dec 2013 17:18:48 +0100
-Subject: [PATCH] ARM: at91: add i2c2 pinctrl speficifation to sama5d3 DT
-Message-ID: <1386001128-29147-1-git-send-email-nicolas.ferre@atmel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon,  2 Dec 2013 16:20:04 +0000
+Subject: [PATCH RFC 1/2] Documentation: arm: add cache DT bindings
+In-Reply-To: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/sama5d3.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On ARM systems the cache topology cannot be probed at runtime, in
+particular, it is impossible to probe which CPUs share a given cache
+level. Power management software requires this knowledge to implement
+optimized power down sequences, hence this patch adds a document that
+defines the DT cache bindings for ARM systems. The bindings are compliant
+with ePAPR (PowerPC bindings), and rely on the cache bindings already
+standardized in the ePAPR v1.1 document; ARM required updates are underlined
+in the binding document.
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index f520b0236671..f5fd111b5ee6 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -304,6 +304,8 @@
- 				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(11)>,
- 				       <&dma1 2 AT91_DMA_CFG_PER_ID(12)>;
- 				dma-names = "tx", "rx";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c2>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				clocks = <&twi2_clk>;
-@@ -494,6 +496,14 @@
- 					};
- 				};
- 
-+				i2c2 {
-+					pinctrl_i2c2: i2c2-0 {
-+						atmel,pins =
-+							<AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_NONE	/* TWD2 pin, conflicts with LCDDAT18, ISI_D2 */
-+							 AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* TWCK2 pin, conflicts with LCDDAT19, ISI_D3 */
-+					};
-+				};
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ Documentation/devicetree/bindings/arm/cache.txt | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cache.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
+new file mode 100644
+index 0000000..009cddb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cache.txt
+@@ -0,0 +1,25 @@
++==========================================
++ARM processors cache binding description
++==========================================
 +
- 				isi {
- 					pinctrl_isi: isi-0 {
- 						atmel,pins =
++Device tree bindings for ARM processor caches adhere to the cache bindings
++described in [3], in section 3.8 for multi-level and shared caches.
++
++On ARM, internal caches cannot be described in the cpu node but require
++specific nodes marked with compatible string set to "cache" (see [3],
++section 3.8).
++
++Furthermore the cache bindings in [3] require the following property update:
++
++- [Table 3.9] cache-level: This property of cache nodes must match the cache
++			   level encoded in the processors CLIDR (v7) and
++			   CLIDR_EL1 (v8) registers, as described in [1][2].
++
++All other properties and rules apply.
++
++[1] ARMv7-AR Reference Manual
++    http://infocenter.arm.com/help/index.jsp
++[2] ARMv8-A Reference Manual
++    http://infocenter.arm.com/help/index.jsp
++[3] ePAPR standard
++    https://www.power.org/documentation/epapr-version-1-1/
 -- 
-1.8.2.2
+1.8.4
