@@ -1,52 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 2 Dec 2013 12:47:53 -0800
-Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
- system
-In-Reply-To: <20131202202120.GA23611@roeck-us.net>
-References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
- <20131202202120.GA23611@roeck-us.net>
-Message-ID: <CAOesGMi-P6LG1-XKVizUS_qX-gfZi_iXBO5r+=6a2nfvBS60mw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 2 Dec 2013 15:52:19 -0500
+Subject: [GIT PULL for-next] ARM: mm: Switch ARM port to NO_BOOTMEM for 3.14
+Message-ID: <1386017539-10295-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 2, 2013 at 12:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
->> A good watchdog driver is supposed to report when it was responsible
->> for resetting the system.  Implement this for the s3c2410, at least on
->> exynos5250 and exynos5420 where we already have a pointer to the PMU
->> registers to read the information.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> ---
->> This patch is based atop Leela Krishna's recent series that ends with
->> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
->> AKA <https://patchwork.kernel.org/patch/3251861/>.
->>
->>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
->>  1 file changed, 39 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
->> index 47f4dcf..2c87d37 100644
->> --- a/drivers/watchdog/s3c2410_wdt.c
->> +++ b/drivers/watchdog/s3c2410_wdt.c
->> @@ -62,9 +62,13 @@
->>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
->>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
->>
->> +#define RST_STAT_REG_OFFSET          0x0404
->>  #define WDT_DISABLE_REG_OFFSET               0x0408
->>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
->>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
->> +#define QUIRK_HAS_RST_STAT           (1 << 1)
->> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
->> +                                      QUIRK_HAS_RST_STAT)
->>
-> I am not really happy about the NEED (both of them, really) here.
-> How about HAS instead ?
+Russell,
 
-Ah, I just commented on these things on our internal review site too
-on this patch. I don't even think a quirk is needed -- just use the
-presence of a non-0 rst_stat_reg to tell if you need to use regmap.
+Here is the pull request for-next so that the series gets wider testing
+to catch any regression early in the cycle.
 
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
--Olof
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14/arm-no-bootmem
+
+for you to fetch changes up to 84f452b1e8fc73ac0e31254c66e3e2260ce5263d:
+
+  ARM: mm: Remove bootmem code and switch to NO_BOOTMEM (2013-11-23 17:58:35 -0500)
+
+----------------------------------------------------------------
+
+Grygorii Strashko (1):
+  ARM: mm: Don't allow resizing of memblock data until "low" memory is
+    not mapped
+
+Santosh Shilimkar (2):
+  ARM: mm: Fix max_mapnr with recent max*pfn updates
+  ARM: mm: Remove bootmem code and switch to NO_BOOTMEM
+
+ arch/arm/Kconfig        |    1 +
+ arch/arm/kernel/setup.c |    2 +-
+ arch/arm/mm/init.c      |   62 +++--------------------------------------------
+ 3 files changed, 6 insertions(+), 59 deletions(-)
+
+-- 
+1.7.9.5
