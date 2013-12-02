@@ -1,58 +1,270 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Dec 2013 13:14:48 +0100
-Subject: [PATCH] clk: tegra: Correct clock number for UARTE
-In-Reply-To: <1385984847.4086.3.camel@weser.hi.pengutronix.de>
-References: <1385983825-20317-1-git-send-email-treding@nvidia.com>
- <1385984847.4086.3.camel@weser.hi.pengutronix.de>
-Message-ID: <20131202121447.GB12793@ulmo.nvidia.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 02 Dec 2013 13:17:10 +0100
+Subject: [PATCH v2 1/2] clk: add clk accuracy retrieval support
+In-Reply-To: <20131202075043.GB29721@pengutronix.de>
+References: <1385556285-19180-1-git-send-email-b.brezillon@overkiz.com>
+ <1385556285-19180-2-git-send-email-b.brezillon@overkiz.com>
+ <20131202075043.GB29721@pengutronix.de>
+Message-ID: <529C7A46.2070401@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 12:47:27PM +0100, Lucas Stach wrote:
-> Am Montag, den 02.12.2013, 12:30 +0100 schrieb Thierry Reding:
-> > UARTE has clock number 66. Number 65 is the right one for UARTD.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> >  drivers/clk/tegra/clk-tegra-periph.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
-> > index 5c35885f4a7c..3744a6fe589e 100644
-> > --- a/drivers/clk/tegra/clk-tegra-periph.c
-> > +++ b/drivers/clk/tegra/clk-tegra-periph.c
-> > @@ -492,7 +492,7 @@ static struct tegra_periph_init_data periph_clks[] = {
-> >  	UART("uartb", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTB, 7, tegra_clk_uartb),
-> >  	UART("uartc", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTC, 55, tegra_clk_uartc),
-> >  	UART("uartd", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTD, 65, tegra_clk_uartd),
-> > -	UART("uarte", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTE, 65, tegra_clk_uarte),
-> > +	UART("uarte", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTE, 66, tegra_clk_uarte),
-> >  	XUSB("xusb_host_src", mux_clkm_pllp_pllc_pllre, CLK_SOURCE_XUSB_HOST_SRC, 143, TEGRA_PERIPH_ON_APB | TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_host_src),
-> >  	XUSB("xusb_falcon_src", mux_clkm_pllp_pllc_pllre, CLK_SOURCE_XUSB_FALCON_SRC, 143, TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_falcon_src),
-> >  	XUSB("xusb_fs_src", mux_clkm_48M_pllp_480M, CLK_SOURCE_XUSB_FS_SRC, 143, TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_fs_src),
-> 
-> Is this a stable patch or why are those magic numbers even necessary? I
-> have to admit I didn't follow the Tegra clk stuff closely, but with all
-> the churn going on there I would have suspected that those numbers would
-> have been replaced by the DT include defines by now.
+Hello Uwe,
 
-There is no 1:1 mapping between the DT include defines and the hardware
-clock numbers. For instance, UARTB has DT define 192, but the enable bit
-is at offset 7.
+Le 02/12/2013 08:50, Uwe Kleine-K?nig a ?crit :
+> Hello,
+>
+> On Wed, Nov 27, 2013 at 01:44:44PM +0100, Boris BREZILLON wrote:
+>> The clock accuracy is expressed in ppb (parts per billion) and represents
+>> the possible clock drift.
+>> Say you have a clock (e.g. an oscillator) which provides a fixed clock of
+>> 20MHz with an accuracy of +- 20Hz. This accuracy expressed in ppb is
+>> 20Hz/20MHz = 1000 ppb (or 1 ppm).
+>>
+>> Clock users may need the clock accuracy information in order to choose
+>> the best clock (the one with the best accuracy) across several available
+>> clocks.
+>>
+>> This patch adds clk accuracy retrieval support for common clk framework by
+>> means of a new function called clk_get_accuracy.
+>> This function returns the given clock accuracy expressed in ppb.
+>>
+>> In order to get the clock accuracy, this implementation adds one callback
+>> called recalc_accuracy to the clk_ops structure.
+>> This callback is given the parent clock accuracy (if the clock is not a
+>> root clock) and should recalculate the given clock accuracy.
+>>
+>> This callback is optional and may be implemented if the clock is not
+>> a perfect clock (accuracy != 0 ppb).
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>   Documentation/clk.txt        |    4 ++
+>>   drivers/clk/clk.c            |  109 ++++++++++++++++++++++++++++++++++++++++--
+>>   include/linux/clk-private.h  |    1 +
+>>   include/linux/clk-provider.h |   11 +++++
+>>   include/linux/clk.h          |   17 +++++++
+>>   5 files changed, 138 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+>> index 3aeb5c4..eb20198 100644
+>> --- a/Documentation/clk.txt
+>> +++ b/Documentation/clk.txt
+>> @@ -77,6 +77,8 @@ the operations defined in clk.h:
+>>   		int		(*set_parent)(struct clk_hw *hw, u8 index);
+>>   		u8		(*get_parent)(struct clk_hw *hw);
+>>   		int		(*set_rate)(struct clk_hw *hw, unsigned long);
+>> +		unsigned long	(*recalc_accuracy)(struct clk_hw *hw,
+>> +						   unsigned long parent_accuracy);
+>>   		void		(*init)(struct clk_hw *hw);
+>>   	};
+>>   
+>> @@ -202,6 +204,8 @@ optional or must be evaluated on a case-by-case basis.
+>>   .set_parent     |      |             | n             | y           | n    |
+>>   .get_parent     |      |             | n             | y           | n    |
+>>                   |      |             |               |             |      |
+>> +.recalc_accuracy|      |             |               |             |      |
+>> +                |      |             |               |             |      |
+>>   .init           |      |             |               |             |      |
+>>                   -----------------------------------------------------------
+>>   [1] either one of round_rate or determine_rate is required.
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 2cf2ea6..4b0c1bc 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -104,10 +104,11 @@ static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
+>>   	if (!c)
+>>   		return;
+>>   
+>> -	seq_printf(s, "%*s%-*s %-11d %-12d %-10lu",
+>> +	seq_printf(s, "%*s%-*s %-11d %-12d %-10lu %-11lu",
+>>   		   level * 3 + 1, "",
+>>   		   30 - level * 3, c->name,
+>> -		   c->enable_count, c->prepare_count, clk_get_rate(c));
+>> +		   c->enable_count, c->prepare_count, clk_get_rate(c),
+>> +		   clk_get_accuracy(c));
+>>   	seq_printf(s, "\n");
+>>   }
+>>   
+>> @@ -129,8 +130,8 @@ static int clk_summary_show(struct seq_file *s, void *data)
+>>   {
+>>   	struct clk *c;
+>>   
+>> -	seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate\n");
+>> -	seq_printf(s, "---------------------------------------------------------------------\n");
+>> +	seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate        accuracy\n");
+>> +	seq_printf(s, "---------------------------------------------------------------------------------\n");
+>>   
+>>   	clk_prepare_lock();
+>>   
+>> @@ -167,6 +168,7 @@ static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
+>>   	seq_printf(s, "\"enable_count\": %d,", c->enable_count);
+>>   	seq_printf(s, "\"prepare_count\": %d,", c->prepare_count);
+>>   	seq_printf(s, "\"rate\": %lu", clk_get_rate(c));
+>> +	seq_printf(s, "\"accuracy\": %lu", clk_get_accuracy(c));
+>>   }
+>>   
+>>   static void clk_dump_subtree(struct seq_file *s, struct clk *c, int level)
+>> @@ -248,6 +250,11 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+>>   	if (!d)
+>>   		goto err_out;
+>>   
+>> +	d = debugfs_create_u32("clk_accuracy", S_IRUGO, clk->dentry,
+>> +			(u32 *)&clk->accuracy);
+>> +	if (!d)
+>> +		goto err_out;
+>> +
+>>   	d = debugfs_create_x32("clk_flags", S_IRUGO, clk->dentry,
+>>   			(u32 *)&clk->flags);
+>>   	if (!d)
+>> @@ -602,6 +609,28 @@ out:
+>>   	return ret;
+>>   }
+>>   
+>> +unsigned long __clk_get_accuracy(struct clk *clk)
+>> +{
+>> +	unsigned long ret;
+>> +
+>> +	if (!clk) {
+>> +		ret = 0;
+>> +		goto out;
+>> +	}
+>> +
+>> +	ret = clk->accuracy;
+>> +
+>> +	if (clk->flags & CLK_IS_ROOT)
+>> +		goto out;
+>> +
+>> +	if (!clk->parent)
+>> +		ret = 0;
+> Why do you need this? Wouldn't it be enough to assert clk->accuracy
+> being 0 in this case?
 
-I think the main reason for doing was because of the Tegra-specific
-reset API. Now that that's being converted to the generic API, there may
-be some room to refactor this. Until then I think we're stuck with
-having these numbers in this table.
+I'm not sure.
+I did this because it was done this way for __clk_get_rate (which is
+not a valid argument ;)).
 
-But perhaps there were other reasons to do this as well. Peter or
-Stephen may know the details better than I do.
+Now that I think about it I don't find any good reason for not directly
+returning the clk->accuracy (even if the clk is orphan).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/cfee0d39/attachment-0001.sig>
+I mean, if we consider the parent_clk as perfect (which is the case if
+the clk is orphan), then the child clk might still introduce some 
+inaccuracy.
+And I think it's better to return the maximum clk accuracy instead of
+considering the clk is perfect.
+
+I'll fix this in the next version.
+
+>> +out:
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(__clk_get_accuracy);
+>> +
+>>   unsigned long __clk_get_flags(struct clk *clk)
+>>   {
+>>   	return !clk ? 0 : clk->flags;
+>> @@ -1016,6 +1045,59 @@ static int __clk_notify(struct clk *clk, unsigned long msg,
+>>   }
+>>   
+>>   /**
+>> + * __clk_recalc_accuracies
+>> + * @clk: first clk in the subtree
+>> + * @msg: notification type (see include/linux/clk.h)
+> There is no msg parameter in this function.
+
+I'll fix the comment.
+
+>
+>> + * Walks the subtree of clks starting with clk and recalculates accuracies as
+>> + * it goes.  Note that if a clk does not implement the .recalc_rate callback
+>> + * then it is assumed that the clock will take on the rate of it's parent.
+>> + *
+>> + * Caller must hold prepare_lock.
+>> + */
+>> +static void __clk_recalc_accuracies(struct clk *clk)
+>> +{
+>> +	unsigned long parent_accuracy = 0;
+>> +	struct clk *child;
+>> +
+>> +	if (clk->parent)
+>> +		parent_accuracy = clk->parent->accuracy;
+>> +
+>> +	if (clk->ops->recalc_accuracy)
+>> +		clk->accuracy = clk->ops->recalc_accuracy(clk->hw,
+>> +							  parent_accuracy);
+>> +	else
+>> +		clk->accuracy = parent_accuracy;
+>> +
+>> +	hlist_for_each_entry(child, &clk->children, child_node)
+>> +		__clk_recalc_accuracies(child);
+>> +}
+>> +
+>> +/**
+>> + * clk_get_accuracy - return the accuracy of clk
+>> + * @clk: the clk whose accuracy is being returned
+>> + *
+>> + * Simply returns the cached accuracy of the clk, unless
+>> + * CLK_GET_ACCURACY_NOCACHE flag is set, which means a recalc_rate will be
+>> + * issued.
+>> + * If clk is NULL then returns 0.
+>> + */
+>> +long clk_get_accuracy(struct clk *clk)
+>> +{
+>> +	unsigned long accuracy;
+>> +
+>> +	clk_prepare_lock();
+>> +	if (clk && (clk->flags & CLK_GET_ACCURACY_NOCACHE))
+>> +		__clk_recalc_accuracies(clk);
+>> +
+>> +	accuracy = __clk_get_accuracy(clk);
+>> +	clk_prepare_unlock();
+>> +
+>> +	return accuracy;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_get_accuracy);
+>> +
+>> +/**
+>>    * __clk_recalc_rates
+>>    * @clk: first clk in the subtree
+>>    * @msg: notification type (see include/linux/clk.h)
+>> @@ -1551,6 +1633,7 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>>   {
+>>   	clk_reparent(clk, new_parent);
+>>   	clk_debug_reparent(clk, new_parent);
+>> +	__clk_recalc_accuracies(clk);
+>>   	__clk_recalc_rates(clk, POST_RATE_CHANGE);
+>>   }
+>>   
+>> @@ -1621,6 +1704,9 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>>   	/* do the re-parent */
+>>   	ret = __clk_set_parent(clk, parent, p_index);
+>>   
+>> +	/* propagate accuracy recalculation */
+>> +	__clk_recalc_accuracies(clk);
+>> +
+> Would it make sense to move this call into the if (ret) below? The rate
+> is only recalculated there, too.
+You mean only if __clk_set_parent returns 0.
+Yes it makes sense: the accuracy should not change if the parent hasn't 
+changed
+(is this case, if we fail to change the parent).
+
+BTW, the rate is recalculated anyway, the only thing that changes is the 
+notification
+message.
+
+I'll fix this if no ones finds a good reason to recalculate the accuracy 
+when we fail
+to change the parent.
+
+Thanks for your review
+
+Best Regars,
+
+Boris
+>>   	/* propagate rate recalculation accordingly */
+>>   	if (ret)
+>>   		__clk_recalc_rates(clk, ABORT_RATE_CHANGE);
+> Best regards
+> Uwe
+>
