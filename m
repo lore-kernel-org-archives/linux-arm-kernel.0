@@ -1,23 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Dec 2013 20:01:17 +0000
-Subject: [PATCH 1/3] drm: Add LCD display clock polarity flags
-In-Reply-To: <1385998768-23512-1-git-send-email-marex@denx.de>
-References: <1385998768-23512-1-git-send-email-marex@denx.de>
-Message-ID: <20131202200117.GN16735@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 2 Dec 2013 12:21:20 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset
+ the system
+In-Reply-To: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+Message-ID: <20131202202120.GA23611@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 04:39:26PM +0100, Marek Vasut wrote:
-> Add DRM flags for the LCD display clock polarity so the pixelclk-active DT
-> property can be properly handled by drivers using the DRM API.
+On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
+> A good watchdog driver is supposed to report when it was responsible
+> for resetting the system.  Implement this for the s3c2410, at least on
+> exynos5250 and exynos5420 where we already have a pointer to the PMU
+> registers to read the information.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> This patch is based atop Leela Krishna's recent series that ends with
+> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+> AKA <https://patchwork.kernel.org/patch/3251861/>.
+> 
+>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 39 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> index 47f4dcf..2c87d37 100644
+> --- a/drivers/watchdog/s3c2410_wdt.c
+> +++ b/drivers/watchdog/s3c2410_wdt.c
+> @@ -62,9 +62,13 @@
+>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+>  
+> +#define RST_STAT_REG_OFFSET		0x0404
+>  #define WDT_DISABLE_REG_OFFSET		0x0408
+>  #define WDT_MASK_RESET_REG_OFFSET	0x040c
+>  #define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
+> +#define QUIRK_HAS_RST_STAT		(1 << 1)
+> +#define QUIRKS_NEED_PMUREG		(QUIRK_NEEDS_PMU_CONFIG | \
+> +					 QUIRK_HAS_RST_STAT)
+>  
+I am not really happy about the NEED (both of them, really) here.
+How about HAS instead ?
 
-I still say that not even this should be part of the DRM mode API to
-userspace.  The hint that you're changing the user API is that you're
-modifying a header file below a 'uapi' directory.
+>  static bool nowayout	= WATCHDOG_NOWAYOUT;
+>  static int tmr_margin;
+> @@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
+>   * timer reset functionality.
+>   * @mask_bit: Bit number for the watchdog timer in the disable register and the
+>   * mask reset register.
+> + * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
+> + * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
+> + * reset.
+>   * @quirks: A bitfield of quirks.
+>   */
+>  
+> @@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
+>  	int disable_reg;
+>  	int mask_reset_reg;
+>  	int mask_bit;
+> +	int rst_stat_reg;
+> +	int rst_stat_bit;
+>  	u32 quirks;
+>  };
+>  
+> @@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
+>  	.disable_reg = WDT_DISABLE_REG_OFFSET,
+>  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+>  	.mask_bit = 20,
+> -	.quirks = QUIRK_NEEDS_PMU_CONFIG
+> +	.rst_stat_reg = RST_STAT_REG_OFFSET,
+> +	.rst_stat_bit = 20,
+> +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
+> +		QUIRK_HAS_RST_STAT,
 
-The settings of double scan, sync polarity etc are all part of the
-display mode specification (check CEA-861 documents).  Things like
-pixel clock polarity are not part of the mode specification, they're
-a property of the display itself and are independent of the mode.
+Why not use QUIRKS_NEED_PMUREG ?
 
-Therefore, they should not be part of struct drm_mode_modeinfo.
+Also, is there ever a chance that the two bits don't come together ?
+If not a single bit might be sufficient.
+
+Thanks,
+Guenter
+
+>  };
+>  
+>  static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
+>  	.disable_reg = WDT_DISABLE_REG_OFFSET,
+>  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+>  	.mask_bit = 0,
+> -	.quirks = QUIRK_NEEDS_PMU_CONFIG
+> +	.rst_stat_reg = RST_STAT_REG_OFFSET,
+> +	.rst_stat_bit = 9,
+> +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
+> +		QUIRK_HAS_RST_STAT,
+>  };
+>  
+>  static const struct of_device_id s3c2410_wdt_match[] = {
+> @@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+>  }
+>  #endif
+>  
+> +static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
+> +{
+> +	unsigned int bootstatus = 0;
+> +	int ret;
+> +
+> +	if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
+> +		unsigned int rst_stat;
+> +
+> +		ret = regmap_read(wdt->pmureg, wdt->drv_data->rst_stat_reg,
+> +				  &rst_stat);
+> +		if (ret)
+> +			dev_warn(wdt->dev, "Couldn't get RST_STAT register\n");
+> +		else if (rst_stat & BIT(wdt->drv_data->rst_stat_bit))
+> +			bootstatus |= WDIOF_CARDRESET;
+> +	}
+> +
+> +	return bootstatus;
+> +}
+> +
+>  /* s3c2410_get_wdt_driver_data */
+>  static inline struct s3c2410_wdt_variant *
+>  get_wdt_drv_data(struct platform_device *pdev)
+> @@ -460,7 +494,7 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+>  	wdt->wdt_device = s3c2410_wdd;
+>  
+>  	wdt->drv_data = get_wdt_drv_data(pdev);
+> -	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
+> +	if (wdt->drv_data->quirks & QUIRKS_NEED_PMUREG) {
+>  		wdt->pmureg = syscon_regmap_lookup_by_phandle(dev->of_node,
+>  							"samsung,syscon-phandle");
+>  		if (IS_ERR(wdt->pmureg)) {
+> @@ -531,6 +565,8 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+>  
+>  	watchdog_set_nowayout(&wdt->wdt_device, nowayout);
+>  
+> +	wdt->wdt_device.bootstatus = s3c2410wdt_get_bootstatus(wdt);
+> +
+>  	ret = watchdog_register_device(&wdt->wdt_device);
+>  	if (ret) {
+>  		dev_err(dev, "cannot register watchdog (%d)\n", ret);
+> -- 
+> 1.8.4.1
+> 
+> 
