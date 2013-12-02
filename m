@@ -1,7 +1,7 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Mon, 2 Dec 2013 09:57:39 +0800
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 2 Dec 2013 10:08:52 +0800
 Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CACVXFVPPK-s8ToH0L06Rq0DY9cvfomyHpYKJ7ufbbVoJq69mnA@mail.gmail.com>
+In-Reply-To: <CAFRkauCFdBFM3L9DA2i7jGDRPe4V5AQA2o-ZsZB7HYA-zvzHAA@mail.gmail.com>
 References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
  <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
  <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
@@ -16,29 +16,52 @@ References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
  <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
  <CAFRkauACb7wPdisp-PEic_-ko5MhhnAyigcpg5gfjLEFUuJqGw@mail.gmail.com>
  <CACVXFVPPK-s8ToH0L06Rq0DY9cvfomyHpYKJ7ufbbVoJq69mnA@mail.gmail.com>
-Message-ID: <CAFRkauCFdBFM3L9DA2i7jGDRPe4V5AQA2o-ZsZB7HYA-zvzHAA@mail.gmail.com>
+ <CAFRkauCFdBFM3L9DA2i7jGDRPe4V5AQA2o-ZsZB7HYA-zvzHAA@mail.gmail.com>
+Message-ID: <CACVXFVPrTWrC443vGpVGy-eH_hDQMN1HxCeC_iJ2uJ3Y=rnBwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/13 Ming Lei <tom.leiming@gmail.com>:
-> Hi Axel,
->
-> On Wed, Nov 13, 2013 at 5:58 PM, Axel Lin <axel.lin@ingics.com> wrote:
->>
->> Hi Ming,
->> You missed "; then" in the end of if statement in your patch.
->>
->> So I got below error with your patch:
->> scripts/link-vmlinux.sh: line 87: syntax error near unexpected token `fi'
->> make: *** [vmlinuxclean] Error 2
->
-> Thanks for your test, and I have fixed it and post a formal one for merge,
-> and you can find these two patches on arm list, but forget to Cc you, sorry
-> for that.
+Hi Axel,
 
-Hi Ming,
-Both your patch and Jonathan's patch are still not in linux-next.
-Any chance to resend the patchs to RMK's patch system?
+I am fine to resend it to RMK's patch system, but I am not sure
+if Russell would like to host it.
+
+Maybe it is better to push it via Rusty's tree since the change is only
+on scripts/, and it doesn't depend on the 1st one.
+
+Rusty, could you pick up the patch with title of
+"scripts/link-vmlinux.sh: only filter kernel symbols for arm"?
+
 
 Thanks,
-Axel
+--
+Ming Lei
+
+On Mon, Dec 2, 2013 at 9:57 AM, Axel Lin <axel.lin@ingics.com> wrote:
+> 2013/11/13 Ming Lei <tom.leiming@gmail.com>:
+>> Hi Axel,
+>>
+>> On Wed, Nov 13, 2013 at 5:58 PM, Axel Lin <axel.lin@ingics.com> wrote:
+>>>
+>>> Hi Ming,
+>>> You missed "; then" in the end of if statement in your patch.
+>>>
+>>> So I got below error with your patch:
+>>> scripts/link-vmlinux.sh: line 87: syntax error near unexpected token `fi'
+>>> make: *** [vmlinuxclean] Error 2
+>>
+>> Thanks for your test, and I have fixed it and post a formal one for merge,
+>> and you can find these two patches on arm list, but forget to Cc you, sorry
+>> for that.
+>
+> Hi Ming,
+> Both your patch and Jonathan's patch are still not in linux-next.
+> Any chance to resend the patchs to RMK's patch system?
+>
+> Thanks,
+> Axel
+
+
+
+-- 
+Ming Lei
