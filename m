@@ -1,70 +1,73 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Dec 2013 10:54:32 +0000
-Subject: [PATCH RESEND] mfd: mc13xxx: Fix null pointer dereference in
- mc13xxx_common_init
-In-Reply-To: <1385805188-5597-1-git-send-email-shc_work@mail.ru>
-References: <1385805188-5597-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131202105432.GC29373@lee--X1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 2 Dec 2013 11:56:14 +0100
+Subject: [PATCH v2] ARM: at91: sama5d3: reduce TWI internal clock frequency
+In-Reply-To: <529C47E3.2010508@atmel.com>
+References: <1385136523-11962-1-git-send-email-ludovic.desroches@atmel.com>
+ <529C47E3.2010508@atmel.com>
+Message-ID: <529C674E.5050403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 30 Nov 2013, Alexander Shiyan wrote:
+On 02/12/2013 09:42, Nicolas Ferre :
+> On 22/11/2013 17:08, ludovic.desroches at atmel.com :
+>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>
+>> With some devices, transfer hangs during I2C frame transmission. This issue
+>> disappears when reducing the internal frequency of the TWI IP. Even if it is
+>> indicated that internal clock max frequency is 66MHz, it seems we have
+>> oversampling on I2C signals making TWI believe that a transfer in progress
+>> is done.
+>>
+>> This fix has no impact on the I2C bus frequency.
+>>
+>> Cc: <stable@vger.kernel.org> #3.10+
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> added to at91-3.14-dt branch.
 
-> If this driver being loaded from devicetree, the pdata is NULL.
-> This cause kernel Oops when "fsl,mc13xxx-uses-codec" and/or
-> "fsl,mc13xxx-uses-touch" properties is specified.
+No, sorry, it will go in at91-3.13-fixes!
 
-<snip>
+Bye,
 
-The original code is pretty gross. This stuff shouldn't be identifying
-_support_ in Device Tree, then dragging in configuration from platform
-code.
+>> ---
+>>
+>> v2: update commit message
+>>
+>>    arch/arm/mach-at91/sama5d3.c |    6 +++---
+>>    1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
+>> index 4012797..4ee0de5 100644
+>> --- a/arch/arm/mach-at91/sama5d3.c
+>> +++ b/arch/arm/mach-at91/sama5d3.c
+>> @@ -95,19 +95,19 @@ static struct clk twi0_clk = {
+>>    	.name		= "twi0_clk",
+>>    	.pid		= SAMA5D3_ID_TWI0,
+>>    	.type		= CLK_TYPE_PERIPHERAL,
+>> -	.div		= AT91_PMC_PCR_DIV2,
+>> +	.div		= AT91_PMC_PCR_DIV8,
+>>    };
+>>    static struct clk twi1_clk = {
+>>    	.name		= "twi1_clk",
+>>    	.pid		= SAMA5D3_ID_TWI1,
+>>    	.type		= CLK_TYPE_PERIPHERAL,
+>> -	.div		= AT91_PMC_PCR_DIV2,
+>> +	.div		= AT91_PMC_PCR_DIV8,
+>>    };
+>>    static struct clk twi2_clk = {
+>>    	.name		= "twi2_clk",
+>>    	.pid		= SAMA5D3_ID_TWI2,
+>>    	.type		= CLK_TYPE_PERIPHERAL,
+>> -	.div		= AT91_PMC_PCR_DIV2,
+>> +	.div		= AT91_PMC_PCR_DIV8,
+>>    };
+>>    static struct clk mmc0_clk = {
+>>    	.name		= "mci0_clk",
+>>
+>
+>
 
-Rather than patch it up with little plasters (band aids), can we fix
-it properly please?
-
-> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  drivers/mfd/mc13xxx-core.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index dbbf8ee..625633a 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -682,14 +682,14 @@ err_revision:
->  	if (mc13xxx->flags & MC13XXX_USE_ADC)
->  		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
->  
-> -	if (mc13xxx->flags & MC13XXX_USE_CODEC)
-> +	if ((mc13xxx->flags & MC13XXX_USE_CODEC) && pdata)
->  		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-codec",
->  					pdata->codec, sizeof(*pdata->codec));
->  
->  	if (mc13xxx->flags & MC13XXX_USE_RTC)
->  		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
->  
-> -	if (mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN)
-> +	if ((mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN) && pdata)
->  		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-ts",
->  				&pdata->touch, sizeof(pdata->touch));
->  
-> @@ -701,6 +701,10 @@ err_revision:
->  		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-pwrbutton",
->  				pdata->buttons, sizeof(*pdata->buttons));
->  	} else {
-> +		if (mc13xxx->flags & MC13XXX_USE_CODEC)
-> +			mc13xxx_add_subdevice(mc13xxx, "%s-codec");
-> +		if (mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN)
-> +			mc13xxx_add_subdevice(mc13xxx, "%s-ts");
->  		mc13xxx_add_subdevice(mc13xxx, "%s-regulator");
->  		mc13xxx_add_subdevice(mc13xxx, "%s-led");
->  		mc13xxx_add_subdevice(mc13xxx, "%s-pwrbutton");
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
