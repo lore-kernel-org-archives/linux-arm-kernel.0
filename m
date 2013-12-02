@@ -1,49 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  2 Dec 2013 09:29:35 +0000
-Subject: [REPOST PATCH] ARM: sunxi: stop timer from ticking before enabling
- interrupts
-Message-ID: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Mon,  2 Dec 2013 15:04:01 +0530
+Subject: [PATCH V6 0/2] genirq: arm64: perf: support for percpu pmu interrupt
+Message-ID: <1385976843-13280-1-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun4i timer can still be ticking when we enable the interrupt.
-If another timer is actually used (A7 architected timer, for example),
-odds are that the interrupt will eventually fire with the event_handler
-pointer being NULL.
+This patch series adds support to handle interrupt registration/deregistration
+in arm64 pmu driver when pmu interrupt type is percpu.
 
-The obvious fix it to stop the timer before registering the interrupt.
+Changelog:
+V6:
+* In arm64 pmu driver: Use macro 'IRQ_TYPE_NONE' while passing irq type value
+  to enable_percpu_irq(). Change 'irqs' etc variables as unsigned, modify the
+  check for 'irqs' inside armpmu_[release/reserve]_hardware().
 
-Observed and tested on sun7i (cubietruck).
+V5:
+* In irqdesc.h: Added Chris Smith's sign-off.
+  In arm64 pmu driver: Handle the invalid irq-0 case for platform_get_irq().
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-Daniel,
+V4:
+* In arm64 pmu driver: Avoid using irq_to_desc() to check validity of irq.
 
-Maxime asked me to forward this to you directly. Please consider merging
-it for 3.13.
+V3:
+* Remove validity check for 'desc' from accessor function in irqdesc.h .
+  Instead, check the irq 'desc' validity in arm64 pmu driver.
 
-Thanks,
+V2:
+* To determine whether an IRQ is percpu or not, added an accessor function in
+  irqdesc.h . This approach was used by Chris Smith here[1] for similar changes
+  in arm pmu driver.
+* In arm64 pmu driver: Got rid of unnecessary pointer typecastings.
 
-	M.
+[1] http://lkml.indiana.edu/hypermail/linux/kernel/1207.3/02955.html
 
- drivers/clocksource/sun4i_timer.c | 3 +++
- 1 file changed, 3 insertions(+)
+Vinayak Kale (2):
+  genirq: Add an accessor for IRQ_PER_CPU flag
+  arm64: perf: add support for percpu pmu interrupt
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 2fb4695..a4f6119 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -179,6 +179,9 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M),
- 	       timer_base + TIMER_CTL_REG(0));
- 
-+	/* Make sure timer is stopped before playing with interrupts */
-+	sun4i_clkevt_time_stop(0);
-+
- 	ret = setup_irq(irq, &sun4i_timer_irq);
- 	if (ret)
- 		pr_warn("failed to setup irq %d\n", irq);
+ arch/arm64/kernel/perf_event.c |  116 +++++++++++++++++++++++++++++-----------
+ include/linux/irqdesc.h        |    8 +++
+ 2 files changed, 94 insertions(+), 30 deletions(-)
+
 -- 
-1.8.2.3
+1.7.9.5
