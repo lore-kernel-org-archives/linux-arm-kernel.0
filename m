@@ -1,44 +1,70 @@
-From: srikanth.thokala@xilinx.com (Srikanth Thokala)
-Date: Mon, 2 Dec 2013 10:51:58 +0000
-Subject: [PATCH 2/2] net: emaclite: add barriers to support Xilinx Zynq
- platform
-In-Reply-To: <20131201.200906.25118738399177322.davem@davemloft.net>
-References: <1385623797-26034-1-git-send-email-sthokal@xilinx.com>
- <9045da6f-88e5-4a20-be68-477790588131@TX2EHSMHS023.ehs.local>
- <20131201.200906.25118738399177322.davem@davemloft.net>
-Message-ID: <804ed99e-257a-46b6-b453-86b215ef7309@DB9EHSMHS025.ehs.local>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Dec 2013 10:54:32 +0000
+Subject: [PATCH RESEND] mfd: mc13xxx: Fix null pointer dereference in
+ mc13xxx_common_init
+In-Reply-To: <1385805188-5597-1-git-send-email-shc_work@mail.ru>
+References: <1385805188-5597-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131202105432.GC29373@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Sat, 30 Nov 2013, Alexander Shiyan wrote:
 
-> -----Original Message-----
-> From: David Miller [mailto:davem at davemloft.net]
-> Sent: Monday, December 02, 2013 6:39 AM
-> To: Srikanth Thokala
-> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Michal
-> Simek; Srikanth Thokala
-> Subject: Re: [PATCH 2/2] net: emaclite: add barriers to support Xilinx Zynq
-> platform
->
-> From: Srikanth Thokala <srikanth.thokala@xilinx.com>
-> Date: Thu, 28 Nov 2013 12:59:57 +0530
->
-> > This patch adds barriers at appropriate places to ensure the driver
-> > works on Xilinx Zynq ARM-based SoC platform.
-> >
-> > Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
->
-> Memory barriers must have comments.
->
-> Specifically, the comment must describe what exactly is being ensured by the
-> memory barrier.  What entity must see what memory operations in what order?
+> If this driver being loaded from devicetree, the pdata is NULL.
+> This cause kernel Oops when "fsl,mc13xxx-uses-codec" and/or
+> "fsl,mc13xxx-uses-touch" properties is specified.
 
-Ok. I will update and send you v2.
+<snip>
 
-Thanks
-Srikanth
+The original code is pretty gross. This stuff shouldn't be identifying
+_support_ in Device Tree, then dragging in configuration from platform
+code.
 
+Rather than patch it up with little plasters (band aids), can we fix
+it properly please?
 
+> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/mfd/mc13xxx-core.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+> index dbbf8ee..625633a 100644
+> --- a/drivers/mfd/mc13xxx-core.c
+> +++ b/drivers/mfd/mc13xxx-core.c
+> @@ -682,14 +682,14 @@ err_revision:
+>  	if (mc13xxx->flags & MC13XXX_USE_ADC)
+>  		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
+>  
+> -	if (mc13xxx->flags & MC13XXX_USE_CODEC)
+> +	if ((mc13xxx->flags & MC13XXX_USE_CODEC) && pdata)
+>  		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-codec",
+>  					pdata->codec, sizeof(*pdata->codec));
+>  
+>  	if (mc13xxx->flags & MC13XXX_USE_RTC)
+>  		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
+>  
+> -	if (mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN)
+> +	if ((mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN) && pdata)
+>  		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-ts",
+>  				&pdata->touch, sizeof(pdata->touch));
+>  
+> @@ -701,6 +701,10 @@ err_revision:
+>  		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-pwrbutton",
+>  				pdata->buttons, sizeof(*pdata->buttons));
+>  	} else {
+> +		if (mc13xxx->flags & MC13XXX_USE_CODEC)
+> +			mc13xxx_add_subdevice(mc13xxx, "%s-codec");
+> +		if (mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN)
+> +			mc13xxx_add_subdevice(mc13xxx, "%s-ts");
+>  		mc13xxx_add_subdevice(mc13xxx, "%s-regulator");
+>  		mc13xxx_add_subdevice(mc13xxx, "%s-led");
+>  		mc13xxx_add_subdevice(mc13xxx, "%s-pwrbutton");
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
