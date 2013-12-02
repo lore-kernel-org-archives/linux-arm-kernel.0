@@ -1,53 +1,37 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Mon, 2 Dec 2013 13:56:56 +0000
-Subject: [PATCH v3 36/36] ARM: STi: Add support for the FSM Serial Flash
- Controller
-In-Reply-To: <20131202134348.GG31626@lee--X1>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
- <529C858B.1040601@st.com> <20131202132013.GF31626@lee--X1>
- <529C8A99.1020204@st.com> <20131202134348.GG31626@lee--X1>
-Message-ID: <529C91A8.3030401@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Dec 2013 14:03:24 +0000
+Subject: [alsa-devel] [PATCH 07/10] ASoC: ux500: Store DMA data in the
+ DAI differently in the pdata and DT case
+In-Reply-To: <20131202135452.GI27568@sirena.org.uk>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+ <1384859269-19801-8-git-send-email-lee.jones@linaro.org>
+ <CAOesGMiu16f_L=cMWFCNZMjNB9tBK-2LXn02k-R7FhkkgR5-+g@mail.gmail.com>
+ <20131202101256.GA29373@lee--X1>
+ <20131202135452.GI27568@sirena.org.uk>
+Message-ID: <20131202140324.GH31626@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/13 13:43, Lee Jones wrote:
-> On Mon, 02 Dec 2013, srinivas kandagatla wrote:
-> 
->> On 02/12/13 13:20, Lee Jones wrote:
->>>>> +		/* FSM */
->>>>> +		spifsm: spifsm at fe902000{
->>>>> +		        compatible         = "st,spi-fsm", "simple-bus";
->>>> "simple-bus" is redundant here.
->>>
->>> Yes I agree, good spot.
->>>
->>> I removed it from the Documentation, but missed this one.
->>>
->>> If I remove it, can I add your Ack for the remainder of the patch?
->> Yes,
->>
->> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>
->> You should be aware that arch/arm/boot/dts/stih416-b2105.dts is not in
->> mainline yet.
-> 
-> Yes, I am aware of this. Are you queuing patches for it?
-Yes, I will post this soon.
+On Mon, 02 Dec 2013, Mark Brown wrote:
 
-thanks,
-srini
+> On Mon, Dec 02, 2013 at 10:12:56AM +0000, Lee Jones wrote:
 > 
->>>>> +		        reg                =  <0xfe902000 0x1000>;
->>>>> +		        reg-names          = "spi-fsm";
->>>>> +		        pinctrl-0          = <&pinctrl_fsm>;
->>>>> +
->>>>> +			st,syscfg	   = <&syscfg_rear>;
->>>>> +		        st,boot-device-reg = <0x958>;
->>>>> +		        st,boot-device-spi = <0x1a>;
->>>>> +
->>>>> +		        status = "okay";
->>>>> +		};
->>>
->>
+> > It's actually my fault. I had two patches round the wrong way in the
+> > series. The imediately subsequent patch in the set fixes this issue:
 > 
+> OK, so what do we do about this?  Is there going to be a revision of
+> that patch adding the note about not using the autoconfiguration stuff
+> and what (if any) are the dependencies on the arch/arm changes?
+
+I can shoot out a revision no problem.
+
+I'm not aware of any dependencies on the ARM changes. I haven't tested
+the arch/arm and sound/soc adaptions orthogonally, but I _think_ the
+right decisions should be made depending on the information passed
+from platform/dt code.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
