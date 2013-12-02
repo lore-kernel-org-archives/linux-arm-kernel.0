@@ -1,35 +1,128 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon,  2 Dec 2013 22:14:42 +0400
-Subject: [PATCH 0/3] ARM: clps711x: IRQCHIP driver
-Message-ID: <1386008082-6867-1-git-send-email-shc_work@mail.ru>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon,  2 Dec 2013 10:14:41 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
+ system
+Message-ID: <1386008082-28740-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is devoted to new CLPS711X irqchip driver.
-The driver designed for booting from ATAGS and devicetree.
+A good watchdog driver is supposed to report when it was responsible
+for resetting the system.  Implement this for the s3c2410, at least on
+exynos5250 and exynos5420 where we already have a pointer to the PMU
+registers to read the information.
 
-Alexander Shiyan (3):
-  ARM: clps711x: Add CLPS711X irqchip driver
-  ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
-    driver
-  ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+This patch is based atop Leela Krishna's recent series that ends with
+(ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+AKA <https://patchwork.kernel.org/patch/3251861/>.
 
- .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
- arch/arm/Kconfig                                   |   2 -
- arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
- arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
- arch/arm/mach-clps711x/board-clep7312.c            |   2 -
- arch/arm/mach-clps711x/board-edb7211.c             |   2 -
- arch/arm/mach-clps711x/board-p720t.c               |   2 -
- arch/arm/mach-clps711x/common.c                    | 201 +----------------
- arch/arm/mach-clps711x/common.h                    |   5 +-
- arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
- drivers/irqchip/Kconfig                            |   8 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-clps711x.c                     | 246 +++++++++++++++++++++
- 13 files changed, 302 insertions(+), 228 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
- create mode 100644 drivers/irqchip/irq-clps711x.c
+ drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 39 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index 47f4dcf..2c87d37 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -62,9 +62,13 @@
+ #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+ #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+ 
++#define RST_STAT_REG_OFFSET		0x0404
+ #define WDT_DISABLE_REG_OFFSET		0x0408
+ #define WDT_MASK_RESET_REG_OFFSET	0x040c
+ #define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
++#define QUIRK_HAS_RST_STAT		(1 << 1)
++#define QUIRKS_NEED_PMUREG		(QUIRK_NEEDS_PMU_CONFIG | \
++					 QUIRK_HAS_RST_STAT)
+ 
+ static bool nowayout	= WATCHDOG_NOWAYOUT;
+ static int tmr_margin;
+@@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
+  * timer reset functionality.
+  * @mask_bit: Bit number for the watchdog timer in the disable register and the
+  * mask reset register.
++ * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
++ * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
++ * reset.
+  * @quirks: A bitfield of quirks.
+  */
+ 
+@@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
+ 	int disable_reg;
+ 	int mask_reset_reg;
+ 	int mask_bit;
++	int rst_stat_reg;
++	int rst_stat_bit;
+ 	u32 quirks;
+ };
+ 
+@@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
+ 	.disable_reg = WDT_DISABLE_REG_OFFSET,
+ 	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+ 	.mask_bit = 20,
+-	.quirks = QUIRK_NEEDS_PMU_CONFIG
++	.rst_stat_reg = RST_STAT_REG_OFFSET,
++	.rst_stat_bit = 20,
++	.quirks = QUIRK_NEEDS_PMU_CONFIG |
++		QUIRK_HAS_RST_STAT,
+ };
+ 
+ static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
+ 	.disable_reg = WDT_DISABLE_REG_OFFSET,
+ 	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+ 	.mask_bit = 0,
+-	.quirks = QUIRK_NEEDS_PMU_CONFIG
++	.rst_stat_reg = RST_STAT_REG_OFFSET,
++	.rst_stat_bit = 9,
++	.quirks = QUIRK_NEEDS_PMU_CONFIG |
++		QUIRK_HAS_RST_STAT,
+ };
+ 
+ static const struct of_device_id s3c2410_wdt_match[] = {
+@@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+ }
+ #endif
+ 
++static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
++{
++	unsigned int bootstatus = 0;
++	int ret;
++
++	if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
++		unsigned int rst_stat;
++
++		ret = regmap_read(wdt->pmureg, wdt->drv_data->rst_stat_reg,
++				  &rst_stat);
++		if (ret)
++			dev_warn(wdt->dev, "Couldn't get RST_STAT register\n");
++		else if (rst_stat & BIT(wdt->drv_data->rst_stat_bit))
++			bootstatus |= WDIOF_CARDRESET;
++	}
++
++	return bootstatus;
++}
++
+ /* s3c2410_get_wdt_driver_data */
+ static inline struct s3c2410_wdt_variant *
+ get_wdt_drv_data(struct platform_device *pdev)
+@@ -460,7 +494,7 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+ 	wdt->wdt_device = s3c2410_wdd;
+ 
+ 	wdt->drv_data = get_wdt_drv_data(pdev);
+-	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
++	if (wdt->drv_data->quirks & QUIRKS_NEED_PMUREG) {
+ 		wdt->pmureg = syscon_regmap_lookup_by_phandle(dev->of_node,
+ 							"samsung,syscon-phandle");
+ 		if (IS_ERR(wdt->pmureg)) {
+@@ -531,6 +565,8 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_nowayout(&wdt->wdt_device, nowayout);
+ 
++	wdt->wdt_device.bootstatus = s3c2410wdt_get_bootstatus(wdt);
++
+ 	ret = watchdog_register_device(&wdt->wdt_device);
+ 	if (ret) {
+ 		dev_err(dev, "cannot register watchdog (%d)\n", ret);
 -- 
-1.8.3.2
+1.8.4.1
