@@ -1,83 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 2 Dec 2013 16:50:59 +0100
-Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
- system suspend
-In-Reply-To: <4994754.y6gINBtP7i@vostro.rjw.lan>
-References: <Pine.LNX.4.44L0.1311291014020.27250-100000@netrider.rowland.org>
- <4994754.y6gINBtP7i@vostro.rjw.lan>
-Message-ID: <CAPDyKFpf58CRKUhFPKHyg4S9oaUR=XHJQs=hK7p63Hkv8gnbbw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 Dec 2013 08:09:39 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: enable network for BeagleBone
+ Black
+In-Reply-To: <1385972129-3638-1-git-send-email-olof@lixom.net>
+References: <1385972129-3638-1-git-send-email-olof@lixom.net>
+Message-ID: <20131202160938.GH23334@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> That would be kind of OK, if the driver's .suspend_late() only invoked its own
-> .runtime_suspend(), what you did below.
->
-> But, in the Ulf's approach the driver calls .runtime_suspend() from
-> its *subsystem* in the hope that it will all work out properly (or
-> perhaps based on the knowledge about this particular subsystem).
+* Olof Johansson <olof@lixom.net> [131202 00:15]:
+> BeagleBone Black uses the TI CPSW ethernet controller, enable it in the
+> multi_v7_defconfig for testing coverage purposes.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-Correct assumption.
+Acked-by: Tony Lindgren <tony@atomide.com>
 
->
-> As I said, that may lead to problems when the same driver is attempted to
-> be used with a different subsystem-level code (for example, a different PM
-> domain).
-
-I don't think this is an issue we need to consider.
-
-I assume the reason for having a PM domain is typically because you
-have a PM domain regulator to handle. Certainly the PM domain,
-controls it by using the runtime PM callbacks.
-
-Thus it does not make sense to bypass the PM domain callbacks, and
-just letting the driver call it's own runtime PM callbacks during
-system suspend. It will only do parts of the work then.
-
->
->> The amount of code needed is quite small; basically nothing more than:
->>
->>       if (!pm_runtime_status_suspended(dev))
->>               dev->driver->pm->runtime_suspend(dev);
->>
->> The problems are:
->>
->>      1. Which callback does this code belong in?
->>
->>      2. Which runtime_suspend callback should be invoked?  The example
->>       above uses dev->driver->pm->runtime_suspend, but this may not
->>       always be the right one.
->
-> Well, none of them may always be the right one, which is my point.
->
-> I don't think we can come up with a really generic set of routines that will
-> be generally useful regardless of the subsystem/driver combination in question,
-> so in my opinion the PM core is not the right place to put such routines into.
->
-> I wouldn't have problems with them being defined in the OMAP PM code.  As part
-> of that code they are free to do whatever they like if that code's maintainers
-> are fine with that.  But I don't want to see such confusing stuff in the core.
-
-As I just replied in my other email, having the code to be available
-and used in the PM domain code is not an option that we will gain
-from. The OMAP PM domain already does this, though in a slightly other
-form  - and side effects is not what we want.
-
-The drivers need to re-use and invoke the runtime PM callbacks, that
-is to me the only option that makes sense.
-
-At the same time, I somewhat agree with you that the new functions I
-propose to be added is not so "generic". What if we think of them as
-pm_runtime helper functions instead, would that make more sense?
-
-Kind regards
-Uffe
-
->
-> Anyway, I'd like to understand what problems in particular those things would
-> be useful to solve, as I suspect that they may be addressed differently and
-> more cleanly.
->
-> Thanks,
-> Rafael
->
+> ---
+>  arch/arm/configs/multi_v7_defconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 4a5903e..d30507d 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -69,6 +69,7 @@ CONFIG_KS8851=y
+>  CONFIG_SMSC911X=y
+>  CONFIG_STMMAC_ETH=y
+>  CONFIG_MDIO_SUN4I=y
+> +CONFIG_TI_CPSW=y
+>  CONFIG_KEYBOARD_SPEAR=y
+>  CONFIG_SERIO_AMBAKMI=y
+>  CONFIG_SERIAL_8250=y
+> -- 
+> 1.7.10.4
+> 
