@@ -1,60 +1,114 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 2 Dec 2013 11:49:32 +0200
-Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
-In-Reply-To: <1385976238.12531.8.camel@host5.omatika.ru>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-2-git-send-email-ynvich@gmail.com>
- <20131202090253.GE3942@xps8300>
- <1385976238.12531.8.camel@host5.omatika.ru>
-Message-ID: <20131202094932.GF3942@xps8300>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Dec 2013 09:50:34 +0000
+Subject: [PATCH v6 08/17] spi: mpc512x: adjust to OF based clock lookup
+In-Reply-To: <1385851897-23475-9-git-send-email-gsi@denx.de>
+References: <1385851897-23475-1-git-send-email-gsi@denx.de>
+ <1385851897-23475-9-git-send-email-gsi@denx.de>
+Message-ID: <20131202095034.GB12952@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Dec 02, 2013 at 01:23:58PM +0400, Sergei Ianovich wrote:
-> On Mon, 2013-12-02 at 11:02 +0200, Heikki Krogerus wrote:
-> > On Sun, Dec 01, 2013 at 10:26:14AM +0400, Sergei Ianovich wrote:
-> > > PXA serial ports have "standard" UART names (ttyS[0-3]), major
-> > > device number (4) and first minor device number (64) by default.
-> > > 
-> > > If the system has extra 8250 serial port hardware in addition
-> > > to onboard PXA serial ports, default settings produce a device
-> > > allocation conflict.
-> > > 
-> > > The patch provides a configuration option which can move onboard
-> > > ports out of the way of 8250_core by assigning a different (204)
-> > > major number and corresponding device names (ttySA[0-3]).
-> > > 
-> > <snip>
-> > 
-> > If drivers/tty/serial/pxa.c was converted to an other probe driver for
-> > the 8250, this would not be an issue.
+On Sat, Nov 30, 2013 at 10:51:28PM +0000, Gerhard Sittig wrote:
+> after device tree based clock lookup became available, the peripheral
+> driver need no longer construct clock names which include the PSC index,
+> remove the "psc%d_mclk" template and unconditionally use 'mclk'
 > 
-> It seems that my patch is not going to be accepted. However, there is a
-> device which has both PXA ports and a additional 8250 accent chip. As a
-> result, there is a device allocation conflict. For the device to be
-> usable the conflict needs to be resolved.
-> 
-> Do you mean that drivers/tty/serial/pxa.c needs to be rewritten to
-> support lp8x4x special case?
+> acquire and release the 'ipg' clock item for register access as well
 
-Sorry I was not clear. I was suggesting that drivers/tty/serial/pxa.c
-would be converted to drivers/tty/serial/8250/8250_pxa.c since it
-looks to me like just an other 16x50 compatible UART. That would fix
-the issue with the name conflict. You would then simply register 8250
-ports from two probe drivers (drivers/tty/serial/8250/8250_pxa.c and
-drivers/tty/serial/8250/8250_lp8x4x.c).
-
-Depending on the order you register your platform devices (which you
-decide in your platform code), but let's say the pxa gets registered
-first and let's say it only has one port. You will then have in your
-system /dev/ttyS0 for the pxa port and /dev/ttyS[1-4] for the other
-UART.
-
-I hope I was able to explain what I mean this time :)
+For this and the other peripheral updates, it would be nice to have the
+expected clock-names entries added to the respective binding documents.
+Otherwise this looks fine to me.
 
 Thanks,
+Mark.
 
--- 
-heikki
+> 
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: linux-spi at vger.kernel.org
+> Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> ---
+>  drivers/spi/spi-mpc512x-psc.c |   26 ++++++++++++++++++--------
+>  1 file changed, 18 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
+> index 9602bbd8d7ea..de66c676c248 100644
+> --- a/drivers/spi/spi-mpc512x-psc.c
+> +++ b/drivers/spi/spi-mpc512x-psc.c
+> @@ -40,6 +40,7 @@ struct mpc512x_psc_spi {
+>  	unsigned int irq;
+>  	u8 bits_per_word;
+>  	struct clk *clk_mclk;
+> +	struct clk *clk_ipg;
+>  	u32 mclk_rate;
+>  
+>  	struct completion txisrdone;
+> @@ -475,8 +476,6 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+>  	struct spi_master *master;
+>  	int ret;
+>  	void *tempp;
+> -	int psc_num;
+> -	char clk_name[16];
+>  	struct clk *clk;
+>  
+>  	master = spi_alloc_master(dev, sizeof *mps);
+> @@ -520,9 +519,7 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+>  		goto free_master;
+>  	init_completion(&mps->txisrdone);
+>  
+> -	psc_num = master->bus_num;
+> -	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
+> -	clk = devm_clk_get(dev, clk_name);
+> +	clk = devm_clk_get(dev, "mclk");
+>  	if (IS_ERR(clk)) {
+>  		ret = PTR_ERR(clk);
+>  		goto free_irq;
+> @@ -533,17 +530,29 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+>  	mps->clk_mclk = clk;
+>  	mps->mclk_rate = clk_get_rate(clk);
+>  
+> +	clk = devm_clk_get(dev, "ipg");
+> +	if (IS_ERR(clk)) {
+> +		ret = PTR_ERR(clk);
+> +		goto free_mclk_clock;
+> +	}
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret)
+> +		goto free_mclk_clock;
+> +	mps->clk_ipg = clk;
+> +
+>  	ret = mpc512x_psc_spi_port_config(master, mps);
+>  	if (ret < 0)
+> -		goto free_clock;
+> +		goto free_ipg_clock;
+>  
+>  	ret = devm_spi_register_master(dev, master);
+>  	if (ret < 0)
+> -		goto free_clock;
+> +		goto free_ipg_clock;
+>  
+>  	return ret;
+>  
+> -free_clock:
+> +free_ipg_clock:
+> +	clk_disable_unprepare(mps->clk_ipg);
+> +free_mclk_clock:
+>  	clk_disable_unprepare(mps->clk_mclk);
+>  free_irq:
+>  	free_irq(mps->irq, mps);
+> @@ -561,6 +570,7 @@ static int mpc512x_psc_spi_do_remove(struct device *dev)
+>  	struct mpc512x_psc_spi *mps = spi_master_get_devdata(master);
+>  
+>  	clk_disable_unprepare(mps->clk_mclk);
+> +	clk_disable_unprepare(mps->clk_ipg);
+>  	free_irq(mps->irq, mps);
+>  	if (mps->psc)
+>  		iounmap(mps->psc);
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
