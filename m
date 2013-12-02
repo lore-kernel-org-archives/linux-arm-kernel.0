@@ -1,67 +1,56 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 2 Dec 2013 15:16:41 -0600
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix usage of invalid iclk / oclk when
- clock node is not present
-Message-ID: <1386019001-10144-1-git-send-email-nm@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 2 Dec 2013 13:36:54 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset
+ the system
+In-Reply-To: <CAOesGMi-P6LG1-XKVizUS_qX-gfZi_iXBO5r+=6a2nfvBS60mw@mail.gmail.com>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+ <20131202202120.GA23611@roeck-us.net>
+ <CAOesGMi-P6LG1-XKVizUS_qX-gfZi_iXBO5r+=6a2nfvBS60mw@mail.gmail.com>
+Message-ID: <20131202213654.GA4059@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit dc75925d(OMAP: hwmod: Fix the missing braces) introduced
-missing braces, however, we just set return result if clk_get fail
-and we populate the error pointer in clk pointer and pass it along to
-clk_prepare. This is wrong. The intent seems to be retry remaining
-clocks if they are available and warn the ones we cant find clks for.
+On Mon, Dec 02, 2013 at 12:47:53PM -0800, Olof Johansson wrote:
+> On Mon, Dec 2, 2013 at 12:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
+> >> A good watchdog driver is supposed to report when it was responsible
+> >> for resetting the system.  Implement this for the s3c2410, at least on
+> >> exynos5250 and exynos5420 where we already have a pointer to the PMU
+> >> registers to read the information.
+> >>
+> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> >> ---
+> >> This patch is based atop Leela Krishna's recent series that ends with
+> >> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+> >> AKA <https://patchwork.kernel.org/patch/3251861/>.
+> >>
+> >>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+> >>  1 file changed, 39 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> >> index 47f4dcf..2c87d37 100644
+> >> --- a/drivers/watchdog/s3c2410_wdt.c
+> >> +++ b/drivers/watchdog/s3c2410_wdt.c
+> >> @@ -62,9 +62,13 @@
+> >>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
+> >>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
+> >>
+> >> +#define RST_STAT_REG_OFFSET          0x0404
+> >>  #define WDT_DISABLE_REG_OFFSET               0x0408
+> >>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
+> >>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
+> >> +#define QUIRK_HAS_RST_STAT           (1 << 1)
+> >> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
+> >> +                                      QUIRK_HAS_RST_STAT)
+> >>
+> > I am not really happy about the NEED (both of them, really) here.
+> > How about HAS instead ?
+> 
+> Ah, I just commented on these things on our internal review site too
+> on this patch. I don't even think a quirk is needed -- just use the
+> presence of a non-0 rst_stat_reg to tell if you need to use regmap.
+> 
+Agreed; same is true for the QUIRK_NEEDS_PMU_CONFIG related registers
+as well.
 
-With the current logic, we see the following crash:
-omap_hwmod: l3_main: cannot clk_get interface_clk emac_ick
-Unable to handle kernel NULL pointer dereference at virtual address 00000032
-pgd = c0004000
-[00000032] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.13.0-rc1-00044-gcc9fd5a-dirty #19
-task: ce0c3440 ti: ce0c4000 task.ti: ce0c4000
-PC is at __clk_prepare+0x10/0x74
-LR is at clk_prepare+0x14/0x24
-  <snip>
-[<c044d59c>] (__clk_prepare+0x10/0x74) from [<c044d9b0>] (clk_prepare+0x14/0x24)
-[<c044d9b0>] (clk_prepare+0x14/0x24) from [<c077d8c4>] (_init+0x24c/0x3bc)
-[<c077d8c4>] (_init+0x24c/0x3bc) from [<c0027328>] (omap_hwmod_for_each+0x34/0x5c)
-[<c0027328>] (omap_hwmod_for_each+0x34/0x5c) from [<c077dfa0>] (__omap_hwmod_setup_all+0x24/0x40)
-[<c077dfa0>] (__omap_hwmod_setup_all+0x24/0x40) from [<c0008928>] (do_one_initcall+0x38/0x168)
-[<c0008928>] (do_one_initcall+0x38/0x168) from [<c0771be8>] (kernel_init_freeable+0xfc/0x1cc)
-[<c0771be8>] (kernel_init_freeable+0xfc/0x1cc) from [<c0521064>] (kernel_init+0x8/0x110)
-[<c0521064>] (kernel_init+0x8/0x110) from [<c000e568>] (ret_from_fork+0x14/0x2c)
-Code: e92d4038 e2504000 01a05004 0a000005 (e5943034)
-
-So, just warn and continue instead of proceeding and crashing, with
-missing clock nodes/bad data, we will eventually fail, however we
-should now have enough information to identify the culprit.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index d0cf926..411e24f 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -787,6 +787,7 @@ static int _init_interface_clks(struct omap_hwmod *oh)
- 			pr_warning("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
- 				   oh->name, os->clk);
- 			ret = -EINVAL;
-+			continue;
- 		}
- 		os->_clk = c;
- 		/*
-@@ -823,6 +824,7 @@ static int _init_opt_clks(struct omap_hwmod *oh)
- 			pr_warning("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
- 				   oh->name, oc->clk);
- 			ret = -EINVAL;
-+			continue;
- 		}
- 		oc->_clk = c;
- 		/*
--- 
-1.7.9.5
+Guenter
