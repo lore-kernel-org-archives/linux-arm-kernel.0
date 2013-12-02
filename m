@@ -1,28 +1,32 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 02 Dec 2013 12:55:47 +0100
-Subject: [PATCH/RESEND] clocksource: armada-370-xp: Enable timer divider
- only when needed
-In-Reply-To: <1385748290-1178-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1385748290-1178-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <529C7543.2050803@linaro.org>
+Date: Mon, 02 Dec 2013 12:57:21 +0100
+Subject: [REPOST PATCH] ARM: sunxi: stop timer from ticking before enabling
+ interrupts
+In-Reply-To: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
+References: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <529C75A1.8020009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 07:04 PM, Ezequiel Garcia wrote:
-> The current code sets the timer divider bits always. However, when
-> the 25 MHz timer is enabled, this is not needed and has no effect.
-> As this causes some confusion, rework the code so the divider is
-> set only when needed, i.e. when the 25 MHz timer is not in use.
+On 12/02/2013 10:29 AM, Marc Zyngier wrote:
+> The sun4i timer can still be ticking when we enable the interrupt.
+> If another timer is actually used (A7 architected timer, for example),
+> odds are that the interrupt will eventually fire with the event_handler
+> pointer being NULL.
 >
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> The obvious fix it to stop the timer before registering the interrupt.
+>
+> Observed and tested on sun7i (cubietruck).
+>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
 
-Applied in my tree for 3.14.
+Applied to my tree as 3.13 fixes.
 
 Thanks
    -- Daniel
-
 
 
 -- 
