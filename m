@@ -1,69 +1,54 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Mon, 02 Dec 2013 15:46:22 +0400
-Subject: [PATCH 05/11] serial: support for 16550 serial ports on LP-8x4x
-In-Reply-To: <20131202084845.GD3942@xps8300>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-6-git-send-email-ynvich@gmail.com>
- <20131202084845.GD3942@xps8300>
-Message-ID: <1385984782.12531.26.camel@host5.omatika.ru>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Dec 2013 11:46:38 +0000
+Subject: [PATCH] ARM:INTEGRATOR: Default enable ARM_PATCH_PHYS_VIRT,
+ AUTO_ZRELADDR
+In-Reply-To: <1385983731-13196-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
+References: <1385983731-13196-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+ <1385983731-13196-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
+Message-ID: <20131202114638.GH16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-02 at 10:48 +0200, Heikki Krogerus wrote:
-> On Sun, Dec 01, 2013 at 10:26:18AM +0400, Sergei Ianovich wrote:
-> > The patch adds support for 3 additional LP-8x4x built-in serial
-> > ports.
-> > 
-> > The device can also host up to 8 extension cards with 4 serial ports
-> > on each card for a total of 35 ports. However, I don't have
-> > the hardware to test extension cards, so they are not supported, yet.
-
-> > --- a/arch/arm/mach-pxa/include/mach/lp8x4x.h
-> > +++ b/arch/arm/mach-pxa/include/mach/lp8x4x.h
-> > @@ -50,6 +50,12 @@
-> >  #define LP8X4X_CLRFALLINT	LP8X4X_P2V(0x1700901a)
-> >  #define LP8X4X_RWRTC		LP8X4X_P2V(0x1700901c)
-> >  #define LP8X4X_SRAMBANK		0x1700901e
-> > +#define LP8X4X_TTYS0_QUIRK	0x17009030
-> > +#define LP8X4X_TTYS1_QUIRK	0x17009032
-> > +#define LP8X4X_TTYS2_QUIRK	0x17009034
-> > +#define LP8X4X_TTYS0_IOMEM	0x17009050
-> > +#define LP8X4X_TTYS1_IOMEM	0x17009060
-> > +#define LP8X4X_TTYS2_IOMEM	0x17009070
-> > +
-> > +static void lp8x4x_set_termios(struct uart_port *port,
-> > +		struct ktermios *termios, struct ktermios *old)
-> > +{
+On Mon, Dec 02, 2013 at 04:58:51PM +0530, panchaxari wrote:
+> ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR has been enabled as default configs
+> to integrator platform.
 > 
-> <snip>
+> Introduction of PHYS_VIRT config as default would enable phy-to-virt and
+> virt-to-phy translation function at boot and module loading time
+> and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
+> enable calculation of kernel load address at run time.
 > 
-> > +static int request_and_remap(int i)
-> > +{
-> > +	if (!request_mem_region(extra_mem[i], 1, "serial"))
-> > +		return -EBUSY;
-> > +
-> > +	lp8x4x_data[i].private_data = ioremap(extra_mem[i], 1);
-> > +	if (lp8x4x_data[i].private_data)
-> > +		return 0;
-> > +
-> > +	release_mem_region(extra_mem[i], 1);
-> > +	return -ENODEV;
-
-> Instead of registering a platform device for serial8250 here, you need
-> to simply register a platform driver for something like lp8x4x_serial.
-> The platform code will to registers the platform devices for it. You
-> will use serial8250_register_8250_port() in your probe to register a
-> new port. Use 8250_em.c and 8250_dw.c under drivers/tty/serial/8250/
-> as an example.
+> PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
+> systems with NOR flash devices, and ZRELADDR config is mutually exclusive
+> to ZBOOT_ROM.
 > 
-> You don't need to introduce plat_serial8250_port so you won't need
-> the QUIRK_PORT stuff. You deliver the iomem and the irq as normal
-> resources that the driver uses when you create the platform device.
-> That of course also means the driver does not need to care about the
-> instances. The platform code will generate a platform device for as
-> many ports you have and set to resources accordingly.
+> Requesting maintainers of Integrator platform to evaluate the changes on the
+> board and comment, as I dont have the board for testing and also requesting
+> an ACK.
 
-8250_core.c doesn't use platform infrastructure to request and map IO
-memory. There will be a conflict (and an error in
-serial8250_request_std_resource()), if main IO memory is requested by
-the platform device, won't it?
+This is _exactly_ the kind of patches I don't want to see - people
+running around changing platforms with no way to test them.  I spent
+most of last week sorting out the fallout from the "single zImage"
+project breaking the Versatile and footbridge platforms, and I've
+decided that this kind of thing has to stop.
+
+We can't have arch/arm living in a constant cycle of total brokenness
+with nothing being stable.  It was a hell of a lot better in terms of
+not being broken when we didn't have this silly single zImage project.
+
+If you want to do such work, send the patches with "[CFT]" in the
+subject line - call for testing.
+
+What that means is "this patch is experimental, we don't know if it
+works, and we'd like someone to test it." and more importantly "It's
+not for merging yet."
+
+If no one steps up to test it, then it should *not* be merged, because
+you're potentially de-stablising an existing platform.  Yes, I know
+that will make things harder to get into the kernel, but that's the way
+it _should_ be if you're going to be causing pain to people.
+
+Frankly, I suspect most "users" just don't touch the mainline kernel
+anymore - they all rely on (eg) debian people to maintain an effective
+forked mainline kernel separately which has all our fsckups fixed.
+Hence why we don't get to hear about this stuff breaking.
