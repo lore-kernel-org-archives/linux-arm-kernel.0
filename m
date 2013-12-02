@@ -1,99 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Dec 2013 12:08:45 +0000
-Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from
- device tree
-In-Reply-To: <20131202115442.GA4725@amd.pavel.ucw.cz>
-References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
- <20131112153057.GA9683@earth.universe>
- <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
- <20131112200514.GA15413@earth.universe>
- <CACRpkdaAaLjm_b+OLj3tobxBN8YGUcTPnXJ=qtBqd02=FTxhjQ@mail.gmail.com>
- <20131112204013.GA17674@earth.universe>
- <20131113142406.GH21713@e106331-lin.cambridge.arm.com>
- <20131117182852.GC30012@xo-6d-61-c0.localdomain>
- <20131202113720.GF12952@e106331-lin.cambridge.arm.com>
- <20131202115442.GA4725@amd.pavel.ucw.cz>
-Message-ID: <20131202120845.GI12952@e106331-lin.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Dec 2013 13:14:48 +0100
+Subject: [PATCH] clk: tegra: Correct clock number for UARTE
+In-Reply-To: <1385984847.4086.3.camel@weser.hi.pengutronix.de>
+References: <1385983825-20317-1-git-send-email-treding@nvidia.com>
+ <1385984847.4086.3.camel@weser.hi.pengutronix.de>
+Message-ID: <20131202121447.GB12793@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 11:54:42AM +0000, Pavel Machek wrote:
-> On Mon 2013-12-02 11:37:20, Mark Rutland wrote:
-> > On Sun, Nov 17, 2013 at 06:28:52PM +0000, Pavel Machek wrote:
-> > > 
-> > > > > Thus I guess we should not use the name, which has the most adopters
-> > > > > in kernel (or out of kernel). Instead the most fitting name should
-> > > > > be used. Current suggestions (taken from kernel) are:
-> > > > > 
-> > > > > * <<vendor>>,no-autorepeat
-> > > > > * keypad,autorepeat
-> > > > > * linux,keypad-no-autorepeat
-> > > > > * linux,input-no-autorepeat
-> > > > > * linux,no-autorepeat
-> > > > > * autorepeat
-> > > > > 
-> > > > > I do not really care, which one is chosen, except for two things:
-> > > > > 
-> > > > > * <<vendor>> seems wrong. This is not vendor specific.
-> > > > > * I would prefer "input-" over "keypad-", since then the same name
-> > > > >   can be used for single keys, buttons, etc.
-> > > > 
-> > > > Both of those sound valid to me, but I think it may make sense to keep
-> > > > the "linux," prefix. As I understand it this is really telling the Linux
-> > > > input subsystem to react to a device acting in a certain way, rather
-> > > > than describing or configuring the device in a certain way.
-> > > 
-> > > I'd say it is very much configuring device in certain way, and yes, other
-> > > operating systems will want to do autorepeat, too.
+On Mon, Dec 02, 2013 at 12:47:27PM +0100, Lucas Stach wrote:
+> Am Montag, den 02.12.2013, 12:30 +0100 schrieb Thierry Reding:
+> > UARTE has clock number 66. Number 65 is the right one for UARTD.
 > > 
-> > Nothing is handled differently at the device with respect to this flag.
-> > The Linux input subsystem behaves differently. Thus this is
-> > configuration of the Linux input subsysytem, not the device.
-> 
-> This flag says "this is device where autorepeat makes sense". It does
-> make sense for qwerty keyboard, it does not make sense for power
-> button. There's nothing Linux specific here.
-
-If you follow that argument, you don't need the property at all. We know
-whether something is being handled as a keyboard or a power button, from
-the rest of the data in the DT and how the driver is handling the
-device. From that you can figure out if it's sensible to handle the
-device as autorepeat or not.
-
-> 
-> > > I believe we don't want to end up with
-> > > 
-> > > linux,input-no-autorepeat
-> > > bsd,keypad-autorepeat
-> > > windows-phone,disable-autorepeat
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  drivers/clk/tegra/clk-tegra-periph.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > > 
-> > I do not see a problem with this. This is only as bad as the current
+> > diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
+> > index 5c35885f4a7c..3744a6fe589e 100644
+> > --- a/drivers/clk/tegra/clk-tegra-periph.c
+> > +++ b/drivers/clk/tegra/clk-tegra-periph.c
+> > @@ -492,7 +492,7 @@ static struct tegra_periph_init_data periph_clks[] = {
+> >  	UART("uartb", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTB, 7, tegra_clk_uartb),
+> >  	UART("uartc", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTC, 55, tegra_clk_uartc),
+> >  	UART("uartd", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTD, 65, tegra_clk_uartd),
+> > -	UART("uarte", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTE, 65, tegra_clk_uarte),
+> > +	UART("uarte", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_UARTE, 66, tegra_clk_uarte),
+> >  	XUSB("xusb_host_src", mux_clkm_pllp_pllc_pllre, CLK_SOURCE_XUSB_HOST_SRC, 143, TEGRA_PERIPH_ON_APB | TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_host_src),
+> >  	XUSB("xusb_falcon_src", mux_clkm_pllp_pllc_pllre, CLK_SOURCE_XUSB_FALCON_SRC, 143, TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_falcon_src),
+> >  	XUSB("xusb_fs_src", mux_clkm_48M_pllp_480M, CLK_SOURCE_XUSB_FS_SRC, 143, TEGRA_PERIPH_NO_RESET, tegra_clk_xusb_fs_src),
 > 
-> Not a problem? DTS bloat? Code bloat for the drivers? (Because that
-> way, we'll need to handle "windows-phone,disable-autorepeat" DTS for
-> compatibility one day).
+> Is this a stable patch or why are those magic numbers even necessary? I
+> have to admit I didn't follow the Tegra clk stuff closely, but with all
+> the churn going on there I would have suspected that those numbers would
+> have been replaced by the DT include defines by now.
 
-I would be extremely surprised if we ever discovered
-"windows-phone,disable-autorepeat" in a DT ;)
+There is no 1:1 mapping between the DT include defines and the hardware
+clock numbers. For instance, UARTB has DT define 192, but the enable bit
+is at offset 7.
 
-I believe that namespacing the property is sensible for the moment, as
-it currently is Linux specific. It also doesn't erroneously imply that
-this is a hardware property. If another OS happen to pick it up, then
-living with a "linux," prefix isn't that horrendous.
+I think the main reason for doing was because of the Tegra-specific
+reset API. Now that that's being converted to the generic API, there may
+be some room to refactor this. Until then I think we're stuck with
+having these numbers in this table.
 
-> 
-> > situation, but has the benefit that the madness is constrained to
-> > particular vendor prefixes, which we can uniquely identify and handle
-> > differently if required.
-> 
-> Madness? We want to avoid madness and improve current situation where
-> different driver use different attributes.
+But perhaps there were other reasons to do this as well. Peter or
+Stephen may know the details better than I do.
 
-Then why not have a way of figuring this out automatically, and get rid
-of the madness of having this in the DT at all? It's not a property of
-the device, and it doesn't even make sense as a piece of static
-configuration -- what if I prefer my keyboard to not autorepeat, but my
-board vendor has decided autorepeat should be on?
-
-Thanks,
-Mark.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/cfee0d39/attachment-0001.sig>
