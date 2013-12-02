@@ -1,48 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 Dec 2013 11:49:08 +0100
-Subject: [REPOST PATCH] ARM: sunxi: stop timer from ticking before
- enabling interrupts
-In-Reply-To: <529C61A3.8010208@linaro.org>
-References: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
- <529C61A3.8010208@linaro.org>
-Message-ID: <20131202104908.GC3034@lukather>
+From: srikanth.thokala@xilinx.com (Srikanth Thokala)
+Date: Mon, 2 Dec 2013 10:51:58 +0000
+Subject: [PATCH 2/2] net: emaclite: add barriers to support Xilinx Zynq
+ platform
+In-Reply-To: <20131201.200906.25118738399177322.davem@davemloft.net>
+References: <1385623797-26034-1-git-send-email-sthokal@xilinx.com>
+ <9045da6f-88e5-4a20-be68-477790588131@TX2EHSMHS023.ehs.local>
+ <20131201.200906.25118738399177322.davem@davemloft.net>
+Message-ID: <804ed99e-257a-46b6-b453-86b215ef7309@DB9EHSMHS025.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi David,
 
-On Mon, Dec 02, 2013 at 11:32:03AM +0100, Daniel Lezcano wrote:
->>+	/* Make sure timer is stopped before playing with interrupts */
->>+	sun4i_clkevt_time_stop(0);
->>+
-> 
-> It isn't possible to *not* enable it instead of stopping it ?
-> 
-> In the code before we have:
-> 
->         writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD |
->                TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M),
->                timer_base + TIMER_CTL_REG(1));
-> 
-> If we remove the TIMER_CTL_ENABLE flag, wouldn't it fix the issue ?
+> -----Original Message-----
+> From: David Miller [mailto:davem at davemloft.net]
+> Sent: Monday, December 02, 2013 6:39 AM
+> To: Srikanth Thokala
+> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Michal
+> Simek; Srikanth Thokala
+> Subject: Re: [PATCH 2/2] net: emaclite: add barriers to support Xilinx Zynq
+> platform
+>
+> From: Srikanth Thokala <srikanth.thokala@xilinx.com>
+> Date: Thu, 28 Nov 2013 12:59:57 +0530
+>
+> > This patch adds barriers at appropriate places to ensure the driver
+> > works on Xilinx Zynq ARM-based SoC platform.
+> >
+> > Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+>
+> Memory barriers must have comments.
+>
+> Specifically, the comment must describe what exactly is being ensured by the
+> memory barrier.  What entity must see what memory operations in what order?
 
-Actually, this excerpt enables the timer 1, that is used as a
-clocksource, while Marc stops the timer 0, which is used as our clock
-event.
+Ok. I will update and send you v2.
 
-The timer 0 is enabled only whenever either .set_mode or
-.set_next_event is called.
+Thanks
+Srikanth
 
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/490fefcf/attachment.sig>
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
