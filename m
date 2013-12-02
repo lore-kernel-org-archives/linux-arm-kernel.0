@@ -1,101 +1,45 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon,  2 Dec 2013 10:02:37 -0800
-Subject: [PATCH v3 2/2] arm: dt: zynq: Add SDHCI nodes
-In-Reply-To: <1386007357-11956-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1386007357-11956-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1386007357-11956-2-git-send-email-soren.brinkmann@xilinx.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon,  2 Dec 2013 18:06:01 +0000
+Subject: [PATCH] ARM: dts: Add CODEC MCLK for SMDK5250
+Message-ID: <1386007561-25722-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for the Arasan SDHCI controller to Zynq dts files.
+From: Mark Brown <broonie@linaro.org>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-v2:
- - update compatibilty string according to changes in 1/2 (append
-   '-8.9a' IP version string)
----
- arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/zynq-zc702.dts |  4 ++++
- arch/arm/boot/dts/zynq-zc706.dts |  4 ++++
- arch/arm/boot/dts/zynq-zed.dts   |  4 ++++
- 4 files changed, 32 insertions(+)
+There is a 16.934MHz fixed rate clock connected to MCLK1 on the CODEC, add
+this to the device tree bindings.
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index e7f73b2e4550..4aecd1baf435 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -65,6 +65,26 @@
- 			interrupts = <0 50 4>;
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm/boot/dts/exynos5250-smdk5250.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index b5966bc8c213..b8525ee6d0a1 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -79,6 +79,9 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 
++			clocks = <&codec_mclk>;
++			clock-names = "MCLK1";
++
+ 			AVDD2-supply = <&vdd>;
+ 			CPVDD-supply = <&vdd>;
+ 			DBVDD-supply = <&dbvdd>;
+@@ -254,5 +257,11 @@
+ 			compatible = "samsung,clock-xxti";
+ 			clock-frequency = <24000000>;
  		};
- 
-+		sdhci0: ps7-sdhci at e0100000 {
-+			compatible = "arasan,sdhci-8.9a";
-+			status = "disabled";
-+			clock-names = "clk_xin", "clk_ahb";
-+			clocks = <&clkc 21>, <&clkc 32>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 24 4>;
-+			reg = <0xe0100000 0x1000>;
-+		} ;
 +
-+		sdhci1: ps7-sdhci at e0101000 {
-+			compatible = "arasan,sdhci-8.9a";
-+			status = "disabled";
-+			clock-names = "clk_xin", "clk_ahb";
-+			clocks = <&clkc 22>, <&clkc 33>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 47 4>;
-+			reg = <0xe0101000 0x1000>;
-+		} ;
-+
- 		slcr: slcr at f8000000 {
- 			compatible = "xlnx,zynq-slcr";
- 			reg = <0xF8000000 0x1000>;
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 21aea99a067b..454394453e9c 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -29,6 +29,10 @@
- 
- };
- 
-+&sdhci0 {
-+	status = "okay";
-+};
-+
- &uart1 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index 79009e0b74b9..d734d5411760 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -30,6 +30,10 @@
- 
- };
- 
-+&sdhci0 {
-+	status = "okay";
-+};
-+
- &uart1 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index d6acf2b1cdf4..cd259dd13cdc 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -30,6 +30,10 @@
- 
- };
- 
-+&sdhci0 {
-+	status = "okay";
-+};
-+
- &uart1 {
- 	status = "okay";
++		codec_mclk: codec-mclk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <16934000>;
++		};
+ 	};
  };
 -- 
 1.8.4.4
