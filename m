@@ -1,39 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 2 Dec 2013 13:57:10 +0100
-Subject: [PATCH] ARM:INTEGRATOR: Default enable ARM_PATCH_PHYS_VIRT,
- AUTO_ZRELADDR
-In-Reply-To: <20131202114638.GH16735@n2100.arm.linux.org.uk>
-References: <1385983731-13196-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
- <1385983731-13196-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
- <20131202114638.GH16735@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZv9cZekBfJ2P1G4pMYOyAobmA2mszF=kN0Db5TC6_5+Q@mail.gmail.com>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Mon, 2 Dec 2013 13:05:15 +0000
+Subject: [PATCH v3 36/36] ARM: STi: Add support for the FSM Serial Flash
+ Controller
+In-Reply-To: <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
+Message-ID: <529C858B.1040601@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 2, 2013 at 12:46 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 02, 2013 at 04:58:51PM +0530, panchaxari wrote:
->>
->> Requesting maintainers of Integrator platform to evaluate the changes on the
->> board and comment, as I dont have the board for testing and also requesting
->> an ACK.
->
-> This is _exactly_ the kind of patches I don't want to see - people
-> running around changing platforms with no way to test them.
+Hi Lee,
+On 29/11/13 12:19, Lee Jones wrote:
+> +		/* FSM */
+> +		spifsm: spifsm at fe902000{
+> +		        compatible         = "st,spi-fsm", "simple-bus";
+"simple-bus" is redundant here.
 
-Actually, blame me for this. I asked Pancham to send the patch
-to the mail list so I would be able to pick it and test it ... I guess
-it would have been less confusing if I had just taken the patch
-in private and tested it and then sent it out instead...
+> +		        reg                =  <0xfe902000 0x1000>;
+> +		        reg-names          = "spi-fsm";
+> +		        pinctrl-0          = <&pinctrl_fsm>;
+> +
+> +			st,syscfg	   = <&syscfg_rear>;
+> +		        st,boot-device-reg = <0x958>;
+> +		        st,boot-device-spi = <0x1a>;
+> +
+> +		        status = "okay";
+> +		};
 
-> If you want to do such work, send the patches with "[CFT]" in the
-> subject line - call for testing.
 
-Good point, I've also seen "[RFT]" (request for testing) in some
-cases.
-
-Anyway, I'll just go test this thing now and see if it works as
-intended.
-
-Yours,
-Linus Walleij
+thanks,
+srini
