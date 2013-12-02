@@ -1,91 +1,147 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 2 Dec 2013 22:07:20 +0100
-Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
-In-Reply-To: <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
- <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
- <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
-Message-ID: <20131202210719.GQ24997@rocoto.smurfnet.nu>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 2 Dec 2013 13:16:35 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
+ system
+In-Reply-To: <20131202202120.GA23611@roeck-us.net>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+ <20131202202120.GA23611@roeck-us.net>
+Message-ID: <CAD=FV=U_ddOu447kCcOfcWS7RA6C7NCPx7CpiuEd-FXcO9dSGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 01:51:22PM -0600, Matt Sealey wrote:
-> Here's where I think this whole thing falls down as being the weirdest
-> possible implementation of this. It defies logic to put this
-> information in the device tree /chosen node while also attempting to
-> boot the kernel using an EFI stub; the stub is going to have this
-> information because it is going to have the pointer to the system
-> System Table (since it was called by StartImage()). Why not stash the
-> System Table pointer somewhere safe in the stub?
+Guenter and Olof,
 
-We do. In the DT.
+On Mon, Dec 2, 2013 at 12:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
+>> A good watchdog driver is supposed to report when it was responsible
+>> for resetting the system.  Implement this for the s3c2410, at least on
+>> exynos5250 and exynos5420 where we already have a pointer to the PMU
+>> registers to read the information.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>> This patch is based atop Leela Krishna's recent series that ends with
+>> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+>> AKA <https://patchwork.kernel.org/patch/3251861/>.
+>>
+>>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 39 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+>> index 47f4dcf..2c87d37 100644
+>> --- a/drivers/watchdog/s3c2410_wdt.c
+>> +++ b/drivers/watchdog/s3c2410_wdt.c
+>> @@ -62,9 +62,13 @@
+>>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
+>>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
+>>
+>> +#define RST_STAT_REG_OFFSET          0x0404
+>>  #define WDT_DISABLE_REG_OFFSET               0x0408
+>>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
+>>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
+>> +#define QUIRK_HAS_RST_STAT           (1 << 1)
+>> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
+>> +                                      QUIRK_HAS_RST_STAT)
+>>
+> I am not really happy about the NEED (both of them, really) here.
+> How about HAS instead ?
 
-> The information in the device tree is all accessible from Boot
-> Services and as long as the System Table isn't being thrown away (my
-> suggestion would be.. stuff it in r2, and set r1 = "EFI\0" then work
-> with arch/arm/kernel/head{-common,}.S code to do the right thing)
+Are you suggesting also changing QUIRK_NEEDS_PMU_CONFIG, then?  That
+would be a request for Leela Krishna on his patch?
 
-You left out the bit of redefining the kernel boot protocol to permit
-calling it with caches, MMU and interrupts enabled - also known as
-before ExitBootServices().
+...see below for more...
 
-> It seems like the advantages of booting from UEFI and having all this
-> information and API around are being thrown away very early, and
-> picked up when it's no longer relevant to gain access to the very
-> minimal runtime services. What's missing is a UUID for a "Device Tree
-> Blob" in the Configuration Table, so you can very easily go grab that
-> information from the firmware.
+>
+>>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>>  static int tmr_margin;
+>> @@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
+>>   * timer reset functionality.
+>>   * @mask_bit: Bit number for the watchdog timer in the disable register and the
+>>   * mask reset register.
+>> + * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
+>> + * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
+>> + * reset.
+>>   * @quirks: A bitfield of quirks.
+>>   */
+>>
+>> @@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
+>>       int disable_reg;
+>>       int mask_reset_reg;
+>>       int mask_bit;
+>> +     int rst_stat_reg;
+>> +     int rst_stat_bit;
+>>       u32 quirks;
+>>  };
+>>
+>> @@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
+>>       .disable_reg = WDT_DISABLE_REG_OFFSET,
+>>       .mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+>>       .mask_bit = 20,
+>> -     .quirks = QUIRK_NEEDS_PMU_CONFIG
+>> +     .rst_stat_reg = RST_STAT_REG_OFFSET,
+>> +     .rst_stat_bit = 20,
+>> +     .quirks = QUIRK_NEEDS_PMU_CONFIG |
+>> +             QUIRK_HAS_RST_STAT,
+>
+> Why not use QUIRKS_NEED_PMUREG ?
+>
+> Also, is there ever a chance that the two bits don't come together ?
+> If not a single bit might be sufficient.
 
-Which is what we are going to implement anyway in order to permit
-firmware to supply DT hardware description in the same way as with
-ACPI. Yes, we could pass the system table pointer directly - but that
-doesn't get us the memory map.
+Here's my logic:
 
-> As implemented, these patches employ a very long-winded and complex
-> method of recovering UEFI after throwing the system table pointer away
-> early in boot, and then implements an EFI calling convention which
-> isn't strictly necessary according to the UEFI spec - the question is,
-> is this a workaround for SetVirtualAddressMap() not actually doing the
-> right thing on ARM UEFI implementations? If you can't guarantee that
-> most of the calls from Boot Services or Runtime Services are going to
-> allow this, then having any UEFI support in the kernel at all seems
-> rather weird.
+According to our 3.4 sources (exynos_get_bootstatus) there is a
+RST_STAT register on exynos4. See
+<https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.4/arch/arm/mach-exynos/pmu.c>.
 
-No, it is a workaround for it being explicitly against the kernel boot
-protocol (not to mention slightly hairy) to enter head.S with MMU and
-caches enabled and interrupts firing.
+According to Tomasz at
+<http://www.spinics.net/lists/linux-watchdog/msg02942.html> the extra
+PMU_CONFIG was needed on exynos5250/5420 and not needed on exynos4.
 
-The EFI calling convention (as pointed out in the patch itself) is
-there in order to not have to duplicate code already there for x86.
+My patch doesn't actually add RST_STAT support for exynos4 but it
+seems wise to pave the way for someone else to add it.
 
-> What I'm worried about is that this is basically a hack to try and
-> shoehorn an existing UEFI implementation to an existing Linux boot
-> method - and implements it in a way nobody is ever going to be able to
-> justify improving. Part of the reason the OpenFirmware CIF got thrown
-> away early in SPARC/PowerPC boot (after "flattening" the device tree
-> using the CIF calls to parse it out) was because you had to disable
-> the MMU, caches, interrupts etc. which caused all kinds of slow
-> firmware code to be all kinds of extra-slow.
 
-I prefer to see it as a way to not reinvent things that do not need
-reinventing, while not adding more special-case code to the kernel.
+...so basically I was saying:
 
-> What that meant is nobody bothered to implement working, re-entrant,
-> re-locatable firmware to a great degree. This ended up being a
-> self-fulfilling prophecy of "don't trust the bootloader" and "get rid
-> of it as soon as we can," which essentially meant Linux never took
-> advantage of the resources available. In OF's case, the CIF sucked by
-> specification. In UEFI's case here, it's been implemented in Linux in
-> such a way that guarantees poor-performing firmware code with huge
-> penalties to call them, which isn't even required by UEFI if the
-> earlier boot code did the right things in the first place.
+* On exynos5250 and exynos5420 we _need_ to configure the PMU to get
+proper functioning
 
-I don't follow. In which way does this implementation result in poor
-performance or reduced functionality?
+* On various devices we _have_ a reset status that register that we can query.
 
-We deal with a highly quirky set of requirements for calling
-SetVirtualAddressMap() in a clunky way - after which calls into UEFI
-are direct and cachable.
+* If we need to use the PMU or we want to query the reset status we
+need to have PMU registers specified.
 
-/
-    Leif
+
+Does any of that change your mind(s)?
+
+
+>>  static const struct of_device_id s3c2410_wdt_match[] = {
+>> @@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+>>  }
+>>  #endif
+>>
+>> +static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
+>> +{
+>> +     unsigned int bootstatus = 0;
+>> +     int ret;
+>> +
+>> +     if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
+
+Internally Olof requested to reverse this "if" and return 0 early
+(avoid indentation).  I'll fix that up for the next patch.
+
+
+>> +             unsigned int rst_stat;
+>> +
+>> +             ret = regmap_read(wdt->pmureg, wdt->drv_data->rst_stat_reg,
+>> +                               &rst_stat);
+>> +             if (ret)
+>> +                     dev_warn(wdt->dev, "Couldn't get RST_STAT register\n");
+>> +             else if (rst_stat & BIT(wdt->drv_data->rst_stat_bit))
+>> +                     bootstatus |= WDIOF_CARDRESET;
+>> +     }
+>> +
+>> +     return bootstatus;
+>> +}
+>> +
