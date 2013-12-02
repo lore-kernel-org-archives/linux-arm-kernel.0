@@ -1,157 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  2 Dec 2013 18:00:22 +0000
-Subject: [PATCH 3/3] ASoC: ux500: Dynamically fill DAI driver data on probe
-In-Reply-To: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
-References: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1386007222-10081-3-git-send-email-lee.jones@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  2 Dec 2013 18:01:30 +0000
+Subject: [PATCH v2] dma: pl330: ensure DMA descriptors are zero-initialised
+Message-ID: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer have a means to differentiate MSP devices at probe time,
-mainline because we don't really have to. So rather than have an over-
-sized static data structure in place, where the only difference between
-devices is the ID and name (which are unused), we'll create them only
-when required and omit the unnecessary information.
+I see the following splat with 3.13-rc1 when attempting to perform DMA:
 
-Cc: alsa-devel at alsa-project.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+[  253.004516] Alignment trap: not handling instruction e1902f9f at [<c0204b40>]
+[  253.004583] Unhandled fault: alignment exception (0x221) at 0xdfdfdfd7
+[  253.004646] Internal error: : 221 [#1] PREEMPT SMP ARM
+[  253.004691] Modules linked in: dmatest(+) [last unloaded: dmatest]
+[  253.004798] CPU: 0 PID: 671 Comm: kthreadd Not tainted 3.13.0-rc1+ #2
+[  253.004864] task: df9b0900 ti: df03e000 task.ti: df03e000
+[  253.004937] PC is at dmaengine_unmap_put+0x14/0x34
+[  253.005010] LR is at pl330_tasklet+0x3c8/0x550
+[  253.005087] pc : [<c0204b44>]    lr : [<c0207478>]    psr: a00e0193
+[  253.005087] sp : df03fe48  ip : 00000000  fp : df03bf18
+[  253.005178] r10: bf00e108  r9 : 00000001  r8 : 00000000
+[  253.005245] r7 : df837040  r6 : dfb41800  r5 : df837048  r4 : df837000
+[  253.005316] r3 : dfdfdfcf  r2 : dfb41f80  r1 : df837048  r0 : dfdfdfd7
+[  253.005384] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[  253.005459] Control: 30c5387d  Table: 9fb9ba80  DAC: fffffffd
+[  253.005520] Process kthreadd (pid: 671, stack limit = 0xdf03e248)
+
+This is due to desc->txd.unmap containing garbage (uninitialised memory).
+
+Rather than add another dummy initialisation to _init_desc, instead
+ensure that the descriptors are zero-initialised during allocation and
+remove the dummy, per-field initialisation.
+
+Cc: Andriy Shevchenko <andriy.shevchenko@intel.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- sound/soc/ux500/ux500_msp_dai.c | 108 ++++++++++------------------------------
- 1 file changed, 26 insertions(+), 82 deletions(-)
+ drivers/dma/pl330.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index 8d1b01f..153fb3f 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -718,87 +718,20 @@ static struct snd_soc_dai_ops ux500_msp_dai_ops[] = {
- 	}
- };
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 98641eaca080..769f865b71db 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2492,12 +2492,9 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
  
--static struct snd_soc_dai_driver ux500_msp_dai_drv[UX500_NBR_OF_DAI] = {
--	{
--		.name = "ux500-msp-i2s.0",
--		.probe = ux500_msp_dai_probe,
--		.id = 0,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.1",
--		.probe = ux500_msp_dai_probe,
--		.id = 1,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.2",
--		.id = 2,
--		.probe = ux500_msp_dai_probe,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.3",
--		.probe = ux500_msp_dai_probe,
--		.id = 3,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
-+void ux500_msp_populate_dai_drv(struct snd_soc_dai_driver *ux500_msp_dai_drv)
-+{
-+	ux500_msp_dai_drv->probe                 = ux500_msp_dai_probe;
-+	ux500_msp_dai_drv->suspend               = NULL;
-+	ux500_msp_dai_drv->resume                = NULL;
-+	ux500_msp_dai_drv->playback.channels_min = UX500_MSP_MIN_CHANNELS;
-+	ux500_msp_dai_drv->playback.channels_max = UX500_MSP_MAX_CHANNELS;
-+	ux500_msp_dai_drv->playback.rates        = UX500_I2S_RATES;
-+	ux500_msp_dai_drv->playback.formats      = UX500_I2S_FORMATS;
-+	ux500_msp_dai_drv->capture.channels_min  = UX500_MSP_MIN_CHANNELS;
-+	ux500_msp_dai_drv->capture.channels_max  = UX500_MSP_MAX_CHANNELS;
-+	ux500_msp_dai_drv->capture.rates         = UX500_I2S_RATES;
-+	ux500_msp_dai_drv->capture.formats       = UX500_I2S_FORMATS;
-+	ux500_msp_dai_drv->ops                   = ux500_msp_dai_ops;
- };
- 
- static const struct snd_soc_component_driver ux500_msp_component = {
-@@ -809,6 +742,7 @@ static const struct snd_soc_component_driver ux500_msp_component = {
- static int ux500_msp_drv_probe(struct platform_device *pdev)
+ static inline void _init_desc(struct dma_pl330_desc *desc)
  {
- 	struct ux500_msp_i2s_drvdata *drvdata;
-+	struct snd_soc_dai_driver *ux500_msp_dai_drv;
- 	int ret = 0;
+-	desc->pchan = NULL;
+ 	desc->req.x = &desc->px;
+ 	desc->req.token = desc;
+ 	desc->rqcfg.swap = SWAP_NO;
+-	desc->rqcfg.privileged = 0;
+-	desc->rqcfg.insnaccess = 0;
+ 	desc->rqcfg.scctl = SCCTRL0;
+ 	desc->rqcfg.dcctl = DCCTRL0;
+ 	desc->req.cfg = &desc->rqcfg;
+@@ -2517,7 +2514,7 @@ static int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
+ 	if (!pdmac)
+ 		return 0;
  
- 	dev_dbg(&pdev->dev, "%s: Enter (pdev->name = %s).\n", __func__,
-@@ -863,8 +797,18 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
- 	}
- 	dev_set_drvdata(&pdev->dev, drvdata);
+-	desc = kmalloc(count * sizeof(*desc), flg);
++	desc = kcalloc(count, sizeof(*desc), flg);
+ 	if (!desc)
+ 		return 0;
  
-+	ux500_msp_dai_drv = devm_kzalloc(&pdev->dev,
-+					 sizeof(*ux500_msp_dai_drv),
-+					 GFP_KERNEL);
-+	if (!ux500_msp_dai_drv) {
-+		ret = -ENOMEM;
-+		goto err_init_msp;
-+	}
-+
-+	ux500_msp_populate_dai_drv(ux500_msp_dai_drv);
-+
- 	ret = snd_soc_register_component(&pdev->dev, &ux500_msp_component,
--					 &ux500_msp_dai_drv[drvdata->msp->id], 1);
-+					 ux500_msp_dai_drv, 1);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Error: %s: Failed to register MSP%d!\n",
- 			__func__, drvdata->msp->id);
 -- 
-1.8.3.2
+1.8.2.2
