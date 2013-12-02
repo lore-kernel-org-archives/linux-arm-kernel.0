@@ -1,37 +1,50 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Dec 2013 09:32:25 +0100
-Subject: [PATCH] arm: at91: sama5d3: enable qt1070 as a wakeup source
-In-Reply-To: <1385972988-20157-1-git-send-email-voice.shen@atmel.com>
-References: <1385972988-20157-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <529C4599.4030601@atmel.com>
+Date: Mon, 2 Dec 2013 09:39:29 +0100
+Subject: [PATCH 1/2] ARM: at91: at91sam9g45: set default mmc pinctrl-names
+In-Reply-To: <1385128193-9963-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1385128193-9963-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <529C4741.7030308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2013 09:29, Bo Shen :
-> Enable qt1070 keyboard as a wakeup source on sama5d3xek board.
+On 22/11/2013 14:49, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 >
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> pinctrl-names property was missing from mmc nodes.
+>
+> Cc: <stable@vger.kernel.org> #3.11+
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks,
+and queued in at91-3.14-dt.
+
+Thanks, bye,
 
 > ---
->   arch/arm/boot/dts/sama5d3xdm.dtsi |    1 +
->   1 file changed, 1 insertion(+)
+>   arch/arm/boot/dts/at91sam9g45.dtsi |    2 ++
+>   1 file changed, 2 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
-> index 1c296d6..f9bdde5 100644
-> --- a/arch/arm/boot/dts/sama5d3xdm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
-> @@ -18,6 +18,7 @@
->   					interrupts = <31 0x0>;
->   					pinctrl-names = "default";
->   					pinctrl-0 = <&pinctrl_qt1070_irq>;
-> +					wakeup-source;
->   				};
->   			};
->
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index c3e5148..cf7de80 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -618,6 +618,7 @@
+>   				compatible = "atmel,hsmci";
+>   				reg = <0xfff80000 0x600>;
+>   				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				pinctrl-names = "default";
+>   				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(0)>;
+>   				dma-names = "rxtx";
+>   				#address-cells = <1>;
+> @@ -629,6 +630,7 @@
+>   				compatible = "atmel,hsmci";
+>   				reg = <0xfffd0000 0x600>;
+>   				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				pinctrl-names = "default";
+>   				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(13)>;
+>   				dma-names = "rxtx";
+>   				#address-cells = <1>;
 >
 
 
