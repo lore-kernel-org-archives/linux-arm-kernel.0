@@ -1,39 +1,20 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Dec 2013 13:20:13 +0000
-Subject: [PATCH v3 36/36] ARM: STi: Add support for the FSM Serial Flash
- Controller
-In-Reply-To: <529C858B.1040601@st.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-37-git-send-email-lee.jones@linaro.org>
- <529C858B.1040601@st.com>
-Message-ID: <20131202132013.GF31626@lee--X1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Dec 2013 13:23:33 +0000
+Subject: [PATCH] ARM:INTEGRATOR: Default enable ARM_PATCH_PHYS_VIRT,
+ AUTO_ZRELADDR
+In-Reply-To: <CACRpkdZv9cZekBfJ2P1G4pMYOyAobmA2mszF=kN0Db5TC6_5+Q@mail.gmail.com>
+References: <1385983731-13196-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+ <1385983731-13196-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
+ <20131202114638.GH16735@n2100.arm.linux.org.uk>
+ <CACRpkdZv9cZekBfJ2P1G4pMYOyAobmA2mszF=kN0Db5TC6_5+Q@mail.gmail.com>
+Message-ID: <20131202132333.GJ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +		/* FSM */
-> > +		spifsm: spifsm at fe902000{
-> > +		        compatible         = "st,spi-fsm", "simple-bus";
-> "simple-bus" is redundant here.
+On Mon, Dec 02, 2013 at 01:57:10PM +0100, Linus Walleij wrote:
+> Good point, I've also seen "[RFT]" (request for testing) in some
+> cases.
 
-Yes I agree, good spot.
-
-I removed it from the Documentation, but missed this one.
-
-If I remove it, can I add your Ack for the remainder of the patch?
-
-> > +		        reg                =  <0xfe902000 0x1000>;
-> > +		        reg-names          = "spi-fsm";
-> > +		        pinctrl-0          = <&pinctrl_fsm>;
-> > +
-> > +			st,syscfg	   = <&syscfg_rear>;
-> > +		        st,boot-device-reg = <0x958>;
-> > +		        st,boot-device-spi = <0x1a>;
-> > +
-> > +		        status = "okay";
-> > +		};
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Note that it still needs [PATCH] before it.  A good way to integrate it
+is to use the form "[PATCH CFT n/nn]" where n/nn exists if you have a
+series.
