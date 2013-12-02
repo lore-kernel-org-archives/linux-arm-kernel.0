@@ -1,54 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Dec 2013 12:08:19 +0100
-Subject: [PATCH] fixed unresolved symbol "at91_pm_set_standby" when built
- without CONFIG_PM
-In-Reply-To: <CAP+RiCDKcBwJunmNF89kh1zoT0xKYRWvaBPHnijRafLU2MHf_g@mail.gmail.com>
-References: <CAP+RiCDKcBwJunmNF89kh1zoT0xKYRWvaBPHnijRafLU2MHf_g@mail.gmail.com>
-Message-ID: <529C6A23.1040900@atmel.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 02 Dec 2013 15:11:03 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCBSRVNFTkRdIG1mZDogbWMxM3h4eDogRml4IG51bGwgcG9p?=
+ =?UTF-8?B?bnRlciBkZXJlZmVyZW5jZSBpbiBtYzEzeHh4X2NvbW1vbl9pbml0?=
+In-Reply-To: <20131202105650.GD29373@lee--X1>
+References: <1385787337-5296-1-git-send-email-shc_work@mail.ru>
+ <1385805125.304293643@f433.i.mail.ru>
+ <20131202105650.GD29373@lee--X1>
+Message-ID: <1385982663.209903201@f198.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/2013 19:02, Brent Taylor :
-> If CONFIG_PM is not defined, then arch/arm/mach-at91/pm.c is not
-> compiled in.  This patch creates an inline function that does nothing
-> if CONFIG_PM is not defined.
-
-Your "Signed-off-by" line is missing. Can you please quickly send it to 
-me (by just replying to this email)?
-
-Otherwise, seems reasonable:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->   arch/arm/mach-at91/pm.h | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-> index 3ed190c..c5101dc 100644
-> --- a/arch/arm/mach-at91/pm.h
-> +++ b/arch/arm/mach-at91/pm.h
-> @@ -16,7 +16,11 @@
->   #include <mach/at91_ramc.h>
->   #include <mach/at91rm9200_sdramc.h>
->
-> +#ifdef CONFIG_PM
->   extern void at91_pm_set_standby(void (*at91_standby)(void));
-> +#else
-> +static inline void at91_pm_set_standby(void (*at91_standby)(void)) { }
-> +#endif
->
->   /*
->    * The AT91RM9200 goes into self-refresh mode with this command, and will
-> --
-> 1.8.3.2
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
 
 
--- 
-Nicolas Ferre
+
+???????????,  2 ??????? 2013, 10:56 UTC ?? Lee Jones <lee.jones@linaro.org>:
+> On Sat, 30 Nov 2013, Alexander Shiyan wrote:
+> 
+> > > On Sat, Nov 30, 2013 at 08:55:37AM +0400, Alexander Shiyan wrote:
+> > > > If this driver being loaded from devicetree, the pdata is NULL.
+> > > > This cause kernel Oops when "fsl,mc13xxx-uses-codec" and/or
+> > > > "fsl,mc13xxx-uses-touch" properties is specified.
+> > > > 
+> > > > mc13xxx spi0.0: mc13783: rev: 3.3, fin: 0, fab: 0, icid: 2/0
+> > > > Unable to handle kernel NULL pointer dereference at virtual address 00000018
+> > ...
+> > > > -	if (mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN)
+> > > > +	if ((mc13xxx->flags & MC13XXX_USE_CODEC) && pdata)
+> > > 
+> > > Why do we check for CODEC if the Touchscreen should be used?
+> > 
+> > Oops, my fault, copy/paste bug.
+> > I'll send the corrected version.
+> 
+> No, please don't.
+> 
+> Just provide proper Device Tree support.
+
+I still have two incomplete MC13XXX DT-related patches.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175099.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/182116.html
+
+I'll resume to work on this (and CODEC & TS too).
+Thanks.
+
+---
