@@ -1,212 +1,90 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 2 Dec 2013 12:02:20 +0100
-Subject: [RFC][PATCHv6+++ 01/13] of: introduce
- of_property_for_earch_phandle_with_args()
-In-Reply-To: <529B8739.60701@wwwdotorg.org>
-References: <20131128.145818.1345100874304396564.hdoyu@nvidia.com><20131129.134625.431945240074254704.hdoyu@nvidia.com><529B8739.60701@wwwdotorg.org>
-Message-ID: <20131202.130220.1404999403649937134.hdoyu@nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Dec 2013 11:02:44 +0000
+Subject: [PATCHv6 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131128223719.GG14689@mithrandir>
+References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
+ <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131128212510.GC14689@mithrandir>
+ <20131128223719.GG14689@mithrandir>
+Message-ID: <20131202110243.GD12952@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Sun, 1 Dec 2013 20:00:09 +0100:
+Hi,
 
-> On 11/29/2013 04:46 AM, Hiroshi Doyu wrote:
-> ...
-> > Iterating over a property containing a list of phandles with arguments
-> > is a common operation for device drivers. This patch adds a new
-> > of_property_for_each_phandle_with_args() macro to make the iteration
-> > simpler.
+On Thu, Nov 28, 2013 at 10:37:19PM +0000, Thierry Reding wrote:
+> On Thu, Nov 28, 2013 at 10:25:11PM +0100, Thierry Reding wrote:
+> > On Tue, Nov 12, 2013 at 09:36:55AM +0800, Xiubo Li wrote:
+> [...]
+> > > +static int fsl_pwm_parse_clk_ps(struct fsl_pwm_chip *fpc)
+> > > +{
+> > > +	int ret;
+> > > +	struct of_phandle_args clkspec;
+> > > +	struct device_node *np = fpc->chip.dev->of_node;
+> > > +
+> > > +	fpc->sys_clk = devm_clk_get(fpc->chip.dev, "ftm0");
+> > > +	if (IS_ERR(fpc->sys_clk)) {
+> > > +		ret = PTR_ERR(fpc->sys_clk);
+> > > +		dev_err(fpc->chip.dev,
+> > > +				"failed to get \"ftm0\" clock %d\n", ret);
+> > > +		return ret;
+> > > +	}
+> > > +
+> > > +	fpc->counter_clk = devm_clk_get(fpc->chip.dev, "ftm0_counter");
+> > > +	if (IS_ERR(fpc->counter_clk)) {
+> > > +		ret = PTR_ERR(fpc->counter_clk);
+> > > +		dev_err(fpc->chip.dev,
+> > > +				"failed to get \"ftm0_counter\" clock %d\n",
+> > > +				ret);
+> > > +		return ret;
+> > > +	}
+> > > +
+> > > +	ret = of_parse_phandle_with_args(np, "clocks", "#clock-cells", 1,
+> > > +					&clkspec);
+> > > +	if (ret)
+> > > +		return ret;
+> > > +
+> > > +	fpc->counter_clk_select = clkspec.args[0];
 > > 
-> > Introduced a new struct "of_phandle_iter" to keep the state when
-> > iterating over the list.
-> > 
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > ---
-> > v6+++:
+> > This isn't at all pretty. But given that once you have access to a
+> > struct clk there's no way to identify it, I don't know of a better
+> > alternative.
 > 
-> Surely that's v9; "+++" is rather unusual.
-
-My intention was to put this into the next v7 series after I get this
-reviewed as RFC.
-...
-> Together with removing:
+> Hi Mike,
 > 
-> > +	const char	*cells_name;
-> > +	int		cell_count;
+> I've seen this crop up a number of times now, to varying degrees of
+> gravity. In this particular case, the driver needs to know the type of a
+> clock because it needs to program this hardware differently depending on
+> which clock feeds the counter. Since there is no way to obtain any kind
+> of identifying information from a struct clk, drivers need to rely on
+> hacks like this and manually reach into the device tree to obtain that
+> information.
+
+Which property of the clock is the consumer concerned with in this case?
+
+>From a quick look at the driver it looks like there are actually a
+number of different input lines to the device that share the clock-name
+"ftm0_counter", though they are actually separate and each has a
+different divider. Have I got that right?
+
+If that's the case, having a unique clock-names value for each of those
+lines would be the solution I'd expect. Then you just have to list the
+one(s) that are wired up, and the driver can figure out the appropriate
+line to use either by requesting by name until it finds a match or
+inspecting the clock-names property.
+
+Is there some other property of the parent that we care about here?
+
 > 
-> ... then you'd only be left with cur/end, so I think you could get away
-> without a struct at all, but simply "cur" as the iterator variable, plus
-> "end" as the one temp variable.
+> I'm aware of similar cases which have been solved by using a mux clock
+> that takes a set of parents and the .set_parent() operation is then used
+> to program registers appropriately. However in all those cases, the mux
+> clock (and the parents) have all been part of a single driver, so I am
+> not sure if the same would be applicable here.
+> 
+> Do you have any other suggestions on how this could possibly be solved?
 
-Although the above proposal would be alsmot same as "[RFC][PATCHv6++
-01/13]"(*1) where I use *list(cur) and rem as remaining count, here's
-the update. I'll put this into v7 series.
+This also feels like the case I describe above. What am I missing? :)
 
----8<------8<------8<------8<------8<------8<------8<------8<------8<---
-From: Hiroshi Doyu <hdoyu@nvidia.com>
-
-Iterating over a property containing a list of phandles with arguments
-is a common operation for device drivers. This patch adds a new
-of_property_for_each_phandle_with_args() macro to make the iteration
-simpler.
-
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
-v6++++:
-Iterate without intrducing a new struct.
-
-v6+++:
-Introduced a new struct "of_phandle_iter" to keep the state when
-iterating over the list.
-
-v6++:
-Optimized to avoid O(n^2), suggested by Stephen Warren.
-http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007066.html
-
-I didn't introduce any struct to hold params and state here.
-
-v6+:
-Use the description, which Grant Likely proposed, to be full enough
-that a future reader can figure out why a patch was written.
-
-v5:
-New patch for v5.
-
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- drivers/of/base.c  | 53 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of.h | 34 ++++++++++++++++++++++++++++++++++
- 2 files changed, 87 insertions(+)
-
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index f807d0e..7501f24 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -1201,6 +1201,59 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
- 	printk("\n");
- }
- 
-+const __be32 *of_phandle_iter_next(const char *cells_name, int cell_count,
-+				   const __be32 *cur, const __be32 *end,
-+				   struct of_phandle_args *out_args)
-+{
-+	phandle phandle;
-+	struct device_node *dn;
-+	int i;
-+
-+	if (!cells_name && !cell_count)
-+		return NULL;
-+
-+	if (!cur)
-+		return NULL;
-+
-+	if (end - cur <= 0)
-+		return NULL;
-+
-+	phandle = be32_to_cpup(cur++);
-+	if (!phandle)
-+		return NULL;
-+
-+	dn = of_find_node_by_phandle(phandle);
-+	if (!dn)
-+		return NULL;
-+
-+	if (cells_name)
-+		if (of_property_read_u32(dn, cells_name, &cell_count))
-+			return NULL;
-+
-+	out_args->np = dn;
-+	out_args->args_count = cell_count;
-+	for (i = 0; i < cell_count; i++)
-+		out_args->args[i] = be32_to_cpup(cur++);
-+
-+	return cur;
-+}
-+EXPORT_SYMBOL_GPL(of_phandle_iter_next);
-+
-+const __be32 *of_phandle_iter_init(const struct device_node *np,
-+				   const char *list_name,
-+				   const __be32 **end)
-+{
-+	size_t bytes;
-+	const __be32 *cur;
-+
-+	cur = of_get_property(np, list_name, &bytes);
-+	if (bytes)
-+		*end = cur + bytes / sizeof(*cur);
-+
-+	return cur;
-+}
-+EXPORT_SYMBOL_GPL(of_phandle_iter_init);
-+
- static int __of_parse_phandle_with_args(const struct device_node *np,
- 					const char *list_name,
- 					const char *cells_name,
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 276c546..c23710b 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -303,6 +303,14 @@ extern int of_parse_phandle_with_fixed_args(const struct device_node *np,
- extern int of_count_phandle_with_args(const struct device_node *np,
- 	const char *list_name, const char *cells_name);
- 
-+extern const __be32 *of_phandle_iter_init(const struct device_node *np,
-+					  const char *list_name,
-+					  const __be32 **end);
-+extern const __be32 *of_phandle_iter_next(const char *cells_name,
-+					  int cell_count,
-+					  const __be32 *cur, const __be32 *end,
-+					  struct of_phandle_args *out_args);
-+
- extern void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align));
- extern int of_alias_get_id(struct device_node *np, const char *stem);
- 
-@@ -527,6 +535,24 @@ static inline int of_count_phandle_with_args(struct device_node *np,
- 	return -ENOSYS;
- }
- 
-+static inline const __be32 *of_phandle_iter_init(const struct device_node *np,
-+						 const char *list_name,
-+						 const char *cells_name,
-+						 const int cell_count,
-+						 struct of_phandle_args *out_args)
-+{
-+	return NULL;
-+}
-+
-+static inline const __be32 *of_phandle_iter_next(const char *cells_name,
-+						 int cell_count,
-+						 const __be32 *cur,
-+						 const __be32 *end,
-+						 struct of_phandle_args *out_args);
-+{
-+	return NULL;
-+}
-+
- static inline int of_alias_get_id(struct device_node *np, const char *stem)
- {
- 	return -ENOSYS;
-@@ -613,6 +639,14 @@ static inline int of_property_read_u32(const struct device_node *np,
- 		s;						\
- 		s = of_prop_next_string(prop, s))
- 
-+#define of_property_for_each_phandle_with_args(node, list_name,	cells_name, \
-+					       cell_count, out_args, cur, end) \
-+	for (cur = of_phandle_iter_init(node, list_name, &end),		\
-+		     cur = of_phandle_iter_next(cells_name, cell_count, \
-+						cur, end, &out_args);	\
-+	     cur;							\
-+	     cur = of_phandle_iter_next(cells_name, cell_count, cur, end, &out_args))
-+
- #if defined(CONFIG_PROC_FS) && defined(CONFIG_PROC_DEVICETREE)
- extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
- extern void proc_device_tree_add_prop(struct proc_dir_entry *pde, struct property *prop);
--- 
-1.8.1.5
-
-
-
-
-
-*1:
- http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007086.html
+Thanks,
+Mark.
