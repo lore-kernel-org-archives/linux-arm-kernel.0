@@ -1,28 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Dec 2013 12:21:13 +0000
-Subject: [PATCH v2 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <2d5282f031a16d2ff227694daaabc977440fbd2e.1385913228.git.stefan@agner.ch>
-References: <cover.1385913227.git.stefan@agner.ch>
- <2d5282f031a16d2ff227694daaabc977440fbd2e.1385913228.git.stefan@agner.ch>
-Message-ID: <20131202122113.GY27568@sirena.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Dec 2013 13:33:19 +0100
+Subject: [PATCH 2/3] leds/pwm: Don't disable pwm when setting brightness
+ to 0
+In-Reply-To: <1385412225-29740-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1385412225-29740-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131202123318.GC12793@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 01, 2013 at 04:59:13PM +0100, Stefan Agner wrote:
+On Mon, Nov 25, 2013 at 09:43:44PM +0100, Uwe Kleine-K?nig wrote:
+> This fixes disabling the LED on i.MX28. The PWM hardware delays using
+> the newly set pwm-config until the beginning of a new period. It's very
+> likely that pwm_disable is called before the current period ends. In
+> case the LED was on brightness=max before the LED stays on because in
+> the disabled PWM block the period never ends.
+> 
+> Also only call pwm_enable only once in the probe call back and the
+> matching pwm_disable in .remove(). Moreover the pwm is explicitly
+> initialized to off.
 
-> +int tps6586x_get_version(struct device *dev)
-> +{
-> +	struct tps6586x *tps6586x = dev_get_drvdata(dev);
-> +
-> +	return tps6586x->version;
-> +}
-> +EXPORT_SYMBOL_GPL(tps6586x_get_version);
+While I do understand the reasoning behind this, if this is really the
+behaviour that we need then there's no use in having pwm_enable() and
+pwm_disable() at all. They can just be folded into pwm_get() and
+pwm_put(), respectively.
 
-May as well make this a static inline in the header.
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/955b912f/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/5e458ca4/attachment.sig>
