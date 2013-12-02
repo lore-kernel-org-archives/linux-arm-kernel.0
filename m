@@ -1,118 +1,71 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon,  2 Dec 2013 11:27:59 +0100
-Subject: [PATCH] gpio: MOXA ART: rename moxart_gpio_base to base
-In-Reply-To: <1385723494-8033-1-git-send-email-jonas.jensen@gmail.com>
-References: <1385723494-8033-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1385980079-20175-1-git-send-email-jonas.jensen@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 02 Dec 2013 11:32:03 +0100
+Subject: [REPOST PATCH] ARM: sunxi: stop timer from ticking before enabling
+ interrupts
+In-Reply-To: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
+References: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <529C61A3.8010208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renaming "moxart_gpio_base" to "base" allows better fit,
-remove line breaks in moxart_gpio_get().
+On 12/02/2013 10:29 AM, Marc Zyngier wrote:
+> The sun4i timer can still be ticking when we enable the interrupt.
+> If another timer is actually used (A7 architected timer, for example),
+> odds are that the interrupt will eventually fire with the event_handler
+> pointer being NULL.
+>
+> The obvious fix it to stop the timer before registering the interrupt.
+>
+> Observed and tested on sun7i (cubietruck).
+>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Daniel,
+>
+> Maxime asked me to forward this to you directly. Please consider merging
+> it for 3.13.
+>
+> Thanks,
+>
+> 	M.
+>
+>   drivers/clocksource/sun4i_timer.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> index 2fb4695..a4f6119 100644
+> --- a/drivers/clocksource/sun4i_timer.c
+> +++ b/drivers/clocksource/sun4i_timer.c
+> @@ -179,6 +179,9 @@ static void __init sun4i_timer_init(struct device_node *node)
+>   	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M),
+>   	       timer_base + TIMER_CTL_REG(0));
+>
+> +	/* Make sure timer is stopped before playing with interrupts */
+> +	sun4i_clkevt_time_stop(0);
+> +
 
-While doing trivial cleanup, also remove fields initialized
-with zero in moxart_template_chip.
+It isn't possible to *not* enable it instead of stopping it ?
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+In the code before we have:
 
-Notes:
-    Thanks for applying!
-    
-    This is a follow-up with trivial changes per your comments.
-    
-    Regarding Documentation/devicetree/bindings/vendor-prefixes.txt,
-    there's already a patch submitted (Mark Rutland requested this):
-    
-    https://lkml.org/lkml/2013/10/8/451
-    
-    Applies to next-20131202
+         writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD |
+                TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M),
+                timer_base + TIMER_CTL_REG(1));
 
- drivers/gpio/gpio-moxart.c | 24 ++++++++++--------------
- 1 file changed, 10 insertions(+), 14 deletions(-)
+If we remove the TIMER_CTL_ENABLE flag, wouldn't it fix the issue ?
 
-diff --git a/drivers/gpio/gpio-moxart.c b/drivers/gpio/gpio-moxart.c
-index d662cde..4ecd195 100644
---- a/drivers/gpio/gpio-moxart.c
-+++ b/drivers/gpio/gpio-moxart.c
-@@ -30,7 +30,7 @@
- 
- struct moxart_gpio_chip {
- 	struct gpio_chip gpio;
--	void __iomem *moxart_gpio_base;
-+	void __iomem *base;
- };
- 
- static inline struct moxart_gpio_chip *to_moxart_gpio(struct gpio_chip *chip)
-@@ -51,7 +51,7 @@ static void moxart_gpio_free(struct gpio_chip *chip, unsigned offset)
- static int moxart_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
- {
- 	struct moxart_gpio_chip *gc = to_moxart_gpio(chip);
--	void __iomem *ioaddr = gc->moxart_gpio_base + GPIO_PIN_DIRECTION;
-+	void __iomem *ioaddr = gc->base + GPIO_PIN_DIRECTION;
- 
- 	writel(readl(ioaddr) & ~BIT(offset), ioaddr);
- 	return 0;
-@@ -61,7 +61,7 @@ static int moxart_gpio_direction_output(struct gpio_chip *chip,
- 					unsigned offset, int value)
- {
- 	struct moxart_gpio_chip *gc = to_moxart_gpio(chip);
--	void __iomem *ioaddr = gc->moxart_gpio_base + GPIO_PIN_DIRECTION;
-+	void __iomem *ioaddr = gc->base + GPIO_PIN_DIRECTION;
- 
- 	writel(readl(ioaddr) | BIT(offset), ioaddr);
- 	return 0;
-@@ -70,7 +70,7 @@ static int moxart_gpio_direction_output(struct gpio_chip *chip,
- static void moxart_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- {
- 	struct moxart_gpio_chip *gc = to_moxart_gpio(chip);
--	void __iomem *ioaddr = gc->moxart_gpio_base + GPIO_DATA_OUT;
-+	void __iomem *ioaddr = gc->base + GPIO_DATA_OUT;
- 	u32 reg = readl(ioaddr);
- 
- 	if (value)
-@@ -85,14 +85,12 @@ static void moxart_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- static int moxart_gpio_get(struct gpio_chip *chip, unsigned offset)
- {
- 	struct moxart_gpio_chip *gc = to_moxart_gpio(chip);
--	u32 ret = readl(gc->moxart_gpio_base + GPIO_PIN_DIRECTION);
-+	u32 ret = readl(gc->base + GPIO_PIN_DIRECTION);
- 
- 	if (ret & BIT(offset))
--		return !!(readl(gc->moxart_gpio_base + GPIO_DATA_OUT) &
--			  BIT(offset));
-+		return !!(readl(gc->base + GPIO_DATA_OUT) & BIT(offset));
- 	else
--		return !!(readl(gc->moxart_gpio_base + GPIO_DATA_IN) &
--			  BIT(offset));
-+		return !!(readl(gc->base + GPIO_DATA_IN) & BIT(offset));
- }
- 
- static struct gpio_chip moxart_template_chip = {
-@@ -103,9 +101,7 @@ static struct gpio_chip moxart_template_chip = {
- 	.direction_output	= moxart_gpio_direction_output,
- 	.set			= moxart_gpio_set,
- 	.get			= moxart_gpio_get,
--	.base			= 0,
- 	.ngpio			= 32,
--	.can_sleep		= 0,
- };
- 
- static int moxart_gpio_probe(struct platform_device *pdev)
-@@ -123,11 +119,11 @@ static int moxart_gpio_probe(struct platform_device *pdev)
- 	mgc->gpio = moxart_template_chip;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	mgc->moxart_gpio_base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(mgc->moxart_gpio_base)) {
-+	mgc->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(mgc->base)) {
- 		dev_err(dev, "%s: devm_ioremap_resource res_gpio failed\n",
- 			dev->of_node->full_name);
--		return PTR_ERR(mgc->moxart_gpio_base);
-+		return PTR_ERR(mgc->base);
- 	}
- 
- 	mgc->gpio.dev = dev;
+
+>   	ret = setup_irq(irq, &sun4i_timer_irq);
+>   	if (ret)
+>   		pr_warn("failed to setup irq %d\n", irq);
+>
+
+
 -- 
-1.8.2.1
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
