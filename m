@@ -1,61 +1,66 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 02 Dec 2013 12:36:39 +0100
-Subject: [PATCH] ARM: at91: add usart3 alias to dtsi
-In-Reply-To: <1385979186-29447-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1385979186-29447-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <529C70C7.9050707@overkiz.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Dec 2013 11:37:20 +0000
+Subject: [PATCH 4/5 v2] input: tc3589x-keypad: support probing from
+ device tree
+In-Reply-To: <20131117182852.GC30012@xo-6d-61-c0.localdomain>
+References: <1384265618-10590-1-git-send-email-linus.walleij@linaro.org>
+ <20131112153057.GA9683@earth.universe>
+ <CACRpkdb_bryGJo7CKGP5tj3RFGv=Gh+Q5m9ucVKqJ068tjPC2g@mail.gmail.com>
+ <20131112200514.GA15413@earth.universe>
+ <CACRpkdaAaLjm_b+OLj3tobxBN8YGUcTPnXJ=qtBqd02=FTxhjQ@mail.gmail.com>
+ <20131112204013.GA17674@earth.universe>
+ <20131113142406.GH21713@e106331-lin.cambridge.arm.com>
+ <20131117182852.GC30012@xo-6d-61-c0.localdomain>
+Message-ID: <20131202113720.GF12952@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Sun, Nov 17, 2013 at 06:28:52PM +0000, Pavel Machek wrote:
+> 
+> > > Thus I guess we should not use the name, which has the most adopters
+> > > in kernel (or out of kernel). Instead the most fitting name should
+> > > be used. Current suggestions (taken from kernel) are:
+> > > 
+> > > * <<vendor>>,no-autorepeat
+> > > * keypad,autorepeat
+> > > * linux,keypad-no-autorepeat
+> > > * linux,input-no-autorepeat
+> > > * linux,no-autorepeat
+> > > * autorepeat
+> > > 
+> > > I do not really care, which one is chosen, except for two things:
+> > > 
+> > > * <<vendor>> seems wrong. This is not vendor specific.
+> > > * I would prefer "input-" over "keypad-", since then the same name
+> > >   can be used for single keys, buttons, etc.
+> > 
+> > Both of those sound valid to me, but I think it may make sense to keep
+> > the "linux," prefix. As I understand it this is really telling the Linux
+> > input subsystem to react to a device acting in a certain way, rather
+> > than describing or configuring the device in a certain way.
+> 
+> I'd say it is very much configuring device in certain way, and yes, other
+> operating systems will want to do autorepeat, too.
 
-Le 02/12/2013 11:13, Nicolas Ferre a ?crit :
-> Alias was missing for SoC of the at91sam9x5 familly that embed USART3.
-> Preripheral node and pinctrl declarations are already in the
-> at91sam9x5_usart3.dtsi file.
->
-> Reported-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->   arch/arm/boot/dts/at91sam9g25.dtsi | 4 ++++
->   arch/arm/boot/dts/at91sam9x25.dtsi | 4 ++++
->   2 files changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
-> index 17b879990914..d4650b4e9ebb 100644
-> --- a/arch/arm/boot/dts/at91sam9g25.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g25.dtsi
-> @@ -14,6 +14,10 @@
->   	model = "Atmel AT91SAM9G25 SoC";
->   	compatible = "atmel,at91sam9g25", "atmel,at91sam9x5";
->   
-> +	aliases {
-> +		serial4 = &usart3;
-> +	};
-> +
+Nothing is handled differently at the device with respect to this flag.
+The Linux input subsystem behaves differently. Thus this is
+configuration of the Linux input subsysytem, not the device.
 
-Shouldn't this go into at91sam9x5_usart3.dtsi ?
-This way you would have the same alias for all the SoCs supporting usart3.
+> 
+> I believe we don't want to end up with
+> 
+> linux,input-no-autorepeat
+> bsd,keypad-autorepeat
+> windows-phone,disable-autorepeat
 
-Best Regards,
+I do not see a problem with this. This is only as bad as the current
+situation, but has the benefit that the madness is constrained to
+particular vendor prefixes, which we can uniquely identify and handle
+differently if required.
 
-Boris
+> 
+> ...and should avoid linux, prefix.
 
->   	ahb {
->   		apb {
->   			pinctrl at fffff400 {
-> diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
-> index c2554219f7a4..aceee86f60eb 100644
-> --- a/arch/arm/boot/dts/at91sam9x25.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x25.dtsi
-> @@ -15,6 +15,10 @@
->   	model = "Atmel AT91SAM9X25 SoC";
->   	compatible = "atmel,at91sam9x25", "atmel,at91sam9x5";
->   
-> +	aliases {
-> +		serial4 = &usart3;
-> +	};
-> +
->   	ahb {
->   		apb {
->   			pinctrl at fffff400 {
+I disagree.
+
+Mark.
