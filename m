@@ -1,41 +1,90 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 2 Dec 2013 15:25:37 +0100
-Subject: [PATCH v6 02/17] dts: mpc512x: introduce dt-bindings/clock/ header
-In-Reply-To: <20131202094656.GA12952@e106331-lin.cambridge.arm.com>
-References: <1385851897-23475-1-git-send-email-gsi@denx.de>
- <1385851897-23475-3-git-send-email-gsi@denx.de>
- <20131202094656.GA12952@e106331-lin.cambridge.arm.com>
-Message-ID: <20131202142537.GS2982@book.gsilab.sittig.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Dec 2013 15:25:23 +0100
+Subject: [PATCH 1/2] ARM: dts: tegra: Header file for pinctrl constants
+In-Reply-To: <1385992502-12771-1-git-send-email-ldewangan@nvidia.com>
+References: <1385992502-12771-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20131202142522.GA17566@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 09:46 +0000, Mark Rutland wrote:
+On Mon, Dec 02, 2013 at 07:25:01PM +0530, Laxman Dewangan wrote:
+
+I think the canonical subject prefix for Tegra is:
+
+	ARM: tegra:
+
+Perhaps also mention that you "Add" the header file? Like so:
+
+	ARM: tegra: Add header file for pinctrl constants
+
+> Defines pincontrol constants to use from Tegra's DTS file
+
+Perhaps: "This new header file defines..."? "DTS files"
+
+> for tegra pincontrol properties option.
+
+"Tegra"
+
 > 
-> On Sat, Nov 30, 2013 at 10:51:22PM +0000, Gerhard Sittig wrote:
-> > introduce a dt-bindings/ header file for MPC512x clocks,
-> > providing symbolic identifiers for those SoC clocks which
-> > clients will reference from their device tree nodes
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+>  include/dt-bindings/pinctrl/pinctrl-tegra.h |   65 +++++++++++++++++++++++++++
+>  1 files changed, 65 insertions(+), 0 deletions(-)
+>  create mode 100644 include/dt-bindings/pinctrl/pinctrl-tegra.h
 > 
-> There should be a binding document update to go with this, pointing out
-> that this include file defines the set of clock IDs for the MPC512x
-> clocks.
+> diff --git a/include/dt-bindings/pinctrl/pinctrl-tegra.h b/include/dt-bindings/pinctrl/pinctrl-tegra.h
+[...]
+> +/* Pull up/down/normal */
+> +#define TEGRA_PIN_PUPD_NORMAL				0
+> +#define TEGRA_PIN_PUPD_PULL_DOWN			1
+> +#define TEGRA_PIN_PUPD_PULL_UP				2
 
-It turns out the Freescale MPC512x did not have a separate clocks
-binding document, but "just did the usual" and followed the
-common bindings.
+Perhaps these would be easier to use as:
 
-I've sent a separate doc update patch which becomes applicable
-after the CCF implementation got accepted.
+	#define TEGRA_PIN_PULL_NONE	0
+	#define TEGRA_PIN_PULL_DOWN	1
+	#define TEGRA_PIN_PULL_UP	2
 
-> Otherwise, this looks fine to me.
+?
 
-So I take this as a "reviewed by" of yours for this dt-bindings
-header file patch, shall I have to re-submit the series.  Thanks!
+> +/* Tristate/normal */
+> +#define TEGRA_PIN_NORMAL				0
+> +#define TEGRA_PIN_TRISTATE				1
+> +
+> +/* Rcv Sel enable/disable */
+> +#define TEGRA_PIN_RCV_SEL_DISABLE			0
+> +#define TEGRA_PIN_RCV_SEL_ENABLE			1
+> +
+> +/* Lock enable/disable */
+> +#define TEGRA_PIN_LOCK_DISABLE				0
+> +#define TEGRA_PIN_LOCK_ENABLE				1
+> +
+> +/* Open drain enable/disable */
+> +#define TEGRA_PIN_OPEN_DRAIN_DISABLE			0
+> +#define TEGRA_PIN_OPEN_DRAIN_ENABLE			1
+> +
+> +/* High speed mode */
+> +#define TEGRA_PIN_DRIVE_HIGH_SPEED_MODE_DISABLE		0
+> +#define TEGRA_PIN_DRIVE_HIGH_SPEED_MODE_ENABLE		1
+> +
+> +/* Schmitt enable/disable */
+> +#define TEGRA_PIN_DRIVE_SCHMITT_DISABLE			0
+> +#define TEGRA_PIN_DRIVE_SCHMITT_ENABLE			1
 
+These are all boolean, so I wonder if perhaps we should be simply
+defining a single pair and reuse that in different contexts:
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+	#define TEGRA_PIN_DISABLE	0
+	#define TEGRA_PIN_ENABLE	1
+
+The property names should provide enough context for them to be used
+unambiguously.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/69608dfe/attachment.sig>
