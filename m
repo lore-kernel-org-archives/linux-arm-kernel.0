@@ -1,28 +1,28 @@
-From: philippe.retornaz@gmail.com (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
-Date: Mon, 02 Dec 2013 09:30:31 +0100
-Subject: [PATCH RESEND] mfd: mc13xxx: Fix null pointer dereference in
- mc13xxx_common_init
-In-Reply-To: <1385805188-5597-1-git-send-email-shc_work@mail.ru>
-References: <1385805188-5597-1-git-send-email-shc_work@mail.ru>
-Message-ID: <529C4527.3040707@gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon,  2 Dec 2013 16:29:48 +0800
+Subject: [PATCH] arm: at91: sama5d3: enable qt1070 as a wakeup source
+Message-ID: <1385972988-20157-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/11/2013 10:53, Alexander Shiyan a ?crit :
-> If this driver being loaded from devicetree, the pdata is NULL. This
-> cause kernel Oops when "fsl,mc13xxx-uses-codec" and/or
-> "fsl,mc13xxx-uses-touch" properties is specified.
->
+Enable qt1070 keyboard as a wakeup source on sama5d3xek board.
 
-Well, the codec and touch are not supported if DT is used, thus why
-bothering ? Just don't specify thoses properties.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3xdm.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-IMHO it would be better to either implement full DT support in the
-subdevices or removing the check for the fsl,mc13xxx-uses-codec and
-fsl,mc13xxx-uses-touch in mc13xxx_probe_flags_dt().
-If it's not supported let's not lie about it.
-
-
-Regards,
-
-Philippe
+diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
+index 1c296d6..f9bdde5 100644
+--- a/arch/arm/boot/dts/sama5d3xdm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
+@@ -18,6 +18,7 @@
+ 					interrupts = <31 0x0>;
+ 					pinctrl-names = "default";
+ 					pinctrl-0 = <&pinctrl_qt1070_irq>;
++					wakeup-source;
+ 				};
+ 			};
+ 
+-- 
+1.7.9.5
