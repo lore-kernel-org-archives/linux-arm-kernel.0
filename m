@@ -1,114 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Dec 2013 09:50:34 +0000
-Subject: [PATCH v6 08/17] spi: mpc512x: adjust to OF based clock lookup
-In-Reply-To: <1385851897-23475-9-git-send-email-gsi@denx.de>
-References: <1385851897-23475-1-git-send-email-gsi@denx.de>
- <1385851897-23475-9-git-send-email-gsi@denx.de>
-Message-ID: <20131202095034.GB12952@e106331-lin.cambridge.arm.com>
+From: philippe.retornaz@gmail.com (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
+Date: Mon, 02 Dec 2013 10:51:00 +0100
+Subject: [PATCH RESEND] mfd: mc13xxx: Remove unneeded mc13xxx_lock/unlock
+In-Reply-To: <1385787681-7736-1-git-send-email-shc_work@mail.ru>
+References: <1385787681-7736-1-git-send-email-shc_work@mail.ru>
+Message-ID: <529C5804.2020501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 30, 2013 at 10:51:28PM +0000, Gerhard Sittig wrote:
-> after device tree based clock lookup became available, the peripheral
-> driver need no longer construct clock names which include the PSC index,
-> remove the "psc%d_mclk" template and unconditionally use 'mclk'
-> 
-> acquire and release the 'ipg' clock item for register access as well
+Le 30/11/2013 06:01, Alexander Shiyan a ?crit :
+> Locking is performed by regmap API so no additional locking is
+> needed. Nevertheless, keep locking in the ADC conversion routine.
+> This need for keep proper read ADC sequence when calling from adc &
+> touchscreen drivers.
 
-For this and the other peripheral updates, it would be nice to have the
-expected clock-names entries added to the respective binding documents.
-Otherwise this looks fine to me.
+You can't do that so easily !
+Regmap only protect against concurrent access to the SPI/I2C bus, but do
+not protect the driver's internal data.
+And it does not protect against a race between concurrent access at a
+higher level :
 
-Thanks,
-Mark.
+reg = regmap_read();
+(modify reg)
+regmap_write(reg);
 
-> 
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: linux-spi at vger.kernel.org
-> Signed-off-by: Gerhard Sittig <gsi@denx.de>
-> ---
->  drivers/spi/spi-mpc512x-psc.c |   26 ++++++++++++++++++--------
->  1 file changed, 18 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
-> index 9602bbd8d7ea..de66c676c248 100644
-> --- a/drivers/spi/spi-mpc512x-psc.c
-> +++ b/drivers/spi/spi-mpc512x-psc.c
-> @@ -40,6 +40,7 @@ struct mpc512x_psc_spi {
->  	unsigned int irq;
->  	u8 bits_per_word;
->  	struct clk *clk_mclk;
-> +	struct clk *clk_ipg;
->  	u32 mclk_rate;
->  
->  	struct completion txisrdone;
-> @@ -475,8 +476,6 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
->  	struct spi_master *master;
->  	int ret;
->  	void *tempp;
-> -	int psc_num;
-> -	char clk_name[16];
->  	struct clk *clk;
->  
->  	master = spi_alloc_master(dev, sizeof *mps);
-> @@ -520,9 +519,7 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
->  		goto free_master;
->  	init_completion(&mps->txisrdone);
->  
-> -	psc_num = master->bus_num;
-> -	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
-> -	clk = devm_clk_get(dev, clk_name);
-> +	clk = devm_clk_get(dev, "mclk");
->  	if (IS_ERR(clk)) {
->  		ret = PTR_ERR(clk);
->  		goto free_irq;
-> @@ -533,17 +530,29 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
->  	mps->clk_mclk = clk;
->  	mps->mclk_rate = clk_get_rate(clk);
->  
-> +	clk = devm_clk_get(dev, "ipg");
-> +	if (IS_ERR(clk)) {
-> +		ret = PTR_ERR(clk);
-> +		goto free_mclk_clock;
-> +	}
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret)
-> +		goto free_mclk_clock;
-> +	mps->clk_ipg = clk;
-> +
->  	ret = mpc512x_psc_spi_port_config(master, mps);
->  	if (ret < 0)
-> -		goto free_clock;
-> +		goto free_ipg_clock;
->  
->  	ret = devm_spi_register_master(dev, master);
->  	if (ret < 0)
-> -		goto free_clock;
-> +		goto free_ipg_clock;
->  
->  	return ret;
->  
-> -free_clock:
-> +free_ipg_clock:
-> +	clk_disable_unprepare(mps->clk_ipg);
-> +free_mclk_clock:
->  	clk_disable_unprepare(mps->clk_mclk);
->  free_irq:
->  	free_irq(mps->irq, mps);
-> @@ -561,6 +570,7 @@ static int mpc512x_psc_spi_do_remove(struct device *dev)
->  	struct mpc512x_psc_spi *mps = spi_master_get_devdata(master);
->  
->  	clk_disable_unprepare(mps->clk_mclk);
-> +	clk_disable_unprepare(mps->clk_ipg);
->  	free_irq(mps->irq, mps);
->  	if (mps->psc)
->  		iounmap(mps->psc);
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+And we do have such behavior:
+* The mc13xxx->irqhandler/irqdata array is
+   protected by this mutex.
+
+* And we also have non-atomic RMW in mc13xxx_irq_unmask():
+
+ret = mc13xxx_reg_read(mc13xxx, offmask, &mask);
+if (ret)
+	return ret;
+if (!(mask & irqbit))
+	return 0;
+return mc13xxx_reg_write(mc13xxx, offmask, mask & ~irqbit);
+
+It's OK to do this if you are protected by a mutex, but as soon as you
+remove it you will have concurrency between two irq_unmask/irq_mask.
+
+So you can remove the lock from trivial function like:
+	mc13xxx_lock(led->master);
+  	mc13xxx_reg_rmw(led->master, reg, mask << shift, value << shift);
+	mc13xxx_unlock(led->master);
+
+Which protect only a single access to regmap.
+
+But we need to keep it for more complex behavior.
+
+Regards,
+
+Philippe
