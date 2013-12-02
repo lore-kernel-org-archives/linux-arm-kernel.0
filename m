@@ -1,47 +1,25 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 02 Dec 2013 19:54:09 +0100
-Subject: [PATCH] ARM: at91: add i2c2 pinctrl speficifation to sama5d3
- DT
-In-Reply-To: <1386001128-29147-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1386001128-29147-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <529CD751.3020704@overkiz.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Dec 2013 19:09:13 +0000
+Subject: [PATCH 1/3] ASoC: ux500_pcm: Stop pretending that we support
+ varying address widths
+In-Reply-To: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+References: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131202190913.GQ27568@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2013 17:18, Nicolas Ferre wrote:
+On Mon, Dec 02, 2013 at 06:00:20PM +0000, Lee Jones wrote:
+> The Slave Config's addr_width attribute is populated by data_width of
+> dma_cfg, which in turn is derived from dma_params' data_size attribute
+> and that comes from the slot_width which is always 16 bits (2 Bytes).
+> We're cutting out the middle man here and just setting the DMA Slave
+> Config directly.
 
-
-Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->   arch/arm/boot/dts/sama5d3.dtsi | 10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index f520b0236671..f5fd111b5ee6 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -304,6 +304,8 @@
->   				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(11)>,
->   				       <&dma1 2 AT91_DMA_CFG_PER_ID(12)>;
->   				dma-names = "tx", "rx";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_i2c2>;
->   				#address-cells = <1>;
->   				#size-cells = <0>;
->   				clocks = <&twi2_clk>;
-> @@ -494,6 +496,14 @@
->   					};
->   				};
->   
-> +				i2c2 {
-> +					pinctrl_i2c2: i2c2-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_NONE	/* TWD2 pin, conflicts with LCDDAT18, ISI_D2 */
-> +							 AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* TWCK2 pin, conflicts with LCDDAT19, ISI_D3 */
-> +					};
-> +				};
-> +
->   				isi {
->   					pinctrl_isi: isi-0 {
->   						atmel,pins =
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/c6d196b8/attachment-0001.sig>
