@@ -1,86 +1,131 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Mon, 2 Dec 2013 02:45:07 +0000
-Subject: [PATCHv6 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20131129092224.GB22771@ulmo.nvidia.com>
-References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
- <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com>
- <20131128212510.GC14689@mithrandir>
- <1DD289F6464F0949A2FCA5AA6DC23F828DD76C@039-SN2MPN1-011.039d.mgd.msft.net>
- <20131129092224.GB22771@ulmo.nvidia.com>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828E17D3@039-SN2MPN1-011.039d.mgd.msft.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 1 Dec 2013 22:02:39 -0500
+Subject: [PATCH v2 2/2] clk: add accuracy support for fixed clock
+In-Reply-To: <5296298C.9040300@overkiz.com>
+References: <1385556285-19180-1-git-send-email-b.brezillon@overkiz.com>
+ <1385556285-19180-3-git-send-email-b.brezillon@overkiz.com>
+ <20131127145620.GR2879@titan.lakedaemon.net>
+ <5296298C.9040300@overkiz.com>
+Message-ID: <20131202030239.GA29282@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > +#define FTM_CNTIN_VAL       0x00
-> > >
-> > > Do we really need this?
-> > >
+Boris,
+
+Sorry for the delay.
+
+On Wed, Nov 27, 2013 at 06:19:08PM +0100, boris brezillon wrote:
+> On 27/11/2013 15:56, Jason Cooper wrote:
+> >On Wed, Nov 27, 2013 at 01:44:45PM +0100, Boris BREZILLON wrote:
+> >>This patch adds support for accuracy retrieval on fixed clocks.
+> >>It also adds a new dt property called 'clock-accuracy' to define the clock
+> >>accuracy.
+> >>
+> >>This can be usefull for oscillator (RC, crystal, ...) definitions which are
+> >>always given an accuracy characteristic.
 > >
-> > Maybe not, I think that the initial value maybe modified in the future.
-> > And this can be more easy to ajust it.
+> >I think we need to be more explicit in the binding and the API,
+> >especially when providing a method to recalculate the accuracy.  I
+> >presume this recalculated value would be relative against the root
+> >clock?
 > 
-> Why would it need to be modified?
+> Yes, indirectly.
+> Actually the clk accuracy depends on the whole clock chain, and is
+> calculated either by comparing the real clk rate to the theorical clk
+> rate
+> (accuracy = absolute_value((theorical_clk_rate - real_clk_rate)) /
+> theorical_clk_rate),
+> or by adding all the accuracies (expressed in ppm, ppb or ppt) of
+> the clk chain
+> (accuracy = current_clk_accuracy + parent_clk_accuracy).
 > 
-
-Well, for the PWM function modifying it make no sense, so I'll remove this. 
-
-
-> > > > +	writel(period_cycles + cntin - 1, fpc->base + FTM_MOD);
-> > > > +	writel(duty_cycles + cntin, fpc->base + FTM_CV(pwm->hwpwm));
-> > >
-> > > And these:
-> > >
-> > > 	writel(period - 1, fpc->base + FTM_MOD);
-> > > 	writel(duty, fpc->base + FTM_CV(pwm->hwpwm));
-> > >
-> > > Although now that I think about it, this seems broken. The period is
-> > > set in a global register, so I assume it is valid for all channels.
-> > > What if you want to use different periods for individual channels?
-> > > The way I read this the last one to be configured will win and
-> > > change the period to whatever it wants. Other channels won't even
-> notice.
-> > >
-> >
-> > That's right. And all the 8 channels share the same period settings.
-> >
-> > > Is there a way to set the period per channel?
-> > >
-> >
-> > Not yet. Only could we do is to set the duty value individually for
-> > each channel. So here is a limitation for the cusumers that all the 8
-> channels'
-> > period values should be the same.
+> Say you have a root clk with a +-10000 ppb accuracy, then a pll multiplying
+> this root clk by 40 and introducing a possible drift of +- 1000 ppb and
+> eventually a system clk based on this pll with a perfect div by 2 prescaler
+> (accuracy = 0 ppb).
 > 
-> That will need to be handled some way. Perhaps the easiest would be to
-> check whether or not another channel is already running and check that
-> indeed the period as requested by the new channel matches that of any
-> running channels. If it doesn't match, then pwm_config() should fail.
+> If I understand correctly how accuracy propagates accross the clk tree,
+> you'll end up with a system clk with a +- 11000 ppb accuracy.
 > 
-> When you do that you can also optimize this a bit by only setting the
-> frequency once. Whenever a new channel is configured it will have the same
-> period and therefore the register doesn't need to be reprogrammed.
+> e.g.:
+>  root clk = 12MHz +- 10000 ppb => 12 MHz * (1 - (10000 / 10^9)) <
+> root clk < 12 MHz * (1 + (10000 / 10^9))
+>                                                     => 11,99988 MHz
+> < root clk < 12,00012 MHz
+>  pll clk = ((root clk) * 40) +- 1000 ppb =>  (11,99988 MHz * 40) *
+> (1 - (1000 / 10^9)) < pll clk < (12,00012 MHz * 40) * (1 + (1000 /
+> 10^9))
+>                                                            =>
+> 479,994720005 MHz < pll clk < 480,005280005 MHz
 > 
+>  system clk = ((pll clk) / 2) +- XXX ppb => 479,994720005 MHz / 2 <
+> system clk < 480,005280005 MHz / 2
+>                                                               =>
+> 239,997360002 MHz < system clk < 240,002640002 MHz
+>                                                               =>
+> system clk accuracy = 0,002640002 / 240 = 11000 ppb
+> 
+> Please tell me if my assumptions are false.
 
-Yes, if it dosen't match it should fail, or nothing to do with the period
-register if it's not the first channel to be configured.
+Nope, it looks fine by me afaict.  Thanks for the clear walk through.
 
+> >There really needs to be two attributes here:  the rated accuracy from
+> >the manufacturer, and the calculated accuracy wrt another clock in the
+> >system.  We only need a binding for the manufacturer rating since the
+> >calculated accuracy is determined at runtime.
+> 
+> Actually when I proposed this new functionnality I only had the theorical
+> (or manufacturer rated) accuracy in mind.
 
-> > > > +static void fsl_pwm_disable(struct pwm_chip *chip, struct
-> > > > +pwm_device
-> > > *pwm)
-> > > > +{
-> > > > +	struct fsl_pwm_chip *fpc;
-> > > > +
-> > > > +	fpc = to_fsl_chip(chip);
-> > > > +
-> > > > +	fsl_counter_clock_disable(fpc);
-> > > > +}
-> > >
-> > > Same here. Since you can't propagate the error, perhaps an error
-> > > message would be appropriate here?
-> > >
-> >
-> > Well, in fsl_counter_clock_disable(fpc); only '0' could be returned,
-> > maybe let it a void type value to return is better.
-> > Just like:
-> > static void fsl_counter_clock_disable(struct fsl_pwm_chip *fpc) 
+Yes, I see we are concerned about two different things.  You need to get
+the theoretical accuracy to assist with clock selection.  I was
+concerned that the recalc function was attempting to measure the real
+accuracy of a given clock from a tree.
+
+Since we're only talking theoretical accuracy, that makes things a lot
+simpler.  :)
+
+> But providing an estimated accuracy (based on another clk) sounds
+> interresting if your reference clk is an extremly accurate one.
+
+Yes, I was thinking against a GPS PPS signal, but again, not relevant to
+this patch series.  Also, it would be complicated by the fact that there
+is no high-speed counter on ARM.
+
+> >I would also prefer to see an unknown accuracy be -1.
+> I decided to keep 0 as a default value for unimplemented recalc_accuracy
+> (or unspecified fixed accuracy) to keep existing implementation coherent.
+> 
+> 0 means the clk is perfect, and I thought it would be easier to handle a
+> perfect clk (even if this is not really the case) than handling an
+> error case.
+> 
+> Another aspect is the propagation of the clk accuracy accross the clk tree.
+> Returning -1 in the middle of the clk chain will drop the previous
+> clk accuracy
+> calculation.
+> 
+> Anyway, I can change this if you think this is more appropriate.
+
+No, in light of this being purely theoretical accuracy, I'm fine with it
+if Mike is.
+
+> >There are already
+> >clocks on the market (PPS reference clocks) with accuracies of
+> >0.1ppb/day [1].  Obviously, these aren't system clocks.  So the limit on
+> >accuracy may be a non-issue.  However, it may be worth changing the
+> >binding property to express the units.
+> Wow, 0.1 ppb, this is impressive :-).
+> 
+> 
+> This needs more than changing the dt bindings: I currently store the
+> accuracy value in an unsigned long field, and expressing this in ppt
+> (parts per trillion) may implies storing this in an u64 field (or store a
+> unit field).
+
+No, let's not derail this series.  ;-)  You've addressed my concerns.
+Thanks for taking the time to bring me up to speed.
+
+thx,
+
+Jason.
