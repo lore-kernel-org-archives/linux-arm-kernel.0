@@ -1,89 +1,113 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 3 Dec 2013 10:33:12 +0100
-Subject: [PATCH v3 RESEND] ARM: imx: pllv1: Fix PLL calculation for i.MX27
-In-Reply-To: <1384076089-30536-1-git-send-email-shc_work@mail.ru>
-References: <1384076089-30536-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131203093311.GI24559@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 3 Dec 2013 00:36:09 +0100
+Subject: [PATCH 4/7] PCI: imx6: Split away the PHY reset
+In-Reply-To: <CAB5oZtCTDJEWFxr-f1YJg7ihw0aCuiJiYvrHV597oNb6cZz92Q@mail.gmail.com>
+References: <1385500248-6551-1-git-send-email-marex@denx.de>
+ <1385500248-6551-4-git-send-email-marex@denx.de>
+ <CAB5oZtCTDJEWFxr-f1YJg7ihw0aCuiJiYvrHV597oNb6cZz92Q@mail.gmail.com>
+Message-ID: <201312030036.09886.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 10, 2013 at 01:34:49PM +0400, Alexander Shiyan wrote:
-> MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
-> is a just sign bit. This patch makes different calculation for i.MX27.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Dear Harro Haan,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
-> ---
->  arch/arm/mach-imx/clk-pllv1.c | 23 +++++++++++++++++++----
->  1 file changed, 19 insertions(+), 4 deletions(-)
+> On 26 November 2013 22:10, Marek Vasut <marex@denx.de> wrote:
+> > Split the PCIe PHY reset from the link up function to make
+> > the code a little more structured.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Frank Li <lznuaa@gmail.com>
+> > Cc: Harro Haan <hrhaan@gmail.com>
+> > Cc: Jingoo Han <jg1.han@samsung.com>
+> > Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+> > Cc: Pratyush Anand <pratyush.anand@st.com>
+> > Cc: Richard Zhu <r65037@freescale.com>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Sean Cross <xobs@kosagi.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+> > Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+> > Cc: Tim Harvey <tharvey@gateworks.com>
+> > Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> > Cc: Yinghai Lu <yinghai@kernel.org>
+> > ---
+> > 
+> >  drivers/pci/host/pci-imx6.c | 33 ++++++++++++++++++---------------
+> >  1 file changed, 18 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> > index 4d5be4e..a9781e7 100644
+> > --- a/drivers/pci/host/pci-imx6.c
+> > +++ b/drivers/pci/host/pci-imx6.c
+> > @@ -336,6 +336,23 @@ static void imx6_pcie_host_init(struct pcie_port
+> > *pp)
+> > 
+> >         return;
+> >  
+> >  }
+> > 
+> > +static void imx6_pcie_reset_phy(struct pcie_port *pp)
+> > +{
+> > +       uint32_t temp;
+> > +
+> > +       pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
+> > +       temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN |
+> > +                PHY_RX_OVRD_IN_LO_RX_PLL_EN);
+> > +       pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
+> > +
+> > +       usleep_range(2000, 3000);
+> > +
+> > +       pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
+> > +       temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN |
+> > +                 PHY_RX_OVRD_IN_LO_RX_PLL_EN);
+> > +       pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
+> > +}
+> > +
+> > 
+> >  static int imx6_pcie_link_up(struct pcie_port *pp)
+> >  {
+> >  
+> >         u32 rc, ltssm, rx_valid, temp;
+> > 
+> > @@ -370,21 +387,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+> > 
+> >         dev_err(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
+> > 
+> > -       pcie_phy_read(pp->dbi_base,
+> > -               PHY_RX_OVRD_IN_LO, &temp);
+> > -       temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN
+> > -               | PHY_RX_OVRD_IN_LO_RX_PLL_EN);
+> > -       pcie_phy_write(pp->dbi_base,
+> > -               PHY_RX_OVRD_IN_LO, temp);
+> > -
+> > -       usleep_range(2000, 3000);
+> > -
+> > -       pcie_phy_read(pp->dbi_base,
+> > -               PHY_RX_OVRD_IN_LO, &temp);
+> > -       temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN
+> > -               | PHY_RX_OVRD_IN_LO_RX_PLL_EN);
+> > -       pcie_phy_write(pp->dbi_base,
+> > -               PHY_RX_OVRD_IN_LO, temp);
+> > +       imx6_pcie_reset_phy(pp);
+> > 
+> >         return 0;
+> >  
+> >  }
+> > 
+> > --
+> > 1.8.4.3
 > 
-> diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
-> index c1eaee3..d21d14c 100644
-> --- a/arch/arm/mach-imx/clk-pllv1.c
-> +++ b/arch/arm/mach-imx/clk-pllv1.c
-> @@ -18,6 +18,11 @@
->   *
->   * PLL clock version 1, found on i.MX1/21/25/27/31/35
->   */
-> +
-> +#define MFN_BITS	(10)
-> +#define MFN_SIGN	(BIT(MFN_BITS - 1))
-> +#define MFN_MASK	(MFN_SIGN - 1)
-> +
->  struct clk_pllv1 {
->  	struct clk_hw	hw;
->  	void __iomem	*base;
-> @@ -25,6 +30,11 @@ struct clk_pllv1 {
->  
->  #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
->  
-> +static inline bool mfn_is_negative(unsigned int mfn)
-> +{
-> +	return !cpu_is_mx1() && !cpu_is_mx21() && (mfn & MFN_SIGN);
-> +}
-> +
->  static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  		unsigned long parent_rate)
->  {
-> @@ -58,10 +68,15 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  
->  	/*
->  	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
-> -	 * 2's complements number
-> +	 * 2's complements number.
-> +	 * On i.MX27 the bit 9 is the sign bit.
->  	 */
-> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
-> -		mfn_abs = 0x400 - mfn;
-> +	if (mfn_is_negative(mfn)) {
-> +		if (cpu_is_mx27())
-> +			mfn_abs = mfn & MFN_MASK;
-> +		else
-> +			mfn_abs = BIT(MFN_BITS) - mfn;
-> +	}
->  
->  	rate = parent_rate * 2;
->  	rate /= pd + 1;
-> @@ -70,7 +85,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  
->  	do_div(ll, mfd + 1);
->  
-> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
-> +	if (mfn_is_negative(mfn))
->  		ll = -ll;
->  
->  	ll = (rate * mfi) + ll;
-> -- 
-> 1.8.1.5
+> Thanks Marek,
 > 
+> A minor:
+> drivers/pci/host/pci-imx6.c: In function 'imx6_pcie_link_up':
+> drivers/pci/host/pci-imx6.c:353:27: warning: unused variable 'temp'
+> [-Wunused-variable]
 > 
+> See the following mail for more info which tests I did with patch 1/7,
+> 3/7, 4/7, 5/7 and 6/7:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/214640.
+> html
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks for the find and testing!
