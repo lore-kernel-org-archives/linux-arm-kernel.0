@@ -1,75 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Dec 2013 10:49:24 +0100
-Subject: [PATCH 1/2] ARM: AT91: Animeo IP: fix mtd partition table
-In-Reply-To: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <529C57A4.60809@atmel.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Mon, 2 Dec 2013 11:49:32 +0200
+Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
+In-Reply-To: <1385976238.12531.8.camel@host5.omatika.ru>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <1385879185-22455-2-git-send-email-ynvich@gmail.com>
+ <20131202090253.GE3942@xps8300>
+ <1385976238.12531.8.camel@host5.omatika.ru>
+Message-ID: <20131202094932.GF3942@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/09/2013 08:48, Jean-Christophe PLAGNIOL-VILLARD :
-> Update to production one.
->
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi,
 
-This one added to at91-3.14-dt
+On Mon, Dec 02, 2013 at 01:23:58PM +0400, Sergei Ianovich wrote:
+> On Mon, 2013-12-02 at 11:02 +0200, Heikki Krogerus wrote:
+> > On Sun, Dec 01, 2013 at 10:26:14AM +0400, Sergei Ianovich wrote:
+> > > PXA serial ports have "standard" UART names (ttyS[0-3]), major
+> > > device number (4) and first minor device number (64) by default.
+> > > 
+> > > If the system has extra 8250 serial port hardware in addition
+> > > to onboard PXA serial ports, default settings produce a device
+> > > allocation conflict.
+> > > 
+> > > The patch provides a configuration option which can move onboard
+> > > ports out of the way of 8250_core by assigning a different (204)
+> > > major number and corresponding device names (ttySA[0-3]).
+> > > 
+> > <snip>
+> > 
+> > If drivers/tty/serial/pxa.c was converted to an other probe driver for
+> > the 8250, this would not be an issue.
+> 
+> It seems that my patch is not going to be accepted. However, there is a
+> device which has both PXA ports and a additional 8250 accent chip. As a
+> result, there is a device allocation conflict. For the device to be
+> usable the conflict needs to be resolved.
+> 
+> Do you mean that drivers/tty/serial/pxa.c needs to be rewritten to
+> support lp8x4x special case?
+
+Sorry I was not clear. I was suggesting that drivers/tty/serial/pxa.c
+would be converted to drivers/tty/serial/8250/8250_pxa.c since it
+looks to me like just an other 16x50 compatible UART. That would fix
+the issue with the name conflict. You would then simply register 8250
+ports from two probe drivers (drivers/tty/serial/8250/8250_pxa.c and
+drivers/tty/serial/8250/8250_lp8x4x.c).
+
+Depending on the order you register your platform devices (which you
+decide in your platform code), but let's say the pxa gets registered
+first and let's say it only has one port. You will then have in your
+system /dev/ttyS0 for the pxa port and /dev/ttyS[1-4] for the other
+UART.
+
+I hope I was able to explain what I mean this time :)
 
 Thanks,
 
-> ---
->   arch/arm/boot/dts/animeo_ip.dts | 31 ++++++++-----------------------
->   1 file changed, 8 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-> index cfed178..6b4b6a1 100644
-> --- a/arch/arm/boot/dts/animeo_ip.dts
-> +++ b/arch/arm/boot/dts/animeo_ip.dts
-> @@ -101,34 +101,19 @@
->   			nand-on-flash-bbt;
->   			status = "okay";
->
-> -			at91bootstrap at 0 {
-> -				label = "at91bootstrap";
-> -				reg = <0x0 0x8000>;
-> -			};
-> -
-> -			barebox at 8000 {
-> +			barebox at 0 {
->   				label = "barebox";
-> -				reg = <0x8000 0x40000>;
-> -			};
-> -
-> -			bareboxenv at 48000 {
-> -				label = "bareboxenv";
-> -				reg = <0x48000 0x8000>;
-> -			};
-> -
-> -			user_block at 0x50000 {
-> -				label = "user_block";
-> -				reg = <0x50000 0xb0000>;
-> +				reg = <0x0 0x58000>;
->   			};
->
-> -			kernel at 100000 {
-> -				label = "kernel";
-> -				reg = <0x100000 0x1b0000>;
-> +			u_boot_env at 58000 {
-> +				label = "u_boot_env";
-> +				reg = <0x58000 0x8000>;
->   			};
->
-> -			root at 2b0000 {
-> -				label = "root";
-> -				reg = <0x2b0000 0x1D50000>;
-> +			ubi at 60000 {
-> +				label = "ubi";
-> +				reg = <0x60000 0x1FA0000>;
->   			};
->   		};
->
->
-
-
 -- 
-Nicolas Ferre
+heikki
