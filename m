@@ -1,44 +1,89 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 02 Dec 2013 15:33:45 +0400
-Subject: =?UTF-8?B?UmU6IFtSRkMvUEFUQ0hdIE5BTkQgYnVzLXdpZHRoIGRldGVjdGlvbiBleHRy?=
- =?UTF-8?B?ZW1lIG1ha2VvdmVy?=
-In-Reply-To: <1385732456-32696-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1385732456-32696-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1385984025.215304817@f198.i.mail.ru>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 02 Dec 2013 12:38:58 +0100
+Subject: [PATCH v2 2/3] regulator: tps6586x: add and use correct voltage
+ table
+In-Reply-To: <20131202093622.GF17834@ulmo.nvidia.com>
+References: <cover.1385913227.git.stefan@agner.ch>
+ <77c960e6e3a91cf39bc866ccb9cd578ccc5acc95.1385913228.git.stefan@agner.ch>
+ <20131202093622.GF17834@ulmo.nvidia.com>
+Message-ID: <7ec014a74ccbcf975f45e0c517615ae2@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-> Here's my proposal, based in Pekon's latest work.
+Am 2013-12-02 10:36, schrieb Thierry Reding:
+> On Sun, Dec 01, 2013 at 04:59:14PM +0100, Stefan Agner wrote:
+> [...]
 > 
-> This patch removes the flash device bus-width configuration, prior to
-> the device detection. With this modification, a NAND driver is no longer
-> able to "force" the device width, and instead can only obtain the detected
-> bus-width after the call to nand_scan_ident().
-...
-> Alexander: Could you try this patch and see if it's suitable for your needs?
-> I think you should be able to use it to set the bus-width, without any need for
-> a new DT property. You will have to split your nand_scan() call in an initial
-> call to nand_scan_ident() and a final call to nand_scan_tail().
+> This looks pretty good generally. A few minor nits below...
+> 
+>> diff --git a/drivers/regulator/tps6586x-regulator.c b/drivers/regulator/tps6586x-regulator.c
+> [...]
+>> +#define tps658623_sm2_voltages tps6586x_ldo4_voltages
+>>  static const unsigned int tps6586x_ldo4_voltages[] = {
+>>  	1700000, 1725000, 1750000, 1775000, 1800000, 1825000, 1850000, 1875000,
+>>  	1900000, 1925000, 1950000, 1975000, 2000000, 2025000, 2050000, 2075000,
+> 
+> I'd put the #define below the ldo4 table. This doesn't actually matter
+> for the preprocessor, but it makes it easier to read the code. Also an
+> additional blank line would help with readability.
+> 
+>> +	TPS6586X_LDO(LDO_0, "vinldo01", tps6586x_ldo0, SUPPLYV1, 5, 3, ENC, 0,
+>> +					END, 0),
+> 
+> Perhaps reduce the indentation here so there's more room in case this
+> ever needs to be extended?
 
-16-bit ONFI:
+The last 4 lines indentation was already that far, so I just adopted
+those lines in order to avoid having to touch them too.
 
-ONFI param page 0 valid
-ONFI flash detected
-NAND device: Manufacturer ID: 0x2c, Chip ID: 0xca (Micron MT29F2G16ABAEAWP), 256MiB, page size: 2048, OOB size: 64
-Scanning device for bad blocks
-1 ofpart partitions found on MTD device MT29F2G16ABAEAWP
-Creating 1 MTD partitions on "MT29F2G16ABAEAWP":
-0x000000000000-0x000010000000 : "nand-gpio"
 
-8-bit non-ONFI:
-NAND device: Manufacturer ID: 0xec, Chip ID: 0x76 (Samsung NAND 64MiB 3,3V 8-bit), 64MiB, page size: 512, OOB size: 16
-Scanning device for bad blocks
-1 ofpart partitions found on MTD device NAND 64MiB 3,3V 8-bit
-Creating 1 MTD partitions on "NAND 64MiB 3,3V 8-bit":
-0x000000000000-0x000004000000 : "nand-gpio"
+> 
+>> @@ -351,6 +380,7 @@ static int tps6586x_regulator_probe(struct platform_device *pdev)
+>>  	struct regulator_init_data *reg_data;
+>>  	struct tps6586x_platform_data *pdata;
+>>  	struct of_regulator_match *tps6586x_reg_matches = NULL;
+>> +	int reg_version;
+> 
+> Why the prefix "reg_"?
+> 
+>> @@ -373,10 +403,27 @@ static int tps6586x_regulator_probe(struct platform_device *pdev)
+>>  		return -ENOMEM;
+>>  	}
+>>
+>> +	reg_version = tps6586x_get_version(pdev->dev.parent);
+>> +
+>>  	for (id = 0; id < TPS6586X_ID_MAX_REGULATOR; ++id) {
+>>  		reg_data = pdata->reg_init_data[id];
+>>
+>> -		ri = find_regulator_info(id);
+>> +		switch(reg_version) {
+>> +		case TPS658623:
+>> +			ri = find_regulator_info(id, tps658623_regulator,
+>> +					ARRAY_SIZE(tps658623_regulator));
+>> +			break;
+>> +		case TPS658643:
+>> +			ri = find_regulator_info(id, tps658643_regulator,
+>> +					ARRAY_SIZE(tps658643_regulator));
+>> +			break;
+>> +		}
+> 
+> Perhaps instead of repeating the function calls this could be:
+> 
+> 		switch (version) {
+> 		case TPS6586XYZ:
+> 			num = ARRAY_SIZE(tps6586xyz_regulator);
+> 			table = tps6586xys_regulator;
+> 			break;
+> 
+> 		...
+> 		}
+> 
+> 		if (table)
+> 			ri = find_regulator_info(id, table, num);
+> 
+> That's slightly longer, but I find that to be more intuitive. Perhaps
+> a bit more future-proof since you only have a single call. But that's
+> perhaps subjective, so I'm fine with your alternative, too.
 
-Cannot test 8-bit ONFI, since have not such chip.
-
----
+Sounds reasonable, will change that accordingly in the next patch
+version.
