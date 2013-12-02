@@ -1,128 +1,65 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon,  2 Dec 2013 10:14:41 -0800
-Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
- system
-Message-ID: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 02 Dec 2013 19:34:29 +0100
+Subject: [alsa-devel] [PATCH 1/3] ASoC: ux500_pcm: Stop pretending that
+ we support varying address widths
+In-Reply-To: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+References: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <529CD2B5.9060905@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A good watchdog driver is supposed to report when it was responsible
-for resetting the system.  Implement this for the s3c2410, at least on
-exynos5250 and exynos5420 where we already have a pointer to the PMU
-registers to read the information.
+On 12/02/2013 07:00 PM, Lee Jones wrote:
+> The Slave Config's addr_width attribute is populated by data_width of
+> dma_cfg, which in turn is derived from dma_params' data_size attribute
+> and that comes from the slot_width which is always 16 bits (2 Bytes).
+> We're cutting out the middle man here and just setting the DMA Slave
+> Config directly.
+> 
+> Cc: alsa-devel at alsa-project.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-This patch is based atop Leela Krishna's recent series that ends with
-(ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
-AKA <https://patchwork.kernel.org/patch/3251861/>.
+Patch looks good. But as a follow up patch I think you can now switch to the
+generic snd_dmaengine_pcm_prepare_slave_config.
 
- drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 39 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 47f4dcf..2c87d37 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -62,9 +62,13 @@
- #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
- #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
- 
-+#define RST_STAT_REG_OFFSET		0x0404
- #define WDT_DISABLE_REG_OFFSET		0x0408
- #define WDT_MASK_RESET_REG_OFFSET	0x040c
- #define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
-+#define QUIRK_HAS_RST_STAT		(1 << 1)
-+#define QUIRKS_NEED_PMUREG		(QUIRK_NEEDS_PMU_CONFIG | \
-+					 QUIRK_HAS_RST_STAT)
- 
- static bool nowayout	= WATCHDOG_NOWAYOUT;
- static int tmr_margin;
-@@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
-  * timer reset functionality.
-  * @mask_bit: Bit number for the watchdog timer in the disable register and the
-  * mask reset register.
-+ * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
-+ * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
-+ * reset.
-  * @quirks: A bitfield of quirks.
-  */
- 
-@@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
- 	int disable_reg;
- 	int mask_reset_reg;
- 	int mask_bit;
-+	int rst_stat_reg;
-+	int rst_stat_bit;
- 	u32 quirks;
- };
- 
-@@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
- 	.disable_reg = WDT_DISABLE_REG_OFFSET,
- 	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
- 	.mask_bit = 20,
--	.quirks = QUIRK_NEEDS_PMU_CONFIG
-+	.rst_stat_reg = RST_STAT_REG_OFFSET,
-+	.rst_stat_bit = 20,
-+	.quirks = QUIRK_NEEDS_PMU_CONFIG |
-+		QUIRK_HAS_RST_STAT,
- };
- 
- static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
- 	.disable_reg = WDT_DISABLE_REG_OFFSET,
- 	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
- 	.mask_bit = 0,
--	.quirks = QUIRK_NEEDS_PMU_CONFIG
-+	.rst_stat_reg = RST_STAT_REG_OFFSET,
-+	.rst_stat_bit = 9,
-+	.quirks = QUIRK_NEEDS_PMU_CONFIG |
-+		QUIRK_HAS_RST_STAT,
- };
- 
- static const struct of_device_id s3c2410_wdt_match[] = {
-@@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
- }
- #endif
- 
-+static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
-+{
-+	unsigned int bootstatus = 0;
-+	int ret;
-+
-+	if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
-+		unsigned int rst_stat;
-+
-+		ret = regmap_read(wdt->pmureg, wdt->drv_data->rst_stat_reg,
-+				  &rst_stat);
-+		if (ret)
-+			dev_warn(wdt->dev, "Couldn't get RST_STAT register\n");
-+		else if (rst_stat & BIT(wdt->drv_data->rst_stat_bit))
-+			bootstatus |= WDIOF_CARDRESET;
-+	}
-+
-+	return bootstatus;
-+}
-+
- /* s3c2410_get_wdt_driver_data */
- static inline struct s3c2410_wdt_variant *
- get_wdt_drv_data(struct platform_device *pdev)
-@@ -460,7 +494,7 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
- 	wdt->wdt_device = s3c2410_wdd;
- 
- 	wdt->drv_data = get_wdt_drv_data(pdev);
--	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
-+	if (wdt->drv_data->quirks & QUIRKS_NEED_PMUREG) {
- 		wdt->pmureg = syscon_regmap_lookup_by_phandle(dev->of_node,
- 							"samsung,syscon-phandle");
- 		if (IS_ERR(wdt->pmureg)) {
-@@ -531,6 +565,8 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
- 
- 	watchdog_set_nowayout(&wdt->wdt_device, nowayout);
- 
-+	wdt->wdt_device.bootstatus = s3c2410wdt_get_bootstatus(wdt);
-+
- 	ret = watchdog_register_device(&wdt->wdt_device);
- 	if (ret) {
- 		dev_err(dev, "cannot register watchdog (%d)\n", ret);
--- 
-1.8.4.1
+> ---
+>  sound/soc/ux500/ux500_pcm.c | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
+> 
+> diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+> index 6162f70..2f1bdb7 100644
+> --- a/sound/soc/ux500/ux500_pcm.c
+> +++ b/sound/soc/ux500/ux500_pcm.c
+> @@ -104,26 +104,25 @@ static int ux500_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
+>  		struct dma_slave_config *slave_config)
+>  {
+>  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> -	struct ux500_msp_dma_params *dma_params;
+> -	struct stedma40_chan_cfg *dma_cfg;
+> +	struct snd_dmaengine_dai_dma_data *dma_params;
+>  	int ret;
+>  
+>  	dma_params = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+> -	dma_cfg = dma_params->dma_cfg;
+>  
+>  	ret = snd_hwparams_to_dma_slave_config(substream, params, slave_config);
+>  	if (ret)
+>  		return ret;
+>  
+>  	slave_config->dst_maxburst = 4;
+> -	slave_config->dst_addr_width = dma_cfg->dst_info.data_width;
+>  	slave_config->src_maxburst = 4;
+> -	slave_config->src_addr_width = dma_cfg->src_info.data_width;
+> +
+> +	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+> +	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>  
+>  	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> -		slave_config->dst_addr = dma_params->tx_rx_addr;
+> +		slave_config->dst_addr = dma_params->addr;
+>  	else
+> -		slave_config->src_addr = dma_params->tx_rx_addr;
+> +		slave_config->src_addr = dma_params->addr;
+>  
+>  	return 0;
+>  }
+> 
