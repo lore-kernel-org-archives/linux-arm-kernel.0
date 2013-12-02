@@ -1,37 +1,23 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 02 Dec 2013 12:57:21 +0100
-Subject: [REPOST PATCH] ARM: sunxi: stop timer from ticking before enabling
- interrupts
-In-Reply-To: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
-References: <1385976575-28011-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <529C75A1.8020009@linaro.org>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 02 Dec 2013 16:01:08 +0400
+Subject: [PATCH 05/11] serial: support for 16550 serial ports on LP-8x4x
+In-Reply-To: <20131202115226.GI16735@n2100.arm.linux.org.uk>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <1385879185-22455-6-git-send-email-ynvich@gmail.com>
+ <20131202113052.GG16735@n2100.arm.linux.org.uk>
+ <1385984366.12531.24.camel@host5.omatika.ru>
+ <20131202115226.GI16735@n2100.arm.linux.org.uk>
+Message-ID: <1385985668.12531.31.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2013 10:29 AM, Marc Zyngier wrote:
-> The sun4i timer can still be ticking when we enable the interrupt.
-> If another timer is actually used (A7 architected timer, for example),
-> odds are that the interrupt will eventually fire with the event_handler
-> pointer being NULL.
->
-> The obvious fix it to stop the timer before registering the interrupt.
->
-> Observed and tested on sun7i (cubietruck).
->
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
+On Mon, 2013-12-02 at 11:52 +0000, Russell King - ARM Linux wrote:
+> Add a new enum.
 
-Applied to my tree as 3.13 fixes.
+I will. Thanks for prompt replies.
 
-Thanks
-   -- Daniel
+A side work process question:
+Should I respin this single patch?
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Or should I wait for other patch reviews and respin the whole series
+when ready?
