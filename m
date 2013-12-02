@@ -1,23 +1,141 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Mon, 02 Dec 2013 16:01:08 +0400
-Subject: [PATCH 05/11] serial: support for 16550 serial ports on LP-8x4x
-In-Reply-To: <20131202115226.GI16735@n2100.arm.linux.org.uk>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-6-git-send-email-ynvich@gmail.com>
- <20131202113052.GG16735@n2100.arm.linux.org.uk>
- <1385984366.12531.24.camel@host5.omatika.ru>
- <20131202115226.GI16735@n2100.arm.linux.org.uk>
-Message-ID: <1385985668.12531.31.camel@host5.omatika.ru>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Dec 2013 13:03:01 +0100
+Subject: [PATCH] OF: base: match each node compatible against all given
+ matches first
+In-Reply-To: <1385663785-8643-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1385663785-8643-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131202120300.GA12793@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-02 at 11:52 +0000, Russell King - ARM Linux wrote:
-> Add a new enum.
+On Thu, Nov 28, 2013 at 07:36:25PM +0100, Sebastian Hesselbarth wrote:
+> Currently, of_match_node compares each given match against all node's
+> compatible strings with of_device_is_compatible.
+> 
+> To achieve multiple compatible strings per node with ordering from
+> specific to generic, this requires given matches to be ordered from
+> specific to generic. For most of the drivers this is not true and also
+> an alphabetical ordering is more sane there.
+> 
+> Therefore, this patch modifies of_match_node to match each of the node's
+> compatible strings against all given matches first, before checking the
+> next compatible string. This implies that node's compatibles are ordered
+> from specific to generic while given matches can be in any order.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/of/base.c |   47 ++++++++++++++++++++++++++++++++---------------
+>  1 file changed, 32 insertions(+), 15 deletions(-)
 
-I will. Thanks for prompt replies.
+Hi Sebastian,
 
-A side work process question:
-Should I respin this single patch?
+I think you're one in a long line of people attempting to fix this. I
+tried myself over a year ago (commit 107a84e61cdd 'of: match by
+compatible property first') but it caused a subtle regression late in
+the release cycle and was reverted (commit bc51b0c22ceb 'Revert "of:
+match by compatible property first").
 
-Or should I wait for other patch reviews and respin the whole series
-when ready?
+Only recently there was another attempt [0] but it's pretty much
+equivalent to what I did back then.
+
+That said, I think you might actually have nailed it with this patch.
+>From what I remember all earlier attempt failed because they didn't
+match all compatible/name/type combinations properly. I'm adding a few
+people on Cc who were involved with the other patches, perhaps they can
+give your patch a spin and see if it fixes things for them.
+
+Thierry
+
+[0]: https://lkml.org/lkml/2013/10/3/585
+
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 7d4c70f..183a9c7 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -713,23 +713,37 @@ static
+>  const struct of_device_id *__of_match_node(const struct of_device_id *matches,
+>  					   const struct device_node *node)
+>  {
+> +	const char *cp;
+> +	int cplen, l;
+> +
+>  	if (!matches)
+>  		return NULL;
+>  
+> -	while (matches->name[0] || matches->type[0] || matches->compatible[0]) {
+> -		int match = 1;
+> -		if (matches->name[0])
+> -			match &= node->name
+> -				&& !strcmp(matches->name, node->name);
+> -		if (matches->type[0])
+> -			match &= node->type
+> -				&& !strcmp(matches->type, node->type);
+> -		if (matches->compatible[0])
+> -			match &= __of_device_is_compatible(node,
+> -							   matches->compatible);
+> -		if (match)
+> -			return matches;
+> -		matches++;
+> +	cp = __of_get_property(node, "compatible", &cplen);
+> +	if (!cp)
+> +		return NULL;
+> +
+> +	while (cplen > 0) {
+> +		const struct of_device_id *m = matches;
+> +
+> +		while (m->name[0] || m->type[0] || m->compatible[0]) {
+> +			int match = 1;
+> +			if (m->name[0])
+> +				match &= node->name
+> +					&& !strcmp(m->name, node->name);
+> +			if (m->type[0])
+> +				match &= node->type
+> +					&& !strcmp(m->type, node->type);
+> +			if (m->compatible[0])
+> +				match &= !of_compat_cmp(cp, m->compatible,
+> +							strlen(m->compatible));
+> +			if (match)
+> +				return m;
+> +			m++;
+> +		}
+> +		l = strlen(cp) + 1;
+> +		cp += l;
+> +		cplen -= l;
+>  	}
+>  	return NULL;
+>  }
+> @@ -739,7 +753,10 @@ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
+>   *	@matches:	array of of device match structures to search in
+>   *	@node:		the of device structure to match against
+>   *
+> - *	Low level utility function used by device matching.
+> + *	Low level utility function used by device matching. Matching order
+> + *	is to compare each of the node's compatibles with all given matches
+> + *	first. This implies node's compatible is sorted from specific to
+> + *	generic while matches can be in any order.
+>   */
+>  const struct of_device_id *of_match_node(const struct of_device_id *matches,
+>  					 const struct device_node *node)
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/d3a41a2a/attachment.sig>
