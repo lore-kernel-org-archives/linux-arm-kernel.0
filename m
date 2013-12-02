@@ -1,41 +1,44 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 02 Dec 2013 20:45:48 +0100
-Subject: [PATCH v3 2/2] arm: dt: zynq: Add SDHCI nodes
-In-Reply-To: <1386007357-11956-2-git-send-email-soren.brinkmann@xilinx.com>
+Date: Mon, 02 Dec 2013 20:42:56 +0100
+Subject: [PATCH v3 1/2] mmc: arasan: Add driver for Arasan SDHCI
+In-Reply-To: <1386007357-11956-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1386007357-11956-1-git-send-email-soren.brinkmann@xilinx.com>
- <1386007357-11956-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <529CE36C.4020707@monstr.eu>
+Message-ID: <529CE2C0.5070401@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/02/2013 07:02 PM, Soren Brinkmann wrote:
-> Add nodes for the Arasan SDHCI controller to Zynq dts files.
+> Add a driver for Arasan's SDHCI controller core.
 > 
 > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Acked-by: Rob Herring <rob.herring@calxeda.com> [binding]
 > ---
+> As discussed, I left binding and license header as is and fixed the typos.
+> 
+> v3:
+>  - fix typo in binding documentation
+>  - add missing '>' in MODULE_AUTHOR string
 > v2:
->  - update compatibilty string according to changes in 1/2 (append
->    '-8.9a' IP version string)
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
->  arch/arm/boot/dts/zynq-zc702.dts |  4 ++++
->  arch/arm/boot/dts/zynq-zc706.dts |  4 ++++
->  arch/arm/boot/dts/zynq-zed.dts   |  4 ++++
->  4 files changed, 32 insertions(+)
-
-Chris: It is up to you if you want to take this through your tree
-or just let me to take it through my tree. It is adding new nodes
-to DTS file that's why it shouldn't be any problem to apply it
-separately.
-
-Anyway please let me know what you think.
-If you want to add it to your tree here is my
+>  - document 'interrupts' and 'interrupt-parent' properties in the driver
+>    bindings
+>  - append '-8.9a' IP version specifier to comaptibility string
+> 
+>    	Thanks,
+> 	S?ren
+> 
+>  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  27 +++
+>  MAINTAINERS                                        |   1 +
+>  drivers/mmc/host/Kconfig                           |  12 ++
+>  drivers/mmc/host/Makefile                          |   1 +
+>  drivers/mmc/host/sdhci-of-arasan.c                 | 224 +++++++++++++++++++++
+>  5 files changed, 265 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+>  create mode 100644 drivers/mmc/host/sdhci-of-arasan.c
 
 Acked-by: Michal Simek <monstr@monstr.eu>
 
 Thanks,
 Michal
-
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -51,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/0b4a24fe/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131202/67fc9b04/attachment.sig>
