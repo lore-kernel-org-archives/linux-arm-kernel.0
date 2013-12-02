@@ -1,91 +1,23 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Mon, 2 Dec 2013 13:51:22 -0600
-Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
-In-Reply-To: <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
- <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Dec 2013 20:01:17 +0000
+Subject: [PATCH 1/3] drm: Add LCD display clock polarity flags
+In-Reply-To: <1385998768-23512-1-git-send-email-marex@denx.de>
+References: <1385998768-23512-1-git-send-email-marex@denx.de>
+Message-ID: <20131202200117.GN16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +UEFI kernel support on ARM
-> +==========================
-> +UEFI kernel support on the ARM architectures (arm and arm64) is only available
-> +when boot is performed through the stub.
-> +
-> +The stub populates the FDT /chosen node with (and the kernel scans for) the
-> +following parameters:
-> +________________________________________________________________________________
-> +Name                      | Size   | Description
-> +================================================================================
-> +linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
-> +--------------------------------------------------------------------------------
-> +linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
-> +                          |        | populated by the UEFI GetMemoryMap() call.
-> +--------------------------------------------------------------------------------
-> +linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
-> +                          |        | pointed to in previous entry.
-> +--------------------------------------------------------------------------------
-> +linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
-> +                          |        | memory map.
-> +--------------------------------------------------------------------------------
-> +linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
-> +--------------------------------------------------------------------------------
-> +linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
-> +--------------------------------------------------------------------------------
+On Mon, Dec 02, 2013 at 04:39:26PM +0100, Marek Vasut wrote:
+> Add DRM flags for the LCD display clock polarity so the pixelclk-active DT
+> property can be properly handled by drivers using the DRM API.
 
-This flies in the face of actually using #address-cells and
-#size-cells to define how big addresses and sizes are. You're limited
-here by the root node definitions... that's the spec.
+I still say that not even this should be part of the DRM mode API to
+userspace.  The hint that you're changing the user API is that you're
+modifying a header file below a 'uapi' directory.
 
-Here's where I think this whole thing falls down as being the weirdest
-possible implementation of this. It defies logic to put this
-information in the device tree /chosen node while also attempting to
-boot the kernel using an EFI stub; the stub is going to have this
-information because it is going to have the pointer to the system
-System Table (since it was called by StartImage()). Why not stash the
-System Table pointer somewhere safe in the stub?
+The settings of double scan, sync polarity etc are all part of the
+display mode specification (check CEA-861 documents).  Things like
+pixel clock polarity are not part of the mode specification, they're
+a property of the display itself and are independent of the mode.
 
-The information in the device tree is all accessible from Boot
-Services and as long as the System Table isn't being thrown away (my
-suggestion would be.. stuff it in r2, and set r1 = "EFI\0" then work
-with arch/arm/kernel/head{-common,}.S code to do the right thing)
-
-It seems like the advantages of booting from UEFI and having all this
-information and API around are being thrown away very early, and
-picked up when it's no longer relevant to gain access to the very
-minimal runtime services. What's missing is a UUID for a "Device Tree
-Blob" in the Configuration Table, so you can very easily go grab that
-information from the firmware.
-
-As implemented, these patches employ a very long-winded and complex
-method of recovering UEFI after throwing the system table pointer away
-early in boot, and then implements an EFI calling convention which
-isn't strictly necessary according to the UEFI spec - the question is,
-is this a workaround for SetVirtualAddressMap() not actually doing the
-right thing on ARM UEFI implementations? If you can't guarantee that
-most of the calls from Boot Services or Runtime Services are going to
-allow this, then having any UEFI support in the kernel at all seems
-rather weird.
-
-What I'm worried about is that this is basically a hack to try and
-shoehorn an existing UEFI implementation to an existing Linux boot
-method - and implements it in a way nobody is ever going to be able to
-justify improving. Part of the reason the OpenFirmware CIF got thrown
-away early in SPARC/PowerPC boot (after "flattening" the device tree
-using the CIF calls to parse it out) was because you had to disable
-the MMU, caches, interrupts etc. which caused all kinds of slow
-firmware code to be all kinds of extra-slow.
-
-What that meant is nobody bothered to implement working, re-entrant,
-re-locatable firmware to a great degree. This ended up being a
-self-fulfilling prophecy of "don't trust the bootloader" and "get rid
-of it as soon as we can," which essentially meant Linux never took
-advantage of the resources available. In OF's case, the CIF sucked by
-specification. In UEFI's case here, it's been implemented in Linux in
-such a way that guarantees poor-performing firmware code with huge
-penalties to call them, which isn't even required by UEFI if the
-earlier boot code did the right things in the first place.
-
-Ta,
-Matt Sealey <neko@bakuhatsu.net>
+Therefore, they should not be part of struct drm_mode_modeinfo.
