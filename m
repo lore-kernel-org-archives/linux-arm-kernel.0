@@ -1,93 +1,33 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 3 Dec 2013 10:19:58 +0100
-Subject: [PATCH RFC] PCI: imx6: remove outbound io/mem ATU region mapping
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D478F0C@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1382504143-27915-1-git-send-email-tharvey@gateworks.com>
- <201311290321.22415.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D478F0C@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <201312031019.58708.marex@denx.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 03 Dec 2013 10:33:43 +0100
+Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
+ pinfunc.
+In-Reply-To: <CACRpkdYDONQ-7U3hGYnx7jb0_Y=rcOcvy-2F1dO058FfOO4stg@mail.gmail.com>
+References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
+ <2715269.S45Tc0DQGQ@flatron>
+ <CACRpkdYDONQ-7U3hGYnx7jb0_Y=rcOcvy-2F1dO058FfOO4stg@mail.gmail.com>
+Message-ID: <2004634.MefHDYV4b2@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Richard Zhu,
-
-> Hi Marek:
-> > -----Original Message-----
-> > From: Marek Vasut [mailto:marex at denx.de]
-> > Sent: Friday, November 29, 2013 10:21 AM
-> > To: Jingoo Han
-> > Cc: 'Pratyush Anand'; 'Mohit KUMAR DCG'; 'Tim Harvey'; 'Kishon Vijay
-> > Abraham I'; linux-pci at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org; 'Bjorn Helgaas'; 'Frank Li'; Zhu
-> > Richard-R65037; 'Sascha Hauer'; 'Sean Cross'; 'Shawn Guo'; 'Siva Reddy
-> > Kallam'; 'Srikanth T Shivanand'; 'Troy Kisky'; 'Yinghai Lu' Subject: Re:
-> > [PATCH RFC] PCI: imx6: remove outbound io/mem ATU region mapping
-> > 
-> > Dear Jingoo Han,
-> > 
-> > > On Wednesday, November 27, 2013 5:37 PM, Pratyush Anand wrote:
-> > > > On Wed, Nov 27, 2013 at 04:24:47PM +0800, Marek Vasut wrote:
-> > > > > > On Wed, Nov 27, 2013 at 04:46:09AM +0800, Marek Vasut wrote:
-> > > > > > > Dear Pratyush Anand,
-> > > > > > > 
-> > > > > > > > Hi,
-> > > > > > > > 
-> > > > > > > > On Wed, Oct 23, 2013 at 12:55:43PM +0800, Tim Harvey wrote:
-> > > > > > > > > The IMX6 iATU is used for address translation between the
-> > > > > > > > > AXI bus address space and PCI address space.  This is used
-> > > > > > > > > for
-> > > > > > > > > type0 and type1 config cycles but is not necessary for
-> > > > > > > > > outbound io/mem regions.
-> > > > > > > > > 
-> > > > > > > > > This patch removes the calls that inappropriately
-> > > > > > > > > re-configures the ATU viewport for outbound memory and IO
-> > > > > > > > > after config cycles and removes them altogether as they are
-> > > > > > > > > not
-> > 
-> > necessary.
-> > 
-> > > > > > > > > This resolves issues with PCI devices behind switches and
-> > > > > > > > > has been tested with a Gige device behind a PLX PEX860x
-> > > > > > > > > switch. More testing is needed for other configurations.
-> > > > > > > > 
-> > > > > > > > It seems to me that in your controller you have only one
-> > > > > > > > view port. Also mem_base and mem_bus_addr is same. Thats why
-> > > > > > > > it works in your case.
-> > > > > > > 
-> > > > > > > MX6 has 4 In/4 Out viewports AFAICT.
-> > > > > > 
-> > > > > > Then if I do not miss anything, MX6 should work even without
-> > > > > > this patch.
-> > > > > 
-> > > > > Yes, yet, it does not. On the other hand, this defect is only
-> > > > > problematic if you use the devices behind a switch. Do you use a
-> > > > > PCIe switch on your platform please?
-> > > > 
-> > > > I had tested with device under bridge.
-> > > > Mohit is in process of validating SPEAr patches with latest kernel.
-> > > > Mohit, see if we can arrange a switch and test, once SPEAr platform
-> > > > is ready with latest kernel.
-> > > 
-> > > I agree with Pratyush Anand's opinion.
-> > > One of our engineers had tested PCI cards under switch.
-> > > As far as I know, there was no issue about this.
-> > > However, currently, I don't have any switches. So, I Cannot test this
-> > > on Exynos platform.
-> > 
-> > OK, I will wait for Richard to come up with confirmation if possible.
-> > Looks like he's out of the office, so it might take a bit.
+On Tuesday 03 of December 2013 10:31:12 Linus Walleij wrote:
+> On Tue, Nov 26, 2013 at 1:30 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 > 
-> [Richard] One Pericom PI7C9X2G303EL pcie switch, and two pcie ep
-> deivces(one is intel e1000e nic, the other is one xhci device) are tested
-> on imx6q sabresd board.
+> > IMHO a way to specify a default safe state of all pins (with lowest power
+> > consumption, without possibility of glitching external devices, etc.)
+> > would be really useful for Samsung platforms (and probably Renesas ones
+> > as Kevin wrote).
+> 
+> I'm following :-)
+> 
+> Now if we could see some more details and a patch, that would
+> be great ...
 
-How/what does have such pericom switch and can be attached to an MX6 sabresdp ? 
-Where can I get it?
+Yeah, I would like to see them too. ;)
 
-> Without removing outbound io/mem regions view map during the cfg0/1
-> read/write cycle, both of these devices can't work well at my side.
-> Works well after remove them during the cfg0/1 read/write cycles.
+Unfortunately my make_pinctrl_default_state_patches() function is
+returning -ENOTIME at the moment. :( (I hope to get it fixed
+later this month, though.)
 
-Understood. Given that the iATU programming works on other CPUs (confirmed on st 
-spear and ti dra7xx), we might have some issues with the iATU on MX6 . Is there 
-anything special about the iATU on the MX6 ?
+Best regards,
+Tomasz
