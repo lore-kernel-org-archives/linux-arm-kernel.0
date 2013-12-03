@@ -1,28 +1,33 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 3 Dec 2013 10:32:35 -0500 (EST)
-Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <529DE791.6080007@atmel.com>
-Message-ID: <Pine.LNX.4.44L0.1312031030390.1226-100000@iolanthe.rowland.org>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Tue, 03 Dec 2013 15:28:23 +0000
+Subject: [Xen-devel] [PATCH] xen/block: Correctly define structures in
+ public headers on ARM32 and ARM64
+In-Reply-To: <529E039A02000078001097F5@nat28.tlf.novell.com>
+References: <1386083382-7306-1-git-send-email-julien.grall@linaro.org>
+ <529E039A02000078001097F5@nat28.tlf.novell.com>
+Message-ID: <529DF897.1080303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Dec 2013, Nicolas Ferre wrote:
-
-> On 03/12/2013 15:07, Boris BREZILLON :
-> > Replace clk_get calls by devm_clk_get calls.
-> >
-> > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> > Tested-by: Robert Nelson <robertcnelson@gmail.com>
+On 12/03/2013 03:15 PM, Jan Beulich wrote:
+>>>> On 03.12.13 at 16:09, Julien Grall <julien.grall@linaro.org> wrote:
+>> --- a/include/xen/interface/io/blkif.h
+>> +++ b/include/xen/interface/io/blkif.h
+>> @@ -146,7 +146,7 @@ struct blkif_request_segment_aligned {
+>>  struct blkif_request_rw {
+>>  	uint8_t        nr_segments;  /* number of segments                   */
+>>  	blkif_vdev_t   handle;       /* only for read/write requests         */
+>> -#ifdef CONFIG_X86_64
+>> +#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Perhaps using
 > 
-> Thanks Boris for these fixes.
+> #ifndef CONFIG_X86_32
 > 
-> Alan, Greg, can you take the whole series as fixes for 3.13?
+> would be the better one, assuming that we won't add further
+> non-64-bit-clean ABI variants?
 
-Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+I'm fine with this solution. I will resend the patch.
 
-The patches look fine to me.  But only the 1/3 patch fixes a bug; the 
-others merely change the resource management.
-
-Alan Stern
+-- 
+Julien Grall
