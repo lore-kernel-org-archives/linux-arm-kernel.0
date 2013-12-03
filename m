@@ -1,62 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Dec 2013 11:31:56 +0000
-Subject: [PATCH v3 14/36] mtd: st_spi_fsm: Add device-tree binding
- documentation
-In-Reply-To: <CACRpkdb8=RRsNRKe4Nbefu2BJ4xHakmNjxFC1gwLea=bAmOz-A@mail.gmail.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdaWXBchz78Yby11VpveBDtn6FrmupS=cnNYhvHgFJsBUw@mail.gmail.com>
- <20131202110304.GB31626@lee--X1>
- <CACRpkdb8=RRsNRKe4Nbefu2BJ4xHakmNjxFC1gwLea=bAmOz-A@mail.gmail.com>
-Message-ID: <20131203113156.GB12031@lee--X1>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Dec 2013 19:44:52 +0800
+Subject: [PATCH 1/3] drm: Add LCD display clock polarity flags
+In-Reply-To: <1385998768-23512-1-git-send-email-marex@denx.de>
+References: <1385998768-23512-1-git-send-email-marex@denx.de>
+Message-ID: <20131203114450.GG13726@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Dec 2013, Linus Walleij wrote:
-
-> On Mon, Dec 2, 2013 at 12:03 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > +Optional properties:
-> >> > +  - st,syscfg          : Phandle to boot-device system configuration registers
-> >> > +  - st,boot-device-reg : Address of the aforementioned boot-device register(s)
-> >> > +  - st,boot-device-spi : Expected boot-device value if booted via this device
-> >> > +
-> >> > +Example:
-> >> > +       spifsm: spifsm at fe902000{
-> >> > +               compatible         = "st,spi-fsm";
-> >> > +               reg                =  <0xfe902000 0x1000>;
-> >> > +               reg-names          = "spi-fsm";
-> >> > +               pinctrl-0          = <&pinctrl_fsm>;
-> >> > +               st,syscfg          = <&syscfg_rear>;
-> >> > +               st,boot-device-reg = <0x958>;
-> >> > +               st,boot-device-spi = <0x1a>;
-> >>
-> >> I don't think we should encode any register offsets whatsoever in device
-> >> tree but maybe that's just me. (Yes, Stephen will beat me up about
-> >> pin control single, but I consider that a special case.)
-> >>
-> >> I would just put the last two things as #defines into the driver file(s)
-> >> or - if it's related to other syscfg registers and varies with SoC incarnation,
-> >> as a #define in a shared header for that syscfg thing.
-> >
-> > No can do. This isn't _this_ device's register offset, this is a
-> > syscfg register offset which a) there is no driver to apply specific
-> > register offsets to and b) are liable to change oversubsequent SoCs.
+On Mon, Dec 02, 2013 at 04:39:26PM +0100, Marek Vasut wrote:
+> Add DRM flags for the LCD display clock polarity so the pixelclk-active DT
+> property can be properly handled by drivers using the DRM API.
 > 
-> So it can be in <linux/mfd/my-sysconfig-regs.h> as
-> a
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Dave Airlie <airlied@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/gpu/drm/drm_modes.c | 5 +++++
+>  include/uapi/drm/drm_mode.h | 3 +++
+>  2 files changed, 8 insertions(+)
 > 
-> #define MY_SYSCON_V1_BOOT_DEV_REG 0x958
-> #define MY_SYSCON_V1_BOOT_DEV_SPI 0x1a
+> diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+> index 85071a1..d1f3bfc 100644
+> --- a/drivers/gpu/drm/drm_modes.c
+> +++ b/drivers/gpu/drm/drm_modes.c
+> @@ -537,6 +537,11 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
+>  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
+>  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
+>  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
+> +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
+> +		dmode->flags |= DRM_MODE_FLAG_PIXELCLK_PPOL;
+> +	else if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+> +		dmode->flags |= DRM_MODE_FLAG_PIXELCLK_NPOL;
+> +
+>  	drm_mode_set_name(dmode);
+>  
+>  	return 0;
+> diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+> index f104c26..a6169ca 100644
+> --- a/include/uapi/drm/drm_mode.h
+> +++ b/include/uapi/drm/drm_mode.h
+> @@ -73,6 +73,9 @@
+>  #define  DRM_MODE_FLAG_3D_TOP_AND_BOTTOM	(7<<14)
+>  #define  DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF	(8<<14)
+>  
+> +/* CRTC LCD clock polarity flags. */
+> +#define DRM_MODE_FLAG_PIXELCLK_PPOL		(1<<19)
+> +#define DRM_MODE_FLAG_PIXELCLK_NPOL		(1<<20)
+
+Marek,
+
+It looks that Denis (copied) is working on the same problem, so you may
+want to be aware of his effort [1][2].
+
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.drivers.driver-project.devel/42832
+[2] http://thread.gmane.org/gmane.linux.drivers.driver-project.devel/42850/focus=279646
+
+>  
+>  /* DPMS flags */
+>  /* bit compatible with the xorg definitions. */
+> -- 
+> 1.8.4.2
 > 
-> The kernel should know which SoC is in use and
-> act apropriately right?
-
-And this have lots of machine_is() calls everywhere?
-
-Sounds perfect. ;)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
