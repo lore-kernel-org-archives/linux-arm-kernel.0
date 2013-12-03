@@ -1,44 +1,107 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 3 Dec 2013 16:25:45 +0200
-Subject: [PATCH v2 0/3] ARM: OMAP2+: USB Host bug fixes for 3.13 rc
-Message-ID: <1386080748-17005-1-git-send-email-rogerq@ti.com>
+Date: Tue, 3 Dec 2013 16:25:47 +0200
+Subject: [PATCH 2/3] ARM: OMAP2+: hwmod: Fix RESET logic
+In-Reply-To: <1386080748-17005-1-git-send-email-rogerq@ti.com>
+References: <1386080748-17005-1-git-send-email-rogerq@ti.com>
+Message-ID: <1386080748-17005-3-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In _ocp_softreset(), after _set_softreset() + write_sysconfig(),
+the hwmod's sysc_cache will always contain SOFTRESET bit set
+so all further writes to sysconfig using this cache will initiate
+a repeated SOFTRESET e.g. enable_sysc(). This is true for OMAP3 like
+platforms that have RESET_DONE status in the SYSSTATUS register and
+so the the SOFTRESET bit in SYSCONFIG is not automatically cleared.
+It is not a problem for OMAP4 like platforms that indicate RESET
+completion by clearing the SOFTRESET bit in the SYSCONFIG register.
 
-This is a follow up solution to the original series in [1]
+This repeated SOFTRESET is undesired and was the root cause of
+USB host issues on OMAP3 platforms when hwmod was allowed to do the
+SOFTRESET for the USB Host module.
 
-The first patch fixes the OMAP4 Panda USB detection problems on 3.13-rc1
-with u-boot v2013.10.
+To fix this we clear the SOFTRESET bit and update the sysconfig
+register + sysc_cache using write_sysconfig().
 
-The remaining 2 patches are required if SOFTRESET needs to be done for the
-USB Host module on OMAP3 platforms.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 43 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
-Patch 2 fixes the hwmod RESET logic to prevent multiple SOFTRESETs
-being issued to the modules. This multiple SOFTRESET was causing problems
-with OMAP3 USB Host module. On Beagleboard C4 this is seen as failure to
-mount NFS root over external USB to Ethernet device.
-
-This might be the reason why HWMOD_INIT_NO_RESET was used for the OMAP
-USB host module in OMAP3 hwmod data and just carried forward in OMAP4
-and OMAP5 hwmod data as well.
-
-cheers,
--roger
-
-[1] - http://thread.gmane.org/gmane.linux.kernel/1603931
-
-Roger Quadros (3):
-  ARM: OMAP4+: hwmod data: Don't prevent RESET of USB Host module
-  ARM: OMAP2+: hwmod: Fix RESET logic
-  ARM: OMAP3: hwmod data: Don't prevent RESET of USB Host module
-
- arch/arm/mach-omap2/omap_hwmod.c           | 43 +++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 13 +++------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 12 ++-------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 13 +++------
- 4 files changed, 50 insertions(+), 31 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e3f0eca..615acec 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -399,7 +399,7 @@ static int _set_clockactivity(struct omap_hwmod *oh, u8 clockact, u32 *v)
+ }
+ 
+ /**
+- * _set_softreset: set OCP_SYSCONFIG.CLOCKACTIVITY bits in @v
++ * _set_softreset: set OCP_SYSCONFIG.SOFTRESET bit in @v
+  * @oh: struct omap_hwmod *
+  * @v: pointer to register contents to modify
+  *
+@@ -427,6 +427,36 @@ static int _set_softreset(struct omap_hwmod *oh, u32 *v)
+ }
+ 
+ /**
++ * _clr_softreset: clear OCP_SYSCONFIG.SOFTRESET bit in @v
++ * @oh: struct omap_hwmod *
++ * @v: pointer to register contents to modify
++ *
++ * Clear the SOFTRESET bit in @v for hwmod @oh.  Returns -EINVAL upon
++ * error or 0 upon success.
++ */
++static int _clr_softreset(struct omap_hwmod *oh, u32 *v)
++{
++	u32 softrst_mask;
++
++	if (!oh->class->sysc ||
++	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
++		return -EINVAL;
++
++	if (!oh->class->sysc->sysc_fields) {
++		WARN(1,
++		     "omap_hwmod: %s: sysc_fields absent for sysconfig class\n",
++		     oh->name);
++		return -EINVAL;
++	}
++
++	softrst_mask = (0x1 << oh->class->sysc->sysc_fields->srst_shift);
++
++	*v &= ~softrst_mask;
++
++	return 0;
++}
++
++/**
+  * _wait_softreset_complete - wait for an OCP softreset to complete
+  * @oh: struct omap_hwmod * to wait on
+  *
+@@ -1911,6 +1941,12 @@ static int _ocp_softreset(struct omap_hwmod *oh)
+ 	ret = _set_softreset(oh, &v);
+ 	if (ret)
+ 		goto dis_opt_clks;
++
++	_write_sysconfig(v, oh);
++	ret = _clr_softreset(oh, &v);
++	if (ret)
++		goto dis_opt_clks;
++
+ 	_write_sysconfig(v, oh);
+ 
+ 	if (oh->class->sysc->srst_udelay)
+@@ -3169,6 +3205,11 @@ int omap_hwmod_softreset(struct omap_hwmod *oh)
+ 		goto error;
+ 	_write_sysconfig(v, oh);
+ 
++	ret = _clr_softreset(oh, &v);
++	if (ret)
++		goto error;
++	_write_sysconfig(v, oh);
++
+ error:
+ 	return ret;
+ }
 -- 
 1.8.3.2
