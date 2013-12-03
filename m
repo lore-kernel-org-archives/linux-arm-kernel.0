@@ -1,26 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 11:36:19 -0700
-Subject: [PATCH 01/31] ARM: tegra: add missing clock documentation to
- DT bindings
-In-Reply-To: <20131129114900.GN22771@ulmo.nvidia.com>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-2-git-send-email-swarren@wwwdotorg.org>
- <20131129114900.GN22771@ulmo.nvidia.com>
-Message-ID: <529E24A3.3080804@wwwdotorg.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Tue, 03 Dec 2013 10:45:29 -0800
+Subject: [PATCH RESEND v5 1/2] PWM: PXA: add device tree support to PWM
+ driver
+In-Reply-To: <20131203101714.GG21178@ulmo.nvidia.com>
+References: <1379791174-2369-1-git-send-email-mikedunn@newsguy.com>
+ <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
+ <20131203101714.GG21178@ulmo.nvidia.com>
+Message-ID: <529E26C9.30707@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 04:49 AM, Thierry Reding wrote:
-> On Fri, Nov 15, 2013 at 01:53:56PM -0700, Stephen Warren wrote:
-...
->> +  - clock-names : Must include the following entries:
+On 12/03/2013 02:17 AM, Thierry Reding wrote:
+> On Sat, Sep 21, 2013 at 12:19:33PM -0700, Mike Dunn wrote:
+>> This patch adds device tree support to the PXA's PWM driver.  Nothing
+>> needs to be extracted from the device tree node by the PWM device.
+>> Client devices need only specify the period; the per-chip index is
+>> implicitly zero because one device node must be present for each PWM
+>> output in use.  This approach is more convenient due to the wide
+>> variability in the number of PWM channels present across the various PXA
+>> variants, and is made possible by the fact that the register sets for
+>> each PWM channel are segregated from each other.  An of_xlate() method
+>> is added to parse this single-cell node.  The existing ID table is
+>> reused for the match table data.
+>>
+>> Tested on a Palm Treo 680 (both platform data and DT cases).
+>>
+>> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+>> ---
+>>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 30 +++++++++++++
+>>  drivers/pwm/pwm-pxa.c                             | 52 ++++++++++++++++++++++-
+>>  2 files changed, 81 insertions(+), 1 deletion(-)
+>>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
 > 
-> One other thing I noticed here is that you use a space between the 
-> property name and the :. None of the other properties have that, so
-> it looks somewhat out of place. The same is true for other
-> bindings, but there seem to be inconsistencies in some places
-> anyway, so perhaps we don't care? Well, I do care, don't know about
-> you. =)
+> Hi Mike,
+> 
+> It looks like this fell through the cracks. Is this patch still the
+> latest one you have? Should it still be applied?
+> 
+> Thierry
+> 
 
-I've fixed those up locally. I assume you don't want a repost for such
-a trivial change? I'll double-check the "resets" patch for the same issue.
+Hi Thierry,
+
+Funny I should hear from you about this today.... I just turned my attention
+back to this today and noticed that it never made it into your for-next branch.
+ Yes, it is the latest.  If the patch still applies cleanly, please feel free.
+Otherwise, I'd be glad to rework it against something more recent.
+
+Also, we never got any ACKs for patch 2/2, which just adds the nodes to
+arch/arm/boot/dts/pxa27x.dtsi
+Any advice on whom to nudge?
+
+Thanks much!
+Mike
