@@ -1,82 +1,90 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 3 Dec 2013 17:19:11 +0530
-Subject: [PATCH V6 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131203113052.GE1169@mudshark.cambridge.arm.com>
-References: <1385976843-13280-1-git-send-email-vkale@apm.com>
- <1385976843-13280-3-git-send-email-vkale@apm.com>
- <20131203113052.GE1169@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYke4P2V47iG=1b_f3YHiTqC2hOG5yiKTUWuWG+pX8JauMQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 03 Dec 2013 12:52:36 +0100
+Subject: [PATCH RFC 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <529DC604.4050600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 3, 2013 at 5:00 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Dec 02, 2013 at 09:34:03AM +0000, Vinayak Kale wrote:
->> Add support for irq registration when pmu interrupt is percpu.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> ---
->>  arch/arm64/kernel/perf_event.c |  116 +++++++++++++++++++++++++++++-----------
->>  1 file changed, 86 insertions(+), 30 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index cea1594..d2d562f 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -22,6 +22,7 @@
->>
->>  #include <linux/bitmap.h>
->>  #include <linux/interrupt.h>
->> +#include <linux/irq.h>
->>  #include <linux/kernel.h>
->>  #include <linux/export.h>
->>  #include <linux/perf_event.h>
->> @@ -363,26 +364,61 @@ validate_group(struct perf_event *event)
->>  }
->>
->>  static void
->> +armpmu_disable_percpu_irq(void *data)
->> +{
->> +     struct arm_pmu *armpmu = data;
->> +     struct platform_device *pmu_device = armpmu->plat_device;
->> +     int irq = platform_get_irq(pmu_device, 0);
->> +
->> +     cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
->> +     disable_percpu_irq(irq);
->> +}
->> +
->> +static void
->>  armpmu_release_hardware(struct arm_pmu *armpmu)
->>  {
->> -     int i, irq, irqs;
->> +     int irq;
+On 12/02/2013 05:20 PM, Lorenzo Pieralisi wrote:
+> ARM based platforms implement a variety of power management schemes that
+> allow processors to enter at run-time low-power states, aka C-states
+> in ACPI jargon. The parameters defining these C-states vary on a per-platform
+> basis forcing the OS to hardcode the state parameters in platform
+> specific static tables whose size grows as the number of platforms supported
+> in the kernel increases and hampers device drivers standardization.
 >
-> Why did you not make this unsigned, like I suggested?
-
-Suggestion was to make 'irqs' variable unsigned and modify the check
-for 'irqs' to if (!irqs).
-This patch incorporates that suggestion.
-
-We have to keep 'irq' signed only. 'platform_get_irq()' can return error value.
-
+> Therefore, this patch aims at standardizing C-state device tree bindings for
+> ARM platforms. Bindings define C-state parameters inclusive of entry methods
+> and state latencies, to allow operating systems to retrieve the
+> configuration entries from the device tree and initialize the related
+> power management drivers, paving the way for common code in the kernel
+> to deal with power states and removing the need for static data in current
+> and previous kernel versions.
 >
->> +     unsigned int i, irqs;
->>       struct platform_device *pmu_device = armpmu->plat_device;
->>
->>       irqs = min(pmu_device->num_resources, num_possible_cpus());
->> +     if (!irqs)
->> +             return;
->>
->> -     for (i = 0; i < irqs; ++i) {
->> -             if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> -                     continue;
->> -             irq = platform_get_irq(pmu_device, i);
->> -             if (irq >= 0)
->> -                     free_irq(irq, armpmu);
->> +     irq = platform_get_irq(pmu_device, 0);
->> +     if (irq <= 0)
->> +             return;
->
-> Then this is just an if (!irq), as I mentioned last time.
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Please see my above comment.
+Hi Lorenzo,
+
+thanks for the detailed description.
+
+Just a couple of typos below.
+
+[ ... ]
+
+> +- cpu-power-states node
+> +
+> +	Usage: Optional - On ARM systems, is a container of processor C-state
+> +			  nodes. If the system does not provide CPU power
+> +			  management capabilities or the processor just
+> +			  supports WFI (C1 state) a cpu-power-states node is
+> +			  not required.
+> +
+> +	Description: cpu-power-states node is a container node, where its
+> +		     subnodes describe the CPU low-power C-states.
+> +
+> +	Node name must be "cpu-power-states".
+> +
+> +	The cpu-power-states node's parent node must be cpus node.
+> +
+> +	The cpu-power-states node's child nodes can be:
+> +
+> +	- one or more state nodes
+> +
+> +	The cpu-power-states node must contain the following properties:
+> +
+> +	- compatible
+> +		Value type: <stringlist>
+> +		Usage: Required
+
+Invert the field above to be consistent with the definitions below.
+
+[ ... ]
+
+> +	- power-depth
+> +		Usage: Required
+> +		Value type: <u32>
+> +		Definition: Integer value, starting from 2 (value 0 meaning
+> +			    running and value 1 representing power depth of
+> +			    wfi (C1)), that defines the level of depth of a
+> +			    power state.
+> +			    The system denotes power states with different
+> +			    depths, an increasing value meaning less power
+> +			    consumption and might involve powering down more
+> +			    components.  Devices that are affected by
+
+                                     ^^^ extra space
+
+[ ... ]
+
+Thanks
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
