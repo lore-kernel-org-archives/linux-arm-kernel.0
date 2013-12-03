@@ -1,50 +1,80 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 3 Dec 2013 16:57:55 +0000
-Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu
- possible/present maps and map logical cpu id to APIC id
-In-Reply-To: <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
-References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
- <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20131203165755.37b07796@alan.etchedpixels.co.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 03 Dec 2013 21:01:38 +0300
+Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
+In-Reply-To: <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
+References: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
+ <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <529E1C82.8070501@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
-> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-> index 45ff625..8527ecc 100644
-> --- a/drivers/acpi/plat/arm-core.c
-> +++ b/drivers/acpi/plat/arm-core.c
-> @@ -58,6 +58,13 @@ EXPORT_SYMBOL(acpi_pci_disabled);
->   */
->  static u64 acpi_lapic_addr __initdata;
->  
-> +/* available_cpus here means enabled cpu in MADT */
-> +int available_cpus;
-> +
-> +/* Map logic cpu id to physical GIC id. */
-> +int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
-> +int boot_cpu_apic_id = -1;
-> +
+On 12/03/2013 05:07 PM, Boris BREZILLON wrote:
 
-static ?
+> Replace clk_get calls by devm_clk_get calls.
 
-Really shouldn't be leaking names like "available_cpus" out of ACPI into
-the global namespace
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Tested-by: Robert Nelson <robertcnelson@gmail.com>
+> ---
+>   drivers/usb/host/ohci-at91.c |   32 ++++++++------------------------
+>   1 file changed, 8 insertions(+), 24 deletions(-)
 
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index c406f1e..3652962 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   		goto err;
+>   	}
+>
+> -	iclk = clk_get(&pdev->dev, "ohci_clk");
+> +	iclk = devm_clk_get(dev, "ohci_clk");
+>   	if (IS_ERR(iclk)) {
+> -		dev_err(&pdev->dev, "failed to get ohci_clk\n");
+> +		dev_err(dev, "failed to get ohci_clk\n");
 
-> +#ifdef CONFIG_SMP
-> +	if (available_cpus == 0) {
-> +		pr_info(PREFIX "Found 0 CPUs; assuming 1\n");
-> +		/* FIXME: should be the real GIC id read from hardware */
-> +		arm_cpu_to_apicid[available_cpus] = 0;
-> +		available_cpus = 1;	/* We've got at least one of these */
-> +	}
-> +#endif
+    You changed this call...
 
-Isn't this true uniprocessor (by definition in fact)
+>   		retval = PTR_ERR(iclk);
+>   		goto err;
+>   	}
+> -	fclk = clk_get(&pdev->dev, "uhpck");
+> +	fclk = devm_clk_get(dev, "uhpck");
+>   	if (IS_ERR(fclk)) {
+>   		dev_err(&pdev->dev, "failed to get uhpck\n");
 
+    ... but not this one.
 
-> + */
-> +void __init prefill_possible_map(void)
+>   		retval = PTR_ERR(fclk);
+> -		goto err4;
+> +		goto err;
+>   	}
+> -	hclk = clk_get(&pdev->dev, "hclk");
+> +	hclk = devm_clk_get(dev, "hclk");
+>   	if (IS_ERR(hclk)) {
+>   		dev_err(&pdev->dev, "failed to get hclk\n");
 
-leaking more unprefixed names into the global namespace
+    ... or this one. Actually, I think cganging these calls would be out of 
+scope for this patch.
+
+>   		retval = PTR_ERR(hclk);
+> -		goto err5;
+> +		goto err;
+>   	}
+>   	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> -		uclk = clk_get(&pdev->dev, "usb_clk");
+> +		uclk = devm_clk_get(&pdev->dev, "usb_clk");
+
+    Hm, why not 'dev' like in all of the above?
+
+>   		if (IS_ERR(uclk)) {
+>   			dev_err(&pdev->dev, "failed to get uclk\n");
+>   			retval = PTR_ERR(uclk);
+> -			goto err6;
+> +			goto err;
+>   		}
+>   	}
+>
+
+WBR, Sergei
