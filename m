@@ -1,55 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Dec 2013 15:17:29 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6q-udoo: Add USB host support
-In-Reply-To: <20131202115303.GH12952@e106331-lin.cambridge.arm.com>
-References: <1384394987-15134-1-git-send-email-festevam@gmail.com>
- <1384394987-15134-2-git-send-email-festevam@gmail.com>
- <20131202115303.GH12952@e106331-lin.cambridge.arm.com>
-Message-ID: <20131203071727.GC10840@S2101-09.ap.freescale.net>
+Date: Tue, 3 Dec 2013 15:20:41 +0800
+Subject: [PATCH V3 1/3] ahci: imx: Explicitly clear
+ IMX6Q_GPR13_SATA_MPLL_CLK_EN
+In-Reply-To: <20131129222818.GM21755@mtj.dyndns.org>
+References: <1385369222-5288-1-git-send-email-marex@denx.de>
+ <20131129222818.GM21755@mtj.dyndns.org>
+Message-ID: <20131203072039.GD10840@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 11:53:03AM +0000, Mark Rutland wrote:
-> On Thu, Nov 14, 2013 at 02:09:47AM +0000, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Nov 29, 2013 at 05:28:18PM -0500, Tejun Heo wrote:
+> On Mon, Nov 25, 2013 at 09:47:00AM +0100, Marek Vasut wrote:
+> > We must clear this IMX6Q_GPR13_SATA_MPLL_CLK_EN bit on i.MX6Q, otherwise
+> > Linux will fail to find the attached drive on some boards.
 > > 
-> > Udoo board has USBH1 port connected to a USB2514 hub.
+> > This entire fix was:
+> > Reported-by: Eric Nelson <eric.nelson@boundarydevices.com>
 > > 
-> > Add support for it.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6q-udoo.dts | 34 ++++++++++++++++++++++++++++++++++
-> >  1 file changed, 34 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
-> > index 1c7f7a1..109b997 100644
-> > --- a/arch/arm/boot/dts/imx6q-udoo.dts
-> > +++ b/arch/arm/boot/dts/imx6q-udoo.dts
-> > @@ -19,6 +19,23 @@
-> >  	memory {
-> >  		reg = <0x10000000 0x40000000>;
-> >  	};
-> > +
-> > +	regulators {
-> > +		compatible = "simple-bus";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Richard Zhu <r65037@freescale.com>
+> > Cc: Tejun Heo <tj@kernel.org>
+> > Cc: Linux-IDE <linux-ide@vger.kernel.org>
 > 
-> This should have a ranges property, or it's not a simple-bus.
+> There have been a lot of review activities on this series.  If you
+> guys more or less agree now, can you please reply with
+> acked/reviewed-by's?
 
-You're right.  It's not a real bus.  We're having node 'regulators' be a
-container for all those fixed regulators, so that we can put them
-together and name them in the generic regulator at num way.
+For the series,
 
-Since kernel does not refuse to probe 'simple-bus' that does not have
-the 'ranges' property, we forgot about it.  This is the common pattern
-used by a lot of existing DTS files.  If we want to improve the thing,
-we may need to consider it as a global move.
-
-Shawn
-
-> 
-> Why do you even need this anyway? The regulators can live under the root
-> quite happily.
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
