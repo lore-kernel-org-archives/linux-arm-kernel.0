@@ -1,45 +1,39 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Tue, 3 Dec 2013 13:59:27 +0200
-Subject: [PATCH v2 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <1381866857-3861-3-git-send-email-kishon@ti.com>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-3-git-send-email-kishon@ti.com>
-Message-ID: <20131203115927.GD26423@xps8300>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Dec 2013 12:04:20 +0000
+Subject: [alsa-devel] [PATCH 1/2] ASoC: ux500_pcm: Differentiate between
+ pdata and DT initialisation
+In-Reply-To: <529DC6BE.3080607@metafoo.de>
+References: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
+ <529DC6BE.3080607@metafoo.de>
+Message-ID: <20131203120420.GC12031@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Tue, 03 Dec 2013, Lars-Peter Clausen wrote:
 
-On Wed, Oct 16, 2013 at 01:24:12AM +0530, Kishon Vijay Abraham I wrote:
-> +	count = of_property_match_string(node, "phy-names", "usb2-phy");
-> +	if (count >= 0 || (pdata && pdata->usb2_generic_phy)) {
-> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
-> +		if (IS_ERR(dwc->usb2_generic_phy)) {
-> +			dev_err(dev, "no usb2 phy configured yet");
-> +			return PTR_ERR(dwc->usb2_generic_phy);
-> +		}
-> +		dwc->usb2_phy = NULL;
-> +	}
-> +
-> +	count = of_property_match_string(node, "phy-names", "usb3-phy");
-> +	if (count >= 0 || (pdata && pdata->usb3_generic_phy)) {
-> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
-> +		if (IS_ERR(dwc->usb3_generic_phy)) {
-> +			dev_err(dev, "no usb3 phy configured yet");
-> +			return PTR_ERR(dwc->usb3_generic_phy);
-> +		}
-> +		dwc->usb3_phy = NULL;
-> +	}
+> On 12/03/2013 11:27 AM, Lee Jones wrote:
+> > If booting with full DT support (i.e. DMA too, the last piece of the
+> > puzzle), then we don't need to use the compatible_request_channel call
+> > back or require some of the historical bumph which probably isn't
+> > required by a platform data start-up now either. This will also be
+> > ripped out in upcoming commits.
+> > 
+> > Cc: alsa-devel at alsa-project.org
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Strictly speaking you do not need the second config, but well considering
+> that this will all hopefully be removed soon anyway it should be fine.
 
-Is there some specific reason for these checks? The driver should not
-need to care about the platform (DT, ACPI, platform based).
+That's true it will, but why don't we need the second config? I won't
+want the compat function to be called in the DT case.
 
-Just get the phys and check the return value. In case ERR_PTR(-ENODEV)
-leave the phy as NULL and let the driver continue normally. With other
-errors you make the dwc3 probe fail.
+> Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
 
-Thanks,
+Thanks.
 
 -- 
-heikki
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
