@@ -1,64 +1,37 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Tue, 3 Dec 2013 10:13:52 +0800
-Subject: Build warning in drivers/dma/mmp_tdma.c
-In-Reply-To: <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
-References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
- <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
- <529C37F3.1040205@marvell.com>
- <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
-Message-ID: <CAMj5Bkjkndq1-AJSm0k9Mm8xeaWEGktoFb6nZ3kr7RackFdcaw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 2 Dec 2013 21:27:19 -0500
+Subject: [PATCH v2 04/23] mm/memory_hotplug: remove unnecessary inclusion of
+ bootmem.h
+In-Reply-To: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386037658-3161-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 3, 2013 at 4:05 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Sun, Dec 1, 2013 at 11:34 PM, Qiao Zhou <zhouqiao@marvell.com> wrote:
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
->>>> commit 1a4ee91dacedde3e82d8ce6eeace7f16884474f9
->>>> Author: Dan Williams <dan.j.williams@intel.com>
->>>> Date:   Thu Nov 28 12:27:38 2013 -0800
->>>>
->>>>      dma: mmp_dma depends on CPU_MMP2
->>>>
->>>>      It calls sram_get_gpool() which is only defined if CONFIG_CPU_MMP2=y
->>>>
->>>>      Signed-off-by: Dan Williams <dan.j.williams@intel.com>
->>>>
->>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->>>> index 446687cc2334..dad83634cb65 100644
->>>> --- a/drivers/dma/Kconfig
->>>> +++ b/drivers/dma/Kconfig
->>>> @@ -287,7 +287,7 @@ config DMA_SA11X0
->>>>
->>>>   config MMP_TDMA
->>>>          bool "MMP Two-Channel DMA support"
->>>> -       depends on ARCH_MMP
->>>> +       depends on ARCH_MMP && CPU_MMP2
->>>
->>>
->>> Hi, Qiao
->>>
->>> Do you have comments?
->>> Does this work on PXA910?
->>
->> MMP_TDMA should not depend on CPU_MMP2. PXA910, and other chip set also use
->> mmp_tdma.
->
-> It does depend on CPU_MMP2, as I can generate the following build
-> failure with the attached config.
->
-> drivers/built-in.o: In function `mmp_tdma_free_descriptor':
-> drivers/dma/mmp_tdma.c:329: undefined reference to `sram_get_gpool'
-> drivers/built-in.o: In function `mmp_tdma_alloc_descriptor':
-> drivers/dma/mmp_tdma.c:379: undefined reference to `sram_get_gpool'
->
+Clean-up to remove depedency with bootmem headers.
 
-How about modifying arch/arm/mach-mmp/Makefile
-Like:
--obj-y                          += common.o devices.o time.o
-+obj-y                          += common.o devices.o time.o sram.o
--obj-$(CONFIG_CPU_MMP2)         += mmp2.o sram.o
-+obj-$(CONFIG_CPU_MMP2)         += mmp2.o
+Cc: Yinghai Lu <yinghai@kernel.org>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ mm/memory_hotplug.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-As Qiao mentioned sram is used both on mmp2 and pxa910.
-
-Thanks
+diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
+index 489f235..cf1736d 100644
+--- a/mm/memory_hotplug.c
++++ b/mm/memory_hotplug.c
+@@ -9,7 +9,6 @@
+ #include <linux/swap.h>
+ #include <linux/interrupt.h>
+ #include <linux/pagemap.h>
+-#include <linux/bootmem.h>
+ #include <linux/compiler.h>
+ #include <linux/export.h>
+ #include <linux/pagevec.h>
+-- 
+1.7.9.5
