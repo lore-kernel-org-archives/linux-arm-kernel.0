@@ -1,32 +1,84 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Dec 2013 15:20:41 +0800
-Subject: [PATCH V3 1/3] ahci: imx: Explicitly clear
- IMX6Q_GPR13_SATA_MPLL_CLK_EN
-In-Reply-To: <20131129222818.GM21755@mtj.dyndns.org>
-References: <1385369222-5288-1-git-send-email-marex@denx.de>
- <20131129222818.GM21755@mtj.dyndns.org>
-Message-ID: <20131203072039.GD10840@S2101-09.ap.freescale.net>
+Date: Tue, 3 Dec 2013 15:28:33 +0800
+Subject: [PATCH v3 RESEND] ARM: imx: pllv1: Fix PLL calculation for i.MX27
+In-Reply-To: <1385788099-10081-1-git-send-email-shc_work@mail.ru>
+References: <1385788099-10081-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131203072831.GE10840@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 05:28:18PM -0500, Tejun Heo wrote:
-> On Mon, Nov 25, 2013 at 09:47:00AM +0100, Marek Vasut wrote:
-> > We must clear this IMX6Q_GPR13_SATA_MPLL_CLK_EN bit on i.MX6Q, otherwise
-> > Linux will fail to find the attached drive on some boards.
-> > 
-> > This entire fix was:
-> > Reported-by: Eric Nelson <eric.nelson@boundarydevices.com>
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Richard Zhu <r65037@freescale.com>
-> > Cc: Tejun Heo <tj@kernel.org>
-> > Cc: Linux-IDE <linux-ide@vger.kernel.org>
+On Sat, Nov 30, 2013 at 09:08:19AM +0400, Alexander Shiyan wrote:
+> MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
+> is a just sign bit. This patch makes different calculation for i.MX27.
 > 
-> There have been a lot of review activities on this series.  If you
-> guys more or less agree now, can you please reply with
-> acked/reviewed-by's?
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-For the series,
+Sascha,
 
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Do you have any comment on the patch?  Or can I get your Ack on it?
+
+Shawn
+
+> ---
+>  arch/arm/mach-imx/clk-pllv1.c | 23 +++++++++++++++++++----
+>  1 file changed, 19 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+> index c1eaee3..d21d14c 100644
+> --- a/arch/arm/mach-imx/clk-pllv1.c
+> +++ b/arch/arm/mach-imx/clk-pllv1.c
+> @@ -18,6 +18,11 @@
+>   *
+>   * PLL clock version 1, found on i.MX1/21/25/27/31/35
+>   */
+> +
+> +#define MFN_BITS	(10)
+> +#define MFN_SIGN	(BIT(MFN_BITS - 1))
+> +#define MFN_MASK	(MFN_SIGN - 1)
+> +
+>  struct clk_pllv1 {
+>  	struct clk_hw	hw;
+>  	void __iomem	*base;
+> @@ -25,6 +30,11 @@ struct clk_pllv1 {
+>  
+>  #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+>  
+> +static inline bool mfn_is_negative(unsigned int mfn)
+> +{
+> +	return !cpu_is_mx1() && !cpu_is_mx21() && (mfn & MFN_SIGN);
+> +}
+> +
+>  static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  		unsigned long parent_rate)
+>  {
+> @@ -58,10 +68,15 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  
+>  	/*
+>  	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+> -	 * 2's complements number
+> +	 * 2's complements number.
+> +	 * On i.MX27 the bit 9 is the sign bit.
+>  	 */
+> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+> -		mfn_abs = 0x400 - mfn;
+> +	if (mfn_is_negative(mfn)) {
+> +		if (cpu_is_mx27())
+> +			mfn_abs = mfn & MFN_MASK;
+> +		else
+> +			mfn_abs = BIT(MFN_BITS) - mfn;
+> +	}
+>  
+>  	rate = parent_rate * 2;
+>  	rate /= pd + 1;
+> @@ -70,7 +85,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  
+>  	do_div(ll, mfd + 1);
+>  
+> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+> +	if (mfn_is_negative(mfn))
+>  		ll = -ll;
+>  
+>  	ll = (rate * mfi) + ll;
+> -- 
+> 1.8.3.2
+> 
