@@ -1,54 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Dec 2013 19:44:12 +0000
-Subject: [PATCH RFC v4 1/6] arm64: support single-step and breakpoint
- handler hooks
-In-Reply-To: <CA+b37P0xNDqKWm-Vdpmwrvqxr01C+bOhas+-nEUxLFe7pzEB7A@mail.gmail.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-2-git-send-email-sandeepa.prabhu@linaro.org>
- <20131025152236.GC10673@mudshark.cambridge.arm.com>
- <CA+b37P0xNDqKWm-Vdpmwrvqxr01C+bOhas+-nEUxLFe7pzEB7A@mail.gmail.com>
-Message-ID: <20131203194412.GC22668@mudshark.cambridge.arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 3 Dec 2013 11:47:11 -0800
+Subject: pull request for clk-tegra-next
+In-Reply-To: <529E1659.2070103@wwwdotorg.org>
+References: <20131128141826.GW26617@tbergstrom-lnx.Nvidia.com>
+ <529E1659.2070103@wwwdotorg.org>
+Message-ID: <CAPtuhTj4Lfo1_oHj5uvmdJc360Y2C9uXe0nsMnw7ptaCJB=f-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 02:33:17PM +0000, Sandeepa Prabhu wrote:
-> Hi Will,
-> 
-> Sorry for responding to this after long-time, I missed this review
-> during Linaro connect travels.
+On Tue, Dec 3, 2013 at 9:35 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/28/2013 07:18 AM, Peter De Schrijver wrote:
+>> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>
+>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>
+>> are available in the git repository at:
+>>   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-next
+>
+> Mike, this series is a dependency for my patch series that converts
+> Tegra drivers to use the standard module reset API rather than a custom
+> API (which is implemented in the clock driver). If you could either
+> merge this pull request, or at least ack that it's OK for me to merge it
+> into the Tegra tree as a dependency, that'd be helpful. Thanks.
 
-No problem.
+Hi Stephen,
 
-> >> @@ -215,7 +257,10 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
-> >>                */
-> >>               user_rewind_single_step(current);
-> >>       } else {
-> >> -             /* TODO: route to KGDB */
-> >> +             /* call registered single step handlers */
-> >
-> > Don't bother with this comment (it's crystal clear from the code).
-> OK, I will remove this unnecessary print.
+I'm catching up on pull requests after a week off for Thanksgiving
+holiday in the US. This looks good to me and I'll have it pulled in
+later today.
 
-Thanks.
-
-> >> +static LIST_HEAD(break_hook);
-> >> +DEFINE_RWLOCK(break_hook_lock);
-> >
-> > This guy can be a plain old spinlock. That way, the readers have less
-> > overhead but things still work because we only call a single hook function.
-> well, kprobes need to support recursive breakpoints (i.e. breakpoint
-> handler executing BRK once again)
-> so I converted this lock to rw_lock.  I should put this info in commit
-> description to be more clearer.
-
-Actually, this is one place where a comment in the code *would* be useful!
-
-> Let me know if you find any issue with re-cursing in breakpoint exception?
-
-Sounds ok to me. With those changes:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Cheers,
-
-Will
+Regards,
+Mike
