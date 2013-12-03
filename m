@@ -1,42 +1,71 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 10:52:09 -0700
-Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
-In-Reply-To: <201311292208.26215.arnd@arndb.de>
-References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
- <2205346.2EJcydzRLA@wuerfel> <5293CF9F.6040305@wwwdotorg.org>
- <201311292208.26215.arnd@arndb.de>
-Message-ID: <529E1A49.6050808@wwwdotorg.org>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue,  3 Dec 2013 18:51:53 +0100
+Subject: [PATCH v2 1/4] usb: ohci-at91: fix irq and iomem resource retrieval
+In-Reply-To: <1386093116-26387-1-git-send-email-b.brezillon@overkiz.com>
+References: <1386093116-26387-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1386093116-26387-2-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 02:08 PM, Arnd Bergmann wrote:
-> On Monday 25 November 2013, Stephen Warren wrote:
->> Well, you suggested not using of_dma_simple_xlate() since it wasn't
->> appropriate. I then started to implement an open-coded xlate function,
->> but found that it was 99% identical to the same thing in the mmp driver,
->> and hence created a common of_dma_slave_xlate() so as not to just
->> cut/paste it everywhere. Unfortunately, I only sent that patch to
->> dmaengine at vger.kernel.org and the DMA maintainers, and there's no
->> archive of that list:-(
-> 
-> Ok, I see. However, I think the need for nontrivial code to be duplicated
-> across drivers is not a sign that we are missing a generic xlate function
-> and another indirection level, but rather that we got the interface
-> for dma_get_slave_channel() wrong (yes, that would be my fault).
-> 
-> Can you try coming up with a different method to achieve the same
-> where you use a different helper from the driver specific xlate
-> function that does not require a callback?
-> 
-> I think dma_get_slave_channel is great if you have one channel per
-> request line and you can directly look up the channel from the
-> DT data, but it is not good if you have pick a channel and work
-> around the race.
+When using dt resources retrieval (interrupts and reg properties) there is
+no predefined order for these resources in the platform dev resources
+table.
 
-Hmm. Can you take a look at "[PATCH V4] dma: add
-dma_get_any_slave_channel(), for use in of_xlate()" at the link below.
-It still implements this via xlate, but I don't see any benefit in
-making drivers use a different API to request slave channels based on
-how the DMA controller works.
+Retrieve resources using the platform_get_resource function instead of
+direct resource table entries to avoid resource type mismatch.
 
-http://lkml.org/lkml/2013/11/26/408
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com> 
+---
+ drivers/usb/host/ohci-at91.c |   19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 418444e..7aec6ca 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -136,23 +136,26 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	struct ohci_hcd *ohci;
+ 	int retval;
+ 	struct usb_hcd *hcd = NULL;
++	struct device *dev = &pdev->dev;
++	struct resource *mem_r, *irq_r;
+ 
+-	if (pdev->num_resources != 2) {
+-		pr_debug("hcd probe: invalid num_resources");
++	mem_r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem_r) {
++		dev_dbg(dev, "hcd probe: missing memory resource\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+-			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+-		pr_debug("hcd probe: invalid resource type\n");
++	irq_r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!irq_r) {
++		dev_dbg(dev, "hcd probe: missing irq resource\n");
+ 		return -ENODEV;
+ 	}
+ 
+ 	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
+ 	if (!hcd)
+ 		return -ENOMEM;
+-	hcd->rsrc_start = pdev->resource[0].start;
+-	hcd->rsrc_len = resource_size(&pdev->resource[0]);
++	hcd->rsrc_start = mem_r->start;
++	hcd->rsrc_len = resource_size(mem_r);
+ 
+ 	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+ 		pr_debug("request_mem_region failed\n");
+@@ -199,7 +202,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	ohci->num_ports = board->ports;
+ 	at91_start_hc(pdev);
+ 
+-	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
++	retval = usb_add_hcd(hcd, irq_r->start, IRQF_SHARED);
+ 	if (retval == 0)
+ 		return retval;
+ 
+-- 
+1.7.9.5
