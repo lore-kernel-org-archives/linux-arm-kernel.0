@@ -1,37 +1,42 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue,  3 Dec 2013 18:51:52 +0100
-Subject: [PATCH v2 0/4] usb: ohci-at91: various fixes and improvements
-Message-ID: <1386093116-26387-1-git-send-email-b.brezillon@overkiz.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 03 Dec 2013 10:52:09 -0700
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <201311292208.26215.arnd@arndb.de>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+ <2205346.2EJcydzRLA@wuerfel> <5293CF9F.6040305@wwwdotorg.org>
+ <201311292208.26215.arnd@arndb.de>
+Message-ID: <529E1A49.6050808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 11/29/2013 02:08 PM, Arnd Bergmann wrote:
+> On Monday 25 November 2013, Stephen Warren wrote:
+>> Well, you suggested not using of_dma_simple_xlate() since it wasn't
+>> appropriate. I then started to implement an open-coded xlate function,
+>> but found that it was 99% identical to the same thing in the mmp driver,
+>> and hence created a common of_dma_slave_xlate() so as not to just
+>> cut/paste it everywhere. Unfortunately, I only sent that patch to
+>> dmaengine at vger.kernel.org and the DMA maintainers, and there's no
+>> archive of that list:-(
+> 
+> Ok, I see. However, I think the need for nontrivial code to be duplicated
+> across drivers is not a sign that we are missing a generic xlate function
+> and another indirection level, but rather that we got the interface
+> for dma_get_slave_channel() wrong (yes, that would be my fault).
+> 
+> Can you try coming up with a different method to achieve the same
+> where you use a different helper from the driver specific xlate
+> function that does not require a callback?
+> 
+> I think dma_get_slave_channel is great if you have one channel per
+> request line and you can directly look up the channel from the
+> DT data, but it is not good if you have pick a channel and work
+> around the race.
 
-This patch series fixes a bug detected in 3.13-rc1 caused by a wrong
-assumption on platform device resources order in the platform device
-resource table.
+Hmm. Can you take a look at "[PATCH V4] dma: add
+dma_get_any_slave_channel(), for use in of_xlate()" at the link below.
+It still implements this via xlate, but I don't see any benefit in
+making drivers use a different API to request slave channels based on
+how the DMA controller works.
 
-It also move the different driver resources (clks and iomem) retrieval
-to the device managed versions (devm_ functions).
-
-Best Regards,
-
-Boris
-
-Changes since v1:
- - split PATCH 3 in 2 different patches: one to remove references to
-   &pdev->dev, the other to make use of devm_clk_get
- - replace forgotten &pdev->dev references in usb_hcd_at91_probe
-
-Boris BREZILLON (4):
-  usb: ohci-at91: fix irq and iomem resource retrieval
-  usb: ohci-at91: replace request_mem_region + ioremap by
-    devm_request_and_ioremap
-  usb: ohci-at91: use dev variable instead of &pdev->dev
-  usb: ohci-at91: use device managed clk retrieval
-
- drivers/usb/host/ohci-at91.c |   83 ++++++++++++++----------------------------
- 1 file changed, 28 insertions(+), 55 deletions(-)
-
--- 
-1.7.9.5
+http://lkml.org/lkml/2013/11/26/408
