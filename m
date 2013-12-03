@@ -1,65 +1,157 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 3 Dec 2013 11:35:49 +0100
-Subject: [PATCH 5/6] amba: Convert to clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <20131203100926.GQ16735@n2100.arm.linux.org.uk>
-References: <1386065071-9529-1-git-send-email-ulf.hansson@linaro.org>
- <1386065071-9529-6-git-send-email-ulf.hansson@linaro.org>
- <20131203100926.GQ16735@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFq6k=kjBLHT2OTfpWtAgn1rOXonCdFGgXMeuPBRZHbMzQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Dec 2013 10:36:32 +0000
+Subject: [RFC] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F828E374B@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1385979309-10505-1-git-send-email-Li.Xiubo@freescale.com>
+ <20131202123406.GK12952@e106331-lin.cambridge.arm.com>
+ <1DD289F6464F0949A2FCA5AA6DC23F828E374B@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <20131203103632.GB7552@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 December 2013 11:09, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 03, 2013 at 11:04:30AM +0100, Ulf Hansson wrote:
->> To simplify code and error handling let's use clk_prepare_enable
->> and clk_disable_unprepare. No functional change.
->
-> Not true.
->
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  drivers/amba/bus.c |   30 ++++++------------------------
->>  1 file changed, 6 insertions(+), 24 deletions(-)
->>
->> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
->> index b90dc1e..0477131 100644
->> --- a/drivers/amba/bus.c
->> +++ b/drivers/amba/bus.c
->> @@ -151,36 +151,18 @@ postcore_initcall(amba_init);
->>
->>  static int amba_get_enable_pclk(struct amba_device *pcdev)
->>  {
->> -     struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
->> -     int ret;
->> -
->> -     pcdev->pclk = pclk;
->> -
->> -     if (IS_ERR(pclk))
->> -             return PTR_ERR(pclk);
->> +     pcdev->pclk = clk_get(&pcdev->dev, "apb_pclk");
->>
->> -     ret = clk_prepare(pclk);
->> -     if (ret) {
->> -             clk_put(pclk);
->> -             return ret;
->> -     }
->> +     if (IS_ERR(pcdev->pclk))
->> +             return PTR_ERR(pcdev->pclk);
->>
->> -     ret = clk_enable(pclk);
->> -     if (ret) {
->> -             clk_unprepare(pclk);
->> -             clk_put(pclk);
->> -     }
->> -
->> -     return ret;
->> +     return clk_prepare_enable(pcdev->pclk);
->
-> There is clearly a change here in the error handling.
+On Tue, Dec 03, 2013 at 04:02:48AM +0000, Li Xiubo wrote:
+> > > I'm sending the RFC patch about the FTM IP block registers read and
+> > > write endian fix for comments and more parcticed ideas.
+> > >
+> > > In Vybird VF610 Tower, all the IP blocks expect LE data. In the LS-1,
+> > > some of the IP blocks expect LE data, while others expect BE data. And
+> > > the CPU always operates in LE mode in these two platforms.
+> > 
+> > Could you elaborate on "expect BE data" please? Is this all registers
+> > within a given device, or a subset thereof?
+> > Are there data structures involved (i.e. buffers)?
+> >
+> 
+> It actually means big-endian mode, and it's all the registers and hasn't any
+> buffers or descriptors involved within FTM IP block.
+> But maybe in other IP blocks, such as eDMA and USB, should consider about the
+> buffers/descriptors issue.
 
-Thanks for quick review and sorry for this obvious mistake. V2 on it's way.
+Ok. So all the registers are big-endian, and there are no memory
+accesses to care about.
 
-Kind regards
-Ulf Hansson
+So for the binding for this device, we only have one property to worry
+about -- the endianness of all registers.
+
+> 
+> 
+> > >
+> > > So now I must take care of all these two cases. I'm not very sure if
+> > > there is other better ways to resolve this problem. In this patch I
+> > > have implemented two functions fsl_pwm_readl() and fsl_pwm_writel() to
+> > > replace readl() and writel(). At the same time there should add one
+> > > "endianess" property in the DT file.
+> > 
+> > If you're adding DT properties, binding updates are helpful to describe
+> > their intended use.
+> > 
+> 
+> Yes, that surely will be added later.
+
+Ok. I'd like to see that at the same time as the patch modifying the
+driver.
+
+> 
+> 
+> > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc, void
+> > > +__iomem *reg) {
+> > > +       u32 val;
+> > > +
+> > > +       val = __raw_readl(reg);
+> > > +
+> > > +       if (fpc->endianess == FTM_BIG)
+> > > +               return be32_to_cpu(val);
+> > > +       else
+> > > +               return le32_to_cpu(val); }
+> > > +
+> > > +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc, u32 val,
+> > > +               void __iomem *reg)
+> > > +{
+> > > +       if (fpc->endianess == FTM_BIG)
+> > > +               val = cpu_to_be32(val);
+> > > +       else
+> > > +               val = cpu_to_le32(val);
+> > > +
+> > > +       __raw_writel(val, reg);
+> > > +}
+> > 
+> > Using the __raw variants also loses you the memory barriers. Does this
+> > create any ordering issues in the rest of the driver?
+> > 
+> 
+> No, I had checked about this, so I just droped them.
+> Maybe it will be much better and safer if there are some memory barriers.
+
+If you've checked, is it safe or is it not?
+
+> 
+> 
+> 
+> > > +static int fsl_pwm_probe(struct platform_device *pdev) {
+> > > +       int ret;
+> > > +       const char *endianess;
+> > > +       struct fsl_pwm_chip *fpc;
+> > > +       struct resource *res;
+> > > +       struct device_node *np = pdev->dev.of_node;
+> > > +
+> > > +       fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
+> > > +       if (!fpc)
+> > > +               return -ENOMEM;
+> > > +
+> > > +       mutex_init(&fpc->lock);
+> > > +
+> > > +       fpc->chip.dev = &pdev->dev;
+> > > +
+> > > +       ret = fsl_pwm_parse_clk_ps(fpc);
+> > > +       if (ret < 0)
+> > > +               return ret;
+> > > +
+> > > +       if (of_property_read_string(np, "endianess", &endianess))
+> > > +               pr_warning("missing \"endianess\" property, "
+> > > +                               "the FTM IP block is little "
+> > > +                               "endian as default\n");
+> > > +       else if (!strcmp("big", endianess))
+> > > +               fpc->endianess = FTM_BIG;
+> > 
+> > Please don't do this.
+> > 
+> > One option is to have a new compatible string -- a big-endian device can't
+> > be poked in the same way as its little-endian variants, so they're not
+> > compatible. You can then associate some data with the compatible strings to
+> > figure out which accessors to use.
+> > 
+> 
+> Do you mean:
+> + static const struct of_device_id fsl_pwm_dt_ids[] = {
+> +        { .compatible = "fsl,vf610-ftm-pwm,big-endian", },
+> +        { .compatible = "fsl,vf610-ftm-pwm,little-endian", },
+> +        { /* sentinel */ }
+> + };  ?
+
+That's one option. Something like that would be fine. Then you could
+store flags in of_device_id::data to tell you which accessors to use.
+
+> 
+> Or just adding one property in DT file likes:
+> 			pwm0: pwm at 40038000 {
+> 				compatible = "fsl,vf610-ftm-pwm";
+> 				#pwm-cells = <3>;
+> 				reg = <0x40038000 0x1000>;
+> 				clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
+> 				clocks = <&clks VF610_CLK_FTM0>,
+> 					<&clks VF610_CLK_FTM0_FIX_SEL>,
+> 					<&clks VF610_CLK_FTM0_EXT_SEL>;
+> +				big-endian;       ---> both registers and buffers/descriptors
+> Or 
+> +				big-endian-regs;  ---> registers
+> +				big-endian-desc;  ---> buffers or descriptors
+
+As you've described above, in this case we don't need to make the
+distinction. Other bindings seem to have a "big-endian" boolean property
+for this case.
+
+It's probably best to align with the existing bindings and use a
+"big-endian" boolean property.
+
+Thanks,
+Mark.
