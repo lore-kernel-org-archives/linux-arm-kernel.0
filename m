@@ -1,27 +1,37 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 3 Dec 2013 07:42:01 -0500
-Subject: [PATCH V6 2/3] ahci: imx: Pull out the clock enable/disable calls
-In-Reply-To: <1385369222-5288-2-git-send-email-marex@denx.de>
-References: <1385369222-5288-1-git-send-email-marex@denx.de>
- <1385369222-5288-2-git-send-email-marex@denx.de>
-Message-ID: <20131203124201.GF8277@htj.dyndns.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Dec 2013 12:43:27 +0000
+Subject: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
+In-Reply-To: <20131203114217.GF1169@mudshark.cambridge.arm.com>
+References: <1386001475-20728-1-git-send-email-broonie@kernel.org>
+ <20131203114217.GF1169@mudshark.cambridge.arm.com>
+Message-ID: <20131203124327.GT27568@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 09:47:01AM +0100, Marek Vasut wrote:
-> The same code for enabling and disabling SATA clock was found in multiple
-> places in the driver. Implement functions that enable/disable the SATA clock
-> and use them in such places instead of duplicating the code.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: Linux-IDE <linux-ide@vger.kernel.org>
+On Tue, Dec 03, 2013 at 11:42:18AM +0000, Will Deacon wrote:
+> On Mon, Dec 02, 2013 at 04:24:35PM +0000, Mark Brown wrote:
 
-Applied 2-3 to libata/for-3.14.
+> > +			virtio_block at 0130000 {
+> > +				compatible = "virtio,mmio";
+> > +				reg = <0x130000 0x1000>;
 
-Thanks.
+> 4k? That seems pretty big to me...
 
--- 
-tejun
+Yeah, it looks like a page size to me though it does also seem like the
+sort of nice round number devices tend to offer.  The binding document
+is depressingly silent on the topic of the size of the region but the
+only existing in tree user (the ARMv8 foundation model DTS) also picks
+the same number.
+
+> > +				interrupts = <0x2a>;
+
+> Any reason this is in hex?
+
+That's what it was in Mark's original patch, easy enough to update.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/8335c3c2/attachment-0001.sig>
