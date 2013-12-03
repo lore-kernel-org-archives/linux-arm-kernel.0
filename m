@@ -1,17 +1,50 @@
 From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 3 Dec 2013 16:53:18 +0000
-Subject: [RFC part1 PATCH 4/7] ARM64 / ACPI: Introduce the skeleton of
- _PDC related for ARM64
-In-Reply-To: <1386088611-2801-5-git-send-email-hanjun.guo@linaro.org>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <1386088611-2801-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20131203165318.2c04a8bf@alan.etchedpixels.co.uk>
+Date: Tue, 3 Dec 2013 16:57:55 +0000
+Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu
+ possible/present maps and map logical cpu id to APIC id
+In-Reply-To: <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
+References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20131203165755.37b07796@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-O> +enum idle_boot_override { IDLE_NO_OVERRIDE = 0, IDLE_HALT, IDLE_NOMWAIT,
-> +			IDLE_POLL, IDLE_FORCE_MWAIT };
 
-This should probably move out of the arch directory to be a single enum
-including both platforms values. That will make it rather easier to keep
-sane and avoid ifdefs around which definitions are for which processor.
+> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
+> index 45ff625..8527ecc 100644
+> --- a/drivers/acpi/plat/arm-core.c
+> +++ b/drivers/acpi/plat/arm-core.c
+> @@ -58,6 +58,13 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>   */
+>  static u64 acpi_lapic_addr __initdata;
+>  
+> +/* available_cpus here means enabled cpu in MADT */
+> +int available_cpus;
+> +
+> +/* Map logic cpu id to physical GIC id. */
+> +int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
+> +int boot_cpu_apic_id = -1;
+> +
+
+static ?
+
+Really shouldn't be leaking names like "available_cpus" out of ACPI into
+the global namespace
+
+
+> +#ifdef CONFIG_SMP
+> +	if (available_cpus == 0) {
+> +		pr_info(PREFIX "Found 0 CPUs; assuming 1\n");
+> +		/* FIXME: should be the real GIC id read from hardware */
+> +		arm_cpu_to_apicid[available_cpus] = 0;
+> +		available_cpus = 1;	/* We've got at least one of these */
+> +	}
+> +#endif
+
+Isn't this true uniprocessor (by definition in fact)
+
+
+> + */
+> +void __init prefill_possible_map(void)
+
+leaking more unprefixed names into the global namespace
