@@ -1,32 +1,66 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 3 Dec 2013 10:15:46 -0800
-Subject: [PATCH v3 00/10] Add power management support for chipidea
-In-Reply-To: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
-References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131203181546.GA27706@kroah.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 03 Dec 2013 10:24:18 -0800
+Subject: [PATCH v6] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <5295F47E.7030409@gmail.com> (Daniel Mack's message of "Wed, 27
+ Nov 2013 14:32:46 +0100")
+References: <1384726754-27875-1-git-send-email-zonque@gmail.com>
+ <52938A12.5030100@ti.com> <5295F211.1050605@ti.com>
+ <5295F47E.7030409@gmail.com>
+Message-ID: <878uw1ssh9.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:55:15AM +0800, Peter Chen wrote:
-> Hi Greg,
-> 
-> This serial adds power management (system & runtime) for chipidea core.
-> With this, the chipidea controller can be at low power mode when it is not in
-> use, and the chipidea controller can be the system wakeup source.
-> It needs to depend on my patch[1], since [1]-"Add power management support for MXS PHY"
-> adds some common PHY APIs, and this serial uses it.
-> 
-> It has been verified at Freescale i.mx6Q/DL SabreSD, i.mx28 evk platform
-> (no runtime pm support), I will verify it at other FSL platforms during
-> the patch review.
+Daniel Mack <zonque@gmail.com> writes:
 
-This series doesn't apply to my tree anymore.
+> On 11/27/2013 02:22 PM, Sekhar Nori wrote:
+>> + Kevin
+>> 
+>> On Monday 25 November 2013 11:04 PM, Joel Fernandes wrote:
+>>> On 11/17/2013 04:19 PM, Daniel Mack wrote:
+>>>> This patch makes the edma driver resume correctly after suspend. Tested
+>>>> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
+>>>>
+>>>> All information can be reconstructed by already known runtime
+>>>> information.
+>>>>
+>>>> As we now use some functions that were previously only used from __init
+>>>> context, annotations had to be dropped.
+>>>>
+>>>> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
+>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>>> Tested-by: Joel Fernandes <joelf@ti.com>
+>>>> Acked-by: Joel Fernandes <joelf@ti.com>
+>>>
+>>> Hi Sekhar,
+>>>
+>>> Can you consider pulling this patch? It has been tested and Acked. Thanks.
+>> 
+>> Kevin had some inputs on previous version of this patch. Were you able
+>> to make sure he is okay with this version being merged?
+>
+> I had concerns about the feedback I got, and haven't got answers yet.
+>
+> In particular, I'm not convinced that using runtime PM to suspend
+> channels would actually save any power during runtime, or have any other
+> benefit. 
 
-And there have been a ton of chipidea patches floating around, I've now
-dropped them all from my "todo" queue and will wait for you to collect
-them and forward them on as I'm totally lost with all of the different
-versions and objections and the like.
+/me returning from a week off
 
-thanks,
+The amount of power to be saved depends on the activity in the system.
+If DMA is unused, at least the clocks could be gated allowing the
+possibility of the enclosing power domain to be gated if other devices
+are also clock gated, etc. etc.
 
-greg k-h
+However, my comments were not really about power saving, they were about
+designing things in a way that are scalable and match the longer term
+goals of converting drivers to be runtime PM centric.  For example, if
+someone did want to add real runtime PM to this driver later, they would
+need to rework much of this.  So my suggestion was to do runtime PM the
+right way from the beginning.
+
+That being said, I'm not the maintainer of this driver so don't get to
+make the final call.  I will just say that from what I've seen here, I
+don't think this is the right approach.
+
+Kevin
