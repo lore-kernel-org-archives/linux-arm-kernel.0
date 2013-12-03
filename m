@@ -1,55 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Dec 2013 12:29:17 +0000
-Subject: [alsa-devel] [PATCH 1/2] ASoC: ux500_pcm: Differentiate between
- pdata and DT initialisation
-In-Reply-To: <529DCD8A.30600@metafoo.de>
-References: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
- <529DC6BE.3080607@metafoo.de> <20131203120420.GC12031@lee--X1>
- <529DCB76.4070705@metafoo.de> <529DCD8A.30600@metafoo.de>
-Message-ID: <20131203122917.GD12031@lee--X1>
+Date: Tue, 3 Dec 2013 12:31:28 +0000
+Subject: [PATCH v3 14/36] mtd: st_spi_fsm: Add device-tree binding
+ documentation
+In-Reply-To: <CACRpkdYdW+p4-sDNCr8L75YB+e6agiQfvfEX5V+wCs4iZUaKSQ@mail.gmail.com>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-15-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaWXBchz78Yby11VpveBDtn6FrmupS=cnNYhvHgFJsBUw@mail.gmail.com>
+ <20131202110304.GB31626@lee--X1>
+ <CACRpkdb8=RRsNRKe4Nbefu2BJ4xHakmNjxFC1gwLea=bAmOz-A@mail.gmail.com>
+ <20131203113156.GB12031@lee--X1>
+ <CACRpkdYdW+p4-sDNCr8L75YB+e6agiQfvfEX5V+wCs4iZUaKSQ@mail.gmail.com>
+Message-ID: <20131203123128.GE12031@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Dec 2013, Lars-Peter Clausen wrote:
+On Tue, 03 Dec 2013, Linus Walleij wrote:
 
-> On 12/03/2013 01:15 PM, Lars-Peter Clausen wrote:
-> > On 12/03/2013 01:04 PM, Lee Jones wrote:
-> >> On Tue, 03 Dec 2013, Lars-Peter Clausen wrote:
+> On Tue, Dec 3, 2013 at 12:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 03 Dec 2013, Linus Walleij wrote:
+> 
+> >> So it can be in <linux/mfd/my-sysconfig-regs.h> as
+> >> a
 > >>
-> >>> On 12/03/2013 11:27 AM, Lee Jones wrote:
-> >>>> If booting with full DT support (i.e. DMA too, the last piece of the
-> >>>> puzzle), then we don't need to use the compatible_request_channel call
-> >>>> back or require some of the historical bumph which probably isn't
-> >>>> required by a platform data start-up now either. This will also be
-> >>>> ripped out in upcoming commits.
-> >>>>
-> >>>> Cc: alsa-devel at alsa-project.org
-> >>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> >>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>>
-> >>> Strictly speaking you do not need the second config, but well considering
-> >>> that this will all hopefully be removed soon anyway it should be fine.
+> >> #define MY_SYSCON_V1_BOOT_DEV_REG 0x958
+> >> #define MY_SYSCON_V1_BOOT_DEV_SPI 0x1a
 > >>
-> >> That's true it will, but why don't we need the second config? I won't
-> >> want the compat function to be called in the DT case.
-> > 
-> > It will only be called if it was not possible to request the DMA channel
-> > from the DT.
+> >> The kernel should know which SoC is in use and
+> >> act apropriately right?
+> >
+> > And this have lots of machine_is() calls everywhere?
 > 
-> The logic used to request the channel is basically this (in pseudo code).
+> No need for Mr. Everywhere to know about the SoC.
 > 
-> chan = NULL.
+> There are other ways to achieve this. arch/arm/mach-foo
+> always knows which ASIC it is running on, and it can do
+> various things:
 > 
-> if (of_node && !(flags & NO_DT))
-> 	chan = dma_request_slave_channel(...)
+> - Add device tree fragments/overlays (OK high-tech, but
+>   we're getting to this, inevitably)
 > 
-> if (!chan && (flags & COMPAT))
-> 	chan = dma_request_channel(compat_filter_fn, compat_filter_data);
+> - Selectively add AUXDATA, which is absolutely OK if
+>   we can do autoprobing of hardware IMO.
 
-Okay, fair enough.
-
-But as you say, this should be fine for now. I'll tend to the
-left-over cruft when I convert the driver to DT only.
+I prefer our solution TBH.
 
 -- 
 Lee Jones
