@@ -1,10 +1,10 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 2 Dec 2013 21:27:30 -0500
-Subject: [PATCH v2 15/23] mm/sparse: Use memblock apis for early memory
+Date: Mon, 2 Dec 2013 21:27:36 -0500
+Subject: [PATCH v2 21/23] mm/ARM: kernel: Use memblock apis for early memory
  allocations
 In-Reply-To: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386037658-3161-16-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386037658-3161-22-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,121 +22,35 @@ Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/sparse-vmemmap.c |    6 ++++--
- mm/sparse.c         |   27 +++++++++++++++------------
- 2 files changed, 19 insertions(+), 14 deletions(-)
+ arch/arm/kernel/devtree.c |    2 +-
+ arch/arm/kernel/setup.c   |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
-index 27eeab3..4cba9c2 100644
---- a/mm/sparse-vmemmap.c
-+++ b/mm/sparse-vmemmap.c
-@@ -40,7 +40,8 @@ static void * __init_refok __earlyonly_bootmem_alloc(int node,
- 				unsigned long align,
- 				unsigned long goal)
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 739c3df..85b9b3b 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -33,7 +33,7 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+ 
+ void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
  {
--	return __alloc_bootmem_node_high(NODE_DATA(node), size, align, goal);
-+	return memblock_virt_alloc_try_nid(size, align, goal,
-+					    BOOTMEM_ALLOC_ACCESSIBLE, node);
+-	return alloc_bootmem_align(size, align);
++	return memblock_virt_alloc_align(size, align);
  }
  
- static void *vmemmap_buf;
-@@ -226,7 +227,8 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
+ void __init arm_dt_memblock_reserve(void)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6a1b8a8..0d3c6aa 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -717,7 +717,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 	kernel_data.end     = virt_to_phys(_end - 1);
  
- 	if (vmemmap_buf_start) {
- 		/* need to free left buf */
--		free_bootmem(__pa(vmemmap_buf), vmemmap_buf_end - vmemmap_buf);
-+		memblock_free_early(__pa(vmemmap_buf),
-+				    vmemmap_buf_end - vmemmap_buf);
- 		vmemmap_buf = NULL;
- 		vmemmap_buf_end = NULL;
- 	}
-diff --git a/mm/sparse.c b/mm/sparse.c
-index 8cc7be0..02f57cc 100644
---- a/mm/sparse.c
-+++ b/mm/sparse.c
-@@ -69,7 +69,7 @@ static struct mem_section noinline __init_refok *sparse_index_alloc(int nid)
- 		else
- 			section = kzalloc(array_size, GFP_KERNEL);
- 	} else {
--		section = alloc_bootmem_node(NODE_DATA(nid), array_size);
-+		section = memblock_virt_alloc_node(array_size, nid);
- 	}
- 
- 	return section;
-@@ -279,8 +279,9 @@ sparse_early_usemaps_alloc_pgdat_section(struct pglist_data *pgdat,
- 	limit = goal + (1UL << PA_SECTION_SHIFT);
- 	nid = early_pfn_to_nid(goal >> PAGE_SHIFT);
- again:
--	p = ___alloc_bootmem_node_nopanic(NODE_DATA(nid), size,
--					  SMP_CACHE_BYTES, goal, limit);
-+	p = memblock_virt_alloc_try_nid_nopanic(size,
-+						SMP_CACHE_BYTES, goal, limit,
-+						nid);
- 	if (!p && limit) {
- 		limit = 0;
- 		goto again;
-@@ -331,7 +332,7 @@ static unsigned long * __init
- sparse_early_usemaps_alloc_pgdat_section(struct pglist_data *pgdat,
- 					 unsigned long size)
- {
--	return alloc_bootmem_node_nopanic(pgdat, size);
-+	return memblock_virt_alloc_node_nopanic(size, pgdat->node_id);
- }
- 
- static void __init check_usemap_section_nr(int nid, unsigned long *usemap)
-@@ -376,8 +377,9 @@ struct page __init *sparse_mem_map_populate(unsigned long pnum, int nid)
- 		return map;
- 
- 	size = PAGE_ALIGN(sizeof(struct page) * PAGES_PER_SECTION);
--	map = __alloc_bootmem_node_high(NODE_DATA(nid), size,
--					 PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
-+	map = memblock_virt_alloc_try_nid(size,
-+					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
-+					  BOOTMEM_ALLOC_ACCESSIBLE, nid);
- 	return map;
- }
- void __init sparse_mem_maps_populate_node(struct page **map_map,
-@@ -401,8 +403,9 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
- 	}
- 
- 	size = PAGE_ALIGN(size);
--	map = __alloc_bootmem_node_high(NODE_DATA(nodeid), size * map_count,
--					 PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
-+	map = memblock_virt_alloc_try_nid(size * map_count,
-+					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
-+					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
- 	if (map) {
- 		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
- 			if (!present_section_nr(pnum))
-@@ -545,7 +548,7 @@ void __init sparse_init(void)
- 	 * sparse_early_mem_map_alloc, so allocate usemap_map@first.
- 	 */
- 	size = sizeof(unsigned long *) * NR_MEM_SECTIONS;
--	usemap_map = alloc_bootmem(size);
-+	usemap_map = memblock_virt_alloc(size);
- 	if (!usemap_map)
- 		panic("can not allocate usemap_map\n");
- 	alloc_usemap_and_memmap(sparse_early_usemaps_alloc_node,
-@@ -553,7 +556,7 @@ void __init sparse_init(void)
- 
- #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
- 	size2 = sizeof(struct page *) * NR_MEM_SECTIONS;
--	map_map = alloc_bootmem(size2);
-+	map_map = memblock_virt_alloc(size2);
- 	if (!map_map)
- 		panic("can not allocate map_map\n");
- 	alloc_usemap_and_memmap(sparse_early_mem_maps_alloc_node,
-@@ -583,9 +586,9 @@ void __init sparse_init(void)
- 	vmemmap_populate_print_last();
- 
- #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
--	free_bootmem(__pa(map_map), size2);
-+	memblock_free_early(__pa(map_map), size2);
- #endif
--	free_bootmem(__pa(usemap_map), size);
-+	memblock_free_early(__pa(usemap_map), size);
- }
- 
- #ifdef CONFIG_MEMORY_HOTPLUG
+ 	for_each_memblock(memory, region) {
+-		res = alloc_bootmem_low(sizeof(*res));
++		res = memblock_virt_alloc(sizeof(*res));
+ 		res->name  = "System RAM";
+ 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+ 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
 -- 
 1.7.9.5
