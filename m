@@ -1,52 +1,46 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 03 Dec 2013 14:31:30 -0500
-Subject: [PATCH 1/3] arm64: add EFI stub
-In-Reply-To: <20131203183844.GA22668@mudshark.cambridge.arm.com>
-References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
- <1385762712-17043-2-git-send-email-msalter@redhat.com>
- <20131203183844.GA22668@mudshark.cambridge.arm.com>
-Message-ID: <1386099090.1861.55.camel@deneb.redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Dec 2013 19:41:43 +0000
+Subject: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
+In-Reply-To: <1386098643-30784-1-git-send-email-broonie@kernel.org>
+References: <1386098643-30784-1-git-send-email-broonie@kernel.org>
+Message-ID: <20131203194136.GB22668@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-03 at 18:38 +0000, Will Deacon wrote:
-> Hi Mark, Roy,
+On Tue, Dec 03, 2013 at 07:24:03PM +0000, Mark Brown wrote:
+> From: Mark Hambleton <mahamble@broadcom.com>
 > 
-> On Fri, Nov 29, 2013 at 10:05:10PM +0000, Mark Salter wrote:
-> > This patch adds PE/COFF header fields to the start of the Image
-> > so that it appears as an EFI application to EFI firmware. An EFI
-> > stub is included to allow direct booting of the kernel Image. Due
-> > to EFI firmware limitations, only little endian kernels with 4K
-> > page sizes are supported at this time. Support in the COFF header
-> > for signed images was provided by Ard Biesheuvel.
+> Describe the virtio device so we can mount disk images in the simulator.
 > 
-> I haven't really jumped into this but, whilst I see the use of EFI_STUB on
-> both arm and arm64, there seems to be some duplication/reinvention between
-> the two series you've put together.
-
-Indeed. As the file banner says, the arm64 stub started out from the arm
-code.
-
+> Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>  arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> Maybe I'm just being ignorant, but the stuff in efi-stub.c really looks to
-> be doing the same thing on both architectures. Would you guys be able to
-> work to together to produce an independent series containing the common
-> parts, then add arm/arm64 backends on top of that please? In particular,
-> factoring out the device-tree parts ensures that we don't introduce subtle
-> differences between the two architectures when there's no real need to do
-> so...
-> 
-> ...or shout at me because I didn't understand what you were doing!
+> diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+> index b45e5f39f577..4ccd96552b70 100644
+> --- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+> @@ -183,6 +183,12 @@
+>  				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
+>  				clock-names = "clcdclk", "apb_pclk";
+>  			};
+> +
+> +			virtio_block at 0130000 {
+> +				compatible = "virtio,mmio";
+> +				reg = <0x130000 0x1000>;
 
-Along the way, Roy has pulled out common bits into:
-   drivers/firmware/efi-stub-helper.c
-and
-   drivers/firmware/fdt.c
+Can we make this 0x200 for the size? That's what kvmtool uses and, from the
+virtio-mmio spec, config data from offset 0x100+ is driver-specific. A quick
+look at the virtio block driver suggests we only use 31 bytes of that at the
+moment, so 4k is really OTT (and doesn't match the page size for 64K page
+systems anyway).
 
-There are arguably more bits which could be made common but there's not
-really a lot left. There are differences between the two stubs which
-limit what we can do. The arm stub is not part of the kernel (it is part
-of the zImage wrapper) but the arm64 stub is. So arm64 has a little more
-flexibility for using kernel facilities (__init attribute, LIBFDT, etc).
+With that change:
 
---Mark
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Cheers,
+
+Will
