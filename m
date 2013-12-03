@@ -1,22 +1,55 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 11:59:42 -0700
-Subject: [PATCH 04/31] ARM: tegra: update DT files to add reset properties
-In-Reply-To: <20131129130031.GQ22771@ulmo.nvidia.com>
+Date: Tue, 03 Dec 2013 12:07:21 -0700
+Subject: [PATCH 07/31] clk: tegra: implement a reset driver
+In-Reply-To: <20131129132618.GT22771@ulmo.nvidia.com>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-5-git-send-email-swarren@wwwdotorg.org>
- <20131129130031.GQ22771@ulmo.nvidia.com>
-Message-ID: <529E2A1E.1000307@wwwdotorg.org>
+ <1384548866-13141-8-git-send-email-swarren@wwwdotorg.org>
+ <20131129132618.GT22771@ulmo.nvidia.com>
+Message-ID: <529E2BE9.5030803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 06:00 AM, Thierry Reding wrote:
-> On Fri, Nov 15, 2013 at 01:53:59PM -0700, Stephen Warren wrote:
-...
->> @@ -110,6 +118,8 @@ reg = <0x54080000 0x00040000>; interrupts =
->> <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>; clocks = <&tegra_car
->> TEGRA30_CLK_VI>; +			resets = <&tegra_car 164>;
+On 11/29/2013 06:26 AM, Thierry Reding wrote:
+> On Fri, Nov 15, 2013 at 01:54:02PM -0700, Stephen Warren wrote: 
+> [...]
+>> diff --git a/drivers/clk/tegra/clk-tegra114.c
+>> b/drivers/clk/tegra/clk-tegra114.c
+> [...]
+>> -	clks = tegra_clk_init(TEGRA124_CLK_CLK_MAX, 6); +	clks =
+>> tegra_clk_init(clk_base, TEGRA124_CLK_CLK_MAX, 6);
 > 
-> I think this needs to be 20.
+> This doesn't really concern this patch, but this is inconsistent
+> with the drivers for other generations. We should probably make
+> that consistent in a separate patch.
+> 
+>> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
+> 
+>> +static int tegra_clk_rst_assert(struct reset_controller_dev
+>> *rcdev, +		unsigned long id); +static int
+>> tegra_clk_rst_deassert(struct reset_controller_dev *rcdev, +
+>> unsigned long id);
+> 
+> Can you reorder the code so that these forward-declarations can be 
+> avoided?
+> 
+>> /* Global data of Tegra CPU CAR ops */ static struct
+>> tegra_cpu_car_ops dummy_car_ops; struct tegra_cpu_car_ops
+>> *tegra_cpu_car_ops = &dummy_car_ops; @@ -70,6 +77,17 @@ static
+>> struct clk **clks; static int clk_num; static struct
+>> clk_onecell_data clk_data;
+>> 
+>> +static struct reset_control_ops rst_ops = { +	.assert =
+>> tegra_clk_rst_assert, +	.deassert = tegra_clk_rst_deassert, +}; 
+>> + +static struct reset_controller_dev rst_ctlr = { +	.ops =
+>> &rst_ops, +	.owner = THIS_MODULE, +	.of_reset_n_cells = 1, +};
+> 
+> It looks like these can be moved further down (below the
+> implementation of tegra_clk_rst_assert() and
+> tegra_clk_rst_deassert()). I rather like not having to modify two
+> locations when the signature changes, but it's not that big a deal,
+> so with or without that fixed up:
+> 
+> Reviewed-by: Thierry Reding <treding@nvidia.com>
 
-Yes, I've fixed that to be 20 in both tegra20.dtsi and tegra30.dtsi in
-this patch.
+OK, I moved the structs right before the function that uses them,
+removed the function prototypes, and maintained your tag. Thanks.
