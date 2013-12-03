@@ -1,33 +1,57 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 03 Dec 2013 10:33:43 +0100
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <CACRpkdYDONQ-7U3hGYnx7jb0_Y=rcOcvy-2F1dO058FfOO4stg@mail.gmail.com>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
- <2715269.S45Tc0DQGQ@flatron>
- <CACRpkdYDONQ-7U3hGYnx7jb0_Y=rcOcvy-2F1dO058FfOO4stg@mail.gmail.com>
-Message-ID: <2004634.MefHDYV4b2@flatron>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 3 Dec 2013 11:36:57 +0200
+Subject: [PATCH] ARM: dts: omap3-beagle: Fix USB host on beagle boards
+ (for 3.13)
+In-Reply-To: <3636447.xncPcCYRzc@avalon>
+References: <1385387745-7162-1-git-send-email-rogerq@ti.com>
+ <3636447.xncPcCYRzc@avalon>
+Message-ID: <529DA639.8000905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 of December 2013 10:31:12 Linus Walleij wrote:
-> On Tue, Nov 26, 2013 at 1:30 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> 
-> > IMHO a way to specify a default safe state of all pins (with lowest power
-> > consumption, without possibility of glitching external devices, etc.)
-> > would be really useful for Samsung platforms (and probably Renesas ones
-> > as Kevin wrote).
-> 
-> I'm following :-)
-> 
-> Now if we could see some more details and a patch, that would
-> be great ...
+Hi Laurent,
 
-Yeah, I would like to see them too. ;)
+On 12/03/2013 05:54 AM, Laurent Pinchart wrote:
+> Hi Roger,
+> 
+> On Monday 25 November 2013 15:55:45 Roger Quadros wrote:
+>> Beagle (rev. C4) and Beagle-XM (all revs) need VAUX2 1.8V supply
+>> for the USB PHY.
+>>
+>> As the generic PHY driver can't handle more than one supply
+>> at the moment, we configure this supply to be always on.
+>> This will cause a very small power impact if the USB host subsystem
+>> is not in use, about 76.86 micro-W + LDO power.
+>>
+>> Older Beagle boards (prior to C4) don't have VAUX2 connected anywhere,
+>> so there won't be any functional impact on those boards other than
+>> some additional LDO power consumption.
+> 
+> Do I need any patch other than this one (on top of v3.13-rc1) to enable the
+> ethernet port on a Beagleboard-xM rev B ? Here's what the kernel reports at
+> boot (with ignore_loglevel set on the command line).
+> 
 
-Unfortunately my make_pinctrl_default_state_patches() function is
-returning -ENOTIME at the moment. :( (I hope to get it fixed
-later this month, though.)
+It seems on Rev A/B, the power enable line for the USB hub has reversed polarity
+than Rev C.
 
-Best regards,
-Tomasz
+Does the below patch work for you?
+
+If yes, how do we account for it? Do we add a new file "omap3-beagle-xm-ab.dts" for
+rev A/B boards?
+
+cheers,
+-roger
+
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index b39918e..434d903 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -78,6 +78,7 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
+ 		startup-delay-us = <70000>;
++		enable-active-high;
+ 	};
+ 
+ 	/* HS USB Host PHY on PORT 2 */
