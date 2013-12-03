@@ -1,7 +1,7 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue,  3 Dec 2013 19:15:27 +0000
+Date: Tue,  3 Dec 2013 19:19:12 +0000
 Subject: [PATCH] arm64: cmpxchg: update macros to prevent warnings
-Message-ID: <1386098127-29070-1-git-send-email-broonie@kernel.org>
+Message-ID: <1386098352-29226-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,7 +26,7 @@ Signed-off-by: Mark Brown <broonie@linaro.org>
  1 file changed, 17 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index 3914c0dcd09c..3f75fdb59447 100644
+index 3914c0dcd09c..c558da59989e 100644
 --- a/arch/arm64/include/asm/cmpxchg.h
 +++ b/arch/arm64/include/asm/cmpxchg.h
 @@ -158,17 +158,23 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
@@ -48,7 +48,7 @@ index 3914c0dcd09c..3f75fdb59447 100644
 +({ \
 +	__typeof__(*(ptr)) __ret; \
 +	__ret = (__typeof__(*(ptr))) \
-+	__cmpxchg((ptr), (unsigned long)(o), (unsigned long)(n), \
++	__cmpxchg_mb((ptr), (unsigned long)(o), (unsigned long)(n), \
 +		sizeof(*(ptr))); \
 +	__ret; \
 +})
@@ -57,7 +57,7 @@ index 3914c0dcd09c..3f75fdb59447 100644
 +({ \
 +	__typeof__(*(ptr)) __ret; \
 +	__ret = (__typeof__(*(ptr))) \
-+	__cmpxchg_local((ptr), (unsigned long)(o), \
++	__cmpxchg((ptr), (unsigned long)(o), \
 +		(unsigned long)(n), sizeof(*(ptr))); \
 +	__ret; \
 +})
