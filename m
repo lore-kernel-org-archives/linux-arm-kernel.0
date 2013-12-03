@@ -1,55 +1,43 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Tue, 03 Dec 2013 10:45:29 -0800
-Subject: [PATCH RESEND v5 1/2] PWM: PXA: add device tree support to PWM
- driver
-In-Reply-To: <20131203101714.GG21178@ulmo.nvidia.com>
-References: <1379791174-2369-1-git-send-email-mikedunn@newsguy.com>
- <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
- <20131203101714.GG21178@ulmo.nvidia.com>
-Message-ID: <529E26C9.30707@newsguy.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 03 Dec 2013 11:48:33 -0700
+Subject: [PATCH 02/31] ARM: tegra: document reset properties in DT bindings
+In-Reply-To: <20131202090852.GD17834@ulmo.nvidia.com>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+ <1384548866-13141-3-git-send-email-swarren@wwwdotorg.org>
+ <20131129122348.GO22771@ulmo.nvidia.com> <529B88C9.60804@wwwdotorg.org>
+ <20131202090852.GD17834@ulmo.nvidia.com>
+Message-ID: <529E2781.5020504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 02:17 AM, Thierry Reding wrote:
-> On Sat, Sep 21, 2013 at 12:19:33PM -0700, Mike Dunn wrote:
->> This patch adds device tree support to the PXA's PWM driver.  Nothing
->> needs to be extracted from the device tree node by the PWM device.
->> Client devices need only specify the period; the per-chip index is
->> implicitly zero because one device node must be present for each PWM
->> output in use.  This approach is more convenient due to the wide
->> variability in the number of PWM channels present across the various PXA
->> variants, and is made possible by the fact that the register sets for
->> each PWM channel are segregated from each other.  An of_xlate() method
->> is added to parse this single-cell node.  The existing ID table is
->> reused for the match table data.
->>
->> Tested on a Palm Treo 680 (both platform data and DT cases).
->>
->> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->> ---
->>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 30 +++++++++++++
->>  drivers/pwm/pwm-pxa.c                             | 52 ++++++++++++++++++++++-
->>  2 files changed, 81 insertions(+), 1 deletion(-)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+On 12/02/2013 02:08 AM, Thierry Reding wrote:
+> On Sun, Dec 01, 2013 at 12:06:49PM -0700, Stephen Warren wrote:
+>> On 11/29/2013 05:23 AM, Thierry Reding wrote:
+>>> On Fri, Nov 15, 2013 at 01:53:57PM -0700, Stephen Warren wrote:
+>>>  [...]
+>>>> diff --git 
+>>>> a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
+>>>>
+>>>> 
+b/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
+>>> 
+>>>> 
+>> [...]
+>>>> +  - resets : Must contain an entry for each entry in 
+>>>> reset-names. +    See ../reset/reset.txt for details. +  - 
+>>>> reset-names : Must include the following entries: +    - dc
+>>> 
+>>> For consistency with this, the clock-names entry for the first 
+>>> clock in this node should then be "dc" as well.
+>> 
+>> The dc driver gets the clock by name, so this isn't a
+>> requirement.
 > 
-> Hi Mike,
-> 
-> It looks like this fell through the cracks. Is this patch still the
-> latest one you have? Should it still be applied?
-> 
-> Thierry
-> 
+> Right, but like I've said in another reply, I'd very much like for
+> this to be fixed up so we don't have to mess around with
+> per-instance names for clocks. So instead of naming the first clock
+> in the display controller node "disp", we could rename it to "dc"
+> for consistency with the reset bindings.
 
-Hi Thierry,
-
-Funny I should hear from you about this today.... I just turned my attention
-back to this today and noticed that it never made it into your for-next branch.
- Yes, it is the latest.  If the patch still applies cleanly, please feel free.
-Otherwise, I'd be glad to rework it against something more recent.
-
-Also, we never got any ACKs for patch 2/2, which just adds the nodes to
-arch/arm/boot/dts/pxa27x.dtsi
-Any advice on whom to nudge?
-
-Thanks much!
-Mike
+I assume you're now OK with not changing the clock names, given my
+explanation?
