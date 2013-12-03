@@ -1,26 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Dec 2013 11:18:54 +0000
-Subject: [PATCH v5 1/4] arm64: support single-step and breakpoint handler
- hooks
-In-Reply-To: <CA+b37P0SzY2B9pXCfYAjhBE+Lv=X38HFM=W4ntNNim4TF4KQQQ@mail.gmail.com>
+Date: Tue, 3 Dec 2013 11:21:39 +0000
+Subject: [PATCH v5 2/4] AArch64: KGDB: Add Basic KGDB support
+In-Reply-To: <20131203101637.GA7552@e106331-lin.cambridge.arm.com>
 References: <1385793148-28979-1-git-send-email-vijay.kilari@gmail.com>
- <1385793148-28979-2-git-send-email-vijay.kilari@gmail.com>
- <CA+b37P0SzY2B9pXCfYAjhBE+Lv=X38HFM=W4ntNNim4TF4KQQQ@mail.gmail.com>
-Message-ID: <20131203111854.GB1169@mudshark.cambridge.arm.com>
+ <1385793148-28979-3-git-send-email-vijay.kilari@gmail.com>
+ <20131203101637.GA7552@e106331-lin.cambridge.arm.com>
+Message-ID: <20131203112139.GC1169@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 06:09:10AM +0000, Sandeepa Prabhu wrote:
-> Hi Will,
+On Tue, Dec 03, 2013 at 10:16:37AM +0000, Mark Rutland wrote:
+> I think that there's a slight problem with this on BE systems.
+
+[...]
+
+> On Sat, Nov 30, 2013 at 06:32:26AM +0000, vijay.kilari at gmail.com wrote:
+> > +       { "pstate", 4, offsetof(struct pt_regs, pstate)},
 > 
-> If you have no further issues or objections with this patch, please
-> can you Ack this patch and consider for queuing it on upstream branch?
-> (Or should it merge along with kgdb series?)
+> As pt_regs::pstate is a u64, we're only describing half of the field
+> here (to match GDB's expectations). While we happen to get the half
+> we're interested in on an LE system, on a BE system this will point at
+> the zeroed half.
 
-I reviewed it here:
+Yup, I think you're right. It's almost as if this hasn't been tested on a BE
+system.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/207372.html
-
-and you still haven't addressed my two, minor comments.
+Given that a large proportion of this CC list *do* actually care about BE,
+I'd like to see a tested-by from one of them before this gets merged. I'm
+pretty sure GDB has a testsuite which might be of some use.
 
 Will
