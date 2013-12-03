@@ -1,12 +1,14 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 2 Dec 2013 21:27:38 -0500
-Subject: [PATCH v2 23/23] mm/ARM: OMAP: Use memblock apis for early memory
+Date: Mon, 2 Dec 2013 21:27:32 -0500
+Subject: [PATCH v2 17/23] mm/page_cgroup: Use memblock apis for early memory
  allocations
 In-Reply-To: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386037658-3161-24-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386037658-3161-18-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
 Switch to memblock interfaces for early memory allocator instead of
 bootmem allocator. No functional change in beahvior than what it is
@@ -20,38 +22,31 @@ bootmem APIs.
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: cgroups at vger.kernel.org
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ mm/page_cgroup.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index e3f0eca..92d11e2 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2695,9 +2695,7 @@ static int __init _alloc_links(struct omap_hwmod_link **ml,
- 	sz = sizeof(struct omap_hwmod_link) * LINKS_PER_OCP_IF;
+diff --git a/mm/page_cgroup.c b/mm/page_cgroup.c
+index 6d757e3a..d8bd2c5 100644
+--- a/mm/page_cgroup.c
++++ b/mm/page_cgroup.c
+@@ -54,8 +54,9 @@ static int __init alloc_node_page_cgroup(int nid)
  
- 	*sl = NULL;
--	*ml = alloc_bootmem(sz);
--
--	memset(*ml, 0, sz);
-+	*ml = memblock_virt_alloc(sz);
+ 	table_size = sizeof(struct page_cgroup) * nr_pages;
  
- 	*sl = (void *)(*ml) + sizeof(struct omap_hwmod_link);
- 
-@@ -2816,9 +2814,7 @@ static int __init _alloc_linkspace(struct omap_hwmod_ocp_if **ois)
- 	pr_debug("omap_hwmod: %s: allocating %d byte linkspace (%d links)\n",
- 		 __func__, sz, max_ls);
- 
--	linkspace = alloc_bootmem(sz);
--
--	memset(linkspace, 0, sz);
-+	linkspace = memblock_virt_alloc(sz);
- 
- 	return 0;
- }
+-	base = __alloc_bootmem_node_nopanic(NODE_DATA(nid),
+-			table_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
++	base = memblock_virt_alloc_try_nid_nopanic(
++			table_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
++			BOOTMEM_ALLOC_ACCESSIBLE, nid);
+ 	if (!base)
+ 		return -ENOMEM;
+ 	NODE_DATA(nid)->node_page_cgroup = base;
 -- 
 1.7.9.5
