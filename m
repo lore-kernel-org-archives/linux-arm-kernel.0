@@ -1,22 +1,42 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 10:35:21 -0700
-Subject: pull request for clk-tegra-next
-In-Reply-To: <20131128141826.GW26617@tbergstrom-lnx.Nvidia.com>
-References: <20131128141826.GW26617@tbergstrom-lnx.Nvidia.com>
-Message-ID: <529E1659.2070103@wwwdotorg.org>
+Date: Tue, 03 Dec 2013 10:37:28 -0700
+Subject: [PATCH V6] kbuild: dtbs_install: new make target
+In-Reply-To: <1385942188-21831-1-git-send-email-jason@lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <1385942188-21831-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <529E16D8.3060608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2013 07:18 AM, Peter De Schrijver wrote:
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+On 12/01/2013 04:56 PM, Jason Cooper wrote:
+> Unlike other build products in the Linux kernel, there is no 'make
+> *install' mechanism to put devicetree blobs in a standard place.
 > 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> This patch is an attempt to fix this problem.  Akin to 'make install',
+> this creates a new make target, dtbs_install.  The script that gets
+> called defers to a distribution or user supplied installdtbs binary,
+> if found in the system.  Otherwise, the default action is to install the
+> built dtbs into
 > 
-> are available in the git repository at:
->   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-next
+>   /lib/devicetrees/${kernel_version}/${dts_filename}.dtb
+> 
+> This is done to keep dtbs from different kernel versions separate until
+> things have settled down.  Once the dtbs are stable, and not so strongly
+> linked to the kernel version, the devicetree files will most likely move
+> to their own repo.  Users will need to upgrade install scripts at that
+> time.
+> 
+> /lib has been selected over /boot since /boot is often a FAT filesystem
+> and a majority of the dts filenames are longer than 8+3.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+> Note: Stephen, I haven't added your Ack because I wanted to make sure you were
+> Ok with the change to /lib in light of /boot partitions formatted to FAT
 
-Mike, this series is a dependency for my patch series that converts
-Tegra drivers to use the standard module reset API rather than a custom
-API (which is implemented in the clock driver). If you could either
-merge this pull request, or at least ack that it's OK for me to merge it
-into the Tegra tree as a dependency, that'd be helpful. Thanks.
+This script shouldn't be installing directly to the filesystem, but
+rather some staging area that then gets copied to the desired location
+by distro-/use-specific scripts. As such, the filesystem in /boot isn't
+relevant.
+
+But that said, I won't try and NAK it because of that.
