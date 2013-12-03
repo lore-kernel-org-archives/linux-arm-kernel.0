@@ -1,226 +1,221 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 3 Dec 2013 18:24:45 -0500
-Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
-References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
- <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131203232445.GX8277@htj.dyndns.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Dec 2013 00:41:34 +0100
+Subject: [PATCH 1/5] PM / Sleep: Add pm_generic functions to re-use
+ runtime PM callbacks
+In-Reply-To: <5255487.U4HM7Lafsi@vostro.rjw.lan>
+References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
+ <1385566500-7666-2-git-send-email-ulf.hansson@linaro.org>
+ <5255487.U4HM7Lafsi@vostro.rjw.lan>
+Message-ID: <1858154.Dd0R3NaGoS@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wednesday, December 04, 2013 12:15:13 AM Rafael J. Wysocki wrote:
+> On Wednesday, November 27, 2013 04:34:56 PM Ulf Hansson wrote:
+> > To put devices into low power state during sleep, it sometimes makes
+> > sense at subsystem-level to re-use the runtime PM callbacks.
+> > 
+> > The PM core will at device_suspend_late disable runtime PM, after that
+> > we can safely operate on these callbacks. At suspend_late the device
+> > will be put into low power state by invoking the runtime_suspend
+> > callbacks, unless the runtime status is already suspended. At
+> > resume_early the state is restored by invoking the runtime_resume
+> > callbacks. Soon after the PM core will re-enable runtime PM before
+> > returning from device_resume_early.
+> > 
+> > The new pm_generic functions are named pm_generic_suspend_late_runtime
+> > and pm_generic_resume_early_runtime, they are supposed to be used in
+> > pairs.
+> > 
+> > Do note that these new generic callbacks will work smothly even with
+> > and without CONFIG_PM_RUNTIME, as long as the runtime PM callbacks are
+> > implemented inside CONFIG_PM instead of CONFIG_PM_RUNTIME.
+> > 
+> > A special thanks to Alan Stern who came up with this idea.
+> > 
+> > Cc: Kevin Hilman <khilman@linaro.org>
+> > Cc: Alan Stern <stern@rowland.harvard.edu>
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > ---
+> >  drivers/base/power/generic_ops.c |   86 ++++++++++++++++++++++++++++++++++++++
+> >  include/linux/pm.h               |    2 +
+> >  2 files changed, 88 insertions(+)
+> > 
+> > diff --git a/drivers/base/power/generic_ops.c b/drivers/base/power/generic_ops.c
+> > index 5ee030a..8e78ad1 100644
+> > --- a/drivers/base/power/generic_ops.c
+> > +++ b/drivers/base/power/generic_ops.c
+> > @@ -93,6 +93,49 @@ int pm_generic_suspend_late(struct device *dev)
+> >  EXPORT_SYMBOL_GPL(pm_generic_suspend_late);
+> 
+> After a bit of reconsideration it appears to me that the only benefit of that
+> would be to make it possible for drivers to work around incomplete PM domains
+> implementations.  Which would be of questionable value.
+> 
+> >  /**
+> > + * pm_generic_suspend_late_runtime - Generic suspend_late callback for drivers
+> > + * @dev: Device to suspend.
+> > + * Use to invoke runtime_suspend callbacks at suspend_late.
+> > + */
+> > +int pm_generic_suspend_late_runtime(struct device *dev)
+> > +{
+> > +	int (*callback)(struct device *);
+> > +	int ret = 0;
+> > +
+> > +	/*
+> > +	 * PM core has disabled runtime PM in device_suspend_late, thus we can
+> > +	 * safely check the device's runtime status and decide whether
+> > +	 * additional actions are needed to put the device into low power state.
+> > +	 * If so, we invoke the runtime_suspend callbacks.
+> > +	 * For the !CONFIG_PM_RUNTIME case, pm_runtime_status_suspended() always
+> > +	 * returns false and therefore the runtime_suspend callback will be
+> > +	 * invoked.
+> > +	 */
+> > +	if (pm_runtime_status_suspended(dev))
+> > +		return 0;
+> > +
+> > +	if (dev->pm_domain)
+> > +		callback = dev->pm_domain->ops.runtime_suspend;
+> 
+> First of all, for this to work you need to assume that the type/bus/class will
+> not exercise hardware in any way by itself (or you can look at the PCI bus type
+> for an example why it won't generally work otherwise), so you could simply skip
+> the rest of this conditional.
+> 
+> For the bus types you are concerned about (platform and AMBA) that actually is
+> the case as far as I can say.
+> 
+> > +	else if (dev->type && dev->type->pm)
+> > +		callback = dev->type->pm->runtime_suspend;
+> > +	else if (dev->class && dev->class->pm)
+> > +		callback = dev->class->pm->runtime_suspend;
+> > +	else if (dev->bus && dev->bus->pm)
+> > +		callback = dev->bus->pm->runtime_suspend;
+> > +	else
+> > +		callback = NULL;
+> > +
+> > +	if (!callback && dev->driver && dev->driver->pm)
+> > +		callback = dev->driver->pm->runtime_suspend;
+> > +
+> > +	if (callback)
+> > +		ret = callback(dev);
+> > +
+> > +	return ret;
+> > +}
+> > +EXPORT_SYMBOL_GPL(pm_generic_suspend_late_runtime);
+> 
+> After that you're left with something like this:
+> 
+> int prototype_suspend_late(struct device *dev)
+> {
+> 	int (*callback)(struct device *);
+> 
+> 	if (pm_runtime_status_suspended(dev))
+> 		return 0;
+> 
+> 	if (dev->pm_domain)
+> 		callback = dev->pm_domain->ops.runtime_suspend;
+> 	else if (dev->driver && dev->driver->pm)
+> 		callback = dev->driver->pm->runtime_suspend;
+> 	else
+> 		callback = NULL;
+> 
+> 	return callback ? callback(dev) : 0;
+> }
+> 
+> Moreover, if a driver's .suspend_late is pointed to the above, it can be called
+> in two ways.  The first way is via type/bus/class or the PM core itself which
+> means that all PM handling at this stage is going to be done by
+> prototype_suspend_late().  The other way is via a PM domain, in which case
+> there may be some additional PM handling in the domain code in principle
+> (before or after calling the driver's .suspend_late()).  However, in the
+> latter case it generally wouldn't be OK to call PM domain's .runtime_suspend(),
+> because that may interfere with the PM handling in its .suspend_late().  So
+> again, this pretty much requires that the PM domain's .suspend_late pointer be
+> NULL or point to a routine that simply executes the driver's callback and does
+> noting in addition to that.
+> 
+> Now, I suspect that if the driver's runtime_suspend callback is
+> driver_runtime_suspend() and the PM domain's runtime_suspend callback is
+> pm_domain_runtime_suspend(), the code you actually want to be executed at the
+> "late suspend" stage will be
+> 
+> 	if (!pm_runtime_status_suspended(dev))
+> 		pm_domain_runtime_suspend()
+> 			driver_runtime_suspend()
+> 
+> (where the assumption is that pm_domain_runtime_suspend() will call
+> driver_runtime_suspend() for you).  Clearly, prototype_suspend_late() will lead
+> to that effective result in the conditions in which it makes sense to use it.
+> 
+> So, instead of pointing the driver's .suspend_late() to prototype_suspend_late(),
+> why don't you point the .suspend_late of the *PM* *domain* to the following
+> slightly modified version of that function:
+> 
+> int pm_domain_simplified_suspend_late(struct device *dev)
+> {
+> 	int (*callback)(struct device *) = NULL;
+> 
+> 	if (pm_runtime_status_suspended(dev))
+> 		return 0;
+> 
+> 	/* Try to execute our own .runtime_suspend() callback. */
+> 	if (dev->pm_domain)
+> 		callback = dev->pm_domain->ops.runtime_suspend;
+> 
+> 	if (WARN_ON(!callback) && dev->driver && dev->driver->pm)
+> 		callback = dev->driver->pm->runtime_suspend;
+> 
+> 	return callback ? callback(dev) : 0;
+> }
+> 
+> This will cause exactly the code you need to be executed too (with
+> a fallback to direct execution of the driver's callback in broken
+> cases where the PM domain's own .runtime_suspend() is not implemented),
+> but in a much cleaner way (no going back to the code layer that has just
+> called you etc.).  And you *can* point the PM domain's .suspend_late
+> to this, because it has to be either empty of trivial if the
+> prototype_suspend_late() above is supposed to work as the driver's
+> .suspend_late() callback.
+> 
+> So in my opinion, if you point the .suspend_late callback pointers of the
+> PM domains in question to the pm_domain_simplified_suspend_late() above
+> and their .resume_early callback pointers to the following function:
+> 
+> int pm_domain_simplified_resume_early(struct device *dev)
+> {
+> 	int (*callback)(struct device *) = NULL;
+> 
+> 	if (pm_runtime_status_suspended(dev))
+> 		return 0;
+> 
+> 	if (dev->pm_domain)
+> 		callback = dev->pm_domain->ops.runtime_resume;
+> 
+> 	if (WARN_ON(!callback) && dev->driver && dev->driver->pm)
+> 		callback = dev->driver->pm->runtime_resume;
+> 
+> 	return callback ? callback(dev) : 0;
+> }
+> 
+> it will solve your problems without that horrible jumping between code
+> layers.
 
-On Mon, Dec 02, 2013 at 09:27:23PM -0500, Santosh Shilimkar wrote:
-> So we add equivalent APIs so that we can replace usage of bootmem
-> with memblock interfaces. Architectures already converted to NO_BOOTMEM
-> use these new interfaces and other which still uses bootmem, these new
-> APIs just fallback to exiting bootmem APIs. So no functional change as
-> such.
+And in addition to that you can point the drivers' .suspend_late callbacks to
+something like:
 
-The last part of the second last sentence doesn't parse too well.  I
-think it'd be worthwhile to improve and preferably expand on it as
-this is a bit tricky to understand given the twisted state of early
-memory allocation.
+int pm_simplified_suspend_late(struct device *dev)
+{ 
+ 	if (pm_runtime_status_suspended(dev))
+ 		return 0;
 
-> In long run, once all the achitectures moves to NO_BOOTMEM, we can get rid of
-> bootmem layer completely. This is one step to remove the core code dependency
-> with bootmem and also gives path for architectures to move away from bootmem.
+ 	return dev->driver->pm->runtime_suspend ?
+ 		dev->driver->pm->runtime_suspend(dev) : 0;
+}
 
-Lines too long?
+(and analogously for the "early resume") which will cause their .runtime_suspend()
+to be executed even if the PM domain doesn't have a .suspend_late (or there's
+no PM domain at all).
 
-> +/*
-> + * FIXME: use NUMA_NO_NODE instead of MAX_NUMNODES when bootmem/nobootmem code
-> + * will be removed.
-> + * It can't be done now, because when MEMBLOCK or NO_BOOTMEM are not enabled
-> + * all calls of the new API will be redirected to bottmem/nobootmem where
-> + * MAX_NUMNODES is widely used.
-
-I don't know.  We're introducing a new API which will be used across
-the kernel.  I don't think it makes a lot of sense to use the wrong
-constant now to convert all the users later.  Wouldn't it be better to
-make the new interface take NUMA_NO_NODE and do whatever it needs to
-do to interface with bootmem?
-
-> + * Also, memblock core APIs __next_free_mem_range_rev() and
-> + * __next_free_mem_range() would need to be updated, and as result we will
-> + * need to re-check/update all direct calls of memblock_alloc_xxx()
-> + * APIs (including nobootmem).
-> + */
-
-Hmmm....
-
-> +/* FIXME: Move to memblock.h at a point where we remove nobootmem.c */
-> +void *memblock_virt_alloc_try_nid_nopanic(phys_addr_t size,
-> +		phys_addr_t align, phys_addr_t from,
-> +		phys_addr_t max_addr, int nid);
-
-Wouldn't @min_addr instead of @from make more sense?  Ditto for other
-occurrences.
-
-> +void *memblock_virt_alloc_try_nid(phys_addr_t size, phys_addr_t align,
-> +		phys_addr_t from, phys_addr_t max_addr, int nid);
-> +void __memblock_free_early(phys_addr_t base, phys_addr_t size);
-> +void __memblock_free_late(phys_addr_t base, phys_addr_t size);
-> +
-> +#define memblock_virt_alloc(x) \
-> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
-> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
-
-The underlying function interprets 0 as the default align, so it
-probably is a better idea to just use 0 here.
-
-> +#define memblock_virt_alloc_align(x, align) \
-> +	memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
-> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
-
-Also, do we really need this align variant separate when the caller
-can simply specify 0 for the default?
-
-> +#define memblock_virt_alloc_nopanic(x) \
-> +	memblock_virt_alloc_try_nid_nopanic(x, SMP_CACHE_BYTES, \
-> +					     BOOTMEM_LOW_LIMIT, \
-> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
-> +					     MAX_NUMNODES)
-> +#define memblock_virt_alloc_align_nopanic(x, align) \
-> +	memblock_virt_alloc_try_nid_nopanic(x, align, \
-> +					     BOOTMEM_LOW_LIMIT, \
-> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
-> +					     MAX_NUMNODES)
-> +#define memblock_virt_alloc_node(x, nid) \
-> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
-> +				     BOOTMEM_ALLOC_ACCESSIBLE, nid)
-> +#define memblock_virt_alloc_node_nopanic(x, nid) \
-> +	memblock_virt_alloc_try_nid_nopanic(x, SMP_CACHE_BYTES, \
-> +					     BOOTMEM_LOW_LIMIT, \
-> +					     BOOTMEM_ALLOC_ACCESSIBLE, nid)
-> +
-> +#define memblock_free_early(x, s)		__memblock_free_early(x, s)
-> +#define memblock_free_early_nid(x, s, nid)	__memblock_free_early(x, s)
-> +#define memblock_free_late(x, s)		__memblock_free_late(x, s)
-
-Please make the wrappers inline functions.
-
-> +#else
-> +
-> +#define BOOTMEM_ALLOC_ACCESSIBLE	0
-> +
-> +
-> +/* Fall back to all the existing bootmem APIs */
-> +#define memblock_virt_alloc(x) \
-> +	__alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
-> +#define memblock_virt_alloc_align(x, align) \
-> +	__alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
-> +#define memblock_virt_alloc_nopanic(x) \
-> +	__alloc_bootmem_nopanic(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
-> +#define memblock_virt_alloc_align_nopanic(x, align) \
-> +	__alloc_bootmem_nopanic(x, align, BOOTMEM_LOW_LIMIT)
-> +#define memblock_virt_alloc_node(x, nid) \
-> +	__alloc_bootmem_node(NODE_DATA(nid), x, SMP_CACHE_BYTES, \
-> +			BOOTMEM_LOW_LIMIT)
-> +#define memblock_virt_alloc_node_nopanic(x, nid) \
-> +	__alloc_bootmem_node_nopanic(NODE_DATA(nid), x, SMP_CACHE_BYTES, \
-> +			BOOTMEM_LOW_LIMIT)
-> +#define memblock_virt_alloc_try_nid(size, align, from, max_addr, nid) \
-> +		__alloc_bootmem_node_high(NODE_DATA(nid), size, align, from)
-> +#define memblock_virt_alloc_try_nid_nopanic(size, align, from, max_addr, nid) \
-> +		___alloc_bootmem_node_nopanic(NODE_DATA(nid), size, align, \
-> +			from, max_addr)
-> +#define memblock_free_early(x, s)	free_bootmem(x, s)
-> +#define memblock_free_early_nid(x, s, nid) \
-> +			free_bootmem_node(NODE_DATA(nid), x, s)
-> +#define memblock_free_late(x, s)	free_bootmem_late(x, s)
-> +
-> +#endif /* defined(CONFIG_HAVE_MEMBLOCK) && defined(CONFIG_NO_BOOTMEM) */
-
-Ditto.
-
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 1d15e07..3311fbb 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -21,6 +21,9 @@
->  #include <linux/memblock.h>
->  
->  #include <asm-generic/sections.h>
-> +#include <asm/io.h>
-> +
-> +#include "internal.h"
->  
->  static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
->  static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
-> @@ -933,6 +936,198 @@ phys_addr_t __init memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, i
->  	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
->  }
->  
-> +/**
-> + * _memblock_virt_alloc_try_nid_nopanic - allocate boot memory block
-
-Please don't use both "__" and "_" prefixes.  It gets confusing like
-hell.  Just give it an another name.
-
-> + * @size: size of memory block to be allocated in bytes
-> + * @align: alignment of the region and block's size
-> + * @from: the lower bound of the memory region from where the allocation
-> + *	  is preferred (phys address)
-> + * @max_addr: the upper bound of the memory region from where the allocation
-> + *	      is preferred (phys address), or %BOOTMEM_ALLOC_ACCESSIBLE to
-> + *	      allocate only from memory limited by memblock.current_limit value
-
-It probably would be better style to make the above shorter and fit
-each on a single line.  If they need further explanation, they can be
-done in the body of the comment.
-
-> + * @nid: nid of the free area to find, %MAX_NUMNODES for any node
-> + *
-> + * The @from limit is dropped if it can not be satisfied and the allocation
-> + * will fall back to memory below @from.
-> + *
-> + * Allocation may fall back to any node in the system if the specified node
-> + * can not hold the requested memory.
-
-Maybe combine the above two paragraphs?
-
-> + * The phys address of allocated boot memory block is converted to virtual and
-> + * allocated memory is reset to 0.
-> + *
-> + * In addition, function sets sets the min_count for allocated boot memory block
-
-                            ^^^^^^^^^
-No mention of kmemleak at all is a bit confusing.  min_count of what?
-
-> + * to 0 so that it is never reported as leaks.
-> + *
-> + * RETURNS:
-> + * Virtual address of allocated memory block on success, NULL on failure.
-> + */
-> +static void * __init _memblock_virt_alloc_try_nid_nopanic(
-> +				phys_addr_t size, phys_addr_t align,
-> +				phys_addr_t from, phys_addr_t max_addr,
-> +				int nid)
-> +{
-> +	phys_addr_t alloc;
-> +	void *ptr;
-> +
-> +	if (WARN_ON_ONCE(slab_is_available())) {
-> +		if (nid == MAX_NUMNODES)
-> +			return kzalloc(size, GFP_NOWAIT);
-> +		else
-> +			return kzalloc_node(size, GFP_NOWAIT, nid);
-> +	}
-> +
-> +	if (!align)
-> +		align = SMP_CACHE_BYTES;
-> +
-> +	/* align @size to avoid excessive fragmentation on reserved array */
-> +	size = round_up(size, align);
-> +
-> +again:
-> +	alloc = memblock_find_in_range_node(from, max_addr, size, align, nid);
-
-Not your fault but we probably wanna update these functions so that
-their param orders are consistent.
-
-Thanks.
-
--- 
-tejun
+Thanks,
+Rafael
