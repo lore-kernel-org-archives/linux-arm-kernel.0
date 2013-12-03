@@ -1,38 +1,23 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 3 Dec 2013 00:42:10 +0100
-Subject: [PATCH 1/3] drm: Add LCD display clock polarity flags
-In-Reply-To: <20131202200117.GN16735@n2100.arm.linux.org.uk>
-References: <1385998768-23512-1-git-send-email-marex@denx.de>
- <20131202200117.GN16735@n2100.arm.linux.org.uk>
-Message-ID: <201312030042.10742.marex@denx.de>
+Date: Tue, 3 Dec 2013 01:00:04 +0100
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <5295C74B.8040106@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <201311271027.06982.marex@denx.de> <5295C74B.8040106@freescale.com>
+Message-ID: <201312030100.04876.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Dear Huang Shijie,
 
-> On Mon, Dec 02, 2013 at 04:39:26PM +0100, Marek Vasut wrote:
-> > Add DRM flags for the LCD display clock polarity so the pixelclk-active
-> > DT property can be properly handled by drivers using the DRM API.
+> ? 2013?11?27? 17:27, Marek Vasut ??:
+> > Is there any kind of documentation for this controller available? I
+> > cannot quite understand how this controller works and why can it not be
+> > used with our current infrastructure.
 > 
-> I still say that not even this should be part of the DRM mode API to
-> userspace.  The hint that you're changing the user API is that you're
-> modifying a header file below a 'uapi' directory.
+> http://cache.freescale.com/files/32bit/doc/ref_manual/VYBRIDRM.pdf
 
-OK, you are right.
-
-> The settings of double scan, sync polarity etc are all part of the
-> display mode specification (check CEA-861 documents).  Things like
-> pixel clock polarity are not part of the mode specification, they're
-> a property of the display itself and are independent of the mode.
-> 
-> Therefore, they should not be part of struct drm_mode_modeinfo.
-
-Can you please provide me with some more hint here ? As for as I understand, 
-using the 'pixelclk-active' DT prop in the 'display-timings' node for this 
-purpose is correct, yes ? What I don't quite grok down is how do I get this 
-information from DT into the imx-drm driver.
-
-Thanks!
+It's a nice bedside reading, I'm making my way through, thanks ;-)
 
 Best regards,
 Marek Vasut
