@@ -1,40 +1,60 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 3 Dec 2013 15:49:05 +0000
-Subject: [Xen-devel] [PATCH] xen/block: Correctly define structures in
- public headers on ARM32 and ARM64
-In-Reply-To: <529DF897.1080303@linaro.org>
-References: <1386083382-7306-1-git-send-email-julien.grall@linaro.org>
- <529E039A02000078001097F5@nat28.tlf.novell.com>
- <529DF897.1080303@linaro.org>
-Message-ID: <1386085745.13256.51.camel@kazak.uk.xensource.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Tue, 03 Dec 2013 18:02:18 +0200
+Subject: [PATCH v2] pinctrl: baytrail: lock IRQs when starting them
+In-Reply-To: <1386082822-20094-1-git-send-email-linus.walleij@linaro.org>
+References: <1386082822-20094-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <529E008A.6030704@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-03 at 15:28 +0000, Julien Grall wrote:
-> On 12/03/2013 03:15 PM, Jan Beulich wrote:
-> >>>> On 03.12.13 at 16:09, Julien Grall <julien.grall@linaro.org> wrote:
-> >> --- a/include/xen/interface/io/blkif.h
-> >> +++ b/include/xen/interface/io/blkif.h
-> >> @@ -146,7 +146,7 @@ struct blkif_request_segment_aligned {
-> >>  struct blkif_request_rw {
-> >>  	uint8_t        nr_segments;  /* number of segments                   */
-> >>  	blkif_vdev_t   handle;       /* only for read/write requests         */
-> >> -#ifdef CONFIG_X86_64
-> >> +#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-> > 
-> > Perhaps using
-> > 
-> > #ifndef CONFIG_X86_32
-> > 
-> > would be the better one, assuming that we won't add further
-> > non-64-bit-clean ABI variants?
-> 
-> I'm fine with this solution. I will resend the patch.
+On 12/03/2013 05:00 PM, Linus Walleij wrote:
+> This uses the new API for tagging GPIO lines as in use by
+> IRQs. This enforces a few semantic checks on how the underlying
+> GPIO line is used.
+>
+> Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
+> Cc: Mathias Nyman <mathias.nyman@linux.intel.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Actually make the change compile, doh.
+> ---
+>   drivers/pinctrl/pinctrl-baytrail.c | 22 ++++++++++++++++++++++
+>   1 file changed, 22 insertions(+)
+>
+> diff --git a/drivers/pinctrl/pinctrl-baytrail.c b/drivers/pinctrl/pinctrl-baytrail.c
+> index 1174ea86b6e9..998dbb0c4c93 100644
+> --- a/drivers/pinctrl/pinctrl-baytrail.c
+> +++ b/drivers/pinctrl/pinctrl-baytrail.c
+> @@ -372,11 +372,33 @@ static void byt_irq_mask(struct irq_data *d)
+>   {
+>   }
+>
+> +static unsigned int byt_irq_startup(struct irq_data *d)
+> +{
+> +	struct byt_gpio *vg = irq_data_get_irq_handler_data(d);
 
-Just a random thought but what about using the CONFIG_$ARCH to define a
-more semantic name, like HAVE_4_BYTE_ALIGNED_QUAD_WORDS, or whichever
-terminology for an 8-byte type is appropriate in the context.
+This should probably be:
 
-Maybe Linux even already has such a #define?
+struct byt_gpio *vg = irq_data_get_irq_chip_data(d);
 
-Ian.
+As chip methods use irq_data->chip_data, not irq_data->handler_data
+(Mika tested that it works on baytrail)
+
+> +
+> +	if (gpio_lock_as_irq(&vg->chip, irqd_to_hwirq(d)))
+> +		dev_err(vg->chip.dev,
+> +			"unable to lock HW IRQ %lu for IRQ\n",
+> +			irqd_to_hwirq(d));
+> +	byt_irq_unmask(d);
+> +	return 0;
+> +}
+> +
+> +static void byt_irq_shutdown(struct irq_data *d)
+> +{
+> +	struct byt_gpio *vg = irq_data_get_irq_handler_data(d);
+
+Same here.
+
+-Mathias
