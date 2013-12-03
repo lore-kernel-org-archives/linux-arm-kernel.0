@@ -1,49 +1,73 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Dec 2013 11:27:01 +0000
-Subject: [PATCH V6 1/2] genirq: Add an accessor for IRQ_PER_CPU flag
-In-Reply-To: <1385976843-13280-2-git-send-email-vkale@apm.com>
+Date: Tue, 3 Dec 2013 11:30:52 +0000
+Subject: [PATCH V6 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1385976843-13280-3-git-send-email-vkale@apm.com>
 References: <1385976843-13280-1-git-send-email-vkale@apm.com>
- <1385976843-13280-2-git-send-email-vkale@apm.com>
-Message-ID: <20131203112701.GD1169@mudshark.cambridge.arm.com>
+ <1385976843-13280-3-git-send-email-vkale@apm.com>
+Message-ID: <20131203113052.GE1169@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 09:34:02AM +0000, Vinayak Kale wrote:
-> This patch adds an accessor function for IRQ_PER_CPU flag.
-> The accessor function is useful to determine whether an IRQ is percpu or not.
+On Mon, Dec 02, 2013 at 09:34:03AM +0000, Vinayak Kale wrote:
+> Add support for irq registration when pmu interrupt is percpu.
 > 
-> This patch is based on an older patch posted by Chris Smith here [1].
-> There is a minor change w.r.t. Chris's original patch: The accessor function
-> is renamed as 'irq_is_percpu' instead of 'irq_is_per_cpu'.
-> 
-> [1]: http://lkml.indiana.edu/hypermail/linux/kernel/1207.3/02955.html
-> 
-> Signed-off-by: Chris Smith <chris.smith@st.com>
 > Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
 > ---
->  include/linux/irqdesc.h |    8 ++++++++
->  1 file changed, 8 insertions(+)
+>  arch/arm64/kernel/perf_event.c |  116 +++++++++++++++++++++++++++++-----------
+>  1 file changed, 86 insertions(+), 30 deletions(-)
 > 
-> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
-> index 56fb646..26e2661 100644
-> --- a/include/linux/irqdesc.h
-> +++ b/include/linux/irqdesc.h
-> @@ -152,6 +152,14 @@ static inline int irq_balancing_disabled(unsigned int irq)
->  	return desc->status_use_accessors & IRQ_NO_BALANCING_MASK;
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index cea1594..d2d562f 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -22,6 +22,7 @@
+>  
+>  #include <linux/bitmap.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/export.h>
+>  #include <linux/perf_event.h>
+> @@ -363,26 +364,61 @@ validate_group(struct perf_event *event)
 >  }
 >  
-> +static inline int irq_is_percpu(unsigned int irq)
+>  static void
+> +armpmu_disable_percpu_irq(void *data)
 > +{
-> +	struct irq_desc *desc;
+> +	struct arm_pmu *armpmu = data;
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
 > +
-> +	desc = irq_to_desc(irq);
-> +	return desc->status_use_accessors & IRQ_PER_CPU;
+> +	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +	disable_percpu_irq(irq);
 > +}
 > +
->  static inline void
->  irq_set_lockdep_class(unsigned int irq, struct lock_class_key *class)
+> +static void
+>  armpmu_release_hardware(struct arm_pmu *armpmu)
 >  {
+> -	int i, irq, irqs;
+> +	int irq;
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Why did you not make this unsigned, like I suggested?
+
+> +	unsigned int i, irqs;
+>  	struct platform_device *pmu_device = armpmu->plat_device;
+>  
+>  	irqs = min(pmu_device->num_resources, num_possible_cpus());
+> +	if (!irqs)
+> +		return;
+>  
+> -	for (i = 0; i < irqs; ++i) {
+> -		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+> -			continue;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq >= 0)
+> -			free_irq(irq, armpmu);
+> +	irq = platform_get_irq(pmu_device, 0);
+> +	if (irq <= 0)
+> +		return;
+
+Then this is just an if (!irq), as I mentioned last time.
 
 Will
