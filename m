@@ -1,56 +1,45 @@
-From: mark.hambleton@broadcom.com (Mark Hambleton)
-Date: Tue, 3 Dec 2013 13:14:44 +0000
-Subject: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
-In-Reply-To: <20131203114217.GF1169@mudshark.cambridge.arm.com>
-References: <1386001475-20728-1-git-send-email-broonie@kernel.org>
- <20131203114217.GF1169@mudshark.cambridge.arm.com>
-Message-ID: <D00A5DFD97C44C4D820FC3A847C5D575072F7EB7@IRVEXCHMB14.corp.ad.broadcom.com>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Tue,  3 Dec 2013 14:16:00 +0100
+Subject: [PATCH] net: mvmdio: fix wait_event_timeout() being called with a 1
+ jiffy timeout.
+In-Reply-To: <20131203122346.GD29282@titan.lakedaemon.net>
+References: <20131203122346.GD29282@titan.lakedaemon.net>
+Message-ID: <1386076560-1886-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will, 
+If a timer interrupt kicks right after the wait_event_timeout() call,
+we may endup a reporting timeout before the timeout really occured.
 
-This patch comes from the ATF: https://github.com/ARM-software/arm-trusted-firmware/blob/master/fdts/rtsm_ve-motherboard.dtsi
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+---
+ drivers/net/ethernet/marvell/mvmdio.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-I suspect Achin Gupta has the answers to the questions...
-
-Mark
-
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: 03 December 2013 11:42
-To: Mark Brown
-Cc: Catalin Marinas; linaro-kernel at lists.linaro.org; Mark Hambleton; linux-arm-kernel at lists.infradead.org; Mark Brown; mark.rutland at arm.com
-Subject: Re: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
-
-On Mon, Dec 02, 2013 at 04:24:35PM +0000, Mark Brown wrote:
-> From: Mark Hambleton <mahamble@broadcom.com>
-> 
-> Describe the virtio device so we can mount disk images in the simulator.
-> 
-> Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> index b45e5f39f577..b3460961038f 100644
-> --- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> @@ -183,6 +183,12 @@
->  				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
->  				clock-names = "clcdclk", "apb_pclk";
->  			};
-> +
-> +			virtio_block at 0130000 {
-> +				compatible = "virtio,mmio";
-> +				reg = <0x130000 0x1000>;
-
-4k? That seems pretty big to me...
-
-> +				interrupts = <0x2a>;
-
-Any reason this is in hex?
-
-Will
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 7354960..2814bbc 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -76,9 +76,19 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+ {
+ 	struct orion_mdio_dev *dev = bus->priv;
+ 	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
+-	unsigned long end = jiffies + timeout;
++	unsigned long end;
+ 	int timedout = 0;
+ 
++	/*
++	 * make sure that we wait at least more than one
++	 * jiffy. wait_event_timeout() with a timeout parameter of 1
++	 * jiffy may return before the SMI access is done if a timer
++	 * interrupt kicks immediately after.
++	 */
++	if (timeout < 2)
++		timeout = 2;
++	end = jiffies + timeout;
++
+ 	while (1) {
+ 	        if (orion_mdio_smi_is_done(dev))
+ 			return 0;
+-- 
+1.8.1.2
