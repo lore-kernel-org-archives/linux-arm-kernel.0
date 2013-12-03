@@ -1,98 +1,48 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 3 Dec 2013 15:37:11 +0800
-Subject: [PATCH v4 17/17] usb: phy-mxs: do not set PWD.RXPWD1PT1 for low speed
- connection
-In-Reply-To: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386056231-17258-18-git-send-email-peter.chen@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Dec 2013 08:23:43 +0000
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <529D7838.6030606@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+ <5298AA23.7080404@st.com> <529C5BBF.6000604@freescale.com>
+ <529C6CBB.4000008@st.com> <529D7838.6030606@freescale.com>
+Message-ID: <20131203082343.GK31626@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At very rare cases, the SoF will not send out after resume with
-low speed connection. The workaround is do not power down
-PWD.RXPWD1PT1 bit during the suspend.
+> >To be honest, I am just glad that someone is taking a look at this area.
+> >However, whether or not is it possible to come up with something that solves all
+> >our problems remains to be seen.  It might turn out that the various H/W
+> >Controllers are just too different to fit into a single unified framework.
+> >
+> Hi Angus & Pekon:
+> thanks for the explanations.
+> 
+> I am not sure that after we add more hooks, if it will meet Jones's
+> new driver.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/phy/phy-mxs-usb.c |   47 ++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 46 insertions(+), 1 deletions(-)
+Angus is the author of "Lee's" driver and knows more about it that I
+ever will, so whatever he says goes in that regard.
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 542b6ec..5ae4a57 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -69,6 +69,9 @@
- #define ANADIG_USB2_LOOPBACK_SET		0x244
- #define ANADIG_USB2_LOOPBACK_CLR		0x248
- 
-+#define ANADIG_USB1_MISC			0x1f0
-+#define ANADIG_USB2_MISC			0x250
-+
- #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
- #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
- 
-@@ -80,6 +83,11 @@
- #define BM_ANADIG_USB2_LOOPBACK_UTMI_DIG_TST1	BIT(2)
- #define BM_ANADIG_USB2_LOOPBACK_TSTI_TX_EN	BIT(5)
- 
-+#define BM_ANADIG_USB1_MISC_RX_VPIN_FS		BIT(29)
-+#define BM_ANADIG_USB1_MISC_RX_VMIN_FS		BIT(28)
-+#define BM_ANADIG_USB2_MISC_RX_VPIN_FS		BIT(29)
-+#define BM_ANADIG_USB2_MISC_RX_VMIN_FS		BIT(28)
-+
- #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
- 
- /* Do disconnection between PHY and controller without vbus */
-@@ -296,12 +304,49 @@ static void mxs_phy_shutdown(struct usb_phy *phy)
- 	clk_disable_unprepare(mxs_phy->clk);
- }
- 
-+static bool mxs_phy_is_low_speed_connection(struct mxs_phy *mxs_phy)
-+{
-+	unsigned int line_state;
-+	/* bit definition is the same for all controllers */
-+	unsigned int dp_bit = BM_ANADIG_USB1_MISC_RX_VPIN_FS,
-+		     dm_bit = BM_ANADIG_USB1_MISC_RX_VMIN_FS;
-+	unsigned int reg = ANADIG_USB1_MISC;
-+
-+	/* If the SoCs don't have anatop, quit */
-+	if (!mxs_phy->regmap_anatop)
-+		return false;
-+
-+	if (mxs_phy->port_id == 0)
-+		reg = ANADIG_USB1_MISC;
-+	else if (mxs_phy->port_id == 1)
-+		reg = ANADIG_USB2_MISC;
-+
-+	regmap_read(mxs_phy->regmap_anatop, reg, &line_state);
-+
-+	if ((line_state & (dp_bit | dm_bit)) ==  dm_bit)
-+		return true;
-+	else
-+		return false;
-+}
-+
- static int mxs_phy_suspend(struct usb_phy *x, int suspend)
- {
- 	struct mxs_phy *mxs_phy = to_mxs_phy(x);
-+	bool low_speed_connection, vbus_is_on;
-+
-+	low_speed_connection = mxs_phy_is_low_speed_connection(mxs_phy);
-+	vbus_is_on = mxs_phy_get_vbus_status(mxs_phy);
- 
- 	if (suspend) {
--		writel(0xffffffff, x->io_priv + HW_USBPHY_PWD);
-+		/*
-+		 * FIXME: Do not power down RXPWD1PT1 bit for low speed
-+		 * connect. The low speed connection will have problem at
-+		 * very rare cases during usb suspend and resume process.
-+		 */
-+		if (low_speed_connection & vbus_is_on)
-+			writel(0xfffbffff, x->io_priv + HW_USBPHY_PWD);
-+		else
-+			writel(0xffffffff, x->io_priv + HW_USBPHY_PWD);
- 		writel(BM_USBPHY_CTRL_CLKGATE,
- 		       x->io_priv + HW_USBPHY_CTRL_SET);
- 		clk_disable_unprepare(mxs_phy->clk);
+I would like to make a suggestion to Brian though. Even if the new
+framework is written within the next couple of months and the
+semantics do suit the FSM Controller driver, I'd still like the
+implementation that's currently on the list to be applied. That way
+we'd have a known good version of the driver which is almost identical
+to how ST's internal driver does now. The one that is present out in
+the wild (i.e. _real_ products).
+
+I will subsequently volunteer to provide my utmost best efforts to
+port the driver over to the new framework as a new task once it has
+landed.
+
+> i will wait for Jones' comment for several days, and send out the
+> next version if he does not reply this thread.
+
+/me waves \o/
+
 -- 
-1.7.8
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
