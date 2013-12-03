@@ -1,10 +1,10 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 2 Dec 2013 21:27:28 -0500
-Subject: [PATCH v2 13/23] mm/lib/swiotlb: Use memblock apis for early memory
+Date: Mon, 2 Dec 2013 21:27:27 -0500
+Subject: [PATCH v2 12/23] mm/power: Use memblock apis for early memory
  allocations
 In-Reply-To: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386037658-3161-14-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386037658-3161-13-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,86 +20,25 @@ bootmem APIs.
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Pavel Machek <pavel@ucw.cz>
+Acked-by: "Rafael J. Wysocki" <rjw@sisk.pl>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- lib/swiotlb.c |   36 +++++++++++++++++++++---------------
- 1 file changed, 21 insertions(+), 15 deletions(-)
+ kernel/power/snapshot.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-index e4399fa..6c8712e 100644
---- a/lib/swiotlb.c
-+++ b/lib/swiotlb.c
-@@ -172,8 +172,9 @@ int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
- 	/*
- 	 * Get the overflow emergency buffer
- 	 */
--	v_overflow_buffer = alloc_bootmem_low_pages_nopanic(
--						PAGE_ALIGN(io_tlb_overflow));
-+	v_overflow_buffer = memblock_virt_alloc_align_nopanic(
-+						PAGE_ALIGN(io_tlb_overflow),
-+						PAGE_SIZE);
- 	if (!v_overflow_buffer)
- 		return -ENOMEM;
- 
-@@ -184,11 +185,15 @@ int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
- 	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE
- 	 * between io_tlb_start and io_tlb_end.
- 	 */
--	io_tlb_list = alloc_bootmem_pages(PAGE_ALIGN(io_tlb_nslabs * sizeof(int)));
-+	io_tlb_list = memblock_virt_alloc_align(
-+				PAGE_ALIGN(io_tlb_nslabs * sizeof(int)),
-+				PAGE_SIZE);
- 	for (i = 0; i < io_tlb_nslabs; i++)
-  		io_tlb_list[i] = IO_TLB_SEGSIZE - OFFSET(i, IO_TLB_SEGSIZE);
- 	io_tlb_index = 0;
--	io_tlb_orig_addr = alloc_bootmem_pages(PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)));
-+	io_tlb_orig_addr = memblock_virt_alloc_align(
-+				PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)),
-+				PAGE_SIZE);
- 
- 	if (verbose)
- 		swiotlb_print_info();
-@@ -215,13 +220,14 @@ swiotlb_init(int verbose)
- 	bytes = io_tlb_nslabs << IO_TLB_SHIFT;
- 
- 	/* Get IO TLB memory from the low pages */
--	vstart = alloc_bootmem_low_pages_nopanic(PAGE_ALIGN(bytes));
-+	vstart = memblock_virt_alloc_align_nopanic(PAGE_ALIGN(bytes),
-+						   PAGE_SIZE);
- 	if (vstart && !swiotlb_init_with_tbl(vstart, io_tlb_nslabs, verbose))
- 		return;
- 
- 	if (io_tlb_start)
--		free_bootmem(io_tlb_start,
--				 PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
-+		memblock_free_early(io_tlb_start,
-+				    PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
- 	pr_warn("Cannot allocate SWIOTLB buffer");
- 	no_iotlb_memory = true;
- }
-@@ -357,14 +363,14 @@ void __init swiotlb_free(void)
- 		free_pages((unsigned long)phys_to_virt(io_tlb_start),
- 			   get_order(io_tlb_nslabs << IO_TLB_SHIFT));
- 	} else {
--		free_bootmem_late(io_tlb_overflow_buffer,
--				  PAGE_ALIGN(io_tlb_overflow));
--		free_bootmem_late(__pa(io_tlb_orig_addr),
--				  PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)));
--		free_bootmem_late(__pa(io_tlb_list),
--				  PAGE_ALIGN(io_tlb_nslabs * sizeof(int)));
--		free_bootmem_late(io_tlb_start,
--				  PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
-+		memblock_free_late(io_tlb_overflow_buffer,
-+				   PAGE_ALIGN(io_tlb_overflow));
-+		memblock_free_late(__pa(io_tlb_orig_addr),
-+				   PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)));
-+		memblock_free_late(__pa(io_tlb_list),
-+				   PAGE_ALIGN(io_tlb_nslabs * sizeof(int)));
-+		memblock_free_late(io_tlb_start,
-+				   PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
- 	}
- 	io_tlb_nslabs = 0;
- }
+diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
+index b38109e..917cbd4 100644
+--- a/kernel/power/snapshot.c
++++ b/kernel/power/snapshot.c
+@@ -637,7 +637,7 @@ __register_nosave_region(unsigned long start_pfn, unsigned long end_pfn,
+ 		BUG_ON(!region);
+ 	} else
+ 		/* This allocation cannot fail */
+-		region = alloc_bootmem(sizeof(struct nosave_region));
++		region = memblock_virt_alloc(sizeof(struct nosave_region));
+ 	region->start_pfn = start_pfn;
+ 	region->end_pfn = end_pfn;
+ 	list_add_tail(&region->list, &nosave_regions);
 -- 
 1.7.9.5
