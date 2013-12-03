@@ -1,19 +1,17 @@
 From: tj@kernel.org (Tejun Heo)
-Date: Tue, 3 Dec 2013 07:41:40 -0500
-Subject: [PATCH V3 1/3] ahci: imx: Explicitly clear
- IMX6Q_GPR13_SATA_MPLL_CLK_EN
-In-Reply-To: <1385369222-5288-1-git-send-email-marex@denx.de>
+Date: Tue, 3 Dec 2013 07:42:01 -0500
+Subject: [PATCH V6 2/3] ahci: imx: Pull out the clock enable/disable calls
+In-Reply-To: <1385369222-5288-2-git-send-email-marex@denx.de>
 References: <1385369222-5288-1-git-send-email-marex@denx.de>
-Message-ID: <20131203124140.GE8277@htj.dyndns.org>
+ <1385369222-5288-2-git-send-email-marex@denx.de>
+Message-ID: <20131203124201.GF8277@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 09:47:00AM +0100, Marek Vasut wrote:
-> We must clear this IMX6Q_GPR13_SATA_MPLL_CLK_EN bit on i.MX6Q, otherwise
-> Linux will fail to find the attached drive on some boards.
-> 
-> This entire fix was:
-> Reported-by: Eric Nelson <eric.nelson@boundarydevices.com>
+On Mon, Nov 25, 2013 at 09:47:01AM +0100, Marek Vasut wrote:
+> The same code for enabling and disabling SATA clock was found in multiple
+> places in the driver. Implement functions that enable/disable the SATA clock
+> and use them in such places instead of duplicating the code.
 > 
 > Signed-off-by: Marek Vasut <marex@denx.de>
 > Cc: Shawn Guo <shawn.guo@linaro.org>
@@ -21,7 +19,7 @@ On Mon, Nov 25, 2013 at 09:47:00AM +0100, Marek Vasut wrote:
 > Cc: Tejun Heo <tj@kernel.org>
 > Cc: Linux-IDE <linux-ide@vger.kernel.org>
 
-Applied to libata/for-3.13-fixes w/ stable cc'd.
+Applied 2-3 to libata/for-3.14.
 
 Thanks.
 
