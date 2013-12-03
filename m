@@ -1,53 +1,129 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  3 Dec 2013 20:57:26 +0100
-Subject: [PATCH v3 0/3] regulator: tps6586x: add version detection and voltage
- tables
-Message-ID: <cover.1386100296.git.stefan@agner.ch>
+Date: Tue,  3 Dec 2013 20:57:27 +0100
+Subject: [PATCH v3 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <cover.1386100296.git.stefan@agner.ch>
+References: <cover.1386100296.git.stefan@agner.ch>
+Message-ID: <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386100296.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the 3rd version of this patchset which adds version detection
-for the tps6586x mfd family. This is required because some regulator
-versions use different voltage tables. The regulator driver now uses
-the right voltage table according to the version.
+Use the VERSIONCRC to determine the exact device version. According to
+the datasheet this register can be used as device identifier. The
+identification is needed since some tps6586x regulators use a different
+voltage table.
 
-While at it, there are a few other incorrect regulator entries in the
-device tree, change them accordingly (this patch is new and grew out
-of a patch with the same name which Lucas Stach posted in July).
-
-Tested on Colibri T20 V1.1 and V1.2 which makes use of diffent version
-of that regulator.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Since the struct tps6586x is inside the c file, I could not easily
+move the tps6586x_get_version function as inline to the header file.
 
 Changes since v2:
   - Avoid moving devm_kzalloc
-  - Removed reg_ from reg_version
-  - Moved walk through version dependent tables to find_regulator_info,
-    removed the inline definition. This reduces .o size and encapsulates
-    the logic of finding the right regulator into one function. It comes
-    with a slight code duplication, the table search now appears twice.
+---
+ drivers/mfd/tps6586x.c       | 43 ++++++++++++++++++++++++++++++++++++++-----
+ include/linux/mfd/tps6586x.h |  7 +++++++
+ 2 files changed, 45 insertions(+), 5 deletions(-)
 
-Changes since v1:
-  - Merged DT and driver change (preserves bisectability)
-  - Use different regulator tables for different regulator version
-    * This also makes the TPS6586X_ANY version needless
-  - Replaced enum with defines
-  - Move version message in a sperate function
-  - Include regulator bugfix, use correct supply voltage
-  - Checked all voltages, fix SM0/SM1 (Core/CPU) and LDO6 voltage (VDAC/VI)
-    in another commit
-  - Rebased on top of v3.13-rc2
-
-
-Stefan Agner (3):
-  mfd: tps6586x: add version detection
-  regulator: tps6586x: add and use correct voltage table
-  ARM: tegra: correct Colibri T20 regulator settings
-
- arch/arm/boot/dts/tegra20-colibri-512.dtsi | 34 +++++------
- drivers/mfd/tps6586x.c                     | 43 ++++++++++++--
- drivers/regulator/tps6586x-regulator.c     | 91 +++++++++++++++++++++++-------
- include/linux/mfd/tps6586x.h               |  7 +++
- 4 files changed, 134 insertions(+), 41 deletions(-)
-
+diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
+index ee61fd7..56a8422 100644
+--- a/drivers/mfd/tps6586x.c
++++ b/drivers/mfd/tps6586x.c
+@@ -124,6 +124,7 @@ struct tps6586x {
+ 	struct device		*dev;
+ 	struct i2c_client	*client;
+ 	struct regmap		*regmap;
++	int			version;
+ 
+ 	int			irq;
+ 	struct irq_chip		irq_chip;
+@@ -208,6 +209,14 @@ int tps6586x_irq_get_virq(struct device *dev, int irq)
+ }
+ EXPORT_SYMBOL_GPL(tps6586x_irq_get_virq);
+ 
++int tps6586x_get_version(struct device *dev)
++{
++	struct tps6586x *tps6586x = dev_get_drvdata(dev);
++
++	return tps6586x->version;
++}
++EXPORT_SYMBOL_GPL(tps6586x_get_version);
++
+ static int __remove_subdev(struct device *dev, void *unused)
+ {
+ 	platform_device_unregister(to_platform_device(dev));
+@@ -472,6 +481,31 @@ static void tps6586x_power_off(void)
+ 	tps6586x_set_bits(tps6586x_dev, TPS6586X_SUPPLYENE, SLEEP_MODE_BIT);
+ }
+ 
++static void tps6586x_print_version(struct i2c_client *client, int version)
++{
++	const char *name;
++
++	switch (version) {
++	case TPS658621A:
++		name = "TPS658621A";
++		break;
++	case TPS658621CD:
++		name = "TPS658621C/D";
++		break;
++	case TPS658623:
++		name = "TPS658623";
++		break;
++	case TPS658643:
++		name = "TPS658643";
++		break;
++	default:
++		name = "TPS6586X";
++		break;
++	}
++
++	dev_info(&client->dev, "Found %s, VERSIONCRC is %02x\n", name, version);
++}
++
+ static int tps6586x_i2c_probe(struct i2c_client *client,
+ 					const struct i2c_device_id *id)
+ {
+@@ -493,13 +527,12 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
+ 		return -EIO;
+ 	}
+ 
+-	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
+-
+ 	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
+-	if (tps6586x == NULL) {
+-		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
++	if (!tps6586x)
+ 		return -ENOMEM;
+-	}
++
++	tps6586x->version = ret;
++	tps6586x_print_version(client, tps6586x->version);
+ 
+ 	tps6586x->client = client;
+ 	tps6586x->dev = &client->dev;
+diff --git a/include/linux/mfd/tps6586x.h b/include/linux/mfd/tps6586x.h
+index 8799454..cbecec2 100644
+--- a/include/linux/mfd/tps6586x.h
++++ b/include/linux/mfd/tps6586x.h
+@@ -13,6 +13,12 @@
+ #define TPS6586X_SLEW_RATE_SET		0x08
+ #define TPS6586X_SLEW_RATE_MASK         0x07
+ 
++/* VERSION CRC */
++#define TPS658621A	0x15
++#define TPS658621CD	0x2c
++#define TPS658623	0x1b
++#define TPS658643	0x03
++
+ enum {
+ 	TPS6586X_ID_SYS,
+ 	TPS6586X_ID_SM_0,
+@@ -97,5 +103,6 @@ extern int tps6586x_clr_bits(struct device *dev, int reg, uint8_t bit_mask);
+ extern int tps6586x_update(struct device *dev, int reg, uint8_t val,
+ 			   uint8_t mask);
+ extern int tps6586x_irq_get_virq(struct device *dev, int irq);
++extern int tps6586x_get_version(struct device *dev);
+ 
+ #endif /*__LINUX_MFD_TPS6586X_H */
 -- 
 1.8.4.2
