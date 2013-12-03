@@ -1,63 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Dec 2013 16:53:04 +0800
-Subject: [PATCH 2/2] ARM: apf28dev: dts: set gpio polarity for usb
- regulator and pinctrl for regulator gpio
-In-Reply-To: <1385801473-97460-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1385801473-97460-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20131203085302.GK10840@S2101-09.ap.freescale.net>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Tue, 3 Dec 2013 10:51:13 +0200
+Subject: [PATCH 1/3] drm: Add LCD display clock polarity flags
+In-Reply-To: <CAF6AEGtgsqea_FkkH6EaA_yg_a12A4vdw6ASr9+GGWgU2HEdGg@mail.gmail.com>
+References: <1385998768-23512-1-git-send-email-marex@denx.de>
+ <20131202200117.GN16735@n2100.arm.linux.org.uk>
+ <CAF6AEGtgsqea_FkkH6EaA_yg_a12A4vdw6ASr9+GGWgU2HEdGg@mail.gmail.com>
+Message-ID: <20131203085113.GQ10036@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 30, 2013 at 09:51:13AM +0100, Gwenhael Goavec-Merou wrote:
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-
-Changed the patch subject to "ARM: dts: apf28dev: ..." and applied.
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx28-apf28dev.dts | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+On Mon, Dec 02, 2013 at 03:32:30PM -0500, Rob Clark wrote:
+> On Mon, Dec 2, 2013 at 3:01 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Dec 02, 2013 at 04:39:26PM +0100, Marek Vasut wrote:
+> >> Add DRM flags for the LCD display clock polarity so the pixelclk-active DT
+> >> property can be properly handled by drivers using the DRM API.
+> >
+> > I still say that not even this should be part of the DRM mode API to
+> > userspace.  The hint that you're changing the user API is that you're
+> > modifying a header file below a 'uapi' directory.
+> >
+> > The settings of double scan, sync polarity etc are all part of the
+> > display mode specification (check CEA-861 documents).  Things like
+> > pixel clock polarity are not part of the mode specification, they're
+> > a property of the display itself and are independent of the mode.
+> >
+> > Therefore, they should not be part of struct drm_mode_modeinfo.
 > 
-> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> index 741aecb..334dea5 100644
-> --- a/arch/arm/boot/dts/imx28-apf28dev.dts
-> +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-> @@ -66,6 +66,16 @@
->  					fsl,voltage = <MXS_VOLTAGE_HIGH>;
->  					fsl,pull-up = <MXS_PULL_DISABLE>;
->  				};
-> +
-> +				usb0_otg_apf28dev: otg-apf28dev at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						MX28_PAD_LCD_D23__GPIO_1_23
-> +					>;
-> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
-> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-> +					fsl,pull-up = <MXS_PULL_DISABLE>;
-> +				};
->  			};
->  
->  			lcdif at 80030000 {
-> @@ -131,6 +141,8 @@
->  
->  	ahb at 80080000 {
->  		usb0: usb at 80080000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&usb0_otg_apf28dev>;
->  			vbus-supply = <&reg_usb0_vbus>;
->  			status = "okay";
->  		};
-> @@ -160,6 +172,7 @@
->  			regulator-min-microvolt = <5000000>;
->  			regulator-max-microvolt = <5000000>;
->  			gpio = <&gpio1 23 1>;
-> +			enable-active-high;
->  		};
->  	};
->  
-> -- 
-> 1.8.3.2
-> 
+> Note that we could make them part of drm_display_mode (but
+> drm_crtc_convert_to_umode() should filter them out when copying from
+> drm_mode_modeinfo.. I agree this information should not be coming from
+> userspace).  Seems like the sort of thing that the bridge or encoder
+> could set on the adjusted_mode.
+
+Probably better to not mix user visible and internal flags in
+drm_display_mode.flags. Just makes it more difficult to add
+real flags. Maybe just stick them into private_flags for the
+drivers that care.
+
+-- 
+Ville Syrj?l?
+Intel OTC
