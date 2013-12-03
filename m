@@ -1,148 +1,56 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 3 Dec 2013 15:37:05 +0800
-Subject: [PATCH v4 11/17] usb: phy-mxs: Add implementation of set_wakeup
+Date: Tue, 3 Dec 2013 15:37:07 +0800
+Subject: [PATCH v4 13/17] usb: phy-mxs: Add sync time after controller clear
+ phcd
 In-Reply-To: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
 References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386056231-17258-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <1386056231-17258-14-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we need the PHY can be waken up by external signals,
-we can call this API. Besides, we call mxs_phy_disconnect_line
-at this API to close the connection between USB PHY and
-controller, after that, the line state from controller is SE0.
-Once the PHY is out of power, without calling mxs_phy_disconnect_line,
-there are unknown wakeups due to dp/dm floating at device mode.
+After clear portsc.phcd, PHY needs 200us stable time for switch
+32K clock to AHB clock.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   79 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 79 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 0908d74..84680e3 100644
+index 3e25c3d..52e80d9 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -31,6 +31,9 @@
- #define HW_USBPHY_CTRL_SET			0x34
- #define HW_USBPHY_CTRL_CLR			0x38
- 
-+#define HW_USBPHY_DEBUG_SET			0x54
-+#define HW_USBPHY_DEBUG_CLR			0x58
-+
- #define HW_USBPHY_IP				0x90
- #define HW_USBPHY_IP_SET			0x94
- #define HW_USBPHY_IP_CLR			0x98
-@@ -39,6 +42,9 @@
- #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
- #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
- #define BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE	BIT(25)
-+#define BM_USBPHY_CTRL_ENVBUSCHG_WKUP		BIT(23)
-+#define BM_USBPHY_CTRL_ENIDCHG_WKUP		BIT(22)
-+#define BM_USBPHY_CTRL_ENDPDMCHG_WKUP		BIT(21)
- #define BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD	BIT(20)
- #define BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE	BIT(19)
- #define BM_USBPHY_CTRL_ENAUTO_PWRON_PLL		BIT(18)
-@@ -48,6 +54,19 @@
- 
- #define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
- 
-+#define BM_USBPHY_DEBUG_CLKGATE			BIT(30)
-+
-+/* Anatop Registers */
-+#define ANADIG_USB1_VBUS_DET_STAT		0x1c0
-+
-+#define ANADIG_USB1_LOOPBACK_SET		0x1e4
-+#define ANADIG_USB1_LOOPBACK_CLR		0x1e8
-+
-+#define BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID	BIT(3)
-+
-+#define BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1	BIT(2)
-+#define BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN	BIT(5)
-+
- #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
- 
- /* Do disconnection between PHY and controller without vbus */
-@@ -146,6 +165,48 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- 	return 0;
+@@ -139,6 +139,15 @@ static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
+ 	return mxs_phy->data == &imx6sl_phy_data;
  }
  
-+static void mxs_phy_disconnect_line(struct mxs_phy *mxs_phy, bool on)
++/*
++ * PHY needs some 32K cycles to switch from 32K clock to
++ * bus (such as AHB/AXI, etc) clock.
++ */
++static void mxs_phy_clock_switch(void)
 +{
-+	void __iomem *base = mxs_phy->phy.io_priv;
-+	bool vbus_is_on = false;
-+	static bool line_is_disconnected;
-+	unsigned int vbus_value = 0;
-+
-+	/* If the SoCs don't need to disconnect line without vbus, quit */
-+	if (!(mxs_phy->data->flags & MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS))
-+		return;
-+
-+	/* If the SoCs don't have anatop, quit */
-+	if (!mxs_phy->regmap_anatop)
-+		return;
-+
-+	regmap_read(mxs_phy->regmap_anatop, ANADIG_USB1_VBUS_DET_STAT,
-+			&vbus_value);
-+	if (vbus_value & BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID)
-+		vbus_is_on = true;
-+
-+	if (on && !vbus_is_on) {
-+		writel_relaxed(BM_USBPHY_DEBUG_CLKGATE,
-+			base + HW_USBPHY_DEBUG_CLR);
-+		regmap_write(mxs_phy->regmap_anatop, ANADIG_USB1_LOOPBACK_SET,
-+				BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1 |
-+				BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN);
-+		/* Delay some time, and let Linestate be SE0 for controller */
-+		usleep_range(500, 1000);
-+		line_is_disconnected = true;
-+	} else if (line_is_disconnected) {
-+		regmap_write(mxs_phy->regmap_anatop, ANADIG_USB1_LOOPBACK_CLR,
-+				BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1 |
-+				BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN);
-+		writel_relaxed(BM_USBPHY_DEBUG_CLKGATE,
-+				base + HW_USBPHY_DEBUG_SET);
-+		line_is_disconnected = false;
-+	}
-+
-+	dev_dbg(mxs_phy->phy.dev, "line is %s\n", line_is_disconnected
-+			? "disconnected" : "connected");
++	usleep_range(300, 400);
 +}
 +
- static int mxs_phy_init(struct usb_phy *phy)
+ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+ {
+ 	int ret;
+@@ -234,6 +243,7 @@ static int mxs_phy_init(struct usb_phy *phy)
  {
  	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
-@@ -183,6 +244,23 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
- 	return 0;
+ 
++	mxs_phy_clock_switch();
+ 	clk_prepare_enable(mxs_phy->clk);
+ 	return mxs_phy_hw_init(mxs_phy);
  }
- 
-+static int mxs_phy_set_wakeup(struct usb_phy *x, bool enabled)
-+{
-+	struct mxs_phy *mxs_phy = to_mxs_phy(x);
-+	u32 value = BM_USBPHY_CTRL_ENVBUSCHG_WKUP |
-+			BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
-+				BM_USBPHY_CTRL_ENIDCHG_WKUP;
-+	if (enabled) {
-+		mxs_phy_disconnect_line(mxs_phy, true);
-+		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_SET);
-+	} else {
-+		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_CLR);
-+		mxs_phy_disconnect_line(mxs_phy, false);
-+	}
-+
-+	return 0;
-+}
-+
- static int mxs_phy_on_connect(struct usb_phy *phy,
- 		enum usb_device_speed speed)
- {
-@@ -289,6 +367,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	mxs_phy->phy.notify_connect	= mxs_phy_on_connect;
- 	mxs_phy->phy.notify_disconnect	= mxs_phy_on_disconnect;
- 	mxs_phy->phy.type		= USB_PHY_TYPE_USB2;
-+	mxs_phy->phy.set_wakeup		= mxs_phy_set_wakeup;
- 
- 	ATOMIC_INIT_NOTIFIER_HEAD(&mxs_phy->phy.notifier);
- 
+@@ -258,6 +268,7 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+ 		       x->io_priv + HW_USBPHY_CTRL_SET);
+ 		clk_disable_unprepare(mxs_phy->clk);
+ 	} else {
++		mxs_phy_clock_switch();
+ 		clk_prepare_enable(mxs_phy->clk);
+ 		writel(BM_USBPHY_CTRL_CLKGATE,
+ 		       x->io_priv + HW_USBPHY_CTRL_CLR);
 -- 
 1.7.8
