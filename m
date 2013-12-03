@@ -1,107 +1,70 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 03 Dec 2013 09:43:25 +0100
-Subject: [PATCH v4 09/17] usb: phy-mxs: Enable IC fixes for related SoCs
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649804140F64@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
- <1386056231-17258-10-git-send-email-peter.chen@freescale.com>
- <529D95F7.8060705@pengutronix.de>
- <F281D0F91ED19E4D8E63A7504E8A649804140F64@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <529D99AD.3010304@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Dec 2013 16:50:32 +0800
+Subject: [PATCH 1/2] ARM: imx28: add apf28 specific initialization
+ (macaddr)
+In-Reply-To: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20131203085030.GJ10840@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 09:38 AM, Peter Chen wrote:
+On Sat, Nov 30, 2013 at 09:51:12AM +0100, Gwenhael Goavec-Merou wrote:
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> ---
+>  arch/arm/mach-mxs/mach-mxs.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 3982e12..02b17f7 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -158,6 +158,7 @@ enum mac_oui {
+>  	OUI_DENX,
+>  	OUI_CRYSTALFONTZ,
+>  	OUI_I2SE,
+
+What tree are you based on?  I do not have this OUI_I2SE thing in my
+tree.
+
+Shawn
+
+> +	OUI_ARMADEUS,
+>  };
 >  
->>
->> On 12/03/2013 08:37 AM, Peter Chen wrote:
->>> Some PHY bugs are fixed by IC logic, but these bits are not
->>> enabled by default, so we enable them at driver.
->>>
->>> Signed-off-by: Peter Chen <peter.chen@freescale.com>
->>> ---
->>>  drivers/usb/phy/phy-mxs-usb.c |   20 ++++++++++++++++++++
->>>  1 files changed, 20 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-
->> usb.c
->>> index 8738890..0908d74 100644
->>> --- a/drivers/usb/phy/phy-mxs-usb.c
->>> +++ b/drivers/usb/phy/phy-mxs-usb.c
->>> @@ -31,6 +31,10 @@
->>>  #define HW_USBPHY_CTRL_SET			0x34
->>>  #define HW_USBPHY_CTRL_CLR			0x38
->>>
->>> +#define HW_USBPHY_IP				0x90
->>> +#define HW_USBPHY_IP_SET			0x94
->>> +#define HW_USBPHY_IP_CLR			0x98
->>> +
->>>  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
->>>  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
->>>  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
->>> @@ -42,6 +46,8 @@
->>>  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
->>>  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
->>>
->>> +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
->>> +
->>>  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
->>>
->>>  /* Do disconnection between PHY and controller without vbus */
->>> @@ -97,6 +103,16 @@ struct mxs_phy {
->>>  	struct regmap *regmap_anatop;
->>>  };
->>>
->>> +static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
->>> +{
->>> +	return mxs_phy->data == &imx6q_phy_data;
->>> +}
->>> +
->>> +static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
->>> +{
->>> +	return mxs_phy->data == &imx6sl_phy_data;
->>> +}
->>
->> Why don't you use a a BIT() here as in Patch 2/17, too?
->>
->  
-> Thanks, I will define the two PHY problems as the register bit
-> position at 2/17, and use those two MACROs at this patch.
-> Is it your point?
-
-I was wondering if the driver looks more uniform if you use something
-like this:
-
-#define MXS_PHY_NEED_IP_FIX		BIT(3)
-
->  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
->  {
->  	int ret;
-> @@ -123,6 +139,10 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
->  		BM_USBPHY_CTRL_ENUTMILEVEL3,
->  	       base + HW_USBPHY_CTRL_SET);
->  
-> +	/* Enable IC solution */
-> +	if (is_imx6q_phy(mxs_phy) || is_imx6sl_phy(mxs_phy))
-
-	if (mxs_phy->data->flags & MXS_PHY_NEED_IP_FIX)
-
-> +		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
-> +
->  	return 0;
+>  static void __init update_fec_mac_prop(enum mac_oui oui)
+> @@ -217,6 +218,11 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+>  			macaddr[1] = 0x01;
+>  			macaddr[2] = 0x87;
+>  			break;
+> +		case OUI_ARMADEUS:
+> +			macaddr[0] = 0x00;
+> +			macaddr[1] = 0x1e;
+> +			macaddr[2] = 0xac;
+> +			break;
+>  		}
+>  		val = ocotp[i];
+>  		macaddr[3] = (val >> 16) & 0xff;
+> @@ -242,6 +248,11 @@ static void __init imx28_evk_init(void)
+>  	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
 >  }
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/b19e8fdc/attachment.sig>
+>  
+> +static void __init imx28_apf28_init(void)
+> +{
+> +	update_fec_mac_prop(OUI_ARMADEUS);
+> +}
+> +
+>  static int apx4devkit_phy_fixup(struct phy_device *phy)
+>  {
+>  	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
+> @@ -469,6 +480,8 @@ static void __init mxs_machine_init(void)
+>  
+>  	if (of_machine_is_compatible("fsl,imx28-evk"))
+>  		imx28_evk_init();
+> +	if (of_machine_is_compatible("armadeus,imx28-apf28"))
+> +		imx28_apf28_init();
+>  	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
+>  		apx4devkit_init();
+>  	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
+> -- 
+> 1.8.3.2
+> 
