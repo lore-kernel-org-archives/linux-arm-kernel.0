@@ -1,90 +1,60 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 3 Dec 2013 15:37:00 +0800
-Subject: [PATCH v4 06/17] usb: phy-mxs: Add anatop regmap
+Date: Tue, 3 Dec 2013 15:37:01 +0800
+Subject: [PATCH v4 07/17] usb: phy: add notify suspend and resume callback
 In-Reply-To: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
 References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386056231-17258-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <1386056231-17258-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is needed by imx6 SoC series, but not for imx23 and imx28.
+They are used to notify PHY that the controller enters suspend
+or finishes resume.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   23 +++++++++++++++++++++--
- 1 files changed, 21 insertions(+), 2 deletions(-)
+ include/linux/usb/phy.h |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 70b084d..d34df4c 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -21,6 +21,8 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of_device.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
- 
- #define DRIVER_NAME "mxs_phy"
- 
-@@ -58,6 +60,9 @@
-  */
- #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
- 
-+/* The SoCs who have anatop module */
-+#define MXS_PHY_HAS_ANATOP			BIT(3)
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 6c0b1c5..a747960 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -116,6 +116,11 @@ struct usb_phy {
+ 			enum usb_device_speed speed);
+ 	int	(*notify_disconnect)(struct usb_phy *x,
+ 			enum usb_device_speed speed);
++	int	(*notify_suspend)(struct usb_phy *x,
++			enum usb_device_speed speed);
++	int	(*notify_resume)(struct usb_phy *x,
++			enum usb_device_speed speed);
 +
- struct mxs_phy_data {
- 	unsigned int flags;
- };
-@@ -68,11 +73,13 @@ static const struct mxs_phy_data imx23_phy_data = {
- 
- static const struct mxs_phy_data imx6q_phy_data = {
- 	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
--		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-+		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-+		MXS_PHY_HAS_ANATOP,
  };
  
- static const struct mxs_phy_data imx6sl_phy_data = {
--	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-+	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-+		MXS_PHY_HAS_ANATOP,
- };
+ /**
+@@ -282,6 +287,24 @@ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
+ 		return 0;
+ }
  
- static const struct of_device_id mxs_phy_dt_ids[] = {
-@@ -87,6 +94,7 @@ struct mxs_phy {
- 	struct usb_phy phy;
- 	struct clk *clk;
- 	const struct mxs_phy_data *data;
-+	struct regmap *regmap_anatop;
- };
- 
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-@@ -190,6 +198,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	int ret;
- 	const struct of_device_id *of_id =
- 			of_match_device(mxs_phy_dt_ids, &pdev->dev);
-+	struct device_node *np = pdev->dev.of_node;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
-@@ -226,6 +235,16 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, mxs_phy);
- 
-+	if (mxs_phy->data->flags & MXS_PHY_HAS_ANATOP) {
-+		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
-+			(np, "fsl,anatop");
-+		if (IS_ERR(mxs_phy->regmap_anatop)) {
-+			dev_dbg(&pdev->dev,
-+				"failed to find regmap for anatop\n");
-+			return PTR_ERR(mxs_phy->regmap_anatop);
-+		}
-+	}
++static inline int usb_phy_notify_suspend
++	(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x && x->notify_suspend)
++		return x->notify_suspend(x, speed);
++	else
++		return 0;
++}
 +
- 	ret = usb_add_phy_dev(&mxs_phy->phy);
- 	if (ret)
- 		return ret;
++static inline int usb_phy_notify_resume
++	(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x && x->notify_resume)
++		return x->notify_resume(x, speed);
++	else
++		return 0;
++}
++
+ /* notifiers */
+ static inline int
+ usb_register_notifier(struct usb_phy *x, struct notifier_block *nb)
 -- 
 1.7.8
