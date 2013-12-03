@@ -1,104 +1,37 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 03 Dec 2013 18:20:13 +0100
-Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <529E1C82.8070501@cogentembedded.com>
-References: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
- <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
- <529E1C82.8070501@cogentembedded.com>
-Message-ID: <529E12CD.5040607@overkiz.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue,  3 Dec 2013 18:51:52 +0100
+Subject: [PATCH v2 0/4] usb: ohci-at91: various fixes and improvements
+Message-ID: <1386093116-26387-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+Hello,
 
-On 03/12/2013 19:01, Sergei Shtylyov wrote:
-> Hello.
->
-> On 12/03/2013 05:07 PM, Boris BREZILLON wrote:
->
->> Replace clk_get calls by devm_clk_get calls.
->
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> Tested-by: Robert Nelson <robertcnelson@gmail.com>
->> ---
->>   drivers/usb/host/ohci-at91.c |   32 ++++++++------------------------
->>   1 file changed, 8 insertions(+), 24 deletions(-)
->
->> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
->> index c406f1e..3652962 100644
->> --- a/drivers/usb/host/ohci-at91.c
->> +++ b/drivers/usb/host/ohci-at91.c
->> @@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct 
->> hc_driver *driver,
->>           goto err;
->>       }
->>
->> -    iclk = clk_get(&pdev->dev, "ohci_clk");
->> +    iclk = devm_clk_get(dev, "ohci_clk");
->>       if (IS_ERR(iclk)) {
->> -        dev_err(&pdev->dev, "failed to get ohci_clk\n");
->> +        dev_err(dev, "failed to get ohci_clk\n");
->
->    You changed this call...
->
->>           retval = PTR_ERR(iclk);
->>           goto err;
->>       }
->> -    fclk = clk_get(&pdev->dev, "uhpck");
->> +    fclk = devm_clk_get(dev, "uhpck");
->>       if (IS_ERR(fclk)) {
->>           dev_err(&pdev->dev, "failed to get uhpck\n");
->
->    ... but not this one.
+This patch series fixes a bug detected in 3.13-rc1 caused by a wrong
+assumption on platform device resources order in the platform device
+resource table.
 
-This is an oversight.
-
->
->>           retval = PTR_ERR(fclk);
->> -        goto err4;
->> +        goto err;
->>       }
->> -    hclk = clk_get(&pdev->dev, "hclk");
->> +    hclk = devm_clk_get(dev, "hclk");
->>       if (IS_ERR(hclk)) {
->>           dev_err(&pdev->dev, "failed to get hclk\n");
->
->    ... or this one. Actually, I think cganging these calls would be 
-> out of scope for this patch.
-
-Ditto.
-
-I'll split the patch to in 2 patches:
-  1) replace &pdev->dev by dev
-  2) use devm_clk_get instead of clk_get.
-
->
->>           retval = PTR_ERR(hclk);
->> -        goto err5;
->> +        goto err;
->>       }
->>       if (IS_ENABLED(CONFIG_COMMON_CLK)) {
->> -        uclk = clk_get(&pdev->dev, "usb_clk");
->> +        uclk = devm_clk_get(&pdev->dev, "usb_clk");
->
->    Hm, why not 'dev' like in all of the above?
-Ditto.
-
-Thanks for your review.
+It also move the different driver resources (clks and iomem) retrieval
+to the device managed versions (devm_ functions).
 
 Best Regards,
 
 Boris
->
->>           if (IS_ERR(uclk)) {
->>               dev_err(&pdev->dev, "failed to get uclk\n");
->>               retval = PTR_ERR(uclk);
->> -            goto err6;
->> +            goto err;
->>           }
->>       }
->>
->
-> WBR, Sergei
->
->
+
+Changes since v1:
+ - split PATCH 3 in 2 different patches: one to remove references to
+   &pdev->dev, the other to make use of devm_clk_get
+ - replace forgotten &pdev->dev references in usb_hcd_at91_probe
+
+Boris BREZILLON (4):
+  usb: ohci-at91: fix irq and iomem resource retrieval
+  usb: ohci-at91: replace request_mem_region + ioremap by
+    devm_request_and_ioremap
+  usb: ohci-at91: use dev variable instead of &pdev->dev
+  usb: ohci-at91: use device managed clk retrieval
+
+ drivers/usb/host/ohci-at91.c |   83 ++++++++++++++----------------------------
+ 1 file changed, 28 insertions(+), 55 deletions(-)
+
+-- 
+1.7.9.5
