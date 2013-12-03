@@ -1,53 +1,79 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 3 Dec 2013 16:19:57 +0100
-Subject: [PATCH v3 0/5] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
- clock framework
-Message-ID: <201312031619.58062.heiko@sntech.de>
+Date: Tue, 3 Dec 2013 16:20:54 +0100
+Subject: [PATCH v3 1/5] clk: samsung: add pll_6552 variant for s3c2416
+In-Reply-To: <201312031619.58062.heiko@sntech.de>
+References: <201312031619.58062.heiko@sntech.de>
+Message-ID: <201312031620.54586.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resurrecting this series again after to much time.
+According to the manual s3c2416 and s3c2450 use a pll 6552 and 6553
+and while the pll_6553 matches exactly the one already implemented
+the pll_6552 differs to the one from the s3c64xx series.
 
-Changed is the pll registration to follow the new system and getting the
-external clocks from dt fixed-rate clocks.
+The change is solely in the bit locations of the mdiv and pdiv values.
+All calculations are the same for both implementatons and even the
+proposed divider-values for specific frequencies in the manuals are
+the same.
 
-Hopefully I did address all comments received for v2 in july.
+Therefore implement a variant that simply uses the changed bit
+locations if necessary.
 
-Tested on both non-dt and dt s3c2416. As s3c2443 is working the same way it
-should work, but is only compile tested.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/samsung/clk-pll.c |   12 ++++++++++--
+ drivers/clk/samsung/clk-pll.h |    1 +
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-Heiko Stuebner (5):
-  clk: samsung: add pll_6552 variant for s3c2416
-  clk: samsung: add plls used by the s3c2443
-  dt-bindings: add binding for clock-controller of s3c2443 and following
-  clk: samsung: add clock-driver for s3c2416, s3c2443 and s3c2450
-  ARM: S3C24XX: Convert s3c2416 and s3c2443 to common clock framework
-
- .../bindings/clock/samsung,s3c2443-clock.txt       |   46 ++
- arch/arm/boot/dts/s3c2416-smdk2416.dts             |    9 +
- arch/arm/boot/dts/s3c2416.dtsi                     |   48 ++
- arch/arm/mach-s3c24xx/Kconfig                      |   14 +-
- arch/arm/mach-s3c24xx/Makefile                     |    5 +-
- arch/arm/mach-s3c24xx/clock-s3c2416.c              |  171 -----
- arch/arm/mach-s3c24xx/clock-s3c2443.c              |  212 ------
- arch/arm/mach-s3c24xx/common-s3c2443.c             |  675 --------------------
- arch/arm/mach-s3c24xx/common.c                     |   16 +-
- arch/arm/mach-s3c24xx/common.h                     |    6 +
- arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   39 +-
- arch/arm/mach-s3c24xx/mach-smdk2416.c              |    9 +-
- arch/arm/mach-s3c24xx/mach-smdk2443.c              |    9 +-
- drivers/clk/samsung/Makefile                       |    1 +
- drivers/clk/samsung/clk-pll.c                      |   84 ++-
- drivers/clk/samsung/clk-pll.h                      |    3 +
- drivers/clk/samsung/clk-s3c2443.c                  |  417 ++++++++++++
- include/dt-bindings/clock/samsung,s3c2443-clock.h  |   92 +++
- 18 files changed, 742 insertions(+), 1114 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
- delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
- delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
- delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
- create mode 100644 drivers/clk/samsung/clk-s3c2443.c
- create mode 100644 include/dt-bindings/clock/samsung,s3c2443-clock.h
-
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index 529e11d..c37d033 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -564,7 +564,9 @@ static const struct clk_ops samsung_pll46xx_clk_min_ops = {
+ #define PLL6552_PDIV_MASK	0x3f
+ #define PLL6552_SDIV_MASK	0x7
+ #define PLL6552_MDIV_SHIFT	16
++#define PLL6552_MDIV_SHIFT_2416	14
+ #define PLL6552_PDIV_SHIFT	8
++#define PLL6552_PDIV_SHIFT_2416	5
+ #define PLL6552_SDIV_SHIFT	0
+ 
+ static unsigned long samsung_pll6552_recalc_rate(struct clk_hw *hw,
+@@ -575,8 +577,13 @@ static unsigned long samsung_pll6552_recalc_rate(struct clk_hw *hw,
+ 	u64 fvco = parent_rate;
+ 
+ 	pll_con = __raw_readl(pll->con_reg);
+-	mdiv = (pll_con >> PLL6552_MDIV_SHIFT) & PLL6552_MDIV_MASK;
+-	pdiv = (pll_con >> PLL6552_PDIV_SHIFT) & PLL6552_PDIV_MASK;
++	if (pll->type == pll_6552_s3c2416) {
++		mdiv = (pll_con >> PLL6552_MDIV_SHIFT_2416) & PLL6552_MDIV_MASK;
++		pdiv = (pll_con >> PLL6552_PDIV_SHIFT_2416) & PLL6552_PDIV_MASK;
++	} else {
++		mdiv = (pll_con >> PLL6552_MDIV_SHIFT) & PLL6552_MDIV_MASK;
++		pdiv = (pll_con >> PLL6552_PDIV_SHIFT) & PLL6552_PDIV_MASK;
++	}
+ 	sdiv = (pll_con >> PLL6552_SDIV_SHIFT) & PLL6552_SDIV_MASK;
+ 
+ 	fvco *= mdiv;
+@@ -773,6 +780,7 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+ 			init.ops = &samsung_pll36xx_clk_ops;
+ 		break;
+ 	case pll_6552:
++	case pll_6552_s3c2416:
+ 		init.ops = &samsung_pll6552_clk_ops;
+ 		break;
+ 	case pll_6553:
+diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+index 6c39030..ddf9029 100644
+--- a/drivers/clk/samsung/clk-pll.h
++++ b/drivers/clk/samsung/clk-pll.h
+@@ -24,6 +24,7 @@ enum samsung_pll_type {
+ 	pll_4650,
+ 	pll_4650c,
+ 	pll_6552,
++	pll_6552_s3c2416,
+ 	pll_6553,
+ };
+ 
 -- 
 1.7.10.4
