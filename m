@@ -1,45 +1,73 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 3 Dec 2013 15:37:09 +0800
-Subject: [PATCH v4 15/17] usb: phy-mxs: add controller id
+Date: Tue, 3 Dec 2013 15:37:08 +0800
+Subject: [PATCH v4 14/17] ARM: dts: imx: add mxs phy controller id
 In-Reply-To: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
 References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386056231-17258-16-git-send-email-peter.chen@freescale.com>
+Message-ID: <1386056231-17258-15-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is used to access un-regulator registers according to
-different controllers.
+We need to use controller id to access different register regions
+for mxs phy.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx23.dtsi   |    1 +
+ arch/arm/boot/dts/imx28.dtsi   |    2 ++
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
+ 4 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 52e80d9..4c2dfcd 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -127,6 +127,7 @@ struct mxs_phy {
- 	struct clk *clk;
- 	const struct mxs_phy_data *data;
- 	struct regmap *regmap_anatop;
-+	int port_id;
- };
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index c96ceae..a231f3d 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -23,6 +23,7 @@
+ 		serial1 = &auart1;
+ 		spi0 = &ssp0;
+ 		spi1 = &ssp1;
++		usbphy0 = &usbphy0;
+ 	};
  
- static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
-@@ -392,6 +393,13 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
+ 	cpus {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index cda19c8..671dda0 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -32,6 +32,8 @@
+ 		serial4 = &auart4;
+ 		spi0 = &ssp1;
+ 		spi1 = &ssp2;
++		usbphy0 = &usbphy0;
++		usbphy1 = &usbphy1;
+ 	};
  
-+	ret = of_alias_get_id(np, "usbphy");
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
-+		return ret;
-+	}
-+	mxs_phy->port_id = ret;
-+
- 	mxs_phy->phy.io_priv		= base;
- 	mxs_phy->phy.dev		= &pdev->dev;
- 	mxs_phy->phy.label		= DRIVER_NAME;
+ 	cpus {
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 4e74962..c23803d 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -33,6 +33,8 @@
+ 		spi1 = &ecspi2;
+ 		spi2 = &ecspi3;
+ 		spi3 = &ecspi4;
++		usbphy0 = &usbphy1;
++		usbphy1 = &usbphy2;
+ 	};
+ 
+ 	intc: interrupt-controller at 00a01000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 30322b5..a06d939 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -27,6 +27,8 @@
+ 		spi1 = &ecspi2;
+ 		spi2 = &ecspi3;
+ 		spi3 = &ecspi4;
++		usbphy0 = &usbphy1;
++		usbphy1 = &usbphy2;
+ 	};
+ 
+ 	cpus {
 -- 
 1.7.8
