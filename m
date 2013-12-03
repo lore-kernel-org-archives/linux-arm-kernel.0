@@ -1,143 +1,57 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Tue, 3 Dec 2013 11:24:16 +0100
-Subject: [PATCH v4 02/17] usb: phy-mxs: Add platform judgement code
-In-Reply-To: <1386056231-17258-3-git-send-email-peter.chen@freescale.com>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
- <1386056231-17258-3-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131203102416.GB27635@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  3 Dec 2013 10:27:06 +0000
+Subject: [PATCH 1/2] ASoC: ux500_pcm: Differentiate between pdata and DT
+ initialisation
+Message-ID: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 03:36:56PM +0800, Peter Chen wrote:
-> The mxs-phy has several bugs and features at different
-> versions, the driver code can get it through of_device_id.data.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
->  1 files changed, 49 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index 545844b..f6cbc78 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
->   * Copyright (C) 2012 Marek Vasut <marex@denx.de>
->   * on behalf of DENX Software Engineering GmbH
->   *
-> @@ -20,6 +20,7 @@
->  #include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
-> +#include <linux/of_device.h>
->  
->  #define DRIVER_NAME "mxs_phy"
->  
-> @@ -34,13 +35,55 @@
->  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
->  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
->  
-> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-> +
-> +/* Do disconnection between PHY and controller without vbus */
-> +#define MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS	BIT(0)
-> +
-> +/*
-> + * The PHY will be in messy if there is an wakeup after putting
-> + * bus to suspend (set portsc.suspendM) but before setting PHY to low
-> + * power mode (set portsc.phcd).
-> + */
-> +#define MXS_PHY_ABNORAML_IN_SUSPEND		BIT(1)
+If booting with full DT support (i.e. DMA too, the last piece of the
+puzzle), then we don't need to use the compatible_request_channel call
+back or require some of the historical bumph which probably isn't
+required by a platform data start-up now either. This will also be
+ripped out in upcoming commits.
 
-ABNORAML? -> ABNORMAL
+Cc: alsa-devel at alsa-project.org
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ sound/soc/ux500/ux500_pcm.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
-> +
-> +/*
-> + * The SOF sends too fast after resuming, it will cause disconnection
-> + * between host and high speed device.
-> + */
-> +#define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
-> +
-> +struct mxs_phy_data {
-> +	unsigned int flags;
-> +};
-> +
-> +static const struct mxs_phy_data imx23_phy_data = {
-> +	.flags = MXS_PHY_ABNORAML_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
-> +};
-
-ABNORAML? -> ABNORMAL
-
-> +
-> +static const struct mxs_phy_data imx6q_phy_data = {
-> +	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
-> +		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-> +};
-> +
-> +static const struct mxs_phy_data imx6sl_phy_data = {
-> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-> +};
-> +
-> +static const struct of_device_id mxs_phy_dt_ids[] = {
-> +	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
-> +	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
-> +	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
-> +
->  struct mxs_phy {
->  	struct usb_phy phy;
->  	struct clk *clk;
-> +	const struct mxs_phy_data *data;
->  };
->  
-> -#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-> -
->  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
->  {
->  	int ret;
-> @@ -131,6 +174,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
->  	struct clk *clk;
->  	struct mxs_phy *mxs_phy;
->  	int ret;
-> +	const struct of_device_id *of_id =
-> +			of_match_device(mxs_phy_dt_ids, &pdev->dev);
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	base = devm_ioremap_resource(&pdev->dev, res);
-> @@ -163,6 +208,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
->  	ATOMIC_INIT_NOTIFIER_HEAD(&mxs_phy->phy.notifier);
->  
->  	mxs_phy->clk = clk;
-> +	mxs_phy->data = of_id->data;
->  
->  	platform_set_drvdata(pdev, mxs_phy);
->  
-> @@ -182,12 +228,6 @@ static int mxs_phy_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id mxs_phy_dt_ids[] = {
-> -	{ .compatible = "fsl,imx23-usbphy", },
-> -	{ /* sentinel */ }
-> -};
-> -MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
-> -
->  static struct platform_driver mxs_phy_driver = {
->  	.probe = mxs_phy_probe,
->  	.remove = mxs_phy_remove,
-> -- 
-> 1.7.8
-> 
-> 
-> 
-
+diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+index 2f1bdb7..ad0d420 100644
+--- a/sound/soc/ux500/ux500_pcm.c
++++ b/sound/soc/ux500/ux500_pcm.c
+@@ -134,15 +134,24 @@ static const struct snd_dmaengine_pcm_config ux500_dmaengine_pcm_config = {
+ 	.prepare_slave_config = ux500_pcm_prepare_slave_config,
+ };
+ 
++static const struct snd_dmaengine_pcm_config ux500_dmaengine_of_pcm_config = {
++	.prepare_slave_config = ux500_pcm_prepare_slave_config,
++};
++
+ int ux500_pcm_register_platform(struct platform_device *pdev)
+ {
++	const struct snd_dmaengine_pcm_config *pcm_config;
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
+-	ret = snd_dmaengine_pcm_register(&pdev->dev,
+-			&ux500_dmaengine_pcm_config,
+-			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
+-			SND_DMAENGINE_PCM_FLAG_COMPAT |
+-			SND_DMAENGINE_PCM_FLAG_NO_DT);
++	if (np)
++		pcm_config = &ux500_dmaengine_of_pcm_config;
++	else
++		pcm_config = &ux500_dmaengine_pcm_config;
++
++	ret = snd_dmaengine_pcm_register(&pdev->dev, pcm_config,
++					 SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
++					 SND_DMAENGINE_PCM_FLAG_COMPAT);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev,
+ 			"%s: ERROR: Failed to register platform '%s' (%d)!\n",
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.3.2
