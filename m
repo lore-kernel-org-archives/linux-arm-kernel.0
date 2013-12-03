@@ -1,91 +1,54 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 03 Dec 2013 22:25:14 +0100
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-References: <87d2lp28pd.fsf@natisbad.org> <20131125120335.GD2408@localhost>
- <87r4a4f5gr.fsf@natisbad.org> <20131126124003.GA2344@localhost>
- <87zjopd240.fsf@natisbad.org> <87wqjtbm8r.fsf@natisbad.org>
- <20131128185040.GA13182@localhost> <87bo12kcyt.fsf@natisbad.org>
- <20131202103305.GB2466@localhost> <87siubneuf.fsf@natisbad.org>
- <20131203002225.GA5333@localhost> <87ob4xbs8l.fsf@natisbad.org>
-Message-ID: <87iov5aapx.fsf@natisbad.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 Dec 2013 22:29:14 +0100
+Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
+ gyroscopes
+In-Reply-To: <20131130140402.21abae28@endymion.delvare>
+References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
+ <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
+ <52926901.9080004@kernel.org> <20131125094044.GE3176@lukather>
+ <5299D3BA.8080700@kernel.org>
+ <20131130140402.21abae28@endymion.delvare>
+Message-ID: <20131203212914.GC31496@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Hi Jean,
 
-arno at natisbad.org (Arnaud Ebalard) writes:
+On Sat, Nov 30, 2013 at 02:04:02PM +0100, Jean Delvare wrote:
+> > i2c has a generic binding that matches to the name bit of the
+> > i2c_device_id array.  That is then exported in sysfs.  There are
+> > quite a lot of instances of underscores out there in these names.
+> > Thus unforutnately they can't be changed without possibly breaking
+> > userspace.  Typically those same names are also output by IIO
+> > though obviously we could keep that the same whilst changing the
+> > dt binding.
+> > 
+> > Also the i2c binding allows binding after dropping the vendor
+> > prefix which is even more 'interesting'. See of_modialias_node in
+> > drivers/of/base.c
+> > 
+> > I'd therefore argue in favour of just leaving the underscores in
+> > existing drivers as a nasty bit of legacy and doing our best to
+> > not introduce any new ones!
+> 
+> I don't know what is the problem with underscores, but please note
+> that hwmon i2c devices are NOT allowed to have dashes in their name
+> because that would break libsensors.
 
-> So I guess, if you have any (non hardware destructive ;-) ) idea, I now
-> have a platform on which the problem is reproducible. Meanwhile, I will
-> try and do the same on my RN104 (should be the same as the RN102).
+As far as I remember, hwmon doesn't handle the accelerometers or
+gyroscopes, does it?
 
-Well, on the RN104 (same chip, same kernel and same SoC as the RN102), I
-have the following (I get the same with a patched driver to increase the
-timeout):
+Thanks,
+Maxime
 
-root at humble:~# flash_erase /dev/mtd4 0 0 
-Erasing 128 Kibyte @ 72e0000 -- 99 % complete flash_erase: Skipping bad block at 07300000
-flash_erase: Skipping bad block at 07320000
-flash_erase: Skipping bad block at 07340000
-flash_erase: Skipping bad block at 07360000
-flash_erase: Skipping bad block at 07380000
-flash_erase: Skipping bad block at 073a0000
-flash_erase: Skipping bad block at 073c0000
-flash_erase: Skipping bad block at 073e0000
-Erasing 128 Kibyte @ 73e0000 -- 100 % complete 
-
-root at humble:~# nandwrite -p /dev/mtd4 mtd4ro 
-Writing data to block 0 at offset 0x0
-[  449.915173] pxa3xx-nand d00d0000.nand: Ready time out!!!
-libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 0, offset 2048)
-        error 5 (Input/output error)
-Erasing failed write from 00000000 to 0x01ffff
-Writing data to block 1 at offset 0x20000
-[  450.115172] pxa3xx-nand d00d0000.nand: Ready time out!!!
-libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 1, offset 2048)
-        error 5 (Input/output error)
-Erasing failed write from 0x020000 to 0x03ffff
-Writing data to block 2 at offset 0x40000
-[  450.315171] pxa3xx-nand d00d0000.nand: Ready time out!!!
-libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 2, offset 2048)
-        error 5 (Input/output error)
-Erasing failed write from 0x040000 to 0x05ffff
-Writing data to block 3 at offset 0x60000
-[  450.515171] pxa3xx-nand d00d0000.nand: Ready time out!!!
-libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 3, offset 2048)
-        error 5 (Input/output error)
-Erasing failed write from 0x060000 to 0x07ffff
-Writing data to block 4 at offset 0x80000
-[  450.715169] pxa3xx-nand d00d0000.nand: Ready time out!!!
-libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 4, offset 2048)
-        error 5 (Input/output error)
-Erasing failed write from 0x080000 to 0x09ffff
-Writing data to block 5 at offset 0xa0000
-[  450.915171] pxa3xx-nand d00d0000.nand: Ready time out!!!
-libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 5, offset 2048)
-        error 5 (Input/output error)
-Erasing failed write from 0x0a0000 to 0x0bffff
-Writing data to block 6 at offset 0xc0000
-[  451.115171] pxa3xx-nand d00d0000.nand: Ready time out!!!
-libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 6, offset 2048)
-        error 5 (Input/output error)
-Erasing failed write from 0x0c0000 to 0x0dffff
-Writing data to block 7 at offset 0xe0000
-
-
-So I then did the same test again on the RN102 by doing a flash_erase on
-/dev/mtd4 and then a nandwrite: it worked as expected (errors only at
-the end when trying to overwrite the reserved block for the BBT).
-
-The only difference I can see between RN104/RN2120 and RN102 is the
-debian: the three are jessie but the one on the RN102 I used is armel
-when the ones on the RN104 and RN2120 are armhf (all kernels are
-armel).
-
-Cheers,
-
-a+
-
-ps: I can provide the config files for each device's kernel if you think
-a specific option (debug or something else) may have an impact on how the
-driver behave.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/f2dacea7/attachment.sig>
