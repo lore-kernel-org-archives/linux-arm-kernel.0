@@ -1,68 +1,41 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 3 Dec 2013 18:46:06 +0530
-Subject: [PATCH V2 1/2] ARM: tegra: Add header file for pinctrl constants
-Message-ID: <1386076567-14283-1-git-send-email-ldewangan@nvidia.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 3 Dec 2013 13:28:20 +0100
+Subject: [PATCH 2/5] ARM: mxs: crypto: Remove the old DCP driver
+In-Reply-To: <20131203110731.GE13726@S2101-09.ap.freescale.net>
+References: <1385932823-3860-1-git-send-email-marex@denx.de>
+ <1385932823-3860-2-git-send-email-marex@denx.de>
+ <20131203110731.GE13726@S2101-09.ap.freescale.net>
+Message-ID: <201312031328.20860.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new header file defines pincontrol constants for Tegra to
-use from Tegra's DTS file for pincontrol properties option.
+Dear Shawn Guo,
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-Changes from V1:
-- Get rid of lots of macro and converge it to TEGRA_PIN_ENABLE/DISABLE.
-- Change macro name for PULL UP/DOWN/NONE.
+> On Sun, Dec 01, 2013 at 10:20:20PM +0100, Marek Vasut wrote:
+> > Remove the old DCP driver as it had multiple severe issues. The driver
+> > will be replaced by a more robust implementation. Here is a short list
+> > of problems with this driver:
+> > 
+> > 1) It only supports AES_CBC
+> > 
+> > 2) The driver was apparently never ran behind anyone working with MXS. ie.:
+> >    -> Restarting the DCP block is not done via mxs_reset_block()
+> >    -> The DT name is not "fsl,dcp" or "fsl,mxs-dcp" as other MXS drivers
+> > 
+> > 3) Introduces new ad-hoc IOCTLs
+> > 4) The IRQ handler can't use usual completion() in the driver because
+> > that'd
+> > 
+> >    trigger "scheduling while atomic" oops, yes?
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> 
+> Please drop "ARM: mxs: " from patch subject, since it's not a patch
+> touching arch/arm/mach-mxs anyhow.  It's there confusing people.
+> 
+> Shawn
 
- include/dt-bindings/pinctrl/pinctrl-tegra.h |   40 +++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
- create mode 100644 include/dt-bindings/pinctrl/pinctrl-tegra.h
+Removed. Will gather more feedback and repost V2.
 
-diff --git a/include/dt-bindings/pinctrl/pinctrl-tegra.h b/include/dt-bindings/pinctrl/pinctrl-tegra.h
-new file mode 100644
-index 0000000..e5f02f8
---- /dev/null
-+++ b/include/dt-bindings/pinctrl/pinctrl-tegra.h
-@@ -0,0 +1,40 @@
-+/*
-+ * This header provides constants for TEGRA pinctrl bindings.
-+ *
-+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-+ *
-+ * Author: Laxman Dewangan <ldewangan@nvidia.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#ifndef _DT_BINDINGS_PINCTRL_TEGRA_H
-+#define _DT_BINDINGS_PINCTRL_TEGRA_H
-+
-+#define TEGRA_PIN_DISABLE				0
-+#define TEGRA_PIN_ENABLE				1
-+
-+/* Pull up/down/normal */
-+#define TEGRA_PIN_PULL_NONE				0
-+#define TEGRA_PIN_PULL_DOWN				1
-+#define TEGRA_PIN_PULL_UP				2
-+
-+/* Low power mode */
-+#define TEGRA_PIN_LP_DRIVE_DIV_8			0
-+#define TEGRA_PIN_LP_DRIVE_DIV_4			1
-+#define TEGRA_PIN_LP_DRIVE_DIV_2			2
-+#define TEGRA_PIN_LP_DRIVE_DIV_1			3
-+
-+#define TEGRA_PIN_SLEW_RATE_FASTEST			0
-+#define TEGRA_PIN_SLEW_RATE_FAST			1
-+#define TEGRA_PIN_SLEW_RATE_SLOW			2
-+#define TEGRA_PIN_SLEW_RATE_SLOWEST			3
-+
-+#endif
--- 
-1.7.1.1
+Best regards,
+Marek Vasut
