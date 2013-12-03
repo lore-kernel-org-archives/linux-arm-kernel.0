@@ -1,46 +1,50 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 3 Dec 2013 14:28:43 +0530
-Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
-In-Reply-To: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
-References: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
-Message-ID: <529D9D43.6040101@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue,  3 Dec 2013 17:01:40 +0800
+Subject: [PATCH] irqchip: sirf: set IRQ_LEVEL status_flags
+Message-ID: <1386061300-26574-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+SiRF internal interrupts are using level trigger. we need to tell the irq
+core this information. otherwise, we might get some problems as below
+1. disable_irq(n)
+here irq core will mark the disabled flag but still keep the irq enabled
+due to involved lazy-disable
+2. doing someting after disable_irq(n)
+in step 2, if one interrupt n comes, irq core will mark it as pending and
+mask the HW interrupt really. we name the coming interrupt as "X".
+3. enable_irq(n)
+this will unmask the interrupt, so the level-trigger HW interrupt will come
+again, irq_handler will enter as "E1". after that, irq core will also check
+whether irq n is pending, if yes, and pending interrupt is not level-trigger,
+irq core will execute the pending irq_handler.
+so if we don't set the IRQ_LEVEL flag here, irq core will execute pending
+X again as "E2", but actually the pending interrupt has been handled by "E1".
+that makes a level-trigger HW interrupt is executed twice.
 
-On Tuesday 03 December 2013 02:03 PM, Marek Belisko wrote:
-> Without this change when booting omap3 device (gta04) with board file
-> leads to follwing errors:
-> 
-> [    1.203308] musb-hdrc musb-hdrc.0.auto: unable to find phy
-> [    1.209075] HS USB OTG: no transceiver configured
-> [    1.214019] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
-> 
-> and usb isn't working.
-> 
-> This is probably regression caused by commit: 6c27f939
+here we fix the issue to avoid redundant interrupt overload.
 
-I think a better fix would be to have this merged..
-https://lkml.org/lkml/2013/7/26/91
-> 
-> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
-> ---
->  arch/arm/mach-omap2/twl-common.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index b0d54da..3640ce0 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -92,7 +92,7 @@ void __init omap_pmic_late_init(void)
->  
->  #if defined(CONFIG_ARCH_OMAP3)
->  struct phy_consumer consumers[] = {
-> -	PHY_CONSUMER("musb-hdrc.0", "usb"),
-> +	PHY_CONSUMER("musb-hdrc.0.auto", "usb"),
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Signed-off-by: Huayi Li <Huayi.Li@csr.com>
+---
+ drivers/irqchip/irq-sirfsoc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-the index '0' might vary for some boards leading it to again break musb.
-
-Thanks
-Kishon
+diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
+index 4851afa..3a070c5 100644
+--- a/drivers/irqchip/irq-sirfsoc.c
++++ b/drivers/irqchip/irq-sirfsoc.c
+@@ -34,9 +34,10 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+ 	struct irq_chip_type *ct;
+ 	int ret;
+ 	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
++	unsigned int set = IRQ_LEVEL;
+ 
+ 	ret = irq_alloc_domain_generic_chips(sirfsoc_irqdomain, num, 1, "irq_sirfsoc",
+-		handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
++		handle_level_irq, clr, set, IRQ_GC_INIT_MASK_CACHE);
+ 
+ 	gc = irq_get_domain_generic_chip(sirfsoc_irqdomain, irq_start);
+ 	gc->reg_base = base;
+-- 
+1.8.2.3
