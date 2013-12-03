@@ -1,43 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Dec 2013 19:41:43 +0000
-Subject: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
-In-Reply-To: <1386098643-30784-1-git-send-email-broonie@kernel.org>
-References: <1386098643-30784-1-git-send-email-broonie@kernel.org>
-Message-ID: <20131203194136.GB22668@mudshark.cambridge.arm.com>
+Date: Tue, 3 Dec 2013 19:44:12 +0000
+Subject: [PATCH RFC v4 1/6] arm64: support single-step and breakpoint
+ handler hooks
+In-Reply-To: <CA+b37P0xNDqKWm-Vdpmwrvqxr01C+bOhas+-nEUxLFe7pzEB7A@mail.gmail.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-2-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131025152236.GC10673@mudshark.cambridge.arm.com>
+ <CA+b37P0xNDqKWm-Vdpmwrvqxr01C+bOhas+-nEUxLFe7pzEB7A@mail.gmail.com>
+Message-ID: <20131203194412.GC22668@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 07:24:03PM +0000, Mark Brown wrote:
-> From: Mark Hambleton <mahamble@broadcom.com>
+On Tue, Dec 03, 2013 at 02:33:17PM +0000, Sandeepa Prabhu wrote:
+> Hi Will,
 > 
-> Describe the virtio device so we can mount disk images in the simulator.
-> 
-> Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> index b45e5f39f577..4ccd96552b70 100644
-> --- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> @@ -183,6 +183,12 @@
->  				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
->  				clock-names = "clcdclk", "apb_pclk";
->  			};
-> +
-> +			virtio_block at 0130000 {
-> +				compatible = "virtio,mmio";
-> +				reg = <0x130000 0x1000>;
+> Sorry for responding to this after long-time, I missed this review
+> during Linaro connect travels.
 
-Can we make this 0x200 for the size? That's what kvmtool uses and, from the
-virtio-mmio spec, config data from offset 0x100+ is driver-specific. A quick
-look at the virtio block driver suggests we only use 31 bytes of that at the
-moment, so 4k is really OTT (and doesn't match the page size for 64K page
-systems anyway).
+No problem.
 
-With that change:
+> >> @@ -215,7 +257,10 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+> >>                */
+> >>               user_rewind_single_step(current);
+> >>       } else {
+> >> -             /* TODO: route to KGDB */
+> >> +             /* call registered single step handlers */
+> >
+> > Don't bother with this comment (it's crystal clear from the code).
+> OK, I will remove this unnecessary print.
+
+Thanks.
+
+> >> +static LIST_HEAD(break_hook);
+> >> +DEFINE_RWLOCK(break_hook_lock);
+> >
+> > This guy can be a plain old spinlock. That way, the readers have less
+> > overhead but things still work because we only call a single hook function.
+> well, kprobes need to support recursive breakpoints (i.e. breakpoint
+> handler executing BRK once again)
+> so I converted this lock to rw_lock.  I should put this info in commit
+> description to be more clearer.
+
+Actually, this is one place where a comment in the code *would* be useful!
+
+> Let me know if you find any issue with re-cursing in breakpoint exception?
+
+Sounds ok to me. With those changes:
 
   Acked-by: Will Deacon <will.deacon@arm.com>
 
