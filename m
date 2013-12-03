@@ -1,39 +1,31 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 03 Dec 2013 21:52:30 +0800
-Subject: [RFC part3 PATCH 2/2] ARM64 / clocksource: Use
- arch_timer_acpi_init()
-In-Reply-To: <CACRpkdYeMOMQzDn5=XpDg7X9L_zMZczGg-5SBA8q_WvwFPnH7A@mail.gmail.com>
-References: <1386069328-22502-1-git-send-email-hanjun.guo@linaro.org>
- <1386069328-22502-3-git-send-email-hanjun.guo@linaro.org>
- <CACRpkdYeMOMQzDn5=XpDg7X9L_zMZczGg-5SBA8q_WvwFPnH7A@mail.gmail.com>
-Message-ID: <529DE21E.4080707@linaro.org>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue,  3 Dec 2013 15:07:46 +0100
+Subject: [PATCH 0/3] usb: ohci-at91: various fixes and improvements
+Message-ID: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?12?03? 20:27, Linus Walleij wrote:
-> On Tue, Dec 3, 2013 at 12:15 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->
->> +       /* if can't be initialised from DT, try ACPI way */
->> +       if (!arch_timer_get_rate())
->> +               arch_timer_acpi_init();
->> +
->>          arch_timer_rate = arch_timer_get_rate();
-> This looks a bit fragile. Having a call like arch_timer_get_rate()
-> to check whether there is a DT node for the timer doesn't seem
-> right, can you refactor the code to provide some
-> has_arch_timer_node() or similar call instead, so it's a bit easier
-> to understand & maintain at least?
+Hello,
 
-Good point, thanks for the guidance.
-I will introduce has_arch_timer_node() as you said and use
-it as follows:
+This patch series fixes a bug detected in 3.13-rc1 caused by a wrong
+assumption on platform device resources order in the platform device
+resource table.
 
-if (has_arch_timer_node())
-clocksource_of_init();
-esle
-arch_timer_acpi_init(); /* try ACPI way */
+It also move the different driver resources (clks and iomem) retrieval
+to the device managed versions (devm_ functions).
 
-Is this make sense to you?
+Best Regards,
 
-Thanks
-Hanjun
+Boris
+
+Boris BREZILLON (3):
+  usb: ohci-at91: fix irq and iomem resource retrieval
+  usb: ohci-at91: replace request_mem_region + ioremap by
+    devm_request_and_ioremap
+  usb: ohci-at91: use device managed clk retrieval
+
+ drivers/usb/host/ohci-at91.c |   75 ++++++++++++++----------------------------
+ 1 file changed, 24 insertions(+), 51 deletions(-)
+
+-- 
+1.7.9.5
