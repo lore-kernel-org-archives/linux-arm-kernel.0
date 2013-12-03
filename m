@@ -1,86 +1,63 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Tue, 3 Dec 2013 08:49:35 +0000
-Subject: [PATCH v4 09/17] usb: phy-mxs: Enable IC fixes for related SoCs
-In-Reply-To: <529D99AD.3010304@pengutronix.de>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
- <1386056231-17258-10-git-send-email-peter.chen@freescale.com>
- <529D95F7.8060705@pengutronix.de>
- <F281D0F91ED19E4D8E63A7504E8A649804140F64@039-SN2MPN1-021.039d.mgd.msft.net>
- <529D99AD.3010304@pengutronix.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649804140FC9@039-SN2MPN1-021.039d.mgd.msft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Dec 2013 16:53:04 +0800
+Subject: [PATCH 2/2] ARM: apf28dev: dts: set gpio polarity for usb
+ regulator and pinctrl for regulator gpio
+In-Reply-To: <1385801473-97460-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1385801473-97460-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20131203085302.GK10840@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Nov 30, 2013 at 09:51:13AM +0100, Gwenhael Goavec-Merou wrote:
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
+Changed the patch subject to "ARM: dts: apf28dev: ..." and applied.
 
- 
-> On 12/03/2013 09:38 AM, Peter Chen wrote:
-> >
-> >>
-> >> On 12/03/2013 08:37 AM, Peter Chen wrote:
-> >>> Some PHY bugs are fixed by IC logic, but these bits are not
-> >>> enabled by default, so we enable them at driver.
-> >>>
-> >>> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> >>> ---
-> >>>  drivers/usb/phy/phy-mxs-usb.c |   20 ++++++++++++++++++++
-> >>>  1 files changed, 20 insertions(+), 0 deletions(-)
-> >>>
-> >>> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-
-> >> usb.c
-> >>> index 8738890..0908d74 100644
-> >>> --- a/drivers/usb/phy/phy-mxs-usb.c
-> >>> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> >>> @@ -31,6 +31,10 @@
-> >>>  #define HW_USBPHY_CTRL_SET			0x34
-> >>>  #define HW_USBPHY_CTRL_CLR			0x38
-> >>>
-> >>> +#define HW_USBPHY_IP				0x90
-> >>> +#define HW_USBPHY_IP_SET			0x94
-> >>> +#define HW_USBPHY_IP_CLR			0x98
-> >>> +
-> >>>  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
-> >>>  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
-> >>>  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
-> >>> @@ -42,6 +46,8 @@
-> >>>  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
-> >>>  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
-> >>>
-> >>> +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
-> >>> +
-> >>>  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-> >>>
-> >>>  /* Do disconnection between PHY and controller without vbus */
-> >>> @@ -97,6 +103,16 @@ struct mxs_phy {
-> >>>  	struct regmap *regmap_anatop;
-> >>>  };
-> >>>
-> >>> +static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
-> >>> +{
-> >>> +	return mxs_phy->data == &imx6q_phy_data;
-> >>> +}
-> >>> +
-> >>> +static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
-> >>> +{
-> >>> +	return mxs_phy->data == &imx6sl_phy_data;
-> >>> +}
-> >>
-> >> Why don't you use a a BIT() here as in Patch 2/17, too?
-> >>
-> >
-> > Thanks, I will define the two PHY problems as the register bit
-> > position at 2/17, and use those two MACROs at this patch.
-> > Is it your point?
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx28-apf28dev.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> I was wondering if the driver looks more uniform if you use something
-> like this:
+> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+> index 741aecb..334dea5 100644
+> --- a/arch/arm/boot/dts/imx28-apf28dev.dts
+> +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+> @@ -66,6 +66,16 @@
+>  					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+>  					fsl,pull-up = <MXS_PULL_DISABLE>;
+>  				};
+> +
+> +				usb0_otg_apf28dev: otg-apf28dev at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						MX28_PAD_LCD_D23__GPIO_1_23
+> +					>;
+> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
+> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+> +					fsl,pull-up = <MXS_PULL_DISABLE>;
+> +				};
+>  			};
+>  
+>  			lcdif at 80030000 {
+> @@ -131,6 +141,8 @@
+>  
+>  	ahb at 80080000 {
+>  		usb0: usb at 80080000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&usb0_otg_apf28dev>;
+>  			vbus-supply = <&reg_usb0_vbus>;
+>  			status = "okay";
+>  		};
+> @@ -160,6 +172,7 @@
+>  			regulator-min-microvolt = <5000000>;
+>  			regulator-max-microvolt = <5000000>;
+>  			gpio = <&gpio1 23 1>;
+> +			enable-active-high;
+>  		};
+>  	};
+>  
+> -- 
+> 1.8.3.2
 > 
-> #define MXS_PHY_NEED_IP_FIX		BIT(3)
-> 
-
-OK, will change like below:
-
-if (mxs_phy->data->flags & MXS_PHY_NEED_IP_FIX)
-	writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
-
-Peter
