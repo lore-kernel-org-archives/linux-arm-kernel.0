@@ -1,35 +1,57 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue,  3 Dec 2013 18:04:54 +0800
-Subject: [PATCH] ASoC: wm8731: fix dsp mode configuration
-Message-ID: <1386065094-26018-1-git-send-email-voice.shen@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Dec 2013 10:09:26 +0000
+Subject: [PATCH 5/6] amba: Convert to clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <1386065071-9529-6-git-send-email-ulf.hansson@linaro.org>
+References: <1386065071-9529-1-git-send-email-ulf.hansson@linaro.org>
+ <1386065071-9529-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20131203100926.GQ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to WM8731 "PD, Rev 4.9 October 2012" datasheet, when it
-works in DSP mode A, LRP = 1, while works in DSP mode B, LRP = 0.
-So, fix LRP for DSP mode as the datesheet specification.
+On Tue, Dec 03, 2013 at 11:04:30AM +0100, Ulf Hansson wrote:
+> To simplify code and error handling let's use clk_prepare_enable
+> and clk_disable_unprepare. No functional change.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- sound/soc/codecs/wm8731.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Not true.
 
-diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-index 456bb8c..bc7472c 100644
---- a/sound/soc/codecs/wm8731.c
-+++ b/sound/soc/codecs/wm8731.c
-@@ -447,10 +447,10 @@ static int wm8731_set_dai_fmt(struct snd_soc_dai *codec_dai,
- 		iface |= 0x0001;
- 		break;
- 	case SND_SOC_DAIFMT_DSP_A:
--		iface |= 0x0003;
-+		iface |= 0x0013;
- 		break;
- 	case SND_SOC_DAIFMT_DSP_B:
--		iface |= 0x0013;
-+		iface |= 0x0003;
- 		break;
- 	default:
- 		return -EINVAL;
--- 
-1.7.9.5
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/amba/bus.c |   30 ++++++------------------------
+>  1 file changed, 6 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+> index b90dc1e..0477131 100644
+> --- a/drivers/amba/bus.c
+> +++ b/drivers/amba/bus.c
+> @@ -151,36 +151,18 @@ postcore_initcall(amba_init);
+>  
+>  static int amba_get_enable_pclk(struct amba_device *pcdev)
+>  {
+> -	struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
+> -	int ret;
+> -
+> -	pcdev->pclk = pclk;
+> -
+> -	if (IS_ERR(pclk))
+> -		return PTR_ERR(pclk);
+> +	pcdev->pclk = clk_get(&pcdev->dev, "apb_pclk");
+>  
+> -	ret = clk_prepare(pclk);
+> -	if (ret) {
+> -		clk_put(pclk);
+> -		return ret;
+> -	}
+> +	if (IS_ERR(pcdev->pclk))
+> +		return PTR_ERR(pcdev->pclk);
+>  
+> -	ret = clk_enable(pclk);
+> -	if (ret) {
+> -		clk_unprepare(pclk);
+> -		clk_put(pclk);
+> -	}
+> -
+> -	return ret;
+> +	return clk_prepare_enable(pcdev->pclk);
+
+There is clearly a change here in the error handling.
