@@ -1,46 +1,64 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 3 Dec 2013 09:48:59 +0900
-Subject: [PATCH v11 0/7] ARM: support for the Trusted Foundations secure
- monitor
-In-Reply-To: <20131126001033.GB21634@quad.lixom.net>
-References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
- <20131126001033.GB21634@quad.lixom.net>
-Message-ID: <CAAVeFuKh7T42AfAud=ZJ-j_7BgeRUFOytD7CNQ_DFdZeQRHj4A@mail.gmail.com>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Tue, 3 Dec 2013 10:13:52 +0800
+Subject: Build warning in drivers/dma/mmp_tdma.c
+In-Reply-To: <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
+References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
+ <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
+ <529C37F3.1040205@marvell.com>
+ <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
+Message-ID: <CAMj5Bkjkndq1-AJSm0k9Mm8xeaWEGktoFb6nZ3kr7RackFdcaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 9:10 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Sun, Nov 24, 2013 at 03:30:45PM +0900, Alexandre Courbot wrote:
->> New rebase that should be ready-to-apply on the latest Tegra tree. The last
->> remaining blocker is Russell's approval for this series and it is my hope to
->> obtain it with this version.
->>
->> There has been quite some debate around this series, notably about the SMC
->> calling conventions and whether the firmware interface should be moved out of
->> arch/arm. I hope that all the questions have been answered and that we can move
->> forward with this series that enables NVIDIA-branded retail Tegra devices to run
->> mainline.
->>
->> Changes since v10:
->> - Rebased on top of more recent sources since some files have been renamed in
->>   mach-tegra.
->> - Gave a final proof-read and extensive testing.
->>
->> Alexandre Courbot (7):
->>   ARM: add basic support for Trusted Foundations
->>   of: add vendor prefix for Trusted Logic Mobility
->>   of: add Trusted Foundations bindings documentation
->>   ARM: tegra: add support for Trusted Foundations
->>   ARM: tegra: split setting of CPU reset handler
->>   ARM: tegra: set CPU reset handler using firmware
->>   ARM: tegra: support Trusted Foundations by default
->
-> Ok, this looks good to me. Russell, do you want the first patch in your
-> tree or are you ok with acking that and we can take everything through
-> arm-soc?
->
-> The alternative is that we can have Stephen provide a stable branch with
-> the first patch on it and we both merge that, then the rest goes on top
-> of that through arm-soc.
+On Tue, Dec 3, 2013 at 4:05 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Sun, Dec 1, 2013 at 11:34 PM, Qiao Zhou <zhouqiao@marvell.com> wrote:
 
-Russell, ping?
+>>>> commit 1a4ee91dacedde3e82d8ce6eeace7f16884474f9
+>>>> Author: Dan Williams <dan.j.williams@intel.com>
+>>>> Date:   Thu Nov 28 12:27:38 2013 -0800
+>>>>
+>>>>      dma: mmp_dma depends on CPU_MMP2
+>>>>
+>>>>      It calls sram_get_gpool() which is only defined if CONFIG_CPU_MMP2=y
+>>>>
+>>>>      Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+>>>>
+>>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>>>> index 446687cc2334..dad83634cb65 100644
+>>>> --- a/drivers/dma/Kconfig
+>>>> +++ b/drivers/dma/Kconfig
+>>>> @@ -287,7 +287,7 @@ config DMA_SA11X0
+>>>>
+>>>>   config MMP_TDMA
+>>>>          bool "MMP Two-Channel DMA support"
+>>>> -       depends on ARCH_MMP
+>>>> +       depends on ARCH_MMP && CPU_MMP2
+>>>
+>>>
+>>> Hi, Qiao
+>>>
+>>> Do you have comments?
+>>> Does this work on PXA910?
+>>
+>> MMP_TDMA should not depend on CPU_MMP2. PXA910, and other chip set also use
+>> mmp_tdma.
+>
+> It does depend on CPU_MMP2, as I can generate the following build
+> failure with the attached config.
+>
+> drivers/built-in.o: In function `mmp_tdma_free_descriptor':
+> drivers/dma/mmp_tdma.c:329: undefined reference to `sram_get_gpool'
+> drivers/built-in.o: In function `mmp_tdma_alloc_descriptor':
+> drivers/dma/mmp_tdma.c:379: undefined reference to `sram_get_gpool'
+>
+
+How about modifying arch/arm/mach-mmp/Makefile
+Like:
+-obj-y                          += common.o devices.o time.o
++obj-y                          += common.o devices.o time.o sram.o
+-obj-$(CONFIG_CPU_MMP2)         += mmp2.o sram.o
++obj-$(CONFIG_CPU_MMP2)         += mmp2.o
+
+As Qiao mentioned sram is used both on mmp2 and pxa910.
+
+Thanks
