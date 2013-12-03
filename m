@@ -1,126 +1,90 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Tue, 3 Dec 2013 09:19:02 +0000
-Subject: [PATCH v4 17/17] usb: phy-mxs: do not set PWD.RXPWD1PT1 for low
- speed connection
-In-Reply-To: <529D9BF7.1080707@pengutronix.de>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
- <1386056231-17258-18-git-send-email-peter.chen@freescale.com>
- <529D9BF7.1080707@pengutronix.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649804141031@039-SN2MPN1-021.039d.mgd.msft.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 3 Dec 2013 14:49:40 +0530
+Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
+In-Reply-To: <CAAfyv37Vie1vZK2XQ1cfVq6eVnSuaBLfykk6pU8fwEyqvPF4BA@mail.gmail.com>
+References: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>	<529D9D43.6040101@ti.com>
+ <CAAfyv37Vie1vZK2XQ1cfVq6eVnSuaBLfykk6pU8fwEyqvPF4BA@mail.gmail.com>
+Message-ID: <529DA22C.6060102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
- 
+On Tuesday 03 December 2013 02:38 PM, Belisko Marek wrote:
+> Hi,
 > 
-> On 12/03/2013 08:37 AM, Peter Chen wrote:
-> > At very rare cases, the SoF will not send out after resume with
-> > low speed connection. The workaround is do not power down
-> > PWD.RXPWD1PT1 bit during the suspend.
-> 
-> Is this also a fix for newly added code? If so please also squash.
-> 
+> On Tue, Dec 3, 2013 at 9:58 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Tuesday 03 December 2013 02:03 PM, Marek Belisko wrote:
+>>> Without this change when booting omap3 device (gta04) with board file
+>>> leads to follwing errors:
+>>>
+>>> [    1.203308] musb-hdrc musb-hdrc.0.auto: unable to find phy
+>>> [    1.209075] HS USB OTG: no transceiver configured
+>>> [    1.214019] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+>>>
+>>> and usb isn't working.
+>>>
+>>> This is probably regression caused by commit: 6c27f939
+>>
+>> I think a better fix would be to have this merged..
+>> https://lkml.org/lkml/2013/7/26/91
+> Yes I see but how this could help with current situation? Ho you then
+> specify device number?
 
-No, it is a workaround for new problem.
-
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/phy/phy-mxs-usb.c |   47
-> ++++++++++++++++++++++++++++++++++++++++-
-> >  1 files changed, 46 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-
-> usb.c
-> > index 542b6ec..5ae4a57 100644
-> > --- a/drivers/usb/phy/phy-mxs-usb.c
-> > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > @@ -69,6 +69,9 @@
-> >  #define ANADIG_USB2_LOOPBACK_SET		0x244
-> >  #define ANADIG_USB2_LOOPBACK_CLR		0x248
-> >
-> > +#define ANADIG_USB1_MISC			0x1f0
-> > +#define ANADIG_USB2_MISC			0x250
-> > +
-> >  #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
-> >  #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
-> >
-> > @@ -80,6 +83,11 @@
-> >  #define BM_ANADIG_USB2_LOOPBACK_UTMI_DIG_TST1	BIT(2)
-> >  #define BM_ANADIG_USB2_LOOPBACK_TSTI_TX_EN	BIT(5)
-> >
-> > +#define BM_ANADIG_USB1_MISC_RX_VPIN_FS		BIT(29)
-> > +#define BM_ANADIG_USB1_MISC_RX_VMIN_FS		BIT(28)
-> > +#define BM_ANADIG_USB2_MISC_RX_VPIN_FS		BIT(29)
-> > +#define BM_ANADIG_USB2_MISC_RX_VMIN_FS		BIT(28)
-> > +
-> >  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-> >
-> >  /* Do disconnection between PHY and controller without vbus */
-> > @@ -296,12 +304,49 @@ static void mxs_phy_shutdown(struct usb_phy *phy)
-> >  	clk_disable_unprepare(mxs_phy->clk);
-> >  }
-> >
-> > +static bool mxs_phy_is_low_speed_connection(struct mxs_phy *mxs_phy)
-> > +{
-> > +	unsigned int line_state;
-> > +	/* bit definition is the same for all controllers */
-> > +	unsigned int dp_bit = BM_ANADIG_USB1_MISC_RX_VPIN_FS,
-> > +		     dm_bit = BM_ANADIG_USB1_MISC_RX_VMIN_FS;
-> > +	unsigned int reg = ANADIG_USB1_MISC;
-> > +
-> > +	/* If the SoCs don't have anatop, quit */
-> > +	if (!mxs_phy->regmap_anatop)
-> > +		return false;
-> > +
-> > +	if (mxs_phy->port_id == 0)
-> > +		reg = ANADIG_USB1_MISC;
-> > +	else if (mxs_phy->port_id == 1)
-> > +		reg = ANADIG_USB2_MISC;
-> > +
-> > +	regmap_read(mxs_phy->regmap_anatop, reg, &line_state);
-> > +
-> > +	if ((line_state & (dp_bit | dm_bit)) ==  dm_bit)
-> > +		return true;
-> > +	else
-> > +		return false;
-> > +}
-> > +
-> >  static int mxs_phy_suspend(struct usb_phy *x, int suspend)
-> >  {
-> >  	struct mxs_phy *mxs_phy = to_mxs_phy(x);
-> > +	bool low_speed_connection, vbus_is_on;
-> > +
-> > +	low_speed_connection = mxs_phy_is_low_speed_connection(mxs_phy);
-> > +	vbus_is_on = mxs_phy_get_vbus_status(mxs_phy);
-> >
-> >  	if (suspend) {
-> > -		writel(0xffffffff, x->io_priv + HW_USBPHY_PWD);
-> > +		/*
-> > +		 * FIXME: Do not power down RXPWD1PT1 bit for low speed
+With this we can for sure know the device numbering (of MUSB) starts from '0'.
+If we use PLATFORM_DEVID_AUTO, we won't know what dev number has been assigned
+to us. In your case you get "musb-hdrc.0.auto" because no one else is creating
+a device using PLATFORM_DEVID_AUTO (before your device is created).
+> This patch is fixing 3.13-rcx regression.
 > 
-> Is this FIXME still true?
+>>>
+>>> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+>>> ---
+>>>  arch/arm/mach-omap2/twl-common.c |    2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+>>> index b0d54da..3640ce0 100644
+>>> --- a/arch/arm/mach-omap2/twl-common.c
+>>> +++ b/arch/arm/mach-omap2/twl-common.c
+>>> @@ -92,7 +92,7 @@ void __init omap_pmic_late_init(void)
+>>>
+>>>  #if defined(CONFIG_ARCH_OMAP3)
+>>>  struct phy_consumer consumers[] = {
+>>> -     PHY_CONSUMER("musb-hdrc.0", "usb"),
+>>> +     PHY_CONSUMER("musb-hdrc.0.auto", "usb"),
+>>
+>> the index '0' might vary for some boards leading it to again break musb.
+> If you run grep for musb-hdrc :
+> arch/arm/mach-omap2/board-3430sdp.c: usb_bind_phy("musb-hdrc.0.auto",
+> 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-devkit8000.c:
+> usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-overo.c: usb_bind_phy("musb-hdrc.0.auto", 0,
+> "twl4030_usb");
+> arch/arm/mach-omap2/board-omap3beagle.c:
+> usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-omap3touchbook.c:
+> usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-cm-t35.c: usb_bind_phy("musb-hdrc.0.auto",
+> 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-omap3stalker.c:
+> usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-omap3logic.c:
+> usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-2430sdp.c: usb_bind_phy("musb-hdrc.0.auto",
+> 0, "twl4030_usb");
+> arch/arm/mach-omap2/board-ldp.c: usb_bind_phy("musb-hdrc.0.auto", 0,
+> "twl4030_usb");
+> arch/arm/mach-omap2/board-rx51.c: usb_bind_phy("musb-hdrc.0.auto", 0,
+> "twl4030_usb");
+> arch/arm/mach-omap2/board-omap3pandora.c:
+> usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
 
-Yes, still not find the root cause.
+hmm.. that patch was in a series that fixes this too
+https://lkml.org/lkml/2013/7/26/88
 
-Peter
-
-> 
-> > +		 * connect. The low speed connection will have problem at
-> > +		 * very rare cases during usb suspend and resume process.
-> > +		 */
-> > +		if (low_speed_connection & vbus_is_on)
-> > +			writel(0xfffbffff, x->io_priv + HW_USBPHY_PWD);
-> > +		else
-> > +			writel(0xffffffff, x->io_priv + HW_USBPHY_PWD);
-> >  		writel(BM_USBPHY_CTRL_CLKGATE,
-> >  		       x->io_priv + HW_USBPHY_CTRL_SET);
-> >  		clk_disable_unprepare(mxs_phy->clk);
-> >
-> 
-> Marc
-> 
-> --
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Thanks
+Kishon
