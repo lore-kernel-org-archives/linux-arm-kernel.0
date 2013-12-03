@@ -1,73 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 10:59:54 -0700
-Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
-In-Reply-To: <20131129141725.GA22771@ulmo.nvidia.com>
-References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
- <20131129141725.GA22771@ulmo.nvidia.com>
-Message-ID: <529E1C1A.5000709@wwwdotorg.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Dec 2013 18:03:00 +0000
+Subject: [RFC part1 PATCH 5/7] ARM64 / ACPI: Introduce arm_core.c and
+ its related head file
+In-Reply-To: <1386088611-2801-6-git-send-email-hanjun.guo@linaro.org>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088611-2801-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20131203180300.GD16025@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2013 07:17 AM, Thierry Reding wrote:
-> On Mon, Nov 25, 2013 at 02:53:36PM -0700, Stephen Warren wrote: 
-> [...]
->> memcpy(&tdc->dma_sconfig, sconfig, sizeof(*sconfig)); +	if
->> (!tdc->slave_id) +		tdc->slave_id = sconfig->slave_id; 
->> tdc->config_init = true;
+On Tue, Dec 03, 2013 at 04:36:49PM +0000, Hanjun Guo wrote:
+> introduce arm_core.c and its related head file, after this patch,
+> we can get ACPI tables from BIOS on ARM64 now.
 > 
-> This could use some blank lines to unclutter it a bit.
-
-To be honest, I feel the opposite; random blank lines sprinkled in the
-middle of related code make the code structure harder to follow.
-
-
->> @@ -942,7 +947,7 @@ static struct dma_async_tx_descriptor
->> *tegra_dma_prep_slave_sg( ahb_seq |=
->> TEGRA_APBDMA_AHBSEQ_BUS_WIDTH_32;
->> 
->> csr |= TEGRA_APBDMA_CSR_ONCE | TEGRA_APBDMA_CSR_FLOW; -	csr |=
->> tdc->dma_sconfig.slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT; +
->> csr |= tdc->slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h |   57 +++++++++++
+>  arch/arm64/kernel/setup.c     |    8 ++
+>  drivers/acpi/Makefile         |    2 +
+>  drivers/acpi/plat/Makefile    |    1 +
+>  drivers/acpi/plat/arm-core.c  |  219 +++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 287 insertions(+)
+>  create mode 100644 drivers/acpi/plat/Makefile
+>  create mode 100644 drivers/acpi/plat/arm-core.c
 > 
-> Perhaps I'm missing something, but couldn't we reuse the .slave_id
-> field of struct dma_slave_config? It seems like it might be
-> overwritten by the DMA engine core or users when they call
-> dmaengine_slave_config().
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index c186f5b..e9444e4 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -19,6 +19,43 @@
+>  #ifndef _ASM_ARM_ACPI_H
+>  #define _ASM_ARM_ACPI_H
+>  
+> +#include <asm/cacheflush.h>
+> +
+> +#include <linux/init.h>
+> +
+> +#define COMPILER_DEPENDENT_INT64	long long
+> +#define COMPILER_DEPENDENT_UINT64	unsigned long long
 
-The slave ID seems channel-specific to me, and hence should be managed
-at the channel level. struct dma_slave_config is the client-specified
-runtime properties. As you mention, I also worry about client drivers
-trampling over the dma_slave_config data, so storing it where they
-can't doesn't seem like a good idea.
+Given we've already pulled in linux/init.h, which has pulled in
+linux/types.h, is there any reason we can't use s64 and u64 here?
 
-> But wouldn't it be better to have the core take care of all the
-> slave ID management, so we don't have to jump through hoops? Or
-> perhaps the concept isn't general enough to map well to other
-> drivers.
+If we can, then why don't we unify this further up so each arch doesn't
+have to define this redundantly?
 
-It's a HW specific detail, I think. At least, the representation of
-the data in a DT binding is, and hence so is the parsing of the data
-from DT. The rest of the code that's in the driver re: slave ID is
-trivial enough it doesn't seem worth sharing. And in fact, once this
-series is done, we can even remove the conditional assignments to
-slave_id and require that it be provided by DT and never from
-dma_slave_config, which simplifies it even further.
+> +
+> +/*
+> + * Calling conventions:
+> + *
+> + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+> + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
+> + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+> + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
+> + */
+> +#define ACPI_SYSTEM_XFACE
+> +#define ACPI_EXTERNAL_XFACE
+> +#define ACPI_INTERNAL_XFACE
+> +#define ACPI_INTERNAL_VAR_XFACE
+> +
+> +/* Asm macros */
+> +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
 
->> static int tegra_dma_probe(struct platform_device *pdev) { struct
->> resource	*res; @@ -1383,10 +1402,22 @@ static int
->> tegra_dma_probe(struct platform_device *pdev) goto err_irq; }
->> 
->> +	tdma->xlate_info.device = &tdma->dma_dev; +
->> tdma->xlate_info.post_alloc = tegra_dma_of_xlate_post_alloc; +
->> ret = of_dma_controller_register(pdev->dev.of_node, +
->> of_dma_slave_xlate, &tdma->xlate_info); +	if (ret < 0) { +
->> dev_err(&pdev->dev, +			"Tegra20 APB DMA OF registration failed
->> %d\n", ret); +		goto err_unregister_dma_dev; +	}
-> 
-> Would it be useful to move this into the core and have it register
-> the OF parts transparently to the driver? That's of course nothing
-> that should be done in this patch.
+Can you elaborate on when ACPI needs to use this? 
 
-That'd probably be possible, yes, given a few extra fields in struct
-dma_device, e.g. for the of_xlate function pointer. As you say, I
-won't address it in this patch though.
+Thanks,
+Mark.
