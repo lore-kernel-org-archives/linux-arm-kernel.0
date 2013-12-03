@@ -1,112 +1,36 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Tue,  3 Dec 2013 08:50:52 +0100
-Subject: [PATCHv2 3/3] ARM: dts: imx27-apf27dev: Add pinctrl for cspi
- chip-select, sdhci2 card-detect, gpio-leds and gpio-keys
-In-Reply-To: <1386057052-9978-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1386057052-9978-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1386057052-9978-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1386057052-9978-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Tue, 3 Dec 2013 09:48:36 +0000
+Subject: [PATCH v4 17/17] usb: phy-mxs: do not set PWD.RXPWD1PT1 for low
+ speed connection
+In-Reply-To: <529DA44C.9090702@pengutronix.de>
+References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
+ <1386056231-17258-18-git-send-email-peter.chen@freescale.com>
+ <529D9BF7.1080707@pengutronix.de>
+ <F281D0F91ED19E4D8E63A7504E8A649804141031@039-SN2MPN1-021.039d.mgd.msft.net>
+ <529DA44C.9090702@pengutronix.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498041410CD@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/boot/dts/imx27-apf27dev.dts | 34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+ 
+> 
+> On 12/03/2013 10:19 AM, Peter Chen wrote:
+> >> On 12/03/2013 08:37 AM, Peter Chen wrote:
+> >>> At very rare cases, the SoF will not send out after resume with
+> >>> low speed connection. The workaround is do not power down
+> >>> PWD.RXPWD1PT1 bit during the suspend.
+> >>
+> >> Is this also a fix for newly added code? If so please also squash.
+> 
+> > No, it is a workaround for new problem.
+> 
+> If this would be a fix, it's better to put this as first patch into a
+> series, so that it can be applied to the stable trees easier.
+> 
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index 6069331..c8d3cb4 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -38,6 +38,8 @@
+It is introduced by [3/17], without [3/17] it needs another fix which
+we have not intended to use. I will squash them, thanks.
+
+Peter
+
  
- 	gpio-keys {
- 		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
- 
- 		user-key {
- 			label = "user";
-@@ -48,6 +50,8 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_leds>;
- 
- 		user {
- 			label = "Heartbeat";
-@@ -61,7 +65,7 @@
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 28 1>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_cspi1>;
-+	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
- 	status = "okay";
- };
- 
-@@ -70,7 +74,7 @@
- 	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
- 			<&gpio2 17 1>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_cspi2>;
-+	pinctrl-0 = <&pinctrl_cspi2 &pinctrl_cspi2_cs>;
- 	status = "okay";
- };
- 
-@@ -106,10 +110,22 @@
- 			fsl,pins = <MX27_CSPI1_PINGRP1>;
- 		};
- 
-+		pinctrl_cspi1_cs: cspi1csgrp {
-+			fsl,pins = <MX27_PAD_CSPI1_SS0__GPIO4_28 0x0>;
-+		};
-+
- 		pinctrl_cspi2: cspi2grp {
- 			fsl,pins = <MX27_CSPI2_PINGRP1>;
- 		};
- 
-+		pinctrl_cspi2_cs: cspi2csgrp {
-+			fsl,pins = <
-+				MX27_PAD_CSI_D5__GPIO2_17 0x0
-+				MX27_PAD_CSPI2_SS0__GPIO4_21 0x0
-+				MX27_PAD_CSPI1_SS1__GPIO4_27 0x0
-+			>;
-+		};
-+
- 		pinctrl_imxfb1: imxfbgrp {
- 			fsl,pins = <MX27_FB_PINGRP1>;
- 		};
-@@ -126,9 +142,21 @@
- 			fsl,pins = <MX27_SDHC2_PINGRP1>;
- 		};
- 
-+		pinctrl_sdhc2_cd: sdhc2cdgrp {
-+			fsl,pins = <MX27_PAD_TOUT__GPIO3_14 0x0>;
-+		};
-+
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <MX27_PWM0_PINGRP1>;
- 		};
-+
-+		pinctrl_gpio_leds: gpioledsgrp {
-+			fsl,pins = <MX27_PAD_PC_VS1__GPIO6_14 0x0>;
-+		};
-+
-+		pinctrl_gpio_keys: gpiokeysgrp {
-+			fsl,pins = <MX27_PAD_PC_VS2__GPIO6_13 0x0>;
-+		};
- 	};
- };
- 
-@@ -136,7 +164,7 @@
- 	bus-width = <4>;
- 	cd-gpios = <&gpio3 14 0>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_sdhc2>;
-+	pinctrl-0 = <&pinctrl_sdhc2 &pinctrl_sdhc2_cd>;
- 	status = "okay";
- };
- 
--- 
-1.8.3.2
