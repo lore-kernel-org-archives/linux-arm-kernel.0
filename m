@@ -1,90 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  3 Dec 2013 15:23:15 -0800
-Subject: [PATCH 1/5] arm/dts: Fix missing entries for am3517
-In-Reply-To: <1386112999-17271-1-git-send-email-tony@atomide.com>
-References: <1386112999-17271-1-git-send-email-tony@atomide.com>
-Message-ID: <1386112999-17271-2-git-send-email-tony@atomide.com>
+Date: Tue,  3 Dec 2013 15:23:14 -0800
+Subject: [PATCH 0/5] Get am3517 working with device tree
+Message-ID: <1386112999-17271-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On am3517 there are some extra devices compared to omap3.dtsi that
-we currently have not defined. Let's fix that by adding am3517.dtsi
-file.
+Hi all,
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/am3517.dtsi | 63 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+Looks like I missed am3517 earlier when making mach-omap2 boot in
+device tree only mode. Here are patches to make am3517-evm bootable
+with NFSroot and MMC with device tree.
+
+This should make it easy to add further support and also to add support
+for the missing am3517 craneboard and cm-t3517 boards.
+
+These should apply against v3.12 except for the pdata-quirks.c patch
+that depends on the earlier mach-omap2 device tree conversion patches.
+
+Regards,
+
+Tony
+
+
+Nishanth Menon (1):
+  ARM: OMAP2+: Fix the machine entry for am3517
+
+Tony Lindgren (4):
+  arm/dts: Fix missing entries for am3517
+  ARM: OMAP2+: Use pdata quirks for emac on am3517
+  ARM/dts: Add basic devices on am3517-evm
+  ARM: OMAP2+: Remove legacy emac code
+
+ arch/arm/boot/dts/am3517-evm.dts    |  35 ++++++++++-
+ arch/arm/boot/dts/am3517.dtsi       |  63 ++++++++++++++++++++
+ arch/arm/mach-omap2/Makefile        |   3 -
+ arch/arm/mach-omap2/am35xx-emac.c   | 115 ------------------------------------
+ arch/arm/mach-omap2/am35xx-emac.h   |  15 -----
+ arch/arm/mach-omap2/board-generic.c |  18 ++++++
+ arch/arm/mach-omap2/pdata-quirks.c  |  43 ++++++++++++++
+ 7 files changed, 156 insertions(+), 136 deletions(-)
  create mode 100644 arch/arm/boot/dts/am3517.dtsi
+ delete mode 100644 arch/arm/mach-omap2/am35xx-emac.c
+ delete mode 100644 arch/arm/mach-omap2/am35xx-emac.h
 
-diff --git a/arch/arm/boot/dts/am3517.dtsi b/arch/arm/boot/dts/am3517.dtsi
-new file mode 100644
-index 0000000..2fbe02f
---- /dev/null
-+++ b/arch/arm/boot/dts/am3517.dtsi
-@@ -0,0 +1,63 @@
-+/*
-+ * Device Tree Source for am3517 SoC
-+ *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include "omap3.dtsi"
-+
-+/ {
-+	aliases {
-+		serial3 = &uart4;
-+	};
-+
-+	ocp {
-+		am35x_otg_hs: am35x_otg_hs at 5c040000 {
-+			compatible = "ti,omap3-musb";
-+			ti,hwmods = "am35x_otg_hs";
-+			status = "disabled";
-+			reg = <0x5c040000 0x1000>;
-+			interrupts = <71>;
-+			interrupt-names = "mc";
-+		};
-+
-+		davinci_emac: ethernet at 0x5c000000 {
-+			compatible = "ti,am3517-emac";
-+			ti,hwmods = "davinci_emac";
-+			status = "disabled";
-+			reg = <0x5c000000 0x30000>;
-+			interrupts = <67 68 69 70>;
-+			ti,davinci-ctrl-reg-offset = <0x10000>;
-+			ti,davinci-ctrl-mod-reg-offset = <0>;
-+			ti,davinci-ctrl-ram-offset = <0x20000>;
-+			ti,davinci-ctrl-ram-size = <0x2000>;
-+			ti,davinci-rmii-en = /bits/ 8 <1>;
-+			local-mac-address = [ 00 00 00 00 00 00 ];
-+		};
-+
-+		davinci_mdio: ethernet at 0x5c030000 {
-+			compatible = "ti,davinci_mdio";
-+			ti,hwmods = "davinci_mdio";
-+			status = "disabled";
-+			reg = <0x5c030000 0x1000>;
-+			bus_freq = <1000000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		uart4: serial at 4809e000 {
-+			compatible = "ti,omap3-uart";
-+			ti,hwmods = "uart4";
-+			status = "disabled";
-+			reg = <0x4809e000 0x400>;
-+			interrupts = <84>;
-+			dmas = <&sdma 55 &sdma 54>;
-+			dma-names = "tx", "rx";
-+			clock-frequency = <48000000>;
-+		};
-+	};
-+};
 -- 
 1.8.1.1
