@@ -1,41 +1,120 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Tue, 3 Dec 2013 09:53:35 +0100
-Subject: [PATCH 1/2] ARM: imx28: add apf28 specific initialization
- (macaddr)
-In-Reply-To: <20131203085030.GJ10840@S2101-09.ap.freescale.net>
-References: <1385801473-97460-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <20131203085030.GJ10840@S2101-09.ap.freescale.net>
-Message-ID: <20131203095335.3c073da4@x230>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 03 Dec 2013 09:53:11 +0100
+Subject: [PATCH v4 17/17] usb: phy-mxs: do not set PWD.RXPWD1PT1 for low
+ speed connection
+In-Reply-To: <1386056231-17258-18-git-send-email-peter.chen@freescale.com>
+References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
+ <1386056231-17258-18-git-send-email-peter.chen@freescale.com>
+Message-ID: <529D9BF7.1080707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Dec 2013 16:50:32 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
+On 12/03/2013 08:37 AM, Peter Chen wrote:
+> At very rare cases, the SoF will not send out after resume with
+> low speed connection. The workaround is do not power down
+> PWD.RXPWD1PT1 bit during the suspend.
 
-> On Sat, Nov 30, 2013 at 09:51:12AM +0100, Gwenhael Goavec-Merou wrote:
-> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> > ---
-> >  arch/arm/mach-mxs/mach-mxs.c | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> > index 3982e12..02b17f7 100644
-> > --- a/arch/arm/mach-mxs/mach-mxs.c
-> > +++ b/arch/arm/mach-mxs/mach-mxs.c
-> > @@ -158,6 +158,7 @@ enum mac_oui {
-> >  	OUI_DENX,
-> >  	OUI_CRYSTALFONTZ,
-> >  	OUI_I2SE,
-> 
-> What tree are you based on?  I do not have this OUI_I2SE thing in my
-> tree.
-> 
-> Shawn
-> 
-It's the for-next[1] branch of
-git://git.linaro.org/people/shawnguo/linux-2.6.git
+Is this also a fix for newly added code? If so please also squash.
 
-Gwenhael
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   47 ++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 46 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 542b6ec..5ae4a57 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -69,6 +69,9 @@
+>  #define ANADIG_USB2_LOOPBACK_SET		0x244
+>  #define ANADIG_USB2_LOOPBACK_CLR		0x248
+>  
+> +#define ANADIG_USB1_MISC			0x1f0
+> +#define ANADIG_USB2_MISC			0x250
+> +
+>  #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
+>  #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
+>  
+> @@ -80,6 +83,11 @@
+>  #define BM_ANADIG_USB2_LOOPBACK_UTMI_DIG_TST1	BIT(2)
+>  #define BM_ANADIG_USB2_LOOPBACK_TSTI_TX_EN	BIT(5)
+>  
+> +#define BM_ANADIG_USB1_MISC_RX_VPIN_FS		BIT(29)
+> +#define BM_ANADIG_USB1_MISC_RX_VMIN_FS		BIT(28)
+> +#define BM_ANADIG_USB2_MISC_RX_VPIN_FS		BIT(29)
+> +#define BM_ANADIG_USB2_MISC_RX_VMIN_FS		BIT(28)
+> +
+>  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+>  
+>  /* Do disconnection between PHY and controller without vbus */
+> @@ -296,12 +304,49 @@ static void mxs_phy_shutdown(struct usb_phy *phy)
+>  	clk_disable_unprepare(mxs_phy->clk);
+>  }
+>  
+> +static bool mxs_phy_is_low_speed_connection(struct mxs_phy *mxs_phy)
+> +{
+> +	unsigned int line_state;
+> +	/* bit definition is the same for all controllers */
+> +	unsigned int dp_bit = BM_ANADIG_USB1_MISC_RX_VPIN_FS,
+> +		     dm_bit = BM_ANADIG_USB1_MISC_RX_VMIN_FS;
+> +	unsigned int reg = ANADIG_USB1_MISC;
+> +
+> +	/* If the SoCs don't have anatop, quit */
+> +	if (!mxs_phy->regmap_anatop)
+> +		return false;
+> +
+> +	if (mxs_phy->port_id == 0)
+> +		reg = ANADIG_USB1_MISC;
+> +	else if (mxs_phy->port_id == 1)
+> +		reg = ANADIG_USB2_MISC;
+> +
+> +	regmap_read(mxs_phy->regmap_anatop, reg, &line_state);
+> +
+> +	if ((line_state & (dp_bit | dm_bit)) ==  dm_bit)
+> +		return true;
+> +	else
+> +		return false;
+> +}
+> +
+>  static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+>  {
+>  	struct mxs_phy *mxs_phy = to_mxs_phy(x);
+> +	bool low_speed_connection, vbus_is_on;
+> +
+> +	low_speed_connection = mxs_phy_is_low_speed_connection(mxs_phy);
+> +	vbus_is_on = mxs_phy_get_vbus_status(mxs_phy);
+>  
+>  	if (suspend) {
+> -		writel(0xffffffff, x->io_priv + HW_USBPHY_PWD);
+> +		/*
+> +		 * FIXME: Do not power down RXPWD1PT1 bit for low speed
 
-[1]
-https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=blob;f=arch/arm/mach-mxs/mach-mxs.c;h=3982e129c054da764d6035b0d2640b0f70a44760;hb=refs/heads/for-next
+Is this FIXME still true?
+
+> +		 * connect. The low speed connection will have problem at
+> +		 * very rare cases during usb suspend and resume process.
+> +		 */
+> +		if (low_speed_connection & vbus_is_on)
+> +			writel(0xfffbffff, x->io_priv + HW_USBPHY_PWD);
+> +		else
+> +			writel(0xffffffff, x->io_priv + HW_USBPHY_PWD);
+>  		writel(BM_USBPHY_CTRL_CLKGATE,
+>  		       x->io_priv + HW_USBPHY_CTRL_SET);
+>  		clk_disable_unprepare(mxs_phy->clk);
+> 
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/443e04f2/attachment.sig>
