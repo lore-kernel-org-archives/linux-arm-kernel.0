@@ -1,46 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Dec 2013 17:41:37 +0000
-Subject: [PATCH V6] kbuild: dtbs_install: new make target
-In-Reply-To: <529E16D8.3060608@wwwdotorg.org>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <1385942188-21831-1-git-send-email-jason@lakedaemon.net>
- <529E16D8.3060608@wwwdotorg.org>
-Message-ID: <20131203174137.GV16735@n2100.arm.linux.org.uk>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 03 Dec 2013 18:20:13 +0100
+Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
+In-Reply-To: <529E1C82.8070501@cogentembedded.com>
+References: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
+ <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
+ <529E1C82.8070501@cogentembedded.com>
+Message-ID: <529E12CD.5040607@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 10:37:28AM -0700, Stephen Warren wrote:
-> On 12/01/2013 04:56 PM, Jason Cooper wrote:
-> > Unlike other build products in the Linux kernel, there is no 'make
-> > *install' mechanism to put devicetree blobs in a standard place.
-> > 
-> > This patch is an attempt to fix this problem.  Akin to 'make install',
-> > this creates a new make target, dtbs_install.  The script that gets
-> > called defers to a distribution or user supplied installdtbs binary,
-> > if found in the system.  Otherwise, the default action is to install the
-> > built dtbs into
-> > 
-> >   /lib/devicetrees/${kernel_version}/${dts_filename}.dtb
-> > 
-> > This is done to keep dtbs from different kernel versions separate until
-> > things have settled down.  Once the dtbs are stable, and not so strongly
-> > linked to the kernel version, the devicetree files will most likely move
-> > to their own repo.  Users will need to upgrade install scripts at that
-> > time.
-> > 
-> > /lib has been selected over /boot since /boot is often a FAT filesystem
-> > and a majority of the dts filenames are longer than 8+3.
-> > 
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > ---
-> > Note: Stephen, I haven't added your Ack because I wanted to make sure you were
-> > Ok with the change to /lib in light of /boot partitions formatted to FAT
-> 
-> This script shouldn't be installing directly to the filesystem, but
-> rather some staging area that then gets copied to the desired location
-> by distro-/use-specific scripts. As such, the filesystem in /boot isn't
-> relevant.
+Hello Sergei,
 
-Why do you think that?  All the other install targets install direct to
-the common destinations unless you ask for an alternative location.  Why
-should this be any different?
+On 03/12/2013 19:01, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 12/03/2013 05:07 PM, Boris BREZILLON wrote:
+>
+>> Replace clk_get calls by devm_clk_get calls.
+>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> Tested-by: Robert Nelson <robertcnelson@gmail.com>
+>> ---
+>>   drivers/usb/host/ohci-at91.c |   32 ++++++++------------------------
+>>   1 file changed, 8 insertions(+), 24 deletions(-)
+>
+>> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+>> index c406f1e..3652962 100644
+>> --- a/drivers/usb/host/ohci-at91.c
+>> +++ b/drivers/usb/host/ohci-at91.c
+>> @@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct 
+>> hc_driver *driver,
+>>           goto err;
+>>       }
+>>
+>> -    iclk = clk_get(&pdev->dev, "ohci_clk");
+>> +    iclk = devm_clk_get(dev, "ohci_clk");
+>>       if (IS_ERR(iclk)) {
+>> -        dev_err(&pdev->dev, "failed to get ohci_clk\n");
+>> +        dev_err(dev, "failed to get ohci_clk\n");
+>
+>    You changed this call...
+>
+>>           retval = PTR_ERR(iclk);
+>>           goto err;
+>>       }
+>> -    fclk = clk_get(&pdev->dev, "uhpck");
+>> +    fclk = devm_clk_get(dev, "uhpck");
+>>       if (IS_ERR(fclk)) {
+>>           dev_err(&pdev->dev, "failed to get uhpck\n");
+>
+>    ... but not this one.
+
+This is an oversight.
+
+>
+>>           retval = PTR_ERR(fclk);
+>> -        goto err4;
+>> +        goto err;
+>>       }
+>> -    hclk = clk_get(&pdev->dev, "hclk");
+>> +    hclk = devm_clk_get(dev, "hclk");
+>>       if (IS_ERR(hclk)) {
+>>           dev_err(&pdev->dev, "failed to get hclk\n");
+>
+>    ... or this one. Actually, I think cganging these calls would be 
+> out of scope for this patch.
+
+Ditto.
+
+I'll split the patch to in 2 patches:
+  1) replace &pdev->dev by dev
+  2) use devm_clk_get instead of clk_get.
+
+>
+>>           retval = PTR_ERR(hclk);
+>> -        goto err5;
+>> +        goto err;
+>>       }
+>>       if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+>> -        uclk = clk_get(&pdev->dev, "usb_clk");
+>> +        uclk = devm_clk_get(&pdev->dev, "usb_clk");
+>
+>    Hm, why not 'dev' like in all of the above?
+Ditto.
+
+Thanks for your review.
+
+Best Regards,
+
+Boris
+>
+>>           if (IS_ERR(uclk)) {
+>>               dev_err(&pdev->dev, "failed to get uclk\n");
+>>               retval = PTR_ERR(uclk);
+>> -            goto err6;
+>> +            goto err;
+>>           }
+>>       }
+>>
+>
+> WBR, Sergei
+>
+>
