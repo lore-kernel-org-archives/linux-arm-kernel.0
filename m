@@ -1,20 +1,52 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 13:09:18 -0700
-Subject: [PATCH 2/2] ARM: tegra: convert device tree file of Dalmore to
- use pinctrl defines
-In-Reply-To: <1385992502-12771-2-git-send-email-ldewangan@nvidia.com>
-References: <1385992502-12771-1-git-send-email-ldewangan@nvidia.com>
- <1385992502-12771-2-git-send-email-ldewangan@nvidia.com>
-Message-ID: <529E3A6E.1050003@wwwdotorg.org>
+Date: Tue, 03 Dec 2013 13:14:18 -0700
+Subject: [RFC][PATCHv6+++ 01/13] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <20131202.130220.1404999403649937134.hdoyu@nvidia.com>
+References: <20131128.145818.1345100874304396564.hdoyu@nvidia.com><20131129.134625.431945240074254704.hdoyu@nvidia.com><529B8739.60701@wwwdotorg.org>
+ <20131202.130220.1404999403649937134.hdoyu@nvidia.com>
+Message-ID: <529E3B9A.50207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2013 06:55 AM, Laxman Dewangan wrote:
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+On 12/02/2013 04:02 AM, Hiroshi Doyu wrote:
+...
+> Iterating over a property containing a list of phandles with arguments
+> is a common operation for device drivers. This patch adds a new
+> of_property_for_each_phandle_with_args() macro to make the iteration
+> simpler.
 
-Patch description?
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
 
-BTW, did you compile all the Tegra DT files before and after this
-change, and make sure that there's zero difference between them (i.e.
-they're identical byte-for-byte when compiled)? I don't feel like
-manually double-checking this entire patch...
+> +const __be32 *of_phandle_iter_init(const struct device_node *np,
+> +				   const char *list_name,
+> +				   const __be32 **end)
+> +{
+> +	size_t bytes;
+> +	const __be32 *cur;
+> +
+> +	cur = of_get_property(np, list_name, &bytes);
+> +	if (bytes)
+> +		*end = cur + bytes / sizeof(*cur);
+> +
+> +	return cur;
+> +}
+
+"bytes" doesn't seem like the correct thing to check in that if
+statement. The property might exist but be zero length. Perhaps if (cur)
+would be better, or just initializing *end in all cases (the value won't
+be used if (!cur), so setting *end to a bogus value in that case won't
+matter).
+
+> +const __be32 *of_phandle_iter_next(const char *cells_name, int cell_count,
+> +				   const __be32 *cur, const __be32 *end,
+> +				   struct of_phandle_args *out_args)
+...
+> +	if (!cur)
+> +		return NULL;
+> +
+> +	if (end - cur <= 0)
+> +		return NULL;
+
+Related, don't you want if (cur >= end) there; just compare the pointers
+directly rather than explicitly calculating and testing the difference?
