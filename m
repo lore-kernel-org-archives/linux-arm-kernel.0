@@ -1,80 +1,32 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 03 Dec 2013 21:01:38 +0300
-Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
-References: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
- <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <529E1C82.8070501@cogentembedded.com>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Tue, 3 Dec 2013 17:02:23 +0000
+Subject: [RFC part1 PATCH 3/7] ACPI / processor_core: Rework _PDC
+ related stuff to make it more arch-independent
+In-Reply-To: <20131203165140.24a05540@alan.etchedpixels.co.uk>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088611-2801-4-git-send-email-hanjun.guo@linaro.org>
+ <20131203165140.24a05540@alan.etchedpixels.co.uk>
+Message-ID: <20131203170223.GA14624@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Dec 03, 2013 at 04:51:40PM +0000, One Thousand Gnomes wrote:
+> On Wed,  4 Dec 2013 00:36:47 +0800
+> Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> 
+> > _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
+> > rework the code to make it more arch-independent.
+> > 
+> > The return value of acpi_processor_eval_pdc() should be 'acpi_status' but
+> > defined as 'int', fix it too.
+> 
+> Why not just define boot_options_idle_override as well. Then you can
+> leave the code unchanged. Also more importantly you can have override
+> values for ARM when it turns out you need those too and the logic will be
+> the same for both processor families
 
-On 12/03/2013 05:07 PM, Boris BREZILLON wrote:
+The arguments to _PDC are architecture specific, so there do need to be 
+code changes here.
 
-> Replace clk_get calls by devm_clk_get calls.
-
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Tested-by: Robert Nelson <robertcnelson@gmail.com>
-> ---
->   drivers/usb/host/ohci-at91.c |   32 ++++++++------------------------
->   1 file changed, 8 insertions(+), 24 deletions(-)
-
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index c406f1e..3652962 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   		goto err;
->   	}
->
-> -	iclk = clk_get(&pdev->dev, "ohci_clk");
-> +	iclk = devm_clk_get(dev, "ohci_clk");
->   	if (IS_ERR(iclk)) {
-> -		dev_err(&pdev->dev, "failed to get ohci_clk\n");
-> +		dev_err(dev, "failed to get ohci_clk\n");
-
-    You changed this call...
-
->   		retval = PTR_ERR(iclk);
->   		goto err;
->   	}
-> -	fclk = clk_get(&pdev->dev, "uhpck");
-> +	fclk = devm_clk_get(dev, "uhpck");
->   	if (IS_ERR(fclk)) {
->   		dev_err(&pdev->dev, "failed to get uhpck\n");
-
-    ... but not this one.
-
->   		retval = PTR_ERR(fclk);
-> -		goto err4;
-> +		goto err;
->   	}
-> -	hclk = clk_get(&pdev->dev, "hclk");
-> +	hclk = devm_clk_get(dev, "hclk");
->   	if (IS_ERR(hclk)) {
->   		dev_err(&pdev->dev, "failed to get hclk\n");
-
-    ... or this one. Actually, I think cganging these calls would be out of 
-scope for this patch.
-
->   		retval = PTR_ERR(hclk);
-> -		goto err5;
-> +		goto err;
->   	}
->   	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> -		uclk = clk_get(&pdev->dev, "usb_clk");
-> +		uclk = devm_clk_get(&pdev->dev, "usb_clk");
-
-    Hm, why not 'dev' like in all of the above?
-
->   		if (IS_ERR(uclk)) {
->   			dev_err(&pdev->dev, "failed to get uclk\n");
->   			retval = PTR_ERR(uclk);
-> -			goto err6;
-> +			goto err;
->   		}
->   	}
->
-
-WBR, Sergei
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
