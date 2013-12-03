@@ -1,39 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue,  3 Dec 2013 19:58:42 +0000
-Subject: [PATCH 1/2] arm64: dts: Add a virtio disk to the RTSM motherboard
-Message-ID: <1386100723-10700-1-git-send-email-broonie@kernel.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue,  3 Dec 2013 20:57:26 +0100
+Subject: [PATCH v3 0/3] regulator: tps6586x: add version detection and voltage
+ tables
+Message-ID: <cover.1386100296.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Hambleton <mahamble@broadcom.com>
+This is the 3rd version of this patchset which adds version detection
+for the tps6586x mfd family. This is required because some regulator
+versions use different voltage tables. The regulator driver now uses
+the right voltage table according to the version.
 
-Describe the virtio device so we can mount disk images in the simulator.
+While at it, there are a few other incorrect regulator entries in the
+device tree, change them accordingly (this patch is new and grew out
+of a patch with the same name which Lucas Stach posted in July).
 
-[Reduced the size of the region based on feedback from review -- broonie]
+Tested on Colibri T20 V1.1 and V1.2 which makes use of diffent version
+of that regulator.
 
-Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
-Signed-off-by: Mark Brown <broonie@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Changes since v2:
+  - Avoid moving devm_kzalloc
+  - Removed reg_ from reg_version
+  - Moved walk through version dependent tables to find_regulator_info,
+    removed the inline definition. This reduces .o size and encapsulates
+    the logic of finding the right regulator into one function. It comes
+    with a slight code duplication, the table search now appears twice.
 
-diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-index b45e5f39f577..2f2ecd217363 100644
---- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-@@ -183,6 +183,12 @@
- 				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
- 				clock-names = "clcdclk", "apb_pclk";
- 			};
-+
-+			virtio_block at 0130000 {
-+				compatible = "virtio,mmio";
-+				reg = <0x130000 0x200>;
-+				interrupts = <42>;
-+			};
- 		};
- 
- 		v2m_fixed_3v3: fixedregulator at 0 {
+Changes since v1:
+  - Merged DT and driver change (preserves bisectability)
+  - Use different regulator tables for different regulator version
+    * This also makes the TPS6586X_ANY version needless
+  - Replaced enum with defines
+  - Move version message in a sperate function
+  - Include regulator bugfix, use correct supply voltage
+  - Checked all voltages, fix SM0/SM1 (Core/CPU) and LDO6 voltage (VDAC/VI)
+    in another commit
+  - Rebased on top of v3.13-rc2
+
+
+Stefan Agner (3):
+  mfd: tps6586x: add version detection
+  regulator: tps6586x: add and use correct voltage table
+  ARM: tegra: correct Colibri T20 regulator settings
+
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi | 34 +++++------
+ drivers/mfd/tps6586x.c                     | 43 ++++++++++++--
+ drivers/regulator/tps6586x-regulator.c     | 91 +++++++++++++++++++++++-------
+ include/linux/mfd/tps6586x.h               |  7 +++
+ 4 files changed, 134 insertions(+), 41 deletions(-)
+
 -- 
-1.8.5
+1.8.4.2
