@@ -1,43 +1,32 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 3 Dec 2013 13:01:39 -0500
-Subject: [PATCH v2] xen/block: Correctly define structures in public
- headers on ARM32 and ARM64
-In-Reply-To: <529E109A.7050700@citrix.com>
-References: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
- <529E109A.7050700@citrix.com>
-Message-ID: <20131203180139.GG3734@phenom.dumpdata.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 3 Dec 2013 10:15:46 -0800
+Subject: [PATCH v3 00/10] Add power management support for chipidea
+In-Reply-To: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131203181546.GA27706@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 05:10:50PM +0000, David Vrabel wrote:
-> On 03/12/13 15:40, Julien Grall wrote:
-> > On ARM (32 bits and 64 bits), the double-word is 8-bytes aligned. This will
-> > result on different structure from Xen and Linux repositories.
-> > 
-> > As Linux is using __packed__ attribute, it must have a 4-bytes padding before
-> > each "id" field.
-> > 
-> > This change breaks guest block support with older kernel. IMHO, it's acceptable
-> > because Xen on ARM is still on Tech Preview and the hypercall ABI is not yet
-> > freezed.
-> > 
-> > Only one architecture (x86_32) doesn't have 64-bit ABI for the block interface.
-> > Don't add padding if Linux is compiled for this architecture.
+On Tue, Nov 05, 2013 at 09:55:15AM +0800, Peter Chen wrote:
+> Hi Greg,
 > 
-> I'm now satisfied that this is the right thing to do.
+> This serial adds power management (system & runtime) for chipidea core.
+> With this, the chipidea controller can be at low power mode when it is not in
+> use, and the chipidea controller can be the system wakeup source.
+> It needs to depend on my patch[1], since [1]-"Add power management support for MXS PHY"
+> adds some common PHY APIs, and this serial uses it.
 > 
-> Acked-by: David Vrabel <david.vrabel@citrix.com>
+> It has been verified at Freescale i.mx6Q/DL SabreSD, i.mx28 evk platform
+> (no runtime pm support), I will verify it at other FSL platforms during
+> the patch review.
 
-Before we go any further, I need testing confirmation that with this patch
-can still run on x86 hardware the following combinations:
+This series doesn't apply to my tree anymore.
 
- 32-bit guest on 64-bit dom0
- 64-bit guest on 32-bit dom0
+And there have been a ton of chipidea patches floating around, I've now
+dropped them all from my "todo" queue and will wait for you to collect
+them and forward them on as I'm totally lost with all of the different
+versions and objections and the like.
 
-and with an 3.12 dom0
+thanks,
 
-B/c I am not seeing that mentioned anywhere and I think that is creating
-confusion with folks thinking it would break the x86-world (which it shouldn't).
-
-> 
-> David
+greg k-h
