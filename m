@@ -1,38 +1,34 @@
-From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Tue,  3 Dec 2013 09:33:09 +0100
-Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
-Message-ID: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 03 Dec 2013 09:34:09 +0100
+Subject: [PATCH v4 16/17] usb: phy-mxs: fix the problem by only using
+ 1st controller's register
+In-Reply-To: <1386056231-17258-17-git-send-email-peter.chen@freescale.com>
+References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
+ <1386056231-17258-17-git-send-email-peter.chen@freescale.com>
+Message-ID: <529D9781.1080209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this change when booting omap3 device (gta04) with board file
-leads to follwing errors:
+On 12/03/2013 08:37 AM, Peter Chen wrote:
+> We fix the problem that we only use the 1st controller's related
+> registers at mxs_phy_disconnect_line, but in fact, it needs to
+> access registers according to different PHYs.
 
-[    1.203308] musb-hdrc musb-hdrc.0.auto: unable to find phy
-[    1.209075] HS USB OTG: no transceiver configured
-[    1.214019] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+Are you fixing the code that has been added in this series before? If
+so, please squash into the patch. Don't add the broken code in the first
+place.
 
-and usb isn't working.
-
-This is probably regression caused by commit: 6c27f939
-
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
----
- arch/arm/mach-omap2/twl-common.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index b0d54da..3640ce0 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -92,7 +92,7 @@ void __init omap_pmic_late_init(void)
- 
- #if defined(CONFIG_ARCH_OMAP3)
- struct phy_consumer consumers[] = {
--	PHY_CONSUMER("musb-hdrc.0", "usb"),
-+	PHY_CONSUMER("musb-hdrc.0.auto", "usb"),
- };
- 
- struct phy_init_data init_data = {
+Marc
 -- 
-1.7.9.5
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/bfee54e4/attachment-0001.sig>
