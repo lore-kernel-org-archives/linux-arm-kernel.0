@@ -1,146 +1,29 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Tue, 3 Dec 2013 04:02:48 +0000
-Subject: [RFC] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20131202123406.GK12952@e106331-lin.cambridge.arm.com>
-References: <1385979309-10505-1-git-send-email-Li.Xiubo@freescale.com>
- <20131202123406.GK12952@e106331-lin.cambridge.arm.com>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828E374B@039-SN2MPN1-011.039d.mgd.msft.net>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 02 Dec 2013 20:59:43 -0800
+Subject: [RFC PATCH 3/4] mm/vmalloc.c: Allow lowmem to be tracked in
+ vmalloc
+In-Reply-To: <20131126144541.6b16979b77f927f6d945ab60@linux-foundation.org>
+References: <1384212412-21236-1-git-send-email-lauraa@codeaurora.org>	<1384212412-21236-4-git-send-email-lauraa@codeaurora.org>	<52850C37.1080506@sr71.net>	<5285A896.3030204@codeaurora.org>
+ <20131126144541.6b16979b77f927f6d945ab60@linux-foundation.org>
+Message-ID: <529D653F.3090401@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I'm sending the RFC patch about the FTM IP block registers read and
-> > write endian fix for comments and more parcticed ideas.
-> >
-> > In Vybird VF610 Tower, all the IP blocks expect LE data. In the LS-1,
-> > some of the IP blocks expect LE data, while others expect BE data. And
-> > the CPU always operates in LE mode in these two platforms.
-> 
-> Could you elaborate on "expect BE data" please? Is this all registers
-> within a given device, or a subset thereof?
-> Are there data structures involved (i.e. buffers)?
+On 11/26/2013 2:45 PM, Andrew Morton wrote:
+> So yes, it would be prudent to be worried about is_vmalloc_addr()
+> performance at the outset.
+>
+> Couldn't is_vmalloc_addr() just be done with a plain old bitmap?  It
+> would consume 128kbytes to manage a 4G address space, and 1/8th of a meg
+> isn't much.
 >
 
-It actually means big-endian mode, and it's all the registers and hasn't any
-buffers or descriptors involved within FTM IP block.
-But maybe in other IP blocks, such as eDMA and USB, should consider about the
-buffers/descriptors issue.
+Yes, I came to the same conclusion after realizing I needed something 
+similar to fix up proc/kcore.c . I plan to go with the bitmap for the 
+next patch version.
 
+Laura
 
-> >
-> > So now I must take care of all these two cases. I'm not very sure if
-> > there is other better ways to resolve this problem. In this patch I
-> > have implemented two functions fsl_pwm_readl() and fsl_pwm_writel() to
-> > replace readl() and writel(). At the same time there should add one
-> > "endianess" property in the DT file.
-> 
-> If you're adding DT properties, binding updates are helpful to describe
-> their intended use.
-> 
-
-Yes, that surely will be added later.
-
-
-> > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc, void
-> > +__iomem *reg) {
-> > +       u32 val;
-> > +
-> > +       val = __raw_readl(reg);
-> > +
-> > +       if (fpc->endianess == FTM_BIG)
-> > +               return be32_to_cpu(val);
-> > +       else
-> > +               return le32_to_cpu(val); }
-> > +
-> > +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc, u32 val,
-> > +               void __iomem *reg)
-> > +{
-> > +       if (fpc->endianess == FTM_BIG)
-> > +               val = cpu_to_be32(val);
-> > +       else
-> > +               val = cpu_to_le32(val);
-> > +
-> > +       __raw_writel(val, reg);
-> > +}
-> 
-> Using the __raw variants also loses you the memory barriers. Does this
-> create any ordering issues in the rest of the driver?
-> 
-
-No, I had checked about this, so I just droped them.
-Maybe it will be much better and safer if there are some memory barriers.
-
-
-
-> > +static int fsl_pwm_probe(struct platform_device *pdev) {
-> > +       int ret;
-> > +       const char *endianess;
-> > +       struct fsl_pwm_chip *fpc;
-> > +       struct resource *res;
-> > +       struct device_node *np = pdev->dev.of_node;
-> > +
-> > +       fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
-> > +       if (!fpc)
-> > +               return -ENOMEM;
-> > +
-> > +       mutex_init(&fpc->lock);
-> > +
-> > +       fpc->chip.dev = &pdev->dev;
-> > +
-> > +       ret = fsl_pwm_parse_clk_ps(fpc);
-> > +       if (ret < 0)
-> > +               return ret;
-> > +
-> > +       if (of_property_read_string(np, "endianess", &endianess))
-> > +               pr_warning("missing \"endianess\" property, "
-> > +                               "the FTM IP block is little "
-> > +                               "endian as default\n");
-> > +       else if (!strcmp("big", endianess))
-> > +               fpc->endianess = FTM_BIG;
-> 
-> Please don't do this.
-> 
-> One option is to have a new compatible string -- a big-endian device can't
-> be poked in the same way as its little-endian variants, so they're not
-> compatible. You can then associate some data with the compatible strings to
-> figure out which accessors to use.
-> 
-
-Do you mean:
-+ static const struct of_device_id fsl_pwm_dt_ids[] = {
-+        { .compatible = "fsl,vf610-ftm-pwm,big-endian", },
-+        { .compatible = "fsl,vf610-ftm-pwm,little-endian", },
-+        { /* sentinel */ }
-+ };  ?
-
-Or just adding one property in DT file likes:
-			pwm0: pwm at 40038000 {
-				compatible = "fsl,vf610-ftm-pwm";
-				#pwm-cells = <3>;
-				reg = <0x40038000 0x1000>;
-				clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-				clocks = <&clks VF610_CLK_FTM0>,
-					<&clks VF610_CLK_FTM0_FIX_SEL>,
-					<&clks VF610_CLK_FTM0_EXT_SEL>;
-+				big-endian;       ---> both registers and buffers/descriptors
-Or 
-+				big-endian-regs;  ---> registers
-+				big-endian-desc;  ---> buffers or descriptors
-				status = "disabled";
-			};
-And then in FTM driver probe function adds:
-+        if (of_get_property(np, "big-endian", NULL))
-+                fpc->be_reg = fpc->be_desc = 1;
-+        else if (of_get_property(np, "big-endian-regs", NULL))
-+                fpc->be_reg = 1;
-+        else if (of_get_property(np, "big-endian-desc", NULL))
-+                fpc->be_desc = 1;
-
-In this case, if all of the following properties is absent, that means they all are
-operated in little-endian mode.
-
-"big-endian"
-"big-endian-regs"
-"big-endian-desc"
-
---
-Best Regards,
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
