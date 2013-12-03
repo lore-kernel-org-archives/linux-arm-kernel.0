@@ -1,67 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Dec 2013 13:41:13 +0000
-Subject: [PATCH V6 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <CAPrCYke4P2V47iG=1b_f3YHiTqC2hOG5yiKTUWuWG+pX8JauMQ@mail.gmail.com>
-References: <1385976843-13280-1-git-send-email-vkale@apm.com>
- <1385976843-13280-3-git-send-email-vkale@apm.com>
- <20131203113052.GE1169@mudshark.cambridge.arm.com>
- <CAPrCYke4P2V47iG=1b_f3YHiTqC2hOG5yiKTUWuWG+pX8JauMQ@mail.gmail.com>
-Message-ID: <20131203134113.GI1169@mudshark.cambridge.arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 3 Dec 2013 14:41:35 +0100
+Subject: [PATCH V3 1/3] ahci: imx: Explicitly clear
+ IMX6Q_GPR13_SATA_MPLL_CLK_EN
+In-Reply-To: <20131203124140.GE8277@htj.dyndns.org>
+References: <1385369222-5288-1-git-send-email-marex@denx.de>
+ <20131203124140.GE8277@htj.dyndns.org>
+Message-ID: <201312031441.35741.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 11:49:11AM +0000, Vinayak Kale wrote:
-> On Tue, Dec 3, 2013 at 5:00 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Dec 02, 2013 at 09:34:03AM +0000, Vinayak Kale wrote:
-> >> Add support for irq registration when pmu interrupt is percpu.
-> >>
-> >> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> >> Signed-off-by: Tuan Phan <tphan@apm.com>
-> >> ---
-> >>  arch/arm64/kernel/perf_event.c |  116 +++++++++++++++++++++++++++++-----------
-> >>  1 file changed, 86 insertions(+), 30 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> >> index cea1594..d2d562f 100644
-> >> --- a/arch/arm64/kernel/perf_event.c
-> >> +++ b/arch/arm64/kernel/perf_event.c
-> >> @@ -22,6 +22,7 @@
-> >>
-> >>  #include <linux/bitmap.h>
-> >>  #include <linux/interrupt.h>
-> >> +#include <linux/irq.h>
-> >>  #include <linux/kernel.h>
-> >>  #include <linux/export.h>
-> >>  #include <linux/perf_event.h>
-> >> @@ -363,26 +364,61 @@ validate_group(struct perf_event *event)
-> >>  }
-> >>
-> >>  static void
-> >> +armpmu_disable_percpu_irq(void *data)
-> >> +{
-> >> +     struct arm_pmu *armpmu = data;
-> >> +     struct platform_device *pmu_device = armpmu->plat_device;
-> >> +     int irq = platform_get_irq(pmu_device, 0);
-> >> +
-> >> +     cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-> >> +     disable_percpu_irq(irq);
-> >> +}
-> >> +
-> >> +static void
-> >>  armpmu_release_hardware(struct arm_pmu *armpmu)
-> >>  {
-> >> -     int i, irq, irqs;
-> >> +     int irq;
-> >
-> > Why did you not make this unsigned, like I suggested?
-> 
-> Suggestion was to make 'irqs' variable unsigned and modify the check
-> for 'irqs' to if (!irqs).
-> This patch incorporates that suggestion.
-> 
-> We have to keep 'irq' signed only. 'platform_get_irq()' can return error value.
+Dear Tejun Heo,
 
-Damn, yes, I see the issue there. Ok, I'll go back and take another look at
-your patch...
+> On Mon, Nov 25, 2013 at 09:47:00AM +0100, Marek Vasut wrote:
+> > We must clear this IMX6Q_GPR13_SATA_MPLL_CLK_EN bit on i.MX6Q, otherwise
+> > Linux will fail to find the attached drive on some boards.
+> > 
+> > This entire fix was:
+> > Reported-by: Eric Nelson <eric.nelson@boundarydevices.com>
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Richard Zhu <r65037@freescale.com>
+> > Cc: Tejun Heo <tj@kernel.org>
+> > Cc: Linux-IDE <linux-ide@vger.kernel.org>
+> 
+> Applied to libata/for-3.13-fixes w/ stable cc'd.
 
-Will
+Thank you!
+
+Best regards,
+Marek Vasut
