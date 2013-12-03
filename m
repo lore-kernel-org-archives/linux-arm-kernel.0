@@ -1,41 +1,39 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 3 Dec 2013 13:28:20 +0100
-Subject: [PATCH 2/5] ARM: mxs: crypto: Remove the old DCP driver
-In-Reply-To: <20131203110731.GE13726@S2101-09.ap.freescale.net>
-References: <1385932823-3860-1-git-send-email-marex@denx.de>
- <1385932823-3860-2-git-send-email-marex@denx.de>
- <20131203110731.GE13726@S2101-09.ap.freescale.net>
-Message-ID: <201312031328.20860.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Dec 2013 21:32:54 +0800
+Subject: [PATCH 1/3] ARM: imx27: add pwm pingrp
+In-Reply-To: <1386069015-10718-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1386069015-10718-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20131203133252.GI13726@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Sun, Dec 01, 2013 at 10:20:20PM +0100, Marek Vasut wrote:
-> > Remove the old DCP driver as it had multiple severe issues. The driver
-> > will be replaced by a more robust implementation. Here is a short list
-> > of problems with this driver:
-> > 
-> > 1) It only supports AES_CBC
-> > 
-> > 2) The driver was apparently never ran behind anyone working with MXS. ie.:
-> >    -> Restarting the DCP block is not done via mxs_reset_block()
-> >    -> The DT name is not "fsl,dcp" or "fsl,mxs-dcp" as other MXS drivers
-> > 
-> > 3) Introduces new ad-hoc IOCTLs
-> > 4) The IRQ handler can't use usual completion() in the driver because
-> > that'd
-> > 
-> >    trigger "scheduling while atomic" oops, yes?
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
+On Tue, Dec 03, 2013 at 12:10:13PM +0100, Gwenhael Goavec-Merou wrote:
+> From: Gwenhael Goavec-Merou <gwenhael.goavec-merou@trabucayre.com>
 > 
-> Please drop "ARM: mxs: " from patch subject, since it's not a patch
-> touching arch/arm/mach-mxs anyhow.  It's there confusing people.
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@trabucayre.com>
+
+Applied all 3 with some small fix-ups (see replies to patch #2 and #3).
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx27-pingrp.h | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Shawn
-
-Removed. Will gather more feedback and repost V2.
-
-Best regards,
-Marek Vasut
+> diff --git a/arch/arm/boot/dts/imx27-pingrp.h b/arch/arm/boot/dts/imx27-pingrp.h
+> index f3fbf5a..edc1e90 100644
+> --- a/arch/arm/boot/dts/imx27-pingrp.h
+> +++ b/arch/arm/boot/dts/imx27-pingrp.h
+> @@ -88,6 +88,9 @@
+>  #define MX27_OWIRE1_PINGRP1 \
+>  	MX27_PAD_RTCK__OWIRE 0x0
+>  
+> +#define MX27_PWM_PINGRP1 \
+> +	MX27_PAD_PWMO__PWMO 0x0
+> +
+>  #define MX27_SDHC1_PINGRP1 \
+>  	MX27_PAD_SD1_CLK__SD1_CLK \
+>  	MX27_PAD_SD1_CMD__SD1_CMD \
+> -- 
+> 1.8.3.2
+> 
