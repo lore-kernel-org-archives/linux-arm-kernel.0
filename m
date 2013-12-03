@@ -1,50 +1,79 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 3 Dec 2013 19:43:37 +0530
-Subject: [PATCH v2 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <20131203115927.GD26423@xps8300>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-3-git-send-email-kishon@ti.com>
- <20131203115927.GD26423@xps8300>
-Message-ID: <529DE711.2090008@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 3 Dec 2013 15:13:54 +0100
+Subject: [PATCH 1/3] usb: ohci-at91: fix irq and iomem resource retrieval
+In-Reply-To: <1386079669-3995-2-git-send-email-b.brezillon@overkiz.com>
+References: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
+ <1386079669-3995-2-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <529DE722.70305@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/12/2013 15:07, Boris BREZILLON :
+> When using dt resources retrieval (interrupts and reg properties) there is
+> no predefined order for these resources in the platform dev resource
+> table.
+>
+> Retrieve resources using the platform_get_resource function instead of
+> direct resource table entries to avoid resource type mismatch.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Tested-by: Robert Nelson <robertcnelson@gmail.com>
 
-On Tuesday 03 December 2013 05:29 PM, Heikki Krogerus wrote:
-> Hi Kishon,
-> 
-> On Wed, Oct 16, 2013 at 01:24:12AM +0530, Kishon Vijay Abraham I wrote:
->> +	count = of_property_match_string(node, "phy-names", "usb2-phy");
->> +	if (count >= 0 || (pdata && pdata->usb2_generic_phy)) {
->> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
->> +		if (IS_ERR(dwc->usb2_generic_phy)) {
->> +			dev_err(dev, "no usb2 phy configured yet");
->> +			return PTR_ERR(dwc->usb2_generic_phy);
->> +		}
->> +		dwc->usb2_phy = NULL;
->> +	}
->> +
->> +	count = of_property_match_string(node, "phy-names", "usb3-phy");
->> +	if (count >= 0 || (pdata && pdata->usb3_generic_phy)) {
->> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
->> +		if (IS_ERR(dwc->usb3_generic_phy)) {
->> +			dev_err(dev, "no usb3 phy configured yet");
->> +			return PTR_ERR(dwc->usb3_generic_phy);
->> +		}
->> +		dwc->usb3_phy = NULL;
->> +	}
-> 
-> Is there some specific reason for these checks? The driver should not
-> need to care about the platform (DT, ACPI, platform based).
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-yeah just wanted to throw an error if a platform needs PHY but wasn't able to
-get it. Btw this has changed after my v3 of this patch series which I sent
-sometime back [1] where we use quirks to know if a PHY is needed for that
-platform or not.
+> ---
+>   drivers/usb/host/ohci-at91.c |   19 +++++++++++--------
+>   1 file changed, 11 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 418444e..7aec6ca 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -136,23 +136,26 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	struct ohci_hcd *ohci;
+>   	int retval;
+>   	struct usb_hcd *hcd = NULL;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *mem_r, *irq_r;
+>
+> -	if (pdev->num_resources != 2) {
+> -		pr_debug("hcd probe: invalid num_resources");
+> +	mem_r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!mem_r) {
+> +		dev_dbg(dev, "hcd probe: missing memory resource\n");
+>   		return -ENODEV;
+>   	}
+>
+> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+> -		pr_debug("hcd probe: invalid resource type\n");
+> +	irq_r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!irq_r) {
+> +		dev_dbg(dev, "hcd probe: missing irq resource\n");
+>   		return -ENODEV;
+>   	}
+>
+>   	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
+>   	if (!hcd)
+>   		return -ENOMEM;
+> -	hcd->rsrc_start = pdev->resource[0].start;
+> -	hcd->rsrc_len = resource_size(&pdev->resource[0]);
+> +	hcd->rsrc_start = mem_r->start;
+> +	hcd->rsrc_len = resource_size(mem_r);
+>
+>   	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+>   		pr_debug("request_mem_region failed\n");
+> @@ -199,7 +202,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	ohci->num_ports = board->ports;
+>   	at91_start_hc(pdev);
+>
+> -	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
+> +	retval = usb_add_hcd(hcd, irq_r->start, IRQF_SHARED);
+>   	if (retval == 0)
+>   		return retval;
+>
+>
 
-http://www.spinics.net/lists/linux-usb/msg98077.html
 
-Thanks
-Kishon
+-- 
+Nicolas Ferre
