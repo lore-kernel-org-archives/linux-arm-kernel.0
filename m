@@ -1,201 +1,78 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  3 Dec 2013 13:28:49 -0700
-Subject: [PATCH V2] clk: tegra: implement a reset driver
-Message-ID: <1386102529-20123-1-git-send-email-swarren@wwwdotorg.org>
+Date: Tue,  3 Dec 2013 13:31:57 -0700
+Subject: [PATCH REPOST] dma: tegra: use reset framework
+Message-ID: <1386102717-21773-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The Tegra CAR module implements both a clock and reset controller. So
-far, the driver exposes the clock feature via the common clock API and
-the reset feature using a custom API. This patch adds an implementation
-of the common reset framework API (include/linux/reset*.h). The legacy
-reset implementation will be removed once all drivers have been
-converted.
+Tegra's clock driver now provides an implementation of the common
+reset API (include/linux/reset.h). Use this instead of the old Tegra-
+specific API; that will soon be removed.
 
 Cc: pdeschrijver at nvidia.com
 Cc: linux-tegra at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 Reviewed-by: Thierry Reding <treding@nvidia.com>
 ---
-v2: Move the added lines in the file, to avoid the need for function
-    prototypes.
-
-Peter, Mike,
-
 This patch is part of a series with strong internal depdendencies. I'm
 looking for an ack so that I can take the entire series through the Tegra
 and arm-soc trees. The series will be part of a stable branch that can be
 merged into other subsystems if needed to avoid/resolve dependencies.
 ---
- drivers/clk/tegra/clk-tegra114.c |  3 ++-
- drivers/clk/tegra/clk-tegra124.c |  2 +-
- drivers/clk/tegra/clk-tegra20.c  |  3 ++-
- drivers/clk/tegra/clk-tegra30.c  |  3 ++-
- drivers/clk/tegra/clk.c          | 50 +++++++++++++++++++++++++++++++++++++++-
- drivers/clk/tegra/clk.h          |  2 +-
- 6 files changed, 57 insertions(+), 6 deletions(-)
+ drivers/dma/tegra20-apb-dma.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index 70bfefebcca5..84d9003ae816 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -1457,7 +1457,8 @@ static void __init tegra114_clock_init(struct device_node *np)
- 		return;
+diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+index 73654e33f13b..afa5844c9346 100644
+--- a/drivers/dma/tegra20-apb-dma.c
++++ b/drivers/dma/tegra20-apb-dma.c
+@@ -32,8 +32,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm.h>
+ #include <linux/pm_runtime.h>
++#include <linux/reset.h>
+ #include <linux/slab.h>
+-#include <linux/clk/tegra.h>
+ 
+ #include "dmaengine.h"
+ 
+@@ -208,6 +208,7 @@ struct tegra_dma {
+ 	struct dma_device		dma_dev;
+ 	struct device			*dev;
+ 	struct clk			*dma_clk;
++	struct reset_control		*rst;
+ 	spinlock_t			global_lock;
+ 	void __iomem			*base_addr;
+ 	const struct tegra_dma_chip_data *chip_data;
+@@ -1282,6 +1283,12 @@ static int tegra_dma_probe(struct platform_device *pdev)
+ 		return PTR_ERR(tdma->dma_clk);
  	}
  
--	clks = tegra_clk_init(TEGRA114_CLK_CLK_MAX, TEGRA114_CLK_PERIPH_BANKS);
-+	clks = tegra_clk_init(clk_base, TEGRA114_CLK_CLK_MAX,
-+				TEGRA114_CLK_PERIPH_BANKS);
- 	if (!clks)
- 		return;
++	tdma->rst = devm_reset_control_get(&pdev->dev, "dma");
++	if (IS_ERR(tdma->rst)) {
++		dev_err(&pdev->dev, "Error: Missing reset\n");
++		return PTR_ERR(tdma->rst);
++	}
++
+ 	spin_lock_init(&tdma->global_lock);
  
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 623fbf35ee08..6f8b1d99e5b9 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -1402,7 +1402,7 @@ static void __init tegra124_clock_init(struct device_node *np)
- 		return;
+ 	pm_runtime_enable(&pdev->dev);
+@@ -1302,9 +1309,9 @@ static int tegra_dma_probe(struct platform_device *pdev)
  	}
  
--	clks = tegra_clk_init(TEGRA124_CLK_CLK_MAX, 6);
-+	clks = tegra_clk_init(clk_base, TEGRA124_CLK_CLK_MAX, 6);
- 	if (!clks)
- 		return;
+ 	/* Reset DMA controller */
+-	tegra_periph_reset_assert(tdma->dma_clk);
++	reset_control_assert(tdma->rst);
+ 	udelay(2);
+-	tegra_periph_reset_deassert(tdma->dma_clk);
++	reset_control_deassert(tdma->rst);
  
-diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-index be5bdbab78a6..d438a089354c 100644
---- a/drivers/clk/tegra/clk-tegra20.c
-+++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -1108,7 +1108,8 @@ static void __init tegra20_clock_init(struct device_node *np)
- 		BUG();
- 	}
- 
--	clks = tegra_clk_init(TEGRA20_CLK_CLK_MAX, TEGRA20_CLK_PERIPH_BANKS);
-+	clks = tegra_clk_init(clk_base, TEGRA20_CLK_CLK_MAX,
-+				TEGRA20_CLK_PERIPH_BANKS);
- 	if (!clks)
- 		return;
- 
-diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index 92c46f1fb5d1..49465529bb09 100644
---- a/drivers/clk/tegra/clk-tegra30.c
-+++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -1429,7 +1429,8 @@ static void __init tegra30_clock_init(struct device_node *np)
- 		BUG();
- 	}
- 
--	clks = tegra_clk_init(TEGRA30_CLK_CLK_MAX, TEGRA30_CLK_PERIPH_BANKS);
-+	clks = tegra_clk_init(clk_base, TEGRA30_CLK_CLK_MAX,
-+				TEGRA30_CLK_PERIPH_BANKS);
- 	if (!clks)
- 		return;
- 
-diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-index a12a5f5107ec..c0a7d7723510 100644
---- a/drivers/clk/tegra/clk.c
-+++ b/drivers/clk/tegra/clk.c
-@@ -18,6 +18,8 @@
- #include <linux/clk-provider.h>
- #include <linux/of.h>
- #include <linux/clk/tegra.h>
-+#include <linux/reset-controller.h>
-+#include <linux/tegra-soc.h>
- 
- #include "clk.h"
- 
-@@ -121,6 +123,35 @@ static struct tegra_clk_periph_regs periph_regs[] = {
- 	},
- };
- 
-+static void __iomem *clk_base;
-+
-+static int tegra_clk_rst_assert(struct reset_controller_dev *rcdev,
-+		unsigned long id)
-+{
-+	/*
-+	 * If peripheral is on the APB bus then we must read the APB bus to
-+	 * flush the write operation in apb bus. This will avoid peripheral
-+	 * access after disabling clock. Since the reset driver has no
-+	 * knowledge of which reset IDs represent which devices, simply do
-+	 * this all the time.
-+	 */
-+	tegra_read_chipid();
-+
-+	writel_relaxed(BIT(id % 32),
-+			clk_base + periph_regs[id / 32].rst_set_reg);
-+
-+	return 0;
-+}
-+
-+static int tegra_clk_rst_deassert(struct reset_controller_dev *rcdev,
-+		unsigned long id)
-+{
-+	writel_relaxed(BIT(id % 32),
-+			clk_base + periph_regs[id / 32].rst_clr_reg);
-+
-+	return 0;
-+}
-+
- struct tegra_clk_periph_regs *get_reg_bank(int clkid)
- {
- 	int reg_bank = clkid / 32;
-@@ -133,8 +164,10 @@ struct tegra_clk_periph_regs *get_reg_bank(int clkid)
- 	}
- }
- 
--struct clk ** __init tegra_clk_init(int num, int banks)
-+struct clk ** __init tegra_clk_init(void __iomem *regs, int num, int banks)
- {
-+	clk_base = regs;
-+
- 	if (WARN_ON(banks > ARRAY_SIZE(periph_regs)))
- 		return NULL;
- 
-@@ -203,6 +236,17 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
- 	}
- }
- 
-+static struct reset_control_ops rst_ops = {
-+	.assert = tegra_clk_rst_assert,
-+	.deassert = tegra_clk_rst_deassert,
-+};
-+
-+static struct reset_controller_dev rst_ctlr = {
-+	.ops = &rst_ops,
-+	.owner = THIS_MODULE,
-+	.of_reset_n_cells = 1,
-+};
-+
- void __init tegra_add_of_provider(struct device_node *np)
- {
- 	int i;
-@@ -220,6 +264,10 @@ void __init tegra_add_of_provider(struct device_node *np)
- 	clk_data.clks = clks;
- 	clk_data.clk_num = clk_num;
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+
-+	rst_ctlr.of_node = np;
-+	rst_ctlr.nr_resets = clk_num * 32;
-+	reset_controller_register(&rst_ctlr);
- }
- 
- void __init tegra_register_devclks(struct tegra_devclk *dev_clks, int num)
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index 7f110acfe2a1..39f24959daf7 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -594,7 +594,7 @@ void tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
- 		struct clk *clks[], int clk_max);
- 
- struct tegra_clk_periph_regs *get_reg_bank(int clkid);
--struct clk **tegra_clk_init(int num, int periph_banks);
-+struct clk **tegra_clk_init(void __iomem *clk_base, int num, int periph_banks);
- 
- struct clk **tegra_lookup_dt_id(int clk_id, struct tegra_clk *tegra_clk);
- 
+ 	/* Enable global DMA registers */
+ 	tdma_write(tdma, TEGRA_APBDMA_GENERAL, TEGRA_APBDMA_GENERAL_ENABLE);
 -- 
 1.8.1.5
