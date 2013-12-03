@@ -1,40 +1,80 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 03 Dec 2013 10:28:44 +0100
-Subject: [PATCH v4 17/17] usb: phy-mxs: do not set PWD.RXPWD1PT1 for low
- speed connection
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649804141031@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
- <1386056231-17258-18-git-send-email-peter.chen@freescale.com>
- <529D9BF7.1080707@pengutronix.de>
- <F281D0F91ED19E4D8E63A7504E8A649804141031@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <529DA44C.9090702@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 3 Dec 2013 10:29:42 +0100
+Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
+ pinfunc.
+In-Reply-To: <5293ACA6.7060403@bracey.fi>
+References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
+ <528BB1F2.4080107@wwwdotorg.org>
+ <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
+ <528BB913.6080409@wwwdotorg.org>
+ <CAH9JG2UjnL5bZzNUuJhWY3GpwPD=rJvR2O4Hcpm33G+prSS=BA@mail.gmail.com>
+ <CACRpkdbyjm0X9RX+8WjqQxBPyRjBOAunkqVcO-0KUd1PTdGavA@mail.gmail.com>
+ <5293ACA6.7060403@bracey.fi>
+Message-ID: <CACRpkdYrPd9tnO48bA_5n+-k=KEDyhY7czkCNhTZfpgF3ar+LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 10:19 AM, Peter Chen wrote:
->> On 12/03/2013 08:37 AM, Peter Chen wrote:
->>> At very rare cases, the SoF will not send out after resume with
->>> low speed connection. The workaround is do not power down
->>> PWD.RXPWD1PT1 bit during the suspend.
->>
->> Is this also a fix for newly added code? If so please also squash.
+On Mon, Nov 25, 2013 at 9:01 PM, Kevin Bracey <kevin@bracey.fi> wrote:
 
-> No, it is a workaround for new problem.
+> I've been working on extending the shmobile PFC driver to provide
+> "gpio-mode" and implement PIN_CONFIG_OUTPUT as described by
+> Documentation/pinctrl.txt, primarily to handle sleep states, but I have
+> begun to wonder about the initial state problem, as discussed here.
+>
+> As far as I can see, we can't currently specify "fallback" states for pins,
+> which is one of Tomasz' key requirements.
 
-If this would be a fix, it's better to put this as first patch into a
-series, so that it can be applied to the stable trees easier.
+That depends on what you mean with "fallback states" so let's hash
+this out.
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> We can specify "hog" states, and we can specify "default for a driver", but
+> not "default before/in absence of a driver" or "sleep in absence of a
+> driver". Having a hog precludes any finer driver control, AFAICT.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/0a1ccb14/attachment.sig>
+So the way it currently works is that hogs are usually used when
+there is no corresponding driver that can take care of the pins.
+
+If there are four SPI pins and no driver for that SPI block, a way
+to e.g. ground them is to do so using pinctrl hogs.
+
+Whenever a driver and a struct device * for this SPI block appears,
+it is wise to transfer control of these over to the device core, which
+will take any "default" state before doing probe() on the device
+driver, and then give you the option to use the nice pinctrl_pm*
+accessors to let the device core switch between "default" "idle"
+and "sleep" states if these are defined.
+
+> Some of our existing pre-pinconf board files have a "unused pins" table
+> which is used to claim and pull GPIOs. I've converted that to "hog" pinconf,
+> but that only works because the table omits all pins used by drivers. And,
+> unsurprisingly, that's been error-prone; if those tables originally covered
+> all unused pins, they don't any more.
+>
+> I'd like confidence that we can get every pin into the correct state by
+> having a fully-populated table containing all pins, that can be used
+> regardless of which drivers start. I think what we're lacking is a "weak
+> hog". Whatever you call that. :)
+>
+> That would also specify the state to fallback to when a group is released
+> (where we currently do pinmux_disable_setting).
+
+So I guess what you're after is a kind of hog that will be pushed
+aside and ignored if a struct device with an associated state appears
+that will use the same pin?
+
+It is true that we currently require the tables to be strict and not
+overlap like this, so ideally you should remove the hogs when you
+have a device driver, but you're actually describing an interesting
+case here:
+
+What if I have a driver for this IP block, and it was supposed to
+take care of a few pins, but I decide not to compile it into my
+kernel? Or if I have it as a module and only modprobe it later
+at runtime?
+
+So a suggested patch to support weak hogs would be interesting
+to look at. Can you provide details on how you think this would
+work?
+
+Yours,
+Linus Walleij
