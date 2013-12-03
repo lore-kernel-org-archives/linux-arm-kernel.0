@@ -1,21 +1,13 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 3 Dec 2013 15:57:24 +0530
-Subject: [PATCH V5 3/4] ARM: OMAP4+: Correct Wakeup-gen code to use physical
- irq number
+Date: Tue, 3 Dec 2013 15:57:25 +0530
+Subject: [PATCH V5 4/4] ARM: DRA: Enable Crossbar IP support for DRA7XX
 In-Reply-To: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
 References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1386066445-28245-4-git-send-email-r.sricharan@ti.com>
+Message-ID: <1386066445-28245-5-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wakeup gen mask/unmask callback uses the irq element of the
-irq_data to setup. The irq is the linux virtual irq number and
-is same as the hardware irq number only when the parent irqchip
-is setup as a legacy domain. When it is used as a linear domain,
-the virtual irqs are allocated dynamically and wakeup gen code
-cannot rely on these numbers to access the irq registers. Instead
-use the hwirq element of the irq_data which represent the physical
-irq number.
+Enable the crossbar IP support for DRA7xx soc.
 
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Rajendra Nayak <rnayak@ti.com>
@@ -24,30 +16,40 @@ Signed-off-by: Sricharan R <r.sricharan@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-omap2/omap-wakeupgen.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/Kconfig        |    1 +
+ arch/arm/mach-omap2/omap4-common.c |    2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 3664562..693fe48 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -138,7 +138,7 @@ static void wakeupgen_mask(struct irq_data *d)
- 	unsigned long flags;
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index dc21df1..d538df6 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -135,6 +135,7 @@ config SOC_DRA7XX
+ 	select ARM_GIC
+ 	select HAVE_SMP
+ 	select COMMON_CLK
++	select IRQ_CROSSBAR
  
- 	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
--	_wakeupgen_clear(d->irq, irq_target_cpu[d->irq]);
-+	_wakeupgen_clear(d->hwirq, irq_target_cpu[d->hwirq]);
- 	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index b39efd4..9880a16 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/export.h>
+ #include <linux/irqchip/arm-gic.h>
++#include <linux/irqchip/irq-crossbar.h>
+ #include <linux/of_address.h>
+ #include <linux/reboot.h>
+ 
+@@ -281,5 +282,6 @@ void __init omap_gic_of_init(void)
+ 
+ skip_errata_init:
+ 	omap_wakeupgen_init();
++	irqcrossbar_init();
+ 	irqchip_init();
  }
- 
-@@ -150,7 +150,7 @@ static void wakeupgen_unmask(struct irq_data *d)
- 	unsigned long flags;
- 
- 	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
--	_wakeupgen_set(d->irq, irq_target_cpu[d->irq]);
-+	_wakeupgen_set(d->hwirq, irq_target_cpu[d->hwirq]);
- 	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- 
 -- 
 1.7.9.5
