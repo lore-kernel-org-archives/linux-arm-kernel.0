@@ -1,9 +1,9 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 2 Dec 2013 21:27:20 -0500
-Subject: [PATCH v2 05/23] mm/staging: remove unnecessary inclusion of bootmem.h
+Date: Mon, 2 Dec 2013 21:27:21 -0500
+Subject: [PATCH v2 06/23] mm/char: remove unnecessary inclusion of bootmem.h
 In-Reply-To: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386037658-3161-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386037658-3161-7-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,28 +14,25 @@ Clean-up to remove depedency with bootmem headers.
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: William Hubbs <w.d.hubbs@gmail.com>
-Cc: Chris Brannon <chris@the-brannons.com>
-Cc: Kirk Reiser <kirk@reisers.ca>
+Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/staging/speakup/main.c |    2 --
- 1 file changed, 2 deletions(-)
+ drivers/char/mem.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/staging/speakup/main.c b/drivers/staging/speakup/main.c
-index 47502fa..ef5933b 100644
---- a/drivers/staging/speakup/main.c
-+++ b/drivers/staging/speakup/main.c
-@@ -37,8 +37,6 @@
- #include <linux/input.h>
- #include <linux/kmod.h>
- 
--#include <linux/bootmem.h>	/* for alloc_bootmem */
--
- /* speakup_*_selection */
- #include <linux/module.h>
- #include <linux/sched.h>
+diff --git a/drivers/char/mem.c b/drivers/char/mem.c
+index f895a8c..92c5937 100644
+--- a/drivers/char/mem.c
++++ b/drivers/char/mem.c
+@@ -22,7 +22,6 @@
+ #include <linux/device.h>
+ #include <linux/highmem.h>
+ #include <linux/backing-dev.h>
+-#include <linux/bootmem.h>
+ #include <linux/splice.h>
+ #include <linux/pfn.h>
+ #include <linux/export.h>
 -- 
 1.7.9.5
