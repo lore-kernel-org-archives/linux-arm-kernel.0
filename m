@@ -1,23 +1,25 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Dec 2013 15:05:29 +0000
-Subject: [PATCH] ASoC: wm8731: fix dsp mode configuration
-In-Reply-To: <1386065094-26018-1-git-send-email-voice.shen@atmel.com>
-References: <1386065094-26018-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20131203150529.GX27568@sirena.org.uk>
+Date: Tue, 3 Dec 2013 15:07:55 +0000
+Subject: [PATCH 1/2] ASoC: ux500_pcm: Differentiate between pdata and DT
+ initialisation
+In-Reply-To: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
+References: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131203150755.GZ27568@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 06:04:54PM +0800, Bo Shen wrote:
-> According to WM8731 "PD, Rev 4.9 October 2012" datasheet, when it
-> works in DSP mode A, LRP = 1, while works in DSP mode B, LRP = 0.
-> So, fix LRP for DSP mode as the datesheet specification.
+On Tue, Dec 03, 2013 at 10:27:06AM +0000, Lee Jones wrote:
+> If booting with full DT support (i.e. DMA too, the last piece of the
+> puzzle), then we don't need to use the compatible_request_channel call
+> back or require some of the historical bumph which probably isn't
+> required by a platform data start-up now either. This will also be
+> ripped out in upcoming commits.
 
-Applied, thanks.  Please do remember to CC maintainers on things, you've
-missed the Wolfson guys.
+Applied both, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/db7e6eb6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/667f1285/attachment.sig>
