@@ -1,141 +1,92 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Tue, 03 Dec 2013 20:57:24 +0000
-Subject: Spurious timeouts in mvmdio
-In-Reply-To: <20131203124033.GT16735@n2100.arm.linux.org.uk>
-References: <529CA42A.3040504@freebox.fr>
- <20131203122346.GD29282@titan.lakedaemon.net>
- <20131203124033.GT16735@n2100.arm.linux.org.uk>
-Message-ID: <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 3 Dec 2013 13:02:59 -0800
+Subject: Build warning in drivers/dma/mmp_tdma.c
+In-Reply-To: <529DB5C8.1010500@marvell.com>
+References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
+ <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
+ <529C37F3.1040205@marvell.com>
+ <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
+ <CAMj5Bkjkndq1-AJSm0k9Mm8xeaWEGktoFb6nZ3kr7RackFdcaw@mail.gmail.com>
+ <529D4273.10602@gmail.com> <529DB5C8.1010500@marvell.com>
+Message-ID: <CAA9_cmc0+onxBJ4_xRAPSfH2Hx6ky87EZk9_8kJvbED03_Ca1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell and Nicolas,
+On Tue, Dec 3, 2013 at 2:43 AM, Qiao Zhou <zhouqiao@marvell.com> wrote:
+> On 12/03/2013 10:31 AM, Haojian Zhuang wrote:
+>>
+>> I prefer to add CONFIG_MMP_SRAM instead, since sram isn't available in
+>> pxa168.
+>
+> Hi Dan,
+>
+> I have two patches. Could you help check whether it can fix the issue?
+>
+> BTW, actually the 2nd alone is enough. The 1st patch is just in case that
+> you still want to use the old sram driver, and you need to enable MMP_SRAM.
+>
+> All, please help review the patches.
+>
+> From 94601015d525db6d2baf47f4d517f38ae2e5e802 Mon Sep 17 00:00:00 2001
+> From: Qiao Zhou <zhouqiao@marvell.com>
+> Date: Tue, 3 Dec 2013 11:06:29 +0800
+> Subject: [PATCH 1/2] arm: mmp: build sram driver alone
+>
+> sram driver can be used by many chips besides CPU_MMP2, and so build
+> it alone.
+>
+> Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
+> ---
+>  arch/arm/mach-mmp/Makefile |    3 ++-
+>
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+> index 9b702a1..98f0f63 100644
+> --- a/arch/arm/mach-mmp/Makefile
+> +++ b/arch/arm/mach-mmp/Makefile
+> @@ -7,7 +7,8 @@ obj-y                           += common.o devices.o time.o
+>  # SoC support
+>  obj-$(CONFIG_CPU_PXA168)       += pxa168.o
+>  obj-$(CONFIG_CPU_PXA910)       += pxa910.o
+>
+> -obj-$(CONFIG_CPU_MMP2)         += mmp2.o sram.o
+> +obj-$(CONFIG_CPU_MMP2)         += mmp2.o
+> +obj-$(CONFIG_MMP_SRAM)         += sram.o
 
-Apologies for taking so long to respond to this thread.
+Missing the Kconfig change to add "config MMP_SRAM"?
 
-On 2013-12-03 12:40, Russell King - ARM Linux wrote:
-> On Tue, Dec 03, 2013 at 07:23:46AM -0500, Jason Cooper wrote:
->> On Mon, Dec 02, 2013 at 04:15:54PM +0100, Nicolas Schichan wrote:
-[...]
->> 11:31 < shesselba> kos_tom: it is already using usecs_to_jiffies()
->> 11:31 < shesselba> the thing is: 1ms is less than a jiffy
-> 
-> Yes, and the kernels time conversion functions aren't stupid.  Let's
-> look at this function's implementation:
-> 
-> unsigned long usecs_to_jiffies(const unsigned int u)
-> {
->         if (u > jiffies_to_usecs(MAX_JIFFY_OFFSET))
->                 return MAX_JIFFY_OFFSET;
-> #if HZ <= USEC_PER_SEC && !(USEC_PER_SEC % HZ)
->         return (u + (USEC_PER_SEC / HZ) - 1) / (USEC_PER_SEC / HZ);
-> #elif HZ > USEC_PER_SEC && !(HZ % USEC_PER_SEC)
->         return u * (HZ / USEC_PER_SEC);
-> #else
->         return (USEC_TO_HZ_MUL32 * u + USEC_TO_HZ_ADJ32)
->                 >> USEC_TO_HZ_SHR32;
-> #endif
-> }
-> 
-> Now, assuming HZ=100 and USEC_PER_SEC=1000000, we will use:
-> 
-> 	return (u + (USEC_PER_SEC / HZ) - 1) / (USEC_PER_SEC / HZ);
-> 
-> If you ask for 1us, this comes out as:
-> 
-> 	return (1 + (1000000 / 100) - 1) / (1000000 / 100);
-> 
-> which is one jiffy.  So, for a requested 1us period, you're given a
-> 1 jiffy interval, or 10ms.  For other (sensible) values:
-> 
->         return (USEC_TO_HZ_MUL32 * u + USEC_TO_HZ_ADJ32)
->                 >> USEC_TO_HZ_SHR32;
-> 
-> gets used, which has a similar behaviour.
-> 
-> Now, depending on how you use this one jiffy interval, the thing to 
-> realise
-> is that with this kind of loop:
-> 
-> 	timeout = jiffies + usecs_to_jiffies(1);
-> 	do {
-> 		something;
-> 	} while (time_is_before_jiffies(timeout));
-> 
-> what this equates to is:
-> 
-> 	} while (jiffies - timeout < 0);
+>
+>  ifeq ($(CONFIG_COMMON_CLK), )
+>  obj-y                          += clock.o
+> --
+> 1.7.0.4
+>
+>
+> From 5396b1bffd574dbe778387979ecc24c51ee0c7a4 Mon Sep 17 00:00:00 2001
+> From: Qiao Zhou <zhouqiao@marvell.com>
+> Date: Tue, 3 Dec 2013 18:17:02 +0800
+> Subject: [PATCH 2/2] dma: mmp-tdma: use gen_pool to get asram
+>
+> use generic pool to get audio sram, instead of sram driver
+>
+> Signed-off-by: nhcao <nhcao@marvell.com>
+> Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
+> ---
+>  drivers/dma/Kconfig    |    1 +
+>  drivers/dma/mmp_tdma.c |   22 +++++++++++++++++-----
+>  2 files changed, 18 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index dd2874e..eeffe3c 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -288,6 +288,7 @@ config MMP_TDMA
+>
+>         bool "MMP Two-Channel DMA support"
+>         depends on ARCH_MMP
+>         select DMA_ENGINE
+> +       select GENERIC_ALLOCATOR
 
-You've got that last line the wrong way round, but I understand what you 
-are
-getting at.
-
-> What this means is that the loop breaks at jiffies = timeout, so it can
-> indeed timeout before one tick - within 0 to 10ms for HZ=100.  The 
-> problem
-> is not the usecs_to_jiffies(), it's with the implementation.
-
-> If you use time_is_before_eq_jiffies() instead, it will also loop if
-> jiffies == timeout, which will give you the additional safety margin -
-> meaning it will timeout after 10 to 20ms instead.
-
-The code in question uses the logic in reverse so it *exits* if
-time_is_before_jiffies(end) is true.  In other words it exits if 
-"jiffies" is
-greater than "end".  Since, as you say, usecs_to_jiffies(somevalue) will 
-be a
-minimum of 1, that means it will always loop at least twice.  So, I 
-think it's
-doing what you suggest, but in a different way, when polling.
-
-> You may wish to consider coding this differently as well - if you have
-> the error interrupt, there's no need for this loop.  You only need the
-> loop if you're using usleep_range().  Note the return value of
-> wait_event_timeout() will tell you positively and correctly if the 
-> waited
-> condition succeeded or you timed out.
-
-Although the the wait_event_timeout is in the loop, it always exits due 
-to
-setting timedout to 1.  This was done to make the code smaller but I was
-probably trying to be cleverer than I should have been.
-
-So, given the above I believe the polling code is correct.  My mistake 
-was to
-assume that wait_event_timeout() guarantees a minimum of 1 jiffie wait.
-
-Nicolas' patch should fix the issue, but I prefer the following as it is 
-more
-correct, as it only adjusts the timeout when calling 
-wait_event_timeout().  As
-I said above,I believe the polling code is correct.
-
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c 
-b/drivers/net/ethernet/marvell/mvmdio.c
-index 7354960..b187c08 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -92,6 +92,14 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
-  			if (time_is_before_jiffies(end))
-  				++timedout;
-  	        } else {
-+			/*
-+			 * wait_event_timeout does not guarantee a delay of at
-+			 * least one whole jiffie, so timeout must be no less
-+			 * than two.
-+			 */
-+			if (timeout < 2)
-+				timeout = 2;
-+
-  			wait_event_timeout(dev->smi_busy_wait,
-  				           orion_mdio_smi_is_done(dev),
-  				           timeout);
-
-Nicolas - does the above also fix your issue?  I will also test it on my 
-Dreamplug.
-
-Apologies for causing this regression.
-
-Regards,
-
-Leigh.
+You still need a depends on MMP_SRAM right?  Otherwise this just turns
+the compile error into a much more subtle runtime failure.
