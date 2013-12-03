@@ -1,85 +1,104 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Dec 2013 15:14:11 +0100
-Subject: [PATCH 2/3] usb: ohci-at91: replace request_mem_region + ioremap
- by devm_request_and_ioremap
-In-Reply-To: <1386079669-3995-3-git-send-email-b.brezillon@overkiz.com>
+Date: Tue, 3 Dec 2013 15:15:45 +0100
+Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
+In-Reply-To: <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
 References: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
- <1386079669-3995-3-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <529DE733.60400@atmel.com>
+ <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <529DE791.6080007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/12/2013 15:07, Boris BREZILLON :
-> Replace the request_mem_region + ioremap calls by the
-> devm_request_and_ioremap call which does the same things but with device
-> managed resources.
+> Replace clk_get calls by devm_clk_get calls.
 >
 > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > Tested-by: Robert Nelson <robertcnelson@gmail.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
+Thanks Boris for these fixes.
+
+Alan, Greg, can you take the whole series as fixes for 3.13?
+
+Thanks, best regards,
+
 > ---
->   drivers/usb/host/ohci-at91.c |   24 +++++-------------------
->   1 file changed, 5 insertions(+), 19 deletions(-)
+>   drivers/usb/host/ohci-at91.c |   32 ++++++++------------------------
+>   1 file changed, 8 insertions(+), 24 deletions(-)
 >
 > diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 7aec6ca..c406f1e 100644
+> index c406f1e..3652962 100644
 > --- a/drivers/usb/host/ohci-at91.c
 > +++ b/drivers/usb/host/ohci-at91.c
-> @@ -157,24 +157,18 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   	hcd->rsrc_start = mem_r->start;
->   	hcd->rsrc_len = resource_size(mem_r);
->
-> -	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-> -		pr_debug("request_mem_region failed\n");
-> -		retval = -EBUSY;
-> -		goto err1;
-> -	}
-> -
-> -	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-> +	hcd->regs = devm_request_and_ioremap(&pdev->dev, mem_r);
->   	if (!hcd->regs) {
-> -		pr_debug("ioremap failed\n");
-> +		dev_dbg(dev, "devm_request_and_ioremap failed\n");
->   		retval = -EIO;
-> -		goto err2;
-> +		goto err;
+> @@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   		goto err;
 >   	}
 >
->   	iclk = clk_get(&pdev->dev, "ohci_clk");
+> -	iclk = clk_get(&pdev->dev, "ohci_clk");
+> +	iclk = devm_clk_get(dev, "ohci_clk");
 >   	if (IS_ERR(iclk)) {
->   		dev_err(&pdev->dev, "failed to get ohci_clk\n");
+> -		dev_err(&pdev->dev, "failed to get ohci_clk\n");
+> +		dev_err(dev, "failed to get ohci_clk\n");
 >   		retval = PTR_ERR(iclk);
-> -		goto err3;
+>   		goto err;
+>   	}
+> -	fclk = clk_get(&pdev->dev, "uhpck");
+> +	fclk = devm_clk_get(dev, "uhpck");
+>   	if (IS_ERR(fclk)) {
+>   		dev_err(&pdev->dev, "failed to get uhpck\n");
+>   		retval = PTR_ERR(fclk);
+> -		goto err4;
 > +		goto err;
 >   	}
->   	fclk = clk_get(&pdev->dev, "uhpck");
->   	if (IS_ERR(fclk)) {
-> @@ -218,13 +212,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->    err4:
->   	clk_put(iclk);
+> -	hclk = clk_get(&pdev->dev, "hclk");
+> +	hclk = devm_clk_get(dev, "hclk");
+>   	if (IS_ERR(hclk)) {
+>   		dev_err(&pdev->dev, "failed to get hclk\n");
+>   		retval = PTR_ERR(hclk);
+> -		goto err5;
+> +		goto err;
+>   	}
+>   	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> -		uclk = clk_get(&pdev->dev, "usb_clk");
+> +		uclk = devm_clk_get(&pdev->dev, "usb_clk");
+>   		if (IS_ERR(uclk)) {
+>   			dev_err(&pdev->dev, "failed to get uclk\n");
+>   			retval = PTR_ERR(uclk);
+> -			goto err6;
+> +			goto err;
+>   		}
+>   	}
 >
-> - err3:
-> -	iounmap(hcd->regs);
+> @@ -203,15 +203,6 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	/* Error handling */
+>   	at91_stop_hc(pdev);
+>
+> -	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> -		clk_put(uclk);
+> - err6:
+> -	clk_put(hclk);
+> - err5:
+> -	clk_put(fclk);
+> - err4:
+> -	clk_put(iclk);
 > -
-> - err2:
-> -	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-> -
-> - err1:
-> + err:
+>    err:
 >   	usb_put_hcd(hcd);
 >   	return retval;
->   }
-> @@ -247,8 +235,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
->   {
+> @@ -236,13 +227,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
 >   	usb_remove_hcd(hcd);
 >   	at91_stop_hc(pdev);
-> -	iounmap(hcd->regs);
-> -	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 >   	usb_put_hcd(hcd);
+> -
+> -	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> -		clk_put(uclk);
+> -	clk_put(hclk);
+> -	clk_put(fclk);
+> -	clk_put(iclk);
+> -	fclk = iclk = hclk = NULL;
+>   }
 >
->   	if (IS_ENABLED(CONFIG_COMMON_CLK))
+>   /*-------------------------------------------------------------------------*/
 >
 
 
