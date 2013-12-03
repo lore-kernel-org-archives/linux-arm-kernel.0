@@ -1,66 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 3 Dec 2013 07:23:46 -0500
-Subject: Spurious timeouts in mvmdio
-In-Reply-To: <529CA42A.3040504@freebox.fr>
-References: <529CA42A.3040504@freebox.fr>
-Message-ID: <20131203122346.GD29282@titan.lakedaemon.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 03 Dec 2013 13:24:42 +0100
+Subject: [alsa-devel] [PATCH 1/2] ASoC: ux500_pcm: Differentiate between
+ pdata and DT initialisation
+In-Reply-To: <529DCB76.4070705@metafoo.de>
+References: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
+ <529DC6BE.3080607@metafoo.de> <20131203120420.GC12031@lee--X1>
+ <529DCB76.4070705@metafoo.de>
+Message-ID: <529DCD8A.30600@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
-
-Sorry for the delay, we spoke about this yesterday on irc, and
-apparently we all thought the other person was going to respond.  oops
-:(
-
-On Mon, Dec 02, 2013 at 04:15:54PM +0100, Nicolas Schichan wrote:
-> During 3.13-rc1 testing, I have found out that the mvmdio driver
-> would report timeouts on the kernel console:
+On 12/03/2013 01:15 PM, Lars-Peter Clausen wrote:
+> On 12/03/2013 01:04 PM, Lee Jones wrote:
+>> On Tue, 03 Dec 2013, Lars-Peter Clausen wrote:
+>>
+>>> On 12/03/2013 11:27 AM, Lee Jones wrote:
+>>>> If booting with full DT support (i.e. DMA too, the last piece of the
+>>>> puzzle), then we don't need to use the compatible_request_channel call
+>>>> back or require some of the historical bumph which probably isn't
+>>>> required by a platform data start-up now either. This will also be
+>>>> ripped out in upcoming commits.
+>>>>
+>>>> Cc: alsa-devel at alsa-project.org
+>>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>>
+>>> Strictly speaking you do not need the second config, but well considering
+>>> that this will all hopefully be removed soon anyway it should be fine.
+>>
+>> That's true it will, but why don't we need the second config? I won't
+>> want the compat function to be called in the DT case.
 > 
-> [   11.011334] orion-mdio orion-mdio: Timeout: SMI busy for too long
-> 
-> The hardware is a MV88F6281 Kirkwood CPU. The mvmdio driver is using
-> the irq line 46 (ge00_err).
-> 
-> I am inclined to believe that it is due to the fact that
-> wait_event_timeout() is called with a timeout parameter of 1 jiffy
-> in orion_mdio_wait_ready(). If the timer interrupt ticks right after
-> calling wait_event_timeout(), we may end up spending much less time
-> than MVMDIO_SMI_TIMEOUT (1 msec) in wait_event_timeout(), and as a
-> result report a timeout as the MDIO access did not complete in such
-> a short time.
-> 
-> As to how to fix this, I see two options (I don't know which one
-> would be prefered):
-> 
-> - Option 1: always pass a timeout of at least 2 jiffy to wait_event_timeout().
-> - Option 2: switch to wait_event_hrtimeout().
-> 
-> I can provide patches for both options.
+> It will only be called if it was not possible to request the DMA channel
+> from the DT.
 
-Based on yesterday's irc chat, option 1 sounds good.  Here's the dump
-from yesterday where Sebastian provided a thorough explanation:
+The logic used to request the channel is basically this (in pseudo code).
 
-11:29 < shesselba> increasing max timeout to 2 ticks at least sounds reasonable
-11:29 < shesselba> 10ms should be enough for every CONFIG_HZ there is
+chan = NULL.
 
-11:30 < kos_tom> why make the timeout tied to the ticks? there are functions/macros to convert real time numbers into ticks.
-11:30 < kos_tom> msecs_to_jiffies() or something
+if (of_node && !(flags & NO_DT))
+	chan = dma_request_slave_channel(...)
 
-11:31 < shesselba> kos_tom: it is already using usecs_to_jiffies()
-11:31 < shesselba> the thing is: 1ms is less than a jiffy
-
-11:33 < kos_tom> so it will wait one jiffy or a little bit more, no?
-
-11:38 < shesselba> no, the spurious timeouts he is seeing come from (1) mvmdio gets jiffies close before the next tick, (2) wait_event_timeout is called with jiffies + timeout
-11:39 < shesselba> with timeout << 1 jiffy
-11:39 < shesselba> then (3) the next timer tick occurs
-11:39 < shesselba> it will end up waiting less then a jiffy
-11:40 < shesselba> IOW, increase timeout to be at least two jiffies (or 20ms for CONFIG_HZ=100)
-11:41 < shesselba> originally, it was 100ms anyway
-
-Looking forward to the patch!
-
-thx,
-
-Jason.
+if (!chan && (flags & COMPAT))
+	chan = dma_request_channel(compat_filter_fn, compat_filter_data);
