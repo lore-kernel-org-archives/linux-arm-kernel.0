@@ -1,60 +1,85 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Dec 2013 15:09:25 +0000
-Subject: [PATCH 0/3] Simplify set_huge_pte_at, pte_same for LPAE
-In-Reply-To: <20131203134623.GA24994@linaro.org>
-References: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
- <20131203134623.GA24994@linaro.org>
-Message-ID: <20131203150924.GE12370@arm.com>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Tue,  3 Dec 2013 15:09:42 +0000
+Subject: [PATCH] xen/block: Correctly define structures in public headers on
+ ARM32 and ARM64
+Message-ID: <1386083382-7306-1-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 01:46:24PM +0000, Steve Capper wrote:
-> On Tue, Nov 19, 2013 at 05:35:26PM +0000, Steve Capper wrote:
-> > The following patch series is my attempt at fixing a rather nasty bug
-> > which became visible in 3.12-rc1 when running the libhugetlbfs test
-> > suite. (This problem only just came to my attention yesterday).
-> > 
-> > For LPAE, set_huge_pte_at calls set_pte_at which then calls
-> > set_pte_ext, which in turn is wired up to call cpu_v7_set_pte_ext,
-> > which is defined in proc-v7-3level.S.
-> > 
-> > For huge pages, given newprot a pgprot_t value for a shared writable
-> > VMA, and ptep a pointer to a pte belonging to this VMA; the following
-> > behaviour is assumed by core code:
-> >    hugetlb_change_protection(vma, address, end, newprot);
-> >    ...
-> > 
-> >    huge_pte_write(huge_ptep_get(ptep)); /* should be true! */
-> > 
-> > Unfortunately, cpu_v7_set_pte_ext will change the bit layout of the
-> > resultant pte, and will set the read only bit if the dirty bit is not
-> > also enabled.
-> 
-> A question has been raised for the arm64 analogue of this series as to
-> whether or not this is the best approach:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215155.html
-> 
-> I am having a think about this, and will send out a V2 once my brain
-> has caught up. :-)
+On ARM (32 bits and 64 bits), the double-word is 8-bytes aligned. This will
+result on different structure from Xen and Linux repositories.
 
-I think we first need to check we don't actually do a CoW for any clean
-anonymous small page just because pte_dirty and pte_write use the same
-PTE_RDONLY bit (both arm+LPAE and arm64). Once that's fixed, I don't
-think you need any hugetlb changes.
+As Linux is using __packed__ attribute, it must have a 4-bytes padding before
+each "id" field.
 
-Basically we need to encode these states:
+This change breaks guest block support with older kernel. IMHO, it's acceptable
+because Xen on ARM is still on Tech Preview and the hypercall ABI is not yet
+freezed.
 
-				PTE_DIRTY	PTE_RDONLY
-!pte_dirty && !pte_write	0		1
-!pte_dirty && pte_write		0		1
-pte_dirty && !pte_write		1		1
-pte_dirty && pte_write		1		0
+Signed-off-by: Julien Grall <julien.grall@linaro.org>
+Cc: Roger Pau Monne <roger.pau@citrix.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-So we can't distinguish between the first two with just two bits since
-PTE_RDONLY is a hardware bit.
+---
 
-My proposal would be for PTE_WRITE bit with PTE_RDONLY only set in the
-set_pte() function (if !pte_dirty || !pte_write).
+This patch is the rework of "xen-block: correctly define structures in public
+headers" sent by Roger (see https://lkml.org/lkml/2013/12/3/155).
+---
+ include/xen/interface/io/blkif.h |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/include/xen/interface/io/blkif.h b/include/xen/interface/io/blkif.h
+index 65e1209..08e8e9d 100644
+--- a/include/xen/interface/io/blkif.h
++++ b/include/xen/interface/io/blkif.h
+@@ -146,7 +146,7 @@ struct blkif_request_segment_aligned {
+ struct blkif_request_rw {
+ 	uint8_t        nr_segments;  /* number of segments                   */
+ 	blkif_vdev_t   handle;       /* only for read/write requests         */
+-#ifdef CONFIG_X86_64
++#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+ 	uint32_t       _pad1;	     /* offsetof(blkif_request,u.rw.id) == 8 */
+ #endif
+ 	uint64_t       id;           /* private guest value, echoed in resp  */
+@@ -163,7 +163,7 @@ struct blkif_request_discard {
+ 	uint8_t        flag;         /* BLKIF_DISCARD_SECURE or zero.        */
+ #define BLKIF_DISCARD_SECURE (1<<0)  /* ignored if discard-secure=0          */
+ 	blkif_vdev_t   _pad1;        /* only for read/write requests         */
+-#ifdef CONFIG_X86_64
++#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+ 	uint32_t       _pad2;        /* offsetof(blkif_req..,u.discard.id)==8*/
+ #endif
+ 	uint64_t       id;           /* private guest value, echoed in resp  */
+@@ -175,7 +175,7 @@ struct blkif_request_discard {
+ struct blkif_request_other {
+ 	uint8_t      _pad1;
+ 	blkif_vdev_t _pad2;        /* only for read/write requests         */
+-#ifdef CONFIG_X86_64
++#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+ 	uint32_t     _pad3;        /* offsetof(blkif_req..,u.other.id)==8*/
+ #endif
+ 	uint64_t     id;           /* private guest value, echoed in resp  */
+@@ -184,7 +184,7 @@ struct blkif_request_other {
+ struct blkif_request_indirect {
+ 	uint8_t        indirect_op;
+ 	uint16_t       nr_segments;
+-#ifdef CONFIG_X86_64
++#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+ 	uint32_t       _pad1;        /* offsetof(blkif_...,u.indirect.id) == 8 */
+ #endif
+ 	uint64_t       id;
+@@ -192,7 +192,7 @@ struct blkif_request_indirect {
+ 	blkif_vdev_t   handle;
+ 	uint16_t       _pad2;
+ 	grant_ref_t    indirect_grefs[BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST];
+-#ifdef CONFIG_X86_64
++#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+ 	uint32_t      _pad3;         /* make it 64 byte aligned */
+ #else
+ 	uint64_t      _pad3;         /* make it 64 byte aligned */
 -- 
-Catalin
+1.7.10.4
