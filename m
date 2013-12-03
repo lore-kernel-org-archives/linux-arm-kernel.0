@@ -1,66 +1,101 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 03 Dec 2013 10:24:18 -0800
-Subject: [PATCH v6] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <5295F47E.7030409@gmail.com> (Daniel Mack's message of "Wed, 27
- Nov 2013 14:32:46 +0100")
-References: <1384726754-27875-1-git-send-email-zonque@gmail.com>
- <52938A12.5030100@ti.com> <5295F211.1050605@ti.com>
- <5295F47E.7030409@gmail.com>
-Message-ID: <878uw1ssh9.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  3 Dec 2013 11:26:39 -0700
+Subject: [PATCH V2] ARM: tegra: add MMC controllers to Tegra124 DT
+Message-ID: <1386095199-24336-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <zonque@gmail.com> writes:
+From: Stephen Warren <swarren@nvidia.com>
 
-> On 11/27/2013 02:22 PM, Sekhar Nori wrote:
->> + Kevin
->> 
->> On Monday 25 November 2013 11:04 PM, Joel Fernandes wrote:
->>> On 11/17/2013 04:19 PM, Daniel Mack wrote:
->>>> This patch makes the edma driver resume correctly after suspend. Tested
->>>> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
->>>>
->>>> All information can be reconstructed by already known runtime
->>>> information.
->>>>
->>>> As we now use some functions that were previously only used from __init
->>>> context, annotations had to be dropped.
->>>>
->>>> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
->>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>>> Tested-by: Joel Fernandes <joelf@ti.com>
->>>> Acked-by: Joel Fernandes <joelf@ti.com>
->>>
->>> Hi Sekhar,
->>>
->>> Can you consider pulling this patch? It has been tested and Acked. Thanks.
->> 
->> Kevin had some inputs on previous version of this patch. Were you able
->> to make sure he is okay with this version being merged?
->
-> I had concerns about the feedback I got, and haven't got answers yet.
->
-> In particular, I'm not convinced that using runtime PM to suspend
-> channels would actually save any power during runtime, or have any other
-> benefit. 
+Tegra124 has 4 MMC controllers just like previous versions of the SoC.
+Note that there are some non-backwards-compatible HW differences, and
+hence a new DT compatible value must be used to describe the HW.
 
-/me returning from a week off
+Also enable the relevant controllers in the Venice2 board DT.
 
-The amount of power to be saved depends on the activity in the system.
-If DMA is unused, at least the clocks could be gated allowing the
-possibility of the enclosing power domain to be gated if other devices
-are also clock gated, etc. etc.
+power-gpios property suggested by Thierry Reding.
 
-However, my comments were not really about power saving, they were about
-designing things in a way that are scalable and match the longer term
-goals of converting drivers to be runtime PM centric.  For example, if
-someone did want to add real runtime PM to this driver later, they would
-need to rework much of this.  So my suggestion was to do runtime PM the
-right way from the beginning.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2: Add power-gpios to SD card node, suggested by Thierry.
+---
+ arch/arm/boot/dts/tegra124-venice2.dts | 12 ++++++++++
+ arch/arm/boot/dts/tegra124.dtsi        | 40 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
 
-That being said, I'm not the maintainer of this driver so don't get to
-make the final call.  I will just say that from what I've seen here, I
-don't think this is the right approach.
-
-Kevin
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index a0b028384658..098d0b2081bf 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -25,6 +25,18 @@
+ 		nvidia,sys-clock-req-active-high;
+ 	};
+ 
++	sdhci at 700b0400 {
++		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
++		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
++		status = "okay";
++		bus-width = <4>;
++	};
++
++	sdhci at 700b0600 {
++		status = "okay";
++		bus-width = <8>;
++	};
++
+ 	clocks {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 96e051e13f76..200373236aaa 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -190,6 +190,46 @@
+ 		clock-names = "pclk", "clk32k_in";
+ 	};
+ 
++	sdhci at 700b0000 {
++		compatible = "nvidia,tegra124-sdhci";
++		reg = <0x700b0000 0x200>;
++		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_SDMMC1>;
++		resets = <&tegra_car 14>;
++		reset-names = "sdhci";
++		status = "disable";
++	};
++
++	sdhci at 700b0200 {
++		compatible = "nvidia,tegra124-sdhci";
++		reg = <0x700b0200 0x200>;
++		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_SDMMC2>;
++		resets = <&tegra_car 9>;
++		reset-names = "sdhci";
++		status = "disable";
++	};
++
++	sdhci at 700b0400 {
++		compatible = "nvidia,tegra124-sdhci";
++		reg = <0x700b0400 0x200>;
++		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_SDMMC3>;
++		resets = <&tegra_car 69>;
++		reset-names = "sdhci";
++		status = "disable";
++	};
++
++	sdhci at 700b0600 {
++		compatible = "nvidia,tegra124-sdhci";
++		reg = <0x700b0600 0x200>;
++		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_SDMMC4>;
++		resets = <&tegra_car 15>;
++		reset-names = "sdhci";
++		status = "disable";
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-- 
+1.8.1.5
