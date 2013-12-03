@@ -1,29 +1,35 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 3 Dec 2013 14:20:40 +0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <529C6CBB.4000008@st.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com> <5298AA23.7080404@st.com>
- <529C5BBF.6000604@freescale.com> <529C6CBB.4000008@st.com>
-Message-ID: <529D7838.6030606@freescale.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 3 Dec 2013 08:46:50 +0200
+Subject: [RFC][PATCHv6+++ 01/13] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <CAL_JsqKDokswB1jJN7ZT-Us0h=uTf5qHLZFUJfGFkXBjdO5XjA@mail.gmail.com>
+References: <20131128.145818.1345100874304396564.hdoyu@nvidia.com>
+ <20131129.134625.431945240074254704.hdoyu@nvidia.com>
+ <529B8739.60701@wwwdotorg.org>
+ <20131202.130220.1404999403649937134.hdoyu@nvidia.com>
+ <CAL_JsqKDokswB1jJN7ZT-Us0h=uTf5qHLZFUJfGFkXBjdO5XjA@mail.gmail.com>
+Message-ID: <20131203084650.bf498e1eb6883e38d873ef4a@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?12?02? 19:19, Angus Clark ??:
-> To be honest, I am just glad that someone is taking a look at this area.
-> However, whether or not is it possible to come up with something that solves all
-> our problems remains to be seen.  It might turn out that the various H/W
-> Controllers are just too different to fit into a single unified framework.
->
-Hi Angus & Pekon:
-thanks for the explanations.
+On Mon, 2 Dec 2013 15:39:25 +0100
+Rob Herring <robherring2@gmail.com> wrote:
 
-I am not sure that after we add more hooks, if it will meet Jones's new 
-driver.
+> On Mon, Dec 2, 2013 at 5:02 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> > Stephen Warren <swarren@wwwdotorg.org> wrote @ Sun, 1 Dec 2013 20:00:09 +0100:
+> >
+> >> On 11/29/2013 04:46 AM, Hiroshi Doyu wrote:
+> >> ...
+> >> > Iterating over a property containing a list of phandles with arguments
+> >> > is a common operation for device drivers. This patch adds a new
+> >> > of_property_for_each_phandle_with_args() macro to make the iteration
+> >> > simpler.
+> >> >
+> >> > Introduced a new struct "of_phandle_iter" to keep the state when
+> >> > iterating over the list.
+> >> >
+> >> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+....
 
-i will wait for Jones' comment for several days, and send out the next 
-version if he does not reply this thread.
-
-
-thanks
-Huang Shijie
+Rob, thank you for review.
+I'll fix them and put this one into the next v7 series.
