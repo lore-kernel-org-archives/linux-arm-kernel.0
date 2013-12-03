@@ -1,101 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  3 Dec 2013 11:26:39 -0700
-Subject: [PATCH V2] ARM: tegra: add MMC controllers to Tegra124 DT
-Message-ID: <1386095199-24336-1-git-send-email-swarren@wwwdotorg.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 3 Dec 2013 10:28:08 -0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <1386084180.18201.67.camel@shinybook.infradead.org>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <201312031519.49171.marex@denx.de> <529DEB2B.5060009@ti.com>
+ <201312031609.36299.marex@denx.de>
+ <1386084180.18201.67.camel@shinybook.infradead.org>
+Message-ID: <20131203182808.GD9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Tue, Dec 03, 2013 at 03:23:00PM +0000, David Woodhouse wrote:
+> Seriously, guys, can you please trim your citations? Include only what's
+> absolutely needed for what you're saying right now!
 
-Tegra124 has 4 MMC controllers just like previous versions of the SoC.
-Note that there are some non-backwards-compatible HW differences, and
-hence a new DT compatible value must be used to describe the HW.
++1
 
-Also enable the relevant controllers in the Venice2 board DT.
+Additionally, when trimming replies, can you please leave a proper
 
-power-gpios property suggested by Thierry Reding.
+  On <date / time>, <sende> wrote:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2: Add power-gpios to SD card node, suggested by Thierry.
----
- arch/arm/boot/dts/tegra124-venice2.dts | 12 ++++++++++
- arch/arm/boot/dts/tegra124.dtsi        | 40 ++++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
+line before the quote? It helps to identify who said what in a quote,
+and it serves a much better purpose than leaving the 'Dear So-and-so'
+intact.
 
-diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-index a0b028384658..098d0b2081bf 100644
---- a/arch/arm/boot/dts/tegra124-venice2.dts
-+++ b/arch/arm/boot/dts/tegra124-venice2.dts
-@@ -25,6 +25,18 @@
- 		nvidia,sys-clock-req-active-high;
- 	};
- 
-+	sdhci at 700b0400 {
-+		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
-+		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
-+		status = "okay";
-+		bus-width = <4>;
-+	};
-+
-+	sdhci at 700b0600 {
-+		status = "okay";
-+		bus-width = <8>;
-+	};
-+
- 	clocks {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 96e051e13f76..200373236aaa 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -190,6 +190,46 @@
- 		clock-names = "pclk", "clk32k_in";
- 	};
- 
-+	sdhci at 700b0000 {
-+		compatible = "nvidia,tegra124-sdhci";
-+		reg = <0x700b0000 0x200>;
-+		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_SDMMC1>;
-+		resets = <&tegra_car 14>;
-+		reset-names = "sdhci";
-+		status = "disable";
-+	};
-+
-+	sdhci at 700b0200 {
-+		compatible = "nvidia,tegra124-sdhci";
-+		reg = <0x700b0200 0x200>;
-+		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_SDMMC2>;
-+		resets = <&tegra_car 9>;
-+		reset-names = "sdhci";
-+		status = "disable";
-+	};
-+
-+	sdhci at 700b0400 {
-+		compatible = "nvidia,tegra124-sdhci";
-+		reg = <0x700b0400 0x200>;
-+		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_SDMMC3>;
-+		resets = <&tegra_car 69>;
-+		reset-names = "sdhci";
-+		status = "disable";
-+	};
-+
-+	sdhci at 700b0600 {
-+		compatible = "nvidia,tegra124-sdhci";
-+		reg = <0x700b0600 0x200>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_SDMMC4>;
-+		resets = <&tegra_car 15>;
-+		reset-names = "sdhci";
-+		status = "disable";
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--- 
-1.8.1.5
+Seeing the following tells me who you were speaking to, not who was
+actually speaking:
+
+> > Dear Sourav Poddar,
+> > 
+> > > Dear Marek Vasut,
+> > > 
+
+Particularly, it seems like Marek's and Huang's mailers tend to leave
+the attribution line off.
+
+Thanks,
+Brian
