@@ -1,24 +1,36 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Dec 2013 19:20:26 +0000
-Subject: [PATCH] arm64: cmpxchg: update macros to prevent warnings
-In-Reply-To: <1386098127-29070-1-git-send-email-broonie@kernel.org>
-References: <1386098127-29070-1-git-send-email-broonie@kernel.org>
-Message-ID: <20131203192026.GA29268@sirena.org.uk>
+Date: Tue,  3 Dec 2013 19:24:03 +0000
+Subject: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
+Message-ID: <1386098643-30784-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 07:15:27PM +0000, Mark Brown wrote:
-> From: Mark Hambleton <mahamble@broadcom.com>
-> 
-> Make sure the value we are going to return is referenced in order to
-> avoid warnings from newer GCCs such as:
+From: Mark Hambleton <mahamble@broadcom.com>
 
-Sorry, I was missing a commit --amend here - resent with the correction
-made.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/264dc0d8/attachment-0001.sig>
+Describe the virtio device so we can mount disk images in the simulator.
+
+Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+index b45e5f39f577..4ccd96552b70 100644
+--- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
++++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+@@ -183,6 +183,12 @@
+ 				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
+ 				clock-names = "clcdclk", "apb_pclk";
+ 			};
++
++			virtio_block at 0130000 {
++				compatible = "virtio,mmio";
++				reg = <0x130000 0x1000>;
++				interrupts = <42>;
++			};
+ 		};
+ 
+ 		v2m_fixed_3v3: fixedregulator at 0 {
+-- 
+1.8.5
