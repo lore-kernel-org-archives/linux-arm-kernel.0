@@ -1,93 +1,61 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed,  4 Dec 2013 00:41:29 +0800
-Subject: [RFC part3 PATCH 0/2] Using ACPI GTDT table to initialize arch timer
-Message-ID: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 3 Dec 2013 16:41:37 +0000
+Subject: [PATCH v2] xen/block: Correctly define structures in public
+ headers on ARM32 and ARM64
+In-Reply-To: <20131203163228.3313dff8@alan.etchedpixels.co.uk>
+References: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
+ <20131203160018.67542a53@alan.etchedpixels.co.uk>
+ <529E04AB.5060304@linaro.org>
+ <20131203163228.3313dff8@alan.etchedpixels.co.uk>
+Message-ID: <1386088897.13256.66.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the last part of patch set for core of ARM64 ACPI, and is based
-on the patch set part2 "Using ACPI MADT table to initialise SMP and GIC".
+On Tue, 2013-12-03 at 16:32 +0000, One Thousand Gnomes wrote:
+> > > How does the patch ensure new kernels on existing hypervisor versions
+> > > don't break ?
+> > 
+> > As Ian said on the thread "xen-block: correctly define structures in
+> > public headers" (see thread https://lkml.org/lkml/2013/12/3/155), the
+> > ABI is not yet fixed for ARM.
+> 
+> And if you are one of the existing users that helps how ?
 
-ACPI GTDT (Generic Timer Description Table) is used for ARM/ARM64 only,
-and contains the information for arch timer initialisation.
+The existing users are using something which was explicitly marked as a
+tech preview and for which it was stated clearly that the ABI was not
+set in stone. They know to expect this sort of thing and have
+experienced it more than once already as this stuff was developed.
 
-This patch trys to convert the arch timer to ACPI using GTDT. 
+This is actually something of a red-herring though, this is a protocol
+between two peers and it has now transpired that Linux was not
+implementing the specified protocol, even though it was able to talk to
+itself. The protocol is defined by an entity which is external to Linux.
+If this had been a bug in the IP protocol handling we would fix it and
+move on. This case is no different IMHO.
 
-After this patch set was posted, we already finished the SMP, GIC and
-arch timer initialisation, which all are essential for ARM64 core system
-running, then we will focus on converting the device drivers to ACPI.
+> > > It seems to me you should be defining
+> > > 
+> > > struct blkif_request_rw_v2
+> > > 
+> > > and using the correct version according to which API the hypervisor
+> > > requires, not just breaking it.
+> > 
+> > This API doesn't involve the hypervisor. It's only a way to talk between
+> > DOM0 and a guest. Without this change you will break compatibility with
+> > other OSes.
+> 
+> With this change you break compatibility between the existing OS's,new
+> guests and old DOM0 and vice versa.
+> 
+> If a request in old format is guaranteed to error in new format (or you
+> can construct one that will) then you can trivially support both APIs on
+> the guest side at least for a while. That will avoid regressions when
+> people mix versions and also mean you've got a much better ability to
+> find a bug if stuff breaks as you won't have to switch guest and dom0
+> together when debugging.
 
-Here is the GTDT ASL code I used:
----
- platforms/foundation-v8.acpi/gtdt.asl |   35 ++++++++++++++++++++++-----------
- 1 file changed, 23 insertions(+), 12 deletions(-)
+Once we set the ABI in stone then this is the sort of thing we will care
+very much about (as we have done for many years on x86). Until then it
+is not.
 
-diff --git a/platforms/foundation-v8.acpi/gtdt.asl b/platforms/foundation-v8.acpi/gtdt.asl
-index 18c821a..714d61c 100644
---- a/platforms/foundation-v8.acpi/gtdt.asl
-+++ b/platforms/foundation-v8.acpi/gtdt.asl
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (c) 2013, Al Stone <al.stone@linaro.org>
-+ *                     Hanjun Guo <hanjun.guo@linaro.org>
-  * 
-  * [GTDT] Generic Timer Description Table
-  * Format: [ByteLength]  FieldName : HexFieldValue
-@@ -21,22 +22,32 @@
- [0004]              Flags (decoded below) : 00000001
-                            Memory Present : 1
- 
--[0004]               Secure PL1 Interrupt : 00000000
--[0004]         SPL1 Flags (decoded below) : 00000000
--                             Trigger Mode : 0
-+/* In Foundation model's dts file, the last cell of interrupts
-+ * is 0xff01, it means its cpu mask is FF, and trigger type
-+ * and flag is 1 = low-to-high edge triggered.
-+ * 
-+ * so in ACPI the Trigger Mode is 1 - Edge triggered, and 
-+ * Polarity is 0 - Active high as ACPI spec describled.
-+ *
-+ * using direct mapping for hwirqs, it means that we using
-+ * ID [16, 31] for PPI, not [0, 15] used in FDT.
-+ */
-+[0004]               Secure PL1 Interrupt : 0000001d
-+[0004]         SPL1 Flags (decoded below) : 00000001
-+                             Trigger Mode : 1
-                                  Polarity : 0
- 
--[0004]           Non-Secure PL1 Interrupt : 00000000
--[0004]        NSPL1 Flags (decoded below) : 00000000
--                             Trigger Mode : 0
-+[0004]           Non-Secure PL1 Interrupt : 0000001e
-+[0004]        NSPL1 Flags (decoded below) : 00000001
-+                             Trigger Mode : 1
-                                  Polarity : 0
- 
--[0004]            Virtual Timer Interrupt : 00000000
--[0004]           VT Flags (decoded below) : 00000000
--                             Trigger Mode : 0
-+[0004]            Virtual Timer Interrupt : 0000001b
-+[0004]           VT Flags (decoded below) : 00000001
-+                             Trigger Mode : 1
-                                  Polarity : 0
- 
--[0004]           Non-Secure PL2 Interrupt : 00000000
--[0004]        NSPL2 Flags (decoded below) : 00000000
--                             Trigger Mode : 0
-+[0004]           Non-Secure PL2 Interrupt : 0000001a
-+[0004]        NSPL2 Flags (decoded below) : 00000001
-+                             Trigger Mode : 1
-                                  Polarity : 0
-
-Hanjun Guo (2):
-  clocksource / arch_timer: Use ACPI GTDT table to initialize arch
-    timer
-  ARM64 / clocksource: Use arch_timer_acpi_init()
-
- arch/arm64/kernel/time.c             |    4 ++
- drivers/clocksource/arm_arch_timer.c |  129 ++++++++++++++++++++++++++++++----
- include/clocksource/arm_arch_timer.h |    7 +-
- 3 files changed, 124 insertions(+), 16 deletions(-)
-
--- 
-1.7.9.5
+Ian.
