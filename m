@@ -1,74 +1,79 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 03 Dec 2013 09:27:35 +0100
-Subject: [PATCH v4 09/17] usb: phy-mxs: Enable IC fixes for related SoCs
-In-Reply-To: <1386056231-17258-10-git-send-email-peter.chen@freescale.com>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
- <1386056231-17258-10-git-send-email-peter.chen@freescale.com>
-Message-ID: <529D95F7.8060705@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Dec 2013 08:31:16 +0000
+Subject: [alsa-devel] [PATCH 1/3] ASoC: ux500_pcm: Stop pretending that
+ we support varying address widths
+In-Reply-To: <529CD2B5.9060905@metafoo.de>
+References: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+ <529CD2B5.9060905@metafoo.de>
+Message-ID: <20131203083116.GA11828@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 08:37 AM, Peter Chen wrote:
-> Some PHY bugs are fixed by IC logic, but these bits are not
-> enabled by default, so we enable them at driver.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/phy/phy-mxs-usb.c |   20 ++++++++++++++++++++
->  1 files changed, 20 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index 8738890..0908d74 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -31,6 +31,10 @@
->  #define HW_USBPHY_CTRL_SET			0x34
->  #define HW_USBPHY_CTRL_CLR			0x38
->  
-> +#define HW_USBPHY_IP				0x90
-> +#define HW_USBPHY_IP_SET			0x94
-> +#define HW_USBPHY_IP_CLR			0x98
-> +
->  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
->  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
->  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
-> @@ -42,6 +46,8 @@
->  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
->  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
->  
-> +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
-> +
->  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
->  
->  /* Do disconnection between PHY and controller without vbus */
-> @@ -97,6 +103,16 @@ struct mxs_phy {
->  	struct regmap *regmap_anatop;
->  };
->  
-> +static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
-> +{
-> +	return mxs_phy->data == &imx6q_phy_data;
-> +}
-> +
-> +static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
-> +{
-> +	return mxs_phy->data == &imx6sl_phy_data;
-> +}
+On Mon, 02 Dec 2013, Lars-Peter Clausen wrote:
 
-Why don't you use a a BIT() here as in Patch 2/17, too?
+> On 12/02/2013 07:00 PM, Lee Jones wrote:
+> > The Slave Config's addr_width attribute is populated by data_width of
+> > dma_cfg, which in turn is derived from dma_params' data_size attribute
+> > and that comes from the slot_width which is always 16 bits (2 Bytes).
+> > We're cutting out the middle man here and just setting the DMA Slave
+> > Config directly.
+> > 
+> > Cc: alsa-devel at alsa-project.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Patch looks good. But as a follow up patch I think you can now switch to the
+> generic snd_dmaengine_pcm_prepare_slave_config.
 
-Marc
+No, I don't think we can. Your version only populates the DMA settings
+for the correct stream (Playback OR Capture), but our DMA Controller
+requires both source and destination to be setup.
+
+> > ---
+> >  sound/soc/ux500/ux500_pcm.c | 13 ++++++-------
+> >  1 file changed, 6 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+> > index 6162f70..2f1bdb7 100644
+> > --- a/sound/soc/ux500/ux500_pcm.c
+> > +++ b/sound/soc/ux500/ux500_pcm.c
+> > @@ -104,26 +104,25 @@ static int ux500_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
+> >  		struct dma_slave_config *slave_config)
+> >  {
+> >  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> > -	struct ux500_msp_dma_params *dma_params;
+> > -	struct stedma40_chan_cfg *dma_cfg;
+> > +	struct snd_dmaengine_dai_dma_data *dma_params;
+> >  	int ret;
+> >  
+> >  	dma_params = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+> > -	dma_cfg = dma_params->dma_cfg;
+> >  
+> >  	ret = snd_hwparams_to_dma_slave_config(substream, params, slave_config);
+> >  	if (ret)
+> >  		return ret;
+> >  
+> >  	slave_config->dst_maxburst = 4;
+> > -	slave_config->dst_addr_width = dma_cfg->dst_info.data_width;
+> >  	slave_config->src_maxburst = 4;
+> > -	slave_config->src_addr_width = dma_cfg->src_info.data_width;
+> > +
+> > +	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+> > +	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+> >  
+> >  	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> > -		slave_config->dst_addr = dma_params->tx_rx_addr;
+> > +		slave_config->dst_addr = dma_params->addr;
+> >  	else
+> > -		slave_config->src_addr = dma_params->tx_rx_addr;
+> > +		slave_config->src_addr = dma_params->addr;
+> >  
+> >  	return 0;
+> >  }
+> > 
+> 
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/1f1a2b29/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
