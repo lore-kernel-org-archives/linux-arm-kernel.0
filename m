@@ -1,45 +1,121 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 03 Dec 2013 11:54:35 +0100
-Subject: [PATCH v2 1/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
-In-Reply-To: <20131126143258.GA5685@S2101-09.ap.freescale.net>
-References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
- <20131126045340.GJ30476@S2101-09.ap.freescale.net>
- <52945B40.5020200@pengutronix.de>
- <20131126143258.GA5685@S2101-09.ap.freescale.net>
-Message-ID: <529DB86B.9010401@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Dec 2013 19:01:53 +0800
+Subject: [PATCH 3/3] ARM: dts: imx27-apf27dev: Add pinctrl for cspi
+ chip-select, sdhci2 card-detect, gpio-leds and gpio-keys
+In-Reply-To: <1385822170-98486-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1385822170-98486-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1385822170-98486-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1385822170-98486-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20131203110152.GD13726@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+On Sat, Nov 30, 2013 at 03:36:10PM +0100, Gwenhael Goavec-Merou wrote:
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
-On 11/26/2013 03:33 PM, Shawn Guo wrote:
-> On Tue, Nov 26, 2013 at 09:26:40AM +0100, Marc Kleine-Budde wrote:
->> The problem is, that the wrong clock is being used. An all i.mx, but not
->> on imx6, both clocks are the same, the bug doesn't show up. So before we
->> can use the 24 MHz clock on mx53, we have to fix the driver.
+Please try to keep the patch subject shorter and move necessary words
+into commit log.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx27-apf27dev.dts | 34 +++++++++++++++++++++++++++++++---
+>  1 file changed, 31 insertions(+), 3 deletions(-)
 > 
-> So it sounds like a more appropriate merging path would be that,
-> you send the driver fix right away to mainline via net tree with
-> v3.13-rc series, and I rebase IMX tree on the -rc that has the fix,
-> and then apply the DTS patch.
-
-The patch is now in Linus master:
-1a3e517 can: flexcan: use correct clock as base for bit rate calculation
-
-So it should be in the v3.13-rc3.
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/53fa4558/attachment.sig>
+> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
+> index 6069331..c8d3cb4 100644
+> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
+> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
+> @@ -38,6 +38,8 @@
+>  
+>  	gpio-keys {
+>  		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_keys>;
+>  
+>  		user-key {
+>  			label = "user";
+> @@ -48,6 +50,8 @@
+>  
+>  	leds {
+>  		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_leds>;
+>  
+>  		user {
+>  			label = "Heartbeat";
+> @@ -61,7 +65,7 @@
+>  	fsl,spi-num-chipselects = <1>;
+>  	cs-gpios = <&gpio4 28 1>;
+>  	pinctrl-names = "default";
+> -	pinctrl-0 = <&pinctrl_cspi1>;
+> +	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
+>  	status = "okay";
+>  };
+>  
+> @@ -70,7 +74,7 @@
+>  	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
+>  			<&gpio2 17 1>;
+>  	pinctrl-names = "default";
+> -	pinctrl-0 = <&pinctrl_cspi2>;
+> +	pinctrl-0 = <&pinctrl_cspi2 &pinctrl_cspi2_cs>;
+>  	status = "okay";
+>  };
+>  
+> @@ -106,10 +110,22 @@
+>  			fsl,pins = <MX27_CSPI1_PINGRP1>;
+>  		};
+>  
+> +		pinctrl_cspi1_cs: cspi1csgrp {
+> +			fsl,pins = <MX27_PAD_CSPI1_SS0__GPIO4_28 0x0>;
+> +		};
+> +
+>  		pinctrl_cspi2: cspi2grp {
+>  			fsl,pins = <MX27_CSPI2_PINGRP1>;
+>  		};
+>  
+> +		pinctrl_cspi2_cs: cspi2csgrp {
+> +			fsl,pins = <
+> +				MX27_PAD_CSI_D5__GPIO2_17 0x0
+> +				MX27_PAD_CSPI2_SS0__GPIO4_21 0x0
+> +				MX27_PAD_CSPI1_SS1__GPIO4_27 0x0
+> +			>;
+> +		};
+> +
+>  		pinctrl_imxfb1: imxfbgrp {
+>  			fsl,pins = <MX27_FB_PINGRP1>;
+>  		};
+> @@ -126,9 +142,21 @@
+>  			fsl,pins = <MX27_SDHC2_PINGRP1>;
+>  		};
+>  
+> +		pinctrl_sdhc2_cd: sdhc2cdgrp {
+> +			fsl,pins = <MX27_PAD_TOUT__GPIO3_14 0x0>;
+> +		};
+> +
+>  		pinctrl_pwm0: pwm0grp {
+>  			fsl,pins = <MX27_PWM0_PINGRP1>;
+>  		};
+> +
+> +		pinctrl_gpio_leds: gpioledsgrp {
+> +			fsl,pins = <MX27_PAD_PC_VS1__GPIO6_14 0x0>;
+> +		};
+> +
+> +		pinctrl_gpio_keys: gpiokeysgrp {
+> +			fsl,pins = <MX27_PAD_PC_VS2__GPIO6_13 0x0>;
+> +		};
+>  	};
+>  };
+>  
+> @@ -136,7 +164,7 @@
+>  	bus-width = <4>;
+>  	cd-gpios = <&gpio3 14 0>;
+>  	pinctrl-names = "default";
+> -	pinctrl-0 = <&pinctrl_sdhc2>;
+> +	pinctrl-0 = <&pinctrl_sdhc2 &pinctrl_sdhc2_cd>;
+>  	status = "okay";
+>  };
+>  
+> -- 
+> 1.8.3.2
+> 
