@@ -1,57 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Dec 2013 10:09:26 +0000
-Subject: [PATCH 5/6] amba: Convert to clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <1386065071-9529-6-git-send-email-ulf.hansson@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue,  3 Dec 2013 11:04:31 +0100
+Subject: [PATCH 6/6] amba: Add clk_prepare|unprepare in runtime PM callbacks
+In-Reply-To: <1386065071-9529-1-git-send-email-ulf.hansson@linaro.org>
 References: <1386065071-9529-1-git-send-email-ulf.hansson@linaro.org>
- <1386065071-9529-6-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20131203100926.GQ16735@n2100.arm.linux.org.uk>
+Message-ID: <1386065071-9529-7-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 11:04:30AM +0100, Ulf Hansson wrote:
-> To simplify code and error handling let's use clk_prepare_enable
-> and clk_disable_unprepare. No functional change.
+To fully gate the clock and thus potentially also save more power in
+runtime suspend state, extend clock handling with clk_prepare|unprepare
+in the runtime PM callbacks.
 
-Not true.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/amba/bus.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/amba/bus.c |   30 ++++++------------------------
->  1 file changed, 6 insertions(+), 24 deletions(-)
-> 
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index b90dc1e..0477131 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -151,36 +151,18 @@ postcore_initcall(amba_init);
->  
->  static int amba_get_enable_pclk(struct amba_device *pcdev)
->  {
-> -	struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
-> -	int ret;
-> -
-> -	pcdev->pclk = pclk;
-> -
-> -	if (IS_ERR(pclk))
-> -		return PTR_ERR(pclk);
-> +	pcdev->pclk = clk_get(&pcdev->dev, "apb_pclk");
->  
-> -	ret = clk_prepare(pclk);
-> -	if (ret) {
-> -		clk_put(pclk);
-> -		return ret;
-> -	}
-> +	if (IS_ERR(pcdev->pclk))
-> +		return PTR_ERR(pcdev->pclk);
->  
-> -	ret = clk_enable(pclk);
-> -	if (ret) {
-> -		clk_unprepare(pclk);
-> -		clk_put(pclk);
-> -	}
-> -
-> -	return ret;
-> +	return clk_prepare_enable(pcdev->pclk);
-
-There is clearly a change here in the error handling.
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 0477131..4cee15a 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -95,7 +95,7 @@ static int amba_pm_runtime_suspend(struct device *dev)
+ 	int ret = pm_generic_runtime_suspend(dev);
+ 
+ 	if (ret == 0 && dev->driver)
+-		clk_disable(pcdev->pclk);
++		clk_disable_unprepare(pcdev->pclk);
+ 
+ 	return ret;
+ }
+@@ -106,7 +106,7 @@ static int amba_pm_runtime_resume(struct device *dev)
+ 	int ret;
+ 
+ 	if (dev->driver) {
+-		ret = clk_enable(pcdev->pclk);
++		ret = clk_prepare_enable(pcdev->pclk);
+ 		/* Failure is probably fatal to the system, but... */
+ 		if (ret)
+ 			return ret;
+-- 
+1.7.9.5
