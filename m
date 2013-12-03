@@ -1,92 +1,49 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue,  3 Dec 2013 15:07:49 +0100
-Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
-References: <1386079669-3995-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1386079669-3995-4-git-send-email-b.brezillon@overkiz.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 3 Dec 2013 19:38:52 +0530
+Subject: [PATCH v2] phy: kconfig: add depends on "USB_PHY" to OMAP_USB2 and
+ TWL4030_USB
+Message-ID: <1386079732-19657-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_get calls by devm_clk_get calls.
+Fixes
+warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet
+direct dependencies (USB_SUPPORT)
+that shows up while disabling USB_SUPPORT from menuconfig.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Tested-by: Robert Nelson <robertcnelson@gmail.com>
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/host/ohci-at91.c |   32 ++++++++------------------------
- 1 file changed, 8 insertions(+), 24 deletions(-)
+Changes from v1:
+* changed from *depends on USB_SUPPORT* to *depends on USB_PHY" and
+also changed the subject.
+ drivers/phy/Kconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index c406f1e..3652962 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		goto err;
- 	}
- 
--	iclk = clk_get(&pdev->dev, "ohci_clk");
-+	iclk = devm_clk_get(dev, "ohci_clk");
- 	if (IS_ERR(iclk)) {
--		dev_err(&pdev->dev, "failed to get ohci_clk\n");
-+		dev_err(dev, "failed to get ohci_clk\n");
- 		retval = PTR_ERR(iclk);
- 		goto err;
- 	}
--	fclk = clk_get(&pdev->dev, "uhpck");
-+	fclk = devm_clk_get(dev, "uhpck");
- 	if (IS_ERR(fclk)) {
- 		dev_err(&pdev->dev, "failed to get uhpck\n");
- 		retval = PTR_ERR(fclk);
--		goto err4;
-+		goto err;
- 	}
--	hclk = clk_get(&pdev->dev, "hclk");
-+	hclk = devm_clk_get(dev, "hclk");
- 	if (IS_ERR(hclk)) {
- 		dev_err(&pdev->dev, "failed to get hclk\n");
- 		retval = PTR_ERR(hclk);
--		goto err5;
-+		goto err;
- 	}
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		uclk = clk_get(&pdev->dev, "usb_clk");
-+		uclk = devm_clk_get(&pdev->dev, "usb_clk");
- 		if (IS_ERR(uclk)) {
- 			dev_err(&pdev->dev, "failed to get uclk\n");
- 			retval = PTR_ERR(uclk);
--			goto err6;
-+			goto err;
- 		}
- 	}
- 
-@@ -203,15 +203,6 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	/* Error handling */
- 	at91_stop_hc(pdev);
- 
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
-- err6:
--	clk_put(hclk);
-- err5:
--	clk_put(fclk);
-- err4:
--	clk_put(iclk);
--
-  err:
- 	usb_put_hcd(hcd);
- 	return retval;
-@@ -236,13 +227,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
- 	usb_remove_hcd(hcd);
- 	at91_stop_hc(pdev);
- 	usb_put_hcd(hcd);
--
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
--	clk_put(hclk);
--	clk_put(fclk);
--	clk_put(iclk);
--	fclk = iclk = hclk = NULL;
- }
- 
- /*-------------------------------------------------------------------------*/
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index a344f3d..330ef2d 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -24,8 +24,8 @@ config PHY_EXYNOS_MIPI_VIDEO
+ config OMAP_USB2
+ 	tristate "OMAP USB2 PHY Driver"
+ 	depends on ARCH_OMAP2PLUS
++	depends on USB_PHY
+ 	select GENERIC_PHY
+-	select USB_PHY
+ 	select OMAP_CONTROL_USB
+ 	help
+ 	  Enable this to support the transceiver that is part of SOC. This
+@@ -36,8 +36,8 @@ config OMAP_USB2
+ config TWL4030_USB
+ 	tristate "TWL4030 USB Transceiver Driver"
+ 	depends on TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS
++	depends on USB_PHY
+ 	select GENERIC_PHY
+-	select USB_PHY
+ 	help
+ 	  Enable this to support the USB OTG transceiver on TWL4030
+ 	  family chips (including the TWL5030 and TPS659x0 devices).
 -- 
-1.7.9.5
+1.7.10.4
