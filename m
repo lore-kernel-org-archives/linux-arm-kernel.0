@@ -1,137 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  3 Dec 2013 10:27:07 +0000
-Subject: [PATCH 2/2] ASoC: ux500: Dynamically fill DAI driver data on probe
-In-Reply-To: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
-References: <1386066427-6862-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1386066427-6862-2-git-send-email-lee.jones@linaro.org>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 3 Dec 2013 15:57:21 +0530
+Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+Message-ID: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer have a means to differentiate between MSP devices at probe
-time, mainly because we don't really have to. So rather than have an over-
-sized static data structure in place, where the only difference between
-devices is the ID and name (which are unused), we'll just create one
-succinct, statically assigned and shared one instead.
+Some socs have a large number of interrupts requests to service
+the needs of its many peripherals and subsystems. All of the interrupt
+requests lines from the subsystems are not needed at the same
+time, so they have to be muxed to the controllers appropriately.
+In such places a interrupt controllers are preceded by an
+IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+requests to the controller inputs.
 
-Cc: alsa-devel at alsa-project.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- sound/soc/ux500/ux500_msp_dai.c | 96 ++++++-----------------------------------
- 1 file changed, 14 insertions(+), 82 deletions(-)
+This series models the peripheral interrupts that can be routed through
+the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
+in a separate linear domain inside the GIC. The registered routable domain's
+callback are invoked as a part of the GIC's callback, which in turn should
+allocate a free irq line and configure the IP accordingly. So every peripheral
+in the dts files mentions the fixed crossbar number as its interrupt. A free
+gic line for that gets allocated and configured when the peripheral interrupts
+are mapped.
 
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index 8d1b01f..8a7ae45 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -718,87 +718,19 @@ static struct snd_soc_dai_ops ux500_msp_dai_ops[] = {
- 	}
- };
- 
--static struct snd_soc_dai_driver ux500_msp_dai_drv[UX500_NBR_OF_DAI] = {
--	{
--		.name = "ux500-msp-i2s.0",
--		.probe = ux500_msp_dai_probe,
--		.id = 0,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.1",
--		.probe = ux500_msp_dai_probe,
--		.id = 1,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.2",
--		.id = 2,
--		.probe = ux500_msp_dai_probe,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
--	{
--		.name = "ux500-msp-i2s.3",
--		.probe = ux500_msp_dai_probe,
--		.id = 3,
--		.suspend = NULL,
--		.resume = NULL,
--		.playback = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.capture = {
--			.channels_min = UX500_MSP_MIN_CHANNELS,
--			.channels_max = UX500_MSP_MAX_CHANNELS,
--			.rates = UX500_I2S_RATES,
--			.formats = UX500_I2S_FORMATS,
--		},
--		.ops = ux500_msp_dai_ops,
--	},
-+static struct snd_soc_dai_driver ux500_msp_dai_drv = {
-+	.probe                 = ux500_msp_dai_probe,
-+	.suspend               = NULL,
-+	.resume                = NULL,
-+	.playback.channels_min = UX500_MSP_MIN_CHANNELS,
-+	.playback.channels_max = UX500_MSP_MAX_CHANNELS,
-+	.playback.rates        = UX500_I2S_RATES,
-+	.playback.formats      = UX500_I2S_FORMATS,
-+	.capture.channels_min  = UX500_MSP_MIN_CHANNELS,
-+	.capture.channels_max  = UX500_MSP_MAX_CHANNELS,
-+	.capture.rates         = UX500_I2S_RATES,
-+	.capture.formats       = UX500_I2S_FORMATS,
-+	.ops                   = ux500_msp_dai_ops,
- };
- 
- static const struct snd_soc_component_driver ux500_msp_component = {
-@@ -864,7 +796,7 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
- 	dev_set_drvdata(&pdev->dev, drvdata);
- 
- 	ret = snd_soc_register_component(&pdev->dev, &ux500_msp_component,
--					 &ux500_msp_dai_drv[drvdata->msp->id], 1);
-+					 &ux500_msp_dai_drv, 1);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Error: %s: Failed to register MSP%d!\n",
- 			__func__, drvdata->msp->id);
+The minimal crossbar driver to track and allocate free GIC lines and configure the
+crossbar is added here, along with the DT bindings.
+
+V5:
+   Addressed a comment from Mark Rutland <mark.rutland@arm.com>,
+   updated tags and rebased on 3.13-rc2
+
+V4:
+   Addressed a couple of comments and split the DTS file updates in to
+   a separate series.
+
+V3:
+   Addressed few more comments from Thomas Gleixner <tglx@linutronix.de>
+
+   Rebased patches 3,4,5,7 which updates the DTS file on top of below branch
+	   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+	   for_3.13/dts
+
+   Rebased patches 1,2,6 on top of 3.12 mainline
+   Updated Commit tags
+
+V2:
+   Addressed Thomas Gleixner <tglx@linutronix.de> comments and
+   Kumar Gala <galak@codeaurora.org>
+
+   Split updating the DRA7.dtsi file for adding the routable-irqs
+
+Previous discussions that led to this is at
+	https://lkml.org/lkml/2013/9/18/540
+
+The V1,V2,V3,V4 post of these patches is at
+      [V1]  https://lkml.org/lkml/2013/9/30/283
+      [V2]  http://www.spinics.net/lists/linux-omap/msg99540.html
+      [V3]  http://www.kernelhub.org/?msg=356470&p=2
+      [V4]  http://www.spinics.net/lists/linux-doc/msg16726.html
+
+Sricharan R (4):
+  DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+  DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+  ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+  ARM: DRA: Enable Crossbar IP support for DRA7XX
+
+ Documentation/devicetree/bindings/arm/gic.txt      |    6 +
+ .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+ arch/arm/mach-omap2/Kconfig                        |    1 +
+ arch/arm/mach-omap2/omap-wakeupgen.c               |    4 +-
+ arch/arm/mach-omap2/omap4-common.c                 |    2 +
+ drivers/irqchip/Kconfig                            |    8 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-crossbar.c                     |  208 ++++++++++++++++++++
+ drivers/irqchip/irq-gic.c                          |   81 +++++++-
+ include/linux/irqchip/arm-gic.h                    |    7 +-
+ include/linux/irqchip/irq-crossbar.h               |   11 ++
+ 11 files changed, 343 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+ create mode 100644 drivers/irqchip/irq-crossbar.c
+ create mode 100644 include/linux/irqchip/irq-crossbar.h
+
 -- 
-1.8.3.2
+1.7.9.5
