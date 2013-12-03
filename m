@@ -1,43 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Dec 2013 13:22:37 +0100
-Subject: [PATCH v3 14/36] mtd: st_spi_fsm: Add device-tree binding
- documentation
-In-Reply-To: <20131203113156.GB12031@lee--X1>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdaWXBchz78Yby11VpveBDtn6FrmupS=cnNYhvHgFJsBUw@mail.gmail.com>
- <20131202110304.GB31626@lee--X1>
- <CACRpkdb8=RRsNRKe4Nbefu2BJ4xHakmNjxFC1gwLea=bAmOz-A@mail.gmail.com>
- <20131203113156.GB12031@lee--X1>
-Message-ID: <CACRpkdYdW+p4-sDNCr8L75YB+e6agiQfvfEX5V+wCs4iZUaKSQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 3 Dec 2013 07:23:46 -0500
+Subject: Spurious timeouts in mvmdio
+In-Reply-To: <529CA42A.3040504@freebox.fr>
+References: <529CA42A.3040504@freebox.fr>
+Message-ID: <20131203122346.GD29282@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 3, 2013 at 12:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 03 Dec 2013, Linus Walleij wrote:
+Nicolas,
 
->> So it can be in <linux/mfd/my-sysconfig-regs.h> as
->> a
->>
->> #define MY_SYSCON_V1_BOOT_DEV_REG 0x958
->> #define MY_SYSCON_V1_BOOT_DEV_SPI 0x1a
->>
->> The kernel should know which SoC is in use and
->> act apropriately right?
->
-> And this have lots of machine_is() calls everywhere?
+Sorry for the delay, we spoke about this yesterday on irc, and
+apparently we all thought the other person was going to respond.  oops
+:(
 
-No need for Mr. Everywhere to know about the SoC.
+On Mon, Dec 02, 2013 at 04:15:54PM +0100, Nicolas Schichan wrote:
+> During 3.13-rc1 testing, I have found out that the mvmdio driver
+> would report timeouts on the kernel console:
+> 
+> [   11.011334] orion-mdio orion-mdio: Timeout: SMI busy for too long
+> 
+> The hardware is a MV88F6281 Kirkwood CPU. The mvmdio driver is using
+> the irq line 46 (ge00_err).
+> 
+> I am inclined to believe that it is due to the fact that
+> wait_event_timeout() is called with a timeout parameter of 1 jiffy
+> in orion_mdio_wait_ready(). If the timer interrupt ticks right after
+> calling wait_event_timeout(), we may end up spending much less time
+> than MVMDIO_SMI_TIMEOUT (1 msec) in wait_event_timeout(), and as a
+> result report a timeout as the MDIO access did not complete in such
+> a short time.
+> 
+> As to how to fix this, I see two options (I don't know which one
+> would be prefered):
+> 
+> - Option 1: always pass a timeout of at least 2 jiffy to wait_event_timeout().
+> - Option 2: switch to wait_event_hrtimeout().
+> 
+> I can provide patches for both options.
 
-There are other ways to achieve this. arch/arm/mach-foo
-always knows which ASIC it is running on, and it can do
-various things:
+Based on yesterday's irc chat, option 1 sounds good.  Here's the dump
+from yesterday where Sebastian provided a thorough explanation:
 
-- Add device tree fragments/overlays (OK high-tech, but
-  we're getting to this, inevitably)
+11:29 < shesselba> increasing max timeout to 2 ticks at least sounds reasonable
+11:29 < shesselba> 10ms should be enough for every CONFIG_HZ there is
 
-- Selectively add AUXDATA, which is absolutely OK if
-  we can do autoprobing of hardware IMO.
+11:30 < kos_tom> why make the timeout tied to the ticks? there are functions/macros to convert real time numbers into ticks.
+11:30 < kos_tom> msecs_to_jiffies() or something
 
-Yours,
-Linus Walleij
+11:31 < shesselba> kos_tom: it is already using usecs_to_jiffies()
+11:31 < shesselba> the thing is: 1ms is less than a jiffy
+
+11:33 < kos_tom> so it will wait one jiffy or a little bit more, no?
+
+11:38 < shesselba> no, the spurious timeouts he is seeing come from (1) mvmdio gets jiffies close before the next tick, (2) wait_event_timeout is called with jiffies + timeout
+11:39 < shesselba> with timeout << 1 jiffy
+11:39 < shesselba> then (3) the next timer tick occurs
+11:39 < shesselba> it will end up waiting less then a jiffy
+11:40 < shesselba> IOW, increase timeout to be at least two jiffies (or 20ms for CONFIG_HZ=100)
+11:41 < shesselba> originally, it was 100ms anyway
+
+Looking forward to the patch!
+
+thx,
+
+Jason.
