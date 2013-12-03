@@ -1,118 +1,56 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Tue,  3 Dec 2013 12:10:15 +0100
-Subject: [PATCHv3 3/3] ARM: dts: imx27-apf27dev: Add pinctrl for cspi, sdhci,
- leds and keys
-In-Reply-To: <1386069015-10718-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1386069015-10718-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1386069015-10718-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1386069015-10718-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: mark.hambleton@broadcom.com (Mark Hambleton)
+Date: Tue, 3 Dec 2013 13:14:44 +0000
+Subject: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
+In-Reply-To: <20131203114217.GF1169@mudshark.cambridge.arm.com>
+References: <1386001475-20728-1-git-send-email-broonie@kernel.org>
+ <20131203114217.GF1169@mudshark.cambridge.arm.com>
+Message-ID: <D00A5DFD97C44C4D820FC3A847C5D575072F7EB7@IRVEXCHMB14.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+Will, 
 
-- add chip-select pinctrl for cspi
-- add card-detect for sdhci2
-- add pinctrl for gpio-leds and gpio-keys
- 
----
-Changelog:
-v3:
- * use short subject and add commit log
+This patch comes from the ATF: https://github.com/ARM-software/arm-trusted-firmware/blob/master/fdts/rtsm_ve-motherboard.dtsi
 
- arch/arm/boot/dts/imx27-apf27dev.dts | 34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+I suspect Achin Gupta has the answers to the questions...
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index a794b1a..17dd206 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -38,6 +38,8 @@
- 
- 	gpio-keys {
- 		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
- 
- 		user-key {
- 			label = "user";
-@@ -48,6 +50,8 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_leds>;
- 
- 		user {
- 			label = "Heartbeat";
-@@ -61,7 +65,7 @@
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_cspi1>;
-+	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
- 	status = "okay";
- };
- 
-@@ -71,7 +75,7 @@
- 		   <&gpio4 27 GPIO_ACTIVE_LOW>,
- 		   <&gpio2 17 GPIO_ACTIVE_LOW>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_cspi2>;
-+	pinctrl-0 = <&pinctrl_cspi2 &pinctrl_cspi2_cs>;
- 	status = "okay";
- };
- 
-@@ -107,10 +111,30 @@
- 			fsl,pins = <MX27_CSPI1_PINGRP1>;
- 		};
- 
-+		pinctrl_cspi1_cs: cspi1csgrp {
-+			fsl,pins = <MX27_PAD_CSPI1_SS0__GPIO4_28 0x0>;
-+		};
-+
- 		pinctrl_cspi2: cspi2grp {
- 			fsl,pins = <MX27_CSPI2_PINGRP1>;
- 		};
- 
-+		pinctrl_cspi2_cs: cspi2csgrp {
-+			fsl,pins = <
-+				MX27_PAD_CSI_D5__GPIO2_17 0x0
-+				MX27_PAD_CSPI2_SS0__GPIO4_21 0x0
-+				MX27_PAD_CSPI1_SS1__GPIO4_27 0x0
-+			>;
-+		};
-+
-+		pinctrl_gpio_leds: gpioledsgrp {
-+			fsl,pins = <MX27_PAD_PC_VS1__GPIO6_14 0x0>;
-+		};
-+
-+		pinctrl_gpio_keys: gpiokeysgrp {
-+			fsl,pins = <MX27_PAD_PC_VS2__GPIO6_13 0x0>;
-+		};
-+
- 		pinctrl_imxfb1: imxfbgrp {
- 			fsl,pins = <MX27_FB_PINGRP1>;
- 		};
-@@ -130,6 +154,10 @@
- 		pinctrl_sdhc2: sdhc2grp {
- 			fsl,pins = <MX27_SDHC2_PINGRP1>;
- 		};
-+
-+		pinctrl_sdhc2_cd: sdhc2cdgrp {
-+			fsl,pins = <MX27_PAD_TOUT__GPIO3_14 0x0>;
-+		};
- 	};
- };
- 
-@@ -137,7 +165,7 @@
- 	bus-width = <4>;
- 	cd-gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_sdhc2>;
-+	pinctrl-0 = <&pinctrl_sdhc2 &pinctrl_sdhc2_cd>;
- 	status = "okay";
- };
- 
--- 
-1.8.3.2
+Mark
+
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com] 
+Sent: 03 December 2013 11:42
+To: Mark Brown
+Cc: Catalin Marinas; linaro-kernel at lists.linaro.org; Mark Hambleton; linux-arm-kernel at lists.infradead.org; Mark Brown; mark.rutland at arm.com
+Subject: Re: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
+
+On Mon, Dec 02, 2013 at 04:24:35PM +0000, Mark Brown wrote:
+> From: Mark Hambleton <mahamble@broadcom.com>
+> 
+> Describe the virtio device so we can mount disk images in the simulator.
+> 
+> Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>  arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+> index b45e5f39f577..b3460961038f 100644
+> --- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+> @@ -183,6 +183,12 @@
+>  				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
+>  				clock-names = "clcdclk", "apb_pclk";
+>  			};
+> +
+> +			virtio_block at 0130000 {
+> +				compatible = "virtio,mmio";
+> +				reg = <0x130000 0x1000>;
+
+4k? That seems pretty big to me...
+
+> +				interrupts = <0x2a>;
+
+Any reason this is in hex?
+
+Will
