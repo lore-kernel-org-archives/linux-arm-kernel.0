@@ -1,41 +1,46 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 3 Dec 2013 15:33:55 -0600
-Subject: [GIT PULL] socfpga fix for 3.13
-Message-ID: <1386106435-25013-1-git-send-email-dinguyen@altera.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Tue, 3 Dec 2013 22:39:38 +0100
+Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
+ gyroscopes
+In-Reply-To: <20131203212914.GC31496@lukather>
+References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
+ <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
+ <52926901.9080004@kernel.org> <20131125094044.GE3176@lukather>
+ <5299D3BA.8080700@kernel.org>
+ <20131130140402.21abae28@endymion.delvare>
+ <20131203212914.GC31496@lukather>
+Message-ID: <20131203223938.7190a01c@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b5afaa4672cc0f3d707ffa56c6b392646c323a8d:
+On Tue, 3 Dec 2013 22:29:14 +0100, Maxime Ripard wrote:
+> Hi Jean,
+> 
+> On Sat, Nov 30, 2013 at 02:04:02PM +0100, Jean Delvare wrote:
+> > > i2c has a generic binding that matches to the name bit of the
+> > > i2c_device_id array.  That is then exported in sysfs.  There are
+> > > quite a lot of instances of underscores out there in these names.
+> > > Thus unforutnately they can't be changed without possibly breaking
+> > > userspace.  Typically those same names are also output by IIO
+> > > though obviously we could keep that the same whilst changing the
+> > > dt binding.
+> > > 
+> > > Also the i2c binding allows binding after dropping the vendor
+> > > prefix which is even more 'interesting'. See of_modialias_node in
+> > > drivers/of/base.c
+> > > 
+> > > I'd therefore argue in favour of just leaving the underscores in
+> > > existing drivers as a nasty bit of legacy and doing our best to
+> > > not introduce any new ones!
+> > 
+> > I don't know what is the problem with underscores, but please note
+> > that hwmon i2c devices are NOT allowed to have dashes in their name
+> > because that would break libsensors.
+> 
+> As far as I remember, hwmon doesn't handle the accelerometers or
+> gyroscopes, does it?
 
-  Linux 3.13-rc1 (2013-12-03 15:00:46 -0600)
+You remember correctly, it does not and never will.
 
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dt-kconfig-fixes-for-3.13
-
-for you to fetch changes up to 2f9f487fb54b4fa9c456921037fb508f5dd7e39b:
-
-  arm: dts: socfpga: Change some clocks of gate-clk type to perip-clk (2013-12-03 15:03:19 -0600)
-
-----------------------------------------------------------------
-Because of commit :
-
-[159c7f8 arm: socfpga: Add clock for smp_twd timer],
-
-where the "arm,cortex-a9-twd-timer" is assigned the mpu_periph_clk, the twd
-timer driver will grab and enable that clock. However, since the mpu_periph_clk
-does not have a gate, the generic call to enable the clock will fail.
-
-Commit : [2f9f487f arm: dts: socfpga: Change some clocks of gate-clk type to perip-clk] will fix this issue.
-
-The 2nd commit : [73fa7bb arm: socfpga: Enable ARM_TWD for socfpga] enables the
-ARM_TWD timer]
-
-----------------------------------------------------------------
-Dinh Nguyen (2):
-      arm: socfpga: Enable ARM_TWD for socfpga
-      arm: dts: socfpga: Change some clocks of gate-clk type to perip-clk
-
- arch/arm/boot/dts/socfpga.dtsi |    7 ++++---
- arch/arm/mach-socfpga/Kconfig  |    1 +
- 2 files changed, 5 insertions(+), 3 deletions(-)
+-- 
+Jean Delvare
