@@ -1,13 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 12:57:53 -0700
-Subject: [PATCH] clk: tegra: Correct clock number for UARTE
-In-Reply-To: <1385983825-20317-1-git-send-email-treding@nvidia.com>
-References: <1385983825-20317-1-git-send-email-treding@nvidia.com>
-Message-ID: <529E37C1.601@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue,  3 Dec 2013 19:58:43 +0000
+Subject: [PATCH 2/2] arm64: dts: Reduce size of virtio block device for
+ foundation model
+In-Reply-To: <1386100723-10700-1-git-send-email-broonie@kernel.org>
+References: <1386100723-10700-1-git-send-email-broonie@kernel.org>
+Message-ID: <1386100723-10700-2-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2013 04:30 AM, Thierry Reding wrote:
-> UARTE has clock number 66. Number 65 is the right one for UARTD.
+From: Mark Brown <broonie@linaro.org>
 
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Will Deacon observed that kvmtool uses a size of 0x200 for virtio
+block memory region and that the virtio block spec only uses 31 bytes in
+the device specific region at 0x100 so reduce the region to a less
+wasteful 0x200.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/boot/dts/foundation-v8.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/foundation-v8.dts b/arch/arm64/boot/dts/foundation-v8.dts
+index 519c4b2c0687..4a060906809d 100644
+--- a/arch/arm64/boot/dts/foundation-v8.dts
++++ b/arch/arm64/boot/dts/foundation-v8.dts
+@@ -224,7 +224,7 @@
+ 
+ 			virtio_block at 0130000 {
+ 				compatible = "virtio,mmio";
+-				reg = <0x130000 0x1000>;
++				reg = <0x130000 0x200>;
+ 				interrupts = <42>;
+ 			};
+ 		};
+-- 
+1.8.5
