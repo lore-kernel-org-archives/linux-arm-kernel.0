@@ -1,62 +1,143 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Dec 2013 11:23:35 +0100
-Subject: [PATCH v3 14/36] mtd: st_spi_fsm: Add device-tree binding
- documentation
-In-Reply-To: <20131202110304.GB31626@lee--X1>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdaWXBchz78Yby11VpveBDtn6FrmupS=cnNYhvHgFJsBUw@mail.gmail.com>
- <20131202110304.GB31626@lee--X1>
-Message-ID: <CACRpkdb8=RRsNRKe4Nbefu2BJ4xHakmNjxFC1gwLea=bAmOz-A@mail.gmail.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Tue, 3 Dec 2013 11:24:16 +0100
+Subject: [PATCH v4 02/17] usb: phy-mxs: Add platform judgement code
+In-Reply-To: <1386056231-17258-3-git-send-email-peter.chen@freescale.com>
+References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
+ <1386056231-17258-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131203102416.GB27635@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 2, 2013 at 12:03 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > +Optional properties:
->> > +  - st,syscfg          : Phandle to boot-device system configuration registers
->> > +  - st,boot-device-reg : Address of the aforementioned boot-device register(s)
->> > +  - st,boot-device-spi : Expected boot-device value if booted via this device
->> > +
->> > +Example:
->> > +       spifsm: spifsm at fe902000{
->> > +               compatible         = "st,spi-fsm";
->> > +               reg                =  <0xfe902000 0x1000>;
->> > +               reg-names          = "spi-fsm";
->> > +               pinctrl-0          = <&pinctrl_fsm>;
->> > +               st,syscfg          = <&syscfg_rear>;
->> > +               st,boot-device-reg = <0x958>;
->> > +               st,boot-device-spi = <0x1a>;
->>
->> I don't think we should encode any register offsets whatsoever in device
->> tree but maybe that's just me. (Yes, Stephen will beat me up about
->> pin control single, but I consider that a special case.)
->>
->> I would just put the last two things as #defines into the driver file(s)
->> or - if it's related to other syscfg registers and varies with SoC incarnation,
->> as a #define in a shared header for that syscfg thing.
->
-> No can do. This isn't _this_ device's register offset, this is a
-> syscfg register offset which a) there is no driver to apply specific
-> register offsets to and b) are liable to change oversubsequent SoCs.
+On Tue, Dec 03, 2013 at 03:36:56PM +0800, Peter Chen wrote:
+> The mxs-phy has several bugs and features at different
+> versions, the driver code can get it through of_device_id.data.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
+>  1 files changed, 49 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 545844b..f6cbc78 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+>   * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+>   * on behalf of DENX Software Engineering GmbH
+>   *
+> @@ -20,6 +20,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> +#include <linux/of_device.h>
+>  
+>  #define DRIVER_NAME "mxs_phy"
+>  
+> @@ -34,13 +35,55 @@
+>  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+>  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+>  
+> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+> +
+> +/* Do disconnection between PHY and controller without vbus */
+> +#define MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS	BIT(0)
+> +
+> +/*
+> + * The PHY will be in messy if there is an wakeup after putting
+> + * bus to suspend (set portsc.suspendM) but before setting PHY to low
+> + * power mode (set portsc.phcd).
+> + */
+> +#define MXS_PHY_ABNORAML_IN_SUSPEND		BIT(1)
 
-So it can be in <linux/mfd/my-sysconfig-regs.h> as
-a
+ABNORAML? -> ABNORMAL
 
-#define MY_SYSCON_V1_BOOT_DEV_REG 0x958
-#define MY_SYSCON_V1_BOOT_DEV_SPI 0x1a
+> +
+> +/*
+> + * The SOF sends too fast after resuming, it will cause disconnection
+> + * between host and high speed device.
+> + */
+> +#define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
+> +
+> +struct mxs_phy_data {
+> +	unsigned int flags;
+> +};
+> +
+> +static const struct mxs_phy_data imx23_phy_data = {
+> +	.flags = MXS_PHY_ABNORAML_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
+> +};
 
-The kernel should know which SoC is in use and
-act apropriately right?
+ABNORAML? -> ABNORMAL
 
-But indeed, what you're doing has been done before
-in drivers/regulator/anatop-regulator.c where some
-register offset is read in from the attribute
-"anatop-delay-reg-offset". So it may be that the DT people
-need to overrule me on this one :-)
+> +
+> +static const struct mxs_phy_data imx6q_phy_data = {
+> +	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
+> +		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
+> +};
+> +
+> +static const struct mxs_phy_data imx6sl_phy_data = {
+> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
+> +};
+> +
+> +static const struct of_device_id mxs_phy_dt_ids[] = {
+> +	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
+> +	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
+> +	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+> +
+>  struct mxs_phy {
+>  	struct usb_phy phy;
+>  	struct clk *clk;
+> +	const struct mxs_phy_data *data;
+>  };
+>  
+> -#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+> -
+>  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+>  {
+>  	int ret;
+> @@ -131,6 +174,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  	struct clk *clk;
+>  	struct mxs_phy *mxs_phy;
+>  	int ret;
+> +	const struct of_device_id *of_id =
+> +			of_match_device(mxs_phy_dt_ids, &pdev->dev);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	base = devm_ioremap_resource(&pdev->dev, res);
+> @@ -163,6 +208,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  	ATOMIC_INIT_NOTIFIER_HEAD(&mxs_phy->phy.notifier);
+>  
+>  	mxs_phy->clk = clk;
+> +	mxs_phy->data = of_id->data;
+>  
+>  	platform_set_drvdata(pdev, mxs_phy);
+>  
+> @@ -182,12 +228,6 @@ static int mxs_phy_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id mxs_phy_dt_ids[] = {
+> -	{ .compatible = "fsl,imx23-usbphy", },
+> -	{ /* sentinel */ }
+> -};
+> -MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+> -
+>  static struct platform_driver mxs_phy_driver = {
+>  	.probe = mxs_phy_probe,
+>  	.remove = mxs_phy_remove,
+> -- 
+> 1.7.8
+> 
+> 
+> 
 
-I don't think we should hard-code knowledge of specific
-register locations into the device tree at all as that makes
-things very hard to debug.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
