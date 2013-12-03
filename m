@@ -1,55 +1,75 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 04 Dec 2013 00:17:56 +0100
-Subject: Spurious timeouts in mvmdio
-In-Reply-To: <8d65780eb7bfe49bb0734a09f05f70a6@doppler.thel33t.co.uk>
-References: <529CA42A.3040504@freebox.fr>
- <20131203122346.GD29282@titan.lakedaemon.net>
- <20131203124033.GT16735@n2100.arm.linux.org.uk>
- <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
- <529E5F03.8040607@gmail.com>
- <8d65780eb7bfe49bb0734a09f05f70a6@doppler.thel33t.co.uk>
-Message-ID: <529E66A4.4050000@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue,  3 Dec 2013 15:23:16 -0800
+Subject: [PATCH 2/5] ARM: OMAP2+: Fix the machine entry for am3517
+In-Reply-To: <1386112999-17271-1-git-send-email-tony@atomide.com>
+References: <1386112999-17271-1-git-send-email-tony@atomide.com>
+Message-ID: <1386112999-17271-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 12:20 AM, Leigh Brown wrote:
-> On 2013-12-03 22:45, Sebastian Hesselbarth wrote:
->> On 12/03/2013 09:57 PM, Leigh Brown wrote:
-> [...]
->>> Nicolas' patch should fix the issue, but I prefer the following as it is
->>> more
->>> correct, as it only adjusts the timeout when calling
->>> wait_event_timeout().  As
->>> I said above,I believe the polling code is correct.
->>>
->>> diff --git a/drivers/net/ethernet/marvell/mvmdio.c
->>> b/drivers/net/ethernet/marvell/mvmdio.c
->>> index 7354960..b187c08 100644
->>> --- a/drivers/net/ethernet/marvell/mvmdio.c
->>> +++ b/drivers/net/ethernet/marvell/mvmdio.c
->>> @@ -92,6 +92,14 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
->>>               if (time_is_before_jiffies(end))
->>>                   ++timedout;
->>>               } else {
->>> +            /*
->>> +             * wait_event_timeout does not guarantee a delay of at
->>> +             * least one whole jiffie, so timeout must be no less
->>> +             * than two.
->>> +             */
->>> +            if (timeout < 2)
->>> +                timeout = 2;
->>
->> If you always want to wait at least two jiffies, why not just increase
->> TIMEOUT makro to 20ms instead of messing here with it again?
->> As said on IRC log above, originally timeout was 100ms.
->
-> You could do that, but would you not feel bad leaving a latent bug in
-> the code?
-> I know it's unlikely that someone would set HZ to 50, but if they did,
-> the same
-> bug would appear again.
+From: Nishanth Menon <nm@ti.com>
 
-If you want to ensure timeout > 2, why not then just use:
+The am3517 is wrongly booting as omap3 which means that the am3517
+specific devices like Ethernet won't work when booted with device
+tree. Now with the new devices defined in am3517.dtsi, let's use
+that instead of the omap3.dtsi, and add a separate machine entry
+for am3517 so am3517-evm can use it.
 
-- 	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
-+ 	unsigned long timeout = 1 + usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
+Signed-off-by: Nishanth Menon <nm@ti.com>
+[tony at atomide.com: updated comments]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/am3517-evm.dts    |  6 +++---
+ arch/arm/mach-omap2/board-generic.c | 18 ++++++++++++++++++
+ 2 files changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/am3517-evm.dts b/arch/arm/boot/dts/am3517-evm.dts
+index e99dfaf..03fcbf0 100644
+--- a/arch/arm/boot/dts/am3517-evm.dts
++++ b/arch/arm/boot/dts/am3517-evm.dts
+@@ -7,11 +7,11 @@
+  */
+ /dts-v1/;
+ 
+-#include "omap34xx.dtsi"
++#include "am3517.dtsi"
+ 
+ / {
+-	model = "TI AM3517 EVM (AM3517/05)";
+-	compatible = "ti,am3517-evm", "ti,omap3";
++	model = "TI AM3517 EVM (AM3517/05 TMDSEVM3517)";
++	compatible = "ti,am3517-evm", "ti,am3517", "ti,omap3";
+ 
+ 	memory {
+ 		device_type = "memory";
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 19f1652..e94a215 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -139,6 +139,24 @@ static const char *am33xx_boards_compat[] __initdata = {
+ 	NULL,
+ };
+ 
++static const char *am3517_boards_compat[] __initdata = {
++	"ti,am3517",
++	NULL,
++};
++
++DT_MACHINE_START(AM3517_DT, "Generic AM3517 (Flattened Device Tree)")
++	.reserve	= omap_reserve,
++	.map_io		= omap3_map_io,
++	.init_early	= am35xx_init_early,
++	.init_irq	= omap_intc_of_init,
++	.handle_irq	= omap3_intc_handle_irq,
++	.init_machine	= omap_generic_init,
++	.init_late	= omap3_init_late,
++	.init_time	= omap3_gptimer_timer_init,
++	.dt_compat	= am3517_boards_compat,
++	.restart	= omap3xxx_restart,
++MACHINE_END
++
+ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= am33xx_map_io,
+-- 
+1.8.1.1
