@@ -1,22 +1,40 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Dec 2013 13:06:42 -0700
+Date: Tue, 03 Dec 2013 13:08:20 -0700
 Subject: [PATCH 1/2] ARM: dts: tegra: Header file for pinctrl constants
-In-Reply-To: <1385992502-12771-1-git-send-email-ldewangan@nvidia.com>
+In-Reply-To: <529D745D.2070503@nvidia.com>
 References: <1385992502-12771-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <529E39D2.9000705@wwwdotorg.org>
+ <20131202142522.GA17566@ulmo.nvidia.com> <529D745D.2070503@nvidia.com>
+Message-ID: <529E3A34.4030206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2013 06:55 AM, Laxman Dewangan wrote:
-> Defines pincontrol constants to use from Tegra's DTS file
-> for tegra pincontrol properties option.
+On 12/02/2013 11:04 PM, Laxman Dewangan wrote:
+> On Monday 02 December 2013 07:55 PM, Thierry Reding wrote:
+>> * PGP Signed by an unknown key
+>>
+>> On Mon, Dec 02, 2013 at 07:25:01PM +0530, Laxman Dewangan wrote:
+>>
+> 
+>> +
+>> +/* Schmitt enable/disable */
+>> +#define TEGRA_PIN_DRIVE_SCHMITT_DISABLE            0
+>> +#define TEGRA_PIN_DRIVE_SCHMITT_ENABLE            1
+>> These are all boolean, so I wonder if perhaps we should be simply
+>> defining a single pair and reuse that in different contexts:
+>>
+>>     #define TEGRA_PIN_DISABLE    0
+>>     #define TEGRA_PIN_ENABLE    1
+>>
+>> The property names should provide enough context for them to be used
+>> unambiguously.
+>>
+>>
+> 
+> I can make generic ENABLE/DISABLE macro as you suggested but datasheet
+> says as 0=NORMAL, 1 = TRISTATE. and that's why I kept name very near to
+> the datasheet.
 
-> diff --git a/include/dt-bindings/pinctrl/pinctrl-tegra.h b/include/dt-bindings/pinctrl/pinctrl-tegra.h
-
-> +/* Pull up/down/normal */
-> +#define TEGRA_PIN_PUPD_NORMAL				0
-> +#define TEGRA_PIN_PUPD_PULL_DOWN			1
-> +#define TEGRA_PIN_PUPD_PULL_UP				2
-
-... and s/NORMAL/NONE/ here too, I think. Some people might consider
-some other value e.g. pull-up as normal:-)
+That documentation is relative to a specific field, whereas the
+namespace for #defines is global. Hence, we may have to name #defines
+using stricter rules than the TRM's field values, in order to make them
+unambiguous.
