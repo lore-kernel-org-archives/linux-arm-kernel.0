@@ -1,33 +1,44 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 3 Dec 2013 17:03:10 +0000
-Subject: [PATCH v2] xen/block: Correctly define structures in public
- headers on ARM32 and ARM64
-In-Reply-To: <1386088897.13256.66.camel@kazak.uk.xensource.com>
-References: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
- <20131203160018.67542a53@alan.etchedpixels.co.uk>
- <529E04AB.5060304@linaro.org>
- <20131203163228.3313dff8@alan.etchedpixels.co.uk>
- <1386088897.13256.66.camel@kazak.uk.xensource.com>
-Message-ID: <20131203170310.7099a706@alan.etchedpixels.co.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Dec 2013 17:08:15 +0000
+Subject: [RFC part3 PATCH 2/2] ARM64 / clocksource: Use
+ arch_timer_acpi_init()
+In-Reply-To: <1386088891-2917-3-git-send-email-hanjun.guo@linaro.org>
+References: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088891-2917-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20131203170815.GB16025@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> itself. The protocol is defined by an entity which is external to Linux.
-> If this had been a bug in the IP protocol handling we would fix it and
-> move on. This case is no different IMHO.
+On Tue, Dec 03, 2013 at 04:41:31PM +0000, Hanjun Guo wrote:
+> Use arch_timer_acpi_init() on ARM64 to initialise arch timer
+> in ACPI way when DT is not available.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/time.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+> index 29c39d5..fb009da 100644
+> --- a/arch/arm64/kernel/time.c
+> +++ b/arch/arm64/kernel/time.c
+> @@ -67,6 +67,10 @@ void __init time_init(void)
+>  
+>  	clocksource_of_init();
+>  
+> +	/* if can't be initialised from DT, try ACPI way */
+> +	if (!arch_timer_get_rate())
+> +		arch_timer_acpi_init();
+> +
 
-Actually that is quite untrue. We are *very* careful that we can talk to
-other internet nodes that speak broken versions of TCP. There have even
-been changes made to protocol definitions during initial research to
-avoid tripping bugs in existing implementations.
+As mentioned on the previous patch, I think for the timebeing we should
+rely on CNTFREQ.
 
-> Once we set the ABI in stone then this is the sort of thing we will care
-> very much about (as we have done for many years on x86). Until then it
-> is not.
+Additionally, if you need to do this we should have an analagous
+mechanism to clocksource_of_init() that performs this initialisation for
+ACPI, and here we can call a clocksource_*_init function that does the
+right thing.
 
-Maybe Xen doesn't, but perhaps Linux doesn't wish to be tarred with the
-same brush. What Xen decides is the official protocol is Xen's decision.
-What a Linux guest does to keep compatibility ought to follow what Linux
-does as policy.
+There's no need for this file to know anything about ACPI.
 
-Alan
+Mark.
