@@ -1,267 +1,252 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 3 Dec 2013 12:14:47 -0800
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <201311270944.09383.marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <1385500248-6551-2-git-send-email-marex@denx.de>
- <20131127043009.GB12773@pratyush-vbox>
- <201311270944.09383.marex@denx.de>
-Message-ID: <CAJ+vNU050mtdiyXBXue_JGFJhFLiKCvoyf031Uda2e5U+vA12g@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 03 Dec 2013 21:21:30 +0100
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+References: <87d2lp28pd.fsf@natisbad.org> <20131125120335.GD2408@localhost>
+ <87r4a4f5gr.fsf@natisbad.org> <20131126124003.GA2344@localhost>
+ <87zjopd240.fsf@natisbad.org> <87wqjtbm8r.fsf@natisbad.org>
+ <20131128185040.GA13182@localhost> <87bo12kcyt.fsf@natisbad.org>
+ <20131202103305.GB2466@localhost> <87siubneuf.fsf@natisbad.org>
+ <20131203002225.GA5333@localhost>
+Message-ID: <87ob4xbs8l.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 12:44 AM, Marek Vasut <marex@denx.de> wrote:
-> Dear Pratyush Anand,
->
->> Dear Marek Vasut,
->>
->> Please replace imx6 with designware in subject line  of this patch.
->
-> OK, this one has to be fixed anyway. We need to figure out why do we even need
-> this one.
->
->> On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
->> > From: Tim Harvey <tharvey@gateworks.com>
->> >
->> > The IMX6 iATU is used for address translation between the AXI bus
->> > address space and PCI address space.  This is used for type0 and type1
->> > config cycles but is not necessary for outbound io/mem regions.
->> >
->> > This patch removes the calls that inappropriately re-configures the ATU
->> > viewport for outbound memory and IO after config cycles and removes them
->> > altogether as they are not necessary.
->>
->> Yes, they are not necessary for all the cases where translation is one
->> to one. So so for sure all the platform till now introduced should
->> work.
->> But, what about a platform where memory translation is not one to one?
->>
->> Existing code should work with all sort of memory translation on a
->> platform having atleast two viewports capable of programming any type
->> of outbound transaction.
->
-> Full ACK, that's why it's called RFC.
->
->> > This resolves issues with PCI devices behind switches and has been tested
->> > with a Gige device behind a PLX PEX860x switch.  More testing is needed
->> > for other configurations.
->>
->> I do not understand if MX6 has 4 Outbound Viewport then how this patch
->> helps?
->> -- PCI devices behind switches would not have been working because
->> CFG1 transaction would not have been correct.
->> -- It works with this patch. This patch changes viewport for CFG1 from
->> 1 to 0.
->> -- Can it be possible that MX6 has some restriction on viewport
->> programming capability. I mean,like only viewport0 can be programmed
->> for CFG0/1?
->
-> Tim ?
->
-> Here is the MX6 datasheet [1], the section 48.3.9.1.1 and 48.3.9.1.2 describe
-> the iATU configuration on MX6. My understanding from this description is that
-> the MX6 has 4 inbound and 4 outbound iATU regions. Am I wrong ?
->
-> [1] http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf
->
->> Otherwise I do not find any convincing reason that why this patch
->> helps in resolving issues with PCI devices behind switches.
+Hi Ezequiel,
 
-In my configuration I have a PLX switch off the IMX root complex with
-several devices behind it.  I find that the devices enumerate
-correctly but as soon as data is transferred to or from (not sure
-which) the device the system hangs (INFO: rcu_sched detected stalls on
-CPUs/tasks: { 0} (detected by 3, t=2135 jiffies, g=20, c=19, q=66)).
-My current test case is a GigE ethernet device and when I connect a
-network to the device I hange when a packet is responded to.
+Ezequiel Garcia <ezequiel.garcia@free-electrons.com> writes:
 
-I can't claim to fully understand PCI resource mappings or the iATU
-and I don't understand why dw_pcie_rd_other_conf/dw_pcie_wr_other_conf
-need to change the viewport then change it back instead of using
-multiple viewports (perhaps because some hardware may not have more
-than the 2 viewports currently being used?).  The current driver uses
-viewport0 for cfg0 and mem and viewport1 for cfg1 and io.  If I remove
-the call to dw_pcie_prog_viewport_io_outbound to reconfigure viewport1
-for io after its altered for type1 cfg cycles, devices behind the
-bridge work for me:
+> I'll try to explain the numbers you're observing. If I say something stupid
+> along the way, feel free to correct me.
+>
+> When I wrote this driver I got puzzled by the same questions you're asking
+> so rest assured I completely understand your confusion ;-)
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designwa
-index e33b68b..a064bc5 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -556,7 +556,7 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struc
-        } else {
-                dw_pcie_prog_viewport_cfg1(pp, busdev);
-                ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
--               dw_pcie_prog_viewport_io_outbound(pp);
-+//               dw_pcie_prog_viewport_io_outbound(pp);
-        }
+Thanks. Unless ones spends the time being taught that or reading the code,
+the logic of BBT mapping and reservation is not exactly straightforward.
+Thanks for the explanation.
 
-        return ret;
-@@ -579,7 +579,7 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struc
-        } else {
-                dw_pcie_prog_viewport_cfg1(pp, busdev);
-                ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
--               dw_pcie_prog_viewport_io_outbound(pp);
-+//               dw_pcie_prog_viewport_io_outbound(pp);
-        }
+More news below.
 
-Can anyone explain whats going on here?   I would think this would
-perhaps break devices that use IO resources?
 
-Thanks,
+> The reason the numbers appear as "upside-down" is because the pxa3xx-nand
+> driver uses this BBT options:
+>
+> .options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
+> 	 | NAND_BBT_2BIT | NAND_BBT_VERSION,
+>
+> So, the NAND core code writes the table to the last block (as per
+> NAND_BBT_LASTBLOCK option). Of course, it must write the bad block
+> table *inside* the flash (before the end of its last partition) and
+> to prevent any user I/O operation from losing the BBT the NAND core
+> marks as bad using a special 'reserved' mark.
 
-Tim
+ok.
 
->>
->>
->> Regards
->> Pratyush
->>
->> > From: Tim Harvey <tharvey@gateworks.com>
->> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
->> > Cc: Bjorn Helgaas <bhelgaas@google.com>
->> > Cc: Frank Li <lznuaa@gmail.com>
->> > Cc: Harro Haan <hrhaan@gmail.com>
->> > Cc: Jingoo Han <jg1.han@samsung.com>
->> > Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
->> > Cc: Pratyush Anand <pratyush.anand@st.com>
->> > Cc: Richard Zhu <r65037@freescale.com>
->> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> > Cc: Sean Cross <xobs@kosagi.com>
->> > Cc: Shawn Guo <shawn.guo@linaro.org>
->> > Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
->> > Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
->> > Cc: Tim Harvey <tharvey@gateworks.com>
->> > Cc: Troy Kisky <troy.kisky@boundarydevices.com>
->> > Cc: Yinghai Lu <yinghai@kernel.org>
->> > ---
+
+> Now, why does NAND reserve eight blocks, if there are only two tables?
+> Well, you'll be able to find this in the driver:
+>
+> static struct nand_bbt_descr bbt_main_descr = {
+> 	/* stuff */
+> 	.maxblocks = 8,         /* Last 8 blocks in each chip */
+> };
+>
+> The snippet above asks the NAND core to scan the last 8 blocks when searching
+> for the in-flash bad block table. The NAND core will also reserve these
+> 8 blocks as the maximum amount of blocks that can be used to store a bad
+> block table (I guess that's in case one block gets 'really' bad).
+>
+> In conclusion, answering your question, yes, this is correct:
+>
+>> it's expected that the partition definition (start address and length)
+>> *includes* the bbt pages/blocks.
+>> 
+>
+> The flash stores 8 x 128 KiB = 1 MiB for the bad block table and so
+> whenever you prepare your filesystem, you must now that the last
+> partition is actually 1 MiB smaller.
+
+ok. Will put a comment in the .dts about that.
+
+
+> On the other issue, about the timeout...
+>
+>> root at mood:~# nandwrite -p /dev/mtd4 /tmp/toto
+>> Writing data to block 0 at offset 0x0
+>> Writing data to block 1 at offset 0x20000
+>> Writing data to block 2 at offset 0x40000
+>> Writing data to block 3 at offset 0x60000
+>> Writing data to block 4 at offset 0x80000
+>> Writing data to block 5 at offset 0xa0000
+>> Writing data to block 6 at offset 0xc0000
+>> Writing data to block 7 at offset 0xe0000
+>> ...
+>> Writing data to block 818 at offset 0x6640000
+>> Writing data to block 819 at offset 0x6660000
+>> Writing data to block 820 at offset 0x6680000
+>> Writing data to block 821 at offset 0x66a0000
+>> Writing data to block 822 at offset 0x66c0000
+>> Writing data to block 823 at offset 0x66e0000
+>> Writing data to block 824 at offset 0x6700000
+>> Bad block at 6700000, 1 block(s) from 6700000 will be skipped
+>> Writing data to block 825 at offset 0x6720000
+>> Bad block at 6720000, 1 block(s) from 6720000 will be skipped
+>> Writing data to block 826 at offset 0x6740000
+>> Bad block at 6740000, 1 block(s) from 6740000 will be skipped
+>> Writing data to block 827 at offset 0x6760000
+>> Bad block at 6760000, 1 block(s) from 6760000 will be skipped
+>> Writing data to block 828 at offset 0x6780000
+>> Bad block at 6780000, 1 block(s) from 6780000 will be skipped
+>> Writing data to block 829 at offset 0x67a0000
+>> Bad block at 67a0000, 1 block(s) from 67a0000 will be skipped
+>> Writing data to block 830 at offset 0x67c0000
+>> Bad block at 67c0000, 1 block(s) from 67c0000 will be skipped
+>> Writing data to block 831 at offset 0x67e0000
+>> Bad block at 67e0000, 1 block(s) from 67e0000 will be skipped
+>> Writing data to block 832 at offset 0x6800000
+>> libmtd: error!: bad eraseblock number 832, mtd4 has 832 eraseblocks
+>> nandwrite: error!: /dev/mtd4: MTD get bad block failed
+>>            error 22 (Invalid argument)
+>> nandwrite: error!: Data was only partially written due to error
+>>            error 22 (Invalid argument)
+>> root at mood:~# 
+>> 
+>
+> OK... Then I guess the driver works fine but you're trying to write
+> an image bigger than possible. Where did you get such filesystem?
+
+The image is a dd from the partition itself. Trying to put it back will
+obviously not work for the reason you provide above, i.e. because dd
+reads to the end of the partition (including the BBT) but then during
+the write operation the reserved block cannot be written back.
+
+
+> Maybe reserving 8 blocks is *a lot* (I personally think it is a lot,
+> but maybe it's more robust that way).
+>
+>> > Hence, the bad block table is what explains the skipping of the group
+>> > of blocks [824..832]. However, you're getting errors when writing
+>> > data to [800..823], and it's a "Ready timeout" condition. I'm not sure
+>> > exactly what's going on, but we can say that:
 >> >
->> >  drivers/pci/host/pcie-designware.c | 41
->> >  +++----------------------------------- 1 file changed, 3 insertions(+),
->> >  38 deletions(-)
+>> >   * Either the waiting time is not enough, or ...
 >> >
->> > diff --git a/drivers/pci/host/pcie-designware.c
->> > b/drivers/pci/host/pcie-designware.c index ed9b11b..01d76ad 100644
->> > --- a/drivers/pci/host/pcie-designware.c
->> > +++ b/drivers/pci/host/pcie-designware.c
->> > @@ -46,7 +46,6 @@
->> >
->> >  #define PCIE_ATU_VIEWPORT          0x900
->> >  #define PCIE_ATU_REGION_INBOUND            (0x1 << 31)
->> >  #define PCIE_ATU_REGION_OUTBOUND   (0x0 << 31)
->> >
->> > -#define PCIE_ATU_REGION_INDEX1             (0x1 << 0)
->> >
->> >  #define PCIE_ATU_REGION_INDEX0             (0x0 << 0)
->> >  #define PCIE_ATU_CR1                       0x904
->> >  #define PCIE_ATU_TYPE_MEM          (0x0 << 0)
->> >
->> > @@ -494,8 +493,8 @@ static void dw_pcie_prog_viewport_cfg0(struct
->> > pcie_port *pp, u32 busdev)
->> >
->> >  static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
->> >  {
->> >
->> > -   /* Program viewport 1 : OUTBOUND : CFG1 */
->> > -   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
->> > PCIE_ATU_REGION_INDEX1, +   /* Program viewport 0 : OUTBOUND : CFG1 */
->> > +   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
->> > PCIE_ATU_REGION_INDEX0,
->> >
->> >                       PCIE_ATU_VIEWPORT);
->> >
->> >     dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
->> >     dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
->> >
->> > @@ -505,38 +504,8 @@ static void dw_pcie_prog_viewport_cfg1(struct
->> > pcie_port *pp, u32 busdev)
->> >
->> >                       PCIE_ATU_LIMIT);
->> >
->> >     dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
->> >     dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
->> >
->> > -}
->> > -
->> > -static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
->> > -{
->> > -   /* Program viewport 0 : OUTBOUND : MEM */
->> > -   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
->> > PCIE_ATU_REGION_INDEX0, -                     PCIE_ATU_VIEWPORT);
->> > -   dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
->> > -   dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
->> > -   dw_pcie_writel_rc(pp, pp->mem_base, PCIE_ATU_LOWER_BASE);
->> > -   dw_pcie_writel_rc(pp, (pp->mem_base >> 32), PCIE_ATU_UPPER_BASE);
->> > -   dw_pcie_writel_rc(pp, pp->mem_base + pp->config.mem_size - 1,
->> > -                     PCIE_ATU_LIMIT);
->> > -   dw_pcie_writel_rc(pp, pp->config.mem_bus_addr, PCIE_ATU_LOWER_TARGET);
->> > -   dw_pcie_writel_rc(pp, upper_32_bits(pp->config.mem_bus_addr),
->> > -                     PCIE_ATU_UPPER_TARGET);
->> > -}
->> > -
->> > -static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
->> > -{
->> > -   /* Program viewport 1 : OUTBOUND : IO */
->> > -   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
->> > PCIE_ATU_REGION_INDEX1, -                     PCIE_ATU_VIEWPORT);
->> > -   dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
->> > +   dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
->> >
->> >     dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
->> >
->> > -   dw_pcie_writel_rc(pp, pp->io_base, PCIE_ATU_LOWER_BASE);
->> > -   dw_pcie_writel_rc(pp, (pp->io_base >> 32), PCIE_ATU_UPPER_BASE);
->> > -   dw_pcie_writel_rc(pp, pp->io_base + pp->config.io_size - 1,
->> > -                     PCIE_ATU_LIMIT);
->> > -   dw_pcie_writel_rc(pp, pp->config.io_bus_addr, PCIE_ATU_LOWER_TARGET);
->> > -   dw_pcie_writel_rc(pp, upper_32_bits(pp->config.io_bus_addr),
->> > -                     PCIE_ATU_UPPER_TARGET);
->> >
->> >  }
->> >
->> >  static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus
->> >  *bus,
->> >
->> > @@ -552,11 +521,9 @@ static int dw_pcie_rd_other_conf(struct pcie_port
->> > *pp, struct pci_bus *bus,
->> >
->> >     if (bus->parent->number == pp->root_bus_nr) {
->> >
->> >             dw_pcie_prog_viewport_cfg0(pp, busdev);
->> >             ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
->> >
->> > -           dw_pcie_prog_viewport_mem_outbound(pp);
->> >
->> >     } else {
->> >
->> >             dw_pcie_prog_viewport_cfg1(pp, busdev);
->> >             ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
->> >
->> > -           dw_pcie_prog_viewport_io_outbound(pp);
->> >
->> >     }
->> >
->> >     return ret;
->> >
->> > @@ -575,11 +542,9 @@ static int dw_pcie_wr_other_conf(struct pcie_port
->> > *pp, struct pci_bus *bus,
->> >
->> >     if (bus->parent->number == pp->root_bus_nr) {
->> >
->> >             dw_pcie_prog_viewport_cfg0(pp, busdev);
->> >             ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
->> >
->> > -           dw_pcie_prog_viewport_mem_outbound(pp);
->> >
->> >     } else {
->> >
->> >             dw_pcie_prog_viewport_cfg1(pp, busdev);
->> >             ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
->> >
->> > -           dw_pcie_prog_viewport_io_outbound(pp);
->> >
->> >     }
->> >
->> >     return ret;
+>> >   * The commands (maybe some race) were badly issued so there's nothing
+>> >     to wait at all.
+>> 
+>> As I can not reproduce previous behavior (I am on the exact same
+>> kernel), I guess it's difficult to go any further yet.
+>> 
+>
+> Hm.. that's not cool. The fact that you got those timeouts, but now
+> you don't have them anymore only worries me even more.
+
+Well, before submitting the patches for armada-based ReadyNAS .dts
+files, I decided to give each of them a try on their respective hardware
+and I was somewhat lucky (if I can say so) on my RN2120 and got the
+following. Note that the NAND chip is the same but the SoC on the NAS
+is different (dual-core armada Xp mv78230 on RN2120 instead of Armada
+370 on RN102). The same tree is used in each case with the same MTD
+related config options:
+
+
+root at thin:~# flash_erase /dev/mtd4 0 0
+...
+
+root at thin:~# nandwrite -p /dev/mtd4 /tmp/mtd4ro 
+Writing data to block 0 at offset 0x0
+[  782.766892] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 0, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 00000000 to 0x01ffff
+Writing data to block 1 at offset 0x20000
+[  782.966891] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 1, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x020000 to 0x03ffff
+Writing data to block 2 at offset 0x40000
+[  783.166891] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 2, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x040000 to 0x05ffff
+Writing data to block 3 at offset 0x60000
+[  783.366889] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 3, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x060000 to 0x07ffff
+Writing data to block 4 at offset 0x80000
+[  783.566890] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 4, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x080000 to 0x09ffff
+Writing data to block 5 at offset 0xa0000
+[  783.766890] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 5, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x0a0000 to 0x0bffff
+Writing data to block 6 at offset 0xc0000
+[  783.966890] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 6, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x0c0000 to 0x0dffff
+Writing data to block 7 at offset 0xe0000
+[  784.166890] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 7, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x0e0000 to 0x0fffff
+Writing data to block 8 at offset 0x100000
+[  784.366889] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 8, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x100000 to 0x11ffff
+Writing data to block 9 at offset 0x120000
+^C[  784.566889] pxa3xx-nand d00d0000.nand: Ready time out!!!
+
+
+So I decided to increase CHIP_DELAY_TIMEOUT in the driver as you
+suggested in a previous email (HZ instead of 2*HZ/10):
+
+root at thin:~# nandwrite -p /dev/mtd4 mtd4ro 
+Writing data to block 0 at offset 0x0
+[  273.917098] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 0, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 00000000 to 0x01ffff
+Writing data to block 1 at offset 0x20000
+[  274.917094] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 1, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x020000 to 0x03ffff
+Writing data to block 2 at offset 0x40000
+[  275.917094] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 2, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x040000 to 0x05ffff
+Writing data to block 3 at offset 0x60000
+^C[  276.917094] pxa3xx-nand d00d0000.nand: Ready time out!!!
+
+
+And then to 25*HZ/10 (I know it's a lot):
+
+root at thin:~# nandwrite /dev/mtd4 mtd4ro 
+Writing data to block 0 at offset 0x0
+[  192.118574] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 0, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 00000000 to 0x01ffff
+Writing data to block 1 at offset 0x20000
+[  194.618569] pxa3xx-nand d00d0000.nand: Ready time out!!!
+libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 1, offset 2048)
+        error 5 (Input/output error)
+Erasing failed write from 0x020000 to 0x03ffff
+Writing data to block 2 at offset 0x40000
+^C[  197.118570] pxa3xx-nand d00d0000.nand: Ready time out!!!
+
+
+So I guess, if you have any (non hardware destructive ;-) ) idea, I now
+have a platform on which the problem is reproducible. Meanwhile, I will
+try and do the same on my RN104 (should be the same as the RN102).
+
+Cheers,
+
+a+
