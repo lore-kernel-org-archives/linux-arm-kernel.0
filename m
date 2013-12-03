@@ -1,116 +1,73 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 3 Dec 2013 08:43:10 -0500
-Subject: Spurious timeouts in mvmdio
-In-Reply-To: <20131203124033.GT16735@n2100.arm.linux.org.uk>
-References: <529CA42A.3040504@freebox.fr>
- <20131203122346.GD29282@titan.lakedaemon.net>
- <20131203124033.GT16735@n2100.arm.linux.org.uk>
-Message-ID: <20131203134310.GE29282@titan.lakedaemon.net>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 3 Dec 2013 13:46:24 +0000
+Subject: [PATCH 0/3] Simplify set_huge_pte_at, pte_same for LPAE
+In-Reply-To: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
+References: <1384882529-28104-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20131203134623.GA24994@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 12:40:34PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 03, 2013 at 07:23:46AM -0500, Jason Cooper wrote:
-> > On Mon, Dec 02, 2013 at 04:15:54PM +0100, Nicolas Schichan wrote:
-> > > During 3.13-rc1 testing, I have found out that the mvmdio driver
-> > > would report timeouts on the kernel console:
-> > > 
-> > > [   11.011334] orion-mdio orion-mdio: Timeout: SMI busy for too long
-> > > 
-> > > The hardware is a MV88F6281 Kirkwood CPU. The mvmdio driver is using
-> > > the irq line 46 (ge00_err).
-> > > 
-> > > I am inclined to believe that it is due to the fact that
-> > > wait_event_timeout() is called with a timeout parameter of 1 jiffy
-> > > in orion_mdio_wait_ready(). If the timer interrupt ticks right after
-> > > calling wait_event_timeout(), we may end up spending much less time
-> > > than MVMDIO_SMI_TIMEOUT (1 msec) in wait_event_timeout(), and as a
-> > > result report a timeout as the MDIO access did not complete in such
-> > > a short time.
-> > > 
-> > > As to how to fix this, I see two options (I don't know which one
-> > > would be prefered):
-> > > 
-> > > - Option 1: always pass a timeout of at least 2 jiffy to wait_event_timeout().
-> > > - Option 2: switch to wait_event_hrtimeout().
-> > > 
-> > > I can provide patches for both options.
-> > 
-> > Based on yesterday's irc chat, option 1 sounds good.  Here's the dump
-> > from yesterday where Sebastian provided a thorough explanation:
-> > 
-> > 11:29 < shesselba> increasing max timeout to 2 ticks at least sounds reasonable
-> > 11:29 < shesselba> 10ms should be enough for every CONFIG_HZ there is
-> > 
-> > 11:30 < kos_tom> why make the timeout tied to the ticks? there are functions/macros to convert real time numbers into ticks.
-> > 11:30 < kos_tom> msecs_to_jiffies() or something
-> > 
-> > 11:31 < shesselba> kos_tom: it is already using usecs_to_jiffies()
-> > 11:31 < shesselba> the thing is: 1ms is less than a jiffy
+On Tue, Nov 19, 2013 at 05:35:26PM +0000, Steve Capper wrote:
+> Hello,
+> The following patch series is my attempt at fixing a rather nasty bug
+> which became visible in 3.12-rc1 when running the libhugetlbfs test
+> suite. (This problem only just came to my attention yesterday).
 > 
-> Yes, and the kernels time conversion functions aren't stupid.  Let's
-> look at this function's implementation:
+> For LPAE, set_huge_pte_at calls set_pte_at which then calls
+> set_pte_ext, which in turn is wired up to call cpu_v7_set_pte_ext,
+> which is defined in proc-v7-3level.S.
 > 
-> unsigned long usecs_to_jiffies(const unsigned int u)
-> {
->         if (u > jiffies_to_usecs(MAX_JIFFY_OFFSET))
->                 return MAX_JIFFY_OFFSET;
-> #if HZ <= USEC_PER_SEC && !(USEC_PER_SEC % HZ)
->         return (u + (USEC_PER_SEC / HZ) - 1) / (USEC_PER_SEC / HZ);
-> #elif HZ > USEC_PER_SEC && !(HZ % USEC_PER_SEC)
->         return u * (HZ / USEC_PER_SEC);
-> #else
->         return (USEC_TO_HZ_MUL32 * u + USEC_TO_HZ_ADJ32)
->                 >> USEC_TO_HZ_SHR32;
-> #endif
-> }
+> For huge pages, given newprot a pgprot_t value for a shared writable
+> VMA, and ptep a pointer to a pte belonging to this VMA; the following
+> behaviour is assumed by core code:
+>    hugetlb_change_protection(vma, address, end, newprot);
+>    ...
 > 
-> Now, assuming HZ=100 and USEC_PER_SEC=1000000, we will use:
+>    huge_pte_write(huge_ptep_get(ptep)); /* should be true! */
 > 
-> 	return (u + (USEC_PER_SEC / HZ) - 1) / (USEC_PER_SEC / HZ);
+> Unfortunately, cpu_v7_set_pte_ext will change the bit layout of the
+> resultant pte, and will set the read only bit if the dirty bit is not
+> also enabled.
 > 
-> If you ask for 1us, this comes out as:
+> If one were to allocate a read only shared huge page, then fault it in,
+> and then mprotect it to be writeable. A subsequent write to that huge
+> page will result in a spurious call to hugetlb_cow, which causes
+> corruption. This call is optimised away prior to:
+>  37a2140 mm, hugetlb: do not use a page in page cache for cow
+>          optimization
 > 
-> 	return (1 + (1000000 / 100) - 1) / (1000000 / 100);
+> If one runs the libhugetlbfs test suite on v3.12-rc1 upwards, then the
+> mprotect test will cause the afformentioned corruption and before the
+> set of tests completes, the system will be left in an unresponsive
+> state. (calls to fork fail with -ENOMEM).
 > 
-> which is one jiffy.  So, for a requested 1us period, you're given a
-> 1 jiffy interval, or 10ms.  For other (sensible) values:
+> This was an absolute pig to debug and, as this is the second time I've
+> ran into issues caused by ptes being modified in transit, I've opted to
+> re-implement set_huge_pte_at such that it just dereferences the pte.
+> (in a similar manner as arm64). This has also allowed me to revert the
+> pte_same logic change (that removed the NG bit from comparison), by
+> also setting the NG bit for all new huge ptes.
 > 
->         return (USEC_TO_HZ_MUL32 * u + USEC_TO_HZ_ADJ32)
->                 >> USEC_TO_HZ_SHR32;
+> These patches are against 3.12, and I have tested this series on an
+> Arndale board with LPAE running libhugetlbfs.
 > 
-> gets used, which has a similar behaviour.
+> I would really value any comments/critique/flames on this series.
+> Especially as I've ommitted the DCCMVAC at the end of set_huge_pte_at
+> as I couldn't see why it was needed, please yell at me if it is needed!
+> :-)
 > 
-> Now, depending on how you use this one jiffy interval, the thing to realise
-> is that with this kind of loop:
-> 
-> 	timeout = jiffies + usecs_to_jiffies(1);
-> 	do {
-> 		something;
-> 	} while (time_is_before_jiffies(timeout));
-> 
-> what this equates to is:
-> 
-> 	} while (jiffies - timeout < 0);
-> 
-> What this means is that the loop breaks at jiffies = timeout, so it can
-> indeed timeout before one tick - within 0 to 10ms for HZ=100.  The problem
-> is not the usecs_to_jiffies(), it's with the implementation.
+> Cheers,
+> -- 
+> Steve
 
-Ack.
+Hi,
+A question has been raised for the arm64 analogue of this series as to
+whether or not this is the best approach:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215155.html
 
-> If you use time_is_before_eq_jiffies() instead, it will also loop if
-> jiffies == timeout, which will give you the additional safety margin -
-> meaning it will timeout after 10 to 20ms instead.
-> 
-> You may wish to consider coding this differently as well - if you have
-> the error interrupt, there's no need for this loop.  You only need the
-> loop if you're using usleep_range().  Note the return value of
-> wait_event_timeout() will tell you positively and correctly if the waited
-> condition succeeded or you timed out.
+I am having a think about this, and will send out a V2 once my brain
+has caught up. :-)
 
-Nicolas, sorry for the confusion.  Mind spinning a v2?
-
-thx,
-
-Jason.
+Cheers,
+-- 
+Steve
