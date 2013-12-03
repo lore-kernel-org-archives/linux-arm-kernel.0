@@ -1,40 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Dec 2013 11:42:18 +0000
-Subject: [PATCH] arm64: dts: Add a virtio disk to the RTSM motherboard
-In-Reply-To: <1386001475-20728-1-git-send-email-broonie@kernel.org>
-References: <1386001475-20728-1-git-send-email-broonie@kernel.org>
-Message-ID: <20131203114217.GF1169@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Dec 2013 19:46:51 +0800
+Subject: [PATCH v2 1/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
+In-Reply-To: <529DB86B.9010401@pengutronix.de>
+References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
+ <20131126045340.GJ30476@S2101-09.ap.freescale.net>
+ <52945B40.5020200@pengutronix.de>
+ <20131126143258.GA5685@S2101-09.ap.freescale.net>
+ <529DB86B.9010401@pengutronix.de>
+Message-ID: <20131203114649.GH13726@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 04:24:35PM +0000, Mark Brown wrote:
-> From: Mark Hambleton <mahamble@broadcom.com>
+On Tue, Dec 03, 2013 at 11:54:35AM +0100, Marc Kleine-Budde wrote:
+> Hello Shawn,
 > 
-> Describe the virtio device so we can mount disk images in the simulator.
+> On 11/26/2013 03:33 PM, Shawn Guo wrote:
+> > On Tue, Nov 26, 2013 at 09:26:40AM +0100, Marc Kleine-Budde wrote:
+> >> The problem is, that the wrong clock is being used. An all i.mx, but not
+> >> on imx6, both clocks are the same, the bug doesn't show up. So before we
+> >> can use the 24 MHz clock on mx53, we have to fix the driver.
+> > 
+> > So it sounds like a more appropriate merging path would be that,
+> > you send the driver fix right away to mainline via net tree with
+> > v3.13-rc series, and I rebase IMX tree on the -rc that has the fix,
+> > and then apply the DTS patch.
 > 
-> Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+> The patch is now in Linus master:
+> 1a3e517 can: flexcan: use correct clock as base for bit rate calculation
+
+Great.
+
 > 
-> diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> index b45e5f39f577..b3460961038f 100644
-> --- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-> @@ -183,6 +183,12 @@
->  				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
->  				clock-names = "clcdclk", "apb_pclk";
->  			};
-> +
-> +			virtio_block at 0130000 {
-> +				compatible = "virtio,mmio";
-> +				reg = <0x130000 0x1000>;
+> So it should be in the v3.13-rc3.
 
-4k? That seems pretty big to me...
+Ok, I will rebase my branch on v3.13-rc3 once it comes out.  But please
+ping me again if I forget to.  Thanks.
 
-> +				interrupts = <0x2a>;
-
-Any reason this is in hex?
-
-Will
+Shawn
