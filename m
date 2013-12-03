@@ -1,31 +1,82 @@
-From: rientjes@google.com (David Rientjes)
-Date: Tue, 3 Dec 2013 15:41:38 -0800 (PST)
-Subject: [PATCH] mm, show_mem: Remove SHOW_MEM_FILTER_PAGE_COUNT
-In-Reply-To: <20131203145721.GQ11295@suse.de>
-References: <20131016104228.GM11028@suse.de>
- <alpine.DEB.2.02.1310161809470.12062@chino.kir.corp.google.com>
- <20131203145721.GQ11295@suse.de>
-Message-ID: <alpine.DEB.2.02.1312031541240.5946@chino.kir.corp.google.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Dec 2013 23:42:09 +0000
+Subject: Spurious timeouts in mvmdio
+In-Reply-To: <ae69666fd3b61411d7bbd9ac993cec13@doppler.thel33t.co.uk>
+References: <529CA42A.3040504@freebox.fr>
+ <20131203122346.GD29282@titan.lakedaemon.net>
+ <20131203124033.GT16735@n2100.arm.linux.org.uk>
+ <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
+ <529E5F03.8040607@gmail.com>
+ <8d65780eb7bfe49bb0734a09f05f70a6@doppler.thel33t.co.uk>
+ <529E66A4.4050000@gmail.com>
+ <ae69666fd3b61411d7bbd9ac993cec13@doppler.thel33t.co.uk>
+Message-ID: <20131203234209.GW16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Dec 2013, Mel Gorman wrote:
+On Tue, Dec 03, 2013 at 11:38:23PM +0000, Leigh Brown wrote:
+> On 2013-12-03 23:17, Sebastian Hesselbarth wrote:
+>> If you want to ensure timeout > 2, why not then just use:
+>>
+>> - 	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
+>> + 	unsigned long timeout = 1 + usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
+>
+> This will make it correct when using interrupts but it will make the  
+> loop wait one jiffie longer than it should when polling.
 
-> Commit 4b59e6c4 (mm, show_mem: suppress page counts in non-blockable
-> contexts) introduced SHOW_MEM_FILTER_PAGE_COUNT to suppress PFN walks
-> on large memory machines. Commit c78e9363 (mm: do not walk all of system
-> memory during show_mem) avoided a PFN walk in the generic show_mem helper
-> which removes the requirement for SHOW_MEM_FILTER_PAGE_COUNT in that case.
-> 
-> This patch removes PFN walkers from the arch-specific implementations that
-> report on a per-node or per-zone granularity. ARM and unicore32 still do
-> a PFN walk as they report memory usage on each bank which is a much finer
-> granularity where the debugging information may still be of use. As the
-> remaining arches doing PFN walks have relatively small amounts of memory,
-> this patch simply removes SHOW_MEM_FILTER_PAGE_COUNT.
-> 
-> Signed-off-by: Mel Gorman <mgorman@suse.de>
+Alternatively, code it like this instead.
 
-Acked-by: David Rientjes <rientjes@google.com>
+ drivers/net/ethernet/marvell/mvmdio.c |   32 +++++++++++++++-----------------
+ 1 files changed, 15 insertions(+), 17 deletions(-)
 
-Thanks!
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 7354960b583b..a6f59831fc5b 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -76,31 +76,29 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+ {
+ 	struct orion_mdio_dev *dev = bus->priv;
+ 	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
+-	unsigned long end = jiffies + timeout;
+-	int timedout = 0;
+ 
+-	while (1) {
+-	        if (orion_mdio_smi_is_done(dev))
++	if (dev->err_interrupt > 0) {
++		if (wait_event_timeout(dev->smi_busy_wait,
++				       orion_mdio_smi_is_done(dev),
++				       1 + timeout))
+ 			return 0;
+-	        else if (timedout)
+-			break;
++	} else {
++		unsigned long end = jiffies + timeout;
+ 
+-	        if (dev->err_interrupt <= 0) {
+-			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
+-				     MVMDIO_SMI_POLL_INTERVAL_MAX);
++		while (1) {
++	        	if (orion_mdio_smi_is_done(dev))
++				return 0;
+ 
+ 			if (time_is_before_jiffies(end))
+-				++timedout;
+-	        } else {
+-			wait_event_timeout(dev->smi_busy_wait,
+-				           orion_mdio_smi_is_done(dev),
+-				           timeout);
+-
+-			++timedout;
+-	        }
++				break;
++
++			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
++				     MVMDIO_SMI_POLL_INTERVAL_MAX);
++		}
+ 	}
+ 
+ 	dev_err(bus->parent, "Timeout: SMI busy for too long\n");
++
+ 	return  -ETIMEDOUT;
+ }
+ 
