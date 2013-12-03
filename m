@@ -1,176 +1,226 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  3 Dec 2013 15:23:19 -0800
-Subject: [PATCH 5/5] ARM: OMAP2+: Remove legacy emac code
-In-Reply-To: <1386112999-17271-1-git-send-email-tony@atomide.com>
-References: <1386112999-17271-1-git-send-email-tony@atomide.com>
-Message-ID: <1386112999-17271-6-git-send-email-tony@atomide.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 3 Dec 2013 18:24:45 -0500
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131203232445.GX8277@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no longer needed when booted with device tree.
+Hello,
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/Makefile      |   3 -
- arch/arm/mach-omap2/am35xx-emac.c | 115 --------------------------------------
- arch/arm/mach-omap2/am35xx-emac.h |  15 -----
- 3 files changed, 133 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/am35xx-emac.c
- delete mode 100644 arch/arm/mach-omap2/am35xx-emac.h
+On Mon, Dec 02, 2013 at 09:27:23PM -0500, Santosh Shilimkar wrote:
+> So we add equivalent APIs so that we can replace usage of bootmem
+> with memblock interfaces. Architectures already converted to NO_BOOTMEM
+> use these new interfaces and other which still uses bootmem, these new
+> APIs just fallback to exiting bootmem APIs. So no functional change as
+> such.
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 8e6b0a4..dea93e2 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -258,7 +258,4 @@ ifneq ($(CONFIG_HWSPINLOCK_OMAP),)
- obj-y					+= hwspinlock.o
- endif
- 
--emac-$(CONFIG_TI_DAVINCI_EMAC)		:= am35xx-emac.o
--obj-y					+= $(emac-m) $(emac-y)
--
- obj-y					+= common-board-devices.o dss-common.o
-diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
-deleted file mode 100644
-index 25b79a2..0000000
---- a/arch/arm/mach-omap2/am35xx-emac.c
-+++ /dev/null
-@@ -1,115 +0,0 @@
--/*
-- * Copyright (C) 2011 Ilya Yanok, Emcraft Systems
-- *
-- * Based on mach-omap2/board-am3517evm.c
-- * Copyright (C) 2009 Texas Instruments Incorporated
-- * Author: Ranjith Lohithakshan <ranjithl@ti.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
-- * whether express or implied; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License for more details.
-- */
--
--#include <linux/err.h>
--#include <linux/davinci_emac.h>
--#include <asm/system.h>
--#include "omap_device.h"
--#include "am35xx.h"
--#include "control.h"
--#include "am35xx-emac.h"
--
--static void am35xx_enable_emac_int(void)
--{
--	u32 v;
--
--	v = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
--	v |= (AM35XX_CPGMAC_C0_RX_PULSE_CLR | AM35XX_CPGMAC_C0_TX_PULSE_CLR |
--	      AM35XX_CPGMAC_C0_MISC_PULSE_CLR | AM35XX_CPGMAC_C0_RX_THRESH_CLR);
--	omap_ctrl_writel(v, AM35XX_CONTROL_LVL_INTR_CLEAR);
--	omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR); /* OCP barrier */
--}
--
--static void am35xx_disable_emac_int(void)
--{
--	u32 v;
--
--	v = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
--	v |= (AM35XX_CPGMAC_C0_RX_PULSE_CLR | AM35XX_CPGMAC_C0_TX_PULSE_CLR);
--	omap_ctrl_writel(v, AM35XX_CONTROL_LVL_INTR_CLEAR);
--	omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR); /* OCP barrier */
--}
--
--static struct emac_platform_data am35xx_emac_pdata = {
--	.ctrl_reg_offset	= AM35XX_EMAC_CNTRL_OFFSET,
--	.ctrl_mod_reg_offset	= AM35XX_EMAC_CNTRL_MOD_OFFSET,
--	.ctrl_ram_offset	= AM35XX_EMAC_CNTRL_RAM_OFFSET,
--	.ctrl_ram_size		= AM35XX_EMAC_CNTRL_RAM_SIZE,
--	.hw_ram_addr		= AM35XX_EMAC_HW_RAM_ADDR,
--	.version		= EMAC_VERSION_2,
--	.interrupt_enable	= am35xx_enable_emac_int,
--	.interrupt_disable	= am35xx_disable_emac_int,
--};
--
--static struct mdio_platform_data am35xx_mdio_pdata;
--
--static int __init omap_davinci_emac_dev_init(struct omap_hwmod *oh,
--		void *pdata, int pdata_len)
--{
--	struct platform_device *pdev;
--
--	pdev = omap_device_build(oh->class->name, 0, oh, pdata, pdata_len);
--	if (IS_ERR(pdev)) {
--		WARN(1, "Can't build omap_device for %s:%s.\n",
--		     oh->class->name, oh->name);
--		return PTR_ERR(pdev);
--	}
--
--	return 0;
--}
--
--void __init am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en)
--{
--	struct omap_hwmod *oh;
--	u32 v;
--	int ret;
--
--	oh = omap_hwmod_lookup("davinci_mdio");
--	if (!oh) {
--		pr_err("Could not find davinci_mdio hwmod\n");
--		return;
--	}
--
--	am35xx_mdio_pdata.bus_freq = mdio_bus_freq;
--
--	ret = omap_davinci_emac_dev_init(oh, &am35xx_mdio_pdata,
--					 sizeof(am35xx_mdio_pdata));
--	if (ret) {
--		pr_err("Could not build davinci_mdio hwmod device\n");
--		return;
--	}
--
--	oh = omap_hwmod_lookup("davinci_emac");
--	if (!oh) {
--		pr_err("Could not find davinci_emac hwmod\n");
--		return;
--	}
--
--	am35xx_emac_pdata.rmii_en = rmii_en;
--
--	ret = omap_davinci_emac_dev_init(oh, &am35xx_emac_pdata,
--					 sizeof(am35xx_emac_pdata));
--	if (ret) {
--		pr_err("Could not build davinci_emac hwmod device\n");
--		return;
--	}
--
--	v = omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET);
--	v &= ~AM35XX_CPGMACSS_SW_RST;
--	omap_ctrl_writel(v, AM35XX_CONTROL_IP_SW_RESET);
--	omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET); /* OCP barrier */
--}
-diff --git a/arch/arm/mach-omap2/am35xx-emac.h b/arch/arm/mach-omap2/am35xx-emac.h
-deleted file mode 100644
-index 15c6f9c..0000000
---- a/arch/arm/mach-omap2/am35xx-emac.h
-+++ /dev/null
-@@ -1,15 +0,0 @@
--/*
-- * Copyright (C) 2011 Ilya Yanok, Emcraft Systems
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#define AM35XX_DEFAULT_MDIO_FREQUENCY	1000000
--
--#if defined(CONFIG_TI_DAVINCI_EMAC) || defined(CONFIG_TI_DAVINCI_EMAC_MODULE)
--void am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en);
--#else
--static inline void am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en) {}
--#endif
+The last part of the second last sentence doesn't parse too well.  I
+think it'd be worthwhile to improve and preferably expand on it as
+this is a bit tricky to understand given the twisted state of early
+memory allocation.
+
+> In long run, once all the achitectures moves to NO_BOOTMEM, we can get rid of
+> bootmem layer completely. This is one step to remove the core code dependency
+> with bootmem and also gives path for architectures to move away from bootmem.
+
+Lines too long?
+
+> +/*
+> + * FIXME: use NUMA_NO_NODE instead of MAX_NUMNODES when bootmem/nobootmem code
+> + * will be removed.
+> + * It can't be done now, because when MEMBLOCK or NO_BOOTMEM are not enabled
+> + * all calls of the new API will be redirected to bottmem/nobootmem where
+> + * MAX_NUMNODES is widely used.
+
+I don't know.  We're introducing a new API which will be used across
+the kernel.  I don't think it makes a lot of sense to use the wrong
+constant now to convert all the users later.  Wouldn't it be better to
+make the new interface take NUMA_NO_NODE and do whatever it needs to
+do to interface with bootmem?
+
+> + * Also, memblock core APIs __next_free_mem_range_rev() and
+> + * __next_free_mem_range() would need to be updated, and as result we will
+> + * need to re-check/update all direct calls of memblock_alloc_xxx()
+> + * APIs (including nobootmem).
+> + */
+
+Hmmm....
+
+> +/* FIXME: Move to memblock.h at a point where we remove nobootmem.c */
+> +void *memblock_virt_alloc_try_nid_nopanic(phys_addr_t size,
+> +		phys_addr_t align, phys_addr_t from,
+> +		phys_addr_t max_addr, int nid);
+
+Wouldn't @min_addr instead of @from make more sense?  Ditto for other
+occurrences.
+
+> +void *memblock_virt_alloc_try_nid(phys_addr_t size, phys_addr_t align,
+> +		phys_addr_t from, phys_addr_t max_addr, int nid);
+> +void __memblock_free_early(phys_addr_t base, phys_addr_t size);
+> +void __memblock_free_late(phys_addr_t base, phys_addr_t size);
+> +
+> +#define memblock_virt_alloc(x) \
+> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
+> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+
+The underlying function interprets 0 as the default align, so it
+probably is a better idea to just use 0 here.
+
+> +#define memblock_virt_alloc_align(x, align) \
+> +	memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
+> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+
+Also, do we really need this align variant separate when the caller
+can simply specify 0 for the default?
+
+> +#define memblock_virt_alloc_nopanic(x) \
+> +	memblock_virt_alloc_try_nid_nopanic(x, SMP_CACHE_BYTES, \
+> +					     BOOTMEM_LOW_LIMIT, \
+> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
+> +					     MAX_NUMNODES)
+> +#define memblock_virt_alloc_align_nopanic(x, align) \
+> +	memblock_virt_alloc_try_nid_nopanic(x, align, \
+> +					     BOOTMEM_LOW_LIMIT, \
+> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
+> +					     MAX_NUMNODES)
+> +#define memblock_virt_alloc_node(x, nid) \
+> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
+> +				     BOOTMEM_ALLOC_ACCESSIBLE, nid)
+> +#define memblock_virt_alloc_node_nopanic(x, nid) \
+> +	memblock_virt_alloc_try_nid_nopanic(x, SMP_CACHE_BYTES, \
+> +					     BOOTMEM_LOW_LIMIT, \
+> +					     BOOTMEM_ALLOC_ACCESSIBLE, nid)
+> +
+> +#define memblock_free_early(x, s)		__memblock_free_early(x, s)
+> +#define memblock_free_early_nid(x, s, nid)	__memblock_free_early(x, s)
+> +#define memblock_free_late(x, s)		__memblock_free_late(x, s)
+
+Please make the wrappers inline functions.
+
+> +#else
+> +
+> +#define BOOTMEM_ALLOC_ACCESSIBLE	0
+> +
+> +
+> +/* Fall back to all the existing bootmem APIs */
+> +#define memblock_virt_alloc(x) \
+> +	__alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
+> +#define memblock_virt_alloc_align(x, align) \
+> +	__alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
+> +#define memblock_virt_alloc_nopanic(x) \
+> +	__alloc_bootmem_nopanic(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
+> +#define memblock_virt_alloc_align_nopanic(x, align) \
+> +	__alloc_bootmem_nopanic(x, align, BOOTMEM_LOW_LIMIT)
+> +#define memblock_virt_alloc_node(x, nid) \
+> +	__alloc_bootmem_node(NODE_DATA(nid), x, SMP_CACHE_BYTES, \
+> +			BOOTMEM_LOW_LIMIT)
+> +#define memblock_virt_alloc_node_nopanic(x, nid) \
+> +	__alloc_bootmem_node_nopanic(NODE_DATA(nid), x, SMP_CACHE_BYTES, \
+> +			BOOTMEM_LOW_LIMIT)
+> +#define memblock_virt_alloc_try_nid(size, align, from, max_addr, nid) \
+> +		__alloc_bootmem_node_high(NODE_DATA(nid), size, align, from)
+> +#define memblock_virt_alloc_try_nid_nopanic(size, align, from, max_addr, nid) \
+> +		___alloc_bootmem_node_nopanic(NODE_DATA(nid), size, align, \
+> +			from, max_addr)
+> +#define memblock_free_early(x, s)	free_bootmem(x, s)
+> +#define memblock_free_early_nid(x, s, nid) \
+> +			free_bootmem_node(NODE_DATA(nid), x, s)
+> +#define memblock_free_late(x, s)	free_bootmem_late(x, s)
+> +
+> +#endif /* defined(CONFIG_HAVE_MEMBLOCK) && defined(CONFIG_NO_BOOTMEM) */
+
+Ditto.
+
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 1d15e07..3311fbb 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -21,6 +21,9 @@
+>  #include <linux/memblock.h>
+>  
+>  #include <asm-generic/sections.h>
+> +#include <asm/io.h>
+> +
+> +#include "internal.h"
+>  
+>  static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
+>  static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
+> @@ -933,6 +936,198 @@ phys_addr_t __init memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, i
+>  	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
+>  }
+>  
+> +/**
+> + * _memblock_virt_alloc_try_nid_nopanic - allocate boot memory block
+
+Please don't use both "__" and "_" prefixes.  It gets confusing like
+hell.  Just give it an another name.
+
+> + * @size: size of memory block to be allocated in bytes
+> + * @align: alignment of the region and block's size
+> + * @from: the lower bound of the memory region from where the allocation
+> + *	  is preferred (phys address)
+> + * @max_addr: the upper bound of the memory region from where the allocation
+> + *	      is preferred (phys address), or %BOOTMEM_ALLOC_ACCESSIBLE to
+> + *	      allocate only from memory limited by memblock.current_limit value
+
+It probably would be better style to make the above shorter and fit
+each on a single line.  If they need further explanation, they can be
+done in the body of the comment.
+
+> + * @nid: nid of the free area to find, %MAX_NUMNODES for any node
+> + *
+> + * The @from limit is dropped if it can not be satisfied and the allocation
+> + * will fall back to memory below @from.
+> + *
+> + * Allocation may fall back to any node in the system if the specified node
+> + * can not hold the requested memory.
+
+Maybe combine the above two paragraphs?
+
+> + * The phys address of allocated boot memory block is converted to virtual and
+> + * allocated memory is reset to 0.
+> + *
+> + * In addition, function sets sets the min_count for allocated boot memory block
+
+                            ^^^^^^^^^
+No mention of kmemleak at all is a bit confusing.  min_count of what?
+
+> + * to 0 so that it is never reported as leaks.
+> + *
+> + * RETURNS:
+> + * Virtual address of allocated memory block on success, NULL on failure.
+> + */
+> +static void * __init _memblock_virt_alloc_try_nid_nopanic(
+> +				phys_addr_t size, phys_addr_t align,
+> +				phys_addr_t from, phys_addr_t max_addr,
+> +				int nid)
+> +{
+> +	phys_addr_t alloc;
+> +	void *ptr;
+> +
+> +	if (WARN_ON_ONCE(slab_is_available())) {
+> +		if (nid == MAX_NUMNODES)
+> +			return kzalloc(size, GFP_NOWAIT);
+> +		else
+> +			return kzalloc_node(size, GFP_NOWAIT, nid);
+> +	}
+> +
+> +	if (!align)
+> +		align = SMP_CACHE_BYTES;
+> +
+> +	/* align @size to avoid excessive fragmentation on reserved array */
+> +	size = round_up(size, align);
+> +
+> +again:
+> +	alloc = memblock_find_in_range_node(from, max_addr, size, align, nid);
+
+Not your fault but we probably wanna update these functions so that
+their param orders are consistent.
+
+Thanks.
+
 -- 
-1.8.1.1
+tejun
