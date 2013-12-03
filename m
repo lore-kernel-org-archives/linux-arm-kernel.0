@@ -1,77 +1,46 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 03 Dec 2013 09:57:56 +0100
-Subject: [alsa-devel] [PATCH 3/3] ASoC: ux500: Dynamically fill DAI driver
- data on probe
-In-Reply-To: <20131203084026.GC11828@lee--X1>
-References: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
- <1386007222-10081-3-git-send-email-lee.jones@linaro.org>
- <529CCD2F.3060206@metafoo.de> <20131203084026.GC11828@lee--X1>
-Message-ID: <529D9D14.9040109@metafoo.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 3 Dec 2013 14:28:43 +0530
+Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
+In-Reply-To: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
+References: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
+Message-ID: <529D9D43.6040101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 09:40 AM, Lee Jones wrote:
-> On Mon, 02 Dec 2013, Lars-Peter Clausen wrote:
->
->> On 12/02/2013 07:00 PM, Lee Jones wrote:
->> [...]
->>> +void ux500_msp_populate_dai_drv(struct snd_soc_dai_driver *ux500_msp_dai_drv)
->>> +{
->>> +	ux500_msp_dai_drv->probe                 = ux500_msp_dai_probe;
->>> +	ux500_msp_dai_drv->suspend               = NULL;
->>> +	ux500_msp_dai_drv->resume                = NULL;
->>> +	ux500_msp_dai_drv->playback.channels_min = UX500_MSP_MIN_CHANNELS;
->>> +	ux500_msp_dai_drv->playback.channels_max = UX500_MSP_MAX_CHANNELS;
->>> +	ux500_msp_dai_drv->playback.rates        = UX500_I2S_RATES;
->>> +	ux500_msp_dai_drv->playback.formats      = UX500_I2S_FORMATS;
->>> +	ux500_msp_dai_drv->capture.channels_min  = UX500_MSP_MIN_CHANNELS;
->>> +	ux500_msp_dai_drv->capture.channels_max  = UX500_MSP_MAX_CHANNELS;
->>> +	ux500_msp_dai_drv->capture.rates         = UX500_I2S_RATES;
->>> +	ux500_msp_dai_drv->capture.formats       = UX500_I2S_FORMATS;
->>> +	ux500_msp_dai_drv->ops                   = ux500_msp_dai_ops;
->>>   };
->>
->> You can just use the same static driver for all devices. No need to
->> dynamically allocate it.
->
-> How do you mean? Just create a 'static struct' instead?
+Hi,
 
-Yes.
+On Tuesday 03 December 2013 02:03 PM, Marek Belisko wrote:
+> Without this change when booting omap3 device (gta04) with board file
+> leads to follwing errors:
+> 
+> [    1.203308] musb-hdrc musb-hdrc.0.auto: unable to find phy
+> [    1.209075] HS USB OTG: no transceiver configured
+> [    1.214019] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+> 
+> and usb isn't working.
+> 
+> This is probably regression caused by commit: 6c27f939
 
-static struct snd_soc_dai_driver ux500_msp_dai_driver = {
-	...
-};
+I think a better fix would be to have this merged..
+https://lkml.org/lkml/2013/7/26/91
+> 
+> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+> ---
+>  arch/arm/mach-omap2/twl-common.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+> index b0d54da..3640ce0 100644
+> --- a/arch/arm/mach-omap2/twl-common.c
+> +++ b/arch/arm/mach-omap2/twl-common.c
+> @@ -92,7 +92,7 @@ void __init omap_pmic_late_init(void)
+>  
+>  #if defined(CONFIG_ARCH_OMAP3)
+>  struct phy_consumer consumers[] = {
+> -	PHY_CONSUMER("musb-hdrc.0", "usb"),
+> +	PHY_CONSUMER("musb-hdrc.0.auto", "usb"),
 
->
->>>   static const struct snd_soc_component_driver ux500_msp_component = {
->>> @@ -809,6 +742,7 @@ static const struct snd_soc_component_driver ux500_msp_component = {
->>>   static int ux500_msp_drv_probe(struct platform_device *pdev)
->>>   {
->>>   	struct ux500_msp_i2s_drvdata *drvdata;
->>> +	struct snd_soc_dai_driver *ux500_msp_dai_drv;
->>>   	int ret = 0;
->>>
->>>   	dev_dbg(&pdev->dev, "%s: Enter (pdev->name = %s).\n", __func__,
->>> @@ -863,8 +797,18 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
->>>   	}
->>>   	dev_set_drvdata(&pdev->dev, drvdata);
->>>
->>> +	ux500_msp_dai_drv = devm_kzalloc(&pdev->dev,
->>> +					 sizeof(*ux500_msp_dai_drv),
->>> +					 GFP_KERNEL);
->>> +	if (!ux500_msp_dai_drv) {
->>> +		ret = -ENOMEM;
->>> +		goto err_init_msp;
->>> +	}
->>> +
->>> +	ux500_msp_populate_dai_drv(ux500_msp_dai_drv);
->>> +
->>>   	ret = snd_soc_register_component(&pdev->dev, &ux500_msp_component,
->>> -					 &ux500_msp_dai_drv[drvdata->msp->id], 1);
->>> +					 ux500_msp_dai_drv, 1);
->>>   	if (ret < 0) {
->>>   		dev_err(&pdev->dev, "Error: %s: Failed to register MSP%d!\n",
->>>   			__func__, drvdata->msp->id);
->>>
->>
->
+the index '0' might vary for some boards leading it to again break musb.
+
+Thanks
+Kishon
