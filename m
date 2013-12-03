@@ -1,45 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 4 Dec 2013 00:41:15 +0100
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131203182808.GD9468@ld-irv-0074.broadcom.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <1386084180.18201.67.camel@shinybook.infradead.org>
- <20131203182808.GD9468@ld-irv-0074.broadcom.com>
-Message-ID: <201312040041.15823.marex@denx.de>
+From: rientjes@google.com (David Rientjes)
+Date: Tue, 3 Dec 2013 15:41:38 -0800 (PST)
+Subject: [PATCH] mm, show_mem: Remove SHOW_MEM_FILTER_PAGE_COUNT
+In-Reply-To: <20131203145721.GQ11295@suse.de>
+References: <20131016104228.GM11028@suse.de>
+ <alpine.DEB.2.02.1310161809470.12062@chino.kir.corp.google.com>
+ <20131203145721.GQ11295@suse.de>
+Message-ID: <alpine.DEB.2.02.1312031541240.5946@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 03, 2013 at 07:28:08 PM, Brian Norris wrote:
-> On Tue, Dec 03, 2013 at 03:23:00PM +0000, David Woodhouse wrote:
-> > Seriously, guys, can you please trim your citations? Include only what's
-> > absolutely needed for what you're saying right now!
+On Tue, 3 Dec 2013, Mel Gorman wrote:
+
+> Commit 4b59e6c4 (mm, show_mem: suppress page counts in non-blockable
+> contexts) introduced SHOW_MEM_FILTER_PAGE_COUNT to suppress PFN walks
+> on large memory machines. Commit c78e9363 (mm: do not walk all of system
+> memory during show_mem) avoided a PFN walk in the generic show_mem helper
+> which removes the requirement for SHOW_MEM_FILTER_PAGE_COUNT in that case.
 > 
-> +1
+> This patch removes PFN walkers from the arch-specific implementations that
+> report on a per-node or per-zone granularity. ARM and unicore32 still do
+> a PFN walk as they report memory usage on each bank which is a much finer
+> granularity where the debugging information may still be of use. As the
+> remaining arches doing PFN walks have relatively small amounts of memory,
+> this patch simply removes SHOW_MEM_FILTER_PAGE_COUNT.
 > 
-> Additionally, when trimming replies, can you please leave a proper
+> Signed-off-by: Mel Gorman <mgorman@suse.de>
 
-Sorry, I was so into the discussion I was carried away. I humbly apologize for 
-my misstep.
+Acked-by: David Rientjes <rientjes@google.com>
 
->   On <date / time>, <sende> wrote:
-> 
-> line before the quote? It helps to identify who said what in a quote,
-> and it serves a much better purpose than leaving the 'Dear So-and-so'
-> intact.
-
-Yeah, I was thinking about changing this for a while now.
-
-> Seeing the following tells me who you were speaking to, not who was
-> 
-> actually speaking:
-> > > Dear Sourav Poddar,
-> > > 
-> > > > Dear Marek Vasut,
-> 
-> Particularly, it seems like Marek's and Huang's mailers tend to leave
-> the attribution line off.
-
-Fixed now I hope.
-
-Best regards,
-Marek Vasut
+Thanks!
