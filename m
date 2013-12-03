@@ -1,46 +1,134 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Tue, 3 Dec 2013 22:39:38 +0100
-Subject: [RFC PATCH 0/3] DT support for ST micro accelerometers and
- gyroscopes
-In-Reply-To: <20131203212914.GC31496@lukather>
-References: <1384876234-1211-1-git-send-email-maxime.ripard@free-electrons.com>
- <528DF164.8060009@st.com> <20131121131402.GF1029@lukather>
- <52926901.9080004@kernel.org> <20131125094044.GE3176@lukather>
- <5299D3BA.8080700@kernel.org>
- <20131130140402.21abae28@endymion.delvare>
- <20131203212914.GC31496@lukather>
-Message-ID: <20131203223938.7190a01c@endymion.delvare>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 03 Dec 2013 23:45:23 +0100
+Subject: Spurious timeouts in mvmdio
+In-Reply-To: <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
+References: <529CA42A.3040504@freebox.fr>
+ <20131203122346.GD29282@titan.lakedaemon.net>
+ <20131203124033.GT16735@n2100.arm.linux.org.uk>
+ <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
+Message-ID: <529E5F03.8040607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Dec 2013 22:29:14 +0100, Maxime Ripard wrote:
-> Hi Jean,
-> 
-> On Sat, Nov 30, 2013 at 02:04:02PM +0100, Jean Delvare wrote:
-> > > i2c has a generic binding that matches to the name bit of the
-> > > i2c_device_id array.  That is then exported in sysfs.  There are
-> > > quite a lot of instances of underscores out there in these names.
-> > > Thus unforutnately they can't be changed without possibly breaking
-> > > userspace.  Typically those same names are also output by IIO
-> > > though obviously we could keep that the same whilst changing the
-> > > dt binding.
-> > > 
-> > > Also the i2c binding allows binding after dropping the vendor
-> > > prefix which is even more 'interesting'. See of_modialias_node in
-> > > drivers/of/base.c
-> > > 
-> > > I'd therefore argue in favour of just leaving the underscores in
-> > > existing drivers as a nasty bit of legacy and doing our best to
-> > > not introduce any new ones!
-> > 
-> > I don't know what is the problem with underscores, but please note
-> > that hwmon i2c devices are NOT allowed to have dashes in their name
-> > because that would break libsensors.
-> 
-> As far as I remember, hwmon doesn't handle the accelerometers or
-> gyroscopes, does it?
+On 12/03/2013 09:57 PM, Leigh Brown wrote:
+> Hi Russell and Nicolas,
+>
+> Apologies for taking so long to respond to this thread.
+>
+> On 2013-12-03 12:40, Russell King - ARM Linux wrote:
+>> On Tue, Dec 03, 2013 at 07:23:46AM -0500, Jason Cooper wrote:
+>>> On Mon, Dec 02, 2013 at 04:15:54PM +0100, Nicolas Schichan wrote:
+> [...]
+>>> 11:31 < shesselba> kos_tom: it is already using usecs_to_jiffies()
+>>> 11:31 < shesselba> the thing is: 1ms is less than a jiffy
+>>
+>> Yes, and the kernels time conversion functions aren't stupid.  Let's
+>> look at this function's implementation:
+>>
+>> unsigned long usecs_to_jiffies(const unsigned int u)
+>> {
+>>         if (u > jiffies_to_usecs(MAX_JIFFY_OFFSET))
+>>                 return MAX_JIFFY_OFFSET;
+>> #if HZ <= USEC_PER_SEC && !(USEC_PER_SEC % HZ)
+>>         return (u + (USEC_PER_SEC / HZ) - 1) / (USEC_PER_SEC / HZ);
+>> #elif HZ > USEC_PER_SEC && !(HZ % USEC_PER_SEC)
+>>         return u * (HZ / USEC_PER_SEC);
+>> #else
+>>         return (USEC_TO_HZ_MUL32 * u + USEC_TO_HZ_ADJ32)
+>>                 >> USEC_TO_HZ_SHR32;
+>> #endif
+>> }
+>>
+>> Now, assuming HZ=100 and USEC_PER_SEC=1000000, we will use:
+>>
+>>     return (u + (USEC_PER_SEC / HZ) - 1) / (USEC_PER_SEC / HZ);
+>>
+>> If you ask for 1us, this comes out as:
+>>
+>>     return (1 + (1000000 / 100) - 1) / (1000000 / 100);
+>>
+>> which is one jiffy.  So, for a requested 1us period, you're given a
+>> 1 jiffy interval, or 10ms.  For other (sensible) values:
+>>
+>>         return (USEC_TO_HZ_MUL32 * u + USEC_TO_HZ_ADJ32)
+>>                 >> USEC_TO_HZ_SHR32;
+>>
+>> gets used, which has a similar behaviour.
+>>
+>> Now, depending on how you use this one jiffy interval, the thing to
+>> realise
+>> is that with this kind of loop:
+>>
+>>     timeout = jiffies + usecs_to_jiffies(1);
+>>     do {
+>>         something;
+>>     } while (time_is_before_jiffies(timeout));
+>>
+>> what this equates to is:
+>>
+>>     } while (jiffies - timeout < 0);
+>
+> You've got that last line the wrong way round, but I understand what you
+> are
+> getting at.
+>
+>> What this means is that the loop breaks at jiffies = timeout, so it can
+>> indeed timeout before one tick - within 0 to 10ms for HZ=100.  The
+>> problem
+>> is not the usecs_to_jiffies(), it's with the implementation.
+>
+>> If you use time_is_before_eq_jiffies() instead, it will also loop if
+>> jiffies == timeout, which will give you the additional safety margin -
+>> meaning it will timeout after 10 to 20ms instead.
+>
+> The code in question uses the logic in reverse so it *exits* if
+> time_is_before_jiffies(end) is true.  In other words it exits if
+> "jiffies" is
+> greater than "end".  Since, as you say, usecs_to_jiffies(somevalue) will
+> be a
+> minimum of 1, that means it will always loop at least twice.  So, I
+> think it's
+> doing what you suggest, but in a different way, when polling.
+>
+>> You may wish to consider coding this differently as well - if you have
+>> the error interrupt, there's no need for this loop.  You only need the
+>> loop if you're using usleep_range().  Note the return value of
+>> wait_event_timeout() will tell you positively and correctly if the waited
+>> condition succeeded or you timed out.
+>
+> Although the the wait_event_timeout is in the loop, it always exits due to
+> setting timedout to 1.  This was done to make the code smaller but I was
+> probably trying to be cleverer than I should have been.
+>
+> So, given the above I believe the polling code is correct.  My mistake
+> was to
+> assume that wait_event_timeout() guarantees a minimum of 1 jiffie wait.
+>
+> Nicolas' patch should fix the issue, but I prefer the following as it is
+> more
+> correct, as it only adjusts the timeout when calling
+> wait_event_timeout().  As
+> I said above,I believe the polling code is correct.
+>
+> diff --git a/drivers/net/ethernet/marvell/mvmdio.c
+> b/drivers/net/ethernet/marvell/mvmdio.c
+> index 7354960..b187c08 100644
+> --- a/drivers/net/ethernet/marvell/mvmdio.c
+> +++ b/drivers/net/ethernet/marvell/mvmdio.c
+> @@ -92,6 +92,14 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+>               if (time_is_before_jiffies(end))
+>                   ++timedout;
+>               } else {
+> +            /*
+> +             * wait_event_timeout does not guarantee a delay of at
+> +             * least one whole jiffie, so timeout must be no less
+> +             * than two.
+> +             */
+> +            if (timeout < 2)
+> +                timeout = 2;
 
-You remember correctly, it does not and never will.
+If you always want to wait at least two jiffies, why not just increase
+TIMEOUT makro to 20ms instead of messing here with it again?
+As said on IRC log above, originally timeout was 100ms.
 
--- 
-Jean Delvare
+Sebastian
