@@ -1,91 +1,25 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue,  3 Dec 2013 18:51:56 +0100
-Subject: [PATCH v2 4/4] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <1386093116-26387-1-git-send-email-b.brezillon@overkiz.com>
-References: <1386093116-26387-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1386093116-26387-5-git-send-email-b.brezillon@overkiz.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Dec 2013 17:59:08 +0000
+Subject: [RFC part1 PATCH 2/7] ARM64 : Add dummy asm/cpu.h
+In-Reply-To: <1386088611-2801-3-git-send-email-hanjun.guo@linaro.org>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088611-2801-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20131203175908.GH27568@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_get calls by devm_clk_get calls.
+On Wed, Dec 04, 2013 at 12:36:46AM +0800, Hanjun Guo wrote:
+> ACPI requires a cpu.h, add a dummy one copied from arm. This will need
+> updated or replaced as ACPI based cpu hotplug for armv8 is worked out.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com> 
----
- drivers/usb/host/ohci-at91.c |   30 +++++++-----------------------
- 1 file changed, 7 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 2a86e32..7b2ccd3 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		goto err;
- 	}
- 
--	iclk = clk_get(dev, "ohci_clk");
-+	iclk = devm_clk_get(dev, "ohci_clk");
- 	if (IS_ERR(iclk)) {
- 		dev_err(dev, "failed to get ohci_clk\n");
- 		retval = PTR_ERR(iclk);
- 		goto err;
- 	}
--	fclk = clk_get(dev, "uhpck");
-+	fclk = devm_clk_get(dev, "uhpck");
- 	if (IS_ERR(fclk)) {
- 		dev_err(dev, "failed to get uhpck\n");
- 		retval = PTR_ERR(fclk);
--		goto err4;
-+		goto err;
- 	}
--	hclk = clk_get(dev, "hclk");
-+	hclk = devm_clk_get(dev, "hclk");
- 	if (IS_ERR(hclk)) {
- 		dev_err(dev, "failed to get hclk\n");
- 		retval = PTR_ERR(hclk);
--		goto err5;
-+		goto err;
- 	}
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		uclk = clk_get(dev, "usb_clk");
-+		uclk = devm_clk_get(dev, "usb_clk");
- 		if (IS_ERR(uclk)) {
- 			dev_err(dev, "failed to get uclk\n");
- 			retval = PTR_ERR(uclk);
--			goto err6;
-+			goto err;
- 		}
- 	}
- 
-@@ -203,15 +203,6 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	/* Error handling */
- 	at91_stop_hc(pdev);
- 
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
-- err6:
--	clk_put(hclk);
-- err5:
--	clk_put(fclk);
-- err4:
--	clk_put(iclk);
--
-  err:
- 	usb_put_hcd(hcd);
- 	return retval;
-@@ -236,13 +227,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
- 	usb_remove_hcd(hcd);
- 	at91_stop_hc(pdev);
- 	usb_put_hcd(hcd);
--
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
--	clk_put(hclk);
--	clk_put(fclk);
--	clk_put(iclk);
--	fclk = iclk = hclk = NULL;
- }
- 
- /*-------------------------------------------------------------------------*/
--- 
-1.7.9.5
+We're going to need the same thing for CPU topology, I've got a similar
+addition as part of a series to introduce that (which is going to want
+an ACPI back end at some point I guess) at which point it'll stop being
+a dummy.  I should be posting this week all being well.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/456367d3/attachment.sig>
