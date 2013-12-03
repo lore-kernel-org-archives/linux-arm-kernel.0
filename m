@@ -1,53 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Dec 2013 16:42:10 +0800
-Subject: [PATCH] ARM: dts: i.MX51: Move include "imx51-pinfunc.h" into
- "imx51-pingrp.h"
-In-Reply-To: <1385793344-24837-1-git-send-email-shc_work@mail.ru>
-References: <1385793344-24837-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131203084209.GH10840@S2101-09.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Dec 2013 08:40:26 +0000
+Subject: [alsa-devel] [PATCH 3/3] ASoC: ux500: Dynamically fill DAI
+ driver data on probe
+In-Reply-To: <529CCD2F.3060206@metafoo.de>
+References: <1386007222-10081-1-git-send-email-lee.jones@linaro.org>
+ <1386007222-10081-3-git-send-email-lee.jones@linaro.org>
+ <529CCD2F.3060206@metafoo.de>
+Message-ID: <20131203084026.GC11828@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 30, 2013 at 10:35:44AM +0400, Alexander Shiyan wrote:
-> Pin function definitions are used for pin groups definitions,
-> so move the header in the "imx51-pingrp.h".
+On Mon, 02 Dec 2013, Lars-Peter Clausen wrote:
 
-I'd like to see the same change for other IMX SoCs in one patch.
+> On 12/02/2013 07:00 PM, Lee Jones wrote:
+> [...]
+> > +void ux500_msp_populate_dai_drv(struct snd_soc_dai_driver *ux500_msp_dai_drv)
+> > +{
+> > +	ux500_msp_dai_drv->probe                 = ux500_msp_dai_probe;
+> > +	ux500_msp_dai_drv->suspend               = NULL;
+> > +	ux500_msp_dai_drv->resume                = NULL;
+> > +	ux500_msp_dai_drv->playback.channels_min = UX500_MSP_MIN_CHANNELS;
+> > +	ux500_msp_dai_drv->playback.channels_max = UX500_MSP_MAX_CHANNELS;
+> > +	ux500_msp_dai_drv->playback.rates        = UX500_I2S_RATES;
+> > +	ux500_msp_dai_drv->playback.formats      = UX500_I2S_FORMATS;
+> > +	ux500_msp_dai_drv->capture.channels_min  = UX500_MSP_MIN_CHANNELS;
+> > +	ux500_msp_dai_drv->capture.channels_max  = UX500_MSP_MAX_CHANNELS;
+> > +	ux500_msp_dai_drv->capture.rates         = UX500_I2S_RATES;
+> > +	ux500_msp_dai_drv->capture.formats       = UX500_I2S_FORMATS;
+> > +	ux500_msp_dai_drv->ops                   = ux500_msp_dai_ops;
+> >  };
+> 
+> You can just use the same static driver for all devices. No need to
+> dynamically allocate it.
 
-Shawn
+How do you mean? Just create a 'static struct' instead?
 
+> >  static const struct snd_soc_component_driver ux500_msp_component = {
+> > @@ -809,6 +742,7 @@ static const struct snd_soc_component_driver ux500_msp_component = {
+> >  static int ux500_msp_drv_probe(struct platform_device *pdev)
+> >  {
+> >  	struct ux500_msp_i2s_drvdata *drvdata;
+> > +	struct snd_soc_dai_driver *ux500_msp_dai_drv;
+> >  	int ret = 0;
+> >  
+> >  	dev_dbg(&pdev->dev, "%s: Enter (pdev->name = %s).\n", __func__,
+> > @@ -863,8 +797,18 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
+> >  	}
+> >  	dev_set_drvdata(&pdev->dev, drvdata);
+> >  
+> > +	ux500_msp_dai_drv = devm_kzalloc(&pdev->dev,
+> > +					 sizeof(*ux500_msp_dai_drv),
+> > +					 GFP_KERNEL);
+> > +	if (!ux500_msp_dai_drv) {
+> > +		ret = -ENOMEM;
+> > +		goto err_init_msp;
+> > +	}
+> > +
+> > +	ux500_msp_populate_dai_drv(ux500_msp_dai_drv);
+> > +
+> >  	ret = snd_soc_register_component(&pdev->dev, &ux500_msp_component,
+> > -					 &ux500_msp_dai_drv[drvdata->msp->id], 1);
+> > +					 ux500_msp_dai_drv, 1);
+> >  	if (ret < 0) {
+> >  		dev_err(&pdev->dev, "Error: %s: Failed to register MSP%d!\n",
+> >  			__func__, drvdata->msp->id);
+> > 
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx51-pingrp.h | 2 ++
->  arch/arm/boot/dts/imx51.dtsi     | 1 -
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-pingrp.h b/arch/arm/boot/dts/imx51-pingrp.h
-> index 550d0d1..f63267b 100644
-> --- a/arch/arm/boot/dts/imx51-pingrp.h
-> +++ b/arch/arm/boot/dts/imx51-pingrp.h
-> @@ -10,6 +10,8 @@
->  #ifndef __DTS_IMX51_PINGRP_H
->  #define __DTS_IMX51_PINGRP_H
->  
-> +#include "imx51-pinfunc.h"
-> +
->  #define MX51_AUDMUX_PINGRP1 \
->  	MX51_PAD_AUD3_BB_TXD__AUD3_TXD			0x80000000 \
->  	MX51_PAD_AUD3_BB_RXD__AUD3_RXD			0x80000000 \
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index cad5a56..61a2552 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -11,7 +11,6 @@
->   */
->  
->  #include "skeleton.dtsi"
-> -#include "imx51-pinfunc.h"
->  #include "imx51-pingrp.h"
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/clock/imx5-clock.h>
-> -- 
-> 1.8.3.2
-> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
