@@ -1,72 +1,53 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 03 Dec 2013 09:38:20 +0100
-Subject: [PATCH v4 02/17] usb: phy-mxs: Add platform judgement code
-In-Reply-To: <1386056231-17258-3-git-send-email-peter.chen@freescale.com>
-References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
- <1386056231-17258-3-git-send-email-peter.chen@freescale.com>
-Message-ID: <529D987C.8080905@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Dec 2013 16:42:10 +0800
+Subject: [PATCH] ARM: dts: i.MX51: Move include "imx51-pinfunc.h" into
+ "imx51-pingrp.h"
+In-Reply-To: <1385793344-24837-1-git-send-email-shc_work@mail.ru>
+References: <1385793344-24837-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131203084209.GH10840@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 08:36 AM, Peter Chen wrote:
-> The mxs-phy has several bugs and features at different
-> versions, the driver code can get it through of_device_id.data.
+On Sat, Nov 30, 2013 at 10:35:44AM +0400, Alexander Shiyan wrote:
+> Pin function definitions are used for pin groups definitions,
+> so move the header in the "imx51-pingrp.h".
+
+I'd like to see the same change for other IMX SoCs in one patch.
+
+Shawn
+
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > ---
->  drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
->  1 files changed, 49 insertions(+), 9 deletions(-)
+>  arch/arm/boot/dts/imx51-pingrp.h | 2 ++
+>  arch/arm/boot/dts/imx51.dtsi     | 1 -
+>  2 files changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index 545844b..f6cbc78 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
->   * Copyright (C) 2012 Marek Vasut <marex@denx.de>
->   * on behalf of DENX Software Engineering GmbH
->   *
-> @@ -20,6 +20,7 @@
->  #include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
-> +#include <linux/of_device.h>
+> diff --git a/arch/arm/boot/dts/imx51-pingrp.h b/arch/arm/boot/dts/imx51-pingrp.h
+> index 550d0d1..f63267b 100644
+> --- a/arch/arm/boot/dts/imx51-pingrp.h
+> +++ b/arch/arm/boot/dts/imx51-pingrp.h
+> @@ -10,6 +10,8 @@
+>  #ifndef __DTS_IMX51_PINGRP_H
+>  #define __DTS_IMX51_PINGRP_H
 >  
->  #define DRIVER_NAME "mxs_phy"
->  
-> @@ -34,13 +35,55 @@
->  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
->  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
->  
-> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+> +#include "imx51-pinfunc.h"
 > +
-> +/* Do disconnection between PHY and controller without vbus */
-> +#define MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS	BIT(0)
-> +
-> +/*
-> + * The PHY will be in messy if there is an wakeup after putting
-                                           ^^
-                                           a
-Do you mean "messy state"?
-
-> + * bus to suspend (set portsc.suspendM) but before setting PHY to low
-> + * power mode (set portsc.phcd).
-> + */
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/4676e553/attachment.sig>
+>  #define MX51_AUDMUX_PINGRP1 \
+>  	MX51_PAD_AUD3_BB_TXD__AUD3_TXD			0x80000000 \
+>  	MX51_PAD_AUD3_BB_RXD__AUD3_RXD			0x80000000 \
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index cad5a56..61a2552 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -11,7 +11,6 @@
+>   */
+>  
+>  #include "skeleton.dtsi"
+> -#include "imx51-pinfunc.h"
+>  #include "imx51-pingrp.h"
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/clock/imx5-clock.h>
+> -- 
+> 1.8.3.2
+> 
