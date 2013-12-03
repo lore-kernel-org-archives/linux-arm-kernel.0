@@ -1,92 +1,40 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Tue,  3 Dec 2013 15:40:37 +0000
-Subject: [PATCH v2] xen/block: Correctly define structures in public headers
- on ARM32 and ARM64
-Message-ID: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 3 Dec 2013 15:49:05 +0000
+Subject: [Xen-devel] [PATCH] xen/block: Correctly define structures in
+ public headers on ARM32 and ARM64
+In-Reply-To: <529DF897.1080303@linaro.org>
+References: <1386083382-7306-1-git-send-email-julien.grall@linaro.org>
+ <529E039A02000078001097F5@nat28.tlf.novell.com>
+ <529DF897.1080303@linaro.org>
+Message-ID: <1386085745.13256.51.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM (32 bits and 64 bits), the double-word is 8-bytes aligned. This will
-result on different structure from Xen and Linux repositories.
+On Tue, 2013-12-03 at 15:28 +0000, Julien Grall wrote:
+> On 12/03/2013 03:15 PM, Jan Beulich wrote:
+> >>>> On 03.12.13 at 16:09, Julien Grall <julien.grall@linaro.org> wrote:
+> >> --- a/include/xen/interface/io/blkif.h
+> >> +++ b/include/xen/interface/io/blkif.h
+> >> @@ -146,7 +146,7 @@ struct blkif_request_segment_aligned {
+> >>  struct blkif_request_rw {
+> >>  	uint8_t        nr_segments;  /* number of segments                   */
+> >>  	blkif_vdev_t   handle;       /* only for read/write requests         */
+> >> -#ifdef CONFIG_X86_64
+> >> +#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+> > 
+> > Perhaps using
+> > 
+> > #ifndef CONFIG_X86_32
+> > 
+> > would be the better one, assuming that we won't add further
+> > non-64-bit-clean ABI variants?
+> 
+> I'm fine with this solution. I will resend the patch.
 
-As Linux is using __packed__ attribute, it must have a 4-bytes padding before
-each "id" field.
+Just a random thought but what about using the CONFIG_$ARCH to define a
+more semantic name, like HAVE_4_BYTE_ALIGNED_QUAD_WORDS, or whichever
+terminology for an 8-byte type is appropriate in the context.
 
-This change breaks guest block support with older kernel. IMHO, it's acceptable
-because Xen on ARM is still on Tech Preview and the hypercall ABI is not yet
-freezed.
+Maybe Linux even already has such a #define?
 
-Only one architecture (x86_32) doesn't have 64-bit ABI for the block interface.
-Don't add padding if Linux is compiled for this architecture.
-
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
-Cc: Roger Pau Monne <roger.pau@citrix.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
----
-
-Changes in v2:
-    - Reverse define
-
-Changes in v1:
-    - This patch is the rework of "xen-block: correctly define structures in
-    public headers" sent by Roger (see https://lkml.org/lkml/2013/12/3/155).
----
- include/xen/interface/io/blkif.h |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/include/xen/interface/io/blkif.h b/include/xen/interface/io/blkif.h
-index 65e1209..ae665ac 100644
---- a/include/xen/interface/io/blkif.h
-+++ b/include/xen/interface/io/blkif.h
-@@ -146,7 +146,7 @@ struct blkif_request_segment_aligned {
- struct blkif_request_rw {
- 	uint8_t        nr_segments;  /* number of segments                   */
- 	blkif_vdev_t   handle;       /* only for read/write requests         */
--#ifdef CONFIG_X86_64
-+#ifndef CONFIG_X86_32
- 	uint32_t       _pad1;	     /* offsetof(blkif_request,u.rw.id) == 8 */
- #endif
- 	uint64_t       id;           /* private guest value, echoed in resp  */
-@@ -163,7 +163,7 @@ struct blkif_request_discard {
- 	uint8_t        flag;         /* BLKIF_DISCARD_SECURE or zero.        */
- #define BLKIF_DISCARD_SECURE (1<<0)  /* ignored if discard-secure=0          */
- 	blkif_vdev_t   _pad1;        /* only for read/write requests         */
--#ifdef CONFIG_X86_64
-+#ifndef CONFIG_X86_32
- 	uint32_t       _pad2;        /* offsetof(blkif_req..,u.discard.id)==8*/
- #endif
- 	uint64_t       id;           /* private guest value, echoed in resp  */
-@@ -175,7 +175,7 @@ struct blkif_request_discard {
- struct blkif_request_other {
- 	uint8_t      _pad1;
- 	blkif_vdev_t _pad2;        /* only for read/write requests         */
--#ifdef CONFIG_X86_64
-+#ifndef CONFIG_X86_32
- 	uint32_t     _pad3;        /* offsetof(blkif_req..,u.other.id)==8*/
- #endif
- 	uint64_t     id;           /* private guest value, echoed in resp  */
-@@ -184,7 +184,7 @@ struct blkif_request_other {
- struct blkif_request_indirect {
- 	uint8_t        indirect_op;
- 	uint16_t       nr_segments;
--#ifdef CONFIG_X86_64
-+#ifndef CONFIG_X86_32
- 	uint32_t       _pad1;        /* offsetof(blkif_...,u.indirect.id) == 8 */
- #endif
- 	uint64_t       id;
-@@ -192,7 +192,7 @@ struct blkif_request_indirect {
- 	blkif_vdev_t   handle;
- 	uint16_t       _pad2;
- 	grant_ref_t    indirect_grefs[BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST];
--#ifdef CONFIG_X86_64
-+#ifndef CONFIG_X86_32
- 	uint32_t      _pad3;         /* make it 64 byte aligned */
- #else
- 	uint64_t      _pad3;         /* make it 64 byte aligned */
--- 
-1.7.10.4
+Ian.
