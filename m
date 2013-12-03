@@ -1,48 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Dec 2013 08:23:43 +0000
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <529D7838.6030606@freescale.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com>
- <5298AA23.7080404@st.com> <529C5BBF.6000604@freescale.com>
- <529C6CBB.4000008@st.com> <529D7838.6030606@freescale.com>
-Message-ID: <20131203082343.GK31626@lee--X1>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 03 Dec 2013 09:27:35 +0100
+Subject: [PATCH v4 09/17] usb: phy-mxs: Enable IC fixes for related SoCs
+In-Reply-To: <1386056231-17258-10-git-send-email-peter.chen@freescale.com>
+References: <1386056231-17258-1-git-send-email-peter.chen@freescale.com>
+ <1386056231-17258-10-git-send-email-peter.chen@freescale.com>
+Message-ID: <529D95F7.8060705@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >To be honest, I am just glad that someone is taking a look at this area.
-> >However, whether or not is it possible to come up with something that solves all
-> >our problems remains to be seen.  It might turn out that the various H/W
-> >Controllers are just too different to fit into a single unified framework.
-> >
-> Hi Angus & Pekon:
-> thanks for the explanations.
+On 12/03/2013 08:37 AM, Peter Chen wrote:
+> Some PHY bugs are fixed by IC logic, but these bits are not
+> enabled by default, so we enable them at driver.
 > 
-> I am not sure that after we add more hooks, if it will meet Jones's
-> new driver.
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   20 ++++++++++++++++++++
+>  1 files changed, 20 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 8738890..0908d74 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -31,6 +31,10 @@
+>  #define HW_USBPHY_CTRL_SET			0x34
+>  #define HW_USBPHY_CTRL_CLR			0x38
+>  
+> +#define HW_USBPHY_IP				0x90
+> +#define HW_USBPHY_IP_SET			0x94
+> +#define HW_USBPHY_IP_CLR			0x98
+> +
+>  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
+>  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
+>  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
+> @@ -42,6 +46,8 @@
+>  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+>  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+>  
+> +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
+> +
+>  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+>  
+>  /* Do disconnection between PHY and controller without vbus */
+> @@ -97,6 +103,16 @@ struct mxs_phy {
+>  	struct regmap *regmap_anatop;
+>  };
+>  
+> +static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
+> +{
+> +	return mxs_phy->data == &imx6q_phy_data;
+> +}
+> +
+> +static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
+> +{
+> +	return mxs_phy->data == &imx6sl_phy_data;
+> +}
 
-Angus is the author of "Lee's" driver and knows more about it that I
-ever will, so whatever he says goes in that regard.
+Why don't you use a a BIT() here as in Patch 2/17, too?
 
-I would like to make a suggestion to Brian though. Even if the new
-framework is written within the next couple of months and the
-semantics do suit the FSM Controller driver, I'd still like the
-implementation that's currently on the list to be applied. That way
-we'd have a known good version of the driver which is almost identical
-to how ST's internal driver does now. The one that is present out in
-the wild (i.e. _real_ products).
-
-I will subsequently volunteer to provide my utmost best efforts to
-port the driver over to the new framework as a new task once it has
-landed.
-
-> i will wait for Jones' comment for several days, and send out the
-> next version if he does not reply this thread.
-
-/me waves \o/
+Marc
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131203/1f1a2b29/attachment.sig>
