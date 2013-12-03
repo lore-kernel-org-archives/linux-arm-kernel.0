@@ -1,10 +1,10 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 2 Dec 2013 21:27:29 -0500
-Subject: [PATCH v2 14/23] mm/lib/cpumask: Use memblock apis for early memory
+Date: Mon, 2 Dec 2013 21:27:35 -0500
+Subject: [PATCH v2 20/23] mm/firmware: Use memblock apis for early memory
  allocations
 In-Reply-To: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386037658-3161-15-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386037658-3161-21-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,31 +20,24 @@ bootmem APIs.
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- lib/cpumask.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/firmware/memmap.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/lib/cpumask.c b/lib/cpumask.c
-index d327b87..44e492e 100644
---- a/lib/cpumask.c
-+++ b/lib/cpumask.c
-@@ -140,7 +140,7 @@ EXPORT_SYMBOL(zalloc_cpumask_var);
-  */
- void __init alloc_bootmem_cpumask_var(cpumask_var_t *mask)
+diff --git a/drivers/firmware/memmap.c b/drivers/firmware/memmap.c
+index e2e04b0..15550b2 100644
+--- a/drivers/firmware/memmap.c
++++ b/drivers/firmware/memmap.c
+@@ -324,7 +324,7 @@ int __init firmware_map_add_early(u64 start, u64 end, const char *type)
  {
--	*mask = alloc_bootmem(cpumask_size());
-+	*mask = memblock_virt_alloc(cpumask_size());
- }
+ 	struct firmware_map_entry *entry;
  
- /**
-@@ -161,6 +161,6 @@ EXPORT_SYMBOL(free_cpumask_var);
-  */
- void __init free_bootmem_cpumask_var(cpumask_var_t mask)
- {
--	free_bootmem(__pa(mask), cpumask_size());
-+	memblock_free_early(__pa(mask), cpumask_size());
- }
- #endif
+-	entry = alloc_bootmem(sizeof(struct firmware_map_entry));
++	entry = memblock_virt_alloc(sizeof(struct firmware_map_entry));
+ 	if (WARN_ON(!entry))
+ 		return -ENOMEM;
+ 
 -- 
 1.7.9.5
