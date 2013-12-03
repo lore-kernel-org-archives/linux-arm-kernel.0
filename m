@@ -1,35 +1,41 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Tue, 3 Dec 2013 22:33:43 +0100
-Subject: 3.13-rc2 phy-twl4030-usb.c - Timeout setting T2 HSUSB PHY DPLL
-Message-ID: <CAAfyv37aM6SrpuU9fzKA6GKsWn=To5ANOpG_kSX509NjMjdecA@mail.gmail.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 3 Dec 2013 15:33:55 -0600
+Subject: [GIT PULL] socfpga fix for 3.13
+Message-ID: <1386106435-25013-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit b5afaa4672cc0f3d707ffa56c6b392646c323a8d:
 
-current 3.13-rcX break usb support on gta04 board (similar to
-beagleboard) when booting via board file.
+  Linux 3.13-rc1 (2013-12-03 15:00:46 -0600)
 
-In console we can see messages:
- [ 5227.287841] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
-[ 5232.936096] omap_musb_mailbox: musb core is not yet ready
-[ 5233.958160] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
-[ 5235.058227] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
+are available in the git repository at:
 
-Any pointer what could cause that? (in 3.12 usb works fine)
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dt-kconfig-fixes-for-3.13
 
-BR,
+for you to fetch changes up to 2f9f487fb54b4fa9c456921037fb508f5dd7e39b:
 
-marek
+  arm: dts: socfpga: Change some clocks of gate-clk type to perip-clk (2013-12-03 15:03:19 -0600)
 
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
+----------------------------------------------------------------
+Because of commit :
 
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+[159c7f8 arm: socfpga: Add clock for smp_twd timer],
+
+where the "arm,cortex-a9-twd-timer" is assigned the mpu_periph_clk, the twd
+timer driver will grab and enable that clock. However, since the mpu_periph_clk
+does not have a gate, the generic call to enable the clock will fail.
+
+Commit : [2f9f487f arm: dts: socfpga: Change some clocks of gate-clk type to perip-clk] will fix this issue.
+
+The 2nd commit : [73fa7bb arm: socfpga: Enable ARM_TWD for socfpga] enables the
+ARM_TWD timer]
+
+----------------------------------------------------------------
+Dinh Nguyen (2):
+      arm: socfpga: Enable ARM_TWD for socfpga
+      arm: dts: socfpga: Change some clocks of gate-clk type to perip-clk
+
+ arch/arm/boot/dts/socfpga.dtsi |    7 ++++---
+ arch/arm/mach-socfpga/Kconfig  |    1 +
+ 2 files changed, 5 insertions(+), 3 deletions(-)
