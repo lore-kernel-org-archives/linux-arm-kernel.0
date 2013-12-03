@@ -1,58 +1,62 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 3 Dec 2013 16:32:28 +0000
-Subject: [PATCH v2] xen/block: Correctly define structures in public
- headers on ARM32 and ARM64
-In-Reply-To: <529E04AB.5060304@linaro.org>
-References: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
- <20131203160018.67542a53@alan.etchedpixels.co.uk>
- <529E04AB.5060304@linaro.org>
-Message-ID: <20131203163228.3313dff8@alan.etchedpixels.co.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed,  4 Dec 2013 00:36:44 +0800
+Subject: [RFC part1 PATCH 0/7] Make ACPI core running on ARM64
+Message-ID: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > How does the patch ensure new kernels on existing hypervisor versions
-> > don't break ?
-> 
-> As Ian said on the thread "xen-block: correctly define structures in
-> public headers" (see thread https://lkml.org/lkml/2013/12/3/155), the
-> ABI is not yet fixed for ARM.
+This is the first part of making ACPI core running on ARM.
 
-And if you are one of the existing users that helps how ?
+PCI is optional on ARM64 but ACPI is dependent on PCI now, so
+in the first patch we try to make ACPI can be running without
+PCI.
 
-> > 
-> > What is the failure case given the alignment change seems potentially to
-> > produce valid but incorrect I/O requests - can it cause corruption ?
-> 
-> The request ID will likely be wrong, so the guest won't accept the
-> request. It should not corrupt the block device.
+_PDC is requred for ACPI processor_core.c, but its related code
+is a little bit x86/ia64 dependent, so I rework _PDC related staff
+to make it more arch independent, and then introduce the skeleton
+of _PDC related for ARM64, it should be fully implemented after
+ACPI spec is ready for processor idle control.
 
-"Would likely" 
+After that, arm-core.c is introduced so we can get ACPI table from
+UEFI, then we can parsed for SMP initialisation, GIC initialisation
+and for ACPI drivers.
 
-That seems joyously confident.
+This patch set is based on:
+git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
 
-So at the very least your guest should deliberately issue a request which
-will error if the ABI version mismatches, and at that point you know
-which ABI to use so the guest can keep compatibility trivially.
+origin/linux-next branch and plus Al Stone's v2 reduced hardware profile
+patch.
 
-> > It seems to me you should be defining
-> > 
-> > struct blkif_request_rw_v2
-> > 
-> > and using the correct version according to which API the hypervisor
-> > requires, not just breaking it.
-> 
-> This API doesn't involve the hypervisor. It's only a way to talk between
-> DOM0 and a guest. Without this change you will break compatibility with
-> other OSes.
+Hanjun Guo (7):
+  ACPI: Make ACPI core running without PCI on ARM64
+  ARM64 : Add dummy asm/cpu.h
+  ACPI / processor_core: Rework _PDC related stuff to make it more
+    arch-independent
+  ARM64 / ACPI: Introduce the skeleton of _PDC related for ARM64
+  ARM64 / ACPI: Introduce arm_core.c and its related head file
+  ARM64 / ACPI: Introduce lowlevel suspend function
+  ARM64 / ACPI: Enable ARM64 in Kconfig
 
-With this change you break compatibility between the existing OS's,new
-guests and old DOM0 and vice versa.
+ arch/arm64/Kconfig                 |    2 +
+ arch/arm64/include/asm/acpi.h      |   93 +++++++++++++++
+ arch/arm64/include/asm/cpu.h       |   25 ++++
+ arch/arm64/include/asm/processor.h |   11 ++
+ arch/arm64/kernel/process.c        |    5 +
+ arch/arm64/kernel/setup.c          |    8 ++
+ drivers/acpi/Kconfig               |   12 +-
+ drivers/acpi/Makefile              |    4 +-
+ drivers/acpi/internal.h            |    5 +
+ drivers/acpi/osl.c                 |   16 +++
+ drivers/acpi/plat/Makefile         |    1 +
+ drivers/acpi/plat/arm-core.c       |  226 ++++++++++++++++++++++++++++++++++++
+ drivers/acpi/processor_core.c      |   27 ++---
+ drivers/acpi/reboot.c              |   47 +++++---
+ drivers/pnp/pnpacpi/rsparser.c     |    2 +
+ 15 files changed, 452 insertions(+), 32 deletions(-)
+ create mode 100644 arch/arm64/include/asm/acpi.h
+ create mode 100644 arch/arm64/include/asm/cpu.h
+ create mode 100644 drivers/acpi/plat/Makefile
+ create mode 100644 drivers/acpi/plat/arm-core.c
 
-If a request in old format is guaranteed to error in new format (or you
-can construct one that will) then you can trivially support both APIs on
-the guest side at least for a while. That will avoid regressions when
-people mix versions and also mean you've got a much better ability to
-find a bug if stuff breaks as you won't have to switch guest and dom0
-together when debugging.
-
-Alan
+-- 
+1.7.9.5
