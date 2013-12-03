@@ -1,18 +1,17 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Dec 2013 21:37:19 +0800
-Subject: [PATCH] ARM: dts: i.MX27: Configure GPIOs as "input" by default
-In-Reply-To: <1385795000-29764-1-git-send-email-shc_work@mail.ru>
-References: <1385795000-29764-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131203133717.GL13726@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Dec 2013 13:34:12 +0000
+Subject: [PATCH] net: mvmdio: fix wait_event_timeout() being called
+ with a 1 jiffy timeout.
+In-Reply-To: <1386076560-1886-1-git-send-email-nschichan@freebox.fr>
+References: <20131203122346.GD29282@titan.lakedaemon.net>
+ <1386076560-1886-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <20131203133412.GU16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 30, 2013 at 11:03:20AM +0400, Alexander Shiyan wrote:
-> This patch changes the default direction for pins used
-> as GPIO to "input". This prevents a short circuit on the
-> configuration stage when GPIO-pin is connected to the
-> other output pin.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+On Tue, Dec 03, 2013 at 02:16:00PM +0100, Nicolas Schichan wrote:
+> If a timer interrupt kicks right after the wait_event_timeout() call,
+> we may endup a reporting timeout before the timeout really occured.
 
-Applied, thanks.
+Please see my reply to Jason Cooper about this in the thread
+"Spurious timeouts in mvmdio".
