@@ -1,56 +1,54 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 04 Dec 2013 19:04:46 +0800
-Subject: [GIT PULL][for 3.14] pull request for hisilicon clock driver
-Message-ID: <529F0C4E.4080501@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 04 Dec 2013 20:09:18 +0900
+Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
+In-Reply-To: <1386155011.25938.4.camel@AMDC1943>
+References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
+ <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
+ <529F08DD.2090005@samsung.com> <1386154579.25938.2.camel@AMDC1943>
+ <529F0B75.5040004@samsung.com> <1386155011.25938.4.camel@AMDC1943>
+Message-ID: <529F0D5E.4060202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 12/04/2013 08:03 PM, Krzysztof Kozlowski wrote:
+> On Wed, 2013-12-04 at 20:01 +0900, Chanwoo Choi wrote:
+>> On 12/04/2013 07:56 PM, Krzysztof Kozlowski wrote:
+>>> On Wed, 2013-12-04 at 19:50 +0900, Chanwoo Choi wrote:
+> (...)
+>>>>
+>>>> I prefer to add dt data about max14577-muic on following:
+>>>> If extcon consumer driver need to use muic device, dts should provide following dt data.
+>>>>
+>>>> 		muic: max14577-muic {
+>>>> 			compatible = "maxim, max14577-muic";
+>>>> 		};
+>>>>> +	};
+>>>>>
+>>>> For example,
+>>>> If fuel-gauge want to use extcon subsystem, dt data of fuel-gauge add 'extcon' property as following:
+>>>>
+>>>> 	fuel-gague@ {
+>>>> 		compatible = "...";
+>>>> 		extcon = <&muic>;
+>>>> 	}
+>>>>
+>>> Hi,
+>>>
+>>> The extcon driver itself does not use the binding. It is only needed for
+>>> consumers. Is it a common practice to add to documentation such notice
+>>> for consumers only?
+>>
+>> As you comment, It is only for extcon consumer.
+>> But extcon provider driver always is operated with extcon consumer driver.
+>> If dts file don't support upper dt data about extcon provider driver,
+>> all of extcon consumer drivers could not use extcon subsystem.
+>>
+>> I thinks it is common dt data for muic device.
+> 
+> OK, I'll add it.
+> 
 
-Please help to merge this hisilicon clock driver.
+Thanks,
 
-Regards
-Haojian
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git 
-tags/clk-hisilicon
-
-for you to fetch changes up to 0aa0c95f743a06893dbc494b2a75fbf7093330d4:
-
-   clk: hisilicon: add common clock support (2013-12-04 18:36:45 +0800)
-
-----------------------------------------------------------------
-clock driver for hisilicon
-
-----------------------------------------------------------------
-Haojian Zhuang (1):
-       clk: hisilicon: add common clock support
-
-  Documentation/devicetree/bindings/clock/hi3620-clock.txt |  19 +++++++
-  drivers/clk/Makefile                                     |   1 +
-  drivers/clk/hisilicon/Makefile                           |   5 ++
-  drivers/clk/hisilicon/clk-hi3620.c                       | 242 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  drivers/clk/hisilicon/clk.c                              | 171 
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  drivers/clk/hisilicon/clk.h                              | 103 
-++++++++++++++++++++++++++++++++++++
-  drivers/clk/hisilicon/clkgate-separated.c                | 130 
-++++++++++++++++++++++++++++++++++++++++++++++
-  include/dt-bindings/clock/hi3620-clock.h                 | 152 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++
-  8 files changed, 823 insertions(+)
-  create mode 100644 
-Documentation/devicetree/bindings/clock/hi3620-clock.txt
-  create mode 100644 drivers/clk/hisilicon/Makefile
-  create mode 100644 drivers/clk/hisilicon/clk-hi3620.c
-  create mode 100644 drivers/clk/hisilicon/clk.c
-  create mode 100644 drivers/clk/hisilicon/clk.h
-  create mode 100644 drivers/clk/hisilicon/clkgate-separated.c
-  create mode 100644 include/dt-bindings/clock/hi3620-clock.h
+Best Regards,
+Chanwoo Choi
