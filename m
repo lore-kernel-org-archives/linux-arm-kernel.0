@@ -1,69 +1,166 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 4 Dec 2013 10:31:36 +0100
-Subject: [PATCH v3 2/3] regulator: tps6586x: add and use correct voltage
- table
-In-Reply-To: <c70dc80179c8cfaa18c2665c342ce1bcd827d923.1386100296.git.stefan@agner.ch>
-References: <cover.1386100296.git.stefan@agner.ch>
- <c70dc80179c8cfaa18c2665c342ce1bcd827d923.1386100296.git.stefan@agner.ch>
-Message-ID: <20131204093136.GN19943@ulmo.nvidia.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 4 Dec 2013 11:32:43 +0200
+Subject: [PATCH REPOST 1/2] clk: tegra: remove legacy reset APIs
+In-Reply-To: <1386103002-21939-1-git-send-email-swarren@wwwdotorg.org>
+References: <1386103002-21939-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131204093243.GJ26617@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 08:57:28PM +0100, Stefan Agner wrote:
-[...]
-> Changes since v2:
->   - Removed reg_ from reg_version
->   - Moved walk through version dependent tables to find_regulator_info,
->     removed the inline definition. This reduces .o size and encapsulates
->     the logic of finding the right regulator into one function. It comes
->     with a slight code duplication, the table search now appears twice.
+On Tue, Dec 03, 2013 at 09:36:41PM +0100, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Now that no code uses the custom Tegra module reset API, we can remove
+> its implementation.
+> 
+> Cc: pdeschrijver at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Reviewed-by: Thierry Reding <treding@nvidia.com>
 
-Well, the table was searched twice in the original patch, too, so this
-variant isn't any worse, really.
+Acked-By: Peter De Schrijver <pdeschrijver@nvidia.com>
 
 > ---
->  arch/arm/boot/dts/tegra20-colibri-512.dtsi |  4 +-
->  drivers/regulator/tps6586x-regulator.c     | 91 +++++++++++++++++++++++-------
->  2 files changed, 74 insertions(+), 21 deletions(-)
+> Peter, Mike,
 > 
-> diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-[...]
-> -static inline struct tps6586x_regulator *find_regulator_info(int id)
-> +static struct tps6586x_regulator *find_regulator_info(int id, int version)
->  {
->  	struct tps6586x_regulator *ri;
-> +	struct tps6586x_regulator *table = NULL;
-> +	int num;
->  	int i;
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
+> ---
+>  drivers/clk/tegra/clk-periph-gate.c | 22 --------------------
+>  drivers/clk/tegra/clk-periph.c      | 40 -------------------------------------
+>  drivers/clk/tegra/clk.h             |  1 -
+>  include/linux/clk/tegra.h           |  7 -------
+>  4 files changed, 70 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
+> index f38f33e3c65d..507015314827 100644
+> --- a/drivers/clk/tegra/clk-periph-gate.c
+> +++ b/drivers/clk/tegra/clk-periph-gate.c
+> @@ -36,8 +36,6 @@ static DEFINE_SPINLOCK(periph_ref_lock);
 >  
-> +	switch (version) {
-> +	case TPS658623:
-> +		table = tps658623_regulator;
-> +		num = ARRAY_SIZE(tps658623_regulator);
-> +		break;
-> +	case TPS658643:
-> +		table = tps658643_regulator;
-> +		num = ARRAY_SIZE(tps658643_regulator);
-> +		break;
-> +	}
-> +
-
-I think you still need to check for table to be valid here. Depending on
-the version it might still be NULL.
-
-> +	/* Search version specific table first */
-> +	for (i = 0; i < num; i++) {
-> +		ri = &table[i];
-> +		if (ri->desc.id == id)
-> +			return ri;
-> +	}
-
-So this would need to be wrapped in an "if (table) { }" block.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/cbaa8a9d/attachment.sig>
+>  #define read_rst(gate) \
+>  	readl_relaxed(gate->clk_base + (gate->regs->rst_reg))
+> -#define write_rst_set(val, gate) \
+> -	writel_relaxed(val, gate->clk_base + (gate->regs->rst_set_reg))
+>  #define write_rst_clr(val, gate) \
+>  	writel_relaxed(val, gate->clk_base + (gate->regs->rst_clr_reg))
+>  
+> @@ -123,26 +121,6 @@ static void clk_periph_disable(struct clk_hw *hw)
+>  	spin_unlock_irqrestore(&periph_ref_lock, flags);
+>  }
+>  
+> -void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert)
+> -{
+> -	if (gate->flags & TEGRA_PERIPH_NO_RESET)
+> -		return;
+> -
+> -	if (assert) {
+> -		/*
+> -		 * If peripheral is in the APB bus then read the APB bus to
+> -		 * flush the write operation in apb bus. This will avoid the
+> -		 * peripheral access after disabling clock
+> -		 */
+> -		if (gate->flags & TEGRA_PERIPH_ON_APB)
+> -			tegra_read_chipid();
+> -
+> -		write_rst_set(periph_clk_to_bit(gate), gate);
+> -	} else {
+> -		write_rst_clr(periph_clk_to_bit(gate), gate);
+> -	}
+> -}
+> -
+>  const struct clk_ops tegra_clk_periph_gate_ops = {
+>  	.is_enabled = clk_periph_is_enabled,
+>  	.enable = clk_periph_enable,
+> diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
+> index b5feccca2f1e..d8ed9f79708b 100644
+> --- a/drivers/clk/tegra/clk-periph.c
+> +++ b/drivers/clk/tegra/clk-periph.c
+> @@ -111,46 +111,6 @@ static void clk_periph_disable(struct clk_hw *hw)
+>  	gate_ops->disable(gate_hw);
+>  }
+>  
+> -void tegra_periph_reset_deassert(struct clk *c)
+> -{
+> -	struct clk_hw *hw = __clk_get_hw(c);
+> -	struct tegra_clk_periph *periph = to_clk_periph(hw);
+> -	struct tegra_clk_periph_gate *gate;
+> -
+> -	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
+> -		gate = to_clk_periph_gate(hw);
+> -		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
+> -			WARN_ON(1);
+> -			return;
+> -		}
+> -	} else {
+> -		gate = &periph->gate;
+> -	}
+> -
+> -	tegra_periph_reset(gate, 0);
+> -}
+> -EXPORT_SYMBOL(tegra_periph_reset_deassert);
+> -
+> -void tegra_periph_reset_assert(struct clk *c)
+> -{
+> -	struct clk_hw *hw = __clk_get_hw(c);
+> -	struct tegra_clk_periph *periph = to_clk_periph(hw);
+> -	struct tegra_clk_periph_gate *gate;
+> -
+> -	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
+> -		gate = to_clk_periph_gate(hw);
+> -		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
+> -			WARN_ON(1);
+> -			return;
+> -		}
+> -	} else {
+> -		gate = &periph->gate;
+> -	}
+> -
+> -	tegra_periph_reset(gate, 1);
+> -}
+> -EXPORT_SYMBOL(tegra_periph_reset_assert);
+> -
+>  const struct clk_ops tegra_clk_periph_ops = {
+>  	.get_parent = clk_periph_get_parent,
+>  	.set_parent = clk_periph_set_parent,
+> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+> index 39f24959daf7..57bd0d3090e3 100644
+> --- a/drivers/clk/tegra/clk.h
+> +++ b/drivers/clk/tegra/clk.h
+> @@ -392,7 +392,6 @@ struct tegra_clk_periph_gate {
+>  #define TEGRA_PERIPH_WAR_1005168 BIT(3)
+>  #define TEGRA_PERIPH_NO_DIV BIT(4)
+>  
+> -void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert);
+>  extern const struct clk_ops tegra_clk_periph_gate_ops;
+>  struct clk *tegra_clk_register_periph_gate(const char *name,
+>  		const char *parent_name, u8 gate_flags, void __iomem *clk_base,
+> diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
+> index 23a0ceee831f..3ca9fca827a2 100644
+> --- a/include/linux/clk/tegra.h
+> +++ b/include/linux/clk/tegra.h
+> @@ -120,13 +120,6 @@ static inline void tegra_cpu_clock_resume(void)
+>  }
+>  #endif
+>  
+> -#ifdef CONFIG_ARCH_TEGRA
+> -void tegra_periph_reset_deassert(struct clk *c);
+> -void tegra_periph_reset_assert(struct clk *c);
+> -#else
+> -static inline void tegra_periph_reset_deassert(struct clk *c) {}
+> -static inline void tegra_periph_reset_assert(struct clk *c) {}
+> -#endif
+>  void tegra_clocks_apply_init_table(void);
+>  
+>  #endif /* __LINUX_CLK_TEGRA_H_ */
+> -- 
+> 1.8.1.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
