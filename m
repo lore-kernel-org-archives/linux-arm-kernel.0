@@ -1,29 +1,24 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 4 Dec 2013 14:22:33 +0200
-Subject: 3.13-rc2 phy-twl4030-usb.c - Timeout setting T2 HSUSB PHY DPLL
-In-Reply-To: <CAAfyv37aM6SrpuU9fzKA6GKsWn=To5ANOpG_kSX509NjMjdecA@mail.gmail.com>
-References: <CAAfyv37aM6SrpuU9fzKA6GKsWn=To5ANOpG_kSX509NjMjdecA@mail.gmail.com>
-Message-ID: <529F1E89.6080700@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 4 Dec 2013 13:28:41 +0100
+Subject: [PATCH] gpio: MOXA ART: rename moxart_gpio_base to base
+In-Reply-To: <1385980079-20175-1-git-send-email-jonas.jensen@gmail.com>
+References: <1385723494-8033-1-git-send-email-jonas.jensen@gmail.com>
+ <1385980079-20175-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CACRpkdaT2fmfAwuyPTuF2Pim-_g5Avd_ViwQ069qRLFM9YBvWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Kishon
+On Mon, Dec 2, 2013 at 11:27 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
 
-On 12/03/2013 11:33 PM, Belisko Marek wrote:
-> Hi,
-> 
-> current 3.13-rcX break usb support on gta04 board (similar to
-> beagleboard) when booting via board file.
-> 
-> In console we can see messages:
->  [ 5227.287841] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
-> [ 5232.936096] omap_musb_mailbox: musb core is not yet ready
-> [ 5233.958160] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
-> [ 5235.058227] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
-> 
-> Any pointer what could cause that? (in 3.12 usb works fine)
-> 
-> BR,
-> 
-> marek
-> 
+> Renaming "moxart_gpio_base" to "base" allows better fit,
+> remove line breaks in moxart_gpio_get().
+>
+> While doing trivial cleanup, also remove fields initialized
+> with zero in moxart_template_chip.
+>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+
+Patch applied!
+
+Thanks!
+Linus Walleij
