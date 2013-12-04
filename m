@@ -1,41 +1,104 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 4 Dec 2013 09:49:56 +0100
-Subject: [PATCH 01/31] ARM: tegra: add missing clock documentation to DT
- bindings
-In-Reply-To: <529E24A3.3080804@wwwdotorg.org>
-References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
- <1384548866-13141-2-git-send-email-swarren@wwwdotorg.org>
- <20131129114900.GN22771@ulmo.nvidia.com>
- <529E24A3.3080804@wwwdotorg.org>
-Message-ID: <20131204084956.GG19943@ulmo.nvidia.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 4 Dec 2013 10:51:10 +0200
+Subject: [patch] video: vt8500: fix error handling in probe()
+In-Reply-To: <20131202081118.GB3852@elgon.mountain>
+References: <20131202081118.GB3852@elgon.mountain>
+Message-ID: <529EECFE.1010607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 11:36:19AM -0700, Stephen Warren wrote:
-> On 11/29/2013 04:49 AM, Thierry Reding wrote:
-> > On Fri, Nov 15, 2013 at 01:53:56PM -0700, Stephen Warren wrote:
-> ...
-> >> +  - clock-names : Must include the following entries:
-> > 
-> > One other thing I noticed here is that you use a space between the 
-> > property name and the :. None of the other properties have that, so
-> > it looks somewhat out of place. The same is true for other
-> > bindings, but there seem to be inconsistencies in some places
-> > anyway, so perhaps we don't care? Well, I do care, don't know about
-> > you. =)
+On 2013-12-02 10:11, Dan Carpenter wrote:
+> We shouldn't kfree(fbi) because that was allocated with devm_kzalloc().
+> There were several error paths which returned directly instead of
+> releasing resources.
 > 
-> I've fixed those up locally. I assume you don't want a repost for such
-> a trivial change? I'll double-check the "resets" patch for the same issue.
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> 
+> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+> index b30e5a439d1f..a8f2b280f796 100644
+> --- a/drivers/video/vt8500lcdfb.c
+> +++ b/drivers/video/vt8500lcdfb.c
+> @@ -293,8 +293,7 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+>  			+ sizeof(u32) * 16, GFP_KERNEL);
+>  	if (!fbi) {
+>  		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
+> -		ret = -ENOMEM;
+> -		goto failed;
+> +		return -ENOMEM;
+>  	}
+>  
+>  	strcpy(fbi->fb.fix.id, "VT8500 LCD");
+> @@ -327,15 +326,13 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (res == NULL) {
+>  		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+> -		ret = -ENODEV;
+> -		goto failed_fbi;
+> +		return -ENODEV;
+>  	}
+>  
+>  	res = request_mem_region(res->start, resource_size(res), "vt8500lcd");
+>  	if (res == NULL) {
+>  		dev_err(&pdev->dev, "failed to request I/O memory\n");
+> -		ret = -EBUSY;
+> -		goto failed_fbi;
+> +		return -EBUSY;
+>  	}
+>  
+>  	fbi->regbase = ioremap(res->start, resource_size(res));
+> @@ -346,17 +343,19 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	disp_timing = of_get_display_timings(pdev->dev.of_node);
+> -	if (!disp_timing)
+> -		return -EINVAL;
+> +	if (!disp_timing) {
+> +		ret = -EINVAL;
+> +		goto failed_free_io;
+> +	}
+>  
+>  	ret = of_get_fb_videomode(pdev->dev.of_node, &of_mode,
+>  							OF_USE_NATIVE_MODE);
+>  	if (ret)
+> -		return ret;
+> +		goto failed_free_io;
+>  
+>  	ret = of_property_read_u32(pdev->dev.of_node, "bits-per-pixel", &bpp);
+>  	if (ret)
+> -		return ret;
+> +		goto failed_free_io;
+>  
+>  	/* try allocating the framebuffer */
+>  	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
+> @@ -364,7 +363,8 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+>  				GFP_KERNEL);
+>  	if (!fb_mem_virt) {
+>  		pr_err("%s: Failed to allocate framebuffer\n", __func__);
+> -		return -ENOMEM;
+> +		ret = -ENOMEM;
+> +		goto failed_free_io;
+>  	}
+>  
+>  	fbi->fb.fix.smem_start	= fb_mem_phys;
+> @@ -447,9 +447,6 @@ failed_free_io:
+>  	iounmap(fbi->regbase);
+>  failed_free_res:
+>  	release_mem_region(res->start, resource_size(res));
+> -failed_fbi:
+> -	kfree(fbi);
+> -failed:
+>  	return ret;
+>  }
 
-No need for a repost. I'll trust you on that one. But I'll urge you to
-consider what I said about the "disp" clock entry for the display
-controllers before merging this.
+Thanks, queued for 3.13 fbdev fixes.
 
-Thierry
+ Tomi
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/bb956fde/attachment.sig>
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/64f89453/attachment.sig>
