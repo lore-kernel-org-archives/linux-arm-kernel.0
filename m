@@ -1,48 +1,102 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Wed, 4 Dec 2013 12:57:18 +0200
-Subject: [PATCH v2] pinctrl: baytrail: lock IRQs when starting them
-In-Reply-To: <529E008A.6030704@linux.intel.com>
-References: <1386082822-20094-1-git-send-email-linus.walleij@linaro.org>
- <529E008A.6030704@linux.intel.com>
-Message-ID: <20131204105718.GV2281@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 04 Dec 2013 11:56:19 +0100
+Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
+In-Reply-To: <529F08DD.2090005@samsung.com>
+References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
+ <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
+ <529F08DD.2090005@samsung.com>
+Message-ID: <1386154579.25938.2.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 06:02:18PM +0200, Mathias Nyman wrote:
-> On 12/03/2013 05:00 PM, Linus Walleij wrote:
-> >This uses the new API for tagging GPIO lines as in use by
-> >IRQs. This enforces a few semantic checks on how the underlying
-> >GPIO line is used.
-> >
-> >Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> >Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
-> >Cc: Mathias Nyman <mathias.nyman@linux.intel.com>
-> >Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >---
-> >ChangeLog v1->v2:
-> >- Actually make the change compile, doh.
-> >---
-> >  drivers/pinctrl/pinctrl-baytrail.c | 22 ++++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> >
-> >diff --git a/drivers/pinctrl/pinctrl-baytrail.c b/drivers/pinctrl/pinctrl-baytrail.c
-> >index 1174ea86b6e9..998dbb0c4c93 100644
-> >--- a/drivers/pinctrl/pinctrl-baytrail.c
-> >+++ b/drivers/pinctrl/pinctrl-baytrail.c
-> >@@ -372,11 +372,33 @@ static void byt_irq_mask(struct irq_data *d)
-> >  {
-> >  }
-> >
-> >+static unsigned int byt_irq_startup(struct irq_data *d)
-> >+{
-> >+	struct byt_gpio *vg = irq_data_get_irq_handler_data(d);
+On Wed, 2013-12-04 at 19:50 +0900, Chanwoo Choi wrote:
+> Hi Krzysztof,
 > 
-> This should probably be:
+> On 12/04/2013 07:40 PM, Krzysztof Kozlowski wrote:
+> > Add document describing device tree bindings for MAX14577 MFD driver.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/max14577.txt |   48 ++++++++++++++++++++
+> >  1 file changed, 48 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/max14577.txt b/Documentation/devicetree/bindings/mfd/max14577.txt
+> > new file mode 100644
+> > index 000000000000..f4fd16360b6b
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/max14577.txt
+> > @@ -0,0 +1,48 @@
+> > +MAXIM MAX14577 multi-function device
+> > +
+> > +MAX14577 is a Multi-function device with Micro-USB Interface Circuit, Li+
+> > +Battery Charger and SFOUT LDO output for powering USB devices. It is
+> > +interfaced to host controller using I2C.
+> > +
+> > +Required properties:
+> > +- compatible : Must be "maxim,max14577".
+> > +- reg : I2C slave address for the max14577 chip.
+> > +- interrupts : IRQ line for the max14577 chip.
+> > +- interrupt-parent :  The parent interrupt controller.
+> > +
+> > +Optional nodes:
+> > +- regulators :
+> > +  Required child node properties:
+> > +  - compatible : "maxim,max14577-regulator"
+> > +
+> > +  Optional child nodes:
+> > +    Each child node representing a regulator, following standard regulator
+> > +    bindings. Valid names for a regulator are: "CHARGER" and "SAFEOUT".
+> > +    The SAFEOUT is a constant voltage regulator so there is no need to specify
+> > +    voltages for it.
+> > +
+> > +	[*] refer Documentation/devicetree/bindings/regulator/regulator.txt
+> > +
+> > +Example:
+> > +	max14577 at 25 {
+> > +		compatible = "maxim,max14577";
+> > +		reg = <0x25>;
+> > +		interrupt-parent = <&gpx1>;
+> > +		interrupts = <5 0>;
+> > +
+> > +		regulators {
+> > +			compatible = "maxim,max14577-regulator";
+> > +
+> > +			safeout_reg: safeout at 1 {
+> > +				regulator-compatible = "SAFEOUT";
+> > +				regulator-name = "SAFEOUT";
+> > +			};
+> > +			charger_reg: charger at 0 {
+> > +				regulator-compatible = "CHARGER";
+> > +				regulator-name = "CHARGER";
+> > +				regulator-min-microamp = <90000>;
+> > +				regulator-max-microamp = <950000>;
+> > +				regulator-boot-on;
+> > +			};
+> > +		};
 > 
-> struct byt_gpio *vg = irq_data_get_irq_chip_data(d);
+> I prefer to add dt data about max14577-muic on following:
+> If extcon consumer driver need to use muic device, dts should provide following dt data.
 > 
-> As chip methods use irq_data->chip_data, not irq_data->handler_data
-> (Mika tested that it works on baytrail)
+> 		muic: max14577-muic {
+> 			compatible = "maxim, max14577-muic";
+> 		};
+> > +	};
+> > 
+> For example,
+> If fuel-gauge want to use extcon subsystem, dt data of fuel-gauge add 'extcon' property as following:
+> 
+> 	fuel-gague@ {
+> 		compatible = "...";
+> 		extcon = <&muic>;
+> 	}
+> 
+Hi,
 
-Yes, if it uses irq_data_get_irq_handler_data() I get NULL vg pointer and
-the kernel crashes. Using irq_data_get_irq_chip_data() makes it work.
+The extcon driver itself does not use the binding. It is only needed for
+consumers. Is it a common practice to add to documentation such notice
+for consumers only?
+
+Best regards,
+Krzysztof
