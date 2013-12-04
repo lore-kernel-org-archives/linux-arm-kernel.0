@@ -1,74 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 4 Dec 2013 20:16:06 +0100
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <20131204170911.GC14859@kroah.com>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
- <5283A8C7.30904@atmel.com> <529C4936.5060304@atmel.com>
- <20131204102353.GI29721@pengutronix.de>
- <20131204170911.GC14859@kroah.com>
-Message-ID: <20131204191606.GL29721@pengutronix.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 4 Dec 2013 20:21:42 +0100
+Subject: [PATCH 00/04] ARM: shmobile: Use SoC suffix for INTC compat string
+In-Reply-To: <20131128064555.GA14878@verge.net.au>
+References: <20131127231450.29081.98054.sendpatchset@w520>
+ <20131128064555.GA14878@verge.net.au>
+Message-ID: <CANqRtoQ4fsCm=-uw8BgN48wFs_iTaG-H_kjDvcZssJXZqE8VTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+On Thu, Nov 28, 2013 at 7:45 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Nov 28, 2013 at 08:14:50AM +0900, Magnus Damm wrote:
+>> ARM: shmobile: Use SoC suffix for INTC compat string
+>>
+>> [PATCH 01/04] ARM: shmobile: Use sh73a0 suffix for INTC compat string
+>> [PATCH 02/04] ARM: shmobile: Use r8a7740 suffix for INTC compat string
+>> [PATCH 03/04] ARM: shmobile: Use r8a7778 suffix for INTC compat string
+>> [PATCH 04/04] ARM: shmobile: Use r8a7779 suffix for INTC compat string
+>>
+>> Update the DTS for INTC irqpin devices to include the SoC in the compat string.
+>>
+>> Both IRQC and INTC irqpin need documentation for the DT bindings, and this
+>> will happen in incremental patches.
+>
+> I have posted some patches for that a few moments ago :)
 
-On Wed, Dec 04, 2013 at 09:09:11AM -0800, Greg Kroah-Hartman wrote:
-> On Wed, Dec 04, 2013 at 11:23:53AM +0100, Uwe Kleine-K?nig wrote:
-> > Hello Greg, hi Nicolas,
-> > 
-> > On Mon, Dec 02, 2013 at 09:47:50AM +0100, Nicolas Ferre wrote:
-> > > On 13/11/2013 17:28, Nicolas Ferre :
-> > > >On 07/11/2013 10:25, Linus Walleij :
-> > > >>This passes the errata fix using a GPIO to control the RTS pin
-> > > >>on one of the AT91 chips to use gpiolib instead of the
-> > > >>AT91-specific interfaces. Also remove the reliance on
-> > > >>compile-time #defines and the cpu_* check and rely on the
-> > > >>platform passing down the proper GPIO pin through platform
-> > > >>data.
-> > > >>
-> > > >>This is a prerequisite for getting rid of the local GPIO
-> > > >>implementation in the AT91 platform and move toward
-> > > >>multiplatform.
-> > > >>
-> > > >>The patch also adds device tree support for getting the
-> > > >>RTS GPIO pin from the device tree on DT boot paths.
-> > > >>
-> > > >>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > >>Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > >>Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > > >
-> > > >Hi Greg,
-> > > >
-> > > >You acknowledged a previous version of this patch which was taking a
-> > > >different approach with the subject:
-> > > >"[PATCH 1/4] ARM/serial: at91: move machine quirk into machine"
-> > > >
-> > > >In order to integrate the series build by Linus in our AT91/arm-soc
-> > > >flow, would you mind reviewing this v4 patch and eventually giving your
-> > > >blessing ;-)
-> > > >If it is okay on your side, I'll integrate it in a pull-request to
-> > > >arm-soc for 3.14.
-> > > 
-> > > Greg, ping?
-> > I'm depending on that patch for a series that gets rid of ARM's
-> > <mach/timex.h>. So I'm interested to either get a stable commit to
-> > base on or alternatively to get the blessing from both of you to take it
-> > (also via arm-soc) as part of my series.
-> > 
-> > A preview of my series is available at
-> > 
-> > 	git://git.pengutronix.de/git/ukl/linux.git deprecatemachtimexh
-> 
-> No objection from me to take it through your tree.
-gregkh: Thanks. I'll interpret this as Acked-by: you if Nicolas also
-agrees that I take it.
+Thanks for that!
 
-nferre: What is your plan with this patch? Do you have patches
-depending on it, too, or is it ok if I take it?
+> I am curious to if it is intentional that this series replaces
+> the use of less-specific compat strings with more specific ones
+> while the recent update to the r8a7790 supplemented the
+> less-specific renesas,irqc comat string with the more-specific
+> renesas,irqc-r8a7790 compat string.
+>
+> i.e.
+>         before: "renesas,intc-irqpin"
+>         after:  "renesas,intc-irqpin-sh73a0"
+>
+>         as opposed to
+>
+>         before: "renesas,irqc"
+>         after: "renesas,irqc-r8a7790", "renesas,irqc"
 
-Best regards
-Uwe
+My intention is to keep them the same. I just checked the intc-irqpin
+patches but they seem to be following the same style as IRQC. On which
+SoC did you observe this difference?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+
+/ magnus
