@@ -1,20 +1,53 @@
-From: mlweber1@rockwellcollins.com (mlweber1 at rockwellcollins.com)
-Date: Wed, 4 Dec 2013 08:25:33 -0600
-Subject: Moschip MCS8142 SoC
-Message-ID: <OF433D4F00.CB35F8E7-ON86257C37.004F3E8D@rockwellcollins.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 04 Dec 2013 22:27:22 +0800
+Subject: [RFC part3 PATCH 2/2] ARM64 / clocksource: Use
+ arch_timer_acpi_init()
+In-Reply-To: <20131203170815.GB16025@e106331-lin.cambridge.arm.com>
+References: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088891-2917-3-git-send-email-hanjun.guo@linaro.org>
+ <20131203170815.GB16025@e106331-lin.cambridge.arm.com>
+Message-ID: <529F3BCA.1020908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Has anyone happened to work with this Moschip SoC?  I found Linux BSP 
-patches for the MCS8140 (OpenWRT 3.3 Kernel plus some initial attempts at 
-mainlining around 3.7), however that MCS8140 SoC was a true ARMv5 compared 
-to the MCS8142 which seems to be based on a Faraday fa526 ARMv4.  
-Another item I'm not to sure about is if the bus and peripheral 
-architecture are similar.
+On 2013?12?04? 01:08, Mark Rutland wrote:
+> On Tue, Dec 03, 2013 at 04:41:31PM +0000, Hanjun Guo wrote:
+>> Use arch_timer_acpi_init() on ARM64 to initialise arch timer
+>> in ACPI way when DT is not available.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   arch/arm64/kernel/time.c |    4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+>> index 29c39d5..fb009da 100644
+>> --- a/arch/arm64/kernel/time.c
+>> +++ b/arch/arm64/kernel/time.c
+>> @@ -67,6 +67,10 @@ void __init time_init(void)
+>>   
+>>   	clocksource_of_init();
+>>   
+>> +	/* if can't be initialised from DT, try ACPI way */
+>> +	if (!arch_timer_get_rate())
+>> +		arch_timer_acpi_init();
+>> +
+> As mentioned on the previous patch, I think for the timebeing we should
+> rely on CNTFREQ.
+>
+> Additionally, if you need to do this we should have an analagous
+> mechanism to clocksource_of_init() that performs this initialisation for
+> ACPI, and here we can call a clocksource_*_init function that does the
+> right thing.
+>
+> There's no need for this file to know anything about ACPI.
 
-Any help is appreciated (reference docs that outline the register 
-definition, etc.) .  We're trying to get a 3.x kernel running on this 
-target to replace a older 2.6.24 blob that we can't get source for..... 
+Oh, Amit already have some patches to introduce clocksource_acpi_init()
+like clocksource_of_init() did, please refer to the link below.
 
-Matthew L Weber / Sr Software Engineer / Platform SW 
-mlweber1 at rockwellcollins.com
+http://marc.info/?l=linaro-acpi&m=138131929721943&w=2
+
+is this the idea you mentioned in your comments?
+
+Thanks
+Hanjun
