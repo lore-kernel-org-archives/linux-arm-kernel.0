@@ -1,33 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Dec 2013 14:29:54 +0000
-Subject: [PATCH v4 2/3] regulator: tps6586x: add and use correct voltage
- table
-In-Reply-To: <0983a0fa016faa5674834afad4472413@agner.ch>
-References: <cover.1386108712.git.stefan@agner.ch>
- <127fe07e18665f93aa8d7c03e03164f1a049ddb6.1386108712.git.stefan@agner.ch>
- <20131204121424.GN29268@sirena.org.uk>
- <0983a0fa016faa5674834afad4472413@agner.ch>
-Message-ID: <20131204142954.GW29268@sirena.org.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 04 Dec 2013 22:30:06 +0800
+Subject: [RFC part1 PATCH 4/7] ARM64 / ACPI: Introduce the skeleton of
+ _PDC related for ARM64
+In-Reply-To: <CAL_JsqKmKsZtYgFrLBU+vOnHkC6x5nB9WfhM7hC=DipzEj8qhg@mail.gmail.com>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088611-2801-5-git-send-email-hanjun.guo@linaro.org>
+ <CAL_JsqKmKsZtYgFrLBU+vOnHkC6x5nB9WfhM7hC=DipzEj8qhg@mail.gmail.com>
+Message-ID: <529F3C6E.5080802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:17:59PM +0100, Stefan Agner wrote:
-> Am 2013-12-04 13:14, schrieb Mark Brown:
+On 2013?12?04? 01:12, Rob Herring wrote:
+> On Tue, Dec 3, 2013 at 10:36 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+[...]
+> +#ifndef _ASM_ARM_ACPI_H
+> +#define _ASM_ARM_ACPI_H
+> +
+> +static inline bool arch_has_acpi_pdc(void)
+> +{
+> +       return false;   /* always false for now */
+> +}
+> +
+> +static inline void arch_acpi_set_pdc_bits(u32 *buf)
+> +{
+> +       return;
+> +}
+> +
+> +#endif /*_ASM_ARM_ACPI_H*/
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 45b20cd..73b1d3a 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -162,6 +162,17 @@ static inline void spin_lock_prefetch(const void *x)
+>
+>   #define HAVE_ARCH_PICK_MMAP_LAYOUT
+>
+> +#ifdef CONFIG_ACPI
+> The ifdef is not necessary.
 
-> > Acked-by: Mark Brown <broonie@linaro.org>
+Good catch, will fix it in next version.
 
-> > I won't apply since I think that patch 3 needs to go along with this,
-> > unless people decide the regulator tree is the easiest way to merge.
+Thanks for the comments.
 
-> I merged the dependent DT changes into that patch, so from my side,
-> patch 3 don't needs to go along with this...
-
-OK, though now I look I see it also depends on patch 1 itself so at
-least those two will need to go together.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/813a4258/attachment-0001.sig>
+Hanjun
