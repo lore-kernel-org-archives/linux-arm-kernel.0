@@ -1,47 +1,64 @@
 From: w-kwok2@ti.com (WingMan Kwok)
-Date: Wed, 4 Dec 2013 15:10:06 -0500
-Subject: [PATCH v2 0/5] Kesytone II USB support
-Message-ID: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
+Date: Wed, 4 Dec 2013 15:10:09 -0500
+Subject: [PATCH v2 3/5] ARM: dts: keystone: Add usb phy devicetree bindings
+In-Reply-To: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
+References: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
+Message-ID: <1386187811-9596-4-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is the updated version of the series which addresses comments from
-earlier version [1].  The PHY register programming is moved to a separate
-PHY driver.
-
-Series adds USB host support for Keystone SOCs. Keystone SOCs uses dwc3
-hardware IP implementation.  On Keystone II platforms, we use no-op phy driver.
-
-All three patches are posted together just for completeness. Only first patch
-is expected to go via usb tree and other two via linux-keystone tree.
-
-Patchset are tested on Keystone II EVM with USB2.0 and USB3.0 flash drives.
+Added device tree support for TI's Keystone USB PHY driver and updated the
+Documentation with device tree binding information.
 
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-WingMan Kwok (5):
-  usb: dwc3: Add Keystone specific glue layer
-  usb: phy: Add keystone usb phy driver
-  ARM: dts: keystone: Add usb phy devicetree bindings
-  ARM: dts: keystone: Add usb devicetree bindings
-  ARM: keystone: defconfig: enable USB support
-
- .../devicetree/bindings/usb/keystone-phy.txt       |   19 ++
- .../devicetree/bindings/usb/keystone-usb.txt       |   41 ++++
- arch/arm/boot/dts/keystone.dtsi                    |   25 +++
- arch/arm/configs/keystone_defconfig                |   20 +-
- drivers/usb/dwc3/Kconfig                           |    7 +
- drivers/usb/dwc3/Makefile                          |    1 +
- drivers/usb/dwc3/dwc3-keystone.c                   |  210 ++++++++++++++++++++
- drivers/usb/phy/Kconfig                            |   10 +
- drivers/usb/phy/Makefile                           |    1 +
- drivers/usb/phy/phy-keystone.c                     |  142 +++++++++++++
- 10 files changed, 475 insertions(+), 1 deletion(-)
+Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+---
+ .../devicetree/bindings/usb/keystone-phy.txt       |   19 +++++++++++++++++++
+ arch/arm/boot/dts/keystone.dtsi                    |    7 +++++++
+ 2 files changed, 26 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/usb/keystone-phy.txt
- create mode 100644 Documentation/devicetree/bindings/usb/keystone-usb.txt
- create mode 100644 drivers/usb/dwc3/dwc3-keystone.c
- create mode 100644 drivers/usb/phy/phy-keystone.c
 
-[1] http://www.spinics.net/lists/linux-usb/msg98166.html
+diff --git a/Documentation/devicetree/bindings/usb/keystone-phy.txt b/Documentation/devicetree/bindings/usb/keystone-phy.txt
+new file mode 100644
+index 0000000..300830d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/keystone-phy.txt
+@@ -0,0 +1,19 @@
++TI Keystone USB PHY
++
++Required properties:
++ - compatible: should be "ti,keystone-usbphy".
++ - #address-cells, #size-cells : should be '1' if the device has sub-nodes
++   with 'reg' property.
++ - reg : Address and length of the usb phy control register set.
++
++The main purpose of this PHY driver is to enable the USB PHY reference clock
++gate on the Keystone SOC for both the USB2 and USB3 PHY. Otherwise it is just
++an NOP PHY driver.  Hence this node is referenced as both the usb2 and usb3
++phy node in the USB Glue layer driver node.
++
++usb_phy: usb_phy at 2620738 {
++	compatible = "ti,keystone-usbphy";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	reg = <0x2620738 32>;
++};
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index f6d6d9e..d497d9e 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -181,5 +181,12 @@
+ 			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
+ 			clocks = <&clkspi>;
+ 		};
++
++		usb_phy: usb_phy at 2620738 {
++			compatible = "ti,keystone-usbphy";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x2620738 32>;
++		};
+ 	};
+ };
 -- 
 1.7.9.5
