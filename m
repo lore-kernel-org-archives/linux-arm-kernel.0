@@ -1,119 +1,63 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 4 Dec 2013 09:40:27 +0200
-Subject: [PATCHv6 05/13] iommu/core: add ops->{bound,unbind}_driver()
-In-Reply-To: <20131125154937.d6dbe9aedc16aab335d92f99@nvidia.com>
-References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com>
- <1385041249-7705-6-git-send-email-hdoyu@nvidia.com>
- <20131125154937.d6dbe9aedc16aab335d92f99@nvidia.com>
-Message-ID: <20131204094027.dad1288aec14551ec42f3743@nvidia.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 4 Dec 2013 13:38:37 +0530
+Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm
+ when bad data is detected
+In-Reply-To: <1386121153-32351-1-git-send-email-nm@ti.com>
+References: <1386121153-32351-1-git-send-email-nm@ti.com>
+Message-ID: <529EE305.70001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Nov 2013 14:49:37 +0100
-Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+On 12/04/2013 07:09 AM, Nishanth Menon wrote:
+> Due to the cross dependencies between hwmod for automanaged device
+> information for OMAP and dts node definitions, we can run into scenarios
+> where the dts node is defined, however it's hwmod entry is yet to be
+> added. In these cases:
+> a) omap_device does not register a pm_domain (since it cannot find
+>    hwmod entry).
+> b) driver does not know about (a), does a pm_runtime_get_sync which
+>    never fails
+> c) It then tries to do some operation on the device (such as read the
+>   revision register (as part of probe) without clock or adequate OMAP
+>   generic PM operation performed for enabling the module.
+> 
+> This causes a crash such as that reported in:
+> https://bugzilla.kernel.org/show_bug.cgi?id=66441
+> 
+> When 'ti,hwmod' is provided in dt node, it is expected that the device
+> will not function without the OMAP's power automanagement. Hence, when
+> we hit a fail condition (due to hwmod entries not present or other
+> similar scenario), fail at pm_domain level due to lack of data, provide
+> enough information for it to be fixed, however, it allows for the driver
+> to take appropriate measures to prevent crash.
+> 
+> Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_device.c |   24 ++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_device.h |    1 +
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index 53f0735..e0a398c 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -183,6 +183,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+>  odbfd_exit1:
+>  	kfree(hwmods);
+>  odbfd_exit:
+> +	/* if data/we are at fault.. load up a fail handler */
+> +	if (ret)
+> +		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
+> +
+>  	return ret;
+>  }
+>  
 
-> Hi Joerg,
-> 
-> Do you have some time to review this patch along with the following ones?
-> 
->   [PATCHv6 02/13] iommu/of: introduce a global iommu device list
->   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007050.html
-> 
->   [PATCHv6 03/13] iommu/of: check if dependee iommu is ready or not
->   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007051.html
+Just wondering, can't we just print the warning here instead of registering new
+pm_domain callbacks?
 
-Any chance to get some feedback on them?
+Concerned that all this LOC may end up being dead code when the "ti,hwmods"
+property becomes obsolete anyway.
 
-> With those patches, now I'm trying to populate iommu master devices
-> after an IOMMU device is populated. Originally [PATCHv6 02/13] was
-> proposed by Thierry. I'm a bit afraid of adding new IOMMU API as
-> this, but I think that this new {bound,unbind}_driver() is the right
-> timiing that depeding devices are populated instead of add_device()
-> since, even after add_device, a device won't be populated. I'm not so
-> sure how this affects on the existing IOMMUs.
-> 
-> It would be nice if you give some feedback on this.
-> 
-> On Thu, 21 Nov 2013 14:40:41 +0100
-> Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> 
-> > ops->{bound,unbind}_driver() functions are called at
-> > BUS_NOTIFY_{BOUND,UNBIND}_DRIVER respectively.
-> > 
-> > This is necessary to control the device population order. IOMMU master
-> > devices depend on an IOMMU device instanciation. IOMMU master devices
-> > can be registered to an IOMMU only after it's successfully
-> > populated. This IOMMU registration is done via
-> > ops->bound_driver(). Currently this population can be deferred if
-> > depending IOMMU device hasn't yet been populated in driver core. This
-> > cannot be done via ops->add_device() since after add_device() device's
-> > population/instanciation can be still deferred via probe().
-> > 
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > ---
-> > v6:
-> > New for v6.
-> > ---
-> >  drivers/iommu/iommu.c | 13 +++++++++++--
-> >  include/linux/iommu.h |  4 ++++
-> >  2 files changed, 15 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> > index e5555fc..5469d36 100644
-> > --- a/drivers/iommu/iommu.c
-> > +++ b/drivers/iommu/iommu.c
-> > @@ -540,14 +540,23 @@ static int iommu_bus_notifier(struct notifier_block *nb,
-> >  	 * ADD/DEL call into iommu driver ops if provided, which may
-> >  	 * result in ADD/DEL notifiers to group->notifier
-> >  	 */
-> > -	if (action == BUS_NOTIFY_ADD_DEVICE) {
-> > +	switch (action) {
-> > +	case BUS_NOTIFY_ADD_DEVICE:
-> >  		if (ops->add_device)
-> >  			return ops->add_device(dev);
-> > -	} else if (action == BUS_NOTIFY_DEL_DEVICE) {
-> > +	case BUS_NOTIFY_DEL_DEVICE:
-> >  		if (ops->remove_device && dev->iommu_group) {
-> >  			ops->remove_device(dev);
-> >  			return 0;
-> >  		}
-> > +	case BUS_NOTIFY_BOUND_DRIVER:
-> > +		if (ops->bound_driver)
-> > +			ops->bound_driver(dev);
-> > +		break;
-> > +	case BUS_NOTIFY_UNBIND_DRIVER:
-> > +		if (ops->unbind_driver)
-> > +			ops->unbind_driver(dev);
-> > +		break;
-> >  	}
-> >  
-> >  	/*
-> > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> > index a444c79..a0e92be 100644
-> > --- a/include/linux/iommu.h
-> > +++ b/include/linux/iommu.h
-> > @@ -96,6 +96,8 @@ enum iommu_attr {
-> >   * @domain_has_cap: domain capabilities query
-> >   * @add_device: add device to iommu grouping
-> >   * @remove_device: remove device from iommu grouping
-> > + * @bound_driver: called at BUS_NOTIFY_BOUND_DRIVER
-> > + * @unbind_driver: called at BUS_NOTIFY_UNBIND_DRIVER
-> >   * @domain_get_attr: Query domain attributes
-> >   * @domain_set_attr: Change domain attributes
-> >   * @pgsize_bitmap: bitmap of supported page sizes
-> > @@ -114,6 +116,8 @@ struct iommu_ops {
-> >  			      unsigned long cap);
-> >  	int (*add_device)(struct device *dev);
-> >  	void (*remove_device)(struct device *dev);
-> > +	int (*bound_driver)(struct device *dev);
-> > +	void (*unbind_driver)(struct device *dev);
-> >  	int (*device_group)(struct device *dev, unsigned int *groupid);
-> >  	int (*domain_get_attr)(struct iommu_domain *domain,
-> >  			       enum iommu_attr attr, void *data);
-> > -- 
-> > 1.8.1.5
-> > 
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+-Joel
