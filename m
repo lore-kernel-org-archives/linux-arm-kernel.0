@@ -1,53 +1,103 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 04 Dec 2013 22:27:22 +0800
-Subject: [RFC part3 PATCH 2/2] ARM64 / clocksource: Use
- arch_timer_acpi_init()
-In-Reply-To: <20131203170815.GB16025@e106331-lin.cambridge.arm.com>
-References: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
- <1386088891-2917-3-git-send-email-hanjun.guo@linaro.org>
- <20131203170815.GB16025@e106331-lin.cambridge.arm.com>
-Message-ID: <529F3BCA.1020908@linaro.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 4 Dec 2013 21:58:44 +0800
+Subject: [PATCH v2 1/2] usb: chipidea: usbmisc: Add support for
+ i.MX27/i.MX31 CPUs
+In-Reply-To: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
+References: <1385480210-9349-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131204135844.GE1573@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?12?04? 01:08, Mark Rutland wrote:
-> On Tue, Dec 03, 2013 at 04:41:31PM +0000, Hanjun Guo wrote:
->> Use arch_timer_acpi_init() on ARM64 to initialise arch timer
->> in ACPI way when DT is not available.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/kernel/time.c |    4 ++++
->>   1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
->> index 29c39d5..fb009da 100644
->> --- a/arch/arm64/kernel/time.c
->> +++ b/arch/arm64/kernel/time.c
->> @@ -67,6 +67,10 @@ void __init time_init(void)
->>   
->>   	clocksource_of_init();
->>   
->> +	/* if can't be initialised from DT, try ACPI way */
->> +	if (!arch_timer_get_rate())
->> +		arch_timer_acpi_init();
->> +
-> As mentioned on the previous patch, I think for the timebeing we should
-> rely on CNTFREQ.
->
-> Additionally, if you need to do this we should have an analagous
-> mechanism to clocksource_of_init() that performs this initialisation for
-> ACPI, and here we can call a clocksource_*_init function that does the
-> right thing.
->
-> There's no need for this file to know anything about ACPI.
+On Tue, Nov 26, 2013 at 07:36:49PM +0400, Alexander Shiyan wrote:
+> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index 8a1094b..4381c5a6 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -21,6 +21,10 @@
+>  #define MX25_USB_PHY_CTRL_OFFSET	0x08
+>  #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
+>  
+> +#define MX27_H1_PM_BIT			BIT(8)
+> +#define MX27_H2_PM_BIT			BIT(16)
+> +#define MX27_OTG_PM_BIT			BIT(24)
+> +
+>  #define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08
+>  #define MX53_USB_UH2_CTRL_OFFSET	0x14
+>  #define MX53_USB_UH3_CTRL_OFFSET	0x18
+> @@ -68,6 +72,36 @@ static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
+>  	return 0;
+>  }
+>  
+> +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
+> +{
+> +	unsigned long flags;
+> +	u32 val;
+> +
+> +	switch (data->index) {
+> +	case 0:
+> +		val = MX27_OTG_PM_BIT;
+> +		break;
+> +	case 1:
+> +		val = MX27_H1_PM_BIT;
+> +		break;
+> +	case 2:
+> +		val = MX27_H2_PM_BIT;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	};
+> +
+> +	spin_lock_irqsave(&usbmisc->lock, flags);
+> +	if (data->disable_oc)
+> +		val = readl(usbmisc->base) | val;
+> +	else
+> +		val = readl(usbmisc->base) & ~val;
+> +	writel(val, usbmisc->base);
+> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+>  static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
+>  {
+>  	void __iomem *reg = NULL;
+> @@ -128,6 +162,10 @@ static const struct usbmisc_ops imx25_usbmisc_ops = {
+>  	.post = usbmisc_imx25_post,
+>  };
+>  
+> +static const struct usbmisc_ops imx27_usbmisc_ops = {
+> +	.init = usbmisc_imx27_init,
+> +};
+> +
+>  static const struct usbmisc_ops imx53_usbmisc_ops = {
+>  	.init = usbmisc_imx53_init,
+>  };
+> @@ -162,6 +200,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
+>  		.data = &imx25_usbmisc_ops,
+>  	},
+>  	{
+> +		.compatible = "fsl,imx27-usbmisc",
+> +		.data = &imx27_usbmisc_ops,
+> +	},
+> +	{
+>  		.compatible = "fsl,imx53-usbmisc",
+>  		.data = &imx53_usbmisc_ops,
+>  	},
+> -- 
+> 1.8.3.2
+> 
+> 
 
-Oh, Amit already have some patches to introduce clocksource_acpi_init()
-like clocksource_of_init() did, please refer to the link below.
+Applied, thanks.
 
-http://marc.info/?l=linaro-acpi&m=138131929721943&w=2
+-- 
 
-is this the idea you mentioned in your comments?
-
-Thanks
-Hanjun
+Best Regards,
+Peter Chen
