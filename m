@@ -1,67 +1,49 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Dec 2013 22:29:07 +0100
-Subject: [GIT PULL FOR v3.14] Renesas R-Car Gen 2 Common Clock Framework
-Message-ID: <3302362.MUz5Y8N3ER@avalon>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 4 Dec 2013 13:38:39 -0800
+Subject: [GIT PULL] s3c64xx dmaengine conversion
+In-Reply-To: <20131124145011.GA14725@sirena.org.uk>
+References: <20131124145011.GA14725@sirena.org.uk>
+Message-ID: <CAOesGMj2uun+0Kr0yKtpHs_0FntJ_rnYGeM8hs+DjpT8Nn-bwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Sun, Nov 24, 2013 at 6:50 AM, Mark Brown <broonie@kernel.org> wrote:
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git tags/s3c64xx-dmaengine
+>
+> for you to fetch changes up to 3faecea70b0d6d050e0ae911032ec340341dc389:
+>
+>   spi: s3c64xx: Always select S3C64XX_PL080 when ARCH_S3C64XX is enabled (2013-11-24 14:38:25 +0000)
+>
+> ----------------------------------------------------------------
+> ARM: s3c64xx: Convert to dmaengine
+>
+> This series of commits from Tomasz converting s3c64xx to use dmaengine
+> rather than the old s3c-dma API missed the v3.13 merge window - Kukjin
+> said that he'd applied it (which should mean it's OK from a review point
+> of view) but it didn't make it into -next or a pull request.
+>
+> Since a s3c64xx based system is one of my primary development platforms
+> it'd be really helpful if I could merge this into both ASoC and SPI,
+> I've got some patches for ASoC ready to go converting to use dmaengine
+> directly which help with multiplatform and there's some other dmaengine
+> work for SPI in progress too.  I've therefore made this signed tag, it'd
+> be great if it could be merged into both arm-soc and those two trees.
+>
+> ----------------------------------------------------------------
+>
+> I'm open to other ideas for doing this, I'd just really like to see the
+> code building on this go in this cycle so anything that accomplishes
+> that is good for me.
 
-As nobody replied to the last version of the patches I will assume that either 
-they're perfect, or I've managed to make all reviewers hibernate from boredom. 
-Both cases call for a pull request.
+It's been 10 days and Kukjin hasn't moved on this, nor replied. I'm
+going to merge it into arm-soc as samsung/s3c64xx-dmaengine ->
+next/drivers so that you can use the branch as a base for your work.
 
-Could you please pull the following three patches for v3.14 ? They have no 
-extra compile-time or runtime dependency, but subsequent platform patches will 
-depend on them. Could you thus please provide a stable branch that Simon can 
-merge in his tree ?
 
-Changes compared to v4:
-
-- Rebased on top of the latest clk-next branch
-- Revert to ARCH_SHMOBILE_MULTI (as in v3) for drivers/clk/Makefile
-
-The following changes since commit cdf64eeeb0d762585e2126f3024458d199c2635d:
-
-  clk: exynos5420: fix cpll clock register offsets (2013-12-04 10:46:45 -0800)
-
-are available in the git repository at:
-
-  git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/rcar-gen2-mainline
-
-for you to fetch changes up to 7135ea019305179dd6f6a99ea7c1e78773eca166:
-
-  clk: shmobile: Add MSTP clock support (2013-12-04 22:18:36 +0100)
-
-----------------------------------------------------------------
-Laurent Pinchart (3):
-      clk: shmobile: Add R-Car Gen2 clocks support
-      clk: shmobile: Add DIV6 clock support
-      clk: shmobile: Add MSTP clock support
-
- .../bindings/clock/renesas,cpg-div6-clocks.txt          |  28 +++
- .../bindings/clock/renesas,cpg-mstp-clocks.txt          |  51 ++++
- .../bindings/clock/renesas,rcar-gen2-cpg-clocks.txt     |  32 +++
- drivers/clk/Makefile                                    |   1 +
- drivers/clk/shmobile/Makefile                           |   7 +
- drivers/clk/shmobile/clk-div6.c                         | 185 +++++++++++++
- drivers/clk/shmobile/clk-mstp.c                         | 229 ++++++++++++++
- drivers/clk/shmobile/clk-rcar-gen2.c                    | 298 +++++++++++++++
- include/linux/clk/shmobile.h                            |  19 ++
- 9 files changed, 850 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-div6-
-clocks.txt
- create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-mstp-
-clocks.txt
- create mode 100644 Documentation/devicetree/bindings/clock/renesas,rcar-gen2-
-cpg-clocks.txt
- create mode 100644 drivers/clk/shmobile/Makefile
- create mode 100644 drivers/clk/shmobile/clk-div6.c
- create mode 100644 drivers/clk/shmobile/clk-mstp.c
- create mode 100644 drivers/clk/shmobile/clk-rcar-gen2.c
- create mode 100644 include/linux/clk/shmobile.h
-
--- 
-Regards,
-
-Laurent Pinchart
+-Olof
