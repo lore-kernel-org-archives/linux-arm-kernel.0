@@ -1,25 +1,42 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 04 Dec 2013 22:08:47 +0800
-Subject: [RFC part1 PATCH 1/7] ACPI: Make ACPI core running without PCI
- on ARM64
-In-Reply-To: <20131203164111.GA13447@srcf.ucam.org>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <1386088611-2801-2-git-send-email-hanjun.guo@linaro.org>
- <20131203164111.GA13447@srcf.ucam.org>
-Message-ID: <529F376F.8050005@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Dec 2013 14:09:51 +0000
+Subject: [PATCH 2/3] clk: bcm281xx: add initial clock framework support
+In-Reply-To: <529F34D3.5080806@linaro.org>
+References: <529EA78E.7060904@linaro.org> <529EA80F.3050009@linaro.org>
+ <20131204111457.GF16025@e106331-lin.cambridge.arm.com>
+ <529F28E3.90905@linaro.org> <529F34D3.5080806@linaro.org>
+Message-ID: <20131204140951.GA29200@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?12?04? 00:41, Matthew Garrett wrote:
-> Given the number of #ifdefs you're adding, wouldn't it make more sense
-> to just add stub functions to include/linux/pci.h?
+On Wed, Dec 04, 2013 at 01:57:39PM +0000, Alex Elder wrote:
+> On 12/04/2013 07:06 AM, Alex Elder wrote:
+> >>> +       name_size = strlen(node->name) + 1;
+> >>> >> +       ccu = kzalloc(sizeof(*ccu) + name_size, GFP_KERNEL);
+> >>> >> +       if (!ccu) {
+> >>> >> +               pr_err("%s: unable to map allocate CCU struct for %s\n",
+> >>> >> +                       __func__, node->name);
+> >>> >> +               return;
+> >>> >> +       }
+> >>> >> +       memcpy((char *)ccu->name, node->name, name_size);
+> >> > 
+> >> > You could simplify this with kstrdup.
+> > You are correct, and I will make that change.  I think at
+> > one point I needed the length but that doesn't appear to
+> > be the case here.
+> 
+> On second thought, no, you may have missed what was happening here.
+> I was avoiding two kmallocs() by setting aside space at the end
+> of the structure to hold its name.  It may seem silly, but this
+> avoids a possible (well, conceivable) failure case.
 
-Thanks for the suggestion :)
+Yes, I'd misunderstood. Sorry about that.
 
-I can add stub functions in include/linux/pci.h for raw_pci_read()/
-raw_pci_write(), then can remove #ifdefs for acpi_os_read/write_pci_configuration().
+> 
+> However, based on your earlier question about "what about freeing
+> ccu->name?" I am going to use kstrdup() here.  I'd rather the code
+> put you at ease than look weird just to avoid an unlikely failure.
 
-Thanks
-Hanjun
+I'm happy either way.
 
->
+Mark.
