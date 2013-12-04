@@ -1,44 +1,31 @@
-From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Wed, 4 Dec 2013 09:09:34 +0800
-Subject: Build warning in drivers/dma/mmp_tdma.c
-In-Reply-To: <CAMj5BkgSYeT2MeOwV4fzxg6wkjQhDhOE1YOvwZEXzwKPrqrHig@mail.gmail.com>
-References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
- <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
- <529C37F3.1040205@marvell.com>
- <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
- <CAMj5Bkjkndq1-AJSm0k9Mm8xeaWEGktoFb6nZ3kr7RackFdcaw@mail.gmail.com>
- <529D4273.10602@gmail.com>	<529DB5C8.1010500@marvell.com>
- <CAMj5BkgSYeT2MeOwV4fzxg6wkjQhDhOE1YOvwZEXzwKPrqrHig@mail.gmail.com>
-Message-ID: <529E80CE.9050601@marvell.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Dec 2013 17:08:22 -0800
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.14
+In-Reply-To: <20131201211341.GX2879@titan.lakedaemon.net>
+References: <20131201211341.GX2879@titan.lakedaemon.net>
+Message-ID: <20131204010822.GA20332@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 07:05 PM, Zhangfei Gao wrote:
-> Hi, Qiao
->
-> On Tue, Dec 3, 2013 at 6:43 PM, Qiao Zhou <zhouqiao@marvell.com> wrote:
->
->>  From 5396b1bffd574dbe778387979ecc24c51ee0c7a4 Mon Sep 17 00:00:00 2001
->> From: Qiao Zhou <zhouqiao@marvell.com>
->> Date: Tue, 3 Dec 2013 18:17:02 +0800
->> Subject: [PATCH 2/2] dma: mmp-tdma: use gen_pool to get asram
->>
->> use generic pool to get audio sram, instead of sram driver
->>
->>
->> Signed-off-by: nhcao <nhcao@marvell.com>
->> Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
->
-> Could you formally update this patch in another thread.
->
-> Acked-by: Zhangfei Gao <zhangfei.gao@gmail.com>
->
->
-> Thanks
->
-OK. Thanks for reviewing.
+On Sun, Dec 01, 2013 at 04:13:41PM -0500, Jason Cooper wrote:
+> Guys,
+> 
+> Another round of small changes that have been in -next for a week or so.
+> 
+> thx,
+> 
+> Jason.
+> 
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.14
 
--- 
+Pulled, thanks.
 
-Best Regards
-Qiao
+
+-Olof
