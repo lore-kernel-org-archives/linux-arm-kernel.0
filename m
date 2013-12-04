@@ -1,116 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 Dec 2013 16:02:28 +0100
-Subject: [PATCH v4 2/4] mvebu: Dove: Instantiate cpufreq driver.
-In-Reply-To: <20131204143628.GB29200@e106331-lin.cambridge.arm.com>
-References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
- <1386166641-7567-3-git-send-email-andrew@lunn.ch>
- <20131204143628.GB29200@e106331-lin.cambridge.arm.com>
-Message-ID: <20131204150228.GB8062@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Dec 2013 15:07:09 +0000
+Subject: [RFC part3 PATCH 2/2] ARM64 / clocksource: Use
+ arch_timer_acpi_init()
+In-Reply-To: <529F3BCA.1020908@linaro.org>
+References: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088891-2917-3-git-send-email-hanjun.guo@linaro.org>
+ <20131203170815.GB16025@e106331-lin.cambridge.arm.com>
+ <529F3BCA.1020908@linaro.org>
+Message-ID: <20131204150709.GF29200@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 02:36:28PM +0000, Mark Rutland wrote:
-> On Wed, Dec 04, 2013 at 02:17:19PM +0000, Andrew Lunn wrote:
-> > Add a platform driver definition to instantiate the dove cpufreq
-> > driver. Also indicate the ARCH has cpufreq support, so allowing the
-> > cpufreq framework to be enabled.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > ---
-> > Make resource names consistent.
-> > Fix length of ranges
-> > ---
-> >  arch/arm/Kconfig                       |  1 +
-> >  arch/arm/mach-dove/board-dt.c          |  3 +++
-> >  arch/arm/mach-dove/common.c            | 36 ++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-dove/common.h            |  1 +
-> >  arch/arm/mach-dove/include/mach/dove.h |  1 +
-> >  5 files changed, 42 insertions(+)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index c1f1a7eee953..908b02f8d901 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -500,6 +500,7 @@ config ARCH_IXP4XX
-> >  
-> >  config ARCH_DOVE
-> >  	bool "Marvell Dove"
-> > +	select ARCH_HAS_CPUFREQ
-> >  	select ARCH_REQUIRE_GPIOLIB
-> >  	select CPU_PJ4
-> >  	select GENERIC_CLOCKEVENTS
-> > diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-> > index 49fa9abd09da..845e8b328432 100644
-> > --- a/arch/arm/mach-dove/board-dt.c
-> > +++ b/arch/arm/mach-dove/board-dt.c
-> > @@ -27,6 +27,9 @@ static void __init dove_dt_init(void)
-> >  	tauros2_init(0);
-> >  #endif
-> >  	BUG_ON(mvebu_mbus_dt_init());
-> > +
-> > +	dove_cpufreq_init();
-> > +
-> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >  }
-> >  
-> > diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> > index c122bcff9f7c..323fcd4b27b6 100644
-> > --- a/arch/arm/mach-dove/common.c
-> > +++ b/arch/arm/mach-dove/common.c
-> > @@ -344,6 +344,42 @@ void __init dove_sdio1_init(void)
-> >  	platform_device_register(&dove_sdio1);
-> >  }
-> >  
-> > +/*****************************************************************************
-> > + * CPU Frequency
-> > + ****************************************************************************/
-> > +static struct resource dove_cpufreq_resources[] = {
-> > +	[0] = {
-> > +		.start  = DOVE_PMU_PHYS_BASE,
-> > +		.end    = DOVE_PMU_PHYS_BASE + 0x7,
-> > +		.flags  = IORESOURCE_MEM,
-> > +		.name   = "cpufreq: DFS"
-> > +	},
-> > +	[1] = {
-> > +		.start  = DOVE_PMU_PHYS_BASE + 0x8000,
-> > +		.end    = DOVE_PMU_PHYS_BASE + 0x8003,
-> > +		.flags  = IORESOURCE_MEM,
-> > +		.name   = "cpufreq: PMU CR"
-> > +	},
-> > +	[2] = {
-> > +		.start  = DOVE_PMU_PHYS_BASE + 0x0044,
-> > +		.end    = DOVE_PMU_PHYS_BASE + 0x0047,
-> > +		.flags  = IORESOURCE_MEM,
-> > +		.name   = "cpufreq: PMU Clk Div"
-> > +	},
-> > +};
-> > +
-> > +static struct platform_device dove_cpufreq_device = {
-> > +	.name		= "dove-cpufreq",
-> > +	.id		= -1,
-> > +	.num_resources	= ARRAY_SIZE(dove_cpufreq_resources),
-> > +	.resource	= dove_cpufreq_resources,
-> > +};
-> > +
-> > +void __init dove_cpufreq_init(void)
-> > +{
-> > +	platform_device_register(&dove_cpufreq_device);
-> > +}
+On Wed, Dec 04, 2013 at 02:27:22PM +0000, Hanjun Guo wrote:
+> On 2013?12?04? 01:08, Mark Rutland wrote:
+> > On Tue, Dec 03, 2013 at 04:41:31PM +0000, Hanjun Guo wrote:
+> >> Use arch_timer_acpi_init() on ARM64 to initialise arch timer
+> >> in ACPI way when DT is not available.
+> >>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>   arch/arm64/kernel/time.c |    4 ++++
+> >>   1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+> >> index 29c39d5..fb009da 100644
+> >> --- a/arch/arm64/kernel/time.c
+> >> +++ b/arch/arm64/kernel/time.c
+> >> @@ -67,6 +67,10 @@ void __init time_init(void)
+> >>   
+> >>   	clocksource_of_init();
+> >>   
+> >> +	/* if can't be initialised from DT, try ACPI way */
+> >> +	if (!arch_timer_get_rate())
+> >> +		arch_timer_acpi_init();
+> >> +
+> > As mentioned on the previous patch, I think for the timebeing we should
+> > rely on CNTFREQ.
+> >
+> > Additionally, if you need to do this we should have an analagous
+> > mechanism to clocksource_of_init() that performs this initialisation for
+> > ACPI, and here we can call a clocksource_*_init function that does the
+> > right thing.
+> >
+> > There's no need for this file to know anything about ACPI.
 > 
-> Please describe your power management unit in the DT. Your hardcoding
-> physical addresses that can easily be described in the DT, and you don't
-> appear to have an early probing requirement.
+> Oh, Amit already have some patches to introduce clocksource_acpi_init()
+> like clocksource_of_init() did, please refer to the link below.
+> 
+> http://marc.info/?l=linaro-acpi&m=138131929721943&w=2
+> 
+> is this the idea you mentioned in your comments?
 
-Hi Mark
+Something along those lines is far better than hardcoding
+arch_timer_acpi_init here.
 
-We have been here before, with the kirkwood cpufreq driver. My v1 of
-that driver had the cpufreq driver fully described in DT. My binding
-got shot down and i was told that pseudo devices, like cpufreq,
-cpuidle, should not be in DT, and a platform driver was the way to go.
-So that is how kirkwood cpufreq works and dove follows that.
-
-Do you want to reverse that decision now?
-
-Thanks
-	Andrew
+Thanks,
+Mark.
