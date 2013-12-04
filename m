@@ -1,118 +1,59 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 Dec 2013 16:27:26 +0100
-Subject: [PATCH v4 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
-References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
- <1386166641-7567-2-git-send-email-andrew@lunn.ch>
- <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
-Message-ID: <20131204152726.GC8062@lunn.ch>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Wed, 04 Dec 2013 09:32:31 -0600
+Subject: [PATCH v2 0/3] clk: bcm281xx: define Broadcom kona clocks
+Message-ID: <529F4B0F.2020801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +static int dove_cpufreq_target(struct cpufreq_policy *policy,
-> > +			       unsigned int index)
-> > +{
-> > +	unsigned int state = dove_freq_table[index].driver_data;
-> > +	unsigned long reg, cr;
-> > +
-> > +	local_irq_disable();
-> > +
-> > +	/* Mask IRQ and FIQ to CPU */
-> > +	cr = readl(priv.pmu_cr);
-> > +	cr |= MASK_IRQ | MASK_FIQ;
-> > +	writel(cr, priv.pmu_cr);
-> > +
-> > +	/* Set/Clear the CPU_SLOW_EN bit */
-> > +	reg = readl_relaxed(priv.dfs + DFS_CR);
-> > +	reg &= ~L2_RATIO_MASK;
-> > +
-> > +	switch (state) {
-> > +	case STATE_CPU_FREQ:
-> > +		reg |= priv.xpratio;
-> > +		reg &= ~CPU_SLOW_EN;
-> > +		break;
-> > +	case STATE_DDR_FREQ:
-> > +		reg |= (priv.dpratio | CPU_SLOW_EN);
-> > +		break;
-> > +	}
-> > +
-> > +	/* Start the DFS process */
-> > +	reg |= DFS_EN;
-> > +
-> > +	writel(reg, priv.dfs + DFS_CR);
-> > +
-> > +	/* Wait-for-Interrupt, while the hardware changes frequency */
-> > +	cpu_do_idle();
-> > +
-> > +	local_irq_enable();
-> 
-> Just to check -- does the PMU automatically unmask IRQ and FIQ? 
+This series adds support for Kona clock control units (CCUs) and
+clocks, used by Broadcom BCM281xx family SoCs.  Kona CCUs are
+represented by nodes in the device tree, and the names of the clocks
+provided by a CCU are included in its node.  Implementation details
+of those clocks are defined in a C file separate from the code that
+implements the functionality used by most of the common clock
+framework.
 
-The data sheet says so, yes.
+This series depends on:
+    "Update Kona drivers to use clocks"
+    https://lkml.org/lkml/2013/11/14/450
 
-> > +static int dove_cpufreq_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *cpu_dev;
-> > +	struct resource *res;
-> > +	int err, irq;
-> > +
-> > +	memset(&priv, 0, sizeof(priv));
-> > +	priv.dev = &pdev->dev;
-> > +
-> > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> > +					   "cpufreq: DFS");
-> > +	priv.dfs = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (IS_ERR(priv.dfs))
-> > +		return PTR_ERR(priv.dfs);
-> > +
-> > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> > +					   "cpufreq: PMU CR");
-> > +	priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (IS_ERR(priv.pmu_cr))
-> > +		return PTR_ERR(priv.pmu_cr);
-> > +
-> > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> > +					   "cpufreq: PMU Clk Div");
-> > +	priv.pmu_clk_div = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (IS_ERR(priv.pmu_clk_div))
-> > +		return PTR_ERR(priv.pmu_clk_div);
-> 
-> I'd very much prefer that the PMU were described in the DT, and the
-> driver probed based on that.
+This series (along with a version of those prerequisite patches) is
+available in the "review/bcm-kona-clocks-v2" branch of this git
+repository:
+    git://git.linaro.org/people/elder/linux.git
 
-Please see my other response. We can discuss that there.
- 
-> > +
-> > +	cpu_dev = get_cpu_device(0);
-> > +
-> > +	priv.cpu_clk = devm_clk_get(cpu_dev, "cpu_clk");
-> > +	if (IS_ERR(priv.cpu_clk)) {
-> > +		err = PTR_ERR(priv.cpu_clk);
-> > +		goto out;
-> > +	}
-> 
-> I think it would be better to describe the clocks as being fed to the
-> PMU than directly to the CPU -- the PMU selects the appropriate clock
-> and feeds it to the CPU.
+Updates:
+v2: - Address all issues raised by Mark Rutland.
 
-The wording in the data sheet is not very clear:
+					-Alex
 
-    The PMU initiates new clock ratio values for the CPU subsystem
-    clocks generation unit.
+Alex Elder (3):
+  clk: bcm281xx: define kona clock binding
+  clk: bcm281xx: add initial clock framework support
+  ARM: dts: bcm281xx: define real clocks
 
-So to me, the PMU is not the clock consumer, it just controls the
-clock generation unit. There is also a block diagram which shows the
-"CPU Subsystem ClockGen" as being external to the PMU.
- 
-> Also, the clocks could be named better with respect to their logical
-> function. One is the high-frequency default, and the other is a
-> low-frequency option. They're both able to feed the CPU, and the fact
-> that one also feeds the DDR isn't relevant to the CPU.
+ .../devicetree/bindings/clock/bcm-kona-clock.txt   |   93 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |  240 +++--
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/bcm/Kconfig                            |    8 +
+ drivers/clk/bcm/Makefile                           |    3 +
+ drivers/clk/bcm/clk-bcm281xx.c                     |  416 ++++++++
+ drivers/clk/bcm/clk-kona-setup.c                   |  769 +++++++++++++++
+ drivers/clk/bcm/clk-kona.c                         | 1033
+++++++++++++++++++++
+ drivers/clk/bcm/clk-kona.h                         |  414 ++++++++
+ include/dt-bindings/clock/bcm281xx.h               |   65 ++
+ 11 files changed, 2967 insertions(+), 76 deletions(-)
+ create mode 100644
+Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
+ create mode 100644 drivers/clk/bcm/Kconfig
+ create mode 100644 drivers/clk/bcm/Makefile
+ create mode 100644 drivers/clk/bcm/clk-bcm281xx.c
+ create mode 100644 drivers/clk/bcm/clk-kona-setup.c
+ create mode 100644 drivers/clk/bcm/clk-kona.c
+ create mode 100644 drivers/clk/bcm/clk-kona.h
+ create mode 100644 include/dt-bindings/clock/bcm281xx.h
 
-The data sheet uses the terms Turbo Speed and Slow Speed modes. So i
-could call them turbo and slow? However, the current names follow the
-kirkwood cpufreq driver. It also can swap between a fast clock and the
-DDR clock. So i thought keeping the drivers similar would help with
-the maintenance burden. 
-
-    Andrew
+-- 
+1.7.9.5
