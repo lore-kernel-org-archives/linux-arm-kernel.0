@@ -1,82 +1,58 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 04 Dec 2013 16:39:43 +0000
-Subject: [PATCH 1/2] ARM: default PHYS_OFFSET if !MMU
-In-Reply-To: <528366A9.7060504@arm.com>
-References: <1384341351-4110-1-git-send-email-tom.leiming@gmail.com>
- <1384341351-4110-2-git-send-email-tom.leiming@gmail.com>
- <528366A9.7060504@arm.com>
-Message-ID: <529F5ACF.7010105@arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 4 Dec 2013 11:46:13 -0500
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <20131204160730.GQ3158@htj.dyndns.org>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131203232445.GX8277@htj.dyndns.org> <529F5047.50309@ti.com>
+ <20131204160730.GQ3158@htj.dyndns.org>
+Message-ID: <529F5C55.1020707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wednesday 04 December 2013 11:07 AM, Tejun Heo wrote:
+> Hello,
+> 
+> On Wed, Dec 04, 2013 at 10:54:47AM -0500, Santosh Shilimkar wrote:
+>> Well as you know there are architectures still using bootmem even after
+>> this series. Changing MAX_NUMNODES to NUMA_NO_NODE is too invasive and
+>> actually should be done in a separate series. As commented, the best
+>> time to do that would be when all remaining architectures moves to
+>> memblock.
+>>
+>> Just to give you perspective, look at the patch end of the email which
+>> Grygorrii cooked up. It doesn't cover all the users of MAX_NUMNODES
+>> and we are bot even sure whether the change is correct and its
+>> impact on the code which we can't even tests. I would really want to
+>> avoid touching all the architectures and keep the scope of the series
+>> to core code as we aligned initially.
+>>
+>> May be you have better idea to handle this change so do
+>> let us know how to proceed with it. With such a invasive change the
+>> $subject series can easily get into circles again :-(
+> 
+> But we don't have to use MAX_NUMNODES for the new interface, no?  Or
+> do you think that it'd be more confusing because it ends up mixing the
+> two?  
+The issue is memblock code already using MAX_NUMNODES. Please
+look at __next_free_mem_range() and __next_free_mem_range_rev().
+The new API use the above apis and hence use MAX_NUMNODES. If the
+usage of these constant was consistent across bootmem and memblock
+then we wouldn't have had the whole confusion.
 
-On 13/11/13 11:46, Jonathan Austin wrote:
-> Hi Ming,
->
-> On 13/11/13 11:15, Ming Lei wrote:
->> From: Jonathan Austin <jonathan.austin@arm.com>
->>
->> Set CONFIG_PAGE_OFFSET as PHYS_OFFSET when !MMU so that
->> we can keep CONFIG_PAGE_OFFSET same with PAGE_OFFSET.
->>
->
-> I'm not so sure about this commit message - I don't think
-> it makes sense...Should it not be more like:
->
-> ------->8-------
-> Subject: ARM: set PAGE_OFFSET = PHYS_OFFSET if !MMU
->
-> With !MMU we still set PAGE_OFFSET to 0xC0000000, which
-> makes little sense and causes a regression on !MMU after
-> f6537f2f0eba4eba ("scripts/kallsyms: filter symbols not
-> kernel address space")
->
-> This patch sets PAGE_OFFSET to PHYS_OFFSET in the !MMU
-> case, fixing the regression (Tested on Cortex-R7/Vexpress)
-> --------8<---------
->
-> Russell: Will you pick this patch up from the list or does
-> it need to go in through the patch system?
+It kinda really bothers me this patchset is expanding the usage
+> of the wrong constant with only very far-out plan to fix that.  All
+> archs converting to nobootmem will take a *long* time, that is, if
+> that happens at all.  I don't really care about the order of things
+> happening but "this is gonna be fixed when everyone moves off
+> MAX_NUMNODES" really isn't good enough.
+> 
+Fair enough though the patchset continue to use the constant
+which is already used by few memblock APIs ;-)
 
+If we can fix the __next_free_mem_range() and __next_free_mem_range_rev()
+to not use MAX_NUMNODES then we can potentially avoid the wrong
+usage of constant.
 
-What's the status of this patch? Shall I put it in the patch system with 
-the commit message above? Or is it going via someone else?
-
-Jonny
-
->
-> Jonny
->
->> This patch and patch 2/2 fix regression on !MMU by
->> f6537f2f0eba4eba("scripts/kallsyms: filter symbols not
->> in kernel address space")
->>
->> Cc: <stable@vger.kernel.org>
->> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
->> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
->> ---
->>    arch/arm/Kconfig |    1 +
->>    1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 799ef94..db708c4 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1560,6 +1560,7 @@ endchoice
->>
->>    config PAGE_OFFSET
->>    	hex
->> +	default PHYS_OFFSET if !MMU
->>    	default 0x40000000 if VMSPLIT_1G
->>    	default 0x80000000 if VMSPLIT_2G
->>    	default 0xC0000000
->>
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+regards,
+Santosh
