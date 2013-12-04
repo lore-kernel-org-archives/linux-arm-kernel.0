@@ -1,40 +1,32 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  4 Dec 2013 15:17:17 +0100
-Subject: [PATCH v4 0/4] Dove cpufreq driver
-Message-ID: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+Date: Wed,  4 Dec 2013 15:17:20 +0100
+Subject: [PATCH v4 3/4] mvebu: Dove: Enable cpufreq driver in defconfig
+In-Reply-To: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1386166641-7567-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds a cpufreq driver for Dove.
+Add cpufreq to dove_defconfig, so it is built by default.
 
-The patchset is based on Rafael's linux-next branch from yesterday.
-Quite likely Jason Cooper will take patches 2-3 via the mvebu tree,
-but i will let you decide on that.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+ arch/arm/configs/dove_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-For version 3 there was a comment that the device tree binding should
-be reviewed, and Viresh offered to do that. The binding is identical
-to the kirkwood binding, with the addition that Dove requires an
-interrupt handler, so the binding also lists this interrupt, using the
-standard DT properties for interrupts.
-
-Andrew Lunn (4):
-  cpufreq: Add a cpufreq driver for Marvell Dove
-  mvebu: Dove: Instantiate cpufreq driver.
-  mvebu: Dove: Enable cpufreq driver in defconfig
-  mvebu: Dove: Add clocks and DFS interrupt to cpu node in DT.
-
- arch/arm/Kconfig                       |   1 +
- arch/arm/boot/dts/dove.dtsi            |   4 +
- arch/arm/configs/dove_defconfig        |   2 +
- arch/arm/mach-dove/board-dt.c          |   3 +
- arch/arm/mach-dove/common.c            |  36 +++++
- arch/arm/mach-dove/common.h            |   1 +
- arch/arm/mach-dove/include/mach/dove.h |   1 +
- drivers/cpufreq/Kconfig.arm            |   5 +
- drivers/cpufreq/Makefile               |   1 +
- drivers/cpufreq/dove-cpufreq.c         | 259 +++++++++++++++++++++++++++++++++
- 10 files changed, 313 insertions(+)
- create mode 100644 drivers/cpufreq/dove-cpufreq.c
-
+diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
+index 110105476848..3d9235017e89 100644
+--- a/arch/arm/configs/dove_defconfig
++++ b/arch/arm/configs/dove_defconfig
+@@ -22,6 +22,8 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+ CONFIG_VFP=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
 -- 
 1.8.5
