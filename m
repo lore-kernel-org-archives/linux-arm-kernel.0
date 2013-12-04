@@ -1,91 +1,63 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Dec 2013 19:44:21 +0100
-Subject: [PATCH/RFC] ARM: omap3: Split the pinmux core device
-In-Reply-To: <20131204182437.GU26766@atomide.com>
-References: <1386177110-26424-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <2098999.THrpfnVM6o@avalon> <20131204182437.GU26766@atomide.com>
-Message-ID: <3374611.sGfCARW7Hu@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Dec 2013 18:43:45 +0000
+Subject: [RFC PATCH] Documentation: devicetree: add description for
+ generic bus properties
+In-Reply-To: <20131129023554.GA14239@kroah.com>
+References: <20131127172806.GC2291@e103592.cambridge.arm.com>
+ <20131128203322.GB14689@mithrandir>
+ <20131128211009.GA26447@obsidianresearch.com>
+ <20131128222232.GF14689@mithrandir>
+ <20131128233147.GA19387@obsidianresearch.com>
+ <20131129023554.GA14239@kroah.com>
+Message-ID: <20131204184345.GA29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, Nov 28, 2013 at 06:35:54PM -0800, Greg KH wrote:
+> On Thu, Nov 28, 2013 at 04:31:47PM -0700, Jason Gunthorpe wrote:
 
-On Wednesday 04 December 2013 10:24:37 Tony Lindgren wrote:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131204 09:59]:
-> > Hi Tony,
-> > 
-> > On Wednesday 04 December 2013 09:28:53 Tony Lindgren wrote:
-> > > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131204 09:12]:
-> > > > The omap3_pmx_core pinmux device in the device tree handles the system
-> > > > controller module (SCM) PADCONFS fonction. Its control registers are
-> > > > split in two distinct areas, with other SCM registers in-between.
-> > > > Those other registers can't thus be requested by other drivers as the
-> > > > memory region gets reserved by the pinmux driver.
-> > > > 
-> > > > Split the omap3_pmx_core device tree node in two for the two memory
-> > > > regions.
-> > > > 
-> > > > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > > ---
-> > > > 
-> > > >  arch/arm/boot/dts/omap3-beagle-xm.dts | 45 ++++++++++++++++++++------
-> > > >  arch/arm/boot/dts/omap3-beagle.dts    | 28 +++++++++++++++-------
-> > > >  arch/arm/boot/dts/omap3-igep0020.dts  | 26 ++++++++++----------
-> > > >  arch/arm/boot/dts/omap3-zoom3.dts     | 19 ++++++++++-----
-> > > >  arch/arm/boot/dts/omap3.dtsi          | 13 +++++++++-
-> > > >  5 files changed, 95 insertions(+), 36 deletions(-)
-> > > > 
-> > > > While working on the OMAP3 ISP driver I've run into a failure to
-> > > > request a memory region already requested by the pinctrl-single
-> > > > driver. This patch is an attempt to fix the problem. An alternative
-> > > > approach would be to support multiple reg values in the pinctrl-single
-> > > > driver, but that might not be much cleaner. I'm open to suggestions.
-> > > 
-> > > Makes sense to me to split it into two, we can save some memory that way
-> > > too.
-> > > 
-> > > It should not cause problems with the wake-up interrupts either as we're
-> > > already using a single chained wake-up interrupt between core and wkup
-> > > pins.
-> > > 
-> > > Do you have some perl or sed script to look for and convert the core2
-> > > registers? Or do we just not have that many of them defined yet?
-> > 
-> > This patch should cover all the ones we have in mainline. As this is an
-> > RFC I've performed the conversion manually.
-> 
-> OK. I wonder if we should add something like this to make it easier to
-> use the padconf values from the TRM:
-> 
-> #define OMAP_IOPAD_OFFSET(pa, offset)	((pa) & 0xffff) - (offset))
-> 
-> #define OMAP2_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0030) (val))
-> #define OMAP3_CORE1_IOPAD(pa, val)	OMAP2_CORE_IOPAD((pa), (val))
-> #define OMAP3_CORE2_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x05a0) (val))
-> #define OMAP4_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0040) (val))
-> #define OMAP4_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xe040) (val))
-> #define OMAP5_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0840) (val))
-> #define OMAP5_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xc850) (val))
-> ...
-> 
-> Then we would have entries like:
-> 
-> 	pinctrl-single,pins = <
-> 		OMAP3_CORE1_IOPAD(0x158, PIN_INPUT_PULLUP | MUX_MODE0)
-> 		...
-> 	>;
-> 
-> instead of:
-> 
-> 	pinctrl-single,pins = <
-> 		0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
-> 		...
-> 	>;
+> > Greg's point makes sense, but the HW guys are not designing things
+> > this way for kicks - there are real physics based reasons for some of
+> > these choices...
 
-That's a good idea, it would be much more readable. Would you like to submit a 
-patch ? Should I rebase my patch on top of that, or the other way around ?
+> > eg An all-to-all bus cross bar (eg like Intel's ring bus) is engery
+> > expensive compared to a purpose built muxed bus tree. Doing coherency
+> > look ups on DMA traffic costs energy, etc.
 
--- 
-Regards,
+> Really?  How much power exactly does it take / save?  Yes, hardware
+> people think "software is free", but when you can't actually control the
+> hardware in the software properly, well, you end up with something like
+> itanium...
 
-Laurent Pinchart
+If you look at the hardware design decisions this stuff tends to be
+totally sensible; there's a bunch of factors at play (complexity, area
+and isolation tend to be other ones).  There's a lot of the stuff that
+we're complaining about where they can reasonably question why this is
+so complex for us.  That doesn't mean that everything that it's possible
+to do is sensible but there's definitely limitations on the kernel side
+here.
+
+> > > code to deal with those descriptions and the hardware they represent. At
+> > > some point we need to start pushing some of the complexity back into
+> > > hardware so that we can keep a sane code-base.
+
+> > Some of this is a consequence of the push to have the firmware
+> > minimal. As soon as you say the kernel has to configure the address
+> > map you've created a big complexity for it..
+
+> Why the push to make firmware "minimal"?  What is that "saving"?  You
+> just push the complexity from one place to the other, just because ARM
+> doesn't seem to have good firmware engineers, doesn't mean they should
+> punish their kernel developers :)
+
+These firmwares have tended to be ROMed or otherwise require expensive
+validation to change for sometimes sensible reasons, keeping the amount
+of code that's painful to change low will tend to make people happier if
+a change is needed.  Most people like the risk mitigation.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/b70f276d/attachment.sig>
