@@ -1,100 +1,35 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 4 Dec 2013 09:48:12 +0100
+Date: Wed, 4 Dec 2013 09:49:56 +0100
 Subject: [PATCH 01/31] ARM: tegra: add missing clock documentation to DT
  bindings
-In-Reply-To: <529E2364.6000205@wwwdotorg.org>
+In-Reply-To: <529E24A3.3080804@wwwdotorg.org>
 References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
  <1384548866-13141-2-git-send-email-swarren@wwwdotorg.org>
  <20131129114900.GN22771@ulmo.nvidia.com>
- <529B8888.3010801@wwwdotorg.org>
- <20131202085257.GA17834@ulmo.nvidia.com>
- <529E2364.6000205@wwwdotorg.org>
-Message-ID: <20131204084811.GF19943@ulmo.nvidia.com>
+ <529E24A3.3080804@wwwdotorg.org>
+Message-ID: <20131204084956.GG19943@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 11:31:00AM -0700, Stephen Warren wrote:
-> On 12/02/2013 01:52 AM, Thierry Reding wrote:
-> > On Sun, Dec 01, 2013 at 12:05:44PM -0700, Stephen Warren wrote:
-> >> On 11/29/2013 04:49 AM, Thierry Reding wrote:
-> >>> On Fri, Nov 15, 2013 at 01:53:56PM -0700, Stephen Warren wrote:
-> >>>  [...]
-> >>>> @@ -60,6 +81,12 @@ of the following host1x client modules: - 
-> >>>> compatible: "nvidia,tegra<chip>-dc" - reg: Physical base
-> >>>> address and length of the controller's registers. -
-> >>>> interrupts: The interrupt outputs from the controller. +  -
-> >>>> clocks : Must contain an entry for each entry in clock-names.
-> >>>> +    See ../clocks/clock-bindings.txt for details. +  -
-> >>>> clock-names : Must include the following entries: +    -
-> >>>> disp1 or disp2 (depending on the controller instance)
-> >>> 
-> >>> I'm not sure if this makes sense. The name could be the same 
-> >>> independent of which controller uses it. If it isn't then the 
-> >>> driver would need additional code to find out which instance it
-> >>> is and construct a dynamic string.
-> >>> 
-> >>> Any objection to just make this entry "disp", or "dc"?
-> >> 
-> >> This patch simply documents the binding that the various drivers 
-> >> already require and/or whatever is already in the DT files if
-> >> there are any clocks the drivers don't currently use. I did
-> >> consider fixing up all the current usage to actually be sane, but
-> >> that would require even more driver changes (in addition to those
-> >> required for the reset framework patches).
+On Tue, Dec 03, 2013 at 11:36:19AM -0700, Stephen Warren wrote:
+> On 11/29/2013 04:49 AM, Thierry Reding wrote:
+> > On Fri, Nov 15, 2013 at 01:53:56PM -0700, Stephen Warren wrote:
+> ...
+> >> +  - clock-names : Must include the following entries:
 > > 
-> > Okay, I understand. I still think we should change the usage for
-> > this particular use-case subsequently. In retrospect the entry in
-> > clock-names wasn't thought out very well. It seems like the reason
-> > for using disp1 and disp2 respectively was so that it would match
-> > the system-wide clock name, rather than the clock's label within
-> > the display controller's context.
-> > 
-> > Just to clarify what I mean, if we stick to the above, then we'll
-> > need to add code to the driver along the lines of:
-> > 
-> > char clock_name[6];
-> > 
-> > if (regs->start == 0x54200000) index = 1; else index = 2;
-> > 
-> > sprintf(clock_name, "disp%u", index);
-> > 
-> > clk = devm_clk_get(&pdev->dev, clock_name);
-> > 
-> > rather than the much more simple and elegant:
-> > 
-> > clk = devm_clk_get(&pdev->dev, "disp");
-> > 
-> > The whole purpose of the clock consumer ID is to be generic and as
-> > such independent of the specific IP block or instance thereof.
+> > One other thing I noticed here is that you use a space between the 
+> > property name and the :. None of the other properties have that, so
+> > it looks somewhat out of place. The same is true for other
+> > bindings, but there seem to be inconsistencies in some places
+> > anyway, so perhaps we don't care? Well, I do care, don't know about
+> > you. =)
 > 
-> I think if the code needs this clock, I'd be tempted to do the following:
-> 
-> clk = clk_get(dev, "disp1");
-> if (IS_ERR(clk) && PTR_ERR(clk) != -EPROBE_DEFERRED)
->     clk = clk_get(dev, "disp2");
-> if (IS_ERR(clk))
->     return PTR_ERR(clk);
-> 
-> That avoids having to hard-code IP block base addresses and construct
-> clock names at run-time.
+> I've fixed those up locally. I assume you don't want a repost for such
+> a trivial change? I'll double-check the "resets" patch for the same issue.
 
-I think perhaps we're getting our wires crossed. What I've been trying
-to say is that I think the binding should define the first clock to be
-named simply "disp".
-
-The reason why I think "disp" is a better choice than "disp1" and
-"disp2" is that it merely encodes the purpose of the clock for the
-display controller, and doesn't contain knowledge about the particular
-instance of the display controller. That's analogous to I2C or SPI nodes
-where the clock isn't named "i2c1", "i2c2", ... or "spi1", "spi2", ...
-but simply "i2c" or "spi" respectively.
-
-I know that existing DTS files use "disp1" and "disp2", respectively,
-but I think that was a wrong choice back at the time and therefore I
-suggest that we change it while we still can (DTS files are changing in
-3.14 anyway because of the reset and DMA binding updates).
-
-Is that any clearer than what I was saying before?
+No need for a repost. I'll trust you on that one. But I'll urge you to
+consider what I said about the "disp" clock entry for the display
+controllers before merging this.
 
 Thierry
 -------------- next part --------------
@@ -103,4 +38,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/817ef0f6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/bb956fde/attachment.sig>
