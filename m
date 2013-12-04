@@ -1,88 +1,37 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Thu,  5 Dec 2013 00:12:56 +0800
-Subject: [RFC PATCH v3 05/19] smp,
- ARM64: kill SMP single function call interrupt
-In-Reply-To: <1386173591-28514-1-git-send-email-liuj97@gmail.com>
-References: <1386173591-28514-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1386173591-28514-6-git-send-email-liuj97@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 4 Dec 2013 11:17:27 -0500 (EST)
+Subject: [PATCH] serial: pl011: use port lock to guard control register
+ access
+In-Reply-To: <1386149930.3417.22.camel@linaro1.home>
+References: <1386149930.3417.22.camel@linaro1.home>
+Message-ID: <alpine.LFD.2.10.1312041105470.31246@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
-similar to smp_call_function_single()" has unified the way to handle
-single and multiple cross-CPU function calls. Now only one intterupt
-is needed for architecture specific code to support generic SMP function
-call interfaces, so kill the redundant single function call interrupt.
+On Wed, 4 Dec 2013, Jon Medhurst (Tixy) wrote:
 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Shaohua Li <shli@kernel.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Ingo Molnar <mingo@elte.hu>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Jiri Kosina <trivial@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Jiang Liu <liuj97@gmail.com>
----
- arch/arm64/include/asm/hardirq.h |  2 +-
- arch/arm64/kernel/smp.c          | 10 +---------
- 2 files changed, 2 insertions(+), 10 deletions(-)
+> I can't help but think I've missed something fundamental here as it
+> seems wrong to be in the situation at all where were initialising
+> hardware if it is already being used?
+> 
+> Also, even with this fix I still see spurious/corrupt output on the
+> serial port at the point the port is initialised, so there is obviously
+> some other issues in this area.
 
-diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-index 990c051..3be64c8 100644
---- a/arch/arm64/include/asm/hardirq.h
-+++ b/arch/arm64/include/asm/hardirq.h
-@@ -20,7 +20,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
--#define NR_IPI	4
-+#define NR_IPI	3
- 
- typedef struct {
- 	unsigned int __softirq_pending;
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index a0c2ca6..ea3e9ab 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -59,7 +59,6 @@ struct secondary_data secondary_data;
- enum ipi_msg_type {
- 	IPI_RESCHEDULE,
- 	IPI_CALL_FUNC,
--	IPI_CALL_FUNC_SINGLE,
- 	IPI_CPU_STOP,
- };
- 
-@@ -438,14 +437,13 @@ void arch_send_call_function_ipi_mask(const struct cpumask *mask)
- 
- void arch_send_call_function_single_ipi(int cpu)
- {
--	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-+	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
- }
- 
- static const char *ipi_types[NR_IPI] = {
- #define S(x,s)	[x - IPI_RESCHEDULE] = s
- 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
- 	S(IPI_CALL_FUNC, "Function call interrupts"),
--	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
- };
- 
-@@ -520,12 +518,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
--	case IPI_CALL_FUNC_SINGLE:
--		irq_enter();
--		generic_smp_call_function_single_interrupt();
--		irq_exit();
--		break;
--
- 	case IPI_CPU_STOP:
- 		irq_enter();
- 		ipi_cpu_stop(cpu);
--- 
-1.8.1.2
+I don't know if this is still the case nowdays, but that might be due to 
+the fact that the tty layer initializes the port speed to 9600 bauds 
+when opened.  So there might be a period when the port goes from 115200 
+bauds (from the serial console setup) to 9600 bauds, to finally go back 
+to 115200 bauds configured by the getty process.  If the serial console 
+is in the middle of outputting something when user space opens the port 
+then you might see garbled output for a brief period.
+
+[ On some boards the typical speed is 38400 instead of 115200 but the 
+  same concern applies. ]
+
+I think that if a serial console has already initialized a port then the 
+tty's initial parameters could simply default to those from the already 
+active serial console sharing the same port.
+
+
+Nicolas
