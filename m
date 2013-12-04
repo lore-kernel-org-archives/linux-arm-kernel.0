@@ -1,77 +1,69 @@
-From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Wed, 4 Dec 2013 10:44:10 +0800
-Subject: Build warning in drivers/dma/mmp_tdma.c
-In-Reply-To: <CAMj5Bkijhhk9-V74=NKXFO_uocyzU7furKyB4E0E_AFWKKtF_A@mail.gmail.com>
-References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
- <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
- <529C37F3.1040205@marvell.com>
- <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
- <CAMj5Bkjkndq1-AJSm0k9Mm8xeaWEGktoFb6nZ3kr7RackFdcaw@mail.gmail.com>
- <529D4273.10602@gmail.com>	<529DB5C8.1010500@marvell.com>
- <CAA9_cmc0+onxBJ4_xRAPSfH2Hx6ky87EZk9_8kJvbED03_Ca1g@mail.gmail.com>
- <529E8087.2080106@marvell.com>
- <CAPcyv4g93i+kZXBzfEKrav-=C2jYL=KXgp4W+Bw9zr0yhLdP0w@mail.gmail.com>
- <529E8C4C.4010107@marvell.com>
- <CAPcyv4gCge1n99c8NGr1=L+PzBCxyWMJvDDQFp-T+mcCRMSMng@mail.gmail.com>
- <529E936A.9080203@marvell.com>
- <CAMj5Bkijhhk9-V74=NKXFO_uocyzU7furKyB4E0E_AFWKKtF_A@mail.gmail.com>
-Message-ID: <529E96FA.5050404@marvell.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 4 Dec 2013 10:59:46 +0800
+Subject: [PATCH v8 1/2] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <20131203094326.GB21178@ulmo.nvidia.com>
+References: <1384766002-2852-1-git-send-email-voice.shen@atmel.com>
+ <20131202105957.GD18060@ulmo.nvidia.com> <529D4B58.9020700@atmel.com>
+ <20131203094326.GB21178@ulmo.nvidia.com>
+Message-ID: <529E9AA2.8020400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 10:34 AM, Zhangfei Gao wrote:
-> On Wed, Dec 4, 2013 at 10:28 AM, Qiao Zhou <zhouqiao@marvell.com> wrote:
->> On 12/04/2013 10:15 AM, Dan Williams wrote:
->>>
->>> On Tue, Dec 3, 2013 at 5:58 PM, Qiao Zhou <zhouqiao@marvell.com> wrote:
->>>>
->>>> On 12/04/2013 09:32 AM, Dan Williams wrote:
->>>>>
->>>>>
->>>>> Please read the question, you can refer to of_get_named_gen_pool() for
->>>>> why I have a question.  Something in the system needs to do the
->>>>> devm_gen_pool_create() for that device.  If you are removing the mmp2
->>>>> sram driver are you switching to the generic sram driver?  If so
->>>>> shouldn't you ensure it is built? Otherwise this will always fail:
->>>>
->>>>
->>>> For CPU_MMP2 specifically, it switches to use generic sram driver. But
->
-> Do you mean CPU_MMP2 still need arch/arm/mach-mmp/sram.c?
-> Is it can be replaced by drivers/misc/sram.c and be removed at all?
-> So only "SRAM" is depends or selected.
-drivers/misc/sram.c is enough for CPU_MMP2.
->
->>>> generally it may not use sram only, a DDR buffer(or other buffer) may
->>>> also
->>>> be a pool. So here we don't add "select SRAM" directly. In this case we
->>>> need
->>>> to enable CONFIG_SRAM in mmp2_defconfig.
->>>>
->>>> If no sram or other similar drivers are enabled, it will throw an error
->>>> for
->>>> warning.
->>>>
->>>
->>> Ok, So, please turn this into a compile time dependency (depends on
->>> (SRAM || MMP_SRAM)) so that someone does not need to boot a platform
->>> to figure out they forgot to enable a driver.
->>>
->> Actually I'm not sure it's good to add such dependency.
->> sound/core/memalloc.c provides the same way for sram buffer allocation. It
->> doesn't add such dependency.
->
-> SRAM can be selected or depended, while MMP_SRAM should be removed latter.
-OK.
->>
->> Zhangfei, Haojian, how do you think?
->>
->> --
->>
->> Best Regards
->> Qiao
+Hi Thierry,
 
--- 
+On 12/03/2013 05:43 PM, Thierry Reding wrote:
+> On Tue, Dec 03, 2013 at 11:09:12AM +0800, Bo Shen wrote:
+>> On 12/02/2013 06:59 PM, Thierry Reding wrote:
+>>> On Mon, Nov 18, 2013 at 05:13:21PM +0800, Bo Shen wrote:
+> [...]
+>>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> [...]
+>>>> +	/* Calculate the period cycles */
+>>>> +	while (div > PWM_MAX_PRD) {
+>>>> +		div = clk_rate / (1 << pres);
+>>>> +		div = div * period_ns;
+>>>> +		/* 1/Hz = 100000000 ns */
+>>>
+>>> I don't think that comment is needed.
+>>
+>> This is asked to be added.
+>> And, I think keep it and it won't hurt, what do you think?
+>
+> I think it's obvious that you're converting from nanoseconds because of
+> the _ns prefix in period_ns. But if somebody requested this and everyone
+> else thinks it's useful, I'm okay with keeping it.
+>
+>>>> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+>>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, dty);
+>>>> +	} else {
+>>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, dty);
+>>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, prd);
+>>>> +	}
+>>>> +}
+>>>
+>>> Neither version 1 nor version 2 seem to be able to change the period
+>>> while the channel is enabled. Perhaps that should be checked for in
+>>> atmel_pwm_config() and an error (-EBUSY) returned?
+>>
+>> The period is configured in dt in device tree, or platform data in non
+>> device tree. Nowhere will update period. So, not code to update period.
+>> Am I right? If not, please figure out.
+>
+> The .config() operation allows the period to be specified. Just because
+> nobody currently changes it at runtime doesn't mean it can't be done.
+>
+> It is also possible that whoever wrote the device tree or platform data
+> didn't know that the period must be the same for all PWM channels and
+> therefore might use different values. If you check for this, at least
+> they'll notice. If you don't check for it, then they may end up having
+> the period reconfigured behind their backs, which may cause parts of
+> their setup to behave unexpectedly.
 
-Best Regards
-Qiao
+Thanks for this information.
+I will add code for changing period.
+
+> Thierry
+>
+
+Best Regards,
+Bo Shen
