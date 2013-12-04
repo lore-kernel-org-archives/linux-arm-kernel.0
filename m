@@ -1,58 +1,84 @@
-From: angus.clark@st.com (Angus Clark)
-Date: Wed, 4 Dec 2013 08:21:05 +0000
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com> <5298AA23.7080404@st.com>
- <529E976E.4050104@freescale.com> <529ED29C.1030208@st.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
-Message-ID: <529EE5F1.9080806@st.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 4 Dec 2013 09:29:34 +0100
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <529E1C1A.5000709@wwwdotorg.org>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+ <20131129141725.GA22771@ulmo.nvidia.com>
+ <529E1C1A.5000709@wwwdotorg.org>
+Message-ID: <20131204082929.GC19943@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pekon,
+On Tue, Dec 03, 2013 at 10:59:54AM -0700, Stephen Warren wrote:
+> On 11/29/2013 07:17 AM, Thierry Reding wrote:
+> > On Mon, Nov 25, 2013 at 02:53:36PM -0700, Stephen Warren wrote: 
+> > [...]
+> >> memcpy(&tdc->dma_sconfig, sconfig, sizeof(*sconfig)); +	if
+> >> (!tdc->slave_id) +		tdc->slave_id = sconfig->slave_id; 
+> >> tdc->config_init = true;
+> > 
+> > This could use some blank lines to unclutter it a bit.
+> 
+> To be honest, I feel the opposite; random blank lines sprinkled in the
+> middle of related code make the code structure harder to follow.
 
-On 12/04/2013 07:19 AM, Gupta, Pekon wrote:
-> Unless a register is controlling a status of internal state-machine, or something
-> It should be instantaneously writable.
+I don't think they are random at all, but we can probably go on arguing
+about that for a long time. So if you prefer to keep it cluttered, feel
+free to do so. =P
 
-Yes, that is my point.  Some register writes are instant, other are not,
-particularly those that involve non-volatile status or configuration bits.
+> >> @@ -942,7 +947,7 @@ static struct dma_async_tx_descriptor
+> >> *tegra_dma_prep_slave_sg( ahb_seq |=
+> >> TEGRA_APBDMA_AHBSEQ_BUS_WIDTH_32;
+> >> 
+> >> csr |= TEGRA_APBDMA_CSR_ONCE | TEGRA_APBDMA_CSR_FLOW; -	csr |=
+> >> tdc->dma_sconfig.slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT; +
+> >> csr |= tdc->slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
+> > 
+> > Perhaps I'm missing something, but couldn't we reuse the .slave_id
+> > field of struct dma_slave_config? It seems like it might be
+> > overwritten by the DMA engine core or users when they call
+> > dmaengine_slave_config().
+> 
+> The slave ID seems channel-specific to me, and hence should be managed
+> at the channel level. struct dma_slave_config is the client-specified
+> runtime properties. As you mention, I also worry about client drivers
+> trampling over the dma_slave_config data, so storing it where they
+> can't doesn't seem like a good idea.
 
-> Also polling should not be part of this particular *(write_reg), if a register
-> needs to be polled then it should be part of *(write) or *(read) .. Like 
-> WIP: Write-in-progress bit of flash
-> generic_flash_write(...) {
-> 	while ((read_reg(STATUS_REG) & WIP) || ~timeout) {
-> 		timeout--;
-> 	};
+I think you meant "does seem like a good idea"? The reason why this had
+me puzzled is probably that I haven't seen this pattern in subsystems
+I'm more familiar with. Like you said, it seems like a channel-specific
+property, so clients should have no business modifying it.
 
-I am in two minds about where the WTR loop should live.  On the one hand, moving
-it to the "generic_flash_write()" call offers H/W controllers the opportunity to
-optimise the polling, if they support such a feature (I know of some that will
-in the future).
+But I assume there were valid reasons for doing things this way, so I
+withdraw my objections.
 
-However, requiring the H/W driver to perform the polling, including knowledge of
-the STATUS CMD, and the WIP bit-field, just seems like moving too much
-"intelligence" away from the spi-nor layer.  What concerns me is when we get on
-to reading/clearing error flags (as now mandated on some Serial Flash devices,
-e.g. n25p512 and n25q00a), this will also need to be part of the generic write.
+> >> static int tegra_dma_probe(struct platform_device *pdev) { struct
+> >> resource	*res; @@ -1383,10 +1402,22 @@ static int
+> >> tegra_dma_probe(struct platform_device *pdev) goto err_irq; }
+> >> 
+> >> +	tdma->xlate_info.device = &tdma->dma_dev; +
+> >> tdma->xlate_info.post_alloc = tegra_dma_of_xlate_post_alloc; +
+> >> ret = of_dma_controller_register(pdev->dev.of_node, +
+> >> of_dma_slave_xlate, &tdma->xlate_info); +	if (ret < 0) { +
+> >> dev_err(&pdev->dev, +			"Tegra20 APB DMA OF registration failed
+> >> %d\n", ret); +		goto err_unregister_dma_dev; +	}
+> > 
+> > Would it be useful to move this into the core and have it register
+> > the OF parts transparently to the driver? That's of course nothing
+> > that should be done in this patch.
+> 
+> That'd probably be possible, yes, given a few extra fields in struct
+> dma_device, e.g. for the of_xlate function pointer. As you say, I
+> won't address it in this patch though.
 
-> With this it just came to my mind, that you also need a 'timeout' field
-> in 'struct spinor-cfg'. 
+Okay, that's fine.
 
-Yes, that is a good point.
-
-I would propose that the spi-nor layer retains responsibility for determining
-whether or not 'WTR' is required for a particular operation, and a suitable
-timeout.  At some point, during initialisation, the H/W driver will need to
-inform the spi-nor layer about its capabilities (e.g. support for DUAL or QUAD
-mode, any warm-reset requirements, etc), and native support of WIP polling could
-be part of this set.  The spi-nor layer could then decide whether to add the WTR
-flag and timeout to the spinor-cfg transfer, or to take responsibility itself,
-and execute its own polling loop.  This gives greatest flexibility, which seems
-to be an important factor, while retaining the knowledge in the spi-nor layer.
-
-Cheers,
-
-Angus
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/a2e263e8/attachment.sig>
