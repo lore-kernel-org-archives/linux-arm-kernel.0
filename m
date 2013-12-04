@@ -1,18 +1,25 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Dec 2013 12:37:00 -0700
-Subject: [PATCH 1/3] ARM: tegra: fix DEBUG_LL combined with LPAE
-In-Reply-To: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
-References: <1385419003-11348-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <529F845C.3020402@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Dec 2013 19:38:04 +0000
+Subject: [PATCH] arm64: cmpxchg: update macros to prevent warnings
+In-Reply-To: <20131204192938.GF14145@mudshark.cambridge.arm.com>
+References: <1386098127-29070-1-git-send-email-broonie@kernel.org>
+ <20131204192938.GF14145@mudshark.cambridge.arm.com>
+Message-ID: <20131204193804.GE29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2013 03:36 PM, Stephen Warren wrote:
-> The DEBUG_LL UART address is mapped as an MMU section, hence, the
-> virtual address must be section-aligned. Sections are 1MB without LPAE
-> and 2MB with LPAE. Tegra's virtual address was only aligned to 1MB, and
-> hence the mapping was set up incorrectly with LPAE enabled, thus causing
-> a hang early during boot. Fix this by picking a different virtual address
-> that is aligned to 2MB.
+On Wed, Dec 04, 2013 at 07:29:38PM +0000, Will Deacon wrote:
 
-I've applied this series to Tegra's for-3.14/soc branch.
+> This removes barrier semantics from cmpxchg and makes cmpxchg_local refer to
+> something which isn't defined anywhere, so the kernel doesn't even build.
+
+Yes, see the followup I sent to this last night (and the fixed version)
+- I forgot to do the git add before I did the commit --amend to fix
+them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/bfd6b67a/attachment-0001.sig>
