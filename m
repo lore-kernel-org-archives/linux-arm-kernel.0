@@ -1,125 +1,24 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  4 Dec 2013 15:17:19 +0100
-Subject: [PATCH v4 2/4] mvebu: Dove: Instantiate cpufreq driver.
-In-Reply-To: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
-References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1386166641-7567-3-git-send-email-andrew@lunn.ch>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 04 Dec 2013 22:17:39 +0800
+Subject: [RFC part1 PATCH 4/7] ARM64 / ACPI: Introduce the skeleton of
+ _PDC related for ARM64
+In-Reply-To: <20131203165318.2c04a8bf@alan.etchedpixels.co.uk>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088611-2801-5-git-send-email-hanjun.guo@linaro.org>
+ <20131203165318.2c04a8bf@alan.etchedpixels.co.uk>
+Message-ID: <529F3983.5000200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a platform driver definition to instantiate the dove cpufreq
-driver. Also indicate the ARCH has cpufreq support, so allowing the
-cpufreq framework to be enabled.
+On 2013?12?04? 00:53, One Thousand Gnomes wrote:
+> O> +enum idle_boot_override { IDLE_NO_OVERRIDE = 0, IDLE_HALT, IDLE_NOMWAIT,
+>> +			IDLE_POLL, IDLE_FORCE_MWAIT };
+> This should probably move out of the arch directory to be a single enum
+> including both platforms values. That will make it rather easier to keep
+> sane and avoid ifdefs around which definitions are for which processor.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Make resource names consistent.
-Fix length of ranges
----
- arch/arm/Kconfig                       |  1 +
- arch/arm/mach-dove/board-dt.c          |  3 +++
- arch/arm/mach-dove/common.c            | 36 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/common.h            |  1 +
- arch/arm/mach-dove/include/mach/dove.h |  1 +
- 5 files changed, 42 insertions(+)
+Thank you very much for the suggestion, it makes sense to me, will figure
+out how to implement it.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7eee953..908b02f8d901 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -500,6 +500,7 @@ config ARCH_IXP4XX
- 
- config ARCH_DOVE
- 	bool "Marvell Dove"
-+	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CPU_PJ4
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-index 49fa9abd09da..845e8b328432 100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-dove/board-dt.c
-@@ -27,6 +27,9 @@ static void __init dove_dt_init(void)
- 	tauros2_init(0);
- #endif
- 	BUG_ON(mvebu_mbus_dt_init());
-+
-+	dove_cpufreq_init();
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index c122bcff9f7c..323fcd4b27b6 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -344,6 +344,42 @@ void __init dove_sdio1_init(void)
- 	platform_device_register(&dove_sdio1);
- }
- 
-+/*****************************************************************************
-+ * CPU Frequency
-+ ****************************************************************************/
-+static struct resource dove_cpufreq_resources[] = {
-+	[0] = {
-+		.start  = DOVE_PMU_PHYS_BASE,
-+		.end    = DOVE_PMU_PHYS_BASE + 0x7,
-+		.flags  = IORESOURCE_MEM,
-+		.name   = "cpufreq: DFS"
-+	},
-+	[1] = {
-+		.start  = DOVE_PMU_PHYS_BASE + 0x8000,
-+		.end    = DOVE_PMU_PHYS_BASE + 0x8003,
-+		.flags  = IORESOURCE_MEM,
-+		.name   = "cpufreq: PMU CR"
-+	},
-+	[2] = {
-+		.start  = DOVE_PMU_PHYS_BASE + 0x0044,
-+		.end    = DOVE_PMU_PHYS_BASE + 0x0047,
-+		.flags  = IORESOURCE_MEM,
-+		.name   = "cpufreq: PMU Clk Div"
-+	},
-+};
-+
-+static struct platform_device dove_cpufreq_device = {
-+	.name		= "dove-cpufreq",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(dove_cpufreq_resources),
-+	.resource	= dove_cpufreq_resources,
-+};
-+
-+void __init dove_cpufreq_init(void)
-+{
-+	platform_device_register(&dove_cpufreq_device);
-+}
-+
- void __init dove_setup_cpu_wins(void)
- {
- 	/*
-diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
-index 1d725224d146..5c9a77bdd442 100644
---- a/arch/arm/mach-dove/common.h
-+++ b/arch/arm/mach-dove/common.h
-@@ -44,6 +44,7 @@ void dove_spi1_init(void);
- void dove_i2c_init(void);
- void dove_sdio0_init(void);
- void dove_sdio1_init(void);
-+void dove_cpufreq_init(void);
- void dove_restart(enum reboot_mode, const char *);
- 
- #endif
-diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
-index 0c4b35f4ee5b..48db186ae6bc 100644
---- a/arch/arm/mach-dove/include/mach/dove.h
-+++ b/arch/arm/mach-dove/include/mach/dove.h
-@@ -144,6 +144,7 @@
- #define  DOVE_SD0_GPIO_SEL		(1 << 0)
- 
- /* Power Management */
-+#define DOVE_PMU_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xd0000)
- #define DOVE_PMU_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0000)
- #define DOVE_PMU_SIG_CTRL	(DOVE_PMU_VIRT_BASE + 0x802c)
- 
--- 
-1.8.5
+Thanks
+Hanjun
