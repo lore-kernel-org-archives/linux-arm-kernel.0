@@ -1,27 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Dec 2013 08:10:21 +0000
-Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
-References: <cover.1386108712.git.stefan@agner.ch>
- <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
-Message-ID: <20131204081021.GB7469@lee--X1>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 4 Dec 2013 09:20:24 +0100
+Subject: [PATCH V2 1/2] ARM: tegra: Add header file for pinctrl constants
+In-Reply-To: <1386076567-14283-1-git-send-email-ldewangan@nvidia.com>
+References: <1386076567-14283-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20131204082023.GA19943@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +int tps6586x_get_version(struct device *dev)
-> +{
-> +	struct tps6586x *tps6586x = dev_get_drvdata(dev);
-> +
-> +	return tps6586x->version;
-> +}
-> +EXPORT_SYMBOL_GPL(tps6586x_get_version);
+On Tue, Dec 03, 2013 at 06:46:06PM +0530, Laxman Dewangan wrote:
+> This new header file defines pincontrol constants for Tegra to
+> use from Tegra's DTS file for pincontrol properties option.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+> Changes from V1:
+> - Get rid of lots of macro and converge it to TEGRA_PIN_ENABLE/DISABLE.
+> - Change macro name for PULL UP/DOWN/NONE.
+> 
+>  include/dt-bindings/pinctrl/pinctrl-tegra.h |   40 +++++++++++++++++++++++++++
+>  1 files changed, 40 insertions(+), 0 deletions(-)
+>  create mode 100644 include/dt-bindings/pinctrl/pinctrl-tegra.h
 
-I thought Mark suggested that this routine was converted to a 'static
-inline' and moved into the header? Did you not think this was a good
-idea?
+I like this a lot. One minor nit below.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> diff --git a/include/dt-bindings/pinctrl/pinctrl-tegra.h b/include/dt-bindings/pinctrl/pinctrl-tegra.h
+> new file mode 100644
+> index 0000000..e5f02f8
+> --- /dev/null
+> +++ b/include/dt-bindings/pinctrl/pinctrl-tegra.h
+> @@ -0,0 +1,40 @@
+> +/*
+> + * This header provides constants for TEGRA pinctrl bindings.
+
+"TEGRA" -> "Tegra"
+
+Other than that:
+
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/83136ac2/attachment-0001.sig>
