@@ -1,59 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Dec 2013 02:34:09 +0100
-Subject: [PATCH V3] dma: tegra: register as an OF DMA controller
-In-Reply-To: <1386102787-21839-1-git-send-email-swarren@wwwdotorg.org>
-References: <1386102787-21839-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201312040234.09708.arnd@arndb.de>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Wed, 4 Dec 2013 01:35:15 +0000
+Subject: [PATCH v3 00/10] Add power management support for chipidea
+In-Reply-To: <20131203181546.GA27706@kroah.com>
+References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+ <20131203181546.GA27706@kroah.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498041427BA@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 December 2013, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+ 
+> > Hi Greg,
+> >
+> > This serial adds power management (system & runtime) for chipidea core.
+> > With this, the chipidea controller can be at low power mode when it is
+> not in
+> > use, and the chipidea controller can be the system wakeup source.
+> > It needs to depend on my patch[1], since [1]-"Add power management
+> support for MXS PHY"
+> > adds some common PHY APIs, and this serial uses it.
+> >
+> > It has been verified at Freescale i.mx6Q/DL SabreSD, i.mx28 evk
+> platform
+> > (no runtime pm support), I will verify it at other FSL platforms during
+> > the patch review.
 > 
-> Call of_dma_controller_register() so that DMA clients can look up the
-> Tegra DMA controller using standard APIs. This requires the of_xlate()
-> function to save off the DMA slave ID, and for tegra_dma_slave_config()
-> not to over-write this information; once DMA client drivers are converted
-> to dma_request_slave_channel() and DT-based lookups, they won't set this
-> field of struct dma_slave_config anymore.
+> This series doesn't apply to my tree anymore.
 > 
-> Cc: treding at nvidia.com
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: dmaengine at vger.kernel.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> And there have been a ton of chipidea patches floating around, I've now
+> dropped them all from my "todo" queue and will wait for you to collect
+> them and forward them on as I'm totally lost with all of the different
+> versions and objections and the like.
+> 
 
-Looks great to me.
+Greg, I will do that.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-but see my comments about the dma_get_any_slave_channel. If we want to merge
-that function with the existing dma_get_slave_channel function (and change
-the three existing users of that one), one line here will of course have
-to change.
-
-Also, one (long-running, not just for this driver) comment I have is
-about this snippet:
-
-> @@ -340,6 +342,8 @@ static int tegra_dma_slave_config(struct dma_chan *dc,
->         }
->  
->         memcpy(&tdc->dma_sconfig, sconfig, sizeof(*sconfig));
-> +       if (!tdc->slave_id)
-> +               tdc->slave_id = sconfig->slave_id;
->         tdc->config_init = true;
->         return 0;
->  }
-
-We really need to be better at having a common set of rules regarding what
-it actually means to set the slave_id through dma_slave_config(). IMHO
-we should just treat it as a bug for any dmaengine driver that is configured
-through DT, or we should get rid of this entirely. Looking through the
-code now, I only see two dmaengine drivers that actually do this: one is 
-the tegra driver (which you are about to change), the other one is shdma,
-and that one is already a bit special. Any ideas?
-
-	Arnd
+Peter
