@@ -1,50 +1,125 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 4 Dec 2013 13:41:25 -0800
-Subject: [PATCH v3 22/28] mtd: nand: pxa3xx: Introduce multiple page
- I/O support
-In-Reply-To: <20131118185059.GB9468@ld-irv-0074.broadcom.com>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-23-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105190432.GQ20061@ld-irv-0074.broadcom.com>
- <20131106011351.GH11759@localhost>
- <CAN8TOE_ZmcsvShKY273KQCaopJEXgtXVR1XY9pP5EKkUK+bUbA@mail.gmail.com>
- <20131106113210.GB2616@localhost>
- <20131118181009.GZ9468@ld-irv-0074.broadcom.com>
- <20131118183325.GC21975@localhost>
- <20131118185059.GB9468@ld-irv-0074.broadcom.com>
-Message-ID: <20131204214125.GC27149@ld-irv-0074.broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Dec 2013 13:49:49 -0800
+Subject: [PATCH/RFC] ARM: omap3: Split the pinmux core device
+In-Reply-To: <20131204185341.GV26766@atomide.com>
+References: <1386177110-26424-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <2098999.THrpfnVM6o@avalon> <20131204182437.GU26766@atomide.com>
+ <3374611.sGfCARW7Hu@avalon> <20131204185341.GV26766@atomide.com>
+Message-ID: <20131204214949.GW26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+* Tony Lindgren <tony@atomide.com> [131204 10:54]:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131204 10:45]:
+> > On Wednesday 04 December 2013 10:24:37 Tony Lindgren wrote:
+> > > 
+> > > OK. I wonder if we should add something like this to make it easier to
+> > > use the padconf values from the TRM:
+> > > 
+> > > #define OMAP_IOPAD_OFFSET(pa, offset)	((pa) & 0xffff) - (offset))
+> > > 
+> > > #define OMAP2_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0030) (val))
+> > > #define OMAP3_CORE1_IOPAD(pa, val)	OMAP2_CORE_IOPAD((pa), (val))
+> > > #define OMAP3_CORE2_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x05a0) (val))
+> > > #define OMAP4_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0040) (val))
+> > > #define OMAP4_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xe040) (val))
+> > > #define OMAP5_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0840) (val))
+> > > #define OMAP5_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xc850) (val))
+> > > ...
+> > > 
+> > > Then we would have entries like:
+> > > 
+> > > 	pinctrl-single,pins = <
+> > > 		OMAP3_CORE1_IOPAD(0x158, PIN_INPUT_PULLUP | MUX_MODE0)
+> > > 		...
+> > > 	>;
+> > > 
+> > > instead of:
+> > > 
+> > > 	pinctrl-single,pins = <
+> > > 		0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
+> > > 		...
+> > > 	>;
+> > 
+> > That's a good idea, it would be much more readable. Would you like to submit a 
+> > patch ? Should I rebase my patch on top of that, or the other way around ?
+> 
+> OK I'll do a patch for that later on today, then you can use that. Might
+> cut down the churn a little that way.
 
-I'd like to follow up on this question, since you didn't answer it, and
-it's still relevant, since we haven't yet merged your GPMI DT binding
-(it's queued for the next merge window):
+Here's the patch for it, needs some checks and testing as I got several
+things wrong in the example above :)
 
-On Mon, Nov 18, 2013 at 10:50:59AM -0800, Brian Norris wrote:
-> Do you have a good reason why you needed GPMI NAND to choose the ECC
-> configuration (a la "miminum ECC") instead of fully specifying your ECC
-> selection in device tree? I recall most of your arguments were about
-> using an ECC strength that leaves room for user data in OOB (e.g., with
-> JFFS2). But you could have done the same thing by creating a proper DT
-> property to describe the desidered ECC strength, with no real
-> disadvantage, right?
+Regards,
 
-I'll rephrase it: why can't/don't you define a GPMI binding for the
-actual ECC level, like:
+Tony
 
-  fsl,nand-ecc-strength and fsl,nand-ecc-sector
+8< ----------------------------
 
-?
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 4 Dec 2013 13:03:58 -0800
+Subject: [PATCH] ARM: dts: Add omap specific pinctrl defines to use padconf addresses
 
-Then, you could still default to the old geometry if these properties
-aren't present, and you don't have to rely on Linux auto-detecting ECC
-properties for non-ONFI chips.
+As we have one to three pinctrl-single instances for each SoC it is
+a bit confusing to configure the padconf register offset from the
+base of the padconf register base.
 
-(Side note: I see you submitted patches for Hynix MLC ECC
-auto-detection; I'm not sure this approach is really scalable, but it
-may be OK for some chips. Anyway, I'll address these patches separately
-once I get to them.)
+Let's add macros that allow using the physical address of the
+padconf register directly, or in most cases, just the last 16-bits
+of the address as they are shown in the documentation.
 
-Brian
+Note that most documentation shows two padconf registers for each
+32-bit address, so adding 2 to the documentation address is needed for
+the second padconf register as we treat them as 16-bit registers
+for omap3+.
+
+For example, omap36xx documentation shows sdmmc2_clk at 0x48002158,
+so we can just use the last 16-bits of that value:
+
+	pinctrl-single,pins = <
+		OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)
+		...
+	>;
+
+And we don't need to separately calculate the offset from the 0x2030
+base:
+
+	pinctrl-single,pins = <
+		0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
+		...
+	>;
+
+Naturally both ways of defining the registers can be used, and I'm
+not saying we should replace all the existing defines. But it may
+be handy to use these macros for new entries and when doing other
+related .dts file clean-up.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/include/dt-bindings/pinctrl/omap.h
++++ b/include/dt-bindings/pinctrl/omap.h
+@@ -49,5 +49,24 @@
+ #define PIN_OFF_INPUT_PULLDOWN	(OFF_EN | OFF_PULL_EN)
+ #define PIN_OFF_WAKEUPENABLE	WAKEUP_EN
+ 
++/*
++ * Macros to allow using the absolute physical address instead of the
++ * padconf registers instead of the offset from padconf base.
++ */
++#define OMAP_IOPAD_OFFSET(pa, offset)	((pa) & 0xffff) - (offset))
++
++#define OMAP2420_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0030) (val))
++#define OMAP2430_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2030) (val))
++#define OMAP3_CORE1_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2030) (val))
++#define OMAP3_CORE2_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x25a0) (val))
++#define OMAP3_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2a00) (val))
++#define AM33XX_IOPAD(pa, val)		(OMAP_IOPAD_OFFSET((pa), 0x0800) (val))
++#define OMAP4_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0040) (val))
++#define OMAP4_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xe040) (val))
++#define AM4372_IOPAD(pa, val)		(OMAP_IOPAD_OFFSET((pa), 0x0800) (val))
++#define OMAP5_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2840) (val))
++#define OMAP5_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xc840) (val))
++#define DRA7XX_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x3400) (val))
++
+ #endif
+ 
