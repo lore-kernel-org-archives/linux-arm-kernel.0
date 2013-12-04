@@ -1,31 +1,37 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  4 Dec 2013 11:39:07 -0800
-Subject: [PATCH 0/5] Allow MSM DT platforms to be built multi-platform
-Message-ID: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed,  4 Dec 2013 11:39:08 -0800
+Subject: [PATCH 1/5] mmc: msm_sdcc: Limit driver to platforms that use it
+In-Reply-To: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
+References: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1386185952-27259-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches allow the MSM code to be built as part of the multi-platform
-kernel. To be fully functional you need the first patch from Ivan's series[1]
-so that the usb-phy driver doesn't use mach specific APIs. I'm hoping that
-we can send these all through arm-soc so driver maintainers please ack
-the first two changes.
+The msm_sdcc driver uses mach specific dma APIs. This is not
+compatible with the multi-platform ARM effort. Let's only compile
+this driver on MSM devices that are prepared to support it,
+allowing the DT based MSM devices to enter the multi-platform ARM
+build.
 
-Stephen Boyd (5):
-  mmc: msm_sdcc: Limit driver to platforms that use it
-  tty: serial: Limit msm_serial_hs driver to platforms that use it
-  ARM: msm: Only build clock.c on proc_comm based platforms
-  ARM: msm: Only build timer.c if required
-  ARM: msm: Move MSM's DT based hardware to multi-platform support
+Cc: Chris Ball <cjb@laptop.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/mmc/host/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/Kconfig           |  4 +--
- arch/arm/mach-msm/Kconfig  | 66 ++++++++++++++++++++++++++++------------------
- arch/arm/mach-msm/Makefile |  4 +--
- drivers/mmc/host/Kconfig   |  2 +-
- drivers/tty/serial/Kconfig |  2 +-
- 5 files changed, 46 insertions(+), 32 deletions(-)
-
-[1] https://lkml.org/lkml/2013/11/12/722 
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 7fc5099..4e8ca9d 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -324,7 +324,7 @@ config MMC_ATMELMCI
+ 
+ config MMC_MSM
+ 	tristate "Qualcomm SDCC Controller Support"
+-	depends on MMC && ARCH_MSM
++	depends on MMC && (ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50)
+ 	help
+ 	  This provides support for the SD/MMC cell found in the
+ 	  MSM and QSD SOCs from Qualcomm. The controller also has
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
