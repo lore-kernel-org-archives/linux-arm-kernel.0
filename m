@@ -1,32 +1,36 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 4 Dec 2013 12:48:54 +0000
-Subject: [PATCH] ARM: mcpm: Make all mcpm functions notrace
-In-Reply-To: <529EEAEF.1040206@samsung.com>
-References: <1385976547.3387.2.camel@linaro1.home>
- <20131202172531.GB2312@e103592.cambridge.arm.com>
- <529EEAEF.1040206@samsung.com>
-Message-ID: <20131204124847.GA2323@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Dec 2013 12:49:29 +0000
+Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
+In-Reply-To: <20131204112039.GC907@lee--X1>
+References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
+ <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
+ <20131204112039.GC907@lee--X1>
+Message-ID: <20131204124929.GO29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 12:42:23PM +0400, Tarek Dakhran wrote:
-> Hi, Dave!
-> 
-> On 12/02/2013 09:25 PM, Dave Martin wrote:
-> >Vyacheslav, Tarek, can you add the corresponding change in your Exynos
-> >Dual Cluster support code please?
-> >
-> >There's no need for it to be a separate patch, you can simply add
-> >the CFLAGS_REMOVE_ definitions alongside the other Makefile additions
-> >for edcs.  If you want to be more fine-grained, you could mark
-> >individual functions notrace instead -- but that may just add effort
-> >and not be very useful.
-> >
+On Wed, Dec 04, 2013 at 11:20:39AM +0000, Lee Jones wrote:
 
-[...]
+> > +		regulators {
+> > +			compatible = "maxim,max14577-regulator";
+> > +
+> > +			safeout_reg: safeout at 1 {
 
-> 
-> Will be done in next version.
+> The name of the node (not the label:safeout_reg) usually depicts the
+> type of device, so 'regulator at 0' and 'regulator at 1'. However, I'm
+> unsure how this works when these nodes are encapsulated by an
+> overarching 'regulators' parent node.
 
-Thanks
----Dave
+> Perhaps Mark can answer this?
+
+The name there is meaningless, the DT convention is as you describe and
+applies to any node but equally well it's just a convention and I
+struggle to see the value it adds.  Having something that humans find
+helpful is just as well.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/dbfbee7f/attachment-0001.sig>
