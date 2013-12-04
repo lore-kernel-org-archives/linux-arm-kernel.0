@@ -1,46 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 4 Dec 2013 09:20:24 +0100
-Subject: [PATCH V2 1/2] ARM: tegra: Add header file for pinctrl constants
-In-Reply-To: <1386076567-14283-1-git-send-email-ldewangan@nvidia.com>
-References: <1386076567-14283-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20131204082023.GA19943@ulmo.nvidia.com>
+From: angus.clark@st.com (Angus Clark)
+Date: Wed, 4 Dec 2013 08:21:05 +0000
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com> <5298AA23.7080404@st.com>
+ <529E976E.4050104@freescale.com> <529ED29C.1030208@st.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
+Message-ID: <529EE5F1.9080806@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 06:46:06PM +0530, Laxman Dewangan wrote:
-> This new header file defines pincontrol constants for Tegra to
-> use from Tegra's DTS file for pincontrol properties option.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> ---
-> Changes from V1:
-> - Get rid of lots of macro and converge it to TEGRA_PIN_ENABLE/DISABLE.
-> - Change macro name for PULL UP/DOWN/NONE.
-> 
->  include/dt-bindings/pinctrl/pinctrl-tegra.h |   40 +++++++++++++++++++++++++++
->  1 files changed, 40 insertions(+), 0 deletions(-)
->  create mode 100644 include/dt-bindings/pinctrl/pinctrl-tegra.h
+Hi Pekon,
 
-I like this a lot. One minor nit below.
+On 12/04/2013 07:19 AM, Gupta, Pekon wrote:
+> Unless a register is controlling a status of internal state-machine, or something
+> It should be instantaneously writable.
 
-> diff --git a/include/dt-bindings/pinctrl/pinctrl-tegra.h b/include/dt-bindings/pinctrl/pinctrl-tegra.h
-> new file mode 100644
-> index 0000000..e5f02f8
-> --- /dev/null
-> +++ b/include/dt-bindings/pinctrl/pinctrl-tegra.h
-> @@ -0,0 +1,40 @@
-> +/*
-> + * This header provides constants for TEGRA pinctrl bindings.
+Yes, that is my point.  Some register writes are instant, other are not,
+particularly those that involve non-volatile status or configuration bits.
 
-"TEGRA" -> "Tegra"
+> Also polling should not be part of this particular *(write_reg), if a register
+> needs to be polled then it should be part of *(write) or *(read) .. Like 
+> WIP: Write-in-progress bit of flash
+> generic_flash_write(...) {
+> 	while ((read_reg(STATUS_REG) & WIP) || ~timeout) {
+> 		timeout--;
+> 	};
 
-Other than that:
+I am in two minds about where the WTR loop should live.  On the one hand, moving
+it to the "generic_flash_write()" call offers H/W controllers the opportunity to
+optimise the polling, if they support such a feature (I know of some that will
+in the future).
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/83136ac2/attachment-0001.sig>
+However, requiring the H/W driver to perform the polling, including knowledge of
+the STATUS CMD, and the WIP bit-field, just seems like moving too much
+"intelligence" away from the spi-nor layer.  What concerns me is when we get on
+to reading/clearing error flags (as now mandated on some Serial Flash devices,
+e.g. n25p512 and n25q00a), this will also need to be part of the generic write.
+
+> With this it just came to my mind, that you also need a 'timeout' field
+> in 'struct spinor-cfg'. 
+
+Yes, that is a good point.
+
+I would propose that the spi-nor layer retains responsibility for determining
+whether or not 'WTR' is required for a particular operation, and a suitable
+timeout.  At some point, during initialisation, the H/W driver will need to
+inform the spi-nor layer about its capabilities (e.g. support for DUAL or QUAD
+mode, any warm-reset requirements, etc), and native support of WIP polling could
+be part of this set.  The spi-nor layer could then decide whether to add the WTR
+flag and timeout to the spinor-cfg transfer, or to take responsibility itself,
+and execute its own polling loop.  This gives greatest flexibility, which seems
+to be an important factor, while retaining the knowledge in the spi-nor layer.
+
+Cheers,
+
+Angus
