@@ -1,45 +1,28 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 4 Dec 2013 11:19:48 +0530
-Subject: [PATCH 1/2] ARM: dts: tegra: Header file for pinctrl constants
-In-Reply-To: <529E3A34.4030206@wwwdotorg.org>
+Date: Wed, 4 Dec 2013 11:21:33 +0530
+Subject: [PATCH 2/2] ARM: tegra: convert device tree file of Dalmore to
+ use pinctrl defines
+In-Reply-To: <529E3A6E.1050003@wwwdotorg.org>
 References: <1385992502-12771-1-git-send-email-ldewangan@nvidia.com>
- <20131202142522.GA17566@ulmo.nvidia.com> <529D745D.2070503@nvidia.com>
- <529E3A34.4030206@wwwdotorg.org>
-Message-ID: <529EC27C.6030003@nvidia.com>
+ <1385992502-12771-2-git-send-email-ldewangan@nvidia.com>
+ <529E3A6E.1050003@wwwdotorg.org>
+Message-ID: <529EC2E5.5050909@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 December 2013 01:38 AM, Stephen Warren wrote:
-> On 12/02/2013 11:04 PM, Laxman Dewangan wrote:
->> On Monday 02 December 2013 07:55 PM, Thierry Reding wrote:
->>> * PGP Signed by an unknown key
->>>
->>> On Mon, Dec 02, 2013 at 07:25:01PM +0530, Laxman Dewangan wrote:
->>>
->>> +
->>> +/* Schmitt enable/disable */
->>> +#define TEGRA_PIN_DRIVE_SCHMITT_DISABLE            0
->>> +#define TEGRA_PIN_DRIVE_SCHMITT_ENABLE            1
->>> These are all boolean, so I wonder if perhaps we should be simply
->>> defining a single pair and reuse that in different contexts:
->>>
->>>      #define TEGRA_PIN_DISABLE    0
->>>      #define TEGRA_PIN_ENABLE    1
->>>
->>> The property names should provide enough context for them to be used
->>> unambiguously.
->>>
->>>
->> I can make generic ENABLE/DISABLE macro as you suggested but datasheet
->> says as 0=NORMAL, 1 = TRISTATE. and that's why I kept name very near to
->> the datasheet.
-> That documentation is relative to a specific field, whereas the
-> namespace for #defines is global. Hence, we may have to name #defines
-> using stricter rules than the TRM's field values, in order to make them
-> unambiguous.
+On Wednesday 04 December 2013 01:39 AM, Stephen Warren wrote:
+> On 12/02/2013 06:55 AM, Laxman Dewangan wrote:
+>> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Patch description?
+>
+> BTW, did you compile all the Tegra DT files before and after this
+> change, and make sure that there's zero difference between them (i.e.
+> they're identical byte-for-byte when compiled)? I don't feel like
+> manually double-checking this entire patch...
 
-I send the V2 patches on which I have taken care of this.
-Request you to please review.
+I just made changes for the Dalmore only. Not touched Tegra30 and 
+Tegra20_ platform dts.
 
-Thanks,
-Laxman
+For Dalmore, I compare the binary before and after this change as well 
+dts generated back from dtb using dtc.
+It is same.
