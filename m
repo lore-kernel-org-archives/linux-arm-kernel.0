@@ -1,43 +1,65 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Wed, 4 Dec 2013 14:26:13 +0100
-Subject: [PATCH v2] pinctrl: baytrail: lock IRQs when starting them
-In-Reply-To: <1386082822-20094-1-git-send-email-linus.walleij@linaro.org>
-References: <1386082822-20094-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20131204132613.GD2982@book.gsilab.sittig.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 4 Dec 2013 13:29:55 +0000
+Subject: [PATCH RFC 1/2] Documentation: arm: add cache DT bindings
+In-Reply-To: <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20131204132955.GB2323@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 16:00 +0100, Linus Walleij wrote:
+On Mon, Dec 02, 2013 at 04:20:04PM +0000, Lorenzo Pieralisi wrote:
+> On ARM systems the cache topology cannot be probed at runtime, in
+> particular, it is impossible to probe which CPUs share a given cache
+> level. Power management software requires this knowledge to implement
+> optimized power down sequences, hence this patch adds a document that
+> defines the DT cache bindings for ARM systems. The bindings are compliant
+> with ePAPR (PowerPC bindings), and rely on the cache bindings already
+> standardized in the ePAPR v1.1 document; ARM required updates are underlined
+> in the binding document.
 > 
-> --- a/drivers/pinctrl/pinctrl-baytrail.c
-> +++ b/drivers/pinctrl/pinctrl-baytrail.c
-> @@ -372,11 +372,33 @@ static void byt_irq_mask(struct irq_data *d)
->  {
->  }
->  
-> +static unsigned int byt_irq_startup(struct irq_data *d)
-> +{
-> +	struct byt_gpio *vg = irq_data_get_irq_handler_data(d);
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/cache.txt | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/cache.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
+> new file mode 100644
+> index 0000000..009cddb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/cache.txt
+> @@ -0,0 +1,25 @@
+> +==========================================
+> +ARM processors cache binding description
+> +==========================================
 > +
-> +	if (gpio_lock_as_irq(&vg->chip, irqd_to_hwirq(d)))
-> +		dev_err(vg->chip.dev,
-> +			"unable to lock HW IRQ %lu for IRQ\n",
-> +			irqd_to_hwirq(d));
-> +	byt_irq_unmask(d);
-> +	return 0;
-> +}
+> +Device tree bindings for ARM processor caches adhere to the cache bindings
+> +described in [3], in section 3.8 for multi-level and shared caches.
 
-Just a thought:  If failure to lock is non-fatal, should the
-message be a warning then?
+For architected levels of cache, most of the cache properties can be
+probed through the system register interface.
 
-I do agree that failure to lock the GPIO should be non-fatal, as
-there was debate and still might be concerns about how strict
-locking should be.
+Should we be explicit about prohibiting properties in the DT describing
+cache characteristics that can be probed?
 
+> +
+> +On ARM, internal caches cannot be described in the cpu node but require
+> +specific nodes marked with compatible string set to "cache" (see [3],
+> +section 3.8).
+> +
+> +Furthermore the cache bindings in [3] require the following property update:
+> +
+> +- [Table 3.9] cache-level: This property of cache nodes must match the cache
+> +			   level encoded in the processors CLIDR (v7) and
+> +			   CLIDR_EL1 (v8) registers, as described in [1][2].
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+I still don't understand why a given cache definitely has the same level
+number assigned to it with respect to each CPU.  Is that an architectural
+requirement?
+
+All those LoC, LoU, LoUIS properties etc. are probeable per-CPU not
+globally...  I don't see why they couldn't be different.
+
+Cheers
+---Dave
