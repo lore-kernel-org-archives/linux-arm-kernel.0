@@ -1,32 +1,74 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Wed,  4 Dec 2013 10:37:04 +0800
-Subject: [PATCH 2/2] ASoC: sam9x5_wm8731: change to work in DSP A mode
+Date: Wed,  4 Dec 2013 10:37:03 +0800
+Subject: [PATCH 1/2] ASoC: atmel_ssc_dai: add dai trigger ops
 In-Reply-To: <1386124624-22414-1-git-send-email-voice.shen@atmel.com>
 References: <1386124624-22414-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1386124624-22414-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <1386124624-22414-2-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change sam9x5 with wm8731 work in DSP A mode, this will fix the
-left/right channel swap issue.
+According to the SSC specifiation, it should be enabled after DMA is
+enabled. So, add trigger operation to make sure the right sequence.
 
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
- sound/soc/atmel/sam9x5_wm8731.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/atmel/atmel_ssc_dai.c |   30 +++++++++++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/atmel/sam9x5_wm8731.c b/sound/soc/atmel/sam9x5_wm8731.c
-index 992ae38..06c1811 100644
---- a/sound/soc/atmel/sam9x5_wm8731.c
-+++ b/sound/soc/atmel/sam9x5_wm8731.c
-@@ -107,7 +107,7 @@ static int sam9x5_wm8731_driver_probe(struct platform_device *pdev)
- 	dai->stream_name = "WM8731 PCM";
- 	dai->codec_dai_name = "wm8731-hifi";
- 	dai->init = sam9x5_wm8731_init;
--	dai->dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF
-+	dai->dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_NB_NF
- 		| SND_SOC_DAIFMT_CBM_CFM;
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index 8697ced..1ead3c9 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -648,7 +648,7 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
  
- 	ret = snd_soc_of_parse_card_name(card, "atmel,model");
+ 	dma_params = ssc_p->dma_params[dir];
+ 
+-	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_enable);
++	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
+ 	ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
+ 
+ 	pr_debug("%s enabled SSC_SR=0x%08x\n",
+@@ -657,6 +657,33 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+ 	return 0;
+ }
+ 
++static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
++			     int cmd, struct snd_soc_dai *dai)
++{
++	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
++	struct atmel_pcm_dma_params *dma_params;
++	int dir;
++
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		dir = 0;
++	else
++		dir = 1;
++
++	dma_params = ssc_p->dma_params[dir];
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_enable);
++		break;
++	default:
++		ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
++		break;
++	}
++
++	return 0;
++}
+ 
+ #ifdef CONFIG_PM
+ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+@@ -731,6 +758,7 @@ static const struct snd_soc_dai_ops atmel_ssc_dai_ops = {
+ 	.startup	= atmel_ssc_startup,
+ 	.shutdown	= atmel_ssc_shutdown,
+ 	.prepare	= atmel_ssc_prepare,
++	.trigger	= atmel_ssc_trigger,
+ 	.hw_params	= atmel_ssc_hw_params,
+ 	.set_fmt	= atmel_ssc_set_dai_fmt,
+ 	.set_clkdiv	= atmel_ssc_set_dai_clkdiv,
 -- 
 1.7.9.5
