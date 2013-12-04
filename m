@@ -1,63 +1,32 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 04 Dec 2013 09:12:51 +0800
-Subject: [PATCH RESEND v5 1/2] PWM: PXA: add device tree support to PWM
- driver
-In-Reply-To: <529E26C9.30707@newsguy.com>
-References: <1379791174-2369-1-git-send-email-mikedunn@newsguy.com>
- <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
- <20131203101714.GG21178@ulmo.nvidia.com> <529E26C9.30707@newsguy.com>
-Message-ID: <529E8193.1040606@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Dec 2013 17:12:19 -0800
+Subject: [GIT PULL] ARM: mvebu: driver changes for v3.14
+In-Reply-To: <20131201212350.GY2879@titan.lakedaemon.net>
+References: <20131201212350.GY2879@titan.lakedaemon.net>
+Message-ID: <20131204011219.GB20332@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Dec 01, 2013 at 04:23:50PM -0500, Jason Cooper wrote:
+> Guys,
+> 
+> This one is a little short.  If you want to hold off pulling until there
+> are a few more driver commits, that's fine.  However, I don't currently
+> see anything on the radar, and these are ready.
 
-On 12/04/2013 02:45 AM, Mike Dunn wrote:
-> On 12/03/2013 02:17 AM, Thierry Reding wrote:
->> On Sat, Sep 21, 2013 at 12:19:33PM -0700, Mike Dunn wrote:
->>> This patch adds device tree support to the PXA's PWM driver.  Nothing
->>> needs to be extracted from the device tree node by the PWM device.
->>> Client devices need only specify the period; the per-chip index is
->>> implicitly zero because one device node must be present for each PWM
->>> output in use.  This approach is more convenient due to the wide
->>> variability in the number of PWM channels present across the various PXA
->>> variants, and is made possible by the fact that the register sets for
->>> each PWM channel are segregated from each other.  An of_xlate() method
->>> is added to parse this single-cell node.  The existing ID table is
->>> reused for the match table data.
->>>
->>> Tested on a Palm Treo 680 (both platform data and DT cases).
->>>
->>> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->>> ---
->>>   Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 30 +++++++++++++
->>>   drivers/pwm/pwm-pxa.c                             | 52 ++++++++++++++++++++++-
->>>   2 files changed, 81 insertions(+), 1 deletion(-)
->>>   create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> Hi Mike,
->>
->> It looks like this fell through the cracks. Is this patch still the
->> latest one you have? Should it still be applied?
->>
->> Thierry
->>
-> Hi Thierry,
->
-> Funny I should hear from you about this today.... I just turned my attention
-> back to this today and noticed that it never made it into your for-next branch.
->   Yes, it is the latest.  If the patch still applies cleanly, please feel free.
-> Otherwise, I'd be glad to rework it against something more recent.
->
-> Also, we never got any ACKs for patch 2/2, which just adds the nodes to
-> arch/arm/boot/dts/pxa27x.dtsi
-> Any advice on whom to nudge?
->
-> Thanks much!
-> Mike
->
+Yeah, short branches are ok. Just send an incremental pull request later if
+needed (with new tag describing the new contents).
 
-It's fine to me.
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-3.14
 
-Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Regards
-Haojian
+Pulled, thanks.
+
+
+-Olof
