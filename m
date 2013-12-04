@@ -1,60 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 4 Dec 2013 09:40:04 -0600
-Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
- maps and map logical cpu id to APIC id
-In-Reply-To: <529F3A57.7010306@linaro.org>
-References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
- <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
- <20131203165755.37b07796@alan.etchedpixels.co.uk>
- <529F3A57.7010306@linaro.org>
-Message-ID: <CAL_JsqLGkxS13NAGJfqExFii-RcF3xRsvucjQbFoHeP5zoRkxA@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed,  4 Dec 2013 16:44:43 +0100
+Subject: [PATCH RFCv2 1/6] net: mv643xx_eth: properly start/stop phy device
+In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1386171888-28190-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 4, 2013 at 8:21 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> On 2013?12?04? 00:57, One Thousand Gnomes wrote:
->>>
->>> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
->>> index 45ff625..8527ecc 100644
->>> --- a/drivers/acpi/plat/arm-core.c
->>> +++ b/drivers/acpi/plat/arm-core.c
->>> @@ -58,6 +58,13 @@ EXPORT_SYMBOL(acpi_pci_disabled);
->>>    */
->>>   static u64 acpi_lapic_addr __initdata;
->>>   +/* available_cpus here means enabled cpu in MADT */
->>> +int available_cpus;
->>> +
->>> +/* Map logic cpu id to physical GIC id. */
->>> +int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
->>> +int boot_cpu_apic_id = -1;
->>> +
->>
->> static ?
->>
->> Really shouldn't be leaking names like "available_cpus" out of ACPI into
->> the global namespace
->
->
-> Ok, will update in next version.
->
->
->
->>> +#ifdef CONFIG_SMP
->>> +       if (available_cpus == 0) {
->>> +               pr_info(PREFIX "Found 0 CPUs; assuming 1\n");
->>> +               /* FIXME: should be the real GIC id read from hardware */
->>> +               arm_cpu_to_apicid[available_cpus] = 0;
->>> +               available_cpus = 1;     /* We've got at least one of
->>> these */
->>> +       }
->>> +#endif
->>
->> Isn't this true uniprocessor (by definition in fact)
->
->
-> This code is intend to handle some buggy firmware I think.
+When using phydev, it should be phy_start/phy_stop'ed properly. This
+driver doesn't do that, so add the corresponding calls to port_start/
+stop respectively.
 
-Really? We have production firmware already that we need to
-work-around? That's impressive given there is no production h/w.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+RFCv1->RFCv2:
+- initial, derived from netdev specific patches
+  (Suggested by Mugunthan and Florian)
 
-Rob
+Cc: David Miller <davem@davemloft.net>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Mugunthan V N <mugunthanvnm@ti.com>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 61088a6..3aa706f 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2098,6 +2098,7 @@ static void port_start(struct mv643xx_eth_private *mp)
+ 		mv643xx_eth_get_settings(mp->dev, &cmd);
+ 		phy_reset(mp);
+ 		mv643xx_eth_set_settings(mp->dev, &cmd);
++		phy_start(mp->phy);
+ 	}
+ 
+ 	/*
+@@ -2293,7 +2294,8 @@ static int mv643xx_eth_stop(struct net_device *dev)
+ 	del_timer_sync(&mp->rx_oom);
+ 
+ 	netif_carrier_off(dev);
+-
++	if (mp->phy)
++		phy_stop(mp->phy);
+ 	free_irq(dev->irq, dev);
+ 
+ 	port_reset(mp);
+-- 
+1.7.2.5
