@@ -1,19 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Dec 2013 16:44:18 -0800
-Subject: [GIT PULL] ux500 defconfig changed for v3.13-rcs
-In-Reply-To: <CACRpkdZ_EN7OPqfqva2BZr4RQGHKjb+JM0TtK+WwxXOESOLgqA@mail.gmail.com>
-References: <CACRpkdZ_EN7OPqfqva2BZr4RQGHKjb+JM0TtK+WwxXOESOLgqA@mail.gmail.com>
-Message-ID: <20131204004418.GB18383@quad.lixom.net>
+Date: Tue, 3 Dec 2013 16:48:33 -0800
+Subject: [GIT PULL] ux500 devicetree changes for v3.14, take one
+In-Reply-To: <CACRpkdZKZdQ08MnDL94f3DwdE1CYbdcHSYwNKwgqr3AhYqE_mg@mail.gmail.com>
+References: <CACRpkdZKZdQ08MnDL94f3DwdE1CYbdcHSYwNKwgqr3AhYqE_mg@mail.gmail.com>
+Message-ID: <20131204004833.GC18383@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 09:27:26PM +0100, Linus Walleij wrote:
+On Tue, Nov 26, 2013 at 09:32:43PM +0100, Linus Walleij wrote:
 > Hi ARM SoC folks,
 > 
-> here are two defconfig patches that I think should go into the
-> release candidates for v3.13.
+> as you know we discontinued ATAG booting for the ux500 platforms
+> in the v3.13 merge window.
 > 
-> Please pull them in!
+> Now we can start to move things over to device tree exclusively and
+> get rid of board files, especially AUXDATA.
+> 
+> In some ACKed cases we even get rid of the non-DT boot path in
+> individual drivers.
+> 
+> Please have a look at this nice diffstat and pull in for v3.14 if you are
+> satisfied with the end result.
 > 
 > Yours,
 > Linus Walleij
@@ -26,10 +33,9 @@ On Tue, Nov 26, 2013 at 09:27:26PM +0100, Linus Walleij wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-defconfig-v3.13-rcs
-> 
+> tags/ux500-devicetree-v3.14-1
 
-This was pulled into fixes last week, btw.
+Pulled, thanks!
 
 
 -Olof
