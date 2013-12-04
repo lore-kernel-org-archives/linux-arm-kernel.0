@@ -1,56 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Dec 2013 02:22:03 +0100
-Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
-In-Reply-To: <529E1A49.6050808@wwwdotorg.org>
-References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
- <201311292208.26215.arnd@arndb.de> <529E1A49.6050808@wwwdotorg.org>
-Message-ID: <201312040222.03604.arnd@arndb.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 3 Dec 2013 17:32:00 -0800
+Subject: Build warning in drivers/dma/mmp_tdma.c
+In-Reply-To: <529E8087.2080106@marvell.com>
+References: <CAPcyv4i1i+3ia5qcYA-LR4TFq1MOCXTHLhW2u5maq6Us9kyATg@mail.gmail.com>
+ <CAMj5Bkjk6v_2Op1oph8GGw2mf8w40c-L3JhBRPNsRewiFxQHpw@mail.gmail.com>
+ <529C37F3.1040205@marvell.com>
+ <CAPcyv4jfk+JBv7WY_njuYtx8hERZHhoCAij=FOfqxAhLJAHnFA@mail.gmail.com>
+ <CAMj5Bkjkndq1-AJSm0k9Mm8xeaWEGktoFb6nZ3kr7RackFdcaw@mail.gmail.com>
+ <529D4273.10602@gmail.com> <529DB5C8.1010500@marvell.com>
+ <CAA9_cmc0+onxBJ4_xRAPSfH2Hx6ky87EZk9_8kJvbED03_Ca1g@mail.gmail.com>
+ <529E8087.2080106@marvell.com>
+Message-ID: <CAPcyv4g93i+kZXBzfEKrav-=C2jYL=KXgp4W+Bw9zr0yhLdP0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 December 2013, Stephen Warren wrote:
-> On 11/29/2013 02:08 PM, Arnd Bergmann wrote:
+On Tue, Dec 3, 2013 at 5:08 PM, Qiao Zhou <zhouqiao@marvell.com> wrote:
+> On 12/04/2013 05:02 AM, Dan Williams wrote:
+>>
+>> On Tue, Dec 3, 2013 at 2:43 AM, Qiao Zhou <zhouqiao@marvell.com> wrote:
+>>>
+>>> On 12/03/2013 10:31 AM, Haojian Zhuang wrote:
+>>>>
+>>>>
+>>>> I prefer to add CONFIG_MMP_SRAM instead, since sram isn't available in
+>>>> pxa168.
+>>>
+>>>
+>>> Hi Dan,
+>>>
+>>> I have two patches. Could you help check whether it can fix the issue?
+>>>
+>>> BTW, actually the 2nd alone is enough. The 1st patch is just in case that
+>>> you still want to use the old sram driver, and you need to enable
+>>> MMP_SRAM.
+>>>
+>>> All, please help review the patches.
+>>>
+>>>  From 94601015d525db6d2baf47f4d517f38ae2e5e802 Mon Sep 17 00:00:00 2001
+>>> From: Qiao Zhou <zhouqiao@marvell.com>
+>>> Date: Tue, 3 Dec 2013 11:06:29 +0800
+>>> Subject: [PATCH 1/2] arm: mmp: build sram driver alone
+>>>
+>>> sram driver can be used by many chips besides CPU_MMP2, and so build
+>>> it alone.
+>>>
+>>> Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
+>>> ---
+>>>   arch/arm/mach-mmp/Makefile |    3 ++-
+>>>
+>>>   1 files changed, 2 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+>>> index 9b702a1..98f0f63 100644
+>>> --- a/arch/arm/mach-mmp/Makefile
+>>> +++ b/arch/arm/mach-mmp/Makefile
+>>> @@ -7,7 +7,8 @@ obj-y                           += common.o devices.o
+>>> time.o
+>>>   # SoC support
+>>>   obj-$(CONFIG_CPU_PXA168)       += pxa168.o
+>>>   obj-$(CONFIG_CPU_PXA910)       += pxa910.o
+>>>
+>>> -obj-$(CONFIG_CPU_MMP2)         += mmp2.o sram.o
+>>> +obj-$(CONFIG_CPU_MMP2)         += mmp2.o
+>>> +obj-$(CONFIG_MMP_SRAM)         += sram.o
+>>
+>>
+>> Missing the Kconfig change to add "config MMP_SRAM"?
+>
+> The sram driver is unnecessary if we use generic pool. Zhangfei mentioned to
+> remove this sram driver. It's just for your test.
+>>
+>>
+>>>
+>>>   ifeq ($(CONFIG_COMMON_CLK), )
+>>>   obj-y                          += clock.o
+>>> --
+>>> 1.7.0.4
+>>>
+>>>
+>>>  From 5396b1bffd574dbe778387979ecc24c51ee0c7a4 Mon Sep 17 00:00:00 2001
+>>> From: Qiao Zhou <zhouqiao@marvell.com>
+>>> Date: Tue, 3 Dec 2013 18:17:02 +0800
+>>> Subject: [PATCH 2/2] dma: mmp-tdma: use gen_pool to get asram
+>>>
+>>> use generic pool to get audio sram, instead of sram driver
+>>>
+>>> Signed-off-by: nhcao <nhcao@marvell.com>
+>>> Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
+>>> ---
+>>>   drivers/dma/Kconfig    |    1 +
+>>>   drivers/dma/mmp_tdma.c |   22 +++++++++++++++++-----
+>>>   2 files changed, 18 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>>> index dd2874e..eeffe3c 100644
+>>> --- a/drivers/dma/Kconfig
+>>> +++ b/drivers/dma/Kconfig
+>>> @@ -288,6 +288,7 @@ config MMP_TDMA
+>>>
+>>>          bool "MMP Two-Channel DMA support"
+>>>          depends on ARCH_MMP
+>>>          select DMA_ENGINE
+>>> +       select GENERIC_ALLOCATOR
+>>
+>>
+>> You still need a depends on MMP_SRAM right?  Otherwise this just turns
+>> the compile error into a much more subtle runtime failure.
+>>
+> No dependence on MMP_SRAM(sram). You can refer to lib/genalloc.c
 
-> > Can you try coming up with a different method to achieve the same
-> > where you use a different helper from the driver specific xlate
-> > function that does not require a callback?
-> > 
-> > I think dma_get_slave_channel is great if you have one channel per
-> > request line and you can directly look up the channel from the
-> > DT data, but it is not good if you have pick a channel and work
-> > around the race.
-> 
-> Hmm. Can you take a look at "[PATCH V4] dma: add
-> dma_get_any_slave_channel(), for use in of_xlate()" at the link below.
-> It still implements this via xlate, but I don't see any benefit in
-> making drivers use a different API to request slave channels based on
-> how the DMA controller works.
-> 
-> http://lkml.org/lkml/2013/11/26/408
-> 
+Please read the question, you can refer to of_get_named_gen_pool() for
+why I have a question.  Something in the system needs to do the
+devm_gen_pool_create() for that device.  If you are removing the mmp2
+sram driver are you switching to the generic sram driver?  If so
+shouldn't you ensure it is built? Otherwise this will always fail:
 
-Yes, I think that is good. I can think of a few variations of that
-that I would prefer slightly over your code, but it's essentially
-what I had in mind and I'm fine with that version getting merged
-as well. Here are my ideas for further improvements, I'll leave
-it up to you and the dmaengine maintainers to decide what to do
-about them:
++       pool = of_get_named_gen_pool(np, "asram", 0);
++       if (!pool) {
++               dev_err(&pdev->dev, "asram pool not available\n");
++               return -ENOMEM;
++       }
 
-* Rather than calling private_candidate(), open-code the part you
-  need and remove the pointless dma_cap_mask comparison:
-
-	err = -EBUSY;
-        list_for_each_entry(chan, &dev->channels, device_node) {
-                if (!chan->client_count) {
-			err = dma_chan_get(chan);
-			break;
-		}
-	}
-
-* Merge the new function with dma_get_slave_channel(). They really
-  do different things, but I think it still makes sense as an API
-  to require to always pass the dma_device pointer, and drivers
-  that want to get an arbitrary channel can just pass NULL as the
-  channel pointer.
-
-	Arnd
+Ultimately I'm not in a position to care as long as this driver builds cleanly.
