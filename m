@@ -1,42 +1,53 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 04 Dec 2013 09:32:37 +0100
-Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <Pine.LNX.4.44L0.1312031030390.1226-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1312031030390.1226-100000@iolanthe.rowland.org>
-Message-ID: <529EE8A5.7010806@overkiz.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 04 Dec 2013 09:33:26 +0100
+Subject: [PATCH v3 10/10] usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A6498041427E5@039-SN2MPN1-021.039d.mgd.msft.net>
+References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+ <1383616525-10769-11-git-send-email-peter.chen@freescale.com>
+ <529E5215.5000107@pengutronix.de>
+ <F281D0F91ED19E4D8E63A7504E8A6498041427E5@039-SN2MPN1-021.039d.mgd.msft.net>
+Message-ID: <529EE8D6.2030600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alan,
+On 12/04/2013 02:40 AM, Peter Chen wrote:
+> There are some re-work for this serial, I will do it.
+> But I don't get your mean why it needs to squash into another patch?
 
-On 03/12/2013 16:32, Alan Stern wrote:
-> On Tue, 3 Dec 2013, Nicolas Ferre wrote:
->
->> On 03/12/2013 15:07, Boris BREZILLON :
->>> Replace clk_get calls by devm_clk_get calls.
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>> Tested-by: Robert Nelson <robertcnelson@gmail.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> Thanks Boris for these fixes.
->>
->> Alan, Greg, can you take the whole series as fixes for 3.13?
-> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
-Sorry, but I forgot to add your Signed-off-by in the 2nd version of this
-series.
->
-> The patches look fine to me.  But only the 1/3 patch fixes a bug; the
-> others merely change the resource management.
+Let's look at the code again:
 
-Do you want me to split this series ?
-  1) the 1st patch that should be merged in 3.13
-  2) patches 2 to 4 that might be applied later
+> -	if (imx_platform_flag->flags & CI_HDRC_IMX_SUPPORT_RUNTIME_PM)
+> +	if (imx_platform_flag->flags & CI_HDRC_IMX_SUPPORT_RUNTIME_PM) {
+>  		pdata.flags |= CI_HDRC_SUPPORTS_RUNTIME_PM;
+>  		data->supports_runtime_pm = true;
+>  	}
 
-Best Regards,
+Without that patch, the driver will not compile.
 
-Boris
+before:
 
->
-> Alan Stern
->
+if ()
+	/* code */
+}
+
+after:
+
+if () {
+	/* code */
+}
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/38456ffe/attachment.sig>
