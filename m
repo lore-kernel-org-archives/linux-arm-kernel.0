@@ -1,70 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 4 Dec 2013 15:00:09 +0000
-Subject: [PATCH RFC 1/2] Documentation: arm: add cache DT bindings
-In-Reply-To: <20131204132955.GB2323@e103592.cambridge.arm.com>
-References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20131204132955.GB2323@e103592.cambridge.arm.com>
-Message-ID: <20131204150009.GA23691@e102568-lin.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 4 Dec 2013 10:01:17 -0500
+Subject: [PATCH v4 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131204145635.GA8062@lunn.ch>
+References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+ <1386166641-7567-2-git-send-email-andrew@lunn.ch>
+ <20131204143317.GL29282@titan.lakedaemon.net>
+ <20131204145635.GA8062@lunn.ch>
+Message-ID: <20131204150117.GN29282@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 01:29:55PM +0000, Dave Martin wrote:
-> On Mon, Dec 02, 2013 at 04:20:04PM +0000, Lorenzo Pieralisi wrote:
-> > On ARM systems the cache topology cannot be probed at runtime, in
-> > particular, it is impossible to probe which CPUs share a given cache
-> > level. Power management software requires this knowledge to implement
-> > optimized power down sequences, hence this patch adds a document that
-> > defines the DT cache bindings for ARM systems. The bindings are compliant
-> > with ePAPR (PowerPC bindings), and rely on the cache bindings already
-> > standardized in the ePAPR v1.1 document; ARM required updates are underlined
-> > in the binding document.
+On Wed, Dec 04, 2013 at 03:56:35PM +0100, Andrew Lunn wrote:
+> On Wed, Dec 04, 2013 at 09:33:17AM -0500, Jason Cooper wrote:
+> > On Wed, Dec 04, 2013 at 03:17:18PM +0100, Andrew Lunn wrote:
+> > > The Marvell Dove SoC can run the CPU at two frequencies. The high
+> > > frequencey is from a PLL, while the lower is the same as the DDR
+> > > clock. Add a cpufreq driver to swap between these frequences.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > > ---
+> > > Sort header files
+> > > Remove unneeded header files
+> > > Notify only on change
+> > > Use get_cpu_device(0), devm_clk_get()
+> > > Use platform_get_resource_byname()
+> > > Error check clk_prepare_enable()
+> > > Comment the interrupt handler
+> > > 
+> > > rebase onto 3.13-rc2 linux-next
 > > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/cache.txt | 25 +++++++++++++++++++++++++
-> >  1 file changed, 25 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/cache.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
-> > new file mode 100644
-> > index 0000000..009cddb
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/cache.txt
-> > @@ -0,0 +1,25 @@
-> > +==========================================
-> > +ARM processors cache binding description
-> > +==========================================
-> > +
-> > +Device tree bindings for ARM processor caches adhere to the cache bindings
-> > +described in [3], in section 3.8 for multi-level and shared caches.
+> > Is there something you need that prevents you from basing on v3.13-rc1?
 > 
-> For architected levels of cache, most of the cache properties can be
-> probed through the system register interface.
-> 
-> Should we be explicit about prohibiting properties in the DT describing
-> cache characteristics that can be probed?
+> It seems to be Rafael's policy that patches for pm need to be based on
+> his linux-next branch. Viresh has also been making some major changes
+> to all the cpufreq drivers to move code into the core and out of
+> drivers. These changes are in rafaels linux-next, and i've made
+> similar changes to the driver so it fits in.
 
-I think so, yes.
+Ah, ok.
 
-> > +On ARM, internal caches cannot be described in the cpu node but require
-> > +specific nodes marked with compatible string set to "cache" (see [3],
-> > +section 3.8).
-> > +
-> > +Furthermore the cache bindings in [3] require the following property update:
-> > +
-> > +- [Table 3.9] cache-level: This property of cache nodes must match the cache
-> > +			   level encoded in the processors CLIDR (v7) and
-> > +			   CLIDR_EL1 (v8) registers, as described in [1][2].
-> 
-> I still don't understand why a given cache definitely has the same level
-> number assigned to it with respect to each CPU.  Is that an architectural
-> requirement?
-> 
-> All those LoC, LoU, LoUIS properties etc. are probeable per-CPU not
-> globally...  I don't see why they couldn't be different.
+thx,
 
-That's a good point, that definitely requires investigation.
-
-Thanks,
-Lorenzo
+Jason.
