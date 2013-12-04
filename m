@@ -1,75 +1,33 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 04 Dec 2013 17:20:11 +0800
-Subject: [GIT PULL][v2] pull request for hisilicon soc
-Message-ID: <529EF3CB.5040505@gmail.com>
+From: dt.tangr@gmail.com (dt.tangr at gmail.com)
+Date: Wed,  4 Dec 2013 20:20:08 +1100
+Subject: [PATCH 2/2] arm: nspire: modify device tree to use the nspire-usb
+ driver
+In-Reply-To: <1386148808-15065-1-git-send-email-dt.tangr@gmail.com>
+References: <1386148808-15065-1-git-send-email-dt.tangr@gmail.com>
+Message-ID: <1386148808-15065-2-git-send-email-dt.tangr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Daniel Tang <dt.tangr@gmail.com>
 
-Please help to merge this pull request.
+This patch adds the needed compatible key to the device tree for TI-Nspires.
 
-I have to use gmail address since my GPG key is based on gmail.com.
+Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+---
+ arch/arm/boot/dts/nspire.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-Best Regards
-Haojian
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git 
-tags/hisilicon-basic
-
-for you to fetch changes up to 10d3095df4393ba3531508691b133a4f69adbd5e:
-
-   ARM: hi3xxx: add hotplug support (2013-11-25 15:10:01 +0800)
-
-----------------------------------------------------------------
-enable hisilicon soc
-
-----------------------------------------------------------------
-Haojian Zhuang (4):
-       ARM: hi3xxx: add board support with device tree
-       ARM: dts: enable hi4511 with device tree
-       ARM: config: enable hi3xxx in multi_v7_defconfig
-       ARM: config: add defconfig for Hi3xxx
-
-Zhangfei Gao (2):
-       ARM: hi3xxx: add smp support
-       ARM: hi3xxx: add hotplug support
-
-  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  32 ++++
-  arch/arm/Kconfig                                              |   2 +
-  arch/arm/Makefile                                             |   1 +
-  arch/arm/boot/dts/Makefile                                    |   1 +
-  arch/arm/boot/dts/hi3620.dtsi                                 | 556 
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/boot/dts/hi4511.dts                                  | 648 
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/configs/hi3xxx_defconfig                             |  56 
-+++++++
-  arch/arm/configs/multi_v7_defconfig                           |   1 +
-  arch/arm/mach-hi3xxx/Kconfig                                  |  16 ++
-  arch/arm/mach-hi3xxx/Makefile                                 |   7 +
-  arch/arm/mach-hi3xxx/core.h                                   |  15 ++
-  arch/arm/mach-hi3xxx/hi3xxx.c                                 |  97 
-++++++++++++
-  arch/arm/mach-hi3xxx/hotplug.c                                | 200 
-+++++++++++++++++++++++++
-  arch/arm/mach-hi3xxx/platsmp.c                                |  89 
-+++++++++++
-  14 files changed, 1721 insertions(+)
-  create mode 100644 
-Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
-  create mode 100644 arch/arm/boot/dts/hi4511.dts
-  create mode 100644 arch/arm/configs/hi3xxx_defconfig
-  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
-  create mode 100644 arch/arm/mach-hi3xxx/Makefile
-  create mode 100644 arch/arm/mach-hi3xxx/core.h
-  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
-  create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
-  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
+diff --git a/arch/arm/boot/dts/nspire.dtsi b/arch/arm/boot/dts/nspire.dtsi
+index a22ffe6..baf7153 100644
+--- a/arch/arm/boot/dts/nspire.dtsi
++++ b/arch/arm/boot/dts/nspire.dtsi
+@@ -65,6 +65,7 @@
+ 		};
+ 
+ 		usb0: usb at B0000000 {
++			compatible = "lsi,nspire-usb";
+ 			reg = <0xB0000000 0x1000>;
+ 			interrupts = <8>;
+ 		};
+-- 
+1.7.10.4
