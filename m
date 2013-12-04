@@ -1,46 +1,40 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 4 Dec 2013 12:42:23 -0800
-Subject: [PATCH v2] clk: exynos5420: fix cpll clock register offsets
-In-Reply-To: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
-References: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CAPtuhTievddh8Z-DUYRCwoNeTtLVW+ucSJ+Kuf2u1pAPX4jxmA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 4 Dec 2013 12:48:18 -0800
+Subject: [PATCH v5 1/5] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <1386185970-14488-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386185970-14488-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386185970-14488-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20131204204818.GA3096@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 2:06 AM, Chander Kashyap
-<chander.kashyap@linaro.org> wrote:
-> Fixes cpll control and lock register offset values for Exynos5420 SoC.
->
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+On Wed, Dec 04, 2013 at 09:39:26PM +0200, Ivan Khoronzhuk wrote:
+> To reduce code duplicate and increase code readability use WDT core
+> code to handle WDT interface.
+> 
+> Remove io_lock as the WDT core uses mutex to lock each wdt device.
+> Remove wdt_state as the WDT core tracks state with its own variable.
+> 
+> The watchdog_init_timeout() can read timeout value from timeout-sec
+> property if the passed value is out of bounds. The heartbeat is
+> initialized in next way. If heartbeat is not set thought module
+> parameter, try to read it's value from WDT node timeout-sec property.
+> If node has no one, use default value.
+> 
+> The heartbeat is hold in wdd->timeout by WDT core, so use it in
+> order to set timeout period.
+> 
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 
-Taken into clk-next.
+Looks good, except you did not explain ...
 
-Thanks!
-Mike
+>  
+> -	dev_info(dev, "heartbeat %d sec\n", heartbeat);
+> +	watchdog_set_nowayout(wdd, 1);
+>  
+why nowayout is enforced.
 
-> ---
-> Changes Since v1:
->         - Fixed patch subject as per Kukgin suggestion.
->
->  drivers/clk/samsung/clk-exynos5420.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 86dfc64..892aac0 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -730,8 +730,8 @@ struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
->  struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
->         [apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
->                 APLL_CON0, NULL),
-> -       [cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
-> -               MPLL_CON0, NULL),
-> +       [cpll] = PLL(pll_2550, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
-> +               CPLL_CON0, NULL),
->         [dpll] = PLL(pll_2550, fout_dpll, "fout_dpll", "fin_pll", DPLL_LOCK,
->                 DPLL_CON0, NULL),
->         [epll] = PLL(pll_2650, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
-> --
-> 1.7.9.5
->
+Thanks,
+Guenter
