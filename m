@@ -1,203 +1,32 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Wed, 04 Dec 2013 06:45:32 -0600
-Subject: [PATCH 1/3] clk: bcm281xx: define kona clock binding
-In-Reply-To: <20131204093911.GE16025@e106331-lin.cambridge.arm.com>
-References: <529EA78E.7060904@linaro.org> <529EA80A.60801@linaro.org>
- <20131204093911.GE16025@e106331-lin.cambridge.arm.com>
-Message-ID: <529F23EC.20306@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 4 Dec 2013 12:48:54 +0000
+Subject: [PATCH] ARM: mcpm: Make all mcpm functions notrace
+In-Reply-To: <529EEAEF.1040206@samsung.com>
+References: <1385976547.3387.2.camel@linaro1.home>
+ <20131202172531.GB2312@e103592.cambridge.arm.com>
+ <529EEAEF.1040206@samsung.com>
+Message-ID: <20131204124847.GA2323@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 03:39 AM, Mark Rutland wrote:
-> On Wed, Dec 04, 2013 at 03:56:58AM +0000, Alex Elder wrote:
->> Document the device tree binding for Broadcom Kona architecture
->> clock control units and clocks.  Kona device nodes are represented
->> with compatible strings having "bcm11351" in their name.
->>
->> Kona clocks are managed by "clock control units" (CCUs).  Each CCU
->> has a device tree node, and within that node are defined the names
->> of the clocks provided by the CCU.
->>
->> The BCM281xx family of SoCs use Kona CCUs and clocks.
->>
->> Signed-off-by: Alex Elder <elder@linaro.org>
->> Reviewed-by: Matt Porter <matt.porter@linaro.org>
->> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
->> ---
->>  .../devicetree/bindings/clock/bcm-kona-clock.txt   |   95
->> ++++++++++++++++++++
->>  1 file changed, 95 insertions(+)
->>  create mode 100644
->> Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
->> b/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
->> new file mode 100644
->> index 0000000..0cafd6a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
->> @@ -0,0 +1,95 @@
->> +Broadcom Kona Family Clocks
->> +
->> +This binding is associated with Broadcom SoCs having "Kona" style
->> +clock control units (CCUs).  A CCU is a clock provider that manages
->> +a set of clock signals.  Each CCU is represented by a node in the
->> +device tree.
->> +
->> +This binding uses the common clock binding:
->> +    Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +
->> +Many source clocks are described using the "fixed-clock" binding:
->> +    Documentation/devicetree/bindings/clock/fixed-clock.txt
+On Wed, Dec 04, 2013 at 12:42:23PM +0400, Tarek Dakhran wrote:
+> Hi, Dave!
 > 
-> Is this necessary? While this describes the device it doesn't describe
-> this binding.
+> On 12/02/2013 09:25 PM, Dave Martin wrote:
+> >Vyacheslav, Tarek, can you add the corresponding change in your Exynos
+> >Dual Cluster support code please?
+> >
+> >There's no need for it to be a separate patch, you can simply add
+> >the CFLAGS_REMOVE_ definitions alongside the other Makefile additions
+> >for edcs.  If you want to be more fine-grained, you could mark
+> >individual functions notrace instead -- but that may just add effort
+> >and not be very useful.
+> >
 
-It's probably gratuitous.  I will remove it.
-
->> +Required properties:
->> +- compatible
->> +	Shall have a value "brcm,bcm11351-<which>-ccu", where
->> +	<which> identifies the particular CCU (see below).
-> 
-> It would be nice to have a full list here, as that makes finding the
-> file easier. Something like:
-> 
-> - compatible: should contain one of:
->    * "brcm,bcm11351-root-ccu"
->    * "brcm,bcm11351-aon-ccu"
->    * "brcm,bcm11351-hub-ccu"
->    * "brcm,bcm11351-master-ccu"
->   The differences between these are described in greater detail below.
-
-I got this suggestion in internal review.  I gambled,
-and lost. :)  I'll add the list as you suggest.
-
->> +- reg
->> +	Shall define the base and range of the address space
->> +	containing clock control registers
->> +- #clock-cells
->> +	Shall have the value <1>
-> 
-> How about:
-> 
-> - #clock-cells: Should be <1>. The permitted clock-specifier values are
->   defined below.
-
-OK.
-
->> +- clock-output-names
->> +	Shall be an ordered list of strings defining the names of
->> +	the clocks provided by the CCU.
->> +
->> +Clock consumers refer to a particular clock supplied by a CCU using
->> +a phandle and specifier pair, using the phandle for the CCU device
->> +tree node and the clock's symbolic specifier.  The clock specifier
->> +is a CCU-unique 0-based index value.
-> 
-> This is redundant given the common clock binding and the description of
-> #clock-cells above.
-
-OK.  I'll delete this paragraph.
-
->> +
->> +
->> +BCM281XX family SoCs use Kona CCUs.  The following table defines
->> +the set of CCUs and clock specifiers for BCM281XX clocks.  The
->> +compatible string for the CCU uses the name in the "CCU" column
->> +below as it's <which> value.
->> +
->> +    CCU     Clock           Type    Index   Specifier
->> +    ---     -----           ----    -----   ---------
->> +    root    frac_1m         peri      0     BCM281XX_ROOT_CCU_FRAC_1M
->> +
->> +    aon     hub_timer       peri      0     BCM281XX_AON_CCU_HUB_TIMER
->> +    aon     pmu_bsc         peri      1     BCM281XX_AON_CCU_PMU_BSC
->> +    aon     pmu_bsc_var     peri      2     BCM281XX_AON_CCU_PMU_BSC_VAR
->> +
->> +    hub     tmon_1m         peri      0     BCM281XX_HUB_CCU_TMON_1M
->> +
->> +    master  sdio1           peri      0     BCM281XX_MASTER_CCU_SDIO1
->> +    master  sdio2           peri      1     BCM281XX_MASTER_CCU_SDIO2
->> +    master  sdio3           peri      2     BCM281XX_MASTER_CCU_SDIO3
->> +    master  sdio4           peri      3     BCM281XX_MASTER_CCU_SDIO4
->> +    master  dmac            peri      4     BCM281XX_MASTER_CCU_DMAC
->> +    master  usb_ic          peri      5     BCM281XX_MASTER_CCU_USB_IC
->> +    master  hsic2_48m       peri      6     BCM281XX_MASTER_CCU_HSIC_48M
->> +    master  hsic2_12m       peri      7     BCM281XX_MASTER_CCU_HSIC_12M
->> +
->> +    slave   uartb           peri      0     BCM281XX_SLAVE_CCU_UARTB
->> +    slave   uartb2          peri      1     BCM281XX_SLAVE_CCU_UARTB2
->> +    slave   uartb3          peri      2     BCM281XX_SLAVE_CCU_UARTB3
->> +    slave   uartb4          peri      3     BCM281XX_SLAVE_CCU_UARTB4
->> +    slave   ssp0            peri      4     BCM281XX_SLAVE_CCU_SSP0
->> +    slave   ssp2            peri      5     BCM281XX_SLAVE_CCU_SSP2
->> +    slave   bsc1            peri      6     BCM281XX_SLAVE_CCU_BSC1
->> +    slave   bsc2            peri      7     BCM281XX_SLAVE_CCU_BSC2
->> +    slave   bsc3            peri      8     BCM281XX_SLAVE_CCU_BSC3
->> +    slave   pwm             peri      9     BCM281XX_SLAVE_CCU_PWM
-> 
-> I guess the Specifier column is referring to some defines in a header
-> file? It would be good to mention which header file these are in.
-
-Yes.  I will add a reference to it.
-
-> The Index is also a specifier, it just happens to not be symbolic.
-
-Yes it is, but I was having trouble trying to describe
-them.  "Symbolic specifier" got to be unwieldy.  The paragraph
-that talked about the "0-based index value" (which I said I
-would delete) was an attempt to at least give it some sort of
-name.  If someone has a suggestion for how best to describe
-this I'm totally open.
-
->> +
->> +
->> +Device tree example:
->> +
->> +	clocks {
->> +		slave_ccu: slave_ccu {
->> +			compatible = "brcm,bcm11351-slave-ccu";
->> +			reg = <0x3e011000 0x0f00>;
->> +			#clock-cells = <1>;
->> +			clock-output-names = "uartb",
->> +					     "uartb2",
->> +					     "uartb3",
->> +					     "uartb4";
->> +		};
->> +		ref_crystal_clk: ref_crystal {
->> +			#clock-cells = <0>;
->> +			compatible = "fixed-clock";
->> +			clock-frequency = <26000000>;
->> +		};
->> +	};
-> 
-> This is wrong, as the clocks container node us not defined as any type
-> of bus, and does not have the requisite #address-cells and #size-cells.
-
-Sorry, I didn't realize it was wrong.  I intentionally used
-it simply for groiuping.
-
-> Really this should _not_ be probed, as the kernel does not know anything
-> about the clocks node. It could be some non-MMIO bus that it doesn't
-> understand, or one which requires other clocks.
-> 
-> I think the current way that we probe clocks is somewhat broken in this
-> regard.
-> 
-> There's no reason to put the clocks in this container at all; just put
-> them under the root. If you really want to use a container, please at
-> least use a simple-bus with the requisite #address-cells, #size-cells,
-> and ranges properties.
-
-No, I'll just pull them all out of the container.
-
-Thank you very much for the quick review.  (And on
-to the next one...)
-
-					-Alex
+[...]
 
 > 
-> Thanks,
-> Mark.
-> 
+> Will be done in next version.
+
+Thanks
+---Dave
