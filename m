@@ -1,43 +1,33 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Dec 2013 09:57:29 -0700
-Subject: [PATCH v2] ARM: tegra: switch FUSE clock on before usage
-In-Reply-To: <CAAVeFuJpHXCANRO=AT5mKGpHzJRpmQoOuX4hjsctEMMAMjgqnQ@mail.gmail.com>
-References: <1385001613-19098-1-git-send-email-acourbot@nvidia.com>
- <528E6D58.6050503@wwwdotorg.org> <528EB4EE.309@nvidia.com>
- <CAAVeFuJpHXCANRO=AT5mKGpHzJRpmQoOuX4hjsctEMMAMjgqnQ@mail.gmail.com>
-Message-ID: <529F5EF9.5010707@wwwdotorg.org>
+Date: Wed, 04 Dec 2013 09:59:52 -0700
+Subject: [PATCH 2/2] ARM: tegra: convert device tree file of Dalmore to
+ use pinctrl defines
+In-Reply-To: <529EC2E5.5050909@nvidia.com>
+References: <1385992502-12771-1-git-send-email-ldewangan@nvidia.com>
+ <1385992502-12771-2-git-send-email-ldewangan@nvidia.com>
+ <529E3A6E.1050003@wwwdotorg.org> <529EC2E5.5050909@nvidia.com>
+Message-ID: <529F5F88.8010101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 12:09 AM, Alexandre Courbot wrote:
-> Hi Stephen,
+On 12/03/2013 10:51 PM, Laxman Dewangan wrote:
+> On Wednesday 04 December 2013 01:39 AM, Stephen Warren wrote:
+>> On 12/02/2013 06:55 AM, Laxman Dewangan wrote:
+>>> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+>> Patch description?
+>>
+>> BTW, did you compile all the Tegra DT files before and after this
+>> change, and make sure that there's zero difference between them (i.e.
+>> they're identical byte-for-byte when compiled)? I don't feel like
+>> manually double-checking this entire patch...
 > 
-> On Fri, Nov 22, 2013 at 10:35 AM, Alex Courbot <acourbot@nvidia.com> wrote:
->> On 11/22/2013 05:30 AM, Stephen Warren wrote:
->>>
->>> On 11/20/2013 07:40 PM, Alexandre Courbot wrote:
->>>>
->>>> FUSE clock is enabled by most bootloaders, but we cannot expect it to be
->>>> on in all contexts (e.g. kexec).
->>>>
->>>> Ensure the FUSE clock is enabled before any of its registers is touched.
->>>> Since FUSE is touched very early during system boot (before the clock
->>>> devices are registered), directly manipulate the clock register bit in
->>>> case the clock device cannot be acquired.
->>>
->>>
->>> This looks reasonable to me. I'll apply it soon after -rc1.
->>
->>
->> Thanks. Be careful as I noticed I misformatted my commit message. The part
->> after the "--" will not be stripped by git am as I intended it to be. I
->> understood what I did wrong and will hopefully not make that mistake again.
->>
->> Sorry for the inconvenience.
-> 
-> I am not seeing this in your tree, have you applied it somewhere already?
+> I just made changes for the Dalmore only. Not touched Tegra30 and
+> Tegra20_ platform dts.
 
-I haven't applied anything for 3.14 yet. I was hoping to get the
-DMA/clock/reset DT binding rework in first, but it's been dragging on
-for while, so I'll probably take a look at what can be applied without
-conflicting with that soon.
+OK. Why not convert all the DTs at once?
+
+> For Dalmore, I compare the binary before and after this change as well
+> dts generated back from dtb using dtc.
+> It is same.
+
+Great.
