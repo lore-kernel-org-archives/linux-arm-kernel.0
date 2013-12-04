@@ -1,38 +1,67 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Wed, 4 Dec 2013 22:44:47 +0000
-Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
-In-Reply-To: <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
- <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
- <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
- <20131202210719.GQ24997@rocoto.smurfnet.nu>
- <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
-Message-ID: <20131204224447.GA19265@srcf.ucam.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 04 Dec 2013 23:54:15 +0100
+Subject: [PATCH] ARM: shmobile: Genmai SPI over GPIO support
+In-Reply-To: <20131204212915.24243.27225.sendpatchset@w520>
+References: <20131204212915.24243.27225.sendpatchset@w520>
+Message-ID: <3565394.fetym5DAi6@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:06:47PM -0600, Matt Sealey wrote:
+Hi Magnus,
 
-> there's no guarantee that the kernel hasn't been decompressed over 
-> some important UEFI feature or some memory hasn't been trashed. You 
-> can't make that guarantee because by entering the plain zImage, you 
-> forfeited that information.
+Thank you for the patch.
 
-The stub is responsible for ensuring that the compressed kernel is 
-loaded at a suitable address. Take a look at efi_relocate_kernel().
+On Thursday 05 December 2013 06:29:15 Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Hook up the serial flash memory to bit bang SPI on the Genmai board.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written on to of renesas git tag renesas-devel-v3.13-rc2-20131202 and
+>  [PATCH 00/04] ARM: shmobile: r7s72100 and Genmai GPIO / PINCTRL support
+> 
+>  arch/arm/boot/dts/r7s72100-genmai-reference.dts |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> --- 0010/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+> +++ work/arch/arm/boot/dts/r7s72100-genmai-reference.dts	2013-12-05
+> 06:23:57.000000000 +0900 @@ -56,5 +56,20 @@
+>  			reg = <0x50>;
+>  		};
+>  	};
+> +	spi0 {
+> +		compatible = "spi-gpio";
+> +		gpio-sck = <&port9 2 0>;
+> +		gpio-mosi = <&port9 4 0>;
+> +		gpio-miso = <&port9 5 0>;
+> +		cs-gpios = <&port9 3 0>;
 
-> Most of the guessing is ideally not required to be a guess at all, the
-> restrictions are purely to deal with the lack of trust for the
-> bootloader environment. Why can't we trust UEFI? Or at least hold it
-> to a higher standard. If someone ships a broken UEFI, they screw a
-> feature or have a horrible bug and ship it, laud the fact Linux
-> doesn't boot on it and the fact that it's their fault - over their
-> head. It actually works these days, Linux actually has "market share,"
-> companies really go out of their way to rescue their "image" and
-> resolve the situation when someone blogs about a serious UEFI bug on
-> their $1300 laptops, or even $300 tablets.
+What about replacing those 0 with GPIO_ACTIVE_HIGH ?
 
-Yeah, that hasn't actually worked out too well for us.
+> +		num-chipselects = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> 
+> +		s25fl512s: s25fl512s0 {
 
+The node should be called flash at 0.
+
+> +			compatible = "s25fl512s";
+> +			reg = <0>;
+> +			spi-max-frequency = <104000000>;
+> +                };
+> +        };
+
+Please use tabs for indentation here.
+
+The rest looks fine to me, but I obviously can't review most of the 
+information as I don't have access to the board schematics. I'll trust you 
+that you have tested the patch :-)
+
+>  };
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Regards,
+
+Laurent Pinchart
