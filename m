@@ -1,290 +1,105 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Wed, 4 Dec 2013 16:03:08 +0530
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <CAJ+vNU050mtdiyXBXue_JGFJhFLiKCvoyf031Uda2e5U+vA12g@mail.gmail.com>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <1385500248-6551-2-git-send-email-marex@denx.de>
- <20131127043009.GB12773@pratyush-vbox>
- <201311270944.09383.marex@denx.de>
- <CAJ+vNU050mtdiyXBXue_JGFJhFLiKCvoyf031Uda2e5U+vA12g@mail.gmail.com>
-Message-ID: <20131204103307.GB2285@pratyush-vbox>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 04 Dec 2013 11:40:12 +0100
+Subject: [PATCH v6 0/3] mfd: max14577: Add max14577 MFD drivers
+Message-ID: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+Hi,
 
-On Wed, Dec 04, 2013 at 04:14:47AM +0800, Tim Harvey wrote:
-> On Wed, Nov 27, 2013 at 12:44 AM, Marek Vasut <marex@denx.de> wrote:
-> > Dear Pratyush Anand,
-> >
-> >> Dear Marek Vasut,
-> >>
-> >> Please replace imx6 with designware in subject line  of this patch.
-> >
-> > OK, this one has to be fixed anyway. We need to figure out why do we even need
-> > this one.
-> >
-> >> On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
-> >> > From: Tim Harvey <tharvey@gateworks.com>
-> >> >
-> >> > The IMX6 iATU is used for address translation between the AXI bus
-> >> > address space and PCI address space.  This is used for type0 and type1
-> >> > config cycles but is not necessary for outbound io/mem regions.
-> >> >
-> >> > This patch removes the calls that inappropriately re-configures the ATU
-> >> > viewport for outbound memory and IO after config cycles and removes them
-> >> > altogether as they are not necessary.
-> >>
-> >> Yes, they are not necessary for all the cases where translation is one
-> >> to one. So so for sure all the platform till now introduced should
-> >> work.
-> >> But, what about a platform where memory translation is not one to one?
-> >>
-> >> Existing code should work with all sort of memory translation on a
-> >> platform having atleast two viewports capable of programming any type
-> >> of outbound transaction.
-> >
-> > Full ACK, that's why it's called RFC.
-> >
-> >> > This resolves issues with PCI devices behind switches and has been tested
-> >> > with a Gige device behind a PLX PEX860x switch.  More testing is needed
-> >> > for other configurations.
-> >>
-> >> I do not understand if MX6 has 4 Outbound Viewport then how this patch
-> >> helps?
-> >> -- PCI devices behind switches would not have been working because
-> >> CFG1 transaction would not have been correct.
-> >> -- It works with this patch. This patch changes viewport for CFG1 from
-> >> 1 to 0.
-> >> -- Can it be possible that MX6 has some restriction on viewport
-> >> programming capability. I mean,like only viewport0 can be programmed
-> >> for CFG0/1?
-> >
-> > Tim ?
-> >
-> > Here is the MX6 datasheet [1], the section 48.3.9.1.1 and 48.3.9.1.2 describe
-> > the iATU configuration on MX6. My understanding from this description is that
-> > the MX6 has 4 inbound and 4 outbound iATU regions. Am I wrong ?
-> >
-> > [1] http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf
-> >
-> >> Otherwise I do not find any convincing reason that why this patch
-> >> helps in resolving issues with PCI devices behind switches.
-> 
-> In my configuration I have a PLX switch off the IMX root complex with
-> several devices behind it.  I find that the devices enumerate
-> correctly but as soon as data is transferred to or from (not sure
-> which) the device the system hangs (INFO: rcu_sched detected stalls on
-> CPUs/tasks: { 0} (detected by 3, t=2135 jiffies, g=20, c=19, q=66)).
-> My current test case is a GigE ethernet device and when I connect a
-> network to the device I hange when a packet is responded to.
-> 
-> I can't claim to fully understand PCI resource mappings or the iATU
-> and I don't understand why dw_pcie_rd_other_conf/dw_pcie_wr_other_conf
-> need to change the viewport then change it back instead of using
-> multiple viewports (perhaps because some hardware may not have more
-> than the 2 viewports currently being used?).  The current driver uses
+This is sixth version of patchset adding drivers for MAXIM 14577 chip.
+Some parts (MFD, extcon) were already merged by maintainers so I removed them
+from the patchset.
 
-Yes, driver has been written keeping in mind that there exist minimum
-of two programmable outbound viewport.
+This version of patchset depends on the max14577 MFD core driver:
+ - mfd: max14577: Add max14577 MFD driver core
+   Merged in: git://git.linaro.org/people/ljones/mfd.git
+   https://git.linaro.org/gitweb?p=people/ljones/mfd.git;a=commit;h=47ae80d7c147caa07165fcac078c26fbe87bfc28
 
-> viewport0 for cfg0 and mem and viewport1 for cfg1 and io.  If I remove
-> the call to dw_pcie_prog_viewport_io_outbound to reconfigure viewport1
-> for io after its altered for type1 cfg cycles, devices behind the
-> bridge work for me:
 
-This is strange !!!
-When you say it does not work, what exactly happens? What does kernel
-crash log says? Which register access forces CPU to hang? Is it
-possible to capture traffic with PCIe analyzer?
+Description
+-----------
+The chip contains Micro-USB Interface Circuit and Li+ Battery Charger.
+It contains accessory and USB charger detection logic. It supports USB 2.0
+Hi-Speed, UART and stereo audio signals over Micro-USB connector.
 
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designwa
-> index e33b68b..a064bc5 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -556,7 +556,7 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struc
->         } else {
->                 dw_pcie_prog_viewport_cfg1(pp, busdev);
->                 ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
-> -               dw_pcie_prog_viewport_io_outbound(pp);
-> +//               dw_pcie_prog_viewport_io_outbound(pp);
->         }
-> 
->         return ret;
-> @@ -579,7 +579,7 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struc
->         } else {
->                 dw_pcie_prog_viewport_cfg1(pp, busdev);
->                 ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
-> -               dw_pcie_prog_viewport_io_outbound(pp);
-> +//               dw_pcie_prog_viewport_io_outbound(pp);
->         }
-> 
-> Can anyone explain whats going on here?   I would think this would
-> perhaps break devices that use IO resources?
+The battery charger is compliant with the USB Battery Charging Specification
+Revision 1.1. It has also SFOUT LDO output for powering USB devices.
 
-Yes, without this devices with IO resource will not work. However, I
-see some issues with IO translation implementation, and as per my
-understanding IO transfer should not work with current implementation. 
-Anyway, that is unrelated to the issue you are facing..so better I
-will discuss that in another thread.
+The patchset consists of following drivers:
+1. MFD core driver. (applied by Lee Jones)
+2. Extcon driver for the MUIC (Micro USB Interface Controller). (applied
+   by Chanwoo Choi)
+3. Charger driver using power supply class.
+4. Regulator driver for SFOUT and charger.
+5. Documentation of device tree bindings.
 
-Regards
-Pratyush
-> 
-> Thanks,
-> 
-> Tim
-> 
-> >>
-> >>
-> >> Regards
-> >> Pratyush
-> >>
-> >> > From: Tim Harvey <tharvey@gateworks.com>
-> >> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> >> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> > Cc: Frank Li <lznuaa@gmail.com>
-> >> > Cc: Harro Haan <hrhaan@gmail.com>
-> >> > Cc: Jingoo Han <jg1.han@samsung.com>
-> >> > Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> >> > Cc: Pratyush Anand <pratyush.anand@st.com>
-> >> > Cc: Richard Zhu <r65037@freescale.com>
-> >> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> >> > Cc: Sean Cross <xobs@kosagi.com>
-> >> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> >> > Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> >> > Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> >> > Cc: Tim Harvey <tharvey@gateworks.com>
-> >> > Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> >> > Cc: Yinghai Lu <yinghai@kernel.org>
-> >> > ---
-> >> >
-> >> >  drivers/pci/host/pcie-designware.c | 41
-> >> >  +++----------------------------------- 1 file changed, 3 insertions(+),
-> >> >  38 deletions(-)
-> >> >
-> >> > diff --git a/drivers/pci/host/pcie-designware.c
-> >> > b/drivers/pci/host/pcie-designware.c index ed9b11b..01d76ad 100644
-> >> > --- a/drivers/pci/host/pcie-designware.c
-> >> > +++ b/drivers/pci/host/pcie-designware.c
-> >> > @@ -46,7 +46,6 @@
-> >> >
-> >> >  #define PCIE_ATU_VIEWPORT          0x900
-> >> >  #define PCIE_ATU_REGION_INBOUND            (0x1 << 31)
-> >> >  #define PCIE_ATU_REGION_OUTBOUND   (0x0 << 31)
-> >> >
-> >> > -#define PCIE_ATU_REGION_INDEX1             (0x1 << 0)
-> >> >
-> >> >  #define PCIE_ATU_REGION_INDEX0             (0x0 << 0)
-> >> >  #define PCIE_ATU_CR1                       0x904
-> >> >  #define PCIE_ATU_TYPE_MEM          (0x0 << 0)
-> >> >
-> >> > @@ -494,8 +493,8 @@ static void dw_pcie_prog_viewport_cfg0(struct
-> >> > pcie_port *pp, u32 busdev)
-> >> >
-> >> >  static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
-> >> >  {
-> >> >
-> >> > -   /* Program viewport 1 : OUTBOUND : CFG1 */
-> >> > -   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
-> >> > PCIE_ATU_REGION_INDEX1, +   /* Program viewport 0 : OUTBOUND : CFG1 */
-> >> > +   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
-> >> > PCIE_ATU_REGION_INDEX0,
-> >> >
-> >> >                       PCIE_ATU_VIEWPORT);
-> >> >
-> >> >     dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
-> >> >     dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> >> >
-> >> > @@ -505,38 +504,8 @@ static void dw_pcie_prog_viewport_cfg1(struct
-> >> > pcie_port *pp, u32 busdev)
-> >> >
-> >> >                       PCIE_ATU_LIMIT);
-> >> >
-> >> >     dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
-> >> >     dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
-> >> >
-> >> > -}
-> >> > -
-> >> > -static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
-> >> > -{
-> >> > -   /* Program viewport 0 : OUTBOUND : MEM */
-> >> > -   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
-> >> > PCIE_ATU_REGION_INDEX0, -                     PCIE_ATU_VIEWPORT);
-> >> > -   dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
-> >> > -   dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> >> > -   dw_pcie_writel_rc(pp, pp->mem_base, PCIE_ATU_LOWER_BASE);
-> >> > -   dw_pcie_writel_rc(pp, (pp->mem_base >> 32), PCIE_ATU_UPPER_BASE);
-> >> > -   dw_pcie_writel_rc(pp, pp->mem_base + pp->config.mem_size - 1,
-> >> > -                     PCIE_ATU_LIMIT);
-> >> > -   dw_pcie_writel_rc(pp, pp->config.mem_bus_addr, PCIE_ATU_LOWER_TARGET);
-> >> > -   dw_pcie_writel_rc(pp, upper_32_bits(pp->config.mem_bus_addr),
-> >> > -                     PCIE_ATU_UPPER_TARGET);
-> >> > -}
-> >> > -
-> >> > -static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
-> >> > -{
-> >> > -   /* Program viewport 1 : OUTBOUND : IO */
-> >> > -   dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
-> >> > PCIE_ATU_REGION_INDEX1, -                     PCIE_ATU_VIEWPORT);
-> >> > -   dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
-> >> > +   dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
-> >> >
-> >> >     dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> >> >
-> >> > -   dw_pcie_writel_rc(pp, pp->io_base, PCIE_ATU_LOWER_BASE);
-> >> > -   dw_pcie_writel_rc(pp, (pp->io_base >> 32), PCIE_ATU_UPPER_BASE);
-> >> > -   dw_pcie_writel_rc(pp, pp->io_base + pp->config.io_size - 1,
-> >> > -                     PCIE_ATU_LIMIT);
-> >> > -   dw_pcie_writel_rc(pp, pp->config.io_bus_addr, PCIE_ATU_LOWER_TARGET);
-> >> > -   dw_pcie_writel_rc(pp, upper_32_bits(pp->config.io_bus_addr),
-> >> > -                     PCIE_ATU_UPPER_TARGET);
-> >> >
-> >> >  }
-> >> >
-> >> >  static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus
-> >> >  *bus,
-> >> >
-> >> > @@ -552,11 +521,9 @@ static int dw_pcie_rd_other_conf(struct pcie_port
-> >> > *pp, struct pci_bus *bus,
-> >> >
-> >> >     if (bus->parent->number == pp->root_bus_nr) {
-> >> >
-> >> >             dw_pcie_prog_viewport_cfg0(pp, busdev);
-> >> >             ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
-> >> >
-> >> > -           dw_pcie_prog_viewport_mem_outbound(pp);
-> >> >
-> >> >     } else {
-> >> >
-> >> >             dw_pcie_prog_viewport_cfg1(pp, busdev);
-> >> >             ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
-> >> >
-> >> > -           dw_pcie_prog_viewport_io_outbound(pp);
-> >> >
-> >> >     }
-> >> >
-> >> >     return ret;
-> >> >
-> >> > @@ -575,11 +542,9 @@ static int dw_pcie_wr_other_conf(struct pcie_port
-> >> > *pp, struct pci_bus *bus,
-> >> >
-> >> >     if (bus->parent->number == pp->root_bus_nr) {
-> >> >
-> >> >             dw_pcie_prog_viewport_cfg0(pp, busdev);
-> >> >             ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
-> >> >
-> >> > -           dw_pcie_prog_viewport_mem_outbound(pp);
-> >> >
-> >> >     } else {
-> >> >
-> >> >             dw_pcie_prog_viewport_cfg1(pp, busdev);
-> >> >             ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
-> >> >
-> >> > -           dw_pcie_prog_viewport_io_outbound(pp);
-> >> >
-> >> >     }
-> >> >
-> >> >     return ret;
+The patchset is rebased on latest Linus' tree (v3.13-rc2-122-gdea4f48a0a30)
+however testing was mostly done on 3.10.
+
+Changes since v5:
+-----------------
+1. Patches "mfd: max14577: Add max14577 MFD driver core" and "mfd: max14577:
+   Match regulator by of_compatible string" were applied by Lee Jones to his
+   tree.
+2. Patch "extcon: max14577: Add extcon-max14577 driver to support MUIC device"
+   were applied by Chanwoo Choi to his tree.
+3. Regulator (2/3): Use of_get_child_by_name() to match regulators node from DT.
+
+Changes since v4:
+-----------------
+1. Split MFD changes from regulator patch.
+
+Changes since v3:
+-----------------
+1. Applied suggestions from Lee Jones and Alexander Shiyan.
+2. Extcon (2/5): Use system_power_efficient_wq for delayed cable detection
+   (pointed by Mark Brown).
+3. Regulator (4/5): Add compatible string to regulators node so MFD core will
+   match it to the driver. Simplify and fix DT parsing. (Lee Jones)
+4. Regulator (4/5): Get rid of regulators variable. (Bartlomiej Zolnierkiewicz).
+
+Changes since v2:
+-----------------
+1. Replaced max14577-irq.c with regmap_irq_chip, as suggested by Mark Brown.
+2. Applied suggestions from review (Mark Brown, Lee Jones).
+3. Regulator: Added registering unconditionally of all regulators (Mark Brown).
+4. Regulator: Removed the "struct max14577_regulator *info" (Bartlomiej
+   Zolnierkiewicz).
+5. Extcon: Removed work-around for hardware reboot (USB cable attached with
+   factory button set to D/L mode) as it is not needed.
+
+Changes since v1:
+-----------------
+1. Applied comments from review (Mark Brown, Mark Rutland).
+2. Removed any DT bindings which are not needed.
+3. Removed "wakeup" node from bindings.
+4. Fixed interrupt handling during resume. This lead to removal of the weird
+   IRQ/GPIO code discussed during review.
+5. Minor fixes pointed by checkpatch, added authors.
+6. Use of_get_child_by_name() for accessing regulators bindings.
+7. Added documentation of bindings (fifth patch).
+
+Best regards,
+Krzysztof Kozlowski
+
+
+Krzysztof Kozlowski (3):
+  charger: max14577: Add charger support for Maxim 14577
+  regulator: max14577: Add regulator driver for Maxim 14577
+  mfd: max14577: Add device tree bindings document
+
+ Documentation/devicetree/bindings/mfd/max14577.txt |   48 +++
+ drivers/power/Kconfig                              |    7 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/max14577_charger.c                   |  311 ++++++++++++++++++++
+ drivers/regulator/Kconfig                          |    7 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/max14577.c                       |  272 +++++++++++++++++
+ 7 files changed, 647 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
+ create mode 100644 drivers/power/max14577_charger.c
+ create mode 100644 drivers/regulator/max14577.c
+
+-- 
+1.7.9.5
