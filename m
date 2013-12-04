@@ -1,45 +1,36 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 04 Dec 2013 13:24:10 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVgyNzogQ29uZmlndXJlIEdQSU9z?=
- =?UTF-8?B?IGFzICJpbnB1dCIgYnkgZGVmYXVsdA==?=
-In-Reply-To: <20131204101316.2011e210@ipc1.ka-ro>
-References: <1385795000-29764-1-git-send-email-shc_work@mail.ru>
- <1386147840.110296074@f57.i.mail.ru>
- <20131204101316.2011e210@ipc1.ka-ro>
-Message-ID: <1386149050.778733527@f57.i.mail.ru>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 4 Dec 2013 10:24:30 +0100
+Subject: [PATCH v3 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386100296.git.stefan@agner.ch>
+References: <cover.1386100296.git.stefan@agner.ch>
+ <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386100296.git.stefan@agner.ch>
+Message-ID: <20131204092429.GM19943@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > > On Sat, Nov 30, 2013 at 11:03:20AM +0400, Alexander Shiyan wrote:
-> > > > > > This patch changes the default direction for pins used
-> > > > > > as GPIO to "input". This prevents a short circuit on the
-> > > > > > configuration stage when GPIO-pin is connected to the
-> > > > > > other output pin.
-> > > > > 
-> > > > > Markus,
-> > > > > 
-> > > > > Does it make sense to you?
-> > > > 
-> > > > I am not sure if this really happens. However, it does make sense and I
-> > > > can't see any disadvantages in changing the default GPIO mux direction to
-> > > > input.
-> > > > 
-> > > What happens, if the bootloader already set up a pin as output and
-> > > linux later does the pinconfig stuff?
-> > > If the pin is reconfigured as input then, this may produce an unwanted
-> > > glitch on the pin. IMO the pinconfig driver should not touch the pin
-> > > direction, but leave it to the gpio driver to set that up. 
-> > 
-> > Such pin can be overridden by board DTS.
-> > 
-> So, which pins will be configured with the default direction?
-> If pins are not stated in DT they should be not configured at all, I
-> suppose.
+On Tue, Dec 03, 2013 at 08:57:27PM +0100, Stefan Agner wrote:
+> Use the VERSIONCRC to determine the exact device version. According to
+> the datasheet this register can be used as device identifier. The
+> identification is needed since some tps6586x regulators use a different
+> voltage table.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Since the struct tps6586x is inside the c file, I could not easily
+> move the tps6586x_get_version function as inline to the header file.
+> 
+> Changes since v2:
+>   - Avoid moving devm_kzalloc
+> ---
+>  drivers/mfd/tps6586x.c       | 43 ++++++++++++++++++++++++++++++++++++++-----
+>  include/linux/mfd/tps6586x.h |  7 +++++++
+>  2 files changed, 45 insertions(+), 5 deletions(-)
 
-Yes. We talk about GPIOs defined in DTS.
-Just one example: We have one GPIO pin connected to switch between ground
-and resistor to pullup (gpio-key driver). When pinctrl driver will initialize pin for the
-driver (before gpio_direction_input() in the driver), direction will be set to output
-and this may cause short circuit.
-
----
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/b0e3f037/attachment.sig>
