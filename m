@@ -1,104 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Dec 2013 11:20:39 +0000
-Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
-In-Reply-To: <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
-References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
- <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20131204112039.GC907@lee--X1>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 4 Dec 2013 19:22:15 +0800
+Subject: [PATCH RESEND] arm: pxa: tosa: fix keys mapping
+In-Reply-To: <CALT56yOnv+2ohsiHtQ1a-jwEjo3H9fZ7hpehHfQCGHydHc6vSw@mail.gmail.com>
+References: <20131116124750.GA26318@anuminas.rup.mentorg.com>
+ <CALT56yOcUChApUP6rOyXqWuK55ZR0Ooj457XVP2b7bVR9yk-8A@mail.gmail.com>
+ <528C2910.8030705@gmail.com>
+ <CALT56yOnv+2ohsiHtQ1a-jwEjo3H9fZ7hpehHfQCGHydHc6vSw@mail.gmail.com>
+Message-ID: <CAN1soZykH7A+Me-riXyhy2JKXhr=CcUNmCOaU22c8n7Nn7OauQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add document describing device tree bindings for MAX14577 MFD driver.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  Documentation/devicetree/bindings/mfd/max14577.txt |   48 ++++++++++++++++++++
->  1 file changed, 48 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/max14577.txt b/Documentation/devicetree/bindings/mfd/max14577.txt
-> new file mode 100644
-> index 000000000000..f4fd16360b6b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/max14577.txt
-> @@ -0,0 +1,48 @@
-> +MAXIM MAX14577 multi-function device
+On Thu, Nov 28, 2013 at 9:12 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> Hello Haojian,
+>
+> On Wed, Nov 20, 2013 at 7:14 AM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On 11/19/2013 04:33 PM, Dmitry Eremin-Solenikov wrote:
+>>>
+>>> Hello,
+>>>
+>>> On Sat, Nov 16, 2013 at 4:47 PM, Dmitry Eremin-Solenikov
+>>> <dbaryshkov@gmail.com> wrote:
+>>>>
+>>>> When converting from tosa-keyboard driver to matrix keyboard, tosa keys
+>>>> received extra 1 column shift. Replace that with correct values to make
+>>>> keyboard work again.
+>>>>
+>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>>> ---
+>>>>   arch/arm/mach-pxa/tosa.c | 102
+>>>> +++++++++++++++++++++++------------------------
+>>>>   1 file changed, 51 insertions(+), 51 deletions(-)
+>>>
+>>>
+>>> As nobody seems to object, I would like to use my tosa maintainer
+>>> powers and push
+>>> this patch for inclusion.
+>>>
+>>> Both Eric and Haojian seem to be unresponsive now.
+>>> Russell, can I push it to your patch system? Or should I push it to
+>>> arm-soc guys?
+>>>
+>>
+>> Hi Dmitry,
+>>
+>> I can take this patch. I didn't response since I'm waiting the new
+>> v3.13-rc1. I'm sorry on inconvenience.
+>
+> Nearly a week passed and I still don't see the patch either in arm-soc
+> or in linux-next.
+>
+> --
+> With best wishes
+> Dmitry
 
-Why is Maxim capitalised in such a way?
+Applied. I'll send the pull request in this week.
 
-If you're going to use the term Multi-Function Device, please
-capitalise it.
-
-> +MAX14577 is a Multi-function device with Micro-USB Interface Circuit, Li+
-
-Same here.
-
-> +Battery Charger and SFOUT LDO output for powering USB devices. It is
-> +interfaced to host controller using I2C.
-> +
-> +Required properties:
-> +- compatible : Must be "maxim,max14577".
-> +- reg : I2C slave address for the max14577 chip.
-> +- interrupts : IRQ line for the max14577 chip.
-> +- interrupt-parent :  The parent interrupt controller.
-> +
-> +Optional nodes:
-> +- regulators :
-> +  Required child node properties:
-> +  - compatible : "maxim,max14577-regulator"
-> +
-> +  Optional child nodes:
-> +    Each child node representing a regulator, following standard regulator
-> +    bindings. Valid names for a regulator are: "CHARGER" and "SAFEOUT".
-> +    The SAFEOUT is a constant voltage regulator so there is no need
-
-s/constant/fixed
-
-> +    to specify voltages for it.
-
-The whole of the "Optional nodes" explaination isn't as clear as it
-could otherwise be. 
-
-> +	[*] refer Documentation/devicetree/bindings/regulator/regulator.txt
-> +
-> +Example:
-> +	max14577 at 25 {
-> +		compatible = "maxim,max14577";
-> +		reg = <0x25>;
-> +		interrupt-parent = <&gpx1>;
-> +		interrupts = <5 0>;
-
-I'm gussing this is IRQ5 and the 0 is flags? If so, please use
-#defines for the flags.
-
-> +		regulators {
-> +			compatible = "maxim,max14577-regulator";
-> +
-> +			safeout_reg: safeout at 1 {
-
-The name of the node (not the label:safeout_reg) usually depicts the
-type of device, so 'regulator at 0' and 'regulator at 1'. However, I'm
-unsure how this works when these nodes are encapsulated by an
-overarching 'regulators' parent node.
-
-Perhaps Mark can answer this?
-
-> +				regulator-compatible = "SAFEOUT";
-> +				regulator-name = "SAFEOUT";
-> +			};
-> +			charger_reg: charger at 0 {
-> +				regulator-compatible = "CHARGER";
-> +				regulator-name = "CHARGER";
-> +				regulator-min-microamp = <90000>;
-> +				regulator-max-microamp = <950000>;
-> +				regulator-boot-on;
-> +			};
-> +		};
-> +	};
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards
+Haojian
