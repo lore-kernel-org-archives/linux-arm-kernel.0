@@ -1,37 +1,100 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Wed, 4 Dec 2013 01:35:15 +0000
-Subject: [PATCH v3 00/10] Add power management support for chipidea
-In-Reply-To: <20131203181546.GA27706@kroah.com>
-References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
- <20131203181546.GA27706@kroah.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498041427BA@039-SN2MPN1-021.039d.mgd.msft.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 3 Dec 2013 19:39:13 -0600
+Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm when
+ bad data is detected
+Message-ID: <1386121153-32351-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Due to the cross dependencies between hwmod for automanaged device
+information for OMAP and dts node definitions, we can run into scenarios
+where the dts node is defined, however it's hwmod entry is yet to be
+added. In these cases:
+a) omap_device does not register a pm_domain (since it cannot find
+   hwmod entry).
+b) driver does not know about (a), does a pm_runtime_get_sync which
+   never fails
+c) It then tries to do some operation on the device (such as read the
+  revision register (as part of probe) without clock or adequate OMAP
+  generic PM operation performed for enabling the module.
+
+This causes a crash such as that reported in:
+https://bugzilla.kernel.org/show_bug.cgi?id=66441
+
+When 'ti,hwmod' is provided in dt node, it is expected that the device
+will not function without the OMAP's power automanagement. Hence, when
+we hit a fail condition (due to hwmod entries not present or other
+similar scenario), fail at pm_domain level due to lack of data, provide
+enough information for it to be fixed, however, it allows for the driver
+to take appropriate measures to prevent crash.
+
+Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/omap_device.c |   24 ++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_device.h |    1 +
+ 2 files changed, 25 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 53f0735..e0a398c 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -183,6 +183,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+ odbfd_exit1:
+ 	kfree(hwmods);
+ odbfd_exit:
++	/* if data/we are at fault.. load up a fail handler */
++	if (ret)
++		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
++
+ 	return ret;
+ }
  
-> > Hi Greg,
-> >
-> > This serial adds power management (system & runtime) for chipidea core.
-> > With this, the chipidea controller can be at low power mode when it is
-> not in
-> > use, and the chipidea controller can be the system wakeup source.
-> > It needs to depend on my patch[1], since [1]-"Add power management
-> support for MXS PHY"
-> > adds some common PHY APIs, and this serial uses it.
-> >
-> > It has been verified at Freescale i.mx6Q/DL SabreSD, i.mx28 evk
-> platform
-> > (no runtime pm support), I will verify it at other FSL platforms during
-> > the patch review.
-> 
-> This series doesn't apply to my tree anymore.
-> 
-> And there have been a ton of chipidea patches floating around, I've now
-> dropped them all from my "todo" queue and will wait for you to collect
-> them and forward them on as I'm totally lost with all of the different
-> versions and objections and the like.
-> 
-
-Greg, I will do that.
-
-Peter
+@@ -604,6 +608,19 @@ static int _od_runtime_resume(struct device *dev)
+ 
+ 	return pm_generic_runtime_resume(dev);
+ }
++
++static int _od_fail_runtime_suspend(struct device *dev)
++{
++	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
++	return -ENODEV;
++}
++
++static int _od_fail_runtime_resume(struct device *dev)
++{
++	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
++	return -ENODEV;
++}
++
+ #endif
+ 
+ #ifdef CONFIG_SUSPEND
+@@ -657,6 +674,13 @@ static int _od_resume_noirq(struct device *dev)
+ #define _od_resume_noirq NULL
+ #endif
+ 
++struct dev_pm_domain omap_device_fail_pm_domain = {
++	.ops = {
++		SET_RUNTIME_PM_OPS(_od_fail_runtime_suspend,
++				   _od_fail_runtime_resume, NULL)
++	}
++};
++
+ struct dev_pm_domain omap_device_pm_domain = {
+ 	.ops = {
+ 		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
+diff --git a/arch/arm/mach-omap2/omap_device.h b/arch/arm/mach-omap2/omap_device.h
+index 17ca1ae..78c02b3 100644
+--- a/arch/arm/mach-omap2/omap_device.h
++++ b/arch/arm/mach-omap2/omap_device.h
+@@ -29,6 +29,7 @@
+ #include "omap_hwmod.h"
+ 
+ extern struct dev_pm_domain omap_device_pm_domain;
++extern struct dev_pm_domain omap_device_fail_pm_domain;
+ 
+ /* omap_device._state values */
+ #define OMAP_DEVICE_STATE_UNKNOWN	0
+-- 
+1.7.9.5
