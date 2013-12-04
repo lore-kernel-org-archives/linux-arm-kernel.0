@@ -1,166 +1,80 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 4 Dec 2013 11:32:43 +0200
-Subject: [PATCH REPOST 1/2] clk: tegra: remove legacy reset APIs
-In-Reply-To: <1386103002-21939-1-git-send-email-swarren@wwwdotorg.org>
-References: <1386103002-21939-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131204093243.GJ26617@tbergstrom-lnx.Nvidia.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 04 Dec 2013 09:38:50 +0000
+Subject: [PATCH] serial: pl011: use port lock to guard control register access
+Message-ID: <1386149930.3417.22.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 09:36:41PM +0100, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Now that no code uses the custom Tegra module reset API, we can remove
-> its implementation.
-> 
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Reviewed-by: Thierry Reding <treding@nvidia.com>
+When the pl011 is being used for a console, pl011_console_write forces
+the control register (CR) to enable the UART for transmission and then
+restores this to the original value afterwards. It does this while
+holding the port lock.
 
-Acked-By: Peter De Schrijver <pdeschrijver@nvidia.com>
+Unfortunately, when the uart is started or shutdown - say in response to
+userland using the serial device for a terminal - then this updates the
+control register without any locking.
 
-> ---
-> Peter, Mike,
-> 
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
-> ---
->  drivers/clk/tegra/clk-periph-gate.c | 22 --------------------
->  drivers/clk/tegra/clk-periph.c      | 40 -------------------------------------
->  drivers/clk/tegra/clk.h             |  1 -
->  include/linux/clk/tegra.h           |  7 -------
->  4 files changed, 70 deletions(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
-> index f38f33e3c65d..507015314827 100644
-> --- a/drivers/clk/tegra/clk-periph-gate.c
-> +++ b/drivers/clk/tegra/clk-periph-gate.c
-> @@ -36,8 +36,6 @@ static DEFINE_SPINLOCK(periph_ref_lock);
->  
->  #define read_rst(gate) \
->  	readl_relaxed(gate->clk_base + (gate->regs->rst_reg))
-> -#define write_rst_set(val, gate) \
-> -	writel_relaxed(val, gate->clk_base + (gate->regs->rst_set_reg))
->  #define write_rst_clr(val, gate) \
->  	writel_relaxed(val, gate->clk_base + (gate->regs->rst_clr_reg))
->  
-> @@ -123,26 +121,6 @@ static void clk_periph_disable(struct clk_hw *hw)
->  	spin_unlock_irqrestore(&periph_ref_lock, flags);
->  }
->  
-> -void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert)
-> -{
-> -	if (gate->flags & TEGRA_PERIPH_NO_RESET)
-> -		return;
-> -
-> -	if (assert) {
-> -		/*
-> -		 * If peripheral is in the APB bus then read the APB bus to
-> -		 * flush the write operation in apb bus. This will avoid the
-> -		 * peripheral access after disabling clock
-> -		 */
-> -		if (gate->flags & TEGRA_PERIPH_ON_APB)
-> -			tegra_read_chipid();
-> -
-> -		write_rst_set(periph_clk_to_bit(gate), gate);
-> -	} else {
-> -		write_rst_clr(periph_clk_to_bit(gate), gate);
-> -	}
-> -}
-> -
->  const struct clk_ops tegra_clk_periph_gate_ops = {
->  	.is_enabled = clk_periph_is_enabled,
->  	.enable = clk_periph_enable,
-> diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
-> index b5feccca2f1e..d8ed9f79708b 100644
-> --- a/drivers/clk/tegra/clk-periph.c
-> +++ b/drivers/clk/tegra/clk-periph.c
-> @@ -111,46 +111,6 @@ static void clk_periph_disable(struct clk_hw *hw)
->  	gate_ops->disable(gate_hw);
->  }
->  
-> -void tegra_periph_reset_deassert(struct clk *c)
-> -{
-> -	struct clk_hw *hw = __clk_get_hw(c);
-> -	struct tegra_clk_periph *periph = to_clk_periph(hw);
-> -	struct tegra_clk_periph_gate *gate;
-> -
-> -	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
-> -		gate = to_clk_periph_gate(hw);
-> -		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
-> -			WARN_ON(1);
-> -			return;
-> -		}
-> -	} else {
-> -		gate = &periph->gate;
-> -	}
-> -
-> -	tegra_periph_reset(gate, 0);
-> -}
-> -EXPORT_SYMBOL(tegra_periph_reset_deassert);
-> -
-> -void tegra_periph_reset_assert(struct clk *c)
-> -{
-> -	struct clk_hw *hw = __clk_get_hw(c);
-> -	struct tegra_clk_periph *periph = to_clk_periph(hw);
-> -	struct tegra_clk_periph_gate *gate;
-> -
-> -	if (periph->magic != TEGRA_CLK_PERIPH_MAGIC) {
-> -		gate = to_clk_periph_gate(hw);
-> -		if (gate->magic != TEGRA_CLK_PERIPH_GATE_MAGIC) {
-> -			WARN_ON(1);
-> -			return;
-> -		}
-> -	} else {
-> -		gate = &periph->gate;
-> -	}
-> -
-> -	tegra_periph_reset(gate, 1);
-> -}
-> -EXPORT_SYMBOL(tegra_periph_reset_assert);
-> -
->  const struct clk_ops tegra_clk_periph_ops = {
->  	.get_parent = clk_periph_get_parent,
->  	.set_parent = clk_periph_set_parent,
-> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-> index 39f24959daf7..57bd0d3090e3 100644
-> --- a/drivers/clk/tegra/clk.h
-> +++ b/drivers/clk/tegra/clk.h
-> @@ -392,7 +392,6 @@ struct tegra_clk_periph_gate {
->  #define TEGRA_PERIPH_WAR_1005168 BIT(3)
->  #define TEGRA_PERIPH_NO_DIV BIT(4)
->  
-> -void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert);
->  extern const struct clk_ops tegra_clk_periph_gate_ops;
->  struct clk *tegra_clk_register_periph_gate(const char *name,
->  		const char *parent_name, u8 gate_flags, void __iomem *clk_base,
-> diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
-> index 23a0ceee831f..3ca9fca827a2 100644
-> --- a/include/linux/clk/tegra.h
-> +++ b/include/linux/clk/tegra.h
-> @@ -120,13 +120,6 @@ static inline void tegra_cpu_clock_resume(void)
->  }
->  #endif
->  
-> -#ifdef CONFIG_ARCH_TEGRA
-> -void tegra_periph_reset_deassert(struct clk *c);
-> -void tegra_periph_reset_assert(struct clk *c);
-> -#else
-> -static inline void tegra_periph_reset_deassert(struct clk *c) {}
-> -static inline void tegra_periph_reset_assert(struct clk *c) {}
-> -#endif
->  void tegra_clocks_apply_init_table(void);
->  
->  #endif /* __LINUX_CLK_TEGRA_H_ */
-> -- 
-> 1.8.1.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This means we can have
+
+  pl011_console_write   Save CR
+  pl011_startup         Initialise CR, e.g. enable receive
+  pl011_console_write   Restore old CR with receive not enabled
+
+this result is a serial port which doesn't respond to any input.
+
+A similar race in reverse could happen when the device is shutdown.
+
+We can fix these problems by taking the port lock when updating CR.
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+
+I can't help but think I've missed something fundamental here as it
+seems wrong to be in the situation at all where were initialising
+hardware if it is already being used?
+
+Also, even with this fix I still see spurious/corrupt output on the
+serial port at the point the port is initialised, so there is obviously
+some other issues in this area.
+
+ drivers/tty/serial/amba-pl011.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 7203864..a0dfb86 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1537,6 +1537,8 @@ static int pl011_startup(struct uart_port *port)
+ 	/*
+ 	 * Provoke TX FIFO interrupt into asserting.
+ 	 */
++	spin_lock_irq(&uap->port.lock);
++
+ 	cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
+ 	writew(cr, uap->port.membase + UART011_CR);
+ 	writew(0, uap->port.membase + UART011_FBRD);
+@@ -1561,6 +1563,8 @@ static int pl011_startup(struct uart_port *port)
+ 	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
+ 	writew(cr, uap->port.membase + UART011_CR);
+ 
++	spin_unlock_irq(&uap->port.lock);
++
+ 	/*
+ 	 * initialise the old status of the modem signals
+ 	 */
+@@ -1629,11 +1633,13 @@ static void pl011_shutdown(struct uart_port *port)
+ 	 * it during startup().
+ 	 */
+ 	uap->autorts = false;
++	spin_lock_irq(&uap->port.lock);
+ 	cr = readw(uap->port.membase + UART011_CR);
+ 	uap->old_cr = cr;
+ 	cr &= UART011_CR_RTS | UART011_CR_DTR;
+ 	cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
+ 	writew(cr, uap->port.membase + UART011_CR);
++	spin_unlock_irq(&uap->port.lock);
+ 
+ 	/*
+ 	 * disable break condition and fifos
+-- 
+1.7.10.4
