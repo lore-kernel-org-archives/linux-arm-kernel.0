@@ -1,69 +1,97 @@
 From: w-kwok2@ti.com (WingMan Kwok)
-Date: Wed, 4 Dec 2013 15:10:11 -0500
-Subject: [PATCH v2 5/5] ARM: keystone: defconfig: enable USB support
+Date: Wed, 4 Dec 2013 15:10:10 -0500
+Subject: [PATCH v2 4/5] ARM: dts: keystone: Add usb devicetree bindings
 In-Reply-To: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
 References: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <1386187811-9596-6-git-send-email-w-kwok2@ti.com>
+Message-ID: <1386187811-9596-5-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the USB support (Host mode only) on TI's Keystone platform.
-It also enables the support of usb mass storage, FAT and Ext4
-filesystems to test rootfs mount over an USB disk.
+Added device tree support for TI's Keystone USB driver and updated the
+Documentation with device tree binding information.
 
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
 ---
- arch/arm/configs/keystone_defconfig |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/usb/keystone-usb.txt       |   41 ++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dtsi                    |   18 +++++++++
+ 2 files changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/keystone-usb.txt
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 9943e5d..a018244 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -115,6 +115,8 @@ CONFIG_MTD_UBI=y
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_EEPROM_AT24=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-@@ -129,10 +131,24 @@ CONFIG_SPI_DAVINCI=y
- CONFIG_SPI_SPIDEV=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_DEBUG=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC3=y
-+CONFIG_USB_DWC3_DEBUG=y
-+CONFIG_USB_DWC3_VERBOSE=y
-+CONFIG_KEYSTONE_USB_PHY=y
- CONFIG_DMADEVICES=y
- CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_MEMORY=y
-+CONFIG_EXT4_FS=y
-+CONFIG_EXT4_FS_POSIX_ACL=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_NTFS_FS=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_FS_WBUF_VERIFY=y
-@@ -144,6 +160,8 @@ CONFIG_ROOT_NFS=y
- CONFIG_NFSD=y
- CONFIG_NFSD_V3=y
- CONFIG_NFSD_V3_ACL=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_SHIRQ=y
- CONFIG_DEBUG_INFO=y
+diff --git a/Documentation/devicetree/bindings/usb/keystone-usb.txt b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+new file mode 100644
+index 0000000..ac2c7cc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+@@ -0,0 +1,41 @@
++TI Keystone Soc USB Controller
++
++DWC3 GLUE
++
++Required properties:
++ - compatible: should be "ti,keystone-dwc3".
++ - #address-cells, #size-cells : should be '1' if the device has sub-nodes
++   with 'reg' property.
++ - reg : Address and length of the register set for the USB subsystem on
++   the SOC.
++ - interrupts : The irq number of this device that is used to interrupt the
++   MPU.
++ - ranges: allows valid 1:1 translation between child's address space and
++   parent's address space.
++ - clocks: Clock IDs array as required by the controller.
++ - clock-names: names of clocks correseponding to IDs in the clock property.
++
++Sub-nodes:
++The dwc3 core should be added as subnode to Keystone DWC3 glue.
++- dwc3 :
++   The binding details of dwc3 can be found in:
++   Documentation/devicetree/bindings/usb/dwc3.txt
++
++Example:
++	usb: usb at 2680000 {
++		compatible = "ti,keystone-dwc3";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x2680000 0x10000>;
++		clocks = <&clkusb>;
++		clock-names = "usb";
++		interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++		ranges;
++
++		dwc3 at 2690000 {
++			compatible = "synopsys,dwc3";
++			reg = <0x2690000 0x70000>;
++			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++			usb-phy = <&usb_phy>, <&usb_phy>;
++		};
++	};
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index d497d9e..0911bb7 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -188,5 +188,23 @@
+ 			#size-cells = <1>;
+ 			reg = <0x2620738 32>;
+ 		};
++
++		usb: usb at 2680000 {
++			compatible = "ti,keystone-dwc3";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x2680000 0x10000>;
++			clocks = <&clkusb>;
++			clock-names = "usb";
++			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++			ranges;
++
++			dwc3 at 2690000 {
++				compatible = "synopsys,dwc3";
++				reg = <0x2690000 0x70000>;
++				interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
++				usb-phy = <&usb_phy>, <&usb_phy>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
