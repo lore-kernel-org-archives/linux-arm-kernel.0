@@ -1,90 +1,59 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Dec 2013 18:58:39 +0100
-Subject: [PATCH/RFC] ARM: omap3: Split the pinmux core device
-In-Reply-To: <20131204172852.GP26766@atomide.com>
-References: <1386177110-26424-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <20131204172852.GP26766@atomide.com>
-Message-ID: <2098999.THrpfnVM6o@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Dec 2013 18:03:21 +0000
+Subject: [PATCH 07/10] ASoC: ux500: Store DMA data in the DAI differently
+ in the pdata and DT case
+In-Reply-To: <CAGa+x85c3y5+VXFjHAZYpUM0+2Tfnra6QKad7-aeUdwjSwo+Vg@mail.gmail.com>
+References: <1384859269-19801-1-git-send-email-lee.jones@linaro.org>
+ <1384859269-19801-8-git-send-email-lee.jones@linaro.org>
+ <CAGa+x85c3y5+VXFjHAZYpUM0+2Tfnra6QKad7-aeUdwjSwo+Vg@mail.gmail.com>
+Message-ID: <20131204180321.GE26581@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+> Today's next (next-20131204) has a new boot failure[1] on
+> ux500/snowball which bisected down to this commit.  Full boot log
+> attached.
 
-On Wednesday 04 December 2013 09:28:53 Tony Lindgren wrote:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131204 09:12]:
-> > The omap3_pmx_core pinmux device in the device tree handles the system
-> > controller module (SCM) PADCONFS fonction. Its control registers are
-> > split in two distinct areas, with other SCM registers in-between. Those
-> > other registers can't thus be requested by other drivers as the memory
-> > region gets reserved by the pinmux driver.
-> > 
-> > Split the omap3_pmx_core device tree node in two for the two memory
-> > regions.
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > ---
-> > 
-> >  arch/arm/boot/dts/omap3-beagle-xm.dts | 45 ++++++++++++++++++++++++------
-> >  arch/arm/boot/dts/omap3-beagle.dts    | 28 +++++++++++++++-------
-> >  arch/arm/boot/dts/omap3-igep0020.dts  | 26 ++++++++++----------
-> >  arch/arm/boot/dts/omap3-zoom3.dts     | 19 ++++++++++-----
-> >  arch/arm/boot/dts/omap3.dtsi          | 13 +++++++++-
-> >  5 files changed, 95 insertions(+), 36 deletions(-)
-> > 
-> > While working on the OMAP3 ISP driver I've run into a failure to request a
-> > memory region already requested by the pinctrl-single driver. This patch
-> > is an attempt to fix the problem. An alternative approach would be to
-> > support multiple reg values in the pinctrl-single driver, but that might
-> > not be much cleaner. I'm open to suggestions.
-> 
-> Makes sense to me to split it into two, we can save some memory that way
-> too.
-> 
-> It should not cause problems with the wake-up interrupts either as we're
-> already using a single chained wake-up interrupt between core and wkup
-> pins.
-> 
-> Do you have some perl or sed script to look for and convert the core2
-> registers? Or do we just not have that many of them defined yet?
+Right.
 
-This patch should cover all the ones we have in mainline. As this is an RFC 
-I've performed the conversion manually.
+Anyone not on CC (which I think you are Kevin) can follow the fun here:
+  http://www.spinics.net/lists/arm-kernel/msg291374.html
 
-> > diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> > b/arch/arm/boot/dts/omap3-beagle-xm.dts index 8d7c813..7028e6a 100644
-> > --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> > +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> It doesn't find the alsa device which in turn seems to prevent the
+> emmc rootfs from being mounted.  It boots fine to an initramfs.
 
-[snip]
+<snip>
 
-> > @@ -152,6 +164,23 @@
-> > 
-> >  &i2c2 {
-> >  	clock-frequency = <400000>;
-> > +
-> > +	switch at 73 {
-> > +		compatible = "nxp,pca9543";
-> > +		reg = <0x73>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		i2c at 0 {
-> > +			reg = <0>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +		};
-> > +		i2c at 1 {
-> > +			reg = <1>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +		};
-> > +	};
-> >  };
-> >  
-> >  &i2c3 {
+> of_dma_request_slave_channel: dma-names property of node '/soc/msp at 80124000' missing or empty
+> of_dma_request_slave_channel: dma-names property of node '/soc/msp at 80124000' missing or empty
+> of_dma_request_slave_channel: dma-names property of node '/soc/msp at 80125000' missing or empty
+> mmc1: new high speed MMC card at address 0001
+> of_dma_request_slave_channel: dma-names property of node '/soc/msp at 80125000' missing or empty
+> mmcblk0: mmc1:0001  7.28 GiB 
+> mmcblk0boot0: mmc1:0001  partition 1 2.00 MiB
+> mmcblk0boot1: mmc1:0001  partition 2 2.00 MiB
+> mmcblk0rpmb: mmc1:0001  partition 3 128 KiB
+> dma dma0chan22: [d40_config_memcpy] No memcpy
+> dma dma0chan22: [d40_alloc_chan_resources] Failed to configure memcpy channel
+> ux500-msp-i2s ux500-msp-i2s.1: Missing dma channel for stream: 0
+> ux500-msp-i2s ux500-msp-i2s.1: ASoC: pcm constructor failed: -22
+> snd-soc-mop500 snd-soc-mop500.0: ASoC: can't create pcm ab8500_0 :-22
+> snd-soc-mop500 snd-soc-mop500.0: ASoC: failed to instantiate card -22
+> snd-soc-mop500 snd-soc-mop500.0: Error: snd_soc_register_card failed (-22)!
+> snd-soc-mop500: probe of snd-soc-mop500.0 failed with error -22
 
-This should obviously not have been included. I'll submit a v2.
+<snip>
+
+> mmci-pl18x sdi4: error during DMA transfer!
+> mmcblk0rpmb: error -110 transferring data, sector 0, nr 8, cmd response 0x900, card status 0x0
+> mmcblk0rpmb: retrying using single block read
+
+It's interesting that the MSP failure has managed to fudge the entire
+DMA Controller. I have absolutely no idea how that can even happen?
+
 
 -- 
-Regards,
-
-Laurent Pinchart
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
