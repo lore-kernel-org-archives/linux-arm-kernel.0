@@ -1,63 +1,117 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed,  4 Dec 2013 16:44:48 +0100
-Subject: [PATCH RFCv2 6/6] net: phy: suspend phydev when going to HALTED
-In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386171888-28190-7-git-send-email-sebastian.hesselbarth@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 4 Dec 2013 09:47:49 -0600
+Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
+ maps and map logical cpu id to APIC id
+In-Reply-To: <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
+References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When phydev is going to HALTED state, we can try to suspend it to
-safe more power. phy_suspend helper will check if PHY can be suspended,
-so just call it when entering HALTED state.
+On Tue, Dec 3, 2013 at 10:39 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> When boot the kernel with MADT, the cpu possible and present maps should be
+> prefilled for cpu topology and acpi based cpu hot-plug.
+>
+> The logic cpu id maps to APIC id (GIC id) is also implemented, it is needed
+> for acpi processor drivers.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h |   10 ++--
+>  arch/arm64/kernel/setup.c     |    2 +
+>  arch/arm64/kernel/smp.c       |    2 +
+>  drivers/acpi/plat/arm-core.c  |  118 +++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 129 insertions(+), 3 deletions(-)
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Changelog:
-RFCv1->RFCv2:
-- initial, integrate phy_suspend to phy state machine
-  (Suggested by Mugunthan and Florian)
+[snip]
 
-Cc: David Miller <davem@davemloft.net>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Mugunthan V N <mugunthanvnm@ti.com>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/net/phy/phy.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index a0c2ca6..1428024 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -420,7 +420,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>                 if (err)
+>                         continue;
+>
+> +#ifndef CONFIG_ACPI
+>                 set_cpu_present(cpu, true);
+> +#endif
 
-diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
-index 36c6994..6429942 100644
---- a/drivers/net/phy/phy.c
-+++ b/drivers/net/phy/phy.c
-@@ -740,7 +740,7 @@ void phy_state_machine(struct work_struct *work)
- 	struct delayed_work *dwork = to_delayed_work(work);
- 	struct phy_device *phydev =
- 			container_of(dwork, struct phy_device, state_queue);
--	int needs_aneg = 0;
-+	int needs_aneg = 0, do_suspend = 0;
- 	int err = 0;
- 
- 	mutex_lock(&phydev->lock);
-@@ -855,6 +855,7 @@ void phy_state_machine(struct work_struct *work)
- 				phydev->link = 0;
- 				netif_carrier_off(phydev->attached_dev);
- 				phydev->adjust_link(phydev->attached_dev);
-+				do_suspend = 1;
- 			}
- 			break;
- 		case PHY_RESUMING:
-@@ -913,6 +914,9 @@ void phy_state_machine(struct work_struct *work)
- 	if (needs_aneg)
- 		err = phy_start_aneg(phydev);
- 
-+	if (do_suspend)
-+		phy_suspend(phydev);
-+
- 	if (err < 0)
- 		phy_error(phydev);
- 
--- 
-1.7.2.5
+Should this be moved to DT cpu topology related code?
+
+>                 max_cpus--;
+>         }
+>  }
+> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
+> index 45ff625..8527ecc 100644
+> --- a/drivers/acpi/plat/arm-core.c
+> +++ b/drivers/acpi/plat/arm-core.c
+
+[snip]
+
+> @@ -221,6 +284,61 @@ static int __init acpi_parse_madt_gic_distributor_entries(void)
+>         return 0;
+>  }
+>
+> +static int setup_possible_cpus __initdata = -1;
+> +static int __init _setup_possible_cpus(char *str)
+> +{
+> +       get_option(&str, &setup_possible_cpus);
+> +       return 0;
+> +}
+> +early_param("possible_cpus", _setup_possible_cpus);
+
+This does not seem ACPI or ARM specific.
+
+> +
+> +/*
+> + * cpu_possible_mask should be static, it cannot change as cpu's
+> + * are onlined, or offlined. The reason is per-cpu data-structures
+> + * are allocated by some modules at init time, and dont expect to
+> + * do this dynamically on cpu arrival/departure.
+> + * cpu_present_mask on the other hand can change dynamically.
+> + * In case when cpu_hotplug is not compiled, then we resort to current
+> + * behaviour, which is cpu_possible == cpu_present.
+> + * - Ashok Raj
+> + *
+> + * Three ways to find out the number of additional hotplug CPUs:
+> + * - If the BIOS specified disabled CPUs in ACPI/mptables use that.
+> + * - The user can overwrite it with possible_cpus=NUM
+> + * - Otherwise don't reserve additional CPUs.
+> + * We do this because additional CPUs waste a lot of memory.
+> + * -AK
+> + */
+> +void __init prefill_possible_map(void)
+> +{
+> +       int i;
+> +       int possible, disabled_cpus;
+> +
+> +       disabled_cpus = total_cpus - available_cpus;
+> +
+> +       if (setup_possible_cpus == -1) {
+> +               if (disabled_cpus > 0)
+> +                       setup_possible_cpus = disabled_cpus;
+> +               else
+> +                       setup_possible_cpus = 0;
+> +       }
+> +
+> +       possible = available_cpus + setup_possible_cpus;
+> +
+> +       pr_info("SMP: the system is limited to %d CPUs\n", nr_cpu_ids);
+> +
+> +       if (possible > nr_cpu_ids)
+> +               possible = nr_cpu_ids;
+> +
+> +       pr_info("SMP: Allowing %d CPUs, %d hotplug CPUs\n",
+> +               possible, max((possible - available_cpus), 0));
+> +
+> +       for (i = 0; i < possible; i++)
+> +               set_cpu_possible(i, true);
+> +       for (; i < NR_CPUS; i++)
+> +               set_cpu_possible(i, false);
+> +}
+
+This does not seem ACPI or ARM specific either.
+
+Rob
