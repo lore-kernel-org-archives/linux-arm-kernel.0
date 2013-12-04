@@ -1,36 +1,75 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 04 Dec 2013 13:04:00 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVgyNzogQ29uZmlndXJlIEdQSU9z?=
- =?UTF-8?B?IGFzICJpbnB1dCIgYnkgZGVmYXVsdA==?=
-In-Reply-To: <20131204095703.236ccbe0@ipc1.ka-ro>
-References: <1385795000-29764-1-git-send-email-shc_work@mail.ru>
- <20131203133045.GC28465@pengutronix.de>
- <20131204095703.236ccbe0@ipc1.ka-ro>
-Message-ID: <1386147840.110296074@f57.i.mail.ru>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 4 Dec 2013 10:03:13 +0100
+Subject: [PATCH RESEND v5 1/2] PWM: PXA: add device tree support to PWM
+ driver
+In-Reply-To: <529E8193.1040606@linaro.org>
+References: <1379791174-2369-1-git-send-email-mikedunn@newsguy.com>
+ <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
+ <20131203101714.GG21178@ulmo.nvidia.com>
+ <529E26C9.30707@newsguy.com> <529E8193.1040606@linaro.org>
+Message-ID: <20131204090312.GK19943@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > On Tue, Dec 03, 2013 at 04:46:27PM +0800, Shawn Guo wrote:
-> > > On Sat, Nov 30, 2013 at 11:03:20AM +0400, Alexander Shiyan wrote:
-> > > > This patch changes the default direction for pins used
-> > > > as GPIO to "input". This prevents a short circuit on the
-> > > > configuration stage when GPIO-pin is connected to the
-> > > > other output pin.
-> > > 
-> > > Markus,
-> > > 
-> > > Does it make sense to you?
-> > 
-> > I am not sure if this really happens. However, it does make sense and I
-> > can't see any disadvantages in changing the default GPIO mux direction to
-> > input.
-> > 
-> What happens, if the bootloader already set up a pin as output and
-> linux later does the pinconfig stuff?
-> If the pin is reconfigured as input then, this may produce an unwanted
-> glitch on the pin. IMO the pinconfig driver should not touch the pin
-> direction, but leave it to the gpio driver to set that up. 
+On Wed, Dec 04, 2013 at 09:12:51AM +0800, Haojian Zhuang wrote:
+> 
+> On 12/04/2013 02:45 AM, Mike Dunn wrote:
+> >On 12/03/2013 02:17 AM, Thierry Reding wrote:
+> >>On Sat, Sep 21, 2013 at 12:19:33PM -0700, Mike Dunn wrote:
+> >>>This patch adds device tree support to the PXA's PWM driver.  Nothing
+> >>>needs to be extracted from the device tree node by the PWM device.
+> >>>Client devices need only specify the period; the per-chip index is
+> >>>implicitly zero because one device node must be present for each PWM
+> >>>output in use.  This approach is more convenient due to the wide
+> >>>variability in the number of PWM channels present across the various PXA
+> >>>variants, and is made possible by the fact that the register sets for
+> >>>each PWM channel are segregated from each other.  An of_xlate() method
+> >>>is added to parse this single-cell node.  The existing ID table is
+> >>>reused for the match table data.
+> >>>
+> >>>Tested on a Palm Treo 680 (both platform data and DT cases).
+> >>>
+> >>>Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+> >>>---
+> >>>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 30 +++++++++++++
+> >>>  drivers/pwm/pwm-pxa.c                             | 52 ++++++++++++++++++++++-
+> >>>  2 files changed, 81 insertions(+), 1 deletion(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> >>Hi Mike,
+> >>
+> >>It looks like this fell through the cracks. Is this patch still the
+> >>latest one you have? Should it still be applied?
+> >>
+> >>Thierry
+> >>
+> >Hi Thierry,
+> >
+> >Funny I should hear from you about this today.... I just turned my attention
+> >back to this today and noticed that it never made it into your for-next branch.
+> >  Yes, it is the latest.  If the patch still applies cleanly, please feel free.
+> >Otherwise, I'd be glad to rework it against something more recent.
+> >
+> >Also, we never got any ACKs for patch 2/2, which just adds the nodes to
+> >arch/arm/boot/dts/pxa27x.dtsi
+> >Any advice on whom to nudge?
+> >
+> >Thanks much!
+> >Mike
+> >
+> 
+> It's fine to me.
+> 
+> Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Such pin can be overridden by board DTS.
+I think it's customary to take DTS file updates through the architecture
+trees, so I think it'd be better if you took patch 2/2. There aren't any
+dependencies between both patches either.
 
----
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/be4e15f2/attachment-0001.sig>
