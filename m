@@ -1,50 +1,41 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 4 Dec 2013 23:34:46 +0530
-Subject: [PATCH v4 1/5] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <1385556508-3935-2-git-send-email-ivan.khoronzhuk@ti.com>
+Date: Wed, 4 Dec 2013 23:40:13 +0530
+Subject: [PATCH v4 0/5] Update Davinci watchdog driver
+In-Reply-To: <5298943D.8010608@ti.com>
 References: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385556508-3935-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <529F6EBE.5050703@ti.com>
+ <5298943D.8010608@ti.com>
+Message-ID: <529F7005.9010904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2013 6:18 PM, Ivan Khoronzhuk wrote:
-> To reduce code duplicate and increase code readability use WDT core
-> code to handle WDT interface.
+On 11/29/2013 6:48 PM, Grygorii Strashko wrote:
+> Hi Sekhar,
 > 
-> Remove io_lock as the WDT core uses mutex to lock each wdt device.
-> Remove wdt_state as the WDT core tracks state with its own variable.
+> On 11/27/2013 02:48 PM, Ivan Khoronzhuk wrote:
+>> These patches are intended to update Davinci watchdog to use WDT core
+>> and reuse driver for keystone arch, because Keystone uses the similar
+>> IP like Davinci.
+>>
+>> See Documentation:
+>> Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
+>> Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
+>>
+>> Also:
+>>   - improved to support GET_TIMELEFT option.
+>>   - added "clocks" and "timeout-sec" properties to DT.
 > 
-> The watchdog_init_timeout() can read timeout value from timeout-sec
-> property if the passed value is out of bounds. The heartbeat is
-> initialized in next way. If heartbeat is not set thought module
-> parameter, try to read it's value from WDT node timeout-sec property.
-> If node has no one, use default value.
-> 
-> The heartbeat is hold in wdd->timeout by WDT core, so use it in
-> order to set timeout period.
-> 
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->  drivers/watchdog/Kconfig       |    2 +
->  drivers/watchdog/davinci_wdt.c |  147 ++++++++++------------------------------
->  2 files changed, 37 insertions(+), 112 deletions(-)
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 5be6e91..eb8c89d 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -271,6 +271,8 @@ config IOP_WATCHDOG
->  config DAVINCI_WATCHDOG
->  	tristate "DaVinci watchdog"
->  	depends on ARCH_DAVINCI
-> +	select WATCHDOG_CORE
-> +	select WATCHDOG_NOWAYOUT
+> Do you have any additional comments to this series?
 
-Its not clear for change log why NOWAYOUT needs to be forced on all the
-time for all users of DaVinci watchdog.
+I have one comment I just sent out and apart from that the series looks
+good to go from my side.
+
+> 
+> By the way patch "[PATCH] watchdog: davinci: rename platform driver to davinci-wdt"
+> https://lkml.org/lkml/2013/11/27/201 can be applied as before as after this series
+> without conflicts.
+
+Yes, I want to queue it from DaVinci tree just because of the amount of
+DaVinci code that patch touches, but need ack from Wim before I do that.
 
 Thanks,
 Sekhar
