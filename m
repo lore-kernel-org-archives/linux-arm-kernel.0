@@ -1,74 +1,78 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 4 Dec 2013 13:34:31 +0200
-Subject: [PATCH 1/1] gpio: twl4030: Fix regression for twl gpio LED output
-In-Reply-To: <1386156871-7639-1-git-send-email-rogerq@ti.com>
-References: <1386156871-7639-1-git-send-email-rogerq@ti.com>
-Message-ID: <1386156871-7639-2-git-send-email-rogerq@ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 04 Dec 2013 12:38:57 +0100
+Subject: [PATCH 1/2] ASoC: atmel_ssc_dai: add dai trigger ops
+In-Reply-To: <1386124624-22414-2-git-send-email-voice.shen@atmel.com>
+References: <1386124624-22414-1-git-send-email-voice.shen@atmel.com>
+ <1386124624-22414-2-git-send-email-voice.shen@atmel.com>
+Message-ID: <529F1451.1060800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0b2aa8be introduced a regression that causes failure
-in setting LED GPO direction to OUT.
+On 04/12/2013 03:37, Bo Shen wrote:
+> According to the SSC specifiation, it should be enabled after DMA is
+> enabled. So, add trigger operation to make sure the right sequence.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+>  sound/soc/atmel/atmel_ssc_dai.c |   30 +++++++++++++++++++++++++++++-
+>  1 file changed, 29 insertions(+), 1 deletion(-)
+> 
+> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+> index 8697ced..1ead3c9 100644
+> --- a/sound/soc/atmel/atmel_ssc_dai.c
+> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> @@ -648,7 +648,7 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+>  
+>  	dma_params = ssc_p->dma_params[dir];
+>  
+> -	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_enable);
+> +	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
+>  	ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
+>  
+>  	pr_debug("%s enabled SSC_SR=0x%08x\n",
+> @@ -657,6 +657,33 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+>  	return 0;
+>  }
+>  
+> +static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
+> +			     int cmd, struct snd_soc_dai *dai)
+> +{
+> +	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> +	struct atmel_pcm_dma_params *dma_params;
+> +	int dir;
+> +
+> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> +		dir = 0;
+> +	else
+> +		dir = 1;
+> +
+> +	dma_params = ssc_p->dma_params[dir];
+> +
+> +	switch (cmd) {
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_enable);
+> +		break;
+> +	default:
+> +		ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
+> +		break;
+> +	}
+> +
+> +	return 0;
+> +}
+>  
+>  #ifdef CONFIG_PM
+>  static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+> @@ -731,6 +758,7 @@ static const struct snd_soc_dai_ops atmel_ssc_dai_ops = {
+>  	.startup	= atmel_ssc_startup,
+>  	.shutdown	= atmel_ssc_shutdown,
+>  	.prepare	= atmel_ssc_prepare,
+> +	.trigger	= atmel_ssc_trigger,
+>  	.hw_params	= atmel_ssc_hw_params,
+>  	.set_fmt	= atmel_ssc_set_dai_fmt,
+>  	.set_clkdiv	= atmel_ssc_set_dai_clkdiv,
+> 
 
-This causes USB host probe failures for Beagleboard C4.
-
-[    2.075469] platform usb_phy_gen_xceiv.2: Driver usb_phy_gen_xceiv requests probe deferral
-[    2.090454] hsusb2_vcc: Failed to request enable GPIO510: -22
-[    2.100982] reg-fixed-voltage reg-fixed-voltage.0.auto: Failed to register regulator: -22
-[    2.109954] reg-fixed-voltage: probe of reg-fixed-voltage.0.auto failed with error -22
-
-direction_out/direction_in must return 0 if the operation succeeded.
-
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- drivers/gpio/gpio-twl4030.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
-index b97d6a6..0999ed1 100644
---- a/drivers/gpio/gpio-twl4030.c
-+++ b/drivers/gpio/gpio-twl4030.c
-@@ -294,13 +294,13 @@ out:
- static int twl_direction_in(struct gpio_chip *chip, unsigned offset)
- {
- 	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
--	int ret;
-+	int ret = 0;
- 
- 	mutex_lock(&priv->mutex);
- 	if (offset < TWL4030_GPIO_MAX)
--		ret = twl4030_set_gpio_direction(offset, 1);
-+		twl4030_set_gpio_direction(offset, 1);
- 	else
--		ret = -EINVAL;
-+		ret = -EINVAL;	/* LED outputs can't be set as input */
- 
- 	if (!ret)
- 		priv->direction &= ~BIT(offset);
-@@ -354,18 +354,21 @@ static void twl_set(struct gpio_chip *chip, unsigned offset, int value)
- static int twl_direction_out(struct gpio_chip *chip, unsigned offset, int value)
- {
- 	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
--	int ret = -EINVAL;
- 
- 	mutex_lock(&priv->mutex);
- 	if (offset < TWL4030_GPIO_MAX)
--		ret = twl4030_set_gpio_direction(offset, 0);
-+		twl4030_set_gpio_direction(offset, 0);
-+
-+	/*
-+	 *  LED gpio's i.e. offset >= TWL4030_GPIO_MAX are always output
-+	 */
- 
- 	priv->direction |= BIT(offset);
- 	mutex_unlock(&priv->mutex);
- 
- 	twl_set(chip, offset, value);
- 
--	return ret;
-+	return 0;
- }
- 
- static int twl_to_irq(struct gpio_chip *chip, unsigned offset)
--- 
-1.8.3.2
+Tested-by: Richard Genoud <richard.genoud@gmail.com>
+on at91sam9g35-ek with 3.12-rc2 + "ASoC: wm8731: fix dsp mode configuration"
