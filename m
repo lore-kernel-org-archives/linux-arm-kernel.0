@@ -1,76 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  4 Dec 2013 15:27:52 -0700
-Subject: [PATCH 1/2] ARM: tegra: rebuild tegra_defconfig
-Message-ID: <1386196073-25193-1-git-send-email-swarren@wwwdotorg.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 5 Dec 2013 03:58:17 +0530
+Subject: [GIT PULL] DaVinci fixes for v3.13-rc3
+Message-ID: <529FAC81.6090102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-This separates out "NULL" changes from future real changes.
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/configs/tegra_defconfig | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+are available in the git repository at:
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 4934295bb4f0..4a293393f415 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -36,8 +36,8 @@ CONFIG_PCIEPORTBUS=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
- CONFIG_HIGHMEM=y
-+CONFIG_CMA=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_KEXEC=y
-@@ -63,7 +63,6 @@ CONFIG_INET_ESP=y
- # CONFIG_INET_LRO is not set
- # CONFIG_INET_DIAG is not set
- CONFIG_IPV6=y
--CONFIG_IPV6_PRIVACY=y
- CONFIG_IPV6_ROUTER_PREF=y
- CONFIG_IPV6_OPTIMISTIC_DAD=y
- CONFIG_INET6_AH=y
-@@ -85,7 +84,6 @@ CONFIG_RFKILL_GPIO=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_FIRMWARE_IN_KERNEL is not set
--CONFIG_CMA=y
- CONFIG_DMA_CMA=y
- CONFIG_MTD=y
- CONFIG_MTD_M25P80=y
-@@ -164,7 +162,6 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_DRM=y
--CONFIG_TEGRA_HOST1X=y
- CONFIG_DRM_TEGRA=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- # CONFIG_LCD_CLASS_DEVICE is not set
-@@ -256,16 +253,15 @@ CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_SLAB=y
-+CONFIG_DEBUG_VM=y
- CONFIG_DETECT_HUNG_TASK=y
- CONFIG_SCHEDSTATS=y
- CONFIG_TIMER_STATS=y
--CONFIG_DEBUG_SLAB=y
- # CONFIG_DEBUG_PREEMPT is not set
- CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_VM=y
- CONFIG_DEBUG_SG=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
--- 
-1.8.1.5
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.13-rc3
+
+for you to fetch changes up to ee880dbd1688c99084052c7890246c1e16c89820:
+
+  ARM: davinci: Fix McASP mem resource names (2013-12-05 03:02:20 +0530)
+
+----------------------------------------------------------------
+This pull request includes a patch
+to align platform code to driver's
+usage of platform_get_resource_byname()
+
+This is needed to start successfully probing
+audio again. The regression was introduced
+in v3.13 merge window.
+
+----------------------------------------------------------------
+Peter Ujfalusi (1):
+      ARM: davinci: Fix McASP mem resource names
+
+ arch/arm/mach-davinci/devices-da8xx.c |    4 ++--
+ arch/arm/mach-davinci/dm355.c         |    1 +
+ arch/arm/mach-davinci/dm365.c         |    1 +
+ arch/arm/mach-davinci/dm644x.c        |    1 +
+ arch/arm/mach-davinci/dm646x.c        |    4 ++--
+ 5 files changed, 7 insertions(+), 4 deletions(-)
