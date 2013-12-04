@@ -1,69 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 05 Dec 2013 00:05:44 +0300
-Subject: [PATCH RFCv2 5/6] net: phy: suspend unused PHYs on mdio_bus in
- late_initcall
-In-Reply-To: <1386171888-28190-6-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1386171888-28190-6-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <529F9928.9090407@cogentembedded.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 04 Dec 2013 12:25:27 -0800
+Subject: [PATCH v2] clk: exynos5420: fix cpll clock register offsets
+In-Reply-To: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
+References: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <20131204202527.29850.94931@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Quoting Chander Kashyap (2013-09-26 02:06:35)
+> Fixes cpll control and lock register offset values for Exynos5420 SoC.
+> 
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-On 12/04/2013 06:44 PM, Sebastian Hesselbarth wrote:
+Taken into clk-next.
 
-> Since phy_attach ensures PHYs are resumed, we can now suspend all
-> PHYs that have no attached netdev after initcalls.
+Thanks,
+Mike
 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
-> Changelog:
-> RFCv1->RFCv2:
-> - only check for phydev->attached_dev and let phy_suspend decide on
->    performing suspend or not (Suggested by Florian)
-
-> @Florian: You suggested to 'make sure that the MDIO bus suspend policy
-> was set to "auto"'. I wasn't able to find any clue how to check that,
-> so I ignored that for now.
-
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Mugunthan V N <mugunthanvnm@ti.com>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->   drivers/net/phy/mdio_bus.c |   25 +++++++++++++++++++++++++
->   1 files changed, 25 insertions(+), 0 deletions(-)
-
-> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-> index 5617876..f533d17 100644
-> --- a/drivers/net/phy/mdio_bus.c
-> +++ b/drivers/net/phy/mdio_bus.c
-> @@ -320,6 +320,31 @@ static int mdio_bus_match(struct device *dev, struct device_driver *drv)
->   		(phydev->phy_id & phydrv->phy_id_mask));
->   }
->
-> +static int mdio_bus_suspend_unused(struct device *busdev, void *data)
-> +{
-> +	struct mii_bus *bus = to_mii_bus(busdev);
-> +	struct phy_device *phydev;
-> +	int i;
-> +
-> +	for (i = 0; i < PHY_MAX_ADDR; i++) {
-> +		if (!bus->phy_map[i])
-> +			continue;
-> +
-> +		phydev = to_phy_device(&bus->phy_map[i]->dev);
-
-    Why so complex? 'bus->phy_map[i]' already gives you 'phydev'.
-
-> +		if (!phydev->attached_dev)
-> +			phy_suspend(phydev);
-> +	}
-> +
-> +	return 0;
-> +}
-
-WBR, Sergei
+> Changes Since v1:
+>         - Fixed patch subject as per Kukgin suggestion.
+> 
+>  drivers/clk/samsung/clk-exynos5420.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 86dfc64..892aac0 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -730,8 +730,8 @@ struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>  struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
+>         [apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+>                 APLL_CON0, NULL),
+> -       [cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
+> -               MPLL_CON0, NULL),
+> +       [cpll] = PLL(pll_2550, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
+> +               CPLL_CON0, NULL),
+>         [dpll] = PLL(pll_2550, fout_dpll, "fout_dpll", "fin_pll", DPLL_LOCK,
+>                 DPLL_CON0, NULL),
+>         [epll] = PLL(pll_2650, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
+> -- 
+> 1.7.9.5
+> 
