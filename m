@@ -1,32 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 4 Dec 2013 17:47:00 +0100
-Subject: Boot time errors/warnings on snowball
-In-Reply-To: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
-References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
-Message-ID: <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
+From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
+Date: Wed, 4 Dec 2013 11:52:34 -0500
+Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
+In-Reply-To: <20131204070442.GA31665@kroah.com>
+References: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
+ <20131204070442.GA31665@kroah.com>
+Message-ID: <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 4, 2013 at 5:37 PM, Olof Johansson <olof@lixom.net> wrote:
+Hi all,
 
-> I noticed these with last night's -next on the snowball:
+First, please excuse me for these misformatted patches that my email
+client messed up. Next time I will use git send-email. The 3 patches
+can be found on
+http://git.dorsal.polymtl.ca/~averge?p=linux.git;a=shortlog;h=refs/heads/etm_with_addr_and_pid
+
+Greg: you're right, sysfs is a questionable place for tracing/debug
+code. Debugfs or /dev entries would be the right place.
+
+Though, the only support for ETM in Linux is there, and currently very
+limited because tracing options such as address and pid are not
+configurable. The code I propose would make it usable, until someone
+with time (and more experience than me ;)) moves it out from sysfs.
+
+Thanks,
+
+Adrien
+
+2013/12/4 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> On Tue, Dec 03, 2013 at 11:39:21PM -0500, Adrien Verg? wrote:
+>> Usage of ETM tracing facility is currently very limited: user can
+>> only start/stop tracing. This set of patches enables management of
+>> address combinations and PIDs that trigger tracing.
+>>
+>> ETM management was done via sysfs entries (trace_info,
+>> trace_running...), this code adds trace_addrrange and trace_pid to
+>> let the user read/write custom values.
 >
-> of_dma_request_slave_channel: dma-names property of node
-> '/soc/msp at 80124000' missing or empty
-> of_dma_request_slave_channel: dma-names property of node
-> '/soc/msp at 80124000' missing or empty
-> of_dma_request_slave_channel: dma-names property of node
-> '/soc/msp at 80125000' missing or empty
-> of_dma_request_slave_channel: dma-names property of node
-> '/soc/msp at 80125000' missing or empty
-> dma dma0chan22: [d40_config_memcpy] No memcpy
-> dma dma0chan22: [d40_alloc_chan_resources] Failed to configure memcpy channel
-> ux500-msp-i2s ux500-msp-i2s.1: Missing dma channel for stream: 0
-> ux500-msp-i2s ux500-msp-i2s.1: ASoC: pcm constructor failed: -22
-
-I don't see this when booting from the stuff I sent for v3.14,
-but I know Mark applied some fixes from Lee yesterday,
-Lee can you see if you recognize this?
-
-Yours,
-Linus Walleij
+> I have lots to say about this from a sysfs point of view, but first, why
+> is it in sysfs at all?  Shouldn't all of this be in debugfs?
+>
+> greg k-h
