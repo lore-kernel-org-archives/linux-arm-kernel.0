@@ -1,48 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Dec 2013 13:41:56 +0000
-Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
-In-Reply-To: <1386164272.6195.3.camel@AMDC1943>
-References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
- <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
- <20131204112039.GC907@lee--X1> <1386164272.6195.3.camel@AMDC1943>
-Message-ID: <20131204134156.GA25422@lee--X1>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Wed, 04 Dec 2013 07:57:39 -0600
+Subject: [PATCH 2/3] clk: bcm281xx: add initial clock framework support
+In-Reply-To: <529F28E3.90905@linaro.org>
+References: <529EA78E.7060904@linaro.org> <529EA80F.3050009@linaro.org>
+ <20131204111457.GF16025@e106331-lin.cambridge.arm.com>
+ <529F28E3.90905@linaro.org>
+Message-ID: <529F34D3.5080806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +MAXIM MAX14577 multi-function device
-> > 
-> > Why is Maxim capitalised in such a way?
-> > 
-> > If you're going to use the term Multi-Function Device, please
-> > capitalise it.
-> > 
-> > > +MAX14577 is a Multi-function device with Micro-USB Interface Circuit, Li+
-> > 
-> > Same here.
-> 
-> I'll fix this. The MAXIM capitalization came from other drivers.
+On 12/04/2013 07:06 AM, Alex Elder wrote:
+>>> +       name_size = strlen(node->name) + 1;
+>>> >> +       ccu = kzalloc(sizeof(*ccu) + name_size, GFP_KERNEL);
+>>> >> +       if (!ccu) {
+>>> >> +               pr_err("%s: unable to map allocate CCU struct for %s\n",
+>>> >> +                       __func__, node->name);
+>>> >> +               return;
+>>> >> +       }
+>>> >> +       memcpy((char *)ccu->name, node->name, name_size);
+>> > 
+>> > You could simplify this with kstrdup.
+> You are correct, and I will make that change.  I think at
+> one point I needed the length but that doesn't appear to
+> be the case here.
 
-No need to repeat mistakes. I believe it should be Maxim.
+On second thought, no, you may have missed what was happening here.
+I was avoiding two kmallocs() by setting aside space at the end
+of the structure to hold its name.  It may seem silly, but this
+avoids a possible (well, conceivable) failure case.
 
-> > > +Example:
-> > > +	max14577 at 25 {
-> > > +		compatible = "maxim,max14577";
-> > > +		reg = <0x25>;
-> > > +		interrupt-parent = <&gpx1>;
-> > > +		interrupts = <5 0>;
-> > 
-> > I'm gussing this is IRQ5 and the 0 is flags? If so, please use
-> > #defines for the flags.
-> 
-> This is a standard interrupt binding. The max14577 MFD core driver
-> ignores the interrupt flags and always uses IRQF_TRIGGER_FALLING. I can
-> fix this with new patch for drivers/mfd/max14577.c but still I don't see
-> what should be added in documentation.
+However, based on your earlier question about "what about freeing
+ccu->name?" I am going to use kstrdup() here.  I'd rather the code
+put you at ease than look weird just to avoid an unlikely failure.
 
-s/0/IRQ_TYPE_NONE
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+					-Alex
