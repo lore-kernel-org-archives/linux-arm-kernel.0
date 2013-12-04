@@ -1,110 +1,50 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 04 Dec 2013 20:01:09 +0900
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 04 Dec 2013 12:03:31 +0100
 Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
-In-Reply-To: <1386154579.25938.2.camel@AMDC1943>
+In-Reply-To: <529F0B75.5040004@samsung.com>
 References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
  <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
  <529F08DD.2090005@samsung.com> <1386154579.25938.2.camel@AMDC1943>
-Message-ID: <529F0B75.5040004@samsung.com>
+ <529F0B75.5040004@samsung.com>
+Message-ID: <1386155011.25938.4.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 07:56 PM, Krzysztof Kozlowski wrote:
-> On Wed, 2013-12-04 at 19:50 +0900, Chanwoo Choi wrote:
->> Hi Krzysztof,
->>
->> On 12/04/2013 07:40 PM, Krzysztof Kozlowski wrote:
->>> Add document describing device tree bindings for MAX14577 MFD driver.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>>  Documentation/devicetree/bindings/mfd/max14577.txt |   48 ++++++++++++++++++++
->>>  1 file changed, 48 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/mfd/max14577.txt b/Documentation/devicetree/bindings/mfd/max14577.txt
->>> new file mode 100644
->>> index 000000000000..f4fd16360b6b
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/mfd/max14577.txt
->>> @@ -0,0 +1,48 @@
->>> +MAXIM MAX14577 multi-function device
->>> +
->>> +MAX14577 is a Multi-function device with Micro-USB Interface Circuit, Li+
->>> +Battery Charger and SFOUT LDO output for powering USB devices. It is
->>> +interfaced to host controller using I2C.
->>> +
->>> +Required properties:
->>> +- compatible : Must be "maxim,max14577".
->>> +- reg : I2C slave address for the max14577 chip.
->>> +- interrupts : IRQ line for the max14577 chip.
->>> +- interrupt-parent :  The parent interrupt controller.
->>> +
->>> +Optional nodes:
->>> +- regulators :
->>> +  Required child node properties:
->>> +  - compatible : "maxim,max14577-regulator"
->>> +
->>> +  Optional child nodes:
->>> +    Each child node representing a regulator, following standard regulator
->>> +    bindings. Valid names for a regulator are: "CHARGER" and "SAFEOUT".
->>> +    The SAFEOUT is a constant voltage regulator so there is no need to specify
->>> +    voltages for it.
->>> +
->>> +	[*] refer Documentation/devicetree/bindings/regulator/regulator.txt
->>> +
->>> +Example:
->>> +	max14577 at 25 {
->>> +		compatible = "maxim,max14577";
->>> +		reg = <0x25>;
->>> +		interrupt-parent = <&gpx1>;
->>> +		interrupts = <5 0>;
->>> +
->>> +		regulators {
->>> +			compatible = "maxim,max14577-regulator";
->>> +
->>> +			safeout_reg: safeout at 1 {
->>> +				regulator-compatible = "SAFEOUT";
->>> +				regulator-name = "SAFEOUT";
->>> +			};
->>> +			charger_reg: charger at 0 {
->>> +				regulator-compatible = "CHARGER";
->>> +				regulator-name = "CHARGER";
->>> +				regulator-min-microamp = <90000>;
->>> +				regulator-max-microamp = <950000>;
->>> +				regulator-boot-on;
->>> +			};
->>> +		};
->>
->> I prefer to add dt data about max14577-muic on following:
->> If extcon consumer driver need to use muic device, dts should provide following dt data.
->>
->> 		muic: max14577-muic {
->> 			compatible = "maxim, max14577-muic";
->> 		};
->>> +	};
->>>
->> For example,
->> If fuel-gauge want to use extcon subsystem, dt data of fuel-gauge add 'extcon' property as following:
->>
->> 	fuel-gague@ {
->> 		compatible = "...";
->> 		extcon = <&muic>;
->> 	}
->>
-> Hi,
+On Wed, 2013-12-04 at 20:01 +0900, Chanwoo Choi wrote:
+> On 12/04/2013 07:56 PM, Krzysztof Kozlowski wrote:
+> > On Wed, 2013-12-04 at 19:50 +0900, Chanwoo Choi wrote:
+(...)
+> >>
+> >> I prefer to add dt data about max14577-muic on following:
+> >> If extcon consumer driver need to use muic device, dts should provide following dt data.
+> >>
+> >> 		muic: max14577-muic {
+> >> 			compatible = "maxim, max14577-muic";
+> >> 		};
+> >>> +	};
+> >>>
+> >> For example,
+> >> If fuel-gauge want to use extcon subsystem, dt data of fuel-gauge add 'extcon' property as following:
+> >>
+> >> 	fuel-gague@ {
+> >> 		compatible = "...";
+> >> 		extcon = <&muic>;
+> >> 	}
+> >>
+> > Hi,
+> > 
+> > The extcon driver itself does not use the binding. It is only needed for
+> > consumers. Is it a common practice to add to documentation such notice
+> > for consumers only?
 > 
-> The extcon driver itself does not use the binding. It is only needed for
-> consumers. Is it a common practice to add to documentation such notice
-> for consumers only?
+> As you comment, It is only for extcon consumer.
+> But extcon provider driver always is operated with extcon consumer driver.
+> If dts file don't support upper dt data about extcon provider driver,
+> all of extcon consumer drivers could not use extcon subsystem.
+> 
+> I thinks it is common dt data for muic device.
 
-As you comment, It is only for extcon consumer.
-But extcon provider driver always is operated with extcon consumer driver.
-If dts file don't support upper dt data about extcon provider driver,
-all of extcon consumer drivers could not use extcon subsystem.
+OK, I'll add it.
 
-I thinks it is common dt data for muic device.
-
-Thanks,
-Chanwoo Choi
+Best regards,
+Krzysztof
