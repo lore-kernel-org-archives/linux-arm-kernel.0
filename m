@@ -1,83 +1,78 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 4 Dec 2013 18:03:55 +0800
-Subject: [GIT PULL][v2] pull request for hisilicon soc
-In-Reply-To: <529EF3CB.5040505@gmail.com>
-References: <529EF3CB.5040505@gmail.com>
-Message-ID: <CAN1soZweQ3_4=NYw0xSmo0W18odnPnVqzXnbCUHr=QvfSOnKdA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 4 Dec 2013 11:03:41 +0100
+Subject: [PATCH v8 1/2] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <529E9AA2.8020400@atmel.com>
+References: <1384766002-2852-1-git-send-email-voice.shen@atmel.com>
+ <20131202105957.GD18060@ulmo.nvidia.com>
+ <529D4B58.9020700@atmel.com>
+ <20131203094326.GB21178@ulmo.nvidia.com>
+ <529E9AA2.8020400@atmel.com>
+Message-ID: <20131204100340.GU19943@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 4, 2013 at 5:20 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> Hi all,
->
-> Please help to merge this pull request.
->
-> I have to use gmail address since my GPG key is based on gmail.com.
->
-> Best Regards
-> Haojian
->
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->
-> are available in the git repository at:
->
-> ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/hisilicon-basic
->
-> for you to fetch changes up to 10d3095df4393ba3531508691b133a4f69adbd5e:
->
->   ARM: hi3xxx: add hotplug support (2013-11-25 15:10:01 +0800)
->
-> ----------------------------------------------------------------
-> enable hisilicon soc
->
-> ----------------------------------------------------------------
-> Haojian Zhuang (4):
->       ARM: hi3xxx: add board support with device tree
->       ARM: dts: enable hi4511 with device tree
->       ARM: config: enable hi3xxx in multi_v7_defconfig
->       ARM: config: add defconfig for Hi3xxx
->
-> Zhangfei Gao (2):
->       ARM: hi3xxx: add smp support
->       ARM: hi3xxx: add hotplug support
->
->  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  32 ++++
->  arch/arm/Kconfig                                              |   2 +
->  arch/arm/Makefile                                             |   1 +
->  arch/arm/boot/dts/Makefile                                    |   1 +
->  arch/arm/boot/dts/hi3620.dtsi                                 | 556
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/hi4511.dts                                  | 648
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/configs/hi3xxx_defconfig                             |  56 +++++++
->  arch/arm/configs/multi_v7_defconfig                           |   1 +
->  arch/arm/mach-hi3xxx/Kconfig                                  |  16 ++
->  arch/arm/mach-hi3xxx/Makefile                                 |   7 +
->  arch/arm/mach-hi3xxx/core.h                                   |  15 ++
->  arch/arm/mach-hi3xxx/hi3xxx.c                                 |  97
-> ++++++++++++
->  arch/arm/mach-hi3xxx/hotplug.c                                | 200
-> +++++++++++++++++++++++++
->  arch/arm/mach-hi3xxx/platsmp.c                                |  89
-> +++++++++++
->  14 files changed, 1721 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
->  create mode 100644 arch/arm/boot/dts/hi4511.dts
->  create mode 100644 arch/arm/configs/hi3xxx_defconfig
->  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
->  create mode 100644 arch/arm/mach-hi3xxx/Makefile
->  create mode 100644 arch/arm/mach-hi3xxx/core.h
->  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
->  create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
->  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
->
+On Wed, Dec 04, 2013 at 10:59:46AM +0800, Bo Shen wrote:
+> Hi Thierry,
+> 
+> On 12/03/2013 05:43 PM, Thierry Reding wrote:
+> >On Tue, Dec 03, 2013 at 11:09:12AM +0800, Bo Shen wrote:
+> >>On 12/02/2013 06:59 PM, Thierry Reding wrote:
+> >>>On Mon, Nov 18, 2013 at 05:13:21PM +0800, Bo Shen wrote:
+> >[...]
+> >>>>diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> >[...]
+> >>>>+	/* Calculate the period cycles */
+> >>>>+	while (div > PWM_MAX_PRD) {
+> >>>>+		div = clk_rate / (1 << pres);
+> >>>>+		div = div * period_ns;
+> >>>>+		/* 1/Hz = 100000000 ns */
+> >>>
+> >>>I don't think that comment is needed.
+> >>
+> >>This is asked to be added.
+> >>And, I think keep it and it won't hurt, what do you think?
+> >
+> >I think it's obvious that you're converting from nanoseconds because of
+> >the _ns prefix in period_ns. But if somebody requested this and everyone
+> >else thinks it's useful, I'm okay with keeping it.
+> >
+> >>>>+	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+> >>>>+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, dty);
+> >>>>+	} else {
+> >>>>+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, dty);
+> >>>>+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, prd);
+> >>>>+	}
+> >>>>+}
+> >>>
+> >>>Neither version 1 nor version 2 seem to be able to change the period
+> >>>while the channel is enabled. Perhaps that should be checked for in
+> >>>atmel_pwm_config() and an error (-EBUSY) returned?
+> >>
+> >>The period is configured in dt in device tree, or platform data in non
+> >>device tree. Nowhere will update period. So, not code to update period.
+> >>Am I right? If not, please figure out.
+> >
+> >The .config() operation allows the period to be specified. Just because
+> >nobody currently changes it at runtime doesn't mean it can't be done.
+> >
+> >It is also possible that whoever wrote the device tree or platform data
+> >didn't know that the period must be the same for all PWM channels and
+> >therefore might use different values. If you check for this, at least
+> >they'll notice. If you don't check for it, then they may end up having
+> >the period reconfigured behind their backs, which may cause parts of
+> >their setup to behave unexpectedly.
+> 
+> Thanks for this information.
+> I will add code for changing period.
 
-Excuse me that the pull request is for 3.14.
+Just to clarify: I wouldn't want this code to allow changing the period
+but rather reject incompatible changes to the period with an error code.
 
-Regards
-Haojian
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/54388f8a/attachment.sig>
