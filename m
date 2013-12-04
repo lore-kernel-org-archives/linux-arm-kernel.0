@@ -1,61 +1,71 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 04 Dec 2013 18:18:52 +0100
-Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
-In-Reply-To: <529F61D3.3030104@wwwdotorg.org>
-References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
- <201311292208.26215.arnd@arndb.de> <529E1A49.6050808@wwwdotorg.org>
- <201312040222.03604.arnd@arndb.de> <529F61D3.3030104@wwwdotorg.org>
-Message-ID: <529F63FC.7010409@metafoo.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 4 Dec 2013 11:25:40 -0800
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <20131204191606.GL29721@pengutronix.de>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+ <5283A8C7.30904@atmel.com> <529C4936.5060304@atmel.com>
+ <20131204102353.GI29721@pengutronix.de>
+ <20131204170911.GC14859@kroah.com>
+ <20131204191606.GL29721@pengutronix.de>
+Message-ID: <20131204192540.GC11841@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 06:09 PM, Stephen Warren wrote:
-> On 12/03/2013 06:22 PM, Arnd Bergmann wrote:
->> On Tuesday 03 December 2013, Stephen Warren wrote:
->>> On 11/29/2013 02:08 PM, Arnd Bergmann wrote:
->>
->>>> Can you try coming up with a different method to achieve the same
->>>> where you use a different helper from the driver specific xlate
->>>> function that does not require a callback?
->>>>
->>>> I think dma_get_slave_channel is great if you have one channel per
->>>> request line and you can directly look up the channel from the
->>>> DT data, but it is not good if you have pick a channel and work
->>>> around the race.
->>>
->>> Hmm. Can you take a look at "[PATCH V4] dma: add
->>> dma_get_any_slave_channel(), for use in of_xlate()" at the link below.
->>> It still implements this via xlate, but I don't see any benefit in
->>> making drivers use a different API to request slave channels based on
->>> how the DMA controller works.
->>>
->>> http://lkml.org/lkml/2013/11/26/408
->>
->> Yes, I think that is good. I can think of a few variations of that
->> that I would prefer slightly over your code, but it's essentially
->> what I had in mind and I'm fine with that version getting merged
->> as well. Here are my ideas for further improvements, I'll leave
->> it up to you and the dmaengine maintainers to decide what to do
->> about them:
->>
->> * Rather than calling private_candidate(), open-code the part you
->>   need and remove the pointless dma_cap_mask comparison:
->>
->> 	err = -EBUSY;
->>         list_for_each_entry(chan, &dev->channels, device_node) {
->>                 if (!chan->client_count) {
->> 			err = dma_chan_get(chan);
->> 			break;
->> 		}
->> 	}
+On Wed, Dec 04, 2013 at 08:16:06PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Greg,
 > 
-> Lars-Peter had specifically suggested to call private_candidate(). Lars,
-> what do you think about open-coding this? Arnd's suggestion would skip
-> the DMA_PRIVATE checking that private_candidate() does, and I'm not sure
-> what the implications of that would be.
+> On Wed, Dec 04, 2013 at 09:09:11AM -0800, Greg Kroah-Hartman wrote:
+> > On Wed, Dec 04, 2013 at 11:23:53AM +0100, Uwe Kleine-K?nig wrote:
+> > > Hello Greg, hi Nicolas,
+> > > 
+> > > On Mon, Dec 02, 2013 at 09:47:50AM +0100, Nicolas Ferre wrote:
+> > > > On 13/11/2013 17:28, Nicolas Ferre :
+> > > > >On 07/11/2013 10:25, Linus Walleij :
+> > > > >>This passes the errata fix using a GPIO to control the RTS pin
+> > > > >>on one of the AT91 chips to use gpiolib instead of the
+> > > > >>AT91-specific interfaces. Also remove the reliance on
+> > > > >>compile-time #defines and the cpu_* check and rely on the
+> > > > >>platform passing down the proper GPIO pin through platform
+> > > > >>data.
+> > > > >>
+> > > > >>This is a prerequisite for getting rid of the local GPIO
+> > > > >>implementation in the AT91 platform and move toward
+> > > > >>multiplatform.
+> > > > >>
+> > > > >>The patch also adds device tree support for getting the
+> > > > >>RTS GPIO pin from the device tree on DT boot paths.
+> > > > >>
+> > > > >>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > > >>Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > > >>Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > > > >
+> > > > >Hi Greg,
+> > > > >
+> > > > >You acknowledged a previous version of this patch which was taking a
+> > > > >different approach with the subject:
+> > > > >"[PATCH 1/4] ARM/serial: at91: move machine quirk into machine"
+> > > > >
+> > > > >In order to integrate the series build by Linus in our AT91/arm-soc
+> > > > >flow, would you mind reviewing this v4 patch and eventually giving your
+> > > > >blessing ;-)
+> > > > >If it is okay on your side, I'll integrate it in a pull-request to
+> > > > >arm-soc for 3.14.
+> > > > 
+> > > > Greg, ping?
+> > > I'm depending on that patch for a series that gets rid of ARM's
+> > > <mach/timex.h>. So I'm interested to either get a stable commit to
+> > > base on or alternatively to get the blessing from both of you to take it
+> > > (also via arm-soc) as part of my series.
+> > > 
+> > > A preview of my series is available at
+> > > 
+> > > 	git://git.pengutronix.de/git/ukl/linux.git deprecatemachtimexh
+> > 
+> > No objection from me to take it through your tree.
+> gregkh: Thanks. I'll interpret this as Acked-by: you if Nicolas also
+> agrees that I take it.
 
-It's not like this is a hot path or that the mask checking is expensive. I'd
-keep it as it is for the sake of not having the same code twice. And the
-DMA_PRIVATE check should probably also stay.
+I gave it on a previous email in this thread, but here it is again for
+you:
 
-- Lars
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
