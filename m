@@ -1,69 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Dec 2013 18:10:47 +0000
-Subject: Boot time errors/warnings on snowball
-In-Reply-To: <CAOesGMh7+r9vUvtH_pwJeMyQJGo3u-uJRJ8-OBidzzO1pC5RDA@mail.gmail.com>
-References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
- <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
- <20131204172626.GB26581@lee--X1>
- <CAOesGMjMWqPtJXh7-VAhyA1a95h7mKV8_UZhyTtxgEbUhU8_5Q@mail.gmail.com>
- <20131204175119.GD26581@lee--X1>
- <CAOesGMh7+r9vUvtH_pwJeMyQJGo3u-uJRJ8-OBidzzO1pC5RDA@mail.gmail.com>
-Message-ID: <20131204181047.GF26581@lee--X1>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Wed, 04 Dec 2013 10:21:55 -0800
+Subject: [PATCH RESEND v5 1/2] PWM: PXA: add device tree support to PWM
+ driver
+In-Reply-To: <20131204092152.GL19943@ulmo.nvidia.com>
+References: <1379791174-2369-1-git-send-email-mikedunn@newsguy.com>
+ <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
+ <20131203101714.GG21178@ulmo.nvidia.com> <529E26C9.30707@newsguy.com>
+ <20131204092152.GL19943@ulmo.nvidia.com>
+Message-ID: <529F72C3.7060503@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> By the way, if these things keep happening, then it's an indicator
-> >> that you should slow down the rate of change a bit and make sure
-> >> things are tested properly. You get a lot of patches produced quickly,
-> >> which is awesome, but please make sure things are coordinated and
-> >> tested especially for the more complex and inter-dependent changes
-> >> like these. If it needs to take another release (or just another week
-> >> or two) to get something staged in the right order, then that's OK.
-> >
-> > I know that you've had a bee in your bonnet about the rate of which I
-> > sent patches for a while, but this instance has nothing to do with
-> > rushing. This is merely an ordering issue and the speed in which
-> > varying subsystems are merged into -next.
+On 12/04/2013 01:21 AM, Thierry Reding wrote:
+> On Tue, Dec 03, 2013 at 10:45:29AM -0800, Mike Dunn wrote:
+>> On 12/03/2013 02:17 AM, Thierry Reding wrote:
+>>> On Sat, Sep 21, 2013 at 12:19:33PM -0700, Mike Dunn wrote:
+>>>> This patch adds device tree support to the PXA's PWM driver.  Nothing
+>>>> needs to be extracted from the device tree node by the PWM device.
+>>>> Client devices need only specify the period; the per-chip index is
+>>>> implicitly zero because one device node must be present for each PWM
+>>>> output in use.  This approach is more convenient due to the wide
+>>>> variability in the number of PWM channels present across the various PXA
+>>>> variants, and is made possible by the fact that the register sets for
+>>>> each PWM channel are segregated from each other.  An of_xlate() method
+>>>> is added to parse this single-cell node.  The existing ID table is
+>>>> reused for the match table data.
+>>>>
+>>>> Tested on a Palm Treo 680 (both platform data and DT cases).
+>>>>
+>>>> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 30 +++++++++++++
+>>>>  drivers/pwm/pwm-pxa.c                             | 52 ++++++++++++++++++++++-
+>>>>  2 files changed, 81 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+>>>
+>>> Hi Mike,
+>>>
+>>> It looks like this fell through the cracks. Is this patch still the
+>>> latest one you have? Should it still be applied?
+>>>
+>>> Thierry
+>>>
+>>
+>> Hi Thierry,
+>>
+>> Funny I should hear from you about this today.... I just turned my attention
+>> back to this today and noticed that it never made it into your for-next branch.
+>>  Yes, it is the latest.  If the patch still applies cleanly, please feel free.
+>> Otherwise, I'd be glad to rework it against something more recent.
 > 
-> I don't have a problem with the rate of change, but it can easily
-> become error prone with too many patches in flight which is my main
-> concern. I'm just asking you to be careful, I'm not saying you're
-> doing anything wrong. It's great to see these conversions happening!
-> 
-> > This is what -next is for though right? To identify these kinds of
-> > decencies before they're merged into Mainline. So let's do something
-> > about it now. I'm not sure what though, as I know that Mark isn't fond
-> > of rebasing his tree.
-> 
-> This is exactly what -next is for, and that's why I'm reporting the
-> issue so it can be resolved. Since it's been fixed by an existing
-> patch, all is good. But it does bring up the below, which is good to
-> cover here:
-> 
-> > Ideally we should have setup an immutable branch between ASoC and
-> > either ux500 or ARM-SoC where both parties can pull from. That's what
-> > Mark and I usually do when ASoC/Regulators and MFD have dependencies
-> > on one another.
-> >
-> > It might not even be an issue though. We just need to ensure that
-> > Linus pulls from ARM-SoC prior to ASoC during the next merge
-> > window. Can that be done?
-> 
-> It can be done. It's unfortunate to lose bisectability though (since
-> when you bisect you can end up in a state where the ASoC patches are
-> enabled but not the ux500 counterparts. Setting up a shared branch is
-> indeed the best (only) way to solve that. Next time around we should
-> do so.
-> 
-> We're usually fairly quick at merging our branches during the merge
-> window, so sequencing should be fine. Even if Mark does his pull
-> requests before us, the window of breakage should be minimal (and
-> we're now aware of it).
+> I've applied it to my for-next branch (with some minor whitespace fixups
+> and some tuning to how the OF match table is defined). I don't consider
+> any of the changes risky, but it'd be great if you could still test the
+> version that I pushed.
 
-FWIW, I agree with everything you said.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I just tested it... looks good.  Thanks again Thierry.  Thanks also Haojian.
+
+Mike
