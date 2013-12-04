@@ -1,56 +1,43 @@
-From: mroos@linux.ee (Meelis Roos)
-Date: Wed, 4 Dec 2013 15:08:39 +0200 (EET)
-Subject: [PATCH v2] OF: base: match each node compatible against all
- given matches first
-In-Reply-To: <20131204094010.GO19943@ulmo.nvidia.com>
-References: <1385663785-8643-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1386078720-8756-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <alpine.SOC.1.00.1312032210480.25191@math.ut.ee> <529E614B.3070307@gmail.com>
- <20131204094010.GO19943@ulmo.nvidia.com>
-Message-ID: <alpine.SOC.1.00.1312041506010.8902@math.ut.ee>
+From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
+Date: Wed, 4 Dec 2013 13:10:13 +0000
+Subject: [PATCH] ARM: multi_v7_defconfig: Fix STi support
+Message-ID: <1386162613-13492-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I added Meelis on Cc because he found a regression with my original
-> proposal (107a84e61cdd "of: match by compatible property first"). That
-> got later reverted in commit bc51b0c22ceb (Revert "of: match by
-> compatible property first"). Here's the commit message for reference:
-> 
-> commit bc51b0c22ceb
-> Author: Linus Torvalds <torvalds@linux-foundation.org>
-> Date:   Tue Jul 10 12:49:32 2012 -0700
-> 
->     Revert "of: match by compatible property first"
-> 
->     This reverts commit 107a84e61cdd3406c842a0e4be7efffd3a05dba6.
-> 
->     Meelis Roos reports a regression since 3.5-rc5 that stops Sun Fire V100
->     and Sun Netra X1 sparc64 machines from booting, hanging after enabling
->     serial console.  He bisected it to commit 107a84e61cdd.
-> 
->     Rob Herring explains:
->      "The problem is match combinations of compatible plus name and/or type
->       fail to match correctly.  I have a fix for this, but given how late it
->       is for 3.5 I think it is best to revert this for now.  There could be
->       other cases that rely on the current although wrong behavior.  I will
->       post an updated version for 3.6."
-> 
->     Bisected-and-reported-by: Meelis Roos <mroos@linux.ee>
->     Requested-by: Rob Herring <rob.herring@calxeda.com>
->     Cc: Thierry Reding <thierry.reding@avionic-design.de>
->     Cc: Grant Likely <grant.likely@secretlab.ca>
->     Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
-> 
-> So if Meelis still has access to the Sun Fire V100 and Sun Netra X1
-> machines that regressed last time around, it'd be great to get this
-> patch tested on them to verify that it indeed fixes the problem and
-> doesn't regress.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-OK, I had forgotten about that.
+This patch adds ST serial driver (st-asc) and ICPLUS ethernet PHY to
+multi_v7_defconfig. All STi based SOCs use ST-ASC as default serial
+console, and most of the STi SOC based boards have ICPLUS external
+ethernet PHY. These two options makes the system boot nfs root with
+console.
 
-Tested successfully on the same Sun Fire V100 and Sun Netra X1, on top 
-of 3.13-rc2. The sunsu console is detected fine and I see no problem for 
-now.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+---
+ arch/arm/configs/multi_v7_defconfig |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4a5903e..d5a6f32 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -68,6 +68,7 @@ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_KS8851=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
++CONFIG_ICPLUS_PHY=y
+ CONFIG_MDIO_SUN4I=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIO_AMBAKMI=y
+@@ -90,6 +91,8 @@ CONFIG_SERIAL_XILINX_PS_UART=y
+ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+ CONFIG_SERIAL_FSL_LPUART=y
+ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_SERIAL_ST_ASC=y
++CONFIG_SERIAL_ST_ASC_CONSOLE=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
 -- 
-Meelis Roos (mroos at linux.ee)
+1.7.6.5
