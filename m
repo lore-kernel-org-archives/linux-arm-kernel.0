@@ -1,203 +1,134 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 4 Dec 2013 09:36:08 -0600
-Subject: [PATCH RFC 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <20131203104004.GA5694@e102568-lin.cambridge.arm.com>
-References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
- <3AA6B169-C4C8-474B-B110-B912510B834E@codeaurora.org>
- <20131203104004.GA5694@e102568-lin.cambridge.arm.com>
-Message-ID: <24A59FCA-88E5-42BB-9AEC-CDA07841A6ED@codeaurora.org>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Wed, 4 Dec 2013 16:37:36 +0100
+Subject: [GIT PULL] Cacheflush updates for 3.12
+In-Reply-To: <20130812173155.GI25995@mudshark.cambridge.arm.com>
+References: <20130812173155.GI25995@mudshark.cambridge.arm.com>
+Message-ID: <CAH9NwWd1AfN_YnO-fj94+wTbE8768H518=EndVcX=dFCV9WESg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/8/12 Will Deacon <will.deacon@arm.com>:
+> Hello again,
+>
+> Please pull the following user-cacheflush updates for 3.12. This series both
+> improves performance of cacheflush-heavy workloads (i.e. browser benchmarks)
+> and also addresses a DoS issue on non-preemptible systems.
+>
+> Will
+>
+> --->8
+>
+> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+>
+>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/cacheflush
+>
+> for you to fetch changes up to d3065541b5a95e5d0ef37e0dc8ada80fd1fba963:
+>
+>   ARM: cacheflush: don't bother rounding to nearest vma (2013-07-22 10:49:00 +0100)
+>
+> ----------------------------------------------------------------
+> Will Deacon (4):
+>       ARM: entry: allow ARM-private syscalls to be restarted
+>       ARM: cacheflush: split user cache-flushing into interruptible chunks
+>       ARM: cacheflush: don't round address range up to nearest page
+>       ARM: cacheflush: don't bother rounding to nearest vma
+>
 
-On Dec 3, 2013, at 4:40 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+Hi all.
 
-> On Mon, Dec 02, 2013 at 06:08:16PM +0000, Kumar Gala wrote:
->> 
->> On Dec 2, 2013, at 10:20 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> 
->>> ARM based platforms implement a variety of power management schemes that
->>> allow processors to enter at run-time low-power states, aka C-states
->>> in ACPI jargon. The parameters defining these C-states vary on a per-platform
->>> basis forcing the OS to hardcode the state parameters in platform
->>> specific static tables whose size grows as the number of platforms supported
->>> in the kernel increases and hampers device drivers standardization.
->>> 
->>> Therefore, this patch aims at standardizing C-state device tree bindings for
->>> ARM platforms. Bindings define C-state parameters inclusive of entry methods
->>> and state latencies, to allow operating systems to retrieve the
->>> configuration entries from the device tree and initialize the related
->>> power management drivers, paving the way for common code in the kernel
->>> to deal with power states and removing the need for static data in current
->>> and previous kernel versions.
->> 
->> Where is this spec'd today in the kernel?
-> 
-> How can it be in the kernel given that these bindings have just been posted ?
-> I started coding the layer managing the C-states in the kernel, even
-> though I would avoid writing it and then restart from scratch if these
-> bindings are scrapped. Bindings should not depend on kernel code, it
-> is the other way around, right ?
+I spend the last day running a bisect and I think I have found a problem :)
 
-I was guessing that there is existing code in the kernel that uses some platform data structures.  I was wondering what that code looked like today.
+I have a simple automated test case running, which looks like this:
 
-> 
-> [...]
-> 
->>> +===========================================
->>> +2 - state node
->>> +===========================================
->>> +
->>> +A state node represents a C-state description and must be defined as follows:
->>> +
->>> +- state node
->>> +
->>> +     Description: must be child of the cpu-power-states node.
->>> +
->>> +     The state node name must be "state", with unit address provided by the
->>> +     "reg" property following standard DT requirements[4].
->>> +
->>> +     A state node defines the following properties:
->>> +
->>> +     - reg
->>> +             Usage: Required
->>> +             Value type: <u32>
->>> +             Definition: Standard device tree property [4] used for
->>> +                         enumeration purposes.
->> 
->> I'm not sure what purpose reg is really serving here.
-> 
-> Enumeration, that's it.
-> 
->>> +
->>> +     - index
->>> +             Usage: Required
->>> +             Value type: <u32>
->>> +             Definition: It represents C-state index, starting from 2 (index
->>> +                         0 represents the processor state "running" and
->>> +                         index 1 represents processor mode "WFI"; indexes 0
->>> +                         and 1 are standard ARM states that need not be
->>> +                         described).
->> 
->> any reason not to call it c-state-index"
-> 
-> Well, they are called "state" nodes, so I called it "index".
-> 
-> I really do not care, can change it if we think we should call states
-> c-states.
-> 
->>> +
->>> +     - entry-method
->>> +             Value type: <stringlist>
->>> +             Usage: Required
->>> +             Definition: Describes the method by which a CPU enters the
->>> +                         C-state. This property is required and must be one
->>> +                         of:
->>> +
->>> +                         - "psci"
->>> +                           ARM Standard firmware interface
->>> +
->>> +                         - "[vendor],[method]"
->>> +                           An implementation dependent string with
->>> +                           format "vendor,method", where vendor is a string
->>> +                           denoting the name of the manufacturer and
->>> +                           method is a string specifying the mechanism
->>> +                           used to enter the C-state.
->>> +
->>> +     - psci-power-state
->>> +             Usage: Required if entry-method property value is set to
->>> +                    "psci".
->>> +             Value type: <u32>
->>> +             Definition: power_state parameter to pass to the PSCI
->>> +                         suspend call to enter the C-state.
->>> +
->>> +     - latency
->>> +             Usage: Required
->>> +             Value type: <u32>
->>> +             Definition: Worst case latency in microseconds required to
->>> +                         enter and exit the C-state.
->>> +
->>> +     - min-residency
->>> +             Usage: Required
->>> +             Value type: <u32>
->>> +             Definition: Time in microseconds required for the CPU to be in
->>> +                         the C-state to make up for the dynamic power
->>> +                         consumed to enter/exit the C-state in order to
->>> +                         break even in terms of power consumption compared
->>> +                         to C1 state (wfi).
->>> +                         This parameter depends on the operating conditions
->>> +                         (operating point, cache state) and must assume
->>> +                         worst case scenario.
->>> +
->>> +     - cpus
->>> +             Usage: Optional
->>> +             Value type: <phandle>
->>> +             Definition: If defined, the phandle points to a node in the
->>> +                         cpu-map[2] representing all CPUs on which C-state
->>> +                         is valid. If not present or system is UP, the
->>> +                         C-state has to be considered valid for all CPUs in
->>> +                         the system.
->>> +
->>> +     - affinity
->>> +             Usage: Optional
->>> +             Value type: <phandle>
->>> +             Definition: If defined, phandle points to a node in the
->>> +                         cpu-map[2] that represents all CPUs that are
->>> +                         affected (ie share) by the C-state and have to
->>> +                         be coordinated on C-state entry/exit. If not
->>> +                         present or system is UP, the C-state is local to
->>> +                         a CPU and need no coordination (ie it is a CPU
->>> +                         state, that does not require coordination with
->>> +                         other CPUs). If present, the affinity property
->>> +                         must contain a phandle to a cpu-map node that
->>> +                         represents a subset, possibly inclusive of the
->>> +                         CPUs described through the cpus property.
->>> +
->>> +     - power-depth
->>> +             Usage: Required
->>> +             Value type: <u32>
->>> +             Definition: Integer value, starting from 2 (value 0 meaning
->>> +                         running and value 1 representing power depth of
->>> +                         wfi (C1)), that defines the level of depth of a
->>> +                         power state.
->>> +                         The system denotes power states with different
->>> +                         depths, an increasing value meaning less power
->>> +                         consumption and might involve powering down more
->>> +                         components.  Devices that are affected by
->>> +                         C-states entry must define the maximum power
->>> +                         depth supported in their respective device tree
->>> +                         bindings so that OSPM can take decision on how
->>> +                         to handle the device in question when the C-state
->>> +                         is entered. All devices (per-CPU or external) with
->>> +                         a power depth lower than the one defined in the
->>> +                         C-state entry stop operating when the C-state
->>> +                         is entered and action is required by OSPM to
->>> +                         guarantee their logic and memory content is saved
->>> +                         restored to guarantee proper functioning.
->> 
->> How is this different from the c-state index?
-> 
-> The idea, not sure it is worthwhile, is to represent a unique value in
-> the system. There can be multiple eg C2 states (two clusters in two
-> different power domains) with same index and different power depths.
-> 
-> Devices attached to power domains can check the power depth to detect if
-> the CPU must be prevented from entering the C-state or not, and on the
-> other hand, power depth allows to understand if a device state must be
-> saved and restored.
-> 
-> I should have added an example but there is already lots of stuff to
-> discuss for bindings as they are IMHO.
-> 
-> Lorenzo
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+imx6d based device running X, chromium and x11vnc <----> windows pc connected
+via VNC to the device. With this patchset applyed the browser tab
+crashed after about
+5 minutes hitting the F5/refresh button every 1-3 seconds.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+The last good kernel is 3.11.10 and the first bad one is 3.12. This is
+the result of my bisect:
+
+root at arm:~/kernel/linux-3.12.2# cat ~/bisect.log
+Bisecting: a merge base must be tested
+[6e4664525b1db28f8c4e1130957f70a94c19213e] Linux 3.11
+Bisecting: 5700 revisions left to test after this (roughly 13 steps)
+[cc998ff8811530be521f6b316f37ab7676a07938] Merge
+git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next
+Bisecting: 2850 revisions left to test after this (roughly 12 steps)
+[f9121153fdfbfaa930bf65077a5597e20d3ac608] mm/hwpoison: don't need to
+hold compound lock for hugetlbfs page
+Bisecting: 1428 revisions left to test after this (roughly 11 steps)
+[327fff3e1391a27dcc89de6e0481689a865361c9] Merge branch 'misc' of
+git://git.kernel.org/pub/scm/linux/kernel/git/mmarek/kbuild
+Bisecting: 775 revisions left to test after this (roughly 10 steps)
+[8e73e367f7dc50f1d1bc22a63e5764bb4eea9b48] Merge tag
+'cleanup-for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+Bisecting: 247 revisions left to test after this (roughly 8 steps)
+[39eda2aba6be642b71f2e0ad623dcb09fd9d79cf] Merge branch 'next' of
+git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc
+Bisecting: 205 revisions left to test after this (roughly 8 steps)
+[22e04f6b4b04a8afe9af9239224591d06ba3b24d] Merge branch 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/jikos/hid
+Bisecting: 110 revisions left to test after this (roughly 7 steps)
+[2e032852245b3dcfe5461d7353e34eb6da095ccf] Merge branch 'for-linus' of
+git://git.linaro.org/people/rmk/linux-arm
+Bisecting: 55 revisions left to test after this (roughly 5 steps)
+[5cc91e0460889c8461620904968e193dddb1beb3] Merge branch
+'for-rmk/cacheflush-v2' of
+git://git.kernel.org/pub/scm/linux/kernel/git/will/linux into
+devel-stable
+Bisecting: 11 revisions left to test after this (roughly 4 steps)
+[6af396a6b6c698eb3834184518fc9a59bc22c817] ARM: cacheflush: use -ishst
+dsb variant for ensuring flush completion
+Bisecting: 5 revisions left to test after this (roughly 3 steps)
+[b4f656eea63376da79b0b5a17660c4ce14b71b74] Pull branch 'for-rmk' of
+git://git.linaro.org/people/ardbiesheuvel/linux-arm into devel-stable
+Bisecting: 2 revisions left to test after this (roughly 2 steps)
+[d9524dc32cab52714dee0c8e59c7437ee33a239a] ARM: cacheflush: don't
+round address range up to nearest page
+Bisecting: 0 revisions left to test after this (roughly 1 step)
+[28256d612726a28a8b9d3c49f2b74198c4423d6a] ARM: cacheflush: split user
+cache-flushing into interruptible chunks
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[377747c40657eb35ad98a56439606d96a928425a] ARM: entry: allow
+ARM-private syscalls to be restarted
+28256d612726a28a8b9d3c49f2b74198c4423d6a is the first bad commit
+commit 28256d612726a28a8b9d3c49f2b74198c4423d6a
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Mon May 13 15:21:49 2013 +0100
+
+    ARM: cacheflush: split user cache-flushing into interruptible chunks
+
+    Flushing a large, non-faulting VMA from userspace can potentially result
+    in a long time spent flushing the cache line-by-line without preemption
+    occurring (in the case of CONFIG_PREEMPT=n).
+
+    Whilst this doesn't affect the stability of the system, it can certainly
+    affect the responsiveness and CPU availability for other tasks.
+
+    This patch splits up the user cacheflush code so that it flushes in
+    chunks of a page. After each chunk has been flushed, we may reschedule
+    if appropriate and, before processing the next chunk, we allow any
+    pending signals to be handled before resuming from where we left off.
+
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+:040000 040000 33ebf747dde46884ce4e7d4ce922fef3cd5b580e
+22cdb8a0bc6dc72cb92d93c13ed1a45081269f77 M      arch
+
+
+If I revert 28256d612726a28a8b9d3c49f2b74198c4423d6a and
+97c72d89ce0ec8c73f19d5e35ec1f90f7a14bed7 my "test" runs hours.
+
+
+What debug options should I enable to get meaningful output from the kernel?
+
+
+greets
+--
+Christian Gmeiner, MSc
