@@ -1,36 +1,45 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 4 Dec 2013 16:09:13 +0900
-Subject: [PATCH v2] ARM: tegra: switch FUSE clock on before usage
-In-Reply-To: <528EB4EE.309@nvidia.com>
-References: <1385001613-19098-1-git-send-email-acourbot@nvidia.com>
- <528E6D58.6050503@wwwdotorg.org> <528EB4EE.309@nvidia.com>
-Message-ID: <CAAVeFuJpHXCANRO=AT5mKGpHzJRpmQoOuX4hjsctEMMAMjgqnQ@mail.gmail.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Wed, 4 Dec 2013 07:19:59 +0000
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <529ED29C.1030208@st.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com> <5298AA23.7080404@st.com>
+ <529E976E.4050104@freescale.com> <529ED29C.1030208@st.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+>From: Angus Clark [mailto:angus.clark at st.com]
+>>On 12/04/2013 02:46 AM, Huang Shijie wrote:
+>> ? 2013?11?29? 22:52, Angus Clark ??:
+>>>     int (*write_reg)(struct spi_nor_info *info,
+>>>              uint8_t cmd, uint8_t *reg, int len,
+>>>              int wren, int wtr);
+>> I guess you add the 'wren' for the issuing write-enable before issuing
+>> the 'cmd'.
+>>
+>> but what's 'wtr' for? i do not know what's the meaning of the 'wtr'.
+>>
+>
+>'wtr' is for "Wait 'til Ready".  Some register writes are instant, while others
+>require polling of the "Write In Progress" bit.
+>
+Unless a register is controlling a status of internal state-machine, or something
+It should be instantaneously writable.
 
-On Fri, Nov 22, 2013 at 10:35 AM, Alex Courbot <acourbot@nvidia.com> wrote:
-> On 11/22/2013 05:30 AM, Stephen Warren wrote:
->>
->> On 11/20/2013 07:40 PM, Alexandre Courbot wrote:
->>>
->>> FUSE clock is enabled by most bootloaders, but we cannot expect it to be
->>> on in all contexts (e.g. kexec).
->>>
->>> Ensure the FUSE clock is enabled before any of its registers is touched.
->>> Since FUSE is touched very early during system boot (before the clock
->>> devices are registered), directly manipulate the clock register bit in
->>> case the clock device cannot be acquired.
->>
->>
->> This looks reasonable to me. I'll apply it soon after -rc1.
->
->
-> Thanks. Be careful as I noticed I misformatted my commit message. The part
-> after the "--" will not be stripped by git am as I intended it to be. I
-> understood what I did wrong and will hopefully not make that mistake again.
->
-> Sorry for the inconvenience.
+Also polling should not be part of this particular *(write_reg), if a register
+needs to be polled then it should be part of *(write) or *(read) .. Like 
+WIP: Write-in-progress bit of flash
+generic_flash_write(...) {
+	while ((read_reg(STATUS_REG) & WIP) || ~timeout) {
+		timeout--;
+	};
 
-I am not seeing this in your tree, have you applied it somewhere already?
+
+With this it just came to my mind, that you also need a 'timeout' field
+in 'struct spinor-cfg'. This is because different controllers would be
+running at different clock speeds (and different SPI_CLK frequencies).
+So they need to specify a 'timeout' value for all polling accesses.
+
+
+with regards, pekon
