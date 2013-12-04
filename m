@@ -1,83 +1,60 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 04 Dec 2013 23:38:56 +0800
-Subject: [RFC part2 PATCH 7/9] irqdomain: Add a new API
- irq_create_acpi_mapping()
-In-Reply-To: <CAL_JsqK93mJbFu+GaK_5L14jKnMgctUNdEBqS6K5zKer16Sm3Q@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 4 Dec 2013 09:40:04 -0600
+Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
+ maps and map logical cpu id to APIC id
+In-Reply-To: <529F3A57.7010306@linaro.org>
 References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
- <1386088753-2850-8-git-send-email-hanjun.guo@linaro.org>
- <CAL_JsqK93mJbFu+GaK_5L14jKnMgctUNdEBqS6K5zKer16Sm3Q@mail.gmail.com>
-Message-ID: <529F4C90.4070402@linaro.org>
+ <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
+ <20131203165755.37b07796@alan.etchedpixels.co.uk>
+ <529F3A57.7010306@linaro.org>
+Message-ID: <CAL_JsqLGkxS13NAGJfqExFii-RcF3xRsvucjQbFoHeP5zoRkxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?12?04? 01:25, Rob Herring wrote:
-> On Tue, Dec 3, 2013 at 10:39 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
+On Wed, Dec 4, 2013 at 8:21 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> On 2013?12?04? 00:57, One Thousand Gnomes wrote:
+>>>
+>>> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
+>>> index 45ff625..8527ecc 100644
+>>> --- a/drivers/acpi/plat/arm-core.c
+>>> +++ b/drivers/acpi/plat/arm-core.c
+>>> @@ -58,6 +58,13 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>>>    */
+>>>   static u64 acpi_lapic_addr __initdata;
+>>>   +/* available_cpus here means enabled cpu in MADT */
+>>> +int available_cpus;
+>>> +
+>>> +/* Map logic cpu id to physical GIC id. */
+>>> +int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
+>>> +int boot_cpu_apic_id = -1;
+>>> +
 >>
->> This patch introduces a new API for acpi based irq mapping.
+>> static ?
 >>
->> [hanjun: Rework this patch to delete the reference to
->> gic_irq_domain_xlate() which can simplify the code a lot.]
+>> Really shouldn't be leaking names like "available_cpus" out of ACPI into
+>> the global namespace
+>
+>
+> Ok, will update in next version.
+>
+>
+>
+>>> +#ifdef CONFIG_SMP
+>>> +       if (available_cpus == 0) {
+>>> +               pr_info(PREFIX "Found 0 CPUs; assuming 1\n");
+>>> +               /* FIXME: should be the real GIC id read from hardware */
+>>> +               arm_cpu_to_apicid[available_cpus] = 0;
+>>> +               available_cpus = 1;     /* We've got at least one of
+>>> these */
+>>> +       }
+>>> +#endif
 >>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   include/linux/acpi.h   |    2 ++
->>   kernel/irq/irqdomain.c |   27 +++++++++++++++++++++++++++
->>   2 files changed, 29 insertions(+)
->>
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index 1e6a0ac..edd5806 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -141,6 +141,8 @@ int acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu);
->>   int acpi_unmap_lsapic(int cpu);
->>   #endif /* CONFIG_ACPI_HOTPLUG_CPU */
->>
->> +unsigned int irq_create_acpi_mapping(irq_hw_number_t hwirq,
->> +                                        unsigned int type);
->>   int acpi_register_ioapic(acpi_handle handle, u64 phys_addr, u32 gsi_base);
->>   int acpi_unregister_ioapic(acpi_handle handle, u32 gsi_base);
->>   void acpi_irq_stats_init(void);
->> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->> index cf68bb3..c661552 100644
->> --- a/kernel/irq/irqdomain.c
->> +++ b/kernel/irq/irqdomain.c
->> @@ -501,6 +501,33 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->>   }
->>   EXPORT_SYMBOL_GPL(irq_create_of_mapping);
->>
->> +#ifdef CONFIG_ACPI
->> +unsigned int irq_create_acpi_mapping(irq_hw_number_t hwirq,
->> +                                       unsigned int type)
->> +{
->> +       struct irq_domain *domain;
->> +       unsigned int virq;
->> +
->> +       domain = irq_default_domain;
->> +       if (!domain) {
->> +               pr_warn("no irq domain found !\n");
->> +               return 0;
->> +       }
->> +
->> +       /* Create mapping */
->> +       virq = irq_create_mapping(domain, hwirq);
->> +       if (!virq)
->> +               return virq;
->> +
->> +       /* Set type if specified and different than the current one */
->> +       if (type != IRQ_TYPE_NONE &&
->> +           type != irq_get_trigger_type(virq))
->> +               irq_set_irq_type(virq, type);
->> +       return virq;
->> +}
->> +EXPORT_SYMBOL_GPL(irq_create_acpi_mapping);
-> There is nothing ACPI specific about this function. This is simply
-> irq_create_of_mapping w/o translating of_phandle_args to a hwirq and
-> type. So I expect the code to be re-factored here to mirror that.
+>> Isn't this true uniprocessor (by definition in fact)
+>
+>
+> This code is intend to handle some buggy firmware I think.
 
-Sorry for my bad english, do you mean create a OF free function
-and call that from the OF function ?
+Really? We have production firmware already that we need to
+work-around? That's impressive given there is no production h/w.
 
-Thanks
-Hanjun
+Rob
