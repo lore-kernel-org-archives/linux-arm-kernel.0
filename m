@@ -1,24 +1,37 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 04 Dec 2013 22:17:39 +0800
-Subject: [RFC part1 PATCH 4/7] ARM64 / ACPI: Introduce the skeleton of
- _PDC related for ARM64
-In-Reply-To: <20131203165318.2c04a8bf@alan.etchedpixels.co.uk>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <1386088611-2801-5-git-send-email-hanjun.guo@linaro.org>
- <20131203165318.2c04a8bf@alan.etchedpixels.co.uk>
-Message-ID: <529F3983.5000200@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed,  4 Dec 2013 15:17:21 +0100
+Subject: [PATCH v4 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu node
+ in DT.
+In-Reply-To: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1386166641-7567-5-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?12?04? 00:53, One Thousand Gnomes wrote:
-> O> +enum idle_boot_override { IDLE_NO_OVERRIDE = 0, IDLE_HALT, IDLE_NOMWAIT,
->> +			IDLE_POLL, IDLE_FORCE_MWAIT };
-> This should probably move out of the arch directory to be a single enum
-> including both platforms values. That will make it rather easier to keep
-> sane and avoid ifdefs around which definitions are for which processor.
+The dove-cpufreq driver needs access to the DDR and CPU clock.  There
+is also an interrupt generated when the DFS hardware completes a
+change of frequencey. Add these to the cpu node in DT.
 
-Thank you very much for the suggestion, it makes sense to me, will figure
-out how to implement it.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+ arch/arm/boot/dts/dove.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks
-Hanjun
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 4c8028513133..3842ba02dddf 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -22,6 +22,10 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <0>;
++			clocks = <&core_clk 1>, <&core_clk 3>;
++			clock-names = "cpu_clk", "ddrclk";
++			interrupt-parent = <&pmu_intc>;
++			interrupts = <0>;
+ 		};
+ 	};
+ 
+-- 
+1.8.5
