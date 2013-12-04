@@ -1,57 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Dec 2013 17:26:26 +0000
-Subject: Boot time errors/warnings on snowball
-In-Reply-To: <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
-References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
- <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
-Message-ID: <20131204172626.GB26581@lee--X1>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 04 Dec 2013 10:27:02 -0700
+Subject: [PATCH V3] dma: tegra: register as an OF DMA controller
+In-Reply-To: <201312040234.09708.arnd@arndb.de>
+References: <1386102787-21839-1-git-send-email-swarren@wwwdotorg.org>
+ <201312040234.09708.arnd@arndb.de>
+Message-ID: <529F65E6.9050606@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I noticed these with last night's -next on the snowball:
-> >
-> > of_dma_request_slave_channel: dma-names property of node
-> > '/soc/msp at 80124000' missing or empty
-> > of_dma_request_slave_channel: dma-names property of node
-> > '/soc/msp at 80124000' missing or empty
-> > of_dma_request_slave_channel: dma-names property of node
-> > '/soc/msp at 80125000' missing or empty
-> > of_dma_request_slave_channel: dma-names property of node
-> > '/soc/msp at 80125000' missing or empty
-> > dma dma0chan22: [d40_config_memcpy] No memcpy`
-> > dma dma0chan22: [d40_alloc_chan_resources] Failed to configure memcpy channel
-> > ux500-msp-i2s ux500-msp-i2s.1: Missing dma channel for stream: 0
-> > ux500-msp-i2s ux500-msp-i2s.1: ASoC: pcm constructor failed: -22
+On 12/03/2013 06:34 PM, Arnd Bergmann wrote:
+> On Tuesday 03 December 2013, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Call of_dma_controller_register() so that DMA clients can look up the
+>> Tegra DMA controller using standard APIs. This requires the of_xlate()
+>> function to save off the DMA slave ID, and for tegra_dma_slave_config()
+>> not to over-write this information; once DMA client drivers are converted
+>> to dma_request_slave_channel() and DT-based lookups, they won't set this
+>> field of struct dma_slave_config anymore.
+...
+> Also, one (long-running, not just for this driver) comment I have is
+> about this snippet:
 > 
-> I don't see this when booting from the stuff I sent for v3.14,
-> but I know Mark applied some fixes from Lee yesterday,
-> Lee can you see if you recognize this?
+>> @@ -340,6 +342,8 @@ static int tegra_dma_slave_config(struct dma_chan *dc,
+>>         }
+>>  
+>>         memcpy(&tdc->dma_sconfig, sconfig, sizeof(*sconfig));
+>> +       if (!tdc->slave_id)
+>> +               tdc->slave_id = sconfig->slave_id;
+>>         tdc->config_init = true;
+>>         return 0;
+>>  }
+> 
+> We really need to be better at having a common set of rules regarding what
+> it actually means to set the slave_id through dma_slave_config(). IMHO
+> we should just treat it as a bug for any dmaengine driver that is configured
+> through DT, or we should get rid of this entirely.
 
-It looks like whatever tree you're building from is missing this patch:
-  
-  ARM: ux500: Add DMA config bindings for MSP devices
-
-Which is part of the initial reason I said this:
-
-  "If this patch-set could go through ASoC as a whole, it would drive
-  down the chance of a dependency mess. Vinod has already provided
-  Acks for his parts, so it's just between you two Linus and Mark."
-
-But in Mark's defence, I also tentatively said this:
-
-  "I'm not aware of any dependencies on the ARM changes. I haven't
-  tested the arch/arm and sound/soc adaptions orthogonally, but I
-  _think_ the right decisions should be made depending on the
-  information passed from platform/dt code."
-
-But this error seems strange, as I thought we were still passing the
-MSP stuff as AUXDATA for this very reason i.e. lack of DMA support. So
-I assumed that the MSP driver(s) would take the platform data
-route. At least until the AUXDATAs have been removed, which was my
-next step.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+By the end of this series (for the Tegra driver) I can remove those "+"
+lines you quoted above; the slave ID will only come from DT through
+of_xlate, and any slave ID in the slave_config will simply be ignored.
