@@ -1,33 +1,31 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  4 Dec 2013 11:39:10 -0800
-Subject: [PATCH 3/5] ARM: msm: Only build clock.c on proc_comm based platforms
-In-Reply-To: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
-References: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1386185952-27259-4-git-send-email-sboyd@codeaurora.org>
+Date: Wed,  4 Dec 2013 11:39:07 -0800
+Subject: [PATCH 0/5] Allow MSM DT platforms to be built multi-platform
+Message-ID: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functionality provided by clock.c in mach-msm is only needed
-on proc_comm based platforms. Only build the file if proc_comm is
-enabled. This prevents compile failures for platforms that are
-part of the multi-platform kernel.
+These patches allow the MSM code to be built as part of the multi-platform
+kernel. To be fully functional you need the first patch from Ivan's series[1]
+so that the usb-phy driver doesn't use mach specific APIs. I'm hoping that
+we can send these all through arm-soc so driver maintainers please ack
+the first two changes.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Stephen Boyd (5):
+  mmc: msm_sdcc: Limit driver to platforms that use it
+  tty: serial: Limit msm_serial_hs driver to platforms that use it
+  ARM: msm: Only build clock.c on proc_comm based platforms
+  ARM: msm: Only build timer.c if required
+  ARM: msm: Move MSM's DT based hardware to multi-platform support
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 7ed4c1b..6baae6e 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -1,5 +1,5 @@
- obj-y += timer.o
--obj-y += clock.o
-+obj-$(CONFIG_MSM_PROC_COMM) += clock.o
- 
- obj-$(CONFIG_MSM_VIC) += irq-vic.o
- 
+ arch/arm/Kconfig           |  4 +--
+ arch/arm/mach-msm/Kconfig  | 66 ++++++++++++++++++++++++++++------------------
+ arch/arm/mach-msm/Makefile |  4 +--
+ drivers/mmc/host/Kconfig   |  2 +-
+ drivers/tty/serial/Kconfig |  2 +-
+ 5 files changed, 46 insertions(+), 32 deletions(-)
+
+[1] https://lkml.org/lkml/2013/11/12/722 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
