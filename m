@@ -1,61 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 4 Dec 2013 11:23:53 +0100
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <529C4936.5060304@atmel.com>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
- <5283A8C7.30904@atmel.com> <529C4936.5060304@atmel.com>
-Message-ID: <20131204102353.GI29721@pengutronix.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 04 Dec 2013 11:26:06 +0100
+Subject: [PATCH] ARM: pxa: Remove unused variables
+In-Reply-To: <1386152565-26524-1-git-send-email-thierry.reding@gmail.com>
+References: <1386152565-26524-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <529F033E.9020608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg, hi Nicolas,
-
-On Mon, Dec 02, 2013 at 09:47:50AM +0100, Nicolas Ferre wrote:
-> On 13/11/2013 17:28, Nicolas Ferre :
-> >On 07/11/2013 10:25, Linus Walleij :
-> >>This passes the errata fix using a GPIO to control the RTS pin
-> >>on one of the AT91 chips to use gpiolib instead of the
-> >>AT91-specific interfaces. Also remove the reliance on
-> >>compile-time #defines and the cpu_* check and rely on the
-> >>platform passing down the proper GPIO pin through platform
-> >>data.
-> >>
-> >>This is a prerequisite for getting rid of the local GPIO
-> >>implementation in the AT91 platform and move toward
-> >>multiplatform.
-> >>
-> >>The patch also adds device tree support for getting the
-> >>RTS GPIO pin from the device tree on DT boot paths.
-> >>
-> >>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> >Hi Greg,
-> >
-> >You acknowledged a previous version of this patch which was taking a
-> >different approach with the subject:
-> >"[PATCH 1/4] ARM/serial: at91: move machine quirk into machine"
-> >
-> >In order to integrate the series build by Linus in our AT91/arm-soc
-> >flow, would you mind reviewing this v4 patch and eventually giving your
-> >blessing ;-)
-> >If it is okay on your side, I'll integrate it in a pull-request to
-> >arm-soc for 3.14.
+On 12/04/2013 11:22 AM, Thierry Reding wrote:
+> The conf and of_id variables are assigned but never used, so they may as
+> well just be removed.
 > 
-> Greg, ping?
-I'm depending on that patch for a series that gets rid of ARM's
-<mach/timex.h>. So I'm interested to either get a stable commit to
-base on or alternatively to get the blessing from both of you to take it
-(also via arm-soc) as part of my series.
+> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 
-A preview of my series is available at
+Acked-by: Daniel Mack <zonque@gmail.com>
 
-	git://git.pengutronix.de/git/ukl/linux.git deprecatemachtimexh
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ---
+>  arch/arm/mach-pxa/irq.c | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> index b6cc1816463e..0eecd83c624e 100644
+> --- a/arch/arm/mach-pxa/irq.c
+> +++ b/arch/arm/mach-pxa/irq.c
+> @@ -235,8 +235,6 @@ static const struct of_device_id intc_ids[] __initconst = {
+>  void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+>  {
+>  	struct device_node *node;
+> -	const struct of_device_id *of_id;
+> -	struct pxa_intc_conf *conf;
+>  	struct resource res;
+>  	int n, ret;
+>  
+> @@ -245,8 +243,6 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+>  		pr_err("Failed to find interrupt controller in arch-pxa\n");
+>  		return;
+>  	}
+> -	of_id = of_match_node(intc_ids, node);
+> -	conf = of_id->data;
+>  
+>  	ret = of_property_read_u32(node, "marvell,intc-nr-irqs",
+>  				   &pxa_internal_irq_nr);
+> 
