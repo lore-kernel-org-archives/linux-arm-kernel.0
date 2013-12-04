@@ -1,48 +1,65 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Wed,  4 Dec 2013 14:22:04 -0700
-Subject: [PATCH v3 2/5] ACPI: bus master reload not supported in reduced HW
- mode
+Date: Wed,  4 Dec 2013 14:22:07 -0700
+Subject: [PATCH v3 5/5] ACPI: do not map/unmap memory regions for FADT entries
+ in reduced HW mode
 In-Reply-To: <1386192127-28564-1-git-send-email-al.stone@linaro.org>
 References: <1386192127-28564-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1386192127-28564-3-git-send-email-al.stone@linaro.org>
+Message-ID: <1386192127-28564-6-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-Remove the saving and restoring of bus master reload registers in
-suspend/resume when in reduced HW mode; according to the spec, no
-such registers should exist
+Several of the FADT fields are normally kept in specific memory
+regions.  Since these fields are to be ignored in hardware reduced
+ACPI mode, do not map those addresses when in that mode, and of
+course do not release the mappings that have not been made.
+
+The function acpi_os_initialize() could become a stub in the header
+file but is left here in case it can be of further use.
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
 ---
- drivers/acpi/processor_idle.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/acpi/osl.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
-index 597cdab..8b48c08 100644
---- a/drivers/acpi/processor_idle.c
-+++ b/drivers/acpi/processor_idle.c
-@@ -202,7 +202,7 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index 613e4a1..3a0bb92 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -1776,10 +1776,12 @@ __setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
  
- #endif
- 
--#ifdef CONFIG_PM_SLEEP
-+#if (IS_ENABLED(CONFIG_PM_SLEEP) && !IS_ENABLED(CONFIG_ACPI_REDUCED_HARDWARE))
- static u32 saved_bm_rld;
- 
- static int acpi_processor_suspend(void)
-@@ -236,7 +236,10 @@ void acpi_processor_syscore_exit(void)
+ acpi_status __init acpi_os_initialize(void)
  {
- 	unregister_syscore_ops(&acpi_processor_syscore_ops);
- }
--#endif /* CONFIG_PM_SLEEP */
-+#else
-+void acpi_processor_syscore_init(void) { return; }
-+void acpi_processor_syscore_exit(void) { return; }
-+#endif
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
++	if (!acpi_gbl_reduced_hardware) {
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
++	}
  
- #if defined(CONFIG_X86)
- static void tsc_check_state(int state)
+ 	return AE_OK;
+ }
+@@ -1804,10 +1806,12 @@ acpi_status acpi_os_terminate(void)
+ 						 acpi_irq_handler);
+ 	}
+ 
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
++	if (!acpi_gbl_reduced_hardware) {
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
++	}
+ 
+ 	destroy_workqueue(kacpid_wq);
+ 	destroy_workqueue(kacpi_notify_wq);
 -- 
 1.8.3.1
