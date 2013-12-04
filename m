@@ -1,141 +1,90 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  4 Dec 2013 11:39:12 -0800
-Subject: [PATCH 5/5] ARM: msm: Move MSM's DT based hardware to multi-platform
- support
-In-Reply-To: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
-References: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1386185952-27259-6-git-send-email-sboyd@codeaurora.org>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 4 Dec 2013 21:39:25 +0200
+Subject: [PATCH v5 0/5] Update Davinci watchdog driver
+Message-ID: <1386185970-14488-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT based MSM platforms can join the multi-platform builds, so
-introduce a DT based ARCH_MSM option. This option allows DT based
-MSM platforms to be built into the multi-platform kernel. Also
-introduce a hidden ARCH_MSM config that both the DT and non-DT
-platform support code select to avoid churn in places that depend
-on CONFIG_ARCH_MSM.
+These patches are intended to update Davinci watchdog to use WDT core
+and reuse driver for keystone arch, because Keystone uses the similar
+IP like Davinci.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/Kconfig          |  4 ++--
- arch/arm/mach-msm/Kconfig | 61 +++++++++++++++++++++++++----------------------
- 2 files changed, 35 insertions(+), 30 deletions(-)
+See Documentation:
+Davinci DM646x - http://www.ti.com/lit/ug/spruer5b/spruer5b.pdf
+Keystone - http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 603d661..d056118 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -630,10 +630,10 @@ config ARCH_PXA
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
- 
--config ARCH_MSM
-+config ARCH_MSM_NODT
- 	bool "Qualcomm MSM"
-+	select ARCH_MSM
- 	select ARCH_REQUIRE_GPIOLIB
--	select CLKSRC_OF if OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	help
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 47cd2df..73c7ff3 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -1,12 +1,42 @@
-+config ARCH_MSM
-+	bool
-+
-+config ARCH_MSM_DT
-+	bool "Qualcomm MSM DT support" if ARCH_MULTI_V7
-+	select ARCH_MSM
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKSRC_OF
-+	select GENERIC_CLOCKEVENTS
-+	help
-+	  Support for Qualcomm's DT-based MSM systems.
-+
- if ARCH_MSM
- 
--comment "Qualcomm MSM SoC Type"
-+menu "Qualcomm MSM SoC selection"
- 	depends on ARCH_MSM_DT
- 
-+config ARCH_MSM8X60
-+	bool "Enable support for MSM8X60"
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_SMP
-+	select MSM_SCM if SMP
-+	select MSM_TIMER
-+
-+config ARCH_MSM8960
-+	bool "Enable support for MSM8960"
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_SMP
-+	select MSM_SCM if SMP
-+	select MSM_TIMER
-+
-+endmenu
-+
- choice
- 	prompt "Qualcomm MSM SoC Type"
- 	default ARCH_MSM7X00A
--	depends on !ARCH_MSM_DT
-+	depends on ARCH_MSM_NODT
- 
- config ARCH_MSM7X00A
- 	bool "MSM7x00A / MSM7x01A"
-@@ -45,30 +75,6 @@ config ARCH_QSD8X50
- 
- endchoice
- 
--config ARCH_MSM8X60
--	bool "MSM8X60"
--	select ARM_GIC
--	select CPU_V7
--	select GPIO_MSM_V2
--	select HAVE_SMP
--	select MSM_SCM if SMP
--	select MSM_TIMER
--
--config ARCH_MSM8960
--	bool "MSM8960"
--	select ARM_GIC
--	select CPU_V7
--	select HAVE_SMP
--	select GPIO_MSM_V2
--	select MSM_SCM if SMP
--	select MSM_TIMER
--
--config ARCH_MSM_DT
--	def_bool y
--	depends on (ARCH_MSM8X60 || ARCH_MSM8960)
--	select SPARSE_IRQ
--	select USE_OF
--
- config MSM_HAS_DEBUG_UART_HS
- 	bool
- 
-@@ -85,7 +91,7 @@ config  MSM_VIC
- 	bool
- 
- menu "Qualcomm MSM Board Type"
--	depends on !ARCH_MSM_DT
-+	depends on ARCH_MSM_NODT
- 
- config MACH_HALIBUT
- 	depends on ARCH_MSM
-@@ -133,7 +139,6 @@ config MSM_SMD
- 
- config MSM_GPIOMUX
- 	bool
--	depends on !ARCH_MSM_DT
- 	help
- 	  Support for MSM V1 TLMM GPIOMUX architecture.
- 
+Also:
+ - improved to support GET_TIMELEFT option.
+ - added "clocks" and "timeout-sec" properties to DT.
+
+Based on
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+keystone/master
+
+v4..v5:
+- watchdog: davinci: change driver to use WDT core
+	switched off CONFIG_WATCHDOG_NOWAYOUT option
+
+v3..v4:
+- watchdog: davinci: change driver to use WDT core
+	reverted rename of platform driver to "davinci-wdt"
+	as it causes a regression on Davinci platforms.
+
+- arm: dts: keystone: add watchdog entry
+	The patch will be sent separately after series is ready.
+
+v2..v3:
+- watchdog: davinci: change driver to use WDT core
+	removed "ti,keystone-wdt" compatible from driver
+	renamed wdt device names for mach-davinci from
+		"watchdog" to "davinci-wdt"
+
+- watchdog: davinci: reuse driver for keystone arch
+	moved "clocks" property under "Optional properties"
+	improved description of "clocks" property
+
+- arm: dts: keystone: add watchdog entry
+	replaced "ti,keystone-wdt" compatible on
+		 "ti,keystone-wdt","ti,davinci-wdt"
+
+v1..v2:
+- watchdog: davinci: change driver to use WDT core
+	corrected 2011 -> 2006-2013
+	removed useless function comment
+	corrected initialization of heartbeat
+	switched on CONFIG_WATCHDOG_NOWAYOUT option
+
+- watchdog: davinci: use davinci_wdt_device structure to hold device data
+	substituted wdd to watchdog device in commit message
+
+- watchdog: davinci: add GET_TIMELEFT option support
+	corrected comment (is -> has)
+	removed redundant error message "clock freq is not set"
+
+- watchdog: davinci: add GET_STATUS option support
+	dropped
+
+- watchdog: davinci: add "timeout-sec" property
+	use consistent formatting
+
+- watchdog: davinci: reuse driver for keystone arch
+	use consistent formatting
+
+- watchdog: davinci: add "clocks" property
+	merged with above patch
+
+Ivan Khoronzhuk (5):
+  watchdog: davinci: change driver to use WDT core
+  watchdog: davinci: use davinci_wdt_device structure to hold device
+    data
+  watchdog: davinci: add GET_TIMELEFT option support
+  watchdog: davinci: add "timeout-sec" property
+  watchdog: davinci: reuse driver for keystone arch
+
+ .../devicetree/bindings/watchdog/davinci-wdt.txt   |   16 +-
+ drivers/watchdog/Kconfig                           |    5 +-
+ drivers/watchdog/davinci_wdt.c                     |  221 +++++++++-----------
+ 3 files changed, 113 insertions(+), 129 deletions(-)
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
