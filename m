@@ -1,80 +1,137 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 4 Dec 2013 09:05:38 -0800
-Subject: [PATCH 3/3] ARM Coresight: Add PID control support for ETM tracing
-In-Reply-To: <CANsc=4Vy911xcf7fYEjyeV_CNGp8POje9BZrLSP8xrk4YAfSNA@mail.gmail.com>
-References: <CANsc=4Vy911xcf7fYEjyeV_CNGp8POje9BZrLSP8xrk4YAfSNA@mail.gmail.com>
-Message-ID: <20131204170538.GA14773@kroah.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 4 Dec 2013 17:06:23 +0000
+Subject: [PATCH RFC 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <20131204152010.GC2323@e103592.cambridge.arm.com>
+References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20131204152010.GC2323@e103592.cambridge.arm.com>
+Message-ID: <20131204170623.GB26534@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 11:40:59PM -0500, Adrien Verg? wrote:
-> In the same manner as for enabling tracing, an entry is created in
-> sysfs to set the PID that triggers tracing. This change requires
-> CONFIG_PID_IN_CONTEXTIDR to be set when using on-chip ETM.
+On Wed, Dec 04, 2013 at 03:20:10PM +0000, Dave Martin wrote:
+> On Mon, Dec 02, 2013 at 04:20:05PM +0000, Lorenzo Pieralisi wrote:
+> > ARM based platforms implement a variety of power management schemes that
+> > allow processors to enter at run-time low-power states, aka C-states
+> > in ACPI jargon. The parameters defining these C-states vary on a per-platform
+> > basis forcing the OS to hardcode the state parameters in platform
+> > specific static tables whose size grows as the number of platforms supported
+> > in the kernel increases and hampers device drivers standardization.
+> > 
+> > Therefore, this patch aims at standardizing C-state device tree bindings for
+> > ARM platforms. Bindings define C-state parameters inclusive of entry methods
+> > and state latencies, to allow operating systems to retrieve the
+> > configuration entries from the device tree and initialize the related
+> > power management drivers, paving the way for common code in the kernel
+> > to deal with power states and removing the need for static data in current
+> > and previous kernel versions.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > +
 > 
-> Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: "zhangwei(Jovi)" <jovi.zhangwei@huawei.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> ---
->  arch/arm/Kconfig.debug                    |  1 +
->  arch/arm/include/asm/hardware/coresight.h |  3 ++
->  arch/arm/kernel/etm.c                     | 73 ++++++++++++++++++++++++++++---
->  3 files changed, 70 insertions(+), 7 deletions(-)
+> [...]
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 5765abf..fef32e15 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1130,6 +1130,7 @@ config EARLY_PRINTK
->  config OC_ETM
->   bool "On-chip ETM and ETB"
->   depends on ARM_AMBA
-> + select PID_IN_CONTEXTIDR
->   help
->    Enables the on-chip embedded trace macrocell and embedded trace
->    buffer driver that will allow you to collect traces of the
-> diff --git a/arch/arm/include/asm/hardware/coresight.h
-> b/arch/arm/include/asm/hardware/coresight.h
-> index 8c50cf6..009cdf9 100644
-> --- a/arch/arm/include/asm/hardware/coresight.h
-> +++ b/arch/arm/include/asm/hardware/coresight.h
-> @@ -98,6 +98,9 @@
->  #define ETMR_ADDRCOMP_VAL(x) (0x40 + (x) * 4)
->  #define ETMR_ADDRCOMP_ACC_TYPE(x) (0x80 + (x) * 4)
+> > +	- cpus
 > 
-> +#define ETMR_CTXIDCOMP_VAL(x) (0x1b0 + (x) * 4)
-> +#define ETMR_CTXIDCOMP_MASK (0x1bc)
-> +
->  /* ETM status register, "ETM Architecture", 3.3.2 */
->  #define ETMR_STATUS (0x10)
->  #define ETMST_OVERFLOW BIT(0)
-> diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-> index a72382b..18afed1 100644
-> --- a/arch/arm/kernel/etm.c
-> +++ b/arch/arm/kernel/etm.c
-> @@ -40,12 +40,14 @@ struct tracectx {
->   void __iomem *etm_regs;
->   unsigned long flags;
->   int naddrcmppairs;
-> + int nctxidcmp;
->   int etm_portsz;
->   struct device *dev;
->   struct clk *emu_clk;
->   struct mutex mutex;
->   unsigned long addrrange_start;
->   unsigned long addrrange_end;
-> + long pid;
+> Because cpus is really a topology subtree, it might be good to have
+> different names.
+> 
+> To avoid confusion with Mark's affinity properties, maybe a different
+> word would be preferable instead of "affinity".
+> 
+> Maybe "topology" instead of "cpus", and "affected-topology" instead of
+> "affinity"?
+> 
+> 
+> cpufreq also has its concepts of "related" and "affected" cpus, which
+> tries to describe something similar (in all honesty, I always struggle
+> to remember which is which ... but if we were consistent with it, that
+> might help).
 
-pid is not a long, your code is totally broken for pid namespaces, and
-really, I don't know how you would fix it given that you don't have a
-way to specify the pid namespace with this interface.
+Yes, I will try to come up with something clearer.
 
-sorry,
+> > +		Usage: Optional
+> > +		Value type: <phandle>
+> > +		Definition: If defined, the phandle points to a node in the
+> > +			    cpu-map[2] representing all CPUs on which C-state
+> > +			    is valid. If not present or system is UP, the
+> > +			    C-state has to be considered valid for all CPUs in
+> > +			    the system.
+> > +
+> > +	- affinity
+> > +		Usage: Optional
+> > +		Value type: <phandle>
+> > +		Definition: If defined, phandle points to a node in the
+> > +			    cpu-map[2] that represents all CPUs that are
+> > +			    affected (ie share) by the C-state and have to
+> > +			    be coordinated on C-state entry/exit. If not
+> > +			    present or system is UP, the C-state is local to
+> > +			    a CPU and need no coordination (ie it is a CPU
+> > +			    state, that does not require coordination with
+> > +			    other CPUs). If present, the affinity property
+> > +			    must contain a phandle to a cpu-map node that
+> > +			    represents a subset, possibly inclusive of the
+> > +			    CPUs described through the cpus property.
+> 
+> Can you elaborate on how cpus and affinity might be different?
 
-greg k-h
+I was referring to:
+
+- cpus -> processor type (eg valid on A15 or A7, or different implementations
+  of the same processor in the same chip)
+- affinity -> power domain (a subset of the cpus that require coordination)
+
+Nowadays the distinction does not make much sense (I hardly see a power
+state valid on eg A15 clusters [cpus], where just a subset of its cpus need to
+be coordinated [affinity] - might be if other levels of caches are added or
+if you have multiple clusters of the same CPU type with different power
+states capabilities).
+
+I think this deserves more attention, and probably adding power domain
+information can remove this mumbo jumbo, there is a scary level of
+duplicated information in there.
+
+> The statement about "having to be coordainted" also feels a bit vague,
+> though I'm not sure how much we can usefully say here.
+> 
+> If we describe power domains more explicitly it might help with this,
+> because that could bring some description of what needs to be
+> coordinated.
+
+Yes, see above.
+
+> > +	- power-depth
+> > +		Usage: Required
+> > +		Value type: <u32>
+> > +		Definition: Integer value, starting from 2 (value 0 meaning
+> > +			    running and value 1 representing power depth of
+> > +			    wfi (C1)), that defines the level of depth of a
+> > +			    power state.
+> > +			    The system denotes power states with different
+> > +			    depths, an increasing value meaning less power
+> > +			    consumption and might involve powering down more
+> > +			    components.  Devices that are affected by
+> > +			    C-states entry must define the maximum power
+> > +			    depth supported in their respective device tree
+> > +			    bindings so that OSPM can take decision on how
+> > +			    to handle the device in question when the C-state
+> > +			    is entered. All devices (per-CPU or external) with
+> > +			    a power depth lower than the one defined in the
+> > +			    C-state entry stop operating when the C-state
+> > +			    is entered and action is required by OSPM to
+> > +			    guarantee their logic and memory content is saved
+> > +			    restored to guarantee proper functioning.
+> 
+> Any reason to use numbers instead of strings?
+> 
+> Strings make the DT more readable ... we would presumably only have to
+> parse this information once, so it shouldn't be an overhead, unless there
+> are hundreds of C-state nodes.
+
+Yes, but it is supposed to be a unique identifier in the entire system.
+Ok, we can create a list of strings denoting power depths, as long as
+they are "standard" fine by me, but I think that a number would be
+easier to use, even though honestly I think it is better to use power
+domains and get rid of this property altogether.
+
+Lorenzo
