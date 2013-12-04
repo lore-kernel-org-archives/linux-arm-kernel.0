@@ -1,343 +1,199 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 04 Dec 2013 21:48:04 +0100
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-In-Reply-To: <20131204142009.GB2486@localhost> (Ezequiel Garcia's message of
- "Wed, 4 Dec 2013 11:20:10 -0300")
-References: <20131126124003.GA2344@localhost> <87zjopd240.fsf@natisbad.org>
- <87wqjtbm8r.fsf@natisbad.org> <20131128185040.GA13182@localhost>
- <87bo12kcyt.fsf@natisbad.org> <20131202103305.GB2466@localhost>
- <87siubneuf.fsf@natisbad.org> <20131203002225.GA5333@localhost>
- <87ob4xbs8l.fsf@natisbad.org> <87iov5aapx.fsf@natisbad.org>
- <20131204142009.GB2486@localhost>
-Message-ID: <87haaogx6j.fsf@natisbad.org>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Wed, 4 Dec 2013 15:06:47 -0600
+Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
+In-Reply-To: <20131202210719.GQ24997@rocoto.smurfnet.nu>
+References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
+ <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
+ <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
+ <20131202210719.GQ24997@rocoto.smurfnet.nu>
+Message-ID: <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
-
-Ezequiel Garcia <ezequiel.garcia@free-electrons.com> writes:
-
-> Thanks a lot for the patience!
-
-Well, if we let the machines win, it's over.
-
-
->> root at humble:~# nandwrite -p /dev/mtd4 mtd4ro 
->> Writing data to block 0 at offset 0x0
->> [  449.915173] pxa3xx-nand d00d0000.nand: Ready time out!!!
->> libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 0, offset 2048)
->>         error 5 (Input/output error)
->> Erasing failed write from 00000000 to 0x01ffff
->> Writing data to block 1 at offset 0x20000
->> [  450.115172] pxa3xx-nand d00d0000.nand: Ready time out!!!
->> libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 1, offset 2048)
->>         error 5 (Input/output error)
->> Erasing failed write from 0x020000 to 0x03ffff
->> Writing data to block 2 at offset 0x40000
->> [  450.315171] pxa3xx-nand d00d0000.nand: Ready time out!!!
->> libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 2, offset 2048)
->>         error 5 (Input/output error)
->> Erasing failed write from 0x040000 to 0x05ffff
->> Writing data to block 3 at offset 0x60000
->> [  450.515171] pxa3xx-nand d00d0000.nand: Ready time out!!!
->> libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 3, offset 2048)
->>         error 5 (Input/output error)
->> Erasing failed write from 0x060000 to 0x07ffff
->> Writing data to block 4 at offset 0x80000
->> [  450.715169] pxa3xx-nand d00d0000.nand: Ready time out!!!
->> libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 4, offset 2048)
->>         error 5 (Input/output error)
->> Erasing failed write from 0x080000 to 0x09ffff
->> Writing data to block 5 at offset 0xa0000
->> [  450.915171] pxa3xx-nand d00d0000.nand: Ready time out!!!
->> libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 5, offset 2048)
->>         error 5 (Input/output error)
->> Erasing failed write from 0x0a0000 to 0x0bffff
->> Writing data to block 6 at offset 0xc0000
->> [  451.115171] pxa3xx-nand d00d0000.nand: Ready time out!!!
->> libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 6, offset 2048)
->>         error 5 (Input/output error)
->> Erasing failed write from 0x0c0000 to 0x0dffff
->> Writing data to block 7 at offset 0xe0000
->> 
->> 
+On Mon, Dec 2, 2013 at 3:07 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Mon, Dec 02, 2013 at 01:51:22PM -0600, Matt Sealey wrote:
+>> Here's where I think this whole thing falls down as being the weirdest
+>> possible implementation of this. It defies logic to put this
+>> information in the device tree /chosen node while also attempting to
+>> boot the kernel using an EFI stub; the stub is going to have this
+>> information because it is going to have the pointer to the system
+>> System Table (since it was called by StartImage()). Why not stash the
+>> System Table pointer somewhere safe in the stub?
 >
-> So, let me confirm this: you have systematically obtained a "Ready
-> timeout" when writing to the device, on every single write to a page,
-> correct?
+> We do. In the DT.
 
-yep, this is what I have on the RN2120.
+Hang on... see way below about "reinventing the wheel"
 
-
-> I'll prepare a patch against the branch we're working that adds lots of
-> pr_info(). It'll be very annoying for you, but it's the only way I can
-> think of, to get the driver's dirty inner sequence and to see *where*
-> is failing.
+>> The information in the device tree is all accessible from Boot
+>> Services and as long as the System Table isn't being thrown away (my
+>> suggestion would be.. stuff it in r2, and set r1 = "EFI\0" then work
+>> with arch/arm/kernel/head{-common,}.S code to do the right thing)
 >
-> However, before that patch, please do a quick test for me. It's just a
-> shot in the dark. The below diff removes the NDCB0_AUTO_RS flag from
-> the PAGE_PROG command when the page size is 2048 byte (or less).
+> You left out the bit of redefining the kernel boot protocol to permit
+> calling it with caches, MMU and interrupts enabled - also known as
+> before ExitBootServices().
+
+And that's a horrible idea because of what?
+
+What's evident here is there could be two major ways to generate an
+image that boots from a UEFI implementation;
+
+* one whereby UEFI is jostled or coerced by second stage bootloader to
+load a plain zImage and you lose all information about UEFI except in
+the event that that information is preserved in the device tree by the
+firmware
+* one whereby a 'stock' UEFI is used and it boots only on UEFI because
+it is in a format very reasonably only capable of being booted by UEFI
+and, subordinately,
+ - one where that plain zImage got glued to an EFI stub just like the
+decompressor is glued to the Image
+ - one where the kernel needs to be built with support for UEFI and
+that somewhat changes the boot path
+
+By the time we get half-way through arm/kernel/head.S the cache and
+MMU has been turned off and on and off again by the decompressor, and
+after a large amount of guesswork and arbitrary restriction-based
+implementation, there's no guarantee that the kernel hasn't been
+decompressed over some important UEFI feature or some memory hasn't
+been trashed. You can't make that guarantee because by entering the
+plain zImage, you forfeited that information. This is at worst case
+going to be lots of blank screens and blinking serial console prompts
+and little more than frustration..
+
+Most of the guessing is ideally not required to be a guess at all, the
+restrictions are purely to deal with the lack of trust for the
+bootloader environment. Why can't we trust UEFI? Or at least hold it
+to a higher standard. If someone ships a broken UEFI, they screw a
+feature or have a horrible bug and ship it, laud the fact Linux
+doesn't boot on it and the fact that it's their fault - over their
+head. It actually works these days, Linux actually has "market share,"
+companies really go out of their way to rescue their "image" and
+resolve the situation when someone blogs about a serious UEFI bug on
+their $1300 laptops, or even $300 tablets.
+
+> Which is what we are going to implement anyway in order to permit
+> firmware to supply DT hardware description in the same way as with
+> ACPI. Yes, we could pass the system table pointer directly - but that
+> doesn't get us the memory map.
+
+Boot Services gives you the ability to get the memory map.. and the
+kinds of things that live in those spots in the memory map. It's at
+least a better guess than "I am located at a specific place and can
+infer from linker data and masking off the bottom bits that there's
+probably this amount of RAM that starts at this location or
+thereabouts". It at least gives the ability to 'allocate' memory to
+put the page table instead of having a firmware call walk all over it,
+or having the kernel walk over some parts of firmware, or even not
+have to do anything except link in a decompressor (eh, sure, it means
+duplicating decompressor code in some cases, but I also don't think
+it's a sane requirement to include the entire decompression suite in
+the kernel proper if it only gets used once at early boot).
+
+> I prefer to see it as a way to not reinvent things that do not need
+> reinventing, while not adding more special-case code to the kernel.
+
+Isn't putting the System Table pointer in the DT specifically
+reinventing the UEFI boot process?
+
+Booting from UEFI is a special case in itself.. the EFI stub here is
+putting a round block in a square hole.
+
+There are two much, much better solutions: put the round block in a
+round hole. Put a square block in that square hole. We could do so
+much better than gluing the round block into the square hole.
+
+>> What that meant is nobody bothered to implement working, re-entrant,
+>> re-locatable firmware to a great degree. This ended up being a
+>> self-fulfilling prophecy of "don't trust the bootloader" and "get rid
+>> of it as soon as we can," which essentially meant Linux never took
+>> advantage of the resources available. In OF's case, the CIF sucked by
+>> specification. In UEFI's case here, it's been implemented in Linux in
+>> such a way that guarantees poor-performing firmware code with huge
+>> penalties to call them, which isn't even required by UEFI if the
+>> earlier boot code did the right things in the first place.
 >
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index fd0ef93..038cf5d 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -831,7 +831,6 @@ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
->  			}
->  		} else {
->  			info->ndcb0 |= NDCB0_CMD_TYPE(0x1)
-> -					| NDCB0_AUTO_RS
->  					| NDCB0_ST_ROW_EN
->  					| NDCB0_DBC
->  					| (NAND_CMD_PAGEPROG << 8)
->
-> Please apply this diff, and then try to write at least one page. If at
-> all possible you might try different approaches:
->
->   $ flash_erase /dev/mtd2 0 1
->   $ dd if=page.raw of=/dev/mtd2 bs=2048 count=1
->
->   $ flash_erase /dev/mtd2 0 1
->   $ nandwrite page.raw /dev/mtd2
+> I don't follow. In which way does this implementation result in poor
+> performance or reduced functionality?
 
-That's very weird. With the patch applied (I did not redo the whole set
-of tests below w/o the patch):
+I believe what I am trying to object to is this weird process of
+getting to a state where you can get to UEFI, and why anyone would
+bother gluing the existing Linux kernel image to the back of an
+externally-built stub, only to do some really quite obnoxious tricks
+to enable it to go into a decompressor and then through, kernel setup
+head, that make a bunch of assumptions about the bootloader interface,
+then to try and recover the information that got thrown away and THEN
+attempt to reinstate some kind of UEFI functionality.
 
-Let's erase the first block of /dev/mtd4
+If your platform has UEFI, then your platform has UEFI - if you built
+a multiplatform kernel that needs to boot on U-Boot, then you glued an
+EFI stub to it to make it boot. At some point between the stub and the
+runtime services driver, you're going through 10,000 lines of code
+with the information that it *is* running on top of UEFI completely
+lost to the boot process.
 
-  root at thin:~# flash_erase /dev/mtd4 0 1
-  Erasing 128 Kibyte @ 0 -- 100 % complete 
-  
-Create a 2048 byte file:
+I believe I am also objecting to the idea that the way this is BEST
+implemented is to take a stock zImage (decompressor+Image payload) and
+glue a stub in front to resolve the interface issue when the
+implication is extra complication to the boot process.
 
-  root at thin:~# dd if=/dev/urandom of=/tmp/page.raw bs=2048 count=1
-  1+0 records in
-  1+0 records out
-  2048 bytes (2.0 kB) copied, 0.00104352 s, 2.0 MB/s
+By not actually using it, nobody actually bothered to improve the
+firmware or fix bugs in the places where it could have been used. This
+ends up as a self-fulfilling prophecy of exhausting amounts of broken
+and unoptimized firmware.
 
-dd that file to the first block
+Nobody in firmware-land has any impetus to fix those bugs or add
+useful optional features.
 
-  root at thin:~# dd if=/tmp/page.raw of=/dev/mtd4 bs=2048 count=1
-  1+0 records in
-  1+0 records out
-  2048 bytes (2.0 kB) copied, 0.0008344 s, 2.5 MB/s
+By "by not actually using it," I do mean the case where someone has
+UEFI and somehow boots a plain zImage and a DTB modified to include
+the System Table pointer. Because that door is completely wide open..
 
-Do the same with nandwrite:
+Personally I think having a well known environment at StartImage()
+jumping to your EFI application entry point is a great place to
+simplify the decompressor by integrating it into the stub.
 
-  root at thin:~# flash_erase /dev/mtd4 0 1
-  Erasing 128 Kibyte @ 0 -- 100 % complete 
+At the point you then jump into kernel/head.S - you can still know
+you're on UEFI, with data in r1 and r2 strongly implying this is UEFI,
+you can branch to a much, MUCH simpler path for initialization where
+quite a lot of the work it's trying to do may have already been
+performed by the stub., and quite a lot of the bare-metalling doesn't
+need to be done.
 
-  root at thin:~# nandwrite /dev/mtd4 /tmp/page.raw 
-  Writing data to block 0 at offset 0x0
+I am sure, even if modifying head.S for any reason than to fix a bug
+or implement some architectural requirement is somehow frowned upon,
+that comparing r1 to a known constant machine id and branching to a
+uefi_start() (which, at that point, may as well be a C function, if
+the stub saw fit to keep around/throw in an early stack) is not going
+to cause anyone any problems (even if it does add 4 instructions to
+the entry and slow everyone else down by a nanosecond or two).
 
-As it seems to work, let's now try with a complete image:
-    
-  root at thin:~# flash_erase /dev/mtd4 0 0
-  Erasing 128 Kibyte @ 72e0000 -- 99 % complete flash_erase: Skipping bad block at 07300000
-  flash_erase: Skipping bad block at 07320000
-  flash_erase: Skipping bad block at 07340000
-  flash_erase: Skipping bad block at 07360000
-  flash_erase: Skipping bad block at 07380000
-  flash_erase: Skipping bad block at 073a0000
-  flash_erase: Skipping bad block at 073c0000
-  flash_erase: Skipping bad block at 073e0000
-  Erasing 128 Kibyte @ 73e0000 -- 100 % complete 
+Everybody keeps their absolutely fixed entry point to the image
+proper, that way, so you can still glue your stub (with or without the
+decompressor as part of the stub) to the front with no changes to the
+build process for the image or the code path for non-UEFI.. one
+conditional branch and you can gain a lot of much, much easier to
+maintain boot process..
 
-  root at thin:~# nandwrite /dev/mtd4 mtd4ro 
-  Writing data to block 0 at offset 0x0
-  [  421.406929] pxa3xx-nand d00d0000.nand: Ready time out!!!
-  libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 0, offset 2048)
-          error 5 (Input/output error)
-  Erasing failed write from 00000000 to 0x01ffff
-  Writing data to block 1 at offset 0x20000
-  [  421.606928] pxa3xx-nand d00d0000.nand: Ready time out!!!
-  libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 1, offset 2048)
-          error 5 (Input/output error)
-  Erasing failed write from 0x020000 to 0x03ffff
-  Writing data to block 2 at offset 0x40000
-  [  421.806928] pxa3xx-nand d00d0000.nand: Ready time out!!!
-  libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 2, offset 2048)
-          error 5 (Input/output error)
-  Erasing failed write from 0x040000 to 0x05ffff
-  Writing data to block 3 at offset 0x60000
-  [  422.006928] pxa3xx-nand d00d0000.nand: Ready time out!!!
-  libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 3, offset 2048)
-          error 5 (Input/output error)
-  Erasing failed write from 0x060000 to 0x07ffff
-  Writing data to block 4 at offset 0x80000
-  [  422.206928] pxa3xx-nand d00d0000.nand: Ready time out!!!
-  libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 4, offset 2048)
-          error 5 (Input/output error)
-  Erasing failed write from 0x080000 to 0x09ffff
-  Writing data to block 5 at offset 0xa0000
-  ^C[  422.406926] pxa3xx-nand d00d0000.nand: Ready time out!!!
+> We deal with a highly quirky set of requirements for calling
+> SetVirtualAddressMap() in a clunky way - after which calls into UEFI
+> are direct and cachable.
 
-So let's try again with a single page:
-  
-  root at thin:~# flash_erase /dev/mtd4 0 1
-  Erasing 128 Kibyte @ 0 -- 100 % complete 
+If the kernel boot process now has been derived from years upon years
+of trial and error and engineering, then it does seem a shame to go do
+things a different way, you would be right to say it would be a shame
+not to promote code-reuse of the existing process by not touching the
+zImage stuff or core kernel boot, and just working on the glue and
+some not-so-early-init code.
 
-  root at thin:~# nandwrite /dev/mtd4 /tmp/page.raw 
-  Writing data to block 0 at offset 0x0
-  
-FWIW, the version of nandwrite I have on my armhf debian is the
-following (no specific bug report related to that version of
-mtd-utils):
+But what it does is make the boot process *more* complicated than it's
+already complicated implementation, in the face of a very nice
+specification of the correct way to deal with booting something from a
+UEFI implementation..
 
-  root at thin:~# nandwrite --version
-  nandwrite 1.5.0
-  
-  Copyright (C) 2003 Thomas Gleixner 
-  
-  nandwrite comes with NO WARRANTY
-  to the extent permitted by law.
-  
-  You may redistribute copies of nandwrite
-  under the terms of the GNU General Public Licence.
-  See the file `COPYING' for more information.
+What might be a much better route to take could be to define a nice,
+shiny new way of getting Linux to the point that it has full control
+over it's own destiny which does a hell of a lot less, with a less
+schizophrenic view of using UEFI or not.
 
-Ok, so let's see if the problem appears if we write more than 1 block:
-  
-  root at thin:/tmp# flash_erase /dev/mtd4 0 3
-  Erasing 128 Kibyte @ 40000 -- 100 % complete 
-  
-  root at thin:/tmp# dd if=/dev/urandom of=/tmp/3-blocks.raw bs=128K count=3
-  3+0 records in
-  3+0 records out
-  393216 bytes (393 kB) copied, 0.120255 s, 3.3 MB/s
-  
-  root at thin:/tmp# nandwrite /dev/mtd4 /tmp/3-blocks.raw 
-  Writing data to block 0 at offset 0x0
-  Writing data to block 1 at offset 0x20000
-  Writing data to block 2 at offset 0x40000
-  
-Now, I am starting to wonder if nandwrite does not try and do something
-smart depending on the content of the file. So let's try and replace
-our "mtd4ro" file by a file of same size filled with random:
-  
-  root at thin:~# ls -l mtd4ro 
-  -rw-r--r-- 1 arno root 121634816 Dec  3 20:30 mtd4ro
-  
-  root at thin:~# dd if=/dev/urandom of=/tmp/whole.raw bs=128K count=928
-  928+0 records in
-  928+0 records out
-  121634816 bytes (122 MB) copied, 37.1333 s, 3.3 MB/s
-  
-  root at thin:~# flash_erase /dev/mtd4 0 1
-  Erasing 128 Kibyte @ 0 -- 100 % complete 
-  
-  
-  root at thin:~# nandwrite /dev/mtd4 /tmp/whole.raw 
-  Writing data to block 0 at offset 0x0
-  ...
-  Writing data to block 916 at offset 0x7280000
-  Writing data to block 917 at offset 0x72a0000
-  Writing data to block 918 at offset 0x72c0000
-  Writing data to block 919 at offset 0x72e0000
-  Writing data to block 920 at offset 0x7300000
-  Bad block at 7300000, 1 block(s) from 7300000 will be skipped
-  Writing data to block 921 at offset 0x7320000
-  Bad block at 7320000, 1 block(s) from 7320000 will be skipped
-  Writing data to block 922 at offset 0x7340000
-  Bad block at 7340000, 1 block(s) from 7340000 will be skipped
-  Writing data to block 923 at offset 0x7360000
-  Bad block at 7360000, 1 block(s) from 7360000 will be skipped
-  Writing data to block 924 at offset 0x7380000
-  Bad block at 7380000, 1 block(s) from 7380000 will be skipped
-  Writing data to block 925 at offset 0x73a0000
-  Bad block at 73a0000, 1 block(s) from 73a0000 will be skipped
-  Writing data to block 926 at offset 0x73c0000
-  Bad block at 73c0000, 1 block(s) from 73c0000 will be skipped
-  Writing data to block 927 at offset 0x73e0000
-  Bad block at 73e0000, 1 block(s) from 73e0000 will be skipped
-  Writing data to block 928 at offset 0x7400000
-  libmtd: error!: bad eraseblock number 928, mtd4 has 928 eraseblocks
-  nandwrite: error!: /dev/mtd4: MTD get bad block failed
-             error 22 (Invalid argument)
-  nandwrite: error!: Data was only partially written due to error
-             error 22 (Invalid argument)
-  
-  I don't believe it! It works as expected. As said previously, the
-content of my "mtd4ro" is a simple a backup of the partition via
-dd (a ubi fs):
-
-  root at thin:~# hexdump -C mtd4ro | less
-  00000000  55 42 49 23 01 00 00 00  00 00 00 00 00 00 00 02  |UBI#............|
-  00000010  00 00 08 00 00 00 10 00  16 9a 76 a5 00 00 00 00  |..........v.....|
-  00000020  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-  00000030  00 00 00 00 00 00 00 00  00 00 00 00 65 9c 26 3a  |............e.&:|
-  00000040  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-  *
-  000007f0  00 00 00 00 00 00 00 00  00 00 00 02 00 00 00 00  |................|
-  00000800  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
-  *
-  00020000  55 42 49 23 01 00 00 00  00 00 00 00 00 00 00 02  |UBI#............|
-  00020010  00 00 08 00 00 00 10 00  16 9a 76 a5 00 00 00 00  |..........v.....|
-  00020020  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-  00020030  00 00 00 00 00 00 00 00  00 00 00 00 65 9c 26 3a  |............e.&:|
-  00020040  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-  *
-  000207f0  00 00 00 00 00 00 00 00  00 00 00 02 00 00 00 00  |................|
-  00020800  55 42 49 21 01 01 00 00  00 00 00 00 00 00 00 00  |UBI!............|
-
-Just to be sure, I did the test three times for each input file: mtd4ro,
-whole.raw, mtd4ro, whole.raw, mtd4ro, whole.raw:
-
- - whole.raw: no error the three times
- - mtd4ro: errors each time
-
-Let's now try with the first block only:
-
-  root at thin:~# dd if=mtd4ro of=/tmp/oneblock bs=128K count=1
-  1+0 records in
-  1+0 records out
-  131072 bytes (131 kB) copied, 0.00126152 s, 104 MB/s
-
-  root at thin:~# flash_erase /dev/mtd4 0 1
-  Erasing 128 Kibyte @ 0 -- 100 % complete 
-
-  root at thin:~# nandwrite /dev/mtd4 /tmp/oneblock 
-  Writing data to block 0 at offset 0x0
-  [ 3860.346928] pxa3xx-nand d00d0000.nand: Ready time out!!!
-  libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 0, offset 2048)
-          error 5 (Input/output error)
-  Erasing failed write from 00000000 to 0x01ffff
-  Writing data to block 1 at offset 0x20000
-  [ 3860.546928] pxa3xx-nand d00d0000.nand: Ready time out!!!
-  libmtd: error!: cannot write 2048 bytes to mtd4 (eraseblock 1, offset 2048)
-          error 5 (Input/output error)
-  
-AFAICT, it seems someone in the process does not like the UBI fs dump I
-provide: nandwrite, your driver, mtd base code or the chip.
-
-I took a very quick look at nandwrite code and it has some options to do
-smart stuff but they seem to be all disabled by default when no cmd line
-option is passed.
-
-Could you try and dump the block to another flash. As I don't think I can
-attach a binary blob to this email, can you drop the following in a
-python shell:
-
-l = ["55 42 49 23 01 00 00 00  00 00 00 00 00 00 00 02",
-     "00 00 08 00 00 00 10 00  16 9a 76 a5 00 00 00 00",
-     "00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00",
-     "00 00 00 00 00 00 00 00  00 00 00 00 65 9c 26 3a",
-     "00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00"*0x7b,
-     "00 00 00 00 00 00 00 00  00 00 00 02 00 00 00 00",
-     "ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff",
-     "ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff"*0x1f7f]
-
-open("/tmp/block.raw", "w").write("".join(l).replace(' ', '').decode("hex"))
-
-FWIW, you should have the following sha256 for the file:
-d3e5534e054f2ab1220194c434d90fbfe9580459de887016db8e308739aa3a7b
-
-If you have any additional idea, I am interested. I have no more time
-this evening to test the other debug patch you sent but I will
-definitely give it a try tomorrow.
-
-If I did something stupid in the process, do not hesitate!
-
-Cheers,
-
-a+
+Ta,
+Matt Sealey <neko@bakuhatsu.net>
