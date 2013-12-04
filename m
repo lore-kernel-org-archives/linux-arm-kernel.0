@@ -1,40 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 Dec 2013 15:56:35 +0100
-Subject: [PATCH v4 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <20131204143317.GL29282@titan.lakedaemon.net>
-References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
- <1386166641-7567-2-git-send-email-andrew@lunn.ch>
- <20131204143317.GL29282@titan.lakedaemon.net>
-Message-ID: <20131204145635.GA8062@lunn.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 4 Dec 2013 09:57:40 -0500
+Subject: [PATCH v2 06/23] mm/char: remove unnecessary inclusion of
+ bootmem.h
+In-Reply-To: <20131203225513.GV8277@htj.dyndns.org>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-7-git-send-email-santosh.shilimkar@ti.com>
+ <20131203225513.GV8277@htj.dyndns.org>
+Message-ID: <529F42E4.8080703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 09:33:17AM -0500, Jason Cooper wrote:
-> On Wed, Dec 04, 2013 at 03:17:18PM +0100, Andrew Lunn wrote:
-> > The Marvell Dove SoC can run the CPU at two frequencies. The high
-> > frequencey is from a PLL, while the lower is the same as the DDR
-> > clock. Add a cpufreq driver to swap between these frequences.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> > Sort header files
-> > Remove unneeded header files
-> > Notify only on change
-> > Use get_cpu_device(0), devm_clk_get()
-> > Use platform_get_resource_byname()
-> > Error check clk_prepare_enable()
-> > Comment the interrupt handler
-> > 
-> > rebase onto 3.13-rc2 linux-next
+On Tuesday 03 December 2013 05:55 PM, Tejun Heo wrote:
+> On Mon, Dec 02, 2013 at 09:27:21PM -0500, Santosh Shilimkar wrote:
+>> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>>
+>> Clean-up to remove depedency with bootmem headers.
+>>
+>> Cc: Yinghai Lu <yinghai@kernel.org>
+>> Cc: Tejun Heo <tj@kernel.org>
+>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> Is there something you need that prevents you from basing on v3.13-rc1?
-
-It seems to be Rafael's policy that patches for pm need to be based on
-his linux-next branch. Viresh has also been making some major changes
-to all the cpufreq drivers to move code into the core and out of
-drivers. These changes are in rafaels linux-next, and i've made
-similar changes to the driver so it fits in.
-
-	Andrew
+> Please merge 4-6 into a single patch.
+> 
+Will do
