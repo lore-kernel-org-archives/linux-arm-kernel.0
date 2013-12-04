@@ -1,113 +1,20 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 4 Dec 2013 15:20:10 +0000
-Subject: [PATCH RFC 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20131204152010.GC2323@e103592.cambridge.arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 4 Dec 2013 10:21:51 -0500 (EST)
+Subject: [PATCH 3/3] usb: ohci-at91: use device managed clk retrieval
+In-Reply-To: <529EE8A5.7010806@overkiz.com>
+Message-ID: <Pine.LNX.4.44L0.1312041021120.1329-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 04:20:05PM +0000, Lorenzo Pieralisi wrote:
-> ARM based platforms implement a variety of power management schemes that
-> allow processors to enter at run-time low-power states, aka C-states
-> in ACPI jargon. The parameters defining these C-states vary on a per-platform
-> basis forcing the OS to hardcode the state parameters in platform
-> specific static tables whose size grows as the number of platforms supported
-> in the kernel increases and hampers device drivers standardization.
+On Wed, 4 Dec 2013, boris brezillon wrote:
+
+> > The patches look fine to me.  But only the 1/3 patch fixes a bug; the
+> > others merely change the resource management.
 > 
-> Therefore, this patch aims at standardizing C-state device tree bindings for
-> ARM platforms. Bindings define C-state parameters inclusive of entry methods
-> and state latencies, to allow operating systems to retrieve the
-> configuration entries from the device tree and initialize the related
-> power management drivers, paving the way for common code in the kernel
-> to deal with power states and removing the need for static data in current
-> and previous kernel versions.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> +
+> Do you want me to split this series ?
+>   1) the 1st patch that should be merged in 3.13
+>   2) patches 2 to 4 that might be applied later
 
-[...]
+That probably would make Greg happier.
 
-> +	- cpus
-
-Because cpus is really a topology subtree, it might be good to have
-different names.
-
-To avoid confusion with Mark's affinity properties, maybe a different
-word would be preferable instead of "affinity".
-
-Maybe "topology" instead of "cpus", and "affected-topology" instead of
-"affinity"?
-
-
-cpufreq also has its concepts of "related" and "affected" cpus, which
-tries to describe something similar (in all honesty, I always struggle
-to remember which is which ... but if we were consistent with it, that
-might help).
-
-> +		Usage: Optional
-> +		Value type: <phandle>
-> +		Definition: If defined, the phandle points to a node in the
-> +			    cpu-map[2] representing all CPUs on which C-state
-> +			    is valid. If not present or system is UP, the
-> +			    C-state has to be considered valid for all CPUs in
-> +			    the system.
-> +
-> +	- affinity
-> +		Usage: Optional
-> +		Value type: <phandle>
-> +		Definition: If defined, phandle points to a node in the
-> +			    cpu-map[2] that represents all CPUs that are
-> +			    affected (ie share) by the C-state and have to
-> +			    be coordinated on C-state entry/exit. If not
-> +			    present or system is UP, the C-state is local to
-> +			    a CPU and need no coordination (ie it is a CPU
-> +			    state, that does not require coordination with
-> +			    other CPUs). If present, the affinity property
-> +			    must contain a phandle to a cpu-map node that
-> +			    represents a subset, possibly inclusive of the
-> +			    CPUs described through the cpus property.
-
-Can you elaborate on how cpus and affinity might be different?
-
-The statement about "having to be coordainted" also feels a bit vague,
-though I'm not sure how much we can usefully say here.
-
-If we describe power domains more explicitly it might help with this,
-because that could bring some description of what needs to be
-coordinated.
-
-> +
-> +	- power-depth
-> +		Usage: Required
-> +		Value type: <u32>
-> +		Definition: Integer value, starting from 2 (value 0 meaning
-> +			    running and value 1 representing power depth of
-> +			    wfi (C1)), that defines the level of depth of a
-> +			    power state.
-> +			    The system denotes power states with different
-> +			    depths, an increasing value meaning less power
-> +			    consumption and might involve powering down more
-> +			    components.  Devices that are affected by
-> +			    C-states entry must define the maximum power
-> +			    depth supported in their respective device tree
-> +			    bindings so that OSPM can take decision on how
-> +			    to handle the device in question when the C-state
-> +			    is entered. All devices (per-CPU or external) with
-> +			    a power depth lower than the one defined in the
-> +			    C-state entry stop operating when the C-state
-> +			    is entered and action is required by OSPM to
-> +			    guarantee their logic and memory content is saved
-> +			    restored to guarantee proper functioning.
-
-Any reason to use numbers instead of strings?
-
-Strings make the DT more readable ... we would presumably only have to
-parse this information once, so it shouldn't be an overhead, unless there
-are hundreds of C-state nodes.
-
-[...]
-
-Cheers
----Dave
+Alan Stern
