@@ -1,75 +1,69 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Wed, 4 Dec 2013 20:42:31 +0200
-Subject: [PATCH v4 1/5] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <20131204182824.GA14499@roeck-us.net>
-References: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385556508-3935-2-git-send-email-ivan.khoronzhuk@ti.com>
- <529F6EBE.5050703@ti.com> <20131204182824.GA14499@roeck-us.net>
-Message-ID: <529F7797.4080100@ti.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 4 Dec 2013 10:44:05 -0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <1386082273.18201.61.camel@shinybook.infradead.org>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+ <5298AA23.7080404@st.com>
+ <1386082273.18201.61.camel@shinybook.infradead.org>
+Message-ID: <20131204184405.GE9468@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 08:28 PM, Guenter Roeck wrote:
-> On Wed, Dec 04, 2013 at 11:34:46PM +0530, Sekhar Nori wrote:
->> On 11/27/2013 6:18 PM, Ivan Khoronzhuk wrote:
->>> To reduce code duplicate and increase code readability use WDT core
->>> code to handle WDT interface.
->>>
->>> Remove io_lock as the WDT core uses mutex to lock each wdt device.
->>> Remove wdt_state as the WDT core tracks state with its own variable.
->>>
->>> The watchdog_init_timeout() can read timeout value from timeout-sec
->>> property if the passed value is out of bounds. The heartbeat is
->>> initialized in next way. If heartbeat is not set thought module
->>> parameter, try to read it's value from WDT node timeout-sec property.
->>> If node has no one, use default value.
->>>
->>> The heartbeat is hold in wdd->timeout by WDT core, so use it in
->>> order to set timeout period.
->>>
->>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>>   drivers/watchdog/Kconfig       |    2 +
->>>   drivers/watchdog/davinci_wdt.c |  147 ++++++++++------------------------------
->>>   2 files changed, 37 insertions(+), 112 deletions(-)
->>>
->>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->>> index 5be6e91..eb8c89d 100644
->>> --- a/drivers/watchdog/Kconfig
->>> +++ b/drivers/watchdog/Kconfig
->>> @@ -271,6 +271,8 @@ config IOP_WATCHDOG
->>>   config DAVINCI_WATCHDOG
->>>   	tristate "DaVinci watchdog"
->>>   	depends on ARCH_DAVINCI
->>> +	select WATCHDOG_CORE
->>> +	select WATCHDOG_NOWAYOUT
->>
->> Its not clear for change log why NOWAYOUT needs to be forced on all the
->> time for all users of DaVinci watchdog.
-
-... you are right
-
->>
-> Actually, thinking about it, it is not necessary and can be replaced with
+On Tue, Dec 03, 2013 at 02:51:13PM +0000, David Woodhouse wrote:
+> On Fri, 2013-11-29 at 14:52 +0000, Angus Clark wrote:
+> > 
+> > As I see it, the main problem with the current support is that dedicated Serial
+> > Flash Controllers require a level of semantics that cannot be conveyed over the
+> > generic SPI framework.  With this in mind, I would start by defining something
+> > along the lines of a "Serial Flash transfer".  
 > 
-> 	watchdog_set_nowayout(wdd, 1);
-
-Good idea, I'll replace watchdog_set_nowayout(wdd, WATCHDOG_NOWAYOUT) on it.
-And delete "select WATCHDOG_NOWAYOUT"
-
+> I think this is the best way to describe the issue, and approach the
+> solution.
 > 
-> In other words, there is no need to force NOWAYOUT on _other_ watchdogs which
-> may be present in the system. Still, you are right, it would be nice to explain
-> in the changelog (or maybe even better as comment in the code) why it is
-> enforced.
+> We should be looking to extend the generic SPI framework to support what
+> we need, rather than hacking around it purely on the MTD side.
 > 
-> Guenter
-> 
+> As such, I'd be very interested in Mark's thoughts on it...
 
-Only question, should I repost only this patch or whole series?
+Hmm, I thought we already had (some form of) this explanation
+weeks/months ago, yet the conclusion was that Mark doesn't want this in
+the SPI framework at all, since a dedicated Serial Flash Controller is
+not truly SPI. But perhaps I'm wrong.
 
--- 
-Regards,
-Ivan Khoronzhuk
+On this topic, I have one more stick to throw on this fire; I have some
+Broadcom hardware that consists of two pieces:
+
+  (1) a true SPI controller, with single-line-I/O and
+  (2) a Serial Flash controller that can accelerate flash read, using
+      dual/quad I/O.
+
+The latter hardware cannot handle flash writes, only uses quad I/O for
+data (not addresses), has some other peculiarities specific to SPI
+flash, and is highly dependent on the former for providing complete SPI
+flash support. My current driver is not really upstream-ready, since
+(like Huang's original driver), it pretends to be a SPI driver yet
+requires "incestuous knowledge" of m25p80 / MTD. But I hope that any new
+framework can support hardware like mine.
+
+I don't have public documentation for this hardware, but I can provide
+more detail if desired.
+
+I mostly bring this up, though, because it is an example of hardware
+that
+
+   (a) can operate as a true SPI device (hardware (1) can handle generic
+       SPI transfers), but
+   (b) requires knowledge of the details of SPI flash in order to get
+       optimal usage out of the acceleration from (2).
+
+In my book, point (a) and (b) hold some bearing over the question of
+"where should this SPI NOR framework live", because it is reasonable
+that a single driver for this hardware should be able to handle either
+true SPI devices or accelerated SPI-NOR flash.
+
+Sorry for my late-ish addition to this discussion. There's been a lot of
+noise on this topic, and SPI flash is not the highest priority on my
+list for now (although it's certainly on the list).
+
+Brian
