@@ -1,85 +1,28 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 4 Dec 2013 12:58:53 +0100
-Subject: [PATCH] ARM: dts: i.MX27: Configure GPIOs as "input" by default
-In-Reply-To: <1386156787.576977781@f410.i.mail.ru>
-References: <1385795000-29764-1-git-send-email-shc_work@mail.ru>
- <1386152166.195844894@f118.i.mail.ru>
- <20131204121508.7123c6c5@ipc1.ka-ro>
- <1386156787.576977781@f410.i.mail.ru>
-Message-ID: <20131204125853.57b79cda@ipc1.ka-ro>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Dec 2013 12:14:24 +0000
+Subject: [PATCH v4 2/3] regulator: tps6586x: add and use correct voltage
+ table
+In-Reply-To: <127fe07e18665f93aa8d7c03e03164f1a049ddb6.1386108712.git.stefan@agner.ch>
+References: <cover.1386108712.git.stefan@agner.ch>
+ <127fe07e18665f93aa8d7c03e03164f1a049ddb6.1386108712.git.stefan@agner.ch>
+Message-ID: <20131204121424.GN29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 03, 2013 at 11:18:47PM +0100, Stefan Agner wrote:
+> Depending on the regulator version, the voltage table might be
+> different. Use version specific regulator tables in order to select
+> correct voltage table. For the following regulator versions different
+> voltage tables are now used:
 
-Alexander Shiyan wrote:
-> > > > > > > > > > On Sat, Nov 30, 2013 at 11:03:20AM +0400, Alexander Shiyan wrote:
-> > > > > > > > > > > This patch changes the default direction for pins used
-> > > > > > > > > > > as GPIO to "input". This prevents a short circuit on the
-> > > > > > > > > > > configuration stage when GPIO-pin is connected to the
-> > > > > > > > > > > other output pin.
-> > > > > > > > > > 
-> > > > > > > > > > Markus,
-> > > > > > > > > > 
-> > > > > > > > > > Does it make sense to you?
-> > > > > > > > > 
-> > > > > > > > > I am not sure if this really happens. However, it does make sense and I
-> > > > > > > > > can't see any disadvantages in changing the default GPIO mux direction to
-> > > > > > > > > input.
-> > > > > > > > > 
-> > > > > > > > What happens, if the bootloader already set up a pin as output and
-> > > > > > > > linux later does the pinconfig stuff?
-> > > > > > > > If the pin is reconfigured as input then, this may produce an unwanted
-> > > > > > > > glitch on the pin. IMO the pinconfig driver should not touch the pin
-> > > > > > > > direction, but leave it to the gpio driver to set that up. 
-> > > > > > > 
-> > > > > > > Such pin can be overridden by board DTS.
-> > > > > > > 
-> > > > > > So, which pins will be configured with the default direction?
-> > > > > > If pins are not stated in DT they should be not configured at all, I
-> > > > > > suppose.
-> > > > > 
-> > > > > Yes. We talk about GPIOs defined in DTS.
-> > > > > Just one example: We have one GPIO pin connected to switch between ground
-> > > > > and resistor to pullup (gpio-key driver). When pinctrl driver will initialize pin for the
-> > > > > driver (before gpio_direction_input() in the driver), direction will be set to output
-> > > > > and this may cause short circuit.
-> > > > > 
-> > > > The pin direction should be determined by the GPIO driver, not the
-> > > 
-> > > Direction determined by driver that use this GPIO pin,
-> > > setup this direction should be by GPIO driver.
-> > > 
-> > > > pinctrl driver. Pins that have been set up correctly by the bootloader
-> > > > must not change their direction when the pinctrl driver reconfigures
-> > > > the pins!
-> > > 
-> > > Yes. But this is another topic for discussion, it does not concern with this patch.
-> > > 
-> > If the pin direction is not being determined by the pinctrl driver the
-> > patch to change the default direction would not be necessary.
-> > 
-> > Otherwise this patch would try to exorcise the devil with the help of
-> > beelzebub.
-> > 
-> > A short between to outputs is to be prevented as well as a temporary
-> > reconfiguration of an output pin to input.
-> 
-> Current "pinctrl-imx1-core.c" touch direction register for any pin.
-> As far this not fixed, this will be a temporary solution.
-> 
-Then that driver should be fixed instead of fixing one bug by
-implementing another one.
+Acked-by: Mark Brown <broonie@linaro.org>
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+I won't apply since I think that patch 3 needs to go along with this,
+unless people decide the regulator tree is the easiest way to merge.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/4e21d4ac/attachment-0001.sig>
