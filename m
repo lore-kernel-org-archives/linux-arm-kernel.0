@@ -1,33 +1,109 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Dec 2013 11:49:09 +0000
-Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <20131204100728.GA907@lee--X1>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 04 Dec 2013 12:52:45 +0100
+Subject: [PATCH v4 3/3] ARM: tegra: correct Colibri T20 regulator settings
+In-Reply-To: <fc7440a2f4bf9ab95e47a911c0e0b3b6a2250356.1386108712.git.stefan@agner.ch>
 References: <cover.1386108712.git.stefan@agner.ch>
- <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
- <20131204081021.GB7469@lee--X1>
- <e2ae7b9602d0c1e11f8e56ced17e9da0@agner.ch>
- <20131204100728.GA907@lee--X1>
-Message-ID: <20131204114909.GK29268@sirena.org.uk>
+ <fc7440a2f4bf9ab95e47a911c0e0b3b6a2250356.1386108712.git.stefan@agner.ch>
+Message-ID: <1386157965.4066.1.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 10:07:28AM +0000, Lee Jones wrote:
-> On Wed, 04 Dec 2013, Stefan Agner wrote:
+Am Dienstag, den 03.12.2013, 23:18 +0100 schrieb Stefan Agner:
+> Set the parent of the regulators LDO2 to LDO9 according to the
+> schematic. Set the base voltage to 3.3V, there is only 3.3V on the
+> module itself.
+> 
+> Set the Core and CPU voltage to the specified voltages of 1.2V and
+> 1.0V respectivly.
+> 
+> LDO6 should deliver 2.85V. The attached peripherals were not in
+> use so far.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-> > As I pointed out in the comment above, the struct tps6586x is in the C
-> > file, so I would need to move that too. That's why I did not made that
-> > change in the end. What do you think, should I still move (and move the
-> > struct too?) 
+> ---
+>  arch/arm/boot/dts/tegra20-colibri-512.dtsi | 30 +++++++++++++++---------------
+>  1 file changed, 15 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+> index cbe89ff..51e0880 100644
+> --- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+> +++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+> @@ -225,15 +225,15 @@
+>  			#gpio-cells = <2>;
+>  			gpio-controller;
+>  
+> -			sys-supply = <&vdd_5v0_reg>;
+> +			sys-supply = <&vdd_3v3_reg>;
+>  			vin-sm0-supply = <&sys_reg>;
+>  			vin-sm1-supply = <&sys_reg>;
+>  			vin-sm2-supply = <&sys_reg>;
+>  			vinldo01-supply = <&sm2_reg>;
+> -			vinldo23-supply = <&sm2_reg>;
+> -			vinldo4-supply = <&sm2_reg>;
+> -			vinldo678-supply = <&sm2_reg>;
+> -			vinldo9-supply = <&sm2_reg>;
+> +			vinldo23-supply = <&vdd_3v3_reg>;
+> +			vinldo4-supply = <&vdd_3v3_reg>;
+> +			vinldo678-supply = <&vdd_3v3_reg>;
+> +			vinldo9-supply = <&vdd_3v3_reg>;
+>  
+>  			regulators {
+>  				#address-cells = <1>;
+> @@ -250,8 +250,8 @@
+>  					reg = <1>;
+>  					regulator-compatible = "sm0";
+>  					regulator-name = "vdd_sm0,vdd_core";
+> -					regulator-min-microvolt = <1275000>;
+> -					regulator-max-microvolt = <1275000>;
+> +					regulator-min-microvolt = <1200000>;
+> +					regulator-max-microvolt = <1200000>;
+>  					regulator-always-on;
+>  				};
+>  
+> @@ -259,8 +259,8 @@
+>  					reg = <2>;
+>  					regulator-compatible = "sm1";
+>  					regulator-name = "vdd_sm1,vdd_cpu";
+> -					regulator-min-microvolt = <1100000>;
+> -					regulator-max-microvolt = <1100000>;
+> +					regulator-min-microvolt = <1000000>;
+> +					regulator-max-microvolt = <1000000>;
+>  					regulator-always-on;
+>  				};
+>  
+> @@ -316,8 +316,8 @@
+>  					reg = <10>;
+>  					regulator-compatible = "ldo6";
+>  					regulator-name = "vdd_ldo6,avdd_vdac,vddio_vi,vddio_cam";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> +					regulator-min-microvolt = <2850000>;
+> +					regulator-max-microvolt = <2850000>;
+>  				};
+>  
+>  				hdmi_vdd_reg: regulator at 11 {
+> @@ -504,12 +504,12 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		vdd_5v0_reg: regulator at 100 {
+> +		vdd_3v3_reg: regulator at 100 {
+>  			compatible = "regulator-fixed";
+>  			reg = <100>;
+> -			regulator-name = "vdd_5v0";
+> -			regulator-min-microvolt = <5000000>;
+> -			regulator-max-microvolt = <5000000>;
+> +			regulator-name = "vdd_3v3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+>  			regulator-always-on;
+>  		};
+>  
 
-> Why would the struct have to be moved if the function is inline?
-
-If the function is in the header and trying to use a struct that's only
-defined in the C file then it's not going to build - keeping the struct
-in the C file only does seem like a worthwhile thing for encapsulation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/971a8602/attachment.sig>
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
