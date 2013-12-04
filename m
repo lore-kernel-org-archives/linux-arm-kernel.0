@@ -1,20 +1,22 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed,  4 Dec 2013 16:44:44 +0100
-Subject: [PATCH RFCv2 2/6] net: phy: marvell: provide genphy suspend/resume
+Date: Wed,  4 Dec 2013 16:44:48 +0100
+Subject: [PATCH RFCv2 6/6] net: phy: suspend phydev when going to HALTED
 In-Reply-To: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386171888-28190-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1386171888-28190-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell PHYs support generic PHY suspend/resume, so provide those
-callbacks to all marvell specific drivers.
+When phydev is going to HALTED state, we can try to suspend it to
+safe more power. phy_suspend helper will check if PHY can be suspended,
+so just call it when entering HALTED state.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 RFCv1->RFCv2:
-- none
+- initial, integrate phy_suspend to phy state machine
+  (Suggested by Mugunthan and Florian)
 
 Cc: David Miller <davem@davemloft.net>
 Cc: Florian Fainelli <f.fainelli@gmail.com>
@@ -23,111 +25,39 @@ Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/phy/marvell.c |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+ drivers/net/phy/phy.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
-index 2e3c778e..bd37e45 100644
---- a/drivers/net/phy/marvell.c
-+++ b/drivers/net/phy/marvell.c
-@@ -894,6 +894,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -907,6 +909,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -920,6 +924,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &marvell_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -933,6 +939,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = {.owner = THIS_MODULE,},
- 	},
- 	{
-@@ -946,6 +954,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
- 		.did_interrupt = &m88e1121_did_interrupt,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -961,6 +971,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.did_interrupt = &m88e1121_did_interrupt,
- 		.get_wol = &m88e1318_get_wol,
- 		.set_wol = &m88e1318_set_wol,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -974,6 +986,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -987,6 +1001,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -1000,6 +1016,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -1013,6 +1031,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.read_status = &genphy_read_status,
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
-@@ -1026,6 +1046,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.ack_interrupt = &marvell_ack_interrupt,
- 		.config_intr = &marvell_config_intr,
- 		.did_interrupt = &m88e1121_did_interrupt,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
- };
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index 36c6994..6429942 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -740,7 +740,7 @@ void phy_state_machine(struct work_struct *work)
+ 	struct delayed_work *dwork = to_delayed_work(work);
+ 	struct phy_device *phydev =
+ 			container_of(dwork, struct phy_device, state_queue);
+-	int needs_aneg = 0;
++	int needs_aneg = 0, do_suspend = 0;
+ 	int err = 0;
+ 
+ 	mutex_lock(&phydev->lock);
+@@ -855,6 +855,7 @@ void phy_state_machine(struct work_struct *work)
+ 				phydev->link = 0;
+ 				netif_carrier_off(phydev->attached_dev);
+ 				phydev->adjust_link(phydev->attached_dev);
++				do_suspend = 1;
+ 			}
+ 			break;
+ 		case PHY_RESUMING:
+@@ -913,6 +914,9 @@ void phy_state_machine(struct work_struct *work)
+ 	if (needs_aneg)
+ 		err = phy_start_aneg(phydev);
+ 
++	if (do_suspend)
++		phy_suspend(phydev);
++
+ 	if (err < 0)
+ 		phy_error(phydev);
+ 
 -- 
 1.7.2.5
