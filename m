@@ -1,230 +1,91 @@
-From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
-Date: Tue, 3 Dec 2013 23:40:59 -0500
-Subject: [PATCH 3/3] ARM Coresight: Add PID control support for ETM tracing
-Message-ID: <CANsc=4Vy911xcf7fYEjyeV_CNGp8POje9BZrLSP8xrk4YAfSNA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 3 Dec 2013 23:58:59 -0500
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.14
+In-Reply-To: <CAOesGMgUrV2zkr3fDtV=M42_nOcm_V0L3vLzY9+xr1WHFJKRdA@mail.gmail.com>
+References: <20131201211341.GX2879@titan.lakedaemon.net>
+ <CAOesGMgexET170EJ5jOoXiV1xQ+K-tngFWydxiKW4zT_WGuuqA@mail.gmail.com>
+ <20131204035347.GI29282@titan.lakedaemon.net>
+ <CAOesGMgUrV2zkr3fDtV=M42_nOcm_V0L3vLzY9+xr1WHFJKRdA@mail.gmail.com>
+Message-ID: <20131204045859.GJ29282@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the same manner as for enabling tracing, an entry is created in
-sysfs to set the PID that triggers tracing. This change requires
-CONFIG_PID_IN_CONTEXTIDR to be set when using on-chip ETM.
+On Tue, Dec 03, 2013 at 08:51:25PM -0800, Olof Johansson wrote:
+> On Tue, Dec 3, 2013 at 7:53 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Tue, Dec 03, 2013 at 07:17:02PM -0800, Olof Johansson wrote:
+> >> On Sun, Dec 1, 2013 at 1:13 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > ...
+> >> > The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> >> >
+> >> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> >> >
+> >> > are available in the git repository at:
+> >> >
+> >> >   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.14
+> >> >
+> >> > for you to fetch changes up to bd22bb23919e6727967e90eb89bb41ab790bcd2d:
+> >> >
+> >> >   ARM: Dove: Add RTC interrupt via PMU interrupt controller. (2013-11-26 16:10:49 +0000)
+> >> >
+> >> > ----------------------------------------------------------------
+> >> > mvebu DT changes for v3.14
+> >> >
+> >> >  - mvebu:
+> >> >     - remove unneeded OS-specific properties from led nodes
+> >> >     - add NAND controller to Armada boards
+> >> >     - add sata leds to readynas 104
+> >> >     - add gpio-poweroff to readynas duo v2
+> >> >
+> >> >  - kirkwood:
+> >> >     - comment cleanup in sheevaplug files
+> >> >     - default pinctrl for sdio
+> >> >     - sdio in guruplug is non-removable
+> >> >
+> >> >  - orion5x:
+> >> >     - typo fix
+> >> >
+> >> >  - dove:
+> >> >     - typo fix
+> >> >     - add PMU interrupt controller and RTC interrupt via same
+> >> >
+> >> > ----------------------------------------------------------------
+> >> > Andrew Lunn (2):
+> >> >       ARM: Dove: Add DT node for PMU interrupt controller.
+> >>
+> >> This one produces a boot time warning on dove now:
+> >>
+> >> [    0.049752] irq: no irq domain found for /mbus/internal-regs/pmu-interrupt-ctrl at d0050 !
+> >
+> > Well, that wasn't supposed to happen.  :)  Shouldn't the of_ code handle
+> > nodes with missing drivers better?
+> >
+> > The driver for this node is currently sitting in mvebu/irqchip.  A pull
+> > request has been sent to Thomas*.  If you'd like to give it a spin:
+> >
+> >    git://git.infradead.org/linux-mvebu.git tags/mvebu-irqchip-3.14
+> >
+> > If merging that in works, then it looks like we have things set up for
+> > an out-of-tree dependency.
+> >
+> > thx,
+> >
+> > Jason.
+> >
+> > * This was arranged recently to help him out with patch wrangling.
+> 
+> Ah. Do you have that branch in -next? That would explain why I didn't
+> see it there.
 
-Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: "zhangwei(Jovi)" <jovi.zhangwei@huawei.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Randy Dunlap <rdunlap@infradead.org>
----
- arch/arm/Kconfig.debug                    |  1 +
- arch/arm/include/asm/hardware/coresight.h |  3 ++
- arch/arm/kernel/etm.c                     | 73 ++++++++++++++++++++++++++++---
- 3 files changed, 70 insertions(+), 7 deletions(-)
+hmm, yes it is:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 5765abf..fef32e15 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1130,6 +1130,7 @@ config EARLY_PRINTK
- config OC_ETM
-  bool "On-chip ETM and ETB"
-  depends on ARM_AMBA
-+ select PID_IN_CONTEXTIDR
-  help
-   Enables the on-chip embedded trace macrocell and embedded trace
-   buffer driver that will allow you to collect traces of the
-diff --git a/arch/arm/include/asm/hardware/coresight.h
-b/arch/arm/include/asm/hardware/coresight.h
-index 8c50cf6..009cdf9 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -98,6 +98,9 @@
- #define ETMR_ADDRCOMP_VAL(x) (0x40 + (x) * 4)
- #define ETMR_ADDRCOMP_ACC_TYPE(x) (0x80 + (x) * 4)
+  40b367d95fb3 irqchip: irq-dove: Add PMU interrupt controller.
 
-+#define ETMR_CTXIDCOMP_VAL(x) (0x1b0 + (x) * 4)
-+#define ETMR_CTXIDCOMP_MASK (0x1bc)
-+
- /* ETM status register, "ETM Architecture", 3.3.2 */
- #define ETMR_STATUS (0x10)
- #define ETMST_OVERFLOW BIT(0)
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index a72382b..18afed1 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -40,12 +40,14 @@ struct tracectx {
-  void __iomem *etm_regs;
-  unsigned long flags;
-  int naddrcmppairs;
-+ int nctxidcmp;
-  int etm_portsz;
-  struct device *dev;
-  struct clk *emu_clk;
-  struct mutex mutex;
-  unsigned long addrrange_start;
-  unsigned long addrrange_end;
-+ long pid;
- };
+> There's nothing broken due to the warning (since it's new
+> functionality that's not yet landed), so it's mostly just a matter of
+> making sure the other patch lands before the merge window.
 
- static struct tracectx tracer;
-@@ -59,14 +61,18 @@ static inline bool trace_isrunning(struct tracectx *t)
-  * Setups ETM to trace only when:
-  *   - address between start and end
-  *     or address not between start and end (if exclude)
-+ *   - in user-space when process id equals pid,
-+ *     in kernel-space (if pid == 0),
-+ *     always (if pid == -1)
-  *   - trace executed instructions
-  *     or trace loads and stores (if data)
-  */
--static int etm_setup_address_range(struct tracectx *t, int n,
-- unsigned long start, unsigned long end, int exclude, int data)
-+static int etm_setup(struct tracectx *t, int n,
-+     unsigned long start, unsigned long end, int exclude,
-+     long pid,
-+     int data)
- {
-- u32 flags = ETMAAT_ARM | ETMAAT_IGNCONTEXTID | ETMAAT_NSONLY | \
--    ETMAAT_NOVALCMP;
-+ u32 flags = ETMAAT_ARM | ETMAAT_NSONLY | ETMAAT_NOVALCMP;
+If our new process works out, that should be the case...
 
-  if (n < 1 || n > t->naddrcmppairs)
-  return -EINVAL;
-@@ -75,6 +81,19 @@ static int etm_setup_address_range(struct tracectx *t, int n,
-  * to bits in a word */
-  n--;
+thx,
 
-+ if (pid < 0) {
-+ /* ignore Context ID */
-+ flags |= ETMAAT_IGNCONTEXTID;
-+ } else {
-+ flags |= ETMAAT_VALUE1;
-+
-+ /* Set up the first Context ID comparator.
-+   Process ID is found in the 24 first bits of Context ID
-+   (provided by CONFIG_PID_IN_CONTEXTIDR) */
-+ etm_writel(t, pid << 8, ETMR_CTXIDCOMP_VAL(0));
-+ etm_writel(t, 0xff, ETMR_CTXIDCOMP_MASK);
-+ }
-+
-  if (data)
-  flags |= ETMAAT_DLOADSTORE;
-  else
-@@ -124,8 +143,10 @@ static int trace_start(struct tracectx *t)
-  return -EFAULT;
-  }
-
-- etm_setup_address_range(t, 1, t->addrrange_start, t->addrrange_end,
-- 0, 0);
-+ etm_setup(t, 1,
-+  t->addrrange_start, t->addrrange_end, 0,
-+  t->pid,
-+  0);
-  etm_writel(t, 0, ETMR_TRACEENCTRL2);
-  etm_writel(t, 0, ETMR_TRACESSCTRL);
-  etm_writel(t, 0x6f, ETMR_TRACEENEVT);
-@@ -488,6 +509,7 @@ static ssize_t trace_info_show(struct kobject *kobj,
-
-  return sprintf(buf, "Trace buffer len: %d\n"
-  "Addr comparator pairs: %d\n"
-+ "Ctx ID comparators: %d\n"
-  "ETBR_WRITEADDR:\t%08x\n"
-  "ETBR_READADDR:\t%08x\n"
-  "ETBR_STATUS:\t%08x\n"
-@@ -496,6 +518,7 @@ static ssize_t trace_info_show(struct kobject *kobj,
-  "ETMR_STATUS:\t%08x\n",
-  datalen,
-  tracer.naddrcmppairs,
-+ tracer.nctxidcmp,
-  etb_wa,
-  etb_ra,
-  etb_st,
-@@ -572,6 +595,35 @@ static ssize_t trace_addrrange_store(struct kobject *kobj,
- static struct kobj_attribute trace_addrrange_attr =
-  __ATTR(trace_addrrange, 0644, trace_addrrange_show, trace_addrrange_store);
-
-+static ssize_t trace_pid_show(struct kobject *kobj,
-+      struct kobj_attribute *attr,
-+      char *buf)
-+{
-+ return sprintf(buf, "%ld\n", tracer.pid);
-+}
-+
-+static ssize_t trace_pid_store(struct kobject *kobj,
-+       struct kobj_attribute *attr,
-+       const char *buf, size_t n)
-+{
-+ long pid;
-+
-+ if (tracer.flags & TRACER_RUNNING)
-+ return -EBUSY;
-+
-+ if (sscanf(buf, "%li", &pid) != 1)
-+ return -EINVAL;
-+
-+ mutex_lock(&tracer.mutex);
-+ tracer.pid = pid;
-+ mutex_unlock(&tracer.mutex);
-+
-+ return n;
-+}
-+
-+static struct kobj_attribute trace_pid_attr =
-+ __ATTR(trace_pid, 0644, trace_pid_show, trace_pid_store);
-+
- static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- {
-  struct tracectx *t = &tracer;
-@@ -601,6 +653,7 @@ static int etm_probe(struct amba_device *dev,
-const struct amba_id *id)
-  t->etm_portsz = 1;
-  t->addrrange_start = (unsigned long) _stext;
-  t->addrrange_end = (unsigned long) _etext;
-+ t->pid = -1; /* trace everything */
-
-  etm_unlock(t);
-  (void)etm_readl(t, ETMMR_PDSR);
-@@ -608,6 +661,7 @@ static int etm_probe(struct amba_device *dev,
-const struct amba_id *id)
-  (void)etm_readl(&tracer, ETMMR_OSSRR);
-
-  t->naddrcmppairs = etm_readl(t, ETMR_CONFCODE) & 0xf;
-+ t->nctxidcmp = (etm_readl(t, ETMR_CONFCODE) >> 24) & 0x3;
-  etm_writel(t, 0x440, ETMR_CTRL);
-  etm_lock(t);
-
-@@ -616,7 +670,7 @@ static int etm_probe(struct amba_device *dev,
-const struct amba_id *id)
-  if (ret)
-  goto out_unmap;
-
-- /* failing to create any of these three is not fatal */
-+ /* failing to create any of these four is not fatal */
-  ret = sysfs_create_file(&dev->dev.kobj, &trace_info_attr.attr);
-  if (ret)
-  dev_dbg(&dev->dev, "Failed to create trace_info in sysfs\n");
-@@ -629,6 +683,10 @@ static int etm_probe(struct amba_device *dev,
-const struct amba_id *id)
-  if (ret)
-  dev_dbg(&dev->dev, "Failed to create trace_addrrange in sysfs\n");
-
-+ ret = sysfs_create_file(&dev->dev.kobj, &trace_pid_attr.attr);
-+ if (ret)
-+ dev_dbg(&dev->dev, "Failed to create trace_pid in sysfs\n");
-+
-  dev_dbg(t->dev, "ETM AMBA driver initialized.\n");
-
- out:
-@@ -659,6 +717,7 @@ static int etm_remove(struct amba_device *dev)
-  sysfs_remove_file(&dev->dev.kobj, &trace_info_attr.attr);
-  sysfs_remove_file(&dev->dev.kobj, &trace_mode_attr.attr);
-  sysfs_remove_file(&dev->dev.kobj, &trace_addrrange_attr.attr);
-+ sysfs_remove_file(&dev->dev.kobj, &trace_pid_attr.attr);
-
-  return 0;
- }
--- 
-1.8.3.1
+Jason.
