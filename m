@@ -1,100 +1,78 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 3 Dec 2013 19:39:13 -0600
-Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm when
- bad data is detected
-Message-ID: <1386121153-32351-1-git-send-email-nm@ti.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Wed, 4 Dec 2013 01:40:50 +0000
+Subject: [PATCH v3 10/10] usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK
+In-Reply-To: <529E5215.5000107@pengutronix.de>
+References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+ <1383616525-10769-11-git-send-email-peter.chen@freescale.com>
+ <529E5215.5000107@pengutronix.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498041427E5@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the cross dependencies between hwmod for automanaged device
-information for OMAP and dts node definitions, we can run into scenarios
-where the dts node is defined, however it's hwmod entry is yet to be
-added. In these cases:
-a) omap_device does not register a pm_domain (since it cannot find
-   hwmod entry).
-b) driver does not know about (a), does a pm_runtime_get_sync which
-   never fails
-c) It then tries to do some operation on the device (such as read the
-  revision register (as part of probe) without clock or adequate OMAP
-  generic PM operation performed for enabling the module.
 
-This causes a crash such as that reported in:
-https://bugzilla.kernel.org/show_bug.cgi?id=66441
+ 
+> 
+> On 11/05/2013 02:55 AM, Peter Chen wrote:
+> > Enable CI_HDRC_IMX_EHCI_QUIRK for controllers who use mxs-phy.
+> >
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/chipidea/ci_hdrc_imx.c |   17 ++++++++++++++---
+> >  1 files changed, 14 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c
+> b/drivers/usb/chipidea/ci_hdrc_imx.c
+> > index fd26c38..78ccde1 100644
+> > --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> > +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> > @@ -25,6 +25,7 @@
+> >
+> >  #define CI_HDRC_IMX_IMX28_WRITE_FIX		BIT(0)
+> >  #define CI_HDRC_IMX_SUPPORT_RUNTIME_PM		BIT(1)
+> > +#define CI_HDRC_IMX_MXS_PHY_EHCI_QUIRK		BIT(2)
+> >
+> >  struct ci_hdrc_imx_platform_flag {
+> >  	unsigned int flags;
+> > @@ -33,17 +34,24 @@ struct ci_hdrc_imx_platform_flag {
+> >  static const struct ci_hdrc_imx_platform_flag imx27_usb_data = {
+> >  };
+> >
+> > +static const struct ci_hdrc_imx_platform_flag imx23_usb_data = {
+> > +	.flags = CI_HDRC_IMX_MXS_PHY_EHCI_QUIRK,
+> > +};
+> > +
+> >  static const struct ci_hdrc_imx_platform_flag imx28_usb_data = {
+> > -	.flags = CI_HDRC_IMX_IMX28_WRITE_FIX,
+> > +	.flags = CI_HDRC_IMX_IMX28_WRITE_FIX |
+> > +		CI_HDRC_IMX_MXS_PHY_EHCI_QUIRK,
+> >  };
+> >
+> >  static const struct ci_hdrc_imx_platform_flag imx6q_usb_data = {
+> > -	.flags = CI_HDRC_IMX_SUPPORT_RUNTIME_PM,
+> > +	.flags = CI_HDRC_IMX_SUPPORT_RUNTIME_PM |
+> > +		CI_HDRC_IMX_MXS_PHY_EHCI_QUIRK,
+> >  };
+> >
+> >  static const struct of_device_id ci_hdrc_imx_dt_ids[] = {
+> >  	{ .compatible = "fsl,imx6q-usb", .data = &imx6q_usb_data},
+> >  	{ .compatible = "fsl,imx28-usb", .data = &imx28_usb_data},
+> > +	{ .compatible = "fsl,imx23-usb", .data = &imx23_usb_data},
+> >  	{ .compatible = "fsl,imx27-usb", .data = &imx27_usb_data},
+> >  	{ /* sentinel */ }
+> >  };
+> > @@ -153,11 +161,14 @@ static int ci_hdrc_imx_probe(struct
+> platform_device *pdev)
+> >  	if (imx_platform_flag->flags & CI_HDRC_IMX_IMX28_WRITE_FIX)
+> >  		pdata.flags |= CI_HDRC_IMX28_WRITE_FIX;
+> >
+> > -	if (imx_platform_flag->flags & CI_HDRC_IMX_SUPPORT_RUNTIME_PM)
+> > +	if (imx_platform_flag->flags & CI_HDRC_IMX_SUPPORT_RUNTIME_PM) {
+>                                                                     ^^^^
+> 
+> Please squash into the correct patch.
+> 
+ 
+There are some re-work for this serial, I will do it.
+But I don't get your mean why it needs to squash into another patch?
 
-When 'ti,hwmod' is provided in dt node, it is expected that the device
-will not function without the OMAP's power automanagement. Hence, when
-we hit a fail condition (due to hwmod entries not present or other
-similar scenario), fail at pm_domain level due to lack of data, provide
-enough information for it to be fixed, however, it allows for the driver
-to take appropriate measures to prevent crash.
-
-Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/omap_device.c |   24 ++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_device.h |    1 +
- 2 files changed, 25 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 53f0735..e0a398c 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -183,6 +183,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- odbfd_exit1:
- 	kfree(hwmods);
- odbfd_exit:
-+	/* if data/we are at fault.. load up a fail handler */
-+	if (ret)
-+		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
-+
- 	return ret;
- }
- 
-@@ -604,6 +608,19 @@ static int _od_runtime_resume(struct device *dev)
- 
- 	return pm_generic_runtime_resume(dev);
- }
-+
-+static int _od_fail_runtime_suspend(struct device *dev)
-+{
-+	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
-+	return -ENODEV;
-+}
-+
-+static int _od_fail_runtime_resume(struct device *dev)
-+{
-+	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
-+	return -ENODEV;
-+}
-+
- #endif
- 
- #ifdef CONFIG_SUSPEND
-@@ -657,6 +674,13 @@ static int _od_resume_noirq(struct device *dev)
- #define _od_resume_noirq NULL
- #endif
- 
-+struct dev_pm_domain omap_device_fail_pm_domain = {
-+	.ops = {
-+		SET_RUNTIME_PM_OPS(_od_fail_runtime_suspend,
-+				   _od_fail_runtime_resume, NULL)
-+	}
-+};
-+
- struct dev_pm_domain omap_device_pm_domain = {
- 	.ops = {
- 		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
-diff --git a/arch/arm/mach-omap2/omap_device.h b/arch/arm/mach-omap2/omap_device.h
-index 17ca1ae..78c02b3 100644
---- a/arch/arm/mach-omap2/omap_device.h
-+++ b/arch/arm/mach-omap2/omap_device.h
-@@ -29,6 +29,7 @@
- #include "omap_hwmod.h"
- 
- extern struct dev_pm_domain omap_device_pm_domain;
-+extern struct dev_pm_domain omap_device_fail_pm_domain;
- 
- /* omap_device._state values */
- #define OMAP_DEVICE_STATE_UNKNOWN	0
--- 
-1.7.9.5
+Peter
