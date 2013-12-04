@@ -1,97 +1,69 @@
-From: w-kwok2@ti.com (WingMan Kwok)
-Date: Wed, 4 Dec 2013 15:10:10 -0500
-Subject: [PATCH v2 4/5] ARM: dts: keystone: Add usb devicetree bindings
-In-Reply-To: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
-References: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <1386187811-9596-5-git-send-email-w-kwok2@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 05 Dec 2013 00:05:44 +0300
+Subject: [PATCH RFCv2 5/6] net: phy: suspend unused PHYs on mdio_bus in
+ late_initcall
+In-Reply-To: <1386171888-28190-6-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1386171888-28190-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <529F9928.9090407@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added device tree support for TI's Keystone USB driver and updated the
-Documentation with device tree binding information.
+Hello.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
----
- .../devicetree/bindings/usb/keystone-usb.txt       |   41 ++++++++++++++++++++
- arch/arm/boot/dts/keystone.dtsi                    |   18 +++++++++
- 2 files changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/keystone-usb.txt
+On 12/04/2013 06:44 PM, Sebastian Hesselbarth wrote:
 
-diff --git a/Documentation/devicetree/bindings/usb/keystone-usb.txt b/Documentation/devicetree/bindings/usb/keystone-usb.txt
-new file mode 100644
-index 0000000..ac2c7cc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/keystone-usb.txt
-@@ -0,0 +1,41 @@
-+TI Keystone Soc USB Controller
-+
-+DWC3 GLUE
-+
-+Required properties:
-+ - compatible: should be "ti,keystone-dwc3".
-+ - #address-cells, #size-cells : should be '1' if the device has sub-nodes
-+   with 'reg' property.
-+ - reg : Address and length of the register set for the USB subsystem on
-+   the SOC.
-+ - interrupts : The irq number of this device that is used to interrupt the
-+   MPU.
-+ - ranges: allows valid 1:1 translation between child's address space and
-+   parent's address space.
-+ - clocks: Clock IDs array as required by the controller.
-+ - clock-names: names of clocks correseponding to IDs in the clock property.
-+
-+Sub-nodes:
-+The dwc3 core should be added as subnode to Keystone DWC3 glue.
-+- dwc3 :
-+   The binding details of dwc3 can be found in:
-+   Documentation/devicetree/bindings/usb/dwc3.txt
-+
-+Example:
-+	usb: usb at 2680000 {
-+		compatible = "ti,keystone-dwc3";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x2680000 0x10000>;
-+		clocks = <&clkusb>;
-+		clock-names = "usb";
-+		interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
-+		ranges;
-+
-+		dwc3 at 2690000 {
-+			compatible = "synopsys,dwc3";
-+			reg = <0x2690000 0x70000>;
-+			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
-+			usb-phy = <&usb_phy>, <&usb_phy>;
-+		};
-+	};
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index d497d9e..0911bb7 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -188,5 +188,23 @@
- 			#size-cells = <1>;
- 			reg = <0x2620738 32>;
- 		};
-+
-+		usb: usb at 2680000 {
-+			compatible = "ti,keystone-dwc3";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x2680000 0x10000>;
-+			clocks = <&clkusb>;
-+			clock-names = "usb";
-+			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
-+			ranges;
-+
-+			dwc3 at 2690000 {
-+				compatible = "synopsys,dwc3";
-+				reg = <0x2690000 0x70000>;
-+				interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
-+				usb-phy = <&usb_phy>, <&usb_phy>;
-+			};
-+		};
- 	};
- };
--- 
-1.7.9.5
+> Since phy_attach ensures PHYs are resumed, we can now suspend all
+> PHYs that have no attached netdev after initcalls.
+
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Changelog:
+> RFCv1->RFCv2:
+> - only check for phydev->attached_dev and let phy_suspend decide on
+>    performing suspend or not (Suggested by Florian)
+
+> @Florian: You suggested to 'make sure that the MDIO bus suspend policy
+> was set to "auto"'. I wasn't able to find any clue how to check that,
+> so I ignored that for now.
+
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>   drivers/net/phy/mdio_bus.c |   25 +++++++++++++++++++++++++
+>   1 files changed, 25 insertions(+), 0 deletions(-)
+
+> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+> index 5617876..f533d17 100644
+> --- a/drivers/net/phy/mdio_bus.c
+> +++ b/drivers/net/phy/mdio_bus.c
+> @@ -320,6 +320,31 @@ static int mdio_bus_match(struct device *dev, struct device_driver *drv)
+>   		(phydev->phy_id & phydrv->phy_id_mask));
+>   }
+>
+> +static int mdio_bus_suspend_unused(struct device *busdev, void *data)
+> +{
+> +	struct mii_bus *bus = to_mii_bus(busdev);
+> +	struct phy_device *phydev;
+> +	int i;
+> +
+> +	for (i = 0; i < PHY_MAX_ADDR; i++) {
+> +		if (!bus->phy_map[i])
+> +			continue;
+> +
+> +		phydev = to_phy_device(&bus->phy_map[i]->dev);
+
+    Why so complex? 'bus->phy_map[i]' already gives you 'phydev'.
+
+> +		if (!phydev->attached_dev)
+> +			phy_suspend(phydev);
+> +	}
+> +
+> +	return 0;
+> +}
+
+WBR, Sergei
