@@ -1,110 +1,88 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Wed, 4 Dec 2013 06:01:29 +0000
-Subject: [PATCHv6 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20131202110243.GD12952@e106331-lin.cambridge.arm.com>
-References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
- <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com>
- <20131128212510.GC14689@mithrandir> <20131128223719.GG14689@mithrandir>
- <20131202110243.GD12952@e106331-lin.cambridge.arm.com>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828E66C5@039-SN2MPN1-011.039d.mgd.msft.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 4 Dec 2013 15:26:07 +0900
+Subject: [GIT PULL 00/28] Renesas ARM based SoC updates for v3.14
+In-Reply-To: <20131204011745.GD20332@quad.lixom.net>
+References: <cover.1385950394.git.horms+renesas@verge.net.au>
+ <20131204011745.GD20332@quad.lixom.net>
+Message-ID: <20131204062605.GA6283@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > +static int fsl_pwm_parse_clk_ps(struct fsl_pwm_chip *fpc)
-> > > > +{
-> > > > +	int ret;
-> > > > +	struct of_phandle_args clkspec;
-> > > > +	struct device_node *np = fpc->chip.dev->of_node;
-> > > > +
-> > > > +	fpc->sys_clk = devm_clk_get(fpc->chip.dev, "ftm0");
-> > > > +	if (IS_ERR(fpc->sys_clk)) {
-> > > > +		ret = PTR_ERR(fpc->sys_clk);
-> > > > +		dev_err(fpc->chip.dev,
-> > > > +				"failed to get \"ftm0\" clock %d\n", ret);
-> > > > +		return ret;
-> > > > +	}
-> > > > +
-> > > > +	fpc->counter_clk = devm_clk_get(fpc->chip.dev, "ftm0_counter");
-> > > > +	if (IS_ERR(fpc->counter_clk)) {
-> > > > +		ret = PTR_ERR(fpc->counter_clk);
-> > > > +		dev_err(fpc->chip.dev,
-> > > > +				"failed to get \"ftm0_counter\" clock %d\n",
-> > > > +				ret);
-> > > > +		return ret;
-> > > > +	}
-> > > > +
-> > > > +	ret = of_parse_phandle_with_args(np, "clocks", "#clock-cells",
-> 1,
-> > > > +					&clkspec);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > > +
-> > > > +	fpc->counter_clk_select = clkspec.args[0];
-> > >
-> > > This isn't at all pretty. But given that once you have access to a
-> > > struct clk there's no way to identify it, I don't know of a better
-> > > alternative.
-> >
-> > Hi Mike,
-> >
-> > I've seen this crop up a number of times now, to varying degrees of
-> > gravity. In this particular case, the driver needs to know the type of a
-> > clock because it needs to program this hardware differently depending on
-> > which clock feeds the counter. Since there is no way to obtain any kind
-> > of identifying information from a struct clk, drivers need to rely on
-> > hacks like this and manually reach into the device tree to obtain that
-> > information.
+On Tue, Dec 03, 2013 at 05:17:45PM -0800, Olof Johansson wrote:
+> Hi Simon,
 > 
-> Which property of the clock is the consumer concerned with in this case?
+> On Mon, Dec 02, 2013 at 11:18:47AM +0900, Simon Horman wrote:
+> > Hi Kevin, Hi Olof, Hi Arnd,
+> > 
+> > please consider these Renesas ARM based SoC updates for v3.14.
+> > 
+> > This pull-request is based on "[GIT PULL 00/16] Renesas ARM based SoC
+> > defconfig updates for v3.14" (tag: renesas-defconfig-for-v3.14) which I
+> > send a pull-request for on Thursday. The reason for this is to include
+> > defconfig updates for the emma2 based kzm9d which are required in order to
+> > avoid a build regression when using the defconfig for that board.
 > 
-
-The "ftm0_counter" clock.
-
-
-> From a quick look at the driver it looks like there are actually a
-> number of different input lines to the device that share the clock-name
-> "ftm0_counter", though they are actually separate and each has a
-> different divider. Have I got that right?
+> If you can get a build regression due to an outdated defconfig, then you're
+> likely missing some dependencies in your Kconfig? You could hit the same state
+> of configurations through randconfig. So I think fixing the dependencies is
+> better than relying on the defconfig branch in this case.
 > 
+> Would you mind doing it that way instead? It'd reduce our dependencies and in
+> general it's a more appropriate approach.
 
-Yes mostly, there are three different input lines wired to the counter
-clock, but they share only one divider. And between the three lines and
-the divider there is one mux inside of the FTM IP block.
-The three clock sources are:
-"ftm0",
-"ftm0-fix",
-"ftm0-ext".
-		 _____________________________________________________
-		|									|
-		|   +++++++++++		FTM Module				|
-ftm0 -------|-->+         +							|
-		|   +         +     +++++++++++++     ++++++++++++++	|
-ftm0-fix ---|-->+   MUX   +---->+  divider  +---->+  counter   +	|
-		|   +         +     +++++++++++++     ++++++++++++++	|
-ftm0-ext ---|-->+         +							|
-		|   +++++++++++							|
-		|_____________________________________________________|
+The problem that I was trying to address was that
+"ARM: shmobile: Remove legacy KZM9D board code" removes
+legacy board code and thus the following line from
+arch/arm/mach-shmobile/Makefile.boot
 
+loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
 
+My understanding is that a result of this change is that
+CONFIG_AUTO_ZRELADDR is now needed in order for the kernel
+to compile.
 
-> If that's the case, having a unique clock-names value for each of those
-> lines would be the solution I'd expect. Then you just have to list the
-> one(s) that are wired up, and the driver can figure out the appropriate
-> line to use either by requesting by name until it finds a match or
-> inspecting the clock-names property.
+Is it appropriate to set CONFIG_AUTO_ZRELADDR in Kconfig?
+Or is there another approach that I could take?
+
+> > This pull-request also includes defconfig changes related to renaming
+> > ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY. These are also to avoid build
+> > regressions when using defconfigs.
 > 
+> So what happens if someone has an old defconfig in their build environment
+> (i.e. hosted outside of the kernel tree), will they see breakage?
 
-Hi Kumar,
-In the list archives for mails of "[RFC][PATCHv5 4/4] Documentation: Add
-device tree bindings for Freescale FTM PWM.",we have discussed about this.
-Is there any different with your suggestions or ideas? 
+Yes, I believe so.
 
+> If so, you should probably add a new option ARCH_SHMOBILE_MULTI or similar.
 
-> Is there some other property of the parent that we care about here?
-> 
+We have added ARCH_SHMOBILE_MULTI.
 
-As I know, not yet.
+The changelog entry describes the motivation for the change as well as I
+could.  My view on this is that its global change that avoids an even more
+widespread global change.
 
---
-Best Regards,
- 
+    From:  Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+    ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+
+    SH-Mobile platforms are transitioning from non-multiplatform to
+    multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
+    been created to group all multiplatform-enabled SH-Mobile SoCs. The
+    existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
+    been converted yet.
+
+    This arrangement works fine for the arch/ code, but lots of drivers
+    needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
+    ARCH_SHMOBILE only. In order to avoid changing them, rename
+    ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
+    ARCH_SHMOBILE configuration symbol that is selected by both
+    ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
+
+    Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+    Acked-by: Magnus Damm <damm@opensource.se>
+    Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+> We had similar issues with the first attempt to go multiplatform on Exynos,
+> some existing defconfigs wouldn't build a usable kernel any more due to new
+> options, so Arnd had to do it the other way (that code is still unmerged
+> though).
