@@ -1,7 +1,7 @@
 From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
-Date: Tue, 3 Dec 2013 23:37:58 -0500
-Subject: ARM Coresight: Enhance ETM tracing control
-Message-ID: <CANsc=4X_C53AHe5p5sRiHDGPA0+P4NgtGWrhOe0h27MZ9LwWbQ@mail.gmail.com>
+Date: Tue, 3 Dec 2013 23:39:21 -0500
+Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
+Message-ID: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
