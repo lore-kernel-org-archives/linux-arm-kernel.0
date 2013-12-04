@@ -1,69 +1,91 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 4 Dec 2013 10:44:05 -0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <1386082273.18201.61.camel@shinybook.infradead.org>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com>
- <5298AA23.7080404@st.com>
- <1386082273.18201.61.camel@shinybook.infradead.org>
-Message-ID: <20131204184405.GE9468@ld-irv-0074.broadcom.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 04 Dec 2013 19:44:21 +0100
+Subject: [PATCH/RFC] ARM: omap3: Split the pinmux core device
+In-Reply-To: <20131204182437.GU26766@atomide.com>
+References: <1386177110-26424-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <2098999.THrpfnVM6o@avalon> <20131204182437.GU26766@atomide.com>
+Message-ID: <3374611.sGfCARW7Hu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 02:51:13PM +0000, David Woodhouse wrote:
-> On Fri, 2013-11-29 at 14:52 +0000, Angus Clark wrote:
+Hi Tony,
+
+On Wednesday 04 December 2013 10:24:37 Tony Lindgren wrote:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131204 09:59]:
+> > Hi Tony,
 > > 
-> > As I see it, the main problem with the current support is that dedicated Serial
-> > Flash Controllers require a level of semantics that cannot be conveyed over the
-> > generic SPI framework.  With this in mind, I would start by defining something
-> > along the lines of a "Serial Flash transfer".  
+> > On Wednesday 04 December 2013 09:28:53 Tony Lindgren wrote:
+> > > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131204 09:12]:
+> > > > The omap3_pmx_core pinmux device in the device tree handles the system
+> > > > controller module (SCM) PADCONFS fonction. Its control registers are
+> > > > split in two distinct areas, with other SCM registers in-between.
+> > > > Those other registers can't thus be requested by other drivers as the
+> > > > memory region gets reserved by the pinmux driver.
+> > > > 
+> > > > Split the omap3_pmx_core device tree node in two for the two memory
+> > > > regions.
+> > > > 
+> > > > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > ---
+> > > > 
+> > > >  arch/arm/boot/dts/omap3-beagle-xm.dts | 45 ++++++++++++++++++++------
+> > > >  arch/arm/boot/dts/omap3-beagle.dts    | 28 +++++++++++++++-------
+> > > >  arch/arm/boot/dts/omap3-igep0020.dts  | 26 ++++++++++----------
+> > > >  arch/arm/boot/dts/omap3-zoom3.dts     | 19 ++++++++++-----
+> > > >  arch/arm/boot/dts/omap3.dtsi          | 13 +++++++++-
+> > > >  5 files changed, 95 insertions(+), 36 deletions(-)
+> > > > 
+> > > > While working on the OMAP3 ISP driver I've run into a failure to
+> > > > request a memory region already requested by the pinctrl-single
+> > > > driver. This patch is an attempt to fix the problem. An alternative
+> > > > approach would be to support multiple reg values in the pinctrl-single
+> > > > driver, but that might not be much cleaner. I'm open to suggestions.
+> > > 
+> > > Makes sense to me to split it into two, we can save some memory that way
+> > > too.
+> > > 
+> > > It should not cause problems with the wake-up interrupts either as we're
+> > > already using a single chained wake-up interrupt between core and wkup
+> > > pins.
+> > > 
+> > > Do you have some perl or sed script to look for and convert the core2
+> > > registers? Or do we just not have that many of them defined yet?
+> > 
+> > This patch should cover all the ones we have in mainline. As this is an
+> > RFC I've performed the conversion manually.
 > 
-> I think this is the best way to describe the issue, and approach the
-> solution.
+> OK. I wonder if we should add something like this to make it easier to
+> use the padconf values from the TRM:
 > 
-> We should be looking to extend the generic SPI framework to support what
-> we need, rather than hacking around it purely on the MTD side.
+> #define OMAP_IOPAD_OFFSET(pa, offset)	((pa) & 0xffff) - (offset))
 > 
-> As such, I'd be very interested in Mark's thoughts on it...
+> #define OMAP2_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0030) (val))
+> #define OMAP3_CORE1_IOPAD(pa, val)	OMAP2_CORE_IOPAD((pa), (val))
+> #define OMAP3_CORE2_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x05a0) (val))
+> #define OMAP4_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0040) (val))
+> #define OMAP4_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xe040) (val))
+> #define OMAP5_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0840) (val))
+> #define OMAP5_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xc850) (val))
+> ...
+> 
+> Then we would have entries like:
+> 
+> 	pinctrl-single,pins = <
+> 		OMAP3_CORE1_IOPAD(0x158, PIN_INPUT_PULLUP | MUX_MODE0)
+> 		...
+> 	>;
+> 
+> instead of:
+> 
+> 	pinctrl-single,pins = <
+> 		0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
+> 		...
+> 	>;
 
-Hmm, I thought we already had (some form of) this explanation
-weeks/months ago, yet the conclusion was that Mark doesn't want this in
-the SPI framework at all, since a dedicated Serial Flash Controller is
-not truly SPI. But perhaps I'm wrong.
+That's a good idea, it would be much more readable. Would you like to submit a 
+patch ? Should I rebase my patch on top of that, or the other way around ?
 
-On this topic, I have one more stick to throw on this fire; I have some
-Broadcom hardware that consists of two pieces:
+-- 
+Regards,
 
-  (1) a true SPI controller, with single-line-I/O and
-  (2) a Serial Flash controller that can accelerate flash read, using
-      dual/quad I/O.
-
-The latter hardware cannot handle flash writes, only uses quad I/O for
-data (not addresses), has some other peculiarities specific to SPI
-flash, and is highly dependent on the former for providing complete SPI
-flash support. My current driver is not really upstream-ready, since
-(like Huang's original driver), it pretends to be a SPI driver yet
-requires "incestuous knowledge" of m25p80 / MTD. But I hope that any new
-framework can support hardware like mine.
-
-I don't have public documentation for this hardware, but I can provide
-more detail if desired.
-
-I mostly bring this up, though, because it is an example of hardware
-that
-
-   (a) can operate as a true SPI device (hardware (1) can handle generic
-       SPI transfers), but
-   (b) requires knowledge of the details of SPI flash in order to get
-       optimal usage out of the acceleration from (2).
-
-In my book, point (a) and (b) hold some bearing over the question of
-"where should this SPI NOR framework live", because it is reasonable
-that a single driver for this hardware should be able to handle either
-true SPI devices or accelerated SPI-NOR flash.
-
-Sorry for my late-ish addition to this discussion. There's been a lot of
-noise on this topic, and SPI flash is not the highest priority on my
-list for now (although it's certainly on the list).
-
-Brian
+Laurent Pinchart
