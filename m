@@ -1,102 +1,298 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 04 Dec 2013 11:56:19 +0100
-Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
-In-Reply-To: <529F08DD.2090005@samsung.com>
-References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
- <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
- <529F08DD.2090005@samsung.com>
-Message-ID: <1386154579.25938.2.camel@AMDC1943>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 4 Dec 2013 12:00:05 +0100
+Subject: [PATCH 1/5] PM / Sleep: Add pm_generic functions to re-use
+ runtime PM callbacks
+In-Reply-To: <1858154.Dd0R3NaGoS@vostro.rjw.lan>
+References: <1385566500-7666-1-git-send-email-ulf.hansson@linaro.org>
+ <1385566500-7666-2-git-send-email-ulf.hansson@linaro.org>
+ <5255487.U4HM7Lafsi@vostro.rjw.lan>
+ <1858154.Dd0R3NaGoS@vostro.rjw.lan>
+Message-ID: <CAPDyKFoTbDWU2c4a=pLa4RmDOCJB9w+1b0-uG75fYELy8Uv9Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-04 at 19:50 +0900, Chanwoo Choi wrote:
-> Hi Krzysztof,
-> 
-> On 12/04/2013 07:40 PM, Krzysztof Kozlowski wrote:
-> > Add document describing device tree bindings for MAX14577 MFD driver.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/max14577.txt |   48 ++++++++++++++++++++
-> >  1 file changed, 48 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/max14577.txt b/Documentation/devicetree/bindings/mfd/max14577.txt
-> > new file mode 100644
-> > index 000000000000..f4fd16360b6b
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/max14577.txt
-> > @@ -0,0 +1,48 @@
-> > +MAXIM MAX14577 multi-function device
-> > +
-> > +MAX14577 is a Multi-function device with Micro-USB Interface Circuit, Li+
-> > +Battery Charger and SFOUT LDO output for powering USB devices. It is
-> > +interfaced to host controller using I2C.
-> > +
-> > +Required properties:
-> > +- compatible : Must be "maxim,max14577".
-> > +- reg : I2C slave address for the max14577 chip.
-> > +- interrupts : IRQ line for the max14577 chip.
-> > +- interrupt-parent :  The parent interrupt controller.
-> > +
-> > +Optional nodes:
-> > +- regulators :
-> > +  Required child node properties:
-> > +  - compatible : "maxim,max14577-regulator"
-> > +
-> > +  Optional child nodes:
-> > +    Each child node representing a regulator, following standard regulator
-> > +    bindings. Valid names for a regulator are: "CHARGER" and "SAFEOUT".
-> > +    The SAFEOUT is a constant voltage regulator so there is no need to specify
-> > +    voltages for it.
-> > +
-> > +	[*] refer Documentation/devicetree/bindings/regulator/regulator.txt
-> > +
-> > +Example:
-> > +	max14577 at 25 {
-> > +		compatible = "maxim,max14577";
-> > +		reg = <0x25>;
-> > +		interrupt-parent = <&gpx1>;
-> > +		interrupts = <5 0>;
-> > +
-> > +		regulators {
-> > +			compatible = "maxim,max14577-regulator";
-> > +
-> > +			safeout_reg: safeout at 1 {
-> > +				regulator-compatible = "SAFEOUT";
-> > +				regulator-name = "SAFEOUT";
-> > +			};
-> > +			charger_reg: charger at 0 {
-> > +				regulator-compatible = "CHARGER";
-> > +				regulator-name = "CHARGER";
-> > +				regulator-min-microamp = <90000>;
-> > +				regulator-max-microamp = <950000>;
-> > +				regulator-boot-on;
-> > +			};
-> > +		};
-> 
-> I prefer to add dt data about max14577-muic on following:
-> If extcon consumer driver need to use muic device, dts should provide following dt data.
-> 
-> 		muic: max14577-muic {
-> 			compatible = "maxim, max14577-muic";
-> 		};
-> > +	};
-> > 
-> For example,
-> If fuel-gauge want to use extcon subsystem, dt data of fuel-gauge add 'extcon' property as following:
-> 
-> 	fuel-gague@ {
-> 		compatible = "...";
-> 		extcon = <&muic>;
-> 	}
-> 
-Hi,
+On 4 December 2013 00:41, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Wednesday, December 04, 2013 12:15:13 AM Rafael J. Wysocki wrote:
+>> On Wednesday, November 27, 2013 04:34:56 PM Ulf Hansson wrote:
+>> > To put devices into low power state during sleep, it sometimes makes
+>> > sense at subsystem-level to re-use the runtime PM callbacks.
+>> >
+>> > The PM core will at device_suspend_late disable runtime PM, after that
+>> > we can safely operate on these callbacks. At suspend_late the device
+>> > will be put into low power state by invoking the runtime_suspend
+>> > callbacks, unless the runtime status is already suspended. At
+>> > resume_early the state is restored by invoking the runtime_resume
+>> > callbacks. Soon after the PM core will re-enable runtime PM before
+>> > returning from device_resume_early.
+>> >
+>> > The new pm_generic functions are named pm_generic_suspend_late_runtime
+>> > and pm_generic_resume_early_runtime, they are supposed to be used in
+>> > pairs.
+>> >
+>> > Do note that these new generic callbacks will work smothly even with
+>> > and without CONFIG_PM_RUNTIME, as long as the runtime PM callbacks are
+>> > implemented inside CONFIG_PM instead of CONFIG_PM_RUNTIME.
+>> >
+>> > A special thanks to Alan Stern who came up with this idea.
+>> >
+>> > Cc: Kevin Hilman <khilman@linaro.org>
+>> > Cc: Alan Stern <stern@rowland.harvard.edu>
+>> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> > ---
+>> >  drivers/base/power/generic_ops.c |   86 ++++++++++++++++++++++++++++++++++++++
+>> >  include/linux/pm.h               |    2 +
+>> >  2 files changed, 88 insertions(+)
+>> >
+>> > diff --git a/drivers/base/power/generic_ops.c b/drivers/base/power/generic_ops.c
+>> > index 5ee030a..8e78ad1 100644
+>> > --- a/drivers/base/power/generic_ops.c
+>> > +++ b/drivers/base/power/generic_ops.c
+>> > @@ -93,6 +93,49 @@ int pm_generic_suspend_late(struct device *dev)
+>> >  EXPORT_SYMBOL_GPL(pm_generic_suspend_late);
+>>
+>> After a bit of reconsideration it appears to me that the only benefit of that
+>> would be to make it possible for drivers to work around incomplete PM domains
+>> implementations.  Which would be of questionable value.
+>>
+>> >  /**
+>> > + * pm_generic_suspend_late_runtime - Generic suspend_late callback for drivers
+>> > + * @dev: Device to suspend.
+>> > + * Use to invoke runtime_suspend callbacks at suspend_late.
+>> > + */
+>> > +int pm_generic_suspend_late_runtime(struct device *dev)
+>> > +{
+>> > +   int (*callback)(struct device *);
+>> > +   int ret = 0;
+>> > +
+>> > +   /*
+>> > +    * PM core has disabled runtime PM in device_suspend_late, thus we can
+>> > +    * safely check the device's runtime status and decide whether
+>> > +    * additional actions are needed to put the device into low power state.
+>> > +    * If so, we invoke the runtime_suspend callbacks.
+>> > +    * For the !CONFIG_PM_RUNTIME case, pm_runtime_status_suspended() always
+>> > +    * returns false and therefore the runtime_suspend callback will be
+>> > +    * invoked.
+>> > +    */
+>> > +   if (pm_runtime_status_suspended(dev))
+>> > +           return 0;
+>> > +
+>> > +   if (dev->pm_domain)
+>> > +           callback = dev->pm_domain->ops.runtime_suspend;
+>>
+>> First of all, for this to work you need to assume that the type/bus/class will
+>> not exercise hardware in any way by itself (or you can look at the PCI bus type
+>> for an example why it won't generally work otherwise), so you could simply skip
+>> the rest of this conditional.
+>>
+>> For the bus types you are concerned about (platform and AMBA) that actually is
+>> the case as far as I can say.
+>>
+>> > +   else if (dev->type && dev->type->pm)
+>> > +           callback = dev->type->pm->runtime_suspend;
+>> > +   else if (dev->class && dev->class->pm)
+>> > +           callback = dev->class->pm->runtime_suspend;
+>> > +   else if (dev->bus && dev->bus->pm)
+>> > +           callback = dev->bus->pm->runtime_suspend;
+>> > +   else
+>> > +           callback = NULL;
+>> > +
+>> > +   if (!callback && dev->driver && dev->driver->pm)
+>> > +           callback = dev->driver->pm->runtime_suspend;
+>> > +
+>> > +   if (callback)
+>> > +           ret = callback(dev);
+>> > +
+>> > +   return ret;
+>> > +}
+>> > +EXPORT_SYMBOL_GPL(pm_generic_suspend_late_runtime);
+>>
+>> After that you're left with something like this:
+>>
+>> int prototype_suspend_late(struct device *dev)
+>> {
+>>       int (*callback)(struct device *);
+>>
+>>       if (pm_runtime_status_suspended(dev))
+>>               return 0;
+>>
+>>       if (dev->pm_domain)
+>>               callback = dev->pm_domain->ops.runtime_suspend;
+>>       else if (dev->driver && dev->driver->pm)
+>>               callback = dev->driver->pm->runtime_suspend;
+>>       else
+>>               callback = NULL;
+>>
+>>       return callback ? callback(dev) : 0;
+>> }
+>>
+>> Moreover, if a driver's .suspend_late is pointed to the above, it can be called
+>> in two ways.  The first way is via type/bus/class or the PM core itself which
+>> means that all PM handling at this stage is going to be done by
+>> prototype_suspend_late().  The other way is via a PM domain, in which case
+>> there may be some additional PM handling in the domain code in principle
+>> (before or after calling the driver's .suspend_late()).  However, in the
+>> latter case it generally wouldn't be OK to call PM domain's .runtime_suspend(),
+>> because that may interfere with the PM handling in its .suspend_late().  So
+>> again, this pretty much requires that the PM domain's .suspend_late pointer be
+>> NULL or point to a routine that simply executes the driver's callback and does
+>> noting in addition to that.
+>>
+>> Now, I suspect that if the driver's runtime_suspend callback is
+>> driver_runtime_suspend() and the PM domain's runtime_suspend callback is
+>> pm_domain_runtime_suspend(), the code you actually want to be executed at the
+>> "late suspend" stage will be
+>>
+>>       if (!pm_runtime_status_suspended(dev))
+>>               pm_domain_runtime_suspend()
+>>                       driver_runtime_suspend()
+>>
+>> (where the assumption is that pm_domain_runtime_suspend() will call
+>> driver_runtime_suspend() for you).  Clearly, prototype_suspend_late() will lead
+>> to that effective result in the conditions in which it makes sense to use it.
+>>
+>> So, instead of pointing the driver's .suspend_late() to prototype_suspend_late(),
+>> why don't you point the .suspend_late of the *PM* *domain* to the following
+>> slightly modified version of that function:
+>>
+>> int pm_domain_simplified_suspend_late(struct device *dev)
+>> {
+>>       int (*callback)(struct device *) = NULL;
+>>
+>>       if (pm_runtime_status_suspended(dev))
+>>               return 0;
+>>
+>>       /* Try to execute our own .runtime_suspend() callback. */
+>>       if (dev->pm_domain)
+>>               callback = dev->pm_domain->ops.runtime_suspend;
+>>
+>>       if (WARN_ON(!callback) && dev->driver && dev->driver->pm)
+>>               callback = dev->driver->pm->runtime_suspend;
+>>
+>>       return callback ? callback(dev) : 0;
+>> }
+>>
+>> This will cause exactly the code you need to be executed too (with
+>> a fallback to direct execution of the driver's callback in broken
+>> cases where the PM domain's own .runtime_suspend() is not implemented),
+>> but in a much cleaner way (no going back to the code layer that has just
+>> called you etc.).  And you *can* point the PM domain's .suspend_late
+>> to this, because it has to be either empty of trivial if the
+>> prototype_suspend_late() above is supposed to work as the driver's
+>> .suspend_late() callback.
+>>
+>> So in my opinion, if you point the .suspend_late callback pointers of the
+>> PM domains in question to the pm_domain_simplified_suspend_late() above
+>> and their .resume_early callback pointers to the following function:
+>>
+>> int pm_domain_simplified_resume_early(struct device *dev)
+>> {
+>>       int (*callback)(struct device *) = NULL;
+>>
+>>       if (pm_runtime_status_suspended(dev))
+>>               return 0;
+>>
+>>       if (dev->pm_domain)
+>>               callback = dev->pm_domain->ops.runtime_resume;
+>>
+>>       if (WARN_ON(!callback) && dev->driver && dev->driver->pm)
+>>               callback = dev->driver->pm->runtime_resume;
+>>
+>>       return callback ? callback(dev) : 0;
+>> }
+>>
+>> it will solve your problems without that horrible jumping between code
+>> layers.
+>
+> And in addition to that you can point the drivers' .suspend_late callbacks to
+> something like:
+>
+> int pm_simplified_suspend_late(struct device *dev)
+> {
+>         if (pm_runtime_status_suspended(dev))
+>                 return 0;
+>
+>         return dev->driver->pm->runtime_suspend ?
+>                 dev->driver->pm->runtime_suspend(dev) : 0;
+> }
+>
+> (and analogously for the "early resume") which will cause their .runtime_suspend()
+> to be executed even if the PM domain doesn't have a .suspend_late (or there's
+> no PM domain at all).
 
-The extcon driver itself does not use the binding. It is only needed for
-consumers. Is it a common practice to add to documentation such notice
-for consumers only?
+Rafael, I highly appreciate your detailed reply!
 
-Best regards,
-Krzysztof
+Let' me try to summarize my picture to try to wrap up the discussion:
+
+1.
+I interpret your answer as we are aligned on that re-using the runtime
+PM callbacks during system suspend, would in some cases be useful and
+accepted. That is great news to hear and definitely the most important
+part! :-)
+
+I suppose that this also means we should go forward with the following
+patches, right?
+
+[PATCH 2/5] PM / Runtime: Implement the pm_generic_runtime functions
+for CONFIG_PM
+
+[PATCH 3/5] PM / Runtime: Add second macro for definition of runtime
+PM callbacks
+
+[PATCH 4/5] PM / Sleep: Add macro to define common late/early system
+PM callbacks
+
+2.
+With your suggestions for how the PM domain shall implement it's
+.suspend_late, I do in some cases see a problem for the driver.
+Particularly in those scenarios were the driver needs full control of
+the sequence of putting it's device into low power state during system
+suspend. That is because the sequence is not initiated by the driver
+but instead from the PM domain.
+
+To be more clear, I don't think defining driver's .suspend_late
+callbacks directly to the pm_generic_suspend_late_runtime function
+would be enough in all cases.
+
+Sometimes the driver have additional actions to complete during system
+suspend - and the order of how things are done are important. Thus I
+see the "pm_generic_suspend_late_runtime" also being invoked as a
+function call from drivers .suspend_late callbacks to be able to
+handle these cases.
+
+I mentioned earlier that it could be better to view the
+pm_generic_suspend_late_runtime more as "helper function" instead of
+only as a callback.
+
+To move things one step further, I think it would make sense to add a
+pm_runtime_disable() in the beginning of
+pm_generic_suspend_late_runtime(), to clarify that it requires runtime
+PM to be disabled (runtime PM will then be re-enabled in the end of
+pm_generic_resume_early_runtime()).
+
+This would provide the option of using them as a "standalone" helper
+functions, since those would no more rely on the PM core to disable
+runtime PM from device_suspend_late.
+
+3.
+Finally, I understand you rejects to have the
+pm_generic_suspend_late_runtime and pm_generic_resume_early_runtime
+functions as a part of the PM core, at least in it's current form.
+
+Considering my reply here, were I suggest to move them out from the
+file with the generic callbacks and instead have them somewhere were
+we can consider them as "helper functions", would that matter to your
+opinion? Not sure were those would belong though, maybe closer to
+runtime PM but still available for CONFIG_PM. :-)
+
+An option would obviously be to not provide these kind of functions at
+all and instead leave it to be implemented wherever it may be needed.
+I just fear it would be duplicated code around, but it might be more
+clear of what goes on then. :-)
+
+Kind regards
+Uffe
+
+>
+> Thanks,
+> Rafael
+>
