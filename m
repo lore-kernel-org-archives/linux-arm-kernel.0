@@ -1,63 +1,101 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 4 Dec 2013 13:38:37 +0530
-Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm
- when bad data is detected
-In-Reply-To: <1386121153-32351-1-git-send-email-nm@ti.com>
-References: <1386121153-32351-1-git-send-email-nm@ti.com>
-Message-ID: <529EE305.70001@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 4 Dec 2013 08:52:01 +0100
+Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
+ mapping
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D47BDD2@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1385500248-6551-1-git-send-email-marex@denx.de>
+ <201311281856.10139.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D47BDD2@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <201312040852.01269.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 07:09 AM, Nishanth Menon wrote:
-> Due to the cross dependencies between hwmod for automanaged device
-> information for OMAP and dts node definitions, we can run into scenarios
-> where the dts node is defined, however it's hwmod entry is yet to be
-> added. In these cases:
-> a) omap_device does not register a pm_domain (since it cannot find
->    hwmod entry).
-> b) driver does not know about (a), does a pm_runtime_get_sync which
->    never fails
-> c) It then tries to do some operation on the device (such as read the
->   revision register (as part of probe) without clock or adequate OMAP
->   generic PM operation performed for enabling the module.
+On Wednesday, December 04, 2013 at 06:49:55 AM, Richard Zhu wrote:
+> Hi Marek:
 > 
-> This causes a crash such as that reported in:
-> https://bugzilla.kernel.org/show_bug.cgi?id=66441
+> Best Regards
+> Richard Zhu
 > 
-> When 'ti,hwmod' is provided in dt node, it is expected that the device
-> will not function without the OMAP's power automanagement. Hence, when
-> we hit a fail condition (due to hwmod entries not present or other
-> similar scenario), fail at pm_domain level due to lack of data, provide
-> enough information for it to be fixed, however, it allows for the driver
-> to take appropriate measures to prevent crash.
+> > -----Original Message-----
+> > From: Marek Vasut [mailto:marex at denx.de]
+> > Sent: Friday, November 29, 2013 1:56 AM
+> > To: Jingoo Han
+> > Cc: 'Tim Harvey'; 'Pratyush Anand'; linux-arm-kernel at lists.infradead.org;
+> > linux-pci at vger.kernel.org; 'Bjorn Helgaas'; 'Frank Li'; 'Harro Haan';
+> > 'Mohit KUMAR DCG'; Zhu Richard-R65037; 'Sascha Hauer'; 'Sean Cross';
+> > 'Shawn Guo'; 'Siva Reddy Kallam'; 'Srikanth T Shivanand'; 'Troy Kisky';
+> > 'Yinghai Lu' Subject: Re: [PATCH 2/7] [RFC] PCI: imx6: remove outbound
+> > io/mem ATU region mapping
+> > 
+> > Dear Jingoo Han,
+> > 
+> > > On Wednesday, November 27, 2013 5:44 PM, Marek Vasut wrote:
+> > > > Wednesday, November 27, 2013 1:30 PM, Pratyush Anand wrote:
+> > > > > On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
+> > > > > > From: Tim Harvey <tharvey@gateworks.com>
+> > > > > > 
+> > > > > > The IMX6 iATU is used for address translation between the AXI
+> > > > > > bus address space and PCI address space.  This is used for type0
+> > > > > > and
+> > > > > > type1 config cycles but is not necessary for outbound io/mem
+> > > > > > regions.
+> > > > > > 
+> > > > > > This patch removes the calls that inappropriately re-configures
+> > > > > > the ATU viewport for outbound memory and IO after config cycles
+> > > > > > and removes them altogether as they are not necessary.
+> > > > > 
+> > > > > Yes, they are not necessary for all the cases where translation is
+> > > > > one to one. So so for sure all the platform till now introduced
+> > > > > should work.
+> > > > > But, what about a platform where memory translation is not one to
+> > > > > one?
+> > > > > 
+> > > > > Existing code should work with all sort of memory translation on a
+> > > > > platform having atleast two viewports capable of programming any
+> > > > > type of outbound transaction.
+> > > > 
+> > > > Full ACK, that's why it's called RFC.
+> > > > 
+> > > > > > This resolves issues with PCI devices behind switches and has
+> > > > > > been tested with a Gige device behind a PLX PEX860x switch.
+> > > > > > More testing is needed for other configurations.
+> > > > > 
+> > > > > I do not understand if MX6 has 4 Outbound Viewport then how this
+> > > > > patch helps?
+> > > > > -- PCI devices behind switches would not have been working because
+> > > > > CFG1 transaction would not have been correct.
+> > > > > -- It works with this patch. This patch changes viewport for CFG1
+> > > > > from
+> > > > > 1 to 0.
+> > > > > -- Can it be possible that MX6 has some restriction on viewport
+> > > > > programming capability. I mean,like only viewport0 can be
+> > > > > programmed for CFG0/1?
+> > > > 
+> > > > Tim ?
+> > > > 
+> > > > Here is the MX6 datasheet [1], the section 48.3.9.1.1 and 48.3.9.1.2
+> > > > describe the iATU configuration on MX6. My understanding from this
+> > > > description is that the MX6 has 4 inbound and 4 outbound iATU
+> > > > regions. Am I wrong ?
+> > > 
+> > > The numbers of inbound and outbound are hardware-configurable features.
+> > > Thus, these numbers  can be confirmed by Freescale  hardware engineers.
+> > > How about asking Freescale hardware engineers, if possible?
+> > 
+> > Richard is on the CC. Richard, can you please confirm those?
 > 
-> Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_device.c |   24 ++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_device.h |    1 +
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 53f0735..e0a398c 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -183,6 +183,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
->  odbfd_exit1:
->  	kfree(hwmods);
->  odbfd_exit:
-> +	/* if data/we are at fault.. load up a fail handler */
-> +	if (ret)
-> +		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
-> +
->  	return ret;
->  }
->  
+> [Richard] One Pericom PI7C9X2G303EL pcie switch, and two pcie ep
+> deivces(one is intel e1000e nic, the other is one xhci device) are tested
+> on imx6q sabresd board. Without removing outbound io/mem regions view map
+> during the cfg0/1 read/write cycle, both of these devices can't work well
+> at my side. Works well after remove them during the cfg0/1 read/write
+> cycles.
+> Same to Tim's situation about switch implementation.
 
-Just wondering, can't we just print the warning here instead of registering new
-pm_domain callbacks?
+Thanks Richard! I am just wondering what kind of conclusion can we draw from 
+this. Let me reiterate what we have:
 
-Concerned that all this LOC may end up being dead code when the "ti,hwmods"
-property becomes obsolete anyway.
+- i.MX6 has 4 inbound and 4 outbound iATU regions, is that correct, Richard?
+- If we program the iATU regions, the i.MX6 PCIe doesn't work with switch.
 
--Joel
+Is there some special sause to the iATU on MX6 maybe ?
