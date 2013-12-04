@@ -1,67 +1,61 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Dec 2013 23:54:15 +0100
-Subject: [PATCH] ARM: shmobile: Genmai SPI over GPIO support
-In-Reply-To: <20131204212915.24243.27225.sendpatchset@w520>
-References: <20131204212915.24243.27225.sendpatchset@w520>
-Message-ID: <3565394.fetym5DAi6@avalon>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 4 Dec 2013 16:52:52 -0600
+Subject: [PATCHv3 0/4] socfpga: Enable SD/MMC support 
+Message-ID: <1386197576-3825-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Thank you for the patch.
+Hi,
 
-On Thursday 05 December 2013 06:29:15 Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Hook up the serial flash memory to bit bang SPI on the Genmai board.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written on to of renesas git tag renesas-devel-v3.13-rc2-20131202 and
->  [PATCH 00/04] ARM: shmobile: r7s72100 and Genmai GPIO / PINCTRL support
-> 
->  arch/arm/boot/dts/r7s72100-genmai-reference.dts |   15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> --- 0010/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> +++ work/arch/arm/boot/dts/r7s72100-genmai-reference.dts	2013-12-05
-> 06:23:57.000000000 +0900 @@ -56,5 +56,20 @@
->  			reg = <0x50>;
->  		};
->  	};
-> +	spi0 {
-> +		compatible = "spi-gpio";
-> +		gpio-sck = <&port9 2 0>;
-> +		gpio-mosi = <&port9 4 0>;
-> +		gpio-miso = <&port9 5 0>;
-> +		cs-gpios = <&port9 3 0>;
+This is v3 of the patch series to enable SD/MMC on the SOCFPGA platform. The
+SD/MMC IP is the Synopsys DW SD/MMC driver. However, the settings for the
+clock-phase of the CIU resides in a register that is located outside of SD/MMC
+IP, in a register block called the system manager.
 
-What about replacing those 0 with GPIO_ACTIVE_HIGH ?
+Per Arnd's suggestion, I implemented a clock driver for the system manager
+block. The SD/MMC driver can now use the common clock API to set the correct
+settings for the SD/MMC clock phase.
 
-> +		num-chipselects = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> 
-> +		s25fl512s: s25fl512s0 {
+Patch 1/4: clk: socfpga: Add a clock driver for SOCFPGA's system manager
+This patch adds a clk-sysmgr driver that can be use by a common clock API
+to set system manager register bits needed by the SD/MMC driver. The SD/MMC
+driver can simply call a common clock API to set the required clock phase
+settings for the SD/MMC CIU.
 
-The node should be called flash at 0.
+Patch 2/4: arm: dts: Add a system manager compatible property
+This patch adds a DTS compatible entry for the new clk-sysmgr driver.
 
-> +			compatible = "s25fl512s";
-> +			reg = <0>;
-> +			spi-max-frequency = <104000000>;
-> +                };
-> +        };
+Patch 3/4: mmc: dw_mmc-socfpga: Clean up SOCFPGA platform specific functionality
+This patch cleans up dw_mmc-socpfga.c file from defines that are outside of
+the SD/MMC IP. It makes the common clock API call to set the SD/MMC clock
+phase settings in the system manager.
 
-Please use tabs for indentation here.
+Patch 4/4: arm: dts: Add support for SD/MMC on SOCFPGA
+This patch adds the necessary DTS bindings for the SOCFPGA specific extensions
+to the base Synopsys DW SD/MMC driver.
 
-The rest looks fine to me, but I obviously can't review most of the 
-information as I don't have access to the board schematics. I'll trust you 
-that you have tested the patch :-)
+Thanks,
 
->  };
+Dinh Nguyen (4):
+  clk: socfpga: Add a clock driver for SOCFPGA's system manager
+  arm: dts: Add a system manager compatible property
+  mmc: dw_mmc-socfpga: Clean up SOCFPGA platform specific
+    funcationality
+  arm: dts: Add support for SD/MMC on SOCFPGA
+
+ .../bindings/arm/altera/socfpga-system.txt         |   10 +++
+ .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   38 ++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |   25 +++++-
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi            |   12 +++
+ arch/arm/boot/dts/socfpga_vt.dts                   |   12 +++
+ drivers/clk/socfpga/Makefile                       |    2 +-
+ drivers/clk/socfpga/clk-sysmgr.c                   |   91 ++++++++++++++++++++
+ drivers/mmc/host/dw_mmc-socfpga.c                  |   78 +++--------------
+ 8 files changed, 196 insertions(+), 72 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+ create mode 100644 drivers/clk/socfpga/clk-sysmgr.c
+
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
