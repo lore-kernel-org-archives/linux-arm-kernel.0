@@ -1,106 +1,28 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Wed, 4 Dec 2013 05:49:55 +0000
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <201311281856.10139.marex@denx.de>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <201311270944.09383.marex@denx.de>
- <006301ceebfd$8d4ba040$a7e2e0c0$%han@samsung.com>
- <201311281856.10139.marex@denx.de>
-Message-ID: <0E83723C55F66F43A6041464FE31119D47BDD2@039-SN2MPN1-013.039d.mgd.msft.net>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 4 Dec 2013 11:17:41 +0530
+Subject: [PATCH] ARM: tegra: convert device tree files to use key defines
+In-Reply-To: <529E393C.4010604@wwwdotorg.org>
+References: <1385989797-10879-1-git-send-email-ldewangan@nvidia.com>
+ <529E393C.4010604@wwwdotorg.org>
+Message-ID: <529EC1FD.2080806@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek:
+On Wednesday 04 December 2013 01:34 AM, Stephen Warren wrote:
+> On 12/02/2013 06:09 AM, Laxman Dewangan wrote:
+>> Use key code macros for all key code refernced for keys.
+>>
+>> For tegra20-seaboard.dts and tegra20-harmony.dts:
+>>    The key comment for key (16th row and 1st column) is KEY_KPSLASH but
+>>    code is 0x004e which is the key code for KEY_KPPLUS. As there other
+>>    key exist with KY_KPPLUS, I am assuming key code is wrong and comment
+>>    is fine. With this assumption, I am keeping the key code as KEY_KPSLASH.
+> This looks reasonable, and I'll apply it soon. What is the patch based
+> on? Note that I recently sent a patch to fix the sort order of DT nodes
+> in all Tegra DT files, which I'll apply early since it's a cleanup, and
+> IIRC some of the KBC nodes may have been moved by that patch, so this
+> may conflict. I'll see if I can rebase while applying it.
+I worked on linux-next of 20131202.
 
-Best Regards
-Richard Zhu
-
-
-> -----Original Message-----
-> From: Marek Vasut [mailto:marex at denx.de]
-> Sent: Friday, November 29, 2013 1:56 AM
-> To: Jingoo Han
-> Cc: 'Tim Harvey'; 'Pratyush Anand'; linux-arm-kernel at lists.infradead.org;
-> linux-pci at vger.kernel.org; 'Bjorn Helgaas'; 'Frank Li'; 'Harro Haan'; 'Mohit
-> KUMAR DCG'; Zhu Richard-R65037; 'Sascha Hauer'; 'Sean Cross'; 'Shawn Guo';
-> 'Siva Reddy Kallam'; 'Srikanth T Shivanand'; 'Troy Kisky'; 'Yinghai Lu'
-> Subject: Re: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
-> mapping
-> 
-> Dear Jingoo Han,
-> 
-> > On Wednesday, November 27, 2013 5:44 PM, Marek Vasut wrote:
-> > > Wednesday, November 27, 2013 1:30 PM, Pratyush Anand wrote:
-> > > > On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
-> > > > > From: Tim Harvey <tharvey@gateworks.com>
-> > > > >
-> > > > > The IMX6 iATU is used for address translation between the AXI
-> > > > > bus address space and PCI address space.  This is used for type0
-> > > > > and
-> > > > > type1 config cycles but is not necessary for outbound io/mem
-> > > > > regions.
-> > > > >
-> > > > > This patch removes the calls that inappropriately re-configures
-> > > > > the ATU viewport for outbound memory and IO after config cycles
-> > > > > and removes them altogether as they are not necessary.
-> > > >
-> > > > Yes, they are not necessary for all the cases where translation is
-> > > > one to one. So so for sure all the platform till now introduced
-> > > > should work.
-> > > > But, what about a platform where memory translation is not one to one?
-> > > >
-> > > > Existing code should work with all sort of memory translation on a
-> > > > platform having atleast two viewports capable of programming any
-> > > > type of outbound transaction.
-> > >
-> > > Full ACK, that's why it's called RFC.
-> > >
-> > > > > This resolves issues with PCI devices behind switches and has
-> > > > > been tested with a Gige device behind a PLX PEX860x switch.
-> > > > > More testing is needed for other configurations.
-> > > >
-> > > > I do not understand if MX6 has 4 Outbound Viewport then how this
-> > > > patch helps?
-> > > > -- PCI devices behind switches would not have been working because
-> > > > CFG1 transaction would not have been correct.
-> > > > -- It works with this patch. This patch changes viewport for CFG1
-> > > > from
-> > > > 1 to 0.
-> > > > -- Can it be possible that MX6 has some restriction on viewport
-> > > > programming capability. I mean,like only viewport0 can be
-> > > > programmed for CFG0/1?
-> > >
-> > > Tim ?
-> > >
-> > > Here is the MX6 datasheet [1], the section 48.3.9.1.1 and 48.3.9.1.2
-> > > describe the iATU configuration on MX6. My understanding from this
-> > > description is that the MX6 has 4 inbound and 4 outbound iATU regions.
-> > > Am I wrong ?
-> >
-> > The numbers of inbound and outbound are hardware-configurable features.
-> > Thus, these numbers  can be confirmed by Freescale  hardware engineers.
-> > How about asking Freescale hardware engineers, if possible?
-> 
-> Richard is on the CC. Richard, can you please confirm those?
-> 
-[Richard] One Pericom PI7C9X2G303EL pcie switch, and two pcie ep deivces(one is intel e1000e nic,
-  the other is one xhci device) are tested on imx6q sabresd board.
-Without removing outbound io/mem regions view map during the cfg0/1
- read/write cycle, both of these devices can't work well at my side.
-Works well after remove them during the cfg0/1 read/write cycles.
-Same to Tim's situation about switch implementation.
-
-> Thanks!
-> 
-> > Best regards,
-> > Jingoo Han
-> >
-> > > [1]
-> > > http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf
-> > >
-> > > > Otherwise I do not find any convincing reason that why this patch
-> > > > helps in resolving issues with PCI devices behind switches.
-> 
-> Best regards,
-> Marek Vasut
+If there is any issue,  I can generate new patch based on the branch 
+which you suggest.
