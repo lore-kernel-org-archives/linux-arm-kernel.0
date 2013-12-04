@@ -1,108 +1,68 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 04 Dec 2013 05:33:08 -0600
-Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm
- when bad data is detected
-In-Reply-To: <529EE305.70001@ti.com>
-References: <1386121153-32351-1-git-send-email-nm@ti.com>
- <529EE305.70001@ti.com>
-Message-ID: <529F12F4.70304@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 04 Dec 2013 15:33:07 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVgyNzogQ29uZmlndXJlIEdQSU9z?=
+ =?UTF-8?B?IGFzICJpbnB1dCIgYnkgZGVmYXVsdA==?=
+In-Reply-To: <20131204121508.7123c6c5@ipc1.ka-ro>
+References: <1385795000-29764-1-git-send-email-shc_work@mail.ru>
+ <1386152166.195844894@f118.i.mail.ru>
+ <20131204121508.7123c6c5@ipc1.ka-ro>
+Message-ID: <1386156787.576977781@f410.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 02:08 AM, Joel Fernandes wrote:
-> On 12/04/2013 07:09 AM, Nishanth Menon wrote:
->> Due to the cross dependencies between hwmod for automanaged device
->> information for OMAP and dts node definitions, we can run into scenarios
->> where the dts node is defined, however it's hwmod entry is yet to be
->> added. In these cases:
->> a) omap_device does not register a pm_domain (since it cannot find
->>     hwmod entry).
->> b) driver does not know about (a), does a pm_runtime_get_sync which
->>     never fails
->> c) It then tries to do some operation on the device (such as read the
->>    revision register (as part of probe) without clock or adequate OMAP
->>    generic PM operation performed for enabling the module.
->>
->> This causes a crash such as that reported in:
->> https://bugzilla.kernel.org/show_bug.cgi?id=66441
->>
->> When 'ti,hwmod' is provided in dt node, it is expected that the device
->> will not function without the OMAP's power automanagement. Hence, when
->> we hit a fail condition (due to hwmod entries not present or other
->> similar scenario), fail at pm_domain level due to lack of data, provide
->> enough information for it to be fixed, however, it allows for the driver
->> to take appropriate measures to prevent crash.
->>
->> Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>   arch/arm/mach-omap2/omap_device.c |   24 ++++++++++++++++++++++++
->>   arch/arm/mach-omap2/omap_device.h |    1 +
->>   2 files changed, 25 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
->> index 53f0735..e0a398c 100644
->> --- a/arch/arm/mach-omap2/omap_device.c
->> +++ b/arch/arm/mach-omap2/omap_device.c
->> @@ -183,6 +183,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
->>   odbfd_exit1:
->>   	kfree(hwmods);
->>   odbfd_exit:
->> +	/* if data/we are at fault.. load up a fail handler */
->> +	if (ret)
->> +		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
->> +
->>   	return ret;
->>   }
->>
->
-> Just wondering, can't we just print the warning here instead of registering new
-> pm_domain callbacks?
->
+> > > > > > > > > On Sat, Nov 30, 2013 at 11:03:20AM +0400, Alexander Shiyan wrote:
+> > > > > > > > > > This patch changes the default direction for pins used
+> > > > > > > > > > as GPIO to "input". This prevents a short circuit on the
+> > > > > > > > > > configuration stage when GPIO-pin is connected to the
+> > > > > > > > > > other output pin.
+> > > > > > > > > 
+> > > > > > > > > Markus,
+> > > > > > > > > 
+> > > > > > > > > Does it make sense to you?
+> > > > > > > > 
+> > > > > > > > I am not sure if this really happens. However, it does make sense and I
+> > > > > > > > can't see any disadvantages in changing the default GPIO mux direction to
+> > > > > > > > input.
+> > > > > > > > 
+> > > > > > > What happens, if the bootloader already set up a pin as output and
+> > > > > > > linux later does the pinconfig stuff?
+> > > > > > > If the pin is reconfigured as input then, this may produce an unwanted
+> > > > > > > glitch on the pin. IMO the pinconfig driver should not touch the pin
+> > > > > > > direction, but leave it to the gpio driver to set that up. 
+> > > > > > 
+> > > > > > Such pin can be overridden by board DTS.
+> > > > > > 
+> > > > > So, which pins will be configured with the default direction?
+> > > > > If pins are not stated in DT they should be not configured at all, I
+> > > > > suppose.
+> > > > 
+> > > > Yes. We talk about GPIOs defined in DTS.
+> > > > Just one example: We have one GPIO pin connected to switch between ground
+> > > > and resistor to pullup (gpio-key driver). When pinctrl driver will initialize pin for the
+> > > > driver (before gpio_direction_input() in the driver), direction will be set to output
+> > > > and this may cause short circuit.
+> > > > 
+> > > The pin direction should be determined by the GPIO driver, not the
+> > 
+> > Direction determined by driver that use this GPIO pin,
+> > setup this direction should be by GPIO driver.
+> > 
+> > > pinctrl driver. Pins that have been set up correctly by the bootloader
+> > > must not change their direction when the pinctrl driver reconfigures
+> > > the pins!
+> > 
+> > Yes. But this is another topic for discussion, it does not concern with this patch.
+> > 
+> If the pin direction is not being determined by the pinctrl driver the
+> patch to change the default direction would not be necessary.
+> 
+> Otherwise this patch would try to exorcise the devil with the help of
+> beelzebub.
+> 
+> A short between to outputs is to be prevented as well as a temporary
+> reconfiguration of an output pin to input.
 
-I suggest you might want to read the commit message again.. but lets try 
-once again:
+Current "pinctrl-imx1-core.c" touch direction register for any pin.
+As far this not fixed, this will be a temporary solution.
 
-As you see in dmesg log 
-https://bugzilla.kernel.org/attachment.cgi?id=117311 pointed in the bug 
-https://bugzilla.kernel.org/show_bug.cgi?id=66441,
-
-
-you already have
-"
-[    0.176940] platform 4b501000.aes: Cannot lookup hwmod 'aes'
-[    0.177215] platform 480a5000.des: Cannot lookup hwmod 'des'"
-
-Now, printing that warning does not help, as I already explained in the 
-commit log,
-"
- >> b) driver does not know about (a), does a pm_runtime_get_sync which
- >>     never fails"
-
-A device node stated it will have hwmod to adequately control it, but in 
-reality, as in this case, it does not. how does printing a warning alone 
-help the driver which is not aware of these? The driver's attempt at 
-pm_runtime_sync should fail, as that is what "ti,hwmod" property controls.
-
-
-> Concerned that all this LOC may end up being dead code when the "ti,hwmods"
-> property becomes obsolete anyway.
-
-we detected we have a bug with 3.13-rc2 - this is a fix for kernel 
-(probably a stable candidate too). ti,hwmod property might become 
-eventually obsolete (and we are working towards that), but the 
-functionality that it provides today is necessary for the transition 
-from mixed dt-hwmod world to pure dt world. - remember we are moving 
-from data structure which is used to describe hardware to another which 
-again describes hardware in a different form - the kind of bugs we see 
-now are expected to be fixed for transition to be smooth for everyone.
-
-without providing adequate warnings, bugs like 
-https://bugzilla.kernel.org/show_bug.cgi?id=66441 will need pretty nasty 
-debug.
-
-I hope this helps convince you that error code is worth the LoC.
-
---
-Regards,
-Nishanth Menon
+---
