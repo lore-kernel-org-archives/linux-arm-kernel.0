@@ -1,65 +1,50 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 4 Dec 2013 13:29:55 +0000
-Subject: [PATCH RFC 1/2] Documentation: arm: add cache DT bindings
-In-Reply-To: <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1386001205-11978-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20131204132955.GB2323@e103592.cambridge.arm.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 4 Dec 2013 21:05:25 +0800
+Subject: [PATCH v3 10/10] usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK
+In-Reply-To: <529EE8D6.2030600@pengutronix.de>
+References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+ <1383616525-10769-11-git-send-email-peter.chen@freescale.com>
+ <529E5215.5000107@pengutronix.de>
+ <F281D0F91ED19E4D8E63A7504E8A6498041427E5@039-SN2MPN1-021.039d.mgd.msft.net>
+ <529EE8D6.2030600@pengutronix.de>
+Message-ID: <20131204130524.GA1573@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 04:20:04PM +0000, Lorenzo Pieralisi wrote:
-> On ARM systems the cache topology cannot be probed at runtime, in
-> particular, it is impossible to probe which CPUs share a given cache
-> level. Power management software requires this knowledge to implement
-> optimized power down sequences, hence this patch adds a document that
-> defines the DT cache bindings for ARM systems. The bindings are compliant
-> with ePAPR (PowerPC bindings), and rely on the cache bindings already
-> standardized in the ePAPR v1.1 document; ARM required updates are underlined
-> in the binding document.
+On Wed, Dec 04, 2013 at 09:33:26AM +0100, Marc Kleine-Budde wrote:
+> On 12/04/2013 02:40 AM, Peter Chen wrote:
+> > There are some re-work for this serial, I will do it.
+> > But I don't get your mean why it needs to squash into another patch?
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/cache.txt | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/cache.txt
+> Let's look at the code again:
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
-> new file mode 100644
-> index 0000000..009cddb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/cache.txt
-> @@ -0,0 +1,25 @@
-> +==========================================
-> +ARM processors cache binding description
-> +==========================================
-> +
-> +Device tree bindings for ARM processor caches adhere to the cache bindings
-> +described in [3], in section 3.8 for multi-level and shared caches.
+> > -	if (imx_platform_flag->flags & CI_HDRC_IMX_SUPPORT_RUNTIME_PM)
+> > +	if (imx_platform_flag->flags & CI_HDRC_IMX_SUPPORT_RUNTIME_PM) {
+> >  		pdata.flags |= CI_HDRC_SUPPORTS_RUNTIME_PM;
+> >  		data->supports_runtime_pm = true;
+> >  	}
+> 
+> Without that patch, the driver will not compile.
+> 
+> before:
+> 
+> if ()
+> 	/* code */
+> }
+> 
+> after:
+> 
+> if () {
+> 	/* code */
+> }
+> 
+> Marc
+> 
+> -- 
 
-For architected levels of cache, most of the cache properties can be
-probed through the system register interface.
+Oh, thanks. I need to sqhash [7/10] and [10/10]
 
-Should we be explicit about prohibiting properties in the DT describing
-cache characteristics that can be probed?
+-- 
 
-> +
-> +On ARM, internal caches cannot be described in the cpu node but require
-> +specific nodes marked with compatible string set to "cache" (see [3],
-> +section 3.8).
-> +
-> +Furthermore the cache bindings in [3] require the following property update:
-> +
-> +- [Table 3.9] cache-level: This property of cache nodes must match the cache
-> +			   level encoded in the processors CLIDR (v7) and
-> +			   CLIDR_EL1 (v8) registers, as described in [1][2].
-
-I still don't understand why a given cache definitely has the same level
-number assigned to it with respect to each CPU.  Is that an architectural
-requirement?
-
-All those LoC, LoU, LoUIS properties etc. are probeable per-CPU not
-globally...  I don't see why they couldn't be different.
-
-Cheers
----Dave
+Best Regards,
+Peter Chen
