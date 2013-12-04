@@ -1,29 +1,34 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed,  4 Dec 2013 10:33:41 -0800
-Subject: [PATCH 3/4] arm64: Enable system reset via arch Kconfig for X-Gene
- system.
-Message-ID: <1386182021-26678-1-git-send-email-fkan@apm.com>
+Date: Wed,  4 Dec 2013 10:33:20 -0800
+Subject: [PATCH 1/4] Documentation: add dts binding for X-Gene reboot dts node.
+Message-ID: <1386182000-26607-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enable the system reset via arch Kconfig for X-Gene platforms.
+Add dts documentation for X-Gene reboot driver.
 
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/arm64/xgene/reboot.txt     |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm64/xgene/reboot.txt
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c044548..188e787 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -116,6 +116,7 @@ config ARCH_VEXPRESS
- 
- config ARCH_XGENE
- 	bool "AppliedMicro X-Gene SOC Family"
-+	select POWER_RESET_XGENE
- 	help
- 	  This enables support for AppliedMicro X-Gene SOC Family
- 
+diff --git a/Documentation/devicetree/bindings/arm64/xgene/reboot.txt b/Documentation/devicetree/bindings/arm64/xgene/reboot.txt
+new file mode 100644
+index 0000000..70aabf7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm64/xgene/reboot.txt
+@@ -0,0 +1,11 @@
++Reboot property to control system reboot on storm platforms:
++
++The register attribute contain the address of the reset 
++register.
++
++Example:
++
++	reboot at 17000014 {
++		compatible = "apm,xgene-reboot";
++		reg = <0x0 0x17000014 0x0 0x4>;
++	};
 -- 
 1.7.6.1
