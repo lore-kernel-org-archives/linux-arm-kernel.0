@@ -1,54 +1,52 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 04 Dec 2013 20:09:18 +0900
-Subject: [PATCH v6 3/3] mfd: max14577: Add device tree bindings document
-In-Reply-To: <1386155011.25938.4.camel@AMDC1943>
-References: <1386153615-25456-1-git-send-email-k.kozlowski@samsung.com>
- <1386153615-25456-4-git-send-email-k.kozlowski@samsung.com>
- <529F08DD.2090005@samsung.com> <1386154579.25938.2.camel@AMDC1943>
- <529F0B75.5040004@samsung.com> <1386155011.25938.4.camel@AMDC1943>
-Message-ID: <529F0D5E.4060202@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 4 Dec 2013 19:12:45 +0800
+Subject: [PATCH] ARM: pxa: Remove unused variables
+In-Reply-To: <529F033E.9020608@gmail.com>
+References: <1386152565-26524-1-git-send-email-thierry.reding@gmail.com>
+ <529F033E.9020608@gmail.com>
+Message-ID: <CAN1soZwWGUfg1sq4TquTBL4_JtEdy7VGoXA42cqhpN7kQew6nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 08:03 PM, Krzysztof Kozlowski wrote:
-> On Wed, 2013-12-04 at 20:01 +0900, Chanwoo Choi wrote:
->> On 12/04/2013 07:56 PM, Krzysztof Kozlowski wrote:
->>> On Wed, 2013-12-04 at 19:50 +0900, Chanwoo Choi wrote:
-> (...)
->>>>
->>>> I prefer to add dt data about max14577-muic on following:
->>>> If extcon consumer driver need to use muic device, dts should provide following dt data.
->>>>
->>>> 		muic: max14577-muic {
->>>> 			compatible = "maxim, max14577-muic";
->>>> 		};
->>>>> +	};
->>>>>
->>>> For example,
->>>> If fuel-gauge want to use extcon subsystem, dt data of fuel-gauge add 'extcon' property as following:
->>>>
->>>> 	fuel-gague@ {
->>>> 		compatible = "...";
->>>> 		extcon = <&muic>;
->>>> 	}
->>>>
->>> Hi,
->>>
->>> The extcon driver itself does not use the binding. It is only needed for
->>> consumers. Is it a common practice to add to documentation such notice
->>> for consumers only?
+On Wed, Dec 4, 2013 at 6:26 PM, Daniel Mack <zonque@gmail.com> wrote:
+> On 12/04/2013 11:22 AM, Thierry Reding wrote:
+>> The conf and of_id variables are assigned but never used, so they may as
+>> well just be removed.
 >>
->> As you comment, It is only for extcon consumer.
->> But extcon provider driver always is operated with extcon consumer driver.
->> If dts file don't support upper dt data about extcon provider driver,
->> all of extcon consumer drivers could not use extcon subsystem.
+>> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+>
+> Acked-by: Daniel Mack <zonque@gmail.com>
+>
+>> ---
+>>  arch/arm/mach-pxa/irq.c | 4 ----
+>>  1 file changed, 4 deletions(-)
 >>
->> I thinks it is common dt data for muic device.
-> 
-> OK, I'll add it.
-> 
+>> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+>> index b6cc1816463e..0eecd83c624e 100644
+>> --- a/arch/arm/mach-pxa/irq.c
+>> +++ b/arch/arm/mach-pxa/irq.c
+>> @@ -235,8 +235,6 @@ static const struct of_device_id intc_ids[] __initconst = {
+>>  void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+>>  {
+>>       struct device_node *node;
+>> -     const struct of_device_id *of_id;
+>> -     struct pxa_intc_conf *conf;
+>>       struct resource res;
+>>       int n, ret;
+>>
+>> @@ -245,8 +243,6 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+>>               pr_err("Failed to find interrupt controller in arch-pxa\n");
+>>               return;
+>>       }
+>> -     of_id = of_match_node(intc_ids, node);
+>> -     conf = of_id->data;
+>>
+>>       ret = of_property_read_u32(node, "marvell,intc-nr-irqs",
+>>                                  &pxa_internal_irq_nr);
+>>
+>
 
-Thanks,
+Applied.
 
-Best Regards,
-Chanwoo Choi
+Thanks
+Haojian
