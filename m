@@ -1,32 +1,110 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 4 Dec 2013 11:30:22 +0530
-Subject: [RFC v2 0/4] Add basic support for ASV
-In-Reply-To: <CAM4voak0QaseYoRM+rsx2Fa8qs1z=w9iVep1smxx73_SUhmkJQ@mail.gmail.com>
-References: <1384515691-26299-1-git-send-email-sachin.kamat@linaro.org>
- <CAJ0PZbS8FxRA_sPTOnWbZcNfUMp=k5Jf_tZHLg1fh6gsAGJ=Gw@mail.gmail.com>
- <CAK9yfHzUAnBMB2Bp+eKzR3NH1iRguJn4K45gss5psWzG4Lc7tw@mail.gmail.com>
- <CAM4voak0QaseYoRM+rsx2Fa8qs1z=w9iVep1smxx73_SUhmkJQ@mail.gmail.com>
-Message-ID: <CAK9yfHzJL2ZKLyg7NtJisFUorTy0oVoOUwGtnWbQYGsysgG-UA@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li Xiubo)
+Date: Wed, 4 Dec 2013 06:01:29 +0000
+Subject: [PATCHv6 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131202110243.GD12952@e106331-lin.cambridge.arm.com>
+References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
+ <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131128212510.GC14689@mithrandir> <20131128223719.GG14689@mithrandir>
+ <20131202110243.GD12952@e106331-lin.cambridge.arm.com>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828E66C5@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
+> > > > +static int fsl_pwm_parse_clk_ps(struct fsl_pwm_chip *fpc)
+> > > > +{
+> > > > +	int ret;
+> > > > +	struct of_phandle_args clkspec;
+> > > > +	struct device_node *np = fpc->chip.dev->of_node;
+> > > > +
+> > > > +	fpc->sys_clk = devm_clk_get(fpc->chip.dev, "ftm0");
+> > > > +	if (IS_ERR(fpc->sys_clk)) {
+> > > > +		ret = PTR_ERR(fpc->sys_clk);
+> > > > +		dev_err(fpc->chip.dev,
+> > > > +				"failed to get \"ftm0\" clock %d\n", ret);
+> > > > +		return ret;
+> > > > +	}
+> > > > +
+> > > > +	fpc->counter_clk = devm_clk_get(fpc->chip.dev, "ftm0_counter");
+> > > > +	if (IS_ERR(fpc->counter_clk)) {
+> > > > +		ret = PTR_ERR(fpc->counter_clk);
+> > > > +		dev_err(fpc->chip.dev,
+> > > > +				"failed to get \"ftm0_counter\" clock %d\n",
+> > > > +				ret);
+> > > > +		return ret;
+> > > > +	}
+> > > > +
+> > > > +	ret = of_parse_phandle_with_args(np, "clocks", "#clock-cells",
+> 1,
+> > > > +					&clkspec);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +
+> > > > +	fpc->counter_clk_select = clkspec.args[0];
+> > >
+> > > This isn't at all pretty. But given that once you have access to a
+> > > struct clk there's no way to identify it, I don't know of a better
+> > > alternative.
+> >
+> > Hi Mike,
+> >
+> > I've seen this crop up a number of times now, to varying degrees of
+> > gravity. In this particular case, the driver needs to know the type of a
+> > clock because it needs to program this hardware differently depending on
+> > which clock feeds the counter. Since there is no way to obtain any kind
+> > of identifying information from a struct clk, drivers need to rely on
+> > hacks like this and manually reach into the device tree to obtain that
+> > information.
+> 
+> Which property of the clock is the consumer concerned with in this case?
+> 
 
-On 3 December 2013 20:16, Abhilash Kesavan <kesavan.abhilash@gmail.com> wrote:
-> Hi Yadwinder and Sachin,
+The "ftm0_counter" clock.
 
-> CC'ing Doug and Andrew who have also worked on ASV.
->
-> I tested these patches on a 5250 Chromebook after modifying the
-> cpufreq code and a few other changes for booting the board. The driver
-> is retrieving the ASV fused group correctly. The behavior on an
-> unfused SMDK5250 is also fine.
-> I have a few minor comments on the patches.
->
 
-Thank you for testing and reviewing the patchset.
-Will incorporate your comments in the next version.
+> From a quick look at the driver it looks like there are actually a
+> number of different input lines to the device that share the clock-name
+> "ftm0_counter", though they are actually separate and each has a
+> different divider. Have I got that right?
+> 
 
--- 
-With warm regards,
-Sachin
+Yes mostly, there are three different input lines wired to the counter
+clock, but they share only one divider. And between the three lines and
+the divider there is one mux inside of the FTM IP block.
+The three clock sources are:
+"ftm0",
+"ftm0-fix",
+"ftm0-ext".
+		 _____________________________________________________
+		|									|
+		|   +++++++++++		FTM Module				|
+ftm0 -------|-->+         +							|
+		|   +         +     +++++++++++++     ++++++++++++++	|
+ftm0-fix ---|-->+   MUX   +---->+  divider  +---->+  counter   +	|
+		|   +         +     +++++++++++++     ++++++++++++++	|
+ftm0-ext ---|-->+         +							|
+		|   +++++++++++							|
+		|_____________________________________________________|
+
+
+
+> If that's the case, having a unique clock-names value for each of those
+> lines would be the solution I'd expect. Then you just have to list the
+> one(s) that are wired up, and the driver can figure out the appropriate
+> line to use either by requesting by name until it finds a match or
+> inspecting the clock-names property.
+> 
+
+Hi Kumar,
+In the list archives for mails of "[RFC][PATCHv5 4/4] Documentation: Add
+device tree bindings for Freescale FTM PWM.",we have discussed about this.
+Is there any different with your suggestions or ideas? 
+
+
+> Is there some other property of the parent that we care about here?
+> 
+
+As I know, not yet.
+
+--
+Best Regards,
+ 
