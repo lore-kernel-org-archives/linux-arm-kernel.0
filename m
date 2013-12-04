@@ -1,125 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Dec 2013 13:49:49 -0800
-Subject: [PATCH/RFC] ARM: omap3: Split the pinmux core device
-In-Reply-To: <20131204185341.GV26766@atomide.com>
-References: <1386177110-26424-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <2098999.THrpfnVM6o@avalon> <20131204182437.GU26766@atomide.com>
- <3374611.sGfCARW7Hu@avalon> <20131204185341.GV26766@atomide.com>
-Message-ID: <20131204214949.GW26766@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 4 Dec 2013 13:54:48 -0800
+Subject: [GIT PULL] at91: cleanup for 3.14 #1 (aka move to CCF)
+In-Reply-To: <1386003701-29760-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1386003701-29760-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <CAOesGMjoK=fN-QCnRS1r2XQFrqc=KN_HPj5A=EVHL3ut58MvQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131204 10:54]:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131204 10:45]:
-> > On Wednesday 04 December 2013 10:24:37 Tony Lindgren wrote:
-> > > 
-> > > OK. I wonder if we should add something like this to make it easier to
-> > > use the padconf values from the TRM:
-> > > 
-> > > #define OMAP_IOPAD_OFFSET(pa, offset)	((pa) & 0xffff) - (offset))
-> > > 
-> > > #define OMAP2_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0030) (val))
-> > > #define OMAP3_CORE1_IOPAD(pa, val)	OMAP2_CORE_IOPAD((pa), (val))
-> > > #define OMAP3_CORE2_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x05a0) (val))
-> > > #define OMAP4_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0040) (val))
-> > > #define OMAP4_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xe040) (val))
-> > > #define OMAP5_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0840) (val))
-> > > #define OMAP5_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xc850) (val))
-> > > ...
-> > > 
-> > > Then we would have entries like:
-> > > 
-> > > 	pinctrl-single,pins = <
-> > > 		OMAP3_CORE1_IOPAD(0x158, PIN_INPUT_PULLUP | MUX_MODE0)
-> > > 		...
-> > > 	>;
-> > > 
-> > > instead of:
-> > > 
-> > > 	pinctrl-single,pins = <
-> > > 		0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
-> > > 		...
-> > > 	>;
-> > 
-> > That's a good idea, it would be much more readable. Would you like to submit a 
-> > patch ? Should I rebase my patch on top of that, or the other way around ?
-> 
-> OK I'll do a patch for that later on today, then you can use that. Might
-> cut down the churn a little that way.
+On Mon, Dec 2, 2013 at 9:01 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Arnd, Olof, Kevin,
+>
+> This is the big move of AT91 to Common Clock Framework for 3.14. I collected
+> all the material as a "cleanup" topic so that the CCF can be considered as a
+> base for all our AT91 patches for 3.14.
+> I prefer to have the sama5d3 use of AT91 CCF included into this pull-request
+> so that it can be read as an example and clearly states that it has been tested
+> in real life.
+> We agreed with Mike to send this work upstream through arm-soc so that we will
+> be able to stack other patches for 3.14 on top of that work without having to
+> deal with conflicts.
+>
+> For merging with the "fixes" pull-request that I sent earlier today, I also
+> uploaded a little branch for reference:
+> at91-3.14-next_fixes_cleanup_dt-resolution.
+> In two words, the clock section of the arch/arm/mach-at91/sama5d3.c file
+> has to be deleted.
+>
+> Do not hesitate to ask questions about this material.
+>
+> Thanks, best regards,
+>
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+>
+> for you to fetch changes up to b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
+>
+>   ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
 
-Here's the patch for it, needs some checks and testing as I got several
-things wrong in the example above :)
+Thanks, pulled into next/cleanup. use this branch as base for your
+future at91 branches if you need it to avoid conflicts, please.
 
-Regards,
+(I named it at91/sama5-ccf in our tree)
 
-Tony
 
-8< ----------------------------
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 4 Dec 2013 13:03:58 -0800
-Subject: [PATCH] ARM: dts: Add omap specific pinctrl defines to use padconf addresses
-
-As we have one to three pinctrl-single instances for each SoC it is
-a bit confusing to configure the padconf register offset from the
-base of the padconf register base.
-
-Let's add macros that allow using the physical address of the
-padconf register directly, or in most cases, just the last 16-bits
-of the address as they are shown in the documentation.
-
-Note that most documentation shows two padconf registers for each
-32-bit address, so adding 2 to the documentation address is needed for
-the second padconf register as we treat them as 16-bit registers
-for omap3+.
-
-For example, omap36xx documentation shows sdmmc2_clk at 0x48002158,
-so we can just use the last 16-bits of that value:
-
-	pinctrl-single,pins = <
-		OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)
-		...
-	>;
-
-And we don't need to separately calculate the offset from the 0x2030
-base:
-
-	pinctrl-single,pins = <
-		0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
-		...
-	>;
-
-Naturally both ways of defining the registers can be used, and I'm
-not saying we should replace all the existing defines. But it may
-be handy to use these macros for new entries and when doing other
-related .dts file clean-up.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/include/dt-bindings/pinctrl/omap.h
-+++ b/include/dt-bindings/pinctrl/omap.h
-@@ -49,5 +49,24 @@
- #define PIN_OFF_INPUT_PULLDOWN	(OFF_EN | OFF_PULL_EN)
- #define PIN_OFF_WAKEUPENABLE	WAKEUP_EN
- 
-+/*
-+ * Macros to allow using the absolute physical address instead of the
-+ * padconf registers instead of the offset from padconf base.
-+ */
-+#define OMAP_IOPAD_OFFSET(pa, offset)	((pa) & 0xffff) - (offset))
-+
-+#define OMAP2420_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0030) (val))
-+#define OMAP2430_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2030) (val))
-+#define OMAP3_CORE1_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2030) (val))
-+#define OMAP3_CORE2_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x25a0) (val))
-+#define OMAP3_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2a00) (val))
-+#define AM33XX_IOPAD(pa, val)		(OMAP_IOPAD_OFFSET((pa), 0x0800) (val))
-+#define OMAP4_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x0040) (val))
-+#define OMAP4_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xe040) (val))
-+#define AM4372_IOPAD(pa, val)		(OMAP_IOPAD_OFFSET((pa), 0x0800) (val))
-+#define OMAP5_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x2840) (val))
-+#define OMAP5_WKUP_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0xc840) (val))
-+#define DRA7XX_CORE_IOPAD(pa, val)	(OMAP_IOPAD_OFFSET((pa), 0x3400) (val))
-+
- #endif
- 
+Olof
