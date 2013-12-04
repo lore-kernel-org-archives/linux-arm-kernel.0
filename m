@@ -1,105 +1,78 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 4 Dec 2013 10:51:22 -0800
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <20131204103307.GB2285@pratyush-vbox>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <1385500248-6551-2-git-send-email-marex@denx.de>
- <20131127043009.GB12773@pratyush-vbox>
- <201311270944.09383.marex@denx.de>
- <CAJ+vNU050mtdiyXBXue_JGFJhFLiKCvoyf031Uda2e5U+vA12g@mail.gmail.com>
- <20131204103307.GB2285@pratyush-vbox>
-Message-ID: <CAJ+vNU2Kz11AGAKDqi0Q=OgpOm9bVuvhDPSQgufhoemRfm7Xcw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 4 Dec 2013 10:58:37 -0800
+Subject: [PATCH v4 1/5] watchdog: davinci: change driver to use WDT core
+In-Reply-To: <529F7797.4080100@ti.com>
+References: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1385556508-3935-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <529F6EBE.5050703@ti.com> <20131204182824.GA14499@roeck-us.net>
+ <529F7797.4080100@ti.com>
+Message-ID: <20131204185837.GA16166@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 4, 2013 at 2:33 AM, Pratyush Anand <pratyush.anand@st.com> wrote:
-> Hi Tim,
->
->>
->> In my configuration I have a PLX switch off the IMX root complex with
->> several devices behind it.  I find that the devices enumerate
->> correctly but as soon as data is transferred to or from (not sure
->> which) the device the system hangs (INFO: rcu_sched detected stalls on
->> CPUs/tasks: { 0} (detected by 3, t=2135 jiffies, g=20, c=19, q=66)).
->> My current test case is a GigE ethernet device and when I connect a
->> network to the device I hange when a packet is responded to.
->>
->> I can't claim to fully understand PCI resource mappings or the iATU
->> and I don't understand why dw_pcie_rd_other_conf/dw_pcie_wr_other_conf
->> need to change the viewport then change it back instead of using
->> multiple viewports (perhaps because some hardware may not have more
->> than the 2 viewports currently being used?).  The current driver uses
->
-> Yes, driver has been written keeping in mind that there exist minimum
-> of two programmable outbound viewport.
->
->> viewport0 for cfg0 and mem and viewport1 for cfg1 and io.  If I remove
->> the call to dw_pcie_prog_viewport_io_outbound to reconfigure viewport1
->> for io after its altered for type1 cfg cycles, devices behind the
->> bridge work for me:
->
-> This is strange !!!
-> When you say it does not work, what exactly happens? What does kernel
-> crash log says? Which register access forces CPU to hang? Is it
-> possible to capture traffic with PCIe analyzer?
->
+On Wed, Dec 04, 2013 at 08:42:31PM +0200, ivan.khoronzhuk wrote:
+> On 12/04/2013 08:28 PM, Guenter Roeck wrote:
+> > On Wed, Dec 04, 2013 at 11:34:46PM +0530, Sekhar Nori wrote:
+> >> On 11/27/2013 6:18 PM, Ivan Khoronzhuk wrote:
+> >>> To reduce code duplicate and increase code readability use WDT core
+> >>> code to handle WDT interface.
+> >>>
+> >>> Remove io_lock as the WDT core uses mutex to lock each wdt device.
+> >>> Remove wdt_state as the WDT core tracks state with its own variable.
+> >>>
+> >>> The watchdog_init_timeout() can read timeout value from timeout-sec
+> >>> property if the passed value is out of bounds. The heartbeat is
+> >>> initialized in next way. If heartbeat is not set thought module
+> >>> parameter, try to read it's value from WDT node timeout-sec property.
+> >>> If node has no one, use default value.
+> >>>
+> >>> The heartbeat is hold in wdd->timeout by WDT core, so use it in
+> >>> order to set timeout period.
+> >>>
+> >>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> >>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> >>> ---
+> >>>   drivers/watchdog/Kconfig       |    2 +
+> >>>   drivers/watchdog/davinci_wdt.c |  147 ++++++++++------------------------------
+> >>>   2 files changed, 37 insertions(+), 112 deletions(-)
+> >>>
+> >>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> >>> index 5be6e91..eb8c89d 100644
+> >>> --- a/drivers/watchdog/Kconfig
+> >>> +++ b/drivers/watchdog/Kconfig
+> >>> @@ -271,6 +271,8 @@ config IOP_WATCHDOG
+> >>>   config DAVINCI_WATCHDOG
+> >>>   	tristate "DaVinci watchdog"
+> >>>   	depends on ARCH_DAVINCI
+> >>> +	select WATCHDOG_CORE
+> >>> +	select WATCHDOG_NOWAYOUT
+> >>
+> >> Its not clear for change log why NOWAYOUT needs to be forced on all the
+> >> time for all users of DaVinci watchdog.
+> 
+> ... you are right
+> 
+> >>
+> > Actually, thinking about it, it is not necessary and can be replaced with
+> > 
+> > 	watchdog_set_nowayout(wdd, 1);
+> 
+> Good idea, I'll replace watchdog_set_nowayout(wdd, WATCHDOG_NOWAYOUT) on it.
+> And delete "select WATCHDOG_NOWAYOUT"
+> 
+> > 
+> > In other words, there is no need to force NOWAYOUT on _other_ watchdogs which
+> > may be present in the system. Still, you are right, it would be nice to explain
+> > in the changelog (or maybe even better as comment in the code) why it is
+> > enforced.
+> > 
+> > Guenter
+> > 
+> 
+> Only question, should I repost only this patch or whole series?
+> 
+Reposting only this patch should be sufficient if the others did not change.
 
-Pratyush,
-
-The device behind the switch is a Marvell Yukon 2 GigE 88E8057:
-
-$ lspci -n
-00:00.0 0604: 16c3:abcd (rev 01)
-01:00.0 0604: 10b5:8609 (rev ba)
-01:00.1 0880: 10b5:8609 (rev ba)
-02:01.0 0604: 10b5:8609 (rev ba)
-02:04.0 0604: 10b5:8609 (rev ba)
-02:05.0 0604: 10b5:8609 (rev ba)
-02:06.0 0604: 10b5:8609 (rev ba)
-02:07.0 0604: 10b5:8609 (rev ba)
-02:08.0 0604: 10b5:8609 (rev ba)
-02:09.0 0604: 10b5:8609 (rev ba)
-07:00.0 0280: 168c:002b (rev 01)
-08:00.0 0200: 11ab:4380
-$ lspci -s 08:00.0 -v
-08:00.0 Ethernet controller: Marvell Technology Group Ltd. 88E8057
-PCI-E Gigabit Ethernet Controller
-        Subsystem: Marvell Technology Group Ltd. 88E8057 PCI-E Gigabit
-Ethernet Controller
-        Flags: bus master, fast devsel, latency 0, IRQ 155
-        Memory at 01200000 (64-bit, non-prefetchable) [size=16K]
-        I/O ports at 1000 [size=256]
-        Capabilities: [48] Power Management version 3
-        Capabilities: [5c] MSI: Enable- Count=1/1 Maskable- 64bit+
-        Capabilities: [c0] Express Legacy Endpoint, MSI 00
-        Capabilities: [100] Advanced Error Reporting
-        Capabilities: [130] Device Serial Number 00-00-00-00-00-00-00-00
-        Kernel driver in use: sky2
-
-$ ifconfig eth1
-eth1      Link encap:Ethernet  HWaddr 00:D0:12:9D:EF:E7
-          BROADCAST MULTICAST  MTU:1500  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000
-          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
-          Interrupt:155
-
-$ ifconfig eth1 up
-[   70.207493] sky2 0000:08:00.0 eth1: enabling interface
-[   70.212855] IPv6: ADDRCONF(NETDEV_UP): eth1: link is not ready
-[   72.703741] sky2 0000:08:00.0 eth1: Link is up at 1000 Mbps, full
-duplex, flow control both
-[   72.712392] IPv6: ADDRCONF(NETDEV_CHANGE): eth1: link becomes ready
-
-board hangs here for several minutes then an rcu_sched stall is
-detected minutes later (I can't explain why the printk time below is
-wrong... it seems to within several minutes after the hang)
-
-[   63.559915] INFO: rcu_sched detected stalls on CPUs/tasks: { 0}
-(detected by 1, t=2102 jiffies, g=4294967231, c=4294967230, q=10)
-
-I do not have an anaylzer that can get on the PCIe bus.
-
-Tim
+Thanks,
+Guenter
