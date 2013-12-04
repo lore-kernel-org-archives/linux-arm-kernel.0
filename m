@@ -1,78 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 4 Dec 2013 10:58:37 -0800
-Subject: [PATCH v4 1/5] watchdog: davinci: change driver to use WDT core
-In-Reply-To: <529F7797.4080100@ti.com>
-References: <1385556508-3935-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1385556508-3935-2-git-send-email-ivan.khoronzhuk@ti.com>
- <529F6EBE.5050703@ti.com> <20131204182824.GA14499@roeck-us.net>
- <529F7797.4080100@ti.com>
-Message-ID: <20131204185837.GA16166@roeck-us.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Dec 2013 18:59:47 +0000
+Subject: Boot time errors/warnings on snowball
+In-Reply-To: <CAOesGMh7+r9vUvtH_pwJeMyQJGo3u-uJRJ8-OBidzzO1pC5RDA@mail.gmail.com>
+References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
+ <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
+ <20131204172626.GB26581@lee--X1>
+ <CAOesGMjMWqPtJXh7-VAhyA1a95h7mKV8_UZhyTtxgEbUhU8_5Q@mail.gmail.com>
+ <20131204175119.GD26581@lee--X1>
+ <CAOesGMh7+r9vUvtH_pwJeMyQJGo3u-uJRJ8-OBidzzO1pC5RDA@mail.gmail.com>
+Message-ID: <20131204185947.GC29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 08:42:31PM +0200, ivan.khoronzhuk wrote:
-> On 12/04/2013 08:28 PM, Guenter Roeck wrote:
-> > On Wed, Dec 04, 2013 at 11:34:46PM +0530, Sekhar Nori wrote:
-> >> On 11/27/2013 6:18 PM, Ivan Khoronzhuk wrote:
-> >>> To reduce code duplicate and increase code readability use WDT core
-> >>> code to handle WDT interface.
-> >>>
-> >>> Remove io_lock as the WDT core uses mutex to lock each wdt device.
-> >>> Remove wdt_state as the WDT core tracks state with its own variable.
-> >>>
-> >>> The watchdog_init_timeout() can read timeout value from timeout-sec
-> >>> property if the passed value is out of bounds. The heartbeat is
-> >>> initialized in next way. If heartbeat is not set thought module
-> >>> parameter, try to read it's value from WDT node timeout-sec property.
-> >>> If node has no one, use default value.
-> >>>
-> >>> The heartbeat is hold in wdd->timeout by WDT core, so use it in
-> >>> order to set timeout period.
-> >>>
-> >>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> >>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> >>> ---
-> >>>   drivers/watchdog/Kconfig       |    2 +
-> >>>   drivers/watchdog/davinci_wdt.c |  147 ++++++++++------------------------------
-> >>>   2 files changed, 37 insertions(+), 112 deletions(-)
-> >>>
-> >>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> >>> index 5be6e91..eb8c89d 100644
-> >>> --- a/drivers/watchdog/Kconfig
-> >>> +++ b/drivers/watchdog/Kconfig
-> >>> @@ -271,6 +271,8 @@ config IOP_WATCHDOG
-> >>>   config DAVINCI_WATCHDOG
-> >>>   	tristate "DaVinci watchdog"
-> >>>   	depends on ARCH_DAVINCI
-> >>> +	select WATCHDOG_CORE
-> >>> +	select WATCHDOG_NOWAYOUT
-> >>
-> >> Its not clear for change log why NOWAYOUT needs to be forced on all the
-> >> time for all users of DaVinci watchdog.
-> 
-> ... you are right
-> 
-> >>
-> > Actually, thinking about it, it is not necessary and can be replaced with
-> > 
-> > 	watchdog_set_nowayout(wdd, 1);
-> 
-> Good idea, I'll replace watchdog_set_nowayout(wdd, WATCHDOG_NOWAYOUT) on it.
-> And delete "select WATCHDOG_NOWAYOUT"
-> 
-> > 
-> > In other words, there is no need to force NOWAYOUT on _other_ watchdogs which
-> > may be present in the system. Still, you are right, it would be nice to explain
-> > in the changelog (or maybe even better as comment in the code) why it is
-> > enforced.
-> > 
-> > Guenter
-> > 
-> 
-> Only question, should I repost only this patch or whole series?
-> 
-Reposting only this patch should be sufficient if the others did not change.
+On Wed, Dec 04, 2013 at 09:58:29AM -0800, Olof Johansson wrote:
 
-Thanks,
-Guenter
+> It can be done. It's unfortunate to lose bisectability though (since
+> when you bisect you can end up in a state where the ASoC patches are
+> enabled but not the ux500 counterparts. Setting up a shared branch is
+> indeed the best (only) way to solve that. Next time around we should
+> do so.
+
+Right, that's why I asked about dependencies for the ASoC patch.
+
+> We're usually fairly quick at merging our branches during the merge
+> window, so sequencing should be fine. Even if Mark does his pull
+> requests before us, the window of breakage should be minimal (and
+> we're now aware of it).
+
+If there's a topic branch for the ARM side I can pull it into ASoC to
+get the window down to a few commits (or even rebase the ux500 stuff
+onto it to remove it).  Or I can sign the ux500 branch for arm-soc.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131204/f1bea071/attachment.sig>
