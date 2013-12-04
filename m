@@ -1,25 +1,31 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed,  4 Dec 2013 10:32:59 -0800
-Subject: [PATCH 0/4] Add missing components for X-Gene reboot drivers.
-Message-ID: <1386181979-26547-1-git-send-email-fkan@apm.com>
+Date: Wed,  4 Dec 2013 10:33:32 -0800
+Subject: [PATCH 2/4] arm64: add missing dts entry for X-Gene platform.
+Message-ID: <1386182012-26642-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dts node for X-Gene reboot driver. Apply documentation dts binding.
-Some minor compile warning fix and enable reboot driver by default.
+This add missing dts entry for X-Gene reboot driver.
 
-Feng Kan (4):
-  Documentation: add dts binding for X-Gene reboot dts node.
-  arm64: add missing dts entry for X-Gene platform.
-  arm64: Enable system reset via arch Kconfig for X-Gene system.
-  arm64: removed using of the mask attribute in the dts for reset bit.
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/boot/dts/apm-storm.dtsi |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
- .../devicetree/bindings/arm64/xgene/reboot.txt     |   11 +++++++++++
- arch/arm64/Kconfig                                 |    1 +
- arch/arm64/boot/dts/apm-storm.dtsi                 |    5 +++++
- drivers/power/reset/xgene-reboot.c                 |    5 ++---
- 4 files changed, 19 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm64/xgene/reboot.txt
-
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index bfdc578..4478bee 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -112,5 +112,10 @@
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <0x0 0x4c 0x4>;
+ 		};
++
++		reboot at 17000014 {
++			compatible = "apm,xgene-reboot";
++			reg = <0x0 0x17000014 0x0 0x4>;
++		};
+ 	};
+ };
 -- 
 1.7.6.1
