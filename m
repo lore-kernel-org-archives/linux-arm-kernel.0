@@ -1,95 +1,250 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 4 Dec 2013 10:01:56 -0300
-Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
-In-Reply-To: <20131128195337.GE13182@localhost>
-References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
- <20131126183559.GA18570@localhost>
- <CAAYSxhqU9GZdaoTjoCAeyQ4h-KPVzU0BH0D1eLYJoFZ+s8tPgQ@mail.gmail.com>
- <20131127185448.GA21422@localhost> <20131128093034.5d61130a@skate>
- <20131128194720.GD13182@localhost>
- <20131128195337.GE13182@localhost>
-Message-ID: <20131204130156.GA2486@localhost>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Wed, 04 Dec 2013 07:06:43 -0600
+Subject: [PATCH 2/3] clk: bcm281xx: add initial clock framework support
+In-Reply-To: <20131204111457.GF16025@e106331-lin.cambridge.arm.com>
+References: <529EA78E.7060904@linaro.org> <529EA80F.3050009@linaro.org>
+ <20131204111457.GF16025@e106331-lin.cambridge.arm.com>
+Message-ID: <529F28E3.90905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 04:53:37PM -0300, Ezequiel Garcia wrote:
-> On Thu, Nov 28, 2013 at 04:47:20PM -0300, Ezequiel Garcia wrote:
-> > Hi Thomas, Tim:
-> > 
-> > On Thu, Nov 28, 2013 at 09:30:34AM +0100, Thomas Petazzoni wrote:
-> > > Dear Ezequiel Garcia,
-> > > 
-> > > On Wed, 27 Nov 2013 15:54:49 -0300, Ezequiel Garcia wrote:
-> > > 
-> > > > > An external device may be keeping the UART busy and preventing LCR
-> > > > > from being written.
-> > > > > 
-> > > > > What device is attached to ttyS1?
-> > > > 
-> > > > There's no device attached at ttyS1. I've just tested this in another
-> > > > box and it seems the same error is obtained on each unused port:
-> > > 
-> > > Are you sure about this? I suppose you're testing on the Armada XP GP
-> > > board, and this board has a 4 ports FTDI chip, and according to the
-> > > board schematics the four UARTs are all connected to the FTDI chip. So
-> > > from the SoC perspective, ttyS1 is connected to something, as far as I
-> > > can understand. Or maybe you also tested Armada XP DB ?
-> > > 
-> > 
-> > Yeah, sorry about that. I missed the FTDI chip. As Thomas says the XP GP
-> > board I'm testing this on, has its four UARTs connected to a FTDI chip.
-> > 
-> > Changing the console port by setting "console=ttyS1,115200" gives this:
-> > 
-> > [..]
-> > Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-> > dw-apb-uart d0012000.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012000.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012000.serial: Couldn't set LCR to 224
-> > dw-apb-uart d0012000.serial: Couldn't set LCR to 224
-> > d0012000.serial: ttyS0 at MMIO 0xd0012000 (irq = 17, base_baud = 15625000) is a 16550A
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-> > dw-apb-uart d0012100.serial: Couldn't set LCR to 224
-> > d0012100.serial: ttyS1 at MMIO 0xd0012100 (irq = 18, base_baud = 15625000) is a 16550A
-> > console [ttyS1] enabled
-> > dw-apb-uart d0012200.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012200.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012200.serial: Couldn't set LCR to 224
-> > dw-apb-uart d0012200.serial: Couldn't set LCR to 224
-> > d0012200.serial: ttyS2 at MMIO 0xd0012200 (irq = 31, base_baud = 15625000) is a 16550A
-> > dw-apb-uart d0012300.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012300.serial: Couldn't set LCR to 191
-> > dw-apb-uart d0012300.serial: Couldn't set LCR to 224
-> > dw-apb-uart d0012300.serial: Couldn't set LCR to 224
-> > d0012300.serial: ttyS3 at MMIO 0xd0012300 (irq = 32, base_baud = 15625000) is a 16550A
-> > 
-> > So we get the "Couldn't set" message in all four ports.
-> > 
-> > Tim: Any ideas?
+On 12/04/2013 05:14 AM, Mark Rutland wrote:
+> On Wed, Dec 04, 2013 at 03:57:03AM +0000, Alex Elder wrote:
+>> Add code for device tree support of clocks in the BCM281xx family of
+>> SoCs.  Machines in this family use peripheral clocks implemented by
+>> "Kona" clock control units (CCUs).  (Other Broadcom SoC families use
+>> Kona style CCUs as well, but support for them is not yet upstream.)
 > 
-> And another thing: the weird output on the console looks related to the
-> early boot console. If I enable 'earlyprintk' on ttyS0 but set the console
-> on ttyS1, this is what I get on ttyS0:
+> How applicable are the clocks defined in this driver to those other
+> SoCs? How big will the changes need to be to add support for them?
 > 
-> bootconsole [earlycon0] enabled
-> [..]
-> Kernel command line: earlyprintk console=ttyS1,115200 root=/dev/nfs rw nfsroot=192.168.0.45:/opt/buildrootfs,v3, ip=192.168.0.159:192.168.0.45:192.168.0.1:255.255.255.0:develboard:eth0:on rootwait
-> [..]
-> Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-> ???????????????????????????????????????????????
-> Welcome to Buildroot
-> buildroot login: 
+> [...]
 > 
-> Hope this helps you understand what's going on...
+>> +/* A bit position must be less than the number of bits in a 32-bit
+>> register. */
+> 
+> Comment codestyle issue.
 
-Gentle ping?
+If you mean the wrapped words, I think my mailer did that.  Otherwise
+I don't konw what the problem is.
 
-Any ideas about those weird characters?
+> [...]
+> 
+>> +       /* Now fill in the parent names and selector arrays */
+>> +       j = 0;
+>> +       for (i = 0; i < orig_count; i++) {
+> 
+> This would look nicer with j initialised in the loop initialisation:
+> 
+> for (i = 0, j = 0; i < orig_count; i++)
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+If you prefer it that way it's fine with me, I'll do that.
+
+> 
+> [...]
+> 
+>> +static void __init kona_ccu_teardown(struct ccu_data *ccu)
+>> +{
+>> +       u32 i;
+>> +
+>> +       if (!ccu || !ccu->base)
+>> +               goto done;
+>> +
+>> +       of_clk_del_provider(ccu->node); /* safe if never added */
+>> +       of_node_put(ccu->node);
+>> +
+>> +       for (i = 0; i < ccu->data.clk_num; i++)
+>> +               kona_clk_teardown(ccu->data.clks[i]);
+>> +       kfree(ccu->data.clks);
+>> +
+>> +       list_del(&ccu->links);
+>> +
+>> +       iounmap(ccu->base);
+>> +done:
+>> +       kfree(ccu);
+> 
+> What about ccu->name ?
+
+When the ccu structure is allocated, space beyond it is
+allocated for ccu->name and the pointer is assigned to
+that spot and filled.  Therefore we don't explicitly
+free ccu->name.  I will add a brief comment to that
+effect.
+
+> 
+>> +}
+>> +
+>> +/*
+>> + * Set up a CCU.  Call the provided ccu_clks_setup callback to
+>> + * initialize the array of clocks provided by the CCU.
+>> + */
+>> +void __init kona_dt_ccu_setup(struct device_node *node,
+>> +                       int (*ccu_clks_setup)(struct ccu_data *))
+>> +{
+>> +       struct ccu_data *ccu;
+>> +       struct resource res = { 0 };
+>> +       resource_size_t range;
+>> +       size_t name_size;
+>> +       int ret;
+>> +
+>> +       name_size = strlen(node->name) + 1;
+>> +       ccu = kzalloc(sizeof(*ccu) + name_size, GFP_KERNEL);
+>> +       if (!ccu) {
+>> +               pr_err("%s: unable to map allocate CCU struct for %s\n",
+>> +                       __func__, node->name);
+>> +               return;
+>> +       }
+>> +       memcpy((char *)ccu->name, node->name, name_size);
+> 
+> You could simplify this with kstrdup.
+
+You are correct, and I will make that change.  I think at
+one point I needed the length but that doesn't appear to
+be the case here.
+
+>> +       INIT_LIST_HEAD(&ccu->links);
+>> +
+>> +       ret = of_address_to_resource(node, 0, &res);
+>> +       if (ret) {
+>> +               pr_err("%s: no valid CCU registers found for %s\n", __func__,
+>> +                       node->name);
+>> +               goto out_err;
+>> +       }
+>> +       ret = -EINVAL;
+>> +       if (res.start > (resource_size_t)U32_MAX) {
+>> +               pr_err("%s: address start too large for %s\n", __func__,
+>> +                       node->name);
+>> +               goto out_err;
+>> +       }
+> 
+> Why do we care? On an LPAE system, you could place devices above 4GB and
+> map them in. Why impose an arbitrary limitation here?
+
+I'm doing the tests here simply to validate that the values
+being used do not exceed the representable range of the
+types of objects that hold them.
+
+That being said, I think the 32-bit limit I'm imposing on
+these may also be due to an assumption about what's in the
+device tree, i.e. that #address-cells = #size-cells = 1.
+But there's no reason to assume that.  I will look at this
+again, and rework it if possible so it is agnostic about
+that--and will increase the size of the fields that hold
+the related value accordingly.
+
+>> +       if (res.start % sizeof(u32)) {
+>> +               pr_err("%s: unaligned address range start %u for %s\n",
+>> +                       __func__, res.start, node->name);
+>> +               goto out_err;
+>> +       }
+> 
+> Is there not a more restrictive alignment constraint on the clocks?
+
+I don't think so.  But in any case my purpose here is doing
+very basic sanity testing.  (To be honest I think most people
+just assume all is well and don't do these sorts of tests.)
+
+>> +
+>> +       range = resource_size(&res);
+>> +       if (range > (resource_size_t)U32_MAX) {
+>> +               pr_err("%s: address range too large for %s\n", __func__,
+>> +                       node->name);
+>> +               goto out_err;
+>> +       }
+> 
+> Surely there's a much smaller max size you can check for given the
+> offsets you know? A size of U32_MAX seems absurd but will pass this
+> test.
+
+Same answer as the last one.  I guess as long as I'm testing
+I could restrict it further (unnecessarily?), but I'm just
+making sure I don't overrun the type of ccu->range.
+
+> [...]
+> 
+>> +/*
+>> + * Build a scaled divider value as close as possible to the
+>> + * given whole part (div_value) and fractional part (expressed
+>> + * in billionths).
+>> + */
+>> +u64 scaled_div_build(struct bcm_clk_div *div, u32 div_value, u32
+>> billionths)
+>> +{
+>> +       u64 combined;
+>> +
+>> +       BUG_ON(!div_value);
+>> +       BUG_ON(billionths > BILLION);
+> 
+> Can billionths == BILLION ?
+
+Oooh!  A bug!  It should not be.  I will fix that.
+
+>> +
+>> +       combined = (u64)div_value * BILLION + billionths;
+>> +       combined <<= div->frac_width;
+>> +
+>> +       return do_div_round_closest(combined, BILLION);
+>> +}
+> 
+> [...]
+> 
+>> diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
+>> new file mode 100644
+>> index 0000000..850a70a
+>> --- /dev/null
+>> +++ b/drivers/clk/bcm/clk-kona.h
+>> @@ -0,0 +1,416 @@
+>> +/*
+>> + * Copyright (C) 2013 Broadcom Corporation
+>> + * Copyright 2013 Linaro Limited
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#ifndef _CLK_KONA_H
+>> +#define _CLK_KONA_H
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/list.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/clk-provider.h>
+>> +
+>> +#define        BILLION         1000000000
+>> +
+>> +#ifndef U32_MAX
+> 
+> Why the ifndef? Either this is defined elsewhere, or it's not. If it's
+> available sometimes but not others, that seems like a bug in itself.
+
+This is in anticipation of submitting a patch that I've had sitting
+around for like a year to get these symbols in <linux/kernel.h>.
+I'll get rid of the #ifndef.
+
+> I see a few other places define U32_MAX. Might it be worth unifying the
+> definitions in a common header?
+
+Yes.  And most of those are mine... :)
+
+>> +#define U8_MAX ((u8)~0U)
+>> +#define U32_MAX        ((u32)~0U)
+>> +#define U64_MAX        ((u64)~0U)
+>> +#endif /* U32_MAX */
+> 
+> Likewise for the rest.
+
+Yup, that's my plan.  You've prodded me now to get this done.
+
+					-Alex
+> Thanks,
+> Mark.
+> 
