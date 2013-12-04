@@ -1,160 +1,119 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 4 Dec 2013 15:02:56 +0800
-Subject: [PATCHv3] usb: chipidea: add support for USB OTG controller on
- TI-NSPIRE
-In-Reply-To: <1385351617-94118-1-git-send-email-dt.tangr@gmail.com>
-References: <1385351617-94118-1-git-send-email-dt.tangr@gmail.com>
-Message-ID: <20131204070255.GF29552@shlinux1.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 4 Dec 2013 09:40:27 +0200
+Subject: [PATCHv6 05/13] iommu/core: add ops->{bound,unbind}_driver()
+In-Reply-To: <20131125154937.d6dbe9aedc16aab335d92f99@nvidia.com>
+References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com>
+ <1385041249-7705-6-git-send-email-hdoyu@nvidia.com>
+ <20131125154937.d6dbe9aedc16aab335d92f99@nvidia.com>
+Message-ID: <20131204094027.dad1288aec14551ec42f3743@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 02:53:37PM +1100, dt.tangr at gmail.com wrote:
-> From: Daniel Tang <dt.tangr@gmail.com>
-> 
-> The USB controller in TI-NSPIRE calculators are based off either Freescale's
-> USB OTG controller or the USB controller found in the IMX233, both of which
-> are Chipidea compatible.
-> 
-> This patch adds a device tree binding for the controller.
-> 
-> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
-> ---
-> 
-> Changelog v3:
->  * Removed redundant module aliases
-> 
-> Changelog v2:
->  * Rename ci13xxx to ci_hdrc
->  * Fixed alignment issues
-> 
-> .../devicetree/bindings/usb/ci-hdrc-nspire.txt     | 17 +++++
->  drivers/usb/chipidea/Makefile                      |  1 +
->  drivers/usb/chipidea/ci_hdrc_nspire.c              | 72 ++++++++++++++++++++++
->  3 files changed, 90 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
->  create mode 100644 drivers/usb/chipidea/ci_hdrc_nspire.c
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
-> new file mode 100644
-> index 0000000..5ba8e90
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
-> @@ -0,0 +1,17 @@
-> +* TI-Nspire USB OTG Controller
-> +
-> +Required properties:
-> +- compatible: Should be "zevio,nspire-usb"
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain controller interrupt
-> +
-> +Recommended properies:
-> +- vbus-supply: regulator for vbus
-> +
-> +Examples:
-> +		usb0: usb at B0000000 {
-> +			reg = <0xB0000000 0x1000>;
-> +			compatible = "zevio,nspire-usb";
-> +			interrupts = <8>;
-> +			vbus-supply = <&vbus_reg>;
-> +		};
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index a99d980..245ea4d 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
->  # Glue/Bridge layers go here
-> 
->  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
-> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_nspire.o
-> 
->  # PCI doesn't provide stubs, need to check
->  ifneq ($(CONFIG_PCI),)
-> diff --git a/drivers/usb/chipidea/ci_hdrc_nspire.c b/drivers/usb/chipidea/ci_hdrc_nspire.c
-> new file mode 100644
-> index 0000000..517ce41
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/ci_hdrc_nspire.c
-> @@ -0,0 +1,72 @@
-> +/*
-> + *	Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * Based off drivers/usb/chipidea/ci_hdrc_msm.c
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/usb/gadget.h>
-> +#include <linux/usb/chipidea.h>
-> +
-> +#include "ci.h"
-> +
-> +static struct ci_hdrc_platform_data ci_hdrc_nspire_platdata = {
-> +	.name			= "ci_hdrc_nspire",
-> +	.flags			= CI_HDRC_REGS_SHARED,
-> +	.capoffset		= DEF_CAPOFFSET,
-> +};
-> +
-> +static int ci_hdrc_nspire_probe(struct platform_device *pdev)
-> +{
-> +	struct platform_device *ci_pdev;
-> +
-> +	dev_dbg(&pdev->dev, "ci_hdrc_nspire_probe\n");
-> +
-> +	ci_pdev = ci_hdrc_add_device(&pdev->dev,
-> +				pdev->resource, pdev->num_resources,
-> +				&ci_hdrc_nspire_platdata);
-> +
-> +	if (IS_ERR(ci_pdev)) {
-> +		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
-> +		return PTR_ERR(ci_pdev);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, ci_pdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ci_hdrc_nspire_remove(struct platform_device *pdev)
-> +{
-> +	struct platform_device *ci_pdev = platform_get_drvdata(pdev);
-> +
-> +	ci_hdrc_remove_device(ci_pdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id ci_hdrc_nspire_dt_ids[] = {
-> +	{ .compatible = "zevio,nspire-usb", },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static struct platform_driver ci_hdrc_nspire_driver = {
-> +	.probe = ci_hdrc_nspire_probe,
-> +	.remove = ci_hdrc_nspire_remove,
-> +	.driver = {
-> +		.name = "nspire_usb",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = ci_hdrc_nspire_dt_ids,
-> +	},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
-> +module_platform_driver(ci_hdrc_nspire_driver);
-> +
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.8.1.3
-> 
-> 
+On Mon, 25 Nov 2013 14:49:37 +0100
+Hiroshi Doyu <hdoyu@nvidia.com> wrote:
 
-Applied, Thanks.
+> Hi Joerg,
+> 
+> Do you have some time to review this patch along with the following ones?
+> 
+>   [PATCHv6 02/13] iommu/of: introduce a global iommu device list
+>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007050.html
+> 
+>   [PATCHv6 03/13] iommu/of: check if dependee iommu is ready or not
+>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007051.html
 
--- 
+Any chance to get some feedback on them?
 
-Best Regards,
-Peter Chen
+> With those patches, now I'm trying to populate iommu master devices
+> after an IOMMU device is populated. Originally [PATCHv6 02/13] was
+> proposed by Thierry. I'm a bit afraid of adding new IOMMU API as
+> this, but I think that this new {bound,unbind}_driver() is the right
+> timiing that depeding devices are populated instead of add_device()
+> since, even after add_device, a device won't be populated. I'm not so
+> sure how this affects on the existing IOMMUs.
+> 
+> It would be nice if you give some feedback on this.
+> 
+> On Thu, 21 Nov 2013 14:40:41 +0100
+> Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> 
+> > ops->{bound,unbind}_driver() functions are called at
+> > BUS_NOTIFY_{BOUND,UNBIND}_DRIVER respectively.
+> > 
+> > This is necessary to control the device population order. IOMMU master
+> > devices depend on an IOMMU device instanciation. IOMMU master devices
+> > can be registered to an IOMMU only after it's successfully
+> > populated. This IOMMU registration is done via
+> > ops->bound_driver(). Currently this population can be deferred if
+> > depending IOMMU device hasn't yet been populated in driver core. This
+> > cannot be done via ops->add_device() since after add_device() device's
+> > population/instanciation can be still deferred via probe().
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> > v6:
+> > New for v6.
+> > ---
+> >  drivers/iommu/iommu.c | 13 +++++++++++--
+> >  include/linux/iommu.h |  4 ++++
+> >  2 files changed, 15 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> > index e5555fc..5469d36 100644
+> > --- a/drivers/iommu/iommu.c
+> > +++ b/drivers/iommu/iommu.c
+> > @@ -540,14 +540,23 @@ static int iommu_bus_notifier(struct notifier_block *nb,
+> >  	 * ADD/DEL call into iommu driver ops if provided, which may
+> >  	 * result in ADD/DEL notifiers to group->notifier
+> >  	 */
+> > -	if (action == BUS_NOTIFY_ADD_DEVICE) {
+> > +	switch (action) {
+> > +	case BUS_NOTIFY_ADD_DEVICE:
+> >  		if (ops->add_device)
+> >  			return ops->add_device(dev);
+> > -	} else if (action == BUS_NOTIFY_DEL_DEVICE) {
+> > +	case BUS_NOTIFY_DEL_DEVICE:
+> >  		if (ops->remove_device && dev->iommu_group) {
+> >  			ops->remove_device(dev);
+> >  			return 0;
+> >  		}
+> > +	case BUS_NOTIFY_BOUND_DRIVER:
+> > +		if (ops->bound_driver)
+> > +			ops->bound_driver(dev);
+> > +		break;
+> > +	case BUS_NOTIFY_UNBIND_DRIVER:
+> > +		if (ops->unbind_driver)
+> > +			ops->unbind_driver(dev);
+> > +		break;
+> >  	}
+> >  
+> >  	/*
+> > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> > index a444c79..a0e92be 100644
+> > --- a/include/linux/iommu.h
+> > +++ b/include/linux/iommu.h
+> > @@ -96,6 +96,8 @@ enum iommu_attr {
+> >   * @domain_has_cap: domain capabilities query
+> >   * @add_device: add device to iommu grouping
+> >   * @remove_device: remove device from iommu grouping
+> > + * @bound_driver: called at BUS_NOTIFY_BOUND_DRIVER
+> > + * @unbind_driver: called at BUS_NOTIFY_UNBIND_DRIVER
+> >   * @domain_get_attr: Query domain attributes
+> >   * @domain_set_attr: Change domain attributes
+> >   * @pgsize_bitmap: bitmap of supported page sizes
+> > @@ -114,6 +116,8 @@ struct iommu_ops {
+> >  			      unsigned long cap);
+> >  	int (*add_device)(struct device *dev);
+> >  	void (*remove_device)(struct device *dev);
+> > +	int (*bound_driver)(struct device *dev);
+> > +	void (*unbind_driver)(struct device *dev);
+> >  	int (*device_group)(struct device *dev, unsigned int *groupid);
+> >  	int (*domain_get_attr)(struct iommu_domain *domain,
+> >  			       enum iommu_attr attr, void *data);
+> > -- 
+> > 1.8.1.5
+> > 
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
