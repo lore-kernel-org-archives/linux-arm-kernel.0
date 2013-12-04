@@ -1,83 +1,28 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 4 Dec 2013 11:56:27 +0530
-Subject: [PATCH V6 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131203135002.GJ1169@mudshark.cambridge.arm.com>
-References: <1385976843-13280-1-git-send-email-vkale@apm.com>
- <1385976843-13280-3-git-send-email-vkale@apm.com>
- <20131203135002.GJ1169@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkewEkD4MvVht88ddW+nUPpzGXd=vCurwzFujiWOJWj2Ow@mail.gmail.com>
+From: angus.clark@st.com (Angus Clark)
+Date: Wed, 4 Dec 2013 06:58:36 +0000
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <529E976E.4050104@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com> <5298AA23.7080404@st.com>
+ <529E976E.4050104@freescale.com>
+Message-ID: <529ED29C.1030208@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 3, 2013 at 7:20 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Dec 02, 2013 at 09:34:03AM +0000, Vinayak Kale wrote:
->>  static void
->> +armpmu_disable_percpu_irq(void *data)
->> +{
->> +     struct arm_pmu *armpmu = data;
->> +     struct platform_device *pmu_device = armpmu->plat_device;
->> +     int irq = platform_get_irq(pmu_device, 0);
->> +
->> +     cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
->
-> Why not just cpumask_clear_cpu?
+On 12/04/2013 02:46 AM, Huang Shijie wrote:
+> ? 2013?11?29? 22:52, Angus Clark ??:
+>>     int (*write_reg)(struct spi_nor_info *info,
+>>              uint8_t cmd, uint8_t *reg, int len,
+>>              int wren, int wtr);
+> I guess you add the 'wren' for the issuing write-enable before issuing
+> the 'cmd'.
+> 
+> but what's 'wtr' for? i do not know what's the meaning of the 'wtr'.
+> 
 
-Yes, that would have serve the purpose. It was due to dumb copy/paste
-from non-percpu counterpart.
+'wtr' is for "Wait 'til Ready".  Some register writes are instant, while others
+require polling of the "Write In Progress" bit.
 
->
->> +     disable_percpu_irq(irq);
->> +}
->> +
->> +static void
->>  armpmu_release_hardware(struct arm_pmu *armpmu)
->>  {
->> -     int i, irq, irqs;
->> +     int irq;
->> +     unsigned int i, irqs;
->>       struct platform_device *pmu_device = armpmu->plat_device;
->>
->>       irqs = min(pmu_device->num_resources, num_possible_cpus());
->> +     if (!irqs)
->> +             return;
->>
->> -     for (i = 0; i < irqs; ++i) {
->> -             if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> -                     continue;
->> -             irq = platform_get_irq(pmu_device, i);
->> -             if (irq >= 0)
->> -                     free_irq(irq, armpmu);
->> +     irq = platform_get_irq(pmu_device, 0);
->> +     if (irq <= 0)
->> +             return;
->> +
->> +     if (irq_is_percpu(irq)) {
->> +             on_each_cpu(armpmu_disable_percpu_irq, armpmu, 1);
->> +             free_percpu_irq(irq, &cpu_hw_events);
->> +     } else {
->> +             for (i = 0; i < irqs; ++i) {
->> +                     if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->> +                             continue;
->> +                     irq = platform_get_irq(pmu_device, i);
->> +                     if (irq > 0)
->> +                             free_irq(irq, armpmu);
->> +             }
->>       }
->>  }
->>
->> +static void
->> +armpmu_enable_percpu_irq(void *data)
->> +{
->> +     struct arm_pmu *armpmu = data;
->> +     struct platform_device *pmu_device = armpmu->plat_device;
->> +     int irq = platform_get_irq(pmu_device, 0);
->> +
->> +     enable_percpu_irq(irq, IRQ_TYPE_NONE);
->> +     cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
->
-> Hmm, wouldn't it make more sense to pass the irq in data, then deal with the
-> mask in the caller? (since the mask will *always* be updated by each CPU).
->
-> Similarly for the disable path.
+Cheers,
 
-Okay.
+Angus
