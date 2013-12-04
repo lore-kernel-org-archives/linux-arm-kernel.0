@@ -1,38 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Dec 2013 10:07:28 +0000
-Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <e2ae7b9602d0c1e11f8e56ced17e9da0@agner.ch>
-References: <cover.1386108712.git.stefan@agner.ch>
- <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
- <20131204081021.GB7469@lee--X1>
- <e2ae7b9602d0c1e11f8e56ced17e9da0@agner.ch>
-Message-ID: <20131204100728.GA907@lee--X1>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 04 Dec 2013 14:16:06 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVgyNzogQ29uZmlndXJlIEdQSU9z?=
+ =?UTF-8?B?IGFzICJpbnB1dCIgYnkgZGVmYXVsdA==?=
+In-Reply-To: <20131204110717.011a22f7@ipc1.ka-ro>
+References: <1385795000-29764-1-git-send-email-shc_work@mail.ru>
+ <1386149050.778733527@f57.i.mail.ru>
+ <20131204110717.011a22f7@ipc1.ka-ro>
+Message-ID: <1386152166.195844894@f118.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Dec 2013, Stefan Agner wrote:
-
-> Am 2013-12-04 09:10, schrieb Lee Jones:
-> >> +int tps6586x_get_version(struct device *dev)
-> >> +{
-> >> +	struct tps6586x *tps6586x = dev_get_drvdata(dev);
-> >> +
-> >> +	return tps6586x->version;
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(tps6586x_get_version);
+> > > > > > > On Sat, Nov 30, 2013 at 11:03:20AM +0400, Alexander Shiyan wrote:
+> > > > > > > > This patch changes the default direction for pins used
+> > > > > > > > as GPIO to "input". This prevents a short circuit on the
+> > > > > > > > configuration stage when GPIO-pin is connected to the
+> > > > > > > > other output pin.
+> > > > > > > 
+> > > > > > > Markus,
+> > > > > > > 
+> > > > > > > Does it make sense to you?
+> > > > > > 
+> > > > > > I am not sure if this really happens. However, it does make sense and I
+> > > > > > can't see any disadvantages in changing the default GPIO mux direction to
+> > > > > > input.
+> > > > > > 
+> > > > > What happens, if the bootloader already set up a pin as output and
+> > > > > linux later does the pinconfig stuff?
+> > > > > If the pin is reconfigured as input then, this may produce an unwanted
+> > > > > glitch on the pin. IMO the pinconfig driver should not touch the pin
+> > > > > direction, but leave it to the gpio driver to set that up. 
+> > > > 
+> > > > Such pin can be overridden by board DTS.
+> > > > 
+> > > So, which pins will be configured with the default direction?
+> > > If pins are not stated in DT they should be not configured at all, I
+> > > suppose.
 > > 
-> > I thought Mark suggested that this routine was converted to a 'static
-> > inline' and moved into the header? Did you not think this was a good
-> > idea?
-> As I pointed out in the comment above, the struct tps6586x is in the C
-> file, so I would need to move that too. That's why I did not made that
-> change in the end. What do you think, should I still move (and move the
-> struct too?) 
+> > Yes. We talk about GPIOs defined in DTS.
+> > Just one example: We have one GPIO pin connected to switch between ground
+> > and resistor to pullup (gpio-key driver). When pinctrl driver will initialize pin for the
+> > driver (before gpio_direction_input() in the driver), direction will be set to output
+> > and this may cause short circuit.
+> > 
+> The pin direction should be determined by the GPIO driver, not the
 
-Why would the struct have to be moved if the function is inline?
+Direction determined by driver that use this GPIO pin,
+setup this direction should be by GPIO driver.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> pinctrl driver. Pins that have been set up correctly by the bootloader
+> must not change their direction when the pinctrl driver reconfigures
+> the pins!
+
+Yes. But this is another topic for discussion, it does not concern with this patch.
+
+---
