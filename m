@@ -1,54 +1,21 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 5 Dec 2013 14:17:49 +0900
-Subject: [PATCH 00/04] ARM: shmobile: Use SoC suffix for INTC compat string
-In-Reply-To: <20131205025001.GF21443@verge.net.au>
-References: <20131127231450.29081.98054.sendpatchset@w520>
- <20131128064555.GA14878@verge.net.au>
- <CANqRtoQ4fsCm=-uw8BgN48wFs_iTaG-H_kjDvcZssJXZqE8VTA@mail.gmail.com>
- <20131205025001.GF21443@verge.net.au>
-Message-ID: <20131205051746.GH12774@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 04 Dec 2013 22:24:31 -0700
+Subject: [PATCH] ARM: bcm2835: add USB controller to device tree
+In-Reply-To: <1386131536-21066-1-git-send-email-swarren@wwwdotorg.org>
+References: <1386131536-21066-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <52A00E0F.8070303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 11:50:04AM +0900, Simon Horman wrote:
-> On Wed, Dec 04, 2013 at 08:21:42PM +0100, Magnus Damm wrote:
-> > On Thu, Nov 28, 2013 at 7:45 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > On Thu, Nov 28, 2013 at 08:14:50AM +0900, Magnus Damm wrote:
-> > >> ARM: shmobile: Use SoC suffix for INTC compat string
-> > >>
-> > >> [PATCH 01/04] ARM: shmobile: Use sh73a0 suffix for INTC compat string
-> > >> [PATCH 02/04] ARM: shmobile: Use r8a7740 suffix for INTC compat string
-> > >> [PATCH 03/04] ARM: shmobile: Use r8a7778 suffix for INTC compat string
-> > >> [PATCH 04/04] ARM: shmobile: Use r8a7779 suffix for INTC compat string
-> > >>
-> > >> Update the DTS for INTC irqpin devices to include the SoC in the compat string.
-> > >>
-> > >> Both IRQC and INTC irqpin need documentation for the DT bindings, and this
-> > >> will happen in incremental patches.
-> > >
-> > > I have posted some patches for that a few moments ago :)
-> > 
-> > Thanks for that!
-> > 
-> > > I am curious to if it is intentional that this series replaces
-> > > the use of less-specific compat strings with more specific ones
-> > > while the recent update to the r8a7790 supplemented the
-> > > less-specific renesas,irqc comat string with the more-specific
-> > > renesas,irqc-r8a7790 compat string.
-> > >
-> > > i.e.
-> > >         before: "renesas,intc-irqpin"
-> > >         after:  "renesas,intc-irqpin-sh73a0"
-> > >
-> > >         as opposed to
-> > >
-> > >         before: "renesas,irqc"
-> > >         after: "renesas,irqc-r8a7790", "renesas,irqc"
-> > 
-> > My intention is to keep them the same. I just checked the intc-irqpin
-> > patches but they seem to be following the same style as IRQC. On which
-> > SoC did you observe this difference?
+On 12/03/2013 09:32 PM, Stephen Warren wrote:
+> The BCM2835 SoC contains a DWC2 USB controller. Add this to the DT.
 > 
-> Sorry, ignore this. I was confused.
+> Set up the pin controller to fully enable the USB controller on the
+> Raspberry Pi. The GPIO setup works because the default output value for
+> GPIO 6 (LAN_RUN/n_reset) just happens to be 1, which enables the
+> USB/LAN chip.
+> 
+> Note that you'll need a U-Boot which enables power to the USB controller;
+> search for U-Boot patch "ARM: rpi_b: power on SDHCI and USB HW modules".
 
-Now that I am not longer confused I will queue up these patches.
+I've applied this to bcm2835's for-3.14/dt branch.
