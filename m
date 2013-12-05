@@ -1,185 +1,83 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Thu, 5 Dec 2013 01:05:40 +0000
-Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
- mapping
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D47C9FA@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1385500248-6551-1-git-send-email-marex@denx.de>
- <201311281856.10139.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D47BDD2@039-SN2MPN1-013.039d.mgd.msft.net>
- <201312040852.01269.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D47C9FA@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <0E83723C55F66F43A6041464FE31119D47CA7F@039-SN2MPN1-013.039d.mgd.msft.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 5 Dec 2013 09:11:28 +0800
+Subject: [PATCH v8 1/2] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <20131204100340.GU19943@ulmo.nvidia.com>
+References: <1384766002-2852-1-git-send-email-voice.shen@atmel.com>
+ <20131202105957.GD18060@ulmo.nvidia.com> <529D4B58.9020700@atmel.com>
+ <20131203094326.GB21178@ulmo.nvidia.com> <529E9AA2.8020400@atmel.com>
+ <20131204100340.GU19943@ulmo.nvidia.com>
+Message-ID: <529FD2C0.6080707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Merak:
+Hi Thierry,
 
+On 12/04/2013 06:03 PM, Thierry Reding wrote:
+> On Wed, Dec 04, 2013 at 10:59:46AM +0800, Bo Shen wrote:
+>> Hi Thierry,
+>>
+>> On 12/03/2013 05:43 PM, Thierry Reding wrote:
+>>> On Tue, Dec 03, 2013 at 11:09:12AM +0800, Bo Shen wrote:
+>>>> On 12/02/2013 06:59 PM, Thierry Reding wrote:
+>>>>> On Mon, Nov 18, 2013 at 05:13:21PM +0800, Bo Shen wrote:
+>>> [...]
+>>>>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+>>> [...]
+>>>>>> +	/* Calculate the period cycles */
+>>>>>> +	while (div > PWM_MAX_PRD) {
+>>>>>> +		div = clk_rate / (1 << pres);
+>>>>>> +		div = div * period_ns;
+>>>>>> +		/* 1/Hz = 100000000 ns */
+>>>>>
+>>>>> I don't think that comment is needed.
+>>>>
+>>>> This is asked to be added.
+>>>> And, I think keep it and it won't hurt, what do you think?
+>>>
+>>> I think it's obvious that you're converting from nanoseconds because of
+>>> the _ns prefix in period_ns. But if somebody requested this and everyone
+>>> else thinks it's useful, I'm okay with keeping it.
+>>>
+>>>>>> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+>>>>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, dty);
+>>>>>> +	} else {
+>>>>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, dty);
+>>>>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, prd);
+>>>>>> +	}
+>>>>>> +}
+>>>>>
+>>>>> Neither version 1 nor version 2 seem to be able to change the period
+>>>>> while the channel is enabled. Perhaps that should be checked for in
+>>>>> atmel_pwm_config() and an error (-EBUSY) returned?
+>>>>
+>>>> The period is configured in dt in device tree, or platform data in non
+>>>> device tree. Nowhere will update period. So, not code to update period.
+>>>> Am I right? If not, please figure out.
+>>>
+>>> The .config() operation allows the period to be specified. Just because
+>>> nobody currently changes it at runtime doesn't mean it can't be done.
+>>>
+>>> It is also possible that whoever wrote the device tree or platform data
+>>> didn't know that the period must be the same for all PWM channels and
+>>> therefore might use different values. If you check for this, at least
+>>> they'll notice. If you don't check for it, then they may end up having
+>>> the period reconfigured behind their backs, which may cause parts of
+>>> their setup to behave unexpectedly.
+>>
+>> Thanks for this information.
+>> I will add code for changing period.
+>
+> Just to clarify: I wouldn't want this code to allow changing the period
+> but rather reject incompatible changes to the period with an error code.
 
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org]
-> On Behalf Of Richard Zhu
-> Sent: Thursday, December 05, 2013 8:45 AM
-> To: Marek Vasut
-> Cc: Jingoo Han; 'Tim Harvey'; 'Pratyush Anand'; linux-arm-
-> kernel at lists.infradead.org; linux-pci at vger.kernel.org; 'Bjorn Helgaas'; 'Frank
-> Li'; 'Harro Haan'; 'Mohit KUMAR DCG'; 'Sascha Hauer'; 'Sean Cross'; 'Shawn
-> Guo'; 'Siva Reddy Kallam'; 'Srikanth T Shivanand'; 'Troy Kisky'; 'Yinghai Lu'
-> Subject: RE: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
-> mapping
-> 
-> Hi Marek:
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: Marek Vasut [mailto:marex at denx.de]
-> > Sent: Wednesday, December 04, 2013 3:52 PM
-> > To: Zhu Richard-R65037
-> > Cc: Jingoo Han; 'Tim Harvey'; 'Pratyush Anand'; linux-arm-
-> > kernel at lists.infradead.org; linux-pci at vger.kernel.org; 'Bjorn
-> > Helgaas'; 'Frank Li'; 'Harro Haan'; 'Mohit KUMAR DCG'; 'Sascha Hauer';
-> > 'Sean Cross'; 'Shawn Guo'; 'Siva Reddy Kallam'; 'Srikanth T Shivanand';
-> 'Troy Kisky'; 'Yinghai Lu'
-> > Subject: Re: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU
-> > region mapping
-> >
-> > On Wednesday, December 04, 2013 at 06:49:55 AM, Richard Zhu wrote:
-> > > Hi Marek:
-> > >
-> > > Best Regards
-> > > Richard Zhu
-> > >
-> > > > -----Original Message-----
-> > > > From: Marek Vasut [mailto:marex at denx.de]
-> > > > Sent: Friday, November 29, 2013 1:56 AM
-> > > > To: Jingoo Han
-> > > > Cc: 'Tim Harvey'; 'Pratyush Anand';
-> > > > linux-arm-kernel at lists.infradead.org;
-> > > > linux-pci at vger.kernel.org; 'Bjorn Helgaas'; 'Frank Li'; 'Harro
-> > > > Haan'; 'Mohit KUMAR DCG'; Zhu Richard-R65037; 'Sascha Hauer';
-> > > > 'Sean Cross'; 'Shawn Guo'; 'Siva Reddy Kallam'; 'Srikanth T
-> > > > Shivanand'; 'Troy Kisky'; 'Yinghai Lu' Subject: Re: [PATCH 2/7] [RFC]
-> PCI: imx6:
-> > > > remove outbound io/mem ATU region mapping
-> > > >
-> > > > Dear Jingoo Han,
-> > > >
-> > > > > On Wednesday, November 27, 2013 5:44 PM, Marek Vasut wrote:
-> > > > > > Wednesday, November 27, 2013 1:30 PM, Pratyush Anand wrote:
-> > > > > > > On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
-> > > > > > > > From: Tim Harvey <tharvey@gateworks.com>
-> > > > > > > >
-> > > > > > > > The IMX6 iATU is used for address translation between the
-> > > > > > > > AXI bus address space and PCI address space.  This is used
-> > > > > > > > for type0 and
-> > > > > > > > type1 config cycles but is not necessary for outbound
-> > > > > > > > io/mem regions.
-> > > > > > > >
-> > > > > > > > This patch removes the calls that inappropriately
-> > > > > > > > re-configures the ATU viewport for outbound memory and IO
-> > > > > > > > after config cycles and removes them altogether as they
-> > > > > > > > are not
-> > necessary.
-> > > > > > >
-> > > > > > > Yes, they are not necessary for all the cases where
-> > > > > > > translation is one to one. So so for sure all the platform
-> > > > > > > till now introduced should work.
-> > > > > > > But, what about a platform where memory translation is not
-> > > > > > > one to one?
-> > > > > > >
-> > > > > > > Existing code should work with all sort of memory
-> > > > > > > translation on a platform having atleast two viewports
-> > > > > > > capable of programming any type of outbound transaction.
-> > > > > >
-> > > > > > Full ACK, that's why it's called RFC.
-> > > > > >
-> > > > > > > > This resolves issues with PCI devices behind switches and
-> > > > > > > > has been tested with a Gige device behind a PLX PEX860x switch.
-> > > > > > > > More testing is needed for other configurations.
-> > > > > > >
-> > > > > > > I do not understand if MX6 has 4 Outbound Viewport then how
-> > > > > > > this patch helps?
-> > > > > > > -- PCI devices behind switches would not have been working
-> > > > > > > because
-> > > > > > > CFG1 transaction would not have been correct.
-> > > > > > > -- It works with this patch. This patch changes viewport for
-> > > > > > > CFG1 from
-> > > > > > > 1 to 0.
-> > > > > > > -- Can it be possible that MX6 has some restriction on
-> > > > > > > viewport programming capability. I mean,like only viewport0
-> > > > > > > can be programmed for CFG0/1?
-> > > > > >
-> > > > > > Tim ?
-> > > > > >
-> > > > > > Here is the MX6 datasheet [1], the section 48.3.9.1.1 and
-> > > > > > 48.3.9.1.2 describe the iATU configuration on MX6. My
-> > > > > > understanding from this description is that the MX6 has 4
-> > > > > > inbound and 4 outbound iATU regions. Am I wrong ?
-> > > > >
-> > > > > The numbers of inbound and outbound are hardware-configurable features.
-> > > > > Thus, these numbers  can be confirmed by Freescale  hardware engineers.
-> > > > > How about asking Freescale hardware engineers, if possible?
-> > > >
-> > > > Richard is on the CC. Richard, can you please confirm those?
-> > >
-> > > [Richard] One Pericom PI7C9X2G303EL pcie switch, and two pcie ep
-> > > deivces(one is intel e1000e nic, the other is one xhci device) are
-> > > tested on imx6q sabresd board. Without removing outbound io/mem
-> > > regions view map during the cfg0/1 read/write cycle, both of these
-> > > devices can't work well at my side. Works well after remove them
-> > > during the cfg0/1 read/write cycles.
-> > > Same to Tim's situation about switch implementation.
-> >
-> > Thanks Richard! I am just wondering what kind of conclusion can we
-> > draw from this. Let me reiterate what we have:
-> >
-> > - i.MX6 has 4 inbound and 4 outbound iATU regions, is that correct, Richard?
-> > - If we program the iATU regions, the i.MX6 PCIe doesn't work with switch.
-> >
-> > Is there some special sause to the iATU on MX6 maybe ?
-> [Richard] welcome, it's correct, imx6 pcie has 4 inbount and 4 outbound iATU
-> regions.
-> Imx6 pcie doesn't work with switch if the following view switches are not
-> removed in The cfg0/1 read/write cycles.
-> 
-> @@ -516,9 +560,11 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp,
-> struct pci_bus *bus,
->         if (bus->parent->number == pp->root_bus_nr) {
->                 dw_pcie_prog_viewport_cfg0(pp, busdev);
->                 ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
-> +               // dw_pcie_prog_viewport_mem_outbound(pp);
->         } else {
->                 dw_pcie_prog_viewport_cfg1(pp, busdev);
->                 ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
-> +               // dw_pcie_prog_viewport_io_outbound(pp);
->         }
-> 
->         return ret;
-> @@ -537,9 +583,11 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp,
-> struct pci_bus *bus,
->         if (bus->parent->number == pp->root_bus_nr) {
->                 dw_pcie_prog_viewport_cfg0(pp, busdev);
->                 ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
-> +               // dw_pcie_prog_viewport_mem_outbound(pp);
->         } else {
->                 dw_pcie_prog_viewport_cfg1(pp, busdev);
->                 ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
-> +               // dw_pcie_prog_viewport_io_outbound(pp);
->         }
-> 
->         return ret;
-> 
-> Best Regards
-> Richard Zhu
-> 
-[Richard] Bisect the code-modifications, only the dw_pcie_prog_viewport_io_outbound()
- should be masked if I want the switch works in my imx6 pcie switch support tests.
-Suspect that the mem emulated io space introduce this problem, debug is on-going.
-> 
-Best Regards
-Richard Zhu
+So, in this patch, just check it as you suggested in previous email, 
+would it be OK?
+--->8---
+Perhaps that should be checked for in atmel_pwm_config() and an error 
+(-EBUSY) returned?
+---8<---
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the
-> body of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+> Thierry
+
+Best Regards,
+Bo Shen
