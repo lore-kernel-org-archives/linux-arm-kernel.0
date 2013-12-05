@@ -1,29 +1,32 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 5 Dec 2013 16:27:46 +0530
-Subject: [PATCH 0/4] pinctrl: tegra: Add pincontrol driver for Tegra124 SoC
-Message-ID: <1386241070-4350-1-git-send-email-ldewangan@nvidia.com>
+Date: Thu, 5 Dec 2013 16:27:49 +0530
+Subject: [PATCH 3/4] ARM: tegra: select PINCTRL_TEGRA124 for Tegra124 SoC
+In-Reply-To: <1386241070-4350-1-git-send-email-ldewangan@nvidia.com>
+References: <1386241070-4350-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1386241070-4350-4-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pincontrol driver for NVIDIA's Tegra124 SoCs.
-This series add pincontrol driver which contains the pinmux tables
-for tegra124, pincontrol dt binding doc, dtsi file change for adding
-pinmux node, selecting pincontrol config for Tegra124.
+The pincontrol driver for Tegra124 is build through config
+PINCTRL_TEGRA124. Select this config option whenever Tegra124
+SoC is enabled.
 
-Ashwini Ghuge (1):
-  pinctrl: tegra: add pinmux controller driver for Tegra124
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/mach-tegra/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Laxman Dewangan (3):
-  pinctrl: tegra: Add devicetree binding document for Tegra124
-  ARM: tegra: add pinmux controller to tegra124.dtsi
-  ARM: tegra: select PINCTRL_TEGRA124 for Tegra124 SoC
-
- .../bindings/pinctrl/nvidia,tegra124-pinmux.txt    |  137 +
- arch/arm/boot/dts/tegra124.dtsi                    |    6 +
- arch/arm/mach-tegra/Kconfig                        |    1 +
- drivers/pinctrl/Kconfig                            |    4 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinctrl-tegra124.c                 | 3147 ++++++++++++++++++++
- 6 files changed, 3296 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-pinmux.txt
- create mode 100644 drivers/pinctrl/pinctrl-tegra124.c
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 09e740f..807e7bc 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -63,6 +63,7 @@ config ARCH_TEGRA_124_SOC
+ 	bool "Enable support for Tegra124 family"
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select HAVE_ARM_ARCH_TIMER
++	select PINCTRL_TEGRA124
+ 	help
+ 	  Support for NVIDIA Tegra T124 processor family, based on the
+ 	  ARM CortexA15MP CPU
+-- 
+1.7.1.1
