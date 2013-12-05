@@ -1,61 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 5 Dec 2013 15:55:36 +0900
-Subject: [PATCH 2/2] ARM: shmobile: armadillo: Set vccq_sdhi0 regulator
- type in DT
-In-Reply-To: <9848623.yKHAtIGPld@avalon>
-References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385653493-9952-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131205034554.GB20388@verge.net.au> <9848623.yKHAtIGPld@avalon>
-Message-ID: <20131205065535.GB6817@verge.net.au>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 5 Dec 2013 15:12:25 +0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20131204184405.GE9468@ld-irv-0074.broadcom.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+ <5298AA23.7080404@st.com>
+ <1386082273.18201.61.camel@shinybook.infradead.org>
+ <20131204184405.GE9468@ld-irv-0074.broadcom.com>
+Message-ID: <20131205071224.GA8936@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 06:56:48AM +0100, Laurent Pinchart wrote:
-> Hi Simon,
+On Wed, Dec 04, 2013 at 10:44:05AM -0800, Brian Norris wrote:
 > 
-> On Thursday 05 December 2013 12:45:54 Simon Horman wrote:
-> > On Thu, Nov 28, 2013 at 04:44:53PM +0100, Laurent Pinchart wrote:
-> > > The mandatory regulator-type property is missing, add it.
-> > 
-> > Thanks, I will queue this up.
+> I mostly bring this up, though, because it is an example of hardware
+> that
 > 
-> Mark has rightfully commented on patch 1/2 in this series that the regulator-
-> type property shouldn't be mandatory but should default to voltage. We could 
-> then drop this patch.
+>    (a) can operate as a true SPI device (hardware (1) can handle generic
+>        SPI transfers), but
+>    (b) requires knowledge of the details of SPI flash in order to get
+>        optimal usage out of the acceleration from (2).
+> 
+> In my book, point (a) and (b) hold some bearing over the question of
+> "where should this SPI NOR framework live", because it is reasonable
+> that a single driver for this hardware should be able to handle either
+> true SPI devices or accelerated SPI-NOR flash.
 
-I will drop it, thanks.
+We have add a @read_id hook for the spi-nor layer, you can use it to read out
+more info (such as the Device Geometry Definition) for your spi-nor controller driver.
 
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> > > b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts index
-> > > 7b80f19..013a7cd 100644
-> > > --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> > > +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> > > @@ -53,6 +53,8 @@
-> > > 
-> > >  		regulator-name = "SDHI0 VccQ";
-> > >  		regulator-min-microvolt = <1800000>;
-> > >  		regulator-max-microvolt = <3300000>;
-> > > 
-> > > +		regulator-type = "voltage";
-> > > +
-> > > 
-> > >  		vin-supply = <&vcc_sdhi0>;
-> > >  		
-> > >  		enable-gpio = <&pfc 74 GPIO_ACTIVE_HIGH>;
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Is it okay?
+
+thanks
+Huang Shijie
