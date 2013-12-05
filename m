@@ -1,34 +1,54 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Thu, 05 Dec 2013 08:31:36 +0400
-Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
-In-Reply-To: <20131205041251.GA24906@kroah.com>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-2-git-send-email-ynvich@gmail.com>
- <20131202090253.GE3942@xps8300> <1385976238.12531.8.camel@host5.omatika.ru>
- <20131202094932.GF3942@xps8300>
- <1385980005.12531.21.camel@host5.omatika.ru>
- <20131202141033.GK3942@xps8300> <20131205041251.GA24906@kroah.com>
-Message-ID: <1386217896.7152.8.camel@host5.omatika.ru>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Dec 2013 14:17:49 +0900
+Subject: [PATCH 00/04] ARM: shmobile: Use SoC suffix for INTC compat string
+In-Reply-To: <20131205025001.GF21443@verge.net.au>
+References: <20131127231450.29081.98054.sendpatchset@w520>
+ <20131128064555.GA14878@verge.net.au>
+ <CANqRtoQ4fsCm=-uw8BgN48wFs_iTaG-H_kjDvcZssJXZqE8VTA@mail.gmail.com>
+ <20131205025001.GF21443@verge.net.au>
+Message-ID: <20131205051746.GH12774@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-04 at 20:12 -0800, Greg Kroah-Hartman wrote:
-> On Mon, Dec 02, 2013 at 04:10:33PM +0200, Heikki Krogerus wrote:
-> > On Mon, Dec 02, 2013 at 02:26:45PM +0400, Sergei Ianovich wrote:
-> > > Who makes the decision which way to go?
+On Thu, Dec 05, 2013 at 11:50:04AM +0900, Simon Horman wrote:
+> On Wed, Dec 04, 2013 at 08:21:42PM +0100, Magnus Damm wrote:
+> > On Thu, Nov 28, 2013 at 7:45 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Thu, Nov 28, 2013 at 08:14:50AM +0900, Magnus Damm wrote:
+> > >> ARM: shmobile: Use SoC suffix for INTC compat string
+> > >>
+> > >> [PATCH 01/04] ARM: shmobile: Use sh73a0 suffix for INTC compat string
+> > >> [PATCH 02/04] ARM: shmobile: Use r8a7740 suffix for INTC compat string
+> > >> [PATCH 03/04] ARM: shmobile: Use r8a7778 suffix for INTC compat string
+> > >> [PATCH 04/04] ARM: shmobile: Use r8a7779 suffix for INTC compat string
+> > >>
+> > >> Update the DTS for INTC irqpin devices to include the SoC in the compat string.
+> > >>
+> > >> Both IRQC and INTC irqpin need documentation for the DT bindings, and this
+> > >> will happen in incremental patches.
+> > >
+> > > I have posted some patches for that a few moments ago :)
 > > 
-> > Greg and Russel make this decision. By having the pxa driver simply
-> > register 8250 ports would probable reduce the code. Thats about the
-> > biggest benefit from it.
+> > Thanks for that!
 > > 
-> > It would still be something nice to have IMO. Ideally all the
-> > 8250/16x50 UARTs should register the ports with 8250_core.c, and not
-> > create complete uart driver on their own.
+> > > I am curious to if it is intentional that this series replaces
+> > > the use of less-specific compat strings with more specific ones
+> > > while the recent update to the r8a7790 supplemented the
+> > > less-specific renesas,irqc comat string with the more-specific
+> > > renesas,irqc-r8a7790 compat string.
+> > >
+> > > i.e.
+> > >         before: "renesas,intc-irqpin"
+> > >         after:  "renesas,intc-irqpin-sh73a0"
+> > >
+> > >         as opposed to
+> > >
+> > >         before: "renesas,irqc"
+> > >         after: "renesas,irqc-r8a7790", "renesas,irqc"
+> > 
+> > My intention is to keep them the same. I just checked the intc-irqpin
+> > patches but they seem to be following the same style as IRQC. On which
+> > SoC did you observe this difference?
 > 
-> I agree, this is the best way to resolve this, having a separate uart
-> driver isn't that good at all to be doing, if at all possible.
+> Sorry, ignore this. I was confused.
 
-I'm reading the last message as a confirmation that
-drivers/tty/serial/pxa.c needs to be rewritten using 8250_core.c.
-However, "if at all possible" confuses me, since we have pxa.c in the
-tree and it works. Greg, could you please clarify?
+Now that I am not longer confused I will queue up these patches.
