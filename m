@@ -1,38 +1,61 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 5 Dec 2013 12:04:46 +0530
-Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
- platform doesn't have PHY
-In-Reply-To: <20131204144027.GB21055@xps8300>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1385373690-12170-5-git-send-email-kishon@ti.com>
- <20131204144027.GB21055@xps8300>
-Message-ID: <52A01E86.50406@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Dec 2013 15:55:36 +0900
+Subject: [PATCH 2/2] ARM: shmobile: armadillo: Set vccq_sdhi0 regulator
+ type in DT
+In-Reply-To: <9848623.yKHAtIGPld@avalon>
+References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385653493-9952-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131205034554.GB20388@verge.net.au> <9848623.yKHAtIGPld@avalon>
+Message-ID: <20131205065535.GB6817@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 04 December 2013 08:10 PM, Heikki Krogerus wrote:
-> Hi guys,
+On Thu, Dec 05, 2013 at 06:56:48AM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> Kishon, sorry I did not see this v3 set.
+> On Thursday 05 December 2013 12:45:54 Simon Horman wrote:
+> > On Thu, Nov 28, 2013 at 04:44:53PM +0100, Laurent Pinchart wrote:
+> > > The mandatory regulator-type property is missing, add it.
+> > 
+> > Thanks, I will queue this up.
 > 
-> On Mon, Nov 25, 2013 at 03:31:24PM +0530, Kishon Vijay Abraham I wrote:
->> There can be systems which does not have an external phy, so get
->> phy only if no quirks are added that indicates the PHY is not present.
->> Introduced two quirk flags to indicate the *absence* of usb2 phy and
->> usb3 phy. Also remove checking if return value is -ENXIO since it's now
->> changed to always enable usb_phy layer.
+> Mark has rightfully commented on patch 1/2 in this series that the regulator-
+> type property shouldn't be mandatory but should default to voltage. We could 
+> then drop this patch.
+
+I will drop it, thanks.
+
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> > > b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts index
+> > > 7b80f19..013a7cd 100644
+> > > --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> > > +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> > > @@ -53,6 +53,8 @@
+> > > 
+> > >  		regulator-name = "SDHI0 VccQ";
+> > >  		regulator-min-microvolt = <1800000>;
+> > >  		regulator-max-microvolt = <3300000>;
+> > > 
+> > > +		regulator-type = "voltage";
+> > > +
+> > > 
+> > >  		vin-supply = <&vcc_sdhi0>;
+> > >  		
+> > >  		enable-gpio = <&pfc 74 GPIO_ACTIVE_HIGH>;
+> -- 
+> Regards,
 > 
-> Can you guys explain why is something like this needed? Like with
-> clocks and gpios, the device drivers shouldn't need to care any more
-> if the platform has the phys or not. -ENODEV tells you your platform
-
-Shouldn't we report if a particular platform needs a PHY and not able to get
-it. How will a user know if a particular controller is not working because it's
-not able to get and initialize the PHYs? Don't you think in such cases it's
-better to fail (and return from probe) because the controller will not work
-anyway without the PHY?
-
-Thanks
-Kishon
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
