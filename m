@@ -1,52 +1,129 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 5 Dec 2013 11:41:21 -0600
-Subject: [PATCH] clk: socfpga: Remove socfpga_init_clocks
-Message-ID: <1386265281-11799-1-git-send-email-dinguyen@altera.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Dec 2013 17:54:34 +0000
+Subject: [PATCH v4 2/4] mvebu: Dove: Instantiate cpufreq driver.
+In-Reply-To: <20131204150228.GB8062@lunn.ch>
+References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+ <1386166641-7567-3-git-send-email-andrew@lunn.ch>
+ <20131204143628.GB29200@e106331-lin.cambridge.arm.com>
+ <20131204150228.GB8062@lunn.ch>
+Message-ID: <20131205175434.GQ29200@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, Dec 04, 2013 at 03:02:28PM +0000, Andrew Lunn wrote:
+> On Wed, Dec 04, 2013 at 02:36:28PM +0000, Mark Rutland wrote:
+> > On Wed, Dec 04, 2013 at 02:17:19PM +0000, Andrew Lunn wrote:
+> > > Add a platform driver definition to instantiate the dove cpufreq
+> > > driver. Also indicate the ARCH has cpufreq support, so allowing the
+> > > cpufreq framework to be enabled.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > ---
+> > > Make resource names consistent.
+> > > Fix length of ranges
+> > > ---
+> > >  arch/arm/Kconfig                       |  1 +
+> > >  arch/arm/mach-dove/board-dt.c          |  3 +++
+> > >  arch/arm/mach-dove/common.c            | 36 ++++++++++++++++++++++++++++++++++
+> > >  arch/arm/mach-dove/common.h            |  1 +
+> > >  arch/arm/mach-dove/include/mach/dove.h |  1 +
+> > >  5 files changed, 42 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index c1f1a7eee953..908b02f8d901 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -500,6 +500,7 @@ config ARCH_IXP4XX
+> > >  
+> > >  config ARCH_DOVE
+> > >  	bool "Marvell Dove"
+> > > +	select ARCH_HAS_CPUFREQ
+> > >  	select ARCH_REQUIRE_GPIOLIB
+> > >  	select CPU_PJ4
+> > >  	select GENERIC_CLOCKEVENTS
+> > > diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+> > > index 49fa9abd09da..845e8b328432 100644
+> > > --- a/arch/arm/mach-dove/board-dt.c
+> > > +++ b/arch/arm/mach-dove/board-dt.c
+> > > @@ -27,6 +27,9 @@ static void __init dove_dt_init(void)
+> > >  	tauros2_init(0);
+> > >  #endif
+> > >  	BUG_ON(mvebu_mbus_dt_init());
+> > > +
+> > > +	dove_cpufreq_init();
+> > > +
+> > >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > >  }
+> > >  
+> > > diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+> > > index c122bcff9f7c..323fcd4b27b6 100644
+> > > --- a/arch/arm/mach-dove/common.c
+> > > +++ b/arch/arm/mach-dove/common.c
+> > > @@ -344,6 +344,42 @@ void __init dove_sdio1_init(void)
+> > >  	platform_device_register(&dove_sdio1);
+> > >  }
+> > >  
+> > > +/*****************************************************************************
+> > > + * CPU Frequency
+> > > + ****************************************************************************/
+> > > +static struct resource dove_cpufreq_resources[] = {
+> > > +	[0] = {
+> > > +		.start  = DOVE_PMU_PHYS_BASE,
+> > > +		.end    = DOVE_PMU_PHYS_BASE + 0x7,
+> > > +		.flags  = IORESOURCE_MEM,
+> > > +		.name   = "cpufreq: DFS"
+> > > +	},
+> > > +	[1] = {
+> > > +		.start  = DOVE_PMU_PHYS_BASE + 0x8000,
+> > > +		.end    = DOVE_PMU_PHYS_BASE + 0x8003,
+> > > +		.flags  = IORESOURCE_MEM,
+> > > +		.name   = "cpufreq: PMU CR"
+> > > +	},
+> > > +	[2] = {
+> > > +		.start  = DOVE_PMU_PHYS_BASE + 0x0044,
+> > > +		.end    = DOVE_PMU_PHYS_BASE + 0x0047,
+> > > +		.flags  = IORESOURCE_MEM,
+> > > +		.name   = "cpufreq: PMU Clk Div"
+> > > +	},
+> > > +};
+> > > +
+> > > +static struct platform_device dove_cpufreq_device = {
+> > > +	.name		= "dove-cpufreq",
+> > > +	.id		= -1,
+> > > +	.num_resources	= ARRAY_SIZE(dove_cpufreq_resources),
+> > > +	.resource	= dove_cpufreq_resources,
+> > > +};
+> > > +
+> > > +void __init dove_cpufreq_init(void)
+> > > +{
+> > > +	platform_device_register(&dove_cpufreq_device);
+> > > +}
+> > 
+> > Please describe your power management unit in the DT. Your hardcoding
+> > physical addresses that can easily be described in the DT, and you don't
+> > appear to have an early probing requirement.
+> 
+> Hi Mark
+> 
+> We have been here before, with the kirkwood cpufreq driver. My v1 of
+> that driver had the cpufreq driver fully described in DT. My binding
+> got shot down and i was told that pseudo devices, like cpufreq,
+> cpuidle, should not be in DT, and a platform driver was the way to go.
+> So that is how kirkwood cpufreq works and dove follows that.
+> 
+> Do you want to reverse that decision now?
 
-The only thing that socfpga_init_clocks was doing setting up the smp_twd clock.
-Now that twd-timer's clock phandle is populated in the DTS, we can remove
-this function.
+I'm not arguing for describing a pseudo-device. The power management
+unit is a real device. If we used that to register a cpufreq driver, it
+doesn't mean that we've registered a pseudo-device, but rather that we
+made a decision to register the cpufreq portions based on the necessary
+real devices being present.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
- arch/arm/mach-socfpga/socfpga.c |    1 -
- drivers/clk/socfpga/clk.c       |   11 -----------
- 2 files changed, 12 deletions(-)
+This code registers a platform device that has PMU register fields. We
+can easily describe the PMU in dt. The PMU _could_ be used by frameworks
+other than cpufreq, so describing it as a cpufreq device is wrong.
+Perhaps this was the problem with the proposed kirkwood binding?
 
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index dd0d49c..d4ae019 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -106,7 +106,6 @@ static void __init socfpga_cyclone5_init(void)
- {
- 	l2x0_of_init(0, ~0UL);
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	socfpga_init_clocks();
- }
- 
- static const char *altera_dt_match[] = {
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index 01baf20..53ddea8 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -358,14 +358,3 @@ static void __init socfpga_gate_init(struct device_node *node)
- 	socfpga_gate_clk_init(node, &gateclk_ops);
- }
- CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
--
--void __init socfpga_init_clocks(void)
--{
--	struct clk *clk;
--	int ret;
--
--	clk = clk_register_fixed_factor(NULL, "smp_twd", "mpuclk", 0, 1, 4);
--	ret = clk_register_clkdev(clk, NULL, "smp_twd");
--	if (ret)
--		pr_err("smp_twd alias not registered\n");
--}
--- 
-1.7.9.5
+Thanks,
+Mark.
