@@ -1,38 +1,100 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 05 Dec 2013 15:17:46 -0500
-Subject: [PATCH v3 00/15] uprobes: Add uprobes support for ARM
-In-Reply-To: <529F6B88.2050005@linaro.org>
-References: <1385520814-10663-1-git-send-email-dave.long@linaro.org>
- <529F6B88.2050005@linaro.org>
-Message-ID: <52A0DF6A.1010402@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Dec 2013 21:18:13 +0100
+Subject: [PATCH 0/12] Getting rid of mach/timex.h usages below arch/arm
+In-Reply-To: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1384292466-31725-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131205201813.GA4707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Masami/Tixy,
+Hello,
 
-As I just noted in a previous email the kprobes.h thing has come back to 
-haunt me.  Something more is needed in my last patchset.  Tixy's 
-suggestion regarding the arch_specific_insn structure:
+short version: I still need acks from akpm and Nicolas Ferre for my
+cleanup series.
 
-> However, I also wonder if we should instead leave arch_specific_insn as
-> a kprobes specific structure and on ARM define it in terms of a new more
-> generic 'struct probe_insn'? The drawback with that is that we'd
-> probably end up with a struct just containing a single member which
-> seems a bit redundant:
->
-> struct arch_specific_insn {
-> 	struct probe_insn pinsn;
-> };
->
-> Thought's anyone?
+long version:
 
-...got me thinking.  When I do as he suggests and create a new 
-arch-specific structure for sharing between kprobes and uprobes then it 
-turns out simply #define'ing the arch_specific_insn structure tag to the 
-new structure tag in arch/arm/include/kprobes.h makes everything happy. 
-  When KPROBES is not configured that include file is (still) not 
-included and the generic kprobes.h include file still continues to make 
-a dummy structure for it.  My question is:  Is it too hacky to use a 
-#define for a structure tag this way?
+codewise I'm happy with my series now. The last patch removes all
+remaining <mach/timex.h> files and even drops the global (dummy)
+definition of CLOCK_TICK_RATE.
 
--dl
+The following patches are included:
+
+Linus Walleij (1):
+( 1)      ARM/serial: at91: switch atmel serial to use gpiolib
+
+Uwe Kleine-K?nig (11):
+( 2)      rtc: at91sam9: include <mach/hardware.h> explicitly
+( 3)      rtc: pxa: drop usage of CLOCK_TICK_RATE
+( 4)      clocksource: sirf/marco+prima2: drop usage of CLOCK_TICK_RATE
+( 5)      ARM: sa1100: stop using mach/timex.h
+( 6)      ARM: netx: stop using mach/timex.h
+( 7)      ARM: mmp: stop using mach/timex.h
+( 8)      ARM: ep93xx: stop using mach/timex.h
+( 9)      ARM: at91: don't use <mach/timex.h>
+(10)      input: ixp4xx-beeper: don't use symbols from <mach/timex.h>
+(11)      ARM: ixp4xx: stop using <mach/timex.h>
+(12)      ARM: drop <mach/timex.h> for !ARCH_MULTIPLATFORM, too
+
+The things still open from my side are:
+
+ - I don't have an explicit blessing from Nicolas Ferre to take patch 1
+   in this series
+ - For the rtc patches (2, 3) I don't have an rtc maintainer ack, patch
+   2 is already in next-20131125 (commit:6a3f18c5874e, branch
+   akpm-current/current) and also later next releases. I asked Andrew
+   for his blessing to take the two patches, no reply yet.
+ - I didn't get feedback for the sa1100 and ixp4xx patch (5, 11). I
+   think this isn't a big problem though because these are in the area
+   of the arm-soc maintainers.
+
+The series is available from
+
+	git://git.pengutronix.de/git/ukl/linux.git deprecatemachtimexh
+
+and has the nice shortstat
+
+	73 files changed, 129 insertions(+), 722 deletions(-)
+
+. The only patch not yet sent out as it is now is patch 12. It's just
+diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
+index 83f2aa8..f6fcc67 100644
+--- a/arch/arm/include/asm/timex.h
++++ b/arch/arm/include/asm/timex.h
+@@ -12,12 +12,6 @@
+ #ifndef _ASMARM_TIMEX_H
+ #define _ASMARM_TIMEX_H
+ 
+-#ifdef CONFIG_ARCH_MULTIPLATFORM
+-#define CLOCK_TICK_RATE 1000000
+-#else
+-#include <mach/timex.h>
+-#endif
+-
+ typedef unsigned long cycles_t;
+ #define get_cycles()   ({ cycles_t c; read_current_timer(&c) ? 0 : c; })
+ 
+plus rm arch/arm/mach-*/include/mach/timex.h. I'll send it out in reply
+to this mail.
+
+Merging next/master into my branch results in 4 conflicts in
+arch/arm/mach-at91/at91sam9{26[013],rl}.c. This is commit 2edb90a (ARM:
+at91: move at91_pmc.h to include/linux/clk/at91_pmc.h) in
+armsoc/at91/sama5-ccf vs. my patch "ARM: at91: don't use <mach/timex.h>"
+(9). The former removes
+
+	#include <mach/at91_pmc.h>
+
+at the location where my patch adds
+
+	#include <mach/hardware.h>
+
+. The fix is to do exactly this. Olof already agreed on irc that he is
+OK to resolve that when merging.
+
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
