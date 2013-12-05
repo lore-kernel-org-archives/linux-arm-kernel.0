@@ -1,30 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 23:04:22 +0100
-Subject: [RFC part1 PATCH 1/7] ACPI: Make ACPI core running without PCI on
- ARM64
-In-Reply-To: <529F376F.8050005@linaro.org>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <20131203164111.GA13447@srcf.ucam.org> <529F376F.8050005@linaro.org>
-Message-ID: <201312052304.22302.arnd@arndb.de>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 5 Dec 2013 16:10:52 -0600
+Subject: [PATCHv4 1/4] arm: dts: Add support for SD/MMC on SOCFPGA
+In-Reply-To: <201312052208.38342.arnd@arndb.de>
+References: <1386263677-7733-1-git-send-email-dinguyen@altera.com>
+ <1386263677-7733-2-git-send-email-dinguyen@altera.com>
+ <201312052208.38342.arnd@arndb.de>
+Message-ID: <1386281452.26656.8.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 December 2013, Hanjun Guo wrote:
-> On 2013?12?04? 00:41, Matthew Garrett wrote:
-> > Given the number of #ifdefs you're adding, wouldn't it make more sense
-> > to just add stub functions to include/linux/pci.h?
+On Thu, 2013-12-05 at 22:08 +0100, Arnd Bergmann wrote:
+> On Thursday 05 December 2013, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Re-use the "rockchip,rk2928-dw-mshc" binding that will support SD/MMC on
+> > Altera's SOCFPGA platform.
+> > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > ---
+> > v3: Re-use "rockchip,rk2928-dw-mshc" binding
+> > v3: none
+> > v2: none
+> > ---
+> >  arch/arm/boot/dts/socfpga.dtsi          |   11 +++++++++++
+> >  arch/arm/boot/dts/socfpga_arria5.dtsi   |   12 ++++++++++++
+> >  arch/arm/boot/dts/socfpga_cyclone5.dtsi |   12 ++++++++++++
+> >  arch/arm/boot/dts/socfpga_vt.dts        |   12 ++++++++++++
+> >  4 files changed, 47 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > index f936476..3d9f01b 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -469,6 +469,17 @@
+> >  			cache-level = <2>;
+> >  		};
+> >  
+> > +		mmc: dwmmc0 at ff704000 {
+> > +			compatible = "rockchip,rk2928-dw-mshc";
+> > +			reg = <0xff704000 0x1000>;
+> > +			interrupts = <0 139 4>;
+> > +			fifo-depth = <0x400>;
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
+> > +			clock-names = "biu", "ciu";
+> > +		};
 > 
-> Thanks for the suggestion :)
 > 
-> I can add stub functions in include/linux/pci.h for raw_pci_read()/
-> raw_pci_write(), then can remove #ifdefs for acpi_os_read/write_pci_configuration().
+> I think it's great that you can reuse the existing driver, but I'd recommend
+> using a generic compatible string here in addition to one that identifies
+> your specific implementation. You can list "rockchip,rk2928-dw-mshc" as
+> well, but that is probably not necessary.
+> 
+> What I'd expect to see here is either
+> 
+> 	compatible = "altr,socfpga-dw-mshc", "rockchip,rk2928-dw-mshc", "snps,dw-mshc";
+> 
+> or 
+> 
+> 	compatible = "altr,socfpga-dw-mshc", "rockchip,rk2928-dw-mshc", "snps,dw-mshc";
+> 
+> 
+> It's probably not too late to generalize the SDMMC_CMD_USE_HOLD_REG
+> handling, which is currently the only difference between the generic
+> "snps,dw-mshc" and the newer "rockchip,rk2928-dw-mshc" variant.
 
-Actually I wonder about the usefulness of this patch in either form: Since ACPI
-on ARM64 is only for servers, I would very much expect them to always come with
-PCI, either physical host bridges with attached devices, or logical PCI functions
-used to describe the on-SoC I/O devices. Even in case of virtual machines, you'd
-normally use PCI as the method to communicate data about the virtio channels.
+Ok, I will try to generalize the driver.
 
-Can you name a realistic use-case where you'd want ACPI but not PCI?
+> 
+> It's quite likely that all implementations should actually set
+> SDMMC_CMD_USE_HOLD_REG (if both rockchips and altera set it) and you
+> don't need to have any distinction in the dw_mmc-pltfm.c driver at all.
+> 
+> If it's actually needed on some but not others, you could add a binary
+> DT property to tell the driver about it rather than keying it off of
+> the compatible string. If it's needed only on older (or only on newer)
+> versions of the dw-mshc design, it could be encoded as a version in the
+> string, such as "snps,dw-mshc-1.234".
 
-	Arnd
+Perhaps Seungwon and Chris might have an opinion on this:
+
+>From the Synopsys databook for this IP, using the SDMMC_CMD_USE_HOLD_REG
+is not recommended for SDR104, SDR50 and DDR50 speed modes. For other
+speeds, SDR12, and SDR25, it would be necessary to use
+SDMMC_CMD_USE_HOLD_REG.
+
+I am referencing v2.50a of the Synopsys DesignWare Cores Mobile Storage
+Host Databook.
+
+So I think a binary DT property should suffice?
+
+Thanks,
+Dinh
+> 
+> 	Arnd
+> 
