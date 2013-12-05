@@ -1,50 +1,42 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 05 Dec 2013 18:03:02 +0100
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <52A0AEB4.7090909@bracey.fi>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
- <1502243.eRBlCfUhTO@amdc1227> <52A0AEB4.7090909@bracey.fi>
-Message-ID: <1475204.PCyxT0KMui@amdc1227>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Dec 2013 10:06:55 -0700
+Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
+References: <cover.1386108712.git.stefan@agner.ch>
+ <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
+Message-ID: <52A0B2AF.60803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 of December 2013 18:49:56 Kevin Bracey wrote:
-> On 05/12/2013 17:11, Tomasz Figa wrote:
-> > On Thursday 05 of December 2013 15:07:47 Mark Brown wrote:
-> >> On Tue, Dec 03, 2013 at 10:29:42AM +0100, Linus Walleij wrote:
-> >>
-> >>> So a suggested patch to support weak hogs would be interesting
-> >>> to look at. Can you provide details on how you think this would
-> >>> work?
-> >> Or should we be going and applying the default state to all devices on
-> >> init without worrying about a driver appearing?
-> > If a device isn't used, then it's often better to configure the pins for
-> > a different function, such as GPIO, to minimize leakage current.
-> >
-> 
-> And there can also be mutually-exclusive drivers choosing different 
-> default states for the same pin. I think you do need a separate "safe" 
-> indicator.
+On 12/03/2013 03:18 PM, Stefan Agner wrote:
+> Use the VERSIONCRC to determine the exact device version. According to
+> the datasheet this register can be used as device identifier. The
+> identification is needed since some tps6586x regulators use a different
+> voltage table.
 
-That's not quite true, as on a single board you should rather have
-a single device node with "okay" status referencing given set of pins.
-Still, I think that a separate safe state is the way to go.
+> diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
 
-> 
-> My current thought is that  a late-init "make safe all unclaimed pins" 
-> pass would make sense - you can't really mess with pins in an automated 
-> fashion on init, as it can mess up bootloader->driver handover.   There 
-> already exist late-init "turn off all unclaimed clocks" (at least on 
-> shmobile)
+> @@ -493,13 +527,12 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
+>  		return -EIO;
+>  	}
+>  
+> -	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
+> -
+>  	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
+> -	if (tps6586x == NULL) {
+> -		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
+> +	if (!tps6586x)
+>  		return -ENOMEM;
+> -	}
+> +
+> +	tps6586x->version = ret;
 
-That's a feature of Common Clock Framework.
-
-> and "turn off all unclaimed regulators", and it would fit that 
-> model.
-
-Maybe that's the way to do it. I need to think a bit more on this,
-especially considering our (Samsung's) use cases.
-
-Best regards,
-Tomasz
+I have to say, I dislike this version of the patch. Separating the
+reading of the version register from the assignment to tps6586x->version
+doesn't make any sense, especially given that the version value is
+stored in a variable named "ret"; that name isn't remotely related to
+what's stored there. What if someone comes along later and adds more
+code that assigns to ret between where it's repurposed for the version
+value and where it's assigned to tps6586x->version? It'd be extremely
+difficult for a patch reviewer to spot that given the limited context in
+a diff, and quite non-obvious to the person changing the code too..
