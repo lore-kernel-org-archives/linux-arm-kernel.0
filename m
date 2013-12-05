@@ -1,393 +1,227 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 5 Dec 2013 08:09:17 -0600
-Subject: [RFC part1 PATCH 5/7] ARM64 / ACPI: Introduce arm_core.c and its
- related head file
-In-Reply-To: <1386088611-2801-6-git-send-email-hanjun.guo@linaro.org>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <1386088611-2801-6-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <CAL_Jsq+8O13+hVKVEVGg_Mu4hkRLi6afBhoeduVAWW7g=5B8bQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Dec 2013 14:18:53 +0000
+Subject: [PATCH 1/3] arm64: add EFI stub
+In-Reply-To: <1385762712-17043-2-git-send-email-msalter@redhat.com>
+References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
+ <1385762712-17043-2-git-send-email-msalter@redhat.com>
+Message-ID: <20131205141853.GA974@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 3, 2013 at 10:36 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> introduce arm_core.c and its related head file, after this patch,
-> we can get ACPI tables from BIOS on ARM64 now.
->
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h |   57 +++++++++++
->  arch/arm64/kernel/setup.c     |    8 ++
->  drivers/acpi/Makefile         |    2 +
->  drivers/acpi/plat/Makefile    |    1 +
->  drivers/acpi/plat/arm-core.c  |  219 +++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 287 insertions(+)
->  create mode 100644 drivers/acpi/plat/Makefile
->  create mode 100644 drivers/acpi/plat/arm-core.c
->
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index c186f5b..e9444e4 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -19,6 +19,43 @@
->  #ifndef _ASM_ARM_ACPI_H
->  #define _ASM_ARM_ACPI_H
->
-> +#include <asm/cacheflush.h>
-> +
+Hi Mark,
+
+On Fri, Nov 29, 2013 at 10:05:10PM +0000, Mark Salter wrote:
+> This patch adds PE/COFF header fields to the start of the Image
+> so that it appears as an EFI application to EFI firmware. An EFI
+> stub is included to allow direct booting of the kernel Image. Due
+> to EFI firmware limitations, only little endian kernels with 4K
+> page sizes are supported at this time.
+
+I don't fully understand the EFI firmware limitations but for big endian
+we could have the EFI_STUB wrapper in little endian and get the kernel
+to switch to big endian once booted. The image header should always be
+little endian.
+
+And I have to dig further into the 4K limitation (or you could give a
+quick summary ;)).
+
+> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+> new file mode 100644
+> index 0000000..5f6d179
+> --- /dev/null
+> +++ b/arch/arm64/kernel/efi-entry.S
+> @@ -0,0 +1,81 @@
+> +/*
+> + * EFI entry point.
+> + *
+> + * Copyright (C) 2013 Red Hat, Inc.
+> + * Author: Mark Salter <msalter@redhat.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +#include <linux/linkage.h>
 > +#include <linux/init.h>
 > +
-> +#define COMPILER_DEPENDENT_INT64       long long
-> +#define COMPILER_DEPENDENT_UINT64      unsigned long long
+> +#include <asm/assembler.h>
 > +
-> +/*
-> + * Calling conventions:
-> + *
-> + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
-> + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
-> + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
-> + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
-> + */
-> +#define ACPI_SYSTEM_XFACE
-> +#define ACPI_EXTERNAL_XFACE
-> +#define ACPI_INTERNAL_XFACE
-> +#define ACPI_INTERNAL_VAR_XFACE
+> +#define EFI_LOAD_ERROR 0x8000000000000001
+
+It's defined already but I see why you can't include efi.h here. Maybe a
+comment.
+
 > +
-> +/* Asm macros */
-> +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
+> +       __INIT
 > +
-> +/* Basic configuration for ACPI */
-> +#ifdef CONFIG_ACPI
-> +extern int acpi_disabled;
-> +extern int acpi_noirq;
-> +extern int acpi_pci_disabled;
-> +extern int acpi_strict;
-> +
-> +static inline void disable_acpi(void)
-> +{
-> +       acpi_disabled = 1;
-> +       acpi_pci_disabled = 1;
-> +       acpi_noirq = 1;
-> +}
-> +
->  static inline bool arch_has_acpi_pdc(void)
->  {
->         return false;   /* always false for now */
-> @@ -29,4 +66,24 @@ static inline void arch_acpi_set_pdc_bits(u32 *buf)
->         return;
->  }
->
-> +static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
-> +static inline void acpi_disable_pci(void)
-> +{
-> +       acpi_pci_disabled = 1;
-> +       acpi_noirq_set();
-> +}
-> +
-> +/* FIXME: this function should be moved to topology.h when it's ready */
-> +void arch_fix_phys_package_id(int num, u32 slot);
-> +
-> +/* temperally define -1 to make acpi core compilerable */
-> +#define cpu_physical_id(cpu) -1
-> +
-> +#else  /* !CONFIG_ACPI */
-> +#define acpi_disabled 1                /* ACPI sometimes enabled on ARM */
-> +#define acpi_noirq 1           /* ACPI sometimes enabled on ARM */
-> +#define acpi_pci_disabled 1    /* ACPI PCI sometimes enabled on ARM */
-> +#define acpi_strict 1          /* no ACPI spec workarounds on ARM */
-> +#endif
-> +
->  #endif /*_ASM_ARM_ACPI_H*/
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index bd9bbd0..8199360 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -41,6 +41,7 @@
->  #include <linux/memblock.h>
->  #include <linux/of_fdt.h>
->  #include <linux/of_platform.h>
-> +#include <linux/acpi.h>
->
->  #include <asm/cputype.h>
->  #include <asm/elf.h>
-> @@ -225,6 +226,13 @@ void __init setup_arch(char **cmdline_p)
->
->         arm64_memblock_init();
->
 > +       /*
-> +        * Parse the ACPI tables for possible boot-time configuration
+> +        * We arrive here from the EFI boot manager with:
+> +        *
+> +        *    * MMU on with identity-mapped RAM.
+> +        *    * Icache and Dcache on
+> +        *
+> +        * We will most likely be running from some place other than where
+> +        * we want to be. The kernel image wants to be placed at TEXT_OFFSET
+> +        * from start of RAM.
 > +        */
-> +       acpi_boot_table_init();
-> +       early_acpi_boot_init();
-> +       acpi_boot_init();
+> +ENTRY(efi_stub_entry)
+> +       stp     x29, x30, [sp, #-32]!
 > +
+> +       /*
+> +        * Call efi_entry to do the real work.
+> +        * x0 and x1 are already set up by firmware. Current runtime
+> +        * address of image is calculated and passed via *image_addr.
+> +        *
+> +        * unsigned long efi_entry(void *handle,
+> +        *                         efi_system_table_t *sys_table,
+> +        *                         unsigned long *image_addr) ;
+> +        */
+> +       adrp    x8, _text
+> +        add    x8, x8, #:lo12:_text
 
-How about a single function here. Perhaps called acpi_early_init. That
-would save checking acpi_disabled 3 times.
+Minor: some wrong whitespace (but I don't trust our incoming mail server
+either, it corrupts patches usually).
 
->         paging_init();
->         request_standard_resources();
->
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index d8cebe3..9fbba50 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -83,3 +83,5 @@ obj-$(CONFIG_ACPI_PROCESSOR_AGGREGATOR) += acpi_pad.o
->  obj-$(CONFIG_ACPI_APEI)                += apei/
->
->  obj-$(CONFIG_ACPI_EXTLOG)      += acpi_extlog.o
+> +       add     x2, sp, 16
+> +       str     x8, [x2]
+> +       bl      efi_entry
+> +       cmn     x0, #1
+> +       b.eq    efi_load_fail
 > +
-> +obj-y                          += plat/
-> diff --git a/drivers/acpi/plat/Makefile b/drivers/acpi/plat/Makefile
+> +       /*
+> +        * efi_entry() will have relocated the kernel image if necessary
+> +        * and we return here with device tree address in x0 and the kernel
+> +        * entry point stored at *image_addr. Save those values in registers
+> +        * which are preserved by __flush_dcache_all.
+> +        */
+> +       ldr     x1, [sp, #16]
+> +       mov     x20, x0
+> +       mov     x21, x1
+> +
+> +       bl      __flush_dcache_all
+
+Regarding __flush_dcache_all, I plan to remove it for all cases apart
+from power management with the MMU disabled. With MMU enabled, there is
+no guarantee that this function does the right thing. It's even worse in
+the guest context.
+
+> +       /* Turn off Dcache and MMU */
+> +       mrs     x0, sctlr_el1
+> +       bic     x0, x0, #1 << 0 // clear SCTLR.M
+> +       bic     x0, x0, #1 << 2 // clear SCTLR.C
+> +       msr     sctlr_el1, x0
+> +       isb
+
+I assume an EFI app is running with the MMU enabled (and UP only). Do we
+always run it in EL1? What about EL2 mode (needed by KVM and Xen)?
+
+> +
+> +       /* Jump to real entry point */
+> +       mov     x0, x20
+> +       mov     x1, xzr
+> +       mov     x2, xzr
+> +       mov     x3, xzr
+> +       br      x21
+> +
+> +efi_load_fail:
+> +       mov     x0, EFI_LOAD_ERROR
+
+Needs #EFI_LOAD_ERROR (strange that gas doesn't complain).
+
+> +       ldp     x29, x30, [sp], #32
+> +       ret
+> +
+> +ENDPROC(efi_stub_entry)
+> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
 > new file mode 100644
-> index 0000000..46bc65e
+> index 0000000..f000b04
 > --- /dev/null
-> +++ b/drivers/acpi/plat/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_ARM64)    += arm-core.o
-> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-> new file mode 100644
-> index 0000000..7b8e64a
-> --- /dev/null
-> +++ b/drivers/acpi/plat/arm-core.c
-> @@ -0,0 +1,219 @@
+> +++ b/arch/arm64/kernel/efi-stub.c
+> @@ -0,0 +1,280 @@
 > +/*
-> + *  ARM/ARM64 Specific Low-Level ACPI Boot Support
+> + * linux/arch/arm/boot/compressed/efi-stub.c
 > + *
-> + *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
-> + *  Copyright (C) 2001 Jun Nakajima <jun.nakajima@intel.com>
-> + *  Copyright (C) 2013, Al Stone <al.stone@linaro.org> (ARM version)
+> + * Copyright (C) 2013 Linaro Ltd;  <roy.franz@linaro.org>
 > + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> + * This file implements the EFI boot stub for the arm64 kernel.
+> + * Adapted from ARM version by Mark Salter <msalter@redhat.com>
 > + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License as published by
-> + *  the Free Software Foundation; either version 2 of the License, or
-> + *  (at your option) any later version.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + *
-> + *  This program is distributed in the hope that it will be useful,
-> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *  GNU General Public License for more details.
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 > + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/acpi.h>
-> +#include <linux/acpi_pmtmr.h>
 > +#include <linux/efi.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/memblock.h>
-> +#include <linux/module.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/slab.h>
-> +#include <linux/bootmem.h>
-> +#include <linux/ioport.h>
-> +#include <linux/pci.h>
+> +#include <linux/libfdt.h>
+> +#include <asm/sections.h>
+> +#include <generated/compile.h>
+> +#include <linux/uts.h>
+> +#include <linux/utsname.h>
+> +#include <generated/utsrelease.h>
+> +#include <linux/version.h>
 > +
-> +#include <asm/pgtable.h>
-> +#include <asm/io.h>
-
-linux/io.h although I can't see where it is even needed.
-
-> +#include <asm/smp.h>
-
-linux/smp.h ...
-
-Seems like you have a lot of unnecessary headers here. efi.h, slab.h,
-pci.h, etc.
-
+> +/* error code which can't be mistaken for valid address */
+> +#define EFI_ERROR      (~0UL)
 > +
 > +/*
-> + * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
-> + * variable is still required by the ACPI core
+> + * EFI function call wrappers. These are not required for arm64, but wrappers
+> + * are required for X86 to convert between ABIs. These wrappers are provided
+> + * to allow code sharing between X86 and other architectures. Since these
+> + * wrappers directly invoke the EFI function pointer, the function pointer
+> + * type must be properly defined, which is not the case for X86. One advantage
+> + * of this is it allows for type checking of arguments, which is not possible
+> + * with the X86 wrappers.
 > + */
-> +u32 acpi_rsdt_forced;
-> +
-> +int acpi_noirq;                        /* skip ACPI IRQ initialization */
-> +int acpi_strict;
-> +int acpi_disabled;
-> +EXPORT_SYMBOL(acpi_disabled);
-> +
-> +int acpi_pci_disabled;         /* skip ACPI PCI scan and IRQ initialization */
-> +EXPORT_SYMBOL(acpi_pci_disabled);
-> +
-> +#define PREFIX                 "ACPI: "
-> +
-> +/* FIXME: this function should be moved to topology.c when it is ready */
-> +void arch_fix_phys_package_id(int num, u32 slot)
-> +{
-> +       return;
-> +}
-> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+> +#define efi_call_phys0(f)                      f()
+> +#define efi_call_phys1(f, a1)                  f(a1)
+> +#define efi_call_phys2(f, a1, a2)              f(a1, a2)
+> +#define efi_call_phys3(f, a1, a2, a3)          f(a1, a2, a3)
+> +#define efi_call_phys4(f, a1, a2, a3, a4)      f(a1, a2, a3, a4)
+> +#define efi_call_phys5(f, a1, a2, a3, a4, a5)  f(a1, a2, a3, a4, a5)
 > +
 > +/*
-> + * Boot-time Configuration
+> + * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
+> + * start of kernel and may not cross a 2MiB boundary. We set alignment to
+> + * equal max size so we know it won't cross a 2MiB boudary.
 > + */
-> +
+> +#define MAX_DTB_SIZE   0x40000
 
-It is not really clear what this comment applies to.
+2MB is 0x200000 (or I don't understand the comment).
 
-> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_PLATFORM;
+> +#define DTB_ALIGN      MAX_DTB_SIZE
+> +#define MAX_DTB_OFFSET 0x20000000
 > +
-> +static unsigned int gsi_to_irq(unsigned int gsi)
-> +{
-> +       int irq = irq_create_mapping(NULL, gsi);
+> +#define pr_efi(msg)     efi_printk(sys_table, "EFI stub: "msg)
+> +#define pr_efi_err(msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
 > +
-> +       return irq;
-> +}
+> +struct fdt_region {
+> +       u64 base;
+> +       u64 size;
+> +};
 > +
-> +/*
-> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
-> + * or early_memremap() should be called here.
-> + *
-> + * FIXME: early_io/memremap()/early_iounmap() are not upstream yet on ARM64,
-> + * just wait for Mark Salter's patchset accepted by mainline
-> + */
-> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
-> +{
-> +       if (!phys || !size)
-> +               return NULL;
-> +
-> +       /*
-> +        * temporarily use phys_to_virt(),
-> +        * should be early_memremap(phys, size) here
-> +        */
-> +       return phys_to_virt(phys);
-> +}
-> +
-> +void __init __acpi_unmap_table(char *map, unsigned long size)
-> +{
-> +       if (!map || !size)
-> +               return;
-> +
-> +       /* should be early_iounmap(map, size); */
-> +       return;
-> +}
-> +
-> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-> +{
-> +       *irq = gsi_to_irq(gsi);
-> +
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
-> +
-> +/*
-> + * success: return IRQ number (>=0)
+> +/* Include shared EFI stub code */
+> +#include "../../../drivers/firmware/efi/efi-stub-helper.c"
+> +#include "../../../drivers/firmware/efi/fdt.c"
 
-'> 0' for interrupts is what normally means success in the kernel. 0
-is for no irq.
+I don't particularly like .c files inclusion but it looks like x86 does
+the same.
 
-> + * failure: return < 0
-> + */
-> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
+> +
+> +static unsigned long __init get_dram_base(efi_system_table_t *sys_table)
 > +{
-> +       return -1;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+> +       efi_status_t status;
+> +       unsigned long map_size, desc_size;
+> +       unsigned long membase = EFI_ERROR;
+> +       efi_memory_desc_t *memory_map;
+> +       int i;
 > +
-> +void acpi_unregister_gsi(u32 gsi)
-> +{
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-> +
-> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> +{
-> +       return 0;
-> +}
-> +
-> +static void __init early_acpi_process_madt(void)
-> +{
-> +       return;
-> +}
-> +
-> +static void __init acpi_process_madt(void)
-> +{
-> +       return;
-> +}
-> +
-> +/*
-> + * acpi_boot_table_init() and acpi_boot_init()
-> + *  called from setup_arch(), always.
-> + *     1. checksums all tables
-> + *     2. enumerates lapics
-> + *     3. enumerates io-apics
-> + *
-> + * acpi_table_init() is separated to allow reading SRAT without
-> + * other side effects.
-> + */
-> +void __init acpi_boot_table_init(void)
-> +{
-> +       /*
-> +        * If acpi_disabled, bail out
-> +        */
-> +       if (acpi_disabled)
-> +               return;
-> +
-> +       /*
-> +        * Initialize the ACPI boot-time table parser.
-> +        */
-> +       if (acpi_table_init()) {
-> +               disable_acpi();
-> +               return;
-> +       }
-> +}
-> +
-> +int __init early_acpi_boot_init(void)
-> +{
-> +       /*
-> +        * If acpi_disabled, bail out
-> +        */
-> +       if (acpi_disabled)
-> +               return 1;
-> +
-> +       /*
-> +        * Process the Multiple APIC Description Table (MADT), if present
-> +        */
-> +       early_acpi_process_madt();
-> +
-> +       return 0;
-> +}
-> +
-> +int __init acpi_boot_init(void)
-> +{
-> +       /*
-> +        * If acpi_disabled, bail out
-> +        */
-> +       if (acpi_disabled)
-> +               return 1;
-> +
-> +       acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
-> +
-> +       /*
-> +        * Process the Multiple APIC Description Table (MADT), if present
-> +        */
-> +       acpi_process_madt();
-> +
-> +       return 0;
-> +}
-> +
-> +static int __init parse_acpi(char *arg)
-> +{
-> +       if (!arg)
-> +               return -EINVAL;
-> +
-> +       /* "acpi=off" disables both ACPI table parsing and interpreter */
-> +       if (strcmp(arg, "off") == 0) {
-> +               disable_acpi();
-> +       }
-> +       /* acpi=strict disables out-of-spec workarounds */
-> +       else if (strcmp(arg, "strict") == 0) {
-> +               acpi_strict = 1;
-> +       }
-> +       return 0;
-> +}
-> +early_param("acpi", parse_acpi);
+> +       status = efi_get_memory_map(sys_table, &memory_map, &map_size,
+> +                                   &desc_size, NULL, NULL);
+> +       if (status == EFI_SUCCESS) {
 
-These aren't common options across architectures?
+Can you exit earlier here if !EFI_SUCCESS? It reduces the indentation
+level.
 
-Rob
+-- 
+Catalin
