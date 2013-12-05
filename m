@@ -1,30 +1,52 @@
 From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
-Date: Thu, 05 Dec 2013 12:34:30 +0400
-Subject: [PATCH 2/2] ARM: fix framepointer check in unwind_frame
-In-Reply-To: <20131205083424.32632.51618.stgit@buzz>
-References: <20131205083424.32632.51618.stgit@buzz>
-Message-ID: <20131205083430.32632.11103.stgit@buzz>
+Date: Thu, 05 Dec 2013 12:34:24 +0400
+Subject: [PATCH 1/2] ARM: check stack pointer in get_wchan
+Message-ID: <20131205083424.32632.51618.stgit@buzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes corner case when (fp + 4) overflows unsigned long,
-for example: fp = 0xFFFFFFFF -> fp + 4 == 3.
+get_wchan() is lockless. Task may wakeup at any time and change its own stack,
+thus each next stack frame may be overwritten and filled with random stuff.
+
+/proc/$pid/stack interface had been disabled for non-current tasks, see [1]
+But 'wchan' still allows to trigger stack frame unwinding on volatile stack.
+
+This patch fixes oops in unwind_frame() by adding stack pointer validation on
+each step (as x86 code do), unwind_frame() already checks frame pointer.
+
+Also I've found another report of this oops on stackoverflow (irony).
 
 Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+Link: http://www.spinics.net/lists/arm-kernel/msg110589.html [1]
+Link: http://stackoverflow.com/questions/18479894/unwind-frame-cause-a-kernel-paging-error
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/stacktrace.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/process.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 00f79e5..af4e8c8 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
- 	high = ALIGN(low, THREAD_SIZE);
- 
- 	/* check current frame pointer is within bounds */
--	if (fp < (low + 12) || fp + 4 >= high)
-+	if (fp < low + 12 || fp > high - 4)
- 		return -EINVAL;
- 
- 	/* restore the registers from the stack frame */
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 94f6b05..92f7b15 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -404,6 +404,7 @@ EXPORT_SYMBOL(dump_fpu);
+ unsigned long get_wchan(struct task_struct *p)
+ {
+ 	struct stackframe frame;
++	unsigned long stack_page;
+ 	int count = 0;
+ 	if (!p || p == current || p->state == TASK_RUNNING)
+ 		return 0;
+@@ -412,9 +413,11 @@ unsigned long get_wchan(struct task_struct *p)
+ 	frame.sp = thread_saved_sp(p);
+ 	frame.lr = 0;			/* recovered from the stack */
+ 	frame.pc = thread_saved_pc(p);
++	stack_page = (unsigned long)task_stack_page(p);
+ 	do {
+-		int ret = unwind_frame(&frame);
+-		if (ret < 0)
++		if (frame.sp < stack_page ||
++		    frame.sp >= stack_page + THREAD_SIZE ||
++		    unwind_frame(&frame) < 0)
+ 			return 0;
+ 		if (!in_sched_functions(frame.pc))
+ 			return frame.pc;
