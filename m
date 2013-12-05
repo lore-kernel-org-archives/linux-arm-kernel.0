@@ -1,97 +1,39 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 4 Dec 2013 18:49:36 -0600
-Subject: [PATCH V2 1/2] Documentation: dt: OMAP: explicitly state SoC
- compatible strings
-In-Reply-To: <1386204578-6018-1-git-send-email-nm@ti.com>
-References: <1386204578-6018-1-git-send-email-nm@ti.com>
-Message-ID: <1386204578-6018-2-git-send-email-nm@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Dec 2013 00:52:16 +0000
+Subject: ARM: gic_arch_extn (Was: [PATCH v3] irqchip: mmp: add dt
+ support for wakeup)
+In-Reply-To: <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
+References: <1386159214-31483-1-git-send-email-zhangwm@marvell.com>
+ <alpine.DEB.2.02.1312042234190.30673@ionos.tec.linutronix.de>
+ <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
+Message-ID: <20131205005216.GA4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SoC family definitions at the moment are reactive to board needs.
-This results in potentially wrong matches taking place for board types.
+On Thu, Dec 05, 2013 at 01:41:53AM +0100, Thomas Gleixner wrote:
+> @all who feel responsible for gic_arch_extn
+> 
+> On Wed, 4 Dec 2013, Thomas Gleixner wrote:
+> > I'm going to reply in a separate mail on this, because you have
+> > brought this to my attention, but you are not responsible in the first
+> > place for this brainfart.
+> 
+> Who came up with that gic_arch_extn concept in the first place?
 
-Eventually, we will have descriptors match only with SoC types and
-should not contain anything specific to board handling and pave the
-way to getting rid of soc_is_XYZ checks and allow this determination
-done with matches at of level.
+If you'd spend more time reviewing IRQ patches then maybe you'd catch
+this at review time.  So please stop your rediculous whinging when
+most of the problem is your own lack of time.
 
-Existing implicit definitions(as part of board descriptions) are
-explicitly documented.
+If you must know, it was introduced by TI to work around the power
+management shortcomings of the architecture mandated GIC.  No it doesn't
+get called for IPIs, but it damned well needs to be called for normal
+IRQs.
 
-NOTE: Even though we prefer to have dt compatibility to explicit,
-"ti,dra7xx", "ti,am33xx", "ti,omap36xx" preexist in current dts and
-are maintained for backward compatibility. It is also expected that
-any future SoC addition will keep this documentation updated.
+At the point it was created, it wasn't clear whether this also applied
+to local IRQs.  Since I *no* *longer* have visibility of what SoC stuff
+is doing with it, of course it's not going to get fixed when a common
+pattern emerges.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- .../devicetree/bindings/arm/omap/omap.txt          |   53 ++++++++++++++++++++
- 1 file changed, 53 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index 808c154..34dc40c 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -31,6 +31,59 @@ spinlock at 1 {
-     ti,hwmods = "spinlock";
- };
- 
-+SoC Type (optional):
-+
-+- General Purpose devices
-+  compatible = "ti,gp"
-+- High Security devices
-+  compatible = "ti,hs"
-+
-+SoC Families:
-+
-+- OMAP2 generic - defaults to OMAP2420
-+  compatible = "ti,omap2"
-+- OMAP3 generic - defaults to OMAP3430
-+  compatible = "ti,omap3"
-+- OMAP4 generic - defaults to OMAP4430
-+  compatible = "ti,omap4"
-+- OMAP5 generic - defaults to OMAP5430
-+  compatible = "ti,omap5"
-+- DRA7 generic - defaults to DRA742
-+  compatible = "ti,dra7"
-+- AM43x generic - defaults to AM4372
-+  compatible = "ti,am43"
-+
-+SoCs:
-+
-+- OMAP2420
-+  compatible = "ti,omap2420", "ti,omap2"
-+- OMAP2430
-+  compatible = "ti,omap2430", "ti,omap2"
-+
-+- OMAP3430
-+  compatible = "ti,omap3430", "ti,omap3"
-+- AM3517
-+  compatible = "ti,am3517", "ti,omap3"
-+- OMAP3630
-+  compatible = "ti,omap36xx", "ti,omap3"
-+- AM33xx
-+  compatible = "ti,am33xx", "ti,omap3"
-+
-+- OMAP4430
-+  compatible = "ti,omap4430", "ti,omap4"
-+- OMAP4460
-+  compatible = "ti,omap4460", "ti,omap4"
-+
-+- OMAP5430
-+  compatible = "ti,omap5430", "ti,omap5"
-+- OMAP5432
-+  compatible = "ti,omap5432", "ti,omap5"
-+
-+- DRA742
-+  compatible = "ti,dra7xx", "ti,dra7"
-+
-+- AM4372
-+  compatible = "ti,am4372", "ti,am43"
- 
- Boards:
- 
--- 
-1.7.9.5
+So... congratulations, you've found something which can be improved,
+which has come to light as the code has evolved and a better
+understanding of what is required has been discovered.
