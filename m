@@ -1,66 +1,185 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 4 Dec 2013 18:53:33 -0600
-Subject: [PATCH v2] arm64: enable EDAC on arm64
-In-Reply-To: <20131126153747.GC692@arm.com>
-References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
- <20131126153747.GC692@arm.com>
-Message-ID: <CAL_JsqJLf-kjzafMJ=wh_ZZa63SOMKy20M_5xjy9GRdofiZVCA@mail.gmail.com>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Thu, 5 Dec 2013 01:05:40 +0000
+Subject: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
+ mapping
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D47C9FA@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1385500248-6551-1-git-send-email-marex@denx.de>
+ <201311281856.10139.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D47BDD2@039-SN2MPN1-013.039d.mgd.msft.net>
+ <201312040852.01269.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D47C9FA@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <0E83723C55F66F43A6041464FE31119D47CA7F@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 9:37 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Nov 22, 2013 at 09:05:08PM +0000, Rob Herring wrote:
->> +static inline void atomic_scrub(void *va, u32 size)
->> +{
->> +     unsigned int *virt_addr = va;
->> +     unsigned int i;
->> +
->> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
->
-> BTW, maybe the compiler is smart enough to drop the i but why not just
-> use a int *last_addr = va + size - 3; and just compare against this?
+Hi Merak:
 
-Evidently, the compiler is not that smart. Here's what I ended up
-with. There's no need to subtract 3 that I can see:
 
-unsigned int *last_addr = va + size;
-for (; virt_addr < last_addr; virt_addr++) {
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org]
+> On Behalf Of Richard Zhu
+> Sent: Thursday, December 05, 2013 8:45 AM
+> To: Marek Vasut
+> Cc: Jingoo Han; 'Tim Harvey'; 'Pratyush Anand'; linux-arm-
+> kernel at lists.infradead.org; linux-pci at vger.kernel.org; 'Bjorn Helgaas'; 'Frank
+> Li'; 'Harro Haan'; 'Mohit KUMAR DCG'; 'Sascha Hauer'; 'Sean Cross'; 'Shawn
+> Guo'; 'Siva Reddy Kallam'; 'Srikanth T Shivanand'; 'Troy Kisky'; 'Yinghai Lu'
+> Subject: RE: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU region
+> mapping
+> 
+> Hi Marek:
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Marek Vasut [mailto:marex at denx.de]
+> > Sent: Wednesday, December 04, 2013 3:52 PM
+> > To: Zhu Richard-R65037
+> > Cc: Jingoo Han; 'Tim Harvey'; 'Pratyush Anand'; linux-arm-
+> > kernel at lists.infradead.org; linux-pci at vger.kernel.org; 'Bjorn
+> > Helgaas'; 'Frank Li'; 'Harro Haan'; 'Mohit KUMAR DCG'; 'Sascha Hauer';
+> > 'Sean Cross'; 'Shawn Guo'; 'Siva Reddy Kallam'; 'Srikanth T Shivanand';
+> 'Troy Kisky'; 'Yinghai Lu'
+> > Subject: Re: [PATCH 2/7] [RFC] PCI: imx6: remove outbound io/mem ATU
+> > region mapping
+> >
+> > On Wednesday, December 04, 2013 at 06:49:55 AM, Richard Zhu wrote:
+> > > Hi Marek:
+> > >
+> > > Best Regards
+> > > Richard Zhu
+> > >
+> > > > -----Original Message-----
+> > > > From: Marek Vasut [mailto:marex at denx.de]
+> > > > Sent: Friday, November 29, 2013 1:56 AM
+> > > > To: Jingoo Han
+> > > > Cc: 'Tim Harvey'; 'Pratyush Anand';
+> > > > linux-arm-kernel at lists.infradead.org;
+> > > > linux-pci at vger.kernel.org; 'Bjorn Helgaas'; 'Frank Li'; 'Harro
+> > > > Haan'; 'Mohit KUMAR DCG'; Zhu Richard-R65037; 'Sascha Hauer';
+> > > > 'Sean Cross'; 'Shawn Guo'; 'Siva Reddy Kallam'; 'Srikanth T
+> > > > Shivanand'; 'Troy Kisky'; 'Yinghai Lu' Subject: Re: [PATCH 2/7] [RFC]
+> PCI: imx6:
+> > > > remove outbound io/mem ATU region mapping
+> > > >
+> > > > Dear Jingoo Han,
+> > > >
+> > > > > On Wednesday, November 27, 2013 5:44 PM, Marek Vasut wrote:
+> > > > > > Wednesday, November 27, 2013 1:30 PM, Pratyush Anand wrote:
+> > > > > > > On Wed, Nov 27, 2013 at 05:10:43AM +0800, Marek Vasut wrote:
+> > > > > > > > From: Tim Harvey <tharvey@gateworks.com>
+> > > > > > > >
+> > > > > > > > The IMX6 iATU is used for address translation between the
+> > > > > > > > AXI bus address space and PCI address space.  This is used
+> > > > > > > > for type0 and
+> > > > > > > > type1 config cycles but is not necessary for outbound
+> > > > > > > > io/mem regions.
+> > > > > > > >
+> > > > > > > > This patch removes the calls that inappropriately
+> > > > > > > > re-configures the ATU viewport for outbound memory and IO
+> > > > > > > > after config cycles and removes them altogether as they
+> > > > > > > > are not
+> > necessary.
+> > > > > > >
+> > > > > > > Yes, they are not necessary for all the cases where
+> > > > > > > translation is one to one. So so for sure all the platform
+> > > > > > > till now introduced should work.
+> > > > > > > But, what about a platform where memory translation is not
+> > > > > > > one to one?
+> > > > > > >
+> > > > > > > Existing code should work with all sort of memory
+> > > > > > > translation on a platform having atleast two viewports
+> > > > > > > capable of programming any type of outbound transaction.
+> > > > > >
+> > > > > > Full ACK, that's why it's called RFC.
+> > > > > >
+> > > > > > > > This resolves issues with PCI devices behind switches and
+> > > > > > > > has been tested with a Gige device behind a PLX PEX860x switch.
+> > > > > > > > More testing is needed for other configurations.
+> > > > > > >
+> > > > > > > I do not understand if MX6 has 4 Outbound Viewport then how
+> > > > > > > this patch helps?
+> > > > > > > -- PCI devices behind switches would not have been working
+> > > > > > > because
+> > > > > > > CFG1 transaction would not have been correct.
+> > > > > > > -- It works with this patch. This patch changes viewport for
+> > > > > > > CFG1 from
+> > > > > > > 1 to 0.
+> > > > > > > -- Can it be possible that MX6 has some restriction on
+> > > > > > > viewport programming capability. I mean,like only viewport0
+> > > > > > > can be programmed for CFG0/1?
+> > > > > >
+> > > > > > Tim ?
+> > > > > >
+> > > > > > Here is the MX6 datasheet [1], the section 48.3.9.1.1 and
+> > > > > > 48.3.9.1.2 describe the iATU configuration on MX6. My
+> > > > > > understanding from this description is that the MX6 has 4
+> > > > > > inbound and 4 outbound iATU regions. Am I wrong ?
+> > > > >
+> > > > > The numbers of inbound and outbound are hardware-configurable features.
+> > > > > Thus, these numbers  can be confirmed by Freescale  hardware engineers.
+> > > > > How about asking Freescale hardware engineers, if possible?
+> > > >
+> > > > Richard is on the CC. Richard, can you please confirm those?
+> > >
+> > > [Richard] One Pericom PI7C9X2G303EL pcie switch, and two pcie ep
+> > > deivces(one is intel e1000e nic, the other is one xhci device) are
+> > > tested on imx6q sabresd board. Without removing outbound io/mem
+> > > regions view map during the cfg0/1 read/write cycle, both of these
+> > > devices can't work well at my side. Works well after remove them
+> > > during the cfg0/1 read/write cycles.
+> > > Same to Tim's situation about switch implementation.
+> >
+> > Thanks Richard! I am just wondering what kind of conclusion can we
+> > draw from this. Let me reiterate what we have:
+> >
+> > - i.MX6 has 4 inbound and 4 outbound iATU regions, is that correct, Richard?
+> > - If we program the iATU regions, the i.MX6 PCIe doesn't work with switch.
+> >
+> > Is there some special sause to the iATU on MX6 maybe ?
+> [Richard] welcome, it's correct, imx6 pcie has 4 inbount and 4 outbound iATU
+> regions.
+> Imx6 pcie doesn't work with switch if the following view switches are not
+> removed in The cfg0/1 read/write cycles.
+> 
+> @@ -516,9 +560,11 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp,
+> struct pci_bus *bus,
+>         if (bus->parent->number == pp->root_bus_nr) {
+>                 dw_pcie_prog_viewport_cfg0(pp, busdev);
+>                 ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
+> +               // dw_pcie_prog_viewport_mem_outbound(pp);
+>         } else {
+>                 dw_pcie_prog_viewport_cfg1(pp, busdev);
+>                 ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
+> +               // dw_pcie_prog_viewport_io_outbound(pp);
+>         }
+> 
+>         return ret;
+> @@ -537,9 +583,11 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp,
+> struct pci_bus *bus,
+>         if (bus->parent->number == pp->root_bus_nr) {
+>                 dw_pcie_prog_viewport_cfg0(pp, busdev);
+>                 ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
+> +               // dw_pcie_prog_viewport_mem_outbound(pp);
+>         } else {
+>                 dw_pcie_prog_viewport_cfg1(pp, busdev);
+>                 ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
+> +               // dw_pcie_prog_viewport_io_outbound(pp);
+>         }
+> 
+>         return ret;
+> 
+> Best Regards
+> Richard Zhu
+> 
+[Richard] Bisect the code-modifications, only the dw_pcie_prog_viewport_io_outbound()
+ should be masked if I want the switch works in my imx6 pcie switch support tests.
+Suspect that the mem emulated io space introduce this problem, debug is on-going.
+> 
+Best Regards
+Richard Zhu
 
-original:
-
-ffffffc0001b0280 <atomic_scrub>:
-ffffffc0001b0280:       53027c21        lsr     w1, w1, #2
-ffffffc0001b0284:       34000141        cbz     w1, ffffffc0001b02ac
-<atomic_scrub+0x2c>
-ffffffc0001b0288:       51000421        sub     w1, w1, #0x1
-ffffffc0001b028c:       91000421        add     x1, x1, #0x1
-ffffffc0001b0290:       8b010801        add     x1, x0, x1, lsl #2
-ffffffc0001b0294:       885f7c02        ldxr    w2, [x0]
-ffffffc0001b0298:       88037c02        stxr    w3, w2, [x0]
-ffffffc0001b029c:       35ffffc3        cbnz    w3, ffffffc0001b0294
-<atomic_scrub+0x14>
-ffffffc0001b02a0:       91001000        add     x0, x0, #0x4
-ffffffc0001b02a4:       eb01001f        cmp     x0, x1
-ffffffc0001b02a8:       54ffff61        b.ne    ffffffc0001b0294
-<atomic_scrub+0x14>
-ffffffc0001b02ac:       d65f03c0        ret
-
-using last_addr:
-
-ffffffc0001b0280 <atomic_scrub>:
-ffffffc0001b0280:       8b214001        add     x1, x0, w1, uxtw
-ffffffc0001b0284:       eb01001f        cmp     x0, x1
-ffffffc0001b0288:       540000e2        b.cs    ffffffc0001b02a4
-<atomic_scrub+0x24>
-ffffffc0001b028c:       885f7c02        ldxr    w2, [x0]
-ffffffc0001b0290:       88037c02        stxr    w3, w2, [x0]
-ffffffc0001b0294:       35ffffc3        cbnz    w3, ffffffc0001b028c
-<atomic_scrub+0xc>
-ffffffc0001b0298:       91001000        add     x0, x0, #0x4
-ffffffc0001b029c:       eb00003f        cmp     x1, x0
-ffffffc0001b02a0:       54ffff68        b.hi    ffffffc0001b028c
-<atomic_scrub+0xc>
-ffffffc0001b02a4:       d65f03c0        ret
-
-Rob
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the
+> body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
