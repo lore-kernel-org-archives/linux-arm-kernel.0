@@ -1,34 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 5 Dec 2013 08:00:28 +0000
+Date: Thu, 5 Dec 2013 08:04:06 +0000
 Subject: Boot time errors/warnings on snowball
-In-Reply-To: <20131204185947.GC29268@sirena.org.uk>
+In-Reply-To: <20131204231756.GX16735@n2100.arm.linux.org.uk>
 References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
  <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
  <20131204172626.GB26581@lee--X1>
  <CAOesGMjMWqPtJXh7-VAhyA1a95h7mKV8_UZhyTtxgEbUhU8_5Q@mail.gmail.com>
  <20131204175119.GD26581@lee--X1>
- <CAOesGMh7+r9vUvtH_pwJeMyQJGo3u-uJRJ8-OBidzzO1pC5RDA@mail.gmail.com>
- <20131204185947.GC29268@sirena.org.uk>
-Message-ID: <20131205080028.GG26581@lee--X1>
+ <20131204231756.GX16735@n2100.arm.linux.org.uk>
+Message-ID: <20131205080406.GH26581@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > We're usually fairly quick at merging our branches during the merge
-> > window, so sequencing should be fine. Even if Mark does his pull
-> > requests before us, the window of breakage should be minimal (and
-> > we're now aware of it).
+> > I know that you've had a bee in your bonnet about the rate of which I
+> > sent patches for a while, but this instance has nothing to do with
+> > rushing. This is merely an ordering issue and the speed in which
+> > varying subsystems are merged into -next.
+> > 
+> > This is what -next is for though right? To identify these kinds of
+> > decencies before they're merged into Mainline. So let's do something
+> > about it now. I'm not sure what though, as I know that Mark isn't fond
+> > of rebasing his tree.
 > 
-> If there's a topic branch for the ARM side I can pull it into ASoC to
-> get the window down to a few commits (or even rebase the ux500 stuff
-> onto it to remove it).
+> You can't solve dependencies by "tree X needs to merge before tree Y
+> otherwise Z breaks", period.
+> 
+> It gives the _illusion_ that it solves it, but it doesn't.  Just try
+> doing a git bisect and hitting commits in tree Y without tree X being
+> merged.  By doing it this way, you're basically telling people that
+> you can't bisect a merge window.  The merge window is _precisely_ the
+> period where we need bisectability to find bugs.
 
-If you're happy to rebase your asoc/topic/ux500 onto Linus'
-ux500-devicetree-v3.14-1 tag, I believe that would solve the
-dependency.
+Right, Olof was already kind enough to point this out:
 
-> Or I can sign the ux500 branch for arm-soc.
-
-What does that do?
+ "It can be done. It's unfortunate to lose bisectability though (since
+  when you bisect you can end up in a state where the ASoC patches are
+  enabled but not the ux500 counterparts. Setting up a shared branch
+  is indeed the best (only) way to solve that. Next time around we
+  should do so."
+ 
+Which reminded me of "how git works"; non-linear history, yada yada.
 
 -- 
 Lee Jones
