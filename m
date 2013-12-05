@@ -1,71 +1,32 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 4 Dec 2013 18:49:37 -0600
-Subject: [PATCH V2 2/2] ARM: OMAP2+: board-generic: update SoC compatibility
- strings
-In-Reply-To: <1386204578-6018-1-git-send-email-nm@ti.com>
-References: <1386204578-6018-1-git-send-email-nm@ti.com>
-Message-ID: <1386204578-6018-3-git-send-email-nm@ti.com>
+Date: Wed, 4 Dec 2013 18:49:35 -0600
+Subject: [PATCH V2 0/2] ARM: OMAP2+/dts: standardize SoC naming
+Message-ID: <1386204578-6018-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have standardized SoC definitions, update the
-compatibility strings in board machine descriptors. Eventually, we
-should just have SoC compatiblity here and all board specific stuff
-should disappear.
+Originally attempted partially in [1], the missing binding were
+reported as part of Rob's report in [2].
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-NOTE: To prevent conflict, I have not added am3517 which is addressed in:
-https://patchwork.kernel.org/patch/3279281/
+So, here is take two of the series, lacking an standard causes issues
+that was fixed such as [3]. Ideally, we should never again introduce a
+board file without a exact compatible SoC match.
 
- arch/arm/mach-omap2/board-generic.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+I have stayed a bit away from updating board and SoC dts files yet
+to look at the direction we'd like to go here. If we feel things are
+good, I would gladly try to clean our mess up.
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 19f1652..5356a29 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -78,6 +78,7 @@ MACHINE_END
- 
- #ifdef CONFIG_ARCH_OMAP3
- static const char *omap3_boards_compat[] __initdata = {
-+	"ti,omap3430",
- 	"ti,omap3",
- 	NULL,
- };
-@@ -155,6 +156,8 @@ MACHINE_END
- 
- #ifdef CONFIG_ARCH_OMAP4
- static const char *omap4_boards_compat[] __initdata = {
-+	"ti,omap4460",
-+	"ti,omap4430",
- 	"ti,omap4",
- 	NULL,
- };
-@@ -175,6 +178,8 @@ MACHINE_END
- 
- #ifdef CONFIG_SOC_OMAP5
- static const char *omap5_boards_compat[] __initdata = {
-+	"ti,omap5432",
-+	"ti,omap5430",
- 	"ti,omap5",
- 	NULL,
- };
-@@ -195,6 +200,7 @@ MACHINE_END
- 
- #ifdef CONFIG_SOC_AM43XX
- static const char *am43_boards_compat[] __initdata = {
-+	"ti,am4372",
- 	"ti,am43",
- 	NULL,
- };
-@@ -212,6 +218,7 @@ MACHINE_END
- 
- #ifdef CONFIG_SOC_DRA7XX
- static const char *dra7xx_boards_compat[] __initdata = {
-+	"ti,dra7xx",
- 	"ti,dra7",
- 	NULL,
- };
+Nishanth Menon (2):
+  Documentation: dt: OMAP: explicitly state SoC compatible strings
+  ARM: OMAP2+: board-generic: update SoC compatibility strings
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   53 ++++++++++++++++++++
+ arch/arm/mach-omap2/board-generic.c                |    7 +++
+ 2 files changed, 60 insertions(+)
+
+[1] https://patchwork.kernel.org/patch/2998201/
+[2] http://marc.info/?l=linux-arm-kernel&m=138378029113665&w=2
+[3] https://patchwork.kernel.org/patch/3279281/
+
 -- 
 1.7.9.5
