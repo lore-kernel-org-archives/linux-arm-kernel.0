@@ -1,54 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Dec 2013 14:34:48 +0100
-Subject: [PATCH 3/6] mmc: mxs: use standard flag for broken card detection
-In-Reply-To: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
-References: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1386250491-4708-4-git-send-email-s.hauer@pengutronix.de>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu,  5 Dec 2013 14:28:04 +0100
+Subject: [PATCH 1/3] ARM: dts: mxs: Add 18bit pin config for lcdif.
+Message-ID: <1386250086-4666-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the standard MMC_CAP_NEEDS_POLL flag rather than a custom broken_cd
-flag. The original code used to just return true in the card detection
-function for broken card detection. The MMC_CAP_NEEDS_POLL works different,
-but was introduced for the same purpose, so assume the code works correct
-now.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- drivers/mmc/host/mxs-mmc.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx28.dtsi |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 374fca7..02210ce 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -72,7 +72,6 @@ struct mxs_mmc_host {
- 	int				wp_gpio;
- 	bool				wp_inverted;
- 	bool				cd_inverted;
--	bool				broken_cd;
- };
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 51ff335..93a7e79 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -668,6 +668,33 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
  
- static int mxs_mmc_get_ro(struct mmc_host *mmc)
-@@ -96,8 +95,7 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
- 	struct mxs_mmc_host *host = mmc_priv(mmc);
- 	struct mxs_ssp *ssp = &host->ssp;
- 
--	return host->broken_cd ||
--		!(readl(ssp->base + HW_SSP_STATUS(ssp)) &
-+	return !(readl(ssp->base + HW_SSP_STATUS(ssp)) &
- 		  BM_SSP_STATUS_CARD_DETECT) ^ host->cd_inverted;
- }
- 
-@@ -652,7 +650,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 		mmc->caps |= MMC_CAP_4_BIT_DATA;
- 	else if (bus_width == 8)
- 		mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
--	host->broken_cd = of_property_read_bool(np, "broken-cd");
-+	if (of_property_read_bool(np, "broken-cd"))
-+		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 	if (of_property_read_bool(np, "non-removable"))
- 		mmc->caps |= MMC_CAP_NONREMOVABLE;
- 	host->wp_gpio = of_get_named_gpio_flags(np, "wp-gpios", 0, &flags);
++				lcdif_18bit_pins_a: lcdif-18bit at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_LCD_D00__LCD_D0
++						MX28_PAD_LCD_D01__LCD_D1
++						MX28_PAD_LCD_D02__LCD_D2
++						MX28_PAD_LCD_D03__LCD_D3
++						MX28_PAD_LCD_D04__LCD_D4
++						MX28_PAD_LCD_D05__LCD_D5
++						MX28_PAD_LCD_D06__LCD_D6
++						MX28_PAD_LCD_D07__LCD_D7
++						MX28_PAD_LCD_D08__LCD_D8
++						MX28_PAD_LCD_D09__LCD_D9
++						MX28_PAD_LCD_D10__LCD_D10
++						MX28_PAD_LCD_D11__LCD_D11
++						MX28_PAD_LCD_D12__LCD_D12
++						MX28_PAD_LCD_D13__LCD_D13
++						MX28_PAD_LCD_D14__LCD_D14
++						MX28_PAD_LCD_D15__LCD_D15
++						MX28_PAD_LCD_D16__LCD_D16
++						MX28_PAD_LCD_D17__LCD_D17
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
+ 				lcdif_16bit_pins_a: lcdif-16bit at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
 -- 
-1.8.4.3
+1.7.9.5
