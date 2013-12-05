@@ -1,554 +1,216 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu,  5 Dec 2013 14:28:06 +0100
-Subject: [PATCH 3/3] Add support for the eukrea-cpuimx28.
-In-Reply-To: <1386250086-4666-1-git-send-email-denis@eukrea.com>
-References: <1386250086-4666-1-git-send-email-denis@eukrea.com>
-Message-ID: <1386250086-4666-3-git-send-email-denis@eukrea.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 05 Dec 2013 21:41:48 +0800
+Subject: [RFC part2 PATCH 9/9] ACPI / GIC: Initialize GIC using the
+ information in MADT
+In-Reply-To: <529F4F39.9090001@arm.com>
+References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088753-2850-10-git-send-email-hanjun.guo@linaro.org>
+ <529E1443.9040509@arm.com> <529F4B2A.6060508@linaro.org>
+ <529F4F39.9090001@arm.com>
+Message-ID: <52A0829C.7020504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric B?nard <eric@eukrea.com>
+On 2013?12?04? 23:50, Marc Zyngier wrote:
+> On 04/12/13 15:32, Hanjun Guo wrote:
+>> On 2013?12?04? 01:26, Marc Zyngier wrote:
+>>> Hi Hanjun,
+>>>
+>>> On 03/12/13 16:39, Hanjun Guo wrote:
+>>>> In MADT table, there are GIC cpu interface base address and
+>>>> GIC distributor base address, use them to convert GIC to ACPI.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>    arch/arm64/kernel/irq.c      |    5 ++++
+>>>>    drivers/acpi/plat/arm-core.c |   66 ++++++++++++++++++++++++++++++++++++------
+>>>>    include/linux/acpi.h         |    6 ++++
+>>>>    3 files changed, 68 insertions(+), 9 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+>>>> index 473e5db..a9e68bf 100644
+>>>> --- a/arch/arm64/kernel/irq.c
+>>>> +++ b/arch/arm64/kernel/irq.c
+>>>> @@ -25,6 +25,7 @@
+>>>>    #include <linux/irq.h>
+>>>>    #include <linux/smp.h>
+>>>>    #include <linux/init.h>
+>>>> +#include <linux/acpi.h>
+>>>>    #include <linux/irqchip.h>
+>>>>    #include <linux/seq_file.h>
+>>>>    #include <linux/ratelimit.h>
+>>>> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+>>>>    void __init init_IRQ(void)
+>>>>    {
+>>>>    	irqchip_init();
+>>>> +
+>>>> +	if (!handle_arch_irq)
+>>>> +		acpi_gic_init();
+>>>> +
+>>> Why is the GIC hardcoded?
+>> Very good question, thanks. I considered GIC only in my patch set.
+>> I have no idea how to handle the GIC hardcoded problem here for
+>> now, but I will figure it out later.
+>>
+>> If any suggestion, I will appreciate a lot.
+>>
+>>> How are you going to support other interrupt
+>>> controllers?
+>> ACPI 5.0 supports GICv2 only for now, if we want to
+>> support other interrupt controller, we should introduce
+>> some OEM table and parsing it, and it will not covered
+>> by this patch set.
+>>
+>>>>    	if (!handle_arch_irq)
+>>>>    		panic("No interrupt controller found.");
+>>>>    }
+>>>> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
+>>>> index 17c99e1..509b847 100644
+>>>> --- a/drivers/acpi/plat/arm-core.c
+>>>> +++ b/drivers/acpi/plat/arm-core.c
+>>>> @@ -29,6 +29,7 @@
+>>>>    #include <linux/module.h>
+>>>>    #include <linux/irq.h>
+>>>>    #include <linux/irqdomain.h>
+>>>> +#include <linux/irqchip/arm-gic.h>
+>>>>    #include <linux/slab.h>
+>>>>    #include <linux/bootmem.h>
+>>>>    #include <linux/ioport.h>
+>>>> @@ -211,11 +212,21 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+>>>>    	return 0;
+>>>>    }
+>>>>    
+>>>> +#ifdef CONFIG_ARM_GIC
+>>>> +/*
+>>>> + * Hard code here, we can not get memory size from MADT (but FDT does),
+>>>> + * this size is described in ARMv8 foudation model's User Guide
+>>>> + */
+>>>> +#define GIC_DISTRIBUTOR_MEMORY_SIZE (SZ_8K)
+>>>> +#define GIC_CPU_INTERFACE_MEMORY_SIZE (SZ_4K)
+>>> Aside from the incorrect sizes, how do you plan to address the other
+>>> regions that the GICv2 specification describes?
+>> Did these regions have the same base address? I mean the same
+>> as GIC distributor base address and GIC cpu interface base address.
+>>
+>> if yes, since the base address is stored in gic_init(), it can be for
+>> furture
+>> use. if I misunderstood your question, please let me know.
+> Look at the VGIC implementation for KVM in virt/kvm/arm. It does its own
+> probing of the additional regions used for virtualization.
+>
+> The GIC and VGIC code are completely separate, and you'll need to find
+> an acceptable solution for that too.
 
-The following devices/functionalities were tested:
- * Main UART.
- * Ethernet0.
- * Ethernet1.
- * SD.
- * USB host.
- * USB otg.
- * Display(and its backlight).
- * Touchscreen.
- * Audio.
- * nand.
- * i2c and the pcf8563 device.
- * The gpio buttons.
- * The gpio leds.
- * Watchdog
+Ok, will review the VGIC code for KVM, thanks for the guidance.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/boot/dts/Makefile                   |    2 +
- arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts |   71 ++++++
- arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts |   50 ++++
- arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi |  326 ++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c                 |    8 +
- 5 files changed, 457 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts
- create mode 100644 arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
- create mode 100644 arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi
+>>>>    static int __init
+>>>>    acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+>>>>    				const unsigned long end)
+>>>>    {
+>>>>    	struct acpi_madt_generic_distributor *distributor = NULL;
+>>>> +	void __iomem *dist_base = NULL;
+>>>> +	void __iomem *cpu_base = NULL;
+>>>>    
+>>>>    	distributor = (struct acpi_madt_generic_distributor *)header;
+>>>>    
+>>>> @@ -224,8 +235,43 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+>>>>    
+>>>>    	acpi_table_print_madt_entry(header);
+>>>>    
+>>>> +	/* GIC is initialised after page_init(), no need for early_ioremap */
+>>>> +	dist_base = ioremap(distributor->base_address,
+>>>> +				GIC_CPU_INTERFACE_MEMORY_SIZE);
+>>>> +	if (!dist_base) {
+>>>> +		pr_warn(PREFIX "unable to map gic dist registers\n");
+>>>> +		return -ENOMEM;
+>>>> +	}
+>>>> +
+>>>> +	/*
+>>>> +	 * acpi_lapic_addr is stored in acpi_parse_madt(),
+>>>> +	 * so we can use it here for GIC init
+>>>> +	 */
+>>>> +	if (acpi_lapic_addr) {
+>>>> +		iounmap(dist_base);
+>>>> +		pr_warn(PREFIX "Invalid GIC cpu interface base address\n");
+>>>> +		return -EINVAL;
+>>>> +	}
+>>>> +
+>>>> +	cpu_base = ioremap(acpi_lapic_addr, GIC_CPU_INTERFACE_MEMORY_SIZE);
+>>>> +	if (!cpu_base) {
+>>>> +		iounmap(dist_base);
+>>>> +		pr_warn(PREFIX "unable to map gic cpu registers\n");
+>>>> +		return -ENOMEM;
+>>>> +	}
+>>>> +
+>>>> +	gic_init(distributor->gic_id, -1, dist_base, cpu_base);
+>>>> +
+>>>>    	return 0;
+>>>>    }
+>>>> +#else
+>>>> +static int __init
+>>>> +acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+>>>> +				const unsigned long end)
+>>>> +{
+>>>> +	return -ENODEV;
+>>>> +}
+>>>> +#endif /* CONFIG_ARM_GIC */
+>>>>    
+>>>>    /*
+>>>>     * Parse GIC cpu interface related entries in MADT
+>>>> @@ -234,7 +280,7 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+>>>>    static int __init acpi_parse_madt_gic_entries(void)
+>>>>    {
+>>>>    	int count;
+>>>> -
+>>>> +
+>>>>    	/*
+>>>>    	 * do a partial walk of MADT to determine how many CPUs
+>>>>    	 * we have including disabled CPUs
+>>>> @@ -468,19 +514,21 @@ static void __init acpi_process_madt(void)
+>>>>    		 * Parse MADT GIC cpu interface entries
+>>>>    		 */
+>>>>    		error = acpi_parse_madt_gic_entries();
+>>>> -		if (!error) {
+>>>> -			/*
+>>>> -			 * Parse MADT GIC distributor entries
+>>>> -			 */
+>>>> -			acpi_parse_madt_gic_distributor_entries();
+>>>> -		}
+>>>> +		if (!error)
+>>>> +			pr_info("Using ACPI for processor (GIC) configuration information\n");
+>>>>    	}
+>>>>    
+>>>> -	pr_info("Using ACPI for processor (GIC) configuration information\n");
+>>>> -
+>>>>    	return;
+>>>>    }
+>>>>    
+>>>> +int __init acpi_gic_init(void)
+>>>> +{
+>>>> +	/*
+>>>> +	 * Parse MADT GIC distributor entries
+>>>> +	 */
+>>>> +	return acpi_parse_madt_gic_distributor_entries();
+>>>> +}
+>>>> +
+>>> Why can't you do the GIC init in the GIC code? We've tried hard to make
+>>> interrupt controllers discoverable and self contained.
+>> thanks for your suggestion, Rob also had the same suggestion,
+>> will try to update it in next version.
+>>
+>>> What are you
+>>> going to do when ACPI adds GICv3 to the mix? I don't really think this
+>>> model (shoving everything into the core ACPI code) is sustainable in the
+>>> long run...
+>> Since GICv3 related ACPI proposal is not public and not goes into ACPI
+>> spec, my suggestion is that we implement GICv2 only for now and post
+>> another patches for GICv3 when the new ACPI spec is available.
+> Certainly. But I think you should aim for a scalable solution right
+> away, instead of starting with something that we already know won't work
+> for stuff that is already around the corner (which is what I infer from
+> your "non public" statement).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b14bb11..dec6e93 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -178,6 +178,8 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- 	imx28-cfa10057.dtb \
- 	imx28-cfa10058.dtb \
- 	imx28-duckbill.dtb \
-+	imx28-eukrea-mbmx283lc.dtb \
-+	imx28-eukrea-mbmx287lc.dtb \
- 	imx28-evk.dtb \
- 	imx28-m28cu3.dtb \
- 	imx28-m28evk.dtb \
-diff --git a/arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts b/arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts
-new file mode 100644
-index 0000000..7c1572c
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts
-@@ -0,0 +1,71 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <eric@eukrea.com>
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/*
-+ * Module contains : i.MX282 + 64MB DDR2 + NAND + Ethernet PHY + RTC
-+ */
-+
-+/dts-v1/;
-+#include "imx28-eukrea-mbmx28lc.dtsi"
-+
-+/ {
-+	model = "Eukrea Electromatique MBMX283LC";
-+	compatible = "eukrea,mbmx283lc", "eukrea,mbmx28lc", "fsl,imx28";
-+
-+	memory {
-+		reg = <0x40000000 0x04000000>;
-+	};
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gpmi_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	pcf8563: rtc at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
-+};
-+
-+
-+&mac0 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mac0_pins_a>;
-+	phy-reset-gpios = <&gpio4 13 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&pinctrl{
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hog_pins_cpuimx283>;
-+
-+	hog_pins_cpuimx283: hog-cpuimx283 at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_ENET0_RX_CLK__GPIO_4_13
-+			MX28_PAD_ENET0_TX_CLK__GPIO_4_5
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_ENABLE>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts b/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
-new file mode 100644
-index 0000000..e773144
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
-@@ -0,0 +1,50 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <eric@eukrea.com>
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/*
-+ * Module contains : i.MX287 + 128MB DDR2 + NAND + 2 x Ethernet PHY + RTC
-+ */
-+
-+#include "imx28-eukrea-mbmx283lc.dts"
-+
-+/ {
-+	model = "Eukrea Electromatique MBMX287LC";
-+	compatible = "eukrea,mbmx287lc", "eukrea,mbmx283lc", "eukrea,mbmx28lc", "fsl,imx28";
-+
-+	memory {
-+		reg = <0x40000000 0x08000000>;
-+	};
-+};
-+
-+&mac1 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mac1_pins_a>;
-+	phy-reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hog_pins_cpuimx283 &hog_pins_cpuimx287>;
-+	hog_pins_cpuimx287: hog-cpuimx287 at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_SPDIF__GPIO_3_27
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_ENABLE>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi b/arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi
-new file mode 100644
-index 0000000..927b391
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi
-@@ -0,0 +1,326 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <eric@eukrea.com>
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include "imx28.dtsi"
-+
-+/ {
-+	model = "Eukrea Electromatique MBMX28LC";
-+	compatible = "eukrea,mbmx28lc", "fsl,imx28";
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 4 1000000>;
-+		brightness-levels = <0 25 50 75 100 125 150 175 200 225 255>;
-+		default-brightness-level = <10>;
-+	};
-+
-+	button-sw3 {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gpio_button_sw3_pins_mbmx28lc>;
-+
-+		sw3 {
-+			label = "SW3";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
-+			linux,code = <BTN_MISC>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	button-sw4 {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gpio_button_sw4_pins_mbmx28lc>;
-+
-+		sw4 {
-+			label = "SW4";
-+			gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
-+			linux,code = <BTN_MISC>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	led-d6 {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_d6_pins_mbmx28lc>;
-+
-+		led1 {
-+			label = "d6";
-+			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	led-d7 {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_d7_pins_mbmx28lc>;
-+
-+		led1 {
-+			label = "d7";
-+			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_3p3v: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		reg_lcd_3v3: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&reg_lcd_3v3_pins_mbmx28lc>;
-+			regulator-name = "lcd-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb0_vbus: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&reg_usb0_vbus_pins_mbmx28lc>;
-+			regulator-name = "usb0_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 18 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb1_vbus: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&reg_usb1_vbus_pins_mbmx28lc>;
-+			regulator-name = "usb1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 19 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx28-mbmx28lc-sgtl5000",
-+			     "fsl,mxs-audio-sgtl5000";
-+		model = "imx28-mbmx28lc-sgtl5000";
-+		saif-controllers = <&saif0 &saif1>;
-+		audio-codec = <&sgtl5000>;
-+	};
-+};
-+
-+&duart {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&duart_4pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	sgtl5000: codec at 0a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		clocks = <&saif0>;
-+	};
-+};
-+
-+&lcdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcdif_18bit_pins_a &lcdif_pins_mbmx28lc>;
-+	lcd-supply = <&reg_lcd_3v3>;
-+	display = <&display0>;
-+	status = "okay";
-+
-+	display0: display0 {
-+		model = "43WVF1G-0";
-+		bits-per-pixel = <16>;
-+		bus-width = <18>;
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: timing0 {
-+				clock-frequency = <9072000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hback-porch = <10>;
-+				hfront-porch = <5>;
-+				vback-porch = <8>;
-+				vfront-porch = <8>;
-+				hsync-len = <40>;
-+				vsync-len = <10>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <1>;
-+			};
-+		};
-+	};
-+};
-+
-+&lradc {
-+	fsl,lradc-touchscreen-wires = <4>;
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	gpio_button_sw3_pins_mbmx28lc: gpio-button-sw3-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_D21__GPIO_1_21
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+
-+	gpio_button_sw4_pins_mbmx28lc: gpio-button-sw4-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_D20__GPIO_1_20
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+
-+	lcdif_pins_mbmx28lc: lcdif-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_VSYNC__LCD_VSYNC
-+			MX28_PAD_LCD_HSYNC__LCD_HSYNC
-+			MX28_PAD_LCD_DOTCLK__LCD_DOTCLK
-+			MX28_PAD_LCD_ENABLE__LCD_ENABLE
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+
-+	led_d6_pins_mbmx28lc: led-d6-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_D23__GPIO_1_23
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+
-+	led_d7_pins_mbmx28lc: led-d7-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_D22__GPIO_1_22
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+
-+	reg_lcd_3v3_pins_mbmx28lc: lcd-3v3-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_RESET__GPIO_3_30
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+
-+	reg_usb0_vbus_pins_mbmx28lc: reg-usb0-vbus-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_D18__GPIO_1_18
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+
-+	reg_usb1_vbus_pins_mbmx28lc: reg-usb1-vbus-mbmx28lc at 0 {
-+		reg = <0>;
-+		fsl,pinmux-ids = <
-+			MX28_PAD_LCD_D19__GPIO_1_19
-+		>;
-+		fsl,drive-strength = <MXS_DRIVE_4mA>;
-+		fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+		fsl,pull-up = <MXS_PULL_DISABLE>;
-+	};
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm4_pins_a>;
-+	status = "okay";
-+};
-+
-+&saif0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&saif0_pins_a>;
-+	status = "okay";
-+};
-+
-+&saif1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&saif1_pins_a>;
-+	fsl,saif-master = <&saif0>;
-+	status = "okay";
-+};
-+
-+&ssp0 {
-+	compatible = "fsl,imx28-mmc";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_cd_cfg &mmc0_sck_cfg>;
-+	bus-width = <4>;
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	disable-over-current;
-+	vbus-supply = <&reg_usb0_vbus>;
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_pins_b>;
-+};
-+
-+&usb1 {
-+	vbus-supply = <&reg_usb1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbphy0 {
-+	status = "okay";
-+};
-+
-+&usbphy1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 02b17f7..3b5f57e 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -448,6 +448,12 @@ static int __init mxs_restart_init(void)
- 	return 0;
- }
- 
-+static void __init eukrea_mbmx283lc_init(void)
-+{
-+	enable_clk_enet_out();
-+	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
-+}
-+
- static void __init mxs_machine_init(void)
- {
- 	struct device_node *root;
-@@ -486,6 +492,8 @@ static void __init mxs_machine_init(void)
- 		apx4devkit_init();
- 	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
- 		crystalfontz_init();
-+	else if (of_machine_is_compatible("eukrea,mbmx283lc"))
-+		eukrea_mbmx283lc_init();
- 	else if (of_machine_is_compatible("i2se,duckbill"))
- 		duckbill_init();
- 	else if (of_machine_is_compatible("msr,m28cu3"))
--- 
-1.7.9.5
+yes, sure I will, thanks for your comments.
+
+Thanks
+Hanjun
