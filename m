@@ -1,41 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Dec 2013 11:50:15 +0000
-Subject: [PATCH] ASoC: samsung: Initialize the dma_data for secondary dai
-In-Reply-To: <CAAgF-BdqRzB5MxTf_9nZkgSOY=F6dGAs0yhTkNHqrUQLonFAsw@mail.gmail.com>
-References: <1385632932-16579-1-git-send-email-padma.v@samsung.com>
- <20131128113800.GB27568@sirena.org.uk>
- <CAAgF-BdqRzB5MxTf_9nZkgSOY=F6dGAs0yhTkNHqrUQLonFAsw@mail.gmail.com>
-Message-ID: <20131205115015.GP29268@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Dec 2013 11:51:42 +0000
+Subject: [PATCH v2] arm64: enable EDAC on arm64
+In-Reply-To: <CAL_JsqJLf-kjzafMJ=wh_ZZa63SOMKy20M_5xjy9GRdofiZVCA@mail.gmail.com>
+References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
+ <20131126153747.GC692@arm.com>
+ <CAL_JsqJLf-kjzafMJ=wh_ZZa63SOMKy20M_5xjy9GRdofiZVCA@mail.gmail.com>
+Message-ID: <20131205115142.GD17165@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 04:33:19PM +0530, Padma Venkat wrote:
-> On Thu, Nov 28, 2013 at 5:08 PM, Mark Brown <broonie@kernel.org> wrote:
+On Thu, Dec 05, 2013 at 12:53:33AM +0000, Rob Herring wrote:
+> On Tue, Nov 26, 2013 at 9:37 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Fri, Nov 22, 2013 at 09:05:08PM +0000, Rob Herring wrote:
+> >> +static inline void atomic_scrub(void *va, u32 size)
+> >> +{
+> >> +     unsigned int *virt_addr = va;
+> >> +     unsigned int i;
+> >> +
+> >> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+> >
+> > BTW, maybe the compiler is smart enough to drop the i but why not just
+> > use a int *last_addr = va + size - 3; and just compare against this?
+> 
+> Evidently, the compiler is not that smart. Here's what I ended up
+> with. There's no need to subtract 3 that I can see:
+> 
+> unsigned int *last_addr = va + size;
+> for (; virt_addr < last_addr; virt_addr++) {
 
-> > Why don't we need this fix for mainline?  The dmaengine change is just
-> > moving the initialisation through a layer of indirection but there was
-> > initialisation anyway.  I'm concerned that there's a bug that ought to
-> > be fixed for v3.13 as well here.
+The 3 thing was for size not multiple of 4. Do we have any guarantees
+here?
 
-> Yes. We need this for mainline. Not dependent on your dmaengine changes.
-
-Ah, just saw this one - I'll cook up a version of it, due to the
-refactoring the change doesn't apply directly to v3.13.
-
-> >>       return snd_dmaengine_pcm_register(dev, &samsung_dmaengine_pcm_config,
-> >> -                                       SND_DMAENGINE_PCM_FLAG_COMPAT);
-> >> +                                       SND_DMAENGINE_PCM_FLAG_COMPAT |
-> >> +                             SND_DMAENGINE_PCM_FLAG_CUSTOM_CHANNEL_NAME);
-
-> > This is already done.
-
-> Should I send another patch by removing this flag from this patch?
-
-No need.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/4bc67a76/attachment.sig>
+-- 
+Catalin
