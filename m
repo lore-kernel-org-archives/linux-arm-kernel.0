@@ -1,77 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 22:08:38 +0100
-Subject: [PATCHv4 1/4] arm: dts: Add support for SD/MMC on SOCFPGA
-In-Reply-To: <1386263677-7733-2-git-send-email-dinguyen@altera.com>
-References: <1386263677-7733-1-git-send-email-dinguyen@altera.com>
- <1386263677-7733-2-git-send-email-dinguyen@altera.com>
-Message-ID: <201312052208.38342.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Dec 2013 22:26:41 +0100
+Subject: [PATCH 2/3] leds/pwm: Don't disable pwm when setting brightness
+ to 0
+In-Reply-To: <20131202131807.GC29721@pengutronix.de>
+References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1385412225-29740-3-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131202123318.GC12793@ulmo.nvidia.com>
+ <20131202131807.GC29721@pengutronix.de>
+Message-ID: <20131205212641.GC4707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 December 2013, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Re-use the "rockchip,rk2928-dw-mshc" binding that will support SD/MMC on
-> Altera's SOCFPGA platform.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> ---
-> v3: Re-use "rockchip,rk2928-dw-mshc" binding
-> v3: none
-> v2: none
-> ---
->  arch/arm/boot/dts/socfpga.dtsi          |   11 +++++++++++
->  arch/arm/boot/dts/socfpga_arria5.dtsi   |   12 ++++++++++++
->  arch/arm/boot/dts/socfpga_cyclone5.dtsi |   12 ++++++++++++
->  arch/arm/boot/dts/socfpga_vt.dts        |   12 ++++++++++++
->  4 files changed, 47 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index f936476..3d9f01b 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -469,6 +469,17 @@
->  			cache-level = <2>;
->  		};
->  
-> +		mmc: dwmmc0 at ff704000 {
-> +			compatible = "rockchip,rk2928-dw-mshc";
-> +			reg = <0xff704000 0x1000>;
-> +			interrupts = <0 139 4>;
-> +			fifo-depth = <0x400>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
-> +			clock-names = "biu", "ciu";
-> +		};
+Hello Thierry,
 
+On Mon, Dec 02, 2013 at 02:18:07PM +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Dec 02, 2013 at 01:33:19PM +0100, Thierry Reding wrote:
+> > On Mon, Nov 25, 2013 at 09:43:44PM +0100, Uwe Kleine-K?nig wrote:
+> > > This fixes disabling the LED on i.MX28. The PWM hardware delays using
+> > > the newly set pwm-config until the beginning of a new period. It's very
+> > > likely that pwm_disable is called before the current period ends. In
+> > > case the LED was on brightness=max before the LED stays on because in
+> > > the disabled PWM block the period never ends.
+> > > 
+> > > Also only call pwm_enable only once in the probe call back and the
+> > > matching pwm_disable in .remove(). Moreover the pwm is explicitly
+> > > initialized to off.
+> > 
+> > While I do understand the reasoning behind this, if this is really the
+> > behaviour that we need then there's no use in having pwm_enable() and
+> > pwm_disable() at all. They can just be folded into pwm_get() and
+> > pwm_put(), respectively.
+> So after the first pwm_get the pwm starts with an unspecified duty
+> cycle? That's not that nice, is it?
+How can we come forward here? After all it's a real bug being fixed.
 
-I think it's great that you can reuse the existing driver, but I'd recommend
-using a generic compatible string here in addition to one that identifies
-your specific implementation. You can list "rockchip,rk2928-dw-mshc" as
-well, but that is probably not necessary.
+Best regards
+Uwe
 
-What I'd expect to see here is either
-
-	compatible = "altr,socfpga-dw-mshc", "rockchip,rk2928-dw-mshc", "snps,dw-mshc";
-
-or 
-
-	compatible = "altr,socfpga-dw-mshc", "rockchip,rk2928-dw-mshc", "snps,dw-mshc";
-
-
-It's probably not too late to generalize the SDMMC_CMD_USE_HOLD_REG
-handling, which is currently the only difference between the generic
-"snps,dw-mshc" and the newer "rockchip,rk2928-dw-mshc" variant.
-
-It's quite likely that all implementations should actually set
-SDMMC_CMD_USE_HOLD_REG (if both rockchips and altera set it) and you
-don't need to have any distinction in the dw_mmc-pltfm.c driver at all.
-
-If it's actually needed on some but not others, you could add a binary
-DT property to tell the driver about it rather than keying it off of
-the compatible string. If it's needed only on older (or only on newer)
-versions of the dw-mshc design, it could be encoded as a version in the
-string, such as "snps,dw-mshc-1.234".
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
