@@ -1,98 +1,23 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 5 Dec 2013 16:10:52 -0600
-Subject: [PATCHv4 1/4] arm: dts: Add support for SD/MMC on SOCFPGA
-In-Reply-To: <201312052208.38342.arnd@arndb.de>
-References: <1386263677-7733-1-git-send-email-dinguyen@altera.com>
- <1386263677-7733-2-git-send-email-dinguyen@altera.com>
- <201312052208.38342.arnd@arndb.de>
-Message-ID: <1386281452.26656.8.camel@linux-builds1>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 5 Dec 2013 17:21:50 -0500 (EST)
+Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks at
+ system suspend
+In-Reply-To: <CAJvTdKnqD3ccPUzh7kNMNqrEYFfD93Vh9hgFuKyHz+pjGNHdtA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1312051720330.869-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-05 at 22:08 +0100, Arnd Bergmann wrote:
-> On Thursday 05 December 2013, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Re-use the "rockchip,rk2928-dw-mshc" binding that will support SD/MMC on
-> > Altera's SOCFPGA platform.
-> > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > ---
-> > v3: Re-use "rockchip,rk2928-dw-mshc" binding
-> > v3: none
-> > v2: none
-> > ---
-> >  arch/arm/boot/dts/socfpga.dtsi          |   11 +++++++++++
-> >  arch/arm/boot/dts/socfpga_arria5.dtsi   |   12 ++++++++++++
-> >  arch/arm/boot/dts/socfpga_cyclone5.dtsi |   12 ++++++++++++
-> >  arch/arm/boot/dts/socfpga_vt.dts        |   12 ++++++++++++
-> >  4 files changed, 47 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index f936476..3d9f01b 100644
-> > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -469,6 +469,17 @@
-> >  			cache-level = <2>;
-> >  		};
-> >  
-> > +		mmc: dwmmc0 at ff704000 {
-> > +			compatible = "rockchip,rk2928-dw-mshc";
-> > +			reg = <0xff704000 0x1000>;
-> > +			interrupts = <0 139 4>;
-> > +			fifo-depth = <0x400>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
-> > +			clock-names = "biu", "ciu";
-> > +		};
-> 
-> 
-> I think it's great that you can reuse the existing driver, but I'd recommend
-> using a generic compatible string here in addition to one that identifies
-> your specific implementation. You can list "rockchip,rk2928-dw-mshc" as
-> well, but that is probably not necessary.
-> 
-> What I'd expect to see here is either
-> 
-> 	compatible = "altr,socfpga-dw-mshc", "rockchip,rk2928-dw-mshc", "snps,dw-mshc";
-> 
-> or 
-> 
-> 	compatible = "altr,socfpga-dw-mshc", "rockchip,rk2928-dw-mshc", "snps,dw-mshc";
-> 
-> 
-> It's probably not too late to generalize the SDMMC_CMD_USE_HOLD_REG
-> handling, which is currently the only difference between the generic
-> "snps,dw-mshc" and the newer "rockchip,rk2928-dw-mshc" variant.
+On Thu, 5 Dec 2013, Len Brown wrote:
 
-Ok, I will try to generalize the driver.
-
+> This thread raises the question...
 > 
-> It's quite likely that all implementations should actually set
-> SDMMC_CMD_USE_HOLD_REG (if both rockchips and altera set it) and you
-> don't need to have any distinction in the dw_mmc-pltfm.c driver at all.
+> Do we still need to have PM_RUNTIME apart from PM_SLEEP?
 > 
-> If it's actually needed on some but not others, you could add a binary
-> DT property to tell the driver about it rather than keying it off of
-> the compatible string. If it's needed only on older (or only on newer)
-> versions of the dw-mshc design, it could be encoded as a version in the
-> string, such as "snps,dw-mshc-1.234".
+> What is the benefit of being able to build-in one one without the other?
+> If that benefit is not significant, perhaps the time has come to
+> replace them both with CONFIG_PM...
 
-Perhaps Seungwon and Chris might have an opinion on this:
+There are lots of embedded/SoC platforms that implement PM_RUNTIME but
+not PM_SLEEP.
 
->From the Synopsys databook for this IP, using the SDMMC_CMD_USE_HOLD_REG
-is not recommended for SDR104, SDR50 and DDR50 speed modes. For other
-speeds, SDR12, and SDR25, it would be necessary to use
-SDMMC_CMD_USE_HOLD_REG.
-
-I am referencing v2.50a of the Synopsys DesignWare Cores Mobile Storage
-Host Databook.
-
-So I think a binary DT property should suffice?
-
-Thanks,
-Dinh
-> 
-> 	Arnd
-> 
+Alan Stern
