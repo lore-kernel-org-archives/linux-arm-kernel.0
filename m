@@ -1,43 +1,94 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 5 Dec 2013 09:49:27 +0000
-Subject: Boot time errors/warnings on snowball
-In-Reply-To: <20131204185947.GC29268@sirena.org.uk>
-References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
- <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
- <20131204172626.GB26581@lee--X1>
- <CAOesGMjMWqPtJXh7-VAhyA1a95h7mKV8_UZhyTtxgEbUhU8_5Q@mail.gmail.com>
- <20131204175119.GD26581@lee--X1>
- <CAOesGMh7+r9vUvtH_pwJeMyQJGo3u-uJRJ8-OBidzzO1pC5RDA@mail.gmail.com>
- <20131204185947.GC29268@sirena.org.uk>
-Message-ID: <20131205094927.GJ26581@lee--X1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Dec 2013 09:49:31 +0000
+Subject: ARM: gic_arch_extn (Was: [PATCH v3] irqchip: mmp: add dt
+ support for wakeup)
+In-Reply-To: <alpine.DEB.2.02.1312050157550.30673@ionos.tec.linutronix.de>
+References: <1386159214-31483-1-git-send-email-zhangwm@marvell.com>
+ <alpine.DEB.2.02.1312042234190.30673@ionos.tec.linutronix.de>
+ <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
+ <20131205005216.GA4360@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1312050157550.30673@ionos.tec.linutronix.de>
+Message-ID: <20131205094931.GB4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> If there's a topic branch for the ARM side I can pull it into ASoC to
-> get the window down to a few commits (or even rebase the ux500 stuff
-> onto it to remove it).  Or I can sign the ux500 branch for arm-soc.
+On Thu, Dec 05, 2013 at 03:12:55AM +0100, Thomas Gleixner wrote:
+> Russell,
+> 
+> On Thu, 5 Dec 2013, Russell King - ARM Linux wrote:
+> > On Thu, Dec 05, 2013 at 01:41:53AM +0100, Thomas Gleixner wrote:
+> > > @all who feel responsible for gic_arch_extn
+> > > 
+> > > On Wed, 4 Dec 2013, Thomas Gleixner wrote:
+> > > > I'm going to reply in a separate mail on this, because you have
+> > > > brought this to my attention, but you are not responsible in the first
+> > > > place for this brainfart.
+> > > 
+> > > Who came up with that gic_arch_extn concept in the first place?
+> > 
+> > If you'd spend more time reviewing IRQ patches then maybe you'd catch
+> > this at review time.  So please stop your rediculous whinging when
+> > most of the problem is your own lack of time.
+> 
+> I'm not a native english speaker, so I want to make sure in the first
+> place that you meant:
+> 
+>     "ridiculous whingeing" 
+> 
+> Assumed that you meant that, let me ridicule you a bit.
+> 
+> The gic_arch_extn concept got merged with:
+> 
+>     commit d7ed36a4ea84e3a850f9932e2058ceef987d1acd
+>     Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>     Date:   Wed Mar 2 08:03:22 2011 +0100
+> 
+>     ARM: 6777/1: gic: Add hooks for architecture specific extensions
+> 
+>     <SNIP>
+> 
+>     Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+>     Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>     Acked-by: Colin Cross <ccross@android.com>
+>     Tested-by: Colin Cross <ccross@android.com>
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+>     ---
+>     arch/arm/common/gic.c		|   47 ++++++++++++....
+>     arch/arm/include/asm/hardware/gic.h |    1
+> 
+> The patch in question was never cc'ed to me and you merged it on your
+> own.
+> 
+> So now you have the chuzpe to blame me for that, just because this
+> code moved to drivers/irqchip with
+> 
+>      commit 81243e444c6e9d1625073e4a3d3bc244c8a545f0
+>      Author: Rob Herring <rob.herring@calxeda.com>
+>      Date:   Tue Nov 20 21:21:40 2012 -0600
+> 
+>      irqchip: Move ARM GIC to drivers/irqchip
+>     
+> almost two years later?
+> 
+> The code move neither exempts you from the responsibility of merging
+> it nor does it imply a retroactive responsibility for me to review all
+> patches which went into that code prior to the move.
 
-Mark, don't trouble yourself with this.
+And neither does it give you permission to send such an idiotic and
+rediculous email.
 
-As far as I'm aware there shouldn't be any dependency or ordering
-issues here. I planned on the transition from platform data to DT to
-be fully seamless. We should be using the platform data up until we
-remove the AUXDATA, but the driver (or the dmaengine) is attempting to
-pull in DMA configuration from the Device Tree, which isn't populated
-fully yet.
+I'm not going to do anything about it because "Thomas Glexiner" has
+suddenly decided he doesn't like it.
 
-There is something going on here that I am missing and I'd very much
-like to get to the bottom of it before merging upstream.
+As for your definition of "hotpath", you're really screwed on that
+because you don't seem to understand what is or isn't the hotpath in
+this code.
 
-Please remove the asoc/topic/ux500 altogether and I will resubmit in
-its entirety once I've solved all of the issues.
+So there's not much point discussing this with you until you:
 
-Linus/Olof, the arch/arm stuff is still fine to be merged.
+(a) calm down
+(b) analyse it properly and work out the frequency under which each
+class of IRQ (those >= 32 and those < 32) call into these functions.
 
-Sorry for any issues this has caused, I'll get to the bottom of it.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+To put it bluntly, you're wrong.
