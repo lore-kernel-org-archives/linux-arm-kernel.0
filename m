@@ -1,42 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Dec 2013 10:48:32 -0800
-Subject: [PATCH v2 0/3] ARM: OMAP2+: USB Host bug fixes for 3.13 rc
-In-Reply-To: <529EFD42.9070507@ti.com>
-References: <1386080748-17005-1-git-send-email-rogerq@ti.com>
- <529EFD42.9070507@ti.com>
-Message-ID: <20131205184832.GG26766@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 5 Dec 2013 10:48:12 -0800
+Subject: [PATCH v2 1/6] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <201312031601.04997.arnd@arndb.de>
+References: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
+ <1385511748-27869-2-git-send-email-marc.ceeeee@gmail.com>
+ <201312031601.04997.arnd@arndb.de>
+Message-ID: <CAGVrzcbxHA+S0yZbsrj8uMZR0hsb_ng=PB02zte7S0rCZWQpBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [131204 02:01]:
-> On 2013-12-03 16:25, Roger Quadros wrote:
-> > Hi,
-> > 
-> > This is a follow up solution to the original series in [1]
-> > 
-> > The first patch fixes the OMAP4 Panda USB detection problems on 3.13-rc1
-> > with u-boot v2013.10.
-> > 
-> > The remaining 2 patches are required if SOFTRESET needs to be done for the
-> > USB Host module on OMAP3 platforms.
-> > 
-> > Patch 2 fixes the hwmod RESET logic to prevent multiple SOFTRESETs
-> > being issued to the modules. This multiple SOFTRESET was causing problems
-> > with OMAP3 USB Host module. On Beagleboard C4 this is seen as failure to
-> > mount NFS root over external USB to Ethernet device.
-> > 
-> > This might be the reason why HWMOD_INIT_NO_RESET was used for the OMAP
-> > USB host module in OMAP3 hwmod data and just carried forward in OMAP4
-> > and OMAP5 hwmod data as well.
-> > 
-> > cheers,
-> > -roger
-> 
-> Tested on Panda and Beagle xM. Works fine for me.
+Hi Arnd,
 
-Looks like we should merge these as regression fixes during the -rc
-cycle. Paul should take a look at these first though.
+2013/12/3 Arnd Bergmann <arnd@arndb.de>:
+>
+>> +     addr = ioremap(BPHYSADDR(BCHP_IRQ0_IRQEN), sizeof(u32));
+>> +     writel_relaxed(BCHP_IRQ0_IRQEN_uarta_irqen_MASK
+>> +             | BCHP_IRQ0_IRQEN_uartb_irqen_MASK
+>> +             | BCHP_IRQ0_IRQEN_uartc_irqen_MASK, addr);
+>> +     iounmap(addr);
+>
+> What does this part do? Isn't that something that should have been set
+> up by the boot loader?
 
-Regards,
+The bootloader will typically use the UART in busy-looping mode and
+not rely on interrupts, also the bootloader currently does not know
+much about how many UARTs there are in the system and how they are
+going to be used.
 
-Tony
+One possible way to solve this would be to write a very small irqchip
+driver which only implements the "irq_enable" method to allow these
+interrupts to be forwarded to the GIC. Somewhere in the Device Tree we
+would have an interrupt-map property which describes the mapping
+between the bits in BCHP_IRQ0_IRQEN and their corresponding
+peripherals (UARTA, B, C).
+
+Would that work?
+-- 
+Florian
