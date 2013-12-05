@@ -1,40 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 5 Dec 2013 10:48:12 -0800
-Subject: [PATCH v2 1/6] ARM: brcmstb: add infrastructure for ARM-based
- Broadcom STB SoCs
-In-Reply-To: <201312031601.04997.arnd@arndb.de>
-References: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
- <1385511748-27869-2-git-send-email-marc.ceeeee@gmail.com>
- <201312031601.04997.arnd@arndb.de>
-Message-ID: <CAGVrzcbxHA+S0yZbsrj8uMZR0hsb_ng=PB02zte7S0rCZWQpBg@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 5 Dec 2013 13:51:16 -0500
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131203232445.GX8277@htj.dyndns.org> <52A0AB34.2030703@ti.com>
+ <20131205165325.GA24062@mtj.dyndns.org>
+ <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
+Message-ID: <20131205185116.GA27274@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hey,
 
-2013/12/3 Arnd Bergmann <arnd@arndb.de>:
->
->> +     addr = ioremap(BPHYSADDR(BCHP_IRQ0_IRQEN), sizeof(u32));
->> +     writel_relaxed(BCHP_IRQ0_IRQEN_uarta_irqen_MASK
->> +             | BCHP_IRQ0_IRQEN_uartb_irqen_MASK
->> +             | BCHP_IRQ0_IRQEN_uartc_irqen_MASK, addr);
->> +     iounmap(addr);
->
-> What does this part do? Isn't that something that should have been set
-> up by the boot loader?
+On Thu, Dec 05, 2013 at 06:48:21PM +0000, Strashko, Grygorii wrote:
+> +/* Fall back to all the existing bootmem APIs */
+> +#define memblock_virt_alloc(x) \
+> +       __alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
+> 
+> which will be transformed to 
+> +/* Fall back to all the existing bootmem APIs */
+> +#define memblock_virt_alloc(x, align) \
+> +       __alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
+> 
+> and used as
+> 
+> memblock_virt_alloc(size, 0);
+> 
+> so, by default bootmem code will use 0 as default alignment and not SMP_CACHE_BYTES
+> and that is wrong.
 
-The bootloader will typically use the UART in busy-looping mode and
-not rely on interrupts, also the bootloader currently does not know
-much about how many UARTs there are in the system and how they are
-going to be used.
+Just translate it to SMP_CACHE_BYTES?  Am I missing something here?
+You're defining a new API which wraps around two interfaces.  Wrap
+them so that they show the same desired behavior?
 
-One possible way to solve this would be to write a very small irqchip
-driver which only implements the "irq_enable" method to allow these
-interrupts to be forwarded to the GIC. Somewhere in the Device Tree we
-would have an interrupt-map property which describes the mapping
-between the bits in BCHP_IRQ0_IRQEN and their corresponding
-peripherals (UARTA, B, C).
-
-Would that work?
 -- 
-Florian
+tejun
