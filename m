@@ -1,82 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Dec 2013 16:30:03 -0700
-Subject: [PATCH 4/4] pinctrl: tegra: add pinmux controller driver for
- Tegra124
-In-Reply-To: <1386241070-4350-5-git-send-email-ldewangan@nvidia.com>
-References: <1386241070-4350-1-git-send-email-ldewangan@nvidia.com>
- <1386241070-4350-5-git-send-email-ldewangan@nvidia.com>
-Message-ID: <52A10C7B.8070406@wwwdotorg.org>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Thu, 5 Dec 2013 15:30:55 -0800
+Subject: [RESEND PATCH] ARM: bcm_defconfig: Do not expect appended DTB
+Message-ID: <1386286255-4338-1-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2013 03:57 AM, Laxman Dewangan wrote:
-> From: Ashwini Ghuge <aghuge@nvidia.com>
-> 
-> This adds a driver for the Tegra124 pinmux, and required
-> parameterization data for Tegra124.
-> 
-> The driver uses the common Tegra pincontrol driver utility
-> functions to implement the majority of the driver.
-> 
-> This driver is not compatible with the earlier NVIDIA's SoCs,
-> hence add new compatibile as "nvidia,tegra124-pinmux".
-> 
-> Originally written by Ashwini Gguhe.
-> ldewangan:
->         - cleanup the patches,
->         - Fix address issue.
+The bootloaders used with Broadcom mobile SoCs are capable of handling
+a device tree separately from the zImage so there is no need for this
+option to be enabled.
 
-IIRC, Thierry mentioned he had some fixes in his local branch for this
-driver. Thierry, can you please confirm/deny this?
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+---
+ arch/arm/configs/bcm_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-I made the following comment on the version Ashwini posted, which hasn't
-been addressed yet:
-
-A day or two ago during upstream review:
-
->> +static const struct tegra_function  tegra124_functions[] = {
-> ...
->> +	FUNCTION(i2c1),
->> +	FUNCTION(i2c2),
->> +	FUNCTION(i2c3),
->> +	FUNCTION(i2c4),
->> +	FUNCTION(i2cpwr),
-> 
-> Is that complete? Tegra124 apparently has 6 I2C controllers. Are the
-> pins for the new sixth controller (0x7000d100) not affected by the pinmux?
-
-That said, if we find things are missing, I suppose we can add them
-later without breaking existing ABI. Breakage would only happen if we
-had to change/remove something.
-
-During downstream review quite a while ago I also said:
-
->> > +static const struct pinctrl_pin_desc  tegra124_pins[] = {
->> 
->> There are two spaces before "tegra124_pins[]".
->> 
->> > +static const char * const gmi_groups[] = {
->> > +	"uart2_cts_n_pj5",
->> > +	"uart2_rts_n_pj6",
->> > +	"uart3_txd_pw6",
->> > +	"uart3_rxd_pw7",
->> > +	"uart3_cts_n_pa1",
->> > +	"uart3_rts_n_pc0",
->> > +
->> > +	"pu0",
->> 
->> It'd be best not to have blank lines in the middle of arrays. The same comment exists elsewhere in the
->> file, so make sure you search the whole file.
-
-Nits:
-
-- There are some cases of multiple blank lines back-to-back.
-- There's a blank line at the end of the file.
-
-Aside from those minor issues, patches 1/4 and 4/4,
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
-(BTW, those 2 patches would go through the pinctrl tree, and patches 2/4
-and 3/4 would go through the Tegra tree. You generally shouldn't posted
-patches that will be applied to different trees in the same series,
-since there aren't dependencies).
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index 6e49310..b152367 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -35,7 +35,6 @@ CONFIG_AEABI=y
+ # CONFIG_COMPACTION is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_CMDLINE="console=ttyS0,115200n8 mem=128M"
+ CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+-- 
+1.8.0.1
