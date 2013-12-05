@@ -1,49 +1,41 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu,  5 Dec 2013 19:28:11 +0100
-Subject: [PATCHv5][ 7/8] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
-In-Reply-To: <1386268092-21719-1-git-send-email-denis@eukrea.com>
-References: <1386268092-21719-1-git-send-email-denis@eukrea.com>
-Message-ID: <1386268092-21719-7-git-send-email-denis@eukrea.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 5 Dec 2013 19:29:39 +0100
+Subject: [PATCH v4 2/4] mvebu: Dove: Instantiate cpufreq driver.
+In-Reply-To: <20131205175434.GQ29200@e106331-lin.cambridge.arm.com>
+References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+ <1386166641-7567-3-git-send-email-andrew@lunn.ch>
+ <20131204143628.GB29200@e106331-lin.cambridge.arm.com>
+ <20131204150228.GB8062@lunn.ch>
+ <20131205175434.GQ29200@e106331-lin.cambridge.arm.com>
+Message-ID: <20131205182939.GB19067@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v3->v5:
-- Updated to the new GPIO defines.
+> I'm not arguing for describing a pseudo-device. The power management
+> unit is a real device. If we used that to register a cpufreq driver, it
+> doesn't mean that we've registered a pseudo-device, but rather that we
+> made a decision to register the cpufreq portions based on the necessary
+> real devices being present.
 
-ChangeLog v2->v3:
-- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds backlight support.
-- Added some interested people in the Cc list, and removed some people that
-  might be annoyed by the receiving of that patch which is unrelated to their
-  subsystem.
----
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Hi Mark
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-index f37d65b..f8f5abe 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -17,6 +17,14 @@
- 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
- 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
- 
-+	backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight_1>;
-+		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <1>;
-+	};
-+
- 	reg_lcd_3v3: lcd-en {
- 		compatible = "regulator-fixed";
- 		pinctrl-names = "default";
--- 
-1.7.9.5
+I need a more concrete explanation to understand what you mean.
+
+Are you suggesting that i add a drivers/pmu/dove.c, which gets
+instantiated by DT? This driver would then instantiate the cpufreq
+driver? If so, it should also instantiate the gated clocks in
+drivers/clk/mvebu/dove.c, since they are also part of the PMU,
+according to the data sheet.  The RTC and the thermal management unit
+are also part of the PMU. Should these drivers also be instantiated by
+the PMU somehow?
+
+> Perhaps this was the problem with the proposed kirkwood binding?
+
+Kirkwood does not have a PMU, at least not according to the data
+sheet. There are registers to control cpuidle, cpufreq, gating some
+clocks, the exact same RTC and a somewhat similar thermal
+sensor. However the data sheet makes no reference as to calling the
+collection the "PMU".
+
+   Thanks
+      Andrew	   
