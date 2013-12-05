@@ -1,67 +1,81 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Thu, 5 Dec 2013 18:16:35 +0100
-Subject: [GIT PULL] Cacheflush updates for 3.12
-In-Reply-To: <1386256471.3525.13.camel@linaro1.home>
-References: <20130812173155.GI25995@mudshark.cambridge.arm.com>
- <CAH9NwWd1AfN_YnO-fj94+wTbE8768H518=EndVcX=dFCV9WESg@mail.gmail.com>
- <20131204161329.GA14145@mudshark.cambridge.arm.com>
- <1386253407.3525.8.camel@linaro1.home>
- <1386256471.3525.13.camel@linaro1.home>
-Message-ID: <CAH9NwWdh-kT8Pgp-CU9x5HiA_C0aKaSDKEO_8OVaYfvpxH2u=Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Dec 2013 09:22:18 -0800
+Subject: [GIT PULL] at91: cleanup for 3.14 #1 (aka move to CCF)
+In-Reply-To: <52A0AB2E.80504@atmel.com>
+References: <1386003701-29760-1-git-send-email-nicolas.ferre@atmel.com>
+ <CAOesGMjoK=fN-QCnRS1r2XQFrqc=KN_HPj5A=EVHL3ut58MvQA@mail.gmail.com>
+ <52A0AB2E.80504@atmel.com>
+Message-ID: <CAOesGMguxEwWsLeXQH=FTvLToSCJPxSS9w+JQVSfPgi=vD4crw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/5 Jon Medhurst (Tixy) <tixy@linaro.org>:
-> On Thu, 2013-12-05 at 14:23 +0000, Jon Medhurst (Tixy) wrote:
->> On Wed, 2013-12-04 at 16:13 +0000, Will Deacon wrote:
->> > took another look at that patch and can't see anything obviously wrong
->> > with it.
+On Thu, Dec 5, 2013 at 8:34 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 04/12/2013 22:54, Olof Johansson :
+>
+>> On Mon, Dec 2, 2013 at 9:01 AM, Nicolas Ferre <nicolas.ferre@atmel.com>
+>> wrote:
+>>>
+>>> Arnd, Olof, Kevin,
+>>>
+>>> This is the big move of AT91 to Common Clock Framework for 3.14. I
+>>> collected
+>>> all the material as a "cleanup" topic so that the CCF can be considered
+>>> as a
+>>> base for all our AT91 patches for 3.14.
+>>> I prefer to have the sama5d3 use of AT91 CCF included into this
+>>> pull-request
+>>> so that it can be read as an example and clearly states that it has been
+>>> tested
+>>> in real life.
+>>> We agreed with Mike to send this work upstream through arm-soc so that we
+>>> will
+>>> be able to stack other patches for 3.14 on top of that work without
+>>> having to
+>>> deal with conflicts.
+>>>
+>>> For merging with the "fixes" pull-request that I sent earlier today, I
+>>> also
+>>> uploaded a little branch for reference:
+>>> at91-3.14-next_fixes_cleanup_dt-resolution.
+>>> In two words, the clock section of the arch/arm/mach-at91/sama5d3.c file
+>>> has to be deleted.
+>>>
+>>> Do not hesitate to ask questions about this material.
+>>>
+>>> Thanks, best regards,
+>>>
+>>> The following changes since commit
+>>> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>>
+>>>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>    git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+>>>
+>>> for you to fetch changes up to b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
+>>>
+>>>    ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
 >>
->> If the memory region isn't guaranteed to be page aligned then doesn't it
->> flush up to PAGE_SIZE-1 more bytes than requested and so exceed the
->> bounds check in do_cache_op? Fixing this as below _appears_ to stop the
->> Browser crashes I'm seeing (still doing some more testing)...
->
-> Actually, a smaller patch and one which avoids the possibility of
-> arithmetic owerflow is...
->
-> From: Jon Medhurst <tixy@linaro.org>
-> Date: Thu, 5 Dec 2013 14:29:24 +0000
-> Subject: [PATCH] ARM: cacheflush: correctly limit range of memory region
->  being flushed
->
-> The __do_cache_op function operates with a 'chunk' size of one page
-> but fails to limit the size of the final chunk so as to not exceed
-> the specified memory region. Fix this.
->
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
->  arch/arm/kernel/traps.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index dbf0923..7940241 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -509,9 +509,10 @@ static inline int
->  __do_cache_op(unsigned long start, unsigned long end)
->  {
->         int ret;
-> -       unsigned long chunk = PAGE_SIZE;
->
->         do {
-> +               unsigned long chunk = min(PAGE_SIZE, end - start);
-> +
->                 if (signal_pending(current)) {
->                         struct thread_info *ti = current_thread_info();
->
-> --
-> 1.7.10.4
+>>
+>> Thanks, pulled into next/cleanup. use this branch as base for your
+>> future at91 branches if you need it to avoid conflicts, please.
 >
 >
+> Yes, sure. I still have to synchronize with Uwe as he is building a series
+> for removing timex.h that may conflict with these modifications.
+>
+>
+>> (I named it at91/sama5-ccf in our tree)
+>
+>
+> Well, it seems that the at91/sama5-ccf is not aligned with
+> next/cleanup as of today (94c5216ee93b)
+>
+> Did I miss something?
 
-I am running my test overnight with this patch... stay tuned.
+Seems that I pulled it into for-next instead of next/cleanup. Thanks
+for catching that.
 
-greets
---
-Christian Gmeiner, MSc
+
+-Olof
