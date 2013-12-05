@@ -1,80 +1,71 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  5 Dec 2013 10:54:40 +0100
-Subject: [PATCH v3 1/3] usb: ohci-at91: replace request_mem_region + ioremap
- by devm_request_and_ioremap
+Date: Thu,  5 Dec 2013 10:54:41 +0100
+Subject: [PATCH v3 2/3] usb: ohci-at91: use dev variable instead of &pdev->dev
 In-Reply-To: <1386237282-22385-1-git-send-email-b.brezillon@overkiz.com>
 References: <1386237282-22385-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1386237282-22385-2-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1386237282-22385-3-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the request_mem_region + ioremap calls by the
-devm_request_and_ioremap call which does the same things but with device
-managed resources.
+Make use of the dev variable instead of referencing the dev field of the
+pdev struct.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ohci-at91.c |   24 +++++-------------------
- 1 file changed, 5 insertions(+), 19 deletions(-)
+ drivers/usb/host/ohci-at91.c |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 7aec6ca..8528895 100644
+index 8528895..2a86e32 100644
 --- a/drivers/usb/host/ohci-at91.c
 +++ b/drivers/usb/host/ohci-at91.c
-@@ -157,24 +157,18 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+@@ -151,7 +151,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 		return -ENODEV;
+ 	}
+ 
+-	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
++	hcd = usb_create_hcd(driver, dev, "at91");
+ 	if (!hcd)
+ 		return -ENOMEM;
  	hcd->rsrc_start = mem_r->start;
- 	hcd->rsrc_len = resource_size(mem_r);
- 
--	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
--		pr_debug("request_mem_region failed\n");
--		retval = -EBUSY;
--		goto err1;
--	}
--
--	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-+	hcd->regs = devm_request_and_ioremap(dev, mem_r);
- 	if (!hcd->regs) {
--		pr_debug("ioremap failed\n");
-+		dev_dbg(dev, "devm_request_and_ioremap failed\n");
- 		retval = -EIO;
--		goto err2;
-+		goto err;
+@@ -164,28 +164,28 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 		goto err;
  	}
  
- 	iclk = clk_get(&pdev->dev, "ohci_clk");
+-	iclk = clk_get(&pdev->dev, "ohci_clk");
++	iclk = clk_get(dev, "ohci_clk");
  	if (IS_ERR(iclk)) {
- 		dev_err(&pdev->dev, "failed to get ohci_clk\n");
+-		dev_err(&pdev->dev, "failed to get ohci_clk\n");
++		dev_err(dev, "failed to get ohci_clk\n");
  		retval = PTR_ERR(iclk);
--		goto err3;
-+		goto err;
+ 		goto err;
  	}
- 	fclk = clk_get(&pdev->dev, "uhpck");
+-	fclk = clk_get(&pdev->dev, "uhpck");
++	fclk = clk_get(dev, "uhpck");
  	if (IS_ERR(fclk)) {
-@@ -218,13 +212,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
-  err4:
- 	clk_put(iclk);
- 
-- err3:
--	iounmap(hcd->regs);
--
-- err2:
--	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
--
-- err1:
-+ err:
- 	usb_put_hcd(hcd);
- 	return retval;
- }
-@@ -247,8 +235,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
- {
- 	usb_remove_hcd(hcd);
- 	at91_stop_hc(pdev);
--	iounmap(hcd->regs);
--	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
- 	usb_put_hcd(hcd);
- 
- 	if (IS_ENABLED(CONFIG_COMMON_CLK))
+-		dev_err(&pdev->dev, "failed to get uhpck\n");
++		dev_err(dev, "failed to get uhpck\n");
+ 		retval = PTR_ERR(fclk);
+ 		goto err4;
+ 	}
+-	hclk = clk_get(&pdev->dev, "hclk");
++	hclk = clk_get(dev, "hclk");
+ 	if (IS_ERR(hclk)) {
+-		dev_err(&pdev->dev, "failed to get hclk\n");
++		dev_err(dev, "failed to get hclk\n");
+ 		retval = PTR_ERR(hclk);
+ 		goto err5;
+ 	}
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+-		uclk = clk_get(&pdev->dev, "usb_clk");
++		uclk = clk_get(dev, "usb_clk");
+ 		if (IS_ERR(uclk)) {
+-			dev_err(&pdev->dev, "failed to get uclk\n");
++			dev_err(dev, "failed to get uclk\n");
+ 			retval = PTR_ERR(uclk);
+ 			goto err6;
+ 		}
 -- 
 1.7.9.5
