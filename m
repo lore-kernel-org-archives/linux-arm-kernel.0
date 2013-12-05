@@ -1,126 +1,47 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 5 Dec 2013 10:41:42 +0200
-Subject: [PATCH REPOST 2/2] clk: tegra: remove bogus PCIE_XCLK
-In-Reply-To: <1386103002-21939-2-git-send-email-swarren@wwwdotorg.org>
-References: <1386103002-21939-1-git-send-email-swarren@wwwdotorg.org>
- <1386103002-21939-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131205084142.GB17188@tbergstrom-lnx.Nvidia.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Thu, 05 Dec 2013 06:14:47 -0300
+Subject: [PATCH] ARM: Clean up setup printks a bit
+In-Reply-To: <1386199826-8183-1-git-send-email-olof@lixom.net>
+References: <1386199826-8183-1-git-send-email-olof@lixom.net>
+Message-ID: <52A04407.4000306@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 09:36:42PM +0100, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> The "pcie_xclk" clock is not actually a clock at all, but rather a reset
-> domain. Now that the custom Tegra module reset API has been removed, we
-> can remove the definition of any "clocks" that existed solely to support
-> it.
-> 
+Hi Olof,
 
-Acked-By: Peter De Schrijver <pdeschrijver@nvidia.com>                                                                                                         
+El 04/12/13 20:30, Olof Johansson escribi?:
+> Clean up the setup ARM printks a bit. Add printk level to a few
+> that were missing (CPU: <...> ones, in particular), and switch from
+> printk(KERN_* ..) to pr_*().
+>
+> Finally, un-wrap some long lines since it makes it harder to grep the
+> sources from where an error came from and tweak some cases of indentation.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>   arch/arm/kernel/setup.c |   39 +++++++++++++++++++--------------------
+>   1 file changed, 19 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 6a1b8a8..7c472f4 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
 
-> Cc: pdeschrijver at nvidia.com
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Reviewed-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Peter, Mike,
-> 
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
-> ---
->  drivers/clk/tegra/clk-tegra20.c         | 6 ------
->  drivers/clk/tegra/clk-tegra30.c         | 7 -------
->  include/dt-bindings/clock/tegra20-car.h | 2 +-
->  include/dt-bindings/clock/tegra30-car.h | 2 +-
->  4 files changed, 2 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-> index d438a089354c..41bf39544111 100644
-> --- a/drivers/clk/tegra/clk-tegra20.c
-> +++ b/drivers/clk/tegra/clk-tegra20.c
-> @@ -467,7 +467,6 @@ static struct tegra_devclk devclks[] __initdata = {
->  	{ .con_id = "isp", .dev_id = "tegra_camera", .dt_id = TEGRA20_CLK_ISP },
->  	{ .con_id = "pex", .dt_id = TEGRA20_CLK_PEX },
->  	{ .con_id = "afi", .dt_id = TEGRA20_CLK_AFI },
-> -	{ .con_id = "pcie_xclk", .dt_id = TEGRA20_CLK_PCIE_XCLK },
->  	{ .con_id = "cdev1", .dt_id = TEGRA20_CLK_CDEV1 },
->  	{ .con_id = "cdev2", .dt_id = TEGRA20_CLK_CDEV2 },
->  	{ .con_id = "clk_32k", .dt_id = TEGRA20_CLK_CLK_32K },
-> @@ -833,11 +832,6 @@ static void __init tegra20_periph_clk_init(void)
->  				    periph_clk_enb_refcnt);
->  	clks[TEGRA20_CLK_PEX] = clk;
->  
-> -	/* pcie_xclk */
-> -	clk = tegra_clk_register_periph_gate("pcie_xclk", "clk_m", 0, clk_base,
-> -				    0, 74, periph_clk_enb_refcnt);
-> -	clks[TEGRA20_CLK_PCIE_XCLK] = clk;
-> -
->  	/* cdev1 */
->  	clk = clk_register_fixed_rate(NULL, "cdev1_fixed", NULL, CLK_IS_ROOT,
->  				      26000000);
-> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-> index 49465529bb09..0986eac22cd7 100644
-> --- a/drivers/clk/tegra/clk-tegra30.c
-> +++ b/drivers/clk/tegra/clk-tegra30.c
-> @@ -651,7 +651,6 @@ static struct tegra_devclk devclks[] __initdata = {
->  	{ .con_id = "isp", .dev_id = "tegra_camera", .dt_id = TEGRA30_CLK_ISP },
->  	{ .con_id = "pcie", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIE },
->  	{ .con_id = "afi", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_AFI },
-> -	{ .con_id = "pciex", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIEX },
->  	{ .con_id = "fuse", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE },
->  	{ .con_id = "fuse_burn", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE_BURN },
->  	{ .con_id = "apbif", .dev_id = "tegra30-ahub", .dt_id = TEGRA30_CLK_APBIF },
-> @@ -1152,11 +1151,6 @@ static void __init tegra30_periph_clk_init(void)
->  				    periph_clk_enb_refcnt);
->  	clks[TEGRA30_CLK_AFI] = clk;
->  
-> -	/* pciex */
-> -	clk = tegra_clk_register_periph_gate("pciex", "pll_e", 0, clk_base, 0,
-> -				    74, periph_clk_enb_refcnt);
-> -	clks[TEGRA30_CLK_PCIEX] = clk;
-> -
->  	/* emc */
->  	clk = clk_register_mux(NULL, "emc_mux", mux_pllmcp_clkm,
->  			       ARRAY_SIZE(mux_pllmcp_clkm),
-> @@ -1397,7 +1391,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
->  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_BSEA, "nvavp", "bsea"),
->  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CML1, "tegra_sata_cml", NULL),
->  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CML0, "tegra_pcie", "cml"),
-> -	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_PCIEX, "tegra_pcie", "pciex"),
->  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_VCP, "nvavp", "vcp"),
->  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CLK_MAX, NULL, NULL), /* MUST be the last entry */
->  };
-> diff --git a/include/dt-bindings/clock/tegra20-car.h b/include/dt-bindings/clock/tegra20-car.h
-> index a1ae9a8fdd6c..9406207cfac8 100644
-> --- a/include/dt-bindings/clock/tegra20-car.h
-> +++ b/include/dt-bindings/clock/tegra20-car.h
-> @@ -92,7 +92,7 @@
->  #define TEGRA20_CLK_OWR 71
->  #define TEGRA20_CLK_AFI 72
->  #define TEGRA20_CLK_CSITE 73
-> -#define TEGRA20_CLK_PCIE_XCLK 74
-> +/* 74 */
->  #define TEGRA20_CLK_AVPUCQ 75
->  #define TEGRA20_CLK_LA 76
->  /* 77 */
-> diff --git a/include/dt-bindings/clock/tegra30-car.h b/include/dt-bindings/clock/tegra30-car.h
-> index 22445820a929..889e49ba0aa3 100644
-> --- a/include/dt-bindings/clock/tegra30-car.h
-> +++ b/include/dt-bindings/clock/tegra30-car.h
-> @@ -92,7 +92,7 @@
->  #define TEGRA30_CLK_OWR 71
->  #define TEGRA30_CLK_AFI 72
->  #define TEGRA30_CLK_CSITE 73
-> -#define TEGRA30_CLK_PCIEX 74
-> +/* 74 */
->  #define TEGRA30_CLK_AVPUCQ 75
->  #define TEGRA30_CLK_LA 76
->  /* 77 */
-> -- 
-> 1.8.1.5
-> 
+...
+
+>
+>   	if (meminfo.nr_banks >= NR_BANKS) {
+> -		printk(KERN_CRIT "NR_BANKS too low, "
+> -			"ignoring memory at 0x%08llx\n", (long long)start);
+> +		pr_crit("NR_BANKS too low, "ignoring memory at 0x%08llx\n",
+
+There's a stray " there
+
+> +			(long long)start);
+>   		return -EINVAL;
+>   	}
+>
+
+Cheers,
+
+Emilio
