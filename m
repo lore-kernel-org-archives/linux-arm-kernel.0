@@ -1,41 +1,69 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 4 Dec 2013 20:01:04 -0800
-Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
-In-Reply-To: <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
-References: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
- <20131204070442.GA31665@kroah.com>
- <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
- <20131204170703.GA14859@kroah.com>
- <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
- <20131204230239.GB9205@kroah.com>
- <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
-Message-ID: <20131205040104.GA14641@kroah.com>
+Date: Wed, 4 Dec 2013 20:12:51 -0800
+Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
+In-Reply-To: <20131202141033.GK3942@xps8300>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <1385879185-22455-2-git-send-email-ynvich@gmail.com>
+ <20131202090253.GE3942@xps8300>
+ <1385976238.12531.8.camel@host5.omatika.ru>
+ <20131202094932.GF3942@xps8300>
+ <1385980005.12531.21.camel@host5.omatika.ru>
+ <20131202141033.GK3942@xps8300>
+Message-ID: <20131205041251.GA24906@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 10:49:25PM -0500, Adrien Verg? wrote:
-> 2013/12/4 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> > How much overhead does the existing tracing code have on ARM?  Is ETM
-> > still even needed?  Why not just use ETM for the core tracing code
-> > instead?
+On Mon, Dec 02, 2013 at 04:10:33PM +0200, Heikki Krogerus wrote:
+> Hi,
 > 
-> Coresight ETM is not just faster than /sys/kernel/debug/tracing, it
-> provides more detailed and customisable info. For instance, you can
-> trace every load, store, instruction fetch, along with the number of
-> cycles taken, with almost zero-overhead.
-
-Can't you already do that with the 'perf' tool the kernel provides
-without the ETM driver?
-
-> > What's wrong with the in-kernel tracing logic that you can't use that
-> > instead of the ETM stuff?
+> On Mon, Dec 02, 2013 at 02:26:45PM +0400, Sergei Ianovich wrote:
+> > On Mon, 2013-12-02 at 11:49 +0200, Heikki Krogerus wrote:
+> > > On Mon, Dec 02, 2013 at 01:23:58PM +0400, Sergei Ianovich wrote:
+> > > > On Mon, 2013-12-02 at 11:02 +0200, Heikki Krogerus wrote:
+> > > > > 
+> > > > > If drivers/tty/serial/pxa.c was converted to an other probe driver for
+> > > > > the 8250, this would not be an issue.
+> > > > 
+> > > > It seems that my patch is not going to be accepted. However, there is a
+> > > > device which has both PXA ports and a additional 8250 accent chip. As a
+> > > > result, there is a device allocation conflict. For the device to be
+> > > > usable the conflict needs to be resolved.
+> > > > 
+> > > > Do you mean that drivers/tty/serial/pxa.c needs to be rewritten to
+> > > > support lp8x4x special case?
+> > > 
+> > > Sorry I was not clear. I was suggesting that drivers/tty/serial/pxa.c
+> > > would be converted to drivers/tty/serial/8250/8250_pxa.c since it
+> > > looks to me like just an other 16x50 compatible UART. That would fix
+> > > the issue with the name conflict. You would then simply register 8250
+> > > ports from two probe drivers (drivers/tty/serial/8250/8250_pxa.c and
+> > > drivers/tty/serial/8250/8250_lp8x4x.c).
+> > > 
+> > > Depending on the order you register your platform devices (which you
+> > > decide in your platform code), but let's say the pxa gets registered
+> > > first and let's say it only has one port. You will then have in your
+> > > system /dev/ttyS0 for the pxa port and /dev/ttyS[1-4] for the other
+> > > UART.
+> > > 
+> > > I hope I was able to explain what I mean this time :)
+> > 
+> > Sorry, I wasn't clear as well. I got it right the first time. You mean
+> > pxa.c needs to merged into 8250. This will solve the conflict in
+> > question, and do it the right way. However, this will be a *much* bigger
+> > patch, and it will affect everyone on pxa.
+> > 
+> > Who makes the decision which way to go?
 > 
-> ETM has a different purpose. Integrating it in
-> /sys/kernel/debug/tracing would not take advantage of all its
-> features.
+> Greg and Russel make this decision. By having the pxa driver simply
+> register 8250 ports would probable reduce the code. Thats about the
+> biggest benefit from it.
+> 
+> It would still be something nice to have IMO. Ideally all the
+> 8250/16x50 UARTs should register the ports with 8250_core.c, and not
+> create complete uart driver on their own.
 
-What is it's purpose then?  At first glance, this seems to be exactly
-what 'perf' provides already.  Doesn't perf work on ARM today?
+I agree, this is the best way to resolve this, having a separate uart
+driver isn't that good at all to be doing, if at all possible.
 
 thanks,
 
