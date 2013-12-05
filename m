@@ -1,52 +1,126 @@
-From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
-Date: Thu, 05 Dec 2013 12:34:24 +0400
-Subject: [PATCH 1/2] ARM: check stack pointer in get_wchan
-Message-ID: <20131205083424.32632.51618.stgit@buzz>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 5 Dec 2013 10:41:42 +0200
+Subject: [PATCH REPOST 2/2] clk: tegra: remove bogus PCIE_XCLK
+In-Reply-To: <1386103002-21939-2-git-send-email-swarren@wwwdotorg.org>
+References: <1386103002-21939-1-git-send-email-swarren@wwwdotorg.org>
+ <1386103002-21939-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131205084142.GB17188@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_wchan() is lockless. Task may wakeup at any time and change its own stack,
-thus each next stack frame may be overwritten and filled with random stuff.
+On Tue, Dec 03, 2013 at 09:36:42PM +0100, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> The "pcie_xclk" clock is not actually a clock at all, but rather a reset
+> domain. Now that the custom Tegra module reset API has been removed, we
+> can remove the definition of any "clocks" that existed solely to support
+> it.
+> 
 
-/proc/$pid/stack interface had been disabled for non-current tasks, see [1]
-But 'wchan' still allows to trigger stack frame unwinding on volatile stack.
+Acked-By: Peter De Schrijver <pdeschrijver@nvidia.com>                                                                                                         
 
-This patch fixes oops in unwind_frame() by adding stack pointer validation on
-each step (as x86 code do), unwind_frame() already checks frame pointer.
-
-Also I've found another report of this oops on stackoverflow (irony).
-
-Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-Link: http://www.spinics.net/lists/arm-kernel/msg110589.html [1]
-Link: http://stackoverflow.com/questions/18479894/unwind-frame-cause-a-kernel-paging-error
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/process.c |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 94f6b05..92f7b15 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -404,6 +404,7 @@ EXPORT_SYMBOL(dump_fpu);
- unsigned long get_wchan(struct task_struct *p)
- {
- 	struct stackframe frame;
-+	unsigned long stack_page;
- 	int count = 0;
- 	if (!p || p == current || p->state == TASK_RUNNING)
- 		return 0;
-@@ -412,9 +413,11 @@ unsigned long get_wchan(struct task_struct *p)
- 	frame.sp = thread_saved_sp(p);
- 	frame.lr = 0;			/* recovered from the stack */
- 	frame.pc = thread_saved_pc(p);
-+	stack_page = (unsigned long)task_stack_page(p);
- 	do {
--		int ret = unwind_frame(&frame);
--		if (ret < 0)
-+		if (frame.sp < stack_page ||
-+		    frame.sp >= stack_page + THREAD_SIZE ||
-+		    unwind_frame(&frame) < 0)
- 			return 0;
- 		if (!in_sched_functions(frame.pc))
- 			return frame.pc;
+> Cc: pdeschrijver at nvidia.com
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Reviewed-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Peter, Mike,
+> 
+> This patch is part of a series with strong internal depdendencies. I'm
+> looking for an ack so that I can take the entire series through the Tegra
+> and arm-soc trees. The series will be part of a stable branch that can be
+> merged into other subsystems if needed to avoid/resolve dependencies.
+> ---
+>  drivers/clk/tegra/clk-tegra20.c         | 6 ------
+>  drivers/clk/tegra/clk-tegra30.c         | 7 -------
+>  include/dt-bindings/clock/tegra20-car.h | 2 +-
+>  include/dt-bindings/clock/tegra30-car.h | 2 +-
+>  4 files changed, 2 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> index d438a089354c..41bf39544111 100644
+> --- a/drivers/clk/tegra/clk-tegra20.c
+> +++ b/drivers/clk/tegra/clk-tegra20.c
+> @@ -467,7 +467,6 @@ static struct tegra_devclk devclks[] __initdata = {
+>  	{ .con_id = "isp", .dev_id = "tegra_camera", .dt_id = TEGRA20_CLK_ISP },
+>  	{ .con_id = "pex", .dt_id = TEGRA20_CLK_PEX },
+>  	{ .con_id = "afi", .dt_id = TEGRA20_CLK_AFI },
+> -	{ .con_id = "pcie_xclk", .dt_id = TEGRA20_CLK_PCIE_XCLK },
+>  	{ .con_id = "cdev1", .dt_id = TEGRA20_CLK_CDEV1 },
+>  	{ .con_id = "cdev2", .dt_id = TEGRA20_CLK_CDEV2 },
+>  	{ .con_id = "clk_32k", .dt_id = TEGRA20_CLK_CLK_32K },
+> @@ -833,11 +832,6 @@ static void __init tegra20_periph_clk_init(void)
+>  				    periph_clk_enb_refcnt);
+>  	clks[TEGRA20_CLK_PEX] = clk;
+>  
+> -	/* pcie_xclk */
+> -	clk = tegra_clk_register_periph_gate("pcie_xclk", "clk_m", 0, clk_base,
+> -				    0, 74, periph_clk_enb_refcnt);
+> -	clks[TEGRA20_CLK_PCIE_XCLK] = clk;
+> -
+>  	/* cdev1 */
+>  	clk = clk_register_fixed_rate(NULL, "cdev1_fixed", NULL, CLK_IS_ROOT,
+>  				      26000000);
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+> index 49465529bb09..0986eac22cd7 100644
+> --- a/drivers/clk/tegra/clk-tegra30.c
+> +++ b/drivers/clk/tegra/clk-tegra30.c
+> @@ -651,7 +651,6 @@ static struct tegra_devclk devclks[] __initdata = {
+>  	{ .con_id = "isp", .dev_id = "tegra_camera", .dt_id = TEGRA30_CLK_ISP },
+>  	{ .con_id = "pcie", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIE },
+>  	{ .con_id = "afi", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_AFI },
+> -	{ .con_id = "pciex", .dev_id = "tegra-pcie", .dt_id = TEGRA30_CLK_PCIEX },
+>  	{ .con_id = "fuse", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE },
+>  	{ .con_id = "fuse_burn", .dev_id = "fuse-tegra", .dt_id = TEGRA30_CLK_FUSE_BURN },
+>  	{ .con_id = "apbif", .dev_id = "tegra30-ahub", .dt_id = TEGRA30_CLK_APBIF },
+> @@ -1152,11 +1151,6 @@ static void __init tegra30_periph_clk_init(void)
+>  				    periph_clk_enb_refcnt);
+>  	clks[TEGRA30_CLK_AFI] = clk;
+>  
+> -	/* pciex */
+> -	clk = tegra_clk_register_periph_gate("pciex", "pll_e", 0, clk_base, 0,
+> -				    74, periph_clk_enb_refcnt);
+> -	clks[TEGRA30_CLK_PCIEX] = clk;
+> -
+>  	/* emc */
+>  	clk = clk_register_mux(NULL, "emc_mux", mux_pllmcp_clkm,
+>  			       ARRAY_SIZE(mux_pllmcp_clkm),
+> @@ -1397,7 +1391,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
+>  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_BSEA, "nvavp", "bsea"),
+>  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CML1, "tegra_sata_cml", NULL),
+>  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CML0, "tegra_pcie", "cml"),
+> -	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_PCIEX, "tegra_pcie", "pciex"),
+>  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_VCP, "nvavp", "vcp"),
+>  	TEGRA_CLK_DUPLICATE(TEGRA30_CLK_CLK_MAX, NULL, NULL), /* MUST be the last entry */
+>  };
+> diff --git a/include/dt-bindings/clock/tegra20-car.h b/include/dt-bindings/clock/tegra20-car.h
+> index a1ae9a8fdd6c..9406207cfac8 100644
+> --- a/include/dt-bindings/clock/tegra20-car.h
+> +++ b/include/dt-bindings/clock/tegra20-car.h
+> @@ -92,7 +92,7 @@
+>  #define TEGRA20_CLK_OWR 71
+>  #define TEGRA20_CLK_AFI 72
+>  #define TEGRA20_CLK_CSITE 73
+> -#define TEGRA20_CLK_PCIE_XCLK 74
+> +/* 74 */
+>  #define TEGRA20_CLK_AVPUCQ 75
+>  #define TEGRA20_CLK_LA 76
+>  /* 77 */
+> diff --git a/include/dt-bindings/clock/tegra30-car.h b/include/dt-bindings/clock/tegra30-car.h
+> index 22445820a929..889e49ba0aa3 100644
+> --- a/include/dt-bindings/clock/tegra30-car.h
+> +++ b/include/dt-bindings/clock/tegra30-car.h
+> @@ -92,7 +92,7 @@
+>  #define TEGRA30_CLK_OWR 71
+>  #define TEGRA30_CLK_AFI 72
+>  #define TEGRA30_CLK_CSITE 73
+> -#define TEGRA30_CLK_PCIEX 74
+> +/* 74 */
+>  #define TEGRA30_CLK_AVPUCQ 75
+>  #define TEGRA30_CLK_LA 76
+>  /* 77 */
+> -- 
+> 1.8.1.5
+> 
