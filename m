@@ -1,75 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Dec 2013 16:54:08 -0700
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <CACRpkdYrPd9tnO48bA_5n+-k=KEDyhY7czkCNhTZfpgF3ar+LQ@mail.gmail.com>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>	<528BB1F2.4080107@wwwdotorg.org>	<CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>	<528BB913.6080409@wwwdotorg.org>	<CAH9JG2UjnL5bZzNUuJhWY3GpwPD=rJvR2O4Hcpm33G+prSS=BA@mail.gmail.com>	<CACRpkdbyjm0X9RX+8WjqQxBPyRjBOAunkqVcO-0KUd1PTdGavA@mail.gmail.com>	<5293ACA6.7060403@bracey.fi>
- <CACRpkdYrPd9tnO48bA_5n+-k=KEDyhY7czkCNhTZfpgF3ar+LQ@mail.gmail.com>
-Message-ID: <52A11220.8080509@wwwdotorg.org>
+From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
+Date: Thu, 5 Dec 2013 18:54:49 -0500
+Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
+In-Reply-To: <52A101F8.3060104@codeaurora.org>
+References: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
+ <20131204070442.GA31665@kroah.com>
+ <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
+ <20131204170703.GA14859@kroah.com>
+ <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
+ <20131204230239.GB9205@kroah.com>
+ <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
+ <20131205040104.GA14641@kroah.com>
+ <52A0DE42.3080602@codeaurora.org>
+ <20131205201659.GA14539@kroah.com>
+ <52A101F8.3060104@codeaurora.org>
+Message-ID: <CANsc=4Vb-2br+K51NWsyQV25R3eJo_=YfpnXsh1G1ecRVDYc3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 02:29 AM, Linus Walleij wrote:
-...
-> So I guess what you're after is a kind of hog that will be pushed
-> aside and ignored if a struct device with an associated state appears
-> that will use the same pin?
+Hi Greg and Christopher,
 
-That probably would be useful. Perhaps we should just make all hogs not
-exclusively own the pins they configure?
+Thank you for your feedback.
 
-> It is true that we currently require the tables to be strict and not
-> overlap like this, so ideally you should remove the hogs when you
-> have a device driver, but you're actually describing an interesting
-> case here:
-> 
-> What if I have a driver for this IP block, and it was supposed to
-> take care of a few pins, but I decide not to compile it into my
-> kernel? Or if I have it as a module and only modprobe it later
-> at runtime?
+2013/12/4 Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> What is it's purpose then?  At first glance, this seems to be exactly
+> what 'perf' provides already.  Doesn't perf work on ARM today?
 
-Indeed, that's the nasty hole in pushing even static per-device pinctrl
-configuration into each device's node; the device may not appear.
+On ARM, perf is unable to trace every instruction, and certainly not
+recording the number of cycles taken by every of them. Also, ETM is
+not just tracing the execution flow. It can trace data, trigger
+tracing on events such as address matching, data matching, context ID
+change, monitor CPRT... It would be sad not to use these capabilities.
 
-Related, I prefer to put /all/ static pinctrl configuration into the
-pinctrl device's "default" state (i.e. use a hog) rather than
-configuring the static pinctrl setup per device, for another reason too:
+If we want perf to use ETM's full functionality, its framework clearly
+needs to be extended. Future Intel processors will embed Processor
+Trace [1], which seems to have similar capabilities as ETM on ARM. At
+that point, it will be easier to decide what should be in the kernel
+or in perf.
 
-If a particular IO controller's signals can be routed to n different
-(sets of) pins, then we need to do *both* of the following when setting
-up the pinmux:
+I the meantime, while ETM is not supported elsewhere than in sysfs, it
+should at least be configurable. The current implementation is almost
+not usable.
 
-a) Configure the pins we want to host those signals to route to/from
-that particular IO controller.
+> Well, these patches were incorrect, so that's not really a valid
+> question :)
 
-b) Configure any other pins that could route to/from that particular IO
-controller as some other function; either disabled, or routed to/from
-some different IO controller.
+Should I correct the pid size and send them again?
 
-That is so that the IO controller's RX/input signals are not connected
-from two different sets of pins at once, which would cause two things to
-driver them. Depending on HW, this could cause on of:
+Thanks,
 
-1) Multiple drivers -> high power usage, or even Silicon damage.
+Adrien
 
-2) Inconsistent configuration, with the "wrong" set of pins driving the
-IO controller's inputs, and hence the signals on the "correct" pins
-being ignored -> hard to find bug.
-
-Now, (a) could easily happen when the driver for the IO controller is
-probed. However, (b) can't, because some other IO controller may need to
-use those pins, and the two drivers (or pinctrl states for different
-devices) can't both set up those pins.
-
-The only way to solve this is to set up all pinmux state using a single
-global table (e.g. the pin controller's default state, or hog) that is
-applied early on.
-
-If we rely on resolving these conflicts in per-device default/...
-states, then that means the conflicts won't get resolved until a driver
-gets probed, if it ever does, which is too late.
-
-... and as such, I prefer only putting *dynamic* configuration into
-per-device (non-hog) nodes. (e.g. an I2C bus mux driver which actively
-changes the pinmux at run-time to move an I2C controller between
-different sets of SoC pins).
+[1]: http://software.intel.com/en-us/blogs/2013/09/18/processor-tracing
