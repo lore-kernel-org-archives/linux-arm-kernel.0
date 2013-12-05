@@ -1,40 +1,32 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Thu, 5 Dec 2013 16:33:19 +0530
-Subject: [PATCH] ASoC: samsung: Initialize the dma_data for secondary dai
-In-Reply-To: <20131128113800.GB27568@sirena.org.uk>
-References: <1385632932-16579-1-git-send-email-padma.v@samsung.com>
- <20131128113800.GB27568@sirena.org.uk>
-Message-ID: <CAAgF-BdqRzB5MxTf_9nZkgSOY=F6dGAs0yhTkNHqrUQLonFAsw@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 05 Dec 2013 11:08:48 +0000
+Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
+In-Reply-To: <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
+References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org> <
+ 1385656883-4420-2-git-send-email-leif.lindholm@linaro.org> <
+ CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com> <
+ 20131202210719.GQ24997@rocoto.smurfnet.nu> <
+ CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
+Message-ID: <20131205110848.A9385C40710@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, 4 Dec 2013 15:06:47 -0600, Matt Sealey <neko@bakuhatsu.net> wrote:
+> If your platform has UEFI, then your platform has UEFI - if you built
+> a multiplatform kernel that needs to boot on U-Boot, then you glued an
+> EFI stub to it to make it boot. At some point between the stub and the
+> runtime services driver, you're going through 10,000 lines of code
+> with the information that it *is* running on top of UEFI completely
+> lost to the boot process.
+> 
+> I believe I am also objecting to the idea that the way this is BEST
+> implemented is to take a stock zImage (decompressor+Image payload) and
+> glue a stub in front to resolve the interface issue when the
+> implication is extra complication to the boot process.
 
-On Thu, Nov 28, 2013 at 5:08 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Nov 28, 2013 at 03:32:12PM +0530, Padmavathi Venna wrote:
->
->> This is made based on Mark Brown for-next branch of sound.git
->> This patch is based on Mark Brown below patches for
->> generic dma engine support for samsung audio IPs.
->> ASoC: samsung: Use ASoC dmaengine code where possible
->> ASoC: samsung: Provide helper for DMA init
->
-> Why don't we need this fix for mainline?  The dmaengine change is just
-> moving the initialisation through a layer of indirection but there was
-> initialisation anyway.  I'm concerned that there's a bug that ought to
-> be fixed for v3.13 as well here.
+Adding UEFI support to an existing image type was a design goal when we
+started. Having yet another image format which is not compatibile with
+existing firmware adds yet another barrier to migrating from U-Boot to
+UEFI, or to supporting multiplatforms.
 
-Yes. We need this for mainline. Not dependent on your dmaengine changes.
-
->
->>       return snd_dmaengine_pcm_register(dev, &samsung_dmaengine_pcm_config,
->> -                                       SND_DMAENGINE_PCM_FLAG_COMPAT);
->> +                                       SND_DMAENGINE_PCM_FLAG_COMPAT |
->> +                             SND_DMAENGINE_PCM_FLAG_CUSTOM_CHANNEL_NAME);
->
-> This is already done.
-
-Should I send another patch by removing this flag from this patch?
-
-Thanks
-Padma
+g.
