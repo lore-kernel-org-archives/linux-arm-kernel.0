@@ -1,7 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu,  5 Dec 2013 14:28:04 +0100
-Subject: [PATCH 1/3] ARM: dts: mxs: Add 18bit pin config for lcdif.
-Message-ID: <1386250086-4666-1-git-send-email-denis@eukrea.com>
+Date: Thu,  5 Dec 2013 14:28:05 +0100
+Subject: [PATCH 2/3] ARM: dts: mxs: Add a new pin config for the usb0 ID.
+In-Reply-To: <1386250086-4666-1-git-send-email-denis@eukrea.com>
+References: <1386250086-4666-1-git-send-email-denis@eukrea.com>
+Message-ID: <1386250086-4666-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,46 +18,30 @@ Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- arch/arm/boot/dts/imx28.dtsi |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/imx28.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 51ff335..93a7e79 100644
+index 93a7e79..8d39c42 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -668,6 +668,33 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
+@@ -822,6 +822,17 @@
+ 					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+ 					fsl,pull-up = <MXS_PULL_ENABLE>;
  				};
- 
-+				lcdif_18bit_pins_a: lcdif-18bit at 0 {
++
++				usb0_id_pins_b: usb0id1 at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						MX28_PAD_LCD_D00__LCD_D0
-+						MX28_PAD_LCD_D01__LCD_D1
-+						MX28_PAD_LCD_D02__LCD_D2
-+						MX28_PAD_LCD_D03__LCD_D3
-+						MX28_PAD_LCD_D04__LCD_D4
-+						MX28_PAD_LCD_D05__LCD_D5
-+						MX28_PAD_LCD_D06__LCD_D6
-+						MX28_PAD_LCD_D07__LCD_D7
-+						MX28_PAD_LCD_D08__LCD_D8
-+						MX28_PAD_LCD_D09__LCD_D9
-+						MX28_PAD_LCD_D10__LCD_D10
-+						MX28_PAD_LCD_D11__LCD_D11
-+						MX28_PAD_LCD_D12__LCD_D12
-+						MX28_PAD_LCD_D13__LCD_D13
-+						MX28_PAD_LCD_D14__LCD_D14
-+						MX28_PAD_LCD_D15__LCD_D15
-+						MX28_PAD_LCD_D16__LCD_D16
-+						MX28_PAD_LCD_D17__LCD_D17
++						MX28_PAD_PWM2__USB0_ID
 +					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,drive-strength = <MXS_DRIVE_12mA>;
 +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
++					fsl,pull-up = <MXS_PULL_ENABLE>;
 +				};
 +
- 				lcdif_16bit_pins_a: lcdif-16bit at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
+ 			};
+ 
+ 			digctl: digctl at 8001c000 {
 -- 
 1.7.9.5
