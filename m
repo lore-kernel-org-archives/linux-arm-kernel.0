@@ -1,128 +1,36 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 05 Dec 2013 17:44:16 +0100
-Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
- system
-In-Reply-To: <20131205164038.GA15560@roeck-us.net>
-References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
- <42011482.56GYn1upCz@amdc1227> <20131205164038.GA15560@roeck-us.net>
-Message-ID: <35548763.UvKAOvJvxh@amdc1227>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu,  5 Dec 2013 17:50:59 +0100
+Subject: [PATCH v2 0/4] PHY driver for Marvell SATA
+Message-ID: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 of December 2013 08:40:38 Guenter Roeck wrote:
-> On Thu, Dec 05, 2013 at 05:21:47PM +0100, Tomasz Figa wrote:
-> > Hi Doug,
-> > 
-> > Please see my comments inline.
-> > 
-> > On Monday 02 of December 2013 10:14:41 Doug Anderson wrote:
-> > > A good watchdog driver is supposed to report when it was responsible
-> > > for resetting the system.  Implement this for the s3c2410, at least on
-> > > exynos5250 and exynos5420 where we already have a pointer to the PMU
-> > > registers to read the information.
-> > > 
-> > > Signed-off-by: Doug Anderson <dianders@chromium.org>
-> > > ---
-> > > This patch is based atop Leela Krishna's recent series that ends with
-> > > (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
-> > > AKA <https://patchwork.kernel.org/patch/3251861/>.
-> > > 
-> > >  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
-> > >  1 file changed, 39 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> > > index 47f4dcf..2c87d37 100644
-> > > --- a/drivers/watchdog/s3c2410_wdt.c
-> > > +++ b/drivers/watchdog/s3c2410_wdt.c
-> > > @@ -62,9 +62,13 @@
-> > >  #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
-> > >  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
-> > >  
-> > > +#define RST_STAT_REG_OFFSET		0x0404
-> > 
-> > IMHO this should be namespaced, at least with EXYNOS5 prefix. The two
-> > registers below should be as well, but I missed this in the patch adding
-> > them.
-> > 
-> > >  #define WDT_DISABLE_REG_OFFSET		0x0408
-> > >  #define WDT_MASK_RESET_REG_OFFSET	0x040c
-> > >  #define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
-> > > +#define QUIRK_HAS_RST_STAT		(1 << 1)
-> > > +#define QUIRKS_NEED_PMUREG		(QUIRK_NEEDS_PMU_CONFIG | \
-> > > +					 QUIRK_HAS_RST_STAT)
-> > >  
-> > >  static bool nowayout	= WATCHDOG_NOWAYOUT;
-> > >  static int tmr_margin;
-> > > @@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
-> > >   * timer reset functionality.
-> > >   * @mask_bit: Bit number for the watchdog timer in the disable register and the
-> > >   * mask reset register.
-> > > + * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
-> > > + * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
-> > > + * reset.
-> > >   * @quirks: A bitfield of quirks.
-> > >   */
-> > >  
-> > > @@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
-> > >  	int disable_reg;
-> > >  	int mask_reset_reg;
-> > >  	int mask_bit;
-> > > +	int rst_stat_reg;
-> > > +	int rst_stat_bit;
-> > >  	u32 quirks;
-> > >  };
-> > >  
-> > > @@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
-> > >  	.disable_reg = WDT_DISABLE_REG_OFFSET,
-> > >  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
-> > >  	.mask_bit = 20,
-> > > -	.quirks = QUIRK_NEEDS_PMU_CONFIG
-> > > +	.rst_stat_reg = RST_STAT_REG_OFFSET,
-> > > +	.rst_stat_bit = 20,
-> > > +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
-> > > +		QUIRK_HAS_RST_STAT,
-> > >  };
-> > >  
-> > >  static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
-> > >  	.disable_reg = WDT_DISABLE_REG_OFFSET,
-> > >  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
-> > >  	.mask_bit = 0,
-> > > -	.quirks = QUIRK_NEEDS_PMU_CONFIG
-> > > +	.rst_stat_reg = RST_STAT_REG_OFFSET,
-> > > +	.rst_stat_bit = 9,
-> > > +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
-> > > +		QUIRK_HAS_RST_STAT,
-> > >  };
-> > >  
-> > >  static const struct of_device_id s3c2410_wdt_match[] = {
-> > > @@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
-> > >  }
-> > >  #endif
-> > >  
-> > > +static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
-> > > +{
-> > > +	unsigned int bootstatus = 0;
-> > > +	int ret;
-> > > +
-> > > +	if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
-> > 
-> > nit: I guess it's just a matter of taste, but to reduce code indentation
-> > you could inverse the check and simply return 0 here.
-> > 
-> 
-> nit: If so, it would make sense to to the same for the other 'quirk'
-> for consistency.
-> 
-> static int s3c2410wdt_mask_and_disable_reset(struct s3c2410_wdt *wdt, bool mask)
-> {
-> 	...
-> 	if (!(wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG))
-> 		return 0;
-> 	...
-> }
+This second version addresses most of the points raised during review.
 
-That's quite a bit different story, as currently the check is outside of
-this function, but I agree, it would look better.
+What has not been changed is the phy-names property. This is awaiting
+feedback on my comment that the naming follows how clocks are named in
+the driver & DT binding. For this reason i've also not added the
+Ack-by: received in the review comments.
 
-Best regards,
-Tomasz
+Andrew Lunn (4):
+  Phy: DT binding documentation for Marvell MVEBU SATA phy.
+  Phy: Add a PHY driver for Marvell MVEBU SATA PHY.
+  SATA: MV: Add support for the optional PHYs
+  Phy: Add DT nodes on kirkwood and Dove for the SATA PHY
+
+ Documentation/devicetree/bindings/ata/marvell.txt  |   6 +
+ .../devicetree/bindings/phy/phy-mvebu.txt          |  22 ++++
+ arch/arm/boot/dts/dove.dtsi                        |  11 ++
+ arch/arm/boot/dts/kirkwood-6281.dtsi               |   2 +
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |   2 +
+ arch/arm/boot/dts/kirkwood.dtsi                    |  18 +++
+ drivers/ata/sata_mv.c                              |  19 +++
+ drivers/phy/Kconfig                                |   6 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-mvebu-sata.c                       | 137 +++++++++++++++++++++
+ 10 files changed, 224 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mvebu.txt
+ create mode 100644 drivers/phy/phy-mvebu-sata.c
+
+-- 
+1.8.5
