@@ -1,119 +1,78 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 5 Dec 2013 13:18:48 -0500
-Subject: [PATCH v2 4/4] Phy: Add DT nodes on kirkwood and Dove for the
- SATA PHY
-In-Reply-To: <1386262263-18956-5-git-send-email-andrew@lunn.ch>
-References: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
- <1386262263-18956-5-git-send-email-andrew@lunn.ch>
-Message-ID: <20131205181848.GS29282@titan.lakedaemon.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Dec 2013 18:23:42 +0000
+Subject: [PATCH v4 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131204152726.GC8062@lunn.ch>
+References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
+ <1386166641-7567-2-git-send-email-andrew@lunn.ch>
+ <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
+ <20131204152726.GC8062@lunn.ch>
+Message-ID: <20131205182342.GR29200@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 05:51:03PM +0100, Andrew Lunn wrote:
-> Add nodes for the two SATA PHYs on kirkewood.
+On Wed, Dec 04, 2013 at 03:27:26PM +0000, Andrew Lunn wrote:
 
-s/kirkewood/kirkwood/ but only if you do a respin.  Otherwise, I can
-patch it up when I pull it in.
-
-thx,
-
-Jason.
-
-> Add node for the one SATA PHY on Dove.
-> Add pHandles to the PHYs in the sata nodes.
+[...]
+  
+> > > +
+> > > +	cpu_dev = get_cpu_device(0);
+> > > +
+> > > +	priv.cpu_clk = devm_clk_get(cpu_dev, "cpu_clk");
+> > > +	if (IS_ERR(priv.cpu_clk)) {
+> > > +		err = PTR_ERR(priv.cpu_clk);
+> > > +		goto out;
+> > > +	}
+> > 
+> > I think it would be better to describe the clocks as being fed to the
+> > PMU than directly to the CPU -- the PMU selects the appropriate clock
+> > and feeds it to the CPU.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> v1->v2:
-> sata_phy at ... ->sata-phy@
-> value after '@' matching the first address in the reg.
-> ---
->  arch/arm/boot/dts/dove.dtsi          | 11 +++++++++++
->  arch/arm/boot/dts/kirkwood-6281.dtsi |  2 ++
->  arch/arm/boot/dts/kirkwood-6282.dtsi |  2 ++
->  arch/arm/boot/dts/kirkwood.dtsi      | 18 ++++++++++++++++++
->  4 files changed, 33 insertions(+)
+> The wording in the data sheet is not very clear:
 > 
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 113a8bc7bee7..0d786f868760 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -490,10 +490,21 @@
->  				reg = <0xa0000 0x2400>;
->  				interrupts = <62>;
->  				clocks = <&gate_clk 3>;
-> +				phys = <&sata_phy0>;
-> +				phy-names = "0";
->  				nr-ports = <1>;
->  				status = "disabled";
->  			};
->  
-> +			sata_phy0: sata-phy at a2000 {
-> +				compatible = "marvell,mvebu-sata-phy";
-> +				reg = <0xa2000 0x0334>;
-> +				clocks = <&gate_clk 3>;
-> +				clock-names = "sata";
-> +				#phy-cells = <0>;
-> +				status = "ok";
-> +			};
-> +
->  			rtc: real-time-clock at d8500 {
->  				compatible = "marvell,orion-rtc";
->  				reg = <0xd8500 0x20>;
-> diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
-> index 650ef30e1856..92a1c747456a 100644
-> --- a/arch/arm/boot/dts/kirkwood-6281.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
-> @@ -89,6 +89,8 @@
->  			interrupts = <21>;
->  			clocks = <&gate_clk 14>, <&gate_clk 15>;
->  			clock-names = "0", "1";
-> +			phys = <&sata_phy0>, <&sata_phy1>;
-> +			phy-names = "0", "1";
->  			status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
-> index 3933a331ddc2..dfa6b073cf00 100644
-> --- a/arch/arm/boot/dts/kirkwood-6282.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
-> @@ -117,6 +117,8 @@
->  			interrupts = <21>;
->  			clocks = <&gate_clk 14>, <&gate_clk 15>;
->  			clock-names = "0", "1";
-> +			phys = <&sata_phy0>, <&sata_phy1>;
-> +			phy-names = "0", "1";
->  			status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 8b73c80f1dad..ee06951721c4 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -282,5 +282,23 @@
->  				/* set phy-handle property in board file */
->  			};
->  		};
-> +
-> +		sata_phy0: sata-phy at 82000 {
-> +			compatible = "marvell,mvebu-sata-phy";
-> +			reg = <0x82000 0x0334>;
-> +			clocks = <&gate_clk 14>;
-> +			clock-names = "sata";
-> +			#phy-cells = <0>;
-> +			status = "ok";
-> +		};
-> +
-> +		sata_phy1: sata-phy at 84000 {
-> +			compatible = "marvell,mvebu-sata-phy";
-> +			reg = <0x84000 0x0334>;
-> +			clocks = <&gate_clk 15>;
-> +			clock-names = "sata";
-> +			#phy-cells = <0>;
-> +			status = "ok";
-> +		};
->  	};
->  };
-> -- 
-> 1.8.5
+>     The PMU initiates new clock ratio values for the CPU subsystem
+>     clocks generation unit.
 > 
+> So to me, the PMU is not the clock consumer, it just controls the
+> clock generation unit. There is also a block diagram which shows the
+> "CPU Subsystem ClockGen" as being external to the PMU.
+
+Hmm. That's somewhat arguable.
+
+>From a block diagram I've found, the situation seems more like the
+ClockGen takes two clocks as input, and feeds the appropriate clock to
+the CPU. Logically, the CPU itself is a consumer of one clock.
+
+The ClockGen unit is controlled by a clock manager. The clock manager
+appears to be a component of the PMU itself, but I may have
+misunderstood. If that is the case, and the CPU Subsytem ClockGen is not
+controlled by anything else, then I don't see the problem with grouping
+that together logically with the clock manager (and therefore the PMU).
+That would imply describing the clock inputs on the PMU is fine.
+
+Have I missed something?
+
+One thing I'm worried about is adding lots of SoC-specific variations on
+data to generic nodes rather than doing that in a uniform fashion. I
+believe describing the clocks in the way you propose clashes with the
+cpufreq-cpu0 way of doing things (whereby the CPU has one clock input).
+
+If the ClockGen were modelled as a mux that allows switching between two
+rates, then that would make the description more uniform.
+
+>  
+> > Also, the clocks could be named better with respect to their logical
+> > function. One is the high-frequency default, and the other is a
+> > low-frequency option. They're both able to feed the CPU, and the fact
+> > that one also feeds the DDR isn't relevant to the CPU.
+> 
+> The data sheet uses the terms Turbo Speed and Slow Speed modes. So i
+> could call them turbo and slow? However, the current names follow the
+> kirkwood cpufreq driver. It also can swap between a fast clock and the
+> DDR clock. So i thought keeping the drivers similar would help with
+> the maintenance burden. 
+
+I think given the above, the changes I'm asking for would already
+involve sufficient changes to make this concern irrelevant. However, I
+don't want to force an unmaintainable change.
+
+Mark.
