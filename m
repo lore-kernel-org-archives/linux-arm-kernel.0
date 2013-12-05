@@ -1,35 +1,40 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 05 Dec 2013 12:04:00 +0000
-Subject: [PATCH v3 0/3] (U)EFI runtime services for arm
-In-Reply-To: <20131129175850.GW24997@rocoto.smurfnet.nu>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org> <
- 20131129115319.GC11775@console-pimps.org> <20131129175850.GW24997@rocoto.
- smurfnet.nu>
-Message-ID: <20131205120400.45EC9C407BC@trevor.secretlab.ca>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 5 Dec 2013 20:02:23 +0800
+Subject: [PATCH 7/9] arm/pci: Use dev_is_pci() to check whether it is pci
+ device
+Message-ID: <1386244943-31016-1-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Nov 2013 18:58:51 +0100, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Fri, Nov 29, 2013 at 11:53:19AM +0000, Matt Fleming wrote:
-> > On Thu, 28 Nov, at 04:41:20PM, Leif Lindholm wrote:
-> > > In systems based on [U]EFI-conformant firmware, runtime services provide
-> > > a standardised way for the kernel to update firmware environment
-> > > variables. This is used for example by efibootmgr to update which image
-> > > should be loaded on next boot.
-> > > 
-> > > This patchset implements basic support for UEFI runtime services on ARM
-> > > platforms, as well as the basic underlying EFI support. It also defines
-> > > a mechanism by which the required information is passed from the
-> > > bootloader (the EFI stub submitted separately) to the kernel via FDT
-> > > entries.
-> > 
-> > This all looks pretty good to me. Is this series going through the ARM
-> > trees?
-> 
-> Thanks.
-> That's the plan.
+Use PCI standard marco dev_is_pci() instead of directly compare
+pci_bus_type to check whether it is pci device.
 
-FWIW, I would like to see this merged this cycle. I think it is ready
-enough and can be fixed up in-place.
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ arch/arm/common/it8152.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-g.
+diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
+index 001f491..5114b68 100644
+--- a/arch/arm/common/it8152.c
++++ b/arch/arm/common/it8152.c
+@@ -257,7 +257,7 @@ static int it8152_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t s
+  */
+ static int it8152_pci_platform_notify(struct device *dev)
+ {
+-	if (dev->bus == &pci_bus_type) {
++	if (dev_is_pci(dev)) {
+ 		if (dev->dma_mask)
+ 			*dev->dma_mask = (SZ_64M - 1) | PHYS_OFFSET;
+ 		dev->coherent_dma_mask = (SZ_64M - 1) | PHYS_OFFSET;
+@@ -268,7 +268,7 @@ static int it8152_pci_platform_notify(struct device *dev)
+ 
+ static int it8152_pci_platform_notify_remove(struct device *dev)
+ {
+-	if (dev->bus == &pci_bus_type)
++	if (dev_is_pci(dev))
+ 		dmabounce_unregister_dev(dev);
+ 
+ 	return 0;
+-- 
+1.7.1
