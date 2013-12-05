@@ -1,47 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 21:07:06 +0100
-Subject: [PATCH v2 1/6] ARM: brcmstb: add infrastructure for ARM-based
- Broadcom STB SoCs
-In-Reply-To: <CAGVrzcbxHA+S0yZbsrj8uMZR0hsb_ng=PB02zte7S0rCZWQpBg@mail.gmail.com>
-References: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
- <201312031601.04997.arnd@arndb.de>
- <CAGVrzcbxHA+S0yZbsrj8uMZR0hsb_ng=PB02zte7S0rCZWQpBg@mail.gmail.com>
-Message-ID: <201312052107.07197.arnd@arndb.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 05 Dec 2013 15:12:50 -0500
+Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
+In-Reply-To: <20131205040104.GA14641@kroah.com>
+References: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
+ <20131204070442.GA31665@kroah.com>
+ <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
+ <20131204170703.GA14859@kroah.com>
+ <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
+ <20131204230239.GB9205@kroah.com>
+ <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
+ <20131205040104.GA14641@kroah.com>
+Message-ID: <52A0DE42.3080602@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 December 2013, Florian Fainelli wrote:
-> 2013/12/3 Arnd Bergmann <arnd@arndb.de>:
-> >
-> >> +     addr = ioremap(BPHYSADDR(BCHP_IRQ0_IRQEN), sizeof(u32));
-> >> +     writel_relaxed(BCHP_IRQ0_IRQEN_uarta_irqen_MASK
-> >> +             | BCHP_IRQ0_IRQEN_uartb_irqen_MASK
-> >> +             | BCHP_IRQ0_IRQEN_uartc_irqen_MASK, addr);
-> >> +     iounmap(addr);
-> >
-> > What does this part do? Isn't that something that should have been set
-> > up by the boot loader?
+Hi Greg,
+
+On 12/04/2013 11:01 PM, Greg Kroah-Hartman wrote:
+> On Wed, Dec 04, 2013 at 10:49:25PM -0500, Adrien Verg? wrote:
+>> 2013/12/4 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+>>> How much overhead does the existing tracing code have on ARM?  Is ETM
+>>> still even needed?  Why not just use ETM for the core tracing code
+>>> instead?
+
+I think support for the Embedded Trace Macrocell is desirable. (Maybe it's not
+necesarily *needed*, but in the same way that graphics and audio aren't
+necessarily needed when using a desktop machine.) Plugging the ETM into the
+core tracing code or maybe into the perf events framework would be
+interesting, but do these patches make that work any more difficult?
+
+>> Coresight ETM is not just faster than /sys/kernel/debug/tracing, it
+>> provides more detailed and customisable info. For instance, you can
+>> trace every load, store, instruction fetch, along with the number of
+>> cycles taken, with almost zero-overhead.
 > 
-> The bootloader will typically use the UART in busy-looping mode and
-> not rely on interrupts, also the bootloader currently does not know
-> much about how many UARTs there are in the system and how they are
-> going to be used.
+> Can't you already do that with the 'perf' tool the kernel provides
+> without the ETM driver?
 
-Well, it should at least know how many ports are wire up and be able
-to set them up to a working state.
+With perf one can get a count of how many instructions have been executed,
+with little overhead, but not the full list of opcodes and addresses. (One can
+also sample the Program Counter intermittently, which might suffice for
+performance analysis, but probably doesn't for most debugging use cases.) I
+think with perf one can have a handful of watchpoints looking at a very few
+loads and stores, with large overhead. As I understand it, ETM can handle
+arbitrarily large regions, with little overhead.
 
-> One possible way to solve this would be to write a very small irqchip
-> driver which only implements the "irq_enable" method to allow these
-> interrupts to be forwarded to the GIC. Somewhere in the Device Tree we
-> would have an interrupt-map property which describes the mapping
-> between the bits in BCHP_IRQ0_IRQEN and their corresponding
-> peripherals (UARTA, B, C).
-> 
-> Would that work?
+Regards,
+Christopher
 
-I think that would work, but it's getting into the overdesign territory.
-Can you clarify why this register exists in the first place and what
-makes it necessary to set it up? Are there similar registers for all
-other IRQs?
-
-	Arnd
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
