@@ -1,122 +1,59 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 05 Dec 2013 21:34:00 +0800
-Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
- maps and map logical cpu id to APIC id
-In-Reply-To: <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
-References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
- <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
- <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
-Message-ID: <52A080C8.5080909@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu,  5 Dec 2013 14:34:49 +0100
+Subject: [PATCH 4/6] mmc: mxs: use standard flag for cd inverted
+In-Reply-To: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
+References: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1386250491-4708-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?12?04? 23:47, Rob Herring wrote:
-> On Tue, Dec 3, 2013 at 10:39 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> When boot the kernel with MADT, the cpu possible and present maps should be
->> prefilled for cpu topology and acpi based cpu hot-plug.
->>
->> The logic cpu id maps to APIC id (GIC id) is also implemented, it is needed
->> for acpi processor drivers.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/include/asm/acpi.h |   10 ++--
->>   arch/arm64/kernel/setup.c     |    2 +
->>   arch/arm64/kernel/smp.c       |    2 +
->>   drivers/acpi/plat/arm-core.c  |  118 +++++++++++++++++++++++++++++++++++++++++
->>   4 files changed, 129 insertions(+), 3 deletions(-)
-> [snip]
->
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index a0c2ca6..1428024 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -420,7 +420,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->>                  if (err)
->>                          continue;
->>
->> +#ifndef CONFIG_ACPI
->>                  set_cpu_present(cpu, true);
->> +#endif
-> Should this be moved to DT cpu topology related code?
+We have a MMC_CAP2_CD_ACTIVE_HIGH flag, so use it rather than a custom
+driver specific flag.
 
-I didn't see the code in the mainline, Mark Brown is
-working on it now?
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/mmc/host/mxs-mmc.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
->>                  max_cpus--;
->>          }
->>   }
->> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
->> index 45ff625..8527ecc 100644
->> --- a/drivers/acpi/plat/arm-core.c
->> +++ b/drivers/acpi/plat/arm-core.c
-> [snip]
->
->> @@ -221,6 +284,61 @@ static int __init acpi_parse_madt_gic_distributor_entries(void)
->>          return 0;
->>   }
->>
->> +static int setup_possible_cpus __initdata = -1;
->> +static int __init _setup_possible_cpus(char *str)
->> +{
->> +       get_option(&str, &setup_possible_cpus);
->> +       return 0;
->> +}
->> +early_param("possible_cpus", _setup_possible_cpus);
-> This does not seem ACPI or ARM specific.
->
->> +
->> +/*
->> + * cpu_possible_mask should be static, it cannot change as cpu's
->> + * are onlined, or offlined. The reason is per-cpu data-structures
->> + * are allocated by some modules at init time, and dont expect to
->> + * do this dynamically on cpu arrival/departure.
->> + * cpu_present_mask on the other hand can change dynamically.
->> + * In case when cpu_hotplug is not compiled, then we resort to current
->> + * behaviour, which is cpu_possible == cpu_present.
->> + * - Ashok Raj
->> + *
->> + * Three ways to find out the number of additional hotplug CPUs:
->> + * - If the BIOS specified disabled CPUs in ACPI/mptables use that.
->> + * - The user can overwrite it with possible_cpus=NUM
->> + * - Otherwise don't reserve additional CPUs.
->> + * We do this because additional CPUs waste a lot of memory.
->> + * -AK
->> + */
->> +void __init prefill_possible_map(void)
->> +{
->> +       int i;
->> +       int possible, disabled_cpus;
->> +
->> +       disabled_cpus = total_cpus - available_cpus;
->> +
->> +       if (setup_possible_cpus == -1) {
->> +               if (disabled_cpus > 0)
->> +                       setup_possible_cpus = disabled_cpus;
->> +               else
->> +                       setup_possible_cpus = 0;
->> +       }
->> +
->> +       possible = available_cpus + setup_possible_cpus;
->> +
->> +       pr_info("SMP: the system is limited to %d CPUs\n", nr_cpu_ids);
->> +
->> +       if (possible > nr_cpu_ids)
->> +               possible = nr_cpu_ids;
->> +
->> +       pr_info("SMP: Allowing %d CPUs, %d hotplug CPUs\n",
->> +               possible, max((possible - available_cpus), 0));
->> +
->> +       for (i = 0; i < possible; i++)
->> +               set_cpu_possible(i, true);
->> +       for (; i < NR_CPUS; i++)
->> +               set_cpu_possible(i, false);
->> +}
-> This does not seem ACPI or ARM specific either.
-
-I think possible map here is related to ACPI based CPU hot-plug,
-that's why I introduce the code here, if anything I'm wrong, please
-correct me.
-
-Thanks
-Hanjun
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index 02210ce..3dd2f4c 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -71,7 +71,6 @@ struct mxs_mmc_host {
+ 	int				sdio_irq_en;
+ 	int				wp_gpio;
+ 	bool				wp_inverted;
+-	bool				cd_inverted;
+ };
+ 
+ static int mxs_mmc_get_ro(struct mmc_host *mmc)
+@@ -94,9 +93,15 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
+ {
+ 	struct mxs_mmc_host *host = mmc_priv(mmc);
+ 	struct mxs_ssp *ssp = &host->ssp;
++	int present;
+ 
+-	return !(readl(ssp->base + HW_SSP_STATUS(ssp)) &
+-		  BM_SSP_STATUS_CARD_DETECT) ^ host->cd_inverted;
++	present = !(readl(ssp->base + HW_SSP_STATUS(ssp)) &
++			BM_SSP_STATUS_CARD_DETECT);
++
++	if (mmc->caps2 & MMC_CAP2_CD_ACTIVE_HIGH)
++		present = !present;
++
++	return present;
+ }
+ 
+ static int mxs_mmc_reset(struct mxs_mmc_host *host)
+@@ -658,7 +663,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 	if (flags & OF_GPIO_ACTIVE_LOW)
+ 		host->wp_inverted = 1;
+ 
+-	host->cd_inverted = of_property_read_bool(np, "cd-inverted");
++	if (of_property_read_bool(np, "cd-inverted"))
++		mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+ 
+ 	mmc->f_min = 400000;
+ 	mmc->f_max = 288000000;
+-- 
+1.8.4.3
