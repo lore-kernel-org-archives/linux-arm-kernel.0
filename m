@@ -1,48 +1,59 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 5 Dec 2013 13:58:06 +0100
-Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
-In-Reply-To: <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
- <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
- <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
- <20131202210719.GQ24997@rocoto.smurfnet.nu>
- <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
-Message-ID: <20131205125805.GX24997@rocoto.smurfnet.nu>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 05 Dec 2013 21:09:29 +0800
+Subject: [RFC part3 PATCH 2/2] ARM64 / clocksource: Use
+ arch_timer_acpi_init()
+In-Reply-To: <20131204150709.GF29200@e106331-lin.cambridge.arm.com>
+References: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088891-2917-3-git-send-email-hanjun.guo@linaro.org>
+ <20131203170815.GB16025@e106331-lin.cambridge.arm.com>
+ <529F3BCA.1020908@linaro.org>
+ <20131204150709.GF29200@e106331-lin.cambridge.arm.com>
+Message-ID: <52A07B09.9010007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:06:47PM -0600, Matt Sealey wrote:
-> By the time we get half-way through arm/kernel/head.S the cache and
-> MMU has been turned off and on and off again by the decompressor, and
-> after a large amount of guesswork and arbitrary restriction-based
-> implementation, there's no guarantee that the kernel hasn't been
-> decompressed over some important UEFI feature or some memory hasn't
-> been trashed. You can't make that guarantee because by entering the
-> plain zImage, you forfeited that information. This is at worst case
-> going to be lots of blank screens and blinking serial console prompts
-> and little more than frustration..
+On 2013?12?04? 23:07, Mark Rutland wrote:
+> On Wed, Dec 04, 2013 at 02:27:22PM +0000, Hanjun Guo wrote:
+>> On 2013?12?04? 01:08, Mark Rutland wrote:
+>>> On Tue, Dec 03, 2013 at 04:41:31PM +0000, Hanjun Guo wrote:
+>>>> Use arch_timer_acpi_init() on ARM64 to initialise arch timer
+>>>> in ACPI way when DT is not available.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>    arch/arm64/kernel/time.c |    4 ++++
+>>>>    1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+>>>> index 29c39d5..fb009da 100644
+>>>> --- a/arch/arm64/kernel/time.c
+>>>> +++ b/arch/arm64/kernel/time.c
+>>>> @@ -67,6 +67,10 @@ void __init time_init(void)
+>>>>    
+>>>>    	clocksource_of_init();
+>>>>    
+>>>> +	/* if can't be initialised from DT, try ACPI way */
+>>>> +	if (!arch_timer_get_rate())
+>>>> +		arch_timer_acpi_init();
+>>>> +
+>>> As mentioned on the previous patch, I think for the timebeing we should
+>>> rely on CNTFREQ.
+>>>
+>>> Additionally, if you need to do this we should have an analagous
+>>> mechanism to clocksource_of_init() that performs this initialisation for
+>>> ACPI, and here we can call a clocksource_*_init function that does the
+>>> right thing.
+>>>
+>>> There's no need for this file to know anything about ACPI.
+>> Oh, Amit already have some patches to introduce clocksource_acpi_init()
+>> like clocksource_of_init() did, please refer to the link below.
+>>
+>> http://marc.info/?l=linaro-acpi&m=138131929721943&w=2
+>>
+>> is this the idea you mentioned in your comments?
+> Something along those lines is far better than hardcoding
+> arch_timer_acpi_init here.
 
-So, Grant covered the reason _why_ we coexist with zImage, so I won't
-go into that. I will however point out that we are explicitly using the
-UEFI interfaces to allocate the regions the zImage will decompress into.
-This isn't guesswork, and has in fact already turned up issues with a
-couple of UEFI board ports that reserved memory near 0 (which were
-indeed previously being silently overwritten by the kernel
-decompression).
+Thanks for the suggestion, will update it.
 
-We _are_ planning to do more development for subsequent patches, making
-more use of the UEFI memory map. And by subsequent, I mean hopefully in
-time for 3.14. I sneekily included this in the version of uefi.txt sent
-out for separate review early November:
-http://permalink.gmane.org/gmane.linux.kernel.efi/2657, but not in
-the one included with this patch set (since the code isn't there yet).
-But we considered it more important to get the basic support ready
-first.
-
-At that point, you will see the stub reading the dram_base from the
-UEFI memory map rather than DT, and memblock_init getting its input
-from there too.
-
-Regards,
-
-Leif
+Hanjun
