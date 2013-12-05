@@ -1,61 +1,30 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 5 Dec 2013 15:59:02 +0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131205081101.GA4636@norris.computersforpeace.net>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com>
- <5298AA23.7080404@st.com>
- <1386082273.18201.61.camel@shinybook.infradead.org>
- <20131204184405.GE9468@ld-irv-0074.broadcom.com>
- <20131205071224.GA8936@shlinux2.ap.freescale.net>
- <20131205081101.GA4636@norris.computersforpeace.net>
-Message-ID: <20131205075901.GA20407@shlinux2.ap.freescale.net>
+From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
+Date: Thu, 05 Dec 2013 12:34:30 +0400
+Subject: [PATCH 2/2] ARM: fix framepointer check in unwind_frame
+In-Reply-To: <20131205083424.32632.51618.stgit@buzz>
+References: <20131205083424.32632.51618.stgit@buzz>
+Message-ID: <20131205083430.32632.11103.stgit@buzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 12:11:01AM -0800, Brian Norris wrote:
-> On Thu, Dec 05, 2013 at 03:12:25PM +0800, Huang Shijie wrote:
-> > On Wed, Dec 04, 2013 at 10:44:05AM -0800, Brian Norris wrote:
-> > > 
-> > > I mostly bring this up, though, because it is an example of hardware
-> > > that
-> > > 
-> > >    (a) can operate as a true SPI device (hardware (1) can handle generic
-> > >        SPI transfers), but
-> > >    (b) requires knowledge of the details of SPI flash in order to get
-> > >        optimal usage out of the acceleration from (2).
-> > > 
-> > > In my book, point (a) and (b) hold some bearing over the question of
-> > > "where should this SPI NOR framework live", because it is reasonable
-> > > that a single driver for this hardware should be able to handle either
-> > > true SPI devices or accelerated SPI-NOR flash.
-> > 
-> > We have add a @read_id hook for the spi-nor layer, you can use it to read out
-> > more info (such as the Device Geometry Definition) for your spi-nor controller driver.
-> > 
-> > Is it okay?
-> 
-> I'm not sure which @read_id hook you're talking about, as I've only
-> skimmed the most recent thread, and it's not in the last patch series I
-> have from you, I don't think. But that is not a response at all to the
-> points I brought up. My statements have nothing to do with device
-> geometry detection.
+This patch fixes corner case when (fp + 4) overflows unsigned long,
+for example: fp = 0xFFFFFFFF -> fp + 4 == 3.
 
-My meaning is You can write a new driver for the (b) with the new spi-nor layer,
+Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+---
+ arch/arm/kernel/stacktrace.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-In the new driver you can implement the @read_id yourself, and read out the
-the necessary info, and implement other hooks for the so-called peculiarities.
-
-> 
-> What I was actually addressing:
-> 
-> Your framework aligns with Mark's original suggestion: that the "SPI
-> NOR" framework should be a separate layer held entirely within the MTD
-> subsystem, and that any given driver is *either* a "SPI NOR" driver *or*
-> a "true SPI" driver, not both.
-You can only use a SPI-NOR driver, and you can abandon the "true SPI" driver.
-
-Is there some limits that prevent we just code a SPI-NOR driver for your hardware?
-
-thanks
-Huang Shijie
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index 00f79e5..af4e8c8 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
+ 	high = ALIGN(low, THREAD_SIZE);
+ 
+ 	/* check current frame pointer is within bounds */
+-	if (fp < (low + 12) || fp + 4 >= high)
++	if (fp < low + 12 || fp > high - 4)
+ 		return -EINVAL;
+ 
+ 	/* restore the registers from the stack frame */
