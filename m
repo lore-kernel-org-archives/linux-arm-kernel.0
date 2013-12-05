@@ -1,66 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 05 Dec 2013 18:24:13 +0000
-Subject: [PATCH] ARM/KVM: inject data abort on unhandled memory access
-In-Reply-To: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
-References: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
-Message-ID: <52A0C4CD.9030106@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Dec 2013 10:40:07 -0800
+Subject: [PATCH] ARM: DTS: omap4-sdp: Add regulator for LCD backlight
+ (pwm-backlight)
+In-Reply-To: <5297164D.9060400@ti.com>
+References: <1385630924-16392-1-git-send-email-peter.ujfalusi@ti.com>
+ <5297164D.9060400@ti.com>
+Message-ID: <20131205184007.GE26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-
-On 05/12/13 15:10, Andre Przywara wrote:
-> If a KVM guest accesses memory that is outside its memory map (so no
-> MMIO and no RAM), KVM will return -ENOSYS to userland, causing QEMU
-> to do an abort() and kill the whole guest. This happens while
-> executing dmidecode on ARM, which mmaps /dev/mem and scans the first
-> Megabyte of memory for a DMI BIOS signature (sic!).
-
-Arghhh. And of course, I expect they do that using instructions we can't
-use for IOs.
-
-Bummer.
-
-> Of course this is silly, but in any case crashing the whole guest
-> does not seems appropriate.
-> So lets mimic native hardware's behavior in this case and inject a
-> Data Abort exception into the guest. In the previous case this will
-> crash dmidecode with SIGSEGV, but keeps the guest alive.
+* Sourav Poddar <sourav.poddar@ti.com> [131128 02:10]:
+> On Thursday 28 November 2013 02:58 PM, Peter Ujfalusi wrote:
+> >Since in DT booted kernel dummy regulators are no longer supported we need
+> >to provide valid phandle for the regulator needed by the backlight.
+> >On the board VBAT is used to power the LCD backlight(s).
+> >
+> >Signed-off-by: Peter Ujfalusi<peter.ujfalusi@ti.com>
+> >---
+> >Hi,
+> >
+> >This patch is needed for 3.13 to get the LCD backlight to work again.
+> Is this usage of power supply a mandatory requirement?
 > 
-> I am not sure if this too coarse grained, but I just wanted to start
-> discussion on this.
+> There is a thread which discusses this issue[1]:
+> http://www.spinics.net/lists/arm-kernel/msg288215.html
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-> ---
->  arch/arm/kvm/mmio.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> According to the above, regulator framework have support in 3.13-rc1
+> to returns
+> a dummy  regulator if there is none specified in the dts data.
+> Thierry told that there seems to be a bug in regulator in handling
+> these case.
 > 
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 4cb5a93..04a105e 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -183,7 +183,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  			return ret;
->  	} else {
->  		kvm_err("load/store instruction decoding not implemented\n");
-> -		return -ENOSYS;
-> +		kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-> +		return 1;
->  	}
->  
->  	rt = vcpu->arch.mmio_decode.rt;
+> Though, I also posted a patch on pwm a couple of days ago[2]
+> [2]: https://patchwork.kernel.org/patch/3246711/
 > 
+> I posted it without "power-supply" by testing it with the
+> solution proposed in [1].
+> If I dont use the solution[1], it fails for me also.
 
-I agree that killing the whole VM is not the nicest thing in the world.
-How about:
-- keeping some form of warning
-- rate-limit it so we don't flood the host
-- inject the data-abort
+Hmm so if this is not needed, I'll mark this thread as read in
+my inbox. If you guys need it please repost.
 
-That should give us a saner behaviour (I agree with you that the current
-one is not very good), and yet annoy the luser enough so that they
-either fix their software or start merging the emulation code...
+Regards,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Tony
