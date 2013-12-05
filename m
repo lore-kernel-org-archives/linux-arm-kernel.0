@@ -1,42 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 5 Dec 2013 22:26:41 +0100
-Subject: [PATCH 2/3] leds/pwm: Don't disable pwm when setting brightness
- to 0
-In-Reply-To: <20131202131807.GC29721@pengutronix.de>
-References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1385412225-29740-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131202123318.GC12793@ulmo.nvidia.com>
- <20131202131807.GC29721@pengutronix.de>
-Message-ID: <20131205212641.GC4707@pengutronix.de>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 5 Dec 2013 13:23:33 -0800
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <20131203002225.GA5333@localhost>
+References: <20131125120335.GD2408@localhost> <87r4a4f5gr.fsf@natisbad.org>
+ <20131126124003.GA2344@localhost> <87zjopd240.fsf@natisbad.org>
+ <87wqjtbm8r.fsf@natisbad.org> <20131128185040.GA13182@localhost>
+ <87bo12kcyt.fsf@natisbad.org> <20131202103305.GB2466@localhost>
+ <87siubneuf.fsf@natisbad.org> <20131203002225.GA5333@localhost>
+Message-ID: <20131205212333.GM27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thierry,
+On Mon, Dec 02, 2013 at 09:22:26PM -0300, Ezequiel Garcia wrote:
+> Now, why does NAND reserve eight blocks, if there are only two tables?
+> Well, you'll be able to find this in the driver:
+> 
+> static struct nand_bbt_descr bbt_main_descr = {
+> 	/* stuff */
+> 	.maxblocks = 8,         /* Last 8 blocks in each chip */
+> };
+> 
+> The snippet above asks the NAND core to scan the last 8 blocks when searching
+> for the in-flash bad block table. The NAND core will also reserve these
+> 8 blocks as the maximum amount of blocks that can be used to store a bad
+> block table (I guess that's in case one block gets 'really' bad).
 
-On Mon, Dec 02, 2013 at 02:18:07PM +0100, Uwe Kleine-K?nig wrote:
-> On Mon, Dec 02, 2013 at 01:33:19PM +0100, Thierry Reding wrote:
-> > On Mon, Nov 25, 2013 at 09:43:44PM +0100, Uwe Kleine-K?nig wrote:
-> > > This fixes disabling the LED on i.MX28. The PWM hardware delays using
-> > > the newly set pwm-config until the beginning of a new period. It's very
-> > > likely that pwm_disable is called before the current period ends. In
-> > > case the LED was on brightness=max before the LED stays on because in
-> > > the disabled PWM block the period never ends.
-> > > 
-> > > Also only call pwm_enable only once in the probe call back and the
-> > > matching pwm_disable in .remove(). Moreover the pwm is explicitly
-> > > initialized to off.
-> > 
-> > While I do understand the reasoning behind this, if this is really the
-> > behaviour that we need then there's no use in having pwm_enable() and
-> > pwm_disable() at all. They can just be folded into pwm_get() and
-> > pwm_put(), respectively.
-> So after the first pwm_get the pwm starts with an unspecified duty
-> cycle? That's not that nice, is it?
-How can we come forward here? After all it's a real bug being fixed.
+That doesn't reflect mainline, where you'll see:
 
-Best regards
-Uwe
+static struct nand_bbt_descr bbt_main_descr = {
+...
+        .maxblocks = NAND_BBT_SCAN_MAXBLOCKS,
+...
+};
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Where NAND_BBT_SCAN_MAXBLOCKS == 4.
+
+Do you have local modifications that make .maxblocks = 8?
+
+Brian
