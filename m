@@ -1,61 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Dec 2013 16:53:53 +0000
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <CAC8NTUVvLgNPdsSPY6Ms_D3JoyJR8AEFRH0=M7-kQEUegNVhKg@mail.gmail.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
- <5295D1A5.5090403@arm.com>
- <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
- <5296330D.9010801@arm.com>
- <CAC8NTUVvLgNPdsSPY6Ms_D3JoyJR8AEFRH0=M7-kQEUegNVhKg@mail.gmail.com>
-Message-ID: <20131205165353.GC1495@darko.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Dec 2013 08:55:49 -0800
+Subject: [PATCH v2 1/1] gpio: twl4030: Fix regression for twl gpio LED
+ output
+In-Reply-To: <1386235415-27670-1-git-send-email-rogerq@ti.com>
+References: <1386156871-7639-2-git-send-email-rogerq@ti.com>
+ <1386235415-27670-1-git-send-email-rogerq@ti.com>
+Message-ID: <20131205165548.GX26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 02:14:30AM +0000, Radha Mohan wrote:
-> On Wed, Nov 27, 2013 at 11:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > So should the 4-level page table cost be unconditionally forced onto all
-> > implementations?
-
-Definitely not.
-
-> We can have a kernel compile-time config option so that platforms having
-> a 48-bit PA can select that option. But having it will create the code something
-> like below
+* Roger Quadros <rogerq@ti.com> [131205 01:24]:
+> Commit 0b2aa8be introduced a regression that causes failure
+> in setting LED GPO direction to OUT.
 > 
-> #ifndef CONFIG_ARM64_64KB_PAGES
-> #ifdef CONFIG_ARCH_SUPPORTS_48BIT_PA
-> ...
-> ..
-> #else
-> ..
-> ..
-> #endif
-> #else /* !CONFIG_ARM64_64KB_PAGES */
-> #ifdef CONFIG_ARCH_SUPPORTS_48BIT_PA
-> ..
-> ..
-> #else
-> ..
-> ..
-> #endif
-> #endif /* CONFIG_ARM64_64KB_PAGES */
+> This causes USB host probe failures for Beagleboard C4.
 > 
-> And we might need to do this at lot of places. Is this ok?
+> [    2.075469] platform usb_phy_gen_xceiv.2: Driver usb_phy_gen_xceiv requests probe deferral
+> [    2.090454] hsusb2_vcc: Failed to request enable GPIO510: -22
+> [    2.100982] reg-fixed-voltage reg-fixed-voltage.0.auto: Failed to register regulator: -22
+> [    2.109954] reg-fixed-voltage: probe of reg-fixed-voltage.0.auto failed with error -22
+> 
+> direction_out/direction_in must return 0 if the operation succeeded.
+> 
+> Also, don't update direction flag and output data if twl4030_set_gpio_direction()
+> failed inside twl_direction_out();
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-We have to figure a way to avoid this. I haven't looked in detail at the
-patches (BTW, please cc the arm64 maintainers on the next version) but I
-think we could restrict the #ifdef's to much fewer headers (primarily
-asm/page.h and asm/pgtable-hwdef.h). What I'm thinking is to have:
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-pgtable-2level-*.h	64K pages only
-pgtable-3level-*.h	4K and 64K pages support
-pgtable-4level-*.h	4K pages only
+Linus, commit 0b2aa8be is in mainline now, so feel free to pick this one
+up if it looks OK to you. This should be also Cc stable as 0b2aa8be has
+that.
 
-You can move the PTRS_PER_* and PMD_SHIFT etc. macros to some common
-header as these depend on the page size. The other definitions like pmd_t
-depend on the number of page table levels. With some care you could
-define PMD_SHIFT for 64K into a single file with some #ifdef's around
-__PAGETABLE_PMD_FOLDED. Same for PUD_SHIFT with 4K pages.
+Regards,
 
--- 
-Catalin
+Tony
+
+> ---
+>  drivers/gpio/gpio-twl4030.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+> index b97d6a6..f999689 100644
+> --- a/drivers/gpio/gpio-twl4030.c
+> +++ b/drivers/gpio/gpio-twl4030.c
+> @@ -300,7 +300,7 @@ static int twl_direction_in(struct gpio_chip *chip, unsigned offset)
+>  	if (offset < TWL4030_GPIO_MAX)
+>  		ret = twl4030_set_gpio_direction(offset, 1);
+>  	else
+> -		ret = -EINVAL;
+> +		ret = -EINVAL;	/* LED outputs can't be set as input */
+>  
+>  	if (!ret)
+>  		priv->direction &= ~BIT(offset);
+> @@ -354,11 +354,20 @@ static void twl_set(struct gpio_chip *chip, unsigned offset, int value)
+>  static int twl_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+>  {
+>  	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
+> -	int ret = -EINVAL;
+> +	int ret = 0;
+>  
+>  	mutex_lock(&priv->mutex);
+> -	if (offset < TWL4030_GPIO_MAX)
+> +	if (offset < TWL4030_GPIO_MAX) {
+>  		ret = twl4030_set_gpio_direction(offset, 0);
+> +		if (ret) {
+> +			mutex_unlock(&priv->mutex);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	/*
+> +	 *  LED gpios i.e. offset >= TWL4030_GPIO_MAX are always output
+> +	 */
+>  
+>  	priv->direction |= BIT(offset);
+>  	mutex_unlock(&priv->mutex);
+> -- 
+> 1.8.3.2
+> 
