@@ -1,75 +1,63 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 05 Dec 2013 17:45:12 -0500
-Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
-In-Reply-To: <20131205201659.GA14539@kroah.com>
-References: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
- <20131204070442.GA31665@kroah.com>
- <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
- <20131204170703.GA14859@kroah.com>
- <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
- <20131204230239.GB9205@kroah.com>
- <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
- <20131205040104.GA14641@kroah.com> <52A0DE42.3080602@codeaurora.org>
- <20131205201659.GA14539@kroah.com>
-Message-ID: <52A101F8.3060104@codeaurora.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 5 Dec 2013 14:45:18 -0800
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <20131205222352.GA2469@localhost>
+References: <20131126124003.GA2344@localhost> <87zjopd240.fsf@natisbad.org>
+ <87wqjtbm8r.fsf@natisbad.org> <20131128185040.GA13182@localhost>
+ <87bo12kcyt.fsf@natisbad.org> <20131202103305.GB2466@localhost>
+ <87siubneuf.fsf@natisbad.org> <20131203002225.GA5333@localhost>
+ <20131205212333.GM27149@ld-irv-0074.broadcom.com>
+ <20131205222352.GA2469@localhost>
+Message-ID: <20131205224518.GO27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2013 03:16 PM, Greg Kroah-Hartman wrote:
-> On Thu, Dec 05, 2013 at 03:12:50PM -0500, Christopher Covington wrote:
-[...]
-> And adding new features to code that is "dead" and should probably be
-> removed isn't a good idea, as I'm sure you can understand.
-
-I would consider feature additions to be a sign of life. Maybe the
-architecture or user interface isn't ideal, but would you suggest just as
-quickly for media codec or cryptography hardware support be removed? Those
-operations can also be performed purely in software, and of course the pure
-software implementation is easier to integrate cleanly across multiple
-architectures, but as with tracing hardware, software implementations don't
-perform at the rate and scale that some use cases require.
-
->>>> Coresight ETM is not just faster than /sys/kernel/debug/tracing, it
->>>> provides more detailed and customisable info. For instance, you can
->>>> trace every load, store, instruction fetch, along with the number of
->>>> cycles taken, with almost zero-overhead.
->>>
->>> Can't you already do that with the 'perf' tool the kernel provides
->>> without the ETM driver?
->>
->> With perf one can get a count of how many instructions have been executed,
->> with little overhead, but not the full list of opcodes and addresses.
+On Thu, Dec 05, 2013 at 07:23:53PM -0300, Ezequiel Garcia wrote:
+> On Thu, Dec 05, 2013 at 01:23:33PM -0800, Brian Norris wrote:
+> > On Mon, Dec 02, 2013 at 09:22:26PM -0300, Ezequiel Garcia wrote:
+> > > Now, why does NAND reserve eight blocks, if there are only two tables?
+> > > Well, you'll be able to find this in the driver:
+> > > 
+> > > static struct nand_bbt_descr bbt_main_descr = {
+> > > 	/* stuff */
+> > > 	.maxblocks = 8,         /* Last 8 blocks in each chip */
+> > > };
+> > > 
+> > > The snippet above asks the NAND core to scan the last 8 blocks when searching
+> > > for the in-flash bad block table. The NAND core will also reserve these
+> > > 8 blocks as the maximum amount of blocks that can be used to store a bad
+> > > block table (I guess that's in case one block gets 'really' bad).
+> > 
+> > That doesn't reflect mainline, where you'll see:
+> > 
 > 
-> Is that a limitation of perf on ARM or perf in general?  For some reason
-> I thought I had seen this using perf on x86, but it's been a while since
-> I last used it.
-
-Try this:
-
-perf record -e instructions:u -c 1 echo hello && perf script
-
-At least on my machines this clearly does not produce an instruction trace.
-What you probably are familiar with is the periodic sampling I mentioned below.
-
->> (One can also sample the Program Counter intermittently, which might
->> suffice for performance analysis, but probably doesn't for most
->> debugging use cases.) I think with perf one can have a handful of
->> watchpoints looking at a very few loads and stores, with large
->> overhead. As I understand it, ETM can handle arbitrarily large
->> regions, with little overhead.
+> I wasn't mentioning nand_bbt.c but rather the pxa3xx-nand custom
+> nand_bbt_descr.
 > 
-> How much work is it to incorportate ETM into the perf framework?  Don't
-> you think that this is a better thing to do overall, instead of having
-> duplicating interfaces for the same thing?
+> $ grep "maxblocks =" drivers/mtd/nand/pxa3xx_nand.c 
+>  	.maxblocks = 8,		/* Last 8 blocks in each chip */
+> 	.maxblocks = 8,		/* Last 8 blocks in each chip */
 
-I'm not familiar enough with the ETM hardware (and the ETB, the buffer where
-the data is stored) and driver to say. One factor may be whether the perf
-events framework would need to be extended for complete functionality or could
-be used as-is.
+Ah, I forgot about that.
 
-Christopher
+> > static struct nand_bbt_descr bbt_main_descr = {
+> > ...
+> >         .maxblocks = NAND_BBT_SCAN_MAXBLOCKS,
+> > ...
+> > };
+> > 
+> > Where NAND_BBT_SCAN_MAXBLOCKS == 4.
+> > 
+> 
+> Do you think using 8 is too much? (I'd agree at changing it)
+> Does it break anything to lower it to 4?
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+I think it's primarily a concern if you have too many consecutive bad
+blocks at the end of your flash (factory, or from wear). On a pristine
+flash, the table will only ever be in the last 2 blocks, and so 4 blocks
+is a reasonable guess at the maximum needed, leaving room for two blocks
+to go bad.
+
+So, you'd only have a problem if 3 or more of the last 4 blocks go bad.
+
+Brian
