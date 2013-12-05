@@ -1,53 +1,78 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 5 Dec 2013 10:14:41 -0600
-Subject: [PATCHv3 4/4] arm: dts: Add support for SD/MMC on SOCFPGA
-In-Reply-To: <201312050407.50385.arnd@arndb.de>
-References: <1386197576-3825-1-git-send-email-dinguyen@altera.com>
- <1386197576-3825-5-git-send-email-dinguyen@altera.com>
- <201312050407.50385.arnd@arndb.de>
-Message-ID: <1386260081.3783.0.camel@linux-builds1>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 05 Dec 2013 17:18:39 +0100
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
+ system
+In-Reply-To: <20131205160027.GA13200@roeck-us.net>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+ <CAL1wa8cQcvRzXgaEP3kzkvzogqyeM2eJt_oRZfu6NbWxfP3zAg@mail.gmail.com>
+ <20131205160027.GA13200@roeck-us.net>
+Message-ID: <7223693.Usv1CTSMc0@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-05 at 04:07 +0100, Arnd Bergmann wrote:
-> On Wednesday 04 December 2013, dinguyen at altera.com wrote:
-> 
-> > +
-> > +* compatible: should be
-> > +        - "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
-> > +          specific extensions.
-> > +
-> > +* samsung,dw-mshc-sdr-timing: See exynos-dw-mshc.txt for more information about
-> > +	this property.
-> > +
-> > +Example:
-> > +	dwmmc0 at ff704000 {
-> > +		compatible = "altr,socfpga-dw-mshc", "snps,dw-mshc";
-> > +		reg = <0xff704000 0x1000>;
-> > +		interrupts = <0 139 4>;
-> > +		fifo-depth = <0x400>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		clocks = <&l4_mp_clk>, <&sdmmc_clk>, <&sysmgr_sdr_mmc>;
-> > +		clock-names = "biu", "ciu", "sysmgr-sdr-mmc";
-> 
-> You add a "sysmgr-sdr-mmc" clock here without documenting it. I think what you
-> actually mean here is
-> 
-> > +		clocks = <&l4_mp_clk>, <&sysmgr_sdr_mmc>;
-> > +		clock-names = "biu", "ciu";
-> 
-> i.e. the <&sysmgr_sdr_mmc> clock is actually your "ciu". If I understand your
-> code correctly, the dw-mshc has exactly two clock inputs, biu and ciu, and
-> you use sysmgr to provide ciu. The driver code already contains logic to
-> set the rate of the ciu clock, and you just need to hook into that.
+On Thursday 05 of December 2013 08:00:27 Guenter Roeck wrote:
+> On Thu, Dec 05, 2013 at 01:27:13PM +0530, Leela Krishna Amudala wrote:
+> > Hi Guenter Roeck,
+> > 
+> > On Tue, Dec 3, 2013 at 3:06 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > >
+> > > On Mon, Dec 02, 2013 at 12:47:53PM -0800, Olof Johansson wrote:
+> > > > On Mon, Dec 2, 2013 at 12:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > > > > On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
+> > > > >> A good watchdog driver is supposed to report when it was responsible
+> > > > >> for resetting the system.  Implement this for the s3c2410, at least on
+> > > > >> exynos5250 and exynos5420 where we already have a pointer to the PMU
+> > > > >> registers to read the information.
+> > > > >>
+> > > > >> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > > > >> ---
+> > > > >> This patch is based atop Leela Krishna's recent series that ends with
+> > > > >> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+> > > > >> AKA <https://patchwork.kernel.org/patch/3251861/>.
+> > > > >>
+> > > > >>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+> > > > >>  1 file changed, 39 insertions(+), 3 deletions(-)
+> > > > >>
+> > > > >> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> > > > >> index 47f4dcf..2c87d37 100644
+> > > > >> --- a/drivers/watchdog/s3c2410_wdt.c
+> > > > >> +++ b/drivers/watchdog/s3c2410_wdt.c
+> > > > >> @@ -62,9 +62,13 @@
+> > > > >>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
+> > > > >>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
+> > > > >>
+> > > > >> +#define RST_STAT_REG_OFFSET          0x0404
+> > > > >>  #define WDT_DISABLE_REG_OFFSET               0x0408
+> > > > >>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
+> > > > >>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
+> > > > >> +#define QUIRK_HAS_RST_STAT           (1 << 1)
+> > > > >> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
+> > > > >> +                                      QUIRK_HAS_RST_STAT)
+> > > > >>
+> > > > > I am not really happy about the NEED (both of them, really) here.
+> > > > > How about HAS instead ?
+> > > >
+> > > > Ah, I just commented on these things on our internal review site too
+> > > > on this patch. I don't even think a quirk is needed -- just use the
+> > > > presence of a non-0 rst_stat_reg to tell if you need to use regmap.
+> > > >
+> > > Agreed; same is true for the QUIRK_NEEDS_PMU_CONFIG related registers
+> > > as well.
+> > >
+> > 
+> > As Tomasz Figa suggested I introduced quirks,
+> > 
+> 'quirk' implies a workaround for non-standard or broken hardware,
+> not a flag indicating device specific functionality.
 
-Ah yes! This is fantastic. I can definitely just re-use the ciu-clk
-hook.
+I wouldn't limit meaning of "quirk" to only this. The word has been widely
+used around the kernel as a name for differences between hardware
+variants.
 
-Thanks!
+As for the original issue itself, IMHO Doug's original solution is the
+most practical, as 0 can be a valid register offset and RST_STAT register
+could be used for other purposes as well in future, depending on other
+quirk flag.
 
-Dinh
-> 
-> 	Arnd
-> 
+Best regards,
+Tomasz
