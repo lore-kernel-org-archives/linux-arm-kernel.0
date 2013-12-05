@@ -1,110 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Dec 2013 11:03:43 -0800
-Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm
- when bad data is detected
-In-Reply-To: <1386121153-32351-1-git-send-email-nm@ti.com>
-References: <1386121153-32351-1-git-send-email-nm@ti.com>
-Message-ID: <20131205190343.GI26766@atomide.com>
+From: sw@weilnetz.de (Stefan Weil)
+Date: Thu,  5 Dec 2013 20:17:40 +0100
+Subject: [PATCH] ARM: bcm2835: Fix grammar in help message
+Message-ID: <1386271060-2375-1-git-send-email-sw@weilnetz.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [131203 17:40]:
-> Due to the cross dependencies between hwmod for automanaged device
-> information for OMAP and dts node definitions, we can run into scenarios
-> where the dts node is defined, however it's hwmod entry is yet to be
-> added. In these cases:
-> a) omap_device does not register a pm_domain (since it cannot find
->    hwmod entry).
-> b) driver does not know about (a), does a pm_runtime_get_sync which
->    never fails
-> c) It then tries to do some operation on the device (such as read the
->   revision register (as part of probe) without clock or adequate OMAP
->   generic PM operation performed for enabling the module.
-> 
-> This causes a crash such as that reported in:
-> https://bugzilla.kernel.org/show_bug.cgi?id=66441
-> 
-> When 'ti,hwmod' is provided in dt node, it is expected that the device
-> will not function without the OMAP's power automanagement. Hence, when
-> we hit a fail condition (due to hwmod entries not present or other
-> similar scenario), fail at pm_domain level due to lack of data, provide
-> enough information for it to be fixed, however, it allows for the driver
-> to take appropriate measures to prevent crash.
+Replace "is use" by "is used" and remove a comma.
 
-Kevin, any comments on this one?
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jiri Kosina <trivial@kernel.org>
+Signed-off-by: Stefan Weil <sw@weilnetz.de>
+---
+ arch/arm/mach-bcm2835/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-
-Tony
- 
-> Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_device.c |   24 ++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_device.h |    1 +
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 53f0735..e0a398c 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -183,6 +183,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
->  odbfd_exit1:
->  	kfree(hwmods);
->  odbfd_exit:
-> +	/* if data/we are at fault.. load up a fail handler */
-> +	if (ret)
-> +		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
-> +
->  	return ret;
->  }
->  
-> @@ -604,6 +608,19 @@ static int _od_runtime_resume(struct device *dev)
->  
->  	return pm_generic_runtime_resume(dev);
->  }
-> +
-> +static int _od_fail_runtime_suspend(struct device *dev)
-> +{
-> +	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
-> +	return -ENODEV;
-> +}
-> +
-> +static int _od_fail_runtime_resume(struct device *dev)
-> +{
-> +	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
-> +	return -ENODEV;
-> +}
-> +
->  #endif
->  
->  #ifdef CONFIG_SUSPEND
-> @@ -657,6 +674,13 @@ static int _od_resume_noirq(struct device *dev)
->  #define _od_resume_noirq NULL
->  #endif
->  
-> +struct dev_pm_domain omap_device_fail_pm_domain = {
-> +	.ops = {
-> +		SET_RUNTIME_PM_OPS(_od_fail_runtime_suspend,
-> +				   _od_fail_runtime_resume, NULL)
-> +	}
-> +};
-> +
->  struct dev_pm_domain omap_device_pm_domain = {
->  	.ops = {
->  		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
-> diff --git a/arch/arm/mach-omap2/omap_device.h b/arch/arm/mach-omap2/omap_device.h
-> index 17ca1ae..78c02b3 100644
-> --- a/arch/arm/mach-omap2/omap_device.h
-> +++ b/arch/arm/mach-omap2/omap_device.h
-> @@ -29,6 +29,7 @@
->  #include "omap_hwmod.h"
->  
->  extern struct dev_pm_domain omap_device_pm_domain;
-> +extern struct dev_pm_domain omap_device_fail_pm_domain;
->  
->  /* omap_device._state values */
->  #define OMAP_DEVICE_STATE_UNKNOWN	0
-> -- 
-> 1.7.9.5
-> 
+diff --git a/arch/arm/mach-bcm2835/Kconfig b/arch/arm/mach-bcm2835/Kconfig
+index 560045c..d1f9612 100644
+--- a/arch/arm/mach-bcm2835/Kconfig
++++ b/arch/arm/mach-bcm2835/Kconfig
+@@ -12,4 +12,4 @@ config ARCH_BCM2835
+ 	select PINCTRL_BCM2835
+ 	help
+ 	  This enables support for the Broadcom BCM2835 SoC. This SoC is
+-	  use in the Raspberry Pi, and Roku 2 devices.
++	  used in the Raspberry Pi and Roku 2 devices.
+-- 
+1.7.10.4
