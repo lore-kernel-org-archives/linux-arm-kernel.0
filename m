@@ -1,95 +1,88 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Dec 2013 14:34:50 +0100
-Subject: [PATCH 5/6] mmc: mxs: use mmc_gpio_get_ro for detecting read-only
- status
+Date: Thu,  5 Dec 2013 14:34:51 +0100
+Subject: [PATCH 6/6] mmc: mxs: use mmc_of_parse to parse devicetree properties
 In-Reply-To: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
 References: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1386250491-4708-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1386250491-4708-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This also fixes that the read-only gpio was used without being
-requested.
+Use generic helper function. This also adds support for the cd-gpios and
+max-frequency devicetree properties.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mmc/host/mxs-mmc.c | 34 +++++++++++-----------------------
- 1 file changed, 11 insertions(+), 23 deletions(-)
+ drivers/mmc/host/mxs-mmc.c | 37 +++++++++++--------------------------
+ 1 file changed, 11 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 3dd2f4c..13016e2 100644
+index 13016e2..073e871 100644
 --- a/drivers/mmc/host/mxs-mmc.c
 +++ b/drivers/mmc/host/mxs-mmc.c
-@@ -38,6 +38,7 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/mmc.h>
- #include <linux/mmc/sdio.h>
-+#include <linux/mmc/slot-gpio.h>
- #include <linux/gpio.h>
- #include <linux/regulator/consumer.h>
- #include <linux/module.h>
-@@ -69,26 +70,8 @@ struct mxs_mmc_host {
- 	unsigned char			bus_width;
- 	spinlock_t			lock;
- 	int				sdio_irq_en;
--	int				wp_gpio;
--	bool				wp_inverted;
- };
- 
--static int mxs_mmc_get_ro(struct mmc_host *mmc)
--{
--	struct mxs_mmc_host *host = mmc_priv(mmc);
--	int ret;
--
--	if (!gpio_is_valid(host->wp_gpio))
--		return -EINVAL;
--
--	ret = gpio_get_value(host->wp_gpio);
--
--	if (host->wp_inverted)
--		ret = !ret;
--
--	return ret;
--}
--
- static int mxs_mmc_get_cd(struct mmc_host *mmc)
+@@ -76,7 +76,11 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
  {
  	struct mxs_mmc_host *host = mmc_priv(mmc);
-@@ -551,7 +534,7 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ 	struct mxs_ssp *ssp = &host->ssp;
+-	int present;
++	int present, ret;
++
++	ret = mmc_gpio_get_cd(mmc);
++	if (ret >= 0)
++		return ret;
  
- static const struct mmc_host_ops mxs_mmc_ops = {
- 	.request = mxs_mmc_request,
--	.get_ro = mxs_mmc_get_ro,
-+	.get_ro = mmc_gpio_get_ro,
- 	.get_cd = mxs_mmc_get_cd,
- 	.set_ios = mxs_mmc_set_ios,
- 	.enable_sdio_irq = mxs_mmc_enable_sdio_irq,
-@@ -585,7 +568,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 	present = !(readl(ssp->base + HW_SSP_STATUS(ssp)) &
+ 			BM_SSP_STATUS_CARD_DETECT);
+@@ -564,15 +568,12 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id =
+ 			of_match_device(mxs_mmc_dt_ids, &pdev->dev);
+-	struct device_node *np = pdev->dev.of_node;
  	struct mxs_mmc_host *host;
  	struct mmc_host *mmc;
  	struct resource *iores;
--	int ret = 0, irq_err;
-+	int ret = 0, irq_err, gpio;
+-	int ret = 0, irq_err, gpio;
++	int ret = 0, irq_err;
  	struct regulator *reg_vmmc;
- 	enum of_gpio_flags flags;
+-	enum of_gpio_flags flags;
  	struct mxs_ssp *ssp;
-@@ -659,9 +642,14 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 	if (of_property_read_bool(np, "non-removable"))
- 		mmc->caps |= MMC_CAP_NONREMOVABLE;
--	host->wp_gpio = of_get_named_gpio_flags(np, "wp-gpios", 0, &flags);
--	if (flags & OF_GPIO_ACTIVE_LOW)
--		host->wp_inverted = 1;
-+	gpio = of_get_named_gpio_flags(np, "wp-gpios", 0, &flags);
-+	if (gpio_is_valid(gpio)) {
-+		ret = mmc_gpio_request_ro(mmc, gpio);
-+		if (ret)
-+			goto out_clk_disable;
-+		if (!(flags & OF_GPIO_ACTIVE_LOW))
-+			mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
-+	}
+-	u32 bus_width = 0;
  
- 	if (of_property_read_bool(np, "cd-inverted"))
- 		mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+ 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	irq_err = platform_get_irq(pdev, 0);
+@@ -633,29 +634,13 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 	mmc->caps = MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED |
+ 		    MMC_CAP_SDIO_IRQ | MMC_CAP_NEEDS_POLL;
+ 
+-	of_property_read_u32(np, "bus-width", &bus_width);
+-	if (bus_width == 4)
+-		mmc->caps |= MMC_CAP_4_BIT_DATA;
+-	else if (bus_width == 8)
+-		mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+-	if (of_property_read_bool(np, "broken-cd"))
+-		mmc->caps |= MMC_CAP_NEEDS_POLL;
+-	if (of_property_read_bool(np, "non-removable"))
+-		mmc->caps |= MMC_CAP_NONREMOVABLE;
+-	gpio = of_get_named_gpio_flags(np, "wp-gpios", 0, &flags);
+-	if (gpio_is_valid(gpio)) {
+-		ret = mmc_gpio_request_ro(mmc, gpio);
+-		if (ret)
+-			goto out_clk_disable;
+-		if (!(flags & OF_GPIO_ACTIVE_LOW))
+-			mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+-	}
+-
+-	if (of_property_read_bool(np, "cd-inverted"))
+-		mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+-
+ 	mmc->f_min = 400000;
+ 	mmc->f_max = 288000000;
++
++	ret = mmc_of_parse(mmc);
++	if (ret)
++		goto out_clk_disable;
++
+ 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+ 
+ 	mmc->max_segs = 52;
 -- 
 1.8.4.3
