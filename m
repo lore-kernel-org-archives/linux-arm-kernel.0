@@ -1,81 +1,122 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu,  5 Dec 2013 19:28:07 +0100
-Subject: [PATCHv5][ 3/8] staging: imx-drm: Correct BGR666 and the board's dts
- that use them.
+Date: Thu,  5 Dec 2013 19:28:08 +0100
+Subject: [PATCHv5][ 4/8] staging: imx-drm: Use de-active and pixelclk-active
+ display-timings.
 In-Reply-To: <1386268092-21719-1-git-send-email-denis@eukrea.com>
 References: <1386268092-21719-1-git-send-email-denis@eukrea.com>
-Message-ID: <1386268092-21719-3-git-send-email-denis@eukrea.com>
+Message-ID: <1386268092-21719-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+If de-active and/or pixelclk-active properties were set in the
+display-timings DT node, they were not used.
+
+Instead the data-enable and the pixel data clock polarity
+were hardcoded.
+
+This change is needed for making the eukrea-cpuimx51
+  QVGA display work.
+
+Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: driverdev-devel at linuxdriverproject.org
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
-Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: linux-media at vger.kernel.org
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-ChangeLog v5:
-- New patch.
----
- arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
- arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ChangeLog v3->v4:
+- The old patch was named "staging: imx-drm: ipuv3-crtc: don't harcode some mode".
+- Reworked the patch entierly: we now takes the mode flags from the device tree.
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index f36a3aa..3b6de6a 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -19,7 +19,7 @@
- 	display at di1 {
- 		compatible = "fsl,imx-parallel-display";
- 		crtcs = <&ipu 0>;
--		interface-pix-fmt = "bgr666";
-+		interface-pix-fmt = "rgb666";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1>;
+ChangeLog v2->v3:
+- Added some interested people in the Cc list.
+- Ajusted the flags to match the changes in "drm: Add the lacking
+  DRM_MODE_FLAG_* for matching the DISPLAY_FLAGS_*"
+---
+ drivers/staging/imx-drm/imx-drm.h          |    3 +++
+ drivers/staging/imx-drm/ipuv3-crtc.c       |   11 +++++++++--
+ drivers/staging/imx-drm/parallel-display.c |   28 ++++++++++++++++++++++++++++
+ 3 files changed, 40 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index ae90c9c..dfdc180 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -5,6 +5,9 @@
  
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index c623774..b98c897 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -24,7 +24,7 @@
- 		display at di1 {
- 			compatible = "fsl,imx-parallel-display";
- 			crtcs = <&ipu 1>;
--			interface-pix-fmt = "bgr666";
-+			interface-pix-fmt = "rgb666";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ipu_disp1>;
+ #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
  
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index 617e65b..b11a2aa 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -397,9 +397,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
++#define IMXDRM_MODE_FLAG_DE_HIGH		(1<<0)
++#define IMXDRM_MODE_FLAG_PIXDATA_POSEDGE	(1<<1)
++
+ struct drm_crtc;
+ struct drm_connector;
+ struct drm_device;
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index ce6ba98..f3d2cae 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -156,8 +156,15 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		sig_cfg.Vsync_pol = 1;
  
- 	/* bgr666 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
+-	sig_cfg.enable_pol = 1;
+-	sig_cfg.clk_pol = 1;
++	/* Such flags are not availables in the DRM modes header,
++	 * and we don't want to export them to userspace.
++	 */
++	if (mode->private_flags & IMXDRM_MODE_FLAG_DE_HIGH)
++		sig_cfg.enable_pol = 1;
++
++	if (mode->private_flags & IMXDRM_MODE_FLAG_PIXDATA_POSEDGE)
++		sig_cfg.clk_pol = 1;
++
+ 	sig_cfg.width = mode->hdisplay;
+ 	sig_cfg.height = mode->vdisplay;
+ 	sig_cfg.pixel_fmt = out_pixel_fmt;
+diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+index bb71d6d..65d0c18 100644
+--- a/drivers/staging/imx-drm/parallel-display.c
++++ b/drivers/staging/imx-drm/parallel-display.c
+@@ -74,7 +74,35 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
  
- 	/* bgr24 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
+ 	if (np) {
+ 		struct drm_display_mode *mode = drm_mode_create(connector->dev);
++		struct device_node *timings_np;
++		struct device_node *mode_np;
++		u32 val;
++
+ 		of_get_drm_display_mode(np, &imxpd->mode, 0);
++
++		/* Such flags are not availables in the DRM modes header,
++		 * and we don't want to export them to userspace.
++		 */
++		timings_np = of_get_child_by_name(np, "display-timings");
++		if (timings_np) {
++			/* get the display mode node */
++			mode_np = of_parse_phandle(timings_np,
++						   "native-mode", 0);
++			if (!mode_np)
++				mode_np = of_get_next_child(timings_np, NULL);
++
++			/* set de-active to 1 if not set */
++			of_property_read_u32(mode_np, "de-active", &val);
++			if (!!val)
++				imxpd->mode.private_flags |=
++					IMXDRM_MODE_FLAG_DE_HIGH;
++
++			/* set pixelclk-active to 1 if not set */
++			of_property_read_u32(mode_np, "pixelclk-active", &val);
++			if (!!val)
++				imxpd->mode.private_flags |=
++					IMXDRM_MODE_FLAG_PIXDATA_POSEDGE;
++		}
+ 		drm_mode_copy(mode, &imxpd->mode);
+ 		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+ 		drm_mode_probed_add(connector, mode);
 -- 
 1.7.9.5
