@@ -1,113 +1,78 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 5 Dec 2013 21:56:50 +0100
-Subject: [PATCHv5][ 6/8] ARM: dts: mbimx51sd: Add display support.
-In-Reply-To: <1386268092-21719-6-git-send-email-denis@eukrea.com>
-References: <1386268092-21719-1-git-send-email-denis@eukrea.com>
- <1386268092-21719-6-git-send-email-denis@eukrea.com>
-Message-ID: <201312052156.50236.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Dec 2013 21:57:37 +0100
+Subject: [PATCHv4 2/4] clk: socfpga: Add a hook for SD/MMC driver to
+ control CIU clock settings
+In-Reply-To: <1386263677-7733-3-git-send-email-dinguyen@altera.com>
+References: <1386263677-7733-1-git-send-email-dinguyen@altera.com>
+ <1386263677-7733-3-git-send-email-dinguyen@altera.com>
+Message-ID: <201312052157.37538.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 05, 2013 at 07:28:10 PM, Denis Carikli wrote:
-> The CMO-QVGA, DVI-SVGA and DVI-VGA are added.
+On Thursday 05 December 2013, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v3->v5:
-> - Updated to new GPIO defines.
-> - Updated to new licenses checkpatch requirements.
-> - one whitespace cleanup.
+> Populate the .prepare function in the clk-ops for the "sdmmc_clk" that represents
+> the "ciu" clock for the SD/MMC driver. The prepare function will handle setting
+> the correct clock-phase for the CIU clock of the SD/MMC IP.
 > 
-> ChangeLog v2->v3:
-> - Splitted out from the patch that added support for the cpuimx51/mbimxsd51
-> boards. - This patch now only adds display support.
-> - Added some interested people in the Cc list, and removed some people that
->   might be annoyed by the receiving of that patch which is unrelated to
-> their subsystem.
-> - rebased and reworked the dts displays addition.
-> - Also rebased and reworked the fsl,pins usage.
-> ---
->  .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |   55
-> ++++++++++++++++++++ .../imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts  | 
->  42 +++++++++++++++ .../imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts   |  
-> 42 +++++++++++++++ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |  
-> 13 +++++
->  4 files changed, 152 insertions(+)
->  create mode 100644
-> arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts create
-> mode 100644
-> arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-svga.dts create
-> mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-dvi-vga.dts
+> Re-use the "rockchip,rk2928-dw-mshc" binding as it is already defined and
+> appropriate for the SOCFPGA platform as well.
 > 
-> diff --git
-> a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-> b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts new file
-> mode 100644
-> index 0000000..f37d65b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-> @@ -0,0 +1,55 @@
-> +/*
-> + * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include "imx51-eukrea-mbimxsd51-baseboard.dts"
-> +
-> +/ {
-> +	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
-> +	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga",
-> "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51"; +
-> +	reg_lcd_3v3: lcd-en {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-> +		regulator-name = "lcd-3v3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio3 13 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +};
-> +
-> +&display {
-> +	display-supply = <&reg_lcd_3v3>;
-> +	status = "okay";
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
-The "status = " here should probably be in the board DTS, not in the LCD DTS.
+I think with this series we're getting closer to where things should be, but
+there are still a number of the same problems. Maybe I have misunderstood
+a few things here in how the clocks fit together, but here is what still
+looks wrong about this patch:
 
-> +	display-timings {
-> +		model = "CMO-QVGA";
-> +		bits-per-pixel = <16>;
-> +		cmoqvga {
-> +			native-mode;
-> +			clock-frequency = <6500000>;
-> +			hactive = <320>;
-> +			vactive = <240>;
-> +			hfront-porch = <20>;
-> +			hback-porch = <38>;
-> +			vfront-porch = <4>;
-> +			vback-porch = <15>;
-> +			hsync-len = <30>;
-> +			vsync-len = <3>;
-> +			hsync-active = <0>;
-> +			vsync-active = <0>;
-> +			de-active = <0>;
-> +			pixelclk-active = <1>;
-> +		};
-> +	};
-> +};
+> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> index 60cb2f5..01baf20 100644
+> --- a/drivers/clk/socfpga/clk.c
+> +++ b/drivers/clk/socfpga/clk.c
+> @@ -55,7 +55,13 @@
+>  #define div_mask(width)	((1 << (width)) - 1)
+>  #define streq(a, b) (strcmp((a), (b)) == 0)
+>  
+> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET	0x108
+> +/* SDMMC Group for System Manager defines */
+> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
+> +	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
+> +
+>  extern void __iomem *clk_mgr_base_addr;
+> +extern void __iomem *sys_manager_base_addr;
 
-[...]
+As mentioned in yesterday's comments, you should not have the 'extern'
+declaration for sys_manager_base_addr here. In fact, the existing
+clk_mgr_base_addr declaration is just as wrong.
+
+> +static int sdmmc_ciuclk_prepare(struct clk_hw *hwclk)
+> +{
+> +	struct device_node *np;
+> +	u32 timing[2];
+> +	u32 hs_timing;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "rockchip,rk2928-dw-mshc");
+> +	if (of_property_read_u32_array(np, "samsung,dw-mshc-sdr-timing", timing, 2)) {
+> +		pr_err("SDMMC: cannot find samsung,dw-mshc-sdr-timing!\n");
+> +		return -ENODATA;
+> +	}
+> +	hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[1], timing[0]);
+> +	writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
+> +	return 0;
+> +}
+> +
+
+And in now way should the clock provider code look into the DT properties of the
+clock consumer. From what I can tell, the dw-mshc code already interprets the
+"samsung,dw-mshc-sdr-timing" property and uses the data to pass the correct
+clock rate using 'clk_set_rate()'. The clock code should only use the data passed
+in the argument to that function to set up the registers and not need to know
+at all who is setting it.
+
+I am a little confused though what the SYSMGR_SDMMCGRP_CTRL_OFFSET register actually
+does. It looks like this is just a clock divider, which should be represented as
+a separate clock node (as you had in v3) and compute the correct factor from the
+requested clock rate and the parent clock rate.
+
+	Arnd
