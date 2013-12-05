@@ -1,44 +1,71 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 05 Dec 2013 01:47:04 +0100
-Subject: [PATCH 1/2] regulator: gpio-regulator: Add required
- regulator-type property
-In-Reply-To: <20131205000928.GI29268@sirena.org.uk>
-References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385653493-9952-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131205000928.GI29268@sirena.org.uk>
-Message-ID: <2248657.5UVkYxaC6z@avalon>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 4 Dec 2013 18:49:37 -0600
+Subject: [PATCH V2 2/2] ARM: OMAP2+: board-generic: update SoC compatibility
+ strings
+In-Reply-To: <1386204578-6018-1-git-send-email-nm@ti.com>
+References: <1386204578-6018-1-git-send-email-nm@ti.com>
+Message-ID: <1386204578-6018-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Now that we have standardized SoC definitions, update the
+compatibility strings in board machine descriptors. Eventually, we
+should just have SoC compatiblity here and all board specific stuff
+should disappear.
 
-On Thursday 05 December 2013 00:09:28 Mark Brown wrote:
-> On Thu, Nov 28, 2013 at 04:44:52PM +0100, Laurent Pinchart wrote:
-> > The gpio-regulator driver requires the regulator-type property to be
-> > present. Document it as required in the DT bindings.
-> 
-> It does?  That seems needless.  It should just default to voltage and
-> provide a way override to current, though frankly I'd be astonished to see a
-> GPIO controlled current regulator at all so I'm not sure I'd even bother
-> writing the code for that until someone needs it.  As it is this will most
-> likely just be noise in the DT files and wasted cycles parsing the property.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+NOTE: To prevent conflict, I have not added am3517 which is addressed in:
+https://patchwork.kernel.org/patch/3279281/
 
-I'm fine with that. The property should still be documented in the DT bindings 
-as optional though. Or be removed completely until a GPIO-controlled current 
-regulator is needed.
+ arch/arm/mach-omap2/board-generic.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> Please CC maintainers...
-
-My bad, sorry.
-
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 19f1652..5356a29 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -78,6 +78,7 @@ MACHINE_END
+ 
+ #ifdef CONFIG_ARCH_OMAP3
+ static const char *omap3_boards_compat[] __initdata = {
++	"ti,omap3430",
+ 	"ti,omap3",
+ 	NULL,
+ };
+@@ -155,6 +156,8 @@ MACHINE_END
+ 
+ #ifdef CONFIG_ARCH_OMAP4
+ static const char *omap4_boards_compat[] __initdata = {
++	"ti,omap4460",
++	"ti,omap4430",
+ 	"ti,omap4",
+ 	NULL,
+ };
+@@ -175,6 +178,8 @@ MACHINE_END
+ 
+ #ifdef CONFIG_SOC_OMAP5
+ static const char *omap5_boards_compat[] __initdata = {
++	"ti,omap5432",
++	"ti,omap5430",
+ 	"ti,omap5",
+ 	NULL,
+ };
+@@ -195,6 +200,7 @@ MACHINE_END
+ 
+ #ifdef CONFIG_SOC_AM43XX
+ static const char *am43_boards_compat[] __initdata = {
++	"ti,am4372",
+ 	"ti,am43",
+ 	NULL,
+ };
+@@ -212,6 +218,7 @@ MACHINE_END
+ 
+ #ifdef CONFIG_SOC_DRA7XX
+ static const char *dra7xx_boards_compat[] __initdata = {
++	"ti,dra7xx",
+ 	"ti,dra7",
+ 	NULL,
+ };
 -- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/410b02e8/attachment-0001.sig>
+1.7.9.5
