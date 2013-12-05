@@ -1,90 +1,67 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 5 Dec 2013 01:20:48 -0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131205075901.GA20407@shlinux2.ap.freescale.net>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com>
- <5298AA23.7080404@st.com>
- <1386082273.18201.61.camel@shinybook.infradead.org>
- <20131204184405.GE9468@ld-irv-0074.broadcom.com>
- <20131205071224.GA8936@shlinux2.ap.freescale.net>
- <20131205081101.GA4636@norris.computersforpeace.net>
- <20131205075901.GA20407@shlinux2.ap.freescale.net>
-Message-ID: <20131205092048.GE4636@norris.computersforpeace.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 5 Dec 2013 11:23:35 +0200
+Subject: [PATCH v2 1/1] gpio: twl4030: Fix regression for twl gpio LED output
+In-Reply-To: <1386156871-7639-2-git-send-email-rogerq@ti.com>
+References: <1386156871-7639-2-git-send-email-rogerq@ti.com>
+Message-ID: <1386235415-27670-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 03:59:02PM +0800, Huang Shijie wrote:
-> On Thu, Dec 05, 2013 at 12:11:01AM -0800, Brian Norris wrote:
-> > On Thu, Dec 05, 2013 at 03:12:25PM +0800, Huang Shijie wrote:
-> > > On Wed, Dec 04, 2013 at 10:44:05AM -0800, Brian Norris wrote:
-> > > > 
-> > > > I mostly bring this up, though, because it is an example of hardware
-> > > > that
-> > > > 
-> > > >    (a) can operate as a true SPI device (hardware (1) can handle generic
-> > > >        SPI transfers), but
-> > > >    (b) requires knowledge of the details of SPI flash in order to get
-> > > >        optimal usage out of the acceleration from (2).
-> > > > 
-> > > > In my book, point (a) and (b) hold some bearing over the question of
-> > > > "where should this SPI NOR framework live", because it is reasonable
-> > > > that a single driver for this hardware should be able to handle either
-> > > > true SPI devices or accelerated SPI-NOR flash.
-> > > 
-> > > We have add a @read_id hook for the spi-nor layer, you can use it to read out
-> > > more info (such as the Device Geometry Definition) for your spi-nor controller driver.
-> > > 
-> > > Is it okay?
-> > 
-> > I'm not sure which @read_id hook you're talking about, as I've only
-> > skimmed the most recent thread, and it's not in the last patch series I
-> > have from you, I don't think. But that is not a response at all to the
-> > points I brought up. My statements have nothing to do with device
-> > geometry detection.
-> 
-> My meaning is You can write a new driver for the (b) with the new spi-nor layer,
+Commit 0b2aa8be introduced a regression that causes failure
+in setting LED GPO direction to OUT.
 
-Yes, I can do that.
+This causes USB host probe failures for Beagleboard C4.
 
-> In the new driver you can implement the @read_id yourself, and read out the
-> the necessary info, and implement other hooks for the so-called peculiarities.
+[    2.075469] platform usb_phy_gen_xceiv.2: Driver usb_phy_gen_xceiv requests probe deferral
+[    2.090454] hsusb2_vcc: Failed to request enable GPIO510: -22
+[    2.100982] reg-fixed-voltage reg-fixed-voltage.0.auto: Failed to register regulator: -22
+[    2.109954] reg-fixed-voltage: probe of reg-fixed-voltage.0.auto failed with error -22
 
-Without giving a full judgment on the framework yet (I haven't followed
-as closely as I'd like), I expect that the SPI NOR API will cover the
-needs of my SPI NOR hardware.
+direction_out/direction_in must return 0 if the operation succeeded.
 
-> > 
-> > What I was actually addressing:
-> > 
-> > Your framework aligns with Mark's original suggestion: that the "SPI
-> > NOR" framework should be a separate layer held entirely within the MTD
-> > subsystem, and that any given driver is *either* a "SPI NOR" driver *or*
-> > a "true SPI" driver, not both.
-> You can only use a SPI-NOR driver, and you can abandon the "true SPI" driver.
-> 
-> Is there some limits that prevent we just code a SPI-NOR driver for your hardware?
+Also, don't update direction flag and output data if twl4030_set_gpio_direction()
+failed inside twl_direction_out();
 
-SPI is not used only for SPI NOR; it is useful for other things, like
-communicating with off-chip peripherals or microcontrollers, supporting
-touchscreens, LEDs, media controllers, etc. So with a SPI NOR framework
-living only in the MTD subsystem, I have to write two drivers: one
-(under drivers/spi/) to use only-(a) for controlling non-flash SPI
-devices, and one (under drivers/mtd/) to manage (a)+(b) on SPI NOR
-flash.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ drivers/gpio/gpio-twl4030.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-If, however, we can define a spi_nor_transfer like Angus suggested, and
-if we take that a step further and make it a first-class (but optional)
-citizen of the SPI framework, then we could have drivers that support
-SPI-only, SPI-NOR-only, or both.
-
-Now, I'm not sure how exactly that sort of proposal would work yet, but
-I wanted to test the waters to see
-  - if this is a complete distortion of what Angus or David may have
-    suggested;
-  - if Mark thinks this is reasonable, or if he thinks I'm spouting
-    nonsense; and
-  - if there is some obvious alternate way to support what I describe
-    without moving the SPI-NOR layer into the SPI subsystem.
-
-Brian
+diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+index b97d6a6..f999689 100644
+--- a/drivers/gpio/gpio-twl4030.c
++++ b/drivers/gpio/gpio-twl4030.c
+@@ -300,7 +300,7 @@ static int twl_direction_in(struct gpio_chip *chip, unsigned offset)
+ 	if (offset < TWL4030_GPIO_MAX)
+ 		ret = twl4030_set_gpio_direction(offset, 1);
+ 	else
+-		ret = -EINVAL;
++		ret = -EINVAL;	/* LED outputs can't be set as input */
+ 
+ 	if (!ret)
+ 		priv->direction &= ~BIT(offset);
+@@ -354,11 +354,20 @@ static void twl_set(struct gpio_chip *chip, unsigned offset, int value)
+ static int twl_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+ {
+ 	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
+-	int ret = -EINVAL;
++	int ret = 0;
+ 
+ 	mutex_lock(&priv->mutex);
+-	if (offset < TWL4030_GPIO_MAX)
++	if (offset < TWL4030_GPIO_MAX) {
+ 		ret = twl4030_set_gpio_direction(offset, 0);
++		if (ret) {
++			mutex_unlock(&priv->mutex);
++			return ret;
++		}
++	}
++
++	/*
++	 *  LED gpios i.e. offset >= TWL4030_GPIO_MAX are always output
++	 */
+ 
+ 	priv->direction |= BIT(offset);
+ 	mutex_unlock(&priv->mutex);
+-- 
+1.8.3.2
