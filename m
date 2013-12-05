@@ -1,65 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 5 Dec 2013 21:28:25 +0100
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <52A0B060.4040203@atmel.com>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
- <5283A8C7.30904@atmel.com> <529C4936.5060304@atmel.com>
- <20131204102353.GI29721@pengutronix.de>
- <20131204170911.GC14859@kroah.com>
- <20131204191606.GL29721@pengutronix.de>
- <52A0B060.4040203@atmel.com>
-Message-ID: <20131205202825.GB4707@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 5 Dec 2013 15:34:31 -0500
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131203232445.GX8277@htj.dyndns.org> <52A0AB34.2030703@ti.com>,
+ <20131205165325.GA24062@mtj.dyndns.org>
+ <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
+Message-ID: <52A0E357.7090008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas,
+Grygorii,
 
-On Thu, Dec 05, 2013 at 05:57:04PM +0100, Nicolas Ferre wrote:
-> On 04/12/2013 20:16, Uwe Kleine-K?nig :
-> >On Wed, Dec 04, 2013 at 09:09:11AM -0800, Greg Kroah-Hartman wrote:
-> >>On Wed, Dec 04, 2013 at 11:23:53AM +0100, Uwe Kleine-K?nig wrote:
-> >>>Hello Greg, hi Nicolas,
-> >>>
-> >>>On Mon, Dec 02, 2013 at 09:47:50AM +0100, Nicolas Ferre wrote:
-> >>>>On 13/11/2013 17:28, Nicolas Ferre :
-> >>>>>On 07/11/2013 10:25, Linus Walleij :
-> >>>>>>This passes the errata fix using a GPIO to control the RTS pin
-> >>>>>>on one of the AT91 chips to use gpiolib instead of the
-> >>>>>>AT91-specific interfaces. Also remove the reliance on
-> >>>>>>compile-time #defines and the cpu_* check and rely on the
-> >>>>>>platform passing down the proper GPIO pin through platform
-> >>>>>>data.
-> >>>>>>
-> >>>>>>This is a prerequisite for getting rid of the local GPIO
-> >>>>>>implementation in the AT91 platform and move toward
-> >>>>>>multiplatform.
-> >>>>>>
-> >>>>>>The patch also adds device tree support for getting the
-> >>>>>>RTS GPIO pin from the device tree on DT boot paths.
-> >>>>>>
-> >>>>>>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>>>>>Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>>>>>Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> [...]
-> >nferre: What is your plan with this patch? Do you have patches
-> >depending on it, too, or is it ok if I take it?
+On Thursday 05 December 2013 01:48 PM, Strashko, Grygorii wrote:
+> Hi Tejun,
 > 
-> Well, the problem is that your branch generates conflicts with the
-> at91/cleanup one that Olof have just pulled. They are not big
-> conflicts, only additions of header files at the same location.
-> Maybe you can rebase your branch on top of this cleanup branch
-> (arm-soc/next/cleanup: 94c5216ee93b3b4).
-Olof said on irc: "that's easy to fix, i'm ok with resolving that when i
-merge". That is what I prefer because I don't want to retest everything
-after rebasing.
+>> On Thu, Dec 05, 2013 at 06:35:00PM +0200, Grygorii Strashko wrote:
+>>>>> +#define memblock_virt_alloc_align(x, align) \
+>>>>> +  memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
+>>>>> +                               BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+>>>>
+>>>> Also, do we really need this align variant separate when the caller
+>>>> can simply specify 0 for the default?
+>>>
+>>> Unfortunately Yes.
+>>> We need it to keep compatibility with bootmem/nobootmem
+>>> which don't handle 0 as default align value.
+>>
+>> Hmm... why wouldn't just interpreting 0 to SMP_CACHE_BYTES in the
+>> memblock_virt*() function work?
+>>
 > 
-> But, anyway I feel that it is better if you take the whole series in a raw.
-So I can interpret this as your blessing to keep the patch in my series
-based on 3.13-rc1?
+> Problem is not with memblock_virt*(). The issue will happen in case if
+> memblock or nobootmem are disabled in below code (memblock_virt*() is disabled).
+> 
+> +/* Fall back to all the existing bootmem APIs */
+> +#define memblock_virt_alloc(x) \
+> +       __alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
+> 
+> which will be transformed to 
+> +/* Fall back to all the existing bootmem APIs */
+> +#define memblock_virt_alloc(x, align) \
+> +       __alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
+> 
+> and used as
+> 
+> memblock_virt_alloc(size, 0);
+> 
+> so, by default bootmem code will use 0 as default alignment and not SMP_CACHE_BYTES
+> and that is wrong.
+> 
+Looks like you didn't understood the suggestion completely.
+The fall back inline will look like below .....
 
-Best regards
-Uwe
+static inline memblock_virt_alloc(x, align)
+{
+	if (align == 0)
+		align = SMP_CACHE_BYTES
+	__alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT);
+}
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+regards,
+Santosh
