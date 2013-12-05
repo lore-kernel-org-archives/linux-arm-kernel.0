@@ -1,49 +1,83 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 5 Dec 2013 11:20:36 -0800
-Subject: [PATCH v4 0/8] Update Kona drivers to use clocks
-Message-ID: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 05 Dec 2013 19:24:56 +0000
+Subject: [PATCH V5 2/6] Add shared update_fdt() function for ARM/ARM64
+In-Reply-To: <1385595115-21488-3-git-send-email-roy.franz@linaro.org>
+References: <1385595115-21488-1-git-send-email-roy.franz@linaro.org> <
+ 1385595115-21488-3-git-send-email-roy.franz@linaro.org>
+Message-ID: <20131205192456.1B602C40785@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series declares the clocks present on bcm11351 (aka bcm281xx) SoCs
-to be fixed at the rates configured by development bootloaders and then
-updates the Kona drivers to make use of clock calls where appropriate.
+On Wed, 27 Nov 2013 15:31:51 -0800, Roy Franz <roy.franz@linaro.org> wrote:
+> Both ARM and ARM64 stubs will update the device tree
+> that they pass to the kernel.  In both cases they
+> primarily need to add the same UEFI related information,
+> so the function can be shared.
+> Create a new FDT related file for this to avoid use
+> of architecture #ifdefs in efi-stub-helper.c
+> Change EFI allocation type for memory map to
+> EFI_RUNTIME_SERVICES_DATA, since we are passing
+> this buffer to the kernel, or immediately freeing it.
+> 
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
 
-Changes in v4:
-  - Rebased on v3.13-rc2
-  - DT binding documents now say "phandle + clock specifier pair"
-  - Recent change by Axel to use sdhci_pltfm_unregister must be undone
-    to allow clk_disable_unprepare to be called at the right point in
-    sdhci_bcm_kona_remove
+Hi Roy,
 
-Changes in v3:
-  - Updated the commit message for the UART DTS change
-  - Added a patch to change the kona timer binding doc
-  - Updated the commit message for the kona timer driver change
-  - Updated the panic message in the kona timer driver
-  - Added a patch to change the kona sdhci binding doc
-  - Moved the SDHCI driver change earlier in the series
-  - Removed unrelated change from SDHCI driver patch
+Comments below...
 
-Changes in v2:
-  - Renamed bsc4_clk to pmu_bsc_clk
+> +static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+> +			       void *fdt, int new_fdt_size, char *cmdline_ptr,
+> +			       u64 initrd_addr, u64 initrd_size,
+> +			       efi_memory_desc_t *memory_map,
+> +			       unsigned long map_size, unsigned long desc_size,
+> +			       u32 desc_ver)
+> +{
+> +	int node;
+> +	int status;
+> +	u32 fdt_val32;
+> +	u64 fdt_val64;
+> +	/* Copy definition of linux_banner here.  Since this code is
+> +	 * built as part of the decompressor for ARM v7, pulling
+> +	 * in version.c where linux_banner is defined for the
+> +	 * kernel brings other kernel dependencies with it.
+> +	 */
+> +	const char linux_banner[] =
+> +	    "Linux version " UTS_RELEASE " (" LINUX_COMPILE_BY "@"
+> +	    LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION "\n";
 
-Tim Kryger (8):
-  ARM: dts: Declare clocks as fixed on bcm11351
-  ARM: dts: Specify clocks for UARTs on bcm11351
-  Documentation: dt: kona-sdhci: Add clocks property
-  ARM: dts: Specify clocks for SDHCIs on bcm11351
-  mmc: sdhci-bcm-kona: Add basic use of clocks
-  Documentation: dt: kona-timer: Add clocks property
-  clocksource: kona: Add basic use of external clock
-  ARM: dts: Specify clocks for timer on bcm11351
+This is inherently fragile because the string is now defined in two
+places. This issue shouldn't hold off merging the patch, but a follow up
+patch should be crafted to make it possible to pull in version.c without
+the other dependencies....
 
- .../devicetree/bindings/arm/bcm/kona-timer.txt     |   7 +-
- .../devicetree/bindings/mmc/kona-sdhci.txt         |   4 +
- arch/arm/boot/dts/bcm11351.dtsi                    | 111 ++++++++++++++++++++-
- drivers/clocksource/bcm_kona_timer.c               |  14 ++-
- drivers/mmc/host/sdhci-bcm-kona.c                  |  37 ++++++-
- 5 files changed, 162 insertions(+), 11 deletions(-)
+Then again, the version.c strings have a very big "DON'T TOUCH" warning
+on them so I'm probably worrying about nothing.  :-)
 
--- 
-1.8.0.1
+> +
+> +	status = fdt_open_into(orig_fdt, fdt, new_fdt_size);
+> +	if (status != 0)
+> +		goto fdt_set_fail;
+> +
+> +	node = fdt_subnode_offset(fdt, 0, "chosen");
+> +	if (node < 0) {
+> +		node = fdt_add_subnode(fdt, 0, "chosen");
+> +		if (node < 0) {
+> +			status = node; /* node is error code when negative */
+> +			goto fdt_set_fail;
+> +		}
+> +	}
+> +
+> +	if ((cmdline_ptr != NULL) && (strlen(cmdline_ptr) > 0)) {
+> +		status = fdt_setprop(fdt, node, "bootargs", cmdline_ptr,
+> +				     strlen(cmdline_ptr) + 1);
+> +		if (status)
+> +			goto fdt_set_fail;
+> +	}
+> +
+> +	/* Set intird address/end in device tree, if present */
+
+sp. initrd
+
+None of the above comments are blockers though.
+
+Acked-by: Grant Likely <grant.likely@linaro.org>
