@@ -1,21 +1,25 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 5 Dec 2013 10:42:36 +0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <201312041636.20875.marex@denx.de>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
- <529EE5F1.9080806@st.com> <201312041636.20875.marex@denx.de>
-Message-ID: <529FE81C.4000608@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Dec 2013 03:43:18 +0100
+Subject: [PATCH 5/5] ARM: msm: Move MSM's DT based hardware to
+ multi-platform support
+In-Reply-To: <1386185952-27259-6-git-send-email-sboyd@codeaurora.org>
+References: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
+ <1386185952-27259-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201312050343.19327.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?12?04? 23:36, Marek Vasut ??:
-> I disagree we should bloat the API with features, that will be used by "possible
-> future controllers" or "possible single controller", right from the start. The
-> real question here is, can the API be designed in such a way, that the SR
-> polling will happen in software NOW and only when a controller appears that can
-> do polling in HW will the API be extended to support it ?
-ok. Let's add this feature in the future when a real case occurs.
+On Wednesday 04 December 2013, Stephen Boyd wrote:
+> The DT based MSM platforms can join the multi-platform builds, so
+> introduce a DT based ARCH_MSM option. This option allows DT based
+> MSM platforms to be built into the multi-platform kernel. Also
+> introduce a hidden ARCH_MSM config that both the DT and non-DT
+> platform support code select to avoid churn in places that depend
+> on CONFIG_ARCH_MSM.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-thanks
-Huang Shijie
+Nice!
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
