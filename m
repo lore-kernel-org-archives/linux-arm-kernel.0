@@ -1,65 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 5 Dec 2013 15:34:31 -0500
-Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
-References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
- <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
- <20131203232445.GX8277@htj.dyndns.org> <52A0AB34.2030703@ti.com>,
- <20131205165325.GA24062@mtj.dyndns.org>
- <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
-Message-ID: <52A0E357.7090008@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 5 Dec 2013 20:35:19 +0000
+Subject: [PATCH 1/2] cpufreq: enable ARM drivers on arm64
+In-Reply-To: <52A0DC28.1040001@gmail.com>
+References: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
+ <1386202994-30784-2-git-send-email-robherring2@gmail.com>
+ <20131205181606.GY29268@sirena.org.uk> <52A0DC28.1040001@gmail.com>
+Message-ID: <20131205203519.GA29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii,
+On Thu, Dec 05, 2013 at 02:03:52PM -0600, Rob Herring wrote:
 
-On Thursday 05 December 2013 01:48 PM, Strashko, Grygorii wrote:
-> Hi Tejun,
-> 
->> On Thu, Dec 05, 2013 at 06:35:00PM +0200, Grygorii Strashko wrote:
->>>>> +#define memblock_virt_alloc_align(x, align) \
->>>>> +  memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
->>>>> +                               BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
->>>>
->>>> Also, do we really need this align variant separate when the caller
->>>> can simply specify 0 for the default?
->>>
->>> Unfortunately Yes.
->>> We need it to keep compatibility with bootmem/nobootmem
->>> which don't handle 0 as default align value.
->>
->> Hmm... why wouldn't just interpreting 0 to SMP_CACHE_BYTES in the
->> memblock_virt*() function work?
->>
-> 
-> Problem is not with memblock_virt*(). The issue will happen in case if
-> memblock or nobootmem are disabled in below code (memblock_virt*() is disabled).
-> 
-> +/* Fall back to all the existing bootmem APIs */
-> +#define memblock_virt_alloc(x) \
-> +       __alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
-> 
-> which will be transformed to 
-> +/* Fall back to all the existing bootmem APIs */
-> +#define memblock_virt_alloc(x, align) \
-> +       __alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
-> 
-> and used as
-> 
-> memblock_virt_alloc(size, 0);
-> 
-> so, by default bootmem code will use 0 as default alignment and not SMP_CACHE_BYTES
-> and that is wrong.
-> 
-Looks like you didn't understood the suggestion completely.
-The fall back inline will look like below .....
+> Will do, but I'm surprised we're at the point on arm64 of needing LSK.
 
-static inline memblock_virt_alloc(x, align)
-{
-	if (align == 0)
-		align = SMP_CACHE_BYTES
-	__alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT);
-}
+ARMv8 isn't just for servers, and of course there's the desire to have
+the software as ready as early as it can be!
 
-regards,
-Santosh
+> There's a couple of subsystems that need enabling. I've posted EDAC
+> patches (need to send v3). cpuidle is another. Probably some more I
+> haven't looked at.
+
+Right, cpuidle is in progress - Lorenzo has been posting patches for
+that:  
+
+   http://lwn.net/Articles/574950/
+
+There's some active work in the trace and debug area too.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/d2c54368/attachment.sig>
