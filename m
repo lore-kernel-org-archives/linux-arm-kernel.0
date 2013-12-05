@@ -1,68 +1,51 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 5 Dec 2013 19:25:56 +0200
-Subject: [PATCH v3 8/9] mtd: nand: davinci: reuse driver for Keystone arch
-In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1386264358-9738-9-git-send-email-ivan.khoronzhuk@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 05 Dec 2013 18:43:38 +0100
+Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <52A0B2AF.60803@wwwdotorg.org>
+References: <cover.1386108712.git.stefan@agner.ch>
+ <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
+ <52A0B2AF.60803@wwwdotorg.org>
+Message-ID: <b2a1db4167d319d355dd2a3a844553bc@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone arch has compatible nand device, so reuse it.
-In case with Keystone it depends on TI_AEMIF because AEMIF
-driver is responsible to set timings.
+Am 2013-12-05 18:06, schrieb Stephen Warren:
+<snip>
+>> @@ -493,13 +527,12 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
+>>  		return -EIO;
+>>  	}
+>>
+>> -	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
+>> -
+>>  	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
+>> -	if (tps6586x == NULL) {
+>> -		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
+>> +	if (!tps6586x)
+>>  		return -ENOMEM;
+>> -	}
+>> +
+>> +	tps6586x->version = ret;
+> 
+> I have to say, I dislike this version of the patch. Separating the
+> reading of the version register from the assignment to tps6586x->version
+> doesn't make any sense, especially given that the version value is
+> stored in a variable named "ret"; that name isn't remotely related to
+> what's stored there. What if someone comes along later and adds more
+> code that assigns to ret between where it's repurposed for the version
+> value and where it's assigned to tps6586x->version? It'd be extremely
+> difficult for a patch reviewer to spot that given the limited context in
+> a diff, and quite non-obvious to the person changing the code too..
 
-See http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+The value comes from the return value of i2c_smbus_read_byte_data. If
+the value is below zero its an EIO error. 
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Reviewed-by: Taras Kondratiuk <taras@ti.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- .../devicetree/bindings/mtd/davinci-nand.txt       |    8 +++++---
- drivers/mtd/nand/Kconfig                           |    6 +++---
- 2 files changed, 8 insertions(+), 6 deletions(-)
+I could add a variable "version", but for me it felt strange because we
+check if version is below zero. This feels like its a wrong version
+rather than a transmit error. So I would prefer ret over version. But I
+agree, when one just reads the patch, its not obvious what exactly
+happens.
 
-diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-index befaa5b..cfb18ab 100644
---- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-@@ -1,14 +1,16 @@
--Device tree bindings for Texas instruments Davinci NAND controller
-+Device tree bindings for Texas instruments Davinci/Keystone NAND controller
- 
--This file provides information, what the device node for the davinci NAND
--interface contains.
-+This file provides information, what the device node for the davinci/keystone
-+NAND interface contains.
- 
- Documentation:
- Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
-+Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
- 
- Required properties:
- 
- - compatible:			"ti,davinci-nand"
-+				"ti,keystone-nand"
- 
- - reg:				Contains 2 offset/length values:
- 				- offset and length for the access window.
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 93ae6a6..35f3ea3 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -464,11 +464,11 @@ config MTD_NAND_SH_FLCTL
- 	  for NAND Flash using FLCTL.
- 
- config MTD_NAND_DAVINCI
--        tristate "Support NAND on DaVinci SoC"
--        depends on ARCH_DAVINCI
-+        tristate "Support NAND on DaVinci/Keystone SoC"
-+        depends on ARCH_DAVINCI || (ARCH_KEYSTONE && TI_AEMIF)
-         help
- 	  Enable the driver for NAND flash chips on Texas Instruments
--	  DaVinci processors.
-+	  DaVinci/Keystone processors.
- 
- config MTD_NAND_TXX9NDFMC
- 	tristate "NAND Flash support for TXx9 SoC"
--- 
-1.7.9.5
+In v2, I moved the i2c_smbus_read_byte_data function call after the
+allocation, so it was more obvious for the reader. But then, as Thierry
+Reding pointed out, not moving it is an optimization: In case reading
+fails, we don't allocate memory first.
