@@ -1,107 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu,  5 Dec 2013 17:51:03 +0100
-Subject: [PATCH v2 4/4] Phy: Add DT nodes on kirkwood and Dove for the SATA PHY
-In-Reply-To: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
-References: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1386262263-18956-5-git-send-email-andrew@lunn.ch>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 5 Dec 2013 11:53:25 -0500
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <52A0AB34.2030703@ti.com>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131203232445.GX8277@htj.dyndns.org> <52A0AB34.2030703@ti.com>
+Message-ID: <20131205165325.GA24062@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for the two SATA PHYs on kirkewood.
-Add node for the one SATA PHY on Dove.
-Add pHandles to the PHYs in the sata nodes.
+Hello,
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
-v1->v2:
-sata_phy at ... ->sata-phy@
-value after '@' matching the first address in the reg.
----
- arch/arm/boot/dts/dove.dtsi          | 11 +++++++++++
- arch/arm/boot/dts/kirkwood-6281.dtsi |  2 ++
- arch/arm/boot/dts/kirkwood-6282.dtsi |  2 ++
- arch/arm/boot/dts/kirkwood.dtsi      | 18 ++++++++++++++++++
- 4 files changed, 33 insertions(+)
+On Thu, Dec 05, 2013 at 06:35:00PM +0200, Grygorii Strashko wrote:
+> >> +#define memblock_virt_alloc_align(x, align) \
+> >> +	memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
+> >> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+> > 
+> > Also, do we really need this align variant separate when the caller
+> > can simply specify 0 for the default?
+> 
+> Unfortunately Yes. 
+> We need it to keep compatibility with bootmem/nobootmem
+> which don't handle 0 as default align value.
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 113a8bc7bee7..0d786f868760 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -490,10 +490,21 @@
- 				reg = <0xa0000 0x2400>;
- 				interrupts = <62>;
- 				clocks = <&gate_clk 3>;
-+				phys = <&sata_phy0>;
-+				phy-names = "0";
- 				nr-ports = <1>;
- 				status = "disabled";
- 			};
- 
-+			sata_phy0: sata-phy at a2000 {
-+				compatible = "marvell,mvebu-sata-phy";
-+				reg = <0xa2000 0x0334>;
-+				clocks = <&gate_clk 3>;
-+				clock-names = "sata";
-+				#phy-cells = <0>;
-+				status = "ok";
-+			};
-+
- 			rtc: real-time-clock at d8500 {
- 				compatible = "marvell,orion-rtc";
- 				reg = <0xd8500 0x20>;
-diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
-index 650ef30e1856..92a1c747456a 100644
---- a/arch/arm/boot/dts/kirkwood-6281.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
-@@ -89,6 +89,8 @@
- 			interrupts = <21>;
- 			clocks = <&gate_clk 14>, <&gate_clk 15>;
- 			clock-names = "0", "1";
-+			phys = <&sata_phy0>, <&sata_phy1>;
-+			phy-names = "0", "1";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
-index 3933a331ddc2..dfa6b073cf00 100644
---- a/arch/arm/boot/dts/kirkwood-6282.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
-@@ -117,6 +117,8 @@
- 			interrupts = <21>;
- 			clocks = <&gate_clk 14>, <&gate_clk 15>;
- 			clock-names = "0", "1";
-+			phys = <&sata_phy0>, <&sata_phy1>;
-+			phy-names = "0", "1";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 8b73c80f1dad..ee06951721c4 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -282,5 +282,23 @@
- 				/* set phy-handle property in board file */
- 			};
- 		};
-+
-+		sata_phy0: sata-phy at 82000 {
-+			compatible = "marvell,mvebu-sata-phy";
-+			reg = <0x82000 0x0334>;
-+			clocks = <&gate_clk 14>;
-+			clock-names = "sata";
-+			#phy-cells = <0>;
-+			status = "ok";
-+		};
-+
-+		sata_phy1: sata-phy at 84000 {
-+			compatible = "marvell,mvebu-sata-phy";
-+			reg = <0x84000 0x0334>;
-+			clocks = <&gate_clk 15>;
-+			clock-names = "sata";
-+			#phy-cells = <0>;
-+			status = "ok";
-+		};
- 	};
- };
+Hmm... why wouldn't just interpreting 0 to SMP_CACHE_BYTES in the
+memblock_virt*() function work?
+
+Thanks.
+
 -- 
-1.8.5
+tejun
