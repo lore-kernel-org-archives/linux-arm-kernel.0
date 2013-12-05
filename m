@@ -1,87 +1,166 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 5 Dec 2013 18:35:00 +0200
-Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <20131203232445.GX8277@htj.dyndns.org>
-References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
- <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
- <20131203232445.GX8277@htj.dyndns.org>
-Message-ID: <52A0AB34.2030703@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu,  5 Dec 2013 16:43:36 +0100
+Subject: [PATCHv13][ 1/4] video: imxfb: Introduce regulator support.
+Message-ID: <1386258219-26437-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+This commit is based on the following commit by Fabio Estevam:
+  4344429 video: mxsfb: Introduce regulator support
 
-On 12/04/2013 01:24 AM, Tejun Heo wrote:
-> Hello,
-> 
-> On Mon, Dec 02, 2013 at 09:27:23PM -0500, Santosh Shilimkar wrote:
->> So we add equivalent APIs so that we can replace usage of bootmem
->> with memblock interfaces. Architectures already converted to NO_BOOTMEM
->> use these new interfaces and other which still uses bootmem, these new
->> APIs just fallback to exiting bootmem APIs. So no functional change as
->> such.
-> 
-> The last part of the second last sentence doesn't parse too well.  I
-> think it'd be worthwhile to improve and preferably expand on it as
-> this is a bit tricky to understand given the twisted state of early
-> memory allocation.
-> 
->> In long run, once all the achitectures moves to NO_BOOTMEM, we can get rid of
->> bootmem layer completely. This is one step to remove the core code dependency
->> with bootmem and also gives path for architectures to move away from bootmem.
-> 
-> Lines too long?
-> 
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v9->v10:
+- Added a return 0; at the end of imxfb_disable_controller.
 
-[...]
+ChangeLog v8->v9:
+- return an error if regulator_{enable,disable} fails in
+  imxfb_{enable,disable}_controller, and use it.
+---
+ drivers/video/imxfb.c |   55 ++++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 43 insertions(+), 12 deletions(-)
 
-> 
->> +/* FIXME: Move to memblock.h at a point where we remove nobootmem.c */
->> +void *memblock_virt_alloc_try_nid_nopanic(phys_addr_t size,
->> +		phys_addr_t align, phys_addr_t from,
->> +		phys_addr_t max_addr, int nid);
-> 
-> Wouldn't @min_addr instead of @from make more sense?  Ditto for other
-> occurrences.
-> 
->> +void *memblock_virt_alloc_try_nid(phys_addr_t size, phys_addr_t align,
->> +		phys_addr_t from, phys_addr_t max_addr, int nid);
->> +void __memblock_free_early(phys_addr_t base, phys_addr_t size);
->> +void __memblock_free_late(phys_addr_t base, phys_addr_t size);
->> +
->> +#define memblock_virt_alloc(x) \
->> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
->> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
-> 
-> The underlying function interprets 0 as the default align, so it
-> probably is a better idea to just use 0 here.
-> 
->> +#define memblock_virt_alloc_align(x, align) \
->> +	memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
->> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
-> 
-> Also, do we really need this align variant separate when the caller
-> can simply specify 0 for the default?
-
-Unfortunately Yes. 
-We need it to keep compatibility with bootmem/nobootmem
-which don't handle 0 as default align value.
-
-> 
->> +#define memblock_virt_alloc_nopanic(x) \
->> +	memblock_virt_alloc_try_nid_nopanic(x, SMP_CACHE_BYTES, \
->> +					     BOOTMEM_LOW_LIMIT, \
->> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
->> +					     MAX_NUMNODES)
->> +#define memblock_virt_alloc_align_nopanic(x, align) \
->> +	memblock_virt_alloc_try_nid_nopanic(x, align, \
->> +					     BOOTMEM_LOW_LIMIT, \
->> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
->> +					     MAX_NUMNODES)
->> +#define memblock_virt_alloc_node(x, nid) \
->> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
->> +				     BOOTMEM_ALLOC_ACCESSIBLE, nid)
->> +#define memblock_virt_alloc_node_nopanic(x, nid) \
-
-Regards,
-- grygorii
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 44ee678..57d3b81 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/math64.h>
+@@ -145,6 +146,7 @@ struct imxfb_info {
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	struct regulator	*reg_lcd;
+ 	enum imxfb_type		devtype;
+ 	bool			enabled;
+ 
+@@ -561,14 +563,25 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ }
+ #endif
+ 
+-static void imxfb_enable_controller(struct imxfb_info *fbi)
++static int imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
+ 
+ 	if (fbi->enabled)
+-		return;
++		return 0;
+ 
+ 	pr_debug("Enabling LCD controller\n");
+ 
++	if (fbi->reg_lcd) {
++		ret = regulator_enable(fbi->reg_lcd);
++		if (ret) {
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator enable failed with error: %d\n",
++				ret);
++			return ret;
++		}
++	}
++
+ 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+ 
+ 	/* panning offset 0 (0 pixel offset)        */
+@@ -593,12 +606,16 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 		fbi->backlight_power(1);
+ 	if (fbi->lcd_power)
+ 		fbi->lcd_power(1);
++
++	return 0;
+ }
+ 
+-static void imxfb_disable_controller(struct imxfb_info *fbi)
++static int imxfb_disable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
++
+ 	if (!fbi->enabled)
+-		return;
++		return 0;
+ 
+ 	pr_debug("Disabling LCD controller\n");
+ 
+@@ -613,6 +630,17 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
++
++	if (fbi->reg_lcd) {
++		ret = regulator_disable(fbi->reg_lcd);
++		if (ret)
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator disable failed with error: %d\n",
++				ret);
++			return ret;
++	}
++
++	return 0;
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+@@ -626,13 +654,12 @@ static int imxfb_blank(int blank, struct fb_info *info)
+ 	case FB_BLANK_VSYNC_SUSPEND:
+ 	case FB_BLANK_HSYNC_SUSPEND:
+ 	case FB_BLANK_NORMAL:
+-		imxfb_disable_controller(fbi);
+-		break;
++		return imxfb_disable_controller(fbi);
+ 
+ 	case FB_BLANK_UNBLANK:
+-		imxfb_enable_controller(fbi);
+-		break;
++		return imxfb_enable_controller(fbi);
+ 	}
++
+ 	return 0;
+ }
+ 
+@@ -734,8 +761,7 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+-	imxfb_disable_controller(fbi);
+-	return 0;
++	return imxfb_disable_controller(fbi);
+ }
+ 
+ static int imxfb_resume(struct platform_device *dev)
+@@ -745,8 +771,7 @@ static int imxfb_resume(struct platform_device *dev)
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+-	imxfb_enable_controller(fbi);
+-	return 0;
++	return imxfb_enable_controller(fbi);
+ }
+ #else
+ #define imxfb_suspend	NULL
+@@ -1020,6 +1045,12 @@ static int imxfb_probe(struct platform_device *pdev)
+ 		goto failed_register;
+ 	}
+ 
++	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
++	if (IS_ERR(fbi->reg_lcd)) {
++		dev_info(&pdev->dev, "No lcd regulator used.\n");
++		fbi->reg_lcd = NULL;
++	}
++
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
+ #ifdef PWMR_BACKLIGHT_AVAILABLE
+-- 
+1.7.9.5
