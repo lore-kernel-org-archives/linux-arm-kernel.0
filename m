@@ -1,43 +1,28 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 5 Dec 2013 12:45:54 +0900
-Subject: [PATCH 2/2] ARM: shmobile: armadillo: Set vccq_sdhi0 regulator
- type in DT
-In-Reply-To: <1385653493-9952-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385653493-9952-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131205034554.GB20388@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Dec 2013 04:48:09 +0100
+Subject: [RFC part2 PATCH 8/9] ACPI / ARM64: Update acpi_register_gsi to
+ register with the core IRQ subsystem
+In-Reply-To: <1386088753-2850-9-git-send-email-hanjun.guo@linaro.org>
+References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088753-2850-9-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <201312050448.10312.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 04:44:53PM +0100, Laurent Pinchart wrote:
-> The mandatory regulator-type property is missing, add it.
+On Tuesday 03 December 2013, Hanjun Guo wrote:
+> +       /*
+> +        * ACPI have no bindings to indicate SPI or PPI, so we
+> +        * use different mappings from DT in ACPI.
+> +        *
+> +        * For FDT
+> +        * PPI interrupt: in the range [0, 15];
+> +        * SPI interrupt: in the range [0, 987];
+> +        *
+> +        * For ACPI, using identity mapping for hwirq:
+> +        * PPI interrupt: in the range [16, 31];
+> +        * SPI interrupt: in the range [32, 1019];
 
-Thanks, I will queue this up.
+This difference might cause endless confusion. Can't you register PPI and SPI as
+separate IRQ controllers to have the same number space that we normally have?
 
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> index 7b80f19..013a7cd 100644
-> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> @@ -53,6 +53,8 @@
->  		regulator-name = "SDHI0 VccQ";
->  		regulator-min-microvolt = <1800000>;
->  		regulator-max-microvolt = <3300000>;
-> +		regulator-type = "voltage";
-> +
->  		vin-supply = <&vcc_sdhi0>;
->  
->  		enable-gpio = <&pfc 74 GPIO_ACTIVE_HIGH>;
-> -- 
-> 1.8.3.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	Arnd
