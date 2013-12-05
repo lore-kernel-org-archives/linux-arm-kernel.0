@@ -1,62 +1,123 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 5 Dec 2013 17:34:54 +0100
-Subject: [GIT PULL] at91: cleanup for 3.14 #1 (aka move to CCF)
-In-Reply-To: <CAOesGMjoK=fN-QCnRS1r2XQFrqc=KN_HPj5A=EVHL3ut58MvQA@mail.gmail.com>
-References: <1386003701-29760-1-git-send-email-nicolas.ferre@atmel.com>
- <CAOesGMjoK=fN-QCnRS1r2XQFrqc=KN_HPj5A=EVHL3ut58MvQA@mail.gmail.com>
-Message-ID: <52A0AB2E.80504@atmel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 5 Dec 2013 08:40:38 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset
+ the system
+In-Reply-To: <42011482.56GYn1upCz@amdc1227>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+ <42011482.56GYn1upCz@amdc1227>
+Message-ID: <20131205164038.GA15560@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 22:54, Olof Johansson :
-> On Mon, Dec 2, 2013 at 9:01 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> Arnd, Olof, Kevin,
->>
->> This is the big move of AT91 to Common Clock Framework for 3.14. I collected
->> all the material as a "cleanup" topic so that the CCF can be considered as a
->> base for all our AT91 patches for 3.14.
->> I prefer to have the sama5d3 use of AT91 CCF included into this pull-request
->> so that it can be read as an example and clearly states that it has been tested
->> in real life.
->> We agreed with Mike to send this work upstream through arm-soc so that we will
->> be able to stack other patches for 3.14 on top of that work without having to
->> deal with conflicts.
->>
->> For merging with the "fixes" pull-request that I sent earlier today, I also
->> uploaded a little branch for reference:
->> at91-3.14-next_fixes_cleanup_dt-resolution.
->> In two words, the clock section of the arch/arm/mach-at91/sama5d3.c file
->> has to be deleted.
->>
->> Do not hesitate to ask questions about this material.
->>
->> Thanks, best regards,
->>
->> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>
->>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>
->> are available in the git repository at:
->>
->>    git://github.com/at91linux/linux-at91.git tags/at91-cleanup
->>
->> for you to fetch changes up to b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
->>
->>    ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
->
-> Thanks, pulled into next/cleanup. use this branch as base for your
-> future at91 branches if you need it to avoid conflicts, please.
+On Thu, Dec 05, 2013 at 05:21:47PM +0100, Tomasz Figa wrote:
+> Hi Doug,
+> 
+> Please see my comments inline.
+> 
+> On Monday 02 of December 2013 10:14:41 Doug Anderson wrote:
+> > A good watchdog driver is supposed to report when it was responsible
+> > for resetting the system.  Implement this for the s3c2410, at least on
+> > exynos5250 and exynos5420 where we already have a pointer to the PMU
+> > registers to read the information.
+> > 
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > ---
+> > This patch is based atop Leela Krishna's recent series that ends with
+> > (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+> > AKA <https://patchwork.kernel.org/patch/3251861/>.
+> > 
+> >  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+> >  1 file changed, 39 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> > index 47f4dcf..2c87d37 100644
+> > --- a/drivers/watchdog/s3c2410_wdt.c
+> > +++ b/drivers/watchdog/s3c2410_wdt.c
+> > @@ -62,9 +62,13 @@
+> >  #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+> >  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+> >  
+> > +#define RST_STAT_REG_OFFSET		0x0404
+> 
+> IMHO this should be namespaced, at least with EXYNOS5 prefix. The two
+> registers below should be as well, but I missed this in the patch adding
+> them.
+> 
+> >  #define WDT_DISABLE_REG_OFFSET		0x0408
+> >  #define WDT_MASK_RESET_REG_OFFSET	0x040c
+> >  #define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
+> > +#define QUIRK_HAS_RST_STAT		(1 << 1)
+> > +#define QUIRKS_NEED_PMUREG		(QUIRK_NEEDS_PMU_CONFIG | \
+> > +					 QUIRK_HAS_RST_STAT)
+> >  
+> >  static bool nowayout	= WATCHDOG_NOWAYOUT;
+> >  static int tmr_margin;
+> > @@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
+> >   * timer reset functionality.
+> >   * @mask_bit: Bit number for the watchdog timer in the disable register and the
+> >   * mask reset register.
+> > + * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
+> > + * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
+> > + * reset.
+> >   * @quirks: A bitfield of quirks.
+> >   */
+> >  
+> > @@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
+> >  	int disable_reg;
+> >  	int mask_reset_reg;
+> >  	int mask_bit;
+> > +	int rst_stat_reg;
+> > +	int rst_stat_bit;
+> >  	u32 quirks;
+> >  };
+> >  
+> > @@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
+> >  	.disable_reg = WDT_DISABLE_REG_OFFSET,
+> >  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+> >  	.mask_bit = 20,
+> > -	.quirks = QUIRK_NEEDS_PMU_CONFIG
+> > +	.rst_stat_reg = RST_STAT_REG_OFFSET,
+> > +	.rst_stat_bit = 20,
+> > +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
+> > +		QUIRK_HAS_RST_STAT,
+> >  };
+> >  
+> >  static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
+> >  	.disable_reg = WDT_DISABLE_REG_OFFSET,
+> >  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+> >  	.mask_bit = 0,
+> > -	.quirks = QUIRK_NEEDS_PMU_CONFIG
+> > +	.rst_stat_reg = RST_STAT_REG_OFFSET,
+> > +	.rst_stat_bit = 9,
+> > +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
+> > +		QUIRK_HAS_RST_STAT,
+> >  };
+> >  
+> >  static const struct of_device_id s3c2410_wdt_match[] = {
+> > @@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+> >  }
+> >  #endif
+> >  
+> > +static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
+> > +{
+> > +	unsigned int bootstatus = 0;
+> > +	int ret;
+> > +
+> > +	if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
+> 
+> nit: I guess it's just a matter of taste, but to reduce code indentation
+> you could inverse the check and simply return 0 here.
+> 
 
-Yes, sure. I still have to synchronize with Uwe as he is building a 
-series for removing timex.h that may conflict with these modifications.
+nit: If so, it would make sense to to the same for the other 'quirk'
+for consistency.
 
-> (I named it at91/sama5-ccf in our tree)
+static int s3c2410wdt_mask_and_disable_reset(struct s3c2410_wdt *wdt, bool mask)
+{
+	...
+	if (!(wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG))
+		return 0;
+	...
+}
 
-Well, it seems that the at91/sama5-ccf is not aligned with
-next/cleanup as of today (94c5216ee93b)
-
-Did I miss something?
-
-Bye,
--- 
-Nicolas Ferre
+Guenter
