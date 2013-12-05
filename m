@@ -1,45 +1,52 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 5 Dec 2013 19:25:57 +0200
-Subject: [PATCH v3 9/9] mtd: nand: davinci: don't request AEMIF address range
-In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1386264358-9738-10-git-send-email-ivan.khoronzhuk@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Dec 2013 09:28:03 -0800
+Subject: [PATCH] ARM: Clean up setup printks a bit
+In-Reply-To: <52A04407.4000306@elopez.com.ar>
+References: <1386199826-8183-1-git-send-email-olof@lixom.net>
+ <52A04407.4000306@elopez.com.ar>
+Message-ID: <CAOesGMj6=MWjEGVj8upQzQ8nEa3KDsHBOcfMNNEZjazU=Ku+sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TI AEMIF driver registers are used to setup timings for each chip
-select. The same registers range is used to setup NAND settings.
-The AEMIF and NAND drivers not use the same registers in this range.
+On Thu, Dec 5, 2013 at 1:14 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> Hi Olof,
+>
+> El 04/12/13 20:30, Olof Johansson escribi?:
+>
+>> Clean up the setup ARM printks a bit. Add printk level to a few
+>> that were missing (CPU: <...> ones, in particular), and switch from
+>> printk(KERN_* ..) to pr_*().
+>>
+>> Finally, un-wrap some long lines since it makes it harder to grep the
+>> sources from where an error came from and tweak some cases of indentation.
+>>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>> ---
+>>   arch/arm/kernel/setup.c |   39 +++++++++++++++++++--------------------
+>>   1 file changed, 19 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index 6a1b8a8..7c472f4 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>
+>
+> ...
+>
+>
+>>
+>>         if (meminfo.nr_banks >= NR_BANKS) {
+>> -               printk(KERN_CRIT "NR_BANKS too low, "
+>> -                       "ignoring memory at 0x%08llx\n", (long
+>> long)start);
+>> +               pr_crit("NR_BANKS too low, "ignoring memory at
+>> 0x%08llx\n",
+>
+>
+> There's a stray " there
 
-In case with TI AEMIF driver, the memory address range is requested
-already by AEMIF, so we cannot request it twice, just ioremap.
+That's certainly embarrassing, and I can't explain how I got that to
+past my build. Revised patch sent to the tracker.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Reviewed-by: Taras Kondratiuk <taras@ti.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- drivers/mtd/nand/davinci_nand.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index f7b21b8..0cd4dbc 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -636,9 +636,11 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	if (IS_ERR(vaddr))
- 		return PTR_ERR(vaddr);
- 
--	base = devm_ioremap_resource(&pdev->dev, res2);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
-+	if (!base) {
-+		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
-+		return -EADDRNOTAVAIL;
-+	}
- 
- 	info->dev		= &pdev->dev;
- 	info->base		= base;
--- 
-1.7.9.5
+-Olof
