@@ -1,57 +1,51 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 05 Dec 2013 15:14:31 +0000
-Subject: [GIT PULL] Cacheflush updates for 3.12
-In-Reply-To: <1386253407.3525.8.camel@linaro1.home>
-References: <20130812173155.GI25995@mudshark.cambridge.arm.com>
- <CAH9NwWd1AfN_YnO-fj94+wTbE8768H518=EndVcX=dFCV9WESg@mail.gmail.com>
- <20131204161329.GA14145@mudshark.cambridge.arm.com>
- <1386253407.3525.8.camel@linaro1.home>
-Message-ID: <1386256471.3525.13.camel@linaro1.home>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 5 Dec 2013 15:15:39 +0000
+Subject: [PATCH] ARM/KVM: inject data abort on unhandled memory access
+In-Reply-To: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
+References: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
+Message-ID: <CAFEAcA8tsdMjok8EQe-2ybuuCn_g7ZEYROwSPVcwr5A1VyrOVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-05 at 14:23 +0000, Jon Medhurst (Tixy) wrote:
-> On Wed, 2013-12-04 at 16:13 +0000, Will Deacon wrote:
-> > took another look at that patch and can't see anything obviously wrong
-> > with it. 
-> 
-> If the memory region isn't guaranteed to be page aligned then doesn't it
-> flush up to PAGE_SIZE-1 more bytes than requested and so exceed the
-> bounds check in do_cache_op? Fixing this as below _appears_ to stop the
-> Browser crashes I'm seeing (still doing some more testing)...
+On 5 December 2013 15:10, Andre Przywara <andre.przywara@linaro.org> wrote:
+> If a KVM guest accesses memory that is outside its memory map (so no
+> MMIO and no RAM), KVM will return -ENOSYS to userland, causing QEMU
+> to do an abort() and kill the whole guest. This happens while
+> executing dmidecode on ARM, which mmaps /dev/mem and scans the first
+> Megabyte of memory for a DMI BIOS signature (sic!).
+> Of course this is silly, but in any case crashing the whole guest
+> does not seems appropriate.
+> So lets mimic native hardware's behavior in this case and inject a
+> Data Abort exception into the guest. In the previous case this will
+> crash dmidecode with SIGSEGV, but keeps the guest alive.
 
-Actually, a smaller patch and one which avoids the possibility of
-arithmetic owerflow is... 
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -183,7 +183,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>                         return ret;
+>         } else {
+>                 kvm_err("load/store instruction decoding not implemented\n");
+> -               return -ENOSYS;
+> +               kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+> +               return 1;
+>         }
 
-From: Jon Medhurst <tixy@linaro.org>
-Date: Thu, 5 Dec 2013 14:29:24 +0000
-Subject: [PATCH] ARM: cacheflush: correctly limit range of memory region
- being flushed
+This seems like it's mixing two different error cases:
+ (1) guest tries to access something with nothing backing it at all
+ -> should definitely cause a guest Data Abort
+ (2) guest tries to access something (whether at a valid device address
+ or not) with a "complex" instruction like LDM/STM which we can't deal
+ without emulating it
 
-The __do_cache_op function operates with a 'chunk' size of one page
-but fails to limit the size of the final chunk so as to not exceed
-the specified memory region. Fix this.
+The error message you've removed relates to (2). I think there's a reasonable
+case to make for "log and reflect back into guest as a Data Abort"; silently
+Data Aborting seems a bit cryptic.
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
- arch/arm/kernel/traps.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Of course if the guest tries to do a memcpy() on the device memory
+(which IIRC is what is happening with dmidecode in this case) then it's
+very likely to hit case (2).
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index dbf0923..7940241 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -509,9 +509,10 @@ static inline int
- __do_cache_op(unsigned long start, unsigned long end)
- {
- 	int ret;
--	unsigned long chunk = PAGE_SIZE;
- 
- 	do {
-+		unsigned long chunk = min(PAGE_SIZE, end - start);
-+
- 		if (signal_pending(current)) {
- 			struct thread_info *ti = current_thread_info();
- 
--- 
-1.7.10.4
+Or we could try to get the ldm/stm emulation code upstream :-)
+
+thanks
+-- PMM
