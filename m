@@ -1,54 +1,59 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Thu, 5 Dec 2013 09:58:28 +0200
-Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
- platform doesn't have PHY
-In-Reply-To: <52A01E86.50406@ti.com>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1385373690-12170-5-git-send-email-kishon@ti.com>
- <20131204144027.GB21055@xps8300> <52A01E86.50406@ti.com>
-Message-ID: <20131205075828.GA32583@xps8300>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 5 Dec 2013 15:33:49 +0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA51E1A@DBDE04.ent.ti.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
+ <529EE5F1.9080806@st.com> <201312041636.20875.marex@denx.de>
+ <529FE81C.4000608@freescale.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA51E1A@DBDE04.ent.ti.com>
+Message-ID: <20131205073348.GB8936@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Dec 05, 2013 at 12:04:46PM +0530, Kishon Vijay Abraham I wrote:
-> On Wednesday 04 December 2013 08:10 PM, Heikki Krogerus wrote:
-> > On Mon, Nov 25, 2013 at 03:31:24PM +0530, Kishon Vijay Abraham I wrote:
-> >> There can be systems which does not have an external phy, so get
-> >> phy only if no quirks are added that indicates the PHY is not present.
-> >> Introduced two quirk flags to indicate the *absence* of usb2 phy and
-> >> usb3 phy. Also remove checking if return value is -ENXIO since it's now
-> >> changed to always enable usb_phy layer.
-> > 
-> > Can you guys explain why is something like this needed? Like with
-> > clocks and gpios, the device drivers shouldn't need to care any more
-> > if the platform has the phys or not. -ENODEV tells you your platform
+On Thu, Dec 05, 2013 at 05:43:05AM +0000, Gupta, Pekon wrote:
+> >From: Huang Shijie [mailto:b32955 at freescale.com]
+> >
+> >>? 2013?12?04? 23:36, Marek Vasut ??:
+> >> I disagree we should bloat the API with features, that will be used by "possible
+> >> future controllers" or "possible single controller", right from the start. The
+> >> real question here is, can the API be designed in such a way, that the SR
+> >> polling will happen in software NOW and only when a controller appears that can
+> >> do polling in HW will the API be extended to support it ?
+> >ok. Let's add this feature in the future when a real case occurs.
+> >
+> Sorry got lost.. Can you please summarize following plans for your next patch:
 > 
-> Shouldn't we report if a particular platform needs a PHY and not able to get
-> it. How will a user know if a particular controller is not working because it's
-> not able to get and initialize the PHYs? Don't you think in such cases it's
-> better to fail (and return from probe) because the controller will not work
-> anyway without the PHY?
+> (1) Polling of status registers should be 
+>   (a) done in S/W (generic driver)
+>   (b) done controller driver, which can be optimized for specific hardware
+> 
+For (b), we can implement the @wait_till_ready hook for the controller driver.
 
-My point is that you do not need to separately tell this to the driver
-like you do with the quirks (if you did, then you would need to fix
-your framework and not hack the drivers).
+For (a), we use the default hook for @wait_till_ready.
 
-Like I said, ENODEV tells you that there is no phy on this platform
-for you, allowing you to safely continue. If your phy driver is not
-loaded, the framework already returns EPROBE_DEFER, right. Any other
-error when getting the phy you can consider critical. They are the
-errors telling you that you do need a phy on this platform, but
-something actually went wrong when getting it.
 
-Those "quirks" should always be avoided, and I don't see any use for
-them here.
 
-> Thanks
-> Kishon
+> (2) How do you plan to have timeout value, (as serial flash can be pretty slow
+>    to access) ?
+>   (a) independent for each access
+>        - read timeouts per sector, which can be multiplied with read_len/sector_size
+>        - write timeout per sector, which can be multiplied with write_len/sector_size
+>        - erase timeout per block, which can be multiplied with erase_len/block_size
+>   (b) Any other method, or leave it to controller driver ?
+> 
 
-Thanks,
+Since i have no idea about this kind of spi-nor controller, so I prefer the (b). 
 
--- 
-heikki
+> In my view, before proceeding to writing down a patch, I think
+> we should come-up with a doc/Readme, which defines all API and interface
+> structs (taking Angus' proposal as baseline). And then refine that spec first.
+> Otherwise there may be too many revisions spent on patch RFC's .. 
+> 
+> Any thoughts ?
+> And is there a space in kernel_docs for such specs ?
+
+maybe the best solution is I send out the new version as soon as possible.
+
+thanks
+Huang Shijie
