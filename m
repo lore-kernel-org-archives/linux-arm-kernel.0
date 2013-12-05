@@ -1,47 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 05 Dec 2013 14:03:52 -0600
-Subject: [PATCH 1/2] cpufreq: enable ARM drivers on arm64
-In-Reply-To: <20131205181606.GY29268@sirena.org.uk>
-References: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
- <1386202994-30784-2-git-send-email-robherring2@gmail.com>
- <20131205181606.GY29268@sirena.org.uk>
-Message-ID: <52A0DC28.1040001@gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 05 Dec 2013 20:04:28 +0000
+Subject: [PATCH V5 6/6] Add config EFI_STUB for ARM to Kconfig
+In-Reply-To: <1385595115-21488-7-git-send-email-roy.franz@linaro.org>
+References: <1385595115-21488-1-git-send-email-roy.franz@linaro.org> <
+ 1385595115-21488-7-git-send-email-roy.franz@linaro.org>
+Message-ID: <20131205200428.8FEBAC40785@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Wed, 27 Nov 2013 15:31:55 -0800, Roy Franz <roy.franz@linaro.org> wrote:
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
 
-On 12/05/2013 12:16 PM, Mark Brown wrote:
-> On Wed, Dec 04, 2013 at 06:23:13PM -0600, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->> 
->> Enable cpufreq and power kconfig menus on arm64 along with arm
->> cpufreq drivers. The power menu is needed for OPP support. At
->> least on Calxeda systems, the same cpufreq driver is used for arm
->> and arm64 based systems.
+Dude. Must have commit text. You know better.  :-)
+
+> ---
+>  arch/arm/Kconfig |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> If this needs any revisions (I'd be surprised but...) can you
-> please keep me on the CCs?  I intend to pull this into LSK if
-> that's OK since I was about to do roughly the same thing for it and
-> upstream the result.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a1b4758..6601985 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1857,6 +1857,16 @@ config EFI
+>  	  This option is only useful on systems that have UEFI firmware.
+>  	  However, even with this option, the resultant kernel will
+>  	  continue to boot on non-UEFI platforms.
+> +config EFI_STUB
 
-Will do, but I'm surprised we're at the point on arm64 of needing LSK.
-There's a couple of subsystems that need enabling. I've posted EDAC
-patches (need to send v3). cpuidle is another. Probably some more I
-haven't looked at.
+Need a blank line between the previous stanza and config EFI_STUB
 
-Rob
+> +	bool "EFI stub support"
+> +	depends on EFI && !CPU_BIG_ENDIAN
+> +	---help---
+> +	  This kernel feature allows a zImage to be loaded directly
+> +	  by EFI firmware without the use of a bootloader.  A PE/COFF
+> +	  header is added to the zImage in a way that makes the binary
+> +	  both a Linux zImage and an PE/COFF executable that can be
+> +	  executed directly by EFI firmware.
+> +	  See Documentation/efi-stub.txt for more information.
 
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.14 (GNU/Linux)
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+Nit: 80 column word wrap is customary.
 
-iQEcBAEBAgAGBQJSoNwoAAoJEMhvYp4jgsXiZmMH/0h6Zubjcqhkrx/UGYa47j7r
-EU0stg3/sJvyNGlo+jDV7ljEEtHVmJyxINORDFCGBlYLnsVisYLY9Q+YRZH7PSrJ
-O7eloK2LdceYabpoe0QFBXuB+VQ5uUiVH5ts9I3JLp3bxvBwjjM6rsYdKHwx4VHp
-IAkCgRZZAC9WLi+F4vteC9oh+S5UoXIKpTr1ei/y21czZ6Gw8tGhrGX4fc3IcFSy
-4OPFb41/RQkJL5U4KCRUrMS+8wOmJy3rLcTvjxXz85b5ht9+i01AUt6yN9mwGrjp
-a/Y5pFzADIXvhlJDYt4KBK+xgYyL6keWSc2cQyW08MhyNRjr2qXzOaw3qb3VvhI=
-=SJ+q
------END PGP SIGNATURE-----
+g.
