@@ -1,28 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 04:48:09 +0100
-Subject: [RFC part2 PATCH 8/9] ACPI / ARM64: Update acpi_register_gsi to
- register with the core IRQ subsystem
-In-Reply-To: <1386088753-2850-9-git-send-email-hanjun.guo@linaro.org>
-References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
- <1386088753-2850-9-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <201312050448.10312.arnd@arndb.de>
+From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
+Date: Wed, 4 Dec 2013 22:49:25 -0500
+Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
+In-Reply-To: <20131204230239.GB9205@kroah.com>
+References: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
+ <20131204070442.GA31665@kroah.com>
+ <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
+ <20131204170703.GA14859@kroah.com>
+ <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
+ <20131204230239.GB9205@kroah.com>
+Message-ID: <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 December 2013, Hanjun Guo wrote:
-> +       /*
-> +        * ACPI have no bindings to indicate SPI or PPI, so we
-> +        * use different mappings from DT in ACPI.
-> +        *
-> +        * For FDT
-> +        * PPI interrupt: in the range [0, 15];
-> +        * SPI interrupt: in the range [0, 987];
-> +        *
-> +        * For ACPI, using identity mapping for hwirq:
-> +        * PPI interrupt: in the range [16, 31];
-> +        * SPI interrupt: in the range [32, 1019];
+2013/12/4 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> How much overhead does the existing tracing code have on ARM?  Is ETM
+> still even needed?  Why not just use ETM for the core tracing code
+> instead?
 
-This difference might cause endless confusion. Can't you register PPI and SPI as
-separate IRQ controllers to have the same number space that we normally have?
+Coresight ETM is not just faster than /sys/kernel/debug/tracing, it
+provides more detailed and customisable info. For instance, you can
+trace every load, store, instruction fetch, along with the number of
+cycles taken, with almost zero-overhead.
 
-	Arnd
+> What's wrong with the in-kernel tracing logic that you can't use that
+> instead of the ETM stuff?
+
+ETM has a different purpose. Integrating it in
+/sys/kernel/debug/tracing would not take advantage of all its
+features.
