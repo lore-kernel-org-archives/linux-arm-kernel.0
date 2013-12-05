@@ -1,76 +1,63 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  5 Dec 2013 10:50:13 +0100
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 05 Dec 2013 10:53:21 +0100
 Subject: [PATCH v3] usb: ohci-at91: fix irq and iomem resource retrieval
-Message-ID: <1386237013-22285-1-git-send-email-b.brezillon@overkiz.com>
+In-Reply-To: <1386237013-22285-1-git-send-email-b.brezillon@overkiz.com>
+References: <1386237013-22285-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <3152704.UEBEXU0Stl@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using dt resources retrieval (interrupts and reg properties) there is
-no predefined order for these resources in the platform dev resources
-table.
+Hi Boris,
 
-Retrieve resources using the platform_get_resource function instead of
-direct resource table entries to avoid resource type mismatch.
+On Thursday 05 of December 2013 10:50:13 Boris BREZILLON wrote:
+> When using dt resources retrieval (interrupts and reg properties) there is
+> no predefined order for these resources in the platform dev resources
+> table.
+> 
+> Retrieve resources using the platform_get_resource function instead of
+> direct resource table entries to avoid resource type mismatch.
+> 
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+> ---
+> Changes since v2:
+>  - split the patch series to isolate the urgent fix provided by this patch
+> 
+> Changes since v1:
+>  - none
+> 
+>  drivers/usb/host/ohci-at91.c |   19 +++++++++++--------
+>  1 file changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 418444e..7aec6ca 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -136,23 +136,26 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>  	struct ohci_hcd *ohci;
+>  	int retval;
+>  	struct usb_hcd *hcd = NULL;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *mem_r, *irq_r;
+>  
+> -	if (pdev->num_resources != 2) {
+> -		pr_debug("hcd probe: invalid num_resources");
+> +	mem_r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!mem_r) {
+> +		dev_dbg(dev, "hcd probe: missing memory resource\n");
+>  		return -ENODEV;
+>  	}
+>  
+> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+> -		pr_debug("hcd probe: invalid resource type\n");
+> +	irq_r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
----
-Changes since v2:
- - split the patch series to isolate the urgent fix provided by this patch
+You could have simply used platform_get_irq() here, but I guess it's just
+a matter of preference, so:
 
-Changes since v1:
- - none
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 
- drivers/usb/host/ohci-at91.c |   19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 418444e..7aec6ca 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -136,23 +136,26 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	struct ohci_hcd *ohci;
- 	int retval;
- 	struct usb_hcd *hcd = NULL;
-+	struct device *dev = &pdev->dev;
-+	struct resource *mem_r, *irq_r;
- 
--	if (pdev->num_resources != 2) {
--		pr_debug("hcd probe: invalid num_resources");
-+	mem_r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!mem_r) {
-+		dev_dbg(dev, "hcd probe: missing memory resource\n");
- 		return -ENODEV;
- 	}
- 
--	if ((pdev->resource[0].flags != IORESOURCE_MEM)
--			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
--		pr_debug("hcd probe: invalid resource type\n");
-+	irq_r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (!irq_r) {
-+		dev_dbg(dev, "hcd probe: missing irq resource\n");
- 		return -ENODEV;
- 	}
- 
- 	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
- 	if (!hcd)
- 		return -ENOMEM;
--	hcd->rsrc_start = pdev->resource[0].start;
--	hcd->rsrc_len = resource_size(&pdev->resource[0]);
-+	hcd->rsrc_start = mem_r->start;
-+	hcd->rsrc_len = resource_size(mem_r);
- 
- 	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
- 		pr_debug("request_mem_region failed\n");
-@@ -199,7 +202,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	ohci->num_ports = board->ports;
- 	at91_start_hc(pdev);
- 
--	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
-+	retval = usb_add_hcd(hcd, irq_r->start, IRQF_SHARED);
- 	if (retval == 0)
- 		return retval;
- 
--- 
-1.7.9.5
+Best regards,
+Tomasz
