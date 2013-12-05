@@ -1,87 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Dec 2013 09:23:57 -0800
-Subject: [GIT PULL] at91: cleanup for 3.14 #1 (aka move to CCF)
-In-Reply-To: <CAOesGMguxEwWsLeXQH=FTvLToSCJPxSS9w+JQVSfPgi=vD4crw@mail.gmail.com>
-References: <1386003701-29760-1-git-send-email-nicolas.ferre@atmel.com>
- <CAOesGMjoK=fN-QCnRS1r2XQFrqc=KN_HPj5A=EVHL3ut58MvQA@mail.gmail.com>
- <52A0AB2E.80504@atmel.com>
- <CAOesGMguxEwWsLeXQH=FTvLToSCJPxSS9w+JQVSfPgi=vD4crw@mail.gmail.com>
-Message-ID: <CAOesGMi3gOMd-qSGQfUq4_vbO=pJPgo1mj3LFkJmNzQThTwN6Q@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 5 Dec 2013 19:25:48 +0200
+Subject: [PATCH v3 0/9] Reuse davinci-nand driver for Keystone arch
+Message-ID: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 9:22 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Dec 5, 2013 at 8:34 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> On 04/12/2013 22:54, Olof Johansson :
->>
->>> On Mon, Dec 2, 2013 at 9:01 AM, Nicolas Ferre <nicolas.ferre@atmel.com>
->>> wrote:
->>>>
->>>> Arnd, Olof, Kevin,
->>>>
->>>> This is the big move of AT91 to Common Clock Framework for 3.14. I
->>>> collected
->>>> all the material as a "cleanup" topic so that the CCF can be considered
->>>> as a
->>>> base for all our AT91 patches for 3.14.
->>>> I prefer to have the sama5d3 use of AT91 CCF included into this
->>>> pull-request
->>>> so that it can be read as an example and clearly states that it has been
->>>> tested
->>>> in real life.
->>>> We agreed with Mike to send this work upstream through arm-soc so that we
->>>> will
->>>> be able to stack other patches for 3.14 on top of that work without
->>>> having to
->>>> deal with conflicts.
->>>>
->>>> For merging with the "fixes" pull-request that I sent earlier today, I
->>>> also
->>>> uploaded a little branch for reference:
->>>> at91-3.14-next_fixes_cleanup_dt-resolution.
->>>> In two words, the clock section of the arch/arm/mach-at91/sama5d3.c file
->>>> has to be deleted.
->>>>
->>>> Do not hesitate to ask questions about this material.
->>>>
->>>> Thanks, best regards,
->>>>
->>>> The following changes since commit
->>>> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>>>
->>>>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>    git://github.com/at91linux/linux-at91.git tags/at91-cleanup
->>>>
->>>> for you to fetch changes up to b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
->>>>
->>>>    ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
->>>
->>>
->>> Thanks, pulled into next/cleanup. use this branch as base for your
->>> future at91 branches if you need it to avoid conflicts, please.
->>
->>
->> Yes, sure. I still have to synchronize with Uwe as he is building a series
->> for removing timex.h that may conflict with these modifications.
->>
->>
->>> (I named it at91/sama5-ccf in our tree)
->>
->>
->> Well, it seems that the at91/sama5-ccf is not aligned with
->> next/cleanup as of today (94c5216ee93b)
->>
->> Did I miss something?
->
-> Seems that I pulled it into for-next instead of next/cleanup. Thanks
-> for catching that.
+This series contains fixes and updates of Davinci nand driver in
+order to reuse it for Keystone platform.
 
-Sorry, no, what I did was that I accidentally checked out for-next
-into at91/sama5-ccf instead of your branch. I did merge the right
-thing.
+v2..v3:
+- mtd: nand: davinci: don't set timings if AEMIF is used
+	dropped, it would be replaced by alone patch
+	ARM: davinci: aemif: get rid of davinci-nand driver dependency on aemif
 
+v1..v2
+The series is combination of two following series:
+- Davinci nand driver fixes and updates:
+https://lkml.org/lkml/2013/11/20/271
+- Reuse davinci-nand driver for Keystone arch
+https://lkml.org/lkml/2013/11/20/315
 
--Olof
+- mtd: nand: davinci: extend description of bindings
+	clarified changeset description
+
+- mtd: nand: davinci: reuse driver for Keystone arch
+	removed "ti,keystone-nand" compatible from driver
+
+Ivan Khoronzhuk (9):
+  mtd: nand: davinci: fix driver registration
+  mtd: nand: davinci: return ENOMEM if memory allocation is failed
+  mtd: nand: davinci: check required ti,davinci-chipselect property
+  mtd: nand: davinci: simplify error handling
+  mtd: nand: davinci: move bindings under mtd
+  mtd: nand: davinci: extend description of bindings
+  mtd: nand: davinci: adjust DT properties to MTD generic
+  mtd: nand: davinci: reuse driver for Keystone arch
+  mtd: nand: davinci: don't request AEMIF address range
+
+ .../devicetree/bindings/arm/davinci/nand.txt       |   46 ----------
+ .../devicetree/bindings/mtd/davinci-nand.txt       |   94 ++++++++++++++++++++
+ drivers/mtd/nand/Kconfig                           |    6 +-
+ drivers/mtd/nand/davinci_nand.c                    |   70 ++++++++-------
+ 4 files changed, 133 insertions(+), 83 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
+ create mode 100644 Documentation/devicetree/bindings/mtd/davinci-nand.txt
+
+-- 
+1.7.9.5
