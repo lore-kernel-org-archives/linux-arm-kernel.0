@@ -1,42 +1,95 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 5 Dec 2013 13:45:26 +0100
-Subject: [PATCH 2/2] ARM: fix framepointer check in unwind_frame
-In-Reply-To: <20131205083430.32632.11103.stgit@buzz>
-References: <20131205083424.32632.51618.stgit@buzz>
- <20131205083430.32632.11103.stgit@buzz>
-Message-ID: <CAFrcx1kCAjoMxBeqaO+iS2CGzX6omuW1reL636Lyj=bg5DB1Rg@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 05 Dec 2013 12:53:32 +0000
+Subject: [PATCH 2/3] doc: arm64: add description of EFI stub support
+In-Reply-To: <1385762712-17043-3-git-send-email-msalter@redhat.com>
+References: <1385762712-17043-1-git-send-email-msalter@redhat.com> <
+ 1385762712-17043-3-git-send-email-msalter@redhat.com>
+Message-ID: <20131205125332.5977FC407BC@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 December 2013 09:34, Konstantin Khlebnikov
-<k.khlebnikov@samsung.com> wrote:
-> This patch fixes corner case when (fp + 4) overflows unsigned long,
-> for example: fp = 0xFFFFFFFF -> fp + 4 == 3.
->
-> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-> ---
->  arch/arm/kernel/stacktrace.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-> index 00f79e5..af4e8c8 100644
-> --- a/arch/arm/kernel/stacktrace.c
-> +++ b/arch/arm/kernel/stacktrace.c
-> @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
->         high = ALIGN(low, THREAD_SIZE);
->
->         /* check current frame pointer is within bounds */
-> -       if (fp < (low + 12) || fp + 4 >= high)
-> +       if (fp < low + 12 || fp > high - 4)
-Shouldn't that use the '>=' comparison?
+On Fri, 29 Nov 2013 17:05:11 -0500, Mark Salter <msalter@redhat.com> wrote:
 
-Jean
->                 return -EINVAL;
->
->         /* restore the registers from the stack frame */
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Even documentation updates should have a mildly sane commit text. State
+why these changes came about. Give a future reader at least some clues
+as to why these changes were made now.
+
+Otherwise:
+
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
+g.
+
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: matt.fleming at intel.com
+> CC: linux-efi at vger.kernel.org
+> CC: linux-doc at vger.kernel.org
+> CC: Rob Landley <rob@landley.net> 
+> CC: Leif Lindholm <leif.lindholm@linaro.org>
+> CC: roy.franz at linaro.org
+> ---
+>  Documentation/arm64/booting.txt |  4 ++++
+>  Documentation/efi-stub.txt      | 10 ++++++++--
+>  2 files changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index a9691cc..aa95d38c 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -85,6 +85,10 @@ The decompressed kernel image contains a 64-byte header as follows:
+>  Header notes:
+>  
+>  - code0/code1 are responsible for branching to stext.
+> +- when booting through EFI, code0/code1 are initially skipped.
+> +  res5 is an offset to the PE header and the PE header has the EFI
+> +  entry point (efi_stub_entry). When the stub has done its work, it
+> +  jumps to code0 to resume the normal boot process.
+>  
+>  The image must be placed at the specified offset (currently 0x80000)
+>  from the start of the system RAM and called there. The start of the
+> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+> index 19e897c..c2a4b11 100644
+> --- a/Documentation/efi-stub.txt
+> +++ b/Documentation/efi-stub.txt
+> @@ -12,6 +12,11 @@ arch/arm/boot/compressed/efi-header.S and
+>  arch/arm/boot/compressed/efi-stub.c.  EFI stub code that is shared
+>  between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+>  
+> +For arm64, there is no compressed kernel support, so the Image itself
+> +masquerades as a PE/COFF image and the EFI stub is linked into the
+> +kernel. The arm64 EFI stub lives in arch/arm64/kernel/efi-entry.S
+> +and arch/arm64/kernel/efi-stub.c.
+> +
+>  By using the EFI boot stub it's possible to boot a Linux kernel
+>  without the use of a conventional EFI boot loader, such as grub or
+>  elilo. Since the EFI boot stub performs the jobs of a boot loader, in
+> @@ -28,7 +33,8 @@ the extension the EFI firmware loader will refuse to execute it. It's
+>  not possible to execute bzImage.efi from the usual Linux file systems
+>  because EFI firmware doesn't have support for them.  For ARM the
+>  arch/arm/boot/zImage should be copied to the system partition, and it
+> -may not need to be renamed.
+> +may not need to be renamed. Similarly for arm64, arch/arm64/boot/Image
+> +should be copied but not necessarily renamed.
+>  
+>  
+>  **** Passing kernel parameters from the EFI shell
+> @@ -72,7 +78,7 @@ is passed to bzImage.efi.
+>  
+>  **** The "dtb=" option
+>  
+> -For the ARM architecture, we also need to be able to provide a device
+> +For ARM and arm64 architecture, we also need to be able to provide a device
+>  tree to the kernel.  This is done with the "dtb=" command line option,
+>  and is process in the same manner as the "initrd=" option that is described
+>  above.
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
