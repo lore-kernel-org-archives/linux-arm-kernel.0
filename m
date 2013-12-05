@@ -1,57 +1,50 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 5 Dec 2013 11:59:36 -0500
-Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <52A07BBE.7060507@ti.com>
-References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
- <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
- <20131203232445.GX8277@htj.dyndns.org> <529F5047.50309@ti.com>
- <20131204160730.GQ3158@htj.dyndns.org> <529F5C55.1020707@ti.com>
- <52A07BBE.7060507@ti.com>
-Message-ID: <20131205165936.GB24062@mtj.dyndns.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 05 Dec 2013 18:03:02 +0100
+Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
+ pinfunc.
+In-Reply-To: <52A0AEB4.7090909@bracey.fi>
+References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
+ <1502243.eRBlCfUhTO@amdc1227> <52A0AEB4.7090909@bracey.fi>
+Message-ID: <1475204.PCyxT0KMui@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Dec 05, 2013 at 03:12:30PM +0200, Grygorii Strashko wrote:
-> I'll try to provide more technical details here.
-> As Santosh mentioned in previous e-mails, it's not easy to simply
-> get rid of using MAX_NUMNODES:
-> 1) we introduce new interface memblock_allocX 
-> 2) our interface uses memblock APIs __next_free_mem_range_rev()
->    and __next_free_mem_range()
-> 3) __next_free_mem_range_rev() and __next_free_mem_range() use MAX_NUMNODES
-> 4) _next_free_mem_range_rev() and __next_free_mem_range() are used standalone,
->    outside of our interface as part of *for_each_free_mem_range* or for_each_mem_pfn_range ..
+On Thursday 05 of December 2013 18:49:56 Kevin Bracey wrote:
+> On 05/12/2013 17:11, Tomasz Figa wrote:
+> > On Thursday 05 of December 2013 15:07:47 Mark Brown wrote:
+> >> On Tue, Dec 03, 2013 at 10:29:42AM +0100, Linus Walleij wrote:
+> >>
+> >>> So a suggested patch to support weak hogs would be interesting
+> >>> to look at. Can you provide details on how you think this would
+> >>> work?
+> >> Or should we be going and applying the default state to all devices on
+> >> init without worrying about a driver appearing?
+> > If a device isn't used, then it's often better to configure the pins for
+> > a different function, such as GPIO, to minimize leakage current.
+> >
 > 
-> The point [4] leads to necessity to find and correct all places where memmblock APIs
-> are used and where it's expected to get MAX_NUMNODES as input parameter.
-> The major problem is that simple "grep" will not work, because memmblock APIs calls
-> are hidden inside other MM modules and it's not always clear
-> what will be passed as input parameters to APIs of these MM modules
-> (for example sparse_memory_present_with_active_regions() or sparse.c).
+> And there can also be mutually-exclusive drivers choosing different 
+> default states for the same pin. I think you do need a separate "safe" 
+> indicator.
 
-Isn't that kinda trivial to work around?  Make those functions accept
-both MAX_NUMNODES and NUMA_NO_NODE but emit warning on MAX_NUMNODES
-(preferably throttled reasonably).  Given the history of API, we'd
-probably want to keep such warning for extended period of time but
-that's what we'd need to do no matter what.
+That's not quite true, as on a single board you should rather have
+a single device node with "okay" status referencing given set of pins.
+Still, I think that a separate safe state is the way to go.
 
-> As result, WIP patch, I did, and which was posted by Santosh illustrates
-> the probable size and complexity of the change.
+> 
+> My current thought is that  a late-init "make safe all unclaimed pins" 
+> pass would make sense - you can't really mess with pins in an automated 
+> fashion on init, as it can mess up bootloader->driver handover.   There 
+> already exist late-init "turn off all unclaimed clocks" (at least on 
+> shmobile)
 
-Again, I don't really mind the order things happen but I don't think
-it's a good idea to spread misusage with a new API.  You gotta deal
-with it one way or the other.
+That's a feature of Common Clock Framework.
 
-> Sorry, but question here is not "Do or not to do?", but rather 'how to do?",
-> taking into account complexity and state of the current MM code.
-> For example. would it be ok if I'll workaround the issue as in the attached patch?
+> and "turn off all unclaimed regulators", and it would fit that 
+> model.
 
-Well, it's more of when.  It's not really a technically difficult
-task and all I'm saying is it better be sooner than later.
+Maybe that's the way to do it. I need to think a bit more on this,
+especially considering our (Samsung's) use cases.
 
-Thanks.
-
--- 
-tejun
+Best regards,
+Tomasz
