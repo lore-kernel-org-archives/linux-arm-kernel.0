@@ -1,129 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Dec 2013 17:54:34 +0000
-Subject: [PATCH v4 2/4] mvebu: Dove: Instantiate cpufreq driver.
-In-Reply-To: <20131204150228.GB8062@lunn.ch>
-References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
- <1386166641-7567-3-git-send-email-andrew@lunn.ch>
- <20131204143628.GB29200@e106331-lin.cambridge.arm.com>
- <20131204150228.GB8062@lunn.ch>
-Message-ID: <20131205175434.GQ29200@e106331-lin.cambridge.arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu,  5 Dec 2013 18:55:08 +0100
+Subject: [PATCHv7][ 1/2] backlight: gpio_backlight: Use a default state enum.
+Message-ID: <1386266109-16071-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:02:28PM +0000, Andrew Lunn wrote:
-> On Wed, Dec 04, 2013 at 02:36:28PM +0000, Mark Rutland wrote:
-> > On Wed, Dec 04, 2013 at 02:17:19PM +0000, Andrew Lunn wrote:
-> > > Add a platform driver definition to instantiate the dove cpufreq
-> > > driver. Also indicate the ARCH has cpufreq support, so allowing the
-> > > cpufreq framework to be enabled.
-> > > 
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > > ---
-> > > Make resource names consistent.
-> > > Fix length of ranges
-> > > ---
-> > >  arch/arm/Kconfig                       |  1 +
-> > >  arch/arm/mach-dove/board-dt.c          |  3 +++
-> > >  arch/arm/mach-dove/common.c            | 36 ++++++++++++++++++++++++++++++++++
-> > >  arch/arm/mach-dove/common.h            |  1 +
-> > >  arch/arm/mach-dove/include/mach/dove.h |  1 +
-> > >  5 files changed, 42 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index c1f1a7eee953..908b02f8d901 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -500,6 +500,7 @@ config ARCH_IXP4XX
-> > >  
-> > >  config ARCH_DOVE
-> > >  	bool "Marvell Dove"
-> > > +	select ARCH_HAS_CPUFREQ
-> > >  	select ARCH_REQUIRE_GPIOLIB
-> > >  	select CPU_PJ4
-> > >  	select GENERIC_CLOCKEVENTS
-> > > diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-> > > index 49fa9abd09da..845e8b328432 100644
-> > > --- a/arch/arm/mach-dove/board-dt.c
-> > > +++ b/arch/arm/mach-dove/board-dt.c
-> > > @@ -27,6 +27,9 @@ static void __init dove_dt_init(void)
-> > >  	tauros2_init(0);
-> > >  #endif
-> > >  	BUG_ON(mvebu_mbus_dt_init());
-> > > +
-> > > +	dove_cpufreq_init();
-> > > +
-> > >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > >  }
-> > >  
-> > > diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> > > index c122bcff9f7c..323fcd4b27b6 100644
-> > > --- a/arch/arm/mach-dove/common.c
-> > > +++ b/arch/arm/mach-dove/common.c
-> > > @@ -344,6 +344,42 @@ void __init dove_sdio1_init(void)
-> > >  	platform_device_register(&dove_sdio1);
-> > >  }
-> > >  
-> > > +/*****************************************************************************
-> > > + * CPU Frequency
-> > > + ****************************************************************************/
-> > > +static struct resource dove_cpufreq_resources[] = {
-> > > +	[0] = {
-> > > +		.start  = DOVE_PMU_PHYS_BASE,
-> > > +		.end    = DOVE_PMU_PHYS_BASE + 0x7,
-> > > +		.flags  = IORESOURCE_MEM,
-> > > +		.name   = "cpufreq: DFS"
-> > > +	},
-> > > +	[1] = {
-> > > +		.start  = DOVE_PMU_PHYS_BASE + 0x8000,
-> > > +		.end    = DOVE_PMU_PHYS_BASE + 0x8003,
-> > > +		.flags  = IORESOURCE_MEM,
-> > > +		.name   = "cpufreq: PMU CR"
-> > > +	},
-> > > +	[2] = {
-> > > +		.start  = DOVE_PMU_PHYS_BASE + 0x0044,
-> > > +		.end    = DOVE_PMU_PHYS_BASE + 0x0047,
-> > > +		.flags  = IORESOURCE_MEM,
-> > > +		.name   = "cpufreq: PMU Clk Div"
-> > > +	},
-> > > +};
-> > > +
-> > > +static struct platform_device dove_cpufreq_device = {
-> > > +	.name		= "dove-cpufreq",
-> > > +	.id		= -1,
-> > > +	.num_resources	= ARRAY_SIZE(dove_cpufreq_resources),
-> > > +	.resource	= dove_cpufreq_resources,
-> > > +};
-> > > +
-> > > +void __init dove_cpufreq_init(void)
-> > > +{
-> > > +	platform_device_register(&dove_cpufreq_device);
-> > > +}
-> > 
-> > Please describe your power management unit in the DT. Your hardcoding
-> > physical addresses that can easily be described in the DT, and you don't
-> > appear to have an early probing requirement.
-> 
-> Hi Mark
-> 
-> We have been here before, with the kirkwood cpufreq driver. My v1 of
-> that driver had the cpufreq driver fully described in DT. My binding
-> got shot down and i was told that pseudo devices, like cpufreq,
-> cpuidle, should not be in DT, and a platform driver was the way to go.
-> So that is how kirkwood cpufreq works and dove follows that.
-> 
-> Do you want to reverse that decision now?
+That enum adds a "keep" state which permits to tell the
+  driver trough its platform data not to touch the
+  hardware during the probe.
 
-I'm not arguing for describing a pseudo-device. The power management
-unit is a real device. If we used that to register a cpufreq driver, it
-doesn't mean that we've registered a pseudo-device, but rather that we
-made a decision to register the cpufreq portions based on the necessary
-real devices being present.
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v5->v6:
+- New patch.
+---
+ drivers/video/backlight/gpio_backlight.c     |    7 +++++--
+ include/linux/platform_data/gpio_backlight.h |    6 ++++++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-This code registers a platform device that has PMU register fields. We
-can easily describe the PMU in dt. The PMU _could_ be used by frameworks
-other than cpufreq, so describing it as a cpufreq device is wrong.
-Perhaps this was the problem with the proposed kirkwood binding?
-
-Thanks,
-Mark.
+diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
+index 81fb127..6ddeba9 100644
+--- a/drivers/video/backlight/gpio_backlight.c
++++ b/drivers/video/backlight/gpio_backlight.c
+@@ -23,6 +23,7 @@ struct gpio_backlight {
+ 
+ 	int gpio;
+ 	int active;
++	enum gpio_backlight_default_state def_value;
+ };
+ 
+ static int gpio_backlight_update_status(struct backlight_device *bl)
+@@ -103,8 +104,10 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 		return PTR_ERR(bl);
+ 	}
+ 
+-	bl->props.brightness = pdata->def_value;
+-	backlight_update_status(bl);
++	if (pdata->def_value != BACKLIGHT_GPIO_DEFSTATE_KEEP) {
++		bl->props.brightness = pdata->def_value;
++		backlight_update_status(bl);
++	}
+ 
+ 	platform_set_drvdata(pdev, bl);
+ 	return 0;
+diff --git a/include/linux/platform_data/gpio_backlight.h b/include/linux/platform_data/gpio_backlight.h
+index 5ae0d9c..3b437b3 100644
+--- a/include/linux/platform_data/gpio_backlight.h
++++ b/include/linux/platform_data/gpio_backlight.h
+@@ -10,6 +10,12 @@
+ 
+ struct device;
+ 
++enum gpio_backlight_default_state {
++	BACKLIGHT_GPIO_DEFSTATE_OFF,
++	BACKLIGHT_GPIO_DEFSTATE_ON,
++	BACKLIGHT_GPIO_DEFSTATE_KEEP,
++};
++
+ struct gpio_backlight_platform_data {
+ 	struct device *fbdev;
+ 	int gpio;
+-- 
+1.7.9.5
