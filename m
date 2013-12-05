@@ -1,85 +1,79 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu,  5 Dec 2013 17:51:02 +0100
-Subject: [PATCH v2 3/4] SATA: MV: Add support for the optional PHYs
+Date: Thu,  5 Dec 2013 17:51:00 +0100
+Subject: [PATCH v2 1/4] Phy: DT binding documentation for Marvell MVEBU SATA
+ phy.
 In-Reply-To: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
 References: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1386262263-18956-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1386262263-18956-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Marvell SoCs have a SATA PHY which can be powered off, in order
-to save power. Make use of the generic phy framework to control these
-phys.
+Describe the binding for the Marvell MVEBU SATA phy. This driver
+can be used at least with Kirkwood, Dove and maybe others.
+Additionally, update the SATA binding with the properties to link
+to the phy nodes.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- drivers/ata/sata_mv.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+v1->v2:
+Correct #phy-cells
+Correct number after @ to match first reg address.
+Rename to mvebu-phy.txt
+---
+ Documentation/devicetree/bindings/ata/marvell.txt  |  6 ++++++
+ .../devicetree/bindings/phy/phy-mvebu.txt          | 22 ++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mvebu.txt
 
-diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-index 56be31819897..9a728bcfbb9a 100644
---- a/drivers/ata/sata_mv.c
-+++ b/drivers/ata/sata_mv.c
-@@ -60,6 +60,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/device.h>
- #include <linux/clk.h>
-+#include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/ata_platform.h>
- #include <linux/mbus.h>
-@@ -563,6 +564,12 @@ struct mv_host_priv {
- 	struct clk		*clk;
- 	struct clk              **port_clks;
- 	/*
-+	 * Some devices have a SATA PHY which can be enabled/disabled
-+	 * in order to save power. These are optional: if the platform
-+	 * devices does not have any phy, they won't be used.
-+	 */
-+	struct phy		**port_phys;
-+	/*
- 	 * These consistent DMA memory pools give us guaranteed
- 	 * alignment for hardware-accessed data structures,
- 	 * and less memory waste in accomplishing the alignment.
-@@ -4076,6 +4083,11 @@ static int mv_platform_probe(struct platform_device *pdev)
- 					GFP_KERNEL);
- 	if (!hpriv->port_clks)
- 		return -ENOMEM;
-+	hpriv->port_phys = devm_kzalloc(&pdev->dev,
-+					sizeof(struct phy *) * n_ports,
-+					GFP_KERNEL);
-+	if (!hpriv->port_phys)
-+		return -ENOMEM;
- 	host->private_data = hpriv;
- 	hpriv->n_ports = n_ports;
- 	hpriv->board_idx = chip_soc;
-@@ -4097,6 +4109,9 @@ static int mv_platform_probe(struct platform_device *pdev)
- 		hpriv->port_clks[port] = clk_get(&pdev->dev, port_number);
- 		if (!IS_ERR(hpriv->port_clks[port]))
- 			clk_prepare_enable(hpriv->port_clks[port]);
-+		hpriv->port_phys[port] = devm_phy_get(&pdev->dev, port_number);
-+		if (!IS_ERR(hpriv->port_phys[port]))
-+			phy_power_on(hpriv->port_phys[port]);
- 	}
+diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
+index b5cdd20cde9c..e072fa105b49 100644
+--- a/Documentation/devicetree/bindings/ata/marvell.txt
++++ b/Documentation/devicetree/bindings/ata/marvell.txt
+@@ -6,11 +6,17 @@ Required Properties:
+ - interrupts    : Interrupt controller is using
+ - nr-ports      : Number of SATA ports in use.
  
- 	/*
-@@ -4132,6 +4147,8 @@ err:
- 			clk_disable_unprepare(hpriv->port_clks[port]);
- 			clk_put(hpriv->port_clks[port]);
- 		}
-+		if (!IS_ERR(hpriv->port_phys[port]))
-+			phy_power_off(hpriv->port_phys[port]);
- 	}
++Optional Properties:
++- phys		: List of phandles to sata phys
++- phy-names	: Should be "0", "1", etc, one number per phandle
++
+ Example:
  
- 	return rc;
-@@ -4161,6 +4178,8 @@ static int mv_platform_remove(struct platform_device *pdev)
- 			clk_disable_unprepare(hpriv->port_clks[port]);
- 			clk_put(hpriv->port_clks[port]);
- 		}
-+		if (!IS_ERR(hpriv->port_phys[port]))
-+			phy_power_off(hpriv->port_phys[port]);
+ 	sata at 80000 {
+ 		compatible = "marvell,orion-sata";
+ 		reg = <0x80000 0x5000>;
+ 		interrupts = <21>;
++		phys = <&sata_phy0>, <&sata_phy1>;
++		phy-names = "0", "1";
+ 		nr-ports = <2>;
  	}
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/phy/phy-mvebu.txt b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+new file mode 100644
+index 000000000000..6cb3364aeafb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+@@ -0,0 +1,22 @@
++* Marvell MVEBU SATA PHY
++
++Power control for the SATA phy found on Marvell MVEBU SoCs.
++
++This document extends the binding described in phy-bindings.txt
++
++Required properties :
++
++ - reg		   : Offset and length of the register set for the SATA device
++ - compatible	   : Should be "marvell,mvebu-sata-phy"
++ - clocks	   : phandle of clock and specifier that supplies the device
++ - clock-names	   : Should be "sata"
++
++Example:
++		sata-phy at 84000 {
++			compatible = "marvell,mvebu-sata-phy";
++			reg = <0x84000 0x0334>;
++			clocks = <&gate_clk 15>;
++			clock-names = "sata";
++			#phy-cells = <0>;
++			status = "ok";
++		};
 -- 
 1.8.5
