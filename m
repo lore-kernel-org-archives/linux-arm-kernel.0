@@ -1,32 +1,122 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 05 Dec 2013 11:08:48 +0000
+Date: Thu, 05 Dec 2013 11:16:41 +0000
 Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
-In-Reply-To: <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
+In-Reply-To: <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
 References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org> <
- 1385656883-4420-2-git-send-email-leif.lindholm@linaro.org> <
- CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com> <
- 20131202210719.GQ24997@rocoto.smurfnet.nu> <
- CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
-Message-ID: <20131205110848.A9385C40710@trevor.secretlab.ca>
+ 1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20131205111641.9BA3DC40710@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Dec 2013 15:06:47 -0600, Matt Sealey <neko@bakuhatsu.net> wrote:
-> If your platform has UEFI, then your platform has UEFI - if you built
-> a multiplatform kernel that needs to boot on U-Boot, then you glued an
-> EFI stub to it to make it boot. At some point between the stub and the
-> runtime services driver, you're going through 10,000 lines of code
-> with the information that it *is* running on top of UEFI completely
-> lost to the boot process.
+On Thu, 28 Nov 2013 16:41:21 +0000, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> This patch provides documentation of the [U]EFI runtime service and
+> configuration features for the arm architecture.
 > 
-> I believe I am also objecting to the idea that the way this is BEST
-> implemented is to take a stock zImage (decompressor+Image payload) and
-> glue a stub in front to resolve the interface issue when the
-> implication is extra complication to the boot process.
+> Changes since v1/v2:
+> - Complete rewrite.
+> - New FDT bindings.
+> 
+> Cc: Rob Landley <rob@landley.net>
+> Cc: linux-doc at vger.kernel.org
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 
-Adding UEFI support to an existing image type was a design goal when we
-started. Having yet another image format which is not compatibile with
-existing firmware adds yet another barrier to migrating from U-Boot to
-UEFI, or to supporting multiplatforms.
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
+With a few minor comments below.
 
 g.
+
+> ---
+>  Documentation/arm/00-INDEX |    3 +++
+>  Documentation/arm/uefi.txt |   61 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 64 insertions(+)
+>  create mode 100644 Documentation/arm/uefi.txt
+> 
+> diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
+> index 36420e1..b3af704 100644
+> --- a/Documentation/arm/00-INDEX
+> +++ b/Documentation/arm/00-INDEX
+> @@ -34,3 +34,6 @@ nwfpe/
+>  	- NWFPE floating point emulator documentation
+>  swp_emulation
+>  	- SWP/SWPB emulation handler/logging description
+> +
+> +uefi.txt
+> +	- [U]EFI configuration and runtime services documentation
+> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+> new file mode 100644
+> index 0000000..9ba59509
+> --- /dev/null
+> +++ b/Documentation/arm/uefi.txt
+> @@ -0,0 +1,61 @@
+> +UEFI, the Unified Extensible Firmware Interface is, a specification
+
+Nit: Comma in the wrong place.
+
+> +governing the behaviours of compatible firmware interfaces. It is
+> +maintained by the UEFI Forum - http://www.uefi.org/.
+> +
+> +UEFI is an evolution of its predecessor 'EFI', so the terms EFI and
+> +UEFI are used somewhat interchangeably in this document and associated
+> +source code. As a rule, anything new uses 'UEFI', whereas 'EFI' refers
+> +to legacy code or specifications.
+> +
+> +UEFI support in Linux
+> +=====================
+> +Booting on a platform with firmware compliant with the UEFI specification
+> +makes it possible for the kernel to support additional features:
+> +- UEFI Runtime Services
+> +- Retrieving various configuration information through the standardised
+> +  interface of UEFI configuration tables. (ACPI, SMBIOS, ...)
+> +
+> +For actually enabling [U]EFI support, enable:
+> +- CONFIG_EFI=y
+> +- CONFIG_EFI_VARS=y or m
+> +
+> +The implementation depends on receiving information about the UEFI environment
+> +in a Flattened Device Tree (FDT) - so is only available with CONFIG_OF.
+> +
+> +UEFI stub
+> +=========
+> +The "stub" is a feature that turns the Image/zImage into a valid UEFI PE/COFF
+
+Nit: s/turns/extends/
+
+> +executable, including a loader application that makes it possible to load the
+> +kernel directly from the UEFI shell, boot menu, or one of the lightweight
+> +bootloaders like Gummiboot or rEFInd.
+> +
+> +The kernel image built with stub support remains a valid kernel image for
+> +booting in non-UEFI environments.
+> +
+> +UEFI kernel support on ARM
+> +==========================
+> +UEFI kernel support on the ARM architectures (arm and arm64) is only available
+> +when boot is performed through the stub.
+> +
+> +The stub populates the FDT /chosen node with (and the kernel scans for) the
+> +following parameters:
+> +________________________________________________________________________________
+> +Name                      | Size   | Description
+> +================================================================================
+> +linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
+> +--------------------------------------------------------------------------------
+> +linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
+> +                          |        | populated by the UEFI GetMemoryMap() call.
+> +--------------------------------------------------------------------------------
+> +linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
+> +                          |        | pointed to in previous entry.
+> +--------------------------------------------------------------------------------
+> +linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
+> +                          |        | memory map.
+> +--------------------------------------------------------------------------------
+> +linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
+> +--------------------------------------------------------------------------------
+> +linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+> +--------------------------------------------------------------------------------
+> +
+> +For verbose debug messages, specify 'uefi_debug' on the kernel command line.
+> -- 
+> 1.7.10.4
+> 
