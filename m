@@ -1,53 +1,61 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 05 Dec 2013 12:34:22 +0100
-Subject: [GIT PULL] s3c64xx dmaengine conversion
-In-Reply-To: <CAOesGMj2uun+0Kr0yKtpHs_0FntJ_rnYGeM8hs+DjpT8Nn-bwg@mail.gmail.com>
-References: <20131124145011.GA14725@sirena.org.uk>
- <CAOesGMj2uun+0Kr0yKtpHs_0FntJ_rnYGeM8hs+DjpT8Nn-bwg@mail.gmail.com>
-Message-ID: <2721712.y1VtH8x62I@amdc1227>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Dec 2013 11:40:34 +0000
+Subject: [PATCHv3 2/4] arm: dts: Add a system manager compatible property
+In-Reply-To: <1386197576-3825-3-git-send-email-dinguyen@altera.com>
+References: <1386197576-3825-1-git-send-email-dinguyen@altera.com>
+ <1386197576-3825-3-git-send-email-dinguyen@altera.com>
+Message-ID: <20131205114034.GL29200@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 of December 2013 13:38:39 Olof Johansson wrote:
-> On Sun, Nov 24, 2013 at 6:50 AM, Mark Brown <broonie@kernel.org> wrote:
-> > The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> >
-> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git tags/s3c64xx-dmaengine
-> >
-> > for you to fetch changes up to 3faecea70b0d6d050e0ae911032ec340341dc389:
-> >
-> >   spi: s3c64xx: Always select S3C64XX_PL080 when ARCH_S3C64XX is enabled (2013-11-24 14:38:25 +0000)
-> >
-> > ----------------------------------------------------------------
-> > ARM: s3c64xx: Convert to dmaengine
-> >
-> > This series of commits from Tomasz converting s3c64xx to use dmaengine
-> > rather than the old s3c-dma API missed the v3.13 merge window - Kukjin
-> > said that he'd applied it (which should mean it's OK from a review point
-> > of view) but it didn't make it into -next or a pull request.
-> >
-> > Since a s3c64xx based system is one of my primary development platforms
-> > it'd be really helpful if I could merge this into both ASoC and SPI,
-> > I've got some patches for ASoC ready to go converting to use dmaengine
-> > directly which help with multiplatform and there's some other dmaengine
-> > work for SPI in progress too.  I've therefore made this signed tag, it'd
-> > be great if it could be merged into both arm-soc and those two trees.
-> >
-> > ----------------------------------------------------------------
-> >
-> > I'm open to other ideas for doing this, I'd just really like to see the
-> > code building on this go in this cycle so anything that accomplishes
-> > that is good for me.
+On Wed, Dec 04, 2013 at 10:52:54PM +0000, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> It's been 10 days and Kukjin hasn't moved on this, nor replied. I'm
-> going to merge it into arm-soc as samsung/s3c64xx-dmaengine ->
-> next/drivers so that you can use the branch as a base for your work.
+> The "altr,sysmgr-sdmmc-sdr" compatible property is used for the SOCFPGA
+> clk-sysmgr driver. This property represents the register inside the
+> system manager that controls the clock phase of the SD/MMC driver.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> ---
+> v3: Cannot use the syscon driver along with the clock because as of v3.13-rc1,
+> the syscon driver is loaded after the clocks.
+> v2: Add syscon
+> ---
+>  .../bindings/arm/altera/socfpga-system.txt         |   10 ++++++++++
+>  arch/arm/boot/dts/socfpga.dtsi                     |   14 +++++++++++---
+>  2 files changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
+> index f4d04a0..7a6c7ed 100644
+> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
+> @@ -5,9 +5,19 @@ Required properties:
+>  - reg : Should contain 1 register ranges(address and length)
+>  - cpu1-start-addr : CPU1 start address in hex.
+>  
+> +Optional properties:
+> +- compatible = "altr,sysmgr-sdmmc-sdr". This compatible property is used
+> +to represent the clock phase settings for the SD/MMC IP.
+> +
 
-OK, thanks.
+This makes no sense with the example below. This is _not_ an optional
+property of the sysmgr node, this is a poor description of a child node.
 
-Best regards,
-Tomasz
+>  Example:
+>  	 sysmgr at ffd08000 {
+>  		compatible = "altr,sys-mgr";
+>  		reg = <0xffd08000 0x1000>;
+>  		cpu1-start-addr = <0xffd080c4>;
+> +
+> +		sysmgr_sdr_mmc: sysmgr_sdr_mmc {
+> +			#clock-cells = <0>;
+> +			compatible = "altr,sysmgr-sdmmc-sdr";
+> +			reg = <0x108 1>;
+
+What's this reg?
+
+Is # clock-cells required?
+
+Neither were described in the binding.
+
+Mark.
