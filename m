@@ -1,39 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Dec 2013 00:52:16 +0000
-Subject: ARM: gic_arch_extn (Was: [PATCH v3] irqchip: mmp: add dt
- support for wakeup)
-In-Reply-To: <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
-References: <1386159214-31483-1-git-send-email-zhangwm@marvell.com>
- <alpine.DEB.2.02.1312042234190.30673@ionos.tec.linutronix.de>
- <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
-Message-ID: <20131205005216.GA4360@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 4 Dec 2013 18:53:33 -0600
+Subject: [PATCH v2] arm64: enable EDAC on arm64
+In-Reply-To: <20131126153747.GC692@arm.com>
+References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
+ <20131126153747.GC692@arm.com>
+Message-ID: <CAL_JsqJLf-kjzafMJ=wh_ZZa63SOMKy20M_5xjy9GRdofiZVCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 01:41:53AM +0100, Thomas Gleixner wrote:
-> @all who feel responsible for gic_arch_extn
-> 
-> On Wed, 4 Dec 2013, Thomas Gleixner wrote:
-> > I'm going to reply in a separate mail on this, because you have
-> > brought this to my attention, but you are not responsible in the first
-> > place for this brainfart.
-> 
-> Who came up with that gic_arch_extn concept in the first place?
+On Tue, Nov 26, 2013 at 9:37 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Nov 22, 2013 at 09:05:08PM +0000, Rob Herring wrote:
+>> +static inline void atomic_scrub(void *va, u32 size)
+>> +{
+>> +     unsigned int *virt_addr = va;
+>> +     unsigned int i;
+>> +
+>> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+>
+> BTW, maybe the compiler is smart enough to drop the i but why not just
+> use a int *last_addr = va + size - 3; and just compare against this?
 
-If you'd spend more time reviewing IRQ patches then maybe you'd catch
-this at review time.  So please stop your rediculous whinging when
-most of the problem is your own lack of time.
+Evidently, the compiler is not that smart. Here's what I ended up
+with. There's no need to subtract 3 that I can see:
 
-If you must know, it was introduced by TI to work around the power
-management shortcomings of the architecture mandated GIC.  No it doesn't
-get called for IPIs, but it damned well needs to be called for normal
-IRQs.
+unsigned int *last_addr = va + size;
+for (; virt_addr < last_addr; virt_addr++) {
 
-At the point it was created, it wasn't clear whether this also applied
-to local IRQs.  Since I *no* *longer* have visibility of what SoC stuff
-is doing with it, of course it's not going to get fixed when a common
-pattern emerges.
+original:
 
-So... congratulations, you've found something which can be improved,
-which has come to light as the code has evolved and a better
-understanding of what is required has been discovered.
+ffffffc0001b0280 <atomic_scrub>:
+ffffffc0001b0280:       53027c21        lsr     w1, w1, #2
+ffffffc0001b0284:       34000141        cbz     w1, ffffffc0001b02ac
+<atomic_scrub+0x2c>
+ffffffc0001b0288:       51000421        sub     w1, w1, #0x1
+ffffffc0001b028c:       91000421        add     x1, x1, #0x1
+ffffffc0001b0290:       8b010801        add     x1, x0, x1, lsl #2
+ffffffc0001b0294:       885f7c02        ldxr    w2, [x0]
+ffffffc0001b0298:       88037c02        stxr    w3, w2, [x0]
+ffffffc0001b029c:       35ffffc3        cbnz    w3, ffffffc0001b0294
+<atomic_scrub+0x14>
+ffffffc0001b02a0:       91001000        add     x0, x0, #0x4
+ffffffc0001b02a4:       eb01001f        cmp     x0, x1
+ffffffc0001b02a8:       54ffff61        b.ne    ffffffc0001b0294
+<atomic_scrub+0x14>
+ffffffc0001b02ac:       d65f03c0        ret
+
+using last_addr:
+
+ffffffc0001b0280 <atomic_scrub>:
+ffffffc0001b0280:       8b214001        add     x1, x0, w1, uxtw
+ffffffc0001b0284:       eb01001f        cmp     x0, x1
+ffffffc0001b0288:       540000e2        b.cs    ffffffc0001b02a4
+<atomic_scrub+0x24>
+ffffffc0001b028c:       885f7c02        ldxr    w2, [x0]
+ffffffc0001b0290:       88037c02        stxr    w3, w2, [x0]
+ffffffc0001b0294:       35ffffc3        cbnz    w3, ffffffc0001b028c
+<atomic_scrub+0xc>
+ffffffc0001b0298:       91001000        add     x0, x0, #0x4
+ffffffc0001b029c:       eb00003f        cmp     x1, x0
+ffffffc0001b02a0:       54ffff68        b.hi    ffffffc0001b028c
+<atomic_scrub+0xc>
+ffffffc0001b02a4:       d65f03c0        ret
+
+Rob
