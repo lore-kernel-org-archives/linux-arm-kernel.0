@@ -1,28 +1,45 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 05 Dec 2013 18:33:20 +0100
-Subject: [PATCH v4 3/3] ARM: tegra: correct Colibri T20 regulator settings
-In-Reply-To: <52A0B40B.7040903@wwwdotorg.org>
-References: <cover.1386108712.git.stefan@agner.ch>
- <fc7440a2f4bf9ab95e47a911c0e0b3b6a2250356.1386108712.git.stefan@agner.ch>
- <52A0B40B.7040903@wwwdotorg.org>
-Message-ID: <e2fe1d7b546e9f81fdd1ad225676e76e@agner.ch>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 5 Dec 2013 19:25:57 +0200
+Subject: [PATCH v3 9/9] mtd: nand: davinci: don't request AEMIF address range
+In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1386264358-9738-10-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2013-12-05 18:12, schrieb Stephen Warren:
-> On 12/03/2013 03:18 PM, Stefan Agner wrote:
->> Set the parent of the regulators LDO2 to LDO9 according to the
->> schematic. Set the base voltage to 3.3V, there is only 3.3V on the
->> module itself.
->>
->> Set the Core and CPU voltage to the specified voltages of 1.2V and
->> 1.0V respectivly.
->>
->> LDO6 should deliver 2.85V. The attached peripherals were not in
->> use so far.
-> 
-> Does this depend on patch 1/3 or 2/3, or can I apply it to the Tegra
-> tree which doesn't include those patches?
+The TI AEMIF driver registers are used to setup timings for each chip
+select. The same registers range is used to setup NAND settings.
+The AEMIF and NAND drivers not use the same registers in this range.
 
-This patch is independent from 1/3 and 2/3, so you can apply it to the
-Tegra tree. The relevant DT change for 2/3 is included in 2/3...
+In case with TI AEMIF driver, the memory address range is requested
+already by AEMIF, so we cannot request it twice, just ioremap.
+
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Reviewed-by: Taras Kondratiuk <taras@ti.com>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/mtd/nand/davinci_nand.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index f7b21b8..0cd4dbc 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -636,9 +636,11 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
+ 	if (IS_ERR(vaddr))
+ 		return PTR_ERR(vaddr);
+ 
+-	base = devm_ioremap_resource(&pdev->dev, res2);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
++	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
++	if (!base) {
++		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
++		return -EADDRNOTAVAIL;
++	}
+ 
+ 	info->dev		= &pdev->dev;
+ 	info->base		= base;
+-- 
+1.7.9.5
