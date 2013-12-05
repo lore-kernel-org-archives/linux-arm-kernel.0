@@ -1,78 +1,81 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 5 Dec 2013 03:12:55 +0100 (CET)
-Subject: ARM: gic_arch_extn (Was: [PATCH v3] irqchip: mmp: add dt support
- for wakeup)
-In-Reply-To: <20131205005216.GA4360@n2100.arm.linux.org.uk>
-References: <1386159214-31483-1-git-send-email-zhangwm@marvell.com>
- <alpine.DEB.2.02.1312042234190.30673@ionos.tec.linutronix.de>
- <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
- <20131205005216.GA4360@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1312050157550.30673@ionos.tec.linutronix.de>
+From: rob@landley.net (Rob Landley)
+Date: Wed, 04 Dec 2013 20:26:31 -0600
+Subject: [PATCH] Documentation/Changes: update binutils version
+ requirement for ARMv7 builds
+In-Reply-To: <528A46C7.6090303@wwwdotorg.org> (from swarren@wwwdotorg.org on
+ Mon Nov 18 10:56:39 2013)
+Message-ID: <1386210391.1974.313@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Thu, 5 Dec 2013, Russell King - ARM Linux wrote:
-> On Thu, Dec 05, 2013 at 01:41:53AM +0100, Thomas Gleixner wrote:
-> > @all who feel responsible for gic_arch_extn
-> > 
-> > On Wed, 4 Dec 2013, Thomas Gleixner wrote:
-> > > I'm going to reply in a separate mail on this, because you have
-> > > brought this to my attention, but you are not responsible in the first
-> > > place for this brainfart.
-> > 
-> > Who came up with that gic_arch_extn concept in the first place?
+On 11/18/2013 10:56:39 AM, Stephen Warren wrote:
+> On 11/17/2013 11:50 AM, Rob Landley wrote:
+> > On 10/30/2013 11:27:07 AM, Paul Walmsley wrote:
+> >>
+> >> ARMv7 builds now make use of the pldw opcode and the  
+> ".arch_extension mp"
+> >> pragma.  These aren't supported in binutils prior to 2.21.  So,  
+> update
+> >> Documentation/Changes accordingly.
+> >
+> > ARMv7 support didn't _exist_ in the minimal binutils version, and  
+> ARMv8
+> > support is newer still. Hexagon, microblaze, they've all shown up in
+> > newer versions than the one that will build older architectures.
+> >
+> > Annotating the global Documentation/Changes with every per-arch
+> > requirement... not sure that's the right place for it.
+> ...
+> > So there are larger issues in motion here. Noting armv7  
+> requirements in
+> > an arm-specific file makes sense. Annotating the top level one  
+> raises
+> > the question of why not to do that for arc, unicore, openrisc,  
+> tile...
 > 
-> If you'd spend more time reviewing IRQ patches then maybe you'd catch
-> this at review time.  So please stop your rediculous whinging when
-> most of the problem is your own lack of time.
+> Documenting some of the requirements in the top-level file and some  
+> in a
+> per-arch file seems bad though. If we move the docs to a per-arch  
+> file,
+> we need to actively remove the top-level documentation since it will
+> conflict.
 
-I'm not a native english speaker, so I want to make sure in the first
-place that you meant:
+No, you just need to document arch-specific deltas in arch-specific  
+files.
 
-    "ridiculous whingeing" 
+You can build Linux with gcc 3.4. There was no ARMv7 support in gcc 3.4  
+(let alone 64 bit arm), but that doesn't change the fact that you can  
+build Linux with it. Which is why it says "Upgrade to at *least* these  
+software revisions".
 
-Assumed that you meant that, let me ridicule you a bit.
+If you're going to build Linux with llvm, you'll need a different  
+version. If pcc manages to build linux (development of that's stalled  
+but not stopped), then there's another one. If tinycc restarts...
 
-The gic_arch_extn concept got merged with:
+> What's wrong with a single table in the top-level document?
 
-    commit d7ed36a4ea84e3a850f9932e2058ceef987d1acd
-    Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
-    Date:   Wed Mar 2 08:03:22 2011 +0100
+So we haven't needed one for 20 years now, but your target is special?
 
-    ARM: 6777/1: gic: Add hooks for architecture specific extensions
+The minimal requirements are the versions needed to build Linux at all,  
+on any target, because there are generic features missing in earlier  
+versions. Building Linux for a specific target often has more specific  
+requirements.
 
-    <SNIP>
+> The answer to missing requirements for the other arch seems to be to
+> encourage the relevant maintainers to document them, not too disallow
+> the ARM requirements to be documented there.
 
-    Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-    Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-    Acked-by: Colin Cross <ccross@android.com>
-    Tested-by: Colin Cross <ccross@android.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+There's a Documentation/arm directory but arm-specific documentation  
+can't go there, it has to go at the top level even though other  
+architectures haven't previously done this. The alternative is that any  
+global documentation that does NOT apply to arm must be deleted to  
+avoid confusing arm.
 
-    ---
-    arch/arm/common/gic.c		|   47 ++++++++++++....
-    arch/arm/include/asm/hardware/gic.h |    1
+Is this really your position?
 
-The patch in question was never cc'ed to me and you merged it on your
-own.
+One of the 8 gazillion todo items I have queued up is moving  
+Documentation/zorro.txt to the Documentation/m68k directory. That's not  
+the same as deleting the file because its existence might confuse ARM  
+developers. I honestly think most of them are smarter than that.
 
-So now you have the chuzpe to blame me for that, just because this
-code moved to drivers/irqchip with
-
-     commit 81243e444c6e9d1625073e4a3d3bc244c8a545f0
-     Author: Rob Herring <rob.herring@calxeda.com>
-     Date:   Tue Nov 20 21:21:40 2012 -0600
-
-     irqchip: Move ARM GIC to drivers/irqchip
-    
-almost two years later?
-
-The code move neither exempts you from the responsibility of merging
-it nor does it imply a retroactive responsibility for me to review all
-patches which went into that code prior to the move.
-
-Thanks,
-
-	tglx
+Rob
