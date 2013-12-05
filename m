@@ -1,78 +1,154 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Dec 2013 18:23:42 +0000
-Subject: [PATCH v4 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <20131204152726.GC8062@lunn.ch>
-References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
- <1386166641-7567-2-git-send-email-andrew@lunn.ch>
- <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
- <20131204152726.GC8062@lunn.ch>
-Message-ID: <20131205182342.GR29200@e106331-lin.cambridge.arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu,  5 Dec 2013 19:28:05 +0100
+Subject: [PATCHv5][ 1/8] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel
+ format.
+Message-ID: <1386268092-21719-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:27:26PM +0000, Andrew Lunn wrote:
+That new macro is needed by the imx_drm staging driver
+  for supporting the QVGA display of the eukrea-cpuimx51 board.
 
-[...]
-  
-> > > +
-> > > +	cpu_dev = get_cpu_device(0);
-> > > +
-> > > +	priv.cpu_clk = devm_clk_get(cpu_dev, "cpu_clk");
-> > > +	if (IS_ERR(priv.cpu_clk)) {
-> > > +		err = PTR_ERR(priv.cpu_clk);
-> > > +		goto out;
-> > > +	}
-> > 
-> > I think it would be better to describe the clocks as being fed to the
-> > PMU than directly to the CPU -- the PMU selects the appropriate clock
-> > and feeds it to the CPU.
-> 
-> The wording in the data sheet is not very clear:
-> 
->     The PMU initiates new clock ratio values for the CPU subsystem
->     clocks generation unit.
-> 
-> So to me, the PMU is not the clock consumer, it just controls the
-> clock generation unit. There is also a block diagram which shows the
-> "CPU Subsystem ClockGen" as being external to the PMU.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: driverdev-devel at linuxdriverproject.org
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
+Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: linux-media at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ChangeLog v3->v4:
+- Added Laurent Pinchart's Ack.
 
-Hmm. That's somewhat arguable.
+ChangeLog v2->v3:
+- Added some interested people in the Cc list.
+- Added Mauro Carvalho Chehab's Ack.
+- Added documentation.
+---
+ .../DocBook/media/v4l/pixfmt-packed-rgb.xml        |   78 ++++++++++++++++++++
+ include/uapi/linux/videodev2.h                     |    1 +
+ 2 files changed, 79 insertions(+)
 
->From a block diagram I've found, the situation seems more like the
-ClockGen takes two clocks as input, and feeds the appropriate clock to
-the CPU. Logically, the CPU itself is a consumer of one clock.
-
-The ClockGen unit is controlled by a clock manager. The clock manager
-appears to be a component of the PMU itself, but I may have
-misunderstood. If that is the case, and the CPU Subsytem ClockGen is not
-controlled by anything else, then I don't see the problem with grouping
-that together logically with the clock manager (and therefore the PMU).
-That would imply describing the clock inputs on the PMU is fine.
-
-Have I missed something?
-
-One thing I'm worried about is adding lots of SoC-specific variations on
-data to generic nodes rather than doing that in a uniform fashion. I
-believe describing the clocks in the way you propose clashes with the
-cpufreq-cpu0 way of doing things (whereby the CPU has one clock input).
-
-If the ClockGen were modelled as a mux that allows switching between two
-rates, then that would make the description more uniform.
-
->  
-> > Also, the clocks could be named better with respect to their logical
-> > function. One is the high-frequency default, and the other is a
-> > low-frequency option. They're both able to feed the CPU, and the fact
-> > that one also feeds the DDR isn't relevant to the CPU.
-> 
-> The data sheet uses the terms Turbo Speed and Slow Speed modes. So i
-> could call them turbo and slow? However, the current names follow the
-> kirkwood cpufreq driver. It also can swap between a fast clock and the
-> DDR clock. So i thought keeping the drivers similar would help with
-> the maintenance burden. 
-
-I think given the above, the changes I'm asking for would already
-involve sufficient changes to make this concern irrelevant. However, I
-don't want to force an unmaintainable change.
-
-Mark.
+diff --git a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
+index 166c8d6..f6a3e84 100644
+--- a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
++++ b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
+@@ -279,6 +279,45 @@ colorspace <constant>V4L2_COLORSPACE_SRGB</constant>.</para>
+ 	    <entry></entry>
+ 	    <entry></entry>
+ 	  </row>
++	  <row id="V4L2-PIX-FMT-RGB666">
++	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
++	    <entry>'RGBH'</entry>
++	    <entry></entry>
++	    <entry>r<subscript>5</subscript></entry>
++	    <entry>r<subscript>4</subscript></entry>
++	    <entry>r<subscript>3</subscript></entry>
++	    <entry>r<subscript>2</subscript></entry>
++	    <entry>r<subscript>1</subscript></entry>
++	    <entry>r<subscript>0</subscript></entry>
++	    <entry>g<subscript>5</subscript></entry>
++	    <entry>g<subscript>4</subscript></entry>
++	    <entry></entry>
++	    <entry>g<subscript>3</subscript></entry>
++	    <entry>g<subscript>2</subscript></entry>
++	    <entry>g<subscript>1</subscript></entry>
++	    <entry>g<subscript>0</subscript></entry>
++	    <entry>b<subscript>5</subscript></entry>
++	    <entry>b<subscript>4</subscript></entry>
++	    <entry>b<subscript>3</subscript></entry>
++	    <entry>b<subscript>2</subscript></entry>
++	    <entry></entry>
++	    <entry>b<subscript>1</subscript></entry>
++	    <entry>b<subscript>0</subscript></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	  </row>
+ 	  <row id="V4L2-PIX-FMT-BGR24">
+ 	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
+ 	    <entry>'BGR3'</entry>
+@@ -781,6 +820,45 @@ defined in error. Drivers may interpret them as in <xref
+ 	    <entry></entry>
+ 	    <entry></entry>
+ 	  </row>
++	  <row><!-- id="V4L2-PIX-FMT-RGB666" -->
++	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
++	    <entry>'RGBH'</entry>
++	    <entry></entry>
++	    <entry>r<subscript>5</subscript></entry>
++	    <entry>r<subscript>4</subscript></entry>
++	    <entry>r<subscript>3</subscript></entry>
++	    <entry>r<subscript>2</subscript></entry>
++	    <entry>r<subscript>1</subscript></entry>
++	    <entry>r<subscript>0</subscript></entry>
++	    <entry>g<subscript>5</subscript></entry>
++	    <entry>g<subscript>4</subscript></entry>
++	    <entry></entry>
++	    <entry>g<subscript>3</subscript></entry>
++	    <entry>g<subscript>2</subscript></entry>
++	    <entry>g<subscript>1</subscript></entry>
++	    <entry>g<subscript>0</subscript></entry>
++	    <entry>b<subscript>5</subscript></entry>
++	    <entry>b<subscript>4</subscript></entry>
++	    <entry>b<subscript>3</subscript></entry>
++	    <entry>b<subscript>2</subscript></entry>
++	    <entry></entry>
++	    <entry>b<subscript>1</subscript></entry>
++	    <entry>b<subscript>0</subscript></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	    <entry></entry>
++	  </row>
+ 	  <row><!-- id="V4L2-PIX-FMT-BGR24" -->
+ 	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
+ 	    <entry>'BGR3'</entry>
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 437f1b0..e8ff410 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -294,6 +294,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16  RGB-5-5-5 BE  */
+ #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B', 'R') /* 16  RGB-5-6-5 BE  */
+ #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B', 'G', 'R', 'H') /* 18  BGR-6-6-6	  */
++#define V4L2_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */
+ #define V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8     */
+ #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24  RGB-8-8-8     */
+ #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R', '4') /* 32  BGR-8-8-8-8   */
+-- 
+1.7.9.5
