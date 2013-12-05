@@ -1,82 +1,110 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 5 Dec 2013 10:18:00 -0600
-Subject: [PATCHv3 3/4] mmc: dw_mmc-socfpga: Clean up SOCFPGA platform
- specific funcationality
-In-Reply-To: <20131205114740.GM29200@e106331-lin.cambridge.arm.com>
-References: <1386197576-3825-1-git-send-email-dinguyen@altera.com>
- <1386197576-3825-4-git-send-email-dinguyen@altera.com>
- <20131205114740.GM29200@e106331-lin.cambridge.arm.com>
-Message-ID: <1386260280.3783.4.camel@linux-builds1>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 05 Dec 2013 17:21:47 +0100
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
+ system
+In-Reply-To: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+Message-ID: <42011482.56GYn1upCz@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-05 at 11:47 +0000, Mark Rutland wrote:
-> On Wed, Dec 04, 2013 at 10:52:55PM +0000, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > The SDR timing registers for the SD/MMC IP block for SOCFPGA is located
-> > in the system manager. This system manager IP block is located outside of
-> > the SD IP block itself. We can use the normal clock API to set the SDR
-> > settings.
-> > 
-> > Also, there is no need for "altr,dw-mshc-ciu-div" as the driver can get
-> > the value of the CIU clock from the common clock API.
-> 
-> If this property isn't necessary, please mark it as deprecated in the
-> documentation.
+Hi Doug,
 
-I would deprecate it. If only there was documentation for it.
+Please see my comments inline.
 
+On Monday 02 of December 2013 10:14:41 Doug Anderson wrote:
+> A good watchdog driver is supposed to report when it was responsible
+> for resetting the system.  Implement this for the s3c2410, at least on
+> exynos5250 and exynos5420 where we already have a pointer to the PMU
+> registers to read the information.
 > 
-> [...]
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> This patch is based atop Leela Krishna's recent series that ends with
+> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+> AKA <https://patchwork.kernel.org/patch/3251861/>.
 > 
-> > +	if (IS_ERR(sysmgr_clk))
-> > +		dev_err(host->dev, "sysmgr-sdr-mmc not available\n");
-> > +	else {
-> > +		clk_disable_unprepare(host->ciu_clk);
-> > +		clk_prepare_enable(sysmgr_clk);
-> > +		clk_prepare_enable(host->ciu_clk);
-> > +	}
-> >  	return 0;
-> >  }
+>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 39 insertions(+), 3 deletions(-)
 > 
-> This looks a little odd. Should you not return an error if you don't
-> have the requisite clocks?
-> 
-> [...]
-> 
-> > -	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
-> > -	if (IS_ERR(priv->sysreg)) {
-> > -		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
-> > -		return PTR_ERR(priv->sysreg);
-> > -	}
-> 
-> Is this property deprecated?
+> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> index 47f4dcf..2c87d37 100644
+> --- a/drivers/watchdog/s3c2410_wdt.c
+> +++ b/drivers/watchdog/s3c2410_wdt.c
+> @@ -62,9 +62,13 @@
+>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+>  
+> +#define RST_STAT_REG_OFFSET		0x0404
 
-"altr,sys-mgr" is used in other places, so no deprecated is necessary.
+IMHO this should be namespaced, at least with EXYNOS5 prefix. The two
+registers below should be as well, but I missed this in the patch adding
+them.
 
-> 
-> > -
-> > -	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
-> > -	if (ret)
-> > -		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
-> > -	priv->ciu_div = div;
-> > -
-> > -	ret = of_property_read_u32_array(np,
-> > -			"altr,dw-mshc-sdr-timing", timing, 2);
-> 
-> Deprecated too?
+>  #define WDT_DISABLE_REG_OFFSET		0x0408
+>  #define WDT_MASK_RESET_REG_OFFSET	0x040c
+>  #define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
+> +#define QUIRK_HAS_RST_STAT		(1 << 1)
+> +#define QUIRKS_NEED_PMUREG		(QUIRK_NEEDS_PMU_CONFIG | \
+> +					 QUIRK_HAS_RST_STAT)
+>  
+>  static bool nowayout	= WATCHDOG_NOWAYOUT;
+>  static int tmr_margin;
+> @@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
+>   * timer reset functionality.
+>   * @mask_bit: Bit number for the watchdog timer in the disable register and the
+>   * mask reset register.
+> + * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
+> + * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
+> + * reset.
+>   * @quirks: A bitfield of quirks.
+>   */
+>  
+> @@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
+>  	int disable_reg;
+>  	int mask_reset_reg;
+>  	int mask_bit;
+> +	int rst_stat_reg;
+> +	int rst_stat_bit;
+>  	u32 quirks;
+>  };
+>  
+> @@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
+>  	.disable_reg = WDT_DISABLE_REG_OFFSET,
+>  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+>  	.mask_bit = 20,
+> -	.quirks = QUIRK_NEEDS_PMU_CONFIG
+> +	.rst_stat_reg = RST_STAT_REG_OFFSET,
+> +	.rst_stat_bit = 20,
+> +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
+> +		QUIRK_HAS_RST_STAT,
+>  };
+>  
+>  static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
+>  	.disable_reg = WDT_DISABLE_REG_OFFSET,
+>  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+>  	.mask_bit = 0,
+> -	.quirks = QUIRK_NEEDS_PMU_CONFIG
+> +	.rst_stat_reg = RST_STAT_REG_OFFSET,
+> +	.rst_stat_bit = 9,
+> +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
+> +		QUIRK_HAS_RST_STAT,
+>  };
+>  
+>  static const struct of_device_id s3c2410_wdt_match[] = {
+> @@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+>  }
+>  #endif
+>  
+> +static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
+> +{
+> +	unsigned int bootstatus = 0;
+> +	int ret;
+> +
+> +	if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
 
-Once again "altr,dw-mshc-sdr-timing" was not documented. But either way,
-v4 of this patch will not be introducing any new bindings. Thanks to
-Arnd's suggestion, I found a way to hook into the existing socfpga clock
-driver.
+nit: I guess it's just a matter of taste, but to reduce code indentation
+you could inverse the check and simply return 0 here.
 
-Thanks alot for your review!
-
-Dinh
-
-> 
-> Thanks,
-> Mark.
-> 
+Best regards,
+Tomasz
