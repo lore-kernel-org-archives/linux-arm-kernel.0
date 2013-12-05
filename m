@@ -1,44 +1,47 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 05 Dec 2013 20:04:28 +0000
-Subject: [PATCH V5 6/6] Add config EFI_STUB for ARM to Kconfig
-In-Reply-To: <1385595115-21488-7-git-send-email-roy.franz@linaro.org>
-References: <1385595115-21488-1-git-send-email-roy.franz@linaro.org> <
- 1385595115-21488-7-git-send-email-roy.franz@linaro.org>
-Message-ID: <20131205200428.8FEBAC40785@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Dec 2013 21:07:06 +0100
+Subject: [PATCH v2 1/6] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <CAGVrzcbxHA+S0yZbsrj8uMZR0hsb_ng=PB02zte7S0rCZWQpBg@mail.gmail.com>
+References: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
+ <201312031601.04997.arnd@arndb.de>
+ <CAGVrzcbxHA+S0yZbsrj8uMZR0hsb_ng=PB02zte7S0rCZWQpBg@mail.gmail.com>
+Message-ID: <201312052107.07197.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Nov 2013 15:31:55 -0800, Roy Franz <roy.franz@linaro.org> wrote:
-> Signed-off-by: Roy Franz <roy.franz@linaro.org>
-
-Dude. Must have commit text. You know better.  :-)
-
-> ---
->  arch/arm/Kconfig |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+On Thursday 05 December 2013, Florian Fainelli wrote:
+> 2013/12/3 Arnd Bergmann <arnd@arndb.de>:
+> >
+> >> +     addr = ioremap(BPHYSADDR(BCHP_IRQ0_IRQEN), sizeof(u32));
+> >> +     writel_relaxed(BCHP_IRQ0_IRQEN_uarta_irqen_MASK
+> >> +             | BCHP_IRQ0_IRQEN_uartb_irqen_MASK
+> >> +             | BCHP_IRQ0_IRQEN_uartc_irqen_MASK, addr);
+> >> +     iounmap(addr);
+> >
+> > What does this part do? Isn't that something that should have been set
+> > up by the boot loader?
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a1b4758..6601985 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1857,6 +1857,16 @@ config EFI
->  	  This option is only useful on systems that have UEFI firmware.
->  	  However, even with this option, the resultant kernel will
->  	  continue to boot on non-UEFI platforms.
-> +config EFI_STUB
+> The bootloader will typically use the UART in busy-looping mode and
+> not rely on interrupts, also the bootloader currently does not know
+> much about how many UARTs there are in the system and how they are
+> going to be used.
 
-Need a blank line between the previous stanza and config EFI_STUB
+Well, it should at least know how many ports are wire up and be able
+to set them up to a working state.
 
-> +	bool "EFI stub support"
-> +	depends on EFI && !CPU_BIG_ENDIAN
-> +	---help---
-> +	  This kernel feature allows a zImage to be loaded directly
-> +	  by EFI firmware without the use of a bootloader.  A PE/COFF
-> +	  header is added to the zImage in a way that makes the binary
-> +	  both a Linux zImage and an PE/COFF executable that can be
-> +	  executed directly by EFI firmware.
-> +	  See Documentation/efi-stub.txt for more information.
+> One possible way to solve this would be to write a very small irqchip
+> driver which only implements the "irq_enable" method to allow these
+> interrupts to be forwarded to the GIC. Somewhere in the Device Tree we
+> would have an interrupt-map property which describes the mapping
+> between the bits in BCHP_IRQ0_IRQEN and their corresponding
+> peripherals (UARTA, B, C).
+> 
+> Would that work?
 
-Nit: 80 column word wrap is customary.
+I think that would work, but it's getting into the overdesign territory.
+Can you clarify why this register exists in the first place and what
+makes it necessary to set it up? Are there similar registers for all
+other IRQs?
 
-g.
+	Arnd
