@@ -1,31 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Dec 2013 17:30:37 +0000
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <CAC8NTUUHiaB3m+zmoPPKXTzWq82veNhT4gCERSQiLvKhfMvRyQ@mail.gmail.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
- <5295D1A5.5090403@arm.com>
- <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
- <5296330D.9010801@arm.com>
- <CAC8NTUVvLgNPdsSPY6Ms_D3JoyJR8AEFRH0=M7-kQEUegNVhKg@mail.gmail.com>
- <CAC8NTUUHiaB3m+zmoPPKXTzWq82veNhT4gCERSQiLvKhfMvRyQ@mail.gmail.com>
-Message-ID: <20131205173036.GE17165@arm.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 5 Dec 2013 19:25:56 +0200
+Subject: [PATCH v3 8/9] mtd: nand: davinci: reuse driver for Keystone arch
+In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1386264358-9738-9-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 02:35:52PM +0000, Radha Mohan wrote:
-> Before going for a next version of patch to fix breaking SMMU and KVM,
-> I would like to know  about the best possible implementation.
-> Should I go for a compile time option? I am not in favor of this. What
-> are options if in future there's 16KB page support in the kernel.
+The Keystone arch has compatible nand device, so reuse it.
+In case with Keystone it depends on TI_AEMIF because AEMIF
+driver is responsible to set timings.
 
-As I said in the other email, separate the shifts definitions (primarily
-page size dependent) from the type definitions (dependent on the number
-of levels).
+See http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
 
-Just to understand your requirements better. Does your platform have
-more than 256GB of RAM? With the current configuration, the VA space is
-39-bit with 4K (which would allow 512GB minus some vmalloc and modules
-space) and 42-bit with 64K pages (2TB minus vmalloc/modules).
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Reviewed-by: Taras Kondratiuk <taras@ti.com>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ .../devicetree/bindings/mtd/davinci-nand.txt       |    8 +++++---
+ drivers/mtd/nand/Kconfig                           |    6 +++---
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+index befaa5b..cfb18ab 100644
+--- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+@@ -1,14 +1,16 @@
+-Device tree bindings for Texas instruments Davinci NAND controller
++Device tree bindings for Texas instruments Davinci/Keystone NAND controller
+ 
+-This file provides information, what the device node for the davinci NAND
+-interface contains.
++This file provides information, what the device node for the davinci/keystone
++NAND interface contains.
+ 
+ Documentation:
+ Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
++Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+ 
+ Required properties:
+ 
+ - compatible:			"ti,davinci-nand"
++				"ti,keystone-nand"
+ 
+ - reg:				Contains 2 offset/length values:
+ 				- offset and length for the access window.
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 93ae6a6..35f3ea3 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -464,11 +464,11 @@ config MTD_NAND_SH_FLCTL
+ 	  for NAND Flash using FLCTL.
+ 
+ config MTD_NAND_DAVINCI
+-        tristate "Support NAND on DaVinci SoC"
+-        depends on ARCH_DAVINCI
++        tristate "Support NAND on DaVinci/Keystone SoC"
++        depends on ARCH_DAVINCI || (ARCH_KEYSTONE && TI_AEMIF)
+         help
+ 	  Enable the driver for NAND flash chips on Texas Instruments
+-	  DaVinci processors.
++	  DaVinci/Keystone processors.
+ 
+ config MTD_NAND_TXX9NDFMC
+ 	tristate "NAND Flash support for TXx9 SoC"
 -- 
-Catalin
+1.7.9.5
