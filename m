@@ -1,41 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 5 Dec 2013 14:29:21 -0500 (EST)
-Subject: [PATCH] clean up cache handling in core code
-Message-ID: <alpine.LFD.2.10.1312051426230.31246@knanqh.ubzr>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 05 Dec 2013 23:33:56 +0300
+Subject: [PATCH v3 1/3] usb: ohci-at91: replace request_mem_region +
+ ioremap by devm_request_and_ioremap
+In-Reply-To: <1386237282-22385-2-git-send-email-b.brezillon@overkiz.com>
+References: <1386237282-22385-1-git-send-email-b.brezillon@overkiz.com>
+ <1386237282-22385-2-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52A0E334.5080002@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ Message Text -----
-We have a handy macro to replace open coded __cpuc_flush_dcache_area(()
-and outer_clean_range() sequences. Let's use it. No functional change.
+Hello.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
-diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index 26020a03f6..87c5f1b595 100644
---- a/arch/arm/common/mcpm_entry.c
-+++ b/arch/arm/common/mcpm_entry.c
-@@ -35,8 +35,7 @@ void mcpm_set_early_poke(unsigned cpu, unsigned cluster,
- 	unsigned long *poke = &mcpm_entry_early_pokes[cluster][cpu][0];
- 	poke[0] = poke_phys_addr;
- 	poke[1] = poke_val;
--	__cpuc_flush_dcache_area((void *)poke, 8);
--	outer_clean_range(__pa(poke), __pa(poke + 2));
-+	__sync_cache_range_w(poke, 2 * sizeof(*poke));
- }
- 
- static const struct mcpm_platform_ops *platform_ops;
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index dc894ab362..8c61325b8b 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -105,8 +105,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	secondary_data.pgdir = get_arch_pgd(idmap_pgd);
- 	secondary_data.swapper_pg_dir = get_arch_pgd(swapper_pg_dir);
- #endif
--	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
--	outer_clean_range(__pa(&secondary_data), __pa(&secondary_data + 1));
-+	sync_cache_w(&secondary_data);
- 
- 	/*
- 	 * Now bring the CPU into our world.
+On 12/05/2013 12:54 PM, Boris BREZILLON wrote:
+
+> Replace the request_mem_region + ioremap calls by the
+> devm_request_and_ioremap call which does the same things but with device
+> managed resources.
+
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+> ---
+>   drivers/usb/host/ohci-at91.c |   24 +++++-------------------
+>   1 file changed, 5 insertions(+), 19 deletions(-)
+
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 7aec6ca..8528895 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -157,24 +157,18 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	hcd->rsrc_start = mem_r->start;
+>   	hcd->rsrc_len = resource_size(mem_r);
+>
+> -	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+> -		pr_debug("request_mem_region failed\n");
+> -		retval = -EBUSY;
+> -		goto err1;
+> -	}
+> -
+> -	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
+> +	hcd->regs = devm_request_and_ioremap(dev, mem_r);
+
+    This function is already deprecated, use devm_ioremap_resource() instead 
+(it returns error pointer, not NULL on error).
+
+>   	if (!hcd->regs) {
+> -		pr_debug("ioremap failed\n");
+> +		dev_dbg(dev, "devm_request_and_ioremap failed\n");
+
+    There's no need -- those functions print error messages themselves.
+
+>   		retval = -EIO;
+> -		goto err2;
+> +		goto err;
+>   	}
+[...]
+
+WBR, Sergei
