@@ -1,60 +1,29 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 05 Dec 2013 10:55:50 +0000
-Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
-In-Reply-To: <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org> <
- 1385656883-4420-2-git-send-email-leif.lindholm@linaro.org> <
- CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
-Message-ID: <20131205105550.692FCC40710@trevor.secretlab.ca>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 5 Dec 2013 16:27:46 +0530
+Subject: [PATCH 0/4] pinctrl: tegra: Add pincontrol driver for Tegra124 SoC
+Message-ID: <1386241070-4350-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Dec 2013 13:51:22 -0600, Matt Sealey <neko@bakuhatsu.net> wrote:
-> > +UEFI kernel support on ARM
-> > +==========================
-> > +UEFI kernel support on the ARM architectures (arm and arm64) is only available
-> > +when boot is performed through the stub.
-> > +
-> > +The stub populates the FDT /chosen node with (and the kernel scans for) the
-> > +following parameters:
-> > +________________________________________________________________________________
-> > +Name                      | Size   | Description
-> > +================================================================================
-> > +linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
-> > +--------------------------------------------------------------------------------
-> > +linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
-> > +                          |        | populated by the UEFI GetMemoryMap() call.
-> > +--------------------------------------------------------------------------------
-> > +linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
-> > +                          |        | pointed to in previous entry.
-> > +--------------------------------------------------------------------------------
-> > +linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
-> > +                          |        | memory map.
-> > +--------------------------------------------------------------------------------
-> > +linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
-> > +--------------------------------------------------------------------------------
-> > +linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
-> > +--------------------------------------------------------------------------------
-> 
-> This flies in the face of actually using #address-cells and
-> #size-cells to define how big addresses and sizes are. You're limited
-> here by the root node definitions... that's the spec.
-> 
-> Here's where I think this whole thing falls down as being the weirdest
-> possible implementation of this. It defies logic to put this
-> information in the device tree /chosen node while also attempting to
-> boot the kernel using an EFI stub; the stub is going to have this
-> information because it is going to have the pointer to the system
-> System Table (since it was called by StartImage()). Why not stash the
-> System Table pointer somewhere safe in the stub?
+Add pincontrol driver for NVIDIA's Tegra124 SoCs.
+This series add pincontrol driver which contains the pinmux tables
+for tegra124, pincontrol dt binding doc, dtsi file change for adding
+pinmux node, selecting pincontrol config for Tegra124.
 
-Everything here is about getting from the stub to the kernel. We have a
-boot interface for the kernel proper. It works, and this patch set works
-with it. Also, this is effectively a kernel-internal interface between
-the stub and the kernel so there aren't any ABI issues that we need to
-deail with.
+Ashwini Ghuge (1):
+  pinctrl: tegra: add pinmux controller driver for Tegra124
 
-Go ahead and propose patches for a better interface, but in the mean
-time I see no reason not to merge this series.
+Laxman Dewangan (3):
+  pinctrl: tegra: Add devicetree binding document for Tegra124
+  ARM: tegra: add pinmux controller to tegra124.dtsi
+  ARM: tegra: select PINCTRL_TEGRA124 for Tegra124 SoC
 
-g.
+ .../bindings/pinctrl/nvidia,tegra124-pinmux.txt    |  137 +
+ arch/arm/boot/dts/tegra124.dtsi                    |    6 +
+ arch/arm/mach-tegra/Kconfig                        |    1 +
+ drivers/pinctrl/Kconfig                            |    4 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-tegra124.c                 | 3147 ++++++++++++++++++++
+ 6 files changed, 3296 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-pinmux.txt
+ create mode 100644 drivers/pinctrl/pinctrl-tegra124.c
