@@ -1,48 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Dec 2013 10:43:23 -0800
-Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
-In-Reply-To: <CAAfyv35gVVNydrk8vifSyidpFjEXjGiT4-i2dgN5Un2=FuHaqQ@mail.gmail.com>
-References: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
- <529D9D43.6040101@ti.com>
- <CAAfyv37Vie1vZK2XQ1cfVq6eVnSuaBLfykk6pU8fwEyqvPF4BA@mail.gmail.com>
- <CAAfyv35gVVNydrk8vifSyidpFjEXjGiT4-i2dgN5Un2=FuHaqQ@mail.gmail.com>
-Message-ID: <20131205184323.GF26766@atomide.com>
+From: grygorii.strashko@ti.com (Strashko, Grygorii)
+Date: Thu, 5 Dec 2013 18:48:21 +0000
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <20131205165325.GA24062@mtj.dyndns.org>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131203232445.GX8277@htj.dyndns.org>
+ <52A0AB34.2030703@ti.com>,<20131205165325.GA24062@mtj.dyndns.org>
+Message-ID: <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Belisko Marek <marek.belisko@gmail.com> [131203 01:21]:
-> On Tue, Dec 3, 2013 at 10:08 AM, Belisko Marek <marek.belisko@gmail.com> wrote:
-> > Hi,
-> >
-> > On Tue, Dec 3, 2013 at 9:58 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> >> Hi,
-> >>
-> >> On Tuesday 03 December 2013 02:03 PM, Marek Belisko wrote:
-> >>> Without this change when booting omap3 device (gta04) with board file
-> >>> leads to follwing errors:
-> >>>
-> >>> [    1.203308] musb-hdrc musb-hdrc.0.auto: unable to find phy
-> >>> [    1.209075] HS USB OTG: no transceiver configured
-> >>> [    1.214019] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
-> >>>
-> >>> and usb isn't working.
-> >>>
-> >>> This is probably regression caused by commit: 6c27f939
-> >>
-> >> I think a better fix would be to have this merged..
-> >> https://lkml.org/lkml/2013/7/26/91
-> > Yes I see but how this could help with current situation? Ho you then
-> > specify device number?
-> I was too fast with reply sorry. I can see whole series and it is of
-> course correct solution. But as I said
-> can we except to be merged to 3.13. If not Tony can you pick my patch.
+Hi Tejun,
 
-If it's a regression, then let's get it merged for the -rc cycle.
+>On Thu, Dec 05, 2013 at 06:35:00PM +0200, Grygorii Strashko wrote:
+>> >> +#define memblock_virt_alloc_align(x, align) \
+>> >> +  memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
+>> >> +                               BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+>> >
+>> > Also, do we really need this align variant separate when the caller
+>> > can simply specify 0 for the default?
+>>
+>> Unfortunately Yes.
+>> We need it to keep compatibility with bootmem/nobootmem
+>> which don't handle 0 as default align value.
+>
+>Hmm... why wouldn't just interpreting 0 to SMP_CACHE_BYTES in the
+>memblock_virt*() function work?
+>
 
-So please try to follow up on getting the proper fix merged, meanwhile
-I'll mark this thread as read. If you need this one merged for some
-reason, then please report to get it back to my radar.
+Problem is not with memblock_virt*(). The issue will happen in case if
+memblock or nobootmem are disabled in below code (memblock_virt*() is disabled).
+
++/* Fall back to all the existing bootmem APIs */
++#define memblock_virt_alloc(x) \
++       __alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
+
+which will be transformed to 
++/* Fall back to all the existing bootmem APIs */
++#define memblock_virt_alloc(x, align) \
++       __alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
+
+and used as
+
+memblock_virt_alloc(size, 0);
+
+so, by default bootmem code will use 0 as default alignment and not SMP_CACHE_BYTES
+and that is wrong.
 
 Regards,
-
-Tony
+-grygorii
