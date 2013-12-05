@@ -1,35 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 5 Dec 2013 14:28:11 +0900
-Subject: [PATCH v2 0/3] ARM: shmobile: marzen: enable HSPI0 to DTS
-In-Reply-To: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
-References: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20131205052810.GI12774@verge.net.au>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Thu, 5 Dec 2013 05:43:05 +0000
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <529FE81C.4000608@freescale.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
+ <529EE5F1.9080806@st.com> <201312041636.20875.marex@denx.de>
+ <529FE81C.4000608@freescale.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA51E1A@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 26, 2013 at 04:47:09PM +0900, Simon Horman wrote:
-> Hi,
-> 
-> this short series enables HSPI0 in DTS for the r8a7779 based marzen board.
-> It is based on work by Kuninori Morimoto for the r8a7778 based bockw board.
-> 
-> This series is based on the renesas-devel-v3.13-rc1-20131124 tag
-> of my renesas tree.
-> 
-> v2
-> * Correct clock suffixes in
->   "ARM: shmobile: r8a7779: add HSPI clock support for DT".
->   They should be ".spi" to match
->   "ARM: shmobile: r8a7779: add HSPI support to DTSI"
-> 
-> Simon Horman (3):
->   ARM: shmobile: r8a7779: add HSPI clock support for DT
->   ARM: shmobile: r8a7779: add HSPI support to DTSI
->   ARM: shmobile: marzen: enable HSPI0 in DTS
-> 
->  arch/arm/boot/dts/r8a7779-marzen-reference.dts | 11 ++++++++++
->  arch/arm/boot/dts/r8a7779.dtsi                 | 30 ++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/clock-r8a7779.c         |  3 +++
->  3 files changed, 44 insertions(+)
+>From: Huang Shijie [mailto:b32955 at freescale.com]
+>
+>>? 2013?12?04? 23:36, Marek Vasut ??:
+>> I disagree we should bloat the API with features, that will be used by "possible
+>> future controllers" or "possible single controller", right from the start. The
+>> real question here is, can the API be designed in such a way, that the SR
+>> polling will happen in software NOW and only when a controller appears that can
+>> do polling in HW will the API be extended to support it ?
+>ok. Let's add this feature in the future when a real case occurs.
+>
+Sorry got lost.. Can you please summarize following plans for your next patch:
 
-I will queue these up.
+(1) Polling of status registers should be 
+  (a) done in S/W (generic driver)
+  (b) done controller driver, which can be optimized for specific hardware
+
+(2) How do you plan to have timeout value, (as serial flash can be pretty slow
+   to access) ?
+  (a) independent for each access
+       - read timeouts per sector, which can be multiplied with read_len/sector_size
+       - write timeout per sector, which can be multiplied with write_len/sector_size
+       - erase timeout per block, which can be multiplied with erase_len/block_size
+  (b) Any other method, or leave it to controller driver ?
+
+In my view, before proceeding to writing down a patch, I think
+we should come-up with a doc/Readme, which defines all API and interface
+structs (taking Angus' proposal as baseline). And then refine that spec first.
+Otherwise there may be too many revisions spent on patch RFC's .. 
+
+Any thoughts ?
+And is there a space in kernel_docs for such specs ?
+
+With regards, pekon
