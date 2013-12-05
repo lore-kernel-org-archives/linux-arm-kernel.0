@@ -1,46 +1,36 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 5 Dec 2013 19:25:49 +0200
-Subject: [PATCH v3 1/9] mtd: nand: davinci: fix driver registration
+Date: Thu, 5 Dec 2013 19:25:51 +0200
+Subject: [PATCH v3 3/9] mtd: nand: davinci: check required ti,
+ davinci-chipselect property
 In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1386264358-9738-4-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kernel is booted using DT, there is no guarantee that Davinci
-NAND device has been created already at the time when driver init
-function is executed. Therefore, platform_driver_probe() can't be used
-because this may result the Davinci NAND driver will never be probed.
-The driver probing has to be made with core mechanism.
+The property "ti,davinci-chipselect" is required. So we have to check
+if it is set.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Reviewed-by: Taras Kondratiuk <taras@ti.com>
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 ---
- drivers/mtd/nand/davinci_nand.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/davinci_nand.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index b77a01e..d87213f 100644
+index ddcd7c8..9a96ac7 100644
 --- a/drivers/mtd/nand/davinci_nand.c
 +++ b/drivers/mtd/nand/davinci_nand.c
-@@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
- }
- 
- static struct platform_driver nand_davinci_driver = {
-+	.probe		= nand_davinci_probe,
- 	.remove		= __exit_p(nand_davinci_remove),
- 	.driver		= {
- 		.name	= "davinci_nand",
-@@ -886,7 +887,7 @@ static struct platform_driver nand_davinci_driver = {
- };
- MODULE_ALIAS("platform:davinci_nand");
- 
--module_platform_driver_probe(nand_davinci_driver, nand_davinci_probe);
-+module_platform_driver(nand_davinci_driver);
- 
- MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Texas Instruments");
+@@ -545,6 +545,9 @@ static struct davinci_nand_pdata
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-chipselect", &prop))
+ 			pdev->id = prop;
++		else
++			return ERR_PTR(-EINVAL);
++
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-mask-ale", &prop))
+ 			pdata->mask_ale = prop;
 -- 
 1.7.9.5
