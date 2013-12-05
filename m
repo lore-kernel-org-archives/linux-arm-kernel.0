@@ -1,51 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Dec 2013 10:40:21 -0700
-Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <b2a1db4167d319d355dd2a3a844553bc@agner.ch>
-References: <cover.1386108712.git.stefan@agner.ch>
- <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
- <52A0B2AF.60803@wwwdotorg.org> <b2a1db4167d319d355dd2a3a844553bc@agner.ch>
-Message-ID: <52A0BA85.4020201@wwwdotorg.org>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Thu, 5 Dec 2013 11:41:21 -0600
+Subject: [PATCH] clk: socfpga: Remove socfpga_init_clocks
+Message-ID: <1386265281-11799-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2013 10:43 AM, Stefan Agner wrote:
-> Am 2013-12-05 18:06, schrieb Stephen Warren:
-> <snip>
->>> @@ -493,13 +527,12 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
->>>  		return -EIO;
->>>  	}
->>>
->>> -	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
->>> -
->>>  	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
->>> -	if (tps6586x == NULL) {
->>> -		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
->>> +	if (!tps6586x)
->>>  		return -ENOMEM;
->>> -	}
->>> +
->>> +	tps6586x->version = ret;
->>
->> I have to say, I dislike this version of the patch. Separating the
->> reading of the version register from the assignment to tps6586x->version
->> doesn't make any sense, especially given that the version value is
->> stored in a variable named "ret"; that name isn't remotely related to
->> what's stored there. What if someone comes along later and adds more
->> code that assigns to ret between where it's repurposed for the version
->> value and where it's assigned to tps6586x->version? It'd be extremely
->> difficult for a patch reviewer to spot that given the limited context in
->> a diff, and quite non-obvious to the person changing the code too..
-> 
-> The value comes from the return value of i2c_smbus_read_byte_data. If
-> the value is below zero its an EIO error. 
-> 
-> I could add a variable "version", but for me it felt strange because we
-> check if version is below zero. This feels like its a wrong version
-> rather than a transmit error. So I would prefer ret over version. But I
-> agree, when one just reads the patch, its not obvious what exactly
-> happens.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-In my opinion, using a variable named "version" here would be
-preferable. Testing that against <0 is just the way the I2C API works,
-so the same argument could be applied to any I2C access.
+The only thing that socfpga_init_clocks was doing setting up the smp_twd clock.
+Now that twd-timer's clock phandle is populated in the DTS, we can remove
+this function.
+
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ arch/arm/mach-socfpga/socfpga.c |    1 -
+ drivers/clk/socfpga/clk.c       |   11 -----------
+ 2 files changed, 12 deletions(-)
+
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index dd0d49c..d4ae019 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -106,7 +106,6 @@ static void __init socfpga_cyclone5_init(void)
+ {
+ 	l2x0_of_init(0, ~0UL);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	socfpga_init_clocks();
+ }
+ 
+ static const char *altera_dt_match[] = {
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 01baf20..53ddea8 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -358,14 +358,3 @@ static void __init socfpga_gate_init(struct device_node *node)
+ 	socfpga_gate_clk_init(node, &gateclk_ops);
+ }
+ CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
+-
+-void __init socfpga_init_clocks(void)
+-{
+-	struct clk *clk;
+-	int ret;
+-
+-	clk = clk_register_fixed_factor(NULL, "smp_twd", "mpuclk", 0, 1, 4);
+-	ret = clk_register_clkdev(clk, NULL, "smp_twd");
+-	if (ret)
+-		pr_err("smp_twd alias not registered\n");
+-}
+-- 
+1.7.9.5
