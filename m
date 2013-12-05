@@ -1,45 +1,53 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Thu, 5 Dec 2013 05:43:05 +0000
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <529FE81C.4000608@freescale.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA51905@DBDE04.ent.ti.com>
- <529EE5F1.9080806@st.com> <201312041636.20875.marex@denx.de>
- <529FE81C.4000608@freescale.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA51E1A@DBDE04.ent.ti.com>
+From: panchaxari.prasannamurthy@linaro.org (panchaxari)
+Date: Thu,  5 Dec 2013 11:23:50 +0530
+Subject: [PATCH CFT] ARM:MMP: Enable ARM_PATCH_PHYS_VIRT and ZRELADDR default
+In-Reply-To: <1386222830-7681-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+References: <1386222830-7681-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+Message-ID: <1386222830-7681-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Huang Shijie [mailto:b32955 at freescale.com]
->
->>? 2013?12?04? 23:36, Marek Vasut ??:
->> I disagree we should bloat the API with features, that will be used by "possible
->> future controllers" or "possible single controller", right from the start. The
->> real question here is, can the API be designed in such a way, that the SR
->> polling will happen in software NOW and only when a controller appears that can
->> do polling in HW will the API be extended to support it ?
->ok. Let's add this feature in the future when a real case occurs.
->
-Sorry got lost.. Can you please summarize following plans for your next patch:
+ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR has been enabled as default configs
+to Marvell PXA168/910/MMP2 platforms.
 
-(1) Polling of status registers should be 
-  (a) done in S/W (generic driver)
-  (b) done controller driver, which can be optimized for specific hardware
+Introduction of PHYS_VIRT config as default would enable phy-to-virt and
+virt-to-phy translation function at boot and module loading time
+and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
+enable calculation of kernel load address at run time.
 
-(2) How do you plan to have timeout value, (as serial flash can be pretty slow
-   to access) ?
-  (a) independent for each access
-       - read timeouts per sector, which can be multiplied with read_len/sector_size
-       - write timeout per sector, which can be multiplied with write_len/sector_size
-       - erase timeout per block, which can be multiplied with erase_len/block_size
-  (b) Any other method, or leave it to controller driver ?
+PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
+systems with NOR flash devices, and ZRELADDR config is mutually exclusive
+to ZBOOT_ROM.
 
-In my view, before proceeding to writing down a patch, I think
-we should come-up with a doc/Readme, which defines all API and interface
-structs (taking Angus' proposal as baseline). And then refine that spec first.
-Otherwise there may be too many revisions spent on patch RFC's .. 
+CFT::Call For Testing
 
-Any thoughts ?
-And is there a space in kernel_docs for such specs ?
+Requesting maintainers of Marvell PXA168/910/MMP2 platforms to evaluate the
+changes on the board and comment, as I dont have the board for testing and
+also requesting an ACK
 
-With regards, pekon
+Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 79ba1a8..13621ed 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -560,6 +560,8 @@ config ARCH_MMP
+ 	bool "Marvell PXA168/910/MMP2"
+ 	depends on MMU
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARM_PATCH_PHYS_VIRT
++	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_CLOCKEVENTS
+-- 
+1.7.10.4
