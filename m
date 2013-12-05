@@ -1,47 +1,69 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 5 Dec 2013 17:00:08 +0100
-Subject: [PATCH] ARM: at91: remove redundant dependency
-In-Reply-To: <1384932191-8967-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1384932191-8967-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <1386259208-2239-1-git-send-email-nicolas.ferre@atmel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 5 Dec 2013 08:00:27 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset
+ the system
+In-Reply-To: <CAL1wa8cQcvRzXgaEP3kzkvzogqyeM2eJt_oRZfu6NbWxfP3zAg@mail.gmail.com>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+ <20131202202120.GA23611@roeck-us.net>
+ <CAOesGMi-P6LG1-XKVizUS_qX-gfZi_iXBO5r+=6a2nfvBS60mw@mail.gmail.com>
+ <20131202213654.GA4059@roeck-us.net>
+ <CAL1wa8cQcvRzXgaEP3kzkvzogqyeM2eJt_oRZfu6NbWxfP3zAg@mail.gmail.com>
+Message-ID: <20131205160027.GA13200@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yanis Moreno <yanis.moreno63@gmail.com>
+On Thu, Dec 05, 2013 at 01:27:13PM +0530, Leela Krishna Amudala wrote:
+> Hi Guenter Roeck,
+> 
+> On Tue, Dec 3, 2013 at 3:06 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+> >
+> > On Mon, Dec 02, 2013 at 12:47:53PM -0800, Olof Johansson wrote:
+> > > On Mon, Dec 2, 2013 at 12:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > > > On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
+> > > >> A good watchdog driver is supposed to report when it was responsible
+> > > >> for resetting the system.  Implement this for the s3c2410, at least on
+> > > >> exynos5250 and exynos5420 where we already have a pointer to the PMU
+> > > >> registers to read the information.
+> > > >>
+> > > >> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > > >> ---
+> > > >> This patch is based atop Leela Krishna's recent series that ends with
+> > > >> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+> > > >> AKA <https://patchwork.kernel.org/patch/3251861/>.
+> > > >>
+> > > >>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+> > > >>  1 file changed, 39 insertions(+), 3 deletions(-)
+> > > >>
+> > > >> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> > > >> index 47f4dcf..2c87d37 100644
+> > > >> --- a/drivers/watchdog/s3c2410_wdt.c
+> > > >> +++ b/drivers/watchdog/s3c2410_wdt.c
+> > > >> @@ -62,9 +62,13 @@
+> > > >>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
+> > > >>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
+> > > >>
+> > > >> +#define RST_STAT_REG_OFFSET          0x0404
+> > > >>  #define WDT_DISABLE_REG_OFFSET               0x0408
+> > > >>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
+> > > >>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
+> > > >> +#define QUIRK_HAS_RST_STAT           (1 << 1)
+> > > >> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
+> > > >> +                                      QUIRK_HAS_RST_STAT)
+> > > >>
+> > > > I am not really happy about the NEED (both of them, really) here.
+> > > > How about HAS instead ?
+> > >
+> > > Ah, I just commented on these things on our internal review site too
+> > > on this patch. I don't even think a quirk is needed -- just use the
+> > > presence of a non-0 rst_stat_reg to tell if you need to use regmap.
+> > >
+> > Agreed; same is true for the QUIRK_NEEDS_PMU_CONFIG related registers
+> > as well.
+> >
+> 
+> As Tomasz Figa suggested I introduced quirks,
+> 
+'quirk' implies a workaround for non-standard or broken hardware,
+not a flag indicating device specific functionality.
 
-This removes the "depends on SOC_SAM_V7" statement
-in a Kconfig section that's under an "if SOC_SAM_V7"
-condition (same parameter).
-
-Signed-off-by: Yanis Moreno <yanis.moreno63@gmail.com>
-Reviewed-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi Olof,
-
-This is an additional patch for cleanup. I didn't include it in my previous
-"cleanup" branch as I had wanted to keep it focused on the move to CCF.
-
-As you said that you are okay with applying patches and that I have only one
-related to "cleanup" for the moment, I send it to you.
-
-Thanks, bye,
-  Nicolas Ferre
-
- arch/arm/mach-at91/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index b4f7d6ffa30b..aac7814db4f9 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -82,7 +82,6 @@ comment "Atmel AT91 Processor"
- if SOC_SAM_V7
- config SOC_SAMA5D3
- 	bool "SAMA5D3 family"
--	depends on SOC_SAM_V7
- 	select SOC_SAMA5
- 	select HAVE_FB_ATMEL
- 	select HAVE_AT91_DBGU1
--- 
-1.8.2.2
+Guenter
