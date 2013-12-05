@@ -1,36 +1,85 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu,  5 Dec 2013 17:50:59 +0100
-Subject: [PATCH v2 0/4] PHY driver for Marvell SATA
-Message-ID: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
+Date: Thu,  5 Dec 2013 17:51:02 +0100
+Subject: [PATCH v2 3/4] SATA: MV: Add support for the optional PHYs
+In-Reply-To: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
+References: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1386262263-18956-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This second version addresses most of the points raised during review.
+Some Marvell SoCs have a SATA PHY which can be powered off, in order
+to save power. Make use of the generic phy framework to control these
+phys.
 
-What has not been changed is the phy-names property. This is awaiting
-feedback on my comment that the naming follows how clocks are named in
-the driver & DT binding. For this reason i've also not added the
-Ack-by: received in the review comments.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ drivers/ata/sata_mv.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-Andrew Lunn (4):
-  Phy: DT binding documentation for Marvell MVEBU SATA phy.
-  Phy: Add a PHY driver for Marvell MVEBU SATA PHY.
-  SATA: MV: Add support for the optional PHYs
-  Phy: Add DT nodes on kirkwood and Dove for the SATA PHY
-
- Documentation/devicetree/bindings/ata/marvell.txt  |   6 +
- .../devicetree/bindings/phy/phy-mvebu.txt          |  22 ++++
- arch/arm/boot/dts/dove.dtsi                        |  11 ++
- arch/arm/boot/dts/kirkwood-6281.dtsi               |   2 +
- arch/arm/boot/dts/kirkwood-6282.dtsi               |   2 +
- arch/arm/boot/dts/kirkwood.dtsi                    |  18 +++
- drivers/ata/sata_mv.c                              |  19 +++
- drivers/phy/Kconfig                                |   6 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-mvebu-sata.c                       | 137 +++++++++++++++++++++
- 10 files changed, 224 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-mvebu.txt
- create mode 100644 drivers/phy/phy-mvebu-sata.c
-
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index 56be31819897..9a728bcfbb9a 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -60,6 +60,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/device.h>
+ #include <linux/clk.h>
++#include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
+ #include <linux/ata_platform.h>
+ #include <linux/mbus.h>
+@@ -563,6 +564,12 @@ struct mv_host_priv {
+ 	struct clk		*clk;
+ 	struct clk              **port_clks;
+ 	/*
++	 * Some devices have a SATA PHY which can be enabled/disabled
++	 * in order to save power. These are optional: if the platform
++	 * devices does not have any phy, they won't be used.
++	 */
++	struct phy		**port_phys;
++	/*
+ 	 * These consistent DMA memory pools give us guaranteed
+ 	 * alignment for hardware-accessed data structures,
+ 	 * and less memory waste in accomplishing the alignment.
+@@ -4076,6 +4083,11 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 					GFP_KERNEL);
+ 	if (!hpriv->port_clks)
+ 		return -ENOMEM;
++	hpriv->port_phys = devm_kzalloc(&pdev->dev,
++					sizeof(struct phy *) * n_ports,
++					GFP_KERNEL);
++	if (!hpriv->port_phys)
++		return -ENOMEM;
+ 	host->private_data = hpriv;
+ 	hpriv->n_ports = n_ports;
+ 	hpriv->board_idx = chip_soc;
+@@ -4097,6 +4109,9 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 		hpriv->port_clks[port] = clk_get(&pdev->dev, port_number);
+ 		if (!IS_ERR(hpriv->port_clks[port]))
+ 			clk_prepare_enable(hpriv->port_clks[port]);
++		hpriv->port_phys[port] = devm_phy_get(&pdev->dev, port_number);
++		if (!IS_ERR(hpriv->port_phys[port]))
++			phy_power_on(hpriv->port_phys[port]);
+ 	}
+ 
+ 	/*
+@@ -4132,6 +4147,8 @@ err:
+ 			clk_disable_unprepare(hpriv->port_clks[port]);
+ 			clk_put(hpriv->port_clks[port]);
+ 		}
++		if (!IS_ERR(hpriv->port_phys[port]))
++			phy_power_off(hpriv->port_phys[port]);
+ 	}
+ 
+ 	return rc;
+@@ -4161,6 +4178,8 @@ static int mv_platform_remove(struct platform_device *pdev)
+ 			clk_disable_unprepare(hpriv->port_clks[port]);
+ 			clk_put(hpriv->port_clks[port]);
+ 		}
++		if (!IS_ERR(hpriv->port_phys[port]))
++			phy_power_off(hpriv->port_phys[port]);
+ 	}
+ 	return 0;
+ }
 -- 
 1.8.5
