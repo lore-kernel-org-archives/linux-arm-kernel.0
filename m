@@ -1,22 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 21:25:57 +0100
-Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
-In-Reply-To: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
-References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201312052125.57644.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Dec 2013 21:28:25 +0100
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <52A0B060.4040203@atmel.com>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+ <5283A8C7.30904@atmel.com> <529C4936.5060304@atmel.com>
+ <20131204102353.GI29721@pengutronix.de>
+ <20131204170911.GC14859@kroah.com>
+ <20131204191606.GL29721@pengutronix.de>
+ <52A0B060.4040203@atmel.com>
+Message-ID: <20131205202825.GB4707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 December 2013, Rob Herring wrote:
-> select ARM_AMBA
-> select ARM_GIC if CPU_V7
-> select HAVE_SMP if CPU_V7
-> select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
-> select ARCH_HAS_CPUFREQ
-> select ARCH_HAS_OPP
+Hello Nicolas,
 
-Not sure about ARM_GIC and HAVE_SMP, as they won't typically be
-set on Cortex-A8, Scorpion and PJ4. The other suggestions sound
-good, and your patch looks fine as well.
+On Thu, Dec 05, 2013 at 05:57:04PM +0100, Nicolas Ferre wrote:
+> On 04/12/2013 20:16, Uwe Kleine-K?nig :
+> >On Wed, Dec 04, 2013 at 09:09:11AM -0800, Greg Kroah-Hartman wrote:
+> >>On Wed, Dec 04, 2013 at 11:23:53AM +0100, Uwe Kleine-K?nig wrote:
+> >>>Hello Greg, hi Nicolas,
+> >>>
+> >>>On Mon, Dec 02, 2013 at 09:47:50AM +0100, Nicolas Ferre wrote:
+> >>>>On 13/11/2013 17:28, Nicolas Ferre :
+> >>>>>On 07/11/2013 10:25, Linus Walleij :
+> >>>>>>This passes the errata fix using a GPIO to control the RTS pin
+> >>>>>>on one of the AT91 chips to use gpiolib instead of the
+> >>>>>>AT91-specific interfaces. Also remove the reliance on
+> >>>>>>compile-time #defines and the cpu_* check and rely on the
+> >>>>>>platform passing down the proper GPIO pin through platform
+> >>>>>>data.
+> >>>>>>
+> >>>>>>This is a prerequisite for getting rid of the local GPIO
+> >>>>>>implementation in the AT91 platform and move toward
+> >>>>>>multiplatform.
+> >>>>>>
+> >>>>>>The patch also adds device tree support for getting the
+> >>>>>>RTS GPIO pin from the device tree on DT boot paths.
+> >>>>>>
+> >>>>>>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>>>>>Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >>>>>>Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> [...]
+> >nferre: What is your plan with this patch? Do you have patches
+> >depending on it, too, or is it ok if I take it?
+> 
+> Well, the problem is that your branch generates conflicts with the
+> at91/cleanup one that Olof have just pulled. They are not big
+> conflicts, only additions of header files at the same location.
+> Maybe you can rebase your branch on top of this cleanup branch
+> (arm-soc/next/cleanup: 94c5216ee93b3b4).
+Olof said on irc: "that's easy to fix, i'm ok with resolving that when i
+merge". That is what I prefer because I don't want to retest everything
+after rebasing.
+> 
+> But, anyway I feel that it is better if you take the whole series in a raw.
+So I can interpret this as your blessing to keep the patch in my series
+based on 3.13-rc1?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
