@@ -1,42 +1,30 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 5 Dec 2013 13:51:44 -0800
-Subject: [RESEND PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
-Message-ID: <1386280304-4227-1-git-send-email-tim.kryger@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Dec 2013 23:04:22 +0100
+Subject: [RFC part1 PATCH 1/7] ACPI: Make ACPI core running without PCI on
+ ARM64
+In-Reply-To: <529F376F.8050005@linaro.org>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <20131203164111.GA13447@srcf.ucam.org> <529F376F.8050005@linaro.org>
+Message-ID: <201312052304.22302.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board schematic states that the "SD_CARD_DET_N gets pulled to GND
-when card is inserted" so the polarity has been updated to active low.
+On Wednesday 04 December 2013, Hanjun Guo wrote:
+> On 2013?12?04? 00:41, Matthew Garrett wrote:
+> > Given the number of #ifdefs you're adding, wouldn't it make more sense
+> > to just add stub functions to include/linux/pci.h?
+> 
+> Thanks for the suggestion :)
+> 
+> I can add stub functions in include/linux/pci.h for raw_pci_read()/
+> raw_pci_write(), then can remove #ifdefs for acpi_os_read/write_pci_configuration().
 
-Polarity is now specified with a GPIO define instead of a magic number.
+Actually I wonder about the usefulness of this patch in either form: Since ACPI
+on ARM64 is only for servers, I would very much expect them to always come with
+PCI, either physical host bridges with attached devices, or logical PCI functions
+used to describe the on-SoC I/O devices. Even in case of virtual machines, you'd
+normally use PCI as the method to communicate data about the virtio channels.
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Can you name a realistic use-case where you'd want ACPI but not PCI?
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 08e47c2..27dd110 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -13,6 +13,8 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- #include "bcm11351.dtsi"
- 
- / {
-@@ -40,7 +42,7 @@
- 
- 	sdio4: sdio at 3f1b0000 {
- 		max-frequency = <48000000>;
--		cd-gpios = <&gpio 14 0>;
-+		cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
- 		status = "okay";
- 	};
- };
--- 
-1.8.0.1
+	Arnd
