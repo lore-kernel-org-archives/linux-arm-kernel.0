@@ -1,26 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 04:38:04 +0100
-Subject: [RFC part1 PATCH 5/7] ARM64 / ACPI: Introduce arm_core.c and its
- related head file
-In-Reply-To: <1386088611-2801-6-git-send-email-hanjun.guo@linaro.org>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <1386088611-2801-6-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <201312050438.05117.arnd@arndb.de>
+Date: Thu, 5 Dec 2013 04:43:21 +0100
+Subject: [RFC part3 PATCH 1/2] clocksource / arch_timer: Use ACPI GTDT
+ table to initialize arch timer
+In-Reply-To: <1386088891-2917-2-git-send-email-hanjun.guo@linaro.org>
+References: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088891-2917-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <201312050443.21858.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 03 December 2013, Hanjun Guo wrote:
-> +static unsigned int gsi_to_irq(unsigned int gsi)
+
+> +#ifdef CONFIG_ACPI
+> +void __init arch_timer_acpi_init(void)
 > +{
-> +       int irq = irq_create_mapping(NULL, gsi);
-> +
-> +       return irq;
+...
 > +}
+> +#else
+> +void __init arch_timer_acpi_init(void) { return; };
+> +#endif
+>  
 
-I think this could use a comment regarding your plans for IRQ domains.
+The #else clause is broken in combination with 
 
-Do you expect that all ACPI systems would have only a single GIC IRQ
-controller and a single domain, or do you plan to add irqdomain code
-later?
+> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+> index 6d26b40..2654edf 100644
+> --- a/include/clocksource/arm_arch_timer.h
+> +++ b/include/clocksource/arm_arch_timer.h
+> @@ -66,6 +66,11 @@ static inline struct timecounter *arch_timer_get_timecounter(void)
+>  	return NULL;
+>  }
+>  
+> +static inline void arch_timer_acpi_init(void)
+> +{
+> +	return;
+> +}
+> +
+>  #endif
+>  
+
+this inline function. Have you build-tested this with CONFIG_ACPI disabled?
 
 	Arnd
