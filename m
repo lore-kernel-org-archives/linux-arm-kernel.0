@@ -1,47 +1,94 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Thu, 05 Dec 2013 06:14:47 -0300
-Subject: [PATCH] ARM: Clean up setup printks a bit
-In-Reply-To: <1386199826-8183-1-git-send-email-olof@lixom.net>
-References: <1386199826-8183-1-git-send-email-olof@lixom.net>
-Message-ID: <52A04407.4000306@elopez.com.ar>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 5 Dec 2013 11:15:46 +0200
+Subject: [PATCH 1/1] gpio: twl4030: Fix regression for twl gpio LED output
+In-Reply-To: <20131204173705.GQ26766@atomide.com>
+References: <1386156871-7639-1-git-send-email-rogerq@ti.com>
+ <1386156871-7639-2-git-send-email-rogerq@ti.com>
+ <20131204173705.GQ26766@atomide.com>
+Message-ID: <52A04442.6050607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 12/04/2013 07:37 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [131204 03:35]:
+>> Commit 0b2aa8be introduced a regression that causes failure
+>> in setting LED GPO direction to OUT.
+>>
+>> This causes USB host probe failures for Beagleboard C4.
+>>
+>> [    2.075469] platform usb_phy_gen_xceiv.2: Driver usb_phy_gen_xceiv requests probe deferral
+>> [    2.090454] hsusb2_vcc: Failed to request enable GPIO510: -22
+>> [    2.100982] reg-fixed-voltage reg-fixed-voltage.0.auto: Failed to register regulator: -22
+>> [    2.109954] reg-fixed-voltage: probe of reg-fixed-voltage.0.auto failed with error -22
+>>
+>> direction_out/direction_in must return 0 if the operation succeeded.
+> 
+> Uh, OK, sorry that was an unexpected side effect. We still should keep the
+> return values though instead of just ignoring them.
 
-El 04/12/13 20:30, Olof Johansson escribi?:
-> Clean up the setup ARM printks a bit. Add printk level to a few
-> that were missing (CPU: <...> ones, in particular), and switch from
-> printk(KERN_* ..) to pr_*().
->
-> Finally, un-wrap some long lines since it makes it harder to grep the
-> sources from where an error came from and tweak some cases of indentation.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->   arch/arm/kernel/setup.c |   39 +++++++++++++++++++--------------------
->   1 file changed, 19 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 6a1b8a8..7c472f4 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
+OK.
+>  
+>>  1 file changed, 9 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+>> index b97d6a6..0999ed1 100644
+>> --- a/drivers/gpio/gpio-twl4030.c
+>> +++ b/drivers/gpio/gpio-twl4030.c
+>> @@ -294,13 +294,13 @@ out:
+>>  static int twl_direction_in(struct gpio_chip *chip, unsigned offset)
+>>  {
+>>  	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
+>> -	int ret;
+>> +	int ret = 0;
+>>  
+>>  	mutex_lock(&priv->mutex);
+>>  	if (offset < TWL4030_GPIO_MAX)
+>> -		ret = twl4030_set_gpio_direction(offset, 1);
+>> +		twl4030_set_gpio_direction(offset, 1);
+>>  	else
+>> -		ret = -EINVAL;
+>> +		ret = -EINVAL;	/* LED outputs can't be set as input */
+>>  
+>>  	if (!ret)
+>>  		priv->direction &= ~BIT(offset);
+> 
+> This looks OK to me.
+> 
+>> @@ -354,18 +354,21 @@ static void twl_set(struct gpio_chip *chip, unsigned offset, int value)
+>>  static int twl_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+>>  {
+>>  	struct gpio_twl4030_priv *priv = to_gpio_twl4030(chip);
+>> -	int ret = -EINVAL;
+>>  
+> 
+> Can't you just have:
+> 
+> 	int ret = 0;
 
-...
+Yes, i'll add that.
+> 
+>>  	mutex_lock(&priv->mutex);
+>>  	if (offset < TWL4030_GPIO_MAX)
+>> -		ret = twl4030_set_gpio_direction(offset, 0);
+>> +		twl4030_set_gpio_direction(offset, 0);
+>> +
+>> +	/*
+>> +	 *  LED gpio's i.e. offset >= TWL4030_GPIO_MAX are always output
+>> +	 */
+>>  
+>>  	priv->direction |= BIT(offset);
+>>  	mutex_unlock(&priv->mutex);
+>>  
+>>  	twl_set(chip, offset, value);
+>>  
+>> -	return ret;
+>> +	return 0;
+>>  }
+> 
+> Then the rest of this change is not needed and we check the return value for
+> twl4030_set_gpio_direction. Makes sense to keep the comment there though.
 
->
->   	if (meminfo.nr_banks >= NR_BANKS) {
-> -		printk(KERN_CRIT "NR_BANKS too low, "
-> -			"ignoring memory at 0x%08llx\n", (long long)start);
-> +		pr_crit("NR_BANKS too low, "ignoring memory at 0x%08llx\n",
+OK. Will post v2.
 
-There's a stray " there
-
-> +			(long long)start);
->   		return -EINVAL;
->   	}
->
-
-Cheers,
-
-Emilio
+cheers,
+-roger
