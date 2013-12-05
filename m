@@ -1,30 +1,34 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 5 Dec 2013 13:32:42 -0800
-Subject: [PATCH v5 00/14] Armada 370/XP NAND support
-In-Reply-To: <87haaogx6j.fsf@natisbad.org>
-References: <87wqjtbm8r.fsf@natisbad.org> <20131128185040.GA13182@localhost>
- <87bo12kcyt.fsf@natisbad.org> <20131202103305.GB2466@localhost>
- <87siubneuf.fsf@natisbad.org> <20131203002225.GA5333@localhost>
- <87ob4xbs8l.fsf@natisbad.org> <87iov5aapx.fsf@natisbad.org>
- <20131204142009.GB2486@localhost> <87haaogx6j.fsf@natisbad.org>
-Message-ID: <20131205213242.GN27149@ld-irv-0074.broadcom.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 5 Dec 2013 15:34:17 -0600
+Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
+In-Reply-To: <201312052125.57644.arnd@arndb.de>
+References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
+ <201312052125.57644.arnd@arndb.de>
+Message-ID: <CAL_Jsq+ReNLYNUm4SofNTu=bD3m2F3rCfVP-tQna4+7Dhmv79Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 09:48:04PM +0100, Arnaud Ebalard wrote:
-> Now, I am starting to wonder if nandwrite does not try and do something
-> smart depending on the content of the file.
+On Thu, Dec 5, 2013 at 2:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 05 December 2013, Rob Herring wrote:
+>> select ARM_AMBA
+>> select ARM_GIC if CPU_V7
+>> select HAVE_SMP if CPU_V7
+>> select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+>> select ARCH_HAS_CPUFREQ
+>> select ARCH_HAS_OPP
+>
+> Not sure about ARM_GIC and HAVE_SMP, as they won't typically be
+> set on Cortex-A8, Scorpion and PJ4. The other suggestions sound
+> good, and your patch looks fine as well.
 
-nandwrite does not do any data-dependent operations. It only checks the
-size of the file to verify against MTD alignment restrictions, but
-otherwise, it is simply a dump page-at-a-time programmer.
+HAVE_SMP only enables visibility of the SMP kconfig option. That could
+cause randconfig builds that would not boot if SMP_ON_UP was not
+enabled, but a "select SMP_ON_UP if SMP" here would fix that though.
 
-However, there are other characteristics which do differentiate it from
-dd, so it's not surprising if nandwrite can uncover different code
-behaviors than dd.
+GIC is on probably 90% of the v7 platforms, so seems like a small cost
+to carry it. We've tried to avoid putting core specific knowledge into
+the kernel, but effectively it is still there. It's just duplicated in
+each platform selecting the individual options (GIC, SCU, TWD, errata,
+etc.) rather than a core type.
 
-(BTW, I wouldn't recommend dd for NAND programming. It may be useful for
-certain debugging purposes, but it ignore bad blocks and is generally
-dangerous to use for any regular purposes.)
-
-Brian
+Rob
