@@ -1,31 +1,49 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 05 Dec 2013 21:51:39 +0800
-Subject: [RFC part1 PATCH 5/7] ARM64 / ACPI: Introduce arm_core.c and
- its related head file
-In-Reply-To: <201312050438.05117.arnd@arndb.de>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <1386088611-2801-6-git-send-email-hanjun.guo@linaro.org>
- <201312050438.05117.arnd@arndb.de>
-Message-ID: <52A084EB.5010103@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 5 Dec 2013 07:52:23 -0600
+Subject: [PATCH v2] arm64: enable EDAC on arm64
+In-Reply-To: <20131205115142.GD17165@arm.com>
+References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
+ <20131126153747.GC692@arm.com>
+ <CAL_JsqJLf-kjzafMJ=wh_ZZa63SOMKy20M_5xjy9GRdofiZVCA@mail.gmail.com>
+ <20131205115142.GD17165@arm.com>
+Message-ID: <CAL_JsqLa-EPEnV=H1rU2Ex_h=tkZCmh2TvwAcSnbhzzvfR2oCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?12?05? 11:38, Arnd Bergmann wrote:
-> On Tuesday 03 December 2013, Hanjun Guo wrote:
->> +static unsigned int gsi_to_irq(unsigned int gsi)
->> +{
->> +       int irq = irq_create_mapping(NULL, gsi);
->> +
->> +       return irq;
->> +}
-> I think this could use a comment regarding your plans for IRQ domains.
+On Thu, Dec 5, 2013 at 5:51 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Dec 05, 2013 at 12:53:33AM +0000, Rob Herring wrote:
+>> On Tue, Nov 26, 2013 at 9:37 AM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Fri, Nov 22, 2013 at 09:05:08PM +0000, Rob Herring wrote:
+>> >> +static inline void atomic_scrub(void *va, u32 size)
+>> >> +{
+>> >> +     unsigned int *virt_addr = va;
+>> >> +     unsigned int i;
+>> >> +
+>> >> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+>> >
+>> > BTW, maybe the compiler is smart enough to drop the i but why not just
+>> > use a int *last_addr = va + size - 3; and just compare against this?
+>>
+>> Evidently, the compiler is not that smart. Here's what I ended up
+>> with. There's no need to subtract 3 that I can see:
+>>
+>> unsigned int *last_addr = va + size;
+>> for (; virt_addr < last_addr; virt_addr++) {
 >
-> Do you expect that all ACPI systems would have only a single GIC IRQ
-> controller and a single domain, or do you plan to add irqdomain code
-> later?
+> The 3 thing was for size not multiple of 4. Do we have any guarantees
+> here?
 
-we added irqdomain code in the part2 patch set, is that the code ok
-with you?
+Only that no one does ECC on less that 64-bit wide DDR. I'm only
+assuming 32-bit alignment and that is what all the other
+implementations assume.
 
-Thanks
-Hanjun
+If we have a non-multiple of 4 size, then we want to expand the size
+to include the partial bytes. This function is a nop effectively, so
+the fact that we may touch 1-3 extra bytes at the end does not matter.
+The only thing subtracting 3 does is mean the comparison needs to be
+'<=' instead of '<'. It would also break if you had a size of 1 or 2.
+I think what you intended was to align size, but you really need to
+add 3 and mask it to do that. But that is not necessary in my version.
+
+Rob
