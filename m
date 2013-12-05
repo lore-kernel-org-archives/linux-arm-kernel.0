@@ -1,167 +1,28 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 5 Dec 2013 19:25:52 +0200
-Subject: [PATCH v3 4/9] mtd: nand: davinci: simplify error handling
-In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1386264358-9738-5-git-send-email-ivan.khoronzhuk@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 05 Dec 2013 18:33:20 +0100
+Subject: [PATCH v4 3/3] ARM: tegra: correct Colibri T20 regulator settings
+In-Reply-To: <52A0B40B.7040903@wwwdotorg.org>
+References: <cover.1386108712.git.stefan@agner.ch>
+ <fc7440a2f4bf9ab95e47a911c0e0b3b6a2250356.1386108712.git.stefan@agner.ch>
+ <52A0B40B.7040903@wwwdotorg.org>
+Message-ID: <e2fe1d7b546e9f81fdd1ad225676e76e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is not needed to use a lot of names for err handling.
-It complicates code support and reading.
+Am 2013-12-05 18:12, schrieb Stephen Warren:
+> On 12/03/2013 03:18 PM, Stefan Agner wrote:
+>> Set the parent of the regulators LDO2 to LDO9 according to the
+>> schematic. Set the base voltage to 3.3V, there is only 3.3V on the
+>> module itself.
+>>
+>> Set the Core and CPU voltage to the specified voltages of 1.2V and
+>> 1.0V respectivly.
+>>
+>> LDO6 should deliver 2.85V. The attached peripherals were not in
+>> use so far.
+> 
+> Does this depend on patch 1/3 or 2/3, or can I apply it to the Tegra
+> tree which doesn't include those patches?
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Reviewed-by: Taras Kondratiuk <taras@ti.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- drivers/mtd/nand/davinci_nand.c |   46 +++++++++++++++------------------------
- 1 file changed, 17 insertions(+), 29 deletions(-)
-
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index 9a96ac7..c0be223 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -615,8 +615,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
- 	if (!info) {
- 		dev_err(&pdev->dev, "unable to allocate memory\n");
--		ret = -ENOMEM;
--		goto err_nomem;
-+		return -ENOMEM;
- 	}
- 
- 	platform_set_drvdata(pdev, info);
-@@ -625,20 +624,16 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	res2 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
- 	if (!res1 || !res2) {
- 		dev_err(&pdev->dev, "resource missing\n");
--		ret = -EINVAL;
--		goto err_nomem;
-+		return -EINVAL;
- 	}
- 
- 	vaddr = devm_ioremap_resource(&pdev->dev, res1);
--	if (IS_ERR(vaddr)) {
--		ret = PTR_ERR(vaddr);
--		goto err_ioremap;
--	}
-+	if (IS_ERR(vaddr))
-+		return PTR_ERR(vaddr);
-+
- 	base = devm_ioremap_resource(&pdev->dev, res2);
--	if (IS_ERR(base)) {
--		ret = PTR_ERR(base);
--		goto err_ioremap;
--	}
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
- 
- 	info->dev		= &pdev->dev;
- 	info->base		= base;
-@@ -705,7 +700,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 			spin_unlock_irq(&davinci_nand_lock);
- 
- 			if (ret == -EBUSY)
--				goto err_ecc;
-+				return ret;
- 
- 			info->chip.ecc.calculate = nand_davinci_calculate_4bit;
- 			info->chip.ecc.correct = nand_davinci_correct_4bit;
-@@ -721,8 +716,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 		info->chip.ecc.strength = pdata->ecc_bits;
- 		break;
- 	default:
--		ret = -EINVAL;
--		goto err_ecc;
-+		return -EINVAL;
- 	}
- 	info->chip.ecc.mode = ecc_mode;
- 
-@@ -730,7 +724,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	if (IS_ERR(info->clk)) {
- 		ret = PTR_ERR(info->clk);
- 		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
--		goto err_clk;
-+		return ret;
- 	}
- 
- 	ret = clk_prepare_enable(info->clk);
-@@ -759,7 +753,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 							info->core_chipsel);
- 	if (ret < 0) {
- 		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
--		goto err_timing;
-+		goto err;
- 	}
- 
- 	spin_lock_irq(&davinci_nand_lock);
-@@ -775,7 +769,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 	ret = nand_scan_ident(&info->mtd, pdata->mask_chipsel ? 2 : 1, NULL);
- 	if (ret < 0) {
- 		dev_dbg(&pdev->dev, "no NAND chip(s) found\n");
--		goto err_scan;
-+		goto err;
- 	}
- 
- 	/* Update ECC layout if needed ... for 1-bit HW ECC, the default
-@@ -789,7 +783,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 		if (!chunks || info->mtd.oobsize < 16) {
- 			dev_dbg(&pdev->dev, "too small\n");
- 			ret = -EINVAL;
--			goto err_scan;
-+			goto err;
- 		}
- 
- 		/* For small page chips, preserve the manufacturer's
-@@ -820,7 +814,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
- 		dev_warn(&pdev->dev, "no 4-bit ECC support yet "
- 				"for 4KiB-page NAND\n");
- 		ret = -EIO;
--		goto err_scan;
-+		goto err;
- 
- syndrome_done:
- 		info->chip.ecc.layout = &info->ecclayout;
-@@ -828,7 +822,7 @@ syndrome_done:
- 
- 	ret = nand_scan_tail(&info->mtd);
- 	if (ret < 0)
--		goto err_scan;
-+		goto err;
- 
- 	if (pdata->parts)
- 		ret = mtd_device_parse_register(&info->mtd, NULL, NULL,
-@@ -841,7 +835,7 @@ syndrome_done:
- 						NULL, 0);
- 	}
- 	if (ret < 0)
--		goto err_scan;
-+		goto err;
- 
- 	val = davinci_nand_readl(info, NRCSR_OFFSET);
- 	dev_info(&pdev->dev, "controller rev. %d.%d\n",
-@@ -849,8 +843,7 @@ syndrome_done:
- 
- 	return 0;
- 
--err_scan:
--err_timing:
-+err:
- 	clk_disable_unprepare(info->clk);
- 
- err_clk_enable:
-@@ -858,11 +851,6 @@ err_clk_enable:
- 	if (ecc_mode == NAND_ECC_HW_SYNDROME)
- 		ecc4_busy = false;
- 	spin_unlock_irq(&davinci_nand_lock);
--
--err_ecc:
--err_clk:
--err_ioremap:
--err_nomem:
- 	return ret;
- }
- 
--- 
-1.7.9.5
+This patch is independent from 1/3 and 2/3, so you can apply it to the
+Tegra tree. The relevant DT change for 2/3 is included in 2/3...
