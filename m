@@ -1,62 +1,55 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed,  4 Dec 2013 18:23:13 -0600
-Subject: [PATCH 1/2] cpufreq: enable ARM drivers on arm64
+Date: Wed,  4 Dec 2013 18:23:14 -0600
+Subject: [PATCH 2/2] cpufreq: highbank: rework the kconfig dependencies for
+ arm64
 In-Reply-To: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
 References: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1386202994-30784-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1386202994-30784-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Enable cpufreq and power kconfig menus on arm64 along with arm cpufreq
-drivers. The power menu is needed for OPP support. At least on Calxeda
-systems, the same cpufreq driver is used for arm and arm64 based
-systems.
+Make ARM_HIGHBANK_CPUFREQ not depend on ARCH_HIGHBANK to enable on
+arm64 and also give better build converage. Change the selects to be
+same depends as the cpu0 driver. Otherwise, we can get kconfig select
+errors. Also, add missing depends for PL320_MBOX.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
 Cc: Viresh Kumar <viresh.kumar@linaro.org>
 Cc: cpufreq at vger.kernel.org
 Cc: linux-pm at vger.kernel.org
 ---
- arch/arm64/Kconfig      | 8 ++++++++
- drivers/cpufreq/Kconfig | 2 +-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ drivers/cpufreq/Kconfig.arm | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 88c8b6c1..1808dd1 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -276,6 +276,14 @@ config SYSVIPC_COMPAT
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index ce52ed9..0d7130d 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -65,16 +65,14 @@ config ARM_EXYNOS5440_CPUFREQ
+ 	  If in doubt, say N.
  
- endmenu
+ config ARM_HIGHBANK_CPUFREQ
+-	tristate "Calxeda Highbank-based"
+-	depends on ARCH_HIGHBANK
+-	select GENERIC_CPUFREQ_CPU0
++	tristate "Calxeda ECX based"
++	depends on HAVE_CLK && REGULATOR && OF
++	depends on PL320_MBOX
++	select ARCH_HAS_OPP
+ 	select PM_OPP
+-	select REGULATOR
+-
+-	default m
++	select GENERIC_CPUFREQ_CPU0
+ 	help
+-	  This adds the CPUFreq driver for Calxeda Highbank SoC
+-	  based boards.
++	  This adds the CPUFreq driver for Calxeda based SoCs.
  
-+menu "Power management options"
-+
-+source "kernel/power/Kconfig"
-+
-+source "drivers/cpufreq/Kconfig"
-+
-+endmenu
-+
- source "net/Kconfig"
- 
- source "drivers/Kconfig"
-diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-index 38093e2..e26fdcd 100644
---- a/drivers/cpufreq/Kconfig
-+++ b/drivers/cpufreq/Kconfig
-@@ -195,7 +195,7 @@ source "drivers/cpufreq/Kconfig.x86"
- endmenu
- 
- menu "ARM CPU frequency scaling drivers"
--depends on ARM
-+depends on ARM || ARM64
- source "drivers/cpufreq/Kconfig.arm"
- endmenu
+ 	  If in doubt, say N.
  
 -- 
 1.8.3.2
