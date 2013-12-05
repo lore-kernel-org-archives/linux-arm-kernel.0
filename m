@@ -1,28 +1,118 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Dec 2013 18:16:06 +0000
-Subject: [PATCH 1/2] cpufreq: enable ARM drivers on arm64
-In-Reply-To: <1386202994-30784-2-git-send-email-robherring2@gmail.com>
-References: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
- <1386202994-30784-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20131205181606.GY29268@sirena.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 5 Dec 2013 10:16:14 -0800
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
+ system
+In-Reply-To: <42011482.56GYn1upCz@amdc1227>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+ <42011482.56GYn1upCz@amdc1227>
+Message-ID: <CAD=FV=U_ntCJWgb7qcRve8JqcFVSo5vyuPTabLGGdNUGg56P-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 06:23:13PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Enable cpufreq and power kconfig menus on arm64 along with arm cpufreq
-> drivers. The power menu is needed for OPP support. At least on Calxeda
-> systems, the same cpufreq driver is used for arm and arm64 based
-> systems.
+Tomasz,
 
-If this needs any revisions (I'd be surprised but...) can you please
-keep me on the CCs?  I intend to pull this into LSK if that's OK since I
-was about to do roughly the same thing for it and upstream the result.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/38178928/attachment.sig>
+On Thu, Dec 5, 2013 at 8:21 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Doug,
+>
+> Please see my comments inline.
+>
+> On Monday 02 of December 2013 10:14:41 Doug Anderson wrote:
+>> A good watchdog driver is supposed to report when it was responsible
+>> for resetting the system.  Implement this for the s3c2410, at least on
+>> exynos5250 and exynos5420 where we already have a pointer to the PMU
+>> registers to read the information.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>> This patch is based atop Leela Krishna's recent series that ends with
+>> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+>> AKA <https://patchwork.kernel.org/patch/3251861/>.
+>>
+>>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 39 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+>> index 47f4dcf..2c87d37 100644
+>> --- a/drivers/watchdog/s3c2410_wdt.c
+>> +++ b/drivers/watchdog/s3c2410_wdt.c
+>> @@ -62,9 +62,13 @@
+>>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
+>>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
+>>
+>> +#define RST_STAT_REG_OFFSET          0x0404
+>
+> IMHO this should be namespaced, at least with EXYNOS5 prefix. The two
+> registers below should be as well, but I missed this in the patch adding
+> them.
+
+Done in v2 (plus fixup of Leela Krishna's).
+
+
+>>  #define WDT_DISABLE_REG_OFFSET               0x0408
+>>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
+>>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
+>> +#define QUIRK_HAS_RST_STAT           (1 << 1)
+>> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
+>> +                                      QUIRK_HAS_RST_STAT)
+>>
+>>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>>  static int tmr_margin;
+>> @@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
+>>   * timer reset functionality.
+>>   * @mask_bit: Bit number for the watchdog timer in the disable register and the
+>>   * mask reset register.
+>> + * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
+>> + * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
+>> + * reset.
+>>   * @quirks: A bitfield of quirks.
+>>   */
+>>
+>> @@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
+>>       int disable_reg;
+>>       int mask_reset_reg;
+>>       int mask_bit;
+>> +     int rst_stat_reg;
+>> +     int rst_stat_bit;
+>>       u32 quirks;
+>>  };
+>>
+>> @@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
+>>       .disable_reg = WDT_DISABLE_REG_OFFSET,
+>>       .mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+>>       .mask_bit = 20,
+>> -     .quirks = QUIRK_NEEDS_PMU_CONFIG
+>> +     .rst_stat_reg = RST_STAT_REG_OFFSET,
+>> +     .rst_stat_bit = 20,
+>> +     .quirks = QUIRK_NEEDS_PMU_CONFIG |
+>> +             QUIRK_HAS_RST_STAT,
+>>  };
+>>
+>>  static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
+>>       .disable_reg = WDT_DISABLE_REG_OFFSET,
+>>       .mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
+>>       .mask_bit = 0,
+>> -     .quirks = QUIRK_NEEDS_PMU_CONFIG
+>> +     .rst_stat_reg = RST_STAT_REG_OFFSET,
+>> +     .rst_stat_bit = 9,
+>> +     .quirks = QUIRK_NEEDS_PMU_CONFIG |
+>> +             QUIRK_HAS_RST_STAT,
+>>  };
+>>
+>>  static const struct of_device_id s3c2410_wdt_match[] = {
+>> @@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+>>  }
+>>  #endif
+>>
+>> +static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
+>> +{
+>> +     unsigned int bootstatus = 0;
+>> +     int ret;
+>> +
+>> +     if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
+>
+> nit: I guess it's just a matter of taste, but to reduce code indentation
+> you could inverse the check and simply return 0 here.
+
+Done in v2.  This is the same suggestion Olof made.
+
+-Doug
