@@ -1,92 +1,51 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  5 Dec 2013 10:54:42 +0100
-Subject: [PATCH v3 3/3] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <1386237282-22385-1-git-send-email-b.brezillon@overkiz.com>
-References: <1386237282-22385-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1386237282-22385-4-git-send-email-b.brezillon@overkiz.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 05 Dec 2013 11:09:10 +0100
+Subject: [PATCH] MAINTAINERS: Add entry for Samsung SoC clock drivers
+In-Reply-To: <1383963454-2749-1-git-send-email-tomasz.figa@gmail.com>
+References: <1383963454-2749-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1965675.1ZOPt5drrV@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_get calls by devm_clk_get calls.
+Hi,
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ohci-at91.c |   30 +++++++-----------------------
- 1 file changed, 7 insertions(+), 23 deletions(-)
+On Saturday 09 of November 2013 03:17:34 Tomasz Figa wrote:
+> From: Tomasz Figa <t.figa@samsung.com>
+> 
+> This patch adds an entry for Samsung SoC clock drivers located under
+> drivers/clk/samsung/ directory, with me taking the maintainer role.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Acked-by: Mike Turquette <mturquette@linaro.org>
+> Acked-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  MAINTAINERS | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 61b8757..df7e1bf 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -7319,6 +7319,12 @@ L:	linux-media at vger.kernel.org
+>  S:	Supported
+>  F:	drivers/media/i2c/s5c73m3/*
+>  
+> +SAMSUNG SOC CLOCK DRIVERS
+> +M:	Tomasz Figa <t.figa@samsung.com>
+> +S:	Supported
+> +L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+> +F:	drivers/clk/samsung/
+> +
+>  SERIAL DRIVERS
+>  M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>  L:	linux-serial at vger.kernel.org
+> 
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 2a86e32..7b2ccd3 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		goto err;
- 	}
- 
--	iclk = clk_get(dev, "ohci_clk");
-+	iclk = devm_clk_get(dev, "ohci_clk");
- 	if (IS_ERR(iclk)) {
- 		dev_err(dev, "failed to get ohci_clk\n");
- 		retval = PTR_ERR(iclk);
- 		goto err;
- 	}
--	fclk = clk_get(dev, "uhpck");
-+	fclk = devm_clk_get(dev, "uhpck");
- 	if (IS_ERR(fclk)) {
- 		dev_err(dev, "failed to get uhpck\n");
- 		retval = PTR_ERR(fclk);
--		goto err4;
-+		goto err;
- 	}
--	hclk = clk_get(dev, "hclk");
-+	hclk = devm_clk_get(dev, "hclk");
- 	if (IS_ERR(hclk)) {
- 		dev_err(dev, "failed to get hclk\n");
- 		retval = PTR_ERR(hclk);
--		goto err5;
-+		goto err;
- 	}
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		uclk = clk_get(dev, "usb_clk");
-+		uclk = devm_clk_get(dev, "usb_clk");
- 		if (IS_ERR(uclk)) {
- 			dev_err(dev, "failed to get uclk\n");
- 			retval = PTR_ERR(uclk);
--			goto err6;
-+			goto err;
- 		}
- 	}
- 
-@@ -203,15 +203,6 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	/* Error handling */
- 	at91_stop_hc(pdev);
- 
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
-- err6:
--	clk_put(hclk);
-- err5:
--	clk_put(fclk);
-- err4:
--	clk_put(iclk);
--
-  err:
- 	usb_put_hcd(hcd);
- 	return retval;
-@@ -236,13 +227,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
- 	usb_remove_hcd(hcd);
- 	at91_stop_hc(pdev);
- 	usb_put_hcd(hcd);
--
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
--	clk_put(hclk);
--	clk_put(fclk);
--	clk_put(iclk);
--	fclk = iclk = hclk = NULL;
- }
- 
- /*-------------------------------------------------------------------------*/
--- 
-1.7.9.5
+I don't see this patch applied anywhere. Mike, should it go through your
+tree?
+
+Best regards,
+Tomasz
