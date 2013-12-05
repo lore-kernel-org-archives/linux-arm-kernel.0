@@ -1,49 +1,46 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 5 Dec 2013 19:25:48 +0200
-Subject: [PATCH v3 0/9] Reuse davinci-nand driver for Keystone arch
-Message-ID: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+Date: Thu, 5 Dec 2013 19:25:49 +0200
+Subject: [PATCH v3 1/9] mtd: nand: davinci: fix driver registration
+In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains fixes and updates of Davinci nand driver in
-order to reuse it for Keystone platform.
+When kernel is booted using DT, there is no guarantee that Davinci
+NAND device has been created already at the time when driver init
+function is executed. Therefore, platform_driver_probe() can't be used
+because this may result the Davinci NAND driver will never be probed.
+The driver probing has to be made with core mechanism.
 
-v2..v3:
-- mtd: nand: davinci: don't set timings if AEMIF is used
-	dropped, it would be replaced by alone patch
-	ARM: davinci: aemif: get rid of davinci-nand driver dependency on aemif
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Reviewed-by: Taras Kondratiuk <taras@ti.com>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/mtd/nand/davinci_nand.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-v1..v2
-The series is combination of two following series:
-- Davinci nand driver fixes and updates:
-https://lkml.org/lkml/2013/11/20/271
-- Reuse davinci-nand driver for Keystone arch
-https://lkml.org/lkml/2013/11/20/315
-
-- mtd: nand: davinci: extend description of bindings
-	clarified changeset description
-
-- mtd: nand: davinci: reuse driver for Keystone arch
-	removed "ti,keystone-nand" compatible from driver
-
-Ivan Khoronzhuk (9):
-  mtd: nand: davinci: fix driver registration
-  mtd: nand: davinci: return ENOMEM if memory allocation is failed
-  mtd: nand: davinci: check required ti,davinci-chipselect property
-  mtd: nand: davinci: simplify error handling
-  mtd: nand: davinci: move bindings under mtd
-  mtd: nand: davinci: extend description of bindings
-  mtd: nand: davinci: adjust DT properties to MTD generic
-  mtd: nand: davinci: reuse driver for Keystone arch
-  mtd: nand: davinci: don't request AEMIF address range
-
- .../devicetree/bindings/arm/davinci/nand.txt       |   46 ----------
- .../devicetree/bindings/mtd/davinci-nand.txt       |   94 ++++++++++++++++++++
- drivers/mtd/nand/Kconfig                           |    6 +-
- drivers/mtd/nand/davinci_nand.c                    |   70 ++++++++-------
- 4 files changed, 133 insertions(+), 83 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
- create mode 100644 Documentation/devicetree/bindings/mtd/davinci-nand.txt
-
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index b77a01e..d87213f 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
+ }
+ 
+ static struct platform_driver nand_davinci_driver = {
++	.probe		= nand_davinci_probe,
+ 	.remove		= __exit_p(nand_davinci_remove),
+ 	.driver		= {
+ 		.name	= "davinci_nand",
+@@ -886,7 +887,7 @@ static struct platform_driver nand_davinci_driver = {
+ };
+ MODULE_ALIAS("platform:davinci_nand");
+ 
+-module_platform_driver_probe(nand_davinci_driver, nand_davinci_probe);
++module_platform_driver(nand_davinci_driver);
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Texas Instruments");
 -- 
 1.7.9.5
