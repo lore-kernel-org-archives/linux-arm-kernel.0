@@ -1,51 +1,33 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 05 Dec 2013 11:09:10 +0100
-Subject: [PATCH] MAINTAINERS: Add entry for Samsung SoC clock drivers
-In-Reply-To: <1383963454-2749-1-git-send-email-tomasz.figa@gmail.com>
-References: <1383963454-2749-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1965675.1ZOPt5drrV@flatron>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 5 Dec 2013 10:15:01 +0000
+Subject: Boot time errors/warnings on snowball
+In-Reply-To: <20131205094927.GJ26581@lee--X1>
+References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
+ <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
+ <20131204172626.GB26581@lee--X1>
+ <CAOesGMjMWqPtJXh7-VAhyA1a95h7mKV8_UZhyTtxgEbUhU8_5Q@mail.gmail.com>
+ <20131204175119.GD26581@lee--X1>
+ <CAOesGMh7+r9vUvtH_pwJeMyQJGo3u-uJRJ8-OBidzzO1pC5RDA@mail.gmail.com>
+ <20131204185947.GC29268@sirena.org.uk>
+ <20131205094927.GJ26581@lee--X1>
+Message-ID: <20131205101501.GL29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 05, 2013 at 09:49:27AM +0000, Lee Jones wrote:
 
-On Saturday 09 of November 2013 03:17:34 Tomasz Figa wrote:
-> From: Tomasz Figa <t.figa@samsung.com>
-> 
-> This patch adds an entry for Samsung SoC clock drivers located under
-> drivers/clk/samsung/ directory, with me taking the maintainer role.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Acked-by: Mike Turquette <mturquette@linaro.org>
-> Acked-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  MAINTAINERS | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 61b8757..df7e1bf 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -7319,6 +7319,12 @@ L:	linux-media at vger.kernel.org
->  S:	Supported
->  F:	drivers/media/i2c/s5c73m3/*
->  
-> +SAMSUNG SOC CLOCK DRIVERS
-> +M:	Tomasz Figa <t.figa@samsung.com>
-> +S:	Supported
-> +L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-> +F:	drivers/clk/samsung/
-> +
->  SERIAL DRIVERS
->  M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->  L:	linux-serial at vger.kernel.org
-> 
+> Please remove the asoc/topic/ux500 altogether and I will resubmit in
+> its entirety once I've solved all of the issues.
 
-I don't see this patch applied anywhere. Mike, should it go through your
-tree?
+Done - the whole thing with the MMC is very weird.
 
-Best regards,
-Tomasz
+> Sorry for any issues this has caused, I'll get to the bottom of it.
+
+No worries.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/ca5a8609/attachment.sig>
