@@ -1,160 +1,95 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu,  5 Dec 2013 10:15:28 -0800
-Subject: [PATCH v2 1/2] fixup: watchdog: s3c2410_wdt: use syscon regmap
- interface to configure pmu register
-In-Reply-To: <1386008082-28740-1-git-send-email-dianders@chromium.org>
-References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
-Message-ID: <1386267329-9941-1-git-send-email-dianders@chromium.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 5 Dec 2013 13:16:51 -0500
+Subject: [PATCH v2 1/4] Phy: DT binding documentation for Marvell MVEBU
+ SATA phy.
+In-Reply-To: <1386262263-18956-2-git-send-email-andrew@lunn.ch>
+References: <1386262263-18956-1-git-send-email-andrew@lunn.ch>
+ <1386262263-18956-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20131205181651.GR29282@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is not intended to land upon itself but is proposed fixup
-to Leela Krishna's patch (v11) that can be found at
-<https://patchwork.kernel.org/patch/3251841/>, potentially making a v12.
+On Thu, Dec 05, 2013 at 05:51:00PM +0100, Andrew Lunn wrote:
+> Describe the binding for the Marvell MVEBU SATA phy. This driver
+> can be used at least with Kirkwood, Dove and maybe others.
+> Additionally, update the SATA binding with the properties to link
+> to the phy nodes.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> v1->v2:
+> Correct #phy-cells
+> Correct number after @ to match first reg address.
 
-Posted so that I can build upon his patch with the fixups requested by
-Guenter, Olof, and Tomasz.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v2:
-- Added EXYNOS5 prefix to REG_OFFSET defines (Tomasz)
-- NEEDS_PMU_CONFIG => HAS_PMU_CONFIG (Olof, Guenter)
-- Move QUIRK_HAS_PMU_CONFIG to (Guenter)
 
- drivers/watchdog/s3c2410_wdt.c | 59 +++++++++++++++++++-----------------------
- 1 file changed, 27 insertions(+), 32 deletions(-)
+> Rename to mvebu-phy.txt
 
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 47f4dcf..6a00299 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -62,9 +62,9 @@
- #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
- #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
- 
--#define WDT_DISABLE_REG_OFFSET		0x0408
--#define WDT_MASK_RESET_REG_OFFSET	0x040c
--#define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
-+#define EXYNOS5_WDT_DISABLE_REG_OFFSET		0x0408
-+#define EXYNOS5_WDT_MASK_RESET_REG_OFFSET	0x040c
-+#define QUIRK_HAS_PMU_CONFIG			(1 << 0)
- 
- static bool nowayout	= WATCHDOG_NOWAYOUT;
- static int tmr_margin;
-@@ -128,17 +128,17 @@ static const struct s3c2410_wdt_variant drv_data_s3c2410 = {
- 
- #ifdef CONFIG_OF
- static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
--	.disable_reg = WDT_DISABLE_REG_OFFSET,
--	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
-+	.disable_reg = EXYNOS5_WDT_DISABLE_REG_OFFSET,
-+	.mask_reset_reg = EXYNOS5_WDT_MASK_RESET_REG_OFFSET,
- 	.mask_bit = 20,
--	.quirks = QUIRK_NEEDS_PMU_CONFIG
-+	.quirks = QUIRK_HAS_PMU_CONFIG
- };
- 
- static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
--	.disable_reg = WDT_DISABLE_REG_OFFSET,
--	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
-+	.disable_reg = EXYNOS5_WDT_DISABLE_REG_OFFSET,
-+	.mask_reset_reg = EXYNOS5_WDT_MASK_RESET_REG_OFFSET,
- 	.mask_bit = 0,
--	.quirks = QUIRK_NEEDS_PMU_CONFIG
-+	.quirks = QUIRK_HAS_PMU_CONFIG
- };
- 
- static const struct of_device_id s3c2410_wdt_match[] = {
-@@ -183,6 +183,10 @@ static int s3c2410wdt_mask_and_disable_reset(struct s3c2410_wdt *wdt, bool mask)
- 	u32 mask_val = 1 << wdt->drv_data->mask_bit;
- 	u32 val = 0;
- 
-+	/* No need to do anything if no PMU CONFIG needed */
-+	if (!(wdt->drv_data->quirks & QUIRK_HAS_PMU_CONFIG))
-+		return 0;
-+
- 	if (mask)
- 		val = mask_val;
- 
-@@ -460,7 +464,7 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
- 	wdt->wdt_device = s3c2410_wdd;
- 
- 	wdt->drv_data = get_wdt_drv_data(pdev);
--	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
-+	if (wdt->drv_data->quirks & QUIRK_HAS_PMU_CONFIG) {
- 		wdt->pmureg = syscon_regmap_lookup_by_phandle(dev->of_node,
- 							"samsung,syscon-phandle");
- 		if (IS_ERR(wdt->pmureg)) {
-@@ -537,11 +541,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
- 		goto err_cpufreq;
- 	}
- 
--	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
--		ret = s3c2410wdt_mask_and_disable_reset(wdt, false);
--		if (ret < 0)
--			goto err_unregister;
--	}
-+	ret = s3c2410wdt_mask_and_disable_reset(wdt, false);
-+	if (ret < 0)
-+		goto err_unregister;
- 
- 	if (tmr_atboot && started == 0) {
- 		dev_info(dev, "starting watchdog timer\n");
-@@ -586,11 +588,9 @@ static int s3c2410wdt_remove(struct platform_device *dev)
- 	int ret;
- 	struct s3c2410_wdt *wdt = platform_get_drvdata(dev);
- 
--	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
--		ret = s3c2410wdt_mask_and_disable_reset(wdt, true);
--		if (ret < 0)
--			return ret;
--	}
-+	ret = s3c2410wdt_mask_and_disable_reset(wdt, true);
-+	if (ret < 0)
-+		return ret;
- 
- 	watchdog_unregister_device(&wdt->wdt_device);
- 
-@@ -606,8 +606,7 @@ static void s3c2410wdt_shutdown(struct platform_device *dev)
- {
- 	struct s3c2410_wdt *wdt = platform_get_drvdata(dev);
- 
--	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG)
--		s3c2410wdt_mask_and_disable_reset(wdt, true);
-+	s3c2410wdt_mask_and_disable_reset(wdt, true);
- 
- 	s3c2410wdt_stop(&wdt->wdt_device);
- }
-@@ -623,11 +622,9 @@ static int s3c2410wdt_suspend(struct device *dev)
- 	wdt->wtcon_save = readl(wdt->reg_base + S3C2410_WTCON);
- 	wdt->wtdat_save = readl(wdt->reg_base + S3C2410_WTDAT);
- 
--	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
--		ret = s3c2410wdt_mask_and_disable_reset(wdt, true);
--		if (ret < 0)
--			return ret;
--	}
-+	ret = s3c2410wdt_mask_and_disable_reset(wdt, true);
-+	if (ret < 0)
-+		return ret;
- 
- 	/* Note that WTCNT doesn't need to be saved. */
- 	s3c2410wdt_stop(&wdt->wdt_device);
-@@ -645,11 +642,9 @@ static int s3c2410wdt_resume(struct device *dev)
- 	writel(wdt->wtdat_save, wdt->reg_base + S3C2410_WTCNT);/* Reset count */
- 	writel(wdt->wtcon_save, wdt->reg_base + S3C2410_WTCON);
- 
--	if (wdt->drv_data->quirks & QUIRK_NEEDS_PMU_CONFIG) {
--		ret = s3c2410wdt_mask_and_disable_reset(wdt, false);
--		if (ret < 0)
--			return ret;
--	}
-+	ret = s3c2410wdt_mask_and_disable_reset(wdt, false);
-+	if (ret < 0)
-+		return ret;
- 
- 	dev_info(dev, "watchdog %sabled\n",
- 		(wdt->wtcon_save & S3C2410_WTCON_ENABLE) ? "en" : "dis");
--- 
-1.8.5.1
+Ok, this follows samsung-phy.txt.
+
+> ---
+>  Documentation/devicetree/bindings/ata/marvell.txt  |  6 ++++++
+>  .../devicetree/bindings/phy/phy-mvebu.txt          | 22 ++++++++++++++++++++++
+
+but this does not... ?
+
+thx,
+
+Jason.
+
+>  2 files changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-mvebu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
+> index b5cdd20cde9c..e072fa105b49 100644
+> --- a/Documentation/devicetree/bindings/ata/marvell.txt
+> +++ b/Documentation/devicetree/bindings/ata/marvell.txt
+> @@ -6,11 +6,17 @@ Required Properties:
+>  - interrupts    : Interrupt controller is using
+>  - nr-ports      : Number of SATA ports in use.
+>  
+> +Optional Properties:
+> +- phys		: List of phandles to sata phys
+> +- phy-names	: Should be "0", "1", etc, one number per phandle
+> +
+>  Example:
+>  
+>  	sata at 80000 {
+>  		compatible = "marvell,orion-sata";
+>  		reg = <0x80000 0x5000>;
+>  		interrupts = <21>;
+> +		phys = <&sata_phy0>, <&sata_phy1>;
+> +		phy-names = "0", "1";
+>  		nr-ports = <2>;
+>  	}
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mvebu.txt b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+> new file mode 100644
+> index 000000000000..6cb3364aeafb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+> @@ -0,0 +1,22 @@
+> +* Marvell MVEBU SATA PHY
+> +
+> +Power control for the SATA phy found on Marvell MVEBU SoCs.
+> +
+> +This document extends the binding described in phy-bindings.txt
+> +
+> +Required properties :
+> +
+> + - reg		   : Offset and length of the register set for the SATA device
+> + - compatible	   : Should be "marvell,mvebu-sata-phy"
+> + - clocks	   : phandle of clock and specifier that supplies the device
+> + - clock-names	   : Should be "sata"
+> +
+> +Example:
+> +		sata-phy at 84000 {
+> +			compatible = "marvell,mvebu-sata-phy";
+> +			reg = <0x84000 0x0334>;
+> +			clocks = <&gate_clk 15>;
+> +			clock-names = "sata";
+> +			#phy-cells = <0>;
+> +			status = "ok";
+> +		};
+> -- 
+> 1.8.5
+> 
