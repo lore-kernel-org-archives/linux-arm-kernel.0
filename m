@@ -1,35 +1,76 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 5 Dec 2013 15:12:25 +0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131204184405.GE9468@ld-irv-0074.broadcom.com>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com>
- <5298AA23.7080404@st.com>
- <1386082273.18201.61.camel@shinybook.infradead.org>
- <20131204184405.GE9468@ld-irv-0074.broadcom.com>
-Message-ID: <20131205071224.GA8936@shlinux2.ap.freescale.net>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Thu, 5 Dec 2013 13:27:13 +0530
+Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
+ system
+In-Reply-To: <20131202213654.GA4059@roeck-us.net>
+References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
+ <20131202202120.GA23611@roeck-us.net>
+ <CAOesGMi-P6LG1-XKVizUS_qX-gfZi_iXBO5r+=6a2nfvBS60mw@mail.gmail.com>
+ <20131202213654.GA4059@roeck-us.net>
+Message-ID: <CAL1wa8cQcvRzXgaEP3kzkvzogqyeM2eJt_oRZfu6NbWxfP3zAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 10:44:05AM -0800, Brian Norris wrote:
-> 
-> I mostly bring this up, though, because it is an example of hardware
-> that
-> 
->    (a) can operate as a true SPI device (hardware (1) can handle generic
->        SPI transfers), but
->    (b) requires knowledge of the details of SPI flash in order to get
->        optimal usage out of the acceleration from (2).
-> 
-> In my book, point (a) and (b) hold some bearing over the question of
-> "where should this SPI NOR framework live", because it is reasonable
-> that a single driver for this hardware should be able to handle either
-> true SPI devices or accelerated SPI-NOR flash.
+Hi Guenter Roeck,
 
-We have add a @read_id hook for the spi-nor layer, you can use it to read out
-more info (such as the Device Geometry Definition) for your spi-nor controller driver.
+On Tue, Dec 3, 2013 at 3:06 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+>
+> On Mon, Dec 02, 2013 at 12:47:53PM -0800, Olof Johansson wrote:
+> > On Mon, Dec 2, 2013 at 12:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > > On Mon, Dec 02, 2013 at 10:14:41AM -0800, Doug Anderson wrote:
+> > >> A good watchdog driver is supposed to report when it was responsible
+> > >> for resetting the system.  Implement this for the s3c2410, at least on
+> > >> exynos5250 and exynos5420 where we already have a pointer to the PMU
+> > >> registers to read the information.
+> > >>
+> > >> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > >> ---
+> > >> This patch is based atop Leela Krishna's recent series that ends with
+> > >> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
+> > >> AKA <https://patchwork.kernel.org/patch/3251861/>.
+> > >>
+> > >>  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
+> > >>  1 file changed, 39 insertions(+), 3 deletions(-)
+> > >>
+> > >> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> > >> index 47f4dcf..2c87d37 100644
+> > >> --- a/drivers/watchdog/s3c2410_wdt.c
+> > >> +++ b/drivers/watchdog/s3c2410_wdt.c
+> > >> @@ -62,9 +62,13 @@
+> > >>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT               (0)
+> > >>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
+> > >>
+> > >> +#define RST_STAT_REG_OFFSET          0x0404
+> > >>  #define WDT_DISABLE_REG_OFFSET               0x0408
+> > >>  #define WDT_MASK_RESET_REG_OFFSET    0x040c
+> > >>  #define QUIRK_NEEDS_PMU_CONFIG               (1 << 0)
+> > >> +#define QUIRK_HAS_RST_STAT           (1 << 1)
+> > >> +#define QUIRKS_NEED_PMUREG           (QUIRK_NEEDS_PMU_CONFIG | \
+> > >> +                                      QUIRK_HAS_RST_STAT)
+> > >>
+> > > I am not really happy about the NEED (both of them, really) here.
+> > > How about HAS instead ?
+> >
+> > Ah, I just commented on these things on our internal review site too
+> > on this patch. I don't even think a quirk is needed -- just use the
+> > presence of a non-0 rst_stat_reg to tell if you need to use regmap.
+> >
+> Agreed; same is true for the QUIRK_NEEDS_PMU_CONFIG related registers
+> as well.
+>
 
-Is it okay?
+As Tomasz Figa suggested I introduced quirks,
 
-thanks
-Huang Shijie
+Tomasz,
+Any comments from you here...??
+
+
+Best wishes,
+Leela Krishna
+
+
+> Guenter
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
