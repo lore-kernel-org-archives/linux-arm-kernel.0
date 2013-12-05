@@ -1,30 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Dec 2013 00:09:28 +0000
-Subject: [PATCH 1/2] regulator: gpio-regulator: Add required
- regulator-type property
-In-Reply-To: <1385653493-9952-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385653493-9952-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131205000928.GI29268@sirena.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed,  4 Dec 2013 18:23:13 -0600
+Subject: [PATCH 1/2] cpufreq: enable ARM drivers on arm64
+In-Reply-To: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
+References: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1386202994-30784-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 04:44:52PM +0100, Laurent Pinchart wrote:
-> The gpio-regulator driver requires the regulator-type property to be
-> present. Document it as required in the DT bindings.
+From: Rob Herring <rob.herring@calxeda.com>
 
-It does?  That seems needless.  It should just default to voltage and
-provide a way override to current, though frankly I'd be astonished to
-see a GPIO controlled current regulator at all so I'm not sure I'd even
-bother writing the code for that until someone needs it.  As it is this
-will most likely just be noise in the DT files and wasted cycles parsing
-the property.
+Enable cpufreq and power kconfig menus on arm64 along with arm cpufreq
+drivers. The power menu is needed for OPP support. At least on Calxeda
+systems, the same cpufreq driver is used for arm and arm64 based
+systems.
 
-Please CC maintainers...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/bc4bd07d/attachment.sig>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: cpufreq at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+---
+ arch/arm64/Kconfig      | 8 ++++++++
+ drivers/cpufreq/Kconfig | 2 +-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 88c8b6c1..1808dd1 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -276,6 +276,14 @@ config SYSVIPC_COMPAT
+ 
+ endmenu
+ 
++menu "Power management options"
++
++source "kernel/power/Kconfig"
++
++source "drivers/cpufreq/Kconfig"
++
++endmenu
++
+ source "net/Kconfig"
+ 
+ source "drivers/Kconfig"
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index 38093e2..e26fdcd 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -195,7 +195,7 @@ source "drivers/cpufreq/Kconfig.x86"
+ endmenu
+ 
+ menu "ARM CPU frequency scaling drivers"
+-depends on ARM
++depends on ARM || ARM64
+ source "drivers/cpufreq/Kconfig.arm"
+ endmenu
+ 
+-- 
+1.8.3.2
