@@ -1,48 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 5 Dec 2013 08:04:06 +0000
-Subject: Boot time errors/warnings on snowball
-In-Reply-To: <20131204231756.GX16735@n2100.arm.linux.org.uk>
-References: <CAOesGMgwyU-fJWkiF+78US+vVZ7Ensku-j+O1UPFVt43WDfUsA@mail.gmail.com>
- <CACRpkda3V4bK3_QO76=++Gcm3pJp78G2L3pgAdaJb2NDcAJG6Q@mail.gmail.com>
- <20131204172626.GB26581@lee--X1>
- <CAOesGMjMWqPtJXh7-VAhyA1a95h7mKV8_UZhyTtxgEbUhU8_5Q@mail.gmail.com>
- <20131204175119.GD26581@lee--X1>
- <20131204231756.GX16735@n2100.arm.linux.org.uk>
-Message-ID: <20131205080406.GH26581@lee--X1>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 5 Dec 2013 00:11:01 -0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20131205071224.GA8936@shlinux2.ap.freescale.net>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+ <5298AA23.7080404@st.com>
+ <1386082273.18201.61.camel@shinybook.infradead.org>
+ <20131204184405.GE9468@ld-irv-0074.broadcom.com>
+ <20131205071224.GA8936@shlinux2.ap.freescale.net>
+Message-ID: <20131205081101.GA4636@norris.computersforpeace.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I know that you've had a bee in your bonnet about the rate of which I
-> > sent patches for a while, but this instance has nothing to do with
-> > rushing. This is merely an ordering issue and the speed in which
-> > varying subsystems are merged into -next.
+On Thu, Dec 05, 2013 at 03:12:25PM +0800, Huang Shijie wrote:
+> On Wed, Dec 04, 2013 at 10:44:05AM -0800, Brian Norris wrote:
 > > 
-> > This is what -next is for though right? To identify these kinds of
-> > decencies before they're merged into Mainline. So let's do something
-> > about it now. I'm not sure what though, as I know that Mark isn't fond
-> > of rebasing his tree.
+> > I mostly bring this up, though, because it is an example of hardware
+> > that
+> > 
+> >    (a) can operate as a true SPI device (hardware (1) can handle generic
+> >        SPI transfers), but
+> >    (b) requires knowledge of the details of SPI flash in order to get
+> >        optimal usage out of the acceleration from (2).
+> > 
+> > In my book, point (a) and (b) hold some bearing over the question of
+> > "where should this SPI NOR framework live", because it is reasonable
+> > that a single driver for this hardware should be able to handle either
+> > true SPI devices or accelerated SPI-NOR flash.
 > 
-> You can't solve dependencies by "tree X needs to merge before tree Y
-> otherwise Z breaks", period.
+> We have add a @read_id hook for the spi-nor layer, you can use it to read out
+> more info (such as the Device Geometry Definition) for your spi-nor controller driver.
 > 
-> It gives the _illusion_ that it solves it, but it doesn't.  Just try
-> doing a git bisect and hitting commits in tree Y without tree X being
-> merged.  By doing it this way, you're basically telling people that
-> you can't bisect a merge window.  The merge window is _precisely_ the
-> period where we need bisectability to find bugs.
+> Is it okay?
 
-Right, Olof was already kind enough to point this out:
+I'm not sure which @read_id hook you're talking about, as I've only
+skimmed the most recent thread, and it's not in the last patch series I
+have from you, I don't think. But that is not a response at all to the
+points I brought up. My statements have nothing to do with device
+geometry detection.
 
- "It can be done. It's unfortunate to lose bisectability though (since
-  when you bisect you can end up in a state where the ASoC patches are
-  enabled but not the ux500 counterparts. Setting up a shared branch
-  is indeed the best (only) way to solve that. Next time around we
-  should do so."
- 
-Which reminded me of "how git works"; non-linear history, yada yada.
+What I was actually addressing:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Your framework aligns with Mark's original suggestion: that the "SPI
+NOR" framework should be a separate layer held entirely within the MTD
+subsystem, and that any given driver is *either* a "SPI NOR" driver *or*
+a "true SPI" driver, not both.
+
+I'm simply describing how my hardware is both, and perhaps (as David
+seems to be doing) we should reconsider the premise that this framework
+will exist solely and entirely within MTD.
+
+Brian
