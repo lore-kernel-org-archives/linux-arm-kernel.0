@@ -1,35 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Dec 2013 20:35:19 +0000
-Subject: [PATCH 1/2] cpufreq: enable ARM drivers on arm64
-In-Reply-To: <52A0DC28.1040001@gmail.com>
-References: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
- <1386202994-30784-2-git-send-email-robherring2@gmail.com>
- <20131205181606.GY29268@sirena.org.uk> <52A0DC28.1040001@gmail.com>
-Message-ID: <20131205203519.GA29268@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Dec 2013 21:40:42 +0100
+Subject: [RFC part1 PATCH 5/7] ARM64 / ACPI: Introduce arm_core.c and its
+ related head file
+In-Reply-To: <52A084EB.5010103@linaro.org>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <201312050438.05117.arnd@arndb.de> <52A084EB.5010103@linaro.org>
+Message-ID: <201312052140.42269.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 02:03:52PM -0600, Rob Herring wrote:
+On Thursday 05 December 2013, Hanjun Guo wrote:
+> On 2013?12?05? 11:38, Arnd Bergmann wrote:
+> > On Tuesday 03 December 2013, Hanjun Guo wrote:
+> >> +static unsigned int gsi_to_irq(unsigned int gsi)
+> >> +{
+> >> +       int irq = irq_create_mapping(NULL, gsi);
+> >> +
+> >> +       return irq;
+> >> +}
+> > I think this could use a comment regarding your plans for IRQ domains.
+> >
+> > Do you expect that all ACPI systems would have only a single GIC IRQ
+> > controller and a single domain, or do you plan to add irqdomain code
+> > later?
+> 
+> we added irqdomain code in the part2 patch set, is that the code ok
+> with you?
 
-> Will do, but I'm surprised we're at the point on arm64 of needing LSK.
+I don't see where it gets added. Do you mean "[RFC part2 PATCH 8/9] ACPI /
+ARM64: Update acpi_register_gsi to register with the core IRQ subsystem"?
+That still just uses a single domain.
 
-ARMv8 isn't just for servers, and of course there's the desire to have
-the software as ready as early as it can be!
+When we talked about ACPI support at Linaro connect, someone mentioned
+that the ACPI spec does have the concept of IRQ domains, but it seems
+they are not implemented by Linux.
 
-> There's a couple of subsystems that need enabling. I've posted EDAC
-> patches (need to send v3). cpuidle is another. Probably some more I
-> haven't looked at.
+How do you get a mapping for an IRQ on a secondary irqchip such as
+a GPIO extender?
 
-Right, cpuidle is in progress - Lorenzo has been posting patches for
-that:  
-
-   http://lwn.net/Articles/574950/
-
-There's some active work in the trace and debug area too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/d2c54368/attachment.sig>
+	Arnd
