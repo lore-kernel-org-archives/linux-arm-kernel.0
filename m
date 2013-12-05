@@ -1,44 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 04:43:21 +0100
-Subject: [RFC part3 PATCH 1/2] clocksource / arch_timer: Use ACPI GTDT
- table to initialize arch timer
-In-Reply-To: <1386088891-2917-2-git-send-email-hanjun.guo@linaro.org>
-References: <1386088891-2917-1-git-send-email-hanjun.guo@linaro.org>
- <1386088891-2917-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <201312050443.21858.arnd@arndb.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Dec 2013 12:45:54 +0900
+Subject: [PATCH 2/2] ARM: shmobile: armadillo: Set vccq_sdhi0 regulator
+ type in DT
+In-Reply-To: <1385653493-9952-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385653493-9952-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131205034554.GB20388@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 December 2013, Hanjun Guo wrote:
+On Thu, Nov 28, 2013 at 04:44:53PM +0100, Laurent Pinchart wrote:
+> The mandatory regulator-type property is missing, add it.
 
-> +#ifdef CONFIG_ACPI
-> +void __init arch_timer_acpi_init(void)
-> +{
-...
-> +}
-> +#else
-> +void __init arch_timer_acpi_init(void) { return; };
-> +#endif
->  
+Thanks, I will queue this up.
 
-The #else clause is broken in combination with 
-
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index 6d26b40..2654edf 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -66,6 +66,11 @@ static inline struct timecounter *arch_timer_get_timecounter(void)
->  	return NULL;
->  }
->  
-> +static inline void arch_timer_acpi_init(void)
-> +{
-> +	return;
-> +}
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> index 7b80f19..013a7cd 100644
+> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> @@ -53,6 +53,8 @@
+>  		regulator-name = "SDHI0 VccQ";
+>  		regulator-min-microvolt = <1800000>;
+>  		regulator-max-microvolt = <3300000>;
+> +		regulator-type = "voltage";
 > +
->  #endif
+>  		vin-supply = <&vcc_sdhi0>;
 >  
-
-this inline function. Have you build-tested this with CONFIG_ACPI disabled?
-
-	Arnd
+>  		enable-gpio = <&pfc 74 GPIO_ACTIVE_HIGH>;
+> -- 
+> 1.8.3.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
