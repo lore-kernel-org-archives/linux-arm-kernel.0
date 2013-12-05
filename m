@@ -1,70 +1,41 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Thu, 05 Dec 2013 20:48:03 +0900
-Subject: [GIT PULL] s3c64xx dmaengine conversion
-In-Reply-To: <2721712.y1VtH8x62I@amdc1227>
-References: <20131124145011.GA14725@sirena.org.uk>
- <CAOesGMj2uun+0Kr0yKtpHs_0FntJ_rnYGeM8hs+DjpT8Nn-bwg@mail.gmail.com>
- <2721712.y1VtH8x62I@amdc1227>
-Message-ID: <000401cef1af$dcdfd330$969f7990$@kernel.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 5 Dec 2013 11:50:15 +0000
+Subject: [PATCH] ASoC: samsung: Initialize the dma_data for secondary dai
+In-Reply-To: <CAAgF-BdqRzB5MxTf_9nZkgSOY=F6dGAs0yhTkNHqrUQLonFAsw@mail.gmail.com>
+References: <1385632932-16579-1-git-send-email-padma.v@samsung.com>
+ <20131128113800.GB27568@sirena.org.uk>
+ <CAAgF-BdqRzB5MxTf_9nZkgSOY=F6dGAs0yhTkNHqrUQLonFAsw@mail.gmail.com>
+Message-ID: <20131205115015.GP29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> On Wednesday 04 of December 2013 13:38:39 Olof Johansson wrote:
-> > On Sun, Nov 24, 2013 at 6:50 AM, Mark Brown <broonie@kernel.org> wrote:
-> > > The following changes since commit
-> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> > >
-> > >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> > >
-> > > are available in the git repository at:
-> > >
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git
-> tags/s3c64xx-dmaengine
-> > >
-> > > for you to fetch changes up to
-> 3faecea70b0d6d050e0ae911032ec340341dc389:
-> > >
-> > >   spi: s3c64xx: Always select S3C64XX_PL080 when ARCH_S3C64XX is
-> enabled (2013-11-24 14:38:25 +0000)
-> > >
-> > > ----------------------------------------------------------------
-> > > ARM: s3c64xx: Convert to dmaengine
-> > >
-> > > This series of commits from Tomasz converting s3c64xx to use dmaengine
-> > > rather than the old s3c-dma API missed the v3.13 merge window - Kukjin
-> > > said that he'd applied it (which should mean it's OK from a review
-> point
-> > > of view) but it didn't make it into -next or a pull request.
-> > >
-> > > Since a s3c64xx based system is one of my primary development
-> platforms
-> > > it'd be really helpful if I could merge this into both ASoC and SPI,
-> > > I've got some patches for ASoC ready to go converting to use dmaengine
-> > > directly which help with multiplatform and there's some other
-> dmaengine
-> > > work for SPI in progress too.  I've therefore made this signed tag,
-> it'd
-> > > be great if it could be merged into both arm-soc and those two trees.
-> > >
-> > > ----------------------------------------------------------------
-> > >
-> > > I'm open to other ideas for doing this, I'd just really like to see
-> the
-> > > code building on this go in this cycle so anything that accomplishes
-> > > that is good for me.
-> >
-> > It's been 10 days and Kukjin hasn't moved on this, nor replied. I'm
-> > going to merge it into arm-soc as samsung/s3c64xx-dmaengine ->
-> > next/drivers so that you can use the branch as a base for your work.
-> 
-Oops, I have no idea why I missed that :-(
-Sorry about that. Olof, thanks for your taking anyway.
+On Thu, Dec 05, 2013 at 04:33:19PM +0530, Padma Venkat wrote:
+> On Thu, Nov 28, 2013 at 5:08 PM, Mark Brown <broonie@kernel.org> wrote:
 
-- Kukjin
+> > Why don't we need this fix for mainline?  The dmaengine change is just
+> > moving the initialisation through a layer of indirection but there was
+> > initialisation anyway.  I'm concerned that there's a bug that ought to
+> > be fixed for v3.13 as well here.
 
-> OK, thanks.
-> 
-> Best regards,
-> Tomasz
+> Yes. We need this for mainline. Not dependent on your dmaengine changes.
+
+Ah, just saw this one - I'll cook up a version of it, due to the
+refactoring the change doesn't apply directly to v3.13.
+
+> >>       return snd_dmaengine_pcm_register(dev, &samsung_dmaengine_pcm_config,
+> >> -                                       SND_DMAENGINE_PCM_FLAG_COMPAT);
+> >> +                                       SND_DMAENGINE_PCM_FLAG_COMPAT |
+> >> +                             SND_DMAENGINE_PCM_FLAG_CUSTOM_CHANNEL_NAME);
+
+> > This is already done.
+
+> Should I send another patch by removing this flag from this patch?
+
+No need.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/4bc67a76/attachment.sig>
