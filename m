@@ -1,29 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Dec 2013 03:46:08 +0100
-Subject: [PATCH V3] dma: tegra: register as an OF DMA controller
-In-Reply-To: <529F65E6.9050606@wwwdotorg.org>
-References: <1386102787-21839-1-git-send-email-swarren@wwwdotorg.org>
- <201312040234.09708.arnd@arndb.de> <529F65E6.9050606@wwwdotorg.org>
-Message-ID: <201312050346.09225.arnd@arndb.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Dec 2013 11:50:04 +0900
+Subject: [PATCH 00/04] ARM: shmobile: Use SoC suffix for INTC compat string
+In-Reply-To: <CANqRtoQ4fsCm=-uw8BgN48wFs_iTaG-H_kjDvcZssJXZqE8VTA@mail.gmail.com>
+References: <20131127231450.29081.98054.sendpatchset@w520>
+ <20131128064555.GA14878@verge.net.au>
+ <CANqRtoQ4fsCm=-uw8BgN48wFs_iTaG-H_kjDvcZssJXZqE8VTA@mail.gmail.com>
+Message-ID: <20131205025001.GF21443@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 December 2013, Stephen Warren wrote:
-> > 
-> > We really need to be better at having a common set of rules regarding what
-> > it actually means to set the slave_id through dma_slave_config(). IMHO
-> > we should just treat it as a bug for any dmaengine driver that is configured
-> > through DT, or we should get rid of this entirely.
+On Wed, Dec 04, 2013 at 08:21:42PM +0100, Magnus Damm wrote:
+> On Thu, Nov 28, 2013 at 7:45 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Nov 28, 2013 at 08:14:50AM +0900, Magnus Damm wrote:
+> >> ARM: shmobile: Use SoC suffix for INTC compat string
+> >>
+> >> [PATCH 01/04] ARM: shmobile: Use sh73a0 suffix for INTC compat string
+> >> [PATCH 02/04] ARM: shmobile: Use r8a7740 suffix for INTC compat string
+> >> [PATCH 03/04] ARM: shmobile: Use r8a7778 suffix for INTC compat string
+> >> [PATCH 04/04] ARM: shmobile: Use r8a7779 suffix for INTC compat string
+> >>
+> >> Update the DTS for INTC irqpin devices to include the SoC in the compat string.
+> >>
+> >> Both IRQC and INTC irqpin need documentation for the DT bindings, and this
+> >> will happen in incremental patches.
+> >
+> > I have posted some patches for that a few moments ago :)
 > 
-> By the end of this series (for the Tegra driver) I can remove those "+"
-> lines you quoted above; the slave ID will only come from DT through
-> of_xlate, and any slave ID in the slave_config will simply be ignored.
+> Thanks for that!
+> 
+> > I am curious to if it is intentional that this series replaces
+> > the use of less-specific compat strings with more specific ones
+> > while the recent update to the r8a7790 supplemented the
+> > less-specific renesas,irqc comat string with the more-specific
+> > renesas,irqc-r8a7790 compat string.
+> >
+> > i.e.
+> >         before: "renesas,intc-irqpin"
+> >         after:  "renesas,intc-irqpin-sh73a0"
+> >
+> >         as opposed to
+> >
+> >         before: "renesas,irqc"
+> >         after: "renesas,irqc-r8a7790", "renesas,irqc"
+> 
+> My intention is to keep them the same. I just checked the intc-irqpin
+> patches but they seem to be following the same style as IRQC. On which
+> SoC did you observe this difference?
 
-Ok, that's certainly a step in the right direction. However, as I said
-my comment wasn't really directed at you and I think it's more important
-to have a clear policy that we can enforce across all dmaengine drivers.
-
-It's really up to Vinod and Dan to decide how it should be handled
-in general.
-
-	Arnd
+Sorry, ignore this. I was confused.
