@@ -1,51 +1,76 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 5 Dec 2013 15:15:39 +0000
-Subject: [PATCH] ARM/KVM: inject data abort on unhandled memory access
-In-Reply-To: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
-References: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
-Message-ID: <CAFEAcA8tsdMjok8EQe-2ybuuCn_g7ZEYROwSPVcwr5A1VyrOVA@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 05 Dec 2013 15:19:23 +0000
+Subject: [PATCH V5 1/6] efi-stub.txt updates for ARM
+In-Reply-To: <1385595115-21488-2-git-send-email-roy.franz@linaro.org>
+References: <1385595115-21488-1-git-send-email-roy.franz@linaro.org> <
+ 1385595115-21488-2-git-send-email-roy.franz@linaro.org>
+Message-ID: <20131205151923.E5B9CC40785@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 December 2013 15:10, Andre Przywara <andre.przywara@linaro.org> wrote:
-> If a KVM guest accesses memory that is outside its memory map (so no
-> MMIO and no RAM), KVM will return -ENOSYS to userland, causing QEMU
-> to do an abort() and kill the whole guest. This happens while
-> executing dmidecode on ARM, which mmaps /dev/mem and scans the first
-> Megabyte of memory for a DMI BIOS signature (sic!).
-> Of course this is silly, but in any case crashing the whole guest
-> does not seems appropriate.
-> So lets mimic native hardware's behavior in this case and inject a
-> Data Abort exception into the guest. In the previous case this will
-> crash dmidecode with SIGSEGV, but keeps the guest alive.
+On Wed, 27 Nov 2013 15:31:50 -0800, Roy Franz <roy.franz@linaro.org> wrote:
+> Update efi-stub.txt documentation to be more general
+> and not x86 specific.  Add ARM only "dtb=" command
+> line option description.
+> 
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
 
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -183,7 +183,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->                         return ret;
->         } else {
->                 kvm_err("load/store instruction decoding not implemented\n");
-> -               return -ENOSYS;
-> +               kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-> +               return 1;
->         }
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-This seems like it's mixing two different error cases:
- (1) guest tries to access something with nothing backing it at all
- -> should definitely cause a guest Data Abort
- (2) guest tries to access something (whether at a valid device address
- or not) with a "complex" instruction like LDM/STM which we can't deal
- without emulating it
-
-The error message you've removed relates to (2). I think there's a reasonable
-case to make for "log and reflect back into guest as a Data Abort"; silently
-Data Aborting seems a bit cryptic.
-
-Of course if the guest tries to do a memcpy() on the device memory
-(which IIRC is what is happening with dmidecode in this case) then it's
-very likely to hit case (2).
-
-Or we could try to get the ldm/stm emulation code upstream :-)
-
-thanks
--- PMM
+> ---
+>  Documentation/efi-stub.txt |   27 ++++++++++++++++++++-------
+>  1 file changed, 20 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+> index 44e6bb6..19e897c 100644
+> --- a/Documentation/efi-stub.txt
+> +++ b/Documentation/efi-stub.txt
+> @@ -1,13 +1,16 @@
+>  			  The EFI Boot Stub
+>  		     ---------------------------
+>  
+> -On the x86 platform, a bzImage can masquerade as a PE/COFF image,
+> -thereby convincing EFI firmware loaders to load it as an EFI
+> -executable. The code that modifies the bzImage header, along with the
+> -EFI-specific entry point that the firmware loader jumps to are
+> -collectively known as the "EFI boot stub", and live in
+> +On the x86 and ARM platforms, a kernel zImage/bzImage can masquerade
+> +as a PE/COFF image, thereby convincing EFI firmware loaders to load
+> +it as an EFI executable. The code that modifies the bzImage header,
+> +along with the EFI-specific entry point that the firmware loader
+> +jumps to are collectively known as the "EFI boot stub", and live in
+>  arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
+> -respectively.
+> +respectively.  For ARM the EFI stub is implemented in
+> +arch/arm/boot/compressed/efi-header.S and
+> +arch/arm/boot/compressed/efi-stub.c.  EFI stub code that is shared
+> +between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+>  
+>  By using the EFI boot stub it's possible to boot a Linux kernel
+>  without the use of a conventional EFI boot loader, such as grub or
+> @@ -23,7 +26,9 @@ The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
+>  System Partiion (ESP) and renamed with the extension ".efi". Without
+>  the extension the EFI firmware loader will refuse to execute it. It's
+>  not possible to execute bzImage.efi from the usual Linux file systems
+> -because EFI firmware doesn't have support for them.
+> +because EFI firmware doesn't have support for them.  For ARM the
+> +arch/arm/boot/zImage should be copied to the system partition, and it
+> +may not need to be renamed.
+>  
+>  
+>  **** Passing kernel parameters from the EFI shell
+> @@ -63,3 +68,11 @@ Notice how bzImage.efi can be specified with a relative path. That's
+>  because the image we're executing is interpreted by the EFI shell,
+>  which understands relative paths, whereas the rest of the command line
+>  is passed to bzImage.efi.
+> +
+> +
+> +**** The "dtb=" option
+> +
+> +For the ARM architecture, we also need to be able to provide a device
+> +tree to the kernel.  This is done with the "dtb=" command line option,
+> +and is process in the same manner as the "initrd=" option that is described
+> +above.
+> -- 
+> 1.7.10.4
+> 
