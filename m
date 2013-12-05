@@ -1,32 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 Dec 2013 00:09:54 +0100
-Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
- maps and map logical cpu id to APIC id
-In-Reply-To: <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
-References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
- <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
- <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
-Message-ID: <201312060009.54801.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Dec 2013 16:16:02 -0700
+Subject: [PATCH 2/4] ARM: tegra: add pinmux controller to tegra124.dtsi
+In-Reply-To: <1386241070-4350-3-git-send-email-ldewangan@nvidia.com>
+References: <1386241070-4350-1-git-send-email-ldewangan@nvidia.com>
+ <1386241070-4350-3-git-send-email-ldewangan@nvidia.com>
+Message-ID: <52A10932.1040903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 December 2013, Rob Herring wrote:
-> > index a0c2ca6..1428024 100644
-> > --- a/arch/arm64/kernel/smp.c
-> > +++ b/arch/arm64/kernel/smp.c
-> > @@ -420,7 +420,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
-> >                 if (err)
-> >                         continue;
-> >
-> > +#ifndef CONFIG_ACPI
-> >                 set_cpu_present(cpu, true);
-> > +#endif
-> 
-> Should this be moved to DT cpu topology related code?
+On 12/05/2013 03:57 AM, Laxman Dewangan wrote:
+> The tegra124 pinmux controller is identical to tegra114 with
+> removing some of existing pins from T114 and adding new pins.
 
-More importantly, the #ifndef is certainly wrong here: It is important that you can
-turn CONFIG_ACPI on or off without impacting the run-time code path for non-ACPI
-systems. The snippet above breaks this because we no longer set the
-cpu mask when ACPI is turned on but not used.
+I already sent this patch.
 
-	Arnd
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+
+> +	pinmux: pinmux {
+
+Note that the rules for DT node naming have changed recently. Node name
+must include a unit address if the node includes a reg property, and not
+include a unit address otherwise. So, that should be:
+
++	pinmux: pinmux at 70000868 {
+
+The patch I sent already does that.
