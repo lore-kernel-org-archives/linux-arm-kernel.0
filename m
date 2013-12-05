@@ -1,15 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Dec 2013 22:24:55 -0700
-Subject: [PATCH 1/2] ARM: bcm2835: rebuild bcm2835_defconfig
-In-Reply-To: <1386131576-21137-1-git-send-email-swarren@wwwdotorg.org>
-References: <1386131576-21137-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <52A00E27.5090907@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Dec 2013 14:28:11 +0900
+Subject: [PATCH v2 0/3] ARM: shmobile: marzen: enable HSPI0 to DTS
+In-Reply-To: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
+References: <1385452032-11544-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20131205052810.GI12774@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2013 09:32 PM, Stephen Warren wrote:
-> This is simply "make bcm2835_defconfig ; make savedefconfig". It
-> separates out the irrelevant changes from the later patches for
-> clarity.
+On Tue, Nov 26, 2013 at 04:47:09PM +0900, Simon Horman wrote:
+> Hi,
+> 
+> this short series enables HSPI0 in DTS for the r8a7779 based marzen board.
+> It is based on work by Kuninori Morimoto for the r8a7778 based bockw board.
+> 
+> This series is based on the renesas-devel-v3.13-rc1-20131124 tag
+> of my renesas tree.
+> 
+> v2
+> * Correct clock suffixes in
+>   "ARM: shmobile: r8a7779: add HSPI clock support for DT".
+>   They should be ".spi" to match
+>   "ARM: shmobile: r8a7779: add HSPI support to DTSI"
+> 
+> Simon Horman (3):
+>   ARM: shmobile: r8a7779: add HSPI clock support for DT
+>   ARM: shmobile: r8a7779: add HSPI support to DTSI
+>   ARM: shmobile: marzen: enable HSPI0 in DTS
+> 
+>  arch/arm/boot/dts/r8a7779-marzen-reference.dts | 11 ++++++++++
+>  arch/arm/boot/dts/r8a7779.dtsi                 | 30 ++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/clock-r8a7779.c         |  3 +++
+>  3 files changed, 44 insertions(+)
 
-I've squashed this series into bcm2835's for-3.14/defconfig branch.
+I will queue these up.
