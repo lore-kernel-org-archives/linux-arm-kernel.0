@@ -1,95 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 05 Dec 2013 12:53:32 +0000
-Subject: [PATCH 2/3] doc: arm64: add description of EFI stub support
-In-Reply-To: <1385762712-17043-3-git-send-email-msalter@redhat.com>
-References: <1385762712-17043-1-git-send-email-msalter@redhat.com> <
- 1385762712-17043-3-git-send-email-msalter@redhat.com>
-Message-ID: <20131205125332.5977FC407BC@trevor.secretlab.ca>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu, 5 Dec 2013 13:58:06 +0100
+Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
+In-Reply-To: <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
+References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
+ <1385656883-4420-2-git-send-email-leif.lindholm@linaro.org>
+ <CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com>
+ <20131202210719.GQ24997@rocoto.smurfnet.nu>
+ <CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com>
+Message-ID: <20131205125805.GX24997@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Nov 2013 17:05:11 -0500, Mark Salter <msalter@redhat.com> wrote:
+On Wed, Dec 04, 2013 at 03:06:47PM -0600, Matt Sealey wrote:
+> By the time we get half-way through arm/kernel/head.S the cache and
+> MMU has been turned off and on and off again by the decompressor, and
+> after a large amount of guesswork and arbitrary restriction-based
+> implementation, there's no guarantee that the kernel hasn't been
+> decompressed over some important UEFI feature or some memory hasn't
+> been trashed. You can't make that guarantee because by entering the
+> plain zImage, you forfeited that information. This is at worst case
+> going to be lots of blank screens and blinking serial console prompts
+> and little more than frustration..
 
-Even documentation updates should have a mildly sane commit text. State
-why these changes came about. Give a future reader at least some clues
-as to why these changes were made now.
+So, Grant covered the reason _why_ we coexist with zImage, so I won't
+go into that. I will however point out that we are explicitly using the
+UEFI interfaces to allocate the regions the zImage will decompress into.
+This isn't guesswork, and has in fact already turned up issues with a
+couple of UEFI board ports that reserved memory near 0 (which were
+indeed previously being silently overwritten by the kernel
+decompression).
 
-Otherwise:
+We _are_ planning to do more development for subsequent patches, making
+more use of the UEFI memory map. And by subsequent, I mean hopefully in
+time for 3.14. I sneekily included this in the version of uefi.txt sent
+out for separate review early November:
+http://permalink.gmane.org/gmane.linux.kernel.efi/2657, but not in
+the one included with this patch set (since the code isn't there yet).
+But we considered it more important to get the basic support ready
+first.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+At that point, you will see the stub reading the dram_base from the
+UEFI memory map rather than DT, and memblock_init getting its input
+from there too.
 
-g.
+Regards,
 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: matt.fleming at intel.com
-> CC: linux-efi at vger.kernel.org
-> CC: linux-doc at vger.kernel.org
-> CC: Rob Landley <rob@landley.net> 
-> CC: Leif Lindholm <leif.lindholm@linaro.org>
-> CC: roy.franz at linaro.org
-> ---
->  Documentation/arm64/booting.txt |  4 ++++
->  Documentation/efi-stub.txt      | 10 ++++++++--
->  2 files changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index a9691cc..aa95d38c 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -85,6 +85,10 @@ The decompressed kernel image contains a 64-byte header as follows:
->  Header notes:
->  
->  - code0/code1 are responsible for branching to stext.
-> +- when booting through EFI, code0/code1 are initially skipped.
-> +  res5 is an offset to the PE header and the PE header has the EFI
-> +  entry point (efi_stub_entry). When the stub has done its work, it
-> +  jumps to code0 to resume the normal boot process.
->  
->  The image must be placed at the specified offset (currently 0x80000)
->  from the start of the system RAM and called there. The start of the
-> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
-> index 19e897c..c2a4b11 100644
-> --- a/Documentation/efi-stub.txt
-> +++ b/Documentation/efi-stub.txt
-> @@ -12,6 +12,11 @@ arch/arm/boot/compressed/efi-header.S and
->  arch/arm/boot/compressed/efi-stub.c.  EFI stub code that is shared
->  between architectures is in drivers/firmware/efi/efi-stub-helper.c.
->  
-> +For arm64, there is no compressed kernel support, so the Image itself
-> +masquerades as a PE/COFF image and the EFI stub is linked into the
-> +kernel. The arm64 EFI stub lives in arch/arm64/kernel/efi-entry.S
-> +and arch/arm64/kernel/efi-stub.c.
-> +
->  By using the EFI boot stub it's possible to boot a Linux kernel
->  without the use of a conventional EFI boot loader, such as grub or
->  elilo. Since the EFI boot stub performs the jobs of a boot loader, in
-> @@ -28,7 +33,8 @@ the extension the EFI firmware loader will refuse to execute it. It's
->  not possible to execute bzImage.efi from the usual Linux file systems
->  because EFI firmware doesn't have support for them.  For ARM the
->  arch/arm/boot/zImage should be copied to the system partition, and it
-> -may not need to be renamed.
-> +may not need to be renamed. Similarly for arm64, arch/arm64/boot/Image
-> +should be copied but not necessarily renamed.
->  
->  
->  **** Passing kernel parameters from the EFI shell
-> @@ -72,7 +78,7 @@ is passed to bzImage.efi.
->  
->  **** The "dtb=" option
->  
-> -For the ARM architecture, we also need to be able to provide a device
-> +For ARM and arm64 architecture, we also need to be able to provide a device
->  tree to the kernel.  This is done with the "dtb=" command line option,
->  and is process in the same manner as the "initrd=" option that is described
->  above.
-> -- 
-> 1.8.3.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Leif
