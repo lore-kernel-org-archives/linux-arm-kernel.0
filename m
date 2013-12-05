@@ -1,56 +1,87 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Dec 2013 15:34:38 +0000
-Subject: [PATCH v2] arm64: enable EDAC on arm64
-In-Reply-To: <CAL_JsqLa-EPEnV=H1rU2Ex_h=tkZCmh2TvwAcSnbhzzvfR2oCw@mail.gmail.com>
-References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
- <20131126153747.GC692@arm.com>
- <CAL_JsqJLf-kjzafMJ=wh_ZZa63SOMKy20M_5xjy9GRdofiZVCA@mail.gmail.com>
- <20131205115142.GD17165@arm.com>
- <CAL_JsqLa-EPEnV=H1rU2Ex_h=tkZCmh2TvwAcSnbhzzvfR2oCw@mail.gmail.com>
-Message-ID: <20131205153438.GE974@darko.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 5 Dec 2013 18:35:00 +0200
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <20131203232445.GX8277@htj.dyndns.org>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131203232445.GX8277@htj.dyndns.org>
+Message-ID: <52A0AB34.2030703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 01:52:23PM +0000, Rob Herring wrote:
-> On Thu, Dec 5, 2013 at 5:51 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, Dec 05, 2013 at 12:53:33AM +0000, Rob Herring wrote:
-> >> On Tue, Nov 26, 2013 at 9:37 AM, Catalin Marinas
-> >> <catalin.marinas@arm.com> wrote:
-> >> > On Fri, Nov 22, 2013 at 09:05:08PM +0000, Rob Herring wrote:
-> >> >> +static inline void atomic_scrub(void *va, u32 size)
-> >> >> +{
-> >> >> +     unsigned int *virt_addr = va;
-> >> >> +     unsigned int i;
-> >> >> +
-> >> >> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
-> >> >
-> >> > BTW, maybe the compiler is smart enough to drop the i but why not just
-> >> > use a int *last_addr = va + size - 3; and just compare against this?
-> >>
-> >> Evidently, the compiler is not that smart. Here's what I ended up
-> >> with. There's no need to subtract 3 that I can see:
-> >>
-> >> unsigned int *last_addr = va + size;
-> >> for (; virt_addr < last_addr; virt_addr++) {
-> >
-> > The 3 thing was for size not multiple of 4. Do we have any guarantees
-> > here?
-> 
-> Only that no one does ECC on less that 64-bit wide DDR. I'm only
-> assuming 32-bit alignment and that is what all the other
-> implementations assume.
-> 
-> If we have a non-multiple of 4 size, then we want to expand the size
-> to include the partial bytes. This function is a nop effectively, so
-> the fact that we may touch 1-3 extra bytes at the end does not matter.
-> The only thing subtracting 3 does is mean the comparison needs to be
-> '<=' instead of '<'. It would also break if you had a size of 1 or 2.
-> I think what you intended was to align size, but you really need to
-> add 3 and mask it to do that. But that is not necessary in my version.
+Hi Tejun,
 
-What I wanted was to make sure it doesn't write more bytes than size. If
-you think it's safe to write the extra bytes, than you don't need any
-subtraction.
+On 12/04/2013 01:24 AM, Tejun Heo wrote:
+> Hello,
+> 
+> On Mon, Dec 02, 2013 at 09:27:23PM -0500, Santosh Shilimkar wrote:
+>> So we add equivalent APIs so that we can replace usage of bootmem
+>> with memblock interfaces. Architectures already converted to NO_BOOTMEM
+>> use these new interfaces and other which still uses bootmem, these new
+>> APIs just fallback to exiting bootmem APIs. So no functional change as
+>> such.
+> 
+> The last part of the second last sentence doesn't parse too well.  I
+> think it'd be worthwhile to improve and preferably expand on it as
+> this is a bit tricky to understand given the twisted state of early
+> memory allocation.
+> 
+>> In long run, once all the achitectures moves to NO_BOOTMEM, we can get rid of
+>> bootmem layer completely. This is one step to remove the core code dependency
+>> with bootmem and also gives path for architectures to move away from bootmem.
+> 
+> Lines too long?
+> 
 
--- 
-Catalin
+[...]
+
+> 
+>> +/* FIXME: Move to memblock.h at a point where we remove nobootmem.c */
+>> +void *memblock_virt_alloc_try_nid_nopanic(phys_addr_t size,
+>> +		phys_addr_t align, phys_addr_t from,
+>> +		phys_addr_t max_addr, int nid);
+> 
+> Wouldn't @min_addr instead of @from make more sense?  Ditto for other
+> occurrences.
+> 
+>> +void *memblock_virt_alloc_try_nid(phys_addr_t size, phys_addr_t align,
+>> +		phys_addr_t from, phys_addr_t max_addr, int nid);
+>> +void __memblock_free_early(phys_addr_t base, phys_addr_t size);
+>> +void __memblock_free_late(phys_addr_t base, phys_addr_t size);
+>> +
+>> +#define memblock_virt_alloc(x) \
+>> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
+>> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+> 
+> The underlying function interprets 0 as the default align, so it
+> probably is a better idea to just use 0 here.
+> 
+>> +#define memblock_virt_alloc_align(x, align) \
+>> +	memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
+>> +				     BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+> 
+> Also, do we really need this align variant separate when the caller
+> can simply specify 0 for the default?
+
+Unfortunately Yes. 
+We need it to keep compatibility with bootmem/nobootmem
+which don't handle 0 as default align value.
+
+> 
+>> +#define memblock_virt_alloc_nopanic(x) \
+>> +	memblock_virt_alloc_try_nid_nopanic(x, SMP_CACHE_BYTES, \
+>> +					     BOOTMEM_LOW_LIMIT, \
+>> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
+>> +					     MAX_NUMNODES)
+>> +#define memblock_virt_alloc_align_nopanic(x, align) \
+>> +	memblock_virt_alloc_try_nid_nopanic(x, align, \
+>> +					     BOOTMEM_LOW_LIMIT, \
+>> +					     BOOTMEM_ALLOC_ACCESSIBLE, \
+>> +					     MAX_NUMNODES)
+>> +#define memblock_virt_alloc_node(x, nid) \
+>> +	memblock_virt_alloc_try_nid(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT, \
+>> +				     BOOTMEM_ALLOC_ACCESSIBLE, nid)
+>> +#define memblock_virt_alloc_node_nopanic(x, nid) \
+
+Regards,
+- grygorii
