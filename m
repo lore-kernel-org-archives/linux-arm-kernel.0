@@ -1,94 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Dec 2013 09:49:31 +0000
-Subject: ARM: gic_arch_extn (Was: [PATCH v3] irqchip: mmp: add dt
- support for wakeup)
-In-Reply-To: <alpine.DEB.2.02.1312050157550.30673@ionos.tec.linutronix.de>
-References: <1386159214-31483-1-git-send-email-zhangwm@marvell.com>
- <alpine.DEB.2.02.1312042234190.30673@ionos.tec.linutronix.de>
- <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
- <20131205005216.GA4360@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1312050157550.30673@ionos.tec.linutronix.de>
-Message-ID: <20131205094931.GB4360@n2100.arm.linux.org.uk>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  5 Dec 2013 10:50:13 +0100
+Subject: [PATCH v3] usb: ohci-at91: fix irq and iomem resource retrieval
+Message-ID: <1386237013-22285-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 03:12:55AM +0100, Thomas Gleixner wrote:
-> Russell,
-> 
-> On Thu, 5 Dec 2013, Russell King - ARM Linux wrote:
-> > On Thu, Dec 05, 2013 at 01:41:53AM +0100, Thomas Gleixner wrote:
-> > > @all who feel responsible for gic_arch_extn
-> > > 
-> > > On Wed, 4 Dec 2013, Thomas Gleixner wrote:
-> > > > I'm going to reply in a separate mail on this, because you have
-> > > > brought this to my attention, but you are not responsible in the first
-> > > > place for this brainfart.
-> > > 
-> > > Who came up with that gic_arch_extn concept in the first place?
-> > 
-> > If you'd spend more time reviewing IRQ patches then maybe you'd catch
-> > this at review time.  So please stop your rediculous whinging when
-> > most of the problem is your own lack of time.
-> 
-> I'm not a native english speaker, so I want to make sure in the first
-> place that you meant:
-> 
->     "ridiculous whingeing" 
-> 
-> Assumed that you meant that, let me ridicule you a bit.
-> 
-> The gic_arch_extn concept got merged with:
-> 
->     commit d7ed36a4ea84e3a850f9932e2058ceef987d1acd
->     Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
->     Date:   Wed Mar 2 08:03:22 2011 +0100
-> 
->     ARM: 6777/1: gic: Add hooks for architecture specific extensions
-> 
->     <SNIP>
-> 
->     Cc: Russell King <rmk+kernel@arm.linux.org.uk>
->     Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->     Acked-by: Colin Cross <ccross@android.com>
->     Tested-by: Colin Cross <ccross@android.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
->     ---
->     arch/arm/common/gic.c		|   47 ++++++++++++....
->     arch/arm/include/asm/hardware/gic.h |    1
-> 
-> The patch in question was never cc'ed to me and you merged it on your
-> own.
-> 
-> So now you have the chuzpe to blame me for that, just because this
-> code moved to drivers/irqchip with
-> 
->      commit 81243e444c6e9d1625073e4a3d3bc244c8a545f0
->      Author: Rob Herring <rob.herring@calxeda.com>
->      Date:   Tue Nov 20 21:21:40 2012 -0600
-> 
->      irqchip: Move ARM GIC to drivers/irqchip
->     
-> almost two years later?
-> 
-> The code move neither exempts you from the responsibility of merging
-> it nor does it imply a retroactive responsibility for me to review all
-> patches which went into that code prior to the move.
+When using dt resources retrieval (interrupts and reg properties) there is
+no predefined order for these resources in the platform dev resources
+table.
 
-And neither does it give you permission to send such an idiotic and
-rediculous email.
+Retrieve resources using the platform_get_resource function instead of
+direct resource table entries to avoid resource type mismatch.
 
-I'm not going to do anything about it because "Thomas Glexiner" has
-suddenly decided he doesn't like it.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+---
+Changes since v2:
+ - split the patch series to isolate the urgent fix provided by this patch
 
-As for your definition of "hotpath", you're really screwed on that
-because you don't seem to understand what is or isn't the hotpath in
-this code.
+Changes since v1:
+ - none
 
-So there's not much point discussing this with you until you:
+ drivers/usb/host/ohci-at91.c |   19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-(a) calm down
-(b) analyse it properly and work out the frequency under which each
-class of IRQ (those >= 32 and those < 32) call into these functions.
-
-To put it bluntly, you're wrong.
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 418444e..7aec6ca 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -136,23 +136,26 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	struct ohci_hcd *ohci;
+ 	int retval;
+ 	struct usb_hcd *hcd = NULL;
++	struct device *dev = &pdev->dev;
++	struct resource *mem_r, *irq_r;
+ 
+-	if (pdev->num_resources != 2) {
+-		pr_debug("hcd probe: invalid num_resources");
++	mem_r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem_r) {
++		dev_dbg(dev, "hcd probe: missing memory resource\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+-			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+-		pr_debug("hcd probe: invalid resource type\n");
++	irq_r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!irq_r) {
++		dev_dbg(dev, "hcd probe: missing irq resource\n");
+ 		return -ENODEV;
+ 	}
+ 
+ 	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
+ 	if (!hcd)
+ 		return -ENOMEM;
+-	hcd->rsrc_start = pdev->resource[0].start;
+-	hcd->rsrc_len = resource_size(&pdev->resource[0]);
++	hcd->rsrc_start = mem_r->start;
++	hcd->rsrc_len = resource_size(mem_r);
+ 
+ 	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+ 		pr_debug("request_mem_region failed\n");
+@@ -199,7 +202,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	ohci->num_ports = board->ports;
+ 	at91_start_hc(pdev);
+ 
+-	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
++	retval = usb_add_hcd(hcd, irq_r->start, IRQF_SHARED);
+ 	if (retval == 0)
+ 		return retval;
+ 
+-- 
+1.7.9.5
