@@ -1,53 +1,52 @@
-From: panchaxari.prasannamurthy@linaro.org (panchaxari)
-Date: Thu,  5 Dec 2013 11:23:50 +0530
-Subject: [PATCH CFT] ARM:MMP: Enable ARM_PATCH_PHYS_VIRT and ZRELADDR default
-In-Reply-To: <1386222830-7681-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-References: <1386222830-7681-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-Message-ID: <1386222830-7681-2-git-send-email-panchaxari.prasannamurthy@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 05 Dec 2013 06:56:48 +0100
+Subject: [PATCH 2/2] ARM: shmobile: armadillo: Set vccq_sdhi0 regulator
+ type in DT
+In-Reply-To: <20131205034554.GB20388@verge.net.au>
+References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385653493-9952-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131205034554.GB20388@verge.net.au>
+Message-ID: <9848623.yKHAtIGPld@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR has been enabled as default configs
-to Marvell PXA168/910/MMP2 platforms.
+Hi Simon,
 
-Introduction of PHYS_VIRT config as default would enable phy-to-virt and
-virt-to-phy translation function at boot and module loading time
-and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
-enable calculation of kernel load address at run time.
+On Thursday 05 December 2013 12:45:54 Simon Horman wrote:
+> On Thu, Nov 28, 2013 at 04:44:53PM +0100, Laurent Pinchart wrote:
+> > The mandatory regulator-type property is missing, add it.
+> 
+> Thanks, I will queue this up.
 
-PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
-systems with NOR flash devices, and ZRELADDR config is mutually exclusive
-to ZBOOT_ROM.
+Mark has rightfully commented on patch 1/2 in this series that the regulator-
+type property shouldn't be mandatory but should default to voltage. We could 
+then drop this patch.
 
-CFT::Call For Testing
-
-Requesting maintainers of Marvell PXA168/910/MMP2 platforms to evaluate the
-changes on the board and comment, as I dont have the board for testing and
-also requesting an ACK
-
-Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 79ba1a8..13621ed 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -560,6 +560,8 @@ config ARCH_MMP
- 	bool "Marvell PXA168/910/MMP2"
- 	depends on MMU
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_PATCH_PHYS_VIRT
-+	select AUTO_ZRELADDR
- 	select CLKDEV_LOOKUP
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> > b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts index
+> > 7b80f19..013a7cd 100644
+> > --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> > +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> > @@ -53,6 +53,8 @@
+> > 
+> >  		regulator-name = "SDHI0 VccQ";
+> >  		regulator-min-microvolt = <1800000>;
+> >  		regulator-max-microvolt = <3300000>;
+> > 
+> > +		regulator-type = "voltage";
+> > +
+> > 
+> >  		vin-supply = <&vcc_sdhi0>;
+> >  		
+> >  		enable-gpio = <&pfc 74 GPIO_ACTIVE_HIGH>;
 -- 
-1.7.10.4
+Regards,
+
+Laurent Pinchart
