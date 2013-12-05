@@ -1,110 +1,143 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 05 Dec 2013 17:21:47 +0100
-Subject: [PATCH] watchdog: s3c2410_wdt: Report when the watchdog reset the
- system
-In-Reply-To: <1386008082-28740-1-git-send-email-dianders@chromium.org>
-References: <1386008082-28740-1-git-send-email-dianders@chromium.org>
-Message-ID: <42011482.56GYn1upCz@amdc1227>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Dec 2013 16:28:01 +0000
+Subject: [PATCH 4/4] arm64: add early_ioremap support
+In-Reply-To: <1385606679-30446-5-git-send-email-msalter@redhat.com>
+References: <1385606679-30446-1-git-send-email-msalter@redhat.com>
+ <1385606679-30446-5-git-send-email-msalter@redhat.com>
+Message-ID: <20131205162800.GB1495@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-Please see my comments inline.
-
-On Monday 02 of December 2013 10:14:41 Doug Anderson wrote:
-> A good watchdog driver is supposed to report when it was responsible
-> for resetting the system.  Implement this for the s3c2410, at least on
-> exynos5250 and exynos5420 where we already have a pointer to the PMU
-> registers to read the information.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> This patch is based atop Leela Krishna's recent series that ends with
-> (ARM: dts: update watchdog device nodes for Exynos5250 and Exynos5420)
-> AKA <https://patchwork.kernel.org/patch/3251861/>.
-> 
->  drivers/watchdog/s3c2410_wdt.c | 42 +++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 39 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> index 47f4dcf..2c87d37 100644
-> --- a/drivers/watchdog/s3c2410_wdt.c
-> +++ b/drivers/watchdog/s3c2410_wdt.c
-> @@ -62,9 +62,13 @@
->  #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
->  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
->  
-> +#define RST_STAT_REG_OFFSET		0x0404
-
-IMHO this should be namespaced, at least with EXYNOS5 prefix. The two
-registers below should be as well, but I missed this in the patch adding
-them.
-
->  #define WDT_DISABLE_REG_OFFSET		0x0408
->  #define WDT_MASK_RESET_REG_OFFSET	0x040c
->  #define QUIRK_NEEDS_PMU_CONFIG		(1 << 0)
-> +#define QUIRK_HAS_RST_STAT		(1 << 1)
-> +#define QUIRKS_NEED_PMUREG		(QUIRK_NEEDS_PMU_CONFIG | \
-> +					 QUIRK_HAS_RST_STAT)
->  
->  static bool nowayout	= WATCHDOG_NOWAYOUT;
->  static int tmr_margin;
-> @@ -98,6 +102,9 @@ MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug (default 0)");
->   * timer reset functionality.
->   * @mask_bit: Bit number for the watchdog timer in the disable register and the
->   * mask reset register.
-> + * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
-> + * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
-> + * reset.
->   * @quirks: A bitfield of quirks.
->   */
->  
-> @@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
->  	int disable_reg;
->  	int mask_reset_reg;
->  	int mask_bit;
-> +	int rst_stat_reg;
-> +	int rst_stat_bit;
->  	u32 quirks;
->  };
->  
-> @@ -131,14 +140,20 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
->  	.disable_reg = WDT_DISABLE_REG_OFFSET,
->  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
->  	.mask_bit = 20,
-> -	.quirks = QUIRK_NEEDS_PMU_CONFIG
-> +	.rst_stat_reg = RST_STAT_REG_OFFSET,
-> +	.rst_stat_bit = 20,
-> +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
-> +		QUIRK_HAS_RST_STAT,
->  };
->  
->  static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
->  	.disable_reg = WDT_DISABLE_REG_OFFSET,
->  	.mask_reset_reg = WDT_MASK_RESET_REG_OFFSET,
->  	.mask_bit = 0,
-> -	.quirks = QUIRK_NEEDS_PMU_CONFIG
-> +	.rst_stat_reg = RST_STAT_REG_OFFSET,
-> +	.rst_stat_bit = 9,
-> +	.quirks = QUIRK_NEEDS_PMU_CONFIG |
-> +		QUIRK_HAS_RST_STAT,
->  };
->  
->  static const struct of_device_id s3c2410_wdt_match[] = {
-> @@ -423,6 +438,25 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
->  }
->  #endif
->  
-> +static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
-> +{
-> +	unsigned int bootstatus = 0;
-> +	int ret;
+On Thu, Nov 28, 2013 at 02:44:39AM +0000, Mark Salter wrote:
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -0,0 +1,68 @@
+> +/*
+> + * fixmap.h: compile-time virtual memory allocation
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + *
+> + * Copyright (C) 1998 Ingo Molnar
+> + * Copyright (C) 2013 Mark Salter <msalter@redhat.com>
+> + *
+> + * Adapted from arch/x86_64 version.
+> + *
+> + */
 > +
-> +	if (wdt->drv_data->quirks & QUIRK_HAS_RST_STAT) {
+> +#ifndef _ASM_ARM64_FIXMAP_H
+> +#define _ASM_ARM64_FIXMAP_H
+> +
+> +#ifndef __ASSEMBLY__
+> +#include <linux/kernel.h>
+> +#include <asm/page.h>
+> +
+> +/*
+> + * Here we define all the compile-time 'special' virtual
+> + * addresses. The point is to have a constant address at
+> + * compile time, but to set the physical address only
+> + * in the boot process.
+> + *
+> + * These 'compile-time allocated' memory buffers are
+> + * page-sized. Use set_fixmap(idx,phys) to associate
+> + * physical memory with fixmap indices.
+> + *
+> + */
+> +enum fixed_addresses {
+> +	FIX_EARLYCON,
+> +	__end_of_permanent_fixed_addresses,
+> +
+> +	/*
+> +	 * Temporary boot-time mappings, used by early_ioremap(),
+> +	 * before ioremap() is functional.
+> +	 */
 
-nit: I guess it's just a matter of taste, but to reduce code indentation
-you could inverse the check and simply return 0 here.
+How temporary are this mappings? The early console may not be disabled
+at run-time, so it still needs the mapping.
 
-Best regards,
-Tomasz
+> +#ifdef CONFIG_ARM64_64K_PAGES
+> +#define NR_FIX_BTMAPS		4
+> +#else
+> +#define NR_FIX_BTMAPS		64
+> +#endif
+> +#define FIX_BTMAPS_SLOTS	7
+> +#define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
+> +
+> +	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+> +	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
+> +	__end_of_fixed_addresses
+> +};
+> +
+> +#define FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
+> +#define FIXADDR_START	(FIXADDR_TOP - FIXADDR_SIZE)
+> +
+> +#define FIXMAP_PAGE_NORMAL __pgprot(PROT_NORMAL | PTE_PXN | PTE_UXN)
+
+I'll push a fix to change PROT_DEFAULT to (pgprot_default | PTE_DIRTY).
+
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 3776217..4a6d7ec 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -50,6 +50,7 @@
+>  #define MODULES_END		(PAGE_OFFSET)
+>  #define MODULES_VADDR		(MODULES_END - SZ_64M)
+>  #define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
+> +#define FIXADDR_TOP		(MODULES_VADDR - SZ_2M - PAGE_SIZE)
+>  #define TASK_SIZE_64		(UL(1) << VA_BITS)
+
+Can we remove EARLYCON_IOBASE?
+
+> --- a/arch/arm64/mm/ioremap.c
+> +++ b/arch/arm64/mm/ioremap.c
+> @@ -25,6 +25,10 @@
+>  #include <linux/vmalloc.h>
+>  #include <linux/io.h>
+>  
+> +#include <asm/fixmap.h>
+> +#include <asm/tlbflush.h>
+> +#include <asm/pgalloc.h>
+> +
+>  static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
+>  				      pgprot_t prot, void *caller)
+>  {
+> @@ -98,3 +102,76 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+>  				__builtin_return_address(0));
+>  }
+>  EXPORT_SYMBOL(ioremap_cache);
+> +
+> +#ifndef CONFIG_ARM64_64K_PAGES
+> +static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> +#endif
+> +
+> +static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
+> +{
+> +	pgd_t *pgd = pgd_offset_k(addr);
+> +	pud_t *pud = pud_offset(pgd, addr);
+> +	pmd_t *pmd = pmd_offset(pud, addr);
+> +
+> +	return pmd;
+> +}
+> +
+> +static inline pte_t * __init early_ioremap_pte(unsigned long addr)
+> +{
+> +	pmd_t *pmd = early_ioremap_pmd(addr);
+> +	return pte_offset_kernel(pmd, addr);
+> +}
+> +
+> +void __init early_ioremap_init(void)
+> +{
+> +	pmd_t *pmd;
+> +
+> +	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
+> +#ifndef CONFIG_ARM64_64K_PAGES
+> +	/* need to populate pmd for 4k pagesize only */
+> +	pmd_populate_kernel(&init_mm, pmd, bm_pte);
+> +#endif
+
+Can we use some of the standard pmd_none() etc. checks which would be
+eliminated for 2-level page tables?
+
+-- 
+Catalin
