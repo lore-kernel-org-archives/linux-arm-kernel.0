@@ -1,56 +1,31 @@
-From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
-Date: Thu, 05 Dec 2013 17:10:08 +0400
-Subject: [PATCH 2/2] ARM: fix framepointer check in unwind_frame
-In-Reply-To: <CAFrcx1kCAjoMxBeqaO+iS2CGzX6omuW1reL636Lyj=bg5DB1Rg@mail.gmail.com>
-References: <20131205083424.32632.51618.stgit@buzz>
- <20131205083430.32632.11103.stgit@buzz>
- <CAFrcx1kCAjoMxBeqaO+iS2CGzX6omuW1reL636Lyj=bg5DB1Rg@mail.gmail.com>
-Message-ID: <1386249008.17844.48.camel@buzz>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 5 Dec 2013 13:24:41 +0000
+Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
+ maps and map logical cpu id to APIC id
+In-Reply-To: <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
+References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
+ <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
+Message-ID: <20131205132441.GR29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-05 at 13:45 +0100, Jean Pihet wrote:
-> On 5 December 2013 09:34, Konstantin Khlebnikov
-> <k.khlebnikov@samsung.com> wrote:
-> > This patch fixes corner case when (fp + 4) overflows unsigned long,
-> > for example: fp = 0xFFFFFFFF -> fp + 4 == 3.
-> >
-> > Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-> > ---
-> >  arch/arm/kernel/stacktrace.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-> > index 00f79e5..af4e8c8 100644
-> > --- a/arch/arm/kernel/stacktrace.c
-> > +++ b/arch/arm/kernel/stacktrace.c
-> > @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
-> >         high = ALIGN(low, THREAD_SIZE);
-> >
-> >         /* check current frame pointer is within bounds */
-> > -       if (fp < (low + 12) || fp + 4 >= high)
-> > +       if (fp < low + 12 || fp > high - 4)
-> Shouldn't that use the '>=' comparison?
+On Wed, Dec 04, 2013 at 09:47:49AM -0600, Rob Herring wrote:
+> On Tue, Dec 3, 2013 at 10:39 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
 
-nope, fp == high-4 is fine:
+> > +#ifndef CONFIG_ACPI
+> >                 set_cpu_present(cpu, true);
+> > +#endif
 
--------------------+ 
-... -5 -4 -3 -2 -1 | -0
--------------------+
-        ^             ^
-        +---- fp      +----- high
- 
-stack frame contains four 'unsigned long' values: {fp, sp, lr, pc}.
-'fp' points to 'pc', so totally there are 16 bytes: fp-12..fp+3
+> Should this be moved to DT cpu topology related code?
 
-> 
-> Jean
-> >                 return -EINVAL;
-> >
-> >         /* restore the registers from the stack frame */
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
+Part of the trick there being that there isn't any CPU topology code for
+ARMv8 in mainline yet, DT or otherwise - I'm working with some patches
+for doing that with DT which I'm hoping to get out soon.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131205/709c050f/attachment.sig>
