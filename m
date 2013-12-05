@@ -1,38 +1,110 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 5 Dec 2013 13:51:16 -0500
-Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
-References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
- <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
- <20131203232445.GX8277@htj.dyndns.org> <52A0AB34.2030703@ti.com>
- <20131205165325.GA24062@mtj.dyndns.org>
- <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
-Message-ID: <20131205185116.GA27274@mtj.dyndns.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Dec 2013 11:03:43 -0800
+Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm
+ when bad data is detected
+In-Reply-To: <1386121153-32351-1-git-send-email-nm@ti.com>
+References: <1386121153-32351-1-git-send-email-nm@ti.com>
+Message-ID: <20131205190343.GI26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+* Nishanth Menon <nm@ti.com> [131203 17:40]:
+> Due to the cross dependencies between hwmod for automanaged device
+> information for OMAP and dts node definitions, we can run into scenarios
+> where the dts node is defined, however it's hwmod entry is yet to be
+> added. In these cases:
+> a) omap_device does not register a pm_domain (since it cannot find
+>    hwmod entry).
+> b) driver does not know about (a), does a pm_runtime_get_sync which
+>    never fails
+> c) It then tries to do some operation on the device (such as read the
+>   revision register (as part of probe) without clock or adequate OMAP
+>   generic PM operation performed for enabling the module.
+> 
+> This causes a crash such as that reported in:
+> https://bugzilla.kernel.org/show_bug.cgi?id=66441
+> 
+> When 'ti,hwmod' is provided in dt node, it is expected that the device
+> will not function without the OMAP's power automanagement. Hence, when
+> we hit a fail condition (due to hwmod entries not present or other
+> similar scenario), fail at pm_domain level due to lack of data, provide
+> enough information for it to be fixed, however, it allows for the driver
+> to take appropriate measures to prevent crash.
 
-On Thu, Dec 05, 2013 at 06:48:21PM +0000, Strashko, Grygorii wrote:
-> +/* Fall back to all the existing bootmem APIs */
-> +#define memblock_virt_alloc(x) \
-> +       __alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
-> 
-> which will be transformed to 
-> +/* Fall back to all the existing bootmem APIs */
-> +#define memblock_virt_alloc(x, align) \
-> +       __alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
-> 
-> and used as
-> 
-> memblock_virt_alloc(size, 0);
-> 
-> so, by default bootmem code will use 0 as default alignment and not SMP_CACHE_BYTES
-> and that is wrong.
+Kevin, any comments on this one?
 
-Just translate it to SMP_CACHE_BYTES?  Am I missing something here?
-You're defining a new API which wraps around two interfaces.  Wrap
-them so that they show the same desired behavior?
+Regards,
 
--- 
-tejun
+Tony
+ 
+> Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_device.c |   24 ++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_device.h |    1 +
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index 53f0735..e0a398c 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -183,6 +183,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+>  odbfd_exit1:
+>  	kfree(hwmods);
+>  odbfd_exit:
+> +	/* if data/we are at fault.. load up a fail handler */
+> +	if (ret)
+> +		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
+> +
+>  	return ret;
+>  }
+>  
+> @@ -604,6 +608,19 @@ static int _od_runtime_resume(struct device *dev)
+>  
+>  	return pm_generic_runtime_resume(dev);
+>  }
+> +
+> +static int _od_fail_runtime_suspend(struct device *dev)
+> +{
+> +	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
+> +	return -ENODEV;
+> +}
+> +
+> +static int _od_fail_runtime_resume(struct device *dev)
+> +{
+> +	dev_warn(dev, "%s: FIXME: missing hwmod/omap_dev info\n", __func__);
+> +	return -ENODEV;
+> +}
+> +
+>  #endif
+>  
+>  #ifdef CONFIG_SUSPEND
+> @@ -657,6 +674,13 @@ static int _od_resume_noirq(struct device *dev)
+>  #define _od_resume_noirq NULL
+>  #endif
+>  
+> +struct dev_pm_domain omap_device_fail_pm_domain = {
+> +	.ops = {
+> +		SET_RUNTIME_PM_OPS(_od_fail_runtime_suspend,
+> +				   _od_fail_runtime_resume, NULL)
+> +	}
+> +};
+> +
+>  struct dev_pm_domain omap_device_pm_domain = {
+>  	.ops = {
+>  		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
+> diff --git a/arch/arm/mach-omap2/omap_device.h b/arch/arm/mach-omap2/omap_device.h
+> index 17ca1ae..78c02b3 100644
+> --- a/arch/arm/mach-omap2/omap_device.h
+> +++ b/arch/arm/mach-omap2/omap_device.h
+> @@ -29,6 +29,7 @@
+>  #include "omap_hwmod.h"
+>  
+>  extern struct dev_pm_domain omap_device_pm_domain;
+> +extern struct dev_pm_domain omap_device_fail_pm_domain;
+>  
+>  /* omap_device._state values */
+>  #define OMAP_DEVICE_STATE_UNKNOWN	0
+> -- 
+> 1.7.9.5
+> 
