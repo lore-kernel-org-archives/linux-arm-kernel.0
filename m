@@ -1,55 +1,58 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 5 Dec 2013 19:20:16 -0800
-Subject: [PATCH 02/15] input: sh_keysc: Restrict non-COMPILE_TEST
- compilation
-In-Reply-To: <20131128073636.GD24146@verge.net.au>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131128073636.GD24146@verge.net.au>
-Message-ID: <20131206032016.GA16530@core.coreip.homeip.net>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 06 Dec 2013 13:40:36 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxM11bIDIvNF0gdmlkZW86IGlteGZiOiBBbHNvIGFkZCBw?=
+ =?UTF-8?B?d21yIGZvciB0aGUgZGV2aWNlIHRyZWUu?=
+In-Reply-To: <20131206093017.GB24559@pengutronix.de>
+References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
+ <1386318910.581671226@f322.i.mail.ru>
+ <20131206093017.GB24559@pengutronix.de>
+Message-ID: <1386322836.19413258@f177.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 04:36:36PM +0900, Simon Horman wrote:
-> On Wed, Nov 27, 2013 at 02:18:24AM +0100, Laurent Pinchart wrote:
-> > Hardware supported by the driver is only found on SUPERH or
-> > ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
+> > > On Fri, Dec 06, 2013 at 12:03:54PM +0400, Alexander Shiyan wrote:
+> > ...
+> > > > > >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+> > > > > >  	register is not modified as recommended by the datasheet.
+> > > > > > +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
+> > > > > > +	optional, but defining it is necessary to get the backlight working. If that
+> > > > > > +	property is ommited, the register is zeroed.
+> > > > > 
+> > > > > Why isn't this implemented as a backlight driver? Static devicetree
+> > > > > provided values is very limiting.
+> > > > 
+> > > > Let's understand the terminology.
+> > > > This register should be renamed according to the datasheet, i.e. LPCCR.
+> > > > As I pointed out earlier, it is NOT control the backlight, this is a contrast control.
+> > > > Yes, it works as PWM, but nothing do with the backlight subsystem.
+> > > > Yes, we can make a driver for this PWM, but how are we going to control it?
+> > > > I misunderstood something?
+> > > 
+> > > I stumbled upon 'get the backlight working' which implied for me that it
+> > > should be a backlight driver. But you're right and now I remember we
+> > > talked about this already.
 > > 
-> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > Cc: linux-input at vger.kernel.org
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Hallelujah.
+> > 
+> > > I still think this should be something adjustable, not static data.
+> > > Maybe we could change the wording to something like "This property
+> > > provides the default value for the contrast control register" since even
+> > > if we add driver support for controlling the contrast we still want
+> > > to have a sane default.
+> > 
+> > Sounds good.
+> > 
+> > > BTW the contrast could be controlled with a lcd_device (see
+> > > lcd_device_register) which seems to be very easy to implement.
+> > 
+> > Address of register is placed within LCD area, so we cannot use this
+> > memory region, I think is no so easy as you say....
 > 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> We do not need a separate driver for this. Look for example at
+> drivers/video/bf537-lq035.c, it just calls lcd_device_register()
+> in its probe function.
 
+Nice. Seems this example even can handle LCD power
+regulator from "[1/4] video: imxfb: Introduce regulator support."
 
-Applied, thank you.
-
-> 
-> > ---
-> >  drivers/input/keyboard/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> > index bb174c1..a673c9f 100644
-> > --- a/drivers/input/keyboard/Kconfig
-> > +++ b/drivers/input/keyboard/Kconfig
-> > @@ -525,7 +525,7 @@ config KEYBOARD_SUNKBD
-> >  
-> >  config KEYBOARD_SH_KEYSC
-> >  	tristate "SuperH KEYSC keypad support"
-> > -	depends on SUPERH || ARM || COMPILE_TEST
-> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
-> >  	help
-> >  	  Say Y here if you want to use a keypad attached to the KEYSC block
-> >  	  on SuperH processors such as sh7722 and sh7343.
-> > -- 
-> > 1.8.3.2
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
-
--- 
-Dmitry
+---
