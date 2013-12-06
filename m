@@ -1,110 +1,79 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 06 Dec 2013 14:22:00 -0800
-Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
-In-Reply-To: <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <52A24E08.706@codeaurora.org>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Fri, 6 Dec 2013 14:23:21 -0800
+Subject: [PATCH v5 0/2] watchdog: bcm281xx: Watchdog Driver
+In-Reply-To: <1385160964-18578-1-git-send-email-markus.mayer@linaro.org>
+References: <1385160964-18578-1-git-send-email-markus.mayer@linaro.org>
+Message-ID: <CAPdLdqnywgMagyxA34PUa14hSY5fJZK28_VtJMmDe-RdmAKD-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/13 18:10, Bjorn Andersson wrote:
-> Add initial definition of parameters for pinctrl-msm for the msm8x74
-> platform.
-
-Hmm. We've tried to remove 'x' from our code because it isn't really
-accurate and leads to more confusion. For example, 8660 and 8960 are
-vastly different with respect to SoC architecture and it was a mistake
-to name it 8x60 in the code. We should have stuck with 8660 and 8260 to
-avoid any confusion with 8960 but we didn't know that 8960 was going to
-be made at the time. While it seems convenient to just throw in the x,
-who knows what marketing will do later on and it could break the whole
-scheme.
-
+On 22 November 2013 14:56, Markus Mayer <markus.mayer@linaro.org> wrote:
+> This is version 5 of the watchdog driver for the BCM281xx family of mobile
+> SoCs.
 >
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
+> Changes since version 4:
+> - Fixed whitespace issue in Kconfig "help" section
+> - Rebased onto 3.13-rc1 (due to merge conflict in Makefile)
 >
-> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> index d0b6846..31c6c4a 100644
-> --- a/drivers/pinctrl/Kconfig
-> +++ b/drivers/pinctrl/Kconfig
-> @@ -208,6 +208,10 @@ config PINCTRL_MSM
->  	select PINCONF
->  	select GENERIC_PINCONF
->  
-> +config PINCTRL_MSM8X74
-> +	bool "Qualcomm 8x74 pin controller driver"
-> +	select PINCTRL_MSM
-
-No help?
-
-> +
->  config PINCTRL_NOMADIK
->  	bool "Nomadik pin controller driver"
->  	depends on ARCH_U8500 || ARCH_NOMADIK
-> diff --git a/drivers/pinctrl/pinctrl-msm8x74.c b/drivers/pinctrl/pinctrl-msm8x74.c
-> new file mode 100644
-> index 0000000..762552b
-> --- /dev/null
-> +++ b/drivers/pinctrl/pinctrl-msm8x74.c
-> @@ -0,0 +1,636 @@
-[snip]
-> +
-> +#define FUNCTION(fname)					\
-> +	[MSM_MUX_##fname] = {				\
-> +		.name = #fname,				\
-> +		.groups = fname##_groups,		\
-> +		.ngroups = ARRAY_SIZE(fname##_groups),	\
-> +	}
-> +
-> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7)	\
-> +	{						\
-> +		.name = "gpio" #id,			\
-> +		.pins = gpio##id##_pins,		\
-> +		.npins = ARRAY_SIZE(gpio##id##_pins),	\
-> +		.funcs = {				\
-> +			MSM_MUX_NA, /* gpio mode */	\
-> +			MSM_MUX_##f1,			\
-> +			MSM_MUX_##f2,			\
-> +			MSM_MUX_##f3,			\
-> +			MSM_MUX_##f4,			\
-> +			MSM_MUX_##f5,			\
-> +			MSM_MUX_##f6,			\
-> +			MSM_MUX_##f7			\
-> +		},					\
-> +		.ctl_reg = 0x1000 + 0x10 * id ,		\
-
-Weird trailing space here.
-
-Also, do we ever plan to have anything more than the gpio pins and the
-sdc pins? It seems like we spend a lot of space describing exactly the
-same thing in these structs for each of the 146 gpio pins when we could
-just know that range 0 to 146 is gpio pins and have different code for
-that part vs the 6 or something sd pins.
-
-> +
-> +static struct of_device_id msm8x74_pinctrl_of_match[] = {
-
-const?
-
+> Changes since version 3:
+> - Removed #include <linux/miscdevice.h>
+> - Added Reviewed-by:/Acked-by: Guenter Roeck
 >
-> +
-> +static int __init msm8x74_pinctrl_init(void)
-> +{
-> +	return platform_driver_register(&msm8x74_pinctrl_driver);
-> +}
-> +arch_initcall(msm8x74_pinctrl_init);
-> +
-> +static void __exit msm8x74_pinctrl_exit(void)
-> +{
-> +	platform_driver_unregister(&msm8x74_pinctrl_driver);
-> +}
-> +module_exit(msm8x74_pinctrl_exit);
+> Changes since version 2:
+>
+> - BCM_KONA_WDT_NAME: "bcm-kona-wdt" -> "bcm_kona_wdt"
+> - Don't initialize static variable
+> - Removed '{'/'}' from single-line statements
+> - busy_count retains the maximum loop count of the longest loop rather
+>   than an over-all maximum
+> - Use seq_puts() in lieu of seq_printf() in 2 locations
+> - Removed error message after devm_kzalloc()
+> - Added MODULE_ALIAS
+>
+> Changes since version 1:
+>
+> - Added module name to "help" section in Kconfig A few cosmetic code
+> - simplifications and fixes Removed most dev_info() calls and changed the
+> - remaining ones to dev_dbg() Renamed SECWDOG_WD_LOAD_FLAG_MASK to
+> - SECWDOG_WD_LOAD_FLAG Added some comments to secure_register_read() and
+> - struct bcm_kona_wdt Added delay to secure_register_read() Reduced maximum
+> - retry loop from 10000 to 1000 Introduced "busy_count" variable to count
+> - how often secure_register_read() gets stalled; this is available through
+> - debugfs Simplified secure_register_read() to return -ETIMEDOUT rather than
+> - using a variable parameter to indicate a timeout error Got rid of all uses
+> - of -EAGAIN Fixed return value check for debugfs_create_dir() Simplified
+> - bcm_kona_wdt_debugfs_init() by getting rid of goto Created new generic
+> - function bcm_kona_wdt_ctrl_reg_modify() The following functions now use
+> - bcm_kona_wdt_ctrl_reg_modify():
+>     - bcm_kona_wdt_set_resolution_reg() bcm_kona_wdt_set_timeout_reg()
+>     - bcm_kona_wdt_stop()
+> - Made bcm_kona_wdt_set_timeout_reg() more generic, so bcm_kona_wdt_start()
+>   can use it Removed MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR)
+>
+> Markus Mayer (2):
+>   watchdog: bcm281xx: Watchdog Driver
+>   ARM: bcm281xx: watchdog configuration
+>
+>  arch/arm/configs/bcm_defconfig  |    3 +
+>  drivers/watchdog/Kconfig        |   22 +++
+>  drivers/watchdog/Makefile       |    1 +
+>  drivers/watchdog/bcm_kona_wdt.c |  365 +++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 391 insertions(+)
+>  create mode 100644 drivers/watchdog/bcm_kona_wdt.c
+>
+> --
+> 1.7.9.5
 
-Why not module_platform_driver()? I thought pinctrl supported deferred
-probing?
+Hi,
+
+This series seems approved and ready to go. I just wanted to
+double-check that my understanding is correct and that it will be
+queued for 3.14. However, if there is anything you need from me,
+please let me know.
+
+Thanks,
+-Markus
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Markus Mayer
+Broadcom Landing Team
