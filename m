@@ -1,32 +1,28 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Fri, 06 Dec 2013 13:28:51 +0400
-Subject: [PATCH] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <20131206001728.GJ4360@n2100.arm.linux.org.uk>
-References: <20131205043544.GA28580@kroah.com>
- <1386286149-2855-1-git-send-email-ynvich@gmail.com>
- <20131206000253.GC21358@kroah.com>
- <20131206001728.GJ4360@n2100.arm.linux.org.uk>
-Message-ID: <1386322131.7152.36.camel@host5.omatika.ru>
+From: jbe@pengutronix.de (=?iso-8859-15?q?J=FCrgen_Beisert?=)
+Date: Fri, 6 Dec 2013 10:32:31 +0100
+Subject: i.MX6/PCIe and MSI interrupts
+Message-ID: <201312061032.31944.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-12-06 at 00:17 +0000, Russell King - ARM Linux wrote:
+Hi,
 
-> I may be able to - one of the downsides though is that many of these
-> systems had hard-coded scripts which started a getty on the original
-> port - and that kind of makes it difficult to sort out.  This kind of
-> change becomes very much one of Linus' "flag days".
+is anybody out there who has MSI interrupts successfully working on i.MX6? I 
+tried with my i.MX6 and a Gbit network card but without success. In legacy 
+interrupt mode it works.
+I'm using various patches here from the list and the PCIe itself works. The 
+designware driver is prepared for MSI interrupts and the Exynos driver makes 
+use of it.
+I added the same glue code to the i.MX6 driver but I can't get the INTD 
+interrupt to fire when MSI arrives (while the INTA fires in legacy interrupt 
+mode). Some idea what needs to be done in the i.MX6 to get MSI working? The 
+Exynos driver additionally changes some bits in its chipset beside the PCIe 
+unit to enable the MSI interrupt to its CPU. Are there some 'hidden' bits in 
+the i.MX6 as well?
 
-> So I'd suggest that we have a period where the old driver is still
-> available, so at least people can choose to use the old major/minor
-> numbers for a while.
+Regards,
+Juergen
 
-The patch doesn't change how the driver looks from the outside. The old
-driver was using 8250 name (ttyS), major (4) and first minor (64). So we
-only resolve an internal conflict.
-
-Kernel configuration is the place where issues may appear, since the
-patch removes CONFIG_SERIAL_PXA_CONSOLE option. I've updated all
-in-kernel users. However, out-of-kernel configs will no longer provide
-serial console, unless manually reconfigured. Is this the case we should
-worry about?
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
