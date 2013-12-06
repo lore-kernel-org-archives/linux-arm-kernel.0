@@ -1,24 +1,26 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 06 Dec 2013 16:26:33 -0500 (EST)
-Subject: [PATCH 03/10] net: stmmac: Use platform data tied with
- compatible strings
-In-Reply-To: <1386350983-13281-4-git-send-email-wens@csie.org>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-4-git-send-email-wens@csie.org>
-Message-ID: <20131206.162633.125107323851595113.davem@davemloft.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 6 Dec 2013 13:28:48 -0800
+Subject: [PATCH v3] watchdog: s3c2410_wdt: Report when the watchdog reset
+ the system
+In-Reply-To: <1386364088-6220-1-git-send-email-dianders@chromium.org>
+References: <1386267329-9941-2-git-send-email-dianders@chromium.org>
+ <1386364088-6220-1-git-send-email-dianders@chromium.org>
+Message-ID: <20131206212848.GA12283@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Sat,  7 Dec 2013 01:29:36 +0800
+On Fri, Dec 06, 2013 at 01:08:07PM -0800, Doug Anderson wrote:
+> A good watchdog driver is supposed to report when it was responsible
+> for resetting the system.  Implement this for the s3c2410, at least on
+> exynos5250 and exynos5420 where we already have a pointer to the PMU
+> registers to read the information.
+> 
+> Note that exynos4 SoCs also provide the reset status, but providing
+> that is left as an exercise for future changes and is not plumbed up
+> in this patch series.  Also note the exynos4 SoCs don't appear to need
+> any PMU config, which is why this patch separates the concepts of
+> having PMU Registers vs. needing PMU Config.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-> +	device = of_match_device(stmmac_dt_ids, &pdev->dev);
-> +	if (!device)
-> +		return -ENODEV;
-> +
-> +	if (device->data)
-> +	    memcpy(plat, device->data, sizeof(*plat));
-> +
-
-Don't invent your own indentation using spaces, this memcpy()
-call is not indented properly, it should be two TABs.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
