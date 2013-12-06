@@ -1,44 +1,110 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 Dec 2013 23:19:03 +0100
-Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
-In-Reply-To: <CAPcyv4giXy++b6BJi8nNKEEY8PC-_4ATAH0_bN-YSOVH+8CaLw@mail.gmail.com>
-References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
- <201312040222.03604.arnd@arndb.de>
- <CAPcyv4giXy++b6BJi8nNKEEY8PC-_4ATAH0_bN-YSOVH+8CaLw@mail.gmail.com>
-Message-ID: <201312062319.03939.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 06 Dec 2013 14:22:00 -0800
+Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
+In-Reply-To: <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <52A24E08.706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 December 2013, Dan Williams wrote:
-> * nod.
-> 
-> I have a similar reaction to dma_request_channel().  There should be
-> more than enough use case to find some common ground and reduce the
-> need for magic filter routines.
+On 12/05/13 18:10, Bjorn Andersson wrote:
+> Add initial definition of parameters for pinctrl-msm for the msm8x74
+> platform.
 
-Right. I didn't really like the addition of the _compat variant, though
-I can see how it helps drivers that are transitioning from pdata to
-DT probing. Once we have progressed enough with the ARM DT conversion,
-a lot of those can surely be converted back to plain 
-dma_request_slave_channel(), and if a significant number remain that
-won't use DT, we can come up with a way to use the same interface
-using the equivalent of clkdev to connect devices to request lines.
+Hmm. We've tried to remove 'x' from our code because it isn't really
+accurate and leads to more confusion. For example, 8660 and 8960 are
+vastly different with respect to SoC architecture and it was a mistake
+to name it 8x60 in the code. We should have stuck with 8660 and 8260 to
+avoid any confusion with 8960 but we didn't know that 8960 was going to
+be made at the time. While it seems convenient to just throw in the x,
+who knows what marketing will do later on and it could break the whole
+scheme.
 
-Also, once things have cooled down a little, we can do a mass-conversion
-to the ERR_PTR variant and kill off the ones that just return NULL
-on error.
+>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
+>
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index d0b6846..31c6c4a 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -208,6 +208,10 @@ config PINCTRL_MSM
+>  	select PINCONF
+>  	select GENERIC_PINCONF
+>  
+> +config PINCTRL_MSM8X74
+> +	bool "Qualcomm 8x74 pin controller driver"
+> +	select PINCTRL_MSM
 
-Looking at the slave drivers that use the old dma_request_channel(),
-I see these classes that are not moving to DT:
+No help?
 
-* Atmel arch/avr32 (some shared with ARM mach-at91, using DT there)
-* Renesas arch/sh (some shared with ARM shmobile, using DT there)
-* x86 topcliff/PCH
-* mfd/timberdale
-* ARM ep93xx, sa11x0
+> +
+>  config PINCTRL_NOMADIK
+>  	bool "Nomadik pin controller driver"
+>  	depends on ARCH_U8500 || ARCH_NOMADIK
+> diff --git a/drivers/pinctrl/pinctrl-msm8x74.c b/drivers/pinctrl/pinctrl-msm8x74.c
+> new file mode 100644
+> index 0000000..762552b
+> --- /dev/null
+> +++ b/drivers/pinctrl/pinctrl-msm8x74.c
+> @@ -0,0 +1,636 @@
+[snip]
+> +
+> +#define FUNCTION(fname)					\
+> +	[MSM_MUX_##fname] = {				\
+> +		.name = #fname,				\
+> +		.groups = fname##_groups,		\
+> +		.ngroups = ARRAY_SIZE(fname##_groups),	\
+> +	}
+> +
+> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7)	\
+> +	{						\
+> +		.name = "gpio" #id,			\
+> +		.pins = gpio##id##_pins,		\
+> +		.npins = ARRAY_SIZE(gpio##id##_pins),	\
+> +		.funcs = {				\
+> +			MSM_MUX_NA, /* gpio mode */	\
+> +			MSM_MUX_##f1,			\
+> +			MSM_MUX_##f2,			\
+> +			MSM_MUX_##f3,			\
+> +			MSM_MUX_##f4,			\
+> +			MSM_MUX_##f5,			\
+> +			MSM_MUX_##f6,			\
+> +			MSM_MUX_##f7			\
+> +		},					\
+> +		.ctl_reg = 0x1000 + 0x10 * id ,		\
 
-The other ones are all ARM or PowerPC platforms that should migrate
-to describing their DMA channels in DT in the future and kill their
-filter functions.
+Weird trailing space here.
 
-	Arnd
+Also, do we ever plan to have anything more than the gpio pins and the
+sdc pins? It seems like we spend a lot of space describing exactly the
+same thing in these structs for each of the 146 gpio pins when we could
+just know that range 0 to 146 is gpio pins and have different code for
+that part vs the 6 or something sd pins.
+
+> +
+> +static struct of_device_id msm8x74_pinctrl_of_match[] = {
+
+const?
+
+>
+> +
+> +static int __init msm8x74_pinctrl_init(void)
+> +{
+> +	return platform_driver_register(&msm8x74_pinctrl_driver);
+> +}
+> +arch_initcall(msm8x74_pinctrl_init);
+> +
+> +static void __exit msm8x74_pinctrl_exit(void)
+> +{
+> +	platform_driver_unregister(&msm8x74_pinctrl_driver);
+> +}
+> +module_exit(msm8x74_pinctrl_exit);
+
+Why not module_platform_driver()? I thought pinctrl supported deferred
+probing?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
