@@ -1,49 +1,20 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri,  6 Dec 2013 11:57:07 +0000
-Subject: [PATCH] ARM: cpu: Document and tweak clock-frequency property
-Message-ID: <1386331027-26065-1-git-send-email-broonie@kernel.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 6 Dec 2013 12:58:21 +0100
+Subject: [PATCH] ARM: s3c24xx: get rid of custom <mach/gpio.h>
+In-Reply-To: <1386322280-23756-1-git-send-email-linus.walleij@linaro.org>
+References: <1386322280-23756-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdZuk3zzhDnj3wJg1cmuqX0Cj-qQ--sBzEEV_XWyeDje3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Fri, Dec 6, 2013 at 10:31 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-The ARMv7 topology code uses the ePAPR specified mandatory clock-frequency
-property to determine the relative performances of the CPUs along with the
-CPU type. However with FDT we don't update to take account of the current
-speed and if the cores are not running at full speed on boot then a device
-tree which is accurate on boot can provide incorrect information about the
-relative performances of the cores.
+> This isolates the custom S3C24xx GPIO definition table to
+> <linux/platform_data/gpio-samsung-s3x24xx.h>
 
-Document the current usage both to override ePAPR and to make the binding
-within the kernel more complete. Ideally the kernel would use information
-from the CPU frequency scaling drivers here but they may in turn consider
-this property and such changes are likely to be part of the energy aware
-scheduling work so not immediately available.
+Maybe I'm too trigger happy. I'll send a combined series with
+S3C24xx, S3C64xx and maybe also S5P variants all fixed
+so you can see the overall idea here. Hold on.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- Documentation/devicetree/bindings/arm/cpus.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 91304353eea4..e3726f6bca92 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -191,6 +191,15 @@ nodes to be present and contain the properties described below.
- 			  property identifying a 64-bit zero-initialised
- 			  memory location.
- 
-+	- clock-frequency
-+		Usage: required
-+		Value type: <u32> or <u64>
-+		Definition:
-+			This is specified in ePAPR as the current clock
-+			frequency of the CPU.  When used with these
-+			extensions it should reflect the maximum clock
-+			frequency for the CPU.
-+
- Example 1 (dual-cluster big.LITTLE system 32-bit):
- 
- 	cpus {
--- 
-1.8.5.1
+Yours,
+Linus Walleij
