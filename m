@@ -1,87 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 6 Dec 2013 08:44:53 +0000
-Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
-In-Reply-To: <ac11b85d05765b3b68eff8c27041e965@agner.ch>
-References: <cover.1386108712.git.stefan@agner.ch>
- <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
- <52A0B2AF.60803@wwwdotorg.org>
- <b2a1db4167d319d355dd2a3a844553bc@agner.ch>
- <52A0BA85.4020201@wwwdotorg.org>
- <ac11b85d05765b3b68eff8c27041e965@agner.ch>
-Message-ID: <20131206084453.GB13093@lee--X1>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 6 Dec 2013 16:18:08 +0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <52A08F43.6060307@st.com>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+ <5298AA23.7080404@st.com>
+ <1386082273.18201.61.camel@shinybook.infradead.org>
+ <20131204184405.GE9468@ld-irv-0074.broadcom.com>
+ <52A08F43.6060307@st.com>
+Message-ID: <20131206081807.GB3710@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> <snip>
-> >>>> @@ -493,13 +527,12 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
-> >>>>  		return -EIO;
-> >>>>  	}
-> >>>>
-> >>>> -	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
-> >>>> -
-> >>>>  	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
-> >>>> -	if (tps6586x == NULL) {
-> >>>> -		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
-> >>>> +	if (!tps6586x)
-> >>>>  		return -ENOMEM;
-> >>>> -	}
-> >>>> +
-> >>>> +	tps6586x->version = ret;
-> >>>
-> >>> I have to say, I dislike this version of the patch. Separating the
-> >>> reading of the version register from the assignment to tps6586x->version
-> >>> doesn't make any sense, especially given that the version value is
-> >>> stored in a variable named "ret"; that name isn't remotely related to
-> >>> what's stored there. What if someone comes along later and adds more
-> >>> code that assigns to ret between where it's repurposed for the version
-> >>> value and where it's assigned to tps6586x->version? It'd be extremely
-> >>> difficult for a patch reviewer to spot that given the limited context in
-> >>> a diff, and quite non-obvious to the person changing the code too..
-> >>
-> >> The value comes from the return value of i2c_smbus_read_byte_data. If
-> >> the value is below zero its an EIO error.
-> >>
-> >> I could add a variable "version", but for me it felt strange because we
-> >> check if version is below zero. This feels like its a wrong version
-> >> rather than a transmit error. So I would prefer ret over version. But I
-> >> agree, when one just reads the patch, its not obvious what exactly
-> >> happens.
+On Thu, Dec 05, 2013 at 02:35:47PM +0000, Angus Clark wrote:
+> Hi Brian,
+> 
+> On 12/04/2013 06:44 PM, Brian Norris wrote:
+> > On this topic, I have one more stick to throw on this fire; I have some
+> > Broadcom hardware that consists of two pieces:
 > > 
-> > In my opinion, using a variable named "version" here would be
-> > preferable. Testing that against <0 is just the way the I2C API works,
-> > so the same argument could be applied to any I2C access.
-
-So, FWIW I agree with Stephen and have done from the start. Please
-see my original comment from the first submission:
-
-> >       ret = i2c_smbus_read_byte_data(client, TPS6586X_VERSIONCRC);
->   If you're going to do this, please change 'ret' to 'version'.
-
-> Hm, I try the empiric way:
+> >   (1) a true SPI controller, with single-line-I/O and
+> >   (2) a Serial Flash controller that can accelerate flash read, using
+> >       dual/quad I/O.
 > 
-> $ grep -r -e i2c_smbus_read_byte_data | grep "ret =" | wc -l
-> 139
-> $ grep -r -e i2c_smbus_read_byte_data | grep "version =" | wc -l
-> 3
+> We support one platform with properties similar to the hardware you describe,
+> and such a hybrid configuration was in mind when I was thinking about the
+> spi-nor framework.  I am not sure how well this will come across over email, but
+> I envisage something like this:
 > 
-> Ok, thats not fair at all, version is usage specific whilst ret is not.
+>                              spi-nor
+>                                 |
+>                                 v
+>                           [spi-nor-xfer]
+>                                 |
+>          ------------------------------------------------
+>         |                       |                        |
+>         v                       v                        v
+>    spi-wrapper (<------)  hybrid-driver          serial-flash-driver
+>         |                       |                        |
+>       [SPI]                     |                        |
+>         |                       |                        |
+>         v                       |                        |
+> generic-spi-driver              |                        |
+>         |                       |                        |
+>         v                       v                        v
+> [generic-SPI-Cntrl]   [SPI-Flash-Read Cntrl]   [SPI-Flash-Controller]
 > 
-> $ grep -r -e i2c_smbus_read_byte_data | grep " = " | wc -l
-> 703
-
-I not really that worried about what everyone else does. I'm more
-concerned with doing what we deem to be the correct thing here.
-
-> On the other hand is the additional variable. But I think the compiler
-> will optimize that anyway, so this might not be an argument at all :-)
+> The 'spi-nor' layer is responsible for Serial Flash domain knowledge, and how to
+> generate 'spi-nor-xfer' messages.  The 'spi-wrapper' would provide an interface
+> to the generic SPI framework, flattening the 'spi-nor-xfer' message to standard
+> SPI calls.  The combination of 'spi-nor' and 'spi-wrapper' should achieve what
+> we have today for the m25p80 driver.  The 'serial-flash-driver' in the example
+> provides an implementation for a dedicated Serial Flash Controller, making use
+> of the spi-nor-xfer semantics where required.  The 'hybrid-driver' could use the
+> 'spi-wrapper' implementation for write and erase hooks, and optimised
+> implementations for read hooks.
 > 
-> I see your point... Should I create another patch revision? Lee, is the
-> patch already merged?
+For the diagram above, I think we can regard the hybrid driver as a kind of
+serial-flash-driver too.
 
-It isn't. Please submit another version as Stephen requests.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+thanks
+Huang Shijie
