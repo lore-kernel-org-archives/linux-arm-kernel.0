@@ -1,70 +1,67 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Fri, 6 Dec 2013 09:05:49 +0100
-Subject: [GIT PULL] Cacheflush updates for 3.12
-In-Reply-To: <CAH9NwWdh-kT8Pgp-CU9x5HiA_C0aKaSDKEO_8OVaYfvpxH2u=Q@mail.gmail.com>
-References: <20130812173155.GI25995@mudshark.cambridge.arm.com>
- <CAH9NwWd1AfN_YnO-fj94+wTbE8768H518=EndVcX=dFCV9WESg@mail.gmail.com>
- <20131204161329.GA14145@mudshark.cambridge.arm.com>
- <1386253407.3525.8.camel@linaro1.home>
- <1386256471.3525.13.camel@linaro1.home>
- <CAH9NwWdh-kT8Pgp-CU9x5HiA_C0aKaSDKEO_8OVaYfvpxH2u=Q@mail.gmail.com>
-Message-ID: <CAH9NwWe95V0MsswfE9JY7WpYLwxy9GqsMHnpXbz4aR3nyvKapA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 6 Dec 2013 09:16:40 +0100
+Subject: [PATCHv13][ 2/4] video: imxfb: Also add pwmr for the device tree.
+In-Reply-To: <1386317034.190941796@f354.i.mail.ru>
+References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
+ <1386258219-26437-2-git-send-email-denis@eukrea.com>
+ <20131206070525.GV24559@pengutronix.de>
+ <1386317034.190941796@f354.i.mail.ru>
+Message-ID: <20131206081640.GZ24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/5 Christian Gmeiner <christian.gmeiner@gmail.com>:
-> 2013/12/5 Jon Medhurst (Tixy) <tixy@linaro.org>:
->> On Thu, 2013-12-05 at 14:23 +0000, Jon Medhurst (Tixy) wrote:
->>> On Wed, 2013-12-04 at 16:13 +0000, Will Deacon wrote:
->>> > took another look at that patch and can't see anything obviously wrong
->>> > with it.
->>>
->>> If the memory region isn't guaranteed to be page aligned then doesn't it
->>> flush up to PAGE_SIZE-1 more bytes than requested and so exceed the
->>> bounds check in do_cache_op? Fixing this as below _appears_ to stop the
->>> Browser crashes I'm seeing (still doing some more testing)...
->>
->> Actually, a smaller patch and one which avoids the possibility of
->> arithmetic owerflow is...
->>
->> From: Jon Medhurst <tixy@linaro.org>
->> Date: Thu, 5 Dec 2013 14:29:24 +0000
->> Subject: [PATCH] ARM: cacheflush: correctly limit range of memory region
->>  being flushed
->>
->> The __do_cache_op function operates with a 'chunk' size of one page
->> but fails to limit the size of the final chunk so as to not exceed
->> the specified memory region. Fix this.
->>
->> Signed-off-by: Jon Medhurst <tixy@linaro.org>
->> ---
->>  arch/arm/kernel/traps.c |    3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index dbf0923..7940241 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -509,9 +509,10 @@ static inline int
->>  __do_cache_op(unsigned long start, unsigned long end)
->>  {
->>         int ret;
->> -       unsigned long chunk = PAGE_SIZE;
->>
->>         do {
->> +               unsigned long chunk = min(PAGE_SIZE, end - start);
->> +
->>                 if (signal_pending(current)) {
->>                         struct thread_info *ti = current_thread_info();
->>
->> --
->> 1.7.10.4
->>
->>
->
-> I am running my test overnight with this patch... stay tuned.
->
+On Fri, Dec 06, 2013 at 12:03:54PM +0400, Alexander Shiyan wrote:
+> > >  .../devicetree/bindings/video/fsl,imx-fb.txt       |    3 +++
+> > >  drivers/video/imxfb.c                              |    2 ++
+> > >  2 files changed, 5 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > index 46da08d..ac457ae 100644
+> > > --- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > @@ -17,6 +17,9 @@ Required nodes:
+> > >  Optional properties:
+> > >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+> > >  	register is not modified as recommended by the datasheet.
+> > > +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
+> > > +	optional, but defining it is necessary to get the backlight working. If that
+> > > +	property is ommited, the register is zeroed.
+> > 
+> > Why isn't this implemented as a backlight driver? Static devicetree
+> > provided values is very limiting.
+> 
+> Let's understand the terminology.
+> This register should be renamed according to the datasheet, i.e. LPCCR.
+> As I pointed out earlier, it is NOT control the backlight, this is a contrast control.
+> Yes, it works as PWM, but nothing do with the backlight subsystem.
+> Yes, we can make a driver for this PWM, but how are we going to control it?
+> I misunderstood something?
 
-My test is still running, which is good.
+I stumbled upon 'get the backlight working' which implied for me that it
+should be a backlight driver. But you're right and now I remember we
+talked about this already.
 
-Tested-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+I still think this should be something adjustable, not static data.
+Maybe we could change the wording to something like "This property
+provides the default value for the contrast control register" since even
+if we add driver support for controlling the contrast we still want
+to have a sane default.
+
+BTW the contrast could be controlled with a lcd_device (see
+lcd_device_register) which seems to be very easy to implement.
+
+SaschaMaybe we could change the wording to something like "This property
+provides the default value for the contrast control register" since even
+if we add driver support for controlling the contrast we still want
+to have a sane default.
+
+BTW the contrast could be controlled with a lcd_device (see
+lcd_device_register) which seems to be very easy to implement.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
