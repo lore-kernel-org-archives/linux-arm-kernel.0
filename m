@@ -1,192 +1,98 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 6 Dec 2013 17:36:11 +0530
-Subject: [PATCH v2 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <1386331571-30903-1-git-send-email-kishon@ti.com>
-References: <1386331571-30903-1-git-send-email-kishon@ti.com>
-Message-ID: <1386331571-30903-3-git-send-email-kishon@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 6 Dec 2013 12:11:55 +0000
+Subject: [PATCH] ARM : unwinder : Prevent data abort due to stack overflow
+In-Reply-To: <1386310193-6434-1-git-send-email-a.anurag@samsung.com>
+References: <1386310193-6434-1-git-send-email-a.anurag@samsung.com>
+Message-ID: <20131206121149.GA4897@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
-MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
-device name of the controller had *.auto* in it. Since with using
-PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
-the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
-So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
-change is done in board file here.
+On Fri, Dec 06, 2013 at 06:09:53AM +0000, Anurag Aggarwal wrote:
+> While unwinding backtrace, stack overflow is possible. This stack
+> overflow can sometimes lead to data abort in system if the area after
+> stack is not mapped to physical memory.
+> 
+> To prevent this problem from happening, execute the instructions that
+> can cause a data abort in separate helper functions, where a check for
+> feasibility is made before reading each word from the stack.
+> 
+> Signed-off-by: Anurag Aggarwal <a.anurag@samsung.com>
+> ---
+>  arch/arm/kernel/unwind.c | 138 ++++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 100 insertions(+), 38 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> index 00df012..6d854f8 100644
+> --- a/arch/arm/kernel/unwind.c
+> +++ b/arch/arm/kernel/unwind.c
+> @@ -49,6 +49,8 @@
+>  #include <asm/traps.h>
+>  #include <asm/unwind.h>
+>  
+> +#define TOTAL_REGISTERS 16
+> +
+>  /* Dummy functions to avoid linker complaints */
+>  void __aeabi_unwind_cpp_pr0(void)
+>  {
+> @@ -66,9 +68,11 @@ void __aeabi_unwind_cpp_pr2(void)
+>  EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
+>  
+>  struct unwind_ctrl_block {
+> -	unsigned long vrs[16];		/* virtual register set */
+> +	unsigned long vrs[TOTAL_REGISTERS];	/* virtual register set */
+>  	const unsigned long *insn;	/* pointer to the current instructions word */
+> +	unsigned long sp_high;		/* highest value of sp allowed*/
+>  	int entries;			/* number of entries left to interpret */
+> +	int last_register_set;          /* store if we are at the last set */
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/mach-omap2/board-2430sdp.c        |    2 +-
- arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
- arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
- arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
- arch/arm/mach-omap2/board-ldp.c            |    2 +-
- arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
- arch/arm/mach-omap2/board-omap3logic.c     |    2 +-
- arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
- arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
- arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
- arch/arm/mach-omap2/board-overo.c          |    2 +-
- arch/arm/mach-omap2/board-rx51.c           |    2 +-
- 12 files changed, 12 insertions(+), 12 deletions(-)
+I find the name and comment a bit confusing here.  Also, strictly
+speaking it can be a bool.
 
-diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-index c711ad6..cc679c6 100644
---- a/arch/arm/mach-omap2/board-2430sdp.c
-+++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@ -246,7 +246,7 @@ static void __init omap_2430sdp_init(void)
- 	omap_hsmmc_init(mmc);
- 
- 	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	board_smc91x_init();
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index d95d0ef..873e463 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -607,7 +607,7 @@ static void __init omap_3430sdp_init(void)
- 	omap_ads7846_init(1, gpio_pendown, 310, NULL);
- 	omap_serial_init();
- 	omap_sdrc_init(hyb18m512160af6_sdrc_params, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	board_smc91x_init();
- 	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 8dd0ec8..ddcadfa 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -725,7 +725,7 @@ static void __init cm_t3x_common_init(void)
- 	cm_t35_init_display();
- 	omap_twl4030_audio_init("cm-t3x", NULL);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	cm_t35_init_usbh();
- 	cm_t35_init_camera();
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index cdc4fb9..bb589f1 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -628,7 +628,7 @@ static void __init devkit8000_init(void)
- 
- 	omap_ads7846_init(2, OMAP3_DEVKIT_TS_GPIO, 0, NULL);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	usbhs_init(&usbhs_bdata);
- 	board_nand_init(devkit8000_nand_partitions,
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index 4ec8d82..ec9b349 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -402,7 +402,7 @@ static void __init omap_ldp_init(void)
- 	omap_ads7846_init(1, 54, 310, NULL);
- 	omap_serial_init();
- 	omap_sdrc_init(NULL, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	board_nand_init(ldp_nand_partitions, ARRAY_SIZE(ldp_nand_partitions),
- 			0, 0, nand_default_timings);
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index d6ed819..0cba5eb 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -561,7 +561,7 @@ static void __init omap3_beagle_init(void)
- 	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
- 				  mt46h32m32lf6_sdrc_params);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init(&usbhs_bdata);
-diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-index bab51e6..d9a6c38 100644
---- a/arch/arm/mach-omap2/board-omap3logic.c
-+++ b/arch/arm/mach-omap2/board-omap3logic.c
-@@ -216,7 +216,7 @@ static void __init omap3logic_init(void)
- 	board_mmc_init();
- 	board_smsc911x_init();
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	/* Ensure SDRC pins are mux'd for self-refresh */
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index de1bc6b..3826af6 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -607,7 +607,7 @@ static void __init omap3pandora_init(void)
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
- 	usbhs_init(&usbhs_bdata);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	gpmc_nand_init(&pandora_nand_data, NULL);
- 
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 119efaf..9421987 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -407,7 +407,7 @@ static void __init omap3_stalker_init(void)
- 
- 	omap_serial_init();
- 	omap_sdrc_init(mt46h32m32lf6_sdrc_params, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index 7da48bc..e8e053d 100644
---- a/arch/arm/mach-omap2/board-omap3touchbook.c
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -367,7 +367,7 @@ static void __init omap3_touchbook_init(void)
- 
- 	/* Touchscreen and accelerometer */
- 	omap_ads7846_init(4, OMAP3_TS_GPIO, 310, &ads7846_pdata);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index f6d3841..c69e049 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -511,7 +511,7 @@ static void __init overo_init(void)
- 				  mt46h32m32lf6_sdrc_params);
- 	board_nand_init(overo_nand_partitions,
- 			ARRAY_SIZE(overo_nand_partitions), NAND_CS, 0, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index db168c9..31d218f 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -103,7 +103,7 @@ static void __init rx51_init(void)
- 	sdrc_params = nokia_get_sdram_timings();
- 	omap_sdrc_init(sdrc_params, sdrc_params);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(&musb_board_data);
- 	rx51_peripherals_init();
- 
--- 
-1.7.10.4
+Maybe:
+
+	/*
+	 * true: check for stack overflow for each register pop;
+	 * false: save overhead if there is plenty of stack remaining.
+	 */
+	bool check_each_pop;
+
+
+It shouldn't be too hard to understand from reading the code though, so
+I'm happy with your version if you prefer.
+	
+[...]
+
+> @@ -382,11 +438,17 @@ int unwind_frame(struct stackframe *frame)
+>  		return -URC_FAILURE;
+>  	}
+>  
+> +	/* we are just starting, initialize last register set as 0 */
+> +	ctrl.last_register_set = 0;
+> +
+>  	while (ctrl.entries > 0) {
+> -		int urc = unwind_exec_insn(&ctrl);
+> +		int urc;
+> +		if ((ctrl.sp_high - ctrl.vrs[SP]) < TOTAL_REGISTERS)
+> +			ctrl.last_register_set = 1;
+
+If this is done once per unwind_exec_insn(), I think it would be better
+to put the check at the start of unwind_exec_insn() instead of outside.
+
+
+The check still looks wrong too?
+
+ctrl.sp_high - ctrl.vrs[SP] gives the available space in bytes, but
+TOTAL_REGISTERS is measured in words.
+
+
+One way to get the correct value would be simply
+
+	sizeof ctrl.vrs
+
+since that's the array we're trying to fill from the stack.
+
+(in that case I guess that the TOTAL_REGISTERS macro might not be needed
+again)
+
+Cheers
+---Dave
