@@ -1,96 +1,138 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Fri, 06 Dec 2013 20:38:31 +0400
-Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
-In-Reply-To: <201312060140.10376.arnd@arndb.de>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-3-git-send-email-ynvich@gmail.com>
- <201312060140.10376.arnd@arndb.de>
-Message-ID: <1386347911.7152.70.camel@host5.omatika.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 6 Dec 2013 17:41:33 +0100
+Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
+In-Reply-To: <CAL_JsqLf0Ubi55mc-p0-qPwY0LzHEZ-SF9QwcELkKPfZH=9t_g@mail.gmail.com>
+References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
+ <201312052250.38986.arnd@arndb.de>
+ <CAL_JsqLf0Ubi55mc-p0-qPwY0LzHEZ-SF9QwcELkKPfZH=9t_g@mail.gmail.com>
+Message-ID: <201312061741.33427.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-12-06 at 01:40 +0100, Arnd Bergmann wrote:
-> On Sunday 01 December 2013, Sergei Ianovich wrote:
-> > 
-> > diff --git a/arch/arm/configs/lp8x4x_defconfig b/arch/arm/configs/lp8x4x_defconfig
-> > new file mode 100644
-> > index 0000000..5cd6d38
-> > --- /dev/null
-> > +++ b/arch/arm/configs/lp8x4x_defconfig
-> > @@ -0,0 +1,2320 @@
-> > +#
-> > +# Automatically generated file; DO NOT EDIT.
-> > +# Linux/arm 3.13.0-rc1 Kernel Configuration
-> > +#
+On Friday 06 December 2013, Rob Herring wrote:
+> On Thu, Dec 5, 2013 at 3:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 05 December 2013, Rob Herring wrote:
+> >> On Thu, Dec 5, 2013 at 2:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Thursday 05 December 2013, Rob Herring wrote:
+> >> >> select ARM_AMBA
+> >> >> select ARM_GIC if CPU_V7
+> >> >> select HAVE_SMP if CPU_V7
+> >> >> select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+> >> >> select ARCH_HAS_CPUFREQ
+> >> >> select ARCH_HAS_OPP
+> >> >
+> >> > Not sure about ARM_GIC and HAVE_SMP, as they won't typically be
+> >> > set on Cortex-A8, Scorpion and PJ4. The other suggestions sound
+> >> > good, and your patch looks fine as well.
+> >>
+> >> HAVE_SMP only enables visibility of the SMP kconfig option. That could
+> >> cause randconfig builds that would not boot if SMP_ON_UP was not
+> >> enabled, but a "select SMP_ON_UP if SMP" here would fix that though.
+> >
+> > Ok, I see. "select HAVE_SMP if CPU_V7" maybe "select HAVE_SMP if
+> > ARCH_MULTI_V7" sounds reasonable then, at least I'd prefer that over
+> > the "select SMP_ON_UP if SMP" option, which would make having SMP_ON_UP
+> > as an option pointless, since you could no longer turn it off.
+> >
+> > If you set HAVE_SMP for CPU_V7, it would be logical to also set it for
+> > CPU_V6K, although I'm unsure if we actually still support any SMP V6K
+> > platforms in practice: CNS3xxx is the only such platform I'm aware of,
+> > and the SMP support for that one was never merged (it's in openwrt
+> > though).
 > 
-> Please use 'make savedefconfig' to generate a smaller version of this file.
+> We should be able to boot an SMP kernel on it whether or not the
+> platform has SMP support added, right?
 
-Done. Updated in v2.
+Yes, although I don't think anyone has ever tried to boot a UP_ON_SMP
+kernel on ARMv5 or earlier. We don't allow that combination at the
+moment, and it would be pointless.
 
-> Ideally we want shared defconfigs where you enable multiple (or all) pxa boards
-> at once and end up with a kernel that works on all of them.
+> Practically every v6 platform selects v6K. We should probably default
+> to V6K for ARCH_MULTI_V6 and let platforms select CPU_V6 instead if
+> needed. I believe that will give the v6 versions of code only as
+> needed and will give better versions of code if only v6K is selected.
+> imx31 is one that doesn't select v6K, but only very early revs did not
+> have v6K version of the 1136. I don't think any of those parts went
+> into production (maybe into the original Zune?).
+
+Interesting, I had no idea that plain ARMv6 was this rare.
+
+If we could show that all supported platforms are actually v6K anyway
+and that nobody has any plans to add new ones, doing away with
+v6 in favor of v6k would clean up a lot of confusing (i.e. possibly
+wrong) Kconfig logic.
+
+> I assume we expect a v6 SMP kernel to run on a non-v6K v6 platform?
+
+Actually, as far as I can see:
+
+config SMP
+        bool "Symmetric Multi-Processing"
+        depends on CPU_V6K || CPU_V7
+        depends on HAVE_SMP
+
+This prevents you from building a plain v6 SMP kernel, and we've
+had a variation of that since CONFIG_SMP was first marked non-BROKEN.
+
+> if so, doing more digging I think we have a problem with
+> __kuser_cmpxchg64 on a v6 only platform with v6K enabled in the
+> kernel. Adding Nico since he wrote this. The code is ifdef'ed like
+> this:
 > 
-> For most other platforms the goal is even to have a shared defconfig across
-> SoC families, but PXA is one of the exceptions that I would make because
-> it is both old and rather different from even the ARM9 or Marvell Feroceon
-> based SoCs.
-
-There is probably no in point sharing this config with most other
-devices on PXA2xx SoC. This device is an industrial PC. Its config needs
-to be optimized for low latency even by the cost of greater power
-consumption. It is not supposed to run on batteries or enter any low
-power mode anyway.
-
-> > +#define LP8X4X_FPGA_PHYS     0x17000000
-> > +#define LP8X4X_FPGA_VIRT     0xf1000000
-> > +#define LP8X4X_P2V(x)                IOMEM((x) - LP8X4X_FPGA_PHYS + LP8X4X_FPGA_VIRT)
-> > +#define LP8X4X_V2P(x)                ((x) - LP8X4X_FPGA_VIRT + LP8X4X_FPGA_PHYS)
+> #if defined(CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG)
+> (only true for pre-v6)
+> ...
+> #elif defined(CONFIG_CPU_32v6K)
+> (true when v6K gets enabled)
+> ...
+> #elif !defined(CONFIG_SMP)
+> #ifdef CONFIG_MMU
+> (this is the correct condition for a v6 only platform)
+> ...
+> #else
+> #warning "NPTL on non MMU needs fixing"
+> ...
+> #endif
+> #else
+> #error "incoherent kernel configuration"
+> #endif
 > 
-> I would recommend defining LP8X4X_FPGA_VIRT as "(void *)0xf1000000". Ideally
+> Any build with v6K enabled will get the double exclusive instructions
+> which won't work on v6 only platforms. It seems we need some
+> ALT_SMP/ALT_UP magic here.
 
-Done in v2. 
+The above code can already be simplified a lot, since the pre-v6 and
+pre-v6k v6 cases are dead code. There are comments in Kconfig like this:
 
-> we try to avoid hardwired virtual addresses entirely and instead use platform
-> device resources, but I realize that there are limits to how far you get with
-> that. Please make an effort to convert as many parts of the FPGA into platform
-> devices with regular resources, but know that we would not enforce this as
-> strictly as we do for new platforms.
-> 
-> > +
-> > +static struct irq_chip lp8x4x_irq_chip = {
-> > +     .name                   = "FPGA",
-> > +     .irq_ack                = lp8x4x_ack_irq,
-> > +     .irq_mask               = lp8x4x_mask_irq,
-> > +     .irq_unmask             = lp8x4x_unmask_irq,
-> > +};
-> 
-> Please try to move the irqchip code to drivers/irqchip/.
+config TLS_REG_EMUL
+        bool
+        select NEED_KUSER_HELPERS
+        help
+          An SMP system using a pre-ARMv6 processor (there are apparently
+          a few prototypes like that in existence) and therefore access to
+          that required register must be emulated.
 
-CONFIG_IRQCHIP depends on CONFIG_OF_IRQ which in turn depends on Open
-Firmware.
+config NEEDS_SYSCALL_FOR_CMPXCHG
+        bool
+        select NEED_KUSER_HELPERS
+        help
+          SMP on a pre-ARMv6 processor?  Well OK then.
+          Forget about fast user space cmpxchg support.
+          It is just not possible.
 
-The device is shipped with such a flash device partition table, which
-makes migration to device tree rather difficult. The partition for
-U-Boot is just 256kiB. This is a high aim already. U-Boot needs to be
-compiled without command line help and USB support to fit into this
-size. Otherwise the main flash needs to be repartitioned.
 
-Could it be acceptable to accept the device without device tree support?
+added in a commit from Nico back in 2005:
 
-If so, FPGA irqchip could remain in the machine source file. It is
-highly unlikely, it will ever be reused. In this case all fixed virtual
-address definitions could be moved to the machine source file. The file
-will be the only place where LP8X4X_FPGA_VIRT is used directly.
+    [PATCH] ARM: 2663/1: straightify TLS register emulation a bit more
+    
+    Patch from Nicolas Pitre
+    
+    This better express things, and should cover RMK's weird SMP toys.
 
-> > +static struct platform_device lp8x4x_flash_device[] = {
-> 
-> static platform_device definitions are no longer the way to do this. For
-> modern platforms, you'd use a device tree, but here I think it is acceptable
-> (because of the PXA exception) to use a hardcoded board file.
-> 
-> The correct way to create the devices is using platform_device_register_data()
-> or a related function that returns a dynamically allocated platform device.
+I don't know what "weird toys" he is referring to, but maybe he or Russell
+can shed some light on that and whether we'd expect to see support for
+them added in the future. If anyone else but Russell were to propose
+adding new platforms like those, I'd probably say no (or possibly
+NOOOOoooo) anyway. 
 
-Done in v2. Allocation migrated to use
-platform_device_register_resndata() and
-platform_device_register_simple().
+	Arnd
