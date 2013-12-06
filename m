@@ -1,45 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 6 Dec 2013 16:48:16 -0500
-Subject: [PATCH v2 0/5] Kesytone II USB support
-In-Reply-To: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
-References: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <52A24620.4060801@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri,  6 Dec 2013 13:52:19 -0800
+Subject: [PATCH 3.10 48/58] clockevents: Prefer CPU local devices over global
+ devices
+In-Reply-To: <20131206214844.906193530@linuxfoundation.org>
+References: <20131206214844.906193530@linuxfoundation.org>
+Message-ID: <20131206214849.344460410@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wingman,
+3.10-stable review patch.  If anyone has any objections, please let me know.
 
-On Wednesday 04 December 2013 03:10 PM, WingMan Kwok wrote:
-> Here is the updated version of the series which addresses comments from
-> earlier version [1].  The PHY register programming is moved to a separate
-> PHY driver.
-> 
-> Series adds USB host support for Keystone SOCs. Keystone SOCs uses dwc3
-> hardware IP implementation.  On Keystone II platforms, we use no-op phy driver.
-> 
-> All three patches are posted together just for completeness. Only first patch
-> is expected to go via usb tree and other two via linux-keystone tree.
->
-The series looks fine now and probably can be split now.
+------------------
+
+From: Stephen Boyd <sboyd@codeaurora.org>
+
+commit 70e5975d3a04be5479a28eec4a2fb10f98ad2785 upstream.
+
+On an SMP system with only one global clockevent and a dummy
+clockevent per CPU we run into problems. We want the dummy
+clockevents to be registered as the per CPU tick devices, but
+we can only achieve that if we register the dummy clockevents
+before the global clockevent or if we artificially inflate the
+rating of the dummy clockevents to be higher than the rating
+of the global clockevent. Failure to do so leads to boot
+hangs when the dummy timers are registered on all other CPUs
+besides the CPU that accepted the global clockevent as its tick
+device and there is no broadcast timer to poke the dummy
+devices.
+
+If we're registering multiple clockevents and one clockevent is
+global and the other is local to a particular CPU we should
+choose to use the local clockevent regardless of the rating of
+the device. This way, if the clockevent is a dummy it will take
+the tick device duty as long as there isn't a higher rated tick
+device and any global clockevent will be bumped out into
+broadcast mode, fixing the problem described above.
+
+Reported-and-tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Tested-by: soren.brinkmann at xilinx.com
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: John Stultz <john.stultz@linaro.org>
+Link: http://lkml.kernel.org/r/20130613183950.GA32061 at codeaurora.org
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kim Phillips <kim.phillips@linaro.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ kernel/time/tick-common.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+--- a/kernel/time/tick-common.c
++++ b/kernel/time/tick-common.c
+@@ -234,8 +234,13 @@ static bool tick_check_preferred(struct
+ 			return false;
+ 	}
  
-> Patchset are tested on Keystone II EVM with USB2.0 and USB3.0 flash drives.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> WingMan Kwok (5):
->   usb: dwc3: Add Keystone specific glue layer
->   usb: phy: Add keystone usb phy driver
-Please update the minor comments on patch 1 and resubmit above
-two patches so that Felipe can pick these up. 
-
->   ARM: dts: keystone: Add usb phy devicetree bindings
->   ARM: dts: keystone: Add usb devicetree bindings
->   ARM: keystone: defconfig: enable USB support
-> 
-On the dts part just enable the phy,usb3 nodes from
-board dts file and have status disabled in common dts file.
-With those update, please repost them and I will take
-them in my 3.14 queue.
-
-Regards,
-Santosh
+-	/* Use the higher rated one */
+-	return !curdev || newdev->rating > curdev->rating;
++	/*
++	 * Use the higher rated one, but prefer a CPU local device with a lower
++	 * rating than a non-CPU local device
++	 */
++	return !curdev ||
++		newdev->rating > curdev->rating ||
++	       !cpumask_equal(curdev->cpumask, newdev->cpumask);
+ }
+ 
+ /*
