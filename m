@@ -1,71 +1,62 @@
-From: hrhaan@gmail.com (Harro Haan)
-Date: Fri, 6 Dec 2013 13:39:09 +0100
-Subject: i.MX6/PCIe and MSI interrupts
-In-Reply-To: <201312061243.56069.marex@denx.de>
-References: <201312061032.31944.jbe@pengutronix.de>
- <201312061243.56069.marex@denx.de>
-Message-ID: <CAB5oZtC_X6Tk+6c5sZB06kDmhOgqmqW0_QG1GKWAJgqNpg2tag@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri,  6 Dec 2013 13:51:44 +0100
+Subject: [PATCH v5 0/3] regulator: tps6586x: add version detection and voltage
+ tables
+Message-ID: <cover.1386333697.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 December 2013 12:43, Marek Vasut <marex@denx.de> wrote:
-> On Friday, December 06, 2013 at 10:32:31 AM, J?rgen Beisert wrote:
->> Hi,
->>
->> is anybody out there who has MSI interrupts successfully working on i.MX6?
->> I tried with my i.MX6 and a Gbit network card but without success. In
->> legacy interrupt mode it works.
->
-> What precise model of card do you use ? Do you have a PCIe switch in the path or
-> just direct RC-EP connection ?
->
->> I'm using various patches here from the list and the PCIe itself works. The
->> designware driver is prepared for MSI interrupts and the Exynos driver
->> makes use of it.
->
-> OK
->
->> I added the same glue code to the i.MX6 driver but I can't get the INTD
->> interrupt to fire when MSI arrives (while the INTA fires in legacy
->> interrupt mode). Some idea what needs to be done in the i.MX6 to get MSI
->> working? The Exynos driver additionally changes some bits in its chipset
->> beside the PCIe unit to enable the MSI interrupt to its CPU. Are there
->> some 'hidden' bits in the i.MX6 as well?
->
-> Can you post your prototype patch for the PCIe MSI so we can see what you did
-> there please?
+This is the 5th version of this patchset which adds version detection
+for the tps6586x mfd family. Just discovered a missing null reference
+check which did not triggered in my tests, sorry about that.
 
-Attached are my patches of the first attempt to get MSI working for
-the i.MX6. It looks like MSI is working but MSIX is not in combination
-with e1000e and SabreSD. I did some successful iperf tests in MSI
-mode. I did the following hack in
-drivers/net/ethernet/intel/e1000e/param.c to disable MSIX:
+This is required because some regulator versions use different voltage
+tables. The regulator driver now uses the right voltage table according
+to the version.
 
--		if (adapter->flags & FLAG_HAS_MSIX) {
-+		if (!(adapter->flags & FLAG_HAS_MSIX)/*TEMP*/) {
+While at it, there are a few other incorrect regulator entries in the
+device tree, change them accordingly (this patch is new and grew out
+of a patch with the same name which Lucas Stach posted in July).
 
-In MSIX mode, the imx6_pcie_msi_irq_handler occurs, but
-e1000_intr_msix_rx, e1000_intr_msix_tx or e1000_intr_msix_other does
-not get called.
+Tested on Colibri T20 V1.1 and V1.2 which makes use of diffent version
+of that regulator.
 
-My MSI tests are not successful when testing it with a Xilinx PCIe
-development board, while this FPGA design works properly with FSL
-imx_3.0.35 (or on x86).
+Changes since v4:
+  - Use variable named version instead of ret
 
-Best regards,
+Changes since v3:
+  - Check if version specific table is necessary
 
-Harro
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-dts-imx6qdl.dtsi-add-msi-interrupt.patch
-Type: text/x-patch
-Size: 1056 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/c0c0bb8e/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-PCI-imx6-add-support-for-MSI.patch
-Type: text/x-patch
-Size: 2085 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/c0c0bb8e/attachment-0001.bin>
+Changes since v2:
+  - Avoid moving devm_kzalloc
+  - Removed reg_ from reg_version
+  - Moved walk through version dependent tables to find_regulator_info,
+    removed the inline definition. This reduces .o size and encapsulates
+    the logic of finding the right regulator into one function. It comes
+    with a slight code duplication, the table search now appears twice.
+
+Changes since v1:
+  - Merged DT and driver change (preserves bisectability)
+  - Use different regulator tables for different regulator version
+    * This also makes the TPS6586X_ANY version needless
+  - Replaced enum with defines
+  - Move version message in a sperate function
+  - Include regulator bugfix, use correct supply voltage
+  - Checked all voltages, fix SM0/SM1 (Core/CPU) and LDO6 voltage (VDAC/VI)
+    in another commit
+  - Rebased on top of v3.13-rc2
+
+
+Stefan Agner (3):
+  mfd: tps6586x: add version detection
+  regulator: tps6586x: add and use correct voltage table
+  ARM: tegra: correct Colibri T20 regulator settings
+
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi | 34 +++++------
+ drivers/mfd/tps6586x.c                     | 50 +++++++++++++---
+ drivers/regulator/tps6586x-regulator.c     | 93 ++++++++++++++++++++++++------
+ include/linux/mfd/tps6586x.h               |  7 +++
+ 4 files changed, 140 insertions(+), 44 deletions(-)
+
+-- 
+1.8.4.2
