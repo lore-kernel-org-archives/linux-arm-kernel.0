@@ -1,70 +1,37 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 6 Dec 2013 16:52:50 +0200
-Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <52A0E357.7090008@ti.com>
-References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
- <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
- <20131203232445.GX8277@htj.dyndns.org> <52A0AB34.2030703@ti.com>,
- <20131205165325.GA24062@mtj.dyndns.org>
- <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
- <52A0E357.7090008@ti.com>
-Message-ID: <52A1E4C2.6020004@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 6 Dec 2013 14:56:59 +0100
+Subject: [PATCH v2 0/3] pinctrl: Qualcomm 8x74 pinctrl driver
+In-Reply-To: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <CACRpkdaYPSJbL80tbFaNP9aTFc+_AKsT=rd-yxc0R6K-M_Tz9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2013 10:34 PM, Santosh Shilimkar wrote:
-> Grygorii,
->
-> On Thursday 05 December 2013 01:48 PM, Strashko, Grygorii wrote:
->> Hi Tejun,
->>
->>> On Thu, Dec 05, 2013 at 06:35:00PM +0200, Grygorii Strashko wrote:
->>>>>> +#define memblock_virt_alloc_align(x, align) \
->>>>>> +  memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
->>>>>> +                               BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
->>>>>
->>>>> Also, do we really need this align variant separate when the caller
->>>>> can simply specify 0 for the default?
->>>>
->>>> Unfortunately Yes.
->>>> We need it to keep compatibility with bootmem/nobootmem
->>>> which don't handle 0 as default align value.
->>>
->>> Hmm... why wouldn't just interpreting 0 to SMP_CACHE_BYTES in the
->>> memblock_virt*() function work?
->>>
->>
->> Problem is not with memblock_virt*(). The issue will happen in case if
->> memblock or nobootmem are disabled in below code (memblock_virt*() is disabled).
->>
->> +/* Fall back to all the existing bootmem APIs */
->> +#define memblock_virt_alloc(x) \
->> +       __alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
->>
->> which will be transformed to
->> +/* Fall back to all the existing bootmem APIs */
->> +#define memblock_virt_alloc(x, align) \
->> +       __alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
->>
->> and used as
->>
->> memblock_virt_alloc(size, 0);
->>
->> so, by default bootmem code will use 0 as default alignment and not SMP_CACHE_BYTES
->> and that is wrong.
->>
-> Looks like you didn't understood the suggestion completely.
-> The fall back inline will look like below .....
->
-> static inline memblock_virt_alloc(x, align)
-> {
-> 	if (align == 0)
-> 		align = SMP_CACHE_BYTES
-> 	__alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT);
-> }
->
+On Fri, Dec 6, 2013 at 3:10 AM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
 
-I understand. thanks.
+> This series adds a pinctrl, pinmux, pinconf and gpiolib driver for the
+> Qualcomm TLMM block found in recent Qualcomm SoCs (8x60 and newer).
+> It designed with both v2 and v3 of the block in mind and comes with initial
+> definitions for the 8x74 SoCs.
+> This should be filled in with more data and definitions for more SoCs.
+>
+> Regards,
+> Bjorn
+>
+> v2
+> --
+> * Replaced subnode dt parsing with generic pinctrl function
+> * Installing irq_handler as chained irq handler
+> * Added call to handle_bad_irq() when no irqs are pending in irq handler
+> * Creating irq mapping at probe() and cleaned up the code accordingly
+> * Replaced pinctrl_add_gpio_range with gpiochip_add_pin_range
+> * Other minor updates based on review comments
 
-Regards,
--grygorii
+I can't see any problem with these patches, and they only use standard
+bindings, so I've applied all three so we get some linux-next rotation
+and build coverage. Any remaining problems can certainly be fixed
+with incremental patches.
+
+Thanks!
+Linus Walleij
