@@ -1,183 +1,85 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 6 Dec 2013 16:21:07 +0800
-Subject: [PATCHv3] usb: chipidea: add support for USB OTG controller on
- TI-NSPIRE
-In-Reply-To: <20131204070255.GF29552@shlinux1.ap.freescale.net>
-References: <1385351617-94118-1-git-send-email-dt.tangr@gmail.com>
- <20131204070255.GF29552@shlinux1.ap.freescale.net>
-Message-ID: <20131206082106.GH14002@shlinux1.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 6 Dec 2013 16:32:40 +0800
+Subject: [PATCH V2 0/4] mtd: spi-nor: add a new framework for SPI NOR
+Message-ID: <1386318764-15882-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:02:56PM +0800, Peter Chen wrote:
-> On Mon, Nov 25, 2013 at 02:53:37PM +1100, dt.tangr at gmail.com wrote:
-> > From: Daniel Tang <dt.tangr@gmail.com>
-> > 
-> > The USB controller in TI-NSPIRE calculators are based off either Freescale's
-> > USB OTG controller or the USB controller found in the IMX233, both of which
-> > are Chipidea compatible.
-> > 
-> > This patch adds a device tree binding for the controller.
-> > 
-> > Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
-> > ---
-> > 
-> > Changelog v3:
-> >  * Removed redundant module aliases
-> > 
-> > Changelog v2:
-> >  * Rename ci13xxx to ci_hdrc
-> >  * Fixed alignment issues
-> > 
-> > .../devicetree/bindings/usb/ci-hdrc-nspire.txt     | 17 +++++
-> >  drivers/usb/chipidea/Makefile                      |  1 +
-> >  drivers/usb/chipidea/ci_hdrc_nspire.c              | 72 ++++++++++++++++++++++
-> >  3 files changed, 90 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
-> >  create mode 100644 drivers/usb/chipidea/ci_hdrc_nspire.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
-> > new file mode 100644
-> > index 0000000..5ba8e90
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-nspire.txt
-> > @@ -0,0 +1,17 @@
-> > +* TI-Nspire USB OTG Controller
-> > +
-> > +Required properties:
-> > +- compatible: Should be "zevio,nspire-usb"
-> > +- reg: Should contain registers location and length
-> > +- interrupts: Should contain controller interrupt
-> > +
-> > +Recommended properies:
-> > +- vbus-supply: regulator for vbus
-> > +
-> > +Examples:
-> > +		usb0: usb at B0000000 {
-> > +			reg = <0xB0000000 0x1000>;
-> > +			compatible = "zevio,nspire-usb";
-> > +			interrupts = <8>;
-> > +			vbus-supply = <&vbus_reg>;
-> > +		};
-> > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> > index a99d980..245ea4d 100644
-> > --- a/drivers/usb/chipidea/Makefile
-> > +++ b/drivers/usb/chipidea/Makefile
-> > @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-> >  # Glue/Bridge layers go here
-> > 
-> >  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
-> > +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_nspire.o
-> > 
-> >  # PCI doesn't provide stubs, need to check
-> >  ifneq ($(CONFIG_PCI),)
-> > diff --git a/drivers/usb/chipidea/ci_hdrc_nspire.c b/drivers/usb/chipidea/ci_hdrc_nspire.c
-> > new file mode 100644
-> > index 0000000..517ce41
-> > --- /dev/null
-> > +++ b/drivers/usb/chipidea/ci_hdrc_nspire.c
-> > @@ -0,0 +1,72 @@
-> > +/*
-> > + *	Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2, as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * Based off drivers/usb/chipidea/ci_hdrc_msm.c
-> > + *
-> > + */
-> > +
-> > +#include <linux/module.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/usb/gadget.h>
-> > +#include <linux/usb/chipidea.h>
-> > +
-> > +#include "ci.h"
-> > +
-> > +static struct ci_hdrc_platform_data ci_hdrc_nspire_platdata = {
-> > +	.name			= "ci_hdrc_nspire",
-> > +	.flags			= CI_HDRC_REGS_SHARED,
-> > +	.capoffset		= DEF_CAPOFFSET,
-> > +};
-> > +
-> > +static int ci_hdrc_nspire_probe(struct platform_device *pdev)
-> > +{
-> > +	struct platform_device *ci_pdev;
-> > +
-> > +	dev_dbg(&pdev->dev, "ci_hdrc_nspire_probe\n");
-> > +
-> > +	ci_pdev = ci_hdrc_add_device(&pdev->dev,
-> > +				pdev->resource, pdev->num_resources,
-> > +				&ci_hdrc_nspire_platdata);
-> > +
-> > +	if (IS_ERR(ci_pdev)) {
-> > +		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
-> > +		return PTR_ERR(ci_pdev);
-> > +	}
-> > +
-> > +	platform_set_drvdata(pdev, ci_pdev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int ci_hdrc_nspire_remove(struct platform_device *pdev)
-> > +{
-> > +	struct platform_device *ci_pdev = platform_get_drvdata(pdev);
-> > +
-> > +	ci_hdrc_remove_device(ci_pdev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id ci_hdrc_nspire_dt_ids[] = {
-> > +	{ .compatible = "zevio,nspire-usb", },
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> > +static struct platform_driver ci_hdrc_nspire_driver = {
-> > +	.probe = ci_hdrc_nspire_probe,
-> > +	.remove = ci_hdrc_nspire_remove,
-> > +	.driver = {
-> > +		.name = "nspire_usb",
-> > +		.owner = THIS_MODULE,
-> > +		.of_match_table = ci_hdrc_nspire_dt_ids,
-> > +	},
-> > +};
-> > +
-> > +MODULE_DEVICE_TABLE(of, ci_hdrc_nspire_dt_ids);
-> > +module_platform_driver(ci_hdrc_nspire_driver);
-> > +
-> > +MODULE_LICENSE("GPL v2");
-> > --
-> > 1.8.1.3
-> > 
-> > 
-> 
-> Applied, Thanks.
-> 
-> -- 
-> 
-> Best Regards,
-> Peter Chen
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+1.) Why add a new framework for SPI NOR?
+  The SPI-NOR controller such as Freescale's Quadspi controller is working
+  in a different way from the SPI bus. It should knows the NOR commands to
+  find the right LUT sequence. Unfortunately, the current code can not meet
+  this requirement.
 
-Hi Daniel,
+2.) How does this patch set do?
+   This patch set adds a new spi-nor layer.
+   Before this patch, the layer is like:
 
-I have reverted this patch from my tree, since your coming one just
-rename file and doc, and I have still not sent to Greg.
+                   MTD
+         ------------------------
+                  m25p80
+         ------------------------
+	       spi bus driver
+         ------------------------
+	        SPI NOR chip
 
-Please squash the two patches, and created a new one after your dts
-has been queued, I am chipidea maintainer, it is better I only queue
-driver patch, so please split your patchset like: driver patch, dts
-patch, and doc patch.
+   After this patch, the layer is like:
+                   MTD
+         ------------------------
+                  spi-nor
+         ------------------------
+                  m25p80
+         ------------------------
+	       spi bus driver
+         ------------------------
+	       SPI NOR chip
+
+  With the spi-nor controller driver(Freescale Quadspi), it looks like:
+                   MTD
+         ------------------------
+                  spi-nor
+         ------------------------
+                fsl-quadspi
+         ------------------------
+	       SPI NOR chip
+
+3.) more details
+    This patch set adds a new data structrue spi_nor{}, clones most the common
+  code to spi-nor.c. Add spi_nor_xfer_cfg {} for the fundamental primitives:
+  read_xfer/write_xfer.
+
+    Make the m25p80.c use the new APIs.
+
+    Let's discuss the SPI nor framework in the new thread. :)
+    
+
+4.) TODO list:
+   3.1) add the new spi_nor_device{} for the spi-nor controller's device.
+   3.2) add the Freescale Quadspi driver.
+
+v1 --> v2:
+	[1] follow Angus's advice, add more hooks and data structrures.
+	[2] others.
+
+Huang Shijie (4):
+  mtd: spi-nor: copy the SPI NOR commands to a new header file
+  mtd: spi-nor: add the basic data structures
+  mtd: spi-nor: add the framework for SPI NOR
+  mtd: m25p80: use the SPI nor framework
+
+ drivers/mtd/Kconfig           |    2 +
+ drivers/mtd/Makefile          |    1 +
+ drivers/mtd/devices/Kconfig   |    2 +-
+ drivers/mtd/devices/m25p80.c  | 1261 +++--------------------------------------
+ drivers/mtd/spi-nor/Kconfig   |    6 +
+ drivers/mtd/spi-nor/Makefile  |    1 +
+ drivers/mtd/spi-nor/spi-nor.c | 1042 ++++++++++++++++++++++++++++++++++
+ include/linux/mtd/spi-nor.h   |  132 +++++
+ 8 files changed, 1277 insertions(+), 1170 deletions(-)
+ create mode 100644 drivers/mtd/spi-nor/Kconfig
+ create mode 100644 drivers/mtd/spi-nor/Makefile
+ create mode 100644 drivers/mtd/spi-nor/spi-nor.c
+ create mode 100644 include/linux/mtd/spi-nor.h
 
 -- 
-
-Best Regards,
-Peter Chen
+1.7.2.rc3
