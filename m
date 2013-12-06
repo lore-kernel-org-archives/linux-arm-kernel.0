@@ -1,45 +1,27 @@
-From: quozl@laptop.org (James Cameron)
-Date: Fri, 6 Dec 2013 13:42:11 +1100
-Subject: [PATCH] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <1386286149-2855-1-git-send-email-ynvich@gmail.com>
-References: <20131205043544.GA28580@kroah.com>
- <1386286149-2855-1-git-send-email-ynvich@gmail.com>
-Message-ID: <20131206024211.GK16425@us.netrek.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 6 Dec 2013 03:53:51 +0100
+Subject: Moschip MCS8142 SoC
+In-Reply-To: <CAGVrzcYWzb95j2qVKWqZ1iVrR9Ak8bX6ej8hZS_6TQ_eEBp+pg@mail.gmail.com>
+References: <OF433D4F00.CB35F8E7-ON86257C37.004F3E8D@rockwellcollins.com>
+ <201312060331.31958.arnd@arndb.de>
+ <CAGVrzcYWzb95j2qVKWqZ1iVrR9Ak8bX6ej8hZS_6TQ_eEBp+pg@mail.gmail.com>
+Message-ID: <201312060353.51538.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 03:28:37AM +0400, Sergei Ianovich wrote:
-> pxa2xx-uart was a separate uart platform driver. It was declaring
-> the same device names and numbers as 8250 driver. As a result,
-> it was impossible to use 8250 driver on PXA SoCs.
-> 
-> Upon closer examination pxa2xx-uart turned out to be a clone of
-> 8250_core driver.
+On Friday 06 December 2013, Florian Fainelli wrote:
+> I still plan on submitting support for the MCS8140 soon (just need some
+> home internet connection),
 
-[...]
+Ah, cool!
 
-> +/* Uart divisor latch write */
-> +static void serial_pxa_dl_write(struct uart_8250_port *up, int value)
-> +{
-> +	serial_out(up, UART_DLL, value & 0xff);
-> +	serial_out(up, UART_DLM, value >> 8 & 0xff);
-> +}
+> although due to the major CPU difference we will
+> probably have a hard time building the same kernel image for all MCS SoCs.
+> At least we should target MULTI_V4 and MULTI_V5.
 
-This is a change.  drivers/tty/serial/pxa.c did read back UART_DLL as
-an errata work around:
+I was wondering about this: Jonas had some problems with kernels that enable
+both ARM9 and FA526 support, IIRC. We didn't get to the bottom of this, but
+for all I can tell, the infrastructure should already be there to support
+a multiplatform kernel with any combination of ARMv4/v4t/v5 cores enabled.
 
-> -	/*
-> -	 * work around Errata #75 according to Intel(R) PXA27x Processor Family
-> -	 * Specification Update (Nov 2005)
-> -	 */
-> -	dll = serial_in(up, UART_DLL);
-> -	WARN_ON(dll != (quot & 0xff));
-
-If this is no longer needed, serial_pxa_dl_write can be removed
-because it is same as default_serial_dl_write.
-
-I did not check the other errata work arounds.
-
---
-James Cameron
-http://quozl.linux.org.au/
+	Arnd
