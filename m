@@ -1,32 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat,  7 Dec 2013 01:29:35 +0800
-Subject: [PATCH 02/10] net: stmmac: Honor DT parameter to force DMA store and
- forward mode
+Date: Sat,  7 Dec 2013 01:29:40 +0800
+Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
 In-Reply-To: <1386350983-13281-1-git-send-email-wens@csie.org>
 References: <1386350983-13281-1-git-send-email-wens@csie.org>
-Message-ID: <1386350983-13281-3-git-send-email-wens@csie.org>
+Message-ID: <1386350983-13281-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"snps,force_sf_dma_mode" is documented in stmmac device tree bindings,
-but is never handled by the driver.
+The CubieTruck uses the GMAC with an RGMII phy.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 51c9069..74c7aef 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -47,6 +47,7 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
- 		plat->bus_id = 0;
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 8a1009d..af212a2 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -33,6 +33,14 @@
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
++
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_rgmii>;
++			snps,phy-addr = <1>;
++			phy-mode = "rgmii";
++			status = "okay";
++		};
+ 	};
  
- 	of_property_read_u32(np, "snps,phy-addr", &plat->phy_addr);
-+	plat->force_sf_dma_mode = of_property_read_bool(np, "snps,force_sf_dma_mode");
- 
- 	plat->mdio_bus_data = devm_kzalloc(&pdev->dev,
- 					   sizeof(struct stmmac_mdio_bus_data),
+ 	leds {
 -- 
 1.8.5.1
