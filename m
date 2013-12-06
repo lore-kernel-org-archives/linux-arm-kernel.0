@@ -1,27 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Dec 2013 16:31:37 +0000
-Subject: [PATCH v2] ARM: add support for the Cortex-A12 processor
-In-Reply-To: <1386342282-8769-1-git-send-email-jonathan.austin@arm.com>
-References: <1386342282-8769-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <20131206163137.GC12376@mudshark.cambridge.arm.com>
+Date: Fri,  6 Dec 2013 16:34:05 +0000
+Subject: [PATCH] ARM: mcpm: remove redundant dsb instructions prior to sev
+Message-ID: <1386347645-16570-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 03:04:42PM +0000, Jonathan Austin wrote:
-> The A12 behaves as the A7/A15 does with respect to setting the SMP bit, and
-> doesn't require TLB ops broadcasting to be explicitly enabled like the A9 does.
-> 
-> Note that as the ACTLR cannot (usually) be written from non-secure, it is the
-> responsibility of the bootloader/firmware to set this bit per core - it is
-> done here in Linux as last resort in case of bad firmware.
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> ---
-> This V2 patch also adds A12 in asm/cputype.h, necessary for KVM, perf, among
-> other things.
+sync_cache_w already includes a dsb, so we can just use sev() directly
+then following a cache-sync.
 
-Ok, please put this in the patch system to supercede your eartlier version.
+Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+Hi guys,
+
+I was auditing our uses of wfe (they're all fine) but noticed these
+extra dsbs in the process.
 
 Will
+
+ arch/arm/common/mcpm_entry.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index 26020a03f659..74140ed9922f 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -167,7 +167,7 @@ void __mcpm_cpu_down(unsigned int cpu, unsigned int cluster)
+ 	dmb();
+ 	mcpm_sync.clusters[cluster].cpus[cpu].cpu = CPU_DOWN;
+ 	sync_cache_w(&mcpm_sync.clusters[cluster].cpus[cpu].cpu);
+-	dsb_sev();
++	sev();
+ }
+ 
+ /*
+@@ -183,7 +183,7 @@ void __mcpm_outbound_leave_critical(unsigned int cluster, int state)
+ 	dmb();
+ 	mcpm_sync.clusters[cluster].cluster = state;
+ 	sync_cache_w(&mcpm_sync.clusters[cluster].cluster);
+-	dsb_sev();
++	sev();
+ }
+ 
+ /*
+-- 
+1.8.2.2
