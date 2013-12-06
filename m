@@ -1,32 +1,70 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 06 Dec 2013 08:51:32 -0500
-Subject: [PATCH 1/3] arm64: add EFI stub
-In-Reply-To: <20131206133827.GB24997@rocoto.smurfnet.nu>
-References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
- <1385762712-17043-2-git-send-email-msalter@redhat.com>
- <20131205141853.GA974@darko.cambridge.arm.com>
- <1386254603.1861.120.camel@deneb.redhat.com>
- <20131205152806.GC974@darko.cambridge.arm.com>
- <20131206122511.301D6C40757@trevor.secretlab.ca>
- <1386336870.1861.155.camel@deneb.redhat.com>
- <20131206133827.GB24997@rocoto.smurfnet.nu>
-Message-ID: <1386337892.1861.158.camel@deneb.redhat.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 6 Dec 2013 16:52:50 +0200
+Subject: [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <52A0E357.7090008@ti.com>
+References: <1386037658-3161-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386037658-3161-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131203232445.GX8277@htj.dyndns.org> <52A0AB34.2030703@ti.com>,
+ <20131205165325.GA24062@mtj.dyndns.org>
+ <902E09E6452B0E43903E4F2D568737AB097B26B2@DNCE04.ent.ti.com>
+ <52A0E357.7090008@ti.com>
+Message-ID: <52A1E4C2.6020004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-12-06 at 14:38 +0100, Leif Lindholm wrote:
-> On Fri, Dec 06, 2013 at 08:34:30AM -0500, Mark Salter wrote:
-> > > Or just disable runtime services on the switch to big ending. Big endian
-> > > should not disable the stub (but getting it to work could be a follow-up
-> > > patch)
-> > > 
-> > The other problem with BE is that the PE/COFF masquerading is built into
-> > head.S so the same Image can be used for EFI and non-EFI. I don't see
-> > a BE opcode which we could us to provide the magic "MZ" at the start
-> > of a BE kernel Image.
-> 
-> That's actually not an issue.
-> Instructions are always LE - endinaness affects only data.
-> 
+On 12/05/2013 10:34 PM, Santosh Shilimkar wrote:
+> Grygorii,
+>
+> On Thursday 05 December 2013 01:48 PM, Strashko, Grygorii wrote:
+>> Hi Tejun,
+>>
+>>> On Thu, Dec 05, 2013 at 06:35:00PM +0200, Grygorii Strashko wrote:
+>>>>>> +#define memblock_virt_alloc_align(x, align) \
+>>>>>> +  memblock_virt_alloc_try_nid(x, align, BOOTMEM_LOW_LIMIT, \
+>>>>>> +                               BOOTMEM_ALLOC_ACCESSIBLE, MAX_NUMNODES)
+>>>>>
+>>>>> Also, do we really need this align variant separate when the caller
+>>>>> can simply specify 0 for the default?
+>>>>
+>>>> Unfortunately Yes.
+>>>> We need it to keep compatibility with bootmem/nobootmem
+>>>> which don't handle 0 as default align value.
+>>>
+>>> Hmm... why wouldn't just interpreting 0 to SMP_CACHE_BYTES in the
+>>> memblock_virt*() function work?
+>>>
+>>
+>> Problem is not with memblock_virt*(). The issue will happen in case if
+>> memblock or nobootmem are disabled in below code (memblock_virt*() is disabled).
+>>
+>> +/* Fall back to all the existing bootmem APIs */
+>> +#define memblock_virt_alloc(x) \
+>> +       __alloc_bootmem(x, SMP_CACHE_BYTES, BOOTMEM_LOW_LIMIT)
+>>
+>> which will be transformed to
+>> +/* Fall back to all the existing bootmem APIs */
+>> +#define memblock_virt_alloc(x, align) \
+>> +       __alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT)
+>>
+>> and used as
+>>
+>> memblock_virt_alloc(size, 0);
+>>
+>> so, by default bootmem code will use 0 as default alignment and not SMP_CACHE_BYTES
+>> and that is wrong.
+>>
+> Looks like you didn't understood the suggestion completely.
+> The fall back inline will look like below .....
+>
+> static inline memblock_virt_alloc(x, align)
+> {
+> 	if (align == 0)
+> 		align = SMP_CACHE_BYTES
+> 	__alloc_bootmem(x, align, BOOTMEM_LOW_LIMIT);
+> }
+>
 
-Oh right, I knew that. Time for coffee.
+I understand. thanks.
+
+Regards,
+-grygorii
