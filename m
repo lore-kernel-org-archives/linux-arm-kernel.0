@@ -1,48 +1,59 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 06 Dec 2013 15:31:49 +0800
-Subject: [GIT PULL][for 3.14] pull request for hisilicon clock driver
-In-Reply-To: <CAPtuhTibU4yTmoNdD-gsV6fp1gqMMjphvvHdCoF8a1r+zf_csA@mail.gmail.com>
-References: <529F0C4E.4080501@gmail.com>
- <CAPtuhTibU4yTmoNdD-gsV6fp1gqMMjphvvHdCoF8a1r+zf_csA@mail.gmail.com>
-Message-ID: <52A17D65.9000005@gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 06 Dec 2013 12:03:54 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxM11bIDIvNF0gdmlkZW86IGlteGZiOiBBbHNvIGFkZCBw?=
+ =?UTF-8?B?d21yIGZvciB0aGUgZGV2aWNlIHRyZWUu?=
+In-Reply-To: <20131206070525.GV24559@pengutronix.de>
+References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
+ <1386258219-26437-2-git-send-email-denis@eukrea.com>
+ <20131206070525.GV24559@pengutronix.de>
+Message-ID: <1386317034.190941796@f354.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2013 08:28 AM, Mike Turquette wrote:
-> On Wed, Dec 4, 2013 at 3:04 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->> Hi Mike,
->>
->> Please help to merge this hisilicon clock driver.
->>
->> Regards
->> Haojian
->>
->> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>
->>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>
->> are available in the git repository at:
->>
->> ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
->> tags/clk-hisilicon
->
-> Is there an anonymous ssh user that I can use to pull this? Otherwise
-> I cannot authenticate ;-)
->
-> Alternatively you could provide an https:// or git:// URI for me to pull.
->
-> Thanks!
-> Mike
->
+> On Thu, Dec 05, 2013 at 04:43:37PM +0100, Denis Carikli wrote:
+> > pwmr has to be set to get the imxfb backlight work,
+> > though pwmr was only configurable trough the platform data.
+> > 
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Cc: linux-fbdev at vger.kernel.org
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: Eric B?nard <eric@eukrea.com>
+> > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Acked-by: Grant Likely <grant.likely@linaro.org>
+> > ---
+> >  .../devicetree/bindings/video/fsl,imx-fb.txt       |    3 +++
+> >  drivers/video/imxfb.c                              |    2 ++
+> >  2 files changed, 5 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > index 46da08d..ac457ae 100644
+> > --- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > @@ -17,6 +17,9 @@ Required nodes:
+> >  Optional properties:
+> >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+> >  	register is not modified as recommended by the datasheet.
+> > +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
+> > +	optional, but defining it is necessary to get the backlight working. If that
+> > +	property is ommited, the register is zeroed.
+> 
+> Why isn't this implemented as a backlight driver? Static devicetree
+> provided values is very limiting.
 
-I'm sorry that I didn't notice the ssh protocol at here. Please use 
-these links instead.
+Let's understand the terminology.
+This register should be renamed according to the datasheet, i.e. LPCCR.
+As I pointed out earlier, it is NOT control the backlight, this is a contrast control.
+Yes, it works as PWM, but nothing do with the backlight subsystem.
+Yes, we can make a driver for this PWM, but how are we going to control it?
+I misunderstood something?
 
-git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-or
-https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-or
-https://kernel.googlesource.com/pub/scm/linux/kernel/git/hzhuang1/linux.git
-
-Thanks
-Haojian
+---
