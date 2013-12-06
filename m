@@ -1,20 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Dec 2013 12:58:21 +0100
-Subject: [PATCH] ARM: s3c24xx: get rid of custom <mach/gpio.h>
-In-Reply-To: <1386322280-23756-1-git-send-email-linus.walleij@linaro.org>
-References: <1386322280-23756-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdZuk3zzhDnj3wJg1cmuqX0Cj-qQ--sBzEEV_XWyeDje3w@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 6 Dec 2013 17:36:09 +0530
+Subject: [PATCH v2 0/2] usb: fix controller-PHY binding for OMAP3 platform
+Message-ID: <1386331571-30903-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 6, 2013 at 10:31 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+After the platform devices are created using PLATFORM_DEVID_AUTO, the
+device names given in usb_bind_phy (in board file) does not match with
+the actual device name causing the USB PHY library not to return the
+PHY reference when the MUSB controller request for the PHY in the non-dt boot
+case.
+So removed creating platform devices using PLATFORM_DEVID_AUTO in omap2430.c.
 
-> This isolates the custom S3C24xx GPIO definition table to
-> <linux/platform_data/gpio-samsung-s3x24xx.h>
+Changes from v1:
+* refreshed to the latested mainline kernel
+* added musb_put_id from omap2430 remove.
 
-Maybe I'm too trigger happy. I'll send a combined series with
-S3C24xx, S3C64xx and maybe also S5P variants all fixed
-so you can see the overall idea here. Hold on.
+Kishon Vijay Abraham I (2):
+  usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
+  arm: omap: remove *.auto* from device names given in usb_bind_phy
 
-Yours,
-Linus Walleij
+ arch/arm/mach-omap2/board-2430sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+ arch/arm/mach-omap2/board-ldp.c            |    2 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+ arch/arm/mach-omap2/board-omap3logic.c     |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+ arch/arm/mach-omap2/board-overo.c          |    2 +-
+ arch/arm/mach-omap2/board-rx51.c           |    2 +-
+ drivers/usb/musb/musb_core.c               |   31 +++++++++++++++++++++++++++-
+ drivers/usb/musb/musb_core.h               |    2 ++
+ drivers/usb/musb/omap2430.c                |   19 +++++++++++++++--
+ 15 files changed, 61 insertions(+), 15 deletions(-)
+
+-- 
+1.7.10.4
