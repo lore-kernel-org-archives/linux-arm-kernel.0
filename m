@@ -1,85 +1,37 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 5 Dec 2013 16:02:53 -0800
-Subject: [PATCH RFCv2 5/6] net: phy: suspend unused PHYs on mdio_bus in
- late_initcall
-In-Reply-To: <1386171888-28190-6-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1386171888-28190-6-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAGVrzcaY2WAhSRNHwR4+rm5h71Ayq3kHb-a269wRqQL+c_WSLQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 5 Dec 2013 16:06:10 -0800
+Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
+In-Reply-To: <CANsc=4Vb-2br+K51NWsyQV25R3eJo_=YfpnXsh1G1ecRVDYc3w@mail.gmail.com>
+References: <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
+ <20131204170703.GA14859@kroah.com>
+ <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
+ <20131204230239.GB9205@kroah.com>
+ <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
+ <20131205040104.GA14641@kroah.com>
+ <52A0DE42.3080602@codeaurora.org>
+ <20131205201659.GA14539@kroah.com>
+ <52A101F8.3060104@codeaurora.org>
+ <CANsc=4Vb-2br+K51NWsyQV25R3eJo_=YfpnXsh1G1ecRVDYc3w@mail.gmail.com>
+Message-ID: <20131206000610.GA30344@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/4 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
-> Since phy_attach ensures PHYs are resumed, we can now suspend all
-> PHYs that have no attached netdev after initcalls.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> RFCv1->RFCv2:
-> - only check for phydev->attached_dev and let phy_suspend decide on
->   performing suspend or not (Suggested by Florian)
->
-> @Florian: You suggested to 'make sure that the MDIO bus suspend policy
-> was set to "auto"'. I wasn't able to find any clue how to check that,
-> so I ignored that for now.
+On Thu, Dec 05, 2013 at 06:54:49PM -0500, Adrien Verg? wrote:
+> > Well, these patches were incorrect, so that's not really a valid
+> > question :)
+> 
+> Should I correct the pid size and send them again?
 
-I was looking at the sysfs knob which controls the auto suspend
-policy, but I am not sure myself how to query that from the kernel, so
-let's just forget about it.
+I'm not the ARM maintainer, so I can't say if I would reject them or
+not.
 
->
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Mugunthan V N <mugunthanvnm@ti.com>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/phy/mdio_bus.c |   25 +++++++++++++++++++++++++
->  1 files changed, 25 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-> index 5617876..f533d17 100644
-> --- a/drivers/net/phy/mdio_bus.c
-> +++ b/drivers/net/phy/mdio_bus.c
-> @@ -320,6 +320,31 @@ static int mdio_bus_match(struct device *dev, struct device_driver *drv)
->                 (phydev->phy_id & phydrv->phy_id_mask));
->  }
->
-> +static int mdio_bus_suspend_unused(struct device *busdev, void *data)
-> +{
-> +       struct mii_bus *bus = to_mii_bus(busdev);
-> +       struct phy_device *phydev;
-> +       int i;
-> +
-> +       for (i = 0; i < PHY_MAX_ADDR; i++) {
-> +               if (!bus->phy_map[i])
-> +                       continue;
-> +
-> +               phydev = to_phy_device(&bus->phy_map[i]->dev);
-> +               if (!phydev->attached_dev)
-> +                       phy_suspend(phydev);
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int mdio_bus_class_suspend_unused(void)
-> +{
-> +       return class_for_each_device(&mdio_bus_class, NULL, NULL,
-> +                                    mdio_bus_suspend_unused);
-> +}
-> +late_initcall_sync(mdio_bus_class_suspend_unused);
-> +
->  #ifdef CONFIG_PM
->
->  static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
-> --
-> 1.7.2.5
->
+And I don't know if you can fix up the pid issue due to namespaces, how
+are you going to specify the namespace of the pid you are interested in?
 
+Oh, and someone should fix up the sysfs files no matter what, they
+shouldn't be using "raw" kobjects, but that's not your issue.  I can
+send a patch to do that after your additions go in if needed.
 
+thanks,
 
--- 
-Florian
+greg k-h
