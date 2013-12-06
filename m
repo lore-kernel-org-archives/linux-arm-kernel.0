@@ -1,103 +1,65 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 6 Dec 2013 11:59:36 -0500 (EST)
-Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
-In-Reply-To: <201312061741.33427.arnd@arndb.de>
-References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
- <201312052250.38986.arnd@arndb.de>
- <CAL_JsqLf0Ubi55mc-p0-qPwY0LzHEZ-SF9QwcELkKPfZH=9t_g@mail.gmail.com>
- <201312061741.33427.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.10.1312061148200.15948@knanqh.ubzr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 6 Dec 2013 18:00:42 +0100
+Subject: [PATCH v2 1/6] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <52A1717D.7000001@gmail.com>
+References: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
+ <201312031601.04997.arnd@arndb.de> <52A1717D.7000001@gmail.com>
+Message-ID: <201312061800.42563.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Dec 2013, Arnd Bergmann wrote:
+On Friday 06 December 2013, Marc C wrote:
 
-> On Friday 06 December 2013, Rob Herring wrote:
-> > I assume we expect a v6 SMP kernel to run on a non-v6K v6 platform?
+> > This seems like stuff that should go into the device drivers for the
+> > respective hardware blocks, not into platform code.
 > 
-> Actually, as far as I can see:
-> 
-> config SMP
->         bool "Symmetric Multi-Processing"
->         depends on CPU_V6K || CPU_V7
->         depends on HAVE_SMP
-> 
-> This prevents you from building a plain v6 SMP kernel, and we've
-> had a variation of that since CONFIG_SMP was first marked non-BROKEN.
+> Understood. I'm not sure if you recall this [1] conversation, but short
+> of having a big array of registers offsets per chip ID (which will
+> probably grow to 10 or more), leveraging the DT to let the bootloader
+> tell the kernel these randomly-located registers are proved to be very
+> lightweight.
 
-I don't think the code currently support SMP if v6k is not available.
-Therefore...
+Right, but I didn't expect the code to look at these registers to be
+outside of a device-driver context.
+ 
+> Seems like there's one thing I could possibly factor out into a separate
+> driver... the registers that assert a chip reset (sw-master-reset-reg).
+> Maybe I could register a reset-controller driver specifically for this
+> purpose?
 
-> > if so, doing more digging I think we have a problem with
-> > __kuser_cmpxchg64 on a v6 only platform with v6K enabled in the
-> > kernel. Adding Nico since he wrote this. The code is ifdef'ed like
-> > this:
-> > 
-> > #if defined(CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG)
-> > (only true for pre-v6)
-> > ...
-> > #elif defined(CONFIG_CPU_32v6K)
-> > (true when v6K gets enabled)
-> > ...
-> > #elif !defined(CONFIG_SMP)
-> > #ifdef CONFIG_MMU
-> > (this is the correct condition for a v6 only platform)
-> > ...
-> > #else
-> > #warning "NPTL on non MMU needs fixing"
-> > ...
-> > #endif
-> > #else
-> > #error "incoherent kernel configuration"
-> > #endif
-> > 
-> > Any build with v6K enabled will get the double exclusive instructions
-> > which won't work on v6 only platforms. It seems we need some
-> > ALT_SMP/ALT_UP magic here.
-> 
-> The above code can already be simplified a lot, since the pre-v6 and
-> pre-v6k v6 cases are dead code. There are comments in Kconfig like this:
-> 
-> config TLS_REG_EMUL
->         bool
->         select NEED_KUSER_HELPERS
->         help
->           An SMP system using a pre-ARMv6 processor (there are apparently
->           a few prototypes like that in existence) and therefore access to
->           that required register must be emulated.
-> 
-> config NEEDS_SYSCALL_FOR_CMPXCHG
->         bool
->         select NEED_KUSER_HELPERS
->         help
->           SMP on a pre-ARMv6 processor?  Well OK then.
->           Forget about fast user space cmpxchg support.
->           It is just not possible.
-> 
-> 
-> added in a commit from Nico back in 2005:
-> 
->     [PATCH] ARM: 2663/1: straightify TLS register emulation a bit more
->     
->     Patch from Nicolas Pitre
->     
->     This better express things, and should cover RMK's weird SMP toys.
-> 
-> I don't know what "weird toys" he is referring to, but maybe he or Russell
-> can shed some light on that and whether we'd expect to see support for
-> them added in the future.
+I have not followed the latest developments regarding system-reset and
+where that is supposed to be handled, but I'm sure it's in some driver,
+probably drivers/power or drivers/reset.
 
-If my memory is right, Russell had a Versatile Express with one of the 
-first SMP implementations available on ARM which was based on a quad 
-ARM9 (ARMv5) core.  I'm pretty sure this is no longer in service, and 
-the current state of the kernel wouldn't accommodate it either.
+> > We try hard to avoid having register available this early and outside
+> > of device drivers. Can you try to make at least some (if not all) of
+> > these more regular, and provide specific comments in the code why this
+> > is not possible for the others?
+> 
+> Just to be sure, you're asking to reduce our dependence on touching
+> these machine-specific registers?
 
-> If anyone else but Russell were to propose
-> adding new platforms like those, I'd probably say no (or possibly
-> NOOOOoooo) anyway. 
+Not touching them at all would be preferred (e.g. if the boot loader
+could set them up to the correct per-board setting), but of course that
+doesn't work for run-time settings or system-reset.
 
-Such a platform would be broken wrt atomic operations across all cores 
-anyway.
+The most important part of my comment above is to have as little as
+possible done "early", i.e. before init_machine(). Beyond that, the
+preferred way to do any kind of register access from a device driver
+with an abstract platform-independent interface. We have added a number
+of new subsystems in the past few years (clk, irqchip, pinctrl, reset,
+clocksource, regmap, syscon, ...) along these lines, to the extent where
+most new platforms can now have an empty machine descriptor (if they
+can use the standard psci_smp_ops, I mentioned already that we need
+some more work to get non-standard smp_ops merged with cpuidle).
 
+Chances are that a lot of the registers you are trying to map here
+already have a subsystem that they can fit in as a device driver,
+or that they do something generic enough that we should add another
+subsystem to abstract them. If you need help figuring out which
+subsystem they should use, we should take a closer look at the actual
+register descriptions together. Is there a manual that is publically
+available?
 
-Nicolas
+	Arnd
