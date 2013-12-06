@@ -1,13 +1,19 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Dec 2013 17:50:40 +0000
-Subject: [GIT PULL] arm64 fixes for 3.13
-Message-ID: <20131206175032.GA30277@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Dec 2013 17:53:19 +0000
+Subject: [GIT PULL] iommu: arm/smmu: fixes for 3.13
+Message-ID: <20131206175319.GD8853@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Alex (CC'ing Joerg),
 
-Please pull the arm64 fixes below. Thanks.
+Please can you pull the following fixes to the arm/smmu driver for 3.13?
+
+Cheers,
+
+Will
+
+--->8
 
 The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
 
@@ -15,39 +21,19 @@ The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
 
-for you to fetch changes up to db4ed53cfe9f5a00355891a631d47dfa3fd4541f:
+for you to fetch changes up to 89a23cde75a7f0b3d8b0c156964eca0c23d2f1eb:
 
-  arm64: mm: Fix PMD_SECT_PROT_NONE definition (2013-12-06 17:22:44 +0000)
-
-----------------------------------------------------------------
-- Page table fixes (PROT_NONE, shareability attribute, TLB invalidation)
-- Secondary CPUs entry endianness fix
-- Make NR_CPUS default to 8
+  iommu/arm-smmu: fix error return code in arm_smmu_device_dt_probe() (2013-12-06 16:44:25 +0000)
 
 ----------------------------------------------------------------
-Catalin Marinas (1):
-      arm64: Fix memory shareability attribute for ioremap_wc/cache
+Wei Yongjun (1):
+      iommu/arm-smmu: fix error return code in arm_smmu_device_dt_probe()
 
-Lorenzo Pieralisi (1):
-      arm64: kernel: add code to set cpu boot mode to secondary_entry shim
+Will Deacon (2):
+      iommu/arm-smmu: use mutex instead of spinlock for locking page tables
+      iommu/arm-smmu: remove potential NULL dereference on mapping path
 
-Mark Rutland (1):
-      arm64: ensure completion of TLB invalidatation
-
-Rob Herring (1):
-      arm64: make default NR_CPUS 8
-
-Steve Capper (1):
-      arm64: mm: Fix PMD_SECT_PROT_NONE definition
-
- arch/arm64/Kconfig                     | 3 +--
- arch/arm64/include/asm/io.h            | 2 +-
- arch/arm64/include/asm/pgtable-hwdef.h | 2 +-
- arch/arm64/kernel/head.S               | 3 ++-
- arch/arm64/mm/proc.S                   | 2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
-
--- 
-Catalin
+ drivers/iommu/arm-smmu.c | 66 ++++++++++++++++++++----------------------------
+ 1 file changed, 28 insertions(+), 38 deletions(-)
