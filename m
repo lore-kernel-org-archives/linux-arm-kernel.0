@@ -1,26 +1,36 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 6 Dec 2013 14:14:04 +0100
-Subject: [PATCHv5][ 2/8] staging: imx-drm: Add RGB666 support for
- parallel display.
-In-Reply-To: <1386268092-21719-2-git-send-email-denis@eukrea.com>
+Date: Fri, 6 Dec 2013 14:23:25 +0100
+Subject: [PATCHv5][ 5/8] staging: imx-drm: parallel display: add
+ regulator support.
+In-Reply-To: <1386268092-21719-5-git-send-email-denis@eukrea.com>
 References: <1386268092-21719-1-git-send-email-denis@eukrea.com>
- <1386268092-21719-2-git-send-email-denis@eukrea.com>
-Message-ID: <20131206131403.GA30960@ulmo.nvidia.com>
+ <1386268092-21719-5-git-send-email-denis@eukrea.com>
+Message-ID: <20131206132324.GB30960@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 07:28:06PM +0100, Denis Carikli wrote:
+On Thu, Dec 05, 2013 at 07:28:09PM +0100, Denis Carikli wrote:
 [...]
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+> diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
 [...]
-> @@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
->  		return IPU_DC_MAP_BGR666;
->  	case V4L2_PIX_FMT_BGR24:
->  		return IPU_DC_MAP_BGR24;
-> +	case V4L2_PIX_FMT_RGB666:
-> +		return IPU_DC_MAP_RGB666;
+> @@ -260,6 +275,13 @@ static int imx_pd_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
+>  
+> +	imxpd->disp_reg = devm_regulator_get(&pdev->dev, "display");
+> +	if (PTR_ERR(imxpd->disp_reg) == -EPROBE_DEFER)
+> +		return -EPROBE_DEFER;
+> +
+> +	if (IS_ERR(imxpd->disp_reg))
+> +		dev_dbg(&pdev->dev, "Operating without display regulator.\n");
 
-Why is this DRM driver even using V4L2 pixel formats in the first place?
+I don't think this is necessary. There is code in the regulator core
+nowadays that supplies a dummy regulator if one hasn't been hooked up in
+devicetree explicitly. So any error that you get at this point is likely
+a valid one rather than just a missing regulator.
+
+The advantage is that you no longer have to check at every step of the
+way that the regulator is valid before calling the regulator API.
 
 Thierry
 -------------- next part --------------
@@ -29,4 +39,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/29376d8d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/b167f37c/attachment.sig>
