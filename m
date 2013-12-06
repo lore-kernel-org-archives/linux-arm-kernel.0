@@ -1,29 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 Dec 2013 23:50:03 +0100
-Subject: [PATCH v2 1/6] ARM: brcmstb: add infrastructure for ARM-based
- Broadcom STB SoCs
-In-Reply-To: <CAGVrzcYha7y2pQ-tFtu19ZAN3DVWVAJOt_0UPEU6e5KfuBnMjA@mail.gmail.com>
-References: <1385511748-27869-1-git-send-email-marc.ceeeee@gmail.com>
- <201312052107.07197.arnd@arndb.de>
- <CAGVrzcYha7y2pQ-tFtu19ZAN3DVWVAJOt_0UPEU6e5KfuBnMjA@mail.gmail.com>
-Message-ID: <201312062350.04133.arnd@arndb.de>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 07 Dec 2013 00:12:53 +0100
+Subject: [PATCHv0 0/3] ARM: mvebu: Enable NAND controller in NETGEAR ReadyNAS
+ .dts files
+Message-ID: <cover.1386370808.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 December 2013, Florian Fainelli wrote:
-> This BCHP_IRQ0 register is kind of special and only acts as an
-> interrupt forwarder. Not enabling the IRQEN bit will prevent the UART
-> interrupts to be raised at the GIC level. Now that I think about this
-> some more, we might just go with some sort of special node which
-> contains a mask of the interrupts and apply this mask to the
-> corresponding hardware register? There is no need for this to be
-> modelled as an interrupt controller because this really is not a real
-> one.
 
-Right, that would work. Unfortunately we need it rather early (before
-the console code starts), so I'm not sure where to best put the code
-for it. Any suggestions?
+Now that NAND controller support is available for Armada 370/XP
+(cb28e2537a6f: ARM: mvebu: Add support for NAND controller in
+Armada 370/XP), let's enable support for ReadyNAS boards.
 
-What else is in the same 4K register region?
+The three commits in this series all include the partitions
+definitions specific to each ReadyNAS variant as delivered
+by NETGEAR with standard images.
 
-	Arnd
+As described in similar commits 2be2bc39c6f0 (ARM: mvebu: Enable
+NAND controller in Armada XP GP board) and d8c552dddfbf (ARM: 
+mvebu: Enable NAND controller in Armada 370 Mirabox),
+"marvell,keep-config" parameter is used as current support does
+not allow for setting of timing parameters yet.
+
+Each patch has been tested on each specific device using Ezequiel's
+tree; last known bug having being fixed today.
+
+Jason, Ezequiel, this is a v0. I do not mind at all waiting for a
+heads up to repost it later when every bit of nand support is where
+it should be.
+
+Ezequiel, I have left a comment in the .dts file to indicate a lost
+reader that the last MB of last partition is in practice not
+writable.
+
+Cheers,
+
+a+
+
+Arnaud Ebalard (3):
+  ARM: mvebu: Enable NAND controller in NETGEAR ReadyNAS 102 .dts file
+  ARM: mvebu: Enable NAND controller in NETGEAR ReadyNAS 104 .dts file
+  ARM: mvebu: Enable NAND controller in NETGEAR ReadyNAS 2120 .dts file
+
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 36 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts | 36 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 36 ++++++++++++++++++++++++++
+ 3 files changed, 108 insertions(+)
+
+-- 
+1.8.4.4
