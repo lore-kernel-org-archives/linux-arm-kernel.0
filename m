@@ -1,61 +1,60 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 5 Dec 2013 16:08:44 -0800
-Subject: [PATCH RFCv2 3/6] net: phy: provide phy_resume/phy_suspend helpers
-In-Reply-To: <1386171888-28190-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu, 5 Dec 2013 16:16:32 -0800
+Subject: [PATCH RFCv2 0/6] net: phy: Ethernet PHY powerdown optimization
+In-Reply-To: <52A031EE.1040301@ti.com>
 References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1386171888-28190-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAGVrzcaTVbHCty2RWZM9jvETYVHV8fFRV1RXOYVauzf0-Arj7g@mail.gmail.com>
+ <1386171888-28190-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52A031EE.1040301@ti.com>
+Message-ID: <CAGVrzcYjcXfbYR7uyL1fAc2bdNhCUA9wAjZk4nsF2K0FRL2_pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/4 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
-> This adds helper functions to resume and suspend a given phy_device
-> by calling the corresponding driver callbacks if available.
+2013/12/4 Mugunthan V N <mugunthanvnm@ti.com>:
+> On Wednesday 04 December 2013 09:14 PM, Sebastian Hesselbarth wrote:
+>> This is v2 of an RFC sent earlier [1] to reduce power consumption of network
+>> PHYs with link that are either unused or the corresponding netdev is down.
+>>
+>> In contrast to RFCv1, this now integrates phy_suspend/phy_resume transparent
+>> to the netdev drivers. Also, phy_suspend now only suspends the PHY if WOL is
+>> disabled. Moreover, the phy state machine calls phy_suspend on entering
+>> HALTED state.
+>>
+>> Again, a branch with RFCv2 applied to v3.13-rc2 can also be found at
+>> https://github.com/shesselba/linux-dove.git topic/ethphy-power-rfc-v2
+>>
+>> [1] http://lwn.net/Articles/574426/
+>>
+>> Sebastian Hesselbarth (6):
+>>   net: mv643xx_eth: properly start/stop phy device
+>>   net: phy: marvell: provide genphy suspend/resume
+>>   net: phy: provide phy_resume/phy_suspend helpers
+>>   net: phy: resume/suspend PHYs on attach/detach
+>>   net: phy: suspend unused PHYs on mdio_bus in late_initcall
+>>   net: phy: suspend phydev when going to HALTED
+>>
+>>  drivers/net/ethernet/marvell/mv643xx_eth.c |    4 +++-
+>>  drivers/net/phy/marvell.c                  |   22 ++++++++++++++++++++++
+>>  drivers/net/phy/mdio_bus.c                 |   25 +++++++++++++++++++++++++
+>>  drivers/net/phy/phy.c                      |    6 +++++-
+>>  drivers/net/phy/phy_device.c               |   27 +++++++++++++++++++++++++++
+>>  include/linux/phy.h                        |    2 ++
+>>  6 files changed, 84 insertions(+), 2 deletions(-)
+>>
+>> ---
+>> Cc: David Miller <davem@davemloft.net>
+>> Cc: Florian Fainelli <f.fainelli@gmail.com>
+>> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+>> Cc: netdev at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+> Apart form Sergei's comment the patch series looks good to me.
 >
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> RFCv1->RFCv2:
-> - only suspend if WOL is not enabled
-> - remove EXPORT_SYMBOL for phy_suspend/resume
->
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Mugunthan V N <mugunthanvnm@ti.com>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/phy/phy_device.c |   24 ++++++++++++++++++++++++
->  include/linux/phy.h          |    2 ++
->  2 files changed, 26 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-> index d6447b3..6f0e9e4 100644
-> --- a/drivers/net/phy/phy_device.c
-> +++ b/drivers/net/phy/phy_device.c
-> @@ -625,6 +625,30 @@ void phy_detach(struct phy_device *phydev)
->  }
->  EXPORT_SYMBOL(phy_detach);
->
-> +int phy_suspend(struct phy_device *phydev)
-> +{
-> +       struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
-> +       struct ethtool_wolinfo wol;
-> +
-> +       /* If the device has WOL enabled, we cannot suspend the PHY */
-> +       wol.cmd = ETHTOOL_GWOL;
-> +       phy_ethtool_get_wol(phydev, &wol);
-> +       if (wol.wolopts)
-> +               return -EBUSY;
+> Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-I wonder if we should not set a flag in the phy device structure which
-says "someone called my phydrv->set_wol() callback, this succeeded and
-WoL is now enabled for me", rather than using this potentially racy
-call? This would have to be modified in phy_ethtool_set_wol() for
-instance?
+Looks good to me as well:
 
-This is kind of theoretical though as I can't picture a case where
-this sequence of events would happen in real-life.
---
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+
+Thanks Sebastian!
+-- 
 Florian
