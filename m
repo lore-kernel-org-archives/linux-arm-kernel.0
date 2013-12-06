@@ -1,39 +1,126 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Dec 2013 17:53:19 +0000
-Subject: [GIT PULL] iommu: arm/smmu: fixes for 3.13
-Message-ID: <20131206175319.GD8853@mudshark.cambridge.arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 6 Dec 2013 18:54:49 +0100
+Subject: [PATCH v3 2/3] arm: Add [U]EFI runtime services support
+In-Reply-To: <201312060259.48259.arnd@arndb.de>
+References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
+ <1385656883-4420-3-git-send-email-leif.lindholm@linaro.org>
+ <201312060259.48259.arnd@arndb.de>
+Message-ID: <20131206175449.GD24997@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex (CC'ing Joerg),
+Hi Arnd,
 
-Please can you pull the following fixes to the arm/smmu driver for 3.13?
+Thank you for your comments.
 
-Cheers,
+On Fri, Dec 06, 2013 at 02:59:48AM +0100, Arnd Bergmann wrote:
+> On Thursday 28 November 2013, Leif Lindholm wrote:
+> > @@ -898,6 +900,10 @@ void __init setup_arch(char **cmdline_p)
+> >  	sanity_check_meminfo();
+> >  	arm_memblock_init(&meminfo, mdesc);
+> >  
+> > +#ifdef CONFIG_EFI
+> > +	uefi_memblock_arm_reserve_range();
+> > +#endif
+> > +
+> 
+> Better use 
+> 
+> 	if (IS_ENABLED(CONFIG_EFI))
+> 
+> here for readability and better build-time checking of the interface when
+> CONFIG_EFI is disabled.
 
-Will
+I think I'll do what Grant suggested and stub it out in asm/uefi.h.
 
---->8
+> > +/*
+> > + * Returns 1 if 'facility' is enabled, 0 otherwise.
+> > + */
+> > +int efi_enabled(int facility)
+> > +{
+> > +	return test_bit(facility, &arm_uefi_facility) != 0;
+> > +}
+> > +EXPORT_SYMBOL(efi_enabled);
+> 
+> I'd use EXPORT_SYMBOL_GPL() unless there is a documented reason why
+> a symbol should be available to GPL-incompatible modules.
 
-The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
+So ... this is duplicating x86 code which Matt Fleming has promised
+to make generic. I'd prefer to keep it identical to x86 until this
+copy goes away.
 
-  Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
+> > +static __init int is_discardable_region(efi_memory_desc_t *md)
+> > +{
+> > +#ifdef KEEP_ALL_REGIONS
+> > +	return 0;
+> > +#endif
+> 
+> IS_ENABLED() again.
+ 
+Ok.
 
-are available in the git repository at:
+> > +	if (md->attribute & EFI_MEMORY_RUNTIME)
+> > +		return 0;
+> > +
+> > +	switch (md->type) {
+> > +#ifdef KEEP_BOOT_SERVICES_REGIONS
+> > +	case EFI_BOOT_SERVICES_CODE:
+> > +	case EFI_BOOT_SERVICES_DATA:
+> > +#endif
+> 
+> and I think it can be used here too:
+> 
+> 	switch (md->type) {
+> 	case EFI_BOOT_SERVICES_CODE:
+> 	case EFI_BOOT_SERVICES_DATA:
+> 		if (IS_ENABLED(KEEP_BOOT_SERVICES_REGIONS))
+> 			return 1;
+> 		/* fallthrough */
+> 	case EFI_ACPI_RECLAIM_MEMORY:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
+Will redesign for next version.
 
-for you to fetch changes up to 89a23cde75a7f0b3d8b0c156964eca0c23d2f1eb:
+> > +	memmap.phys_map = early_memremap((phys_addr_t)(u32) uefi_boot_mmap,
+> > +					 uefi_boot_mmap_size);
+> > +	if (!memmap.phys_map)
+> > +		return 1;
+> > +
+> > +	p = memmap.phys_map;
+> > +	e = (void *)((u32)p + uefi_boot_mmap_size);
+> 
+> You are doing a lot of type casts here, which is normally an indication
+> that you have the types wrong in some way. I can't spot a mistake
+> here, but maybe you can give it some more thought and see if it can be
+> changed.
 
-  iommu/arm-smmu: fix error return code in arm_smmu_device_dt_probe() (2013-12-06 16:44:25 +0000)
+Grant made much the same comments here. It is possible the change to
+the DT bindings to have all addresses 64-bit actually makes this go
+away. I will revisit for next version.
 
-----------------------------------------------------------------
-Wei Yongjun (1):
-      iommu/arm-smmu: fix error return code in arm_smmu_device_dt_probe()
+> > +static int __init remap_region(efi_memory_desc_t *md, efi_memory_desc_t *entry)
+> > +{
+> > +	u64 va;
+> > +	u64 paddr;
+> > +	u64 size;
+> > +
+> > +	*entry = *md;
+> > +	paddr = entry->phys_addr;
+> > +	size = entry->num_pages << EFI_PAGE_SHIFT;
+> > +
+> > +	/*
+> > +	 * Map everything writeback-capable as coherent memory,
+> > +	 * anything else as device.
+> > +	 */
+> > +	if (md->attribute & EFI_MEMORY_WB)
+> > +		va = (u64)((u32)uefi_remap(paddr, size) & 0xffffffffUL);
+> > +	else
+> > +		va = (u64)((u32)uefi_ioremap(paddr, size) & 0xffffffffUL);
+> 
+> Same here. Why is 'va' a u64?
 
-Will Deacon (2):
-      iommu/arm-smmu: use mutex instead of spinlock for locking page tables
-      iommu/arm-smmu: remove potential NULL dereference on mapping path
+Because the field in the structure (defined by UEFI) is 64-bit:
 
- drivers/iommu/arm-smmu.c | 66 ++++++++++++++++++++----------------------------
- 1 file changed, 28 insertions(+), 38 deletions(-)
+        entry->virt_addr = va;
+
+/
+    Leif
