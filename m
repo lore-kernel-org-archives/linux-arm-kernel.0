@@ -1,55 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 6 Dec 2013 15:08:35 -0600
-Subject: [PATCH v2 2/2] arm: omap: remove *.auto* from device names given
- in usb_bind_phy
-In-Reply-To: <CABxcv=n67gNq6ayx+t_mfZ0++UBKkXpH9avXvRKFEH4VUrwy0g@mail.gmail.com>
-References: <1386331571-30903-1-git-send-email-kishon@ti.com>
- <1386331571-30903-3-git-send-email-kishon@ti.com>
- <CABxcv=n67gNq6ayx+t_mfZ0++UBKkXpH9avXvRKFEH4VUrwy0g@mail.gmail.com>
-Message-ID: <20131206210835.GM21086@saruman.home>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 6 Dec 2013 13:09:06 -0800
+Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
+In-Reply-To: <1386350983-13281-8-git-send-email-wens@csie.org>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-8-git-send-email-wens@csie.org>
+Message-ID: <CAGVrzcb_r9_p4urz4XkE2A-G85KAHJa4PJ=Gt9a4RPYQNJ6j0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2013/12/6 Chen-Yu Tsai <wens@csie.org>:
+> The CubieTruck uses the GMAC with an RGMII phy.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index 8a1009d..af212a2 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -33,6 +33,14 @@
+>                         pinctrl-0 = <&uart0_pins_a>;
+>                         status = "okay";
+>                 };
+> +
+> +               gmac: ethernet at 01c50000 {
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&gmac_pins_rgmii>;
+> +                       snps,phy-addr = <1>;
 
-On Fri, Dec 06, 2013 at 01:14:38PM +0100, Javier Martinez Canillas wrote:
-> On Fri, Dec 6, 2013 at 1:06 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> > Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
-> > MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
-> > device name of the controller had *.auto* in it. Since with using
-> > PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
-> > the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
-> > So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
-> > change is done in board file here.
-> >
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/board-2430sdp.c        |    2 +-
-> >  arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
-> >  arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
-> >  arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
-> >  arch/arm/mach-omap2/board-ldp.c            |    2 +-
-> >  arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
-> >  arch/arm/mach-omap2/board-omap3logic.c     |    2 +-
-> >  arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
-> >  arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
-> >  arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
-> >  arch/arm/mach-omap2/board-overo.c          |    2 +-
-> >  arch/arm/mach-omap2/board-rx51.c           |    2 +-
-> >  12 files changed, 12 insertions(+), 12 deletions(-)
-> >
-> 
-> You can drop this patch since boards files are being removed for v3.14
+What is this snps,phy-addr property? Why is not a standard device tree
+node for an Ethernet PHY node used?
 
-if we can drop this patch, the whole series is invalid, since we'll be
-using DT phandles to find PHYs going forward, no ?
+> +                       phy-mode = "rgmii";
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/25469874/attachment.sig>
+Especially since you use the relatively standard "phy-mode" property here?
+--
+Florian
