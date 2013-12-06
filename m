@@ -1,27 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 Dec 2013 03:53:51 +0100
-Subject: Moschip MCS8142 SoC
-In-Reply-To: <CAGVrzcYWzb95j2qVKWqZ1iVrR9Ak8bX6ej8hZS_6TQ_eEBp+pg@mail.gmail.com>
-References: <OF433D4F00.CB35F8E7-ON86257C37.004F3E8D@rockwellcollins.com>
- <201312060331.31958.arnd@arndb.de>
- <CAGVrzcYWzb95j2qVKWqZ1iVrR9Ak8bX6ej8hZS_6TQ_eEBp+pg@mail.gmail.com>
-Message-ID: <201312060353.51538.arnd@arndb.de>
+From: quozl@laptop.org (James Cameron)
+Date: Fri, 6 Dec 2013 13:55:41 +1100
+Subject: [PATCH] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <20131206003851.GI16425@us.netrek.org>
+References: <20131205043544.GA28580@kroah.com>
+ <1386286149-2855-1-git-send-email-ynvich@gmail.com>
+ <20131206003851.GI16425@us.netrek.org>
+Message-ID: <20131206025541.GL16425@us.netrek.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 December 2013, Florian Fainelli wrote:
-> I still plan on submitting support for the MCS8140 soon (just need some
-> home internet connection),
+On Fri, Dec 06, 2013 at 11:38:51AM +1100, James Cameron wrote:
+> On Fri, Dec 06, 2013 at 03:28:37AM +0400, Sergei Ianovich wrote:
+> > pxa2xx-uart was a separate uart platform driver. It was declaring
+> > the same device names and numbers as 8250 driver. As a result,
+> > it was impossible to use 8250 driver on PXA SoCs.
+> > 
+> > Upon closer examination pxa2xx-uart turned out to be a clone of
+> > 8250_core driver.
+> 
+> I'm testing this backported to 3.5 on the OLPC XO-4 [1] [2].
+> 
+> As Russell says, the getty had to change, but after that the shell
+> worked fine; no more or no less responsive.
+> 
+> What hasn't worked yet is the console; no kernel messages appear.  I
+> have tried changing command line to console=ttyS0,115200.
 
-Ah, cool!
+My error.  Our kernel had CONFIG_CMDLINE set, changing that fixed it.
+Console is working fine.
 
-> although due to the major CPU difference we will
-> probably have a hard time building the same kernel image for all MCS SoCs.
-> At least we should target MULTI_V4 and MULTI_V5.
-
-I was wondering about this: Jonas had some problems with kernels that enable
-both ARM9 and FA526 support, IIRC. We didn't get to the bottom of this, but
-for all I can tell, the infrastructure should already be there to support
-a multiplatform kernel with any combination of ARMv4/v4t/v5 cores enabled.
-
-	Arnd
+-- 
+James Cameron
+http://quozl.linux.org.au/
