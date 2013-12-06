@@ -1,60 +1,63 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 6 Dec 2013 13:10:19 -0800
-Subject: [PATCH 08/10] ARM: dts: sun7i: cubieboard2: Enable GMAC instead
- of EMAC
-In-Reply-To: <1386350983-13281-9-git-send-email-wens@csie.org>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-9-git-send-email-wens@csie.org>
-Message-ID: <CAGVrzcYhA1S17AP8tO8m0Mjt3z=qq6feziOkwi2BwEuSPU=9Rw@mail.gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 6 Dec 2013 13:16:00 -0800
+Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
+In-Reply-To: <201312040222.03604.arnd@arndb.de>
+References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
+ <201311292208.26215.arnd@arndb.de> <529E1A49.6050808@wwwdotorg.org>
+ <201312040222.03604.arnd@arndb.de>
+Message-ID: <CAPcyv4giXy++b6BJi8nNKEEY8PC-_4ATAH0_bN-YSOVH+8CaLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/6 Chen-Yu Tsai <wens@csie.org>:
-> GMAC has better performance and fewer hardware issues.
-> Use the GMAC in MII mode for ethernet instead of the EMAC.
+On Tue, Dec 3, 2013 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 03 December 2013, Stephen Warren wrote:
+>> On 11/29/2013 02:08 PM, Arnd Bergmann wrote:
 >
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 23 ++++++++---------------
->  1 file changed, 8 insertions(+), 15 deletions(-)
+>> > Can you try coming up with a different method to achieve the same
+>> > where you use a different helper from the driver specific xlate
+>> > function that does not require a callback?
+>> >
+>> > I think dma_get_slave_channel is great if you have one channel per
+>> > request line and you can directly look up the channel from the
+>> > DT data, but it is not good if you have pick a channel and work
+>> > around the race.
+>>
+>> Hmm. Can you take a look at "[PATCH V4] dma: add
+>> dma_get_any_slave_channel(), for use in of_xlate()" at the link below.
+>> It still implements this via xlate, but I don't see any benefit in
+>> making drivers use a different API to request slave channels based on
+>> how the DMA controller works.
+>>
+>> http://lkml.org/lkml/2013/11/26/408
+>>
 >
-> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> index 5c51cb8..9ef5848 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> @@ -19,21 +19,6 @@
->         compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
+> Yes, I think that is good. I can think of a few variations of that
+> that I would prefer slightly over your code, but it's essentially
+> what I had in mind and I'm fine with that version getting merged
+> as well. Here are my ideas for further improvements, I'll leave
+> it up to you and the dmaengine maintainers to decide what to do
+> about them:
 >
->         soc at 01c00000 {
-> -               emac: ethernet at 01c0b000 {
-> -                       pinctrl-names = "default";
-> -                       pinctrl-0 = <&emac_pins_a>;
-> -                       phy = <&phy1>;
-> -                       status = "okay";
-> -               };
-> -
-> -               mdio at 01c0b080 {
-> -                       status = "okay";
-> -
-> -                       phy1: ethernet-phy at 1 {
-> -                               reg = <1>;
-> -                       };
-> -               };
-> -
->                 pinctrl at 01c20800 {
->                         led_pins_cubieboard2: led_pins at 0 {
->                                 allwinner,pins = "PH20", "PH21";
-> @@ -60,6 +45,14 @@
->                         pinctrl-0 = <&i2c1_pins_a>;
->                         status = "okay";
->                 };
-> +
-> +               gmac: ethernet at 01c50000 {
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&gmac_pins_mii>;
-> +                       snps,phy-addr = <1>;
+> * Rather than calling private_candidate(), open-code the part you
+>   need and remove the pointless dma_cap_mask comparison:
+>
+>         err = -EBUSY;
+>         list_for_each_entry(chan, &dev->channels, device_node) {
+>                 if (!chan->client_count) {
+>                         err = dma_chan_get(chan);
+>                         break;
+>                 }
+>         }
+>
+> * Merge the new function with dma_get_slave_channel(). They really
+>   do different things, but I think it still makes sense as an API
+>   to require to always pass the dma_device pointer, and drivers
+>   that want to get an arbitrary channel can just pass NULL as the
+>   channel pointer.
+>
 
-Same here, this is a custom property which has no reason to exist,
-keep the existing ethernet PHY node please.
--- 
-Florian
+* nod.
+
+I have a similar reaction to dma_request_channel().  There should be
+more than enough use case to find some common ground and reduce the
+need for magic filter routines.
